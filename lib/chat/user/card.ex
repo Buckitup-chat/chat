@@ -3,11 +3,12 @@ defmodule Chat.User.Card do
 
   alias Chat.User.Identity
 
+  @derive {Inspect, only: [:name, :id]}
   defstruct [:name, :id, :pub_key]
 
   def from_identity(%Identity{} = identity) do
     %__MODULE__{
-      id: identity.id,
+      id: UUID.uuid4(),
       name: identity.name,
       pub_key: Identity.pub_key(identity)
     }

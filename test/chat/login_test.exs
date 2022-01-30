@@ -24,5 +24,21 @@ defmodule Chat.LoginTest do
     assert User.encrypt(message, alice_card) != message
 
     assert ^message = message |> User.encrypt(alice_card) |> User.decrypt(alice)
+
+    assert ~s|#Chat.User.Identity<name: "#{alice.name}", ...>| == inspect(alice)
+
+    assert ~s|#Chat.User.Card<id: "#{alice_card.id}", name: "#{alice_card.name}", ...>| ==
+             inspect(alice_card)
+  end
+
+  test "device codec" do
+    alice = "Alice" |> User.login()
+
+    decoded =
+      alice
+      |> User.device_encode()
+      |> User.device_decode()
+
+    assert {^alice, []} = decoded
   end
 end

@@ -25,6 +25,13 @@ import "phoenix_html"
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
+import * as LocalStateStore from "./hooks/local-storage"
+
+
+
+let Hooks = {}
+
+Hooks.LocalStateStore = LocalStateStore.hooks
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
@@ -32,6 +39,7 @@ let liveSocket = new LiveSocket("/live", Socket, {
       locale: Intl.NumberFormat().resolvedOptions().locale,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       timezone_offset: -(new Date().getTimezoneOffset() / 60),
+      hooks: Hooks
 })
 
 // Show progress bar on live navigation and form submits

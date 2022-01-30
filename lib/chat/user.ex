@@ -3,6 +3,7 @@ defmodule Chat.User do
 
   alias Chat.User.Card
   alias Chat.User.Identity
+  alias Chat.User.LocalStorage
   alias Chat.User.Registry
 
   def encrypt(text, %Card{pub_key: key}) do
@@ -19,4 +20,7 @@ defmodule Chat.User do
   def register(%Identity{} = identity), do: Registry.enlist(identity)
 
   def list, do: Registry.all()
+
+  def device_encode(%Identity{} = identity, rooms \\ []), do: LocalStorage.encode(identity, rooms)
+  def device_decode(data), do: LocalStorage.decode(data)
 end

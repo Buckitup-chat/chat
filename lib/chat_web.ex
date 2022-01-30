@@ -48,6 +48,7 @@ defmodule ChatWeb do
         layout: {ChatWeb.LayoutView, "live.html"}
 
       unquote(view_helpers())
+      unquote(live_helpers())
     end
   end
 
@@ -56,6 +57,7 @@ defmodule ChatWeb do
       use Phoenix.LiveComponent
 
       unquote(view_helpers())
+      unquote(live_helpers())
     end
   end
 
@@ -91,6 +93,7 @@ defmodule ChatWeb do
 
       # Import LiveView and .heex helpers (live_render, live_patch, <.form>, etc)
       import Phoenix.LiveView.Helpers
+      import ChatWeb.LiveHelpers
 
       # Import basic rendering functionality (render, render_layout, etc)
       import Phoenix.View
@@ -98,6 +101,14 @@ defmodule ChatWeb do
       import ChatWeb.ErrorHelpers
       import ChatWeb.Gettext
       alias ChatWeb.Router.Helpers, as: Routes
+    end
+  end
+
+  defp live_helpers do
+    quote do
+      defp ok(x), do: {:ok, x}
+
+      defp noreply(x), do: {:noreply, x}
     end
   end
 

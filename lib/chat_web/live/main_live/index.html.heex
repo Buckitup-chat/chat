@@ -1,0 +1,34 @@
+<div style="display: none;" id="session-link" phx-hook="LocalStateStore"></div>
+<%= unless connected?(@socket) do %>
+
+<% else %>
+
+
+<%= if @need_login do %>
+<div class="phx-hero">
+  <.form
+    let={f}
+    for={:login}
+    id="login-form"
+    phx-submit="login">
+  
+    <%= text_input f, :name, placeholder: "Your name" %>
+    <%= error_tag f, :name %>
+  
+    <div>
+      <%= submit "Login", phx_disable_with: "Saving..." %>
+    </div>
+  </.form>
+</div> 
+<% else %>
+  Hello, <%= @me.name %>
+  <div>
+    <pre>
+      <%#= inspect(@users, pretty: true) %>
+    </pre>
+  </div>
+<% end%>
+
+<% end %>
+
+

@@ -1,12 +1,12 @@
 defmodule Chat.User.Identity do
   @moduledoc "User Identity to be stored on user device"
 
-  defstruct [:id, :name, :priv_key]
+  @derive {Inspect, only: [:name]}
+  defstruct [:name, :priv_key]
 
   def create(name) do
     %__MODULE__{
       name: name,
-      id: UUID.uuid4(),
       priv_key: generate_key()
     }
   end

@@ -13,6 +13,10 @@ defmodule Chat.User.Registry do
 
   def all, do: GenServer.call(__MODULE__, :all)
 
+  def start_link(opts) do
+    GenServer.start_link(__MODULE__, :ok, opts)
+  end
+
   ### Implementation
 
   @impl true
@@ -26,9 +30,9 @@ defmodule Chat.User.Registry do
   end
 
   @impl true
-  def handle_call({:enlist, %Identity{} = user}, _, %{list: list}) do
-    key = Identity.pub_key(user)
-
-    {:reply, :ok, Map.put(list, key, Card.from_identity(user))}
+  def handle_call({:enlist, %Identity{} = user}, _, %{list: list} = state) do
+    card = Card.from_identity(user)
+    new_list = Map.put(list, card.pub_key, card)
+    {:reply, card.id, %{state | list: new_list}}
   end
 end

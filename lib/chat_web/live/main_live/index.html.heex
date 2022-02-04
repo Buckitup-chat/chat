@@ -21,12 +21,20 @@
   </.form>
 </div> 
 <% else %>
-  Hello, <%= @me.name %>
-  <div>
-    <pre>
-      <%#= inspect(@users, pretty: true) %>
-    </pre>
-  </div>
+    <h2> User list </h2>
+    <ul>
+    <%= for user <- @users do %>
+      <%= if user.id == @my_id do %>
+        <li><i><%= user.name %></i></li>
+      <% else %>
+        <li>
+          <a href="javascript:void(0)" phx-click="open-chat" phx-value-user-id={user.id}>
+            <%= user.name %>
+          </a>
+        </li>
+        <% end %>
+    <% end %>
+    </ul>
 <% end%>
 
 <% end %>

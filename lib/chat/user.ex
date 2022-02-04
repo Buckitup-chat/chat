@@ -6,9 +6,8 @@ defmodule Chat.User do
   alias Chat.User.LocalStorage
   alias Chat.User.Registry
 
-  def encrypt(text, %Card{pub_key: key}) do
-    :public_key.encrypt_public(text, key)
-  end
+  def encrypt(text, %Card{pub_key: key}), do: encrypt(text, key)
+  def encrypt(text, key), do: :public_key.encrypt_public(text, key)
 
   def decrypt(ciphertext, %Identity{priv_key: key}) do
     :public_key.decrypt_private(ciphertext, key)
@@ -19,8 +18,15 @@ defmodule Chat.User do
 
   def register(%Identity{} = identity), do: Registry.enlist(identity)
 
-  def list, do: Registry.all()
+  def list,
+    do:
+      Registry.all()
+      |> Map.values()
+      |> Enum.sort_by(&"#{&1.name} #{&1.id}")
 
   def device_encode(%Identity{} = identity, rooms \\ []), do: LocalStorage.encode(identity, rooms)
   def device_decode(data), do: LocalStorage.decode(data)
+
+  def pub_key(%Card{pub_key: key}), do: key
+  def pub_key(%Identity{} = identity), do: identity |> Identity.pub_key()
 end

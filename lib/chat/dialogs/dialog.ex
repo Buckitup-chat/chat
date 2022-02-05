@@ -4,6 +4,7 @@ defmodule Chat.Dialogs.Dialog do
   alias Chat.User
 
   alias Chat.Dialogs.Message
+  alias Chat.Dialogs.PrivateMessage
 
   @derive {Inspect, only: [:messages]}
   defstruct [:a_key, :b_key, :messages]
@@ -19,15 +20,64 @@ defmodule Chat.Dialogs.Dialog do
   def add_text(
         %__MODULE__{a_key: a_key, b_key: b_key} = dialog,
         %User.Identity{} = source,
-        text
+        text,
+        now \\ DateTime.utc_now()
       ) do
     new_messsage =
       case source |> User.pub_key() do
-        ^a_key -> Message.a_to_b(User.encrypt(text, a_key), User.encrypt(text, b_key))
-        ^b_key -> Message.b_to_a(User.encrypt(text, a_key), User.encrypt(text, b_key))
+        ^a_key -> Message.a_to_b(User.encrypt(text, a_key), User.encrypt(text, b_key), now)
+        ^b_key -> Message.b_to_a(User.encrypt(text, a_key), User.encrypt(text, b_key), now)
         _ -> raise "unknown_user_in_dialog"
       end
 
     %{dialog | messages: [new_messsage | dialog.messages]}
+  end
+
+  def read(
+        %__MODULE__{messages: messages, a_key: a_key, b_key: b_key},
+        %User.Identity{} = me,
+        before \\ DateTime.utc_now() |> DateTime.to_unix(),
+        amount \\ 100
+      ) do
+    side =
+      case me |> User.pub_key() do
+        ^a_key -> :a_copy
+        ^b_key -> :b_copy
+        _ -> raise "unknown_user_in_dialog"
+      end
+
+    messages
+    |> Enum.reduce_while({[], nil, amount}, fn
+      %{timestamp: last_timestamp} = msg, {acc, last_timestamp, amount} ->
+        {:cont, {[msg | acc], last_timestamp, amount - 1}}
+
+      _, {_, _, amount} = acc when amount < 1 ->
+        {:halt, acc}
+
+      %{timestamp: timestamp} = msg, {acc, _, amount} when timestamp < before ->
+        {:cont, {[msg | acc], timestamp, amount - 1}}
+
+      _, acc ->
+        {:cont, acc}
+    end)
+    |> then(&elem(&1, 0))
+    |> Enum.map(fn msg ->
+      is_mine? = (side == :a_copy and msg.is_a_to_b?) or (side == :b_copy and !msg.is_a_to_b?)
+
+      %PrivateMessage{
+        timestamp: msg.timestamp,
+        type: msg.type,
+        is_mine?: is_mine?,
+        content: msg[side] |> User.decrypt(me)
+      }
+    end)
+  end
+
+  def peer_pub_key(%__MODULE__{a_key: a_key, b_key: b_key}, %User.Identity{} = me) do
+    case me |> User.pub_key() do
+      ^a_key -> b_key
+      ^b_key -> a_key
+      _ -> raise "unknown_user_in_dialog"
+    end
   end
 end

@@ -24,6 +24,16 @@ defmodule Chat.User do
       |> Map.values()
       |> Enum.sort_by(&"#{&1.name} #{&1.id}")
 
+  def by_id(id) do
+    Registry.all()
+    |> Enum.find_value(fn {_, card} -> card.id == id && card end)
+  end
+
+  def by_key(pub_key) do
+    Registry.all()
+    |> Map.get(pub_key)
+  end
+
   def device_encode(%Identity{} = identity, rooms \\ []), do: LocalStorage.encode(identity, rooms)
   def device_decode(data), do: LocalStorage.decode(data)
 

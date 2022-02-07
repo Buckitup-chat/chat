@@ -80,4 +80,8 @@ defmodule Chat.Dialogs.Dialog do
       _ -> raise "unknown_user_in_dialog"
     end
   end
+
+  def glimpse(%__MODULE__{messages: [last | _]} = dialog) do
+    %{dialog | messages: [last]}
+  end
 end

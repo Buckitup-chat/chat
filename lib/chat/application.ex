@@ -16,7 +16,8 @@ defmodule Chat.Application do
       ChatWeb.Endpoint,
       # Start a worker by calling: Chat.Worker.start_link(arg)
       # {Chat.Worker, arg}
-      {Chat.User.Registry, name: Chat.User.Registry}
+      {Chat.User.Registry, name: Chat.User.Registry},
+      Chat.Dialogs.Registry
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

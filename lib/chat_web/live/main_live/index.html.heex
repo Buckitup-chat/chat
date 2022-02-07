@@ -21,6 +21,7 @@
   </.form>
 </div> 
 <% else %>
+  <%= if @mode == :user_list do %>
     <h2> User list </h2>
     <ul>
     <%= for user <- @users do %>
@@ -28,15 +29,49 @@
         <li><i><%= user.name %></i></li>
       <% else %>
         <li>
-          <a href="javascript:void(0)" phx-click="open-chat" phx-value-user-id={user.id}>
+          <a href="javascript:void(0)" phx-click="open-dialog" phx-value-user-id={user.id}>
             <%= user.name %>
           </a>
         </li>
         <% end %>
     <% end %>
     </ul>
+  <% end %>
+  <%= if @mode == :dialog do %>
+    <div id="dialog-mode">
+      <button class="button button-outline float-right" phx-click="close-dialog">Back</button>
+      <h1>Dialog with <%= @peer.name %></h1>
+      <div id="dialog-messages" phx-update={@message_update_mode}>
+      <%= for msg <- @messages do %>
+        <div class="row" id={"dialog-message-#{UUID.uuid4()}"}>
+          <div class={msg.is_mine? && "column column-75 column-offset-25 text-right" || "column column-75" }>
+            <span title={msg.timestamp |> DateTime.from_unix!()}><%= msg.content %></span>
+          </div>
+        </div> 
+      <% end %>
+      </div>
+      <.form
+        let={di}
+        for={:dialog}
+        id="dialog-form"
+        phx-submit={ JS.push("dialog-message") |> JS.dispatch("dialog:clear", to: "#dialog-input")}
+        class="text-right row"
+      >
+        <div class="column column-50 column-offset-50">
+          <%= text_input di, :text,
+              placeholder: "New message",
+              class: "text-right",
+              id: "dialog-input",
+              spellcheck: "false",
+              autocomplete: "off",
+              maxlength: 210
+          %> 
+          <%= submit "Send", phx_disable_with: "..." %>
+        </div>
+      </.form>
+    </div>
+  <% end %>
 <% end%>
-
 <% end %>
 
 

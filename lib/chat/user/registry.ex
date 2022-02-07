@@ -30,9 +30,21 @@ defmodule Chat.User.Registry do
   end
 
   @impl true
-  def handle_call({:enlist, %Identity{} = user}, _, %{list: list} = state) do
-    card = Card.from_identity(user)
-    new_list = Map.put(list, card.pub_key, card)
-    {:reply, card.id, %{state | list: new_list}}
+  def handle_call({:enlist, %Identity{name: name} = user}, _, %{list: list} = state) do
+    key = user |> Identity.pub_key()
+
+    case Map.get(list, key) do
+      nil ->
+        card = Card.from_identity(user)
+        new_list = Map.put(list, card.pub_key, card)
+        {:reply, card.id, %{state | list: new_list}}
+
+      %Card{name: card_name} = card when name != card_name ->
+        new_list = Map.put(list, card.pub_key, %{card | name: name})
+        {:reply, card.id, %{state | list: new_list}}
+
+      card ->
+        {:reply, card.id, state}
+    end
   end
 end

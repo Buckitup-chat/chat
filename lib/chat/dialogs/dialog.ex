@@ -1,6 +1,7 @@
 defmodule Chat.Dialogs.Dialog do
   @moduledoc "Module to hold a conversation between A and B"
 
+  alias Chat.Images
   alias Chat.User
 
   alias Chat.Dialogs.Message
@@ -18,19 +19,27 @@ defmodule Chat.Dialogs.Dialog do
   end
 
   def add_text(
-        %__MODULE__{a_key: a_key, b_key: b_key} = dialog,
+        %__MODULE__{} = dialog,
         %User.Identity{} = source,
         text,
         now \\ DateTime.utc_now()
       ) do
-    new_messsage =
-      case source |> User.pub_key() do
-        ^a_key -> Message.a_to_b(User.encrypt(text, a_key), User.encrypt(text, b_key), now)
-        ^b_key -> Message.b_to_a(User.encrypt(text, a_key), User.encrypt(text, b_key), now)
-        _ -> raise "unknown_user_in_dialog"
-      end
+    add_message(dialog, source, text, now: now, type: :text)
+  end
 
-    %{dialog | messages: [new_messsage | dialog.messages]}
+  def add_image(
+        %__MODULE__{} = dialog,
+        %User.Identity{} = source,
+        data,
+        now \\ DateTime.utc_now()
+      ) do
+    {key, secret} = Images.add(data)
+
+    msg =
+      %{key => secret |> Base.encode64()}
+      |> Jason.encode!()
+
+    add_message(dialog, source, msg, now: now, type: :image)
   end
 
   def read(
@@ -83,5 +92,21 @@ defmodule Chat.Dialogs.Dialog do
 
   def glimpse(%__MODULE__{messages: [last | _]} = dialog) do
     %{dialog | messages: [last]}
+  end
+
+  defp add_message(
+         %__MODULE__{a_key: a_key, b_key: b_key} = dialog,
+         %User.Identity{} = source,
+         msg,
+         opts
+       ) do
+    new_messsage =
+      case source |> User.pub_key() do
+        ^a_key -> Message.a_to_b(User.encrypt(msg, a_key), User.encrypt(msg, b_key), opts)
+        ^b_key -> Message.b_to_a(User.encrypt(msg, a_key), User.encrypt(msg, b_key), opts)
+        _ -> raise "unknown_user_in_dialog"
+      end
+
+    %{dialog | messages: [new_messsage | dialog.messages]}
   end
 end

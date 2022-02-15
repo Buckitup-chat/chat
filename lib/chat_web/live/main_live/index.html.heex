@@ -65,10 +65,32 @@
               spellcheck: "false",
               autocomplete: "off",
               maxlength: 210
-          %> 
+          %>
           <%= submit "Send", phx_disable_with: "..." %>
         </div>
       </.form>
+      <div class="text-right row">
+        <.form
+          for={:dialog_image}
+          id="dialog-image-form"
+          class="column column-50 column-offset-50"
+          phx-change="dialog-image-change"
+          phx-submit="dialog-image-submit"
+          phx-drop-target={@uploads.image.ref}
+        >
+            <%= live_file_input @uploads.image %>
+
+          <%= for entry <- @uploads.image.entries do %>
+            <%= if entry.progress > 0 and entry.progress < 100 do %>
+              <progress value={entry.progress} max="100"> <%= entry.progress %>% </progress>
+            <% end %>
+
+            <%= for err <- upload_errors(@uploads.image, entry) do %>
+              <p class="alert alert-danger"><%= err %></p>
+            <% end %>
+          <% end %>
+        </.form>
+      </div>
     </div>
   <% end %>
 <% end%>

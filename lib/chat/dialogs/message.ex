@@ -6,12 +6,12 @@ defmodule Chat.Dialogs.Message do
   @derive {Inspect, only: [:timestamp, :is_a_to_b?, :type]}
   defstruct [:timestamp, :is_a_to_b?, :a_copy, :b_copy, :type]
 
-  def a_to_b(a_copy, b_copy, now \\ DateTime.utc_now()) do
-    new(a_copy, b_copy, now: now)
+  def a_to_b(a_copy, b_copy, opts) do
+    new(a_copy, b_copy, opts |> Keyword.merge(is_a_to_b?: true))
   end
 
-  def b_to_a(a_copy, b_copy, now \\ DateTime.utc_now()) do
-    new(a_copy, b_copy, now: now, is_a_to_b?: false)
+  def b_to_a(a_copy, b_copy, opts) do
+    new(a_copy, b_copy, opts |> Keyword.merge(is_a_to_b?: false))
   end
 
   defp new(a_copy, b_copy, opts) do

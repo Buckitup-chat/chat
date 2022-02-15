@@ -23,6 +23,13 @@ defmodule ChatWeb.MainLive.Index do
         need_login: true,
         mode: :user_list
       )
+      |> allow_upload(:image,
+        accept: ~w(.jpg .jpeg .png),
+        auto_upload: true,
+        max_entries: 1,
+        max_size: 16_000_000,
+        progress: &handle_progress/3
+      )
       |> push_event("restore", %{key: @local_store_key, event: "restoreAuth"})
       |> ok()
     else
@@ -90,6 +97,14 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("dialog-image-change", _, socket) do
+    socket |> noreply()
+  end
+
+  def handle_event("dialog-image-submit", _, socket) do
+    socket |> noreply()
+  end
+
   def handle_event("close-dialog", _, %{assigns: %{dialog: dialog}} = socket) do
     PubSub.unsubscribe(Chat.PubSub, dialog |> dialog_topic())
 
@@ -107,6 +122,32 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> assign(:messages, glimpse |> Dialogs.read(me))
     |> assign(:message_update_mode, :append)
+    |> noreply()
+  end
+
+  def handle_progress(:image, %{done?: true}, %{assigns: %{dialog: dialog, me: me}} = socket) do
+    updated_dialog =
+      consume_uploaded_entries(
+        socket,
+        :image,
+        fn %{path: path}, _entry -> {:ok, Dialogs.add_image(dialog, me, File.read!(path))} end
+      )
+      |> Enum.at(0)
+      |> tap(&Dialogs.update/1)
+
+    PubSub.broadcast!(
+      Chat.PubSub,
+      updated_dialog |> dialog_topic(),
+      {:new_dialog_message, updated_dialog |> Dialogs.glimpse()}
+    )
+
+    socket
+    |> assign(:dialog, updated_dialog)
+    |> noreply()
+  end
+
+  def handle_progress(:image, _, socket) do
+    socket
     |> noreply()
   end
 

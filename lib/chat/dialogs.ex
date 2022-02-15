@@ -23,6 +23,7 @@ defmodule Chat.Dialogs do
   defdelegate update(dialog), to: Registry
 
   defdelegate add_text(dialog, src, text, now \\ DateTime.utc_now()), to: Dialog
+  defdelegate add_image(dialog, src, data, now \\ DateTime.utc_now()), to: Dialog
 
   defdelegate glimpse(dialog), to: Dialog
 

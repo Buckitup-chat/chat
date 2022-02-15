@@ -14,7 +14,7 @@ defmodule Chat.User.Registry do
   def all, do: GenServer.call(__MODULE__, :all)
 
   def start_link(opts) do
-    GenServer.start_link(__MODULE__, :ok, opts)
+    GenServer.start_link(__MODULE__, :ok, Keyword.merge([name: __MODULE__], opts))
   end
 
   ### Implementation

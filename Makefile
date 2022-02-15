@@ -19,3 +19,8 @@ iex:
 assets:
 	mix assets.deploy
 
+deploy:
+	git push gigalixir 
+
+firmware:
+	MIX_TARGET=host mix compile assets.deploy

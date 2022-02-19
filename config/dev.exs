@@ -17,6 +17,13 @@ config :chat, ChatWeb.Endpoint,
   watchers: [
     # Start the esbuild watcher by calling Esbuild.install_and_run(:default, args)
     esbuild: {Esbuild, :install_and_run, [:default, ~w(--sourcemap=inline --watch)]}
+  ],
+  https: [
+    otp_app: :chat,
+    port: 4001,
+    cipher_suite: :strong,
+    certfile: "priv/cert/selfsigned.pem",
+    keyfile: "priv/cert/selfsigned_key.pem"
   ]
 
 # ## SSL Support

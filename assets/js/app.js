@@ -44,6 +44,7 @@ let liveSocket = new LiveSocket("/live", Socket, {
 
 
 window.addEventListener("dialog:clear", (e) => {e.target.value = ""})
+window.addEventListener("img:toggle-preview", (e) => {e.target.classList.toggle("preview")})
 
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})

@@ -6,7 +6,9 @@
   text-align: right;
 }
 
-
+img.preview {
+  max-width: 200px;
+}
 
 
 /* Alerts and form errors used by phx.new */

@@ -45,7 +45,7 @@
       <%= for msg <- @messages do %>
         <div class="row" id={"dialog-message-#{UUID.uuid4()}"}>
           <div class={msg.is_mine? && "column column-75 column-offset-25 text-right" || "column column-75" }>
-            <span title={msg.timestamp |> DateTime.from_unix!()}><%= msg.content %></span>
+            <.message msg={msg} />
           </div>
         </div> 
       <% end %>
@@ -78,7 +78,8 @@
           phx-submit="dialog-image-submit"
           phx-drop-target={@uploads.image.ref}
         >
-            <%= live_file_input @uploads.image %>
+            <%= live_file_input @uploads.image, style: "display: none" %>
+            <input type="button" value="Upload Image" onclick="event.target.parentNode.querySelector('input[type=file]').click()" >
 
           <%= for entry <- @uploads.image.entries do %>
             <%= if entry.progress > 0 and entry.progress < 100 do %>

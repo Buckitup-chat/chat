@@ -130,7 +130,10 @@ defmodule ChatWeb.MainLive.Index do
       consume_uploaded_entries(
         socket,
         :image,
-        fn %{path: path}, _entry -> {:ok, Dialogs.add_image(dialog, me, File.read!(path))} end
+        fn %{path: path}, entry ->
+          data = {File.read!(path), entry.client_type}
+          {:ok, Dialogs.add_image(dialog, me, data)}
+        end
       )
       |> Enum.at(0)
       |> tap(&Dialogs.update/1)
@@ -179,5 +182,31 @@ defmodule ChatWeb.MainLive.Index do
     |> Enum.sort()
     |> Enum.join("---")
     |> then(&"dialog:#{&1}")
+  end
+
+  defp message(%{msg: %{type: :text}} = assigns) do
+    ~H"""
+        <span title={@msg.timestamp |> DateTime.from_unix!()}><%= @msg.content %></span>
+    """
+  end
+
+  defp message(%{msg: %{type: :image, content: json}} = assigns) do
+    [{id, secret}] =
+      json
+      |> Jason.decode!()
+      |> Map.to_list()
+
+    assigns =
+      assigns
+      |> Map.put(:url, "/get/image/#{id}?a=#{secret}")
+
+    ~H"""
+        <img 
+          title={@msg.timestamp |> DateTime.from_unix!()}
+          class="preview"
+          src={@url}
+          phx-click={JS.dispatch("img:toggle-preview")}
+        />
+    """
   end
 end

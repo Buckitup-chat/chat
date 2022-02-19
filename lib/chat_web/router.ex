@@ -18,6 +18,7 @@ defmodule ChatWeb.Router do
     pipe_through :browser
 
     get "/index", PageController, :index
+    get "/get/image/:id", FileController, :image
 
     live "/", MainLive.Index, :index
   end

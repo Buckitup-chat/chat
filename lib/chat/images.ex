@@ -22,16 +22,20 @@ defmodule Chat.Images do
     {key, secret}
   end
 
-  defp encrypt(data) do
+  def encrypt({data, type}) do
     iv = 8 |> :crypto.strong_rand_bytes()
     key = 16 |> :crypto.strong_rand_bytes()
 
-    blob = :crypto.crypto_one_time(@cipher, key, iv, data, true)
+    data_blob = :crypto.crypto_one_time(@cipher, key, iv, data, true)
+    type_blob = :crypto.crypto_one_time(@cipher, key, iv, type, true)
 
-    {blob, iv <> key}
+    {{data_blob, type_blob}, iv <> key}
   end
 
-  defp decrypt(data, <<iv::bits-size(64), key::bits>> = _secret) do
-    :crypto.crypto_one_time(:blowfish_cfb64, key, iv, data, false)
+  def decrypt({data_blob, type_blob} = _data, <<iv::bits-size(64), key::bits>> = _secret) do
+    {
+      :crypto.crypto_one_time(:blowfish_cfb64, key, iv, data_blob, false),
+      :crypto.crypto_one_time(:blowfish_cfb64, key, iv, type_blob, false)
+    }
   end
 end

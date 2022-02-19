@@ -36,7 +36,7 @@ defmodule Chat.Dialogs.Dialog do
     {key, secret} = Images.add(data)
 
     msg =
-      %{key => secret |> Base.encode64()}
+      %{key => secret |> Base.url_encode64()}
       |> Jason.encode!()
 
     add_message(dialog, source, msg, now: now, type: :image)

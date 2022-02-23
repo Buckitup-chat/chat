@@ -1,8 +1,8 @@
 defmodule Chat.User do
   @moduledoc "User context"
 
-  alias Chat.User.Card
-  alias Chat.User.Identity
+  alias Chat.Card
+  alias Chat.Identity
   alias Chat.User.LocalStorage
   alias Chat.User.Registry
 
@@ -22,11 +22,11 @@ defmodule Chat.User do
     do:
       Registry.all()
       |> Map.values()
-      |> Enum.sort_by(&"#{&1.name} #{&1.id}")
+      |> Enum.sort_by(&"#{&1.name} #{&1.hash}")
 
   def by_id(id) do
     Registry.all()
-    |> Enum.find_value(fn {_, card} -> card.id == id && card end)
+    |> Enum.find_value(fn {_, card} -> card.hash == id && card end)
   end
 
   def by_key(pub_key) do

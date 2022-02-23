@@ -22,20 +22,43 @@
 </div> 
 <% else %>
   <%= if @mode == :user_list do %>
-    <h2> User list </h2>
-    <ul>
-    <%= for user <- @users do %>
-      <%= if user.id == @my_id do %>
-        <li><i><%= user.name %></i></li>
-      <% else %>
-        <li>
-          <a href="javascript:void(0)" phx-click="open-dialog" phx-value-user-id={user.id}>
-            <%= user.name %>
-          </a>
-        </li>
+    <div class="row">
+      <div class="column column-50">
+        <h2> User list </h2>
+        <ul>
+        <%= for user <- @users do %>
+          <%= if user.hash == @my_id do %>
+            <li><i><%= user.name %></i></li>
+          <% else %>
+            <li>
+              <a href="javascript:void(0)" phx-click="open-dialog" phx-value-user-id={user.hash}>
+                <%= user.name %>
+              </a>
+            </li>
+            <% end %>
         <% end %>
-    <% end %>
-    </ul>
+        </ul>
+      </div>
+      <div class="column column-50">
+        <h2> Room list </h2>
+        <div class="row">
+          <a href="javascript:void(0)"> Add room </a>
+          New form here
+        </div>
+        <ul>
+          Your rooms
+          <%= for room <- @joined_rooms do %>
+            <pre><%= room %></pre>
+          <% end %>  
+        </ul>
+        <ul>
+          New rooms
+          <%= for room <- @new_rooms do %>
+            <pre><%= room %></pre>
+          <% end %>  
+        </ul>  
+      </div>
+    </div>
   <% end %>
   <%= if @mode == :dialog do %>
     <div id="dialog-mode">

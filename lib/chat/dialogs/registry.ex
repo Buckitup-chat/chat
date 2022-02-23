@@ -7,7 +7,7 @@ defmodule Chat.Dialogs.Registry do
 
   ### Interface
 
-  def find(%User.Identity{} = me, %User.Card{} = peer),
+  def find(%Chat.Identity{} = me, %Chat.Card{} = peer),
     do: GenServer.call(__MODULE__, {:find, me, peer})
 
   def update(%Dialogs.Dialog{} = dialog), do: GenServer.cast(__MODULE__, {:update, dialog})
@@ -36,7 +36,7 @@ defmodule Chat.Dialogs.Registry do
     {:noreply, %{state | list: new_list}}
   end
 
-  defp peer_key(%User.Identity{} = me, %User.Card{} = peer) do
+  defp peer_key(%Chat.Identity{} = me, %Chat.Card{} = peer) do
     [me, peer]
     |> Enum.map(&User.pub_key/1)
     |> key()

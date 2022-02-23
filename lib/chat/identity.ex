@@ -1,5 +1,5 @@
-defmodule Chat.User.Identity do
-  @moduledoc "User Identity to be stored on user device"
+defmodule Chat.Identity do
+  @moduledoc "Identity to be stored on user device. Can be used for User as well as for Room"
 
   @derive {Inspect, only: [:name]}
   defstruct [:name, :priv_key]

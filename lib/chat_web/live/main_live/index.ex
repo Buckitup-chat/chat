@@ -6,6 +6,7 @@ defmodule ChatWeb.MainLive.Index do
   alias Phoenix.PubSub
 
   alias Chat.Dialogs
+  alias Chat.Rooms
   alias Chat.User
 
   @local_store_key "buckitUp-chat-auth"
@@ -57,6 +58,8 @@ defmodule ChatWeb.MainLive.Index do
 
     socket
     |> assign_logged_user(me, id, rooms)
+    |> assign_user_list()
+    |> assign_room_list()
     |> noreply()
   end
 
@@ -114,6 +117,7 @@ defmodule ChatWeb.MainLive.Index do
     |> assign(:messages, nil)
     |> assign(:peer, nil)
     |> assign_user_list()
+    |> assign_room_list()
     |> noreply()
   end
 
@@ -161,11 +165,20 @@ defmodule ChatWeb.MainLive.Index do
     |> assign(:rooms, rooms)
     |> assign(:need_login, false)
     |> assign_user_list()
+    |> assign_room_list()
   end
 
   defp assign_user_list(socket) do
     socket
     |> assign(:users, User.list())
+  end
+
+  defp assign_room_list(%{assigns: %{rooms: rooms}} = socket) do
+    {joined, new} = Rooms.list(rooms)
+
+    socket
+    |> assign(:joined_rooms, joined)
+    |> assign(:new_rooms, new)
   end
 
   defp push_user_local_store(socket, me, rooms \\ []) do

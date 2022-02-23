@@ -18,7 +18,8 @@ defmodule Chat.Application do
       # {Chat.Worker, arg}
       Chat.User.Registry,
       Chat.Dialogs.Registry,
-      Chat.Images.Registry
+      Chat.Images.Registry,
+      Chat.Rooms.Registry
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

@@ -1,6 +1,7 @@
 defmodule Chat.Dialogs.MessageTest do
   use ExUnit.Case, async: true
 
+  alias Chat.Card
   alias Chat.Dialogs
   alias Chat.User
 
@@ -8,7 +9,7 @@ defmodule Chat.Dialogs.MessageTest do
     alice = User.login("Alice")
     bob = User.login("Bob")
 
-    bob_card = bob |> User.Card.from_identity()
+    bob_card = bob |> Card.from_identity()
 
     text_message = "Alice welcomes Bob"
 
@@ -43,7 +44,7 @@ defmodule Chat.Dialogs.MessageTest do
   test "read dialog" do
     alice = User.login("Alice")
     bob = User.login("Bob")
-    bob_card = bob |> User.Card.from_identity()
+    bob_card = bob |> Card.from_identity()
 
     text_message = "Alice welcomes Bob"
     bob_answer = "Bob welcomes Alice too"

@@ -10,7 +10,7 @@ defmodule Chat.Dialogs.Dialog do
   @derive {Inspect, only: [:messages]}
   defstruct [:a_key, :b_key, :messages]
 
-  def start(%User.Identity{} = a, %User.Card{} = b) do
+  def start(%Chat.Identity{} = a, %Chat.Card{} = b) do
     %__MODULE__{
       a_key: a |> User.pub_key(),
       b_key: b |> User.pub_key(),
@@ -20,7 +20,7 @@ defmodule Chat.Dialogs.Dialog do
 
   def add_text(
         %__MODULE__{} = dialog,
-        %User.Identity{} = source,
+        %Chat.Identity{} = source,
         text,
         now \\ DateTime.utc_now()
       ) do
@@ -29,7 +29,7 @@ defmodule Chat.Dialogs.Dialog do
 
   def add_image(
         %__MODULE__{} = dialog,
-        %User.Identity{} = source,
+        %Chat.Identity{} = source,
         data,
         now \\ DateTime.utc_now()
       ) do
@@ -44,7 +44,7 @@ defmodule Chat.Dialogs.Dialog do
 
   def read(
         %__MODULE__{messages: messages, a_key: a_key, b_key: b_key},
-        %User.Identity{} = me,
+        %Chat.Identity{} = me,
         before \\ DateTime.utc_now() |> DateTime.to_unix(),
         amount \\ 100
       ) do
@@ -82,7 +82,7 @@ defmodule Chat.Dialogs.Dialog do
     end)
   end
 
-  def peer_pub_key(%__MODULE__{a_key: a_key, b_key: b_key}, %User.Identity{} = me) do
+  def peer_pub_key(%__MODULE__{a_key: a_key, b_key: b_key}, %Chat.Identity{} = me) do
     case me |> User.pub_key() do
       ^a_key -> b_key
       ^b_key -> a_key
@@ -96,7 +96,7 @@ defmodule Chat.Dialogs.Dialog do
 
   defp add_message(
          %__MODULE__{a_key: a_key, b_key: b_key} = dialog,
-         %User.Identity{} = source,
+         %Chat.Identity{} = source,
          msg,
          opts
        ) do

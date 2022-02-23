@@ -1,11 +1,12 @@
 defmodule Chat.Dialogs do
   @moduledoc "Context for dialogs"
 
+  alias Chat.Card
   alias Chat.Dialogs.Dialog
   alias Chat.Dialogs.Registry
-  alias Chat.User
+  alias Chat.Identity
 
-  def find_or_open(%User.Identity{} = src, %User.Card{} = dst) do
+  def find_or_open(%Identity{} = src, %Card{} = dst) do
     case Registry.find(src, dst) do
       nil ->
         open(src, dst)
@@ -16,7 +17,7 @@ defmodule Chat.Dialogs do
     end
   end
 
-  def open(%User.Identity{} = src, %User.Card{} = dst) do
+  def open(%Identity{} = src, %Card{} = dst) do
     Dialog.start(src, dst)
   end
 

@@ -4,8 +4,8 @@ defmodule Chat.User.Registry do
   use GenServer
   require Logger
 
-  alias Chat.User.Card
-  alias Chat.User.Identity
+  alias Chat.Card
+  alias Chat.Identity
 
   ### Interface
 
@@ -37,14 +37,14 @@ defmodule Chat.User.Registry do
       nil ->
         card = Card.from_identity(user)
         new_list = Map.put(list, card.pub_key, card)
-        {:reply, card.id, %{state | list: new_list}}
+        {:reply, card.hash, %{state | list: new_list}}
 
       %Card{name: card_name} = card when name != card_name ->
         new_list = Map.put(list, card.pub_key, %{card | name: name})
-        {:reply, card.id, %{state | list: new_list}}
+        {:reply, card.hash, %{state | list: new_list}}
 
       card ->
-        {:reply, card.id, state}
+        {:reply, card.hash, state}
     end
   end
 end

@@ -12,11 +12,22 @@ import Config
 config :chat, ChatWeb.Endpoint,
   cache_static_manifest: "priv/static/cache_manifest.json",
   # Possibly not needed, but doesn't hurt
-  http: [port: {:system, "PORT"}],
-  url: [host: System.get_env("APP_NAME") <> ".gigalixirapp.com", port: 443],
+  # http: [port: {:system, "PORT"}],
+  # url: [host: System.get_env("APP_NAME") <> ".gigalixirapp.com", port: 443],
+  # secret_key_base: Map.fetch!(System.get_env(), "SECRET_KEY_BASE"),
+  # check_origin: ["https://offline-chat.gigalixirapp.com", "https://buckitup.app"],
+  url: [host: "buckitup.app", port: 443],
   secret_key_base: Map.fetch!(System.get_env(), "SECRET_KEY_BASE"),
-  check_origin: ["https://offline-chat.gigalixirapp.com"],
-  server: true
+  check_origin: ["https://buckitup.app"],
+  server: true,
+  https: [
+    port: 443,
+    cipher_suite: :strong,
+    cacertfile: "priv/cert/buckitup_app.ca-bundle",
+    certfile: "priv/cert/buckitup_app.crt",
+    keyfile: "priv/cert/priv.key"
+  ],
+  force_ssl: [hsts: true]
 
 # Do not print debug messages in production
 config :logger, level: :info

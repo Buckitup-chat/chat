@@ -20,10 +20,12 @@ config :chat, ChatWeb.Endpoint,
   ],
   https: [
     otp_app: :chat,
-    port: 4001,
+    port: 4443,
+    # host: "buckitup.app",
     cipher_suite: :strong,
-    certfile: "priv/cert/selfsigned.pem",
-    keyfile: "priv/cert/selfsigned_key.pem"
+    cacertfile: "priv/cert/buckitup_app.ca-bundle",
+    certfile: "priv/cert/buckitup_app.crt",
+    keyfile: "priv/cert/priv.key"
   ]
 
 # ## SSL Support

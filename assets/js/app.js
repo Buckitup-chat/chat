@@ -43,8 +43,13 @@ let liveSocket = new LiveSocket("/live", Socket, {
 })
 
 
-window.addEventListener("dialog:clear", (e) => {e.target.value = ""})
-window.addEventListener("img:toggle-preview", (e) => {e.target.classList.toggle("preview")})
+window.addEventListener("chat:clear-value", (e) => {e.target.value = ""});
+window.addEventListener("chat:focus", (e) => {const el = e.target; setTimeout(() => el.focus(), 100);});
+window.addEventListener("chat:toggle", (e) => {
+  if (e.detail && e.detail.class) {
+    e.target.classList.toggle(e.detail.class)
+  }
+});
 
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})

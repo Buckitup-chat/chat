@@ -10,6 +10,10 @@ check:
 test: 
 	mix test --cover
 
+commit: check test
+	gitui
+	
+
 server:
 	mix phx.server
 

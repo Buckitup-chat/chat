@@ -2,8 +2,8 @@ defmodule Chat.Rooms.Registry do
   @moduledoc "Holds all rooms"
   use GenServer
 
-  alias Chat.Rooms.Room
   alias Chat.Card
+  alias Chat.Rooms.Room
   alias Chat.Utils
 
   ### Interface

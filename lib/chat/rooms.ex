@@ -8,7 +8,6 @@ defmodule Chat.Rooms do
   alias Chat.Utils
 
   @doc "Returns new room Identity"
-  @spec add(me :: Identity, name :: String) :: Identity
   def add(me, name) do
     name
     |> Identity.create()
@@ -30,7 +29,7 @@ defmodule Chat.Rooms do
 
     Registry.all()
     |> Map.values()
-    |> Enum.map(&%Card{name: &1.card, pub_key: &1.pub_key, hash: Utils.hash(&1.pub_key)})
+    |> Enum.map(&%Card{name: &1.name, pub_key: &1.pub_key, hash: Utils.hash(&1.pub_key)})
     |> Enum.sort_by(& &1.name)
     |> Enum.split_with(&(&1.hash in my_room_hashes))
   end

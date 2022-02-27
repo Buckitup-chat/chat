@@ -10,11 +10,15 @@ defmodule Chat.Rooms.RoomTest do
 
     room_name = "Alice's room"
 
-    room = alice |> Rooms.add(room_name)
+    room_identity = alice |> Rooms.add(room_name)
+
+    room = Rooms.Room.create(alice, room_identity)
 
     assert %Rooms.Room{} = room
 
-    assert ~s|#Chat.Rooms.Room<messages: [], name: "#{room_name}", users: ["#{alice_hash}"], ...>| =
-             inspect(room)
+    correct =
+      ~s|#Chat.Rooms.Room<messages: [], name: "#{room_name}", users: ["#{alice_hash}"], ...>|
+
+    assert correct == inspect(room)
   end
 end

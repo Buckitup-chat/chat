@@ -3,13 +3,8 @@ defmodule ChatWeb.MainLive.Index do
   use ChatWeb, :live_view
 
   alias Phoenix.LiveView.JS
-  alias Phoenix.PubSub
 
-  alias Chat.Dialogs
-  alias Chat.Rooms
-  alias Chat.User
-
-  @local_store_key "buckitUp-chat-auth"
+  alias ChatWeb.MainLive.Page
 
   @impl true
   def mount(_params, _session, socket) do
@@ -31,7 +26,7 @@ defmodule ChatWeb.MainLive.Index do
         max_size: 16_000_000,
         progress: &handle_progress/3
       )
-      |> push_event("restore", %{key: @local_store_key, event: "restoreAuth"})
+      |> Page.Login.check_stored()
       |> ok()
     else
       socket
@@ -41,161 +36,77 @@ defmodule ChatWeb.MainLive.Index do
 
   @impl true
   def handle_event("login", %{"login" => %{"name" => name}}, socket) do
-    me = User.login(name |> String.trim())
-    id = User.register(me)
-
     socket
-    |> assign_logged_user(me, id)
-    |> push_user_local_store(me)
+    |> Page.Login.create_user(name)
+    |> Page.Lobby.init()
     |> noreply()
   end
 
   def handle_event("restoreAuth", nil, socket), do: socket |> noreply()
 
   def handle_event("restoreAuth", data, socket) do
-    {me, rooms} = User.device_decode(data)
-    id = User.register(me)
-
     socket
-    |> assign_logged_user(me, id, rooms)
-    |> assign_user_list()
-    |> assign_room_list()
+    |> Page.Login.load_user(data)
+    |> Page.Lobby.init()
     |> noreply()
   end
 
-  def handle_event("open-dialog", %{"user-id" => user_id}, %{assigns: %{me: me}} = socket) do
-    peer = User.by_id(user_id)
-    dialog = Dialogs.find_or_open(me, peer)
-    messages = dialog |> Dialogs.read(me)
-
-    PubSub.subscribe(Chat.PubSub, dialog |> dialog_topic())
-
+  def handle_event("open-dialog", %{"user-id" => user_id}, socket) do
     socket
-    |> assign(:mode, :dialog)
-    |> assign(:peer, peer)
-    |> assign(:dialog, dialog)
-    |> assign(:messages, messages)
-    |> assign(:message_update_mode, :replace)
+    |> Page.Lobby.close()
+    |> Page.Dialog.init(user_id)
     |> noreply()
   end
 
-  def handle_event(
-        "dialog-message",
-        %{"dialog" => %{"text" => text}},
-        %{assigns: %{dialog: dialog, me: me}} = socket
-      ) do
-    updated_dialog =
-      dialog
-      |> Dialogs.add_text(me, text)
-      |> tap(&Dialogs.update/1)
-
-    PubSub.broadcast!(
-      Chat.PubSub,
-      updated_dialog |> dialog_topic(),
-      {:new_dialog_message, updated_dialog |> Dialogs.glimpse()}
-    )
-
+  def handle_event("dialog-message", %{"dialog" => %{"text" => text}}, socket) do
     socket
-    |> assign(:dialog, updated_dialog)
+    |> Page.Dialog.send_text(text)
     |> noreply()
   end
 
-  def handle_event("dialog-image-change", _, socket) do
-    socket |> noreply()
-  end
+  def handle_event("dialog-image-change", _, socket), do: socket |> noreply()
 
-  def handle_event("dialog-image-submit", _, socket) do
-    socket |> noreply()
-  end
+  def handle_event("dialog-image-submit", _, socket), do: socket |> noreply()
 
-  def handle_event("close-dialog", _, %{assigns: %{dialog: dialog}} = socket) do
-    PubSub.unsubscribe(Chat.PubSub, dialog |> dialog_topic())
-
+  def handle_event("close-dialog", _, socket) do
     socket
-    |> assign(:mode, :user_list)
-    |> assign(:dialog, nil)
-    |> assign(:messages, nil)
-    |> assign(:peer, nil)
-    |> assign_user_list()
-    |> assign_room_list()
+    |> Page.Dialog.close()
+    |> Page.Lobby.init()
+    |> noreply()
+  end
+
+  def handle_event("create-room", %{"new_room" => %{"name" => name}}, socket) do
+    socket
+    |> Page.Lobby.new_room(name)
     |> noreply()
   end
 
   @impl true
-  def handle_info({:new_dialog_message, glimpse}, %{assigns: %{me: me}} = socket) do
+  def handle_info({:new_dialog_message, glimpse}, socket) do
     socket
-    |> assign(:messages, glimpse |> Dialogs.read(me))
-    |> assign(:message_update_mode, :append)
+    |> Page.Dialog.show_new(glimpse)
     |> noreply()
   end
 
-  def handle_progress(:image, %{done?: true}, %{assigns: %{dialog: dialog, me: me}} = socket) do
-    updated_dialog =
-      consume_uploaded_entries(
-        socket,
-        :image,
-        fn %{path: path}, entry ->
-          data = {File.read!(path), entry.client_type}
-          {:ok, Dialogs.add_image(dialog, me, data)}
-        end
-      )
-      |> Enum.at(0)
-      |> tap(&Dialogs.update/1)
-
-    PubSub.broadcast!(
-      Chat.PubSub,
-      updated_dialog |> dialog_topic(),
-      {:new_dialog_message, updated_dialog |> Dialogs.glimpse()}
-    )
-
+  def handle_info({:new_user, card}, socket) do
     socket
-    |> assign(:dialog, updated_dialog)
+    |> Page.Lobby.show_new_user(card)
     |> noreply()
   end
 
-  def handle_progress(:image, _, socket) do
+  def handle_info({:new_room, card}, socket) do
     socket
+    |> Page.Lobby.show_new_room(card)
     |> noreply()
   end
 
-  defp assign_logged_user(socket, me, id, rooms \\ []) do
+  def handle_progress(:image, %{done?: true}, socket) do
     socket
-    |> assign(:me, me)
-    |> assign(:my_id, id)
-    |> assign(:rooms, rooms)
-    |> assign(:need_login, false)
-    |> assign_user_list()
-    |> assign_room_list()
+    |> Page.Dialog.send_image()
+    |> noreply()
   end
 
-  defp assign_user_list(socket) do
-    socket
-    |> assign(:users, User.list())
-  end
-
-  defp assign_room_list(%{assigns: %{rooms: rooms}} = socket) do
-    {joined, new} = Rooms.list(rooms)
-
-    socket
-    |> assign(:joined_rooms, joined)
-    |> assign(:new_rooms, new)
-  end
-
-  defp push_user_local_store(socket, me, rooms \\ []) do
-    socket
-    |> push_event("store", %{
-      key: @local_store_key,
-      data: User.device_encode(me, rooms)
-    })
-  end
-
-  defp dialog_topic(%Dialogs.Dialog{a_key: a_key, b_key: b_key}) do
-    [a_key, b_key]
-    |> Enum.map(fn key -> key |> User.by_key() |> Map.get(:id) end)
-    |> Enum.sort()
-    |> Enum.join("---")
-    |> then(&"dialog:#{&1}")
-  end
+  def handle_progress(:image, _, socket), do: socket |> noreply()
 
   defp message(%{msg: %{type: :text}} = assigns) do
     ~H"""
@@ -218,7 +129,7 @@ defmodule ChatWeb.MainLive.Index do
           title={@msg.timestamp |> DateTime.from_unix!()}
           class="preview"
           src={@url}
-          phx-click={JS.dispatch("img:toggle-preview")}
+          phx-click={JS.dispatch("chat:toggle", detail: %{class: "preview"})}
         />
     """
   end

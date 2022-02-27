@@ -41,20 +41,44 @@
       </div>
       <div class="column column-50">
         <h2> Room list </h2>
+          <button 
+            id="room-create-toggle"
+            phx-click={
+              JS.hide() 
+              |> JS.show(to: "#room-create-form")
+              |> JS.dispatch("chat:focus", to: "#room-create-form input[name='new_room[name]']")
+            }
+          > Add room </button>
         <div class="row">
-          <a href="javascript:void(0)"> Add room </a>
-          New form here
+          <.form
+            let={f}
+            for={:new_room}
+            id="room-create-form"
+            autocomplete="off"
+            phx-submit={
+              JS.hide()
+              |> JS.show(to: "#room-create-toggle")
+              |> JS.push("create-room")
+            }
+            style="display: none;"
+          >
+          
+            <%= text_input f, :name, placeholder: "Room name" %>
+            <%= error_tag f, :name %>
+          
+            <div>
+              <%= submit "Create", phx_disable_with: "Saving..." %>
+            </div>
+          </.form>
         </div>
         <ul>
-          Your rooms
           <%= for room <- @joined_rooms do %>
-            <pre><%= room %></pre>
+            <li><a><b><%= room.name %></b></a></li>
           <% end %>  
         </ul>
         <ul>
-          New rooms
           <%= for room <- @new_rooms do %>
-            <pre><%= room %></pre>
+            <li><a><%= room.name %></a></li>
           <% end %>  
         </ul>  
       </div>
@@ -77,7 +101,7 @@
         let={di}
         for={:dialog}
         id="dialog-form"
-        phx-submit={ JS.push("dialog-message") |> JS.dispatch("dialog:clear", to: "#dialog-input")}
+        phx-submit={ JS.push("dialog-message") |> JS.dispatch("chat:clear-value", to: "#dialog-input")}
         class="text-right row"
       >
         <div class="column column-50 column-offset-50">

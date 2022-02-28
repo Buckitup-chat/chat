@@ -7,12 +7,16 @@ defmodule Chat.Card do
   @derive {Inspect, only: [:name, :hash]}
   defstruct [:name, :hash, :pub_key]
 
-  def from_identity(%Identity{} = identity) do
+  def from_identity(%Identity{name: name} = identity) do
     pub_key = identity |> Identity.pub_key()
 
+    new(name, pub_key)
+  end
+
+  def new(name, pub_key) do
     %__MODULE__{
       hash: Utils.hash(pub_key),
-      name: identity.name,
+      name: name,
       pub_key: pub_key
     }
   end

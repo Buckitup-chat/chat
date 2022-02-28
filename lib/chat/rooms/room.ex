@@ -2,6 +2,7 @@ defmodule Chat.Rooms.Room do
   @moduledoc "Room struct"
 
   alias Chat.Identity
+  alias Chat.Rooms.Message
   alias Chat.Utils
 
   @derive {Inspect, only: [:name, :messages, :users]}
@@ -17,5 +18,17 @@ defmodule Chat.Rooms.Room do
       messages: [],
       users: [admin_hash]
     }
+  end
+
+  def add_text(
+        %__MODULE__{pub_key: room_key, messages: messages} = room,
+        %Identity{} = author,
+        text
+      ) do
+    author_hash = author |> Identity.pub_key() |> Utils.hash()
+    encrypted = Chat.User.encrypt(text, room_key)
+    message = Message.new(author_hash, encrypted, type: :text)
+
+    %{room | messages: [message | messages]}
   end
 end

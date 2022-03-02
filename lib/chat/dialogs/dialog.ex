@@ -56,20 +56,7 @@ defmodule Chat.Dialogs.Dialog do
       end
 
     messages
-    |> Enum.reduce_while({[], nil, amount}, fn
-      %{timestamp: last_timestamp} = msg, {acc, last_timestamp, amount} ->
-        {:cont, {[msg | acc], last_timestamp, amount - 1}}
-
-      _, {_, _, amount} = acc when amount < 1 ->
-        {:halt, acc}
-
-      %{timestamp: timestamp} = msg, {acc, _, amount} when timestamp < before ->
-        {:cont, {[msg | acc], timestamp, amount - 1}}
-
-      _, acc ->
-        {:cont, acc}
-    end)
-    |> then(&elem(&1, 0))
+    |> Chat.Utils.page(before, amount)
     |> Enum.map(fn msg ->
       is_mine? = (side == :a_copy and msg.is_a_to_b?) or (side == :b_copy and !msg.is_a_to_b?)
 

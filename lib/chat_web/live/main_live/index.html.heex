@@ -43,6 +43,7 @@
         <h2> Room list </h2>
           <button 
             id="room-create-toggle"
+            class="button button-outline"
             phx-click={
               JS.hide() 
               |> JS.show(to: "#room-create-form")
@@ -73,7 +74,7 @@
         </div>
         <ul>
           <%= for room <- @joined_rooms do %>
-            <li><a><b><%= room.name %></b></a></li>
+            <li><a phx-click="open-room" phx-value-room={room.hash}><b><%= room.name %></b></a></li>
           <% end %>  
         </ul>
         <ul>
@@ -139,6 +140,65 @@
           <% end %>
         </.form>
       </div>
+    </div>
+  <% end %>
+  <%= if @mode == :room do %>
+    <div id="room-mode">
+      <button class="button button-outline float-right" phx-click="close-room">Back</button>
+      <h1>Room: <b><%= @room.name %></b></h1>
+      <div id="room-messages" phx-update={@message_update_mode}>
+      <%= for msg <- @messages do %>
+        <div class="row" id={"room-message-#{UUID.uuid4()}"}>
+          <div class="column column-75">
+            <.room_message msg={msg} />
+          </div>
+        </div> 
+      <% end %>
+      </div>
+
+      <.form
+        let={ri}
+        for={:room}
+        id="room-form"
+        phx-submit={ JS.push("room-message") |> JS.dispatch("chat:clear-value", to: "#room-input")}
+        class="text-right row"
+      >
+        <div class="column column-50 column-offset-50">
+          <%= text_input ri, :text,
+              placeholder: "New message",
+              class: "text-right",
+              id: "room-input",
+              spellcheck: "false",
+              autocomplete: "off",
+              maxlength: 210
+          %>
+          <%= submit "Send", phx_disable_with: "..." %>
+        </div>
+      </.form>
+      <div class="text-right row">
+        <.form
+          for={:room_image}
+          id="room-image-form"
+          class="column column-50 column-offset-50"
+          phx-change="room-image-submit"
+          phx-submit="room-image-submit"
+          phx-drop-target={@uploads.room_image.ref}
+        >
+            <%= live_file_input @uploads.room_image, style: "display: none" %>
+            <input type="button" value="Upload Image" onclick="event.target.parentNode.querySelector('input[type=file]').click()" >
+
+          <%= for entry <- @uploads.room_image.entries do %>
+            <%= if entry.progress > 0 and entry.progress < 100 do %>
+              <progress value={entry.progress} max="100"> <%= entry.progress %>% </progress>
+            <% end %>
+
+            <%= for err <- upload_errors(@uploads.room_image, entry) do %>
+              <p class="alert alert-danger"><%= err %></p>
+            <% end %>
+          <% end %>
+        </.form>
+      </div>
+ 
     </div>
   <% end %>
 <% end%>

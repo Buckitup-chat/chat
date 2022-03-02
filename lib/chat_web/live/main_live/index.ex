@@ -23,7 +23,14 @@ defmodule ChatWeb.MainLive.Index do
         accept: ~w(.jpg .jpeg .png),
         auto_upload: true,
         max_entries: 1,
-        max_size: 16_000_000,
+        max_size: 60_000_000,
+        progress: &handle_progress/3
+      )
+      |> allow_upload(:room_image,
+        accept: ~w(.jpg .jpeg .png),
+        auto_upload: true,
+        max_entries: 1,
+        max_size: 60_000_000,
         progress: &handle_progress/3
       )
       |> Page.Login.check_stored()
@@ -81,6 +88,28 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("open-room", %{"room" => hash}, socket) do
+    socket
+    |> Page.Lobby.close()
+    |> Page.Room.init(hash)
+    |> noreply()
+  end
+
+  def handle_event("room-message", %{"room" => %{"text" => text}}, socket) do
+    socket
+    |> Page.Room.send_text(text)
+    |> noreply()
+  end
+
+  def handle_event("room-image-submit", _, socket), do: socket |> noreply()
+
+  def handle_event("close-room", _, socket) do
+    socket
+    |> Page.Room.close()
+    |> Page.Lobby.init()
+    |> noreply()
+  end
+
   @impl true
   def handle_info({:new_dialog_message, glimpse}, socket) do
     socket
@@ -100,6 +129,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_info({:new_room_message, glimpse}, socket) do
+    socket
+    |> Page.Room.show_new(glimpse)
+    |> noreply()
+  end
+
   def handle_progress(:image, %{done?: true}, socket) do
     socket
     |> Page.Dialog.send_image()
@@ -107,6 +142,14 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   def handle_progress(:image, _, socket), do: socket |> noreply()
+
+  def handle_progress(:room_image, %{done?: true}, socket) do
+    socket
+    |> Page.Room.send_image()
+    |> noreply()
+  end
+
+  def handle_progress(:room_image, _, socket), do: socket |> noreply()
 
   defp message(%{msg: %{type: :text}} = assigns) do
     ~H"""
@@ -125,6 +168,37 @@ defmodule ChatWeb.MainLive.Index do
       |> Map.put(:url, "/get/image/#{id}?a=#{secret}")
 
     ~H"""
+        <img 
+          title={@msg.timestamp |> DateTime.from_unix!()}
+          class="preview"
+          src={@url}
+          phx-click={JS.dispatch("chat:toggle", detail: %{class: "preview"})}
+        />
+    """
+  end
+
+  defp room_message(%{msg: %{type: :text, author_hash: hash}} = assigns) do
+    %{name: name} = Chat.User.by_id(hash)
+
+    ~H"""
+        <span title={@msg.timestamp |> DateTime.from_unix!()}><i><%= name %></i>: <%= @msg.content %></span>
+    """
+  end
+
+  defp room_message(%{msg: %{type: :image, content: json, author_hash: hash}} = assigns) do
+    [{id, secret}] =
+      json
+      |> Jason.decode!()
+      |> Map.to_list()
+
+    %{name: name} = Chat.User.by_id(hash)
+
+    assigns =
+      assigns
+      |> Map.put(:url, "/get/image/#{id}?a=#{secret}")
+
+    ~H"""
+        <i><%= name %></i>:
         <img 
           title={@msg.timestamp |> DateTime.from_unix!()}
           class="preview"

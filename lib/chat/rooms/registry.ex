@@ -8,8 +8,8 @@ defmodule Chat.Rooms.Registry do
 
   ### Interface
 
-  def find(%Card{} = room),
-    do: GenServer.call(__MODULE__, {:find, room})
+  def find(%Card{} = room), do: GenServer.call(__MODULE__, {:find, room})
+  def find(hash), do: GenServer.call(__MODULE__, {:find, hash})
 
   def all, do: GenServer.call(__MODULE__, :all)
 
@@ -29,6 +29,11 @@ defmodule Chat.Rooms.Registry do
   @impl true
   def handle_call({:find, %Card{pub_key: pub_key}}, _, list) do
     room = Map.get(list, pub_key |> Utils.hash())
+    {:reply, room, list}
+  end
+
+  def handle_call({:find, hash}, _, list) do
+    room = Map.get(list, hash)
     {:reply, room, list}
   end
 

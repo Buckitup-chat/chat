@@ -79,7 +79,11 @@
         </ul>
         <ul>
           <%= for room <- @new_rooms do %>
-            <li><a><%= room.name %></a></li>
+            <%= if room |> Rooms.is_requested_by?(@my_id) do %>
+              <li><a ><%= room.name %> (requested)</a></li>
+            <% else %>
+              <li><a phx-click="request-room" phx-value-room={room.hash}><%= room.name %></a></li>
+            <% end %>
           <% end %>  
         </ul>  
       </div>
@@ -149,8 +153,8 @@
       <div id="room-messages" phx-update={@message_update_mode}>
       <%= for msg <- @messages do %>
         <div class="row" id={"room-message-#{UUID.uuid4()}"}>
-          <div class="column column-75">
-            <.room_message msg={msg} />
+          <div class={msg.author_hash == @my_id && "column column-75 column-offset-25 text-right" || "column column-75" }>
+            <.room_message msg={msg} my_id={@my_id} />
           </div>
         </div> 
       <% end %>

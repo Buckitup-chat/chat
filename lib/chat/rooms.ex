@@ -51,5 +51,39 @@ defmodule Chat.Rooms do
               ),
               to: Room
 
+  def add_request(room_hash, user_identity) do
+    room_hash
+    |> get()
+    |> Room.add_request(user_identity)
+    |> update()
+  end
+
+  def approve_requests(room_hash, room_identity) do
+    room = get(room_hash)
+
+    if room do
+      room
+      |> Room.approve_requests(room_identity)
+      |> update()
+    end
+  end
+
+  def join_approved_requests(room_hash, person_identity) do
+    room_hash
+    |> get
+    |> Room.join_approved_requests(person_identity)
+    |> then(fn {room, joined_identities} ->
+      update(room)
+
+      joined_identities
+    end)
+  end
+
+  def is_requested_by?(room_hash, person_hash) do
+    room_hash
+    |> get()
+    |> Room.is_requested_by?(person_hash)
+  end
+
   defdelegate update(room), to: Registry
 end

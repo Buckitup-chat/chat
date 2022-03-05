@@ -6,7 +6,6 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   alias Chat.Identity
   alias Chat.Rooms
-  alias Chat.User
   alias Chat.Utils
 
   def init(%{assigns: %{rooms: rooms}} = socket, room_hash) do

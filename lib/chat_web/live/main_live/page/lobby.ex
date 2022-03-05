@@ -4,8 +4,10 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   alias Phoenix.PubSub
 
+  alias Chat.Identity
   alias Chat.Rooms
   alias Chat.User
+  alias Chat.Utils
   alias ChatWeb.MainLive.Page
 
   @topic "chat::lobby"
@@ -16,7 +18,9 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     socket
     |> assign(:mode, :user_list)
     |> assign_user_list()
+    |> approve_joined_room_requests()
     |> assign_room_list()
+    |> join_approved_rooms()
   end
 
   def new_room(%{assigns: %{me: me, rooms: rooms}} = socket, name) do
@@ -54,6 +58,29 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign_room_list()
   end
 
+  def request_room(%{assigns: %{me: me}} = socket, room_hash) do
+    Rooms.add_request(room_hash, me)
+
+    PubSub.broadcast!(
+      Chat.PubSub,
+      @topic,
+      :room_request
+    )
+
+    socket
+    |> assign_room_list()
+  end
+
+  def approve_requests(socket) do
+    socket
+    |> approve_joined_room_requests()
+  end
+
+  def join_rooms(socket) do
+    socket
+    |> join_approved_rooms()
+  end
+
   def close(socket) do
     PubSub.unsubscribe(Chat.PubSub, @topic)
 
@@ -71,5 +98,34 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     socket
     |> assign(:joined_rooms, joined)
     |> assign(:new_rooms, new)
+  end
+
+  defp approve_joined_room_requests(%{assigns: %{rooms: rooms}} = socket) do
+    rooms
+    |> Enum.each(fn room_identity ->
+      room_identity
+      |> Identity.pub_key()
+      |> Utils.hash()
+      |> Rooms.approve_requests(room_identity)
+    end)
+
+    PubSub.broadcast!(
+      Chat.PubSub,
+      @topic,
+      :room_request_approved
+    )
+
+    socket
+  end
+
+  defp join_approved_rooms(%{assigns: %{new_rooms: new_rooms, rooms: rooms, me: me}} = socket) do
+    joined_rooms =
+      new_rooms
+      |> Enum.flat_map(fn %{hash: hash} -> hash |> Rooms.join_approved_requests(me) end)
+
+    socket
+    |> assign(:rooms, joined_rooms ++ rooms)
+    |> Page.Login.store()
+    |> assign_room_list()
   end
 end

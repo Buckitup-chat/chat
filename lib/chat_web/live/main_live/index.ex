@@ -4,6 +4,7 @@ defmodule ChatWeb.MainLive.Index do
 
   alias Phoenix.LiveView.JS
 
+  alias Chat.Rooms
   alias ChatWeb.MainLive.Page
 
   @impl true
@@ -95,6 +96,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("request-room", %{"room" => hash}, socket) do
+    socket
+    |> Page.Lobby.request_room(hash)
+    |> noreply()
+  end
+
   def handle_event("room-message", %{"room" => %{"text" => text}}, socket) do
     socket
     |> Page.Room.send_text(text)
@@ -132,6 +139,18 @@ defmodule ChatWeb.MainLive.Index do
   def handle_info({:new_room_message, glimpse}, socket) do
     socket
     |> Page.Room.show_new(glimpse)
+    |> noreply()
+  end
+
+  def handle_info(:room_request, socket) do
+    socket
+    |> Page.Lobby.approve_requests()
+    |> noreply()
+  end
+
+  def handle_info(:room_request_approved, socket) do
+    socket
+    |> Page.Lobby.join_rooms()
     |> noreply()
   end
 
@@ -177,15 +196,22 @@ defmodule ChatWeb.MainLive.Index do
     """
   end
 
-  defp room_message(%{msg: %{type: :text, author_hash: hash}} = assigns) do
+  defp room_message(%{msg: %{type: :text, author_hash: hash}, my_id: my_id} = assigns) do
     %{name: name} = Chat.User.by_id(hash)
 
     ~H"""
-        <span title={@msg.timestamp |> DateTime.from_unix!()}><i><%= name %></i>: <%= @msg.content %></span>
+        <span title={@msg.timestamp |> DateTime.from_unix!()}>
+        <%= unless hash == my_id do %>
+          <i><%= name %></i>:
+        <% end %>
+        <%= @msg.content %>
+        </span>
     """
   end
 
-  defp room_message(%{msg: %{type: :image, content: json, author_hash: hash}} = assigns) do
+  defp room_message(
+         %{msg: %{type: :image, content: json, author_hash: hash}, my_id: my_id} = assigns
+       ) do
     [{id, secret}] =
       json
       |> Jason.decode!()
@@ -198,7 +224,9 @@ defmodule ChatWeb.MainLive.Index do
       |> Map.put(:url, "/get/image/#{id}?a=#{secret}")
 
     ~H"""
-        <i><%= name %></i>:
+        <%= unless hash == my_id do %>
+          <i><%= name %></i>:
+        <% end %>
         <img 
           title={@msg.timestamp |> DateTime.from_unix!()}
           class="preview"

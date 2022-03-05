@@ -1,5 +1,6 @@
 defmodule Chat.Utils do
   @moduledoc "Util functions"
+  @cipher :blowfish_cfb64
   def hash(data) do
     data
     |> :erlang.term_to_binary()
@@ -24,5 +25,38 @@ defmodule Chat.Utils do
         {:cont, acc}
     end)
     |> then(&elem(&1, 0))
+  end
+
+  def encrypt_blob({data, type}) do
+    {iv, key} = generate_key()
+    data_blob = :crypto.crypto_one_time(@cipher, key, iv, data, true)
+    type_blob = :crypto.crypto_one_time(@cipher, key, iv, type, true)
+
+    {{data_blob, type_blob}, iv <> key}
+  end
+
+  def encrypt_blob(data) do
+    {iv, key} = generate_key()
+    data_blob = :crypto.crypto_one_time(@cipher, key, iv, data, true)
+
+    {data_blob, iv <> key}
+  end
+
+  def decrypt_blob({data_blob, type_blob} = _data, <<iv::bits-size(64), key::bits>> = _secret) do
+    {
+      :crypto.crypto_one_time(@cipher, key, iv, data_blob, false),
+      :crypto.crypto_one_time(@cipher, key, iv, type_blob, false)
+    }
+  end
+
+  def decrypt_blob(data, <<iv::bits-size(64), key::bits>> = _secret) do
+    :crypto.crypto_one_time(@cipher, key, iv, data, false)
+  end
+
+  defp generate_key do
+    iv = 8 |> :crypto.strong_rand_bytes()
+    key = 16 |> :crypto.strong_rand_bytes()
+
+    {iv, key}
   end
 end

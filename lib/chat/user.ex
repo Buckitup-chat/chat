@@ -26,12 +26,7 @@ defmodule Chat.User do
 
   def by_id(id) do
     Registry.all()
-    |> Enum.find_value(fn {_, card} -> card.hash == id && card end)
-  end
-
-  def by_key(pub_key) do
-    Registry.all()
-    |> Map.get(pub_key)
+    |> Map.get(id)
   end
 
   def device_encode(%Identity{} = identity, rooms \\ []), do: LocalStorage.encode(identity, rooms)

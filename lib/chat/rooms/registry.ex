@@ -1,48 +1,21 @@
 defmodule Chat.Rooms.Registry do
   @moduledoc "Holds all rooms"
-  use GenServer
 
   alias Chat.Card
+  alias Chat.Db
   alias Chat.Rooms.Room
   alias Chat.Utils
 
-  ### Interface
+  def find(%Card{pub_key: pub_key}), do: pub_key |> Utils.hash() |> find()
+  def find(hash), do: Db.db() |> CubDB.get({:rooms, hash})
 
-  def find(%Card{} = room), do: GenServer.call(__MODULE__, {:find, room})
-  def find(hash), do: GenServer.call(__MODULE__, {:find, hash})
+  def all,
+    do:
+      {{:rooms, 0}, {:"rooms\0", 0}}
+      |> Db.list(fn {{:rooms, hash}, %Room{} = room} -> {hash, room} end)
 
-  def all, do: GenServer.call(__MODULE__, :all)
-
-  def update(%Room{} = room), do: GenServer.cast(__MODULE__, {:update, room})
-
-  def start_link(opts) do
-    GenServer.start_link(__MODULE__, :ok, Keyword.merge([name: __MODULE__], opts))
-  end
-
-  ### Implementation
-
-  @impl true
-  def init(_) do
-    {:ok, %{}}
-  end
-
-  @impl true
-  def handle_call({:find, %Card{pub_key: pub_key}}, _, list) do
-    room = Map.get(list, pub_key |> Utils.hash())
-    {:reply, room, list}
-  end
-
-  def handle_call({:find, hash}, _, list) do
-    room = Map.get(list, hash)
-    {:reply, room, list}
-  end
-
-  @impl true
-  def handle_call(:all, _, list), do: {:reply, list, list}
-
-  @impl true
-  def handle_cast({:update, %Room{pub_key: pub_key} = room}, list) do
-    new_list = Map.put(list, pub_key |> Utils.hash(), room)
-    {:noreply, new_list}
+  def update(%Room{pub_key: pub_key} = room) do
+    Db.db()
+    |> CubDB.put({:rooms, pub_key |> Utils.hash()}, room)
   end
 end

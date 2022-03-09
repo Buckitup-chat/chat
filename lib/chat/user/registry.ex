@@ -1,50 +1,23 @@
 defmodule Chat.User.Registry do
   @moduledoc "Registry of User Cards"
 
-  use GenServer
-  require Logger
-
   alias Chat.Card
+  alias Chat.Db
   alias Chat.Identity
+  alias Chat.Utils
 
-  ### Interface
+  def enlist(%Identity{} = user) do
+    card = user |> Card.from_identity()
+    hash = card.pub_key |> Utils.hash()
 
-  def enlist(%Identity{} = user), do: GenServer.call(__MODULE__, {:enlist, user})
+    Db.db()
+    |> CubDB.put({:users, hash}, card)
 
-  def all, do: GenServer.call(__MODULE__, :all)
-
-  def start_link(opts) do
-    GenServer.start_link(__MODULE__, :ok, Keyword.merge([name: __MODULE__], opts))
+    hash
   end
 
-  ### Implementation
-
-  @impl true
-  def init(_) do
-    {:ok, %{list: %{}}}
-  end
-
-  @impl true
-  def handle_call(:all, _, %{list: list} = state) do
-    {:reply, list, state}
-  end
-
-  @impl true
-  def handle_call({:enlist, %Identity{name: name} = user}, _, %{list: list} = state) do
-    key = user |> Identity.pub_key()
-
-    case Map.get(list, key) do
-      nil ->
-        card = Card.from_identity(user)
-        new_list = Map.put(list, card.pub_key, card)
-        {:reply, card.hash, %{state | list: new_list}}
-
-      %Card{name: card_name} = card when name != card_name ->
-        new_list = Map.put(list, card.pub_key, %{card | name: name})
-        {:reply, card.hash, %{state | list: new_list}}
-
-      card ->
-        {:reply, card.hash, state}
-    end
+  def all do
+    {{:users, 0}, {:"users\0", 0}}
+    |> Db.list(fn {{:users, hash}, %Card{} = user} -> {hash, user} end)
   end
 end

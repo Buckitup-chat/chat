@@ -42,4 +42,7 @@ npm-debug.log
 # Certificates
 /priv/cert
 
+# Database
+/priv/db
+
 chat.iml

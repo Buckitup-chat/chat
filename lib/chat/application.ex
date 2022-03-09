@@ -12,14 +12,12 @@ defmodule Chat.Application do
       ChatWeb.Telemetry,
       # Start the PubSub system
       {Phoenix.PubSub, name: Chat.PubSub},
+      # Start DB
+      Chat.Db,
       # Start the Endpoint (http/https)
-      ChatWeb.Endpoint,
+      ChatWeb.Endpoint
       # Start a worker by calling: Chat.Worker.start_link(arg)
       # {Chat.Worker, arg}
-      Chat.User.Registry,
-      Chat.Dialogs.Registry,
-      Chat.Images.Registry,
-      Chat.Rooms.Registry
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

@@ -1,13 +1,14 @@
 defmodule Chat.Utils do
   @moduledoc "Util functions"
   @cipher :blowfish_cfb64
-  def hash(data) do
+  def hash(data) when is_binary(data) do
     data
-    |> :erlang.term_to_binary()
     |> then(&:crypto.hash(:sha3_256, &1))
     |> Base.encode16()
     |> String.downcase()
   end
+
+  def hash({:RSAPublicKey, a, b}), do: "RSAPublicKey|#{a}|#{b}" |> hash()
 
   def page(timestamped, before, amount) do
     timestamped

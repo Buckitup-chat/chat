@@ -1,39 +1,19 @@
 defmodule Chat.Dialogs.Registry do
   @moduledoc "Holds all dialogs"
-  use GenServer
 
+  alias Chat.Db
   alias Chat.Dialogs
   alias Chat.User
+  alias Chat.Utils
 
-  ### Interface
-
-  def find(%Chat.Identity{} = me, %Chat.Card{} = peer),
-    do: GenServer.call(__MODULE__, {:find, me, peer})
-
-  def update(%Dialogs.Dialog{} = dialog), do: GenServer.cast(__MODULE__, {:update, dialog})
-
-  def start_link(opts) do
-    GenServer.start_link(__MODULE__, :ok, Keyword.merge([name: __MODULE__], opts))
+  def update(%Dialogs.Dialog{} = dialog) do
+    Db.db()
+    |> CubDB.put({:dialogs, dialog |> dialog_key()}, dialog)
   end
 
-  ### Implementation
-
-  @impl true
-  def init(_) do
-    {:ok, %{list: %{}}}
-  end
-
-  @impl true
-  def handle_call({:find, me, peer}, _, %{list: list} = state) do
-    dialog = Map.get(list, peer_key(me, peer))
-    {:reply, dialog, state}
-  end
-
-  @impl true
-  def handle_cast({:update, dialog}, %{list: list} = state) do
-    new_list = Map.put(list, dialog_key(dialog), dialog)
-
-    {:noreply, %{state | list: new_list}}
+  def find(%Chat.Identity{} = me, %Chat.Card{} = peer) do
+    Db.db()
+    |> CubDB.get({:dialogs, peer_key(me, peer)})
   end
 
   defp peer_key(%Chat.Identity{} = me, %Chat.Card{} = peer) do
@@ -47,5 +27,10 @@ defmodule Chat.Dialogs.Registry do
     |> key()
   end
 
-  defp key(peer_keys), do: Enum.sort(peer_keys)
+  defp key(peer_keys) do
+    peer_keys
+    |> Enum.map(&Utils.hash/1)
+    |> Enum.sort()
+    |> Enum.join()
+  end
 end

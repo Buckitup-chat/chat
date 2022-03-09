@@ -6,6 +6,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
   alias Chat.Dialogs
   alias Chat.User
+  alias Chat.Utils
 
   def init(%{assigns: %{me: me}} = socket, user_id) do
     peer = User.by_id(user_id)
@@ -78,7 +79,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
   defp dialog_topic(%Dialogs.Dialog{a_key: a_key, b_key: b_key}) do
     [a_key, b_key]
-    |> Enum.map(fn key -> key |> User.by_key() |> Map.get(:id) end)
+    |> Enum.map(&Utils.hash/1)
     |> Enum.sort()
     |> Enum.join("---")
     |> then(&"dialog:#{&1}")

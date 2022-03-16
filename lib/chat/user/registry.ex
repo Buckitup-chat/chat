@@ -10,8 +10,7 @@ defmodule Chat.User.Registry do
     card = user |> Card.from_identity()
     hash = card.pub_key |> Utils.hash()
 
-    Db.db()
-    |> CubDB.put({:users, hash}, card)
+    Db.put({:users, hash}, card)
 
     hash
   end

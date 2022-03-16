@@ -7,13 +7,11 @@ defmodule Chat.Dialogs.Registry do
   alias Chat.Utils
 
   def update(%Dialogs.Dialog{} = dialog) do
-    Db.db()
-    |> CubDB.put({:dialogs, dialog |> dialog_key()}, dialog)
+    Db.put({:dialogs, dialog |> dialog_key()}, dialog)
   end
 
   def find(%Chat.Identity{} = me, %Chat.Card{} = peer) do
-    Db.db()
-    |> CubDB.get({:dialogs, peer_key(me, peer)})
+    Db.get({:dialogs, peer_key(me, peer)})
   end
 
   defp peer_key(%Chat.Identity{} = me, %Chat.Card{} = peer) do

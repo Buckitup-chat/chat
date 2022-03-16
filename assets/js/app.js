@@ -26,19 +26,18 @@ import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import * as LocalStateStore from "./hooks/local-storage"
+import * as LocalTime from "./hooks/local-time"
 
 
 
 let Hooks = {}
 
 Hooks.LocalStateStore = LocalStateStore.hooks
+Hooks.LocalTime = LocalTime.hooks
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
       params: {_csrf_token: csrfToken},
-      locale: Intl.NumberFormat().resolvedOptions().locale,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      timezone_offset: -(new Date().getTimezoneOffset() / 60),
       hooks: Hooks
 })
 

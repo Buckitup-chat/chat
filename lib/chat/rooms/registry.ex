@@ -7,7 +7,7 @@ defmodule Chat.Rooms.Registry do
   alias Chat.Utils
 
   def find(%Card{pub_key: pub_key}), do: pub_key |> Utils.hash() |> find()
-  def find(hash), do: Db.db() |> CubDB.get({:rooms, hash})
+  def find(hash), do: Db.get({:rooms, hash})
 
   def all,
     do:
@@ -15,7 +15,6 @@ defmodule Chat.Rooms.Registry do
       |> Db.list(fn {{:rooms, hash}, %Room{} = room} -> {hash, room} end)
 
   def update(%Room{pub_key: pub_key} = room) do
-    Db.db()
-    |> CubDB.put({:rooms, pub_key |> Utils.hash()}, room)
+    Db.put({:rooms, pub_key |> Utils.hash()}, room)
   end
 end

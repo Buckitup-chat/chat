@@ -7,16 +7,13 @@ defmodule ChatWeb.MainLive.Index do
   alias Chat.Rooms
   alias ChatWeb.MainLive.Page
 
+  on_mount ChatWeb.Hooks.LocalTimeHook
+
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
-      params = get_connect_params(socket)
-
       socket
       |> assign(
-        locale: params["locale"] || "en",
-        timezone: params["timezone"] || "UTC",
-        timezone_offset: params["timezone_offset"] || 0,
         need_login: true,
         mode: :user_list
       )

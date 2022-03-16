@@ -27,4 +27,8 @@ deploy:
 	git push gigalixir 
 
 firmware:
+	mix phx.digest
 	MIX_TARGET=host mix compile assets.deploy
+
+clean:
+	mix phx.digest.clean

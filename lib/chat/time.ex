@@ -4,15 +4,11 @@ defmodule Chat.Time do
   alias Chat.Db
 
   def init_time do
-    "#{Db.file_path()}/*.cub"
-    |> Path.wildcard()
-    |> Enum.map(fn file ->
-      %{atime: atime, mtime: mtime, ctime: ctime} = file |> File.lstat!(time: :posix)
-
-      [atime, mtime, ctime]
-      |> Enum.max()
-    end)
-    |> Enum.concat([Mix.Project.config_mtime()])
+    unless time = db_time() do
+      static_time()
+    else
+      time
+    end
     |> Enum.max()
     |> DateTime.from_unix!()
     |> set_time()
@@ -58,5 +54,32 @@ defmodule Chat.Time do
 
         :error
     end
+  end
+
+  defp db_time do
+    "#{Db.file_path()}/*.cub"
+    |> path_time()
+  end
+
+  defp static_time do
+    Application.app_dir(:chat)
+    |> Path.join("priv/static")
+    |> then(&"#{&1}/*")
+    |> path_time
+  end
+
+  defp path_time(wildcard) do
+    wildcard
+    |> Path.wildcard()
+    |> Enum.map(fn file ->
+      %{atime: atime, mtime: mtime, ctime: ctime} = file |> File.lstat!(time: :posix)
+
+      [atime, mtime, ctime]
+      |> Enum.max()
+    end)
+    |> then(fn
+      [] -> nil
+      x -> x
+    end)
   end
 end

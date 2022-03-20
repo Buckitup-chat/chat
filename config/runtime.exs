@@ -28,7 +28,7 @@ if config_env() == :prod do
   host =
     System.get_env("PHX_HOST") ||
       if System.get_env("APP_NAME") do
-        "#{System.get_env("APP_NAME")}.gigalixir.com"
+        "#{System.get_env("APP_NAME")}.gigalixirapp.com"
       end ||
       "buckitup.net"
 

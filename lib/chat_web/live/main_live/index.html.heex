@@ -21,6 +21,7 @@
     </div>
   </.form>
 </div> 
+  <a style="cursor: pointer" phx-click="login:request-key-ring"> Import Key Ring </a>
 <% else %>
   <%= if @mode == :user_list do %>
     <div class="row">
@@ -206,7 +207,43 @@
  
     </div>
   <% end %>
-<% end%>
+  <%= if @mode == :import_key_ring do %>
+    <div  align="center">
+      <p style="font-weight: bold; font-size: 500%"><%= @code %></p>
+      <a href={@url} target="_blank">
+        <img src={"data:image/svg+xml;base64, #{@encoded_qr_code}"} />
+      </a>
+    </div>
+  <% end %>
+  <%= if @mode == :export_key_ring do %>
+    <p>
+      Your identity and all rooms access will be copied to another client, that supplied this link and code to you.
+    </p>
+    <div class="row">
+      <.form
+        let={f}
+        for={:export_key_ring}
+        id="export-key-form"
+        autocomplete="off"
+        phx-submit={JS.hide() |> JS.push("export-keys")}
+      >
+        <%= text_input f, :code, placeholder: "Export Code", type: "number", min: 10, max: 99 %>
+        <%= error_tag f, :code %>
+          
+        <div>
+          <%= submit "Export Keys", phx_disable_with: "Saving..." %>
+        </div>
+      </.form>
+    </div>
+    <%= if @export_result == :error do %>
+      <p> Something went wrong. </p>
+      <p> Regenerate link and try new one </p>
+    <% end %>
+    <%= if @export_result == :ok do %>
+      <p> All good. Keys have been exported </p>
+    <% end %>
+  <% end %>
+<% end %>
 <% end %>
 
 

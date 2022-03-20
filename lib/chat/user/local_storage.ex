@@ -3,7 +3,7 @@ defmodule Chat.User.LocalStorage do
 
   alias Chat.Identity
 
-  def encode(%Identity{} = me, rooms \\ []) do
+  def encode(%Identity{} = me, rooms) do
     %{me: me, rooms: rooms}
     |> :erlang.term_to_binary()
     |> Base.encode64()

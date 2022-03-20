@@ -15,9 +15,10 @@ defmodule Chat.Application do
       # Start DB
       Chat.Db,
       # Start the Endpoint (http/https)
-      ChatWeb.Endpoint
+      ChatWeb.Endpoint,
       # Start a worker by calling: Chat.Worker.start_link(arg)
       # {Chat.Worker, arg}
+      Chat.KeyRingTokens
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

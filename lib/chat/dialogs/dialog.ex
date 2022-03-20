@@ -22,7 +22,7 @@ defmodule Chat.Dialogs.Dialog do
         %__MODULE__{} = dialog,
         %Chat.Identity{} = source,
         text,
-        now \\ DateTime.utc_now()
+        now
       ) do
     add_message(dialog, source, text, now: now, type: :text)
   end
@@ -31,7 +31,7 @@ defmodule Chat.Dialogs.Dialog do
         %__MODULE__{} = dialog,
         %Chat.Identity{} = source,
         data,
-        now \\ DateTime.utc_now()
+        now
       ) do
     {key, secret} = Images.add(data)
 
@@ -45,8 +45,8 @@ defmodule Chat.Dialogs.Dialog do
   def read(
         %__MODULE__{messages: messages, a_key: a_key, b_key: b_key},
         %Chat.Identity{} = me,
-        before \\ DateTime.utc_now() |> DateTime.to_unix(),
-        amount \\ 100
+        before,
+        amount
       ) do
     side =
       case me |> User.pub_key() do
@@ -67,14 +67,6 @@ defmodule Chat.Dialogs.Dialog do
         content: msg[side] |> User.decrypt(me)
       }
     end)
-  end
-
-  def peer_pub_key(%__MODULE__{a_key: a_key, b_key: b_key}, %Chat.Identity{} = me) do
-    case me |> User.pub_key() do
-      ^a_key -> b_key
-      ^b_key -> a_key
-      _ -> raise "unknown_user_in_dialog"
-    end
   end
 
   def glimpse(%__MODULE__{messages: [last | _]} = dialog) do

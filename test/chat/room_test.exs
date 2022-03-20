@@ -36,6 +36,9 @@ defmodule Chat.Rooms.RoomTest do
 
     assert %Rooms.Room{messages: [%Rooms.Message{author_hash: ^alice_hash, type: :text}]} =
              updated_room
+
+    assert [%Rooms.PlainMessage{content: ^message, type: :text, author_hash: ^alice_hash}] =
+             updated_room |> Rooms.read(room_identity)
   end
 
   test "room invite" do

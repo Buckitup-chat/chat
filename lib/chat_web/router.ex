@@ -21,6 +21,7 @@ defmodule ChatWeb.Router do
     get "/get/image/:id", FileController, :image
 
     live "/", MainLive.Index, :index
+    live "/export-key-ring/:id", MainLive.Index, :export
   end
 
   # Other scopes may use custom stacks.

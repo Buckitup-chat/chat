@@ -14,6 +14,7 @@ defmodule ChatWeb.MainLive.Page.Login do
     socket
     |> assign_logged_user(me, id)
     |> store()
+    |> close()
     |> Page.Lobby.notify_new_user(me |> Chat.Card.from_identity())
   end
 
@@ -23,6 +24,7 @@ defmodule ChatWeb.MainLive.Page.Login do
 
     socket
     |> assign_logged_user(me, id, rooms)
+    |> close()
     |> Page.Lobby.notify_new_user(me |> Chat.Card.from_identity())
   end
 
@@ -44,6 +46,10 @@ defmodule ChatWeb.MainLive.Page.Login do
     |> assign(:me, me)
     |> assign(:my_id, id)
     |> assign(:rooms, rooms)
+  end
+
+  def close(socket) do
+    socket
     |> assign(:need_login, false)
   end
 end

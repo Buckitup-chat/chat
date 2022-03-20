@@ -33,6 +33,7 @@ defmodule Chat.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      {:qr_code, "~> 2.2.1"},
       {:cubdb, "~> 1.1.0"},
       {:struct_access, "~> 1.1"},
       {:uuid, "~> 1.1"},

@@ -10,33 +10,40 @@ defmodule ChatWeb.MainLive.Index do
   on_mount ChatWeb.Hooks.LocalTimeHook
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(params, _session, %{assigns: %{live_action: action}} = socket) do
     if connected?(socket) do
-      socket
-      |> assign(
-        need_login: true,
-        mode: :user_list
-      )
-      |> allow_upload(:image,
-        accept: ~w(.jpg .jpeg .png),
-        auto_upload: true,
-        max_entries: 1,
-        max_size: 60_000_000,
-        progress: &handle_progress/3
-      )
-      |> allow_upload(:room_image,
-        accept: ~w(.jpg .jpeg .png),
-        auto_upload: true,
-        max_entries: 1,
-        max_size: 60_000_000,
-        progress: &handle_progress/3
-      )
-      |> Page.Login.check_stored()
-      |> ok()
+      if action == :export do
+        socket
+        |> assign(:need_login, false)
+        |> Page.ExportKeyRing.init(params["id"])
+        |> Page.Login.check_stored()
+        |> ok()
+      else
+        socket
+        |> assign(
+          need_login: true,
+          mode: :user_list
+        )
+        |> allow_image_upload(:image)
+        |> allow_image_upload(:room_image)
+        |> Page.Login.check_stored()
+        |> ok()
+      end
     else
       socket
       |> ok()
     end
+  end
+
+  defp allow_image_upload(socket, type) do
+    socket
+    |> allow_upload(type,
+      accept: ~w(.jpg .jpeg .png),
+      auto_upload: true,
+      max_entries: 1,
+      max_size: 60_000_000,
+      progress: &handle_progress/3
+    )
   end
 
   @impl true
@@ -49,10 +56,23 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_event("restoreAuth", nil, socket), do: socket |> noreply()
 
+  def handle_event("restoreAuth", data, %{assigns: %{live_action: :export}} = socket) do
+    socket
+    |> Page.Login.load_user(data)
+    |> noreply()
+  end
+
   def handle_event("restoreAuth", data, socket) do
     socket
     |> Page.Login.load_user(data)
     |> Page.Lobby.init()
+    |> noreply()
+  end
+
+  def handle_event("login:request-key-ring", _, socket) do
+    socket
+    |> Page.Login.close()
+    |> Page.ImportKeyRing.init()
     |> noreply()
   end
 
@@ -114,6 +134,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("export-keys", %{"export_key_ring" => %{"code" => code}}, socket) do
+    socket
+    |> Page.ExportKeyRing.send_key_ring(code |> String.to_integer())
+    |> noreply
+  end
+
   @impl true
   def handle_info({:new_dialog_message, glimpse}, socket) do
     socket
@@ -148,6 +174,15 @@ defmodule ChatWeb.MainLive.Index do
   def handle_info(:room_request_approved, socket) do
     socket
     |> Page.Lobby.join_rooms()
+    |> noreply()
+  end
+
+  def handle_info({:exported_key_ring, keys}, socket) do
+    socket
+    |> Page.ImportKeyRing.save_key_ring(keys)
+    |> Page.Login.store()
+    |> Page.ImportKeyRing.close()
+    |> Page.Lobby.init()
     |> noreply()
   end
 

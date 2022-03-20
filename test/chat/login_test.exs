@@ -41,4 +41,16 @@ defmodule Chat.LoginTest do
 
     assert {^alice, []} = decoded
   end
+
+  test "deprecated identity" do
+    alice = "Alice" |> User.login()
+    deprecated_alice = %{alice | __struct__: Chat.User.Identity}
+
+    assert {^alice, []} =
+             deprecated_alice
+             |> then(&%{me: &1, rooms: []})
+             |> :erlang.term_to_binary()
+             |> Base.encode64()
+             |> User.LocalStorage.decode()
+  end
 end

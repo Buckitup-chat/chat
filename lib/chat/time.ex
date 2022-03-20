@@ -1,13 +1,14 @@
 defmodule Chat.Time do
+  @moduledoc "Time manipulation helpers as RPi has no offline internal clock"
   require Logger
 
   alias Chat.Db
 
   def init_time do
-    unless time = db_time() do
-      static_time()
-    else
+    if time = db_time() do
       time
+    else
+      static_time()
     end
     |> Enum.max()
     |> DateTime.from_unix!()

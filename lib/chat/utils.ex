@@ -1,14 +1,28 @@
 defmodule Chat.Utils do
   @moduledoc "Util functions"
+
+  alias Chat.Card
+  alias Chat.Identity
+
   @cipher :blowfish_cfb64
-  def hash(data) when is_binary(data) do
-    data
-    |> then(&:crypto.hash(:sha3_256, &1))
+  @hasher :sha3_256
+
+  def binhash(data) do
+    :crypto.hash(@hasher, binary(data))
+  end
+
+  def hash(<<_::size(256)>> = bin) do
+    bin
     |> Base.encode16()
     |> String.downcase()
   end
 
-  def hash({:RSAPublicKey, a, b}), do: "RSAPublicKey|#{a}|#{b}" |> hash()
+  def hash(data) do
+    data
+    |> binhash()
+    |> Base.encode16()
+    |> String.downcase()
+  end
 
   def page(timestamped, before, amount) do
     timestamped
@@ -53,6 +67,10 @@ defmodule Chat.Utils do
   def decrypt_blob(data, <<iv::bits-size(64), key::bits>> = _secret) do
     :crypto.crypto_one_time(@cipher, key, iv, data, false)
   end
+
+  defp binary({:RSAPublicKey, a, b}), do: "RSAPublicKey|#{a}|#{b}"
+  defp binary(%Card{pub_key: key}), do: key |> binary()
+  defp binary(%Identity{} = ident), do: ident |> Identity.pub_key() |> binary()
 
   defp generate_key do
     iv = 8 |> :crypto.strong_rand_bytes()

@@ -3,6 +3,7 @@ defmodule Chat.Rooms do
 
   alias Chat.Card
   alias Chat.Identity
+  alias Chat.Log
   alias Chat.Rooms.Registry
   alias Chat.Rooms.Room
   alias Chat.Utils
@@ -14,6 +15,8 @@ defmodule Chat.Rooms do
     |> tap(fn room_identity ->
       Room.create(me, room_identity)
       |> Registry.update()
+
+      me |> Log.create_room(room_identity)
     end)
   end
 
@@ -55,6 +58,9 @@ defmodule Chat.Rooms do
     room_hash
     |> get()
     |> Room.add_request(user_identity)
+    |> tap(fn room ->
+      Log.request_room_key(user_identity, room.pub_key)
+    end)
     |> update()
   end
 
@@ -74,6 +80,10 @@ defmodule Chat.Rooms do
     |> Room.join_approved_requests(person_identity)
     |> then(fn {room, joined_identities} ->
       update(room)
+
+      unless [] == joined_identities do
+        Log.got_room_key(person_identity, room.pub_key)
+      end
 
       joined_identities
     end)

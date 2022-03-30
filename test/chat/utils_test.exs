@@ -29,4 +29,17 @@ defmodule Chat.UtilsTest do
              %{timestamp: 18}
            ] = Utils.page(list, 19, 2)
   end
+
+  test "test binhash" do
+    bin = :binary.copy(<<255>>, 32)
+
+    assert "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" == Utils.hash(bin)
+  end
+
+  test "" do
+    me = Chat.Identity.create("Alice")
+    card = Chat.Card.from_identity(me)
+
+    assert Utils.hash(me) == Utils.hash(card)
+  end
 end

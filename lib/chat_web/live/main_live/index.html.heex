@@ -25,6 +25,9 @@
 <% else %>
   <%= if @mode == :user_list do %>
     <div class="row">
+      <a phx-click="open-feed" style="cursor: pointer;">News feed</a>
+    </div>
+    <div class="row">
       <div class="column column-50">
         <h2> User list </h2>
         <ul>
@@ -242,6 +245,21 @@
     <%= if @export_result == :ok do %>
       <p> All good. Keys have been exported </p>
     <% end %>
+  <% end %>
+  <%= if @mode == :action_feed do %>
+    <div id="action-feed-mode">
+      <button class="button button-outline float-right" phx-click="close-feed">Back</button>
+      <div id="action-feed-list" phx-update="append">
+        <%= for item <- @action_feed_list do %>
+          <div class="row" id={"item-#{UUID.uuid4()}"}>
+            <Page.Feed.item item={item} tz={@timezone} />
+          </div>
+        <% end %>
+      </div>
+      <%= if @action_feed_till > Chat.Log.start_time do %> 
+        <button class="button button-outline" phx-click="feed-more">More</button>
+      <% end %>
+    </div>
   <% end %>
 <% end %>
 <% end %>

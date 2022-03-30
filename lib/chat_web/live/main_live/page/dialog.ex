@@ -5,6 +5,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Phoenix.PubSub
 
   alias Chat.Dialogs
+  alias Chat.Log
   alias Chat.User
   alias Chat.Utils
 
@@ -14,6 +15,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     messages = dialog |> Dialogs.read(me)
 
     PubSub.subscribe(Chat.PubSub, dialog |> dialog_topic())
+    Log.open_direct(me, peer)
 
     socket
     |> assign(:mode, :dialog)
@@ -34,6 +36,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       updated_dialog |> dialog_topic(),
       {:new_dialog_message, updated_dialog |> Dialogs.glimpse()}
     )
+
+    Log.message_direct(me, Dialogs.peer(dialog, me))
 
     socket
     |> assign(:dialog, updated_dialog)
@@ -57,6 +61,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       updated_dialog |> dialog_topic(),
       {:new_dialog_message, updated_dialog |> Dialogs.glimpse()}
     )
+
+    Log.message_direct(me, Dialogs.peer(dialog, me))
 
     socket
     |> assign(:dialog, updated_dialog)

@@ -30,11 +30,16 @@ defmodule Chat.Db do
     |> GenServer.call(:db)
   end
 
-  def list({min, max}, transform) do
+  def list(range, transform) do
+    range
+    |> list()
+    |> Map.new(transform)
+  end
+
+  def list({min, max}) do
     db()
     |> CubDB.select(min_key: min, max_key: max)
     |> then(fn {:ok, list} -> list end)
-    |> Map.new(transform)
   end
 
   def get(key) do

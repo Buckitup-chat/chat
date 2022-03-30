@@ -3,6 +3,7 @@ defmodule Chat.User do
 
   alias Chat.Card
   alias Chat.Identity
+  alias Chat.Log
   alias Chat.User.LocalStorage
   alias Chat.User.Registry
 
@@ -13,8 +14,13 @@ defmodule Chat.User do
     :public_key.decrypt_private(ciphertext, key)
   end
 
-  def login(%Identity{} = identity), do: identity
-  def login(name) when is_binary(name), do: Identity.create(name)
+  def login(%Identity{} = identity), do: identity |> tap(&Log.visit/1)
+
+  def login(name) when is_binary(name) do
+    name
+    |> Identity.create()
+    |> tap(&Log.sign_in/1)
+  end
 
   def register(%Identity{} = identity), do: Registry.enlist(identity)
 

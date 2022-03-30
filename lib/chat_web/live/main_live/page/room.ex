@@ -5,10 +5,11 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Phoenix.PubSub
 
   alias Chat.Identity
+  alias Chat.Log
   alias Chat.Rooms
   alias Chat.Utils
 
-  def init(%{assigns: %{rooms: rooms}} = socket, room_hash) do
+  def init(%{assigns: %{rooms: rooms, me: me}} = socket, room_hash) do
     room = Rooms.get(room_hash)
 
     room_identity =
@@ -18,6 +19,8 @@ defmodule ChatWeb.MainLive.Page.Room do
     messages = room |> Rooms.read(room_identity)
 
     PubSub.subscribe(Chat.PubSub, room |> room_topic())
+
+    Log.visit_room(me, room_identity)
 
     socket
     |> assign(:mode, :room)
@@ -38,6 +41,8 @@ defmodule ChatWeb.MainLive.Page.Room do
       updated_room |> room_topic(),
       {:new_room_message, updated_room |> Rooms.glimpse()}
     )
+
+    Log.message_room(me, room.pub_key)
 
     socket
     |> assign(:room, updated_room)
@@ -61,6 +66,8 @@ defmodule ChatWeb.MainLive.Page.Room do
       updated_room |> room_topic(),
       {:new_room_message, updated_room |> Rooms.glimpse()}
     )
+
+    Log.message_room(me, room.pub_key)
 
     socket
     |> assign(:room, updated_room)

@@ -140,6 +140,26 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply
   end
 
+  def handle_event("open-feed", _, socket) do
+    socket
+    |> Page.Lobby.close()
+    |> Page.Feed.init()
+    |> noreply()
+  end
+
+  def handle_event("feed-more", _, socket) do
+    socket
+    |> Page.Feed.more()
+    |> noreply()
+  end
+
+  def handle_event("close-feed", _, socket) do
+    socket
+    |> Page.Feed.close()
+    |> Page.Lobby.init()
+    |> noreply()
+  end
+
   @impl true
   def handle_info({:new_dialog_message, glimpse}, socket) do
     socket

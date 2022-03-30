@@ -3,6 +3,7 @@ defmodule ChatWeb.MainLive.Page.ExportKeyRing do
   import Phoenix.LiveView, only: [assign: 3]
 
   alias Chat.KeyRingTokens
+  alias Chat.Log
 
   def init(socket, uuid) do
     socket
@@ -15,6 +16,7 @@ defmodule ChatWeb.MainLive.Page.ExportKeyRing do
     case KeyRingTokens.get(export_id, code) do
       {:ok, pid} ->
         send(pid, {:exported_key_ring, {me, rooms}})
+        Log.export_keys(me)
 
         socket
         |> assign(:export_result, :ok)

@@ -35,4 +35,9 @@ defmodule Chat.Dialogs do
                 amount \\ 1000
               ),
               to: Dialog
+
+  def peer(dialog, %Identity{} = me), do: peer(dialog, me |> Identity.pub_key())
+  def peer(dialog, %Card{pub_key: key}), do: peer(dialog, key)
+  def peer(%Dialog{a_key: my_key, b_key: peer_key}, my_key), do: peer_key
+  def peer(%Dialog{a_key: peer_key, b_key: my_key}, my_key), do: peer_key
 end

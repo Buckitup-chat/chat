@@ -32,13 +32,21 @@ defmodule Chat.Rooms.RoomTest do
     room = Rooms.Room.create(alice, room_identity)
 
     message = "hello, room"
-    updated_room = Rooms.add_text(room, alice, message)
+    image = {"image_content", "image/plain"}
 
-    assert %Rooms.Room{messages: [%Rooms.Message{author_hash: ^alice_hash, type: :text}]} =
-             updated_room
+    updated_room =
+      room
+      |> Rooms.add_text(alice, message)
+      |> Rooms.add_image(alice, image)
 
-    assert [%Rooms.PlainMessage{content: ^message, type: :text, author_hash: ^alice_hash}] =
-             updated_room |> Rooms.read(room_identity)
+    assert [
+             %Rooms.PlainMessage{content: ^message, type: :text, author_hash: ^alice_hash},
+             %Rooms.PlainMessage{type: :image}
+           ] = updated_room |> Rooms.read(room_identity)
+
+    assert [
+             %Rooms.PlainMessage{type: :image}
+           ] = updated_room |> Rooms.glimpse() |> Rooms.read(room_identity)
   end
 
   test "room invite" do

@@ -1,11 +1,11 @@
 defmodule Chat.Dialogs.Dialog do
   @moduledoc "Module to hold a conversation between A and B"
 
-  alias Chat.Images
-  alias Chat.User
-
   alias Chat.Dialogs.Message
   alias Chat.Dialogs.PrivateMessage
+  alias Chat.Images
+  alias Chat.User
+  alias Chat.Utils
 
   @derive {Inspect, only: [:messages]}
   defstruct [:a_key, :b_key, :messages]
@@ -64,7 +64,7 @@ defmodule Chat.Dialogs.Dialog do
         timestamp: msg.timestamp,
         type: msg.type,
         is_mine?: is_mine?,
-        content: msg[side] |> User.decrypt(me)
+        content: msg[side] |> Utils.decrypt(me)
       }
     end)
   end
@@ -81,8 +81,8 @@ defmodule Chat.Dialogs.Dialog do
        ) do
     new_messsage =
       case source |> User.pub_key() do
-        ^a_key -> Message.a_to_b(User.encrypt(msg, a_key), User.encrypt(msg, b_key), opts)
-        ^b_key -> Message.b_to_a(User.encrypt(msg, a_key), User.encrypt(msg, b_key), opts)
+        ^a_key -> Message.a_to_b(Utils.encrypt(msg, a_key), Utils.encrypt(msg, b_key), opts)
+        ^b_key -> Message.b_to_a(Utils.encrypt(msg, a_key), Utils.encrypt(msg, b_key), opts)
         _ -> raise "unknown_user_in_dialog"
       end
 

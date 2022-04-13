@@ -31,25 +31,23 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def send_text(%{assigns: %{room: room, me: me}} = socket, text) do
-    updated_room =
+    new_message =
       room
       |> Rooms.add_text(me, text)
-      |> tap(&Rooms.update/1)
 
     PubSub.broadcast!(
       Chat.PubSub,
-      updated_room |> room_topic(),
-      {:new_room_message, updated_room |> Rooms.glimpse()}
+      room |> room_topic(),
+      {:new_room_message, new_message}
     )
 
     Log.message_room(me, room.pub_key)
 
     socket
-    |> assign(:room, updated_room)
   end
 
   def send_image(%{assigns: %{me: me, room: room}} = socket) do
-    updated_room =
+    new_message =
       consume_uploaded_entries(
         socket,
         :room_image,
@@ -59,27 +57,21 @@ defmodule ChatWeb.MainLive.Page.Room do
         end
       )
       |> Enum.at(0)
-      |> tap(&Rooms.update/1)
 
     PubSub.broadcast!(
       Chat.PubSub,
-      updated_room |> room_topic(),
-      {:new_room_message, updated_room |> Rooms.glimpse()}
+      room |> room_topic(),
+      {:new_room_message, new_message}
     )
 
     Log.message_room(me, room.pub_key)
 
     socket
-    |> assign(:room, updated_room)
   end
 
-  def show_new(%{assigns: %{room_identity: identity}} = socket, glimpse) do
-    messages =
-      glimpse
-      |> Rooms.read(identity)
-
+  def show_new(%{assigns: %{room_identity: identity}} = socket, new_message) do
     socket
-    |> assign(:messages, messages)
+    |> assign(:messages, [new_message |> Rooms.read_message(identity)])
     |> assign(:message_update_mode, :append)
   end
 

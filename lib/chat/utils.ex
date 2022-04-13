@@ -42,6 +42,16 @@ defmodule Chat.Utils do
     |> then(&elem(&1, 0))
   end
 
+  def encrypt(text, %Identity{} = identity),
+    do: identity |> Identity.pub_key() |> then(&encrypt(text, &1))
+
+  def encrypt(text, %Card{pub_key: key}), do: encrypt(text, key)
+  def encrypt(text, key), do: :public_key.encrypt_public(text, key)
+
+  def decrypt(ciphertext, %Identity{priv_key: key}) do
+    :public_key.decrypt_private(ciphertext, key)
+  end
+
   def encrypt_blob({data, type}) do
     {iv, key} = generate_key()
     data_blob = :crypto.crypto_one_time(@cipher, key, iv, data, true)
@@ -71,6 +81,12 @@ defmodule Chat.Utils do
   defp binary({:RSAPublicKey, a, b}), do: "RSAPublicKey|#{a}|#{b}"
   defp binary(%Card{pub_key: key}), do: key |> binary()
   defp binary(%Identity{} = ident), do: ident |> Identity.pub_key() |> binary()
+
+  defp binary(
+         <<_::binary-size(8), ?-, _::binary-size(4), ?-, _::binary-size(4), ?-, _::binary-size(4),
+           ?-, _::binary-size(12)>> = uuid
+       ),
+       do: UUID.string_to_binary!(uuid)
 
   defp generate_key do
     iv = 8 |> :crypto.strong_rand_bytes()

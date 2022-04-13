@@ -4,6 +4,7 @@ defmodule ChatWeb.MainLive.Index do
 
   alias Phoenix.LiveView.JS
 
+  alias Chat.Db
   alias Chat.Rooms
   alias ChatWeb.MainLive.Page
 
@@ -26,6 +27,7 @@ defmodule ChatWeb.MainLive.Index do
         )
         |> allow_image_upload(:image)
         |> allow_image_upload(:room_image)
+        |> allow_any500m_upload(:backup_file)
         |> Page.Login.check_stored()
         |> ok()
       end
@@ -33,17 +35,6 @@ defmodule ChatWeb.MainLive.Index do
       socket
       |> ok()
     end
-  end
-
-  defp allow_image_upload(socket, type) do
-    socket
-    |> allow_upload(type,
-      accept: ~w(.jpg .jpeg .png),
-      auto_upload: true,
-      max_entries: 1,
-      max_size: 60_000_000,
-      progress: &handle_progress/3
-    )
   end
 
   @impl true
@@ -160,6 +151,20 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("open-data-restore", _, socket) do
+    socket
+    |> assign(:mode, :restore_data)
+    |> noreply()
+  end
+
+  def handle_event("backup-file-submit", _, socket), do: socket |> noreply()
+
+  def handle_event("close-data-restore", _, socket) do
+    socket
+    |> assign(:mode, :user_list)
+    |> noreply()
+  end
+
   @impl true
   def handle_info({:new_dialog_message, glimpse}, socket) do
     socket
@@ -212,15 +217,32 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_progress(:image, _, socket), do: socket |> noreply()
-
   def handle_progress(:room_image, %{done?: true}, socket) do
     socket
     |> Page.Room.send_image()
     |> noreply()
   end
 
-  def handle_progress(:room_image, _, socket), do: socket |> noreply()
+  def handle_progress(:backup_file, %{done?: true}, socket) do
+    consume_uploaded_entries(
+      socket,
+      :backup_file,
+      fn %{path: path}, _entry ->
+        dir = Temp.mkdir!("rec")
+        File.rename!(path, Path.join([dir, "0.cub"]))
+
+        {:ok, other_db} = CubDB.start_link(dir)
+        other_db |> Db.copy_data(Db.db())
+        Db.db() |> CubDB.file_sync()
+
+        CubDB.stop(other_db)
+      end
+    )
+  end
+
+  def handle_progress(_file, _entry, socket) do
+    socket |> noreply()
+  end
 
   defp message(%{msg: %{type: :text}} = assigns) do
     ~H"""
@@ -286,5 +308,27 @@ defmodule ChatWeb.MainLive.Index do
           phx-click={JS.dispatch("chat:toggle", detail: %{class: "preview"})}
         />
     """
+  end
+
+  defp allow_image_upload(socket, type) do
+    socket
+    |> allow_upload(type,
+      accept: ~w(.jpg .jpeg .png),
+      auto_upload: true,
+      max_entries: 1,
+      max_size: 60_000_000,
+      progress: &handle_progress/3
+    )
+  end
+
+  defp allow_any500m_upload(socket, type) do
+    socket
+    |> allow_upload(type,
+      auto_upload: true,
+      max_file_size: 524_000_000,
+      accept: :any,
+      max_entries: 1,
+      progress: &handle_progress/3
+    )
   end
 end

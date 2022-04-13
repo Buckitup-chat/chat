@@ -19,6 +19,7 @@ defmodule ChatWeb.Router do
 
     get "/index", PageController, :index
     get "/get/image/:id", FileController, :image
+    get "/get/backup", TempSyncController, :backup
 
     live "/", MainLive.Index, :index
     live "/export-key-ring/:id", MainLive.Index, :export

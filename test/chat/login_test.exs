@@ -2,6 +2,7 @@ defmodule Chat.LoginTest do
   use ExUnit.Case, async: true
 
   alias Chat.User
+  alias Chat.Utils
 
   test "login with no identity" do
     correct_name = "Some Name Here"
@@ -21,9 +22,9 @@ defmodule Chat.LoginTest do
 
     message = "some message in string"
 
-    assert User.encrypt(message, alice_card) != message
+    assert Utils.encrypt(message, alice_card) != message
 
-    assert ^message = message |> User.encrypt(alice_card) |> User.decrypt(alice)
+    assert ^message = message |> Utils.encrypt(alice_card) |> Utils.decrypt(alice)
 
     assert ~s|#Chat.Identity<name: "#{alice.name}", ...>| == inspect(alice)
 

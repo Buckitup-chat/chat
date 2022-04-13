@@ -7,13 +7,6 @@ defmodule Chat.User do
   alias Chat.User.LocalStorage
   alias Chat.User.Registry
 
-  def encrypt(text, %Card{pub_key: key}), do: encrypt(text, key)
-  def encrypt(text, key), do: :public_key.encrypt_public(text, key)
-
-  def decrypt(ciphertext, %Identity{priv_key: key}) do
-    :public_key.decrypt_private(ciphertext, key)
-  end
-
   def login(%Identity{} = identity), do: identity |> tap(&Log.visit/1)
 
   def login(name) when is_binary(name) do

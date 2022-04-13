@@ -4,8 +4,10 @@ defmodule Chat.Rooms do
   alias Chat.Card
   alias Chat.Identity
   alias Chat.Log
+  alias Chat.Rooms.Message
   alias Chat.Rooms.Registry
   alias Chat.Rooms.Room
+  alias Chat.Rooms.RoomMessages
   alias Chat.Utils
 
   @doc "Returns new room Identity"
@@ -42,17 +44,18 @@ defmodule Chat.Rooms do
     Registry.find(hash)
   end
 
-  defdelegate add_text(room, me, text), to: Room
-  defdelegate add_image(room, me, data), to: Room
-  defdelegate glimpse(room), to: Room
+  defdelegate add_text(room, me, text), to: RoomMessages
+  defdelegate add_image(room, me, data), to: RoomMessages
 
   defdelegate read(
                 room,
                 room_identity,
-                before \\ DateTime.utc_now() |> DateTime.add(1) |> DateTime.to_unix(),
+                before \\ {nil, 0},
                 amount \\ 1000
               ),
-              to: Room
+              to: RoomMessages
+
+  def read_message(%Message{} = msg, %Identity{} = identity), do: RoomMessages.read(msg, identity)
 
   def add_request(room_hash, user_identity) do
     room_hash

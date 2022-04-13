@@ -8,18 +8,13 @@ defmodule Chat.Rooms.RoomTest do
 
   test "room creation" do
     alice = User.login("Alice")
-    alice_hash = alice |> User.pub_key() |> Utils.hash()
-
     room_name = "Alice's room"
-
     room_identity = alice |> Rooms.add(room_name)
-
     room = Rooms.Room.create(alice, room_identity)
 
     assert %Rooms.Room{} = room
 
-    correct =
-      ~s|#Chat.Rooms.Room<messages: [], name: "#{room_name}", users: ["#{alice_hash}"], ...>|
+    correct = ~s|#Chat.Rooms.Room<name: "#{room_name}", ...>|
 
     assert correct == inspect(room)
   end
@@ -34,19 +29,15 @@ defmodule Chat.Rooms.RoomTest do
     message = "hello, room"
     image = {"image_content", "image/plain"}
 
-    updated_room =
-      room
-      |> Rooms.add_text(alice, message)
-      |> Rooms.add_image(alice, image)
+    room |> Rooms.add_text(alice, message)
+    image_msg = room |> Rooms.add_image(alice, image)
 
     assert [
              %Rooms.PlainMessage{content: ^message, type: :text, author_hash: ^alice_hash},
              %Rooms.PlainMessage{type: :image}
-           ] = updated_room |> Rooms.read(room_identity)
+           ] = room |> Rooms.read(room_identity)
 
-    assert [
-             %Rooms.PlainMessage{type: :image}
-           ] = updated_room |> Rooms.glimpse() |> Rooms.read(room_identity)
+    assert %Rooms.PlainMessage{type: :image} = image_msg |> Rooms.read_message(room_identity)
   end
 
   test "room invite" do
@@ -73,7 +64,7 @@ defmodule Chat.Rooms.RoomTest do
 
     secret =
       enc_secret
-      |> User.decrypt(bob)
+      |> Utils.decrypt(bob)
 
     decrypted =
       blob

@@ -44,5 +44,7 @@ npm-debug.log
 
 # Database
 /priv/db
+/priv/test_db
+
 
 chat.iml

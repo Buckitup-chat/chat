@@ -25,6 +25,12 @@
 <% else %>
   <%= if @mode == :user_list do %>
     <div class="row">
+      <blockquote>
+      <a phx-click="open-data-restore" style="cursor: pointer;">Restore data</a>
+      or <a href="/get/backup">Backup</a> it
+      </blockquote>
+    </div>
+    <div class="row">
       <a phx-click="open-feed" style="cursor: pointer;">News feed</a>
     </div>
     <div class="row">
@@ -261,6 +267,35 @@
       <% end %>
     </div>
   <% end %>
+  <%= if @mode == :restore_data do %>
+    <div id="restore-data-mode">
+      <button class="button button-outline float-right" phx-click="close-data-restore">Back</button>
+      <div class="text-right row">
+        <.form
+          for={:backup_file}
+          id="backup-file-form"
+          class="column column-50 column-offset-50"
+          phx-change="backup-file-submit"
+          phx-submit="backup-file-submit"
+          phx-drop-target={@uploads.backup_file.ref}
+        >
+            <%= live_file_input @uploads.backup_file, style: "display: none" %>
+            <input type="button" value="Upload Backup" onclick="event.target.parentNode.querySelector('input[type=file]').click()" >
+
+          <%= for entry <- @uploads.backup_file.entries do %>
+            <%= if entry.progress > 0 and entry.progress < 100 do %>
+              <progress value={entry.progress} max="100"> <%= entry.progress %>% </progress>
+            <% end %>
+
+            <%= for err <- upload_errors(@uploads.backup_file, entry) do %>
+              <p class="alert alert-danger"><%= err %></p>
+            <% end %>
+          <% end %>
+        </.form>
+      </div>
+    </div>
+
+  <% end %> 
 <% end %>
 <% end %>
 

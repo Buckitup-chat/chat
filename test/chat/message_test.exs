@@ -4,6 +4,7 @@ defmodule Chat.Dialogs.MessageTest do
   alias Chat.Card
   alias Chat.Dialogs
   alias Chat.User
+  alias Chat.Utils
 
   test "start dialog" do
     alice = User.login("Alice")
@@ -22,10 +23,10 @@ defmodule Chat.Dialogs.MessageTest do
 
     message = dialog.messages |> Enum.at(0)
 
-    assert text_message == message.a_copy |> User.decrypt(alice)
-    assert text_message == message.b_copy |> User.decrypt(bob)
+    assert text_message == message.a_copy |> Utils.decrypt(alice)
+    assert text_message == message.b_copy |> Utils.decrypt(bob)
 
-    assert_raise ErlangError, fn -> message.a_copy |> User.decrypt(bob) end
+    assert_raise ErlangError, fn -> message.a_copy |> Utils.decrypt(bob) end
 
     bob_answer = "Bob welcomes Alice too"
 
@@ -37,8 +38,8 @@ defmodule Chat.Dialogs.MessageTest do
 
     message = dialog.messages |> Enum.reverse() |> Enum.at(1)
 
-    assert bob_answer == message.a_copy |> User.decrypt(alice)
-    assert bob_answer == message.b_copy |> User.decrypt(bob)
+    assert bob_answer == message.a_copy |> Utils.decrypt(alice)
+    assert bob_answer == message.b_copy |> Utils.decrypt(bob)
   end
 
   test "read dialog" do

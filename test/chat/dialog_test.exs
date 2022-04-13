@@ -3,7 +3,6 @@ defmodule Chat.Dialogs.DialogTest do
 
   alias Chat.Card
   alias Chat.Dialogs
-  alias Chat.Identitiy
   alias Chat.User
 
   test "start dialog" do

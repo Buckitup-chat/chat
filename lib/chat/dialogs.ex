@@ -3,8 +3,10 @@ defmodule Chat.Dialogs do
 
   alias Chat.Card
   alias Chat.Dialogs.Dialog
+  alias Chat.Dialogs.Message
   alias Chat.Dialogs.Registry
   alias Chat.Identity
+  alias Chat.Utils
 
   def find_or_open(%Identity{} = src, %Card{} = dst) do
     case Registry.find(src, dst) do
@@ -26,15 +28,24 @@ defmodule Chat.Dialogs do
   defdelegate add_text(dialog, src, text, now \\ DateTime.utc_now()), to: Dialog
   defdelegate add_image(dialog, src, data, now \\ DateTime.utc_now()), to: Dialog
 
-  defdelegate glimpse(dialog), to: Dialog
+  def read(
+        %Dialog{} = dialog,
+        %Identity{} = reader,
+        before \\ {nil, 0},
+        amount \\ 1000
+      ),
+      do: Dialog.read(dialog, reader, before, amount)
 
-  defdelegate read(
-                dialog,
-                reader,
-                before \\ DateTime.utc_now() |> DateTime.add(1) |> DateTime.to_unix(),
-                amount \\ 1000
-              ),
-              to: Dialog
+  def read_message(%Dialog{} = dialog, %Message{} = message, %Identity{} = me) do
+    side = Dialog.my_side(dialog, me)
+    Dialog.read(message, me, side)
+  end
+
+  def key(%Dialog{} = dialog) do
+    dialog
+    |> Dialog.dialog_key()
+    |> Utils.hash()
+  end
 
   def peer(dialog, %Identity{} = me), do: peer(dialog, me |> Identity.pub_key())
   def peer(dialog, %Card{pub_key: key}), do: peer(dialog, key)

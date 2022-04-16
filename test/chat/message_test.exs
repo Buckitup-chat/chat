@@ -4,7 +4,6 @@ defmodule Chat.Dialogs.MessageTest do
   alias Chat.Card
   alias Chat.Dialogs
   alias Chat.User
-  alias Chat.Utils
 
   test "start dialog" do
     alice = User.login("Alice")
@@ -17,29 +16,16 @@ defmodule Chat.Dialogs.MessageTest do
     dialog =
       alice
       |> Dialogs.open(bob_card)
-      |> Dialogs.add_text(alice, text_message)
 
-    assert 1 == Enum.count(dialog.messages)
+    dialog |> Dialogs.add_text(alice, text_message)
 
-    message = dialog.messages |> Enum.at(0)
+    dialog_messages = Dialogs.read(dialog, alice)
 
-    assert text_message == message.a_copy |> Utils.decrypt(alice)
-    assert text_message == message.b_copy |> Utils.decrypt(bob)
+    assert 1 == Enum.count(dialog_messages)
 
-    assert_raise ErlangError, fn -> message.a_copy |> Utils.decrypt(bob) end
+    message = dialog_messages |> Enum.at(0)
 
-    bob_answer = "Bob welcomes Alice too"
-
-    dialog =
-      dialog
-      |> Dialogs.add_text(bob, bob_answer)
-
-    assert 2 == Enum.count(dialog.messages)
-
-    message = dialog.messages |> Enum.reverse() |> Enum.at(1)
-
-    assert bob_answer == message.a_copy |> Utils.decrypt(alice)
-    assert bob_answer == message.b_copy |> Utils.decrypt(bob)
+    assert text_message == message.content
   end
 
   test "read dialog" do
@@ -56,8 +42,9 @@ defmodule Chat.Dialogs.MessageTest do
     dialog =
       alice
       |> Dialogs.open(bob_card)
-      |> Dialogs.add_text(alice, text_message, start_time)
-      |> Dialogs.add_text(bob, bob_answer, second_time)
+
+    dialog |> Dialogs.add_text(alice, text_message, start_time)
+    dialog |> Dialogs.add_text(bob, bob_answer, second_time)
 
     bob_version =
       dialog
@@ -79,14 +66,14 @@ defmodule Chat.Dialogs.MessageTest do
 
     short_bob_version =
       dialog
-      |> Dialogs.read(bob, DateTime.utc_now() |> DateTime.to_unix(), 1)
+      |> Dialogs.read(bob, {nil, 0}, 1)
 
     assert 1 == short_bob_version |> Enum.count()
     assert bob_answer == short_bob_version |> Enum.at(0) |> then(& &1.content)
 
     short_bob_version_cont =
       dialog
-      |> Dialogs.read(bob, second_time |> DateTime.to_unix())
+      |> Dialogs.read(bob, {second_time |> DateTime.to_unix(), 0})
 
     assert 1 == short_bob_version_cont |> Enum.count()
     assert text_message == short_bob_version_cont |> Enum.at(0) |> then(& &1.content)

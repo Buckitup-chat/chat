@@ -88,6 +88,8 @@ defmodule Chat.Utils do
        ),
        do: UUID.string_to_binary!(uuid)
 
+  defp binary(data) when is_binary(data), do: data
+
   defp generate_key do
     iv = 8 |> :crypto.strong_rand_bytes()
     key = 16 |> :crypto.strong_rand_bytes()

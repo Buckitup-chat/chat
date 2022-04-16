@@ -33,9 +33,9 @@ defmodule Chat.Rooms.RoomTest do
     image_msg = room |> Rooms.add_image(alice, image)
 
     assert [
-             %Rooms.PlainMessage{content: ^message, type: :text, author_hash: ^alice_hash},
-             %Rooms.PlainMessage{type: :image}
-           ] = room |> Rooms.read(room_identity)
+             %Rooms.PlainMessage{type: :image},
+             %Rooms.PlainMessage{content: ^message, type: :text, author_hash: ^alice_hash}
+           ] = room |> Rooms.read(room_identity) |> Enum.sort_by(fn %{type: type} -> type end)
 
     assert %Rooms.PlainMessage{type: :image} = image_msg |> Rooms.read_message(room_identity)
   end

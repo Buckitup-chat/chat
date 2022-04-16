@@ -50,18 +50,12 @@ defmodule Chat.Rooms.RoomMessages do
   end
 
   def read(%Room{pub_key: room_key}, identity, {time, id} = _before, amount) do
-    {:ok, list} =
-      Db.db()
-      |> CubDB.select(
-        min_key: key(room_key, 0, 0),
-        max_key: key(room_key, time, id),
-        max_key_inclusive: false,
-        reverse: true,
-        pipe: [take: amount]
-      )
-
-    list
-    |> Enum.map(fn {_k, v} -> read(v, identity) end)
+    {
+      key(room_key, 0, 0),
+      key(room_key, time, id)
+    }
+    |> Db.values(amount)
+    |> Enum.map(&read(&1, identity))
   end
 
   def read(

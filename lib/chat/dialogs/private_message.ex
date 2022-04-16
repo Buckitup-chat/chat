@@ -1,5 +1,5 @@
 defmodule Chat.Dialogs.PrivateMessage do
   @moduledoc "Represents decrypted message for a peer"
 
-  defstruct [:timestamp, :type, :content, :is_mine?]
+  defstruct [:timestamp, :type, :content, :is_mine?, :id]
 end

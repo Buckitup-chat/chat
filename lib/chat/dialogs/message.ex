@@ -3,8 +3,8 @@ defmodule Chat.Dialogs.Message do
 
   use StructAccess
 
-  @derive {Inspect, only: [:timestamp, :is_a_to_b?, :type]}
-  defstruct [:timestamp, :is_a_to_b?, :a_copy, :b_copy, :type]
+  @derive {Inspect, only: [:timestamp, :is_a_to_b?, :type, :id]}
+  defstruct [:timestamp, :is_a_to_b?, :a_copy, :b_copy, :type, :id, version: 1]
 
   def a_to_b(a_copy, b_copy, opts) do
     new(a_copy, b_copy, opts |> Keyword.merge(is_a_to_b?: true))
@@ -24,7 +24,8 @@ defmodule Chat.Dialogs.Message do
       is_a_to_b?: is_a_to_b?,
       a_copy: a_copy,
       b_copy: b_copy,
-      type: type
+      type: type,
+      id: UUID.uuid4()
     }
   end
 end

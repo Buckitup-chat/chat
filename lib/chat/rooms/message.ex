@@ -1,7 +1,7 @@
 defmodule Chat.Rooms.Message do
   @moduledoc "Room message struct"
 
-  defstruct [:timestamp, :author_hash, :encrypted, :type, :id]
+  defstruct [:timestamp, :author_hash, :encrypted, :type, :id, version: 1]
 
   def new(author, encrypted, opts) do
     now = opts |> Keyword.get(:now, DateTime.utc_now())

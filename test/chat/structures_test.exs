@@ -2,16 +2,16 @@ defmodule Chat.StructuresTest do
   use ExUnit.Case, async: true
 
   test "dialog message" do
-    struct = %Chat.Dialogs.Message{timestamp: 1, is_a_to_b?: false, a_copy: 2, b_copy: 3}
+    struct = %Chat.Dialogs.Message{timestamp: 1, is_a_to_b?: false, a_copy: 2, b_copy: 3, id: 4}
 
-    assert "#Chat.Dialogs.Message<is_a_to_b?: false, timestamp: 1, type: nil, ...>" ==
+    assert "#Chat.Dialogs.Message<id: 4, is_a_to_b?: false, timestamp: 1, type: nil, ...>" ==
              inspect(struct)
   end
 
   test "dialog.dialog" do
-    struct = %Chat.Dialogs.Dialog{a_key: 1, b_key: 2, messages: [3, 4]}
+    struct = %Chat.Dialogs.Dialog{a_key: 1, b_key: 2}
 
-    assert "#Chat.Dialogs.Dialog<messages: [3, 4], ...>" ==
+    assert "#Chat.Dialogs.Dialog<...>" ==
              inspect(struct)
   end
 

@@ -1,26 +1,28 @@
 defmodule Chat.Dialogs.Dialog do
   @moduledoc "Module to hold a conversation between A and B"
 
+  alias Chat.Db
   alias Chat.Dialogs.Message
   alias Chat.Dialogs.PrivateMessage
   alias Chat.Images
-  alias Chat.User
+
+  alias Chat.Card
+  alias Chat.Identity
   alias Chat.Utils
 
-  @derive {Inspect, only: [:messages]}
-  defstruct [:a_key, :b_key, :messages]
+  @derive {Inspect, only: []}
+  defstruct [:a_key, :b_key]
 
-  def start(%Chat.Identity{} = a, %Chat.Card{} = b) do
+  def start(%Identity{} = a, %Card{pub_key: b_key}) do
     %__MODULE__{
-      a_key: a |> User.pub_key(),
-      b_key: b |> User.pub_key(),
-      messages: []
+      a_key: a |> Identity.pub_key(),
+      b_key: b_key
     }
   end
 
   def add_text(
         %__MODULE__{} = dialog,
-        %Chat.Identity{} = source,
+        %Identity{} = source,
         text,
         now
       ) do
@@ -42,50 +44,78 @@ defmodule Chat.Dialogs.Dialog do
     add_message(dialog, source, msg, now: now, type: :image)
   end
 
+  def read(%Message{} = msg, identitiy, side) when side in [:a_copy, :b_copy] do
+    is_mine? = (side == :a_copy and msg.is_a_to_b?) or (side == :b_copy and !msg.is_a_to_b?)
+
+    %PrivateMessage{
+      timestamp: msg.timestamp,
+      type: msg.type,
+      id: msg.id,
+      is_mine?: is_mine?,
+      content: msg[side] |> Utils.decrypt(identitiy)
+    }
+  end
+
   def read(
-        %__MODULE__{messages: messages, a_key: a_key, b_key: b_key},
-        %Chat.Identity{} = me,
+        %__MODULE__{} = dialog,
+        %Identity{} = me,
         before,
         amount
       ) do
-    side =
-      case me |> User.pub_key() do
-        ^a_key -> :a_copy
-        ^b_key -> :b_copy
-        _ -> raise "unknown_user_in_dialog"
-      end
+    side = dialog |> my_side(me)
 
-    messages
-    |> Chat.Utils.page(before, amount)
-    |> Enum.map(fn msg ->
-      is_mine? = (side == :a_copy and msg.is_a_to_b?) or (side == :b_copy and !msg.is_a_to_b?)
-
-      %PrivateMessage{
-        timestamp: msg.timestamp,
-        type: msg.type,
-        is_mine?: is_mine?,
-        content: msg[side] |> Utils.decrypt(me)
-      }
-    end)
+    dialog
+    |> get_messages(before, amount)
+    |> Enum.map(&read(&1, me, side))
+    |> Enum.reverse()
   end
 
-  def glimpse(%__MODULE__{messages: [last | _]} = dialog) do
-    %{dialog | messages: [last]}
+  def my_side(%__MODULE__{a_key: a_key, b_key: b_key}, identitiy) do
+    case identitiy |> Identity.pub_key() do
+      ^a_key -> :a_copy
+      ^b_key -> :b_copy
+      _ -> raise "unknown_user_in_dialog"
+    end
   end
 
   defp add_message(
          %__MODULE__{a_key: a_key, b_key: b_key} = dialog,
-         %Chat.Identity{} = source,
-         msg,
+         %Identity{} = source,
+         content,
          opts
        ) do
-    new_messsage =
-      case source |> User.pub_key() do
-        ^a_key -> Message.a_to_b(Utils.encrypt(msg, a_key), Utils.encrypt(msg, b_key), opts)
-        ^b_key -> Message.b_to_a(Utils.encrypt(msg, a_key), Utils.encrypt(msg, b_key), opts)
-        _ -> raise "unknown_user_in_dialog"
-      end
+    a_copy = content |> Utils.encrypt(a_key)
+    b_copy = content |> Utils.encrypt(b_key)
 
-    %{dialog | messages: [new_messsage | dialog.messages]}
+    dialog
+    |> my_side(source)
+    |> case do
+      :a_copy -> Message.a_to_b(a_copy, b_copy, opts)
+      :b_copy -> Message.b_to_a(a_copy, b_copy, opts)
+    end
+    |> tap(fn %{id: id, timestamp: time} = msg -> dialog |> msg_key(time, id) |> Db.put(msg) end)
+  end
+
+  defp get_messages(dialog, {time, id}, amount) do
+    {
+      msg_key(dialog, 0, 0),
+      msg_key(dialog, time, id)
+    }
+    |> Db.values(amount)
+  end
+
+  defp msg_key(%__MODULE__{} = dialog, time, 0),
+    do: {:dialog_message, dialog |> dialog_key(), time, 0}
+
+  defp msg_key(%__MODULE__{} = dialog, time, id),
+    do: {:dialog_message, dialog |> dialog_key(), time, id |> Utils.binhash()}
+
+  def dialog_key(%__MODULE__{a_key: a_key, b_key: b_key}) do
+    [a_key, b_key]
+    |> Enum.map(&Utils.hash/1)
+    |> Enum.sort()
+    |> Enum.join()
+    |> Utils.hash()
+    |> Utils.binhash()
   end
 end

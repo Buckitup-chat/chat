@@ -4,7 +4,7 @@ defmodule Chat.Db do
   """
   use GenServer
 
-  @db_version "v.1"
+  @db_version "v.2"
   @db_location Application.compile_env(:chat, :cub_db_file, "priv/db")
 
   @doc false
@@ -45,6 +45,18 @@ defmodule Chat.Db do
   def last({min, max}) do
     db()
     |> CubDB.select(min_key: min, max_key: max, reverse: true, pipe: [take: 1])
+    |> then(fn {:ok, list} -> list end)
+  end
+
+  def values({min, max}, amount) do
+    db()
+    |> CubDB.select(
+      min_key: min,
+      max_key: max,
+      max_key_inclusive: false,
+      reverse: true,
+      pipe: [take: amount, map: fn {_, v} -> v end]
+    )
     |> then(fn {:ok, list} -> list end)
   end
 

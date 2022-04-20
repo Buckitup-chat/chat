@@ -7,7 +7,10 @@ defmodule Chat.User do
   alias Chat.User.LocalStorage
   alias Chat.User.Registry
 
-  def login(%Identity{} = identity), do: identity |> tap(&Log.visit/1)
+  def login(%Identity{} = identity) do
+    identity
+    |> tap(&Log.visit/1)
+  end
 
   def login(name) when is_binary(name) do
     name

@@ -10,6 +10,8 @@ defmodule Chat.Log do
   def sign_in(me), do: me |> log(:sign_in)
   def visit(me), do: me |> log(:visit)
   def export_keys(me), do: me |> log(:export_keys)
+  def self_backup(me), do: me |> log(:self_backup)
+  def logout(me), do: me |> log(:logout)
 
   def create_room(me, room), do: me |> log(:create_room, room: binhash(room))
   def message_room(me, room), do: me |> log(:message_room, room: binhash(room))
@@ -26,6 +28,8 @@ defmodule Chat.Log do
     sign_in: "signs in",
     visit: "visits",
     export_keys: "exports keys",
+    self_backup: "downloads own keys",
+    logout: "signs out",
     create_room: "creates room",
     message_room: "writes in room",
     request_room_key: "requests key of room",

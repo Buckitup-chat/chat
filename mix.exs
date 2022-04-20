@@ -10,7 +10,10 @@ defmodule Chat.MixProject do
       compilers: [:gettext] ++ Mix.compilers(),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      deps: deps()
+      deps: deps(),
+      test_coverage: [
+        summary: [threshold: 42]
+      ]
     ]
   end
 
@@ -33,6 +36,8 @@ defmodule Chat.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      {:phoenix_ecto, "~> 4.0"},
+      {:ecto, "~> 3.7"},
       {:temp, "~> 0.4.7"},
       {:termit, "~> 2.0"},
       {:tzdata, "~> 1.1"},

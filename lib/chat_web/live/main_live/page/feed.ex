@@ -41,7 +41,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
     user = User.by_id(who)
 
     ~H"""
-      <span style="color: #ccc" title={date}><%= time %></span> &nbsp; <%= user.name %> <.action action={action} />
+      <span style="color: #ccc" title={date}><%= time %></span> &nbsp; <%= user && user.name %> <.action action={action} />
     """
   end
 

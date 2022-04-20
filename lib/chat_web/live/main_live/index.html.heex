@@ -25,10 +25,17 @@
 <% else %>
   <%= if @mode == :user_list do %>
     <div class="row">
-      <blockquote>
-      <a phx-click="open-data-restore" style="cursor: pointer;">Restore data</a>
-      or <a href="/get/backup">Backup</a> it
-      </blockquote>
+      <div class="column column-50">
+        <blockquote>
+        <a phx-click="open-data-restore" style="cursor: pointer;">Restore data</a>
+        or <a href="/get/backup">Backup</a> it
+        </blockquote>
+      </div>
+      <div class="column column-50">
+        <div class="float-right">
+          <a phx-click="logout-open" style="cursor: pointer;">Logout</a>
+        </div>
+      </div>
     </div>
     <div class="row">
       <a phx-click="open-feed" style="cursor: pointer;">News feed</a>
@@ -294,7 +301,50 @@
         </.form>
       </div>
     </div>
+  <% end %> 
+  <%= if @mode == :logout do %> 
+    <button class="button button-outline float-right" phx-click="logout-close">Back</button>
+    <%= if @step == :initial do %> 
+      <h2>Log Out & Back Up</h2>
+      <p>To get access again you will need the recovery keys:</p>
+      <button class="button" phx-click="logout-go-middle">Download the Keys</button>
+    <% end %> 
+    <%= if @step == :middle do %> 
+      <h2>Set Up Password</h2>
+      <p>To store the backup copy of the key securely, enter the encryption password for the file</p>
+      <.form
+        let={f}
+        for={@changeset}
+        id="logout-form"
+        phx-change="logout-check-password"
+        phx-submit="logout-download-with-password"
+        as="logout"
+      >
+      
+        <blockquote>
+          This password in not stored and can NOT be recovered
+        </blockquote>
+        <%= text_input f, :password, type: "password", placeholder: "Enter Password", phx_debounce: 700 %>
+        <%= error_tag f, :password %>
+        <%= text_input f, :password_confirmation, type: "password", placeholder: "Repeat Password", phx_debounce: 700 %>
+        <%= error_tag f, :password_confirmation %>
+        <p>At least 12 symbols</p>
 
+        <div>
+          <%= submit "Download", phx_disable_with: "Generating..." %>
+        </div>
+      </.form>
+      <button class="button button-outline" phx-click="logout-download-insecure">
+        Download without password 
+        <span style="color: red">insecure!</span>
+      </button>
+
+    <% end %> 
+    <%= if @step == :final do %> 
+      <h2>Success</h2>
+      <p>If you downloaded the the recovery key, you can log out now, it will erase all the browser data about BuckitUp.</p>
+      <button class="button" phx-click="logout-wipe">Exit</button>
+    <% end %> 
   <% end %> 
 <% end %>
 <% end %>

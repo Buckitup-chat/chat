@@ -12,6 +12,8 @@ defmodule ChatWeb.MainLive.Index do
 
   @impl true
   def mount(params, _session, %{assigns: %{live_action: action}} = socket) do
+    Process.flag(:sensitive, true)
+
     if connected?(socket) do
       if action == :export do
         socket
@@ -162,6 +164,56 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("close-data-restore", _, socket) do
     socket
     |> assign(:mode, :user_list)
+    |> noreply()
+  end
+
+  def handle_event("logout-open", _, socket) do
+    socket
+    |> Page.Lobby.close()
+    |> Page.Logout.init()
+    |> noreply()
+  end
+
+  def handle_event("logout-go-middle", _, socket) do
+    socket
+    |> Page.Logout.go_middle()
+    |> noreply()
+  end
+
+  def handle_event("logout-download-insecure", _, socket) do
+    socket
+    |> Page.Logout.generate_backup("")
+    |> Page.Logout.go_final()
+    |> noreply()
+  end
+
+  def handle_event(
+        "logout-download-with-password",
+        %{"logout" => form},
+        socket
+      ) do
+    socket
+    |> Page.Logout.download_on_good_password(form)
+    |> noreply()
+  end
+
+  def handle_event("logout-check-password", %{"logout" => form}, socket) do
+    socket
+    |> Page.Logout.check_password(form)
+    |> noreply()
+  end
+
+  def handle_event("logout-wipe", _, socket) do
+    socket
+    |> Page.Login.clear()
+    |> Page.Logout.wipe()
+    |> noreply()
+  end
+
+  def handle_event("logout-close", _, socket) do
+    socket
+    |> Page.Logout.close()
+    |> Page.Lobby.init()
     |> noreply()
   end
 

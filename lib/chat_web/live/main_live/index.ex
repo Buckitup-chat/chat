@@ -30,6 +30,7 @@ defmodule ChatWeb.MainLive.Index do
         |> allow_image_upload(:image)
         |> allow_image_upload(:room_image)
         |> allow_any500m_upload(:backup_file)
+        |> allow_any500m_upload(:my_keys_file)
         |> Page.Login.check_stored()
         |> ok()
       end
@@ -66,6 +67,40 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> Page.Login.close()
     |> Page.ImportKeyRing.init()
+    |> noreply()
+  end
+
+  def handle_event("login:import-own-key-ring", _, socket) do
+    socket
+    |> Page.Login.close()
+    |> Page.ImportOwnKeyRing.init()
+    |> noreply()
+  end
+
+  def handle_event("login:my-keys-file-submit", _, socket) do
+    socket |> noreply()
+  end
+
+  def handle_event(
+        "login:import-own-keyring-decrypt",
+        %{"import_own_keyring_password" => %{"password" => password}},
+        socket
+      ) do
+    socket
+    |> Page.ImportOwnKeyRing.try_password(password)
+    |> noreply()
+  end
+
+  def handle_event("login:import-own-keyring-reupload", _, socket) do
+    socket
+    |> Page.ImportOwnKeyRing.back_to_file()
+    |> noreply()
+  end
+
+  def handle_event("login:import-own-keyring-close", _, socket) do
+    socket
+    |> Page.ImportKeyRing.close()
+    |> assign(:need_login, true)
     |> noreply()
   end
 
@@ -290,6 +325,12 @@ defmodule ChatWeb.MainLive.Index do
         CubDB.stop(other_db)
       end
     )
+  end
+
+  def handle_progress(:my_keys_file, %{done?: true}, socket) do
+    socket
+    |> Page.ImportOwnKeyRing.read_file()
+    |> noreply()
   end
 
   def handle_progress(_file, _entry, socket) do

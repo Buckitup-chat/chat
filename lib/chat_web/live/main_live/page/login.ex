@@ -2,6 +2,7 @@ defmodule ChatWeb.MainLive.Page.Login do
   @moduledoc "Login part of chat"
   import Phoenix.LiveView, only: [assign: 3, push_event: 3]
 
+  alias Chat.Identity
   alias Chat.User
   alias ChatWeb.MainLive.Page
 
@@ -21,6 +22,11 @@ defmodule ChatWeb.MainLive.Page.Login do
   def load_user(socket, data) do
     {me, rooms} = User.device_decode(data)
 
+    socket
+    |> load_user(me, rooms)
+  end
+
+  def load_user(socket, %Identity{} = me, rooms) do
     id =
       me
       |> User.login()

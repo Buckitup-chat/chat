@@ -21,7 +21,12 @@
     </div>
   </.form>
 </div> 
+<div>
   <a style="cursor: pointer" phx-click="login:request-key-ring"> Import Key Ring </a>
+</div>
+<div>
+  <a style="cursor: pointer" phx-click="login:import-own-key-ring">Import the recovery keys</a>
+</div>
 <% else %>
   <%= if @mode == :user_list do %>
     <div class="row">
@@ -346,6 +351,59 @@
       <button class="button" phx-click="logout-wipe">Exit</button>
     <% end %> 
   <% end %> 
+  <%= if @mode == :import_own_key_ring do %> 
+    <button class="button button-outline float-right" phx-click="login:import-own-keyring-close">Back</button>
+    <%= if @step == :initial do %>
+      <h2>Import the recovery keys</h2>
+      <p>Please, upload the key file and enter the password for decryption</p>
+      <div class="row">
+        <.form
+          for={:my_keys_file}
+          id="my-keys-file-form"
+          class="column "
+          phx-change="login:my-keys-file-submit"
+          phx-submit="login:my-keys-file-submit"
+          phx-drop-target={@uploads.my_keys_file.ref}
+        >
+            <%= live_file_input @uploads.my_keys_file, style: "display: none" %>
+            <input type="button" value="Upload Key File" onclick="event.target.parentNode.querySelector('input[type=file]').click()" >
+
+          <%= for entry <- @uploads.my_keys_file.entries do %>
+            <%= if entry.progress > 0 and entry.progress <= 100 do %>
+              <progress value={entry.progress} max="100"> <%= entry.progress %>% </progress>
+            <% end %>
+
+            <%= for err <- upload_errors(@uploads.my_keys_file, entry) do %>
+              <p class="alert alert-danger"><%= err %></p>
+            <% end %>
+          <% end %>
+        </.form>
+      </div>
+    <% end %>
+    <%= if @step == :decrypt do %>
+      <h2>Import the recovery keys</h2>
+      <p>Please, upload the key file and enter the password for decryption</p>
+      <div class="row">
+        <%= @filename %> 
+        <button class="button button-outline float-right" phx-click="login:import-own-keyring-reupload">Delete</button>
+      </div>
+      <.form
+        let={f}
+        for={:import_own_keyring_password}
+        id="logout-import-own-keyring-password-form"
+        phx-submit="login:import-own-keyring-decrypt"
+      >
+      
+        <%= text_input f, :password, type: "password", placeholder: "Enter Password", phx_debounce: 700 %>
+        <%= if @show_invalid do %>
+          <div>Invalid password</div>
+        <% end %> 
+        <div>
+          <%= submit "Log In", phx_disable_with: "Checking..." %>
+        </div>
+      </.form>
+    <% end %> 
+  <% end %>
 <% end %>
 <% end %>
 

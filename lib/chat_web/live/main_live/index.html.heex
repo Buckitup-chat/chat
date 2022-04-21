@@ -6,22 +6,64 @@
 
 
 <%= if @need_login do %>
-<div class="phx-hero">
-  <.form
-    let={f}
-    for={:login}
-    id="login-form"
-    phx-submit="login">
+  <img class="vectorGroup bottomVectorGroup" src={Routes.static_path(@socket, "/images/bottom_vector_group.svg")}/>
+  <img class="vectorGroup topVectorGroup" src={Routes.static_path(@socket, "/images/top_vector_group.svg")}/>
+
+  <div class="flex flex-col items-center justify-center w-screen">
+    <div class="container loginForm relative top-12" >
+      <div class="flex justify-center">
+        <svg width="54" height="57" class="fill-white" >
+          <use href="/images/icons.svg#logo"></use>
+        </svg>
+      </div>
+      <div class="left-0 mt-10">     
+        <h1 style="font-size: 28px; line-height: 34px;" class="font-inter font-bold text-white">Log In</h1>
+        <p class="mt-2.5 font-inter text-sm text-white/70">Please, enter your name. That’s how other users will see you</p>
+      </div>
   
-    <%= text_input f, :name, placeholder: "Your name" %>
-    <%= error_tag f, :name %>
+      <div class="w-full mt-7">
+        <.form
+          let={f}
+          for={:login}
+          id="login-form"
+          phx-submit="login">
+      
+        <%= text_input f, :name, placeholder: "Your name", class: "w-full h-11 py-2.5 appearance-none block bg-transparent border border-white/50 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-0 focus:border-white" %>
+        <%= error_tag f, :name %>
+      
+        <div class="mt-2.5">
+          <%= submit "Log In", phx_disable_with: "Saving...", class: "w-full h-11 focus:outline-none text-white px-4 rounded-lg", style: "background-color: rgb(36, 24, 36);"   %>
+        </div>
+        </.form>
+      </div>
   
-    <div>
-      <%= submit "Login", phx_disable_with: "Saving..." %>
-    </div>
-  </.form>
-</div> 
-  <a style="cursor: pointer" phx-click="login:request-key-ring"> Import Key Ring </a>
+      <div class="mt-7 flex flex-row items-center justify-between" >
+        <hr class="basis-[44%] border-1 border-white/10">
+        <p class="text-white/50">or</p>
+        <hr class="basis-[44%] border-1 border-white/10">
+      </div>
+  
+      <button phx-click="login:request-key-ring" class="w-full h-11 mt-7 bg-transparent text-white py-2 px-4 border border-white/50 rounded-lg flex items-center justify-center">
+        <span>Login with QR code</span>
+        <svg width="16" height="16" class="ml-2 fill-white">
+          <use href="/images/icons.svg#qrcode"></use>
+        </svg>
+      </button>
+  
+      <button class="w-full h-11 mt-2.5 bg-transparent text-white py-2 px-4 border border-white/50 rounded-lg flex items-center justify-center">
+        <span>Import the recovery keys</span>
+        <svg width="16" height="16" class="ml-2 fill-white">
+          <use href="/images/icons.svg#upload1"></use>
+        </svg>
+      </button>    
+    </div>     
+  </div>
+
+  
+  <div class="flex flex-col justify-center w-72 relative top-12">
+  </div> 
+
+
 <% else %>
   <%= if @mode == :user_list do %>
     <div class="row">

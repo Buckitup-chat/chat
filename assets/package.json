@@ -1,5 +1,8 @@
 {
   "scripts": {
     "deploy": "cd .. && mix assets.deploy && rm -f _build/esbuild"
+  },
+  "devDependencies": {
+    "tailwindcss-font-inter": "^3.0.1"
   }
 }

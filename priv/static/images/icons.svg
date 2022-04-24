@@ -9,7 +9,7 @@
     <path fill-rule="evenodd" clip-rule="evenodd" d="M7.99951 1C4.13551 1 0.999512 4.136 0.999512 8C0.999512 11.864 4.13551 15 7.99951 15C11.8635 15 14.9995 11.864 14.9995 8C14.9995 4.136 11.8635 1 7.99951 1ZM8.99951 4V6H6.99951V4L8.99951 4ZM8.99951 12L8.99951 7H6.99951L6.99951 12H8.99951Z" fill-opacity="0.9"/>
   </svg>
 
-  <svg id="alert" width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+  <svg id="alert" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
     <path fill-rule="evenodd" clip-rule="evenodd" d="M7.99951 1C4.13551 1 0.999512 4.136 0.999512 8C0.999512 11.864 4.13551 15 7.99951 15C11.8635 15 14.9995 11.864 14.9995 8C14.9995 4.136 11.8635 1 7.99951 1ZM6.99951 12V10H8.99951V12H6.99951ZM6.99951 4V9H8.99951V4H6.99951Z" fill-opacity="0.9"/>
   </svg>
 
@@ -53,9 +53,10 @@
     <rect x="6.11182" y="2" width="4" height="2" rx="1"/>
   </svg>
 
-  <svg id="check" width="16" height="16" viewBox="0 0 16 16"  xmlns="http://www.w3.org/2000/svg">
-    <path d="M2.11182 7.25L5.86182 11L14.1118 2" stroke="#241824"/>
+  <svg id="check" width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2.11182 7.25L5.86182 11L14.1118 2" />
   </svg>
+
 
   <svg id="close" width="17" height="16" viewBox="0 0 17 16"  xmlns="http://www.w3.org/2000/svg">
     <path fill-rule="evenodd" clip-rule="evenodd" d="M3.68897 2.75781L13.4653 12.5342L12.7582 13.2413L2.98186 3.46492L3.68897 2.75781Z"/>

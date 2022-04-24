@@ -2,6 +2,7 @@ defmodule ChatWeb.MainLive.Page.Login do
   @moduledoc "Login part of chat"
   import Phoenix.LiveView, only: [assign: 3, push_event: 3]
 
+  alias Chat.Identity
   alias Chat.User
   alias ChatWeb.MainLive.Page
 
@@ -20,7 +21,16 @@ defmodule ChatWeb.MainLive.Page.Login do
 
   def load_user(socket, data) do
     {me, rooms} = User.device_decode(data)
-    id = User.register(me)
+
+    socket
+    |> load_user(me, rooms)
+  end
+
+  def load_user(socket, %Identity{} = me, rooms) do
+    id =
+      me
+      |> User.login()
+      |> User.register()
 
     socket
     |> assign_logged_user(me, id, rooms)
@@ -34,6 +44,11 @@ defmodule ChatWeb.MainLive.Page.Login do
       key: @local_store_key,
       data: User.device_encode(me, rooms)
     })
+  end
+
+  def clear(%{assigns: %{rooms: _rooms, me: _me}} = socket) do
+    socket
+    |> push_event("clear", %{key: @local_store_key})
   end
 
   def check_stored(socket) do

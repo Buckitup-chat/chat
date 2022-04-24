@@ -67,11 +67,19 @@ defmodule Chat.Utils do
     {data_blob, iv <> key}
   end
 
+  def encrypt_blob(data, <<iv::binary-size(8), key::binary-size(16), _::binary-size(8)>>) do
+    :crypto.crypto_one_time(@cipher, key, iv, data, true)
+  end
+
   def decrypt_blob({data_blob, type_blob} = _data, <<iv::bits-size(64), key::bits>> = _secret) do
     {
       :crypto.crypto_one_time(@cipher, key, iv, data_blob, false),
       :crypto.crypto_one_time(@cipher, key, iv, type_blob, false)
     }
+  end
+
+  def decrypt_blob(data, <<iv::binary-size(8), key::binary-size(16), _::binary-size(8)>>) do
+    :crypto.crypto_one_time(@cipher, key, iv, data, false)
   end
 
   def decrypt_blob(data, <<iv::bits-size(64), key::bits>> = _secret) do

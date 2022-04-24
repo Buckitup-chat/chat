@@ -48,6 +48,11 @@ window.addEventListener("chat:toggle", (e) => {
     e.target.classList.toggle(e.detail.class)
   }
 });
+window.addEventListener("phx:chat:redirect", (e) => { 
+  const openUrl = (url) => window.location = url;
+  url = e.detail.url
+  url && openUrl(url)
+});
 
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})

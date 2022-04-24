@@ -1,6 +1,8 @@
 defmodule Chat.UtilsTest do
   use ExUnit.Case, async: true
 
+  alias Chat.Actor
+  alias Chat.Identity
   alias Chat.Utils
 
   test "blob crypt" do
@@ -37,9 +39,42 @@ defmodule Chat.UtilsTest do
   end
 
   test "" do
-    me = Chat.Identity.create("Alice")
+    me = Identity.create("Alice")
     card = Chat.Card.from_identity(me)
 
     assert Utils.hash(me) == Utils.hash(card)
+  end
+
+  test "Actor encoding should work fine" do
+    [me, room1, room2] =
+      ["Alice", "room 1", "room 2"]
+      |> Enum.map(&Identity.create/1)
+
+    actor = Actor.new(me, [room1, room2])
+    password = "123456543211"
+
+    encrypted =
+      actor
+      |> Actor.to_encrypted_json(password)
+
+    assert is_binary(encrypted)
+
+    decrypted = encrypted |> Actor.from_encrypted_json(password)
+
+    assert decrypted.me == actor.me
+
+    assert decrypted.rooms |> Enum.map(& &1.priv_key) == actor.rooms |> Enum.map(& &1.priv_key)
+  end
+
+  test "Identity encrypt should work" do
+    me = Identity.create("me")
+
+    text = "hello world"
+
+    encrypted = text |> Utils.encrypt(me)
+
+    assert encrypted != text
+
+    assert ^text = Utils.decrypt(encrypted, me)
   end
 end

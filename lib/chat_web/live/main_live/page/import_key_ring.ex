@@ -11,11 +11,12 @@ defmodule ChatWeb.MainLive.Page.ImportKeyRing do
     {uuid, code} = KeyRingTokens.create()
 
     url = Routes.main_index_url(socket, :export, uuid)
+    qr_settings = %QRCode.SvgSettings{qrcode_color: "#ffffff", background_opacity: 0}
 
     qr =
       url
       |> QRCode.create!()
-      |> QRCode.Svg.to_base64()
+      |> QRCode.Svg.to_base64(qr_settings)
 
     socket
     |> assign(:mode, :import_key_ring)

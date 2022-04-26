@@ -4,15 +4,6 @@
 
 /* This file is for your main application CSS */
 
-
-.text-right {
-  text-align: right;
-}
-
-img.preview {
-  max-width: 200px;
-}
-
 html {
   min-height: 100%;
   background: radial-gradient(100% 270.84% at 100% 100%, #C56139 0%, #722F58 48.96%, #502461 81.47%, #162755 100%);

@@ -49,13 +49,14 @@ defmodule Chat.Rooms.RoomMessages do
     message
   end
 
-  def read(%Room{pub_key: room_key}, identity, {time, id} = _before, amount) do
+  def read(%Room{pub_key: room_key}, identity, pub_keys_mapper, {time, id} = _before, amount) do
     {
       key(room_key, 0, 0),
       key(room_key, time, id)
     }
     |> Db.values(amount)
     |> Enum.reverse()
+    |> filter_signed(pub_keys_mapper)
     |> Enum.map(&read(&1, identity))
   end
 
@@ -65,7 +66,7 @@ defmodule Chat.Rooms.RoomMessages do
           type: type,
           author_hash: author_hash,
           id: id,
-          encrypted: {encrypted, sign}
+          encrypted: {encrypted, _}
         },
         identity
       ) do
@@ -74,10 +75,22 @@ defmodule Chat.Rooms.RoomMessages do
       type: type,
       author_hash: author_hash,
       id: id,
-      content: encrypted |> Utils.decrypt(identity),
-      sign: sign,
-      sign_status: :not_checked
+      content: encrypted |> Utils.decrypt(identity)
     }
+  end
+
+  def filter_signed(messages, pub_keys_mapper) do
+    ids =
+      messages
+      |> Enum.map(fn %Message{author_hash: id} -> id end)
+      |> Enum.uniq()
+
+    map = ids |> then(pub_keys_mapper)
+
+    messages
+    |> Enum.filter(fn %Message{encrypted: {data, sign}, author_hash: author} ->
+      Utils.is_signed_by?(sign, data, map |> Map.get(author))
+    end)
   end
 
   def key(room_key, time, 0),

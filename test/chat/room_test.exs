@@ -21,6 +21,7 @@ defmodule Chat.Rooms.RoomTest do
 
   test "room messages" do
     alice = User.login("Alice")
+    alice |> User.register()
     alice_hash = alice |> Identity.pub_key() |> Utils.hash()
 
     room_identity = alice |> Rooms.add("some room")
@@ -35,7 +36,10 @@ defmodule Chat.Rooms.RoomTest do
     assert [
              %Rooms.PlainMessage{type: :image},
              %Rooms.PlainMessage{content: ^message, type: :text, author_hash: ^alice_hash}
-           ] = room |> Rooms.read(room_identity) |> Enum.sort_by(fn %{type: type} -> type end)
+           ] =
+             room
+             |> Rooms.read(room_identity, &User.id_map_builder/1)
+             |> Enum.sort_by(fn %{type: type} -> type end)
 
     assert %Rooms.PlainMessage{type: :image} = image_msg |> Rooms.read_message(room_identity)
   end

@@ -92,14 +92,18 @@ defmodule Chat.Utils do
 
   def sign(data, private_key) do
     data
-    |> :public_key.sign(@hasher, private_key)
+    |> binhash()
+    |> then(&{:digest, &1})
+    |> :public_key.sign(:none, private_key)
   end
 
   def is_signed_by?(sign, data, %Card{pub_key: key}), do: sign |> is_signed_by?(data, key)
 
   def is_signed_by?(sign, data, public_key) do
     data
-    |> :public_key.verify(@hasher, sign, public_key)
+    |> binhash()
+    |> then(&{:digest, &1})
+    |> :public_key.verify(:none, sign, public_key)
   end
 
   def encrypt_and_sign(data, for, by) do

@@ -50,6 +50,7 @@ defmodule Chat.Rooms do
   defdelegate read(
                 room,
                 room_identity,
+                id_map_builder,
                 before \\ {nil, 0},
                 amount \\ 1000
               ),

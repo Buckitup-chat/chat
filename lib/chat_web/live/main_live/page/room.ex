@@ -7,6 +7,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.Identity
   alias Chat.Log
   alias Chat.Rooms
+  alias Chat.User
   alias Chat.Utils
 
   def init(%{assigns: %{rooms: rooms, me: me}} = socket, room_hash) do
@@ -16,7 +17,7 @@ defmodule ChatWeb.MainLive.Page.Room do
       rooms
       |> Enum.find(&(room_hash == &1 |> Identity.pub_key() |> Utils.hash()))
 
-    messages = room |> Rooms.read(room_identity)
+    messages = room |> Rooms.read(room_identity, &User.id_map_builder/1)
 
     PubSub.subscribe(Chat.PubSub, room |> room_topic())
 
@@ -69,10 +70,17 @@ defmodule ChatWeb.MainLive.Page.Room do
     socket
   end
 
-  def show_new(%{assigns: %{room_identity: identity}} = socket, new_message) do
-    socket
-    |> assign(:messages, [new_message |> Rooms.read_message(identity)])
-    |> assign(:message_update_mode, :append)
+  def show_new(
+        %{assigns: %{room_identity: identity}} = socket,
+        %{author_hash: hash, encrypted: {data, sign}} = new_message
+      ) do
+    if Utils.is_signed_by?(sign, data, User.by_id(hash)) do
+      socket
+      |> assign(:messages, [new_message |> Rooms.read_message(identity)])
+      |> assign(:message_update_mode, :append)
+    else
+      socket
+    end
   end
 
   def close(%{assigns: %{room: room}} = socket) do

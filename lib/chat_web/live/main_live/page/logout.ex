@@ -52,7 +52,7 @@ defmodule ChatWeb.MainLive.Page.Logout do
 
   def generate_backup(%{assigns: %{me: me, rooms: rooms}} = socket, password) do
     broker_key =
-      Actor.new(me, rooms)
+      Actor.new(me, rooms, %{})
       |> Actor.to_encrypted_json(password)
       |> then(&{"#{me.name}.data", &1})
       |> Broker.store()

@@ -48,7 +48,9 @@ defmodule Chat.Utils do
   def encrypt(text, %Card{pub_key: key}), do: encrypt(text, key)
   def encrypt(text, key), do: :public_key.encrypt_public(text, key)
 
-  def decrypt(ciphertext, %Identity{priv_key: key}) do
+  def decrypt(ciphertext, %Identity{priv_key: key}), do: decrypt(ciphertext, key)
+
+  def decrypt(ciphertext, key) do
     :public_key.decrypt_private(ciphertext, key)
   end
 
@@ -84,6 +86,20 @@ defmodule Chat.Utils do
 
   def decrypt_blob(data, <<iv::bits-size(64), key::bits>> = _secret) do
     :crypto.crypto_one_time(@cipher, key, iv, data, false)
+  end
+
+  def sign(data, %Identity{priv_key: key} = _signer), do: data |> sign(key)
+
+  def sign(data, private_key) do
+    data
+    |> :public_key.sign(@hasher, private_key)
+  end
+
+  def is_signed_by?(sign, data, %Card{pub_key: key}), do: sign |> is_signed_by?(data, key)
+
+  def is_signed_by?(sign, data, public_key) do
+    data
+    |> :public_key.verify(@hasher, sign, public_key)
   end
 
   defp binary({:RSAPublicKey, a, b}), do: "RSAPublicKey|#{a}|#{b}"

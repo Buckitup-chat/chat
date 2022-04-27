@@ -50,7 +50,7 @@ defmodule Chat.UtilsTest do
       ["Alice", "room 1", "room 2"]
       |> Enum.map(&Identity.create/1)
 
-    actor = Actor.new(me, [room1, room2])
+    actor = Actor.new(me, [room1, room2], %{})
     password = "123456543211"
 
     encrypted =

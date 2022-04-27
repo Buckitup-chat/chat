@@ -44,7 +44,7 @@ defmodule Chat.Dialogs.Dialog do
     add_message(dialog, source, msg, now: now, type: :image)
   end
 
-  def read(%Message{} = msg, identitiy, side) when side in [:a_copy, :b_copy] do
+  def read(%Message{} = msg, identitiy, side, peer_key) when side in [:a_copy, :b_copy] do
     is_mine? = (side == :a_copy and msg.is_a_to_b?) or (side == :b_copy and !msg.is_a_to_b?)
 
     %PrivateMessage{
@@ -52,7 +52,9 @@ defmodule Chat.Dialogs.Dialog do
       type: msg.type,
       id: msg.id,
       is_mine?: is_mine?,
-      content: msg[side] |> Utils.decrypt(identitiy)
+      content:
+        msg[side]
+        |> Utils.decrypt_signed(identitiy, (is_mine? && Identity.pub_key(identitiy)) || peer_key)
     }
   end
 
@@ -66,7 +68,7 @@ defmodule Chat.Dialogs.Dialog do
 
     dialog
     |> get_messages(before, amount)
-    |> Enum.map(&read(&1, me, side))
+    |> Enum.map(&read(&1, me, side, peer_key(dialog, side)))
     |> Enum.reverse()
   end
 
@@ -78,14 +80,17 @@ defmodule Chat.Dialogs.Dialog do
     end
   end
 
+  def peer_key(%__MODULE__{a_key: key}, :b_copy), do: key
+  def peer_key(%__MODULE__{b_key: key}, :a_copy), do: key
+
   defp add_message(
          %__MODULE__{a_key: a_key, b_key: b_key} = dialog,
          %Identity{} = source,
          content,
          opts
        ) do
-    a_copy = content |> Utils.encrypt(a_key)
-    b_copy = content |> Utils.encrypt(b_key)
+    a_copy = content |> Utils.encrypt_and_sign(a_key, source)
+    b_copy = content |> Utils.encrypt_and_sign(b_key, source)
 
     dialog
     |> my_side(source)

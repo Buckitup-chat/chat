@@ -17,7 +17,7 @@ defmodule Chat.Rooms.RoomMessages do
         text
       ) do
     author_hash = author |> Identity.pub_key() |> Utils.hash()
-    encrypted = Utils.encrypt(text, room_key)
+    encrypted = Utils.encrypt_and_sign(text, room_key, author)
     message = Message.new(author_hash, encrypted, type: :text)
 
     room_key
@@ -39,7 +39,7 @@ defmodule Chat.Rooms.RoomMessages do
       |> Jason.encode!()
 
     author_hash = author |> Identity.pub_key() |> Utils.hash()
-    encrypted = Utils.encrypt(msg, room_key)
+    encrypted = Utils.encrypt_and_sign(msg, room_key, author)
     message = Message.new(author_hash, encrypted, type: :image)
 
     room_key
@@ -64,7 +64,7 @@ defmodule Chat.Rooms.RoomMessages do
           type: type,
           author_hash: author_hash,
           id: id,
-          encrypted: encrypted
+          encrypted: {encrypted, sign}
         },
         identity
       ) do
@@ -73,7 +73,9 @@ defmodule Chat.Rooms.RoomMessages do
       type: type,
       author_hash: author_hash,
       id: id,
-      content: encrypted |> Utils.decrypt(identity)
+      content: encrypted |> Utils.decrypt(identity),
+      sign: sign,
+      sign_status: :not_checked
     }
   end
 

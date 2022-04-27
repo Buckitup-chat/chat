@@ -102,6 +102,19 @@ defmodule Chat.Utils do
     |> :public_key.verify(@hasher, sign, public_key)
   end
 
+  def encrypt_and_sign(data, for, by) do
+    encrypted = encrypt(data, for)
+    sign = sign(encrypted, by)
+
+    {encrypted, sign}
+  end
+
+  def decrypt_signed({encrypted, sign}, for, by) do
+    true = is_signed_by?(sign, encrypted, by)
+
+    decrypt(encrypted, for)
+  end
+
   defp binary({:RSAPublicKey, a, b}), do: "RSAPublicKey|#{a}|#{b}"
   defp binary(%Card{pub_key: key}), do: key |> binary()
   defp binary(%Identity{} = ident), do: ident |> Identity.pub_key() |> binary()

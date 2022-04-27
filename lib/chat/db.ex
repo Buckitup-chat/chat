@@ -4,7 +4,7 @@ defmodule Chat.Db do
   """
   use GenServer
 
-  @db_version "v.2"
+  @db_version "v.3"
   @db_location Application.compile_env(:chat, :cub_db_file, "priv/db")
 
   @doc false

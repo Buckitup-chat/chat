@@ -38,7 +38,7 @@ defmodule Chat.Dialogs do
 
   def read_message(%Dialog{} = dialog, %Message{} = message, %Identity{} = me) do
     side = Dialog.my_side(dialog, me)
-    Dialog.read(message, me, side)
+    Dialog.read(message, me, side, peer(dialog, me))
   end
 
   def key(%Dialog{} = dialog) do

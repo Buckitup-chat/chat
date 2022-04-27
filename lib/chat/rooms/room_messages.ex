@@ -55,6 +55,7 @@ defmodule Chat.Rooms.RoomMessages do
       key(room_key, time, id)
     }
     |> Db.values(amount)
+    |> Enum.reverse()
     |> Enum.map(&read(&1, identity))
   end
 

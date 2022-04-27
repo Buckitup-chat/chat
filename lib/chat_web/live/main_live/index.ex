@@ -15,24 +15,33 @@ defmodule ChatWeb.MainLive.Index do
     Process.flag(:sensitive, true)
 
     if connected?(socket) do
-      if action == :export do
-        socket
-        |> assign(:need_login, false)
-        |> Page.ExportKeyRing.init(params["id"])
-        |> Page.Login.check_stored()
-        |> ok()
-      else
-        socket
-        |> assign(
-          need_login: true,
-          mode: :user_list
-        )
-        |> allow_image_upload(:image)
-        |> allow_image_upload(:room_image)
-        |> allow_any500m_upload(:backup_file)
-        |> allow_any500m_upload(:my_keys_file)
-        |> Page.Login.check_stored()
-        |> ok()
+      cond do
+        action == :export ->
+          socket
+          |> assign(:need_login, false)
+          |> Page.ExportKeyRing.init(params["id"])
+          |> Page.Login.check_stored()
+          |> ok()
+
+        action == :accept_handshake ->
+          socket
+          |> assign(:need_login, false)
+          |> Page.AcceptHandshake.init(params["key"])
+          |> Page.Login.check_stored()
+          |> ok()
+
+        true ->
+          socket
+          |> assign(
+            need_login: true,
+            mode: :user_list
+          )
+          |> allow_image_upload(:image)
+          |> allow_image_upload(:room_image)
+          |> allow_any500m_upload(:backup_file)
+          |> allow_any500m_upload(:my_keys_file)
+          |> Page.Login.check_stored()
+          |> ok()
       end
     else
       socket
@@ -125,6 +134,26 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> Page.Dialog.close()
     |> Page.Lobby.init()
+    |> noreply()
+  end
+
+  def handle_event("dialog/peer-handshake", %{"user-id" => user_id}, socket) do
+    socket
+    |> Page.Dialog.close()
+    |> Page.PeerHandshake.init(user_id)
+    |> noreply()
+  end
+
+  def handle_event("peer-handshake/refresh-code", _, socket) do
+    socket
+    |> Page.PeerHandshake.refresh()
+    |> noreply()
+  end
+
+  def handle_event("peer-handshake/back-to-dialog", %{"user-id" => user_id}, socket) do
+    socket
+    |> Page.PeerHandshake.close()
+    |> Page.Dialog.init(user_id)
     |> noreply()
   end
 

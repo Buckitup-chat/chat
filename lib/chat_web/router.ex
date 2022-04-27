@@ -24,6 +24,7 @@ defmodule ChatWeb.Router do
 
     live "/", MainLive.Index, :index
     live "/export-key-ring/:id", MainLive.Index, :export
+    live "/handshake/:key", MainLive.AcceptPeerHandshake, :accept_handshake
   end
 
   # Other scopes may use custom stacks.

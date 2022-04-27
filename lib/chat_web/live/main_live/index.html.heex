@@ -115,6 +115,7 @@
   <%= if @mode == :dialog do %>
     <div id="dialog-mode">
       <button class="button button-outline float-right" phx-click="close-dialog">Back</button>
+      <button class="button button-outline float-right" phx-click="dialog/peer-handshake" phx-value-user-id={@peer.hash}>Handshake(if not yet)</button>
       <h1>Dialog with <%= @peer.name %></h1>
       <div id="dialog-messages" phx-update={@message_update_mode}>
       <%= for msg <- @messages do %>
@@ -404,6 +405,19 @@
       </.form>
     <% end %> 
   <% end %>
+  <%= if @mode == :peer_handshake do %>
+    <button class="button button-outline float-right" phx-click="peer-handshake/back-to-dialog" phx-value-user-id={@peer.hash}>Back</button>
+    <h2>Handshake with <%= @peer.name %></h2>
+    <p>Show this to your peer to handshake</p>
+    <p>Or copy url to clipboard (some JS here)</p>
+    <div  align="center">
+      <a href={@url} target="_blank">
+        <img src={"data:image/svg+xml;base64, #{@qr}"} />
+      </a>
+    </div>
+    <button class="button" phx-click="peer-handshake/refresh-code">Refresh</button>
+
+  <% end %> 
 <% end %>
 <% end %>
 

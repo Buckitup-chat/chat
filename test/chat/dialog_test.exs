@@ -3,7 +3,10 @@ defmodule Chat.Dialogs.DialogTest do
 
   alias Chat.Card
   alias Chat.Dialogs
+  alias Chat.Files
+  alias Chat.Memo
   alias Chat.User
+  alias Chat.Utils.StorageId
 
   test "start dialog" do
     alice = User.login("Alice")
@@ -19,8 +22,8 @@ defmodule Chat.Dialogs.DialogTest do
       |> Dialogs.open(bob_card)
 
     dialog |> Dialogs.add_text(alice, text_message, DateTime.utc_now())
-    dialog |> Dialogs.add_image(alice, {"not_image", "text/plain"})
-    dialog |> Dialogs.add_image(bob, {"not_image 2", "text/plain"}, DateTime.utc_now())
+    dialog |> Dialogs.add_image(alice, ["not_image", "text/plain"])
+    dialog |> Dialogs.add_image(bob, ["not_image 2", "text/plain"], DateTime.utc_now())
 
     assert 3 == dialog |> Dialogs.read(bob) |> Enum.count()
 
@@ -55,5 +58,45 @@ defmodule Chat.Dialogs.DialogTest do
     assert bob_key == dialog |> Dialogs.peer(alice)
 
     assert is_binary(Dialogs.key(dialog))
+  end
+
+  test "dialog with memo should work" do
+    alice = User.login("Alice")
+    bob = User.login("Bob")
+    bob_card = bob |> Card.from_identity()
+    content = "hi memo"
+
+    dialog = Dialogs.find_or_open(alice, bob_card)
+
+    msg = dialog |> Dialogs.add_memo(alice, content)
+
+    bob_version = Dialogs.read_message(dialog, msg, bob)
+
+    assert :memo = bob_version.type
+
+    assert ^content =
+             bob_version.content
+             |> StorageId.from_json()
+             |> Memo.get()
+  end
+
+  test "dialog with fle should work" do
+    alice = User.login("Alice")
+    bob = User.login("Bob")
+    bob_card = bob |> Card.from_identity()
+    content = ["text file", "text/plain", "some.txt", 1000 |> to_string()]
+
+    dialog = Dialogs.find_or_open(alice, bob_card)
+
+    msg = dialog |> Dialogs.add_file(alice, content)
+
+    bob_version = Dialogs.read_message(dialog, msg, bob)
+
+    assert :file = bob_version.type
+
+    assert ^content =
+             bob_version.content
+             |> StorageId.from_json()
+             |> Files.get()
   end
 end

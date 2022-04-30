@@ -4,11 +4,14 @@ defmodule Chat.Dialogs.Dialog do
   alias Chat.Db
   alias Chat.Dialogs.Message
   alias Chat.Dialogs.PrivateMessage
+  alias Chat.Files
   alias Chat.Images
+  alias Chat.Memo
 
   alias Chat.Card
   alias Chat.Identity
   alias Chat.Utils
+  alias Chat.Utils.StorageId
 
   @derive {Inspect, only: []}
   defstruct [:a_key, :b_key]
@@ -26,7 +29,32 @@ defmodule Chat.Dialogs.Dialog do
         text,
         now
       ) do
-    add_message(dialog, source, text, now: now, type: :text)
+    text
+    |> add_message(dialog, source, now: now, type: :text)
+  end
+
+  def add_memo(
+        %__MODULE__{} = dialog,
+        %Chat.Identity{} = source,
+        text,
+        now
+      ) do
+    text
+    |> Memo.add()
+    |> StorageId.to_json()
+    |> add_message(dialog, source, now: now, type: :memo)
+  end
+
+  def add_file(
+        %__MODULE__{} = dialog,
+        %Chat.Identity{} = source,
+        data,
+        now
+      ) do
+    data
+    |> Files.add()
+    |> StorageId.to_json()
+    |> add_message(dialog, source, now: now, type: :file)
   end
 
   def add_image(
@@ -35,13 +63,10 @@ defmodule Chat.Dialogs.Dialog do
         data,
         now
       ) do
-    {key, secret} = Images.add(data)
-
-    msg =
-      %{key => secret |> Base.url_encode64()}
-      |> Jason.encode!()
-
-    add_message(dialog, source, msg, now: now, type: :image)
+    data
+    |> Images.add()
+    |> StorageId.to_json()
+    |> add_message(dialog, source, now: now, type: :image)
   end
 
   def read(%Message{} = msg, identitiy, side, peer_key) when side in [:a_copy, :b_copy] do
@@ -84,9 +109,9 @@ defmodule Chat.Dialogs.Dialog do
   def peer_key(%__MODULE__{b_key: key}, :a_copy), do: key
 
   defp add_message(
+         content,
          %__MODULE__{a_key: a_key, b_key: b_key} = dialog,
          %Identity{} = source,
-         content,
          opts
        ) do
     a_copy = content |> Utils.encrypt_and_sign(a_key, source)

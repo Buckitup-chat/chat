@@ -138,12 +138,34 @@
               class: "text-right",
               id: "dialog-input",
               spellcheck: "false",
-              autocomplete: "off",
-              maxlength: 210
+              autocomplete: "off"
           %>
           <%= submit "Send", phx_disable_with: "..." %>
         </div>
       </.form>
+      <div class="text-right row">
+        <.form
+          for={:dialog_file}
+          id="dialog-file-form"
+          class="column column-50 column-offset-50"
+          phx-change="dialog-file-change"
+          phx-submit="dialog-file-submit"
+          phx-drop-target={@uploads.dialog_file.ref}
+        >
+            <%= live_file_input @uploads.dialog_file, style: "display: none" %>
+            <input type="button" value="Upload File" onclick="event.target.parentNode.querySelector('input[type=file]').click()" >
+
+          <%= for entry <- @uploads.dialog_file.entries do %>
+            <%= if entry.progress > 0 and entry.progress < 100 do %>
+              <progress value={entry.progress} max="100"> <%= entry.progress %>% </progress>
+            <% end %>
+
+            <%= for err <- upload_errors(@uploads.dialog_file, entry) do %>
+              <p class="alert alert-danger"><%= err %></p>
+            <% end %>
+          <% end %>
+        </.form>
+      </div>
       <div class="text-right row">
         <.form
           for={:dialog_image}
@@ -196,12 +218,34 @@
               class: "text-right",
               id: "room-input",
               spellcheck: "false",
-              autocomplete: "off",
-              maxlength: 210
+              autocomplete: "off"
           %>
           <%= submit "Send", phx_disable_with: "..." %>
         </div>
       </.form>
+      <div class="text-right row">
+        <.form
+          for={:room_file}
+          id="room-file-form"
+          class="column column-50 column-offset-50"
+          phx-change="room-file-submit"
+          phx-submit="room-file-submit"
+          phx-drop-target={@uploads.room_file.ref}
+        >
+            <%= live_file_input @uploads.room_file, style: "display: none" %>
+            <input type="button" value="Upload File" onclick="event.target.parentNode.querySelector('input[type=file]').click()" >
+
+          <%= for entry <- @uploads.room_file.entries do %>
+            <%= if entry.progress > 0 and entry.progress < 100 do %>
+              <progress value={entry.progress} max="100"> <%= entry.progress %>% </progress>
+            <% end %>
+
+            <%= for err <- upload_errors(@uploads.room_file, entry) do %>
+              <p class="alert alert-danger"><%= err %></p>
+            <% end %>
+          <% end %>
+        </.form>
+      </div>
       <div class="text-right row">
         <.form
           for={:room_image}

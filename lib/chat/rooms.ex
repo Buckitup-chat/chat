@@ -44,7 +44,9 @@ defmodule Chat.Rooms do
     Registry.find(hash)
   end
 
+  defdelegate add_memo(room, me, text), to: RoomMessages
   defdelegate add_text(room, me, text), to: RoomMessages
+  defdelegate add_file(room, me, data), to: RoomMessages
   defdelegate add_image(room, me, data), to: RoomMessages
 
   defdelegate read(

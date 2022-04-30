@@ -28,13 +28,18 @@ defmodule Chat.Rooms.RoomTest do
     room = Rooms.Room.create(alice, room_identity)
 
     message = "hello, room"
-    image = {"image_content", "image/plain"}
+    image = ["image_content", "image/plain"]
+    file = ["file content", "plain/text", "file.txt", "10 B"]
 
     room |> Rooms.add_text(alice, message)
+    room |> Rooms.add_memo(alice, message)
+    room |> Rooms.add_file(alice, file)
     image_msg = room |> Rooms.add_image(alice, image)
 
     assert [
+             %Rooms.PlainMessage{type: :file},
              %Rooms.PlainMessage{type: :image},
+             %Rooms.PlainMessage{type: :memo},
              %Rooms.PlainMessage{content: ^message, type: :text, author_hash: ^alice_hash}
            ] =
              room

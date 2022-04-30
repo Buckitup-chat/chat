@@ -5,7 +5,10 @@ defmodule ChatWeb.MainLive.Index do
   alias Phoenix.LiveView.JS
 
   alias Chat.Db
+  alias Chat.Files
+  alias Chat.Memo
   alias Chat.Rooms
+  alias Chat.Utils.StorageId
   alias ChatWeb.MainLive.Page
 
   on_mount ChatWeb.Hooks.LocalTimeHook
@@ -31,6 +34,8 @@ defmodule ChatWeb.MainLive.Index do
         |> allow_image_upload(:room_image)
         |> allow_any500m_upload(:backup_file)
         |> allow_any500m_upload(:my_keys_file)
+        |> allow_any500m_upload(:dialog_file)
+        |> allow_any500m_upload(:room_file)
         |> Page.Login.check_stored()
         |> ok()
       end
@@ -118,8 +123,9 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   def handle_event("dialog-image-change", _, socket), do: socket |> noreply()
-
   def handle_event("dialog-image-submit", _, socket), do: socket |> noreply()
+  def handle_event("dialog-file-change", _, socket), do: socket |> noreply()
+  def handle_event("dialog-file-submit", _, socket), do: socket |> noreply()
 
   def handle_event("close-dialog", _, socket) do
     socket
@@ -154,6 +160,7 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   def handle_event("room-image-submit", _, socket), do: socket |> noreply()
+  def handle_event("room-file-submit", _, socket), do: socket |> noreply()
 
   def handle_event("close-room", _, socket) do
     socket
@@ -304,9 +311,21 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_progress(:dialog_file, %{done?: true}, socket) do
+    socket
+    |> Page.Dialog.send_file()
+    |> noreply()
+  end
+
   def handle_progress(:room_image, %{done?: true}, socket) do
     socket
     |> Page.Room.send_image()
+    |> noreply()
+  end
+
+  def handle_progress(:room_file, %{done?: true}, socket) do
+    socket
+    |> Page.Room.send_file()
     |> noreply()
   end
 
@@ -343,15 +362,25 @@ defmodule ChatWeb.MainLive.Index do
     """
   end
 
-  defp message(%{msg: %{type: :image, content: json}} = assigns) do
-    [{id, secret}] =
+  defp message(%{msg: %{type: :memo, content: json}} = assigns) do
+    memo =
       json
-      |> Jason.decode!()
-      |> Map.to_list()
+      |> StorageId.from_json()
+      |> Memo.get()
+
+    assigns = assigns |> Map.put(:memo, memo)
+
+    ~H"""
+        <span title={@msg.timestamp |> DateTime.from_unix!()}><%= @memo %></span>
+    """
+  end
+
+  defp message(%{msg: %{type: :image, content: json}} = assigns) do
+    {id, secret} = json |> StorageId.from_json()
 
     assigns =
       assigns
-      |> Map.put(:url, "/get/image/#{id}?a=#{secret}")
+      |> Map.put(:url, "/get/image/#{id}?a=#{secret |> Base.url_encode64()}")
 
     ~H"""
         <img 
@@ -360,6 +389,27 @@ defmodule ChatWeb.MainLive.Index do
           src={@url}
           phx-click={JS.dispatch("chat:toggle", detail: %{class: "preview"})}
         />
+    """
+  end
+
+  defp message(%{msg: %{type: :file, content: json}} = assigns) do
+    {id, secret} = json |> StorageId.from_json()
+    [_, _, name, size] = Files.get(id, secret)
+
+    assigns =
+      assigns
+      |> Map.put(:url, "/get/file/#{id}?a=#{secret |> Base.url_encode64()}")
+      |> Map.put(:name, name)
+      |> Map.put(:size, size)
+
+    ~H"""
+        <div title={@msg.timestamp |> DateTime.from_unix!()}
+          style="margin: 1em"
+        >
+          file: 
+          <a href={@url}><%= @name %></a>
+          (<%= @size %>)
+        </div>
     """
   end
 
@@ -377,18 +427,31 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   defp room_message(
-         %{msg: %{type: :image, content: json, author_hash: hash}, my_id: my_id} = assigns
+         %{msg: %{type: :memo, author_hash: hash, content: json}, my_id: my_id} = assigns
        ) do
-    [{id, secret}] =
-      json
-      |> Jason.decode!()
-      |> Map.to_list()
-
     %{name: name} = Chat.User.by_id(hash)
 
-    assigns =
-      assigns
-      |> Map.put(:url, "/get/image/#{id}?a=#{secret}")
+    memo =
+      json
+      |> StorageId.from_json()
+      |> Memo.get()
+
+    ~H"""
+        <span title={@msg.timestamp |> DateTime.from_unix!()} style="word-wrap: break-word;">
+        <%= unless hash == my_id do %>
+          <i><%= name %></i>:
+        <% end %>
+        <%= memo %>
+        </span>
+    """
+  end
+
+  defp room_message(
+         %{msg: %{type: :image, content: json, author_hash: hash}, my_id: my_id} = assigns
+       ) do
+    {id, secret} = json |> StorageId.from_json()
+    url = "/get/image/#{id}?a=#{secret |> Base.url_encode64()}"
+    %{name: name} = Chat.User.by_id(hash)
 
     ~H"""
         <%= unless hash == my_id do %>
@@ -397,9 +460,30 @@ defmodule ChatWeb.MainLive.Index do
         <img 
           title={@msg.timestamp |> DateTime.from_unix!()}
           class="preview"
-          src={@url}
+          src={url}
           phx-click={JS.dispatch("chat:toggle", detail: %{class: "preview"})}
         />
+    """
+  end
+
+  defp room_message(
+         %{msg: %{type: :file, content: json, author_hash: hash}, my_id: my_id} = assigns
+       ) do
+    {id, secret} = json |> StorageId.from_json()
+    [_, _, file_name, size] = Files.get(id, secret)
+    url = "/get/file/#{id}?a=#{secret |> Base.url_encode64()}"
+
+    %{name: name} = Chat.User.by_id(hash)
+
+    ~H"""
+      <span title={@msg.timestamp |> DateTime.from_unix!()} >
+        <%= unless hash == my_id do %>
+          <i><%= name %></i>:
+        <% end %>
+        file: 
+        <a href={url}><%= file_name %></a>
+        (<%= size %>)
+      </span>
     """
   end
 

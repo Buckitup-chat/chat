@@ -1,5 +1,6 @@
 defmodule ChatWeb.MainLive.Page.Dialog do
   @moduledoc "Dialog page"
+  import ChatWeb.MainLive.Page.Shared
   import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entries: 3]
 
   alias Phoenix.PubSub
@@ -25,40 +26,48 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def send_text(%{assigns: %{dialog: dialog, me: me}} = socket, text) do
-    new_message =
-      dialog
-      |> Dialogs.add_text(me, text)
+    if String.length(text) > 150 do
+      dialog |> Dialogs.add_memo(me, text)
+    else
+      dialog |> Dialogs.add_text(me, text)
+    end
+    |> broadcast_new_message(dialog, me)
 
-    PubSub.broadcast!(
-      Chat.PubSub,
-      dialog |> dialog_topic(),
-      {:new_dialog_message, new_message}
+    socket
+  end
+
+  def send_file(%{assigns: %{dialog: dialog, me: me}} = socket) do
+    consume_uploaded_entries(
+      socket,
+      :dialog_file,
+      fn %{path: path}, entry ->
+        data = [
+          File.read!(path),
+          entry.client_type |> mime_type(),
+          entry.client_name,
+          entry.client_size |> format_size()
+        ]
+
+        {:ok, Dialogs.add_file(dialog, me, data)}
+      end
     )
-
-    Log.message_direct(me, Dialogs.peer(dialog, me))
+    |> Enum.at(0)
+    |> broadcast_new_message(dialog, me)
 
     socket
   end
 
   def send_image(%{assigns: %{dialog: dialog, me: me}} = socket) do
-    new_message =
-      consume_uploaded_entries(
-        socket,
-        :image,
-        fn %{path: path}, entry ->
-          data = {File.read!(path), entry.client_type}
-          {:ok, Dialogs.add_image(dialog, me, data)}
-        end
-      )
-      |> Enum.at(0)
-
-    PubSub.broadcast!(
-      Chat.PubSub,
-      dialog |> dialog_topic(),
-      {:new_dialog_message, new_message}
+    consume_uploaded_entries(
+      socket,
+      :image,
+      fn %{path: path}, entry ->
+        data = [File.read!(path), entry.client_type]
+        {:ok, Dialogs.add_image(dialog, me, data)}
+      end
     )
-
-    Log.message_direct(me, Dialogs.peer(dialog, me))
+    |> Enum.at(0)
+    |> broadcast_new_message(dialog, me)
 
     socket
   end
@@ -82,5 +91,15 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     dialog
     |> Dialogs.key()
     |> then(&"dialog:#{&1}")
+  end
+
+  defp broadcast_new_message(message, dialog, me) do
+    PubSub.broadcast!(
+      Chat.PubSub,
+      dialog |> dialog_topic(),
+      {:new_dialog_message, message}
+    )
+
+    Log.message_direct(me, Dialogs.peer(dialog, me))
   end
 end

@@ -1,5 +1,6 @@
 defmodule ChatWeb.MainLive.Page.Room do
   @moduledoc "Room page"
+  import ChatWeb.MainLive.Page.Shared
   import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entries: 3]
 
   alias Phoenix.PubSub
@@ -32,40 +33,48 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def send_text(%{assigns: %{room: room, me: me}} = socket, text) do
-    new_message =
-      room
-      |> Rooms.add_text(me, text)
+    if String.length(text) > 150 do
+      room |> Rooms.add_memo(me, text)
+    else
+      room |> Rooms.add_text(me, text)
+    end
+    |> broadcast_message(room, me)
 
-    PubSub.broadcast!(
-      Chat.PubSub,
-      room |> room_topic(),
-      {:new_room_message, new_message}
+    socket
+  end
+
+  def send_file(%{assigns: %{me: me, room: room}} = socket) do
+    consume_uploaded_entries(
+      socket,
+      :room_file,
+      fn %{path: path}, entry ->
+        data = [
+          File.read!(path),
+          entry.client_type |> mime_type(),
+          entry.client_name,
+          entry.client_size |> format_size()
+        ]
+
+        {:ok, Rooms.add_file(room, me, data)}
+      end
     )
-
-    Log.message_room(me, room.pub_key)
+    |> Enum.at(0)
+    |> broadcast_message(room, me)
 
     socket
   end
 
   def send_image(%{assigns: %{me: me, room: room}} = socket) do
-    new_message =
-      consume_uploaded_entries(
-        socket,
-        :room_image,
-        fn %{path: path}, entry ->
-          data = {File.read!(path), entry.client_type}
-          {:ok, Rooms.add_image(room, me, data)}
-        end
-      )
-      |> Enum.at(0)
-
-    PubSub.broadcast!(
-      Chat.PubSub,
-      room |> room_topic(),
-      {:new_room_message, new_message}
+    consume_uploaded_entries(
+      socket,
+      :room_image,
+      fn %{path: path}, entry ->
+        data = [File.read!(path), entry.client_type]
+        {:ok, Rooms.add_image(room, me, data)}
+      end
     )
-
-    Log.message_room(me, room.pub_key)
+    |> Enum.at(0)
+    |> broadcast_message(room, me)
 
     socket
   end
@@ -97,5 +106,15 @@ defmodule ChatWeb.MainLive.Page.Room do
     key
     |> Utils.hash()
     |> then(&"room:#{&1}")
+  end
+
+  defp broadcast_message(message, room, me) do
+    PubSub.broadcast!(
+      Chat.PubSub,
+      room |> room_topic(),
+      {:new_room_message, message}
+    )
+
+    Log.message_room(me, room.pub_key)
   end
 end

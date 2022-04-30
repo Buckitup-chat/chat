@@ -9,11 +9,11 @@ defmodule Chat.UtilsTest do
     data = "1234"
     type = "text/plain"
 
-    {encrypted, secret} = Utils.encrypt_blob({data, type})
+    {encrypted, secret} = Utils.encrypt_blob([data, type])
 
     assert encrypted != {data, type}
 
-    assert {^data, ^type} = Utils.decrypt_blob(encrypted, secret)
+    assert [^data, ^type] = Utils.decrypt_blob(encrypted, secret)
   end
 
   test "pagination" do

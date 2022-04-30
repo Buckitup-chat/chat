@@ -42,12 +42,6 @@ defmodule Chat.Db do
     |> then(fn {:ok, list} -> list end)
   end
 
-  def last({min, max}) do
-    db()
-    |> CubDB.select(min_key: min, max_key: max, reverse: true, pipe: [take: 1])
-    |> then(fn {:ok, list} -> list end)
-  end
-
   def values({min, max}, amount) do
     db()
     |> CubDB.select(

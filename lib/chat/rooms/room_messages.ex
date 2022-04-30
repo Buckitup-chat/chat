@@ -2,12 +2,15 @@ defmodule Chat.Rooms.RoomMessages do
   @moduledoc "Room messages logic"
 
   alias Chat.Db
+  alias Chat.Files
   alias Chat.Identity
   alias Chat.Images
+  alias Chat.Memo
   alias Chat.Rooms.Message
   alias Chat.Rooms.PlainMessage
   alias Chat.Rooms.Room
   alias Chat.Utils
+  alias Chat.Utils.StorageId
 
   @db_key :room_message
 
@@ -16,38 +19,20 @@ defmodule Chat.Rooms.RoomMessages do
         %Identity{} = author,
         text
       ) do
-    author_hash = author |> Identity.pub_key() |> Utils.hash()
-    encrypted = Utils.encrypt_and_sign(text, room_key, author)
-    message = Message.new(author_hash, encrypted, type: :text)
-
-    room_key
-    |> now_key(message.id)
-    |> Db.put(message)
-
-    message
+    text
+    |> Utils.encrypt_and_sign(room_key, author)
+    |> Message.new(author |> Utils.hash(), type: :text)
+    |> tap(&db_save(&1, room_key))
   end
 
-  def add_image(
-        %Room{pub_key: room_key},
-        %Identity{} = author,
-        data
-      ) do
-    {key, secret} = Images.add(data)
+  def add_memo(room, author, text),
+    do: add_stored(room, author, text, {:memo, &Memo.add/1})
 
-    msg =
-      %{key => secret |> Base.url_encode64()}
-      |> Jason.encode!()
+  def add_file(room, author, data),
+    do: add_stored(room, author, data, {:file, &Files.add/1})
 
-    author_hash = author |> Identity.pub_key() |> Utils.hash()
-    encrypted = Utils.encrypt_and_sign(msg, room_key, author)
-    message = Message.new(author_hash, encrypted, type: :image)
-
-    room_key
-    |> now_key(message.id)
-    |> Db.put(message)
-
-    message
-  end
+  def add_image(room, author, data),
+    do: add_stored(room, author, data, {:image, &Images.add/1})
 
   def read(%Room{pub_key: room_key}, identity, pub_keys_mapper, {time, id} = _before, amount) do
     {
@@ -101,5 +86,25 @@ defmodule Chat.Rooms.RoomMessages do
 
   def now_key(room_key, id) do
     key(room_key, System.system_time(:second), id)
+  end
+
+  defp db_save(message, room_key) do
+    room_key
+    |> now_key(message.id)
+    |> Db.put(message)
+  end
+
+  defp add_stored(
+         %Room{pub_key: room_key},
+         %Identity{} = author,
+         data,
+         {type, store_adding_fun}
+       ) do
+    data
+    |> then(store_adding_fun)
+    |> StorageId.to_json()
+    |> Utils.encrypt_and_sign(room_key, author)
+    |> Message.new(author |> Utils.hash(), type: type)
+    |> tap(&db_save(&1, room_key))
   end
 end

@@ -3,7 +3,7 @@ defmodule Chat.Rooms.Message do
 
   defstruct [:timestamp, :author_hash, :encrypted, :type, :id, version: 1]
 
-  def new(author, encrypted, opts) do
+  def new(encrypted, author, opts) do
     now = opts |> Keyword.get(:now, DateTime.utc_now())
     type = opts |> Keyword.get(:type, :text)
     id = opts |> Keyword.get(:id, UUID.uuid4())

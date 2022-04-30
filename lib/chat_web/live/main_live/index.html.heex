@@ -43,16 +43,21 @@
       </div>
     </div>
     <div class="row">
-      <a phx-click="open-feed" style="cursor: pointer;">News feed</a>
+      <div class="column">      
+        <a href="javascript:void(0)" phx-click="open-dialog" phx-value-user-id={@my_id}>
+          <b>My Notes</b>
+        </a>
+      </div>
+      <div class="column">      
+        <a phx-click="open-feed" style="cursor: pointer;">News feed</a>
+      </div>
     </div>
     <div class="row">
       <div class="column column-50">
         <h2> User list </h2>
         <ul>
         <%= for user <- @users do %>
-          <%= if user.hash == @my_id do %>
-            <li><i><%= user.name %></i></li>
-          <% else %>
+          <%= unless user.hash == @my_id do %>
             <li>
               <a href="javascript:void(0)" phx-click="open-dialog" phx-value-user-id={user.hash}>
                 <%= user.name %>
@@ -115,7 +120,13 @@
   <%= if @mode == :dialog do %>
     <div id="dialog-mode">
       <button class="button button-outline float-right" phx-click="close-dialog">Back</button>
-      <h1>Dialog with <%= @peer.name %></h1>
+      <h1>
+        <%= if @peer.hash == @my_id do %>
+          My Notes
+        <% else %>
+          Dialog with <%= @peer.name %>
+        <% end %>
+      </h1>
       <div id="dialog-messages" phx-update={@message_update_mode}>
       <%= for msg <- @messages do %>
         <div class="row" id={"dialog-message-#{UUID.uuid4()}"}>

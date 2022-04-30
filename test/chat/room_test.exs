@@ -1,6 +1,7 @@
 defmodule Chat.Rooms.RoomTest do
   use ExUnit.Case, async: true
 
+  alias Chat.Card
   alias Chat.Identity
   alias Chat.Rooms
   alias Chat.User
@@ -86,5 +87,42 @@ defmodule Chat.Rooms.RoomTest do
 
     assert room_identity == joined_identitiy
     assert [] = room.requests
+  end
+
+  test "room list should return my created room" do
+    alice = User.login("Alice")
+    room_name = "Some my room"
+    room_identity = alice |> Rooms.add(room_name)
+    room_hash = room_identity |> Utils.hash()
+
+    {my_rooms, _other} = Rooms.list([room_identity])
+
+    assert [%Card{name: ^room_name}] = my_rooms
+
+    assert nil == Rooms.get("")
+    assert %Rooms.Room{name: ^room_name} = Rooms.get(room_hash)
+  end
+
+  test "requesting room should work" do
+    alice = User.login("Alice")
+    room_name = "Some my room"
+    room_identity = alice |> Rooms.add(room_name)
+    room_hash = room_identity |> Utils.hash()
+
+    bob = User.login("Bob")
+
+    Rooms.add_request(room_hash, bob)
+
+    assert 1 =
+             Rooms.list([])
+             |> elem(1)
+             |> Enum.filter(&Rooms.is_requested_by?(&1.hash, bob |> Utils.hash()))
+             |> Enum.count()
+
+    assert [] = Rooms.join_approved_requests(room_hash, bob)
+
+    Rooms.approve_requests(room_hash, room_identity)
+
+    assert [^room_identity] = Rooms.join_approved_requests(room_hash, bob)
   end
 end

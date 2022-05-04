@@ -56,6 +56,15 @@ html {
     bottom: -3%;
   }
 }
+
+.sidebarIcon {
+  @apply flex flex-col items-center justify-center 
+}
+
+.roomsAndChatsBar {
+  @apply h-screen bg-white/90 overflow-hidden;
+}
+
 /* Alerts and form errors used by phx.new */
 .alert {
   padding: 15px;
@@ -108,7 +117,7 @@ html {
 .phx-modal {
   opacity: 1!important;
   position: fixed;
-  z-index: 1;
+  z-index: 11;
   left: 0;
   top: 0;
   width: 100%;
@@ -118,11 +127,7 @@ html {
 }
 
 .phx-modal-content {
-  background-color: #fefefe;
-  margin: 15vh auto;
-  padding: 20px;
-  border: 1px solid #888;
-  width: 80%;
+  @apply flex mx-auto mt-[15%];
 }
 
 .phx-modal-close {

@@ -16,7 +16,8 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     PubSub.subscribe(Chat.PubSub, @topic)
 
     socket
-    |> assign(:mode, :user_list)
+    |> assign(:mode, :lobby)
+    |> assign(:lobby_mode, :chats)
     |> assign_user_list()
     |> approve_joined_room_requests()
     |> assign_room_list()
@@ -25,17 +26,15 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   def new_room(%{assigns: %{me: me, rooms: rooms}} = socket, name) do
     new_room_identity = Rooms.add(me, name)
+    new_room_card = Chat.Card.from_identity(new_room_identity)
 
-    PubSub.broadcast!(
-      Chat.PubSub,
-      @topic,
-      {:new_room, new_room_identity |> Chat.Card.from_identity()}
-    )
+    PubSub.broadcast!(Chat.PubSub, @topic, {:new_room, new_room_card})
 
     socket
     |> assign(:rooms, [new_room_identity | rooms])
     |> Page.Login.store()
     |> assign_room_list()
+    |> Page.Room.init(new_room_card.hash)
   end
 
   def notify_new_user(socket, user_card) do
@@ -56,6 +55,11 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   def show_new_room(socket, _room_card) do
     socket
     |> assign_room_list()
+  end
+
+  def switch_lobby_mode(socket, mode) do
+    socket
+    |> assign(:lobby_mode, mode)
   end
 
   def request_room(%{assigns: %{me: me}} = socket, room_hash) do
@@ -89,6 +93,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   defp assign_user_list(socket) do
     socket
+    |> assign(:user_id, User.list() |> List.last())
     |> assign(:users, User.list())
   end
 

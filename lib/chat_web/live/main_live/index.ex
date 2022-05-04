@@ -45,6 +45,7 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> Page.Login.create_user(name)
     |> Page.Lobby.init()
+    |> Page.Dialog.init()
     |> noreply()
   end
 
@@ -60,6 +61,8 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> Page.Login.load_user(data)
     |> Page.Lobby.init()
+    |> Page.Dialog.init()
+    |> IO.inspect()
     |> noreply()
   end
 
@@ -117,10 +120,30 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("open-dialog", %{"user-id" => user_id}, socket) do
+  def handle_event("switch-lobby-mode:rooms", _, socket) do
     socket
-    |> Page.Lobby.close()
+    |> Page.Dialog.close()
+    |> Page.Lobby.switch_lobby_mode(:rooms)
+    |> Page.Room.init()
+    |> noreply()
+  end
+
+  def handle_event("switch-lobby-mode:chats", _, socket) do
+    socket
+    |> Page.Lobby.switch_lobby_mode(:chats)
+    |> Page.Dialog.init()
+    |> noreply()
+  end
+
+  def handle_event("switch-dialog", %{"user-id" => user_id}, socket) do
+    socket
+    |> Page.Dialog.close()
     |> Page.Dialog.init(user_id)
+    |> noreply()
+  end
+
+  def handle_event("dialog-message", %{"dialog" => %{"text" => ""}}, socket) do
+    socket
     |> noreply()
   end
 
@@ -147,9 +170,9 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("open-room", %{"room" => hash}, socket) do
+  def handle_event("switch-room", %{"room" => hash}, socket) do
     socket
-    |> Page.Lobby.close()
+    |> Page.Room.close()
     |> Page.Room.init(hash)
     |> noreply()
   end
@@ -167,13 +190,6 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   def handle_event("room-image-submit", _, socket), do: socket |> noreply()
-
-  def handle_event("close-room", _, socket) do
-    socket
-    |> Page.Room.close()
-    |> Page.Lobby.init()
-    |> noreply()
-  end
 
   def handle_event("export-keys", %{"export_key_ring" => %{"code" => code}}, socket) do
     socket
@@ -211,7 +227,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_event("close-data-restore", _, socket) do
     socket
-    |> assign(:mode, :user_list)
+    |> assign(:mode, :lobby)
     |> noreply()
   end
 
@@ -352,7 +368,11 @@ defmodule ChatWeb.MainLive.Index do
 
   defp message(%{msg: %{type: :text}} = assigns) do
     ~H"""
-        <span title={@msg.timestamp |> DateTime.from_unix!()}><%= @msg.content %></span>
+    <div class={"#{@class} max-w-md min-w-[180px] rounded-lg overflow-hidden shadow-lg"}>
+        <.message_header author={@author} />
+        <span class="px-2 flex justify-start px-1"><%= @msg.content %></span>
+        <.message_timestamp msg={@msg} />
+      </div>  
     """
   end
 
@@ -367,12 +387,52 @@ defmodule ChatWeb.MainLive.Index do
       |> Map.put(:url, "/get/image/#{id}?a=#{secret}")
 
     ~H"""
+      <div class={"#{@class} max-w-md min-w-[180px] rounded-lg overflow-hidden shadow-lg"}>
+        <.message_header author={@author} />
+        <.message_timestamp msg={@msg} />
         <img 
           title={@msg.timestamp |> DateTime.from_unix!()}
-          class="preview"
+          class="max-w-sm"
           src={@url}
           phx-click={JS.dispatch("chat:toggle", detail: %{class: "preview"})}
         />
+      </div>  
+    """
+  end
+
+  defp message_header(assigns) do
+    ~H"""
+      <div class="py-1 px-2 flex items-center justify-between">
+        <div class="flex flex-row">
+          <div class="text-sm text-grayscale600">[<%= short_hash(@author.hash) %>]</div>
+          <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
+        </div>
+
+        <button>
+          <svg class="w-4 h-4 flex fill-purple" >
+            <use href="/images/icons.svg#menu"></use>
+          </svg>
+        </button>
+      </div>
+    """
+  end
+
+  defp short_hash(hash), do: hash |> String.split_at(-6) |> elem(1)
+
+  defp message_timestamp(assigns) do
+    ~H"""
+    <div class="px-2 text-grayscale600 flex justify-end mr-1" style="font-size: 10px;">
+      <%= @msg.timestamp |> DateTime.from_unix!() |> Timex.format!("{h12}:{0m} {AM}, {D}.{M}.{YYYY}") %>
+    </div>
+    """
+  end
+
+  defp contact(assigns) do
+    ~H"""
+    <div class="flex flex-row">
+      <div class="text-sm text-grayscale600">[<%= short_hash(@user.hash) %>]</div>
+      <div class="ml-1 font-bold text-sm text-purple"><%= @user.name %></div>
+    </div>
     """
   end
 
@@ -415,6 +475,7 @@ defmodule ChatWeb.MainLive.Index do
         />
     """
   end
+
 
   defp allow_image_upload(socket, type) do
     socket

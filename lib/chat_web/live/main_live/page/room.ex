@@ -9,13 +9,15 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.Rooms
   alias Chat.Utils
 
+  def init(socket), do: socket |> assign(:room, nil)
+
   def init(%{assigns: %{rooms: rooms, me: me}} = socket, room_hash) do
     room = Rooms.get(room_hash)
-
+    IO.inspect room
     room_identity =
       rooms
       |> Enum.find(&(room_hash == &1 |> Identity.pub_key() |> Utils.hash()))
-
+    IO.inspect room_identity
     messages = room |> Rooms.read(room_identity)
 
     PubSub.subscribe(Chat.PubSub, room |> room_topic())
@@ -23,7 +25,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     Log.visit_room(me, room_identity)
 
     socket
-    |> assign(:mode, :room)
+    # |> assign(:mode, :room)
     |> assign(:room, room)
     |> assign(:room_identity, room_identity)
     |> assign(:messages, messages)
@@ -74,6 +76,8 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:messages, [new_message |> Rooms.read_message(identity)])
     |> assign(:message_update_mode, :append)
   end
+
+  def close(%{assigns: %{room: nil}} = socket), do: socket
 
   def close(%{assigns: %{room: room}} = socket) do
     PubSub.unsubscribe(Chat.PubSub, room |> room_topic())

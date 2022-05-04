@@ -9,7 +9,12 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        current: 'white'
+        current: 'white',
+        grayscale: '#241824',
+        grayscale600: '#7A727A',
+        purple: '#8E2B77',
+        purple50: '#F7E0F7',
+        stone250: '#5325611a'
       }
     },
   },

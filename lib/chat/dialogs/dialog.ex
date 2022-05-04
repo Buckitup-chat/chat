@@ -9,6 +9,7 @@ defmodule Chat.Dialogs.Dialog do
   alias Chat.Memo
 
   alias Chat.Card
+  alias Chat.Content
   alias Chat.Identity
   alias Chat.Utils
   alias Chat.Utils.StorageId
@@ -107,6 +108,34 @@ defmodule Chat.Dialogs.Dialog do
 
   def peer_key(%__MODULE__{a_key: key}, :b_copy), do: key
   def peer_key(%__MODULE__{b_key: key}, :a_copy), do: key
+
+  def is_mine?(dialog, %{is_a_to_b?: is_a_to_b}, me) do
+    dialog
+    |> my_side(me)
+    |> then(fn
+      :a_copy -> is_a_to_b
+      :b_copy -> !is_a_to_b
+    end)
+  end
+
+  def delete(%__MODULE__{} = dialog, %Identity{} = author, {time, id}) do
+    key = dialog |> msg_key(time, id)
+    msg = Db.get(key)
+
+    case dialog |> is_mine?(msg, author) do
+      true ->
+        side = my_side(dialog, author)
+
+        msg
+        |> read(author, side, peer_key(dialog, side))
+        |> Content.delete()
+
+        Db.delete(key)
+
+      _ ->
+        nil
+    end
+  end
 
   defp add_message(
          content,

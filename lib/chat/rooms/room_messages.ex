@@ -1,6 +1,7 @@
 defmodule Chat.Rooms.RoomMessages do
   @moduledoc "Room messages logic"
 
+  alias Chat.Content
   alias Chat.Db
   alias Chat.Files
   alias Chat.Identity
@@ -62,6 +63,18 @@ defmodule Chat.Rooms.RoomMessages do
       id: id,
       content: encrypted |> Utils.decrypt(identity)
     }
+  end
+
+  def delete_message({time, id}, %Identity{} = room, %Identity{} = author) do
+    with msg_key <- room |> Identity.pub_key() |> key(time, id),
+         msg <- Db.get(msg_key),
+         true <- msg.author_hash == author |> Utils.hash() do
+      msg
+      |> read(room)
+      |> Content.delete()
+
+      Db.delete(msg_key)
+    end
   end
 
   def filter_signed(messages, pub_keys_mapper) do

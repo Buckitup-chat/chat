@@ -10,6 +10,9 @@ img.preview {
   max-width: 200px;
 }
 
+.hidden {
+  display: none;
+}
 
 /* Alerts and form errors used by phx.new */
 .alert {

@@ -42,18 +42,31 @@ let liveSocket = new LiveSocket("/live", Socket, {
 })
 
 
-window.addEventListener("chat:clear-value", (e) => {e.target.value = ""});
-window.addEventListener("chat:focus", (e) => {const el = e.target; setTimeout(() => el.focus(), 100);});
-window.addEventListener("chat:toggle", (e) => {
-  if (e.detail && e.detail.class) {
-    e.target.classList.toggle(e.detail.class)
-  }
-});
-window.addEventListener("phx:chat:redirect", (e) => { 
-  const openUrl = (url) => window.location = url;
-  url = e.detail.url
-  url && openUrl(url)
-});
+const listeners = {
+  "chat:clear-value": (e) => {e.target.value = ""},
+  "chat:focus": (e) => {const el = e.target; setTimeout(() => el.focus(), 100);},
+  "chat:toggle": (e) => {
+    if (e.detail && e.detail.class) {
+      e.target.classList.toggle(e.detail.class)
+    }
+  },
+  "phx:chat:toggle": (e) => {
+    if (e.detail && e.detail.class && e.detail.to) {
+      document
+        .querySelector(e.detail.to)
+        .classList.toggle(e.detail.class)
+    }
+  },
+  "phx:chat:redirect": (e) => { 
+    const openUrl = (url) => window.location = url;
+    url = e.detail.url
+    url && openUrl(url)
+  },  
+};
+for (key in listeners) {
+  window.addEventListener(key, listeners[key]);
+}
+
 
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})

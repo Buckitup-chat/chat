@@ -14,6 +14,12 @@ defmodule Chat.Memo do
     end
   end
 
+  def delete({key, _secret}), do: delete(key)
+
+  def delete(key) do
+    Db.delete({:memo, key})
+  end
+
   def add(data) do
     key = UUID.uuid4()
 

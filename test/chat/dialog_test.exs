@@ -4,6 +4,7 @@ defmodule Chat.Dialogs.DialogTest do
   alias Chat.Card
   alias Chat.Dialogs
   alias Chat.Files
+  alias Chat.Images
   alias Chat.Memo
   alias Chat.User
   alias Chat.Utils.StorageId
@@ -98,5 +99,104 @@ defmodule Chat.Dialogs.DialogTest do
              bob_version.content
              |> StorageId.from_json()
              |> Files.get()
+  end
+
+  test "removed by author message should not be present in dialog" do
+    alice = User.login("Alice")
+    bob = User.login("Bob")
+    bob_card = bob |> Card.from_identity()
+    text_message = "Alice welcomes Bob"
+
+    dialog =
+      alice
+      |> Dialogs.open(bob_card)
+
+    dialog |> Dialogs.add_text(alice, text_message, DateTime.utc_now())
+    dialog |> Dialogs.add_image(alice, ["not_image", "text/plain"])
+    dialog |> Dialogs.add_image(bob, ["not_image 2", "text/plain"], DateTime.utc_now())
+
+    msg_id =
+      dialog
+      |> Dialogs.read(bob)
+      |> Enum.find(&(&1.content == text_message))
+      |> then(fn
+        nil -> nil
+        x -> {x.timestamp, x.id}
+      end)
+
+    assert msg_id != nil
+
+    dialog |> Dialogs.delete(alice, msg_id)
+
+    assert nil ==
+             dialog
+             |> Dialogs.read(bob)
+             |> Enum.find(&(&1.content == text_message))
+  end
+
+  test "message cannot be removed by a peer in dialog" do
+    {alice, bob, _bob_card, dialog} = alice_bob_dialog()
+    text_message = "Alice welcomes Bob"
+
+    dialog |> Dialogs.add_text(alice, text_message, DateTime.utc_now())
+    dialog |> Dialogs.add_image(alice, ["not_image", "text/plain"])
+    dialog |> Dialogs.add_image(bob, ["not_image 2", "text/plain"], DateTime.utc_now())
+
+    msg_id =
+      dialog
+      |> Dialogs.read(bob)
+      |> Enum.find(&(&1.content == text_message))
+      |> then(fn
+        nil -> nil
+        x -> {x.timestamp, x.id}
+      end)
+
+    assert msg_id != nil
+
+    dialog |> Dialogs.delete(bob, msg_id)
+
+    assert nil !=
+             dialog
+             |> Dialogs.read(bob)
+             |> Enum.find(&(&1.content == text_message))
+  end
+
+  test "message removal shoukld remove content as well" do
+    {alice, _, _, dialog} = alice_bob_dialog()
+
+    time = DateTime.utc_now() |> DateTime.add(-10, :second)
+
+    dialog |> Dialogs.add_memo(alice, "memo here", time)
+
+    dialog
+    |> Dialogs.add_image(alice, ["not_image", "text/plain"], time |> DateTime.add(1, :second))
+
+    dialog
+    |> Dialogs.add_file(
+      alice,
+      ["not_image 2", "text/plain", "file.txt", "100 B"],
+      time |> DateTime.add(2, :second)
+    )
+
+    dialog
+    |> Dialogs.read(alice)
+    |> Enum.zip([&Memo.get/1, &Images.get/1, &Files.get/1])
+    |> Enum.map(fn {msg, getter} ->
+      assert nil != msg.content |> StorageId.from_json() |> then(getter)
+      dialog |> Dialogs.delete(alice, {msg.timestamp, msg.id})
+      assert nil == msg.content |> StorageId.from_json() |> then(getter)
+    end)
+  end
+
+  defp alice_bob_dialog do
+    alice = User.login("Alice")
+    bob = User.login("Bob")
+    bob_card = bob |> Card.from_identity()
+
+    dialog =
+      alice
+      |> Dialogs.open(bob_card)
+
+    {alice, bob, bob_card, dialog}
   end
 end

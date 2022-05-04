@@ -4,12 +4,20 @@ defmodule Chat.Images do
   alias Chat.Images.Registry
   alias Chat.Utils
 
+  def get({key, secret}), do: get(key, secret)
+
   def get(key, secret) do
     blob = Registry.get(key)
 
     if blob do
       Utils.decrypt_blob(blob, secret)
     end
+  end
+
+  def delete({key, _secret}), do: delete(key)
+
+  def delete(key) do
+    Registry.delete(key)
   end
 
   def add(data) do

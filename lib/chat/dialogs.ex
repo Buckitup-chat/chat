@@ -30,6 +30,8 @@ defmodule Chat.Dialogs do
   defdelegate add_file(dialog, src, data, now \\ DateTime.utc_now()), to: Dialog
   defdelegate add_image(dialog, src, data, now \\ DateTime.utc_now()), to: Dialog
 
+  defdelegate delete(dialog, author, msg_time_id), to: Dialog
+
   def read(
         %Dialog{} = dialog,
         %Identity{} = reader,

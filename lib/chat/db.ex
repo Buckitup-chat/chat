@@ -64,6 +64,11 @@ defmodule Chat.Db do
     |> CubDB.put(key, value)
   end
 
+  def delete(key) do
+    db()
+    |> CubDB.delete(key)
+  end
+
   def file_path do
     "#{@db_location}/#{@db_version}"
   end

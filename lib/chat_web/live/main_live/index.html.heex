@@ -129,9 +129,16 @@
       </h1>
       <div id="dialog-messages" phx-update={@message_update_mode}>
       <%= for msg <- @messages do %>
-        <div class="row" id={"dialog-message-#{UUID.uuid4()}"}>
+        <div class="row" id={"dialog-message-#{msg.id}"}>
           <div class={msg.is_mine? && "column column-75 column-offset-25 text-right" || "column column-75" }>
             <.message msg={msg} />
+            <%= if msg.is_mine? do %>
+              <a style="cursor: pointer"
+                phx-click="dialog/delete-message" 
+                phx-value-id={msg.id} 
+                phx-value-timestamp={msg.timestamp}
+              > ✖ </a>
+            <% end %> 
           </div>
         </div> 
       <% end %>
@@ -208,9 +215,16 @@
       <h1>Room: <b><%= @room.name %></b></h1>
       <div id="room-messages" phx-update={@message_update_mode}>
       <%= for msg <- @messages do %>
-        <div class="row" id={"room-message-#{UUID.uuid4()}"}>
+        <div class="row" id={"room-message-#{msg.id}"}>
           <div class={msg.author_hash == @my_id && "column column-75 column-offset-25 text-right" || "column column-75" }>
             <.room_message msg={msg} my_id={@my_id} />
+            <%= if msg.author_hash == @my_id do %>
+              <a style="cursor: pointer"
+                phx-click="room/delete-message" 
+                phx-value-id={msg.id} 
+                phx-value-timestamp={msg.timestamp}
+              > ✖ </a>
+            <% end %>
           </div>
         </div> 
       <% end %>

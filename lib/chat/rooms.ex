@@ -60,6 +60,8 @@ defmodule Chat.Rooms do
 
   def read_message(%Message{} = msg, %Identity{} = identity), do: RoomMessages.read(msg, identity)
 
+  def delete_message(msg_id, room, me), do: msg_id |> RoomMessages.delete_message(room, me)
+
   def add_request(room_hash, user_identity) do
     room_hash
     |> get()

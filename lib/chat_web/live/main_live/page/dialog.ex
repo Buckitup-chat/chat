@@ -78,6 +78,13 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:message_update_mode, :append)
   end
 
+  def delete_message(%{assigns: %{me: me, dialog: dialog}} = socket, {time, msg_id}) do
+    Dialogs.delete(dialog, me, {time, msg_id})
+    broadcast_message_deleted(msg_id, dialog, me)
+
+    socket
+  end
+
   def close(%{assigns: %{dialog: dialog}} = socket) do
     PubSub.unsubscribe(Chat.PubSub, dialog |> dialog_topic())
 
@@ -94,12 +101,24 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   defp broadcast_new_message(message, dialog, me) do
+    {:new_dialog_message, message}
+    |> dialog_broadcast(dialog)
+
+    Log.message_direct(me, Dialogs.peer(dialog, me))
+  end
+
+  defp broadcast_message_deleted(message_id, dialog, me) do
+    {:deleted_dialog_message, message_id}
+    |> dialog_broadcast(dialog)
+
+    Log.delete_message_direct(me, Dialogs.peer(dialog, me))
+  end
+
+  defp dialog_broadcast(message, dialog) do
     PubSub.broadcast!(
       Chat.PubSub,
       dialog |> dialog_topic(),
-      {:new_dialog_message, message}
+      message
     )
-
-    Log.message_direct(me, Dialogs.peer(dialog, me))
   end
 end

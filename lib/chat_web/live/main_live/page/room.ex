@@ -38,7 +38,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     else
       room |> Rooms.add_text(me, text)
     end
-    |> broadcast_message(room, me)
+    |> broadcast_new_message(room, me)
 
     socket
   end
@@ -59,7 +59,7 @@ defmodule ChatWeb.MainLive.Page.Room do
       end
     )
     |> Enum.at(0)
-    |> broadcast_message(room, me)
+    |> broadcast_new_message(room, me)
 
     socket
   end
@@ -74,7 +74,7 @@ defmodule ChatWeb.MainLive.Page.Room do
       end
     )
     |> Enum.at(0)
-    |> broadcast_message(room, me)
+    |> broadcast_new_message(room, me)
 
     socket
   end
@@ -90,6 +90,16 @@ defmodule ChatWeb.MainLive.Page.Room do
     else
       socket
     end
+  end
+
+  def delete_message(
+        %{assigns: %{me: me, room_identity: room_identity, room: room}} = socket,
+        {time, msg_id}
+      ) do
+    Rooms.delete_message({time, msg_id}, room_identity, me)
+    broadcast_deleted_message(msg_id, room, me)
+
+    socket
   end
 
   def close(%{assigns: %{room: room}} = socket) do
@@ -108,13 +118,25 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> then(&"room:#{&1}")
   end
 
-  defp broadcast_message(message, room, me) do
+  defp broadcast_new_message(message, room, me) do
+    {:new_room_message, message}
+    |> room_broadcast(room)
+
+    Log.message_room(me, room.pub_key)
+  end
+
+  defp broadcast_deleted_message(msg_id, room, me) do
+    {:deleted_room_message, msg_id}
+    |> room_broadcast(room)
+
+    Log.delete_room_message(me, room.pub_key)
+  end
+
+  defp room_broadcast(message, room) do
     PubSub.broadcast!(
       Chat.PubSub,
       room |> room_topic(),
-      {:new_room_message, message}
+      message
     )
-
-    Log.message_room(me, room.pub_key)
   end
 end

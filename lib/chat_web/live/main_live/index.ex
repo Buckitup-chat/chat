@@ -127,6 +127,12 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("dialog-file-change", _, socket), do: socket |> noreply()
   def handle_event("dialog-file-submit", _, socket), do: socket |> noreply()
 
+  def handle_event("dialog/delete-message", %{"id" => id, "timestamp" => time}, socket) do
+    socket
+    |> Page.Dialog.delete_message({time |> String.to_integer(), id})
+    |> noreply()
+  end
+
   def handle_event("close-dialog", _, socket) do
     socket
     |> Page.Dialog.close()
@@ -156,6 +162,12 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("room-message", %{"room" => %{"text" => text}}, socket) do
     socket
     |> Page.Room.send_text(text)
+    |> noreply()
+  end
+
+  def handle_event("room/delete-message", %{"id" => id, "timestamp" => time}, socket) do
+    socket
+    |> Page.Room.delete_message({time |> String.to_integer(), id})
     |> noreply()
   end
 
@@ -266,6 +278,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_info({:deleted_dialog_message, msg_id}, socket) do
+    socket
+    |> push_event("chat:toggle", %{to: "#dialog-message-#{msg_id}", class: "hidden"})
+    |> noreply()
+  end
+
   def handle_info({:new_user, card}, socket) do
     socket
     |> Page.Lobby.show_new_user(card)
@@ -281,6 +299,12 @@ defmodule ChatWeb.MainLive.Index do
   def handle_info({:new_room_message, glimpse}, socket) do
     socket
     |> Page.Room.show_new(glimpse)
+    |> noreply()
+  end
+
+  def handle_info({:deleted_room_message, msg_id}, socket) do
+    socket
+    |> push_event("chat:toggle", %{to: "#room-message-#{msg_id}", class: "hidden"})
     |> noreply()
   end
 

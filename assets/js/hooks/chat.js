@@ -1,6 +1,13 @@
 export const hooks = {
   mounted() {
-    console.log(this.el);
-    this.el.scroll({ top: 1000, behavior: 'auto' });    
+    this.scrollToBottom();
+  },
+  updated() {
+    this.scrollToBottom();
+  },
+  scrollToBottom() {
+    Promise.all(Array.from(document.images).filter(img => !img.complete).map(img => new Promise(resolve => { img.onload = img.onerror = resolve; }))).then(() => {
+      this.el.scroll({top: this.el.scrollHeight, behavior: 'smooth'});
+    });
   }
 }

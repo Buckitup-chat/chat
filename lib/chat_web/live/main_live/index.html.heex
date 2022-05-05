@@ -120,7 +120,7 @@
                 <li class={classes("w-full hover:bg-stone250", %{"bg-stone250" => user == @peer})}>
                   <a href="javascript:void(0)" phx-click="switch-dialog" phx-value-user-id={user.hash}>
                     <div class="flex flex-row px-7">
-                      <div class="text-sm text-grayscale600">[<%= short_hash(user.hash) %>]</div>
+                      <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(user.hash) %>]</tt>
                       <div class="ml-1 text-sm"><%= user == Chat.Card.from_identity(@me) && "My notes" || user.name %></div>
                     </div>
                   </a>
@@ -150,7 +150,7 @@
             <li class={classes("w-full hover:bg-stone250", %{"bg-stone250" => room == @room})}>
               <a phx-click="switch-room" phx-value-room={room.hash}>
                 <div class="flex flex-row px-7">
-                  <div class="text-sm text-grayscale600">[<%= short_hash(room.hash) %>]</div>
+                  <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
                   <div class="ml-1 text-sm"><%= room.name %></div>
                 </div>
               </a>
@@ -171,18 +171,19 @@
         <% end %>
     </div>
     
-<div class="basis-[80%] flex flex-col items-stretch">
+<div class="basis-[80%] flex flex-col items-stretch ">
   <%= if @lobby_mode == :chats do %>      
-    <div class="basis-[93%] overflow-scroll" id={"chat-#{@peer.hash}"} phx-hook="Chat">
-      <div class="h-14 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start fixed" >
-        <div class="text-base text-white/60">[<%= short_hash(@peer.hash) %>]</div>
-        <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>
-        <button>
-          <svg class="w-4 h-4 ml-1 flex fill-white/50" >
-            <use href="/images/icons.svg#edit"></use>
-          </svg>
-        </button>
-      </div>
+    <div class="h-14 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start fixed">
+      <div class="text-base text-white/60">[<%= short_hash(@peer.hash) %>]</div>
+      <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>
+      <button>
+        <svg class="w-4 h-4 ml-1 flex fill-white/50" >
+          <use href="/images/icons.svg#edit"></use>
+        </svg>
+      </button>
+    </div>
+    <div class="basis-[93%] overflow-y-auto flex flex-col justify-between" id={"chat-#{@peer.hash}"} phx-hook="Chat">
+      <div></div>
       <div class="px-8 backdrop-opacity-25" id="dialog-messages" phx-update={@message_update_mode}>
         <%= for msg <- @messages do %>
           <div class={classes("m-1 flex", %{"justify-end" => msg.is_mine?, "justify-start" => !msg.is_mine?})} id={"dialog-message-#{UUID.uuid4()}"}>
@@ -195,7 +196,7 @@
         <% end %>
       </div>
     </div>
-    <div class="basis-[7%] px-8 border border-white bg-white flex items-center">
+    <div id="rrr" class="basis-[7%] px-8 border border-white bg-white flex items-center">
       <.form
         for={:dialog_image}
         id="dialog-image-form"
@@ -265,7 +266,7 @@
           </button>
       </div>
     <%= else %>
-      <div class="basis-[93%] overflow-scroll" id={"room-#{@room.admin_hash}"} >
+      <div class="basis-[93%] overflow-scroll flex flex-col justify-between" id={"room-#{@room.admin_hash}"} phx-hook="Chat">
         <div class="h-14 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between fixed" >
           <div class="flex flex-row items-center">
             <div class="text-base text-white/60">[<%= short_hash(@room.admin_hash) %>]</div>
@@ -278,6 +279,7 @@
             <span class="text-base text-white"> Invite</span>
           </button>
         </div>
+        <div></div>
         <div class="px-8 w-full " id="room-messages" phx-update={@message_update_mode}>
           <div id="room-messages" phx-update={@message_update_mode}>
             <%= for msg <- @messages do %>

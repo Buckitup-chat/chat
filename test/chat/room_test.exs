@@ -51,10 +51,7 @@ defmodule Chat.Rooms.RoomTest do
   end
 
   test "room invite" do
-    alice = User.login("Alice")
-
-    room_identity = alice |> Rooms.add("some room")
-    room = Rooms.Room.create(alice, room_identity)
+    {_alice, room_identity, room} = alice_and_room()
 
     bob = User.login("Bob")
     bob_key = bob |> Identity.pub_key()
@@ -124,5 +121,45 @@ defmodule Chat.Rooms.RoomTest do
     Rooms.approve_requests(room_hash, room_identity)
 
     assert [^room_identity] = Rooms.join_approved_requests(room_hash, bob)
+  end
+
+  test "message removed from room should not accessed any more" do
+    {alice, room_identity, room} = alice_and_room()
+    User.register(alice)
+
+    time = DateTime.utc_now() |> DateTime.add(-10, :second)
+
+    Rooms.add_text(room, alice, "Hello", now: time)
+    Rooms.add_text(room, alice, "1", now: time |> DateTime.add(2, :second))
+    Rooms.add_text(room, alice, "2", now: time |> DateTime.add(5, :second))
+
+    [msg] =
+      Rooms.read(
+        room,
+        room_identity,
+        &User.id_map_builder/1,
+        {time |> DateTime.add(5, :second) |> DateTime.to_unix(), 0},
+        1
+      )
+
+    assert "1" == msg.content
+
+    Rooms.delete_message({msg.timestamp, msg.id}, room_identity, alice)
+
+    assert [_, _] =
+             Rooms.read(
+               room,
+               room_identity,
+               &User.id_map_builder/1
+             )
+  end
+
+  defp alice_and_room do
+    alice = User.login("Alice")
+
+    room_identity = alice |> Rooms.add("Alice room")
+    room = Rooms.Room.create(alice, room_identity)
+
+    {alice, room_identity, room}
   end
 end

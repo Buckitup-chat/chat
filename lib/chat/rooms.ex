@@ -45,7 +45,7 @@ defmodule Chat.Rooms do
   end
 
   defdelegate add_memo(room, me, text), to: RoomMessages
-  defdelegate add_text(room, me, text), to: RoomMessages
+  defdelegate add_text(room, me, text, opts \\ []), to: RoomMessages
   defdelegate add_file(room, me, data), to: RoomMessages
   defdelegate add_image(room, me, data), to: RoomMessages
 
@@ -60,7 +60,8 @@ defmodule Chat.Rooms do
 
   def read_message(%Message{} = msg, %Identity{} = identity), do: RoomMessages.read(msg, identity)
 
-  def delete_message(msg_id, room, me), do: msg_id |> RoomMessages.delete_message(room, me)
+  def delete_message(msg_id, room, me),
+    do: msg_id |> RoomMessages.delete_message(room, me)
 
   def add_request(room_hash, user_identity) do
     room_hash

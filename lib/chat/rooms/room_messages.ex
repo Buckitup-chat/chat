@@ -18,11 +18,12 @@ defmodule Chat.Rooms.RoomMessages do
   def add_text(
         %Room{pub_key: room_key},
         %Identity{} = author,
-        text
+        text,
+        opts
       ) do
     text
     |> Utils.encrypt_and_sign(room_key, author)
-    |> Message.new(author |> Utils.hash(), type: :text)
+    |> Message.new(author |> Utils.hash(), opts |> Keyword.merge(type: :text))
     |> tap(&db_save(&1, room_key))
   end
 
@@ -65,12 +66,17 @@ defmodule Chat.Rooms.RoomMessages do
     }
   end
 
-  def delete_message({time, id}, %Identity{} = room, %Identity{} = author) do
-    with msg_key <- room |> Identity.pub_key() |> key(time, id),
+  def delete_message(
+        {time, id},
+        %Identity{} = room_identity,
+        %Identity{} = author
+      ) do
+    with room_key <- room_identity |> Identity.pub_key(),
+         msg_key <- room_key |> key(time, id),
          msg <- Db.get(msg_key),
          true <- msg.author_hash == author |> Utils.hash() do
       msg
-      |> read(room)
+      |> read(room_identity)
       |> Content.delete()
 
       Db.delete(msg_key)
@@ -97,13 +103,9 @@ defmodule Chat.Rooms.RoomMessages do
   def key(room_key, time, id),
     do: {@db_key, room_key |> Utils.binhash(), time, id |> Utils.binhash()}
 
-  def now_key(room_key, id) do
-    key(room_key, System.system_time(:second), id)
-  end
-
   defp db_save(message, room_key) do
     room_key
-    |> now_key(message.id)
+    |> key(message.timestamp, message.id)
     |> Db.put(message)
   end
 

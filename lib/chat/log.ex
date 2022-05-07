@@ -23,11 +23,13 @@ defmodule Chat.Log do
   def open_direct(me, peer), do: me |> log(:open_direct, to: binhash(peer))
   def message_direct(me, peer), do: me |> log(:message_direct, to: binhash(peer))
   def delete_message_direct(me, peer), do: me |> log(:delete_message_direct, to: binhash(peer))
+  def update_message_direct(me, peer), do: me |> log(:update_message_direct, to: binhash(peer))
 
   @human_actions %{
     open_direct: "reads dialog",
     message_direct: "writes message",
     delete_message_direct: "removes message",
+    update_message_direct: "edits message",
     sign_in: "signs in",
     visit: "visits",
     export_keys: "exports keys",

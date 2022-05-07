@@ -131,8 +131,16 @@
       <%= for msg <- @messages do %>
         <div class="row" id={"dialog-message-#{msg.id}"}>
           <div class={msg.is_mine? && "column column-75 column-offset-25 text-right" || "column column-75" }>
-            <.message msg={msg} />
+            <span class="x-content"
+            ><.message msg={msg} /></span>
             <%= if msg.is_mine? do %>
+              <%= if msg.type in [:text, :memo] do %>
+                <a style="cursor: pointer"
+                  phx-click="dialog/edit-message" 
+                  phx-value-id={msg.id} 
+                  phx-value-timestamp={msg.timestamp}
+                > 📝 </a>
+              <% end %> 
               <a style="cursor: pointer"
                 phx-click="dialog/delete-message" 
                 phx-value-id={msg.id} 
@@ -143,24 +151,47 @@
         </div> 
       <% end %>
       </div>
-      <.form
-        let={di}
-        for={:dialog}
-        id="dialog-form"
-        phx-submit={ JS.push("dialog-message") |> JS.dispatch("chat:clear-value", to: "#dialog-input")}
-        class="text-right row"
-      >
-        <div class="column column-50 column-offset-50">
-          <%= text_input di, :text,
-              placeholder: "New message",
-              class: "text-right",
-              id: "dialog-input",
-              spellcheck: "false",
-              autocomplete: "off"
-          %>
-          <%= submit "Send", phx_disable_with: "..." %>
-        </div>
-      </.form>
+      <%= if @edit_dialog do %>
+        <.form
+          let={dei}
+          for={:dialog_edit}
+          id="dialog-edit-form"
+          phx-submit="dialog/edited-message"
+          class="text-right row"
+        >
+          <div class="column column-50 column-offset-50">
+            <%= text_input dei, :text,
+                class: "text-right",
+                id: "dialog-edit-input",
+                spellcheck: "false",
+                autocomplete: "off",
+                value: @edit_content
+            %>
+            <button type="button" class="button button-outline" phx-click="dialog/cancel-edit" >Cancel</button>
+            <%= submit "Update", phx_disable_with: "..." %>
+          </div>
+        </.form>
+
+      <% else %> 
+        <.form
+          let={di}
+          for={:dialog}
+          id="dialog-form"
+          phx-submit={ JS.push("dialog-message") |> JS.dispatch("chat:clear-value", to: "#dialog-input")}
+          class="text-right row"
+        >
+          <div class="column column-50 column-offset-50">
+            <%= text_input di, :text,
+                placeholder: "New message",
+                class: "text-right",
+                id: "dialog-input",
+                spellcheck: "false",
+                autocomplete: "off"
+            %>
+            <%= submit "Send", phx_disable_with: "..." %>
+          </div>
+        </.form>
+      <% end %> 
       <div class="text-right row">
         <.form
           for={:dialog_file}

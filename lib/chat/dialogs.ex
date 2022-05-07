@@ -30,6 +30,7 @@ defmodule Chat.Dialogs do
   defdelegate add_file(dialog, src, data, now \\ DateTime.utc_now()), to: Dialog
   defdelegate add_image(dialog, src, data, now \\ DateTime.utc_now()), to: Dialog
 
+  defdelegate update(dialog, author, msg_time_id, content), to: Dialog
   defdelegate delete(dialog, author, msg_time_id), to: Dialog
 
   def read(
@@ -39,6 +40,12 @@ defmodule Chat.Dialogs do
         amount \\ 1000
       ),
       do: Dialog.read(dialog, reader, before, amount)
+
+  def read_message(%Dialog{} = dialog, {time, msg_id}, %Identity{} = me) do
+    message = Dialog.get_message(dialog, {time, msg_id})
+    side = Dialog.my_side(dialog, me)
+    Dialog.read(message, me, side, peer(dialog, me))
+  end
 
   def read_message(%Dialog{} = dialog, %Message{} = message, %Identity{} = me) do
     side = Dialog.my_side(dialog, me)

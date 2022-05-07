@@ -188,6 +188,28 @@ defmodule Chat.Dialogs.DialogTest do
     end)
   end
 
+  test "message update should replace previous version in dialog" do
+    {alice, _, _, dialog} = alice_bob_dialog()
+    time = DateTime.utc_now() |> DateTime.add(-10, :second)
+    text = "text here"
+    updated_text = "updated text here"
+
+    dialog |> Dialogs.add_memo(alice, "memo here", time)
+    dialog |> Dialogs.add_text(alice, text, time |> DateTime.add(1, :second))
+
+    assert [_, msg] = dialog |> Dialogs.read(alice)
+    assert ^text = msg.content
+
+    msg_id = {msg.timestamp, msg.id}
+    dialog |> Dialogs.update(alice, msg_id, {:memo, updated_text})
+
+    assert [_, %{type: :memo} = msg] = dialog |> Dialogs.read(alice)
+    assert ^updated_text = msg.content |> StorageId.from_json() |> Memo.get()
+
+    dialog |> Dialogs.update(alice, msg_id, updated_text)
+    assert [_, %{type: :text, content: ^updated_text}] = dialog |> Dialogs.read(alice)
+  end
+
   defp alice_bob_dialog do
     alice = User.login("Alice")
     bob = User.login("Bob")

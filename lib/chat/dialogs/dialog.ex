@@ -98,6 +98,11 @@ defmodule Chat.Dialogs.Dialog do
     |> Enum.reverse()
   end
 
+  def get_message(%__MODULE__{} = dialog, {time, id}) do
+    msg_key(dialog, time, id)
+    |> Db.get()
+  end
+
   def my_side(%__MODULE__{a_key: a_key, b_key: b_key}, identitiy) do
     case identitiy |> Identity.pub_key() do
       ^a_key -> :a_copy
@@ -118,22 +123,53 @@ defmodule Chat.Dialogs.Dialog do
     end)
   end
 
-  def delete(%__MODULE__{} = dialog, %Identity{} = author, {time, id}) do
+  def delete(%__MODULE__{} = dialog, %Identity{} = author, msg_id) do
+    fn msg, key ->
+      side = my_side(dialog, author)
+
+      msg
+      |> read(author, side, peer_key(dialog, side))
+      |> Content.delete()
+
+      Db.delete(key)
+      :ok
+    end
+    |> change_my_message(author, dialog, msg_id)
+  end
+
+  def update(%__MODULE__{} = dialog, %Identity{} = author, msg_id, new_text) do
+    fn msg, _key ->
+      side = my_side(dialog, author)
+
+      msg
+      |> read(author, side, peer_key(dialog, side))
+      |> Content.delete()
+
+      {type, content} =
+        case new_text do
+          {:memo, text} ->
+            text
+            |> Memo.add()
+            |> StorageId.to_json()
+            |> then(&{:memo, &1})
+
+          text ->
+            {:text, text}
+        end
+
+      content
+      |> add_message(dialog, author, type: type, now: msg.timestamp, id: msg.id)
+    end
+    |> change_my_message(author, dialog, msg_id)
+  end
+
+  defp change_my_message(action_fn, author, dialog, {time, id}) do
     key = dialog |> msg_key(time, id)
     msg = Db.get(key)
 
     case dialog |> is_mine?(msg, author) do
-      true ->
-        side = my_side(dialog, author)
-
-        msg
-        |> read(author, side, peer_key(dialog, side))
-        |> Content.delete()
-
-        Db.delete(key)
-
-      _ ->
-        nil
+      true -> action_fn.(msg, key)
+      _ -> nil
     end
   end
 

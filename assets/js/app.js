@@ -62,6 +62,8 @@ const listeners = {
     url = e.detail.url
     url && openUrl(url)
   },  
+  "phx:chat:focus": (e) => {const el = document.querySelector(e.detail.to); setTimeout(() => el.focus(), 100);},
+  "phx:chat:change": (e) => {const el = document.querySelector(e.detail.to); el.innerHTML = e.detail.content; },
 };
 for (key in listeners) {
   window.addEventListener(key, listeners[key]);

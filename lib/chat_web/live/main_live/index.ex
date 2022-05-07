@@ -127,6 +127,24 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("dialog-file-change", _, socket), do: socket |> noreply()
   def handle_event("dialog-file-submit", _, socket), do: socket |> noreply()
 
+  def handle_event("dialog/cancel-edit", _, socket) do
+    socket
+    |> Page.Dialog.cancel_edit()
+    |> noreply()
+  end
+
+  def handle_event("dialog/edited-message", %{"dialog_edit" => %{"text" => text}}, socket) do
+    socket
+    |> Page.Dialog.update_edited_message(text)
+    |> noreply()
+  end
+
+  def handle_event("dialog/edit-message", %{"id" => id, "timestamp" => time}, socket) do
+    socket
+    |> Page.Dialog.edit_message({time |> String.to_integer(), id})
+    |> noreply()
+  end
+
   def handle_event("dialog/delete-message", %{"id" => id, "timestamp" => time}, socket) do
     socket
     |> Page.Dialog.delete_message({time |> String.to_integer(), id})
@@ -278,6 +296,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_info({:updated_dialog_message, msg_id}, socket) do
+    socket
+    |> Page.Dialog.update_message(msg_id, &message/1)
+    |> noreply()
+  end
+
   def handle_info({:deleted_dialog_message, msg_id}, socket) do
     socket
     |> push_event("chat:toggle", %{to: "#dialog-message-#{msg_id}", class: "hidden"})
@@ -380,13 +404,13 @@ defmodule ChatWeb.MainLive.Index do
     socket |> noreply()
   end
 
-  defp message(%{msg: %{type: :text}} = assigns) do
+  def message(%{msg: %{type: :text}} = assigns) do
     ~H"""
         <span title={@msg.timestamp |> DateTime.from_unix!()}><%= @msg.content %></span>
     """
   end
 
-  defp message(%{msg: %{type: :memo, content: json}} = assigns) do
+  def message(%{msg: %{type: :memo, content: json}} = assigns) do
     memo =
       json
       |> StorageId.from_json()
@@ -399,7 +423,7 @@ defmodule ChatWeb.MainLive.Index do
     """
   end
 
-  defp message(%{msg: %{type: :image, content: json}} = assigns) do
+  def message(%{msg: %{type: :image, content: json}} = assigns) do
     {id, secret} = json |> StorageId.from_json()
 
     assigns =
@@ -416,7 +440,7 @@ defmodule ChatWeb.MainLive.Index do
     """
   end
 
-  defp message(%{msg: %{type: :file, content: json}} = assigns) do
+  def message(%{msg: %{type: :file, content: json}} = assigns) do
     {id, secret} = json |> StorageId.from_json()
     [_, _, name, size] = Files.get(id, secret)
 

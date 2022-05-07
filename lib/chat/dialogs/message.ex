@@ -17,15 +17,19 @@ defmodule Chat.Dialogs.Message do
   defp new(a_copy, b_copy, opts) do
     now = opts |> Keyword.get(:now, DateTime.utc_now())
     type = opts |> Keyword.get(:type, :text)
+    id = opts |> Keyword.get(:id, UUID.uuid4())
     is_a_to_b? = opts |> Keyword.get(:is_a_to_b?, true)
 
     %__MODULE__{
-      timestamp: now |> DateTime.to_unix(),
+      timestamp: now |> unixtime(),
       is_a_to_b?: is_a_to_b?,
       a_copy: a_copy,
       b_copy: b_copy,
       type: type,
-      id: UUID.uuid4()
+      id: id
     }
   end
+
+  defp unixtime(time) when is_integer(time), do: time
+  defp unixtime(time), do: DateTime.to_unix(time)
 end

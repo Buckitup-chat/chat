@@ -9,4 +9,6 @@ defmodule ChatWeb.MainLive.Page.Shared do
   def format_size(n) when n > 1_000_000, do: "#{trunc(n / 100_000) / 10} Mb"
   def format_size(n) when n > 1_000, do: "#{trunc(n / 100) / 10} Kb"
   def format_size(n), do: "#{n} b"
+
+  def is_memo?(text), do: String.length(text) > 150
 end

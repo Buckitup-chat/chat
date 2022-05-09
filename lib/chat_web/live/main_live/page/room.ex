@@ -13,11 +13,13 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def init(%{assigns: %{rooms: rooms, me: me}} = socket, room_hash) do
     room = Rooms.get(room_hash)
-    IO.inspect room
+    IO.inspect(room)
+
     room_identity =
       rooms
       |> Enum.find(&(room_hash == &1 |> Identity.pub_key() |> Utils.hash()))
-    IO.inspect room_identity
+
+    IO.inspect(room_identity)
     messages = room |> Rooms.read(room_identity)
 
     PubSub.subscribe(Chat.PubSub, room |> room_topic())

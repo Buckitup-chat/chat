@@ -50,6 +50,20 @@ window.addEventListener("chat:toggle", (e) => {
     e.target.classList.toggle(e.detail.class)
   }
 });
+window.addEventListener("chat:set-input-size", (e) => {
+  e.target.style.height = '';
+  e.target.style.height = (e.target.scrollHeight > 150 ? 150 : e.target.scrollHeight) + 'px';
+});
+window.addEventListener("chat:keydown", (e) => {
+  console.log(e)
+  console.log(e.target)
+  console.log(e.key)
+  console.log(e.shiftKey)
+  if (e.key === 'Enter' && e.shiftKey) {
+    console.log(e)
+    console.log(e.target)
+  }
+});
 window.addEventListener("phx:chat:redirect", (e) => { 
   const openUrl = (url) => window.location = url;
   url = e.detail.url

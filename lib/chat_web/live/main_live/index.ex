@@ -14,6 +14,8 @@ defmodule ChatWeb.MainLive.Index do
   def mount(params, _session, %{assigns: %{live_action: action}} = socket) do
     Process.flag(:sensitive, true)
 
+    IO.inspect(2)
+
     if connected?(socket) do
       if action == :export do
         socket
@@ -25,7 +27,8 @@ defmodule ChatWeb.MainLive.Index do
         socket
         |> assign(
           need_login: true,
-          mode: :user_list
+          mode: :user_list,
+          shift_key_pressed: false
         )
         |> allow_image_upload(:image)
         |> allow_image_upload(:room_image)
@@ -62,7 +65,7 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Login.load_user(data)
     |> Page.Lobby.init()
     |> Page.Dialog.init()
-    |> IO.inspect()
+    |> Page.Logout.init()
     |> noreply()
   end
 
@@ -142,14 +145,46 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("dialog-message", %{"dialog" => %{"text" => ""}}, socket) do
+  def handle_event("dialog-message", %{"dialog" => %{"text" => text}}, socket) do
+    if String.trim(text) == "" do
+      socket
+      |> noreply()
+    else
+      socket
+      |> Page.Dialog.send_text(text)
+      |> noreply()
+    end
+  end
+
+  def handle_event("dialog-message", %{"key" => "Shift"} = params, socket) do
+    IO.inspect "pressed"
+    IO.inspect params
+    socket
+    |> assign(:shift_key_pressed, true)
+    |> noreply()
+  end
+
+  def handle_event("dialog-message", %{"key" => "Shift"} = params, socket) do
+    IO.inspect "unpressed"
+    IO.inspect params
+    socket
+    |> assign(:shift_key_pressed, false)
+    |> noreply()
+  end
+
+  def handle_event("dialog-message", %{"key" => "Enter"} = params, %{assigns: %{shift_key_pressed: shift_key_pressed}} = socket) do
+    if shift_key_pressed do
+      IO.inspect "enter"
+
+    end
+    
     socket
     |> noreply()
   end
 
-  def handle_event("dialog-message", %{"dialog" => %{"text" => text}}, socket) do
+  def handle_event(event, params, socket) do
+    IO.inspect params, label: :ignore
     socket
-    |> Page.Dialog.send_text(text)
     |> noreply()
   end
 
@@ -184,9 +219,14 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   def handle_event("room-message", %{"room" => %{"text" => text}}, socket) do
-    socket
-    |> Page.Room.send_text(text)
-    |> noreply()
+    if String.trim(text) == "" do
+      socket
+      |> noreply()
+    else
+      socket
+      |> Page.Room.send_text(text)
+      |> noreply()
+    end
   end
 
   def handle_event("room-image-submit", _, socket), do: socket |> noreply()
@@ -232,9 +272,10 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   def handle_event("logout-open", _, socket) do
+    IO.inspect("open")
+
     socket
-    |> Page.Lobby.close()
-    |> Page.Logout.init()
+    |> Page.Logout.open()
     |> noreply()
   end
 
@@ -244,9 +285,21 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("logout:toggle-password-visibility", _, socket) do
+    socket
+    |> Page.Logout.toggle_password_visibility()
+    |> noreply()
+  end
+
+  def handle_event("logout:toggle-password-confirmation-visibility", _, socket) do
+    socket
+    |> Page.Logout.toggle_password_confirmation_visibility()
+    |> noreply()
+  end
+
   def handle_event("logout-download-insecure", _, socket) do
     socket
-    |> Page.Logout.generate_backup("")
+    ## |> Page.Logout.generate_backup("")
     |> Page.Logout.go_final()
     |> noreply()
   end
@@ -277,7 +330,6 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("logout-close", _, socket) do
     socket
     |> Page.Logout.close()
-    |> Page.Lobby.init()
     |> noreply()
   end
 
@@ -370,7 +422,7 @@ defmodule ChatWeb.MainLive.Index do
     ~H"""
     <div class={"#{@class} max-w-md min-w-[180px] rounded-lg overflow-hidden shadow-lg"}>
         <.message_header author={@author} />
-        <span class="px-2 flex justify-start px-1"><%= @msg.content %></span>
+        <span class="w-full px-2 flex justify-start break-all whitespace-pre-wrap"><%= @msg.content %></span>
         <.message_timestamp msg={@msg} />
       </div>  
     """
@@ -475,7 +527,6 @@ defmodule ChatWeb.MainLive.Index do
         />
     """
   end
-
 
   defp allow_image_upload(socket, type) do
     socket

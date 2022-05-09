@@ -64,7 +64,96 @@
     </div>     
   </div>
 <% else %>
-  <%= if @mode == :lobby do %> 
+  <%= if @mode == :lobby do %>
+    <.modal id="logout-backup-popup" hide_event="logout-close" class="w-96 h-max">
+      <%= if @logout_step == :initial do %> 
+        <h1 class="text-base font-bold text-grayscale">Log Out & Back Up</h1>
+        <p class="mt-3 text-sm text-black/50">To get access again you will need the recovery keys:</p>
+        <button class="mt-5 w-full h-12 border-0 rounded-lg bg-grayscale flex items-center justify-center" phx-click="logout-go-middle">
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-white">Download the Keys</span>
+            <svg width="16" height="16" class="ml-2 fill-white">
+              <use href="/images/icons.svg#upload1"></use>
+            </svg>
+          </div>
+        </button>
+        <button class="mt-3 w-full h-12 border rounded-lg border-black/10" >Log Out without Keys</button>
+        <button class="mt-3 w-full h-12 border rounded-lg border-black/10" >Cancel</button>
+    <% end %> 
+    <%= if @logout_step == :middle do %>
+      <h1 class="text-base font-bold text-grayscale">Set Up Password</h1>
+      <p class="mt-3 text-sm text-black/50">To store the backup copy of the key securely, enter the encryption password for the file</p>
+      <div class="mt-5 w-full h-7 flex items-center justify-between border-0 rounded-lg bg-black/10"> 
+        <svg width="16" height="16" class="ml-1 fill-black/40">
+          <use href="/images/icons.svg#alert"></use>
+        </svg>
+         <blockquote class="text-xs text-black/50 mr-3">
+          This password in not stored and can NOT be recovered
+        </blockquote>
+      </div>
+      <.form
+        let={f}
+        for={@changeset}
+        id="logout-form"
+        phx-change="logout-check-password"
+        phx-submit="logout-download-with-password"
+        as="logout"
+        class="mt-3 w-full"
+      >  
+        <div class="w-ull relative">
+          <%= if @is_password_visible do %>
+            <%= text_input f, :password, type: "text", placeholder: "Enter Password", phx_debounce: 700, class: "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50" %>
+            <a>
+              <svg phx-click="logout:toggle-password-visibility" width="16" height="16" class="absolute top-4 right-3 ml-2">
+                <use href={"/images/icons.svg#visibility"}></use>
+              </svg>
+            </a>
+          <% else %>
+            <%= text_input f, :password, type: "password", placeholder: "Enter Password", phx_debounce: 700, class: "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50" %>
+            <a>
+              <svg phx-click="logout:toggle-password-visibility" width="16" height="16" class="absolute top-4 right-3 ml-2">
+                <use href={"/images/icons.svg#visibilityOff"}></use>  
+              </svg>
+            </a>
+          <% end %>
+        </div>
+        <!--<%= error_tag f, :password %> -->
+        <div class="mt-3 w-ull relative">
+          <%= if @is_password_confirmation_visible do %>
+            <%= text_input f, :password_confirmation, type: "text", placeholder: "Repeat Password", phx_debounce: 700, class: "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50" %>
+            <a>
+              <svg phx-click="logout:toggle-password-confirmation-visibility" width="16" height="16" class="absolute top-4 right-3 ml-2">
+                <use href="/images/icons.svg#visibility"></use>
+              </svg>
+            </a>
+          <% else %>
+            <%= text_input f, :password_confirmation, type: "password", placeholder: "Repeat Password", phx_debounce: 700, class: "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50" %>
+            <a>
+              <svg phx-click="logout:toggle-password-confirmation-visibility" width="16" height="16" class="absolute top-4 right-3 ml-2">
+                <use href="/images/icons.svg#visibilityOff"></use>
+              </svg>
+            </a>
+          <% end %>
+        </div>
+        <!-- <%= error_tag f, :password_confirmation %> -->
+        <p class="mt-3 text-sm text-black/50">At least 12 symbols</p>
+        
+        <%= submit "Download", phx_disable_with: "Downloading...", class: "mt-5 w-full h-12 border-0 rounded-lg bg-grayscale text-white disabled:opacity-50", disabled: !@changeset.valid? %>
+      </.form>
+      <button class="mt-3 w-full h-12 border rounded-lg border-black/10" phx-click="logout-download-insecure">
+        Download without password 
+        <span style="color: red">insecure!</span>
+      </button>
+    <% end %> 
+    <%= if @logout_step == :final do %>
+      <h1 class="text-base font-bold text-grayscale">Success</h1>
+      <p class="mt-3 text-sm text-black/50">If you downloaded the the recovery key, you can log out now, it will erase all the browser data about BuckitUp.</p>
+      <button class="mt-3 w-full h-12 border-0 rounded-lg bg-grayscale text-white" phx-click="logout-wipe">Exit</button>
+      <button class="mt-3 w-full h-12 border rounded-lg border-black/10">Cancel</button>
+    <% end %> 
+    </.modal>
+    
+
   <div class="w-screen h-screen flex flex-row items-stretch">
     <div class="basis-[5%] h-screen flex flex-col justify-between bg-white">
       <div class="flex flex-col items-center"> 
@@ -92,15 +181,15 @@
       <div class="flex flex-col items-center">
         <a phx-click="open-feed" style="display: none; cursor: pointer;">News feed</a>
     
-        <div class="row mt-10" > 
+        <div class="row mt-10"> 
           <div class="column column-50" style="display: none;">
           <blockquote>
-          <a phx-click="open-data-restore" style="display: none; cursor: pointer;">Restore data</a>
+          <a phx-click="open-data-restore" style="cursor: pointer;">Restore data</a>
           or <a href="/get/backup">Backup</a> it
           </blockquote>
         </div>
 
-        <button phx-click="logout-open" class="sidebarIcon mb-1">
+        <button phx-click={JS.push("logout-open") |> show_modal("logout-backup-popup")} class="sidebarIcon mb-1">
           <svg class="w-6 h-6 hover:fill-purple">
             <use href="/images/icons.svg#logout"></use>
           </svg>
@@ -118,7 +207,7 @@
             <ul>
               <%= for user <- @users do %>
                 <li class={classes("w-full hover:bg-stone250", %{"bg-stone250" => user == @peer})}>
-                  <a href="javascript:void(0)" phx-click="switch-dialog" phx-value-user-id={user.hash}>
+                  <a phx-click="switch-dialog" phx-value-user-id={user.hash}>
                     <div class="flex flex-row px-7">
                       <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(user.hash) %>]</tt>
                       <div class="ml-1 text-sm"><%= user == Chat.Card.from_identity(@me) && "My notes" || user.name %></div>
@@ -131,12 +220,26 @@
         <% end %>
 
         <%= if @lobby_mode == :rooms do %>
+                          <.modal id="create-room-popup" class="h-[25%] w-[416px]">
+        <h1 class="text-base font-bold text-grayscale">Create Room</h1>
+        <.form
+          let={f}
+          for={:new_room}
+          id="room-create-form"
+          autocomplete="off"
+          phx-submit={JS.push("create-room")}
+        >  
+          <%= text_input f, :name, placeholder: "Name your Room", class: "w-full h-11 mt-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-0" %>
+          <%= submit "Create", phx_disable_with: "Saving...", class: "w-full h-11 mt-2 text-white border-0 rounded-lg bg-grayscale flex items-center justify-center" %>
+        </.form>
+      </.modal>
+
             <div class='px-7 mt-3 flex items-center justify-between'>
               <h5 class="channel-block-text text-grayscale" style="font-size: 22px;">Rooms</h5>
               <button 
                 id="room-create-toggle"
                 class="w-5 h-5 border rounded-full flex items-center justify-center" style="background: linear-gradient(135deg, #611E87 0%, #A75B63 100%);"
-                phx-click={JS.remove_class("hidden", to: "#create-room-popup") |> JS.remove_attribute("style", to: "#create-room-popup")}>  
+                phx-click={show_modal("create-room-popup")}>
                 <svg class="w-3 h-3 flex fill-white" >
                   <use href="/images/icons.svg#add"></use>
                 </svg>
@@ -157,7 +260,7 @@
             </li>
           <% end %>  
         </ul>
-        <ul style="display: none;"> 
+        <ul> 
           <span class="px-7">Unconfirmed</span>
           <%= for room <- @new_rooms do %>
             <%= if room |> Rooms.is_requested_by?(@my_id) do %>
@@ -196,7 +299,7 @@
         <% end %>
       </div>
     </div>
-    <div id="rrr" class="basis-[7%] px-8 border border-white bg-white flex items-center">
+    <div class="basis-[7%] px-8 border border-white bg-white flex items-center">
       <.form
         for={:dialog_image}
         id="dialog-image-form"
@@ -218,8 +321,10 @@
         for={:dialog}
         id="dialog-form"
         class="basis-[99%] flex items-center justify-between"
-        phx-change
-        phx-submit={ JS.push("dialog-message") |> JS.dispatch("chat:clear-value", to: "#dialog-input")}
+        phx-change={JS.dispatch("chat:set-input-size", to: "#dialog-input")}
+        phx-submit={JS.push("dialog-message") |> JS.dispatch("chat:clear-value", to: "#dialog-input") |> JS.dispatch("chat:set-input-size", to: "#dialog-input")}
+        phx-window-keydown="dialog-message"
+        phx-window-keyup="dialog-message"
       >
         <%= textarea di, :text,
           placeholder: "Enter message",
@@ -238,27 +343,11 @@
     </div>  
   <% end %>
   <%= if @lobby_mode == :rooms do %>
-      <.modal id="create-room-popup" class="h-[25%] md:w-[416px]">
-        <h1 class="text-base font-bold text-grayscale">Create Room</h1>
-        <.form
-          let={f}
-          for={:new_room}
-          id="room-create-form"
-          autocomplete="off"
-          phx-submit={
-              JS.add_class("hidden",  to: "#create-room-popup")
-              |> JS.hide(to: "#create-room-popup", transition: "fade-out")
-              |> JS.remove_attribute("style", to: "#create-room-popup")
-              |> JS.push("create-room")}
-        >  
-          <%= text_input f, :name, placeholder: "Name your Room", class: "w-full h-11 mt-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-0" %>
-          <%= submit "Create", phx_disable_with: "Saving...", class: "w-full h-11 mt-2 text-white border-0 rounded-lg bg-grayscale flex items-center justify-center" %>
-        </.form>
-      </.modal>
+
     <%= unless @room do %>
       <div class="my-auto mx-auto flex flex-col items-center justify-center w-80 h-32 border-9 rounded-lg bg-white/20 ">
           <span class="my-2 text-sm text-white">Select any Room or create your own</span>
-          <button phx-click={JS.remove_class("hidden", to: "#create-room-popup") |> JS.remove_attribute("style", to: "#create-room-popup")} class="my-2 flex flex-row items-center justify-center border rounded-lg border-white w-72 h-11">
+          <button phx-click={show_modal("create-room-popup")} class="my-2 flex flex-row items-center justify-center border rounded-lg border-white w-72 h-11">
             <span class="text-sm text-white">Create Room</span>
             <svg class="w-4 h-4 flex fill-white">
               <use href="/images/icons.svg#add"></use>
@@ -317,8 +406,10 @@
                   let={ri}
                   for={:room}
                   id="room-form"
-                  phx-submit={JS.push("room-message") |> JS.dispatch("chat:clear-value", to: "#room-input")}
+                  phx-change={JS.dispatch("chat:set-input-size", to: "#room-input")}
+                  phx-submit={JS.push("room-message") |> JS.dispatch("chat:clear-value", to: "#room-input") |> JS.dispatch("chat:set-input-size", to: "#room-input") } 
                   class="basis-[99%] flex items-center justify-between"
+
                 >
                   <%= textarea ri, :text,
                       placeholder: "Enter message",
@@ -449,47 +540,7 @@
   <% end %> 
   <%= if @mode == :logout do %> 
     <button class="button button-outline float-right" phx-click="logout-close">Back</button>
-    <%= if @step == :initial do %> 
-      <h2>Log Out & Back Up</h2>
-      <p>To get access again you will need the recovery keys:</p>
-      <button class="button" phx-click="logout-go-middle">Download the Keys</button>
-    <% end %> 
-    <%= if @step == :middle do %> 
-      <h2>Set Up Password</h2>
-      <p>To store the backup copy of the key securely, enter the encryption password for the file</p>
-      <.form
-        let={f}
-        for={@changeset}
-        id="logout-form"
-        phx-change="logout-check-password"
-        phx-submit="logout-download-with-password"
-        as="logout"
-      >
-      
-        <blockquote>
-          This password in not stored and can NOT be recovered
-        </blockquote>
-        <%= text_input f, :password, type: "password", placeholder: "Enter Password", phx_debounce: 700 %>
-        <%= error_tag f, :password %>
-        <%= text_input f, :password_confirmation, type: "password", placeholder: "Repeat Password", phx_debounce: 700 %>
-        <%= error_tag f, :password_confirmation %>
-        <p>At least 12 symbols</p>
-
-        <div>
-          <%= submit "Download", phx_disable_with: "Generating..." %>
-        </div>
-      </.form>
-      <button class="button button-outline" phx-click="logout-download-insecure">
-        Download without password 
-        <span style="color: red">insecure!</span>
-      </button>
-
-    <% end %> 
-    <%= if @step == :final do %> 
-      <h2>Success</h2>
-      <p>If you downloaded the the recovery key, you can log out now, it will erase all the browser data about BuckitUp.</p>
-      <button class="button" phx-click="logout-wipe">Exit</button>
-    <% end %> 
+ 
   <% end %> 
   <%= if @mode == :import_own_key_ring do %> 
     <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg"/>

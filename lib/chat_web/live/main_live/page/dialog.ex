@@ -66,7 +66,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def show_new(%{assigns: %{me: me, dialog: dialog}} = socket, new_message) do
-    IO.inspect new_message
+    IO.inspect(new_message)
+
     socket
     |> assign(:messages, [Dialogs.read_message(dialog, new_message, me)])
     |> assign(:message_update_mode, :append)

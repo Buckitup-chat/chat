@@ -25,18 +25,19 @@ defmodule ChatWeb.LiveHelpers do
       </.modal>
   """
   def modal(assigns) do
-    assigns = assign_new(assigns, :return_to, fn -> nil end)
+    assigns = assign_new(assigns, :hide_event, fn -> assigns[:hide_event] end)
 
     ~H"""
-    <div id={@id} class="hidden phx-modal fade-in" phx-remove={hide_modal(@id)}>
+    <div id={@id} class="phx-modal fade-in" phx-remove={hide_modal(@id, @hide_event)} style="display: none;">
       <div
         id={@id <> "-content"}
         class={"phx-modal-content border-0 rounded-lg bg-white p-4 fade-in-scale flex flex-col #{@class}"}
         phx-click-away={JS.dispatch("click", to: "#close")}
         phx-window-keydown={JS.dispatch("click", to: "#close")}
         phx-key="escape"
+        style="display: none;"
       >   
-        <a id="close" href="#" class="phx-modal-close w-full flex flex-row justify-end" phx-click={hide_modal(@id)}>
+        <a id="close" href="#" class="phx-modal-close w-full flex flex-row justify-end" phx-click={hide_modal(@id, @hide_event)}>
           <svg class="w-4 h-4 flex fill-grayscale">
             <use href="/images/icons.svg#close"></use>
           </svg>
@@ -48,12 +49,23 @@ defmodule ChatWeb.LiveHelpers do
     """
   end
 
-  defp hide_modal(id, js \\ %JS{}) do
+  def show_modal(id), do: show_modal(%JS{}, id)
+
+  def show_modal(%JS{} = js, id) do
     js
-    |> JS.add_class("hidden",  to: "#" <> id)
-    |> JS.hide(to: "#" <> id, transition: "fade-out")
-    |> JS.remove_attribute("style", to: "#" <> id)
+    |> JS.show(to: "#" <> id)
+    |> JS.show(to: "#" <> id <> "-content")
   end
+
+  defp hide_modal(id, event, js \\ %JS{}) do
+    js
+    |> JS.hide(transition: "fade-out", to: "#" <> id)
+    |> JS.hide(transition: "fade-out-scale", to: "#" <> id <> "-content")
+    |> push(event)
+  end
+
+  defp push(%JS{} = js, nil), do: js
+  defp push(%JS{} = js, event), do: JS.push(js, event)
 
   def classes(%{} = optionals), do: classes([], optionals)
   def classes(constants), do: classes(constants, %{})

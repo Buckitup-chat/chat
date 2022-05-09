@@ -11,14 +11,35 @@ defmodule ChatWeb.MainLive.Page.Logout do
 
   def init(%{assigns: %{}} = socket) do
     socket
-    |> assign(:mode, :logout)
-    |> assign(:step, :initial)
+    |> assign(:logout_step, nil)
+  end
+
+  def open(%{assigns: %{}} = socket) do
+    socket
+    |> assign(:logout_step, :initial)
   end
 
   def go_middle(%{assigns: %{}} = socket) do
     socket
-    |> assign(:step, :middle)
-    |> assign(:changeset, Changeset.change({%{}, schema()}))
+    |> assign(:logout_step, :middle)
+    |> assign(
+      :changeset,
+      Changeset.change({%{}, schema()}) |> Changeset.validate_required([:password])
+    )
+    |> assign(:is_password_visible, false)
+    |> assign(:is_password_confirmation_visible, false)
+  end
+
+  def toggle_password_visibility(%{assigns: %{is_password_visible: flag}} = socket) do
+    socket
+    |> assign(:is_password_visible, !flag)
+  end
+
+  def toggle_password_confirmation_visibility(
+        %{assigns: %{is_password_confirmation_visible: flag}} = socket
+      ) do
+    socket
+    |> assign(:is_password_confirmation_visible, !flag)
   end
 
   def check_password(socket, form) do
@@ -65,7 +86,7 @@ defmodule ChatWeb.MainLive.Page.Logout do
 
   def go_final(%{assigns: %{}} = socket) do
     socket
-    |> assign(:step, :final)
+    |> assign(:logout_step, :final)
   end
 
   def wipe(%{assigns: %{me: me}} = socket) do
@@ -80,7 +101,7 @@ defmodule ChatWeb.MainLive.Page.Logout do
 
   def close(%{assigns: %{}} = socket) do
     socket
-    |> assign(:step, nil)
+    |> assign(:logout_step, nil)
     |> assign(:changeset, nil)
   end
 

@@ -1,8 +1,10 @@
 export const hooks = {
   mounted() {
+    console.log(2222)
     this.scrollToBottom();
   },
   updated() {
+    console.log(3333)
     this.scrollToBottom();
   },
   scrollToBottom() {

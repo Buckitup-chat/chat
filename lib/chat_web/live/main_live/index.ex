@@ -157,33 +157,6 @@ defmodule ChatWeb.MainLive.Index do
     end
   end
 
-  def handle_event("dialog-message", %{"key" => "Shift"} = params, socket) do
-    IO.inspect "pressed"
-    IO.inspect params
-    socket
-    |> assign(:shift_key_pressed, true)
-    |> noreply()
-  end
-
-  def handle_event("dialog-message", %{"key" => "Shift"} = params, socket) do
-    IO.inspect "unpressed"
-    IO.inspect params
-    socket
-    |> assign(:shift_key_pressed, false)
-    |> noreply()
-  end
-
-  def handle_event("dialog-message", %{"key" => "Enter"} = params, %{assigns: %{shift_key_pressed: shift_key_pressed}} = socket) do
-    if shift_key_pressed do
-      IO.inspect "enter"
-
-    end
-    
-    socket
-    |> noreply()
-  end
-
-
   def handle_event("dialog-image-change", _, socket), do: socket |> noreply()
 
   def handle_event("dialog-image-submit", _, socket), do: socket |> noreply()
@@ -326,12 +299,6 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("logout-close", _, socket) do
     socket
     |> Page.Logout.close()
-    |> noreply()
-  end
-
-  def handle_event(event, params, socket) do
-    IO.inspect params, label: :ignore
-    socket
     |> noreply()
   end
 

@@ -42,7 +42,6 @@ let liveSocket = new LiveSocket("/live", Socket, {
       hooks: Hooks
 })
 
-
 window.addEventListener("chat:clear-value", (e) => {e.target.value = ""});
 window.addEventListener("chat:focus", (e) => {const el = e.target; setTimeout(() => el.focus(), 100);});
 window.addEventListener("chat:toggle", (e) => {
@@ -54,21 +53,13 @@ window.addEventListener("chat:set-input-size", (e) => {
   e.target.style.height = '';
   e.target.style.height = (e.target.scrollHeight > 150 ? 150 : e.target.scrollHeight) + 'px';
 });
-window.addEventListener("chat:keydown", (e) => {
-  console.log(e)
-  console.log(e.target)
-  console.log(e.key)
-  console.log(e.shiftKey)
-  if (e.key === 'Enter' && e.shiftKey) {
-    console.log(e)
-    console.log(e.target)
-  }
-});
+
 window.addEventListener("phx:chat:redirect", (e) => { 
   const openUrl = (url) => window.location = url;
   url = e.detail.url
   url && openUrl(url)
 });
+
 
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})

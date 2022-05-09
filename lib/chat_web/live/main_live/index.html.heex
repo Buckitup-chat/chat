@@ -323,8 +323,12 @@
         class="basis-[99%] flex items-center justify-between"
         phx-change={JS.dispatch("chat:set-input-size", to: "#dialog-input")}
         phx-submit={JS.push("dialog-message") |> JS.dispatch("chat:clear-value", to: "#dialog-input") |> JS.dispatch("chat:set-input-size", to: "#dialog-input")}
-        phx-window-keydown="dialog-message"
-        phx-window-keyup="dialog-message"
+        onkeydown="
+          if (event.key == 'Enter' && event.shiftKey) {
+            console.log('evrica')
+            document.getElementById('dialog-form-submit-button').click()
+          }
+        "
       >
         <%= textarea di, :text,
           placeholder: "Enter message",
@@ -334,7 +338,7 @@
           autocomplete: "off",
           maxlength: 210
         %>
-        <button type="submit">
+        <button id="dialog-form-submit-button" type="submit">
           <svg class="w-7 h-7 flex fill-purple" >
             <use href="/images/icons.svg#send"></use>
           </svg>
@@ -406,10 +410,16 @@
                   let={ri}
                   for={:room}
                   id="room-form"
+                  class="basis-[99%] flex items-center justify-between"
                   phx-change={JS.dispatch("chat:set-input-size", to: "#room-input")}
                   phx-submit={JS.push("room-message") |> JS.dispatch("chat:clear-value", to: "#room-input") |> JS.dispatch("chat:set-input-size", to: "#room-input") } 
-                  class="basis-[99%] flex items-center justify-between"
-
+                  onkeydown="
+                  console.log(2)
+                    if (event.key == 'Enter' && event.shiftKey) {
+                      console.log('evrica')
+                      document.getElementById('room-input-submit-btn').click()
+                    }
+                  "
                 >
                   <%= textarea ri, :text,
                       placeholder: "Enter message",
@@ -419,7 +429,7 @@
                       autocomplete: "off",
                       maxlength: 210
                   %>
-                  <button type="submit">
+                  <button id="room-input-submit-btn" type="submit">
                     <svg class="w-7 h-7 flex fill-purple" >
                       <use href="/images/icons.svg#send"></use>
                     </svg>

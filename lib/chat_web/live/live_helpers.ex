@@ -57,7 +57,9 @@ defmodule ChatWeb.LiveHelpers do
     |> JS.show(to: "#" <> id <> "-content")
   end
 
-  defp hide_modal(id, event, js \\ %JS{}) do
+  def hide_modal(%JS{} = js, id), do: hide_modal(id, nil, js)
+     
+  def hide_modal(id, event, js \\ %JS{}) do
     js
     |> JS.hide(transition: "fade-out", to: "#" <> id)
     |> JS.hide(transition: "fade-out-scale", to: "#" <> id <> "-content")

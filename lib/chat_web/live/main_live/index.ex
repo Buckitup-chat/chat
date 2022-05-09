@@ -182,11 +182,6 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event(event, params, socket) do
-    IO.inspect params, label: :ignore
-    socket
-    |> noreply()
-  end
 
   def handle_event("dialog-image-change", _, socket), do: socket |> noreply()
 
@@ -332,6 +327,13 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Logout.close()
     |> noreply()
   end
+
+  def handle_event(event, params, socket) do
+    IO.inspect params, label: :ignore
+    socket
+    |> noreply()
+  end
+
 
   @impl true
   def handle_info({:new_dialog_message, glimpse}, socket) do

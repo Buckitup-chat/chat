@@ -220,14 +220,14 @@
         <% end %>
 
         <%= if @lobby_mode == :rooms do %>
-                          <.modal id="create-room-popup" class="h-[25%] w-[416px]">
+          <.modal id="create-room-popup" class="h-[25%] w-[416px]">
         <h1 class="text-base font-bold text-grayscale">Create Room</h1>
         <.form
           let={f}
           for={:new_room}
           id="room-create-form"
           autocomplete="off"
-          phx-submit={JS.push("create-room")}
+          phx-submit={JS.push("create-room") |> hide_modal("create-room-popup")}
         >  
           <%= text_input f, :name, placeholder: "Name your Room", class: "w-full h-11 mt-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-0" %>
           <%= submit "Create", phx_disable_with: "Saving...", class: "w-full h-11 mt-2 text-white border-0 rounded-lg bg-grayscale flex items-center justify-center" %>

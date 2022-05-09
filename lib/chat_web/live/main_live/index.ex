@@ -49,6 +49,7 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Login.create_user(name)
     |> Page.Lobby.init()
     |> Page.Dialog.init()
+    |> Page.Logout.init()
     |> noreply()
   end
 
@@ -333,7 +334,6 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> noreply()
   end
-
 
   @impl true
   def handle_info({:new_dialog_message, glimpse}, socket) do

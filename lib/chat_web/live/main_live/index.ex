@@ -14,8 +14,6 @@ defmodule ChatWeb.MainLive.Index do
   def mount(params, _session, %{assigns: %{live_action: action}} = socket) do
     Process.flag(:sensitive, true)
 
-    IO.inspect(2)
-
     if connected?(socket) do
       if action == :export do
         socket
@@ -27,8 +25,7 @@ defmodule ChatWeb.MainLive.Index do
         socket
         |> assign(
           need_login: true,
-          mode: :user_list,
-          shift_key_pressed: false
+          mode: :user_list
         )
         |> allow_image_upload(:image)
         |> allow_image_upload(:room_image)
@@ -143,6 +140,18 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> Page.Dialog.close()
     |> Page.Dialog.init(user_id)
+    |> noreply()
+  end
+
+  def handle_event("chat:load-more", _, %{assigns: %{dialog: %{}}} = socket) do
+    socket
+    |> Page.Dialog.load_more_messages()
+    |> noreply()
+  end
+
+  def handle_event("chat:load-more", _, %{assigns: %{room: %{}}} = socket) do
+    socket
+    |> Page.Room.load_more_messages()
     |> noreply()
   end
 

@@ -62,7 +62,7 @@ html {
 }
 
 .roomsAndChatsBar {
-  @apply h-screen bg-white/90 overflow-hidden;
+  @apply h-screen min-w-fit bg-white/90 overflow-hidden;
 }
 
 /* Alerts and form errors used by phx.new */

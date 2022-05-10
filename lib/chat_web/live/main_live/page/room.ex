@@ -9,29 +9,33 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.Rooms
   alias Chat.Utils
 
+  @per_page 15
+
   def init(socket), do: socket |> assign(:room, nil)
 
   def init(%{assigns: %{rooms: rooms, me: me}} = socket, room_hash) do
     room = Rooms.get(room_hash)
-    IO.inspect(room)
-
     room_identity =
       rooms
       |> Enum.find(&(room_hash == &1 |> Identity.pub_key() |> Utils.hash()))
 
-    IO.inspect(room_identity)
-    messages = room |> Rooms.read(room_identity)
-
     PubSub.subscribe(Chat.PubSub, room |> room_topic())
-
     Log.visit_room(me, room_identity)
 
     socket
-    # |> assign(:mode, :room)
+    |> assign(:page, 0)
     |> assign(:room, room)
     |> assign(:room_identity, room_identity)
-    |> assign(:messages, messages)
+    |> assign(:has_more_messages, true)
+    |> assign_messages()
     |> assign(:message_update_mode, :replace)
+  end
+
+  def load_more_messages(%{assigns: %{page: page}} = socket) do
+    socket
+    |> assign(:page, page + 1)
+    |> assign(:message_update_mode, :prepend)
+    |> assign_messages()
   end
 
   def send_text(%{assigns: %{room: room, me: me}} = socket, text) do
@@ -77,6 +81,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     socket
     |> assign(:messages, [new_message |> Rooms.read_message(identity)])
     |> assign(:message_update_mode, :append)
+    |> assign(:page, 0)
   end
 
   def close(%{assigns: %{room: nil}} = socket), do: socket
@@ -95,5 +100,26 @@ defmodule ChatWeb.MainLive.Page.Room do
     key
     |> Utils.hash()
     |> then(&"room:#{&1}")
+  end
+
+  defp assign_messages(socket, per_page \\ @per_page)
+  
+  defp assign_messages(%{assigns: %{has_more_messages: false}} = socket, _), do: socket
+  
+  defp assign_messages(%{assigns: %{page: 0, room: room, room_identity: identity}} = socket, per_page) do
+    messages = Rooms.read(room, identity, {nil, 0}, per_page + 1)
+    
+    socket
+    |> assign(:messages, Enum.take(messages, -per_page))
+    |> assign(:has_more_messages, length(messages) > per_page)
+  end
+
+  defp assign_messages(%{assigns: %{room: room, room_identity: identity, messages: messages}} = socket, per_page) do
+    before_message = List.first(messages) 
+    messages = Rooms.read(room, identity, {before_message.timestamp, 0}, per_page + 1)
+    
+    socket
+    |> assign(:messages, Enum.take(messages, -per_page))
+    |> assign(:has_more_messages, length(messages) > per_page)
   end
 end

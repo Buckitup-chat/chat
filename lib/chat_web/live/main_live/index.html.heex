@@ -276,6 +276,7 @@
     
 <div class="basis-[80%] flex flex-col items-stretch ">
   <%= if @lobby_mode == :chats do %>      
+    <div class="basis-[93%] overflow-y-auto flex flex-col justify-between" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
     <div class="h-14 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start fixed">
       <div class="text-base text-white/60">[<%= short_hash(@peer.hash) %>]</div>
       <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>
@@ -285,9 +286,8 @@
         </svg>
       </button>
     </div>
-    <div class="basis-[93%] overflow-y-auto flex flex-col justify-between" id={"chat-#{@peer.hash}"} phx-hook="Chat">
       <div></div>
-      <div class="px-8 backdrop-opacity-25" id="dialog-messages" phx-update={@message_update_mode}>
+      <div class="px-8 mt-16 backdrop-opacity-25" id="dialog-messages" phx-update={@message_update_mode}>
         <%= for msg <- @messages do %>
           <div class={classes("m-1 flex", %{"justify-end" => msg.is_mine?, "justify-start" => !msg.is_mine?})} id={"dialog-message-#{UUID.uuid4()}"}>
             <%= if msg.is_mine? do %>
@@ -322,10 +322,9 @@
         id="dialog-form"
         class="basis-[99%] flex items-center justify-between"
         phx-change={JS.dispatch("chat:set-input-size", to: "#dialog-input")}
-        phx-submit={JS.push("dialog-message") |> JS.dispatch("chat:clear-value", to: "#dialog-input") |> JS.dispatch("chat:set-input-size", to: "#dialog-input")}
+        phx-submit={JS.push("dialog-message") |> JS.dispatch("chat:clear-value", to: "#dialog-input") |> JS.dispatch("chat:set-input-size", to: "#dialog-input")}  
         onkeydown="
           if (event.key == 'Enter' && event.shiftKey) {
-            console.log('evrica')
             document.getElementById('dialog-form-submit-button').click()
           }
         "
@@ -359,7 +358,7 @@
           </button>
       </div>
     <%= else %>
-      <div class="basis-[93%] overflow-scroll flex flex-col justify-between" id={"room-#{@room.admin_hash}"} phx-hook="Chat">
+      <div class="basis-[93%] overflow-scroll flex flex-col justify-between" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
         <div class="h-14 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between fixed" >
           <div class="flex flex-row items-center">
             <div class="text-base text-white/60">[<%= short_hash(@room.admin_hash) %>]</div>
@@ -373,8 +372,7 @@
           </button>
         </div>
         <div></div>
-        <div class="px-8 w-full " id="room-messages" phx-update={@message_update_mode}>
-          <div id="room-messages" phx-update={@message_update_mode}>
+        <div class="mt-16 px-8 w-full " id="room-messages" phx-update={@message_update_mode}>
             <%= for msg <- @messages do %>
               <%= if msg.author_hash == @my_id do %>
                 <div class="m-1 flex justify-end" id={"dialog-message-#{UUID.uuid4()}"}>
@@ -387,7 +385,6 @@
               <%= end %>
             <% end %>
           </div>
-        </div>
       </div>
 
        <div class="basis-[7%] px-8 border border-white bg-white flex flex-row items-center">
@@ -416,7 +413,6 @@
                   onkeydown="
                   console.log(2)
                     if (event.key == 'Enter' && event.shiftKey) {
-                      console.log('evrica')
                       document.getElementById('room-input-submit-btn').click()
                     }
                   "

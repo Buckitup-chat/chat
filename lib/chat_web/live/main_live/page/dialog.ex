@@ -8,22 +8,33 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.Log
   alias Chat.User
 
+  @per_page 15
+
   def init(%{assigns: %{my_id: my_id}} = socket), do: init(socket, my_id)
 
   def init(%{assigns: %{me: me}} = socket, user_id) do
     peer = User.by_id(user_id)
     dialog = Dialogs.find_or_open(me, peer)
-    messages = dialog |> Dialogs.read(me)
-
+    IO.inspect "init mount"
+    
     PubSub.subscribe(Chat.PubSub, dialog |> dialog_topic())
     Log.open_direct(me, peer)
 
     socket
-    # |> assign(:mode, :dialog)
+    |> assign(:page, 0)
     |> assign(:peer, peer)
     |> assign(:dialog, dialog)
-    |> assign(:messages, messages)
+    |> assign(:has_more_messages, true)
+    |> assign_messages()
     |> assign(:message_update_mode, :replace)
+  end
+
+  def load_more_messages(%{assigns: %{page: page}} = socket) do
+    IO.inspect "hh"
+    socket
+    |> assign(:page, page + 1)
+    |> assign(:message_update_mode, :prepend)
+    |> assign_messages()
   end
 
   def send_text(%{assigns: %{dialog: dialog, me: me}} = socket, text) do
@@ -71,6 +82,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     socket
     |> assign(:messages, [Dialogs.read_message(dialog, new_message, me)])
     |> assign(:message_update_mode, :append)
+    |> assign(:page, 0)
   end
 
   def close(%{assigns: %{dialog: nil}} = socket), do: socket
@@ -88,5 +100,26 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     dialog
     |> Dialogs.key()
     |> then(&"dialog:#{&1}")
+  end
+
+  defp assign_messages(socket, per_page \\ @per_page)
+  
+  defp assign_messages(%{assigns: %{has_more_messages: false}} = socket, _), do: socket
+  
+  defp assign_messages(%{assigns: %{page: 0, dialog: dialog, me: me}} = socket, per_page) do
+    messages = Dialogs.read(dialog, me, {nil, 0}, per_page + 1)
+    
+    socket
+    |> assign(:messages, Enum.take(messages, -per_page))
+    |> assign(:has_more_messages, length(messages) > per_page)
+  end
+
+  defp assign_messages(%{assigns: %{dialog: dialog, me: me, messages: messages}} = socket, per_page) do
+    before_message = List.first(messages) 
+    messages = Dialogs.read(dialog, me, {before_message.timestamp, 0}, per_page + 1)
+    
+    socket
+    |> assign(:messages, Enum.take(messages, -per_page))
+    |> assign(:has_more_messages, length(messages) > per_page)
   end
 end

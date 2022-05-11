@@ -1,6 +1,8 @@
 defmodule ChatWeb.MainLive.Page.Shared do
   @moduledoc "Shared page functions"
 
+  alias Phoenix.HTML.Safe
+
   def mime_type(nil), do: "application/octet-stream"
   def mime_type(""), do: mime_type(nil)
   def mime_type(x), do: x
@@ -11,4 +13,11 @@ defmodule ChatWeb.MainLive.Page.Shared do
   def format_size(n), do: "#{n} b"
 
   def is_memo?(text), do: String.length(text) > 150
+
+  def render_to_html_string(assigns, render_fun) do
+    assigns
+    |> then(render_fun)
+    |> Safe.to_iodata()
+    |> IO.iodata_to_binary()
+  end
 end

@@ -22,19 +22,26 @@ defmodule Chat.Rooms.RoomMessages do
         opts
       ) do
     text
-    |> Utils.encrypt_and_sign(room_key, author)
-    |> Message.new(author |> Utils.hash(), opts |> Keyword.merge(type: :text))
-    |> tap(&db_save(&1, room_key))
+    |> add_message(room_key, author, opts |> Keyword.merge(type: :text))
   end
 
-  def add_memo(room, author, text),
-    do: add_stored(room, author, text, {:memo, &Memo.add/1})
+  def add_memo(%Room{pub_key: room_key}, author, text, opts),
+    do: add_memo(room_key, author, text, opts)
 
-  def add_file(room, author, data),
-    do: add_stored(room, author, data, {:file, &Files.add/1})
+  def add_memo(room_key, author, text, opts),
+    do: add_stored(room_key, author, text, &Memo.add/1, opts |> Keyword.merge(type: :memo))
 
-  def add_image(room, author, data),
-    do: add_stored(room, author, data, {:image, &Images.add/1})
+  def add_file(%Room{pub_key: room_key}, author, data, opts),
+    do: add_file(room_key, author, data, opts)
+
+  def add_file(room, author, data, opts),
+    do: add_stored(room, author, data, &Files.add/1, opts |> Keyword.merge(type: :file))
+
+  def add_image(%Room{pub_key: room_key}, author, data, opts),
+    do: add_image(room_key, author, data, opts)
+
+  def add_image(room, author, data, opts),
+    do: add_stored(room, author, data, &Images.add/1, opts |> Keyword.merge(type: :image))
 
   def read(%Room{pub_key: room_key}, identity, pub_keys_mapper, {time, id} = _before, amount) do
     {
@@ -45,6 +52,17 @@ defmodule Chat.Rooms.RoomMessages do
     |> Enum.reverse()
     |> filter_signed(pub_keys_mapper)
     |> Enum.map(&read(&1, identity))
+  end
+
+  def read({time, id} = _msg_id, identity, pub_keys_mapper) do
+    identity
+    |> Identity.pub_key()
+    |> key(time, id)
+    |> Db.get()
+    |> then(&[&1])
+    |> filter_signed(pub_keys_mapper)
+    |> Enum.map(&read(&1, identity))
+    |> List.first()
   end
 
   def read(
@@ -64,6 +82,30 @@ defmodule Chat.Rooms.RoomMessages do
       id: id,
       content: encrypted |> Utils.decrypt(identity)
     }
+  end
+
+  def update_message(
+        {time, id} = _msg_id,
+        %Identity{} = room_identity,
+        %Identity{} = author,
+        new_text
+      ) do
+    with room_key <- room_identity |> Identity.pub_key(),
+         msg_key <- room_key |> key(time, id),
+         msg <- Db.get(msg_key),
+         true <- msg.author_hash == author |> Utils.hash() do
+      msg
+      |> read(room_identity)
+      |> Content.delete()
+
+      case new_text do
+        {:memo, text} ->
+          add_memo(room_key, author, text, now: msg.timestamp, id: msg.id)
+
+        text ->
+          add_message(text, room_key, author, now: msg.timestamp, id: msg.id)
+      end
+    end
   end
 
   def delete_message(
@@ -110,16 +152,22 @@ defmodule Chat.Rooms.RoomMessages do
   end
 
   defp add_stored(
-         %Room{pub_key: room_key},
+         room_key,
          %Identity{} = author,
          data,
-         {type, store_adding_fun}
+         store_adding_fun,
+         opts
        ) do
     data
     |> then(store_adding_fun)
     |> StorageId.to_json()
+    |> add_message(room_key, author, opts)
+  end
+
+  defp add_message(content, room_key, author, opts) do
+    content
     |> Utils.encrypt_and_sign(room_key, author)
-    |> Message.new(author |> Utils.hash(), type: type)
+    |> Message.new(author |> Utils.hash(), opts)
     |> tap(&db_save(&1, room_key))
   end
 end

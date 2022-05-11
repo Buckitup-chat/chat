@@ -248,8 +248,16 @@
       <%= for msg <- @messages do %>
         <div class="row" id={"room-message-#{msg.id}"}>
           <div class={msg.author_hash == @my_id && "column column-75 column-offset-25 text-right" || "column column-75" }>
-            <.room_message msg={msg} my_id={@my_id} />
+            <span class="x-content"
+            ><.room_message msg={msg} my_id={@my_id} /></span>
             <%= if msg.author_hash == @my_id do %>
+              <%= if msg.type in [:text, :memo] do %>
+                <a style="cursor: pointer"
+                  phx-click="room/edit-message" 
+                  phx-value-id={msg.id} 
+                  phx-value-timestamp={msg.timestamp}
+                > 📝 </a>
+              <% end %> 
               <a style="cursor: pointer"
                 phx-click="room/delete-message" 
                 phx-value-id={msg.id} 
@@ -260,25 +268,48 @@
         </div> 
       <% end %>
       </div>
+      <%= if @edit_room do %>
+        <.form
+          let={dei}
+          for={:room_edit}
+          id="room-edit-form"
+          phx-submit="room/edited-message"
+          class="text-right row"
+        >
+          <div class="column column-50 column-offset-50">
+            <%= text_input dei, :text,
+                class: "text-right",
+                id: "room-edit-input",
+                spellcheck: "false",
+                autocomplete: "off",
+                value: @edit_content
+            %>
+            <button type="button" class="button button-outline" phx-click="room/cancel-edit" >Cancel</button>
+            <%= submit "Update", phx_disable_with: "..." %>
+          </div>
+        </.form>
 
-      <.form
-        let={ri}
-        for={:room}
-        id="room-form"
-        phx-submit={ JS.push("room-message") |> JS.dispatch("chat:clear-value", to: "#room-input")}
-        class="text-right row"
-      >
-        <div class="column column-50 column-offset-50">
-          <%= text_input ri, :text,
-              placeholder: "New message",
-              class: "text-right",
-              id: "room-input",
-              spellcheck: "false",
-              autocomplete: "off"
-          %>
-          <%= submit "Send", phx_disable_with: "..." %>
-        </div>
-      </.form>
+      <% else %> 
+
+        <.form
+          let={ri}
+          for={:room}
+          id="room-form"
+          phx-submit={ JS.push("room-message") |> JS.dispatch("chat:clear-value", to: "#room-input")}
+          class="text-right row"
+        >
+          <div class="column column-50 column-offset-50">
+            <%= text_input ri, :text,
+                placeholder: "New message",
+                class: "text-right",
+                id: "room-input",
+                spellcheck: "false",
+                autocomplete: "off"
+            %>
+            <%= submit "Send", phx_disable_with: "..." %>
+          </div>
+        </.form>
+      <% end %>
       <div class="text-right row">
         <.form
           for={:room_file}

@@ -44,10 +44,15 @@ defmodule Chat.Rooms do
     Registry.find(hash)
   end
 
-  defdelegate add_memo(room, me, text), to: RoomMessages
+  defdelegate add_memo(room, me, text, opts \\ []), to: RoomMessages
   defdelegate add_text(room, me, text, opts \\ []), to: RoomMessages
-  defdelegate add_file(room, me, data), to: RoomMessages
-  defdelegate add_image(room, me, data), to: RoomMessages
+  defdelegate add_file(room, me, data, opts \\ []), to: RoomMessages
+  defdelegate add_image(room, me, data, opts \\ []), to: RoomMessages
+
+  def read_message(%Message{} = msg, %Identity{} = identity), do: RoomMessages.read(msg, identity)
+
+  def read_message({_, _} = msg_id, %Identity{} = identity, id_map_builder),
+    do: RoomMessages.read(msg_id, identity, id_map_builder)
 
   defdelegate read(
                 room,
@@ -58,7 +63,8 @@ defmodule Chat.Rooms do
               ),
               to: RoomMessages
 
-  def read_message(%Message{} = msg, %Identity{} = identity), do: RoomMessages.read(msg, identity)
+  def update_message(msg_id, content, room, me),
+    do: RoomMessages.update_message(msg_id, room, me, content)
 
   def delete_message(msg_id, room, me),
     do: msg_id |> RoomMessages.delete_message(room, me)

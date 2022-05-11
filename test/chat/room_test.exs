@@ -3,9 +3,11 @@ defmodule Chat.Rooms.RoomTest do
 
   alias Chat.Card
   alias Chat.Identity
+  alias Chat.Memo
   alias Chat.Rooms
   alias Chat.User
   alias Chat.Utils
+  alias Chat.Utils.StorageId
 
   test "room creation" do
     alice = User.login("Alice")
@@ -152,6 +154,76 @@ defmodule Chat.Rooms.RoomTest do
                room_identity,
                &User.id_map_builder/1
              )
+  end
+
+  test "updated message should be stored" do
+    {alice, room_identity, room} = alice_and_room()
+    User.register(alice)
+
+    time = DateTime.utc_now() |> DateTime.add(-10, :second)
+
+    Rooms.add_text(room, alice, "Hello", now: time)
+    Rooms.add_text(room, alice, "1", now: time |> DateTime.add(2, :second))
+    Rooms.add_text(room, alice, "2", now: time |> DateTime.add(5, :second))
+
+    [msg] =
+      Rooms.read(
+        room,
+        room_identity,
+        &User.id_map_builder/1,
+        {time |> DateTime.add(5, :second) |> DateTime.to_unix(), 0},
+        1
+      )
+
+    assert "1" == msg.content
+
+    Rooms.update_message({msg.timestamp, msg.id}, "111", room_identity, alice)
+
+    assert [_, updated_msg, _] =
+             Rooms.read(
+               room,
+               room_identity,
+               &User.id_map_builder/1
+             )
+
+    assert "111" = updated_msg.content
+  end
+
+  test "updated memo message should be stored" do
+    {alice, room_identity, room} = alice_and_room()
+    User.register(alice)
+
+    time = DateTime.utc_now() |> DateTime.add(-10, :second)
+
+    Rooms.add_text(room, alice, "Hello", now: time)
+    Rooms.add_text(room, alice, "1", now: time |> DateTime.add(2, :second))
+    Rooms.add_text(room, alice, "2", now: time |> DateTime.add(5, :second))
+
+    [msg] =
+      Rooms.read(
+        room,
+        room_identity,
+        &User.id_map_builder/1,
+        {time |> DateTime.add(5, :second) |> DateTime.to_unix(), 0},
+        1
+      )
+
+    assert "1" == msg.content
+
+    Rooms.update_message({msg.timestamp, msg.id}, {:memo, "111"}, room_identity, alice)
+
+    assert [_, _, _] =
+             Rooms.read(
+               room,
+               room_identity,
+               &User.id_map_builder/1
+             )
+
+    assert "111" =
+             Rooms.read_message({msg.timestamp, msg.id}, room_identity, &User.id_map_builder/1)
+             |> Map.get(:content)
+             |> StorageId.from_json()
+             |> Memo.get()
   end
 
   defp alice_and_room do

@@ -1,15 +1,17 @@
 defmodule ChatWeb.MainLive.Page.Room do
   @moduledoc "Room page"
   import ChatWeb.MainLive.Page.Shared
-  import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entries: 3]
+  import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entries: 3, push_event: 3]
 
   alias Phoenix.PubSub
 
   alias Chat.Identity
   alias Chat.Log
+  alias Chat.Memo
   alias Chat.Rooms
   alias Chat.User
   alias Chat.Utils
+  alias Chat.Utils.StorageId
 
   def init(%{assigns: %{rooms: rooms, me: me}} = socket, room_hash) do
     room = Rooms.get(room_hash)
@@ -26,15 +28,16 @@ defmodule ChatWeb.MainLive.Page.Room do
 
     socket
     |> assign(:mode, :room)
+    |> assign(:edit_room, false)
     |> assign(:room, room)
     |> assign(:room_identity, room_identity)
     |> assign(:messages, messages)
     |> assign(:message_update_mode, :replace)
   end
 
-  def send_text(%{assigns: %{room: room, me: me}} = socket, text) do
-    if String.length(text) > 150 do
-      room |> Rooms.add_memo(me, text)
+  def send_text(%{assigns: %{room: room, me: me, room_identity: room_identity}} = socket, text) do
+    if is_memo?(text) do
+      room_identity |> Rooms.add_memo(me, text)
     else
       room |> Rooms.add_text(me, text)
     end
@@ -92,6 +95,62 @@ defmodule ChatWeb.MainLive.Page.Room do
     end
   end
 
+  def edit_message(
+        %{assigns: %{room_identity: room_identity}} = socket,
+        msg_id
+      ) do
+    content =
+      Rooms.read_message(msg_id, room_identity, &User.id_map_builder/1)
+      |> then(fn
+        %{type: :text, content: text} ->
+          text
+
+        %{type: :memo, content: json} ->
+          json |> StorageId.from_json() |> Memo.get()
+      end)
+
+    socket
+    |> assign(:edit_room, true)
+    |> assign(:edit_content, content)
+    |> assign(:edit_message_id, msg_id)
+    |> push_event("chat:focus", %{to: "#room-edit-input"})
+  end
+
+  def update_edited_message(
+        %{assigns: %{room_identity: room_identity, room: room, me: me, edit_message_id: msg_id}} =
+          socket,
+        text
+      ) do
+    content = if is_memo?(text), do: {:memo, text}, else: text
+
+    Rooms.update_message(msg_id, content, room_identity, me)
+    broadcast_message_updated(msg_id, room, me)
+
+    socket
+    |> cancel_edit()
+  end
+
+  def update_message(
+        %{assigns: %{room_identity: room_identity, my_id: my_id}} = socket,
+        {_time, id} = msg_id,
+        render_fun
+      ) do
+    content =
+      Rooms.read_message(msg_id, room_identity, &User.id_map_builder/1)
+      |> then(&%{msg: &1, my_id: my_id})
+      |> render_to_html_string(render_fun)
+
+    socket
+    |> push_event("chat:change", %{to: "#room-message-#{id} .x-content", content: content})
+  end
+
+  def cancel_edit(socket) do
+    socket
+    |> assign(:edit_room, false)
+    |> assign(:edit_content, nil)
+    |> assign(:edit_message_id, nil)
+  end
+
   def delete_message(
         %{assigns: %{me: me, room_identity: room_identity, room: room}} = socket,
         {time, msg_id}
@@ -107,6 +166,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
     socket
     |> assign(:room, nil)
+    |> assign(:edit_room, nil)
     |> assign(:room_identity, nil)
     |> assign(:messages, nil)
     |> assign(:message_update_mode, nil)
@@ -118,15 +178,22 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> then(&"room:#{&1}")
   end
 
+  defp broadcast_message_updated(msg_id, room, me) do
+    {:updated_message, msg_id}
+    |> room_broadcast(room)
+
+    Log.update_room_message(me, room.pub_key)
+  end
+
   defp broadcast_new_message(message, room, me) do
-    {:new_room_message, message}
+    {:new_message, message}
     |> room_broadcast(room)
 
     Log.message_room(me, room.pub_key)
   end
 
   defp broadcast_deleted_message(msg_id, room, me) do
-    {:deleted_room_message, msg_id}
+    {:deleted_message, msg_id}
     |> room_broadcast(room)
 
     Log.delete_room_message(me, room.pub_key)
@@ -136,7 +203,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     PubSub.broadcast!(
       Chat.PubSub,
       room |> room_topic(),
-      message
+      {:room, message}
     )
   end
 end

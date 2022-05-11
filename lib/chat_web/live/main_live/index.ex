@@ -183,6 +183,24 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("room/cancel-edit", _, socket) do
+    socket
+    |> Page.Room.cancel_edit()
+    |> noreply()
+  end
+
+  def handle_event("room/edited-message", %{"room_edit" => %{"text" => text}}, socket) do
+    socket
+    |> Page.Room.update_edited_message(text)
+    |> noreply()
+  end
+
+  def handle_event("room/edit-message", %{"id" => id, "timestamp" => time}, socket) do
+    socket
+    |> Page.Room.edit_message({time |> String.to_integer(), id})
+    |> noreply()
+  end
+
   def handle_event("room/delete-message", %{"id" => id, "timestamp" => time}, socket) do
     socket
     |> Page.Room.delete_message({time |> String.to_integer(), id})
@@ -320,13 +338,19 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_info({:new_room_message, glimpse}, socket) do
+  def handle_info({:room, {:new_message, glimpse}}, socket) do
     socket
     |> Page.Room.show_new(glimpse)
     |> noreply()
   end
 
-  def handle_info({:deleted_room_message, msg_id}, socket) do
+  def handle_info({:room, {:updated_message, msg_id}}, socket) do
+    socket
+    |> Page.Room.update_message(msg_id, &room_message/1)
+    |> noreply()
+  end
+
+  def handle_info({:room, {:deleted_message, msg_id}}, socket) do
     socket
     |> push_event("chat:toggle", %{to: "#room-message-#{msg_id}", class: "hidden"})
     |> noreply()
@@ -461,7 +485,7 @@ defmodule ChatWeb.MainLive.Index do
     """
   end
 
-  defp room_message(%{msg: %{type: :text, author_hash: hash}, my_id: my_id} = assigns) do
+  def room_message(%{msg: %{type: :text, author_hash: hash}, my_id: my_id} = assigns) do
     %{name: name} = Chat.User.by_id(hash)
 
     ~H"""
@@ -474,9 +498,9 @@ defmodule ChatWeb.MainLive.Index do
     """
   end
 
-  defp room_message(
-         %{msg: %{type: :memo, author_hash: hash, content: json}, my_id: my_id} = assigns
-       ) do
+  def room_message(
+        %{msg: %{type: :memo, author_hash: hash, content: json}, my_id: my_id} = assigns
+      ) do
     %{name: name} = Chat.User.by_id(hash)
 
     memo =
@@ -494,9 +518,9 @@ defmodule ChatWeb.MainLive.Index do
     """
   end
 
-  defp room_message(
-         %{msg: %{type: :image, content: json, author_hash: hash}, my_id: my_id} = assigns
-       ) do
+  def room_message(
+        %{msg: %{type: :image, content: json, author_hash: hash}, my_id: my_id} = assigns
+      ) do
     {id, secret} = json |> StorageId.from_json()
     url = "/get/image/#{id}?a=#{secret |> Base.url_encode64()}"
     %{name: name} = Chat.User.by_id(hash)
@@ -514,9 +538,9 @@ defmodule ChatWeb.MainLive.Index do
     """
   end
 
-  defp room_message(
-         %{msg: %{type: :file, content: json, author_hash: hash}, my_id: my_id} = assigns
-       ) do
+  def room_message(
+        %{msg: %{type: :file, content: json, author_hash: hash}, my_id: my_id} = assigns
+      ) do
     {id, secret} = json |> StorageId.from_json()
     [_, _, file_name, size] = Files.get(id, secret)
     url = "/get/file/#{id}?a=#{secret |> Base.url_encode64()}"

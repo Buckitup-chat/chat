@@ -16,6 +16,7 @@ defmodule Chat.Log do
   def create_room(me, room), do: me |> log(:create_room, room: binhash(room))
   def message_room(me, room), do: me |> log(:message_room, room: binhash(room))
   def delete_room_message(me, room), do: me |> log(:delete_room_message, room: binhash(room))
+  def update_room_message(me, room), do: me |> log(:update_room_message, room: binhash(room))
   def request_room_key(me, room), do: me |> log(:request_room_key, room: binhash(room))
   def got_room_key(me, room), do: me |> log(:got_room_key, room: binhash(room))
   def visit_room(me, room), do: me |> log(:visit_room, room: binhash(room))
@@ -37,6 +38,7 @@ defmodule Chat.Log do
     logout: "signs out",
     create_room: "creates room",
     message_room: "writes in room",
+    update_room_message: "edits in room",
     delete_room_message: "deletes in room",
     request_room_key: "requests key of room",
     got_room_key: "got key for room",

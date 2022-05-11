@@ -3,7 +3,6 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   import ChatWeb.MainLive.Page.Shared
   import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entries: 3, push_event: 3]
 
-  alias Phoenix.HTML.Safe
   alias Phoenix.PubSub
 
   alias Chat.Dialogs
@@ -183,12 +182,5 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       dialog |> dialog_topic(),
       message
     )
-  end
-
-  defp render_to_html_string(assigns, render_fun) do
-    assigns
-    |> then(render_fun)
-    |> Safe.to_iodata()
-    |> IO.iodata_to_binary()
   end
 end

@@ -198,7 +198,7 @@
       </div>
     </div>
   </div>
-  <div class='basis-[15%] roomsAndChatsBar min-w-fit  overflow-y-scroll'>
+  <div class='roomsAndChatsBar w-72 min-w-fit  overflow-y-scroll'>
         <%= if @lobby_mode == :chats do %>
           <div class='px-7 mt-3 flex items-center justify-between'>
             <h5 class="text-grayscale" style="font-size: 22px;">Chats</h5>
@@ -206,7 +206,7 @@
           <div class="mt-10 w-full">
             <ul>
               <%= for user <- @users do %>
-                <li class={classes("w-full hover:bg-stone250", %{"bg-stone250" => user == @peer})}>
+                <li class={classes("w-full h-9 flex items-center hover:bg-stone250", %{"bg-stone250" => user == @peer})}>
                   <a phx-click="switch-dialog" phx-value-user-id={user.hash}>
                     <div class="flex flex-row px-7">
                       <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(user.hash) %>]</tt>
@@ -254,13 +254,13 @@
           <span class="ml-1 text-sm  font-bold cursor-pointer">Confirmed</span>
         </div>  
       
-        <div class="mt-3" id="confirmed-rooms">
+        <div class="mt-3 w-full" id="confirmed-rooms">
           <ul>
             <%= if @joined_rooms == [] do %>
             <p class="text-base text-grayscale600 px-7">You have no rooms</p>
             <% else %>
               <%= for room <- @joined_rooms do %>
-              <li class={classes("w-full cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
+              <li class={classes("w-full h-9 flex items-center cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
                 <a phx-click="switch-room" phx-value-room={room.hash}>
                   <div class="flex flex-row px-7">
                     <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>

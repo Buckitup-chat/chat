@@ -32,12 +32,12 @@ defmodule ChatWeb.LiveHelpers do
       <div
         id={@id <> "-content"}
         class={"phx-modal-content border-0 rounded-lg bg-white p-4 fade-in-scale flex flex-col #{@class}"}
-        phx-click-away={JS.dispatch("click", to: "#close")}
-        phx-window-keydown={JS.dispatch("click", to: "#close")}
+        phx-click-away={JS.dispatch("click", to: "#" <> @id <> "-close")}
+        phx-window-keydown={JS.dispatch("click", to: "#" <> @id <> "-close")}
         phx-key="escape"
         style="display: none;"
       >   
-        <a id="close" href="#" class="phx-modal-close w-full flex flex-row justify-end" phx-click={hide_modal(@id, @hide_event)}>
+        <a id={@id <> "-close"} href="#" class="phx-modal-close w-full flex flex-row justify-end" phx-click={hide_modal(@id, @hide_event)}>
           <svg class="w-4 h-4 flex fill-grayscale">
             <use href="/images/icons.svg#close"></use>
           </svg>

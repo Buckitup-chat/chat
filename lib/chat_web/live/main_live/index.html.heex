@@ -78,7 +78,7 @@
           </div>
         </button>
         <button class="mt-3 w-full h-12 border rounded-lg border-black/10" >Log Out without Keys</button>
-        <button class="mt-3 w-full h-12 border rounded-lg border-black/10" >Cancel</button>
+        <button phx-click={hide_modal(%JS{}, "logout-backup-popup")} class="mt-3 w-full h-12 border rounded-lg border-black/10" >Cancel</button>
     <% end %> 
     <%= if @logout_step == :middle do %>
       <h1 class="text-base font-bold text-grayscale">Set Up Password</h1>
@@ -149,7 +149,7 @@
       <h1 class="text-base font-bold text-grayscale">Success</h1>
       <p class="mt-3 text-sm text-black/50">If you downloaded the the recovery key, you can log out now, it will erase all the browser data about BuckitUp.</p>
       <button class="mt-3 w-full h-12 border-0 rounded-lg bg-grayscale text-white" phx-click="logout-wipe">Exit</button>
-      <button class="mt-3 w-full h-12 border rounded-lg border-black/10">Cancel</button>
+      <button phx-click={hide_modal(%JS{}, "logout-backup-popup")} class="mt-3 w-full h-12 border rounded-lg border-black/10">Cancel</button>
     <% end %> 
     </.modal>
     
@@ -198,7 +198,7 @@
       </div>
     </div>
   </div>
-  <div class='basis-[15%] roomsAndChatsBar'>
+  <div class='basis-[15%] roomsAndChatsBar min-w-fit  overflow-y-scroll'>
         <%= if @lobby_mode == :chats do %>
           <div class='px-7 mt-3 flex items-center justify-between'>
             <h5 class="text-grayscale" style="font-size: 22px;">Chats</h5>
@@ -246,33 +246,64 @@
               </button>
             </div>
 
-
-        <ul>
-          <span class="px-7">Confirmed</span>
-          <%= for room <- @joined_rooms do %>
-            <li class={classes("w-full hover:bg-stone250", %{"bg-stone250" => room == @room})}>
-              <a phx-click="switch-room" phx-value-room={room.hash}>
-                <div class="flex flex-row px-7">
-                  <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
-                  <div class="ml-1 text-sm"><%= room.name %></div>
-                </div>
-              </a>
-            </li>
-          <% end %>  
-        </ul>
-        <ul> 
-          <span class="px-7">Unconfirmed</span>
-          <%= for room <- @new_rooms do %>
-            <%= if room |> Rooms.is_requested_by?(@my_id) do %>
-              <li><a ><%= room.name %> (requested)</a></li>
+        <div class="w-full mt-6 flex flex-col items-start"> 
+        <div phx-click={JS.toggle(to: "#confirmed-rooms", in: "fade-in-scale", out: "fade-out-scale")} class="px-7 mt-3 flex items-center">
+          <svg class="w-4 h-4 flex fill-black" >
+            <use href="/images/icons.svg#arrowDown"></use>
+          </svg>
+          <span class="ml-1 text-sm  font-bold cursor-pointer">Confirmed</span>
+        </div>  
+      
+        <div class="mt-3" id="confirmed-rooms">
+          <ul>
+            <%= if @joined_rooms == [] do %>
+            <p class="text-base text-grayscale600 px-7">You have no rooms</p>
             <% else %>
-              <li><a phx-click="request-room" phx-value-room={room.hash}><%= room.name %></a></li>
+              <%= for room <- @joined_rooms do %>
+              <li class={classes("w-full cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
+                <a phx-click="switch-room" phx-value-room={room.hash}>
+                  <div class="flex flex-row px-7">
+                    <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
+                    <div class="ml-1 text-sm"><%= room.name %></div>
+                  </div>
+                </a>
+              </li>
+              <% end %>  
+            <% end %>  
+          </ul>
+        </div>
+        <div phx-click={JS.toggle(to: "#unconfirmed-rooms", in: "fade-in-scale", out: "fade-out-scale")} class="px-7 mt-3 flex items-center">
+          <svg class="w-4 h-4 flex fill-black" >
+            <use href="/images/icons.svg#arrowDown"></use>
+          </svg>
+          <span class="ml-1 text-sm  font-bold cursor-pointer">Not Confirmed</span>
+        </div> 
+        <div id="unconfirmed-rooms" class="mt-3 w-full">  
+          <ul>  
+          <%= if @new_rooms == [] do %>
+            <p class="text-base text-grayscale600 px-7">You have no rooms</p>
+          <% else %>
+            <%= for room <- @new_rooms do %>
+                <li class="w-full cursor-pointer hover:bg-stone250">
+                  <%= if room |> Rooms.is_requested_by?(@my_id) do %>
+                      <a ><%= room.name %> (requested)</a>
+                  <% else %>
+                    <a phx-click="request-room" phx-value-room={room.hash}>
+                      <div class="flex flex-row px-7 w-full">
+                        <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
+                        <div class="ml-1 text-sm"><%= room.name %></div>
+                      </div>
+                    </a>
+                  <% end %>
+                </li>
+            <% end %>  
             <% end %>
-          <% end %>  
-        </ul>  
+          </ul>  
+        </div>
+      </div>
 
-        <% end %>
-    </div>
+    <% end %>
+  </div>
     
 <div class="basis-[80%] flex flex-col items-stretch ">
   <%= if @lobby_mode == :chats do %>      
@@ -334,8 +365,7 @@
           class: "w-full h-7 resize-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
           id: "dialog-input",
           spellcheck: "false",
-          autocomplete: "off",
-          maxlength: 210
+          autocomplete: "off"
         %>
         <button id="dialog-form-submit-button" type="submit">
           <svg class="w-7 h-7 flex fill-purple" >
@@ -422,8 +452,7 @@
                       class: "w-full h-7 resize-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
                       id: "room-input",
                       spellcheck: "false",
-                      autocomplete: "off",
-                      maxlength: 210
+                      autocomplete: "off"
                   %>
                   <button id="room-input-submit-btn" type="submit">
                     <svg class="w-7 h-7 flex fill-purple" >

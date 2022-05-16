@@ -1,12 +1,10 @@
 defmodule Chat.Rooms.Registry do
   @moduledoc "Holds all rooms"
 
-  alias Chat.Card
   alias Chat.Db
   alias Chat.Rooms.Room
   alias Chat.Utils
 
-  def find(%Card{pub_key: pub_key}), do: pub_key |> Utils.hash() |> find()
   def find(hash), do: Db.get({:rooms, hash})
 
   def all,

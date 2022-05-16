@@ -210,6 +210,16 @@ defmodule Chat.Dialogs.DialogTest do
     assert [_, %{type: :text, content: ^updated_text}] = dialog |> Dialogs.read(alice)
   end
 
+  test "message should be readable by its id" do
+    {alice, _, _, dialog} = alice_bob_dialog()
+    dialog |> Dialogs.add_memo(alice, "memo here")
+    assert [msg] = dialog |> Dialogs.read(alice)
+
+    same_msg = Dialogs.read_message(dialog, {msg.timestamp, msg.id}, alice)
+
+    assert same_msg == msg
+  end
+
   defp alice_bob_dialog do
     alice = User.login("Alice")
     bob = User.login("Bob")

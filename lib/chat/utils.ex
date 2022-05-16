@@ -48,16 +48,18 @@ defmodule Chat.Utils do
   def encrypt(text, %Card{pub_key: key}), do: encrypt(text, key)
   def encrypt(text, key), do: :public_key.encrypt_public(text, key)
 
-  def decrypt(ciphertext, %Identity{priv_key: key}) do
+  def decrypt(ciphertext, %Identity{priv_key: key}), do: decrypt(ciphertext, key)
+
+  def decrypt(ciphertext, key) do
     :public_key.decrypt_private(ciphertext, key)
   end
 
-  def encrypt_blob({data, type}) do
+  def encrypt_blob(data) when is_list(data) do
     {iv, key} = generate_key()
-    data_blob = :crypto.crypto_one_time(@cipher, key, iv, data, true)
-    type_blob = :crypto.crypto_one_time(@cipher, key, iv, type, true)
 
-    {{data_blob, type_blob}, iv <> key}
+    data
+    |> Enum.map(&:crypto.crypto_one_time(@cipher, key, iv, &1, true))
+    |> then(&{&1, iv <> key})
   end
 
   def encrypt_blob(data) do
@@ -71,11 +73,8 @@ defmodule Chat.Utils do
     :crypto.crypto_one_time(@cipher, key, iv, data, true)
   end
 
-  def decrypt_blob({data_blob, type_blob} = _data, <<iv::bits-size(64), key::bits>> = _secret) do
-    {
-      :crypto.crypto_one_time(@cipher, key, iv, data_blob, false),
-      :crypto.crypto_one_time(@cipher, key, iv, type_blob, false)
-    }
+  def decrypt_blob(data, <<iv::bits-size(64), key::bits>> = _secret) when is_list(data) do
+    data |> Enum.map(&:crypto.crypto_one_time(@cipher, key, iv, &1, false))
   end
 
   def decrypt_blob(data, <<iv::binary-size(8), key::binary-size(16), _::binary-size(8)>>) do
@@ -84,6 +83,37 @@ defmodule Chat.Utils do
 
   def decrypt_blob(data, <<iv::bits-size(64), key::bits>> = _secret) do
     :crypto.crypto_one_time(@cipher, key, iv, data, false)
+  end
+
+  def sign(data, %Identity{priv_key: key} = _signer), do: data |> sign(key)
+
+  def sign(data, private_key) do
+    data
+    |> binhash()
+    |> then(&{:digest, &1})
+    |> :public_key.sign(:none, private_key)
+  end
+
+  def is_signed_by?(sign, data, %Card{pub_key: key}), do: sign |> is_signed_by?(data, key)
+
+  def is_signed_by?(sign, data, public_key) do
+    data
+    |> binhash()
+    |> then(&{:digest, &1})
+    |> :public_key.verify(:none, sign, public_key)
+  end
+
+  def encrypt_and_sign(data, for, by) do
+    encrypted = encrypt(data, for)
+    sign = sign(encrypted, by)
+
+    {encrypted, sign}
+  end
+
+  def decrypt_signed({encrypted, sign}, for, by) do
+    true = is_signed_by?(sign, encrypted, by)
+
+    decrypt(encrypted, for)
   end
 
   defp binary({:RSAPublicKey, a, b}), do: "RSAPublicKey|#{a}|#{b}"

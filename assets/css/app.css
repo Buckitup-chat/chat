@@ -65,6 +65,32 @@ html {
   @apply h-screen min-w-fit bg-white/90 overflow-hidden;
 }
 
+.dropdown {
+  @apply 
+  hidden 
+  absolute
+  right-0
+  z-10
+  w-32
+  bg-white
+  border
+  rounded-md
+  border-black/10
+  fade-in
+  flex
+  flex-col
+  overflow-auto
+  min-w-fit
+}
+
+.dropdownItem {
+  @apply w-full h-11 px-2 flex items-center justify-start cursor-pointer hover:bg-black/10 
+}
+
+.dropdownItem span {
+  @apply ml-2
+}
+
 /* Alerts and form errors used by phx.new */
 .alert {
   padding: 15px;

@@ -57,7 +57,7 @@ defmodule ChatWeb.LiveHelpers do
     |> JS.show(to: "#" <> id <> "-content")
   end
 
-  def hide_modal(%JS{} = js, id), do: hide_modal(id, nil, js)
+  def hide_modal(id), do: hide_modal(id, nil, %JS{})
      
   def hide_modal(id, event, js \\ %JS{}) do
     js
@@ -88,4 +88,28 @@ defmodule ChatWeb.LiveHelpers do
     |> Enum.concat()
     |> Enum.join(" ")
   end
+
+  def dropdown(assigns) do
+    ~H"""
+      <div
+        id={@id}
+        class="dropdown"
+        phx-click-away={JS.hide(transition: "fade-out", to: "#" <> @id)}
+        phx-window-keydown={JS.hide(transition: "fade-out", to: "#" <> @id)}
+        phx-key="escape"
+        style="display: none;"
+      >   
+        <%= render_slot(@inner_block) %>
+      </div>
+    """
+  end
+
+  def open_dropdown(id), 
+    do: 
+      JS.show(transition: "fade-in", to: "#" <> id)
+      |> JS.add_class("z-10", to: "#" <> id)
+
+  def hide_dropdown(id), do: hide_dropdown(%JS{}, id)
+
+  def hide_dropdown(%JS{} = js, id),  do: JS.hide(transition: "fade-out", to: "#" <> id)
 end

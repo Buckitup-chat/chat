@@ -31,6 +31,12 @@ defmodule Chat.User do
     |> Map.get(id)
   end
 
+  def id_map_builder(ids) do
+    Registry.all()
+    |> Map.split(ids)
+    |> elem(0)
+  end
+
   def device_encode(%Identity{} = identity, rooms \\ []), do: LocalStorage.encode(identity, rooms)
   def device_decode(data), do: LocalStorage.decode(data)
 

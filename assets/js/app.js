@@ -42,24 +42,47 @@ let liveSocket = new LiveSocket("/live", Socket, {
       hooks: Hooks
 })
 
-window.addEventListener("chat:clear-value", (e) => {e.target.value = ""});
-window.addEventListener("chat:focus", (e) => {const el = e.target; setTimeout(() => el.focus(), 100);});
-window.addEventListener("chat:toggle", (e) => {
-  if (e.detail && e.detail.class) {
-    e.target.classList.toggle(e.detail.class)
-  }
-});
-window.addEventListener("chat:set-input-size", (e) => {
-  e.target.style.height = '';
-  e.target.style.height = (e.target.scrollHeight > 150 ? 150 : e.target.scrollHeight) + 'px';
-});
-
-window.addEventListener("phx:chat:redirect", (e) => { 
-  const openUrl = (url) => window.location = url;
-  url = e.detail.url
-  url && openUrl(url)
-});
-
+const listeners = {
+  "chat:clear-value": (e) => {e.target.value = ""},
+  "chat:focus": (e) => {const el = e.target; setTimeout(() => el.focus(), 100);},
+  "chat:toggle": (e) => {
+    if (e.detail && e.detail.class) {
+      e.target.classList.toggle(e.detail.class)
+    }
+  },
+  "chat:set-input-size": (e) => {
+    e.target.style.height = '';
+    e.target.style.height = (e.target.scrollHeight > 150 ? 150 : e.target.scrollHeight) + 'px';
+  },
+  "chat:set-dropdown-position": (e) => {
+    const relativeElementRect = document.getElementById(e.detail.relativeElementId).getBoundingClientRect();
+    console.log(relativeElementRect)
+    
+    e.target.style.left = relativeElementRect.left + 'px';
+  },
+  "phx:chat:toggle": (e) => {
+    if (e.detail && e.detail.class && e.detail.to) {
+      document
+        .querySelector(e.detail.to)
+        .classList.toggle(e.detail.class)
+    }
+  },
+  "phx:chat:redirect": (e) => { 
+    const openUrl = (url) => window.location = url;
+    url = e.detail.url
+    url && openUrl(url)
+  },  
+  "phx:chat:focus": (e) => {const el = document.querySelector(e.detail.to); setTimeout(() => el.focus(), 100);},
+  "phx:chat:change": (e) => {
+    console.log(e, 'e'); 
+    const el = document.querySelector(e.detail.to);
+    console.log(el, 'el')
+     el.innerHTML = e.detail.content; 
+  },
+};
+for (key in listeners) {
+  window.addEventListener(key, listeners[key]);
+}
 
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})

@@ -8,6 +8,8 @@ check:
 	mix dialyzer --ignore-exit-status
 
 test: 
+	rm -rf priv/test_db
+	mkdir -p priv/test_db
 	mix test --cover
 
 commit: check test

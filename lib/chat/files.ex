@@ -1,13 +1,13 @@
-defmodule Chat.Images do
-  @moduledoc "Context for Image oprations"
+defmodule Chat.Files do
+  @moduledoc "Context for File oprations"
 
-  alias Chat.Images.Registry
+  alias Chat.Db
   alias Chat.Utils
 
   def get({key, secret}), do: get(key, secret)
 
   def get(key, secret) do
-    blob = Registry.get(key)
+    blob = Db.get({:file, key})
 
     if blob do
       Utils.decrypt_blob(blob, secret)
@@ -17,14 +17,14 @@ defmodule Chat.Images do
   def delete({key, _secret}), do: delete(key)
 
   def delete(key) do
-    Registry.delete(key)
+    Db.delete({:file, key})
   end
 
   def add(data) do
     key = UUID.uuid4()
 
     {blob, secret} = Utils.encrypt_blob(data)
-    Registry.add(key, blob)
+    Db.put({:file, key}, blob)
 
     {key, secret}
   end

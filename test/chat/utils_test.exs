@@ -9,11 +9,11 @@ defmodule Chat.UtilsTest do
     data = "1234"
     type = "text/plain"
 
-    {encrypted, secret} = Utils.encrypt_blob({data, type})
+    {encrypted, secret} = Utils.encrypt_blob([data, type])
 
     assert encrypted != {data, type}
 
-    assert {^data, ^type} = Utils.decrypt_blob(encrypted, secret)
+    assert [^data, ^type] = Utils.decrypt_blob(encrypted, secret)
   end
 
   test "pagination" do
@@ -50,7 +50,7 @@ defmodule Chat.UtilsTest do
       ["Alice", "room 1", "room 2"]
       |> Enum.map(&Identity.create/1)
 
-    actor = Actor.new(me, [room1, room2])
+    actor = Actor.new(me, [room1, room2], %{})
     password = "123456543211"
 
     encrypted =

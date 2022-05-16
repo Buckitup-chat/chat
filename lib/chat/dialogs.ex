@@ -26,7 +26,12 @@ defmodule Chat.Dialogs do
   defdelegate update(dialog), to: Registry
 
   defdelegate add_text(dialog, src, text, now \\ DateTime.utc_now()), to: Dialog
+  defdelegate add_memo(dialog, src, memo, now \\ DateTime.utc_now()), to: Dialog
+  defdelegate add_file(dialog, src, data, now \\ DateTime.utc_now()), to: Dialog
   defdelegate add_image(dialog, src, data, now \\ DateTime.utc_now()), to: Dialog
+
+  defdelegate update(dialog, author, msg_time_id, content), to: Dialog
+  defdelegate delete(dialog, author, msg_time_id), to: Dialog
 
   def read(
         %Dialog{} = dialog,
@@ -36,9 +41,15 @@ defmodule Chat.Dialogs do
       ),
       do: Dialog.read(dialog, reader, before, amount)
 
+  def read_message(%Dialog{} = dialog, {time, msg_id}, %Identity{} = me) do
+    message = Dialog.get_message(dialog, {time, msg_id})
+    side = Dialog.my_side(dialog, me)
+    Dialog.read(message, me, side, peer(dialog, me))
+  end
+
   def read_message(%Dialog{} = dialog, %Message{} = message, %Identity{} = me) do
     side = Dialog.my_side(dialog, me)
-    Dialog.read(message, me, side)
+    Dialog.read(message, me, side, peer(dialog, me))
   end
 
   def key(%Dialog{} = dialog) do

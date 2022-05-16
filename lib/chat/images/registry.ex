@@ -5,4 +5,5 @@ defmodule Chat.Images.Registry do
 
   def add(key, value), do: Db.put({:images, key}, value)
   def get(key), do: Db.get({:images, key})
+  def delete(key), do: Db.delete({:images, key})
 end

@@ -19,6 +19,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def init(%{assigns: %{rooms: rooms, me: me}} = socket, room_hash) do
     room = Rooms.get(room_hash)
+
     room_identity =
       rooms
       |> Enum.find(&(room_hash == &1 |> Identity.pub_key() |> Utils.hash()))
@@ -37,14 +38,12 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:message_update_mode, :replace)
   end
 
-
   def load_more_messages(%{assigns: %{page: page}} = socket) do
     socket
     |> assign(:page, page + 1)
     |> assign(:message_update_mode, :prepend)
     |> assign_messages()
   end
-
 
   def send_text(%{assigns: %{room: room, me: me, room_identity: room_identity}} = socket, text) do
     if is_memo?(text) do
@@ -193,21 +192,35 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   defp assign_messages(socket, per_page \\ @per_page)
-  
+
   defp assign_messages(%{assigns: %{has_more_messages: false}} = socket, _), do: socket
-  
-  defp assign_messages(%{assigns: %{page: 0, room: room, room_identity: identity}} = socket, per_page) do
+
+  defp assign_messages(
+         %{assigns: %{page: 0, room: room, room_identity: identity}} = socket,
+         per_page
+       ) do
     messages = Rooms.read(room, identity, &User.id_map_builder/1, {nil, 0}, per_page + 1)
-    
+
     socket
     |> assign(:messages, Enum.take(messages, -per_page))
     |> assign(:has_more_messages, length(messages) > per_page)
   end
 
-  defp assign_messages(%{assigns: %{room: room, room_identity: identity, messages: messages}} = socket, per_page) do
-    before_message = List.first(messages) 
-    messages = Rooms.read(room, identity, &User.id_map_builder/1, {before_message.timestamp, 0}, per_page + 1)
-    
+  defp assign_messages(
+         %{assigns: %{room: room, room_identity: identity, messages: messages}} = socket,
+         per_page
+       ) do
+    before_message = List.first(messages)
+
+    messages =
+      Rooms.read(
+        room,
+        identity,
+        &User.id_map_builder/1,
+        {before_message.timestamp, 0},
+        per_page + 1
+      )
+
     socket
     |> assign(:messages, Enum.take(messages, -per_page))
     |> assign(:has_more_messages, length(messages) > per_page)

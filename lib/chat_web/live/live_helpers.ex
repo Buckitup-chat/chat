@@ -58,7 +58,7 @@ defmodule ChatWeb.LiveHelpers do
   end
 
   def hide_modal(id), do: hide_modal(id, nil, %JS{})
-     
+
   def hide_modal(id, event, js \\ %JS{}) do
     js
     |> JS.hide(transition: "fade-out", to: "#" <> id)
@@ -108,5 +108,5 @@ defmodule ChatWeb.LiveHelpers do
 
   def hide_dropdown(id), do: hide_dropdown(%JS{}, id)
 
-  def hide_dropdown(%JS{} = js, id),  do: js |> JS.hide(transition: "fade-out", to: "#" <> id)
+  def hide_dropdown(%JS{} = js, id), do: js |> JS.hide(transition: "fade-out", to: "#" <> id)
 end

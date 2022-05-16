@@ -15,8 +15,6 @@ defmodule ChatWeb.MainLive.Page.Shared do
   def is_memo?(text), do: String.length(text) > 150
 
   def render_to_html_string(assigns, render_fun) do
-    IO.inspect assigns
-    IO.inspect render_fun
     assigns
     |> then(render_fun)
     |> Safe.to_iodata()

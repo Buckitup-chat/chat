@@ -319,7 +319,7 @@
     <% end %>
   </div>
     
-<div class="w-full basis-[80%] flex flex-col items-stretch">
+<div class="w-full basis-[80%] overflow-hidden flex flex-col">
   <%= if @lobby_mode == :chats do %>      
     <div class="basis-[93%] overflow-y-auto flex flex-col justify-between" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
     <div class="h-14 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start fixed">
@@ -347,11 +347,11 @@
     </div>
     <div class="w-full basis-[7%] px-8 border border-white bg-white flex items-center">
       <%= if @edit_dialog do %>
-        <div class="flex flex-col">
-          <div class="flex items-center justify-between">
-            <div class="w-full whitespace-nowrap overflow-hidden text-clip">
+        <div class="w-full flex flex-col ">
+          <div class="flex items-center justify-between pb-2">
+            <div class="w-[95%]">
               <h1 class="text-purple">Editing</h1>
-              <span class="text-xs text-black/50"><%= @edit_content %></span>
+              <span class="truncate block text-xs text-black/50"><%= @edit_content %></span>
             </div>
             <button type="button" class="" phx-click="dialog/cancel-edit" >
               <svg class="w-7 h-7 flex fill-black/50" >
@@ -359,24 +359,28 @@
               </svg>
             </button>
           </div>
-          
             <.form
               let={dei}
               for={:dialog_edit}
               id="dialog-edit-form"
-              class="flex items-center justify-start"
+              class="flex items-center justify-start "
               phx-change={JS.dispatch("chat:set-input-size", to: "#dialog-input")}
               phx-submit={JS.push("dialog/edited-message") |> JS.dispatch("chat:clear-value", to: "#dialog-input") |> JS.dispatch("chat:set-input-size", to: "#dialog-input")}
-              
+              onkeydown="
+              if (event.key == 'Enter' && event.shiftKey) {
+                document.getElementById('dialog-edit-form-submit-button').click()
+              }
+            "
+  
             >
               <%= textarea dei, :text,
-                    class: "w-full resize-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
+                    class: "w-full px-0 resize-none outline-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
                     id: "dialog-edit-input",
                     spellcheck: "false",
                     autocomplete: "off",
                     value: @edit_content
               %>
-              <button id="dialog-form-submit-button" type="submit">
+              <button id="dialog-edit-form-submit-button" type="submit">
                 <svg class="w-7 h-7 flex fill-purple" >
                   <use href="/images/icons.svg#send"></use>
                 </svg>
@@ -484,72 +488,62 @@
         <div></div>
         <div class="mt-16 px-8 w-full " id="room-messages" phx-update={@message_update_mode}>
             <%= for msg <- @messages do %>
-              <%= if msg.author_hash == @my_id do %>
-                <div class="m-1 flex justify-end" id={"dialog-message-#{UUID.uuid4()}"}>
-                  <.message msg={msg} author={Chat.User.by_id(msg.author_hash)} class="bg-purple50" />
-                </div>
-              <%= else %>
-                <div class="m-1 flex justify-start" id={"dialog-message-#{UUID.uuid4()}"}>
-                  <.message msg={msg} author={Chat.User.by_id(msg.author_hash)} class="bg-white" />
-                </div>
-              <%= end %>
+              <div class={classes("m-1 flex", %{"justify-end" => msg.author_hash == @my_id, "justify-start" => msg.author_hash != @my_id})} id={"room-message-#{msg.id}"}>
+                <.message 
+                  color={msg.author_hash == @my_id && "bg-white" || "bg-purple50"}
+                  msg={msg} 
+                  author={Chat.User.by_id(msg.author_hash)}
+                  is_mine={msg.author_hash == @my_id}  
+                />
+              </div> 
             <% end %>
+          
           </div>
       </div>
-
-
-   <!-- <div id="room-messages" phx-update={@message_update_mode}>
-      <%= for msg <- @messages do %>
-        <div class="row" id={"room-message-#{msg.id}"}>
-          <div class={msg.author_hash == @my_id && "column column-75 column-offset-25 text-right" || "column column-75" }>
-            <span class="x-content"
-            ><.room_message msg={msg} my_id={@my_id} /></span>
-            <%= if msg.author_hash == @my_id do %>
-              <%= if msg.type in [:text, :memo] do %>
-                <a style="cursor: pointer"
-                  phx-click="room/edit-message" 
-                  phx-value-id={msg.id} 
-                  phx-value-timestamp={msg.timestamp}
-                > 📝 </a>
-              <% end %> 
-              <a style="cursor: pointer"
-                phx-click="room/delete-message" 
-                phx-value-id={msg.id} 
-                phx-value-timestamp={msg.timestamp}
-              > ✖ </a>
-            <% end %>
-          </div>
-        </div> 
-      <% end %>
-      </div>
-
-    -->
-
-
        <div class="basis-[7%] px-8 border border-white bg-white flex flex-row items-center">
-              <%= if @edit_room do %>
-        <.form
-          let={dei}
-          for={:room_edit}
-          id="room-edit-form"
-          phx-submit="room/edited-message"
-          class="text-right row"
-        >
-          <div class="column column-50 column-offset-50">
-            <%= text_input dei, :text,
-                class: "text-right",
-                id: "room-edit-input",
-                spellcheck: "false",
-                autocomplete: "off",
-                value: @edit_content
-            %>
-            <button type="button" class="button button-outline" phx-click="room/cancel-edit" >Cancel</button>
-            <%= submit "Update", phx_disable_with: "..." %>
+        <%= if @edit_room do %>
+        <div class="w-full flex flex-col ">
+          <div class="flex items-center justify-between pb-2">
+            <div class="w-[95%]">
+              <h1 class="text-purple">Editing</h1>
+              <span class="truncate block text-xs text-black/50"><%= @edit_content %></span>
+            </div>
+            <button type="button" class="" phx-click="room/cancel-edit" >
+              <svg class="w-7 h-7 flex fill-black/50" >
+                <use href="/images/icons.svg#close"></use>
+              </svg>
+            </button>
           </div>
-        </.form>
-
-      <% else %> 
-         <div class="text-right row">
+            <.form
+              let={dei}
+              for={:room_edit}
+              id="rooom-edit-form"
+              class="flex items-center justify-start "
+              phx-change={JS.dispatch("chat:set-input-size", to: "#room-input")}
+              phx-submit={JS.push("room/edited-message") |> JS.dispatch("chat:clear-value", to: "#room-input") |> JS.dispatch("chat:set-input-size", to: "#room-input")}
+              onkeydown="
+              if (event.key == 'Enter' && event.shiftKey) {
+                document.getElementById('room-edit-form-submit-button').click()
+              }
+            "
+  
+            >
+              <%= textarea dei, :text,
+                    class: "w-full px-0 resize-none outline-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
+                    id: "room-edit-input",
+                    spellcheck: "false",
+                    autocomplete: "off",
+                    value: @edit_content
+              %>
+              <button id="room-edit-form-submit-button" type="submit">
+                <svg class="w-7 h-7 flex fill-purple" >
+                  <use href="/images/icons.svg#send"></use>
+                </svg>
+              </button>   
+            </.form>
+        
+        </div>
+      <% else %>
         <.form
           for={:room_file}
           id="room-file-form"
@@ -558,74 +552,71 @@
           phx-submit="room-file-submit"
           phx-drop-target={@uploads.room_file.ref}
         >
-            <%= live_file_input @uploads.room_file, style: "display: none" %>
-            <input type="button" value="Upload File" onclick="event.target.parentNode.querySelector('input[type=file]').click()" >
-
-          <%= for entry <- @uploads.room_file.entries do %>
-            <%= if entry.progress > 0 and entry.progress < 100 do %>
-              <progress value={entry.progress} max="100"> <%= entry.progress %>% </progress>
-            <% end %>
-
-            <%= for err <- upload_errors(@uploads.room_file, entry) do %>
-              <p class="alert alert-danger"><%= err %></p>
-            <% end %>
-          <% end %>
+          <%= live_file_input @uploads.room_file, style: "display: none"  %>
+        </.form>      
+        <.form
+          for={:room_image}
+          id="room-image-form"
+          class="basis-[1%]"
+          phx-change="room-image-submit"
+          phx-submit="room-image-submit"
+          phx-drop-target={@uploads.room_image.ref}
+        >
+          <%= live_file_input @uploads.room_image, style: "display: none" %>
         </.form>
-      </div>
 
+        <button class="relative" id="attachFileBtn" phx-click={open_dropdown("attachFileDropdown") |> JS.dispatch("chat:set-dropdown-position", to: "#attachFileDropdown", detail: %{relativeElementId: "attachFileBtn"})}>
+          <svg class="w-7 h-7 mt-3 flex fill-white" >
+            <use href="/images/icons.svg#attach"></use>
+          </svg>
+          <.dropdown class="mr-5" id="attachFileDropdown"> 
+          <a class="dropdownItem" phx-click={JS.dispatch("click", to: "#room-file-form input[type=file]")}>
+            <svg class="w-4 h-4 fill-grayscale" >
+              <use href="/images/icons.svg#document"></use>
+            </svg>
+            <span>File</span>
+          </a>
 
-                <.form
-                  for={:room_image}
-                  id="room-image-form"
-                  class="basis-[1%]"
-                  phx-change="room-image-submit"
-                  phx-submit="room-image-submit"
-                  phx-drop-target={@uploads.room_image.ref}
-                >
-                  <%= live_file_input @uploads.room_image, style: "display: none" %>
-                  <button type="button" onclick="document.getElementById('room-image-form').querySelector('input[type=file]').click()">
-                    <svg class="w-7 h-7 mt-3 flex fill-white" >
-                      <use href="/images/icons.svg#attach"></use>
-                    </svg>
-                  </button>
-                </.form>
-                <.form
-                  let={ri}
-                  for={:room}
-                  id="room-form"
-                  class="basis-[99%] flex items-center justify-between"
-                  phx-change={JS.dispatch("chat:set-input-size", to: "#room-input")}
-                  phx-submit={JS.push("room-message") |> JS.dispatch("chat:clear-value", to: "#room-input") |> JS.dispatch("chat:set-input-size", to: "#room-input") } 
-                  onkeydown="
-                  console.log(2)
-                    if (event.key == 'Enter' && event.shiftKey) {
-                      document.getElementById('room-input-submit-btn').click()
-                    }
-                  "
-                >
-                  <%= textarea ri, :text,
-                      placeholder: "Enter message",
-                      class: "w-full h-7 resize-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
-                      id: "room-input",
-                      spellcheck: "false",
-                      autocomplete: "off"
-                  %>
-                  <button id="room-input-submit-btn" type="submit">
-                    <svg class="w-7 h-7 flex fill-purple" >
-                      <use href="/images/icons.svg#send"></use>
-                    </svg>
-                  </button>
-                </.form>
-      <% end %>
-
-
-              
-            </div>
-            
-          <% end %>
-        <% end %>
-      </div>
-    </div>
+          <a class="dropdownItem" phx-click={JS.dispatch("click", to: "#room-image-form input[type=file]")}>
+            <svg class="w-4 h-4 fill-grayscale" >
+              <use href="/images/icons.svg#image"></use>
+            </svg>
+            <span>Image</span>
+          </a>
+        </.dropdown>
+        </button>
+        <.form
+          let={di}
+          for={:room}
+          id="room-form"
+          class="basis-[99%] flex items-center justify-between"
+          phx-change={JS.dispatch("chat:set-input-size", to: "#room-input")}
+          phx-submit={JS.push("room-message") |> JS.dispatch("chat:clear-value", to: "#room-input") |> JS.dispatch("chat:set-input-size", to: "#room-input")}  
+          onkeydown="
+            if (event.key == 'Enter' && event.shiftKey) {
+              document.getElementById('room-form-submit-button').click()
+            }
+          "
+        >
+          <%= textarea di, :text,
+            placeholder: "Enter message",
+            class: "w-full h-7 resize-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
+            id: "room-input",
+            spellcheck: "false",
+            autocomplete: "off"
+          %>
+          <button id="room-form-submit-button" type="submit">
+            <svg class="w-7 h-7 flex fill-purple" >
+              <use href="/images/icons.svg#send"></use>
+            </svg>
+          </button>
+        </.form>
+      <% end %> 
+    </div>  
+  <% end %>
+  <% end %>
+  </div>
+  </div>
   <% end %>
   <%= if @mode == :import_key_ring do %>
     <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg"/>

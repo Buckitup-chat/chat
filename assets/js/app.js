@@ -57,7 +57,7 @@ const listeners = {
   "chat:set-dropdown-position": (e) => {
     const relativeElementRect = document.getElementById(e.detail.relativeElementId).getBoundingClientRect();
     
-    if (relativeElementRect.bottom + 100 > window.innerHeight) {
+    if (relativeElementRect.bottom + 200 > window.innerHeight) {
       e.target.style.bottom = 0;
     } else {
       e.target.style.top = 28 + 'px';

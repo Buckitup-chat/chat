@@ -109,6 +109,8 @@ defmodule ChatWeb do
       defp ok(x), do: {:ok, x}
 
       defp noreply(x), do: {:noreply, x}
+
+      defp reply(x, p), do: {:reply, p, x}
     end
   end
 

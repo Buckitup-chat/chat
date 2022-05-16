@@ -31,6 +31,7 @@ defmodule ChatWeb.MainLive.Page.ImportOwnKeyRing do
         |> Page.Login.load_user(me, rooms)
         |> Page.Login.store()
         |> Page.Lobby.init()
+        |> Page.Dialog.init()
 
       _ ->
         socket
@@ -60,6 +61,11 @@ defmodule ChatWeb.MainLive.Page.ImportOwnKeyRing do
     socket
     |> close()
     |> assign(:step, :initial)
+  end
+
+  def drop_error(socket) do
+    socket
+    |> assign(:show_invalid, false)
   end
 
   def close(socket) do

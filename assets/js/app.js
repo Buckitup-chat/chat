@@ -1,6 +1,5 @@
 // We import the CSS which is extracted to its own file by esbuild.
 // Remove this line if you add a your own CSS build pipeline (e.g postcss).
-import "../css/app.css"
 
 // If you want to use Phoenix channels, run `mix help phx.gen.channel`
 // to get started and then uncomment the line below.
@@ -27,6 +26,7 @@ import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import * as LocalStateStore from "./hooks/local-storage"
 import * as LocalTime from "./hooks/local-time"
+import * as Chat from "./hooks/chat"
 
 
 
@@ -34,13 +34,13 @@ let Hooks = {}
 
 Hooks.LocalStateStore = LocalStateStore.hooks
 Hooks.LocalTime = LocalTime.hooks
+Hooks.Chat = Chat.hooks
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
       params: {_csrf_token: csrfToken},
       hooks: Hooks
 })
-
 
 const listeners = {
   "chat:clear-value": (e) => {e.target.value = ""},
@@ -49,6 +49,21 @@ const listeners = {
     if (e.detail && e.detail.class) {
       e.target.classList.toggle(e.detail.class)
     }
+  },
+  "chat:set-input-size": (e) => {
+    e.target.style.height = '';
+    e.target.style.height = (e.target.scrollHeight > 150 ? 150 : e.target.scrollHeight) + 'px';
+  },
+  "chat:set-dropdown-position": (e) => {
+    const relativeElementRect = document.getElementById(e.detail.relativeElementId).getBoundingClientRect();
+    
+    if (relativeElementRect.bottom + 200 > window.innerHeight) {
+      e.target.style.bottom = 0;
+    } else {
+      e.target.style.top = 28 + 'px';
+    } 
+    
+    if (relativeElementRect.width < e.target.offsetWidth) { e.target.style.left = 0 }
   },
   "phx:chat:toggle": (e) => {
     if (e.detail && e.detail.class && e.detail.to) {
@@ -63,12 +78,16 @@ const listeners = {
     url && openUrl(url)
   },  
   "phx:chat:focus": (e) => {const el = document.querySelector(e.detail.to); setTimeout(() => el.focus(), 100);},
-  "phx:chat:change": (e) => {const el = document.querySelector(e.detail.to); el.innerHTML = e.detail.content; },
+  "phx:chat:change": (e) => {
+    console.log(e, 'e'); 
+    const el = document.querySelector(e.detail.to);
+    console.log(el, 'el')
+     el.innerHTML = e.detail.content; 
+  },
 };
 for (key in listeners) {
   window.addEventListener(key, listeners[key]);
 }
-
 
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})

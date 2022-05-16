@@ -1,198 +1,394 @@
 <div style="display: none;" id="session-link" phx-hook="LocalStateStore"></div>
 <div style="display: none;" id="time-link" phx-hook="LocalTime"></div>
 <%= unless connected?(@socket) do %>
+  <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg"/>
+  <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg"/>
 
-<% else %>
-
-
-<%= if @need_login do %>
-<div class="phx-hero">
-  <.form
-    let={f}
-    for={:login}
-    id="login-form"
-    phx-submit="login">
-  
-    <%= text_input f, :name, placeholder: "Your name" %>
-    <%= error_tag f, :name %>
-  
-    <div>
-      <%= submit "Login", phx_disable_with: "Saving..." %>
+  <div class="flex flex-col items-center justify-center w-screen h-screen">
+    <div class="container unauthenticated" >
+      <img src="/images/logo.png"/>
     </div>
-  </.form>
-</div> 
-<div>
-  <a style="cursor: pointer" phx-click="login:request-key-ring"> Import Key Ring </a>
-</div>
-<div>
-  <a style="cursor: pointer" phx-click="login:import-own-key-ring">Import the recovery keys</a>
-</div>
+  </div>
 <% else %>
-  <%= if @mode == :user_list do %>
-    <div class="row">
-      <div class="column column-50">
-        <blockquote>
-        <a phx-click="open-data-restore" style="cursor: pointer;">Restore data</a>
-        or <a href="/get/backup">Backup</a> it
+<%= if @need_login do %>
+  <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg"/>
+  <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg"/>
+
+  <div class="flex flex-col items-center justify-center w-screen h-screen">
+    <div class="container unauthenticated" >
+      <div class="flex justify-center">
+        <svg width="54" height="57" class="fill-white" >
+          <use href="/images/icons.svg#logo"></use>
+        </svg>
+      </div>
+      <div class="left-0 mt-10">
+        <h1 style="font-size: 28px; line-height: 34px;" class="font-inter font-bold text-white">Log In</h1>
+        <p class="mt-2.5 font-inter text-sm text-white/70">Please, enter your name. That’s how other users will see you</p>
+      </div>
+  
+      <div class="w-full mt-7">
+        <.form
+          let={f}
+          for={:login}
+          id="login-form"
+          phx-submit="login">
+      
+        <%= text_input f, :name, placeholder: "Your name", class: "w-full h-11 bg-transparent border border-white/50 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-0 focus:border-white" %>
+        <%= error_tag f, :name %>
+      
+        <div class="mt-2.5">
+          <%= submit "Log In", phx_disable_with: "Saving...", class: "w-full h-11 focus:outline-none text-white px-4 rounded-lg", style: "background-color: rgb(36, 24, 36);"   %>
+        </div>
+        </.form>
+      </div>
+  
+      <div class="mt-7 flex flex-row items-center justify-between" >
+        <hr class="basis-[44%] border-1 border-white/10">
+        <p class="text-white/50">or</p>
+        <hr class="basis-[44%] border-1 border-white/10">
+      </div>
+  
+      <button phx-click="login:request-key-ring" class="w-full h-11 mt-7 bg-transparent text-white py-2 px-4 border border-white/50 rounded-lg flex items-center justify-center">
+        <span>Login with QR code</span>
+        <svg width="16" height="16" class="ml-2 fill-white">
+          <use href="/images/icons.svg#qrcode"></use>
+        </svg>
+      </button>
+  
+      <button phx-click="login:import-own-key-ring" class="w-full h-11 mt-2.5 bg-transparent text-white py-2 px-4 border border-white/50 rounded-lg flex items-center justify-center">
+        <span>Import the recovery keys</span>
+        <svg width="16" height="16" class="ml-2 fill-white">
+          <use href="/images/icons.svg#upload1"></use>
+        </svg>
+      </button>    
+    </div>     
+  </div>
+<% else %>
+  <%= if @mode == :lobby do %>
+    <.modal id="logout-backup-popup" hide_event="logout-close" class="w-96 h-max">
+      <%= if @logout_step == :initial do %> 
+        <h1 class="text-base font-bold text-grayscale">Log Out & Back Up</h1>
+        <p class="mt-3 text-sm text-black/50">To get access again you will need the recovery keys:</p>
+        <button class="mt-5 w-full h-12 border-0 rounded-lg bg-grayscale flex items-center justify-center" phx-click="logout-go-middle">
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-white">Download the Keys</span>
+            <svg width="16" height="16" class="ml-2 fill-white">
+              <use href="/images/icons.svg#upload1"></use>
+            </svg>
+          </div>
+        </button>
+        <button class="mt-3 w-full h-12 border rounded-lg border-black/10" >Log Out without Keys</button>
+        <button phx-click={hide_modal("logout-backup-popup")} class="mt-3 w-full h-12 border rounded-lg border-black/10" >Cancel</button>
+    <% end %> 
+    <%= if @logout_step == :middle do %>
+      <h1 class="text-base font-bold text-grayscale">Set Up Password</h1>
+      <p class="mt-3 text-sm text-black/50">To store the backup copy of the key securely, enter the encryption password for the file</p>
+      <div class="mt-5 w-full h-7 flex items-center justify-between border-0 rounded-lg bg-black/10"> 
+        <svg width="16" height="16" class="ml-1 fill-black/40">
+          <use href="/images/icons.svg#alert"></use>
+        </svg>
+         <blockquote class="text-xs text-black/50 mr-3">
+          This password in not stored and can NOT be recovered
         </blockquote>
       </div>
-      <div class="column column-50">
-        <div class="float-right">
-          <a phx-click="logout-open" style="cursor: pointer;">Logout</a>
+      <.form
+        let={f}
+        for={@changeset}
+        id="logout-form"
+        phx-change="logout-check-password"
+        phx-submit="logout-download-with-password"
+        as="logout"
+        class="mt-3 w-full"
+      >  
+        <div class="w-ull relative">
+          <%= if @is_password_visible do %>
+            <%= text_input f, :password, type: "text", placeholder: "Enter Password", phx_debounce: 700, class: "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50" %>
+            <a>
+              <svg phx-click="logout:toggle-password-visibility" width="16" height="16" class="absolute top-4 right-3 ml-2">
+                <use href={"/images/icons.svg#visibility"}></use>
+              </svg>
+            </a>
+          <% else %>
+            <%= text_input f, :password, type: "password", placeholder: "Enter Password", phx_debounce: 700, class: "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50" %>
+            <a>
+              <svg phx-click="logout:toggle-password-visibility" width="16" height="16" class="absolute top-4 right-3 ml-2">
+                <use href={"/images/icons.svg#visibilityOff"}></use>  
+              </svg>
+            </a>
+          <% end %>
         </div>
-      </div>
-    </div>
-    <div class="row">
-      <div class="column">      
-        <a href="javascript:void(0)" phx-click="open-dialog" phx-value-user-id={@my_id}>
-          <b>My Notes</b>
-        </a>
-      </div>
-      <div class="column">      
-        <a phx-click="open-feed" style="cursor: pointer;">News feed</a>
-      </div>
-    </div>
-    <div class="row">
-      <div class="column column-50">
-        <h2> User list </h2>
-        <ul>
-        <%= for user <- @users do %>
-          <%= unless user.hash == @my_id do %>
-            <li>
-              <a href="javascript:void(0)" phx-click="open-dialog" phx-value-user-id={user.hash}>
-                <%= user.name %>
-              </a>
-            </li>
-            <% end %>
-        <% end %>
-        </ul>
-      </div>
-      <div class="column column-50">
-        <h2> Room list </h2>
-          <button 
-            id="room-create-toggle"
-            class="button button-outline"
-            phx-click={
-              JS.hide() 
-              |> JS.show(to: "#room-create-form")
-              |> JS.dispatch("chat:focus", to: "#room-create-form input[name='new_room[name]']")
-            }
-          > Add room </button>
-        <div class="row">
-          <.form
-            let={f}
-            for={:new_room}
-            id="room-create-form"
-            autocomplete="off"
-            phx-submit={
-              JS.hide()
-              |> JS.show(to: "#room-create-toggle")
-              |> JS.push("create-room")
-            }
-            style="display: none;"
-          >
-          
-            <%= text_input f, :name, placeholder: "Room name" %>
-            <%= error_tag f, :name %>
-          
-            <div>
-              <%= submit "Create", phx_disable_with: "Saving..." %>
-            </div>
-          </.form>
+        <!--<%= error_tag f, :password %> -->
+        <div class="mt-3 w-ull relative">
+          <%= if @is_password_confirmation_visible do %>
+            <%= text_input f, :password_confirmation, type: "text", placeholder: "Repeat Password", phx_debounce: 700, class: "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50" %>
+            <a>
+              <svg phx-click="logout:toggle-password-confirmation-visibility" width="16" height="16" class="absolute top-4 right-3 ml-2">
+                <use href="/images/icons.svg#visibility"></use>
+              </svg>
+            </a>
+          <% else %>
+            <%= text_input f, :password_confirmation, type: "password", placeholder: "Repeat Password", phx_debounce: 700, class: "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50" %>
+            <a>
+              <svg phx-click="logout:toggle-password-confirmation-visibility" width="16" height="16" class="absolute top-4 right-3 ml-2">
+                <use href="/images/icons.svg#visibilityOff"></use>
+              </svg>
+            </a>
+          <% end %>
         </div>
-        <ul>
-          <%= for room <- @joined_rooms do %>
-            <li><a phx-click="open-room" phx-value-room={room.hash}><b><%= room.name %></b></a></li>
-          <% end %>  
-        </ul>
-        <ul>
-          <%= for room <- @new_rooms do %>
-            <%= if room |> Rooms.is_requested_by?(@my_id) do %>
-              <li><a ><%= room.name %> (requested)</a></li>
-            <% else %>
-              <li><a phx-click="request-room" phx-value-room={room.hash}><%= room.name %></a></li>
-            <% end %>
-          <% end %>  
-        </ul>  
+        <!-- <%= error_tag f, :password_confirmation %> -->
+        <p class="mt-3 text-sm text-black/50">At least 12 symbols</p>
+        
+        <%= submit "Download", phx_disable_with: "Downloading...", class: "mt-5 w-full h-12 border-0 rounded-lg bg-grayscale text-white disabled:opacity-50", disabled: !@changeset.valid? %>
+      </.form>
+      <button class="mt-3 w-full h-12 border rounded-lg border-black/10" phx-click="logout-download-insecure">
+        Download without password 
+        <span style="color: red">insecure!</span>
+      </button>
+    <% end %> 
+    <%= if @logout_step == :final do %>
+      <h1 class="text-base font-bold text-grayscale">Success</h1>
+      <p class="mt-3 text-sm text-black/50">If you downloaded the the recovery key, you can log out now, it will erase all the browser data about BuckitUp.</p>
+      <button class="mt-3 w-full h-12 border-0 rounded-lg bg-grayscale text-white" phx-click="logout-wipe">Exit</button>
+      <button phx-click={hide_modal("logout-backup-popup")} class="mt-3 w-full h-12 border rounded-lg border-black/10">Cancel</button>
+    <% end %> 
+    </.modal>
+    <.modal id="delete-message-popup" hide_event="delete-message-popup:close" class="w-96 h-max">
+      <h1 class="text-base font-bold text-grayscale">Delete Message</h1>
+      <p class="mt-3 text-sm text-black/50">Are you sure you want to delete this message?</p>
+      <div class="mt-5 flex items-center justify-between">
+        <button phx-click={hide_modal("delete-message-popup")} class="w-full mr-1 h-12 border rounded-lg border-black/10">Cancel</button>
+        <button phx-click={hide_modal("delete-message-popup") |> JS.push("delete-message")} class="deleteMessageButton w-full ml-1 h-12 border-0 rounded-lg bg-red-500">
+          <span class="text-white ">Delete</span>
+          <svg width="3" height="3" >
+            <use href="/images/icons.svg#delete"></use>
+          </svg>
+        </button>
       </div>
-    </div>
-  <% end %>
-  <%= if @mode == :dialog do %>
-    <div id="dialog-mode">
-      <button class="button button-outline float-right" phx-click="close-dialog">Back</button>
-      <h1>
-        <%= if @peer.hash == @my_id do %>
-          My Notes
-        <% else %>
-          Dialog with <%= @peer.name %>
-        <% end %>
-      </h1>
-      <div id="dialog-messages" phx-update={@message_update_mode}>
-      <%= for msg <- @messages do %>
-        <div class="row" id={"dialog-message-#{msg.id}"}>
-          <div class={msg.is_mine? && "column column-75 column-offset-25 text-right" || "column column-75" }>
-            <span class="x-content"
-            ><.message msg={msg} /></span>
-            <%= if msg.is_mine? do %>
-              <%= if msg.type in [:text, :memo] do %>
-                <a style="cursor: pointer"
-                  phx-click="dialog/edit-message" 
-                  phx-value-id={msg.id} 
-                  phx-value-timestamp={msg.timestamp}
-                > 📝 </a>
-              <% end %> 
-              <a style="cursor: pointer"
-                phx-click="dialog/delete-message" 
-                phx-value-id={msg.id} 
-                phx-value-timestamp={msg.timestamp}
-              > ✖ </a>
-            <% end %> 
-          </div>
-        </div> 
-      <% end %>
-      </div>
-      <%= if @edit_dialog do %>
-        <.form
-          let={dei}
-          for={:dialog_edit}
-          id="dialog-edit-form"
-          phx-submit="dialog/edited-message"
-          class="text-right row"
-        >
-          <div class="column column-50 column-offset-50">
-            <%= text_input dei, :text,
-                class: "text-right",
-                id: "dialog-edit-input",
-                spellcheck: "false",
-                autocomplete: "off",
-                value: @edit_content
-            %>
-            <button type="button" class="button button-outline" phx-click="dialog/cancel-edit" >Cancel</button>
-            <%= submit "Update", phx_disable_with: "..." %>
-          </div>
-        </.form>
+    </.modal>
 
-      <% else %> 
-        <.form
-          let={di}
-          for={:dialog}
-          id="dialog-form"
-          phx-submit={ JS.push("dialog-message") |> JS.dispatch("chat:clear-value", to: "#dialog-input")}
-          class="text-right row"
-        >
-          <div class="column column-50 column-offset-50">
-            <%= text_input di, :text,
-                placeholder: "New message",
-                class: "text-right",
-                id: "dialog-input",
-                spellcheck: "false",
-                autocomplete: "off"
-            %>
-            <%= submit "Send", phx_disable_with: "..." %>
+    
+
+  <div class="w-screen h-screen flex flex-row items-stretch">
+    <div class="basis-[5%] h-screen flex flex-col justify-between bg-white">
+      <div class="flex flex-col items-center"> 
+        <div class="sidebarIcon mt-3">
+          <svg width="35" height="35" >
+            <use href="/images/icons.svg#logo"></use>
+          </svg>
+        </div>
+
+        <button phx-click="switch-lobby-mode:rooms" class="sidebarIcon mt-9">
+          <svg class={classes("w-6 h-6 hover:fill-purple", %{"fill-purple" => @lobby_mode == :rooms, "fill-grayscale" => @lobby_mode != :rooms})} >
+            <use  href="/images/icons.svg#sidebarRooms"></use>
+          </svg>
+          <span class="text-xs">Rooms</span>
+        </button>
+
+        <button phx-click="switch-lobby-mode:chats" class="sidebarIcon mt-5">
+          <svg class={classes("w-6 h-6 hover:fill-purple", %{"fill-purple" => @lobby_mode == :chats, "fill-grayscale" => @lobby_mode != :chats})} >
+            <use href="/images/icons.svg#sidebarChats"></use>
+          </svg>
+          <span class="text-xs">Chats</span>
+        </button>
+      </div>
+
+      <div class="flex flex-col items-center">
+        <a phx-click="open-feed" style="display: none; cursor: pointer;">News feed</a>
+    
+        <div class="row mt-10"> 
+          <div class="column column-50" style="display: none;">
+          <blockquote>
+          <a phx-click="open-data-restore" style="cursor: pointer;">Restore data</a>
+          or <a href="/get/backup">Backup</a> it
+          </blockquote>
+        </div>
+
+        <button phx-click={JS.push("logout-open") |> show_modal("logout-backup-popup")} class="sidebarIcon mb-1">
+          <svg class="w-6 h-6 hover:fill-purple">
+            <use href="/images/icons.svg#logout"></use>
+          </svg>
+          <span class="text-xs">Log out & Back Up</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class='roomsAndChatsBar w-72 min-w-fit  overflow-y-scroll'>
+        <%= if @lobby_mode == :chats do %>
+          <div class='px-7 mt-3 flex items-center justify-between'>
+            <h5 class="text-grayscale" style="font-size: 22px;">Chats</h5>
           </div>
+          <div class="mt-10 w-full">
+            <ul>
+              <%= for user <- @users do %>
+                <li class={classes("w-full h-9 flex items-center hover:bg-stone250", %{"bg-stone250" => user == @peer})}>
+                  <a phx-click="switch-dialog" phx-value-user-id={user.hash}>
+                    <div class="flex flex-row px-7">
+                      <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(user.hash) %>]</tt>
+                      <div class="ml-1 text-sm"><%= user == Chat.Card.from_identity(@me) && "My notes" || user.name %></div>
+                    </div>
+                  </a>
+                </li>
+              <% end %>
+            </ul>
+          </div>
+        <% end %>
+
+        <%= if @lobby_mode == :rooms do %>
+        <.modal id="create-room-popup" class="h-[25%] w-[416px]">
+        <h1 class="text-base font-bold text-grayscale">Create Room</h1>
+        <.form
+          let={f}
+          for={:new_room}
+          id="room-create-form"
+          autocomplete="off"
+          phx-submit={hide_modal("create-room-popup") |> JS.push("create-room")}
+        >  
+          <%= text_input f, :name, placeholder: "Name your Room", class: "w-full h-11 mt-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-0" %>
+          <%= submit "Create", phx_disable_with: "Saving...", class: "w-full h-11 mt-2 text-white border-0 rounded-lg bg-grayscale flex items-center justify-center" %>
         </.form>
-      <% end %> 
-      <div class="text-right row">
+      </.modal>
+
+            <div class='px-7 mt-3 flex items-center justify-between'>
+              <h5 class="channel-block-text text-grayscale" style="font-size: 22px;">Rooms</h5>
+              <button 
+                id="room-create-toggle"
+                class="w-5 h-5 border rounded-full flex items-center justify-center" style="background: linear-gradient(135deg, #611E87 0%, #A75B63 100%);"
+                phx-click={show_modal("create-room-popup")}>
+                <svg class="w-3 h-3 flex fill-white" >
+                  <use href="/images/icons.svg#add"></use>
+                </svg>
+              </button>
+            </div>
+
+        <div class="w-full mt-6 flex flex-col items-start"> 
+        <div phx-click={JS.toggle(to: "#confirmed-rooms", in: "fade-in-scale", out: "fade-out-scale")} class="px-7 mt-3 flex items-center">
+          <svg class="w-4 h-4 flex fill-black" >
+            <use href="/images/icons.svg#arrowDown"></use>
+          </svg>
+          <span class="ml-1 text-sm  font-bold cursor-pointer">Confirmed</span>
+        </div>  
+      
+        <div class="mt-3 w-full" id="confirmed-rooms">
+          <ul>
+            <%= if @joined_rooms == [] do %>
+            <p class="text-base text-grayscale600 px-7">You have no rooms</p>
+            <% else %>
+              <%= for room <- @joined_rooms do %>
+              <li class={classes("w-full h-9 flex items-center cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
+                <a phx-click="switch-room" phx-value-room={room.hash}>
+                  <div class="flex flex-row px-7">
+                    <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
+                    <div class="ml-1 text-sm"><%= room.name %></div>
+                  </div>
+                </a>
+              </li>
+              <% end %>  
+            <% end %>  
+          </ul>
+        </div>
+        <div phx-click={JS.toggle(to: "#unconfirmed-rooms", in: "fade-in-scale", out: "fade-out-scale")} class="px-7 mt-3 flex items-center">
+          <svg class="w-4 h-4 flex fill-black" >
+            <use href="/images/icons.svg#arrowDown"></use>
+          </svg>
+          <span class="ml-1 text-sm  font-bold cursor-pointer">Not Confirmed</span>
+        </div> 
+        <div id="unconfirmed-rooms" class="mt-3 w-full">  
+          <ul>  
+          <%= if @new_rooms == [] do %>
+            <p class="text-base text-grayscale600 px-7">You have no rooms</p>
+          <% else %>
+            <%= for room <- @new_rooms do %>
+                <li class="w-full cursor-pointer hover:bg-stone250">
+                  <%= if room |> Rooms.is_requested_by?(@my_id) do %>
+                      <a ><%= room.name %> (requested)</a>
+                  <% else %>
+                    <a phx-click="request-room" phx-value-room={room.hash}>
+                      <div class="flex flex-row px-7 w-full">
+                        <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
+                        <div class="ml-1 text-sm"><%= room.name %></div>
+                      </div>
+                    </a>
+                  <% end %>
+                </li>
+            <% end %>  
+            <% end %>
+          </ul>  
+        </div>
+      </div>
+
+    <% end %>
+  </div>
+    
+<div class="w-full basis-[80%] overflow-hidden flex flex-col">
+  <%= if @lobby_mode == :chats do %>      
+    <div class="basis-[93%] overflow-y-auto flex flex-col justify-between" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
+    <div class="h-14 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start fixed">
+      <div class="text-base text-white/60">[<%= short_hash(@peer.hash) %>]</div>
+      <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>
+      <button>
+        <svg class="w-4 h-4 ml-1 flex fill-white/50" >
+          <use href="/images/icons.svg#edit"></use>
+        </svg>
+      </button>
+    </div>
+      <div></div>
+      <div class="px-8 mt-16 backdrop-opacity-25" id="dialog-messages" phx-update={@message_update_mode}>
+        <%= for msg <- @messages do %>
+          <div class={classes("m-1 flex", %{"justify-end" => msg.is_mine?, "justify-start" => !msg.is_mine?})} id={"dialog-message-#{msg.id}"}>
+              <.message 
+                color="bg-purple50" 
+                msg={msg} 
+                author={msg.is_mine? && Chat.Card.from_identity(@me) || @peer}
+                is_mine={msg.is_mine?}  
+              />
+          </div> 
+        <% end %>
+      </div>
+    </div>
+    <div class="w-full basis-[7%] px-8 border border-white bg-white flex items-center">
+      <%= if @edit_dialog do %>
+        <div class="w-full flex flex-col ">
+          <div class="flex items-center justify-between pb-2">
+            <div class="w-[95%]">
+              <h1 class="text-purple">Editing</h1>
+              <span class="truncate block text-xs text-black/50"><%= @edit_content %></span>
+            </div>
+            <button type="button" class="" phx-click="dialog/cancel-edit" >
+              <svg class="w-7 h-7 flex fill-black/50" >
+                <use href="/images/icons.svg#close"></use>
+              </svg>
+            </button>
+          </div>
+            <.form
+              let={dei}
+              for={:dialog_edit}
+              id="dialog-edit-form"
+              class="flex items-center justify-start "
+              phx-change={JS.dispatch("chat:set-input-size", to: "#dialog-input")}
+              phx-submit={JS.push("dialog/edited-message") |> JS.dispatch("chat:clear-value", to: "#dialog-input") |> JS.dispatch("chat:set-input-size", to: "#dialog-input")}
+              onkeydown="
+              if (event.key == 'Enter' && event.shiftKey) {
+                document.getElementById('dialog-edit-form-submit-button').click()
+              }
+            "
+  
+            >
+              <%= textarea dei, :text,
+                    class: "w-full px-0 resize-none outline-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
+                    id: "dialog-edit-input",
+                    spellcheck: "false",
+                    autocomplete: "off",
+                    value: @edit_content
+              %>
+              <button id="dialog-edit-form-submit-button" type="submit">
+                <svg class="w-7 h-7 flex fill-purple" >
+                  <use href="/images/icons.svg#send"></use>
+                </svg>
+              </button>   
+            </.form>
+        
+        </div>
+      <% else %>
         <.form
           for={:dialog_file}
           id="dialog-file-form"
@@ -201,116 +397,153 @@
           phx-submit="dialog-file-submit"
           phx-drop-target={@uploads.dialog_file.ref}
         >
-            <%= live_file_input @uploads.dialog_file, style: "display: none" %>
-            <input type="button" value="Upload File" onclick="event.target.parentNode.querySelector('input[type=file]').click()" >
-
-          <%= for entry <- @uploads.dialog_file.entries do %>
-            <%= if entry.progress > 0 and entry.progress < 100 do %>
-              <progress value={entry.progress} max="100"> <%= entry.progress %>% </progress>
-            <% end %>
-
-            <%= for err <- upload_errors(@uploads.dialog_file, entry) do %>
-              <p class="alert alert-danger"><%= err %></p>
-            <% end %>
-          <% end %>
-        </.form>
-      </div>
-      <div class="text-right row">
+          <%= live_file_input @uploads.dialog_file, style: "display: none"  %>
+        </.form>      
         <.form
           for={:dialog_image}
           id="dialog-image-form"
-          class="column column-50 column-offset-50"
+          class="basis-[1%]"
           phx-change="dialog-image-change"
           phx-submit="dialog-image-submit"
           phx-drop-target={@uploads.image.ref}
         >
-            <%= live_file_input @uploads.image, style: "display: none" %>
-            <input type="button" value="Upload Image" onclick="event.target.parentNode.querySelector('input[type=file]').click()" >
-
-          <%= for entry <- @uploads.image.entries do %>
-            <%= if entry.progress > 0 and entry.progress < 100 do %>
-              <progress value={entry.progress} max="100"> <%= entry.progress %>% </progress>
-            <% end %>
-
-            <%= for err <- upload_errors(@uploads.image, entry) do %>
-              <p class="alert alert-danger"><%= err %></p>
-            <% end %>
-          <% end %>
+          <%= live_file_input @uploads.image, style: "display: none" %>
         </.form>
-      </div>
-    </div>
+
+        <button class="relative" id="attachFileBtn" phx-click={open_dropdown("attachFileDropdown") |> JS.dispatch("chat:set-dropdown-position", to: "#attachFileDropdown", detail: %{relativeElementId: "attachFileBtn"})}>
+          <svg class="w-7 h-7 mt-3 flex fill-white" >
+            <use href="/images/icons.svg#attach"></use>
+          </svg>
+          <.dropdown class="mr-5" id="attachFileDropdown"> 
+          <a class="dropdownItem" phx-click={JS.dispatch("click", to: "#dialog-file-form input[type=file]")}>
+            <svg class="w-4 h-4 fill-grayscale" >
+              <use href="/images/icons.svg#document"></use>
+            </svg>
+            <span>File</span>
+          </a>
+
+          <a class="dropdownItem" phx-click={JS.dispatch("click", to: "#dialog-image-form input[type=file]")}>
+            <svg class="w-4 h-4 fill-grayscale" >
+              <use href="/images/icons.svg#image"></use>
+            </svg>
+            <span>Image</span>
+          </a>
+        </.dropdown>
+        </button>
+        <.form
+          let={di}
+          for={:dialog}
+          id="dialog-form"
+          class="basis-[99%] flex items-center justify-between"
+          phx-change={JS.dispatch("chat:set-input-size", to: "#dialog-input")}
+          phx-submit={JS.push("dialog-message") |> JS.dispatch("chat:clear-value", to: "#dialog-input") |> JS.dispatch("chat:set-input-size", to: "#dialog-input")}  
+          onkeydown="
+            if (event.key == 'Enter' && event.shiftKey) {
+              document.getElementById('dialog-form-submit-button').click()
+            }
+          "
+        >
+          <%= textarea di, :text,
+            placeholder: "Enter message",
+            class: "w-full h-7 resize-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
+            id: "dialog-input",
+            spellcheck: "false",
+            autocomplete: "off"
+          %>
+          <button id="dialog-form-submit-button" type="submit">
+            <svg class="w-7 h-7 flex fill-purple" >
+              <use href="/images/icons.svg#send"></use>
+            </svg>
+          </button>
+        </.form>
+      <% end %> 
+    </div>  
   <% end %>
-  <%= if @mode == :room do %>
-    <div id="room-mode">
-      <button class="button button-outline float-right" phx-click="close-room">Back</button>
-      <h1>Room: <b><%= @room.name %></b></h1>
-      <div id="room-messages" phx-update={@message_update_mode}>
-      <%= for msg <- @messages do %>
-        <div class="row" id={"room-message-#{msg.id}"}>
-          <div class={msg.author_hash == @my_id && "column column-75 column-offset-25 text-right" || "column column-75" }>
-            <span class="x-content"
-            ><.room_message msg={msg} my_id={@my_id} /></span>
-            <%= if msg.author_hash == @my_id do %>
-              <%= if msg.type in [:text, :memo] do %>
-                <a style="cursor: pointer"
-                  phx-click="room/edit-message" 
-                  phx-value-id={msg.id} 
-                  phx-value-timestamp={msg.timestamp}
-                > 📝 </a>
-              <% end %> 
-              <a style="cursor: pointer"
-                phx-click="room/delete-message" 
-                phx-value-id={msg.id} 
-                phx-value-timestamp={msg.timestamp}
-              > ✖ </a>
-            <% end %>
-          </div>
-        </div> 
-      <% end %>
+  <%= if @lobby_mode == :rooms do %>
+    <%= unless @room do %>
+      <div class="my-auto mx-auto flex flex-col items-center justify-center w-80 h-32 border-9 rounded-lg bg-white/20 ">
+          <span class="my-2 text-sm text-white">Select any Room or create your own</span>
+          <button phx-click={show_modal("create-room-popup")} class="my-2 flex flex-row items-center justify-center border rounded-lg border-white w-72 h-11">
+            <span class="text-sm text-white">Create Room</span>
+            <svg class="w-4 h-4 flex fill-white">
+              <use href="/images/icons.svg#add"></use>
+            </svg>
+          </button>
       </div>
-      <%= if @edit_room do %>
-        <.form
-          let={dei}
-          for={:room_edit}
-          id="room-edit-form"
-          phx-submit="room/edited-message"
-          class="text-right row"
-        >
-          <div class="column column-50 column-offset-50">
-            <%= text_input dei, :text,
-                class: "text-right",
-                id: "room-edit-input",
-                spellcheck: "false",
-                autocomplete: "off",
-                value: @edit_content
-            %>
-            <button type="button" class="button button-outline" phx-click="room/cancel-edit" >Cancel</button>
-            <%= submit "Update", phx_disable_with: "..." %>
-          </div>
-        </.form>
+    <%= else %>
 
-      <% else %> 
-
-        <.form
-          let={ri}
-          for={:room}
-          id="room-form"
-          phx-submit={ JS.push("room-message") |> JS.dispatch("chat:clear-value", to: "#room-input")}
-          class="text-right row"
-        >
-          <div class="column column-50 column-offset-50">
-            <%= text_input ri, :text,
-                placeholder: "New message",
-                class: "text-right",
-                id: "room-input",
-                spellcheck: "false",
-                autocomplete: "off"
-            %>
-            <%= submit "Send", phx_disable_with: "..." %>
+      <div class="basis-[93%] overflow-scroll flex flex-col justify-between" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
+        <div class="h-14 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between fixed" >
+          <div class="flex flex-row items-center">
+            <div class="text-base text-white/60">[<%= short_hash(@room.admin_hash) %>]</div>
+            <h1 class="ml-1 text-base font-bolt text-white" ><%= @room.name %></h1>
           </div>
-        </.form>
-      <% end %>
-      <div class="text-right row">
+          <button>
+            <svg class="w-4 h-4 ml-1 z-20 fill-black" >
+              <use href="/images/icons.svg#share"></use>
+            </svg>
+            <span class="text-base text-white"> Invite</span>
+          </button>
+        </div>
+        <div></div>
+        <div class="mt-16 px-8 w-full " id="room-messages" phx-update={@message_update_mode}>
+            <%= for msg <- @messages do %>
+              <div class={classes("m-1 flex", %{"justify-end" => msg.author_hash == @my_id, "justify-start" => msg.author_hash != @my_id})} id={"room-message-#{msg.id}"}>
+                <.message 
+                  color={msg.author_hash == @my_id && "bg-white" || "bg-purple50"}
+                  msg={msg} 
+                  author={Chat.User.by_id(msg.author_hash)}
+                  is_mine={msg.author_hash == @my_id}  
+                />
+              </div> 
+            <% end %>
+          
+          </div>
+      </div>
+       <div class="basis-[7%] px-8 border border-white bg-white flex flex-row items-center">
+        <%= if @edit_room do %>
+        <div class="w-full flex flex-col ">
+          <div class="flex items-center justify-between pb-2">
+            <div class="w-[95%]">
+              <h1 class="text-purple">Editing</h1>
+              <span class="truncate block text-xs text-black/50"><%= @edit_content %></span>
+            </div>
+            <button type="button" class="" phx-click="room/cancel-edit" >
+              <svg class="w-7 h-7 flex fill-black/50" >
+                <use href="/images/icons.svg#close"></use>
+              </svg>
+            </button>
+          </div>
+            <.form
+              let={dei}
+              for={:room_edit}
+              id="rooom-edit-form"
+              class="flex items-center justify-start "
+              phx-change={JS.dispatch("chat:set-input-size", to: "#room-input")}
+              phx-submit={JS.push("room/edited-message") |> JS.dispatch("chat:clear-value", to: "#room-input") |> JS.dispatch("chat:set-input-size", to: "#room-input")}
+              onkeydown="
+              if (event.key == 'Enter' && event.shiftKey) {
+                document.getElementById('room-edit-form-submit-button').click()
+              }
+            "
+  
+            >
+              <%= textarea dei, :text,
+                    class: "w-full px-0 resize-none outline-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
+                    id: "room-edit-input",
+                    spellcheck: "false",
+                    autocomplete: "off",
+                    value: @edit_content
+              %>
+              <button id="room-edit-form-submit-button" type="submit">
+                <svg class="w-7 h-7 flex fill-purple" >
+                  <use href="/images/icons.svg#send"></use>
+                </svg>
+              </button>   
+            </.form>
+        
+        </div>
+      <% else %>
         <.form
           for={:room_file}
           id="room-file-form"
@@ -319,52 +552,104 @@
           phx-submit="room-file-submit"
           phx-drop-target={@uploads.room_file.ref}
         >
-            <%= live_file_input @uploads.room_file, style: "display: none" %>
-            <input type="button" value="Upload File" onclick="event.target.parentNode.querySelector('input[type=file]').click()" >
-
-          <%= for entry <- @uploads.room_file.entries do %>
-            <%= if entry.progress > 0 and entry.progress < 100 do %>
-              <progress value={entry.progress} max="100"> <%= entry.progress %>% </progress>
-            <% end %>
-
-            <%= for err <- upload_errors(@uploads.room_file, entry) do %>
-              <p class="alert alert-danger"><%= err %></p>
-            <% end %>
-          <% end %>
-        </.form>
-      </div>
-      <div class="text-right row">
+          <%= live_file_input @uploads.room_file, style: "display: none"  %>
+        </.form>      
         <.form
           for={:room_image}
           id="room-image-form"
-          class="column column-50 column-offset-50"
+          class="basis-[1%]"
           phx-change="room-image-submit"
           phx-submit="room-image-submit"
           phx-drop-target={@uploads.room_image.ref}
         >
-            <%= live_file_input @uploads.room_image, style: "display: none" %>
-            <input type="button" value="Upload Image" onclick="event.target.parentNode.querySelector('input[type=file]').click()" >
-
-          <%= for entry <- @uploads.room_image.entries do %>
-            <%= if entry.progress > 0 and entry.progress < 100 do %>
-              <progress value={entry.progress} max="100"> <%= entry.progress %>% </progress>
-            <% end %>
-
-            <%= for err <- upload_errors(@uploads.room_image, entry) do %>
-              <p class="alert alert-danger"><%= err %></p>
-            <% end %>
-          <% end %>
+          <%= live_file_input @uploads.room_image, style: "display: none" %>
         </.form>
-      </div>
- 
-    </div>
+
+        <button class="relative" id="attachFileBtn" phx-click={open_dropdown("attachFileDropdown") |> JS.dispatch("chat:set-dropdown-position", to: "#attachFileDropdown", detail: %{relativeElementId: "attachFileBtn"})}>
+          <svg class="w-7 h-7 mt-3 flex fill-white" >
+            <use href="/images/icons.svg#attach"></use>
+          </svg>
+          <.dropdown class="mr-5" id="attachFileDropdown"> 
+          <a class="dropdownItem" phx-click={JS.dispatch("click", to: "#room-file-form input[type=file]")}>
+            <svg class="w-4 h-4 fill-grayscale" >
+              <use href="/images/icons.svg#document"></use>
+            </svg>
+            <span>File</span>
+          </a>
+
+          <a class="dropdownItem" phx-click={JS.dispatch("click", to: "#room-image-form input[type=file]")}>
+            <svg class="w-4 h-4 fill-grayscale" >
+              <use href="/images/icons.svg#image"></use>
+            </svg>
+            <span>Image</span>
+          </a>
+        </.dropdown>
+        </button>
+        <.form
+          let={di}
+          for={:room}
+          id="room-form"
+          class="basis-[99%] flex items-center justify-between"
+          phx-change={JS.dispatch("chat:set-input-size", to: "#room-input")}
+          phx-submit={JS.push("room-message") |> JS.dispatch("chat:clear-value", to: "#room-input") |> JS.dispatch("chat:set-input-size", to: "#room-input")}  
+          onkeydown="
+            if (event.key == 'Enter' && event.shiftKey) {
+              document.getElementById('room-form-submit-button').click()
+            }
+          "
+        >
+          <%= textarea di, :text,
+            placeholder: "Enter message",
+            class: "w-full h-7 resize-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
+            id: "room-input",
+            spellcheck: "false",
+            autocomplete: "off"
+          %>
+          <button id="room-form-submit-button" type="submit">
+            <svg class="w-7 h-7 flex fill-purple" >
+              <use href="/images/icons.svg#send"></use>
+            </svg>
+          </button>
+        </.form>
+      <% end %> 
+    </div>  
+  <% end %>
+  <% end %>
+  </div>
+  </div>
   <% end %>
   <%= if @mode == :import_key_ring do %>
-    <div  align="center">
-      <p style="font-weight: bold; font-size: 500%"><%= @code %></p>
-      <a href={@url} target="_blank">
-        <img src={"data:image/svg+xml;base64, #{@encoded_qr_code}"} />
-      </a>
+    <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg"/>
+    <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg"/>
+
+    <div class="flex flex-col items-center justify-center w-screen h-screen">
+      <div class="container unauthenticated" >
+        <div class="flex justify-center">
+          <svg width="54" height="57" class="fill-white" >
+            <use href="/images/icons.svg#logo"></use>
+          </svg>
+        </div>
+        <div class="left-0 mt-10">
+          <a phx-click="login:import-keyring-close" class="flex items-center justify-start">
+            <svg width="16" height="16" class="fill-white/70" >
+              <use href="/images/icons.svg#arrowLeft"></use>
+            </svg>
+            <p class="ml-2 text-sm text-white/70">Back to Log In</p>
+          </a>
+          <h1 style="font-size: 28px; line-height: 34px;" class="mt-5 font-inter font-bold text-white">Login with QR code</h1>
+          <div>
+            <p class="mt-2.5 font-inter text-sm text-white/70">
+              Scan the QR code from device where you logged in and enter the code
+              <span class="font-bold text-white"><%= @code %></span>
+            </p>
+          </div>
+        </div>
+        <div class="mt-5 border rounded border-white/10 rounded-xl p-10" >
+          <a href={@url} target="_blank">
+            <img class="w-full" src={"data:image/svg+xml;base64, #{@encoded_qr_code}"} />
+          </a>
+        </div>
+      </div>     
     </div>
   <% end %>
   <%= if @mode == :export_key_ring do %>
@@ -440,53 +725,30 @@
   <% end %> 
   <%= if @mode == :logout do %> 
     <button class="button button-outline float-right" phx-click="logout-close">Back</button>
-    <%= if @step == :initial do %> 
-      <h2>Log Out & Back Up</h2>
-      <p>To get access again you will need the recovery keys:</p>
-      <button class="button" phx-click="logout-go-middle">Download the Keys</button>
-    <% end %> 
-    <%= if @step == :middle do %> 
-      <h2>Set Up Password</h2>
-      <p>To store the backup copy of the key securely, enter the encryption password for the file</p>
-      <.form
-        let={f}
-        for={@changeset}
-        id="logout-form"
-        phx-change="logout-check-password"
-        phx-submit="logout-download-with-password"
-        as="logout"
-      >
-      
-        <blockquote>
-          This password in not stored and can NOT be recovered
-        </blockquote>
-        <%= text_input f, :password, type: "password", placeholder: "Enter Password", phx_debounce: 700 %>
-        <%= error_tag f, :password %>
-        <%= text_input f, :password_confirmation, type: "password", placeholder: "Repeat Password", phx_debounce: 700 %>
-        <%= error_tag f, :password_confirmation %>
-        <p>At least 12 symbols</p>
-
-        <div>
-          <%= submit "Download", phx_disable_with: "Generating..." %>
-        </div>
-      </.form>
-      <button class="button button-outline" phx-click="logout-download-insecure">
-        Download without password 
-        <span style="color: red">insecure!</span>
-      </button>
-
-    <% end %> 
-    <%= if @step == :final do %> 
-      <h2>Success</h2>
-      <p>If you downloaded the the recovery key, you can log out now, it will erase all the browser data about BuckitUp.</p>
-      <button class="button" phx-click="logout-wipe">Exit</button>
-    <% end %> 
+ 
   <% end %> 
   <%= if @mode == :import_own_key_ring do %> 
-    <button class="button button-outline float-right" phx-click="login:import-own-keyring-close">Back</button>
+    <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg"/>
+    <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg"/>
+
+        <div class="flex flex-col items-center justify-center w-screen h-screen">
+      <div class="container unauthenticated" >
+        <div class="flex justify-center">
+          <svg width="54" height="57" class="fill-white" >
+            <use href="/images/icons.svg#logo"></use>
+          </svg>
+        </div>
+        <div class="left-0 mt-10">
+          <a phx-click="login:import-own-keyring-close" class="flex items-center justify-start">
+            <svg width="16" height="16" class="fill-white/70" >
+              <use href="/images/icons.svg#arrowLeft"></use>
+            </svg>
+            <p class="ml-2 text-sm text-white/70">Back to Log In</p>
+          </a>
+          <h1 style="font-size: 28px; line-height: 34px;" class="mt-5 font-inter font-bold text-white">Import the recovery keys</h1>
+          <p class="mt-2.5 font-inter text-sm text-white/70">Please, upload the key file and enter the password for decryption</p>
+        </div>
     <%= if @step == :initial do %>
-      <h2>Import the recovery keys</h2>
-      <p>Please, upload the key file and enter the password for decryption</p>
       <div class="row">
         <.form
           for={:my_keys_file}
@@ -497,7 +759,7 @@
           phx-drop-target={@uploads.my_keys_file.ref}
         >
             <%= live_file_input @uploads.my_keys_file, style: "display: none" %>
-            <input type="button" value="Upload Key File" onclick="event.target.parentNode.querySelector('input[type=file]').click()" >
+            <input style="background-color: rgb(36, 24, 36);" class="w-full h-11 mt-7 bg-transparent text-white py-2 px-4 border border-white/0 rounded-lg flex items-center justify-center" type="button" value="Upload Key File" onclick="event.target.parentNode.querySelector('input[type=file]').click()" >
 
           <%= for entry <- @uploads.my_keys_file.entries do %>
             <%= if entry.progress > 0 and entry.progress <= 100 do %>
@@ -512,30 +774,58 @@
       </div>
     <% end %>
     <%= if @step == :decrypt do %>
-      <h2>Import the recovery keys</h2>
-      <p>Please, upload the key file and enter the password for decryption</p>
-      <div class="row">
-        <%= @filename %> 
-        <button class="button button-outline float-right" phx-click="login:import-own-keyring-reupload">Delete</button>
+      <div class="w-full h-14 mt-7 bg-transparent text-white py-2 px-2.5 border border-white/50 rounded-lg flex flex-row items-center justify-between">
+        <div class="w-44 flex flex-row items-stretch justify-start" > 
+          <div class="border-white/0 bg-white/50 w-7 h-7 flex items-center justify-center" style="border-radius: 50%;">
+            <svg width="16" height="16" class="stroke-white fill-white/0">
+              <use href="/images/icons.svg#check"></use>
+            </svg>
+          </div>
+          <div class="ml-2" style="line-height: 12px;">
+            <p style="font-size: 14px;"><%= @filename %></p> 
+            <p class="text-xs text-white/50">uploaded</p>
+          </div>
+        </div>
+        <button class="w-20 h-9 p-1.5 flex items-center justify-between border rounded-lg bg-white/20 border-white/0 " phx-click="login:import-own-keyring-reupload">
+          <p style="font-size: 14px;">Delete</p>
+          <svg width="16" height="16" class="fill-white">
+            <use href="/images/icons.svg#delete"></use>
+          </svg>
+        </button>
       </div>
+      
       <.form
         let={f}
         for={:import_own_keyring_password}
         id="logout-import-own-keyring-password-form"
         phx-submit="login:import-own-keyring-decrypt"
+        class="mt-2.5"
       >
       
-        <%= text_input f, :password, type: "password", placeholder: "Enter Password", phx_debounce: 700 %>
+        <%= text_input f, :password, type: "password", placeholder: "Enter Password", phx_debounce: 700, class: "w-full  h-11 py-2.5 appearance-none block bg-transparent border border-white/50 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-0 focus:border-white" %>
         <%= if @show_invalid do %>
-          <div>Invalid password</div>
+          <div class="mt-2.5 p-2.5 w-full h-11 bg-transparent border border-white/0 rounded-lg text-white flex flex-row items-strech justify-between" style="background: #F45649;">
+            <div class="w-44 flex flex-row items-stretch justify-start" > 
+              <svg width="14" height="14" class="mt-1 fill-white">
+                <use class="w-full" href="/images/icons.svg#alert"></use>
+              </svg>
+              <p class="ml-1" style="font-size: 14px;">Password Incorrect</p> 
+            </div>
+            <button type="button" phx-click="login:import-own-keyring:drop-password-error">
+              <svg width="16" height="16" class="fill-white">
+                <use href="/images/icons.svg#close"></use>
+              </svg>
+            </button>
+          </div>
         <% end %> 
         <div>
-          <%= submit "Log In", phx_disable_with: "Checking..." %>
+          <%= submit "Log In", phx_disable_with: "Checking...", class: "w-full h-11 mt-7 bg-transparent text-white py-2 px-4 border border-white/0 rounded-lg flex items-center justify-center", style: "background-color: rgb(36, 24, 36);" %>
         </div>
       </.form>
     <% end %> 
+      </div>     
+    </div>
   <% end %>
 <% end %>
 <% end %>
-
 

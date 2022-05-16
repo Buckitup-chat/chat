@@ -5,9 +5,9 @@ defmodule ChatWeb.MainLive.Index do
   alias Phoenix.LiveView.JS
 
   alias Chat.Db
+  alias Chat.Rooms
   alias Chat.Files
   alias Chat.Memo
-  alias Chat.Rooms
   alias Chat.Utils.StorageId
   alias ChatWeb.MainLive.Page
 
@@ -50,6 +50,8 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> Page.Login.create_user(name)
     |> Page.Lobby.init()
+    |> Page.Dialog.init()
+    |> Page.Logout.init()
     |> noreply()
   end
 
@@ -65,6 +67,8 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> Page.Login.load_user(data)
     |> Page.Lobby.init()
+    |> Page.Dialog.init()
+    |> Page.Logout.init()
     |> noreply()
   end
 
@@ -102,24 +106,69 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("login:import-own-keyring-close", _, socket) do
+  def handle_event("login:import-own-keyring:drop-password-error", _, socket) do
+    socket
+    |> Page.ImportOwnKeyRing.drop_error()
+    |> noreply()
+  end
+
+  def handle_event("login:import-keyring-close", _, socket) do
     socket
     |> Page.ImportKeyRing.close()
     |> assign(:need_login, true)
     |> noreply()
   end
 
-  def handle_event("open-dialog", %{"user-id" => user_id}, socket) do
+  def handle_event("login:import-own-keyring-close", _, socket) do
     socket
-    |> Page.Lobby.close()
+    |> Page.ImportOwnKeyRing.close()
+    |> assign(:need_login, true)
+    |> noreply()
+  end
+
+  def handle_event("switch-lobby-mode:rooms", _, socket) do
+    socket
+    |> Page.Dialog.close()
+    |> Page.Lobby.switch_lobby_mode(:rooms)
+    |> Page.Room.init()
+    |> noreply()
+  end
+
+  def handle_event("switch-lobby-mode:chats", _, socket) do
+    socket
+    |> Page.Lobby.switch_lobby_mode(:chats)
+    |> Page.Dialog.init()
+    |> noreply()
+  end
+
+  def handle_event("switch-dialog", %{"user-id" => user_id}, socket) do
+    socket
+    |> Page.Dialog.close()
     |> Page.Dialog.init(user_id)
     |> noreply()
   end
 
-  def handle_event("dialog-message", %{"dialog" => %{"text" => text}}, socket) do
+  def handle_event("chat:load-more", _, %{assigns: %{dialog: %{}}} = socket) do
     socket
-    |> Page.Dialog.send_text(text)
+    |> Page.Dialog.load_more_messages()
     |> noreply()
+  end
+
+  def handle_event("chat:load-more", _, %{assigns: %{room: %{}}} = socket) do
+    socket
+    |> Page.Room.load_more_messages()
+    |> noreply()
+  end
+
+  def handle_event("dialog-message", %{"dialog" => %{"text" => text}}, socket) do
+    if String.trim(text) == "" do
+      socket
+      |> noreply()
+    else
+      socket
+      |> Page.Dialog.send_text(text)
+      |> noreply()
+    end
   end
 
   def handle_event("dialog-image-change", _, socket), do: socket |> noreply()
@@ -145,7 +194,11 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("dialog/delete-message", %{"id" => id, "timestamp" => time}, socket) do
+  def handle_event(
+        "delete-message",
+        %{"id" => id, "timestamp" => time, "type" => "dialog"},
+        socket
+      ) do
     socket
     |> Page.Dialog.delete_message({time |> String.to_integer(), id})
     |> noreply()
@@ -164,9 +217,9 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("open-room", %{"room" => hash}, socket) do
+  def handle_event("switch-room", %{"room" => hash}, socket) do
     socket
-    |> Page.Lobby.close()
+    |> Page.Room.close()
     |> Page.Room.init(hash)
     |> noreply()
   end
@@ -178,9 +231,14 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   def handle_event("room-message", %{"room" => %{"text" => text}}, socket) do
-    socket
-    |> Page.Room.send_text(text)
-    |> noreply()
+    if String.trim(text) == "" do
+      socket
+      |> noreply()
+    else
+      socket
+      |> Page.Room.send_text(text)
+      |> noreply()
+    end
   end
 
   def handle_event("room/cancel-edit", _, socket) do
@@ -201,7 +259,7 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("room/delete-message", %{"id" => id, "timestamp" => time}, socket) do
+  def handle_event("delete-message", %{"id" => id, "timestamp" => time, "type" => "room"}, socket) do
     socket
     |> Page.Room.delete_message({time |> String.to_integer(), id})
     |> noreply()
@@ -209,13 +267,6 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_event("room-image-submit", _, socket), do: socket |> noreply()
   def handle_event("room-file-submit", _, socket), do: socket |> noreply()
-
-  def handle_event("close-room", _, socket) do
-    socket
-    |> Page.Room.close()
-    |> Page.Lobby.init()
-    |> noreply()
-  end
 
   def handle_event("export-keys", %{"export_key_ring" => %{"code" => code}}, socket) do
     socket
@@ -253,14 +304,13 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_event("close-data-restore", _, socket) do
     socket
-    |> assign(:mode, :user_list)
+    |> assign(:mode, :lobby)
     |> noreply()
   end
 
   def handle_event("logout-open", _, socket) do
     socket
-    |> Page.Lobby.close()
-    |> Page.Logout.init()
+    |> Page.Logout.open()
     |> noreply()
   end
 
@@ -270,9 +320,21 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("logout:toggle-password-visibility", _, socket) do
+    socket
+    |> Page.Logout.toggle_password_visibility()
+    |> noreply()
+  end
+
+  def handle_event("logout:toggle-password-confirmation-visibility", _, socket) do
+    socket
+    |> Page.Logout.toggle_password_confirmation_visibility()
+    |> noreply()
+  end
+
   def handle_event("logout-download-insecure", _, socket) do
     socket
-    |> Page.Logout.generate_backup("")
+    ## |> Page.Logout.generate_backup("")
     |> Page.Logout.go_final()
     |> noreply()
   end
@@ -303,7 +365,6 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("logout-close", _, socket) do
     socket
     |> Page.Logout.close()
-    |> Page.Lobby.init()
     |> noreply()
   end
 
@@ -316,7 +377,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_info({:updated_dialog_message, msg_id}, socket) do
     socket
-    |> Page.Dialog.update_message(msg_id, &message/1)
+    |> Page.Dialog.update_message(msg_id, &message_text/1)
     |> noreply()
   end
 
@@ -346,7 +407,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_info({:room, {:updated_message, msg_id}}, socket) do
     socket
-    |> Page.Room.update_message(msg_id, &room_message/1)
+    |> Page.Room.update_message(msg_id, &message_text/1)
     |> noreply()
   end
 
@@ -428,13 +489,23 @@ defmodule ChatWeb.MainLive.Index do
     socket |> noreply()
   end
 
-  def message(%{msg: %{type: :text}} = assigns) do
+  def message(%{msg: %{type: type}} = assigns) when type in [:text, :memo] do
     ~H"""
-        <span title={@msg.timestamp |> DateTime.from_unix!()}><%= @msg.content %></span>
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+      <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
+      <span class="x-content"><.message_text msg={@msg} /></span>
+      <.message_timestamp msg={@msg} />
+    </div>  
     """
   end
 
-  def message(%{msg: %{type: :memo, content: json}} = assigns) do
+  defp message_text(%{msg: %{type: :text, content: content}} = assigns) do
+    ~H"""
+    <span class="w-full px-2 flex justify-start break-all whitespace-pre-wrap"><%= @msg.content %></span>
+    """
+  end
+
+  defp message_text(%{msg: %{type: :memo, content: json}} = assigns) do
     memo =
       json
       |> StorageId.from_json()
@@ -443,7 +514,7 @@ defmodule ChatWeb.MainLive.Index do
     assigns = assigns |> Map.put(:memo, memo)
 
     ~H"""
-        <span title={@msg.timestamp |> DateTime.from_unix!()}><%= @memo %></span>
+    <span class="w-full px-2 flex justify-start break-all whitespace-pre-wrap"><%= @memo %></span>
     """
   end
 
@@ -455,16 +526,25 @@ defmodule ChatWeb.MainLive.Index do
       |> Map.put(:url, "/get/image/#{id}?a=#{secret |> Base.url_encode64()}")
 
     ~H"""
-        <img 
-          title={@msg.timestamp |> DateTime.from_unix!()}
-          class="preview"
-          src={@url}
-          phx-click={JS.dispatch("chat:toggle", detail: %{class: "preview"})}
-        />
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+      <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
+      <.message_timestamp msg={@msg} />
+      <.message_image url={@url} /> 
+    </div>  
     """
   end
 
-  def message(%{msg: %{type: :file, content: json}} = assigns) do
+  def message(%{msg: %{type: :file}} = assigns) do
+    ~H"""
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+      <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
+      <.message_file msg={@msg} />
+      <.message_timestamp msg={@msg} />
+    </div>  
+    """
+  end
+
+  defp message_file(%{msg: %{type: :file, content: json}} = assigns) do
     {id, secret} = json |> StorageId.from_json()
     [_, _, name, size] = Files.get(id, secret)
 
@@ -475,89 +555,99 @@ defmodule ChatWeb.MainLive.Index do
       |> Map.put(:size, size)
 
     ~H"""
-        <div title={@msg.timestamp |> DateTime.from_unix!()}
-          style="margin: 1em"
-        >
-          file: 
-          <a href={@url}><%= @name %></a>
-          (<%= @size %>)
-        </div>
+    <div class="flex items-center justify-center">
+      <svg class="w-14 h-14 flex fill-black/50">
+        <use href="/images/icons.svg#document"></use>
+      </svg>
+      <div class="w-48 flex flex-col pr-3">
+        <span class="truncate text-xs" href={@url}><%= @name %></span>
+        <span class="text-xs text-black/50 whitespace-pre-line"><%= @size %></span>
+      </div>
+    </div>  
     """
   end
 
-  def room_message(%{msg: %{type: :text, author_hash: hash}, my_id: my_id} = assigns) do
-    %{name: name} = Chat.User.by_id(hash)
-
+  defp message_header(assigns) do
     ~H"""
-        <span title={@msg.timestamp |> DateTime.from_unix!()}>
-        <%= unless hash == my_id do %>
-          <i><%= name %></i>:
-        <% end %>
-        <%= @msg.content %>
-        </span>
+    <div id={"message-header-#{@msg.id}"} class="py-1 px-2 flex items-center justify-between relative">
+      <div class="flex flex-row">
+        <div class="text-sm text-grayscale600">[<%= short_hash(@author.hash) %>]</div>
+        <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
+      </div>
+      <button phx-click={open_dropdown("messageActionsDropdown-#{@msg.id}") 
+                         |> JS.dispatch("chat:set-dropdown-position", to: "#messageActionsDropdown-#{@msg.id}", detail: %{relativeElementId: "message-#{@msg.id}"})}
+      >
+        <svg class="w-4 h-4 flex fill-purple">
+          <use href="/images/icons.svg#menu"></use>
+        </svg>
+      </button>
+      <.dropdown id={"messageActionsDropdown-#{@msg.id}"} >
+        <%= if @is_mine do %>
+          <%= if @msg.type in [:text, :memo] do %>
+            <a class="dropdownItem"
+              phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{message_of(@msg)}/edit-message")} 
+              phx-value-id={@msg.id} 
+              phx-value-timestamp={@msg.timestamp}
+            > 
+              <svg class="w-4 h-4 flex fill-black">
+                <use href="/images/icons.svg#edit"></use>
+              </svg>
+              <span>Edit</span>
+            </a>
+          <% end %> 
+          <a class="dropdownItem"
+            phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") 
+                       |> show_modal("delete-message-popup")
+                       |> JS.set_attribute({"phx-value-id", @msg.id}, to: "#delete-message-popup .deleteMessageButton") 
+                       |> JS.set_attribute({"phx-value-timestamp", @msg.timestamp}, to: "#delete-message-popup .deleteMessageButton")
+                       |> JS.set_attribute({"phx-value-type", message_of(@msg)}, to: "#delete-message-popup .deleteMessageButton")
+                      }
+            phx-value-id={@msg.id}
+            phx-value-timestamp={@msg.timestamp}
+            phx-value-type="dialog-message"
+          > 
+            <svg class="w-4 h-4 flex fill-black">
+              <use href="/images/icons.svg#delete"></use>
+            </svg>
+            <span>Delete</span>
+          </a>
+        <% end %> 
+        <a phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")} class="dropdownItem"> 
+          <svg class="w-4 h-4 flex fill-black">
+            <use href="/images/icons.svg#share"></use>
+          </svg>
+          <span>Share</span>
+        </a>
+        <a phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")} class="dropdownItem"> 
+          <svg class="w-4 h-4 flex fill-black">
+            <use href="/images/icons.svg#download"></use>
+          </svg>
+          <span>Download</span>
+        </a>
+      </.dropdown>
+    </div>
     """
   end
 
-  def room_message(
-        %{msg: %{type: :memo, author_hash: hash, content: json}, my_id: my_id} = assigns
-      ) do
-    %{name: name} = Chat.User.by_id(hash)
-
-    memo =
-      json
-      |> StorageId.from_json()
-      |> Memo.get()
-
+  defp message_image(assigns) do
     ~H"""
-        <span title={@msg.timestamp |> DateTime.from_unix!()} style="word-wrap: break-word;">
-        <%= unless hash == my_id do %>
-          <i><%= name %></i>:
-        <% end %>
-        <%= memo %>
-        </span>
+    <img class="max-w-sm" src={@url} phx-click={JS.dispatch("chat:toggle", detail: %{class: "preview"})}
+    />
     """
   end
 
-  def room_message(
-        %{msg: %{type: :image, content: json, author_hash: hash}, my_id: my_id} = assigns
-      ) do
-    {id, secret} = json |> StorageId.from_json()
-    url = "/get/image/#{id}?a=#{secret |> Base.url_encode64()}"
-    %{name: name} = Chat.User.by_id(hash)
-
+  defp message_timestamp(assigns) do
     ~H"""
-        <%= unless hash == my_id do %>
-          <i><%= name %></i>:
-        <% end %>
-        <img 
-          title={@msg.timestamp |> DateTime.from_unix!()}
-          class="preview"
-          src={url}
-          phx-click={JS.dispatch("chat:toggle", detail: %{class: "preview"})}
-        />
+    <div class="px-2 text-grayscale600 flex justify-end mr-1" style="font-size: 10px;">
+      <%= @msg.timestamp |> DateTime.from_unix!() |> Timex.format!("{h12}:{0m} {AM}, {D}.{M}.{YYYY}") %>
+    </div>
     """
   end
 
-  def room_message(
-        %{msg: %{type: :file, content: json, author_hash: hash}, my_id: my_id} = assigns
-      ) do
-    {id, secret} = json |> StorageId.from_json()
-    [_, _, file_name, size] = Files.get(id, secret)
-    url = "/get/file/#{id}?a=#{secret |> Base.url_encode64()}"
+  defp message_of(%{author_hash: _}), do: "room"
+  defp message_of(_), do: "dialog"
 
-    %{name: name} = Chat.User.by_id(hash)
-
-    ~H"""
-      <span title={@msg.timestamp |> DateTime.from_unix!()} >
-        <%= unless hash == my_id do %>
-          <i><%= name %></i>:
-        <% end %>
-        file: 
-        <a href={url}><%= file_name %></a>
-        (<%= size %>)
-      </span>
-    """
-  end
+  defp short_hash(hash), do: hash |> String.split_at(-6) |> elem(1)
 
   defp allow_image_upload(socket, type) do
     socket

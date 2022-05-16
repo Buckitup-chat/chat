@@ -1,17 +1,94 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
 /* This file is for your main application CSS */
-@import "./phoenix.css";
 
-
-.text-right {
-  text-align: right;
+html {
+  min-height: 100%;
+  background: radial-gradient(100% 270.84% at 100% 100%, #C56139 0%, #722F58 48.96%, #502461 81.47%, #162755 100%);
 }
 
-img.preview {
-  max-width: 200px;
+.vectorGroup {
+  mix-blend-mode: overlay;
+  position: fixed;
+  opacity: 0.4;
 }
 
-.hidden {
-  display: none;
+@media screen and (min-width: 480px) {
+  .unauthenticated {
+    width: 355px;
+  } 
+
+  .topVectorGroup {
+    overflow: hidden;
+    width: 836px;
+    height: 657px;
+    right: -14%;
+    top: -40%;
+  }
+  
+  .bottomVectorGroup {
+    overflow: hidden;
+    width: 836px;
+    height: 657px;
+    left: -14%;
+    bottom: -40%;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .unauthenticated { 
+    width: 288px;
+  }
+
+  .topVectorGroup {
+    width: 357px;
+    height: 281px; 
+    right: -45%;
+    top: -3%;
+  }
+  
+  .bottomVectorGroup {
+    width: 357px;
+    height: 281px;
+    left: -45%;
+    bottom: -3%;
+  }
+}
+
+.sidebarIcon {
+  @apply flex flex-col items-center justify-center 
+}
+
+.roomsAndChatsBar {
+  @apply h-screen min-w-fit bg-white/90 overflow-hidden;
+}
+
+.dropdown {
+  @apply 
+  hidden 
+  absolute
+  right-0
+  z-20
+  w-32
+  bg-white
+  border
+  rounded-md
+  border-black/10
+  fade-in
+  flex
+  flex-col
+  overflow-auto
+  min-w-fit
+}
+
+.dropdownItem {
+  @apply w-full h-11 px-2 flex items-center justify-start cursor-pointer hover:bg-black/10 
+}
+
+.dropdownItem span {
+  @apply ml-2
 }
 
 /* Alerts and form errors used by phx.new */
@@ -66,7 +143,7 @@ img.preview {
 .phx-modal {
   opacity: 1!important;
   position: fixed;
-  z-index: 1;
+  z-index: 11;
   left: 0;
   top: 0;
   width: 100%;
@@ -76,11 +153,7 @@ img.preview {
 }
 
 .phx-modal-content {
-  background-color: #fefefe;
-  margin: 15vh auto;
-  padding: 20px;
-  border: 1px solid #888;
-  width: 80%;
+  @apply flex mx-auto mt-[15%];
 }
 
 .phx-modal-close {
@@ -131,3 +204,4 @@ img.preview {
   0% { opacity: 1; }
   100% { opacity: 0; }
 }
+

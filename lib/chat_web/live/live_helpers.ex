@@ -25,37 +25,88 @@ defmodule ChatWeb.LiveHelpers do
       </.modal>
   """
   def modal(assigns) do
-    assigns = assign_new(assigns, :return_to, fn -> nil end)
+    assigns = assign_new(assigns, :hide_event, fn -> assigns[:hide_event] end)
 
     ~H"""
-    <div id="modal" class="phx-modal fade-in" phx-remove={hide_modal()}>
+    <div id={@id} class="phx-modal fade-in" phx-remove={hide_modal(@id, @hide_event)} style="display: none;">
       <div
-        id="modal-content"
-        class="phx-modal-content fade-in-scale"
-        phx-click-away={JS.dispatch("click", to: "#close")}
-        phx-window-keydown={JS.dispatch("click", to: "#close")}
+        id={@id <> "-content"}
+        class={"phx-modal-content border-0 rounded-lg bg-white p-4 fade-in-scale flex flex-col #{@class}"}
+        phx-click-away={JS.dispatch("click", to: "#" <> @id <> "-close")}
+        phx-window-keydown={JS.dispatch("click", to: "#" <> @id <> "-close")}
         phx-key="escape"
-      >
-        <%= if @return_to do %>
-          <%= live_patch "✖",
-            to: @return_to,
-            id: "close",
-            class: "phx-modal-close",
-            phx_click: hide_modal()
-          %>
-        <% else %>
-         <a id="close" href="#" class="phx-modal-close" phx-click={hide_modal()}>✖</a>
-        <% end %>
-
+        style="display: none;"
+      >   
+        <a id={@id <> "-close"} href="#" class="phx-modal-close w-full flex flex-row justify-end" phx-click={hide_modal(@id, @hide_event)}>
+          <svg class="w-4 h-4 flex fill-grayscale">
+            <use href="/images/icons.svg#close"></use>
+          </svg>
+        </a>
+        
         <%= render_slot(@inner_block) %>
       </div>
     </div>
     """
   end
 
-  defp hide_modal(js \\ %JS{}) do
+  def show_modal(id), do: show_modal(%JS{}, id)
+
+  def show_modal(%JS{} = js, id) do
     js
-    |> JS.hide(to: "#modal", transition: "fade-out")
-    |> JS.hide(to: "#modal-content", transition: "fade-out-scale")
+    |> JS.show(to: "#" <> id)
+    |> JS.show(to: "#" <> id <> "-content")
   end
+
+  def hide_modal(id), do: hide_modal(id, nil, %JS{})
+
+  def hide_modal(id, event, js \\ %JS{}) do
+    js
+    |> JS.hide(transition: "fade-out", to: "#" <> id)
+    |> JS.hide(transition: "fade-out-scale", to: "#" <> id <> "-content")
+    |> push(event)
+  end
+
+  defp push(%JS{} = js, nil), do: js
+  defp push(%JS{} = js, event), do: JS.push(js, event)
+
+  def classes(%{} = optionals), do: classes([], optionals)
+  def classes(constants), do: classes(constants, %{})
+
+  def classes(nil, optionals), do: classes([], optionals)
+
+  def classes("" <> constant, optionals) do
+    classes([constant], optionals)
+  end
+
+  def classes(constants, optionals) do
+    [
+      constants,
+      optionals
+      |> Enum.filter(&elem(&1, 1))
+      |> Enum.map(&elem(&1, 0))
+    ]
+    |> Enum.concat()
+    |> Enum.join(" ")
+  end
+
+  def dropdown(assigns) do
+    ~H"""
+      <div
+        id={@id}
+        class="dropdown"
+        phx-click-away={JS.hide(transition: "fade-out", to: "#" <> @id)}
+        phx-window-keydown={JS.hide(transition: "fade-out", to: "#" <> @id)}
+        phx-key="escape"
+        style="display: none;"
+      >   
+        <%= render_slot(@inner_block) %>
+      </div>
+    """
+  end
+
+  def open_dropdown(id), do: JS.show(transition: "fade-in", to: "#" <> id)
+
+  def hide_dropdown(id), do: hide_dropdown(%JS{}, id)
+
+  def hide_dropdown(%JS{} = js, id), do: js |> JS.hide(transition: "fade-out", to: "#" <> id)
 end

@@ -194,7 +194,8 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("dialog/delete-message", %{"id" => id, "timestamp" => time}, socket) do
+  def handle_event("delete-message", %{"id" => id, "timestamp" => time, "type" => "dialog-message"}, socket) do
+    IO.inspect id
     socket
     |> Page.Dialog.delete_message({time |> String.to_integer(), id})
     |> noreply()
@@ -256,7 +257,8 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("room/delete-message", %{"id" => id, "timestamp" => time}, socket) do
+  def handle_event("delete-message", %{"id" => id, "timestamp" => time, "type" => "room-message"}, socket) do
+    IO.inspect id
     socket
     |> Page.Room.delete_message({time |> String.to_integer(), id})
     |> noreply()
@@ -598,7 +600,9 @@ defmodule ChatWeb.MainLive.Index do
             phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") 
                        |> show_modal("delete-message-popup")
                        |> JS.set_attribute({"phx-value-id", @msg.id}, to: "#delete-message-popup .deleteMessageButton") 
-                       |> JS.set_attribute({"phx-value-timestamp", @msg.timestamp}, to: "#delete-message-popup .deleteMessageButton")}
+                       |> JS.set_attribute({"phx-value-timestamp", @msg.timestamp}, to: "#delete-message-popup .deleteMessageButton")
+                       |> JS.set_attribute({"phx-value-type", message_type(@msg)}, to: "#delete-message-popup .deleteMessageButton")
+                      }
             phx-value-id={@msg.id}
             phx-value-timestamp={@msg.timestamp}
             phx-value-type="dialog-message"
@@ -640,6 +644,9 @@ defmodule ChatWeb.MainLive.Index do
     </div>
     """
   end
+
+  defp message_type(%{author_hash: _}), do: "room-message"
+  defp message_type(_), do: "dialog-message"
 
   defp short_hash(hash), do: hash |> String.split_at(-6) |> elem(1)
 

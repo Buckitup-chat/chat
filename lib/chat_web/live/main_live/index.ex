@@ -490,7 +490,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def message(%{msg: %{type: type}} = assigns) when type in [:text, :memo] do
     ~H"""
-    <div class={"#{@color} max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-md min-w-[180px] rounded-lg shadow-lg"}>
       <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
       <span class="x-content"><.message_text msg={@msg} /></span>
       <.message_timestamp msg={@msg} />
@@ -525,7 +525,7 @@ defmodule ChatWeb.MainLive.Index do
       |> Map.put(:url, "/get/image/#{id}?a=#{secret |> Base.url_encode64()}")
 
     ~H"""
-    <div class={"#{@color} max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-md min-w-[180px] rounded-lg shadow-lg"}>
       <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
       <.message_timestamp msg={@msg} />
       <.message_image url={@url} /> 
@@ -535,7 +535,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def message(%{msg: %{type: :file}} = assigns) do
     ~H"""
-    <div class={"#{@color} max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-md min-w-[180px] rounded-lg shadow-lg"}>
       <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
       <.message_file msg={@msg} />
       <.message_timestamp msg={@msg} />
@@ -568,13 +568,13 @@ defmodule ChatWeb.MainLive.Index do
 
   defp message_header(assigns) do
     ~H"""
-    <div id={"message-header-#{@msg.id}"} class="py-1 px-2 flex items-center justify-between">
+    <div id={"message-header-#{@msg.id}"} class="py-1 px-2 flex items-center justify-between relative">
       <div class="flex flex-row">
         <div class="text-sm text-grayscale600">[<%= short_hash(@author.hash) %>]</div>
         <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
       </div>
       <button phx-click={open_dropdown("messageActionsDropdown-#{@msg.id}") 
-                         |> JS.dispatch("chat:set-dropdown-position", to: "#messageActionsDropdown-#{@msg.id}", detail: %{relativeElementId: "dialog-message-#{@msg.id}"})}
+                         |> JS.dispatch("chat:set-dropdown-position", to: "#messageActionsDropdown-#{@msg.id}", detail: %{relativeElementId: "message-#{@msg.id}"})}
       >
         <svg class="w-4 h-4 flex fill-purple">
           <use href="/images/icons.svg#menu"></use>

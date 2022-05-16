@@ -107,7 +107,7 @@ defmodule ChatWeb.LiveHelpers do
   def open_dropdown(id), 
     do: 
       JS.show(transition: "fade-in", to: "#" <> id)
-      |> JS.add_class("z-10", to: "#" <> id)
+      #|> JS.add_class("z-10", to: "#" <> id)
 
   def hide_dropdown(id), do: hide_dropdown(%JS{}, id)
 

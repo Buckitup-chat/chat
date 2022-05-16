@@ -56,9 +56,14 @@ const listeners = {
   },
   "chat:set-dropdown-position": (e) => {
     const relativeElementRect = document.getElementById(e.detail.relativeElementId).getBoundingClientRect();
-    console.log(relativeElementRect)
     
-    e.target.style.left = relativeElementRect.left + 'px';
+    if (relativeElementRect.bottom + 100 > window.innerHeight) {
+      e.target.style.bottom = 0;
+    } else {
+      e.target.style.top = 28 + 'px';
+    } 
+    
+    if (relativeElementRect.width < e.target.offsetWidth) { e.target.style.left = 0 }
   },
   "phx:chat:toggle": (e) => {
     if (e.detail && e.detail.class && e.detail.to) {

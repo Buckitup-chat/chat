@@ -405,7 +405,13 @@
         >
           <%= live_file_input @uploads.image, style: "display: none" %>
         </.form>
-        <.dropdown id="attachFileDropdown"> 
+
+
+        <button class="relative" id="attachFileBtn" phx-click={open_dropdown("attachFileDropdown") |> JS.dispatch("chat:set-dropdown-position", to: "#attachFileDropdown", detail: %{relativeElementId: "attachFileBtn"})}>
+          <svg class="w-7 h-7 mt-3 flex fill-white" >
+            <use href="/images/icons.svg#attach"></use>
+          </svg>
+          <.dropdown class="mr-5" id="attachFileDropdown"> 
           <a class="dropdownItem" phx-click={JS.dispatch("click", to: "#dialog-file-form input[type=file]")}>
             <svg class="w-4 h-4 fill-grayscale" >
               <use href="/images/icons.svg#document"></use>
@@ -420,11 +426,6 @@
             <span>Image</span>
           </a>
         </.dropdown>
-
-        <button id="attachFileBtn" phx-click={open_dropdown("attachFileDropdown") |> JS.dispatch("chat:set-dropdown-position", to: "#attachFileDropdown", detail: %{relativeElementId: "attachFileBtn"})}>
-          <svg class="w-7 h-7 mt-3 flex fill-white" >
-            <use href="/images/icons.svg#attach"></use>
-          </svg>
         </button>
         <.form
           let={di}

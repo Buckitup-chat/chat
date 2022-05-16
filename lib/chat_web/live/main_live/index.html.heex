@@ -234,7 +234,7 @@
         <% end %>
 
         <%= if @lobby_mode == :rooms do %>
-          <.modal id="create-room-popup" class="h-[25%] w-[416px]">
+        <.modal id="create-room-popup" class="h-[25%] w-[416px]">
         <h1 class="text-base font-bold text-grayscale">Create Room</h1>
         <.form
           let={f}
@@ -319,7 +319,7 @@
     <% end %>
   </div>
     
-<div class="w-full basis-[80%] flex flex-col items-stretch ">
+<div class="w-full basis-[80%] flex flex-col items-stretch">
   <%= if @lobby_mode == :chats do %>      
     <div class="basis-[93%] overflow-y-auto flex flex-col justify-between" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
     <div class="h-14 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start fixed">
@@ -345,13 +345,13 @@
         <% end %>
       </div>
     </div>
-    <div class="basis-[7%] px-8 border border-white bg-white flex items-center">
+    <div class="w-full basis-[7%] px-8 border border-white bg-white flex items-center">
       <%= if @edit_dialog do %>
-        <div class="w-full flex flex-col">
-          <div class="flex items- justify-between">
-            <div>
+        <div class="flex flex-col">
+          <div class="flex items-center justify-between">
+            <div class="w-full whitespace-nowrap overflow-hidden text-clip">
               <h1 class="text-purple">Editing</h1>
-              <span class="text-xs text-black/50 overflow-hidden">The quick, brown fox jumps over a lazy dog. DJs flock by when MTV ax quiz prog.</span>
+              <span class="text-xs text-black/50"><%= @edit_content %></span>
             </div>
             <button type="button" class="" phx-click="dialog/cancel-edit" >
               <svg class="w-7 h-7 flex fill-black/50" >

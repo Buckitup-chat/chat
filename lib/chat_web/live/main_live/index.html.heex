@@ -65,7 +65,7 @@
   </div>
 <% else %>
   <%= if @mode == :lobby do %>
-    <.modal id="logout-backup-popup" hide_event="logout-close" class="w-96 h-max">
+    <.modal id="logout-backup-popup" hide_event="logout-close" class="">
       <%= if @logout_step == :initial do %> 
         <h1 class="text-base font-bold text-grayscale">Log Out & Back Up</h1>
         <p class="mt-3 text-sm text-black/50">To get access again you will need the recovery keys:</p>
@@ -77,7 +77,7 @@
             </svg>
           </div>
         </button>
-        <button class="mt-3 w-full h-12 border rounded-lg border-black/10" >Log Out without Keys</button>
+        <button class="mt-3 w-full h-12 border rounded-lg border-black/10" phx-click="logout-wipe">Log Out without Keys</button>
         <button phx-click={hide_modal("logout-backup-popup")} class="mt-3 w-full h-12 border rounded-lg border-black/10" >Cancel</button>
     <% end %> 
     <%= if @logout_step == :middle do %>
@@ -152,7 +152,7 @@
       <button phx-click={hide_modal("logout-backup-popup")} class="mt-3 w-full h-12 border rounded-lg border-black/10">Cancel</button>
     <% end %> 
     </.modal>
-    <.modal id="delete-message-popup" hide_event="delete-message-popup:close" class="w-96 h-max">
+    <.modal id="delete-message-popup" class="">
       <h1 class="text-base font-bold text-grayscale">Delete Message</h1>
       <p class="mt-3 text-sm text-black/50">Are you sure you want to delete this message?</p>
       <div class="mt-5 flex items-center justify-between">
@@ -166,10 +166,38 @@
       </div>
     </.modal>
 
-    
+  <div class="w-screen h-screen flex flex-row">
+    <div id="navbarTop" class="navbarTop px-4">
+      <div class="sidebarIcon">
+        <svg width="25" height="23" >
+          <use href="/images/icons.svg#logo"></use>
+        </svg>
+      </div>
+      <button class="flex justify-between" phx-click={JS.push("logout-open") |> show_modal("logout-backup-popup")} class="sidebarIcon mb-1">
+        <svg class="w-4 h-4 hover:fill-purple">
+          <use href="/images/icons.svg#logout"></use>
+        </svg>
+        <span class="text-xs">Log out & Back Up</span>
+      </button>
+    </div>
+    <div id="navbarBottom" class="navbarBottom px-20">
+      <button phx-click="switch-lobby-mode:rooms" class="sidebarIcon">
+        <svg class={classes("w-6 h-6 hover:fill-purple", %{"fill-purple" => @lobby_mode == :rooms, "fill-grayscale" => @lobby_mode != :rooms})} >
+          <use  href="/images/icons.svg#sidebarRooms"></use>
+        </svg>
+        <span class="text-xs">Rooms</span>
+      </button>
 
-  <div class="w-screen h-screen flex flex-row items-stretch">
-    <div class="basis-[5%] h-screen flex flex-col justify-between bg-white">
+      <button phx-click="switch-lobby-mode:chats" class="sidebarIcon">
+        <svg class={classes("w-6 h-6 hover:fill-purple", %{"fill-purple" => @lobby_mode == :chats, "fill-grayscale" => @lobby_mode != :chats})} >
+          <use href="/images/icons.svg#sidebarChats"></use>
+        </svg>
+        <span class="text-xs">Chats</span>
+      </button>
+    </div>
+
+
+    <div class="navbar">
       <div class="flex flex-col items-center"> 
         <div class="sidebarIcon mt-3">
           <svg width="35" height="35" >
@@ -212,7 +240,7 @@
       </div>
     </div>
   </div>
-  <div class='roomsAndChatsBar w-72 min-w-fit  overflow-y-scroll'>
+  <div id="chatRoomBar" class='chatRoomBar'>
         <%= if @lobby_mode == :chats do %>
           <div class='px-7 mt-3 flex items-center justify-between'>
             <h5 class="text-grayscale" style="font-size: 22px;">Chats</h5>
@@ -220,21 +248,31 @@
           <div class="mt-10 w-full">
             <ul>
               <%= for user <- @users do %>
-                <li class={classes("w-full h-9 flex items-center hover:bg-stone250", %{"bg-stone250" => user == @peer})}>
-                  <a phx-click="switch-dialog" phx-value-user-id={user.hash}>
+                <li phx-click="switch-dialog" phx-value-user-id={user.hash} class={classes("hidden sm:flex w-full cursor-pointer h-9 flex items-center hover:bg-stone250", %{"bg-stone250" => user == @peer})}>
+                  <a>
                     <div class="flex flex-row px-7">
                       <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(user.hash) %>]</tt>
                       <div class="ml-1 text-sm"><%= user == Chat.Card.from_identity(@me) && "My notes" || user.name %></div>
                     </div>
                   </a>
                 </li>
+
+                <li phx-click={JS.push("switch-dialog") |> open_dialog()} phx-value-user-id={user.hash} class={classes("sm:hidden w-full cursor-pointer h-9 flex items-center hover:bg-stone250", %{"bg-stone250" => user == @peer})}>
+                  <a>
+                    <div class="flex flex-row px-7">
+                      <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(user.hash) %>]</tt>
+                      <div class="ml-1 text-sm"><%= user == Chat.Card.from_identity(@me) && "My notes" || user.name %></div>
+                    </div>
+                  </a>
+                </li>
+
               <% end %>
             </ul>
           </div>
         <% end %>
 
         <%= if @lobby_mode == :rooms do %>
-        <.modal id="create-room-popup" class="h-[25%] w-[416px]">
+        <.modal id="create-room-popup" class="">
         <h1 class="text-base font-bold text-grayscale">Create Room</h1>
         <.form
           let={f}
@@ -274,14 +312,23 @@
             <p class="text-base text-grayscale600 px-7">You have no rooms</p>
             <% else %>
               <%= for room <- @joined_rooms do %>
-              <li class={classes("w-full h-9 flex items-center cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
-                <a phx-click="switch-room" phx-value-room={room.hash}>
+              <li phx-click="switch-room" phx-value-room={room.hash} class={classes("hidden sm:flex w-full h-9 flex items-center cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
+                <a>
                   <div class="flex flex-row px-7">
                     <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
                     <div class="ml-1 text-sm"><%= room.name %></div>
                   </div>
                 </a>
               </li>
+
+              <li phx-click={JS.push("switch-room") |> open_room()} phx-value-room={room.hash} class={classes("sm:hidden w-full h-9 flex items-center cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
+                <a>
+                  <div class="flex flex-row px-7">
+                    <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
+                    <div class="ml-1 text-sm"><%= room.name %></div>
+                  </div>
+                </a>
+              </li>              
               <% end %>  
             <% end %>  
           </ul>
@@ -319,10 +366,18 @@
     <% end %>
   </div>
     
-<div class="w-full basis-[80%] overflow-hidden flex flex-col">
-  <%= if @lobby_mode == :chats do %>      
+<div id="contentContainer" class="hidden sm:flex w-full overflow-hidden flex flex-col">
+  <%= if @lobby_mode == :chats do %>
+  <%= unless @dialog do %>
+
+  <% else %>
     <div class="basis-[93%] overflow-y-auto flex flex-col justify-between" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
     <div class="h-14 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start fixed">
+      <button phx-click={JS.push("close-dialog") |> close_dialog()} class="sm:hidden pr-3">
+        <svg class="w-6 h-6 fill-white">
+          <use href="/images/icons.svg#arrowBack"></use>
+        </svg>
+      </button>
       <div class="text-base text-white/60">[<%= short_hash(@peer.hash) %>]</div>
       <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>
       <button>
@@ -332,11 +387,11 @@
       </button>
     </div>
       <div></div>
-      <div class="px-8 mt-16 backdrop-opacity-25" id="dialog-messages" phx-update={@message_update_mode}>
+      <div class="px-2 sm:px-8 mt-16 backdrop-opacity-25" id="dialog-messages" phx-update={@message_update_mode}>
         <%= for msg <- @messages do %>
           <div class={classes("m-1 flex", %{"justify-end" => msg.is_mine?, "justify-start" => !msg.is_mine?})} id={"dialog-message-#{msg.id}"}>
               <.message 
-                color="bg-purple50" 
+                color={msg.is_mine? && "bg-purple50" || "bg-white"}
                 msg={msg} 
                 author={msg.is_mine? && Chat.Card.from_identity(@me) || @peer}
                 is_mine={msg.is_mine?}  
@@ -348,7 +403,7 @@
     <div class="w-full basis-[7%] px-8 border border-white bg-white flex items-center">
       <%= if @edit_dialog do %>
         <div class="w-full flex flex-col ">
-          <div class="flex items-center justify-between pb-2">
+          <div class="flex items-center justify-between pb-2 mt-2">
             <div class="w-[95%]">
               <h1 class="text-purple">Editing</h1>
               <span class="truncate block text-xs text-black/50"><%= @edit_content %></span>
@@ -457,7 +512,8 @@
           </button>
         </.form>
       <% end %> 
-    </div>  
+    </div>
+    <% end %>
   <% end %>
   <%= if @lobby_mode == :rooms do %>
     <%= unless @room do %>
@@ -475,22 +531,27 @@
       <div class="basis-[93%] overflow-scroll flex flex-col justify-between" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
         <div class="h-14 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between fixed" >
           <div class="flex flex-row items-center">
+            <button phx-click={JS.push("close-room") |> close_room()} class="sm:hidden pr-3">
+              <svg class="w-6 h-6 fill-white">
+                <use href="/images/icons.svg#arrowBack"></use>
+              </svg>
+            </button>
             <div class="text-base text-white/60">[<%= short_hash(@room.admin_hash) %>]</div>
             <h1 class="ml-1 text-base font-bolt text-white" ><%= @room.name %></h1>
           </div>
-          <button>
-            <svg class="w-4 h-4 ml-1 z-20 fill-black" >
+          <button class="flex items-center">
+            <svg class="w-4 h-4 mr-1 z-20 fill-white" >
               <use href="/images/icons.svg#share"></use>
             </svg>
             <span class="text-base text-white"> Invite</span>
           </button>
         </div>
         <div></div>
-        <div class="mt-16 px-8 w-full " id="room-messages" phx-update={@message_update_mode}>
+        <div class="mt-16 px-2 sm:px-8  w-full " id="room-messages" phx-update={@message_update_mode}>
             <%= for msg <- @messages do %>
               <div class={classes("m-1 flex", %{"justify-end" => msg.author_hash == @my_id, "justify-start" => msg.author_hash != @my_id})} id={"room-message-#{msg.id}"}>
                 <.message 
-                  color={msg.author_hash == @my_id && "bg-white" || "bg-purple50"}
+                  color={msg.author_hash == @my_id && "bg-purple50" || "bg-white" }
                   msg={msg} 
                   author={Chat.User.by_id(msg.author_hash)}
                   is_mine={msg.author_hash == @my_id}  
@@ -503,7 +564,7 @@
        <div class="basis-[7%] px-8 border border-white bg-white flex flex-row items-center">
         <%= if @edit_room do %>
         <div class="w-full flex flex-col ">
-          <div class="flex items-center justify-between pb-2">
+          <div class="flex items-center justify-between pb-2 mt-2">
             <div class="w-[95%]">
               <h1 class="text-purple">Editing</h1>
               <span class="truncate block text-xs text-black/50"><%= @edit_content %></span>

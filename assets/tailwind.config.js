@@ -8,6 +8,9 @@ module.exports = {
   ],
   theme: {
     extend: {
+      maxWidth: {
+        'xxs': '215px'
+      },
       colors: {
         current: 'white',
         grayscale: '#241824',

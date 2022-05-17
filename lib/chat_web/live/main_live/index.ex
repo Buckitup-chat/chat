@@ -207,7 +207,12 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("close-dialog", _, socket) do
     socket
     |> Page.Dialog.close()
-    |> Page.Lobby.init()
+    |> noreply()
+  end
+
+  def handle_event("close-room", _, socket) do
+    socket
+    |> Page.Room.close()
     |> noreply()
   end
 
@@ -334,7 +339,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_event("logout-download-insecure", _, socket) do
     socket
-    ## |> Page.Logout.generate_backup("")
+    |> Page.Logout.generate_backup("")
     |> Page.Logout.go_final()
     |> noreply()
   end
@@ -491,7 +496,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def message(%{msg: %{type: type}} = assigns) when type in [:text, :memo] do
     ~H"""
-    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
       <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
       <span class="x-content"><.message_text msg={@msg} /></span>
       <.message_timestamp msg={@msg} />
@@ -526,7 +531,7 @@ defmodule ChatWeb.MainLive.Index do
       |> Map.put(:url, "/get/image/#{id}?a=#{secret |> Base.url_encode64()}")
 
     ~H"""
-    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
       <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
       <.message_timestamp msg={@msg} />
       <.message_image url={@url} /> 
@@ -536,7 +541,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def message(%{msg: %{type: :file}} = assigns) do
     ~H"""
-    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
       <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
       <.message_file msg={@msg} />
       <.message_timestamp msg={@msg} />
@@ -555,11 +560,11 @@ defmodule ChatWeb.MainLive.Index do
       |> Map.put(:size, size)
 
     ~H"""
-    <div class="flex items-center justify-center">
+    <div class="flex items-center justify-between">
       <svg class="w-14 h-14 flex fill-black/50">
         <use href="/images/icons.svg#document"></use>
       </svg>
-      <div class="w-48 flex flex-col pr-3">
+      <div class="w-36 flex flex-col pr-3">
         <span class="truncate text-xs" href={@url}><%= @name %></span>
         <span class="text-xs text-black/50 whitespace-pre-line"><%= @size %></span>
       </div>
@@ -631,7 +636,7 @@ defmodule ChatWeb.MainLive.Index do
 
   defp message_image(assigns) do
     ~H"""
-    <img class="max-w-sm" src={@url} phx-click={JS.dispatch("chat:toggle", detail: %{class: "preview"})}
+    <img class=" object-cover overflow-hidden" src={@url} phx-click={JS.dispatch("chat:toggle", detail: %{class: "preview"})}
     />
     """
   end
@@ -643,6 +648,30 @@ defmodule ChatWeb.MainLive.Index do
     </div>
     """
   end
+
+  defp open_dialog(%JS{} = js, time \\ 100) do
+    js
+    |> JS.hide(transition: "fade-out", to: "#navbarTop", time: 0)
+    |> JS.hide(transition: "fade-out", to: "#navbarBottom", time: 0)
+    |> JS.remove_class("hidden sm:flex",
+      transition: "fade-in",
+      to: "#contentContainer",
+      time: time
+    )
+    |> JS.add_class("hidden", to: "#chatRoomBar", transition: "fade-out", time: 0)
+  end
+
+  defp close_dialog(%JS{} = js, time \\ 100) do
+    js
+    |> JS.show(transition: "fade-in", to: "#navbarTop", display: "flex", time: time)
+    |> JS.show(transition: "fade-in", to: "#navbarBottom", display: "flex", time: time)
+    |> JS.add_class("hidden sm:flex", transition: "fade-out", to: "#contentContainer", time: 0)
+    |> JS.remove_class("hidden", to: "#chatRoomBar", transition: "fade-in", time: time)
+  end
+
+  defp open_room(%JS{} = js), do: open_dialog(js)
+
+  defp close_room(%JS{} = js), do: close_dialog(js)
 
   defp message_of(%{author_hash: _}), do: "room"
   defp message_of(_), do: "dialog"

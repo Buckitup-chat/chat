@@ -13,7 +13,11 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
   @per_page 15
 
-  def init(%{assigns: %{my_id: my_id}} = socket), do: init(socket, my_id)
+  def init(%{assigns: %{}} = socket) do
+    socket
+    |> assign(:dialog, nil)
+    |> assign(:peer, nil)
+  end
 
   def init(%{assigns: %{me: me}} = socket, user_id) do
     peer = User.by_id(user_id)
@@ -33,8 +37,6 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def load_more_messages(%{assigns: %{page: page}} = socket) do
-    IO.inspect("hh")
-
     socket
     |> assign(:page, page + 1)
     |> assign(:message_update_mode, :prepend)

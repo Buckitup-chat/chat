@@ -59,7 +59,9 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   def switch_lobby_mode(socket, mode) do
     socket
-    |> assign(:lobby_mode, mode)
+    |> close_current_mode()
+    |> assign(:lobby_mode, String.to_atom(mode))
+    |> init_new_mode()
   end
 
   def request_room(%{assigns: %{me: me}} = socket, room_hash) do
@@ -133,4 +135,17 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> Page.Login.store()
     |> assign_room_list()
   end
+
+  defp close_current_mode(%{assigns: %{lobby_mode: :chats}} = socket),
+    do: socket |> Page.Dialog.close()
+
+  defp close_current_mode(%{assigns: %{lobby_mode: :rooms}} = socket),
+    do: socket |> Page.Room.close()
+
+  defp close_current_mode(%{assigns: %{lobby_mode: :feeds}} = socket),
+    do: socket |> Page.Feed.close()
+
+  defp init_new_mode(%{assigns: %{lobby_mode: :chats}} = socket), do: socket |> Page.Dialog.init()
+  defp init_new_mode(%{assigns: %{lobby_mode: :rooms}} = socket), do: socket |> Page.Room.init()
+  defp init_new_mode(%{assigns: %{lobby_mode: :feeds}} = socket), do: socket |> Page.Feed.init()
 end

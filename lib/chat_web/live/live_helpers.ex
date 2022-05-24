@@ -38,9 +38,7 @@ defmodule ChatWeb.LiveHelpers do
         style="display: none;"
       >   
         <a id={@id <> "-close"} href="#" class="phx-modal-close w-full flex flex-row justify-end" phx-click={hide_modal(@id, @hide_event)}>
-          <svg class="w-4 h-4 flex fill-grayscale">
-            <use href="/images/icons.svg#close"></use>
-          </svg>
+          <.icon id="close" class="w-4 h-4 flex fill-grayscale"/>
         </a>
         
         <%= render_slot(@inner_block) %>
@@ -109,4 +107,12 @@ defmodule ChatWeb.LiveHelpers do
   def hide_dropdown(id), do: hide_dropdown(%JS{}, id)
 
   def hide_dropdown(%JS{} = js, id), do: js |> JS.hide(transition: "fade-out", to: "#" <> id)
+
+  def icon(assigns) do
+    ~H"""
+    <svg class={@class}>
+      <use href={"/images/icons.svg##{@id}"}></use>
+    </svg>
+    """
+  end
 end

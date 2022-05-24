@@ -57,12 +57,30 @@ html {
   }
 }
 
-.sidebarIcon {
-  @apply flex flex-col items-center justify-center 
+.contentContainer { @apply h-screen basis-[100%] }
+
+@media screen and (min-width: 640px) {
+  .navbar { @apply h-screen w-[70px] flex flex-none flex-col justify-between bg-white }
+
+  .navbarTop { @apply hidden }
+  .navbarBottom { @apply hidden }
+
+  .chatRoomBar { @apply h-screen w-[320px] flex-none min-w-fit bg-white/90 overflow-y-scroll  }
 }
 
-.roomsAndChatsBar {
-  @apply h-screen min-w-fit bg-white/90 overflow-hidden;
+@media screen and (max-width: 640px) {
+  .navbar { @apply hidden }
+
+  .navbarTop { @apply  w-screen h-12 flex items-center justify-between bg-white fixed top-0}
+  .navbarBottom { @apply  w-screen h-14 flex items-center justify-between bg-white fixed bottom-0 }
+
+  .chatRoomBar { @apply  h-screen w-screen py-20 bg-white/90 overflow-y-scroll }
+  
+}
+
+
+.sidebarIcon {
+  @apply flex flex-col items-center justify-center 
 }
 
 .dropdown {
@@ -153,7 +171,7 @@ html {
 }
 
 .phx-modal-content {
-  @apply flex mx-auto mt-[15%];
+  @apply flex mx-auto mt-[15%] w-screen sm:w-96 min-h-fit;
 }
 
 .phx-modal-close {

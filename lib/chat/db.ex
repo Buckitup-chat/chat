@@ -25,9 +25,18 @@ defmodule Chat.Db do
     {:reply, state, state}
   end
 
+  def handle_call({:swap, pid}, _from, old_pid) do
+    {:reply, old_pid, pid}
+  end
+
   def db do
     __MODULE__
     |> GenServer.call(:db)
+  end
+
+  def swap_pid(new_pid) do
+    __MODULE__
+    |> GenServer.call({:swap, new_pid})
   end
 
   def list(range, transform) do

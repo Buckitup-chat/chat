@@ -10,9 +10,8 @@ defmodule ChatWeb.MainLive.Page.Feed do
 
   def init(socket) do
     {list, till} = load_actions(@items_treshold)
-
+    
     socket
-    |> assign(:mode, :action_feed)
     |> assign(:action_feed_till, till)
     |> assign(:action_feed_list, list)
   end
@@ -32,19 +31,21 @@ defmodule ChatWeb.MainLive.Page.Feed do
   end
 
   def item(%{item: {timestamp, who, action}, tz: timezone} = assigns) do
-    [date, time] =
+    datetime =
       DateTime.from_unix!(timestamp)
       |> DateTime.shift_zone!(timezone)
-      |> Calendar.strftime("%Y-%m-%d %H:%M:%S")
-      |> String.split(" ")
+      |> Timex.format!("{h12}:{0m} {AM}, {D}.{M}.{YYYY}")
 
     user = User.by_id(who)
 
     ~H"""
-      <span style="color: #ccc" title={date}><%= time %></span> &nbsp; <%= user && user.name %> <.action action={action} />
+      <div class="border-0 rounded-md bg-white/20 p-2 flex flex-col justify-start" >
+        <span class="text-white"><%= user && user.name %> <.action action={action}/></span>
+        <div class="text-white/70" style="font-size: 10px;"><%= datetime %></div>
+      </div>
     """
   end
-
+  
   def action(%{action: {action, opts}} = assigns) do
     act = Chat.Log.humanize_action(action)
     to = opts[:to]
@@ -79,7 +80,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
 
   def action(%{action: action} = assigns) do
     act = Chat.Log.humanize_action(action)
-
+    
     ~H"""
       <%= act %>
     """

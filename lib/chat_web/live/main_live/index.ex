@@ -488,25 +488,6 @@ defmodule ChatWeb.MainLive.Index do
     """
   end
 
-  def message_text(%{msg: %{type: :text, content: content}} = assigns) do
-    ~H"""
-    <span class="w-full px-2 flex justify-start break-all whitespace-pre-wrap"><%= @msg.content %></span>
-    """
-  end
-
-  def message_text(%{msg: %{type: :memo, content: json}} = assigns) do
-    memo =
-      json
-      |> StorageId.from_json()
-      |> Memo.get()
-
-    assigns = assigns |> Map.put(:memo, memo)
-
-    ~H"""
-    <span class="w-full px-2 flex justify-start break-all whitespace-pre-wrap"><%= @memo %></span>
-    """
-  end
-
   def message(%{msg: %{type: :image, content: json}} = assigns) do
     {id, secret} = json |> StorageId.from_json()
 
@@ -530,6 +511,25 @@ defmodule ChatWeb.MainLive.Index do
       <.message_file msg={@msg} />
       <.message_timestamp msg={@msg} />
     </div>  
+    """
+  end
+
+  def message_text(%{msg: %{type: :text}} = assigns) do
+    ~H"""
+    <span class="w-full px-2 flex justify-start break-all whitespace-pre-wrap"><%= @msg.content %></span>
+    """
+  end
+
+  def message_text(%{msg: %{type: :memo, content: json}} = assigns) do
+    memo =
+      json
+      |> StorageId.from_json()
+      |> Memo.get()
+
+    assigns = assigns |> Map.put(:memo, memo)
+
+    ~H"""
+    <span class="w-full px-2 flex justify-start break-all whitespace-pre-wrap"><%= @memo %></span>
     """
   end
 

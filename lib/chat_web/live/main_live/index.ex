@@ -1,7 +1,7 @@
 defmodule ChatWeb.MainLive.Index do
   @moduledoc "Main Liveview"
   use ChatWeb, :live_view
-  
+
   alias Phoenix.LiveView.JS
 
   alias Chat.Db
@@ -10,7 +10,7 @@ defmodule ChatWeb.MainLive.Index do
   alias Chat.Memo
   alias Chat.Utils.StorageId
   alias ChatWeb.MainLive.Page
-  
+
   on_mount ChatWeb.Hooks.LocalTimeHook
 
   @impl true

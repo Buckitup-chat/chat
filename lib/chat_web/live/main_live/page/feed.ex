@@ -10,7 +10,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
 
   def init(socket) do
     {list, till} = load_actions(@items_treshold)
-    
+
     socket
     |> assign(:action_feed_till, till)
     |> assign(:action_feed_list, list)
@@ -45,7 +45,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
       </div>
     """
   end
-  
+
   def action(%{action: {action, opts}} = assigns) do
     act = Chat.Log.humanize_action(action)
     to = opts[:to]
@@ -80,7 +80,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
 
   def action(%{action: action} = assigns) do
     act = Chat.Log.humanize_action(action)
-    
+
     ~H"""
       <%= act %>
     """

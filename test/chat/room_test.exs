@@ -17,7 +17,7 @@ defmodule Chat.Rooms.RoomTest do
 
     assert %Rooms.Room{} = room
 
-    correct = ~s|#Chat.Rooms.Room<name: "#{room_name}", ...>|
+    correct = ~s|#Chat.Rooms.Room<name: "#{room_name}", type: :public, ...>|
 
     assert correct == inspect(room)
   end
@@ -66,6 +66,8 @@ defmodule Chat.Rooms.RoomTest do
     assert [{bob_hash, bob_key, :pending}] == room.requests
 
     assert room |> Rooms.Room.is_requested_by?(bob_hash)
+
+    room = room |> Rooms.Room.approve_requests(room_identity)
 
     room = room |> Rooms.Room.approve_requests(room_identity)
 

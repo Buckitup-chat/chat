@@ -4,19 +4,24 @@ defmodule Chat.Rooms.Room do
   alias Chat.Identity
   alias Chat.Utils
 
-  @derive {Inspect, only: [:name]}
-  defstruct [:admin_hash, :name, :pub_key, :requests]
+  @type room_type() :: :public | :request | :private
 
-  def create(%Identity{} = admin, %Identity{name: name} = room) do
+  @derive {Inspect, only: [:name, :type]}
+  defstruct [:admin_hash, :name, :pub_key, :requests, type: :public]
+
+  def create(%Identity{} = admin, %Identity{name: name} = room, type \\ :public) do
     admin_hash = admin |> Identity.pub_key() |> Utils.hash()
 
     %__MODULE__{
       admin_hash: admin_hash,
       name: name,
       pub_key: room |> Identity.pub_key(),
-      requests: []
+      requests: [],
+      type: type
     }
   end
+
+  def add_request(%__MODULE__{type: :private} = room, _), do: room
 
   def add_request(%__MODULE__{requests: requests} = room, %Identity{} = me) do
     key = me |> Identity.pub_key()
@@ -30,13 +35,12 @@ defmodule Chat.Rooms.Room do
     |> Enum.any?(fn {hash, _, _} -> hash == user_hash end)
   end
 
-  def approve_requests(%__MODULE__{requests: requests} = room, %Identity{} = room_identity) do
+  def approve_requests(
+        %__MODULE__{requests: requests, type: :public} = room,
+        %Identity{} = room_identity
+      ) do
     new_requests =
       requests
-      |> Enum.reject(fn
-        {_, _, :joined} -> true
-        {_, _, _} -> false
-      end)
       |> Enum.map(fn
         {hash, key, :pending} ->
           {blob, secret} =
@@ -54,6 +58,10 @@ defmodule Chat.Rooms.Room do
 
     %{room | requests: new_requests}
   end
+
+  def approve_requests(room, _), do: room
+
+  def join_approved_requests(%__MODULE__{type: :private} = room, _), do: {room, []}
 
   def join_approved_requests(%__MODULE__{requests: requests} = room, %Identity{} = me) do
     pub_key = me |> Identity.pub_key()

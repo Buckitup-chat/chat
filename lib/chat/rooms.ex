@@ -11,14 +11,14 @@ defmodule Chat.Rooms do
   alias Chat.Utils
 
   @doc "Returns new room Identity"
-  def add(me, name) do
+  def add(me, name, type \\ :public) do
     name
     |> Identity.create()
     |> tap(fn room_identity ->
-      Room.create(me, room_identity)
+      Room.create(me, room_identity, type)
       |> Registry.update()
 
-      me |> Log.create_room(room_identity)
+      me |> Log.create_room(room_identity, type)
     end)
   end
 
@@ -103,6 +103,8 @@ defmodule Chat.Rooms do
       joined_identities
     end)
   end
+
+  def is_requested_by?(nil, _), do: false
 
   def is_requested_by?(room_hash, person_hash) do
     room_hash

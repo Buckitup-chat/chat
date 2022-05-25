@@ -35,6 +35,8 @@ defmodule Chat.Rooms.Room do
     |> Enum.any?(fn {hash, _, _} -> hash == user_hash end)
   end
 
+  def is_requested_by?(_, _), do: false
+
   def approve_requests(
         %__MODULE__{requests: requests, type: :public} = room,
         %Identity{} = room_identity

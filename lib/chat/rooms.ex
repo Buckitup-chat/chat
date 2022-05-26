@@ -79,14 +79,20 @@ defmodule Chat.Rooms do
     |> update()
   end
 
-  def approve_requests(room_hash, room_identity) do
-    room = get(room_hash)
+  def approve_request(room_hash, user_hash, room_identity) do
+    if_room_found(room_hash, fn room ->
+      room
+      |> Room.approve_request(user_hash, room_identity)
+      |> update()
+    end)
+  end
 
-    if room do
+  def approve_requests(room_hash, room_identity) do
+    if_room_found(room_hash, fn room ->
       room
       |> Room.approve_requests(room_identity)
       |> update()
-    end
+    end)
   end
 
   def join_approved_requests(room_hash, person_identity) do
@@ -112,5 +118,19 @@ defmodule Chat.Rooms do
     |> Room.is_requested_by?(person_hash)
   end
 
+  def list_pending_requests(room_hash) do
+    if_room_found(room_hash, &Room.list_pending_requests/1, [])
+  end
+
   defdelegate update(room), to: Registry
+
+  defp if_room_found(hash, action, default \\ nil) do
+    room = get(hash)
+
+    if room do
+      room |> action.()
+    else
+      default
+    end
+  end
 end

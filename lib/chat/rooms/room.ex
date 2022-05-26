@@ -37,6 +37,30 @@ defmodule Chat.Rooms.Room do
 
   def is_requested_by?(_, _), do: false
 
+  def list_pending_requests(%__MODULE__{requests: requests, type: :request}) do
+    requests
+    |> Enum.map(fn
+      {hash, key, :pending} -> {hash, key}
+      {_, _, _} -> nil
+    end)
+    |> Enum.reject(&(&1 == nil))
+  end
+
+  def approve_request(
+        %__MODULE__{requests: requests, type: :request} = room,
+        user_hash,
+        %Identity{} = room_identity
+      ) do
+    new_requests =
+      requests
+      |> Enum.map(fn
+        {^user_hash, key, :pending} -> {user_hash, key, room_identity |> encrypt_identity(key)}
+        {_, _, _} = x -> x
+      end)
+
+    %{room | requests: new_requests}
+  end
+
   def approve_requests(
         %__MODULE__{requests: requests, type: :public} = room,
         %Identity{} = room_identity
@@ -44,18 +68,8 @@ defmodule Chat.Rooms.Room do
     new_requests =
       requests
       |> Enum.map(fn
-        {hash, key, :pending} ->
-          {blob, secret} =
-            room_identity
-            |> :erlang.term_to_binary()
-            |> Utils.encrypt_blob()
-
-          encrypted = {secret |> Utils.encrypt(key), blob}
-
-          {hash, key, encrypted}
-
-        {_, _, _} = x ->
-          x
+        {hash, key, :pending} -> {hash, key, room_identity |> encrypt_identity(key)}
+        {_, _, _} = x -> x
       end)
 
     %{room | requests: new_requests}
@@ -92,5 +106,14 @@ defmodule Chat.Rooms.Room do
       %{room | requests: new_requests},
       rooms
     }
+  end
+
+  defp encrypt_identity(room_identity, key) do
+    {blob, secret} =
+      room_identity
+      |> :erlang.term_to_binary()
+      |> Utils.encrypt_blob()
+
+    {secret |> Utils.encrypt(key), blob}
   end
 end

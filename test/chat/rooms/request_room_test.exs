@@ -1,6 +1,7 @@
 defmodule Chat.Rooms.RequestRoomTest do
   use ExUnit.Case, async: true
 
+  alias Chat.Identity
   alias Chat.Rooms
   alias Chat.User
   alias Chat.Utils
@@ -21,18 +22,56 @@ defmodule Chat.Rooms.RequestRoomTest do
   end
 
   test "requesting should work as for public" do
-    {_alice, identity, room} = "Alice" |> user_and_request_room()
+    {_alice, identity, _room} = "Alice" |> user_and_request_room()
     room_hash = identity |> Utils.hash()
     bob = "Bob" |> User.login()
+    bob_pub_key = bob |> Identity.pub_key()
+    bob_hash = bob |> Utils.hash()
+
+    Rooms.add_request(room_hash, bob)
+    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
+
+    Rooms.approve_requests(room_hash, identity)
+    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
+  end
+
+  test "should be approved individually by any room key holder" do
+    {_alice, identity, _room} = "Alice" |> user_and_request_room()
+    room_hash = identity |> Utils.hash()
+    bob = "Bob" |> User.login()
+    bob_pub_key = bob |> Identity.pub_key()
+    bob_hash = bob |> Utils.hash()
+
+    Rooms.add_request(room_hash, bob)
+    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
+
+    Rooms.approve_request(room_hash, bob_hash, identity)
+
+    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, _bob_room_key}]} =
+             Rooms.get(room_hash)
+
+    Rooms.approve_request(room_hash, bob_hash, identity)
+
+    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, _bob_room_key}]} =
+             Rooms.get(room_hash)
+
+    assert [^identity] = Rooms.join_approved_requests(room_hash, bob)
+  end
+
+  test "should show a list of pending user requests" do
+    {_alice, identity, _room} = "Alice" |> user_and_request_room()
+    room_hash = identity |> Utils.hash()
+    bob = "Bob" |> User.login()
+    bob_pub_key = bob |> Identity.pub_key()
+    bob_hash = bob |> Utils.hash()
 
     Rooms.add_request(room_hash, bob)
 
-    assert %Rooms.Room{requests: []} = Rooms.get(room_hash)
+    assert [{^bob_hash, ^bob_pub_key}] = Rooms.list_pending_requests(room_hash)
+    Rooms.approve_request(room_hash, bob_hash, identity)
+
+    assert [] = Rooms.list_pending_requests(room_hash)
   end
-
-  test "ahould be approved individually by any room key holder", do: :todo
-
-  test "what else ?", do: :todo
 
   defp user_and_request_room(name) do
     alice = User.login(name)

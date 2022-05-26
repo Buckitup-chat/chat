@@ -238,24 +238,6 @@ defmodule ChatWeb.MainLive.Index do
     end
   end
 
-  def handle_event("room/cancel-edit", _, socket) do
-    socket
-    |> Page.Room.cancel_edit()
-    |> noreply()
-  end
-
-  def handle_event("room/edited-message", %{"room_edit" => %{"text" => text}}, socket) do
-    socket
-    |> Page.Room.update_edited_message(text)
-    |> noreply()
-  end
-
-  def handle_event("room/edit-message", %{"id" => id, "timestamp" => time}, socket) do
-    socket
-    |> Page.Room.edit_message({time |> String.to_integer(), id})
-    |> noreply()
-  end
-
   def handle_event("delete-message", %{"id" => id, "timestamp" => time, "type" => "room"}, socket) do
     socket
     |> Page.Room.delete_message({time |> String.to_integer(), id})
@@ -357,6 +339,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("room/" <> event, params, socket) do
+    socket
+    |> Page.RoomRouter.event(event, params)
+    |> noreply()
+  end
+
   @impl true
   def handle_info({:new_dialog_message, glimpse}, socket) do
     socket
@@ -388,24 +376,6 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_info({:room, {:new_message, glimpse}}, socket) do
-    socket
-    |> Page.Room.show_new(glimpse)
-    |> noreply()
-  end
-
-  def handle_info({:room, {:updated_message, msg_id}}, socket) do
-    socket
-    |> Page.Room.update_message(msg_id, &message_text/1)
-    |> noreply()
-  end
-
-  def handle_info({:room, {:deleted_message, msg_id}}, socket) do
-    socket
-    |> push_event("chat:toggle", %{to: "#room-message-#{msg_id}", class: "hidden"})
-    |> noreply()
-  end
-
   def handle_info(:room_request, socket) do
     socket
     |> Page.Lobby.approve_requests()
@@ -426,6 +396,8 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Lobby.init()
     |> noreply()
   end
+
+  def handle_info({:room, msg}, socket), do: socket |> Page.RoomRouter.info(msg)
 
   def handle_progress(:image, %{done?: true}, socket) do
     socket

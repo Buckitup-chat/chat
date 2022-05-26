@@ -172,6 +172,11 @@ defmodule ChatWeb.MainLive.Page.Room do
     socket
   end
 
+  def render_deleted_message(socket, msg_id) do
+    socket
+    |> push_event("chat:toggle", %{to: "#room-message-#{msg_id}", class: "hidden"})
+  end
+
   def close(%{assigns: %{room: nil}} = socket), do: socket
 
   def close(%{assigns: %{room: room}} = socket) do

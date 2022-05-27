@@ -2,7 +2,9 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   @moduledoc "Dialog page"
   import ChatWeb.MainLive.Page.Shared
   import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entries: 3, push_event: 3]
+
   use Phoenix.Component
+
   alias Phoenix.PubSub
 
   alias Chat.Dialogs
@@ -10,6 +12,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.Memo
   alias Chat.User
   alias Chat.Utils.StorageId
+  alias ChatWeb.Router.Helpers, as: Routes
 
   @per_page 15
 
@@ -154,6 +157,35 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     broadcast_message_deleted(msg_id, dialog, me)
 
     socket
+  end
+
+  def download_message(
+        %{assigns: %{me: me, dialog: dialog}} = socket,
+        msg_id
+      ) do
+    dialog
+    |> Dialogs.read_message(msg_id, me)
+    |> case do
+      %{type: :file, content: json} ->
+        {file_id, secret} = json |> StorageId.from_json()
+
+        socket
+        |> push_event("chat:redirect", %{
+          url: Routes.file_url(socket, :file, file_id, a: secret |> Base.url_encode64())
+        })
+
+      %{type: :image, content: json} ->
+        {id, secret} = json |> StorageId.from_json()
+
+        socket
+        |> push_event("chat:redirect", %{
+          url:
+            Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64(), download: true)
+        })
+
+      _ ->
+        socket
+    end
   end
 
   def close(%{assigns: %{dialog: nil}} = socket), do: socket

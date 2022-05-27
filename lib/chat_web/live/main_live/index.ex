@@ -196,6 +196,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("dialog/download-message", %{"id" => id, "timestamp" => time}, socket) do
+    socket
+    |> Page.Dialog.download_message({time |> String.to_integer(), id})
+    |> noreply()
+  end
+
   def handle_event("close-dialog", _, socket) do
     socket
     |> Page.Dialog.close()
@@ -253,6 +259,12 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("room/edit-message", %{"id" => id, "timestamp" => time}, socket) do
     socket
     |> Page.Room.edit_message({time |> String.to_integer(), id})
+    |> noreply()
+  end
+
+  def handle_event("room/download-message", %{"id" => id, "timestamp" => time}, socket) do
+    socket
+    |> Page.Room.download_message({time |> String.to_integer(), id})
     |> noreply()
   end
 
@@ -597,10 +609,17 @@ defmodule ChatWeb.MainLive.Index do
           <.icon id="share" class="w-4 h-4 flex fill-black"/>
           <span>Share</span>
         </a>
-        <a phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")} class="dropdownItem"> 
-          <.icon id="download" class="w-4 h-4 flex fill-black"/>
-          <span>Download</span>
-        </a>
+        <%= if @msg.type in [:file, :image] do %>
+          <a 
+            class="dropdownItem"
+            phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{message_of(@msg)}/download-message")}  
+            phx-value-id={@msg.id} 
+            phx-value-timestamp={@msg.timestamp}
+          > 
+            <.icon id="download" class="w-4 h-4 flex fill-black"/>
+            <span>Download</span>
+          </a>
+        <% end %> 
       </.dropdown>
     </div>
     """

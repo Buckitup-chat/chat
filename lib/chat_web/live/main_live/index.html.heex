@@ -44,11 +44,11 @@
         </div>
         <button phx-click="login:request-key-ring" class="w-full h-11 mt-7 bg-transparent text-white py-2 px-4 border border-white/50 rounded-lg flex items-center justify-center">
           <span>Login with QR code</span>
-          <.icon id="qrcode" class="w-4 h-4 fill-white"/>
+          <.icon id="qrcode" class="w-4 h-4 ml-2 fill-white"/>
         </button>
         <button phx-click="login:import-own-key-ring" class="w-full h-11 mt-2.5 bg-transparent text-white py-2 px-4 border border-white/50 rounded-lg flex items-center justify-center">
           <span>Import the recovery keys</span>
-          <.icon id="upload1" class="w-4 h-4 fill-white"/>
+          <.icon id="upload1" class="w-4 h-4 ml-2 fill-white"/>
         </button>    
       </div>     
     </div>
@@ -673,36 +673,42 @@
             Your identity and all rooms access will be copied to another client, that supplied this link and code to you.
           </p>
           <div class="mt-5">
+            <%= unless @export_result do %>
             <.form
               let={f}
               for={:export_key_ring}
               id="export-key-form"
               autocomplete="off"
-              phx-submit="export-keys"
+              phx-submit={JS.hide() |> JS.push("export-keys")}
             >
               <%= text_input f, :code, placeholder: "Enter code", type: "number", min: 10, max: 99, class: "w-full  h-11 py-2.5 appearance-none block bg-transparent border border-white/50 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-0 focus:border-white" %>
-              
-              <%= unless @export_result do %>
-                <%= submit "Log In", class: "mt-2.5 w-full h-11 focus:outline-none text-white px-4 rounded-lg", style: "background-color: rgb(36, 24, 36);" %>
-              <% else %>
-                <div class="mt-2.5 p-2.5 w-full h-11 bg-transparent border border-white/0 rounded-lg text-white flex flex-row items-strech justify-between" style="background: #F45649;">
-                  <div class="w-44 flex flex-row items-stretch justify-start" > 
-                    <.icon id="alert" class="w-4 h-4 mt-1 fill-white"/>
-                    <p class="ml-1" style="font-size: 14px;">The code is wrong</p> 
+              <%= submit "Log In", class: "mt-2.5 w-full h-11 focus:outline-none text-white px-4 rounded-lg", style: "background-color: rgb(36, 24, 36);" %>
+            </.form>
+            <% else %>
+              <%= if @export_result == :error do %>
+                <div class="mt-2.5 p-2.5 w-full bg-transparent border border-white/0 rounded-lg text-white flex flex-row items-strech justify-between" style="background: #F45649;">
+                  <div class="w-44  flex flex-row items-stretch justify-start"> 
+                    <.icon id="alert" class="w-7 h-7 mt-1 fill-white"/>
+                    <p class="ml-2" style="font-size: 14px;">The code is wrong. Fresh link needed.</p> 
                   </div>
                   <button type="button">
                     <.icon id="close" class="w-4 h-4 fill-white"/>
                   </button>
                 </div>
-
-                <button phx-click="login:export-code-close" type="button" class="mt-2.5 w-full h-11 focus:outline-none text-white px-4 rounded-lg", style="background-color: rgb(36, 24, 36);">
-                  Regenerate link and try new one
-                </button>
-
+              <% else %>
+                  <div class="mt-2.5 p-2.5 w-full bg-transparent border border-white/0 rounded-lg text-white flex flex-row items-strech justify-between" style="background: #6FBC7F;">
+                    <div class="w-44  flex flex-row items-stretch justify-start"> 
+                      <.icon id="checked" class="w-7 h-7 mt-1 mr-1 fill-white"/>
+                      <p class="ml-2" style="font-size: 14px;">All good. Keys have been exported.</p> 
+                    </div>
+                    <button type="button">
+                      <.icon id="close" class="w-4 h-4 fill-white"/>
+                    </button>
+                  </div>
               <% end %>
+            <%  end %>
               <div>
-              </div>
-            </.form>
+            </div>
           </div>
         </div>
       </div>     

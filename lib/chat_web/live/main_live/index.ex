@@ -428,6 +428,8 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   def handle_progress(:image, %{done?: true}, socket) do
+    IO.inspect(:image)
+
     socket
     |> Page.Dialog.send_image()
     |> noreply()
@@ -474,7 +476,8 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_progress(_file, _entry, socket) do
+  def handle_progress(file, entry, socket) do
+    IO.inspect(entry, label: file)
     socket |> noreply()
   end
 
@@ -652,7 +655,7 @@ defmodule ChatWeb.MainLive.Index do
       accept: ~w(.jpg .jpeg .png),
       auto_upload: true,
       max_entries: 1,
-      max_size: 60_000_000,
+      max_file_size: 60_000_000,
       progress: &handle_progress/3
     )
   end

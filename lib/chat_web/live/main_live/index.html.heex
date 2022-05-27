@@ -202,7 +202,7 @@
           <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
             <%= unless @dialog do %>
             <% else %>
-            <div class="basis-[93%] overflow-y-scroll flex flex-col justify-between relative" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
+            <div id="dialogContent" class="basis-[93%] overflow-y-scroll flex flex-col justify-between relative" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
               <div class="w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start sticky top-0 right-0" style="min-height: 56px;">
                 <button phx-click={JS.push("close-dialog") |> close_content()} class="sm:hidden pr-3">
                   <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
@@ -213,18 +213,43 @@
                   <.icon id="edit" class="w-4 h-4 ml-1 flex fill-white/50"/>
                 </button>
               </div>
-              <div></div>
-              <div class="px-2  sm:px-8 mt-16 backdrop-opacity-25" id="dialog-messages" phx-update={@message_update_mode}>
-                  <%= for msg <- @messages do %>
-                    <div class={classes("m-1 flex", %{"justify-end" => msg.is_mine?, "justify-start" => !msg.is_mine?})} id={"dialog-message-#{msg.id}"}>
-                      <.message 
-                        color={msg.is_mine? && "bg-purple50" || "bg-white"}
-                        msg={msg} 
-                        author={msg.is_mine? && Chat.Card.from_identity(@me) || @peer}
-                        is_mine={msg.is_mine?}  
-                      />
-                    </div> 
-                  <% end %>
+              <div>
+                <div class="px-2 sm:px-8 backdrop-opacity-25" id="dialog-messages" phx-update={@message_update_mode}>
+                    <%= for msg <- @messages do %>
+                      <div class={classes("m-1 flex", %{"justify-end" => msg.is_mine?, "justify-start" => !msg.is_mine?})} id={"dialog-message-#{msg.id}"}>
+                        <.message 
+                          color={msg.is_mine? && "bg-purple50" || "bg-white"}
+                          msg={msg} 
+                          author={msg.is_mine? && Chat.Card.from_identity(@me) || @peer}
+                          is_mine={msg.is_mine?}  
+                        />
+                      </div>
+                    <% end %>
+                  </div>
+                  <div class="px-2 sm:px-8" phx-update="replace" id="ddd">
+                    <%= for %{valid?: true} = entry <- @uploads.image.entries do %>
+                      <div id={"upload#{entry.uuid}"} class="m-1 flex justify-end">
+                        <div class="flex-col max-w-xxs sm:max-w-md min-w-[180px]">
+                          <%= live_img_preview entry, class: "blur-sm animate-pulse" %>
+                          
+                          <div class="w-full bg-gray-200 h-2 dark:bg-gray-700">
+                            <div class="bg-gray-600 h-2 dark:bg-gray-300" style={"width: #{entry.progress}%"}></div>
+                          </div>
+                        </div>
+                      </div>
+                    <% end %>
+                    <%= for %{valid?: true} = entry <- @uploads.dialog_file.entries do %>
+                      <div id={"upload#{entry.uuid}"} class="m-1 flex justify-end">
+                        <div class="bg-purple50 max-w-xxs sm:max-w-md min-w-[180px] rounded-lg flex items-center justify-between">
+                          <.icon id="document" class="w-14 h-14 flex fill-black/50 animate-pulse"/>
+                          <div class="w-36 flex flex-col pr-3">
+                            <span class="truncate text-xs"><%= entry.client_name %></span>
+                            <div class="text-xs text-black/50"><%= entry.progress %>% uploaded</div>
+                          </div>
+                        </div>  
+                      </div>                  
+                    <% end %>
+                  </div>
                 </div>
               </div>
               <div class=" basis-[7%] px-8 border border-white bg-white flex items-center">
@@ -432,7 +457,7 @@
                     <span class="text-base text-white"> Invite</span>
                   </button>
                 </div>
-                <div></div>
+              <div>
                 <div class="mt-16 px-2 sm:px-8 w-full" id="room-messages" phx-update={@message_update_mode}>
                   <%= for msg <- @messages do %>
                     <div class={classes("m-1 flex", %{"justify-end" => msg.author_hash == @my_id, "justify-start" => msg.author_hash != @my_id})} id={"room-message-#{msg.id}"}>
@@ -445,6 +470,31 @@
                     </div> 
                   <% end %>
                 </div>
+                <div class="px-2 sm:px-8" phx-update="replace" id="ddd">
+                  <%= for %{valid?: true} = entry <- @uploads.room_image.entries do %>
+                    <div id={"upload#{entry.uuid}"} class="m-1 flex justify-end">
+                      <div class="flex-col max-w-xxs sm:max-w-md min-w-[180px]">
+                        <%= live_img_preview entry, class: "blur-sm animate-pulse" %>
+                        
+                        <div class="w-full bg-gray-200 h-2 dark:bg-gray-700">
+                          <div class="bg-gray-600 h-2 dark:bg-gray-300" style={"width: #{entry.progress}%"}></div>
+                        </div>
+                      </div>
+                    </div>
+                  <% end %>
+                  <%= for %{valid?: true} = entry <- @uploads.room_file.entries do %>
+                    <div id={"upload#{entry.uuid}"} class="m-1 flex justify-end">
+                      <div class="bg-purple50 max-w-xxs sm:max-w-md min-w-[180px] rounded-lg flex items-center justify-between">
+                        <.icon id="document" class="w-14 h-14 flex fill-black/50 animate-pulse"/>
+                        <div class="w-36 flex flex-col pr-3">
+                          <span class="truncate text-xs"><%= entry.client_name %></span>
+                          <div class="text-xs text-black/50"><%= entry.progress %>% uploaded</div>
+                        </div>
+                      </div>  
+                    </div>                  
+                  <% end %>
+                </div>
+              </div>
               </div>
               <div class="basis-[7%] px-8 border border-white bg-white flex flex-row items-center">
                 <%= if @edit_room do %>
@@ -550,7 +600,7 @@
                   <a class="sm:hidden mr-2" phx-value-lobby-mode="chats" phx-click={JS.push("switch-lobby-mode") |> JS.push("close-feeds") |> close_content()}><.icon id="arrowBack" class="w-6 h-6 fill-white"/></a>
                   <h1 class="ml-1 text-base font-bolt text-white">Feeds</h1>
                 </div>
-                <div class="mt-16 mb-8 px-4 sm:px-8 w-full" id="action-feed-list" phx-update="append">
+                <div class="mt-16 mb-8 px-4 sm:px-8 w-full" id="action-feed-list" phx-update={@feed_update_mode}>
                   <%= if @action_feed_list do %>
                     <%= for item <- @action_feed_list do %>
                       <div class="py-1 flex justify-start" id={"item-#{UUID.uuid4()}"}>

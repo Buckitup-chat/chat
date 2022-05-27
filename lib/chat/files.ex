@@ -21,6 +21,7 @@ defmodule Chat.Files do
   end
 
   def add(data) do
+    IO.inspect(data)
     key = UUID.uuid4()
 
     {blob, secret} = Utils.encrypt_blob(data)

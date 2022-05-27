@@ -12,6 +12,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.User
   alias Chat.Utils
   alias Chat.Utils.StorageId
+  alias ChatWeb.Router.Helpers, as: Routes
 
   @per_page 15
 
@@ -183,6 +184,34 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:room_identity, nil)
     |> assign(:messages, nil)
     |> assign(:message_update_mode, nil)
+  end
+
+  def download_message(
+        %{assigns: %{room_identity: room_identity}} = socket,
+        msg_id
+      ) do
+    Rooms.read_message(msg_id, room_identity, &User.id_map_builder/1)
+    |> case do
+      %{type: :file, content: json} ->
+        {file_id, secret} = json |> StorageId.from_json()
+
+        socket
+        |> push_event("chat:redirect", %{
+          url: Routes.file_url(socket, :file, file_id, a: secret |> Base.url_encode64())
+        })
+
+      %{type: :image, content: json} ->
+        {id, secret} = json |> StorageId.from_json()
+
+        socket
+        |> push_event("chat:redirect", %{
+          url:
+            Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64(), download: true)
+        })
+
+      _ ->
+        socket
+    end
   end
 
   defp room_topic(%Rooms.Room{pub_key: key}) do

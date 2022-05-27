@@ -8,7 +8,7 @@ defmodule Chat.Files do
 
   def get(key, secret) do
     blob = Db.get({:file, key})
-
+    
     if blob do
       Utils.decrypt_blob(blob, secret)
     end
@@ -21,7 +21,6 @@ defmodule Chat.Files do
   end
 
   def add(data) do
-    IO.inspect(data)
     key = UUID.uuid4()
 
     {blob, secret} = Utils.encrypt_blob(data)

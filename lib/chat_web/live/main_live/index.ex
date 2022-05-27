@@ -126,6 +126,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("login:export-code-close", _, socket) do
+    socket
+    |> push_event("chat:redirect", %{url: Routes.main_index_path(socket, :index)})
+    |> noreply()
+  end
+
   def handle_event("switch-lobby-mode", %{"lobby-mode" => mode}, socket) do
     socket
     |> Page.Lobby.switch_lobby_mode(mode)
@@ -671,7 +677,7 @@ defmodule ChatWeb.MainLive.Index do
       accept: ~w(.jpg .jpeg .png),
       auto_upload: true,
       max_entries: 1,
-      max_size: 60_000_000,
+      max_file_size: 60_000_000,
       progress: &handle_progress/3
     )
   end

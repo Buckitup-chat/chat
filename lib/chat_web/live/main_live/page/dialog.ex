@@ -35,8 +35,9 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:edit_dialog, false)
     |> assign(:dialog, dialog)
     |> assign(:has_more_messages, true)
-    |> assign_messages()
+    |> assign(:last_load_timestamp, nil)
     |> assign(:message_update_mode, :replace)
+    |> assign_messages()
   end
 
   def load_more_messages(%{assigns: %{page: page}} = socket) do
@@ -115,6 +116,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:edit_dialog, true)
     |> assign(:edit_content, content)
     |> assign(:edit_message_id, msg_id)
+    |> assign(:messages, [])
+    |> assign(:message_update_mode, :append)
     |> push_event("chat:focus", %{to: "#dialog-edit-input"})
   end
 
@@ -142,6 +145,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       |> render_to_html_string(render_fun)
 
     socket
+    |> assign(:messages, [])
+    |> assign(:message_update_mode, :append)
     |> push_event("chat:change", %{to: "#dialog-message-#{id} .x-content", content: content})
   end
 
@@ -209,24 +214,16 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
   defp assign_messages(%{assigns: %{has_more_messages: false}} = socket, _), do: socket
 
-  defp assign_messages(%{assigns: %{page: 0, dialog: dialog, me: me}} = socket, per_page) do
-    messages = Dialogs.read(dialog, me, {nil, 0}, per_page + 1)
-
-    socket
-    |> assign(:messages, Enum.take(messages, -per_page))
-    |> assign(:has_more_messages, length(messages) > per_page)
-  end
-
   defp assign_messages(
-         %{assigns: %{dialog: dialog, me: me, messages: messages}} = socket,
+         %{assigns: %{dialog: dialog, me: me, last_load_timestamp: timestamp}} = socket,
          per_page
        ) do
-    before_message = List.first(messages)
-    messages = Dialogs.read(dialog, me, {before_message.timestamp, 0}, per_page + 1)
+    messages = Dialogs.read(dialog, me, {timestamp, 0}, per_page + 1)
 
     socket
     |> assign(:messages, Enum.take(messages, -per_page))
     |> assign(:has_more_messages, length(messages) > per_page)
+    |> assign(:last_load_timestamp, set_messages_timestamp(messages))
   end
 
   defp broadcast_new_message(message, dialog, me) do
@@ -257,4 +254,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       message
     )
   end
+
+  defp set_messages_timestamp([]), do: nil
+  defp set_messages_timestamp([message | _]), do: message.timestamp
 end

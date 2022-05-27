@@ -8,7 +8,7 @@ defmodule Chat.Files do
 
   def get(key, secret) do
     blob = Db.get({:file, key})
-
+    
     if blob do
       Utils.decrypt_blob(blob, secret)
     end

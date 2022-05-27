@@ -232,7 +232,6 @@ defmodule ChatWeb.MainLive.Page.Room do
   defp assign_messages(
          %{
            assigns: %{
-             page: 0,
              room: room,
              room_identity: identity,
              last_load_timestamp: timestamp

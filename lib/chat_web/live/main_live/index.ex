@@ -55,7 +55,9 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("restoreAuth", nil, socket), do: socket |> noreply()
+  def handle_event("restoreAuth", nil, socket) do
+    socket |> noreply()
+  end
 
   def handle_event("restoreAuth", data, %{assigns: %{live_action: :export}} = socket) do
     socket
@@ -442,6 +444,8 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Login.store()
     |> Page.ImportKeyRing.close()
     |> Page.Lobby.init()
+    |> Page.Logout.init()
+    |> Page.Dialog.init()
     |> noreply()
   end
 

@@ -126,6 +126,20 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("login:export-code-close", _, socket) do
+    socket
+    |> push_event("chat:redirect", %{url: Routes.main_index_path(socket, :index)})
+    |> noreply()
+  end
+
+  def handle_event("login:export-code-regenerate", _, socket) do
+    socket
+    |> Page.ExportKeyRing.close()
+    ##|> push_event("chat:redirect", %{url: Routes.main_index_path(socket, :index)})
+    |> Page.ImportKeyRing.init()
+    |> noreply()
+  end
+
   def handle_event("switch-lobby-mode", %{"lobby-mode" => mode}, socket) do
     socket
     |> Page.Lobby.switch_lobby_mode(mode)
@@ -428,8 +442,6 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   def handle_progress(:image, %{done?: true}, socket) do
-    IO.inspect(:image)
-
     socket
     |> Page.Dialog.send_image()
     |> noreply()
@@ -476,8 +488,7 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_progress(file, entry, socket) do
-    IO.inspect(entry, label: file)
+  def handle_progress(_file, _entry, socket) do
     socket |> noreply()
   end
 

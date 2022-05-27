@@ -61,7 +61,7 @@
           <button class="mt-5 w-full h-12 border-0 rounded-lg bg-grayscale flex items-center justify-center" phx-click="logout-go-middle">
             <div class="flex items-center justify-between">
               <span class="text-sm text-white">Download the Keys</span>
-              <.icon id="upload1" class="w-4 h-4 fill-white"/>
+              <.icon id="upload1" class="w-4 h-4 ml-2 fill-white"/>
             </div>
           </button>
           <button class="mt-3 w-full h-12 border rounded-lg border-black/10" phx-click="logout-wipe">Log Out without the Keys</button>
@@ -652,32 +652,61 @@
     </div>
   <% end %>
   <%= if @mode == :export_key_ring do %>
-    <p>
-      Your identity and all rooms access will be copied to another client, that supplied this link and code to you.
-    </p>
-    <div class="row">
-      <.form
-        let={f}
-        for={:export_key_ring}
-        id="export-key-form"
-        autocomplete="off"
-        phx-submit={JS.hide() |> JS.push("export-keys")}
-      >
-        <%= text_input f, :code, placeholder: "Export Code", type: "number", min: 10, max: 99 %>
-        <%= error_tag f, :code %>
-          
-        <div>
-          <%= submit "Export Keys", phx_disable_with: "Saving..." %>
+    <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg"/>
+    <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg"/>
+    
+
+    <div class="flex flex-col items-center justify-center w-screen h-screen">
+      <div class="container unauthenticated" >
+        <div class="flex justify-center">
+          <.icon id="logo" class="w-14 h-14 flex fill-white"/>
         </div>
-      </.form>
+        <div class="left-0 mt-10">
+          
+          <a phx-click="login:export-code-close" class="flex items-center justify-start">
+            <.icon id="arrowLeft" class="w-4 h-4 flex fill-white/70"/>
+            <p class="ml-2 text-sm text-white/70">Back to Log In</p>
+          </a>
+          
+          <h1 style="font-size: 28px; line-height: 34px;" class="mt-5 font-inter font-bold text-white">Login with QR code</h1>
+          <p class="mt-2.5 font-inter text-sm text-white/50">
+            Your identity and all rooms access will be copied to another client, that supplied this link and code to you.
+          </p>
+          <div class="mt-5">
+            <.form
+              let={f}
+              for={:export_key_ring}
+              id="export-key-form"
+              autocomplete="off"
+              phx-submit="export-keys"
+            >
+              <%= text_input f, :code, placeholder: "Enter code", type: "number", min: 10, max: 99, class: "w-full  h-11 py-2.5 appearance-none block bg-transparent border border-white/50 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-0 focus:border-white" %>
+              
+              <%= unless @export_result do %>
+                <%= submit "Log In", class: "mt-2.5 w-full h-11 focus:outline-none text-white px-4 rounded-lg", style: "background-color: rgb(36, 24, 36);" %>
+              <% else %>
+                <div class="mt-2.5 p-2.5 w-full h-11 bg-transparent border border-white/0 rounded-lg text-white flex flex-row items-strech justify-between" style="background: #F45649;">
+                  <div class="w-44 flex flex-row items-stretch justify-start" > 
+                    <.icon id="alert" class="w-4 h-4 mt-1 fill-white"/>
+                    <p class="ml-1" style="font-size: 14px;">The code is wrong</p> 
+                  </div>
+                  <button type="button">
+                    <.icon id="close" class="w-4 h-4 fill-white"/>
+                  </button>
+                </div>
+
+                <button phx-click="login:export-code-regenerate" type="button" class="mt-2.5 w-full h-11 focus:outline-none text-white px-4 rounded-lg", style="background-color: rgb(36, 24, 36);">
+                  Regenerate link and try new one
+                </button>
+
+              <% end %>
+              <div>
+              </div>
+            </.form>
+          </div>
+        </div>
+      </div>     
     </div>
-    <%= if @export_result == :error do %>
-      <p> Something went wrong. </p>
-      <p> Regenerate link and try new one </p>
-    <% end %>
-    <%= if @export_result == :ok do %>
-      <p> All good. Keys have been exported </p>
-    <% end %>
   <% end %>
 
   <%= if @mode == :restore_data do %>

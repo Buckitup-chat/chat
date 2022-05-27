@@ -132,14 +132,6 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("login:export-code-regenerate", _, socket) do
-    socket
-    |> Page.ExportKeyRing.close()
-    ##|> push_event("chat:redirect", %{url: Routes.main_index_path(socket, :index)})
-    |> Page.ImportKeyRing.init()
-    |> noreply()
-  end
-
   def handle_event("switch-lobby-mode", %{"lobby-mode" => mode}, socket) do
     socket
     |> Page.Lobby.switch_lobby_mode(mode)

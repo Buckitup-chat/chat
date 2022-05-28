@@ -36,4 +36,10 @@ defmodule ChatWeb.MainLive.Page.ExportKeyRing do
     socket
     |> assign(:export_result, :error)
   end
+
+  def close(socket) do
+    socket
+    |> assign(:export_id, nil)
+    |> assign(:export_result, nil)
+  end
 end

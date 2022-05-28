@@ -55,7 +55,9 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("restoreAuth", nil, socket), do: socket |> noreply()
+  def handle_event("restoreAuth", nil, socket) do
+    socket |> noreply()
+  end
 
   def handle_event("restoreAuth", data, %{assigns: %{live_action: :export}} = socket) do
     socket
@@ -123,6 +125,12 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> Page.ImportOwnKeyRing.close()
     |> assign(:need_login, true)
+    |> noreply()
+  end
+
+  def handle_event("login:export-code-close", _, socket) do
+    socket
+    |> push_event("chat:redirect", %{url: Routes.main_index_path(socket, :index)})
     |> noreply()
   end
 
@@ -196,6 +204,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("dialog/download-message", %{"id" => id, "timestamp" => time}, socket) do
+    socket
+    |> Page.Dialog.download_message({time |> String.to_integer(), id})
+    |> noreply()
+  end
+
   def handle_event("close-dialog", _, socket) do
     socket
     |> Page.Dialog.close()
@@ -236,6 +250,12 @@ defmodule ChatWeb.MainLive.Index do
       |> Page.Room.send_text(text)
       |> noreply()
     end
+  end
+
+  def handle_event("room/download-message", %{"id" => id, "timestamp" => time}, socket) do
+    socket
+    |> Page.Room.download_message({time |> String.to_integer(), id})
+    |> noreply()
   end
 
   def handle_event("delete-message", %{"id" => id, "timestamp" => time, "type" => "room"}, socket) do
@@ -341,7 +361,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_event("room/" <> event, params, socket) do
     socket
-    |> Page.RoomRouter.event(event, params)
+    |> Page.RoomRouter.event({event, params})
     |> noreply()
   end
 
@@ -394,6 +414,8 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Login.store()
     |> Page.ImportKeyRing.close()
     |> Page.Lobby.init()
+    |> Page.Logout.init()
+    |> Page.Dialog.init()
     |> noreply()
   end
 
@@ -569,10 +591,17 @@ defmodule ChatWeb.MainLive.Index do
           <.icon id="share" class="w-4 h-4 flex fill-black"/>
           <span>Share</span>
         </a>
-        <a phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")} class="dropdownItem"> 
-          <.icon id="download" class="w-4 h-4 flex fill-black"/>
-          <span>Download</span>
-        </a>
+        <%= if @msg.type in [:file, :image] do %>
+          <a 
+            class="dropdownItem"
+            phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{message_of(@msg)}/download-message")}  
+            phx-value-id={@msg.id} 
+            phx-value-timestamp={@msg.timestamp}
+          > 
+            <.icon id="download" class="w-4 h-4 flex fill-black"/>
+            <span>Download</span>
+          </a>
+        <% end %> 
       </.dropdown>
     </div>
     """
@@ -624,7 +653,7 @@ defmodule ChatWeb.MainLive.Index do
       accept: ~w(.jpg .jpeg .png),
       auto_upload: true,
       max_entries: 1,
-      max_size: 60_000_000,
+      max_file_size: 60_000_000,
       progress: &handle_progress/3
     )
   end

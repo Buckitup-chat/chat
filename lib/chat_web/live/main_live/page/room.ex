@@ -12,6 +12,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.User
   alias Chat.Utils
   alias Chat.Utils.StorageId
+  alias ChatWeb.Router.Helpers, as: Routes
 
   @per_page 15
 
@@ -33,9 +34,10 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:edit_room, false)
     |> assign(:room, room)
     |> assign(:room_identity, room_identity)
+    |> assign(:last_load_timestamp, nil)
     |> assign(:has_more_messages, true)
-    |> assign_messages()
     |> assign(:message_update_mode, :replace)
+    |> assign_messages()
   end
 
   def load_more_messages(%{assigns: %{page: page}} = socket) do
@@ -124,6 +126,8 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:edit_room, true)
     |> assign(:edit_content, content)
     |> assign(:edit_message_id, msg_id)
+    |> assign(:messages, [])
+    |> assign(:message_update_mode, :append)
     |> push_event("chat:focus", %{to: "#room-edit-input"})
   end
 
@@ -152,6 +156,8 @@ defmodule ChatWeb.MainLive.Page.Room do
       |> render_to_html_string(render_fun)
 
     socket
+    |> assign(:messages, [])
+    |> assign(:message_update_mode, :append)
     |> push_event("chat:change", %{to: "#room-message-#{id} .x-content", content: content})
   end
 
@@ -190,6 +196,34 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:message_update_mode, nil)
   end
 
+  def download_message(
+        %{assigns: %{room_identity: room_identity}} = socket,
+        msg_id
+      ) do
+    Rooms.read_message(msg_id, room_identity, &User.id_map_builder/1)
+    |> case do
+      %{type: :file, content: json} ->
+        {file_id, secret} = json |> StorageId.from_json()
+
+        socket
+        |> push_event("chat:redirect", %{
+          url: Routes.file_url(socket, :file, file_id, a: secret |> Base.url_encode64())
+        })
+
+      %{type: :image, content: json} ->
+        {id, secret} = json |> StorageId.from_json()
+
+        socket
+        |> push_event("chat:redirect", %{
+          url:
+            Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64(), download: true)
+        })
+
+      _ ->
+        socket
+    end
+  end
+
   defp room_topic(%Rooms.Room{pub_key: key}) do
     key
     |> Utils.hash()
@@ -201,34 +235,21 @@ defmodule ChatWeb.MainLive.Page.Room do
   defp assign_messages(%{assigns: %{has_more_messages: false}} = socket, _), do: socket
 
   defp assign_messages(
-         %{assigns: %{page: 0, room: room, room_identity: identity}} = socket,
+         %{
+           assigns: %{
+             room: room,
+             room_identity: identity,
+             last_load_timestamp: timestamp
+           }
+         } = socket,
          per_page
        ) do
-    messages = Rooms.read(room, identity, &User.id_map_builder/1, {nil, 0}, per_page + 1)
+    messages = Rooms.read(room, identity, &User.id_map_builder/1, {timestamp, 0}, per_page + 1)
 
     socket
     |> assign(:messages, Enum.take(messages, -per_page))
     |> assign(:has_more_messages, length(messages) > per_page)
-  end
-
-  defp assign_messages(
-         %{assigns: %{room: room, room_identity: identity, messages: messages}} = socket,
-         per_page
-       ) do
-    before_message = List.first(messages)
-
-    messages =
-      Rooms.read(
-        room,
-        identity,
-        &User.id_map_builder/1,
-        {before_message.timestamp, 0},
-        per_page + 1
-      )
-
-    socket
-    |> assign(:messages, Enum.take(messages, -per_page))
-    |> assign(:has_more_messages, length(messages) > per_page)
+    |> assign(:last_load_timestamp, set_messages_timestamp(messages))
   end
 
   defp broadcast_message_updated(msg_id, room, me) do
@@ -259,4 +280,7 @@ defmodule ChatWeb.MainLive.Page.Room do
       {:room, message}
     )
   end
+
+  defp set_messages_timestamp([]), do: nil
+  defp set_messages_timestamp([message | _]), do: message.timestamp
 end

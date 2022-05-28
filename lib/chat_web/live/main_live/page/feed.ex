@@ -14,6 +14,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
     socket
     |> assign(:action_feed_till, till)
     |> assign(:action_feed_list, list)
+    |> assign(:feed_update_mode, :ignore)
   end
 
   def more(%{assigns: %{action_feed_till: since}} = socket) do
@@ -22,6 +23,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
     socket
     |> assign(:action_feed_till, till)
     |> assign(:action_feed_list, list)
+    |> assign(:feed_update_mode, :append)
   end
 
   def close(socket) do

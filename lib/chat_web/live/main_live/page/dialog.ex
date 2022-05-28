@@ -2,7 +2,9 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   @moduledoc "Dialog page"
   import ChatWeb.MainLive.Page.Shared
   import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entries: 3, push_event: 3]
+
   use Phoenix.Component
+
   alias Phoenix.PubSub
 
   alias Chat.Dialogs
@@ -10,6 +12,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.Memo
   alias Chat.User
   alias Chat.Utils.StorageId
+  alias ChatWeb.Router.Helpers, as: Routes
 
   @per_page 15
 
@@ -32,8 +35,9 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:edit_dialog, false)
     |> assign(:dialog, dialog)
     |> assign(:has_more_messages, true)
-    |> assign_messages()
+    |> assign(:last_load_timestamp, nil)
     |> assign(:message_update_mode, :replace)
+    |> assign_messages()
   end
 
   def load_more_messages(%{assigns: %{page: page}} = socket) do
@@ -112,6 +116,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:edit_dialog, true)
     |> assign(:edit_content, content)
     |> assign(:edit_message_id, msg_id)
+    |> assign(:messages, [])
+    |> assign(:message_update_mode, :append)
     |> push_event("chat:focus", %{to: "#dialog-edit-input"})
   end
 
@@ -139,6 +145,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       |> render_to_html_string(render_fun)
 
     socket
+    |> assign(:messages, [])
+    |> assign(:message_update_mode, :append)
     |> push_event("chat:change", %{to: "#dialog-message-#{id} .x-content", content: content})
   end
 
@@ -154,6 +162,35 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     broadcast_message_deleted(msg_id, dialog, me)
 
     socket
+  end
+
+  def download_message(
+        %{assigns: %{me: me, dialog: dialog}} = socket,
+        msg_id
+      ) do
+    dialog
+    |> Dialogs.read_message(msg_id, me)
+    |> case do
+      %{type: :file, content: json} ->
+        {file_id, secret} = json |> StorageId.from_json()
+
+        socket
+        |> push_event("chat:redirect", %{
+          url: Routes.file_url(socket, :file, file_id, a: secret |> Base.url_encode64())
+        })
+
+      %{type: :image, content: json} ->
+        {id, secret} = json |> StorageId.from_json()
+
+        socket
+        |> push_event("chat:redirect", %{
+          url:
+            Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64(), download: true)
+        })
+
+      _ ->
+        socket
+    end
   end
 
   def close(%{assigns: %{dialog: nil}} = socket), do: socket
@@ -177,24 +214,16 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
   defp assign_messages(%{assigns: %{has_more_messages: false}} = socket, _), do: socket
 
-  defp assign_messages(%{assigns: %{page: 0, dialog: dialog, me: me}} = socket, per_page) do
-    messages = Dialogs.read(dialog, me, {nil, 0}, per_page + 1)
-
-    socket
-    |> assign(:messages, Enum.take(messages, -per_page))
-    |> assign(:has_more_messages, length(messages) > per_page)
-  end
-
   defp assign_messages(
-         %{assigns: %{dialog: dialog, me: me, messages: messages}} = socket,
+         %{assigns: %{dialog: dialog, me: me, last_load_timestamp: timestamp}} = socket,
          per_page
        ) do
-    before_message = List.first(messages)
-    messages = Dialogs.read(dialog, me, {before_message.timestamp, 0}, per_page + 1)
+    messages = Dialogs.read(dialog, me, {timestamp, 0}, per_page + 1)
 
     socket
     |> assign(:messages, Enum.take(messages, -per_page))
     |> assign(:has_more_messages, length(messages) > per_page)
+    |> assign(:last_load_timestamp, set_messages_timestamp(messages))
   end
 
   defp broadcast_new_message(message, dialog, me) do
@@ -225,4 +254,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       message
     )
   end
+
+  defp set_messages_timestamp([]), do: nil
+  defp set_messages_timestamp([message | _]), do: message.timestamp
 end

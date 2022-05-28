@@ -73,6 +73,19 @@ defmodule Chat.Rooms.RequestRoomTest do
     assert [] = Rooms.list_pending_requests(room_hash)
   end
 
+  test "reuest message should be added upon requesting" do
+    {_alice, identity, room} = "Alice" |> user_and_request_room()
+    room_hash = identity |> Utils.hash()
+    bob = "Bob" |> User.login()
+    User.register(bob)
+
+    Rooms.add_request(room_hash, bob)
+
+    messages = Rooms.read(room, identity, &User.id_map_builder/1)
+
+    assert [%{type: :request}] = messages
+  end
+
   defp user_and_request_room(name) do
     alice = User.login(name)
     room_identity = Rooms.add(alice, "#{name}'s Request room", :request)

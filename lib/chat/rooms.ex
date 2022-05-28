@@ -26,17 +26,16 @@ defmodule Chat.Rooms do
   def list(my_rooms) do
     my_room_hashes =
       my_rooms
-      |> Enum.map(
-        &(&1
-          |> Identity.pub_key()
-          |> Utils.hash())
-      )
+      |> Enum.map(&Utils.hash/1)
+      |> MapSet.new()
 
     Registry.all()
-    |> Map.values()
-    |> Enum.map(&%Card{name: &1.name, pub_key: &1.pub_key, hash: Utils.hash(&1.pub_key)})
+    |> Map.filter(fn {hash, room} ->
+      room.type in [:public, :request] or MapSet.member?(my_room_hashes, hash)
+    end)
+    |> Enum.map(fn {hash, room} -> %Card{name: room.name, pub_key: room.pub_key, hash: hash} end)
     |> Enum.sort_by(& &1.name)
-    |> Enum.split_with(&(&1.hash in my_room_hashes))
+    |> Enum.split_with(&MapSet.member?(my_room_hashes, &1.hash))
   end
 
   @doc "Returns Room or nil"
@@ -48,6 +47,7 @@ defmodule Chat.Rooms do
   defdelegate add_text(room, me, text, opts \\ []), to: RoomMessages
   defdelegate add_file(room, me, data, opts \\ []), to: RoomMessages
   defdelegate add_image(room, me, data, opts \\ []), to: RoomMessages
+  defdelegate add_request_message(room, author, opts \\ []), to: RoomMessages
 
   def read_message(%Message{} = msg, %Identity{} = identity), do: RoomMessages.read(msg, identity)
 
@@ -73,7 +73,11 @@ defmodule Chat.Rooms do
     room_hash
     |> get()
     |> Room.add_request(user_identity)
-    |> tap(fn room ->
+    |> tap(fn %{type: type} = room ->
+      if type == :request do
+        add_request_message(room, user_identity)
+      end
+
       Log.request_room_key(user_identity, room.pub_key)
     end)
     |> update()

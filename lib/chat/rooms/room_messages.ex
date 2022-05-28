@@ -25,6 +25,12 @@ defmodule Chat.Rooms.RoomMessages do
     |> add_message(room_key, author, opts |> Keyword.merge(type: :text))
   end
 
+  def add_request_message(%Room{pub_key: room_key}, author, opts),
+    do: add_request_message(room_key, author, opts)
+
+  def add_request_message(room_key, author, opts),
+    do: add_message("", room_key, author, opts |> Keyword.merge(type: :request))
+
   def add_memo(%Room{pub_key: room_key}, author, text, opts),
     do: add_memo(room_key, author, text, opts)
 

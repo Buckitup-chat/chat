@@ -5,9 +5,9 @@ defmodule ChatWeb.MainLive.Index do
   alias Phoenix.LiveView.JS
 
   alias Chat.Db
-  alias Chat.Rooms
   alias Chat.Files
   alias Chat.Memo
+  alias Chat.Rooms
   alias Chat.Utils.StorageId
   alias ChatWeb.MainLive.Page
 
@@ -222,12 +222,6 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("create-room", %{"new_room" => %{"name" => name}}, socket) do
-    socket
-    |> Page.Lobby.new_room(name)
-    |> noreply()
-  end
-
   def handle_event("switch-room", %{"room" => hash}, socket) do
     socket
     |> Page.Room.close()
@@ -419,7 +413,7 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_info({:room, msg}, socket), do: socket |> Page.RoomRouter.info(msg)
+  def handle_info({:room, msg}, socket), do: socket |> Page.RoomRouter.info(msg) |> noreply()
 
   def handle_progress(:image, %{done?: true}, socket) do
     socket
@@ -477,6 +471,16 @@ defmodule ChatWeb.MainLive.Index do
     <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
       <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
       <span class="x-content"><.message_text msg={@msg} /></span>
+      <.message_timestamp msg={@msg} />
+    </div>  
+    """
+  end
+
+  def message(%{msg: %{type: :request}} = assigns) do
+    ~H"""
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+      <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
+       -- Requesting access into the room --
       <.message_timestamp msg={@msg} />
     </div>  
     """

@@ -38,6 +38,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:has_more_messages, true)
     |> assign(:message_update_mode, :replace)
     |> assign_messages()
+    |> assign_requests()
   end
 
   def load_more_messages(%{assigns: %{page: page}} = socket) do
@@ -183,6 +184,12 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> push_event("chat:toggle", %{to: "#room-message-#{msg_id}", class: "hidden"})
   end
 
+  def approve_request(%{assigns: %{room_identity: room_identity}} = socket, user_hash) do
+    Rooms.approve_request(room_identity |> Utils.hash(), user_hash, room_identity)
+
+    socket
+  end
+
   def close(%{assigns: %{room: nil}} = socket), do: socket
 
   def close(%{assigns: %{room: room}} = socket) do
@@ -190,6 +197,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
     socket
     |> assign(:room, nil)
+    |> assign(:room_requests, nil)
     |> assign(:edit_room, nil)
     |> assign(:room_identity, nil)
     |> assign(:messages, nil)
@@ -251,6 +259,19 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:has_more_messages, length(messages) > per_page)
     |> assign(:last_load_timestamp, set_messages_timestamp(messages))
   end
+
+  defp assign_requests(%{assigns: %{room: %{type: :request} = room}} = socket) do
+    request_list =
+      room.pub_key
+      |> Utils.hash()
+      |> Rooms.list_pending_requests()
+      |> Enum.map(fn {hash, _} -> User.by_id(hash) end)
+
+    socket
+    |> assign(:room_requests, request_list)
+  end
+
+  defp assign_requests(socket), do: socket
 
   defp broadcast_message_updated(msg_id, room, me) do
     {:updated_message, msg_id}

@@ -357,8 +357,9 @@
                 for={:new_room}
                 id="room-create-form"
                 autocomplete="off"
-                phx-submit={hide_modal("create-room-popup") |> JS.push("create-room")}>  
+                phx-submit={hide_modal("create-room-popup") |> JS.push("room/create")}>  
                 <%= text_input f, :name, placeholder: "Name your Room", class: "w-full h-11 mt-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-0" %>
+                <%= select(f, :type, ["Open": "public", "Guarded": "request", "Private": "private"]) %> 
                 <%= submit "Create", phx_disable_with: "Saving...", class: "w-full h-11 mt-2 text-white border-0 rounded-lg bg-grayscale flex items-center justify-center" %>
               </.form>
             </.modal>
@@ -452,6 +453,15 @@
                   <div class="text-base text-white/60">[<%= short_hash(@room.admin_hash) %>]</div>
                     <h1 class="ml-1 text-base font-bolt text-white" ><%= @room.name %></h1>
                   </div>
+                  <%= if @room.type == :request do %>
+                    <div>
+                      <%= for user <- @room_requests do %>
+                        <a phx-click="room/approve-request"
+                          phx-value-hash={user.hash}
+                        ><%= user.name %></a>
+                      <% end %> 
+                    </div>
+                  <% end %>
                   <button class="flex items-center">
                     <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-white"/>
                     <span class="text-base text-white"> Invite</span>

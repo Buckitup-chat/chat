@@ -10,6 +10,12 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
 
   def event(socket, event) do
     case event do
+      {"create", %{"new_room" => %{"name" => name, "type" => type}}} ->
+        socket |> Page.Lobby.new_room(name, type |> String.to_existing_atom())
+
+      {"approve-request", %{"hash" => hash}} ->
+        socket |> Page.Room.approve_request(hash)
+
       {"cancel-edit", _} ->
         socket |> Page.Room.cancel_edit()
 

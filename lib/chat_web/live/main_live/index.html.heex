@@ -631,7 +631,7 @@
           <.icon id="logo" class="w-14 h-14 flex fill-white"/>
         </div>
         <div class="left-0 mt-10">
-          <a phx-click="login:import-keyring-close" class="flex items-center justify-start">
+          <a phx-click="login:import-keyring-close" class="x-back-target flex items-center justify-start">
             <.icon id="arrowLeft" class="w-4 h-4 flex fill-white/70"/>
             <p class="ml-2 text-sm text-white/70">Back to Log In</p>
           </a>
@@ -663,7 +663,7 @@
         </div>
         <div class="left-0 mt-10">
           
-          <a phx-click="login:export-code-close" class="flex items-center justify-start">
+          <a phx-click="login:export-code-close" class="x-back-target flex items-center justify-start">
             <.icon id="arrowLeft" class="w-4 h-4 flex fill-white/70"/>
             <p class="ml-2 text-sm text-white/70">Back to Log In</p>
           </a>
@@ -717,7 +717,7 @@
 
   <%= if @mode == :restore_data do %>
     <div id="restore-data-mode">
-      <button class="button button-outline float-right" phx-click="close-data-restore">Back</button>
+      <button class="x-back-target button button-outline float-right" phx-click="close-data-restore">Back</button>
       <div class="text-right row">
         <.form
           for={:backup_file}
@@ -753,7 +753,7 @@
           <.icon id="logo" class="w-14 h-14 fill-white"/>
         </div>
         <div class="left-0 mt-10">
-          <a phx-click="login:import-own-keyring-close" class="flex items-center justify-start">
+          <a phx-click="login:import-own-keyring-close" class="x-back-target flex items-center justify-start">
             <.icon id="arrowLeft" class="w-4 h-4 fill-white/70"/>
             <p class="ml-2 text-sm text-white/70">Back to Log In</p>
           </a>

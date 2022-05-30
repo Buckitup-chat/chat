@@ -89,6 +89,17 @@ topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", info => topbar.show())
 window.addEventListener("phx:page-loading-stop", info => topbar.hide())
 
+// back button fix 
+window.addEventListener("popstate", e => {
+  history.pushState(null, null, window.location.pathname);
+
+  const target = document.querySelector('.x-back-target')
+  if (target) {
+    target.click()
+  }
+}, false);
+history.pushState({}, null, null);
+
 // connect if there are any LiveViews on the page
 liveSocket.connect()
 

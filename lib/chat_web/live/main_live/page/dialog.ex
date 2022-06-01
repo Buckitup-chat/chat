@@ -13,6 +13,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.Memo
   alias Chat.RoomInvites
   alias Chat.User
+  alias Chat.Utils
   alias Chat.Utils.StorageId
   alias ChatWeb.MainLive.Page
   alias ChatWeb.Router.Helpers, as: Routes
@@ -212,6 +213,33 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       |> Page.Login.store()
       |> Page.Lobby.refresh_room_list()
     end
+  rescue
+    _ -> socket
+  end
+
+  def accept_room_invite_and_open_room(
+        %{assigns: %{me: me, dialog: dialog, rooms: rooms}} = socket,
+        message_id
+      ) do
+    new_room_identitiy =
+      Dialogs.read_message(dialog, message_id, me)
+      |> then(fn %{type: :room_invite, content: json} -> json end)
+      |> StorageId.from_json()
+      |> RoomInvites.get()
+      |> Identity.from_strings()
+
+    room_hash = new_room_identitiy |> Utils.hash()
+
+    if rooms |> Enum.any?(&(&1.priv_key == new_room_identitiy.priv_key)) do
+      socket
+    else
+      socket
+      |> assign(:rooms, [new_room_identitiy | rooms])
+      |> Page.Login.store()
+      |> Page.Lobby.refresh_room_list()
+    end
+    |> close()
+    |> Page.Room.init(room_hash)
   rescue
     _ -> socket
   end

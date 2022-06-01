@@ -11,6 +11,9 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
     case event do
       {"accept-room-invite", %{"id" => id, "time" => time}} ->
         socket |> Page.Dialog.accept_room_invite({time |> String.to_integer(), id})
+
+      {"accept-room-invite-and-open-room", %{"id" => id, "time" => time}} ->
+        socket |> Page.Dialog.accept_room_invite_and_open_room({time |> String.to_integer(), id})
     end
   end
 

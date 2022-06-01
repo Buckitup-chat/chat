@@ -6,7 +6,9 @@ defmodule ChatWeb.MainLive.Index do
 
   alias Chat.Db
   alias Chat.Files
+  alias Chat.Identity
   alias Chat.Memo
+  alias Chat.RoomInvites
   alias Chat.Rooms
   alias Chat.Utils.StorageId
   alias ChatWeb.MainLive.Page
@@ -353,6 +355,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("dialog/" <> event, params, socket) do
+    socket
+    |> Page.DialogRouter.event({event, params})
+    |> noreply()
+  end
+
   def handle_event("room/" <> event, params, socket) do
     socket
     |> Page.RoomRouter.event({event, params})
@@ -471,6 +479,39 @@ defmodule ChatWeb.MainLive.Index do
     <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
       <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
       <span class="x-content"><.message_text msg={@msg} /></span>
+      <.message_timestamp msg={@msg} />
+    </div>  
+    """
+  end
+
+  def message(%{msg: %{type: :room_invite, content: json}} = assigns) do
+    name =
+      json
+      |> StorageId.from_json()
+      |> RoomInvites.get()
+      |> Identity.from_strings()
+      |> Map.get(:name)
+
+    assigns =
+      assigns
+      |> Map.put(:room_name, name)
+
+    ~H"""
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+      <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
+       -- Room Invite: <%= @room_name %> --
+       <%= unless @is_mine do %>
+         <button class="border"
+          phx-click="dialog/accept-room-invite"
+          phx-value-id={@msg.id}
+          phx-value-time={@msg.timestamp}
+         >Accept</button>
+         <button class="border"
+          phx-click="dialog/accept-room-invite-and-open-room"
+          phx-value-id={@msg.id}
+          phx-value-time={@msg.timestamp}
+         >and Open</button>
+       <% end %>
       <.message_timestamp msg={@msg} />
     </div>  
     """

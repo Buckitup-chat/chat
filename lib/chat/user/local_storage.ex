@@ -6,7 +6,7 @@ defmodule Chat.User.LocalStorage do
 
   def encode(%Identity{} = me, rooms) do
     Actor.new(me, rooms, [])
-    |> Actor.to_encrypted_json("v2")
+    |> Actor.to_json()
   end
 
   def decode(data) do
@@ -17,7 +17,7 @@ defmodule Chat.User.LocalStorage do
 
   defp decode_v2(data) do
     data
-    |> Actor.from_encrypted_json("v2")
+    |> Actor.from_json()
     |> then(&{&1.me, &1.rooms})
   end
 

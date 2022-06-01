@@ -5,6 +5,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   alias Phoenix.PubSub
 
+  alias Chat.Dialogs
   alias Chat.Identity
   alias Chat.Log
   alias Chat.Memo
@@ -188,6 +189,23 @@ defmodule ChatWeb.MainLive.Page.Room do
     Rooms.approve_request(room_identity |> Utils.hash(), user_hash, room_identity)
 
     socket
+  end
+
+  def invite_user(
+        %{assigns: %{room: %{name: room_name}, room_identity: identity, me: me}} = socket,
+        user_hash
+      ) do
+    full_room_identity =
+      identity
+      |> Map.put(:name, room_name)
+
+    me
+    |> Dialogs.find_or_open(user_hash |> User.by_id())
+    |> Dialogs.add_room_invite(me, full_room_identity)
+
+    socket
+  rescue
+    _ -> socket
   end
 
   def close(%{assigns: %{room: nil}} = socket), do: socket

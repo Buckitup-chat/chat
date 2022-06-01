@@ -462,7 +462,17 @@
                       <% end %> 
                     </div>
                   <% end %>
-                  <button class="flex items-center">
+                  <div id="room-invite-list" class="hidden">
+                    <%= for user <- Chat.User.list() do %>
+                      <%= unless user.hash == @my_id do %>
+                        <a
+                          phx-click="room/invite-user"
+                          phx-value-hash={user.hash}
+                        ><%= user.name %> [hash]</a>
+                      <% end %> 
+                    <% end %> 
+                  </div>
+                  <button class="flex items-center" phx-click={JS.toggle(to: "#room-invite-list")}>
                     <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-white"/>
                     <span class="text-base text-white"> Invite</span>
                   </button>

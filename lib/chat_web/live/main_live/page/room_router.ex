@@ -13,6 +13,9 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
       {"create", %{"new_room" => %{"name" => name, "type" => type}}} ->
         socket |> Page.Lobby.new_room(name, type |> String.to_existing_atom())
 
+      {"invite-user", %{"hash" => hash}} ->
+        socket |> Page.Room.invite_user(hash)
+
       {"approve-request", %{"hash" => hash}} ->
         socket |> Page.Room.approve_request(hash)
 

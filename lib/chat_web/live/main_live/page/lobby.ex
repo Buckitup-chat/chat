@@ -94,6 +94,8 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     socket
   end
 
+  def refresh_room_list(socket), do: assign_room_list(socket)
+
   defp assign_user_list(socket) do
     socket
     |> assign(:user_id, User.list() |> List.last())

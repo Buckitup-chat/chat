@@ -94,7 +94,7 @@ defmodule Chat.Rooms.Room do
           decrypted =
             blob
             |> Utils.decrypt_blob(secret)
-            |> :erlang.binary_to_term()
+            |> Identity.from_strings()
 
           {reqs, [decrypted | rooms]}
 
@@ -111,7 +111,7 @@ defmodule Chat.Rooms.Room do
   defp encrypt_identity(room_identity, key) do
     {blob, secret} =
       room_identity
-      |> :erlang.term_to_binary()
+      |> Identity.to_strings()
       |> Utils.encrypt_blob()
 
     {secret |> Utils.encrypt(key), blob}

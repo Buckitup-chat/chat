@@ -80,7 +80,7 @@ defmodule Chat.Rooms.RoomTest do
     decrypted =
       blob
       |> Utils.decrypt_blob(secret)
-      |> :erlang.binary_to_term()
+      |> Identity.from_strings()
 
     assert room_identity == decrypted
 

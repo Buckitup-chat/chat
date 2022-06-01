@@ -29,6 +29,7 @@ defmodule Chat.Dialogs do
   defdelegate add_memo(dialog, src, memo, now \\ DateTime.utc_now()), to: Dialog
   defdelegate add_file(dialog, src, data, now \\ DateTime.utc_now()), to: Dialog
   defdelegate add_image(dialog, src, data, now \\ DateTime.utc_now()), to: Dialog
+  defdelegate add_room_invite(dialog, src, room_identity, now \\ DateTime.utc_now()), to: Dialog
 
   defdelegate update(dialog, author, msg_time_id, content), to: Dialog
   defdelegate delete(dialog, author, msg_time_id), to: Dialog

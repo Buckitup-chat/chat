@@ -1,6 +1,8 @@
 defmodule Chat.Identity do
   @moduledoc "Identity to be stored on user device. Can be used for User as well as for Room"
 
+  alias Chat.Codec
+
   @derive {Inspect, only: [:name]}
   defstruct [:name, :priv_key]
 
@@ -13,6 +15,17 @@ defmodule Chat.Identity do
 
   def pub_key(%__MODULE__{} = identitiy) do
     X509.PublicKey.derive(identitiy.priv_key)
+  end
+
+  def to_strings(%__MODULE__{name: name, priv_key: key}) do
+    [name, key |> Codec.private_key_to_string()]
+  end
+
+  def from_strings([name, key_str]) do
+    %__MODULE__{
+      name: name,
+      priv_key: key_str |> Codec.private_key_from_string()
+    }
   end
 
   defp generate_key do

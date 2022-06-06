@@ -210,6 +210,18 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("dialog/toggle-messages-select", params, socket) do
+    socket
+    |> Page.Dialog.toggle_messages_select(params)
+    |> noreply()
+  end
+
+  def handle_event("dialog/select-message", params, socket) do
+    socket
+    |> Page.Dialog.select_message(params)
+    |> noreply()
+  end
+
   def handle_event("close-dialog", _, socket) do
     socket
     |> Page.Dialog.close()
@@ -279,6 +291,30 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("delete-message", %{"id" => id, "timestamp" => time, "type" => "room"}, socket) do
     socket
     |> Page.Room.delete_message({time |> String.to_integer(), id})
+    |> noreply()
+  end
+
+  def handle_event("room/delete-messages", params, socket) do
+    socket
+    |> Page.Room.delete_messages(params)
+    |> noreply()
+  end
+
+  def handle_event("room/toggle-messages-select", params, socket) do
+    socket
+    |> Page.Room.toggle_messages_select(params)
+    |> noreply()
+  end
+
+  def handle_event("room/select-message", params, socket) do
+    socket
+    |> Page.Room.select_message(params)
+    |> noreply()
+  end
+
+  def handle_event("dialog/delete-messages", params, socket) do
+    socket
+    |> Page.Dialog.delete_messages(params)
     |> noreply()
   end
 
@@ -392,7 +428,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_info({:deleted_dialog_message, msg_id}, socket) do
     socket
-    |> push_event("chat:toggle", %{to: "#dialog-message-#{msg_id}", class: "hidden"})
+    |> Page.Dialog.hide_deleted_message(msg_id)
     |> noreply()
   end
 
@@ -422,7 +458,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_info({:room, {:deleted_message, msg_id}}, socket) do
     socket
-    |> push_event("chat:toggle", %{to: "#room-message-#{msg_id}", class: "hidden"})
+    |> Page.Room.hide_deleted_message(msg_id)
     |> noreply()
   end
 
@@ -583,12 +619,12 @@ defmodule ChatWeb.MainLive.Index do
         <div class="text-sm text-grayscale600">[<%= short_hash(@author.hash) %>]</div>
         <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
       </div>
-      <button phx-click={open_dropdown("messageActionsDropdown-#{@msg.id}") 
+      <button type="button"  class="messageActionsDropdownButton hiddenUnderSelection" phx-click={open_dropdown("messageActionsDropdown-#{@msg.id}") 
                          |> JS.dispatch("chat:set-dropdown-position", to: "#messageActionsDropdown-#{@msg.id}", detail: %{relativeElementId: "message-#{@msg.id}"})}
       >
         <.icon id="menu" class="w-4 h-4 flex fill-purple"/>
       </button>
-      <.dropdown id={"messageActionsDropdown-#{@msg.id}"} >
+      <.dropdown class="messageActionsDropdown " id={"messageActionsDropdown-#{@msg.id}"} >
         <%= if @is_mine do %>
           <%= if @msg.type in [:text, :memo] do %>
             <a class="dropdownItem"
@@ -618,6 +654,14 @@ defmodule ChatWeb.MainLive.Index do
         <a phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")} class="dropdownItem"> 
           <.icon id="share" class="w-4 h-4 flex fill-black"/>
           <span>Share</span>
+        </a>
+        <a class="dropdownItem"
+           phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")
+                      |> JS.push("#{message_of(@msg)}/toggle-messages-select", 
+                          value: %{action: :on, id: @msg.id, type: message_of(@msg)})
+                      }> 
+          <.icon id="select" class="w-4 h-4 flex fill-black"/>
+          <span>Select</span>
         </a>
         <%= if @msg.type in [:file, :image] do %>
           <a 

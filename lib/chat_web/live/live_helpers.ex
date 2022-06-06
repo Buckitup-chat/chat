@@ -108,6 +108,8 @@ defmodule ChatWeb.LiveHelpers do
 
   def hide_dropdown(%JS{} = js, id), do: js |> JS.hide(transition: "fade-out", to: "#" <> id)
 
+  def stringify_commands(%JS{ops: ops}), do: Jason.encode!(ops)
+
   def icon(assigns) do
     ~H"""
     <svg class={@class}>

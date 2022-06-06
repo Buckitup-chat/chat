@@ -65,6 +65,23 @@ const listeners = {
     
     if (relativeElementRect.width < e.target.offsetWidth) { e.target.style.left = 0 }
   },
+  "chat:messages-to-delete": (e) => {
+    setTimeout(() => {
+      const checkboxes = document.querySelectorAll('.selectCheckbox.checked');
+      const deleteButton = e.target.querySelector('.deleteMessageButton');
+      const messages = []
+      for (const checkbox of checkboxes) {
+        const message = checkbox.parentNode;
+        if (message.getAttribute('phx-value-is-mine') == 'true' && message.classList.contains('hidden') == false) {
+          messages.push({
+            id: message.getAttribute('phx-value-id'),
+            timestamp: message.getAttribute('phx-value-timestamp')
+          });
+        }
+      }
+      deleteButton.setAttribute('phx-value-messages', JSON.stringify(messages));
+    }, 200);
+   },
   "phx:chat:toggle": (e) => {
     if (e.detail && e.detail.class && e.detail.to) {
       document

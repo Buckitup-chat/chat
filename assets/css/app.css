@@ -57,7 +57,7 @@ html {
   }
 }
 
-.contentContainer { @apply h-screen basis-[100%] }
+.contentContainer { @apply basis-[100%] }
 
 @media screen and (min-width: 640px) {
   .navbar { @apply h-screen w-[70px] flex flex-none flex-col justify-between bg-white }
@@ -78,6 +78,25 @@ html {
   
 }
 
+.selectCheckbox {
+  @apply hidden;
+}
+
+.selectedMessageBackground {
+  @apply bg-transparent;
+}
+
+.selectMode .selectedMessageBackground {
+  @apply bg-black/10;
+}
+
+.selectMode .messageActionsDropdownButton {
+  @apply hidden;
+}
+
+.selectMode .selectCheckbox {
+  @apply block;
+}
 
 .sidebarIcon {
   @apply flex flex-col items-center justify-center 

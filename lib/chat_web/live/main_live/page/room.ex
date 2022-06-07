@@ -48,7 +48,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> case do
       %{assigns: %{room_mode: :select}} = socket ->
         socket
-        |> push_event("chat:toggle", %{to: "#room-messages", class: "selectMode"})
+        |> push_event("chat:toggle", %{to: "#chat-messages", class: "selectMode"})
 
       socket ->
         socket
@@ -245,12 +245,11 @@ defmodule ChatWeb.MainLive.Page.Room do
     end
   end
 
-  def toggle_messages_select(%{assigns: %{}} = socket, %{"action" => "on", "id" => _} = params) do
+  def toggle_messages_select(%{assigns: %{}} = socket, %{"action" => "on"}) do
     socket
     |> forget_current_messages()
     |> assign(:room_mode, :select)
-    |> push_event("chat:toggle", %{to: "#room-messages", class: "selectMode"})
-    |> push_event("chat:select-message", params)
+    |> push_event("chat:toggle", %{to: "#chat-messages", class: "selectMode"})
   end
 
   def toggle_messages_select(%{assigns: %{room_mode: :select}} = socket, %{"action" => "off"}) do
@@ -258,16 +257,6 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> forget_current_messages()
     |> assign(:room_mode, :plain)
   end
-
-  def select_message(
-        %{assigns: %{room_mode: :select}} = socket,
-        %{"id" => _id, "type" => "room"} = params
-      ) do
-    socket
-    |> push_event("chat:select-message", params)
-  end
-
-  def select_message(%{assigns: %{}} = socket, _), do: socket
 
   defp room_topic(%Rooms.Room{pub_key: key}) do
     key

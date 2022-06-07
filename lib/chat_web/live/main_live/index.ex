@@ -216,12 +216,6 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("dialog/select-message", params, socket) do
-    socket
-    |> Page.Dialog.select_message(params)
-    |> noreply()
-  end
-
   def handle_event("close-dialog", _, socket) do
     socket
     |> Page.Dialog.close()
@@ -303,12 +297,6 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("room/toggle-messages-select", params, socket) do
     socket
     |> Page.Room.toggle_messages_select(params)
-    |> noreply()
-  end
-
-  def handle_event("room/select-message", params, socket) do
-    socket
-    |> Page.Room.select_message(params)
     |> noreply()
   end
 
@@ -657,9 +645,9 @@ defmodule ChatWeb.MainLive.Index do
         </a>
         <a class="dropdownItem"
            phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")
-                      |> JS.push("#{message_of(@msg)}/toggle-messages-select", 
-                          value: %{action: :on, id: @msg.id, type: message_of(@msg)})
-                      }> 
+                     |> JS.push("#{message_of(@msg)}/toggle-messages-select", value: %{action: :on, id: @msg.id, chatType: message_of(@msg)})
+                     |> JS.dispatch("chat:select-message", to: "#message-block-#{@msg.id}", detail: %{chatType: message_of(@msg)})
+                     }> 
           <.icon id="select" class="w-4 h-4 flex fill-black"/>
           <span>Select</span>
         </a>

@@ -48,7 +48,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> case do
       %{assigns: %{dialog_mode: :select}} = socket ->
         socket
-        |> push_event("chat:toggle", %{to: "#dialog-messages", class: "selectMode"})
+        |> push_event("chat:toggle", %{to: "#chat-messages", class: "selectMode"})
 
       socket ->
         socket
@@ -217,12 +217,11 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     end
   end
 
-  def toggle_messages_select(%{assigns: %{}} = socket, %{"action" => "on", "id" => _} = params) do
+  def toggle_messages_select(%{assigns: %{}} = socket, %{"action" => "on"} = params) do
     socket
     |> forget_current_messages()
     |> assign(:dialog_mode, :select)
-    |> push_event("chat:toggle", %{to: "#dialog-messages", class: "selectMode"})
-    |> push_event("chat:select-message", params)
+    |> push_event("chat:toggle", %{to: "#chat-messages", class: "selectMode"})
   end
 
   def toggle_messages_select(%{assigns: %{dialog_mode: :select}} = socket, %{"action" => "off"}) do
@@ -230,16 +229,6 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> forget_current_messages()
     |> assign(:dialog_mode, :plain)
   end
-
-  def select_message(
-        %{assigns: %{dialog_mode: :select}} = socket,
-        %{"id" => _id, "type" => "dialog"} = params
-      ) do
-    socket
-    |> push_event("chat:select-message", params)
-  end
-
-  def select_message(%{assigns: %{}} = socket, _), do: socket
 
   def close(%{assigns: %{dialog: nil}} = socket), do: socket
 

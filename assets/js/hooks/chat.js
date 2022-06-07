@@ -14,23 +14,8 @@ export const hooks = {
       }
     })
 
-    this.handleEvent("chat:select-message", ({id: id, type: chatType}) => {
-     const messageBlock = document.querySelector(`#message-block-${id}`);
-     const messageBlockCheckbox = messageBlock.querySelector('.selectCheckbox');
-  
-     if (messageBlockCheckbox.classList.contains('hidden') == true) { return false }
-     if (messageBlockCheckbox.classList.contains('checked') == true) { 
-       messageBlock.classList.remove('selectedMessageBackground');
-       messageBlockCheckbox.classList.remove('checked');
-       messageBlockCheckbox.checked = false;
-     } else {
-       messageBlock.classList.add('selectedMessageBackground');
-       messageBlockCheckbox.classList.add('checked');
-       messageBlockCheckbox.checked = true;
-     }
-     if (document.querySelectorAll('.checked').length == 0) {
-       this.pushEvent(`${chatType}/toggle-messages-select`, {action: 'off'})
-     }
+    this.el.addEventListener("chat:toggle-selection-mode", e => {
+      this.pushEvent(`${e.detail.chatType}/toggle-messages-select`, {action: 'off'})
     })
   },
 

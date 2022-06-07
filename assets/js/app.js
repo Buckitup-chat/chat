@@ -65,6 +65,22 @@ const listeners = {
     
     if (relativeElementRect.width < e.target.offsetWidth) { e.target.style.left = 0 }
   },
+  "chat:select-message": (e) => {
+    setTimeout(() => {
+      if (document.querySelector("#chat-messages").classList.contains('selectMode') == false) { return false }
+      
+      const messageBlock = e.target;
+      const messageBlockCheckbox = messageBlock.querySelector('.selectCheckbox');
+      messageBlock.classList.toggle('selectedMessageBackground');
+      messageBlockCheckbox.classList.toggle('checked');
+      messageBlockCheckbox.checked = !messageBlockCheckbox.checked;
+      if (document.querySelectorAll('.checked').length == 0) {  
+        document.getElementById("chatContent").dispatchEvent(
+          new CustomEvent('chat:toggle-selection-mode', {detail: {chatType: e.detail.chatType}})
+        )
+      }
+  }, 200);
+  },
   "chat:messages-to-delete": (e) => {
     setTimeout(() => {
       const checkboxes = document.querySelectorAll('.selectCheckbox.checked');

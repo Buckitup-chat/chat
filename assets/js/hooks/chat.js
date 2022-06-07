@@ -19,7 +19,6 @@ export const hooks = {
      const messageBlockCheckbox = messageBlock.querySelector('.selectCheckbox');
   
      if (messageBlockCheckbox.classList.contains('hidden') == true) { return false }
-     //messageBlockCheckbox.classList.toggle('checked');
      if (messageBlockCheckbox.classList.contains('checked') == true) { 
        messageBlock.classList.remove('selectedMessageBackground');
        messageBlockCheckbox.classList.remove('checked');

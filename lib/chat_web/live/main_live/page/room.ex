@@ -264,7 +264,6 @@ defmodule ChatWeb.MainLive.Page.Room do
         %{"id" => _id, "type" => "room"} = params
       ) do
     socket
-    |> forget_current_messages()
     |> push_event("chat:select-message", params)
   end
 

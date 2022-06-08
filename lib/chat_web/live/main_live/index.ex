@@ -225,6 +225,12 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_event("close-dialog", _, socket) do
     socket
+    |> Page.Dialog.toggle_messages_select(params)
+    |> noreply()
+  end
+
+  def handle_event("close-dialog", _, socket) do
+    socket
     |> Page.Dialog.close()
     |> noreply()
   end
@@ -268,6 +274,30 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("delete-message", %{"id" => id, "timestamp" => time, "type" => "room"}, socket) do
     socket
     |> Page.Room.delete_message({time |> String.to_integer(), id})
+    |> noreply()
+  end
+
+  def handle_event("room/delete-messages", params, socket) do
+    socket
+    |> Page.Room.delete_messages(params)
+    |> noreply()
+  end
+
+  def handle_event("room/toggle-messages-select", params, socket) do
+    socket
+    |> Page.Room.toggle_messages_select(params)
+    |> noreply()
+  end
+
+  def handle_event("dialog/delete-messages", params, socket) do
+    socket
+    |> Page.Dialog.delete_messages(params)
+    |> noreply()
+  end
+
+  def handle_event("room/import-images", _, socket) do
+    socket
+    |> push_event("chat:scroll-down", %{})
     |> noreply()
   end
 
@@ -455,7 +485,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_info({:room, msg}, socket), do: socket |> Page.RoomRouter.info(msg) |> noreply()
 
-  def handle_progress(:image, %{done?: true} = entry, socket) do
+def handle_progress(:image, %{done?: true} = entry, socket) do
     socket
     |> Page.Dialog.send_image(entry)
     |> noreply()

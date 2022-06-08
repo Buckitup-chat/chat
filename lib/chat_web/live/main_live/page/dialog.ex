@@ -32,8 +32,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     socket
     |> assign(:page, 0)
     |> assign(:peer, peer)
-    |> assign(:edit_dialog, false)
     |> assign(:dialog, dialog)
+    |> assign(:dialog_mode, :plain)
     |> assign(:has_more_messages, true)
     |> assign(:last_load_timestamp, nil)
     |> assign(:message_update_mode, :replace)
@@ -45,6 +45,14 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:page, page + 1)
     |> assign(:message_update_mode, :prepend)
     |> assign_messages()
+    |> case do
+      %{assigns: %{dialog_mode: :select}} = socket ->
+        socket
+        |> push_event("chat:toggle", %{to: "#chat-messages", class: "selectMode"})
+
+      socket ->
+        socket
+    end
   end
 
   def send_text(%{assigns: %{dialog: dialog, me: me}} = socket, text) do
@@ -113,11 +121,10 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       end)
 
     socket
-    |> assign(:edit_dialog, true)
+    |> assign(:dialog_mode, :edit)
     |> assign(:edit_content, content)
     |> assign(:edit_message_id, msg_id)
-    |> assign(:messages, [])
-    |> assign(:message_update_mode, :append)
+    |> forget_current_messages()
     |> push_event("chat:focus", %{to: "#dialog-edit-input"})
   end
 
@@ -145,14 +152,13 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       |> render_to_html_string(render_fun)
 
     socket
-    |> assign(:messages, [])
-    |> assign(:message_update_mode, :append)
+    |> forget_current_messages()
     |> push_event("chat:change", %{to: "#dialog-message-#{id} .x-content", content: content})
   end
 
   def cancel_edit(socket) do
     socket
-    |> assign(:edit_dialog, false)
+    |> assign(:dialog_mode, :plain)
     |> assign(:edit_content, nil)
     |> assign(:edit_message_id, nil)
   end
@@ -162,6 +168,24 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     broadcast_message_deleted(msg_id, dialog, me)
 
     socket
+  end
+
+  def delete_messages(%{assigns: %{me: me, dialog: dialog}} = socket, %{"messages" => messages}) do
+    messages
+    |> Jason.decode!()
+    |> Enum.map(fn %{"id" => msg_id, "timestamp" => time} ->
+      Dialogs.delete(dialog, me, {String.to_integer(time), msg_id})
+      broadcast_message_deleted(msg_id, dialog, me)
+    end)
+
+    socket
+    |> assign(:dialog_mode, :plain)
+  end
+
+  def hide_deleted_message(socket, id) do
+    socket
+    |> forget_current_messages()
+    |> push_event("chat:toggle", %{to: "#message-block-#{id}", class: "hidden"})
   end
 
   def download_message(
@@ -191,6 +215,19 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       _ ->
         socket
     end
+  end
+
+  def toggle_messages_select(%{assigns: %{}} = socket, %{"action" => "on"}) do
+    socket
+    |> forget_current_messages()
+    |> assign(:dialog_mode, :select)
+    |> push_event("chat:toggle", %{to: "#chat-messages", class: "selectMode"})
+  end
+
+  def toggle_messages_select(%{assigns: %{dialog_mode: :select}} = socket, %{"action" => "off"}) do
+    socket
+    |> forget_current_messages()
+    |> assign(:dialog_mode, :plain)
   end
 
   def close(%{assigns: %{dialog: nil}} = socket), do: socket
@@ -257,4 +294,10 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
   defp set_messages_timestamp([]), do: nil
   defp set_messages_timestamp([message | _]), do: message.timestamp
+
+  defp forget_current_messages(socket) do
+    socket
+    |> assign(:messages, [])
+    |> assign(:message_update_mode, :append)
+  end
 end

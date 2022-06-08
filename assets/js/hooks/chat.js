@@ -13,11 +13,14 @@ export const hooks = {
         })
       }
     })
+
+    this.el.addEventListener("chat:toggle-selection-mode", e => {
+      this.pushEvent(`${e.detail.chatType}/toggle-messages-select`, {action: 'off'})
+    })
   },
 
   updated() {
     this.pending = this.page();
-    this.setScrollTop();
   },
 
   reconnected() {

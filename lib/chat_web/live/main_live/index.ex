@@ -34,8 +34,8 @@ defmodule ChatWeb.MainLive.Index do
         |> allow_image_upload(:room_image)
         |> allow_any500m_upload(:backup_file)
         |> allow_any500m_upload(:my_keys_file)
-        |> allow_any500m_upload(:dialog_file)
-        |> allow_any500m_upload(:room_file)
+        |> allow_any500m_upload(:dialog_file, max_entries: 50)
+        |> allow_any500m_upload(:room_file, max_entries: 50)
         |> Page.Login.check_stored()
         |> ok()
       end
@@ -171,10 +171,17 @@ defmodule ChatWeb.MainLive.Index do
     end
   end
 
-  def handle_event("dialog-image-change", _, socket), do: socket |> noreply()
-  def handle_event("dialog-image-submit", _, socket), do: socket |> noreply()
-  def handle_event("dialog-file-change", _, socket), do: socket |> noreply()
-  def handle_event("dialog-file-submit", _, socket), do: socket |> noreply()
+  def handle_event("dialog/import-images", _, socket) do
+    socket
+    |> push_event("chat:scroll-down", %{})
+    |> noreply()
+  end
+
+  def handle_event("dialog/import-files", _, socket) do
+    socket
+    |> push_event("chat:scroll-down", %{})
+    |> noreply()
+  end
 
   def handle_event("dialog/cancel-edit", _, socket) do
     socket
@@ -207,6 +214,12 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("dialog/download-message", %{"id" => id, "timestamp" => time}, socket) do
     socket
     |> Page.Dialog.download_message({time |> String.to_integer(), id})
+    |> noreply()
+  end
+
+  def handle_event("dialog/toggle-messages-select", params, socket) do
+    socket
+    |> Page.Dialog.toggle_messages_select(params)
     |> noreply()
   end
 
@@ -258,8 +271,35 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("room-image-submit", _, socket), do: socket |> noreply()
-  def handle_event("room-file-submit", _, socket), do: socket |> noreply()
+  def handle_event("room/delete-messages", params, socket) do
+    socket
+    |> Page.Room.delete_messages(params)
+    |> noreply()
+  end
+
+  def handle_event("room/toggle-messages-select", params, socket) do
+    socket
+    |> Page.Room.toggle_messages_select(params)
+    |> noreply()
+  end
+
+  def handle_event("dialog/delete-messages", params, socket) do
+    socket
+    |> Page.Dialog.delete_messages(params)
+    |> noreply()
+  end
+
+  def handle_event("room/import-images", _, socket) do
+    socket
+    |> push_event("chat:scroll-down", %{})
+    |> noreply()
+  end
+
+  def handle_event("room/import-files", _, socket) do
+    socket
+    |> push_event("chat:scroll-down", %{})
+    |> noreply()
+  end
 
   def handle_event("export-keys", %{"export_key_ring" => %{"code" => code}}, socket) do
     socket
@@ -374,7 +414,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_info({:deleted_dialog_message, msg_id}, socket) do
     socket
-    |> push_event("chat:toggle", %{to: "#dialog-message-#{msg_id}", class: "hidden"})
+    |> Page.Dialog.hide_deleted_message(msg_id)
     |> noreply()
   end
 
@@ -415,27 +455,27 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_info({:room, msg}, socket), do: socket |> Page.RoomRouter.info(msg) |> noreply()
 
-  def handle_progress(:image, %{done?: true}, socket) do
+  def handle_progress(:image, %{done?: true} = entry, socket) do
     socket
-    |> Page.Dialog.send_image()
+    |> Page.Dialog.send_image(entry)
     |> noreply()
   end
 
-  def handle_progress(:dialog_file, %{done?: true}, socket) do
+  def handle_progress(:dialog_file, %{done?: true} = entry, socket) do
     socket
-    |> Page.Dialog.send_file()
+    |> Page.Dialog.send_file(entry)
     |> noreply()
   end
 
-  def handle_progress(:room_image, %{done?: true}, socket) do
+  def handle_progress(:room_image, %{done?: true} = entry, socket) do
     socket
-    |> Page.Room.send_image()
+    |> Page.Room.send_image(entry)
     |> noreply()
   end
 
-  def handle_progress(:room_file, %{done?: true}, socket) do
+  def handle_progress(:room_file, %{done?: true} = entry, socket) do
     socket
-    |> Page.Room.send_file()
+    |> Page.Room.send_file(entry)
     |> noreply()
   end
 
@@ -479,8 +519,17 @@ defmodule ChatWeb.MainLive.Index do
   def message(%{msg: %{type: :request}} = assigns) do
     ~H"""
     <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
-      <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
-       -- Requesting access into the room --
+      <div class="py-1 px-2">
+        <div class="inline-flex">
+          <div class=" font-bold text-sm text-purple">[<%= short_hash(@author.hash) %>]</div>
+          <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
+        </div>
+        <p class="inline-flex">wants you to join this room </p>
+        <div class="inline-flex">        
+          <div class="font-bold text-sm text-purple">[<%= short_hash(@room.admin_hash) %>]</div>
+          <h1 class="ml-1 font-bold text-sm text-purple" ><%= @room.name %></h1>
+        </div>
+      </div>
       <.message_timestamp msg={@msg} />
     </div>  
     """
@@ -559,12 +608,12 @@ defmodule ChatWeb.MainLive.Index do
         <div class="text-sm text-grayscale600">[<%= short_hash(@author.hash) %>]</div>
         <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
       </div>
-      <button phx-click={open_dropdown("messageActionsDropdown-#{@msg.id}") 
+      <button type="button"  class="messageActionsDropdownButton hiddenUnderSelection" phx-click={open_dropdown("messageActionsDropdown-#{@msg.id}") 
                          |> JS.dispatch("chat:set-dropdown-position", to: "#messageActionsDropdown-#{@msg.id}", detail: %{relativeElementId: "message-#{@msg.id}"})}
       >
         <.icon id="menu" class="w-4 h-4 flex fill-purple"/>
       </button>
-      <.dropdown id={"messageActionsDropdown-#{@msg.id}"} >
+      <.dropdown class="messageActionsDropdown " id={"messageActionsDropdown-#{@msg.id}"} >
         <%= if @is_mine do %>
           <%= if @msg.type in [:text, :memo] do %>
             <a class="dropdownItem"
@@ -594,6 +643,14 @@ defmodule ChatWeb.MainLive.Index do
         <a phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")} class="dropdownItem"> 
           <.icon id="share" class="w-4 h-4 flex fill-black"/>
           <span>Share</span>
+        </a>
+        <a class="dropdownItem"
+           phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")
+                     |> JS.push("#{message_of(@msg)}/toggle-messages-select", value: %{action: :on, id: @msg.id, chatType: message_of(@msg)})
+                     |> JS.dispatch("chat:select-message", to: "#message-block-#{@msg.id}", detail: %{chatType: message_of(@msg)})
+                     }> 
+          <.icon id="select" class="w-4 h-4 flex fill-black"/>
+          <span>Select</span>
         </a>
         <%= if @msg.type in [:file, :image] do %>
           <a 
@@ -656,19 +713,19 @@ defmodule ChatWeb.MainLive.Index do
     |> allow_upload(type,
       accept: ~w(.jpg .jpeg .png),
       auto_upload: true,
-      max_entries: 1,
+      max_entries: 50,
       max_file_size: 60_000_000,
       progress: &handle_progress/3
     )
   end
 
-  defp allow_any500m_upload(socket, type) do
+  defp allow_any500m_upload(socket, type, opts \\ []) do
     socket
     |> allow_upload(type,
       auto_upload: true,
       max_file_size: 524_000_000,
       accept: :any,
-      max_entries: 1,
+      max_entries: Keyword.get(opts, :max_entries, 1),
       progress: &handle_progress/3
     )
   end

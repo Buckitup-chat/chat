@@ -10,7 +10,8 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
 
   def event(socket, event) do
     case event do
-      {"create", %{"new_room" => %{"name" => name, "type" => type}}} ->
+      {"create", %{"new_room" => %{"name" => name, "type" => type}} = params} ->
+        IO.inspect(params)
         socket |> Page.Lobby.new_room(name, type |> String.to_existing_atom())
 
       {"approve-request", %{"hash" => hash}} ->
@@ -40,7 +41,7 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
         socket |> Page.Room.update_message(msg_id, &Index.message_text/1)
 
       {:deleted_message, msg_id} ->
-        socket |> Page.Room.render_deleted_message(msg_id)
+        socket |> Page.Room.hide_deleted_message(msg_id)
     end
   end
 end

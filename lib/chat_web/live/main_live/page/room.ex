@@ -109,6 +109,7 @@ defmodule ChatWeb.MainLive.Page.Room do
       |> assign(:page, 0)
       |> assign(:messages, [new_message |> Rooms.read_message(identity)])
       |> assign(:message_update_mode, :append)
+      |> push_event("chat:scroll-down", %{})
     else
       socket
     end

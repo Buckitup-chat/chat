@@ -17,6 +17,8 @@ export const hooks = {
     this.el.addEventListener("chat:toggle-selection-mode", e => {
       this.pushEvent(`${e.detail.chatType}/toggle-messages-select`, {action: 'off'})
     })
+
+    this.handleEvent("chat:scroll-down", e => { setTimeout(() => { this.setScrollTop() }, 300) })
   },
 
   updated() {

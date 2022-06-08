@@ -1,7 +1,7 @@
 defmodule ChatWeb.MainLive.Page.Dialog do
   @moduledoc "Dialog page"
   import ChatWeb.MainLive.Page.Shared
-  import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entries: 3, consume_uploaded_entry: 3, push_event: 3]
+  import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entry: 3, push_event: 3]
 
   use Phoenix.Component
 
@@ -91,7 +91,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       socket,
       entry,
       fn %{path: path} ->
-        data = [File.read!(path), entry.client_type]        
+        data = [File.read!(path), entry.client_type]
         {:ok, Dialogs.add_image(dialog, me, data)}
       end
     )

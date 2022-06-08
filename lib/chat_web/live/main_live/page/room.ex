@@ -1,7 +1,7 @@
 defmodule ChatWeb.MainLive.Page.Room do
   @moduledoc "Room page"
   import ChatWeb.MainLive.Page.Shared
-  import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entries: 3, consume_uploaded_entry: 3, push_event: 3]
+  import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entry: 3, push_event: 3]
 
   alias Phoenix.PubSub
 
@@ -67,7 +67,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def send_file(%{assigns: %{me: me, room: room}} = socket, entry) do
-    consume_uploaded_entries(
+    consume_uploaded_entry(
       socket,
       entry,
       fn %{path: path} ->

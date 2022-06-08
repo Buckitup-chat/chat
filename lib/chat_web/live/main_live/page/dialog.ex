@@ -217,7 +217,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     end
   end
 
-  def toggle_messages_select(%{assigns: %{}} = socket, %{"action" => "on"} = params) do
+  def toggle_messages_select(%{assigns: %{}} = socket, %{"action" => "on"}) do
     socket
     |> forget_current_messages()
     |> assign(:dialog_mode, :select)

@@ -34,8 +34,8 @@ defmodule ChatWeb.MainLive.Index do
         |> allow_image_upload(:room_image)
         |> allow_any500m_upload(:backup_file)
         |> allow_any500m_upload(:my_keys_file)
-        |> allow_any500m_upload(:dialog_file)
-        |> allow_any500m_upload(:room_file)
+        |> allow_any500m_upload(:dialog_file, max_entries: 50)
+        |> allow_any500m_upload(:room_file, max_entries: 50)
         |> Page.Login.check_stored()
         |> ok()
       end
@@ -473,27 +473,27 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_progress(:image, %{done?: true}, socket) do
+  def handle_progress(:image, %{done?: true} = entry, socket) do
     socket
-    |> Page.Dialog.send_image()
+    |> Page.Dialog.send_image(entry)
     |> noreply()
   end
 
-  def handle_progress(:dialog_file, %{done?: true}, socket) do
+  def handle_progress(:dialog_file, %{done?: true} = entry, socket) do
     socket
-    |> Page.Dialog.send_file()
+    |> Page.Dialog.send_file(entry)
     |> noreply()
   end
 
-  def handle_progress(:room_image, %{done?: true}, socket) do
+  def handle_progress(:room_image, %{done?: true} = entry, socket) do
     socket
-    |> Page.Room.send_image()
+    |> Page.Room.send_image(entry)
     |> noreply()
   end
 
-  def handle_progress(:room_file, %{done?: true}, socket) do
+  def handle_progress(:room_file, %{done?: true} = entry, socket) do
     socket
-    |> Page.Room.send_file()
+    |> Page.Room.send_file(entry)
     |> noreply()
   end
 
@@ -712,19 +712,19 @@ defmodule ChatWeb.MainLive.Index do
     |> allow_upload(type,
       accept: ~w(.jpg .jpeg .png),
       auto_upload: true,
-      max_entries: 1,
+      max_entries: 50,
       max_file_size: 60_000_000,
       progress: &handle_progress/3
     )
   end
 
-  defp allow_any500m_upload(socket, type) do
+  defp allow_any500m_upload(socket, type, opts \\ []) do
     socket
     |> allow_upload(type,
       auto_upload: true,
       max_file_size: 524_000_000,
       accept: :any,
-      max_entries: 1,
+      max_entries: Keyword.get(opts, :max_entries, 1),
       progress: &handle_progress/3
     )
   end

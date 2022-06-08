@@ -128,10 +128,6 @@ html {
   @apply ml-2
 }
 
-.checkedBackgroundinput [type="radio"] {
-  background-color: #31708f;
-}
-
 /* Alerts and form errors used by phx.new */
 .alert {
   padding: 15px;

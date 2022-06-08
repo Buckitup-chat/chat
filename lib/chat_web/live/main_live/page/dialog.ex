@@ -1,7 +1,7 @@
 defmodule ChatWeb.MainLive.Page.Dialog do
   @moduledoc "Dialog page"
   import ChatWeb.MainLive.Page.Shared
-  import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entries: 3, push_event: 3]
+  import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entry: 3, push_event: 3]
 
   use Phoenix.Component
 
@@ -66,11 +66,11 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     socket
   end
 
-  def send_file(%{assigns: %{dialog: dialog, me: me}} = socket) do
-    consume_uploaded_entries(
+  def send_file(%{assigns: %{dialog: dialog, me: me}} = socket, entry) do
+    consume_uploaded_entry(
       socket,
-      :dialog_file,
-      fn %{path: path}, entry ->
+      entry,
+      fn %{path: path} ->
         data = [
           File.read!(path),
           entry.client_type |> mime_type(),
@@ -81,22 +81,20 @@ defmodule ChatWeb.MainLive.Page.Dialog do
         {:ok, Dialogs.add_file(dialog, me, data)}
       end
     )
-    |> Enum.at(0)
     |> broadcast_new_message(dialog, me)
 
     socket
   end
 
-  def send_image(%{assigns: %{dialog: dialog, me: me}} = socket) do
-    consume_uploaded_entries(
+  def send_image(%{assigns: %{dialog: dialog, me: me}} = socket, entry) do
+    consume_uploaded_entry(
       socket,
-      :image,
-      fn %{path: path}, entry ->
+      entry,
+      fn %{path: path} ->
         data = [File.read!(path), entry.client_type]
         {:ok, Dialogs.add_image(dialog, me, data)}
       end
     )
-    |> Enum.at(0)
     |> broadcast_new_message(dialog, me)
 
     socket

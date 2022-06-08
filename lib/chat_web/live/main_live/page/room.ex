@@ -1,7 +1,7 @@
 defmodule ChatWeb.MainLive.Page.Room do
   @moduledoc "Room page"
   import ChatWeb.MainLive.Page.Shared
-  import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entries: 3, push_event: 3]
+  import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entry: 3, push_event: 3]
 
   alias Phoenix.PubSub
 
@@ -66,11 +66,11 @@ defmodule ChatWeb.MainLive.Page.Room do
     socket
   end
 
-  def send_file(%{assigns: %{me: me, room: room}} = socket) do
-    consume_uploaded_entries(
+  def send_file(%{assigns: %{me: me, room: room}} = socket, entry) do
+    consume_uploaded_entry(
       socket,
-      :room_file,
-      fn %{path: path}, entry ->
+      entry,
+      fn %{path: path} ->
         data = [
           File.read!(path),
           entry.client_type |> mime_type(),
@@ -81,22 +81,20 @@ defmodule ChatWeb.MainLive.Page.Room do
         {:ok, Rooms.add_file(room, me, data)}
       end
     )
-    |> Enum.at(0)
     |> broadcast_new_message(room, me)
 
     socket
   end
 
-  def send_image(%{assigns: %{me: me, room: room}} = socket) do
-    consume_uploaded_entries(
+  def send_image(%{assigns: %{me: me, room: room}} = socket, entry) do
+    consume_uploaded_entry(
       socket,
-      :room_image,
-      fn %{path: path}, entry ->
+      entry,
+      fn %{path: path} ->
         data = [File.read!(path), entry.client_type]
         {:ok, Rooms.add_image(room, me, data)}
       end
     )
-    |> Enum.at(0)
     |> broadcast_new_message(room, me)
 
     socket

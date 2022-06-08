@@ -105,6 +105,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:messages, [Dialogs.read_message(dialog, new_message, me)])
     |> assign(:message_update_mode, :append)
     |> assign(:page, 0)
+    |> push_event("chat:scroll-down", %{})
   end
 
   def edit_message(%{assigns: %{me: me, dialog: dialog}} = socket, msg_id) do

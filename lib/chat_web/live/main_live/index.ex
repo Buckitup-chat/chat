@@ -171,10 +171,17 @@ defmodule ChatWeb.MainLive.Index do
     end
   end
 
-  def handle_event("dialog-image-change", _, socket), do: socket |> noreply()
-  def handle_event("dialog-image-submit", _, socket), do: socket |> noreply()
-  def handle_event("dialog-file-change", _, socket), do: socket |> noreply()
-  def handle_event("dialog-file-submit", _, socket), do: socket |> noreply()
+  def handle_event("dialog/import-images", _, socket) do
+    socket
+    |> push_event("chat:scroll-down", %{})
+    |> noreply()
+  end
+
+  def handle_event("dialog/import-files", _, socket) do
+    socket
+    |> push_event("chat:scroll-down", %{})
+    |> noreply()
+  end
 
   def handle_event("dialog/cancel-edit", _, socket) do
     socket
@@ -306,8 +313,17 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("room-image-submit", _, socket), do: socket |> noreply()
-  def handle_event("room-file-submit", _, socket), do: socket |> noreply()
+  def handle_event("room/import-images", _, socket) do
+    socket
+    |> push_event("chat:scroll-down", %{})
+    |> noreply()
+  end
+
+  def handle_event("room/import-files", _, socket) do
+    socket
+    |> push_event("chat:scroll-down", %{})
+    |> noreply()
+  end
 
   def handle_event("export-keys", %{"export_key_ring" => %{"code" => code}}, socket) do
     socket

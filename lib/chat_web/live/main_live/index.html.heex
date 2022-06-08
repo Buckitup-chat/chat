@@ -279,8 +279,7 @@
                     for={:dialog_file}
                     id="dialog-file-form"
                     class="column column-50 column-offset-50"
-                    phx-change="dialog-file-change"
-                    phx-submit="dialog-file-submit"
+                    phx-change="dialog/import-files"
                     phx-drop-target={@uploads.dialog_file.ref}
                   >
                     <%= live_file_input @uploads.dialog_file, style: "display: none"  %>
@@ -288,8 +287,7 @@
                   <.form
                     for={:dialog_image}
                     id="dialog-image-form"
-                    phx-change="dialog-image-change"
-                    phx-submit="dialog-image-submit"
+                    phx-change="dialog/import-images"
                     phx-drop-target={@uploads.image.ref}
                   >
                     <%= live_file_input @uploads.image, style: "display: none" %>
@@ -554,8 +552,7 @@
                     for={:room_file}
                     id="room-file-form"
                     class="column column-50 column-offset-50"
-                    phx-change="room-file-submit"
-                    phx-submit="room-file-submit"
+                    phx-change="room/import-files"
                     phx-drop-target={@uploads.room_file.ref}
                   >
                   <%= live_file_input @uploads.room_file, style: "display: none"  %>
@@ -563,8 +560,7 @@
                   <.form
                     for={:room_image}
                     id="room-image-form"
-                    phx-change="room-image-submit"
-                    phx-submit="room-image-submit"
+                    phx-change="room/import-images"
                     phx-drop-target={@uploads.room_image.ref}
                   >
                     <%= live_file_input @uploads.room_image, style: "display: none" %>

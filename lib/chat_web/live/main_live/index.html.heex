@@ -724,8 +724,35 @@
                   <header class="text-2xl bg-white/50 rounded-md p-2">Invite new one</header>
                   <section>
                   <%= for user <- @user_list do %>
-                    <div><%= user.name %></div>  
+                    <div 
+                      phx-click="admin/invite-new-user"
+                      phx-value-hash={user.hash}
+                    ><%= user.name %></div>  
                   <% end %> 
+                  </section>
+                </article>
+              </div>
+              <div class="flex flex-row flex-wrap m-2">
+                <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
+                  <header class="text-2xl bg-white/50 rounded-md p-2">Remove Room</header>
+                  <section>
+                  <%= for room <- @room_list do %>
+                    <div
+                      phx-click="admin/remove-room"
+                      phx-value-hash={room.hash}
+                    ><%= room.name %></div>
+                  <% end %> 
+                  </section>
+                </article>
+                <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
+                  <header class="text-2xl bg-white/50 rounded-md p-2">Remove User</header>
+                  <section>
+                  <%= for user <- @full_user_list do %>
+                    <div 
+                      phx-click="admin/remove-user"
+                      phx-value-hash={user.hash}
+                    ><%= user.name %></div>  
+                  <% end %>   
                   </section>
                 </article>
               </div>

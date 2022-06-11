@@ -37,6 +37,8 @@ defmodule Chat.User do
     |> elem(0)
   end
 
+  def remove(hash), do: Registry.remove(hash)
+
   def device_encode(%Identity{} = identity, rooms \\ []), do: LocalStorage.encode(identity, rooms)
   def device_decode(data), do: LocalStorage.decode(data)
 

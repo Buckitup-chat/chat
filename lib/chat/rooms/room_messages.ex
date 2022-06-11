@@ -151,6 +151,14 @@ defmodule Chat.Rooms.RoomMessages do
   def key(room_key, time, id),
     do: {@db_key, room_key |> Utils.binhash(), time, id |> Utils.binhash()}
 
+  def delete_by_room(hash) do
+    {
+      {@db_key, hash |> Utils.binhash(), -1, 0},
+      {@db_key, hash |> Utils.binhash(), nil, 0}
+    }
+    |> Db.bulk_delete()
+  end
+
   defp db_save(message, room_key) do
     room_key
     |> key(message.timestamp, message.id)

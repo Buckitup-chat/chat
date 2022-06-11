@@ -78,6 +78,19 @@ defmodule Chat.Db do
     |> CubDB.delete(key)
   end
 
+  def bulk_delete({min, max}) do
+    {:ok, key_list} =
+      CubDB.select(db(),
+        min_key: min,
+        max_key: max,
+        pipe: [
+          map: fn {key, _value} -> key end
+        ]
+      )
+
+    CubDB.delete_multi(db(), key_list)
+  end
+
   def file_path do
     "#{@db_location}/#{@db_version}"
   end

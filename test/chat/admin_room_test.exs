@@ -6,8 +6,8 @@ defmodule Chat.AdminRoomTest do
     AdminRoom,
     Card,
     Dialogs,
-    RoomInvites,
     Identity,
+    RoomInvites,
     User,
     Utils
   }
@@ -57,7 +57,7 @@ defmodule Chat.AdminRoomTest do
   end
 
   defp admin_with_room(name) do
-    if AdminRoom.is_created?() do
+    if AdminRoom.created?() do
       raise "Admihn room is already created"
     end
 

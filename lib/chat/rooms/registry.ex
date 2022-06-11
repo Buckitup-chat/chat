@@ -15,4 +15,6 @@ defmodule Chat.Rooms.Registry do
   def update(%Room{pub_key: pub_key} = room) do
     Db.put({:rooms, pub_key |> Utils.hash()}, room)
   end
+
+  def delete(hash), do: Db.delete({:rooms, hash})
 end

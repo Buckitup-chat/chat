@@ -5,13 +5,13 @@ defmodule Chat.AdminRoom do
   alias Chat.Card
   alias Chat.Identity
 
-  def is_created? do
+  def created? do
     AdminDb.db()
     |> CubDB.has_key?(:pub_key)
   end
 
   def create do
-    if is_created?() do
+    if created?() do
       raise "Admin room already created"
     end
 
@@ -28,11 +28,6 @@ defmodule Chat.AdminRoom do
     %{hash: hash} = admin_card = admin |> Card.from_identity()
 
     AdminDb.put({:new_admin, hash}, admin_card)
-  end
-
-  # todo: deprecate
-  def enlist(%Card{hash: hash} = new_admin) do
-    AdminDb.put({:new_admin, hash}, new_admin)
   end
 
   def admin_list do

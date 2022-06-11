@@ -13,6 +13,15 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
     case event do
       {"wifi-submit", %{"ssid" => ssid, "password" => password}} ->
         socket |> Page.AdminPanel.set_wifi(ssid |> String.trim(), password |> String.trim())
+
+      {"invite-new-user", %{"hash" => hash}} ->
+        socket |> Page.AdminPanel.invite_user(hash)
+
+      {"remove-user", %{"hash" => hash}} ->
+        socket |> Page.AdminPanel.remove_user(hash)
+
+      {"remove-room", %{"hash" => hash}} ->
+        socket |> Page.AdminPanel.remove_room(hash)
     end
   end
 

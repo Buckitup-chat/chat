@@ -84,7 +84,7 @@ defmodule ChatWeb.MainLive.Page.Login do
 
   defp maybe_create_admin_room(%{assigns: %{my_id: my_id}} = socket) do
     with true <- User.is_first_and_only?(my_id),
-         false <- AdminRoom.is_created?() do
+         false <- AdminRoom.created?() do
       admin_room = AdminRoom.create()
 
       socket

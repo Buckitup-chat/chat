@@ -5,7 +5,10 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Phoenix.PubSub
 
   alias Chat.AdminRoom
+  alias Chat.Dialogs
+  alias Chat.Rooms
   alias Chat.User
+  alias Chat.Utils
 
   @incoming_topic "platform->chat"
   @outgoing_topic "chat->platform"
@@ -17,8 +20,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
 
     socket
     |> assign(:wifi_loaded, false)
-    |> assign_user_lists()
     |> request_wifi_settings()
+    |> assign_user_lists()
+    |> assign_room_list()
   end
 
   def request_wifi_settings(socket) do
@@ -52,6 +56,35 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     |> assign(:wifi_loaded, true)
   end
 
+  def invite_user(%{assigns: %{me: me, room_map: rooms}} = socket, hash) do
+    if new_user = User.by_id(hash) do
+      room_identity =
+        AdminRoom.pub_key()
+        |> Utils.hash()
+        |> then(&Map.get(rooms, &1))
+
+      me
+      |> Dialogs.find_or_open(new_user)
+      |> Dialogs.add_room_invite(me, room_identity)
+    end
+
+    socket
+  end
+
+  def remove_user(socket, hash) do
+    User.remove(hash)
+
+    socket
+    |> assign_user_lists()
+  end
+
+  def remove_room(socket, hash) do
+    Rooms.delete(hash)
+
+    socket
+    |> assign_room_list()
+  end
+
   def close(socket) do
     PubSub.unsubscribe(Chat.PubSub, @incoming_topic)
 
@@ -69,12 +102,23 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
       |> Enum.map(&{&1.hash, &1})
       |> Map.new()
 
+    full_user_list = User.list()
+
     user_list =
-      User.list()
+      full_user_list
       |> Enum.reject(fn %{hash: hash} -> admin_map[hash] end)
 
     socket
     |> assign(:admin_list, admin_map |> Map.values())
     |> assign(:user_list, user_list)
+    |> assign(:full_user_list, full_user_list)
+  end
+
+  defp assign_room_list(%{assigns: %{room_map: rooms}} = socket) do
+    {my, other} = Rooms.list(rooms |> Map.values())
+    room_list = my ++ other
+
+    socket
+    |> assign(:room_list, room_list)
   end
 end

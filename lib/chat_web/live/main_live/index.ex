@@ -367,6 +367,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("admin/" <> event, params, socket) do
+    socket
+    |> Page.AdminPanelRouter.event({event, params})
+    |> noreply()
+  end
+
   @impl true
   def handle_info({:new_dialog_message, glimpse}, socket) do
     socket
@@ -421,7 +427,11 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_info({:room, msg}, socket), do: socket |> Page.RoomRouter.info(msg) |> noreply()
+  def handle_info({:room, msg}, socket),
+    do: socket |> Page.RoomRouter.info(msg) |> noreply()
+
+  def handle_info({:platform_response, msg}, socket),
+    do: socket |> Page.AdminPanelRouter.info(msg) |> noreply()
 
   def handle_progress(:image, %{done?: true}, socket) do
     socket

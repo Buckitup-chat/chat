@@ -4,6 +4,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   alias Phoenix.PubSub
 
+  alias Chat.AdminRoom
   alias Chat.Identity
   alias Chat.Rooms
   alias Chat.User
@@ -22,9 +23,10 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> approve_joined_room_requests()
     |> assign_room_list()
     |> join_approved_rooms()
+    |> assign_admin()
   end
 
-  def new_room(%{assigns: %{me: me, rooms: rooms}} = socket, name, type)
+  def new_room(%{assigns: %{me: me}} = socket, name, type)
       when type in [:public, :request, :private] do
     new_room_identity = Rooms.add(me, name, type)
     new_room_card = Chat.Card.from_identity(new_room_identity)
@@ -32,8 +34,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     PubSub.broadcast!(Chat.PubSub, @topic, {:new_room, new_room_card})
 
     socket
-    |> assign(:rooms, [new_room_identity | rooms])
-    |> Page.Login.store()
+    |> Page.Login.store_new_room(new_room_identity)
     |> assign_room_list()
     |> Page.Room.init(new_room_card.hash)
   end
@@ -88,13 +89,17 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> join_approved_rooms()
   end
 
+  def refresh_room_list(socket),
+    do:
+      socket
+      |> assign_room_list()
+      |> assign_admin()
+
   def close(socket) do
     PubSub.unsubscribe(Chat.PubSub, @topic)
 
     socket
   end
-
-  def refresh_room_list(socket), do: assign_room_list(socket)
 
   defp assign_user_list(socket) do
     socket
@@ -108,6 +113,23 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     socket
     |> assign(:joined_rooms, joined)
     |> assign(:new_rooms, new)
+  end
+
+  defp assign_admin(%{assigns: %{room_map: rooms}} = socket) do
+    has_admin_key =
+      with admin_pub_key <- AdminRoom.pub_key(),
+           false <- is_nil(admin_pub_key),
+           admin_hash <- admin_pub_key |> Utils.hash(),
+           identitiy <- rooms[admin_hash],
+           false <- is_nil(identitiy),
+           sign <- Utils.sign(admin_hash, identitiy),
+           true <- Utils.is_signed_by?(sign, admin_hash, admin_pub_key) do
+        true
+      else
+        _ -> false
+      end
+
+    socket |> assign(:is_admin, has_admin_key)
   end
 
   defp approve_joined_room_requests(%{assigns: %{rooms: rooms}} = socket) do
@@ -148,7 +170,13 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   defp close_current_mode(%{assigns: %{lobby_mode: :feeds}} = socket),
     do: socket |> Page.Feed.close()
 
+  defp close_current_mode(%{assigns: %{lobby_mode: :admin}} = socket),
+    do: socket |> Page.AdminPanel.close()
+
   defp init_new_mode(%{assigns: %{lobby_mode: :chats}} = socket), do: socket |> Page.Dialog.init()
   defp init_new_mode(%{assigns: %{lobby_mode: :rooms}} = socket), do: socket |> Page.Room.init()
   defp init_new_mode(%{assigns: %{lobby_mode: :feeds}} = socket), do: socket |> Page.Feed.init()
+
+  defp init_new_mode(%{assigns: %{lobby_mode: :admin}} = socket),
+    do: socket |> Page.AdminPanel.init()
 end

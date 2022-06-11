@@ -17,3 +17,4 @@ config :logger, level: :warn
 config :phoenix, :plug_init_mode, :runtime
 
 config :chat, :cub_db_file, "priv/test_db"
+config :chat, :admin_cub_db_file, "priv/test_admin_db"

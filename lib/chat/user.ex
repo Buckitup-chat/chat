@@ -42,4 +42,8 @@ defmodule Chat.User do
 
   def pub_key(%Card{pub_key: key}), do: key
   def pub_key(%Identity{} = identity), do: identity |> Identity.pub_key()
+
+  def is_first_and_only?(hash) do
+    match?([%{hash: ^hash}], list())
+  end
 end

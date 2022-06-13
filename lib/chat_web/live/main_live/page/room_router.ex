@@ -1,6 +1,8 @@
 defmodule ChatWeb.MainLive.Page.RoomRouter do
   @moduledoc "Route room events"
 
+  import Phoenix.LiveView, only: [push_event: 3]
+
   alias ChatWeb.MainLive.Index
   alias ChatWeb.MainLive.Page
 
@@ -10,8 +12,7 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
 
   def event(socket, event) do
     case event do
-      {"create", %{"new_room" => %{"name" => name, "type" => type}} = params} ->
-        IO.inspect(params)
+      {"create", %{"new_room" => %{"name" => name, "type" => type}}} ->
         socket |> Page.Lobby.new_room(name, type |> String.to_existing_atom())
 
       {"approve-request", %{"hash" => hash}} ->
@@ -25,6 +26,27 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
 
       {"edit-message", %{"id" => id, "timestamp" => time}} ->
         socket |> Page.Room.edit_message({time |> String.to_integer(), id})
+
+      {"download-message", %{"id" => id, "timestamp" => time}} ->
+        socket |> Page.Room.download_message({time |> String.to_integer(), id})
+
+      {"delete-message", %{"id" => id, "timestamp" => time, "type" => "room"}} ->
+        socket |> Page.Room.delete_message({time |> String.to_integer(), id})
+
+      {"delete-messages", params} ->
+        socket |> Page.Room.delete_messages(params)
+
+      {"toggle-messages-select", params} ->
+        socket |> Page.Room.toggle_messages_select(params)
+
+      {"import-images", _} ->
+        socket |> push_event("chat:scroll-down", %{})
+
+      {"import-files", _} ->
+        socket |> push_event("chat:scroll-down", %{})
+
+      {"close", _} ->
+        socket |> Page.Room.close()
     end
   end
 

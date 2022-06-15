@@ -584,7 +584,7 @@ defmodule ChatWeb.MainLive.Index do
 
   defp message_file(%{msg: %{type: :file, content: json}} = assigns) do
     {id, secret} = json |> StorageId.from_json()
-    [_, _, name, size] = Files.get(id, secret)
+    [name, size] = Files.get_meta(id, secret)
 
     assigns =
       assigns

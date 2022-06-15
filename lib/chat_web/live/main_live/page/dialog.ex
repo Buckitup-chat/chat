@@ -8,10 +8,14 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Phoenix.PubSub
 
   alias Chat.Dialogs
+  alias Chat.Identity
   alias Chat.Log
   alias Chat.Memo
+  alias Chat.RoomInvites
   alias Chat.User
+  alias Chat.Utils
   alias Chat.Utils.StorageId
+  alias ChatWeb.MainLive.Page
   alias ChatWeb.Router.Helpers, as: Routes
 
   @per_page 15
@@ -56,10 +60,10 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def send_text(%{assigns: %{dialog: dialog, me: me}} = socket, text) do
-    if is_memo?(text) do
-      dialog |> Dialogs.add_memo(me, text)
-    else
-      dialog |> Dialogs.add_text(me, text)
+    cond do
+      text |> String.trim() == "" -> nil
+      text |> is_memo?() -> dialog |> Dialogs.add_memo(me, text)
+      true -> dialog |> Dialogs.add_text(me, text)
     end
     |> broadcast_new_message(dialog, me)
 
@@ -216,6 +220,53 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     end
   end
 
+  def accept_room_invite(%{assigns: %{me: me, dialog: dialog, rooms: rooms}} = socket, message_id) do
+    new_room_identitiy =
+      Dialogs.read_message(dialog, message_id, me)
+      |> then(fn %{type: :room_invite, content: json} -> json end)
+      |> StorageId.from_json()
+      |> RoomInvites.get()
+      |> Identity.from_strings()
+
+    if rooms |> Enum.any?(&(&1.priv_key == new_room_identitiy.priv_key)) do
+      socket
+    else
+      socket
+      |> assign(:rooms, [new_room_identitiy | rooms])
+      |> Page.Login.store()
+      |> Page.Lobby.refresh_room_list()
+    end
+  rescue
+    _ -> socket
+  end
+
+  def accept_room_invite_and_open_room(
+        %{assigns: %{me: me, dialog: dialog, rooms: rooms}} = socket,
+        message_id
+      ) do
+    new_room_identitiy =
+      Dialogs.read_message(dialog, message_id, me)
+      |> then(fn %{type: :room_invite, content: json} -> json end)
+      |> StorageId.from_json()
+      |> RoomInvites.get()
+      |> Identity.from_strings()
+
+    room_hash = new_room_identitiy |> Utils.hash()
+
+    if rooms |> Enum.any?(&(&1.priv_key == new_room_identitiy.priv_key)) do
+      socket
+    else
+      socket
+      |> assign(:rooms, [new_room_identitiy | rooms])
+      |> Page.Login.store()
+      |> Page.Lobby.refresh_room_list()
+    end
+    |> close()
+    |> Page.Room.init(room_hash)
+  rescue
+    _ -> socket
+  end
+
   def toggle_messages_select(%{assigns: %{}} = socket, %{"action" => "on"}) do
     socket
     |> forget_current_messages()
@@ -262,6 +313,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:last_load_timestamp, set_messages_timestamp(messages))
   end
 
+  defp broadcast_new_message(nil, _, _), do: nil
+
   defp broadcast_new_message(message, dialog, me) do
     {:new_dialog_message, message}
     |> dialog_broadcast(dialog)
@@ -287,7 +340,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     PubSub.broadcast!(
       Chat.PubSub,
       dialog |> dialog_topic(),
-      message
+      {:dialog, message}
     )
   end
 

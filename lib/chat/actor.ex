@@ -1,10 +1,10 @@
 defmodule Chat.Actor do
   @moduledoc "Perpresents acting person in the system"
 
+  import Chat.Codec
+
   alias Chat.Identity
   alias Chat.Utils
-  alias X509.PrivateKey
-  alias X509.PublicKey
 
   defstruct [:me, rooms: [], contacts: %{}]
 
@@ -65,29 +65,5 @@ defmodule Chat.Actor do
     data
     |> Utils.decrypt_blob(password |> Utils.binhash())
     |> from_json()
-  end
-
-  defp private_key_to_string(key) do
-    key
-    |> PrivateKey.to_der()
-    |> Base.encode64()
-  end
-
-  defp private_key_from_string(string) do
-    string
-    |> Base.decode64!()
-    |> PrivateKey.from_der!()
-  end
-
-  defp public_key_to_string(key) do
-    key
-    |> PublicKey.to_der()
-    |> Base.encode64()
-  end
-
-  defp public_key_from_string(string) do
-    string
-    |> Base.decode64!()
-    |> PublicKey.from_der!()
   end
 end

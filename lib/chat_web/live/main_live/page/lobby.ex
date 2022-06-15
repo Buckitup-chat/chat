@@ -24,8 +24,9 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> join_approved_rooms()
   end
 
-  def new_room(%{assigns: %{me: me, rooms: rooms}} = socket, name) do
-    new_room_identity = Rooms.add(me, name)
+  def new_room(%{assigns: %{me: me, rooms: rooms}} = socket, name, type)
+      when type in [:public, :request, :private] do
+    new_room_identity = Rooms.add(me, name, type)
     new_room_card = Chat.Card.from_identity(new_room_identity)
 
     PubSub.broadcast!(Chat.PubSub, @topic, {:new_room, new_room_card})
@@ -92,6 +93,8 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
     socket
   end
+
+  def refresh_room_list(socket), do: assign_room_list(socket)
 
   defp assign_user_list(socket) do
     socket

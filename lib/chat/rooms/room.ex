@@ -4,19 +4,24 @@ defmodule Chat.Rooms.Room do
   alias Chat.Identity
   alias Chat.Utils
 
-  @derive {Inspect, only: [:name]}
-  defstruct [:admin_hash, :name, :pub_key, :requests]
+  @type room_type() :: :public | :request | :private
 
-  def create(%Identity{} = admin, %Identity{name: name} = room) do
+  @derive {Inspect, only: [:name, :type]}
+  defstruct [:admin_hash, :name, :pub_key, :requests, type: :public]
+
+  def create(%Identity{} = admin, %Identity{name: name} = room, type \\ :public) do
     admin_hash = admin |> Identity.pub_key() |> Utils.hash()
 
     %__MODULE__{
       admin_hash: admin_hash,
       name: name,
       pub_key: room |> Identity.pub_key(),
-      requests: []
+      requests: [],
+      type: type
     }
   end
+
+  def add_request(%__MODULE__{type: :private} = room, _), do: room
 
   def add_request(%__MODULE__{requests: requests} = room, %Identity{} = me) do
     key = me |> Identity.pub_key()
@@ -32,30 +37,47 @@ defmodule Chat.Rooms.Room do
 
   def is_requested_by?(_, _), do: false
 
-  def approve_requests(%__MODULE__{requests: requests} = room, %Identity{} = room_identity) do
+  def list_pending_requests(%__MODULE__{requests: requests, type: :request}) do
+    requests
+    |> Enum.map(fn
+      {hash, key, :pending} -> {hash, key}
+      {_, _, _} -> nil
+    end)
+    |> Enum.reject(&(&1 == nil))
+  end
+
+  def approve_request(
+        %__MODULE__{requests: requests, type: :request} = room,
+        user_hash,
+        %Identity{} = room_identity
+      ) do
     new_requests =
       requests
-      |> Enum.reject(fn
-        {_, _, :joined} -> true
-        {_, _, _} -> false
-      end)
       |> Enum.map(fn
-        {hash, key, :pending} ->
-          {blob, secret} =
-            room_identity
-            |> :erlang.term_to_binary()
-            |> Utils.encrypt_blob()
-
-          encrypted = {secret |> Utils.encrypt(key), blob}
-
-          {hash, key, encrypted}
-
-        {_, _, _} = x ->
-          x
+        {^user_hash, key, :pending} -> {user_hash, key, room_identity |> encrypt_identity(key)}
+        {_, _, _} = x -> x
       end)
 
     %{room | requests: new_requests}
   end
+
+  def approve_requests(
+        %__MODULE__{requests: requests, type: :public} = room,
+        %Identity{} = room_identity
+      ) do
+    new_requests =
+      requests
+      |> Enum.map(fn
+        {hash, key, :pending} -> {hash, key, room_identity |> encrypt_identity(key)}
+        {_, _, _} = x -> x
+      end)
+
+    %{room | requests: new_requests}
+  end
+
+  def approve_requests(room, _), do: room
+
+  def join_approved_requests(%__MODULE__{type: :private} = room, _), do: {room, []}
 
   def join_approved_requests(%__MODULE__{requests: requests} = room, %Identity{} = me) do
     pub_key = me |> Identity.pub_key()
@@ -72,7 +94,7 @@ defmodule Chat.Rooms.Room do
           decrypted =
             blob
             |> Utils.decrypt_blob(secret)
-            |> :erlang.binary_to_term()
+            |> Identity.from_strings()
 
           {reqs, [decrypted | rooms]}
 
@@ -84,5 +106,14 @@ defmodule Chat.Rooms.Room do
       %{room | requests: new_requests},
       rooms
     }
+  end
+
+  defp encrypt_identity(room_identity, key) do
+    {blob, secret} =
+      room_identity
+      |> Identity.to_strings()
+      |> Utils.encrypt_blob()
+
+    {secret |> Utils.encrypt(key), blob}
   end
 end

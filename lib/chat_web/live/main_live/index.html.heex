@@ -49,11 +49,12 @@
         <button phx-click="login:import-own-key-ring" class="w-full h-11 mt-2.5 bg-transparent text-white py-2 px-4 border border-white/50 rounded-lg flex items-center justify-center">
           <span>Import the recovery keys</span>
           <.icon id="upload1" class="w-4 h-4 ml-2 fill-white"/>
-        </button>    
+        </button>
       </div>     
     </div>
   <% else %>
     <%= if @mode == :lobby do %>
+      
       <.modal id="logout-backup-popup" hide_event="logout-close" class="">
         <%= if @logout_step == :initial do %> 
           <h1 class="text-base font-bold text-grayscale">Log Out & Back Up</h1>
@@ -121,7 +122,7 @@
         <p class="mt-3 text-sm text-black/50">Are you sure you want to do this?</p>
         <div class="mt-5 flex items-center justify-between">
           <button phx-click={hide_modal("delete-message-popup")} class="w-full mr-1 h-12 border rounded-lg border-black/10">Cancel</button>
-          <button phx-click={hide_modal("delete-message-popup") |> JS.push("delete-message")} class="deleteMessageButton w-full ml-1 h-12 border-0 rounded-lg bg-red-500 flex items-center justify-center">
+          <button class="deleteMessageButton w-full ml-1 h-12 border-0 rounded-lg bg-red-500 flex items-center justify-center">
             <span class="text-white mr-1">Delete</span>
             <.icon id="delete" class="w-4 h-4 fill-white"/>
           </button>
@@ -195,13 +196,13 @@
             </div>
             <div class="mt-10 w-full">
               <ul><%= for user <- @users do %>
-                <li phx-click="switch-dialog" phx-value-user-id={user.hash} class={classes("hidden sm:flex w-full cursor-pointer h-9 flex items-center hover:bg-stone250", %{"bg-stone250" => user == @peer})}>
+                <li phx-click="dialog/switch" phx-value-user-id={user.hash} class={classes("hidden sm:flex w-full cursor-pointer h-9 flex items-center hover:bg-stone250", %{"bg-stone250" => user == @peer})}>
                   <a><div class="flex flex-row px-7">
                     <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(user.hash) %>]</tt>
                     <div class="ml-1 text-sm"><%= user == Chat.Card.from_identity(@me) && "My notes" || user.name %></div>
                   </div></a>
                 </li>
-                <li phx-click={JS.push("switch-dialog") |> open_content()} phx-value-user-id={user.hash} class={classes("sm:hidden w-full cursor-pointer h-9 flex items-center hover:bg-stone250", %{"bg-stone250" => user == @peer})}>
+                <li phx-click={JS.push("dialog/switch") |> open_content()} phx-value-user-id={user.hash} class={classes("sm:hidden w-full cursor-pointer h-9 flex items-center hover:bg-stone250", %{"bg-stone250" => user == @peer})}>
                   <a><div class="flex flex-row px-7">
                     <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(user.hash) %>]</tt>
                     <div class="ml-1 text-sm"><%= user == Chat.Card.from_identity(@me) && "My notes" || user.name %></div>
@@ -311,7 +312,7 @@
                     id="dialog-form"
                     class="basis-[99%] flex items-center justify-between"
                     phx-change={JS.dispatch("chat:set-input-size", to: "#dialog-input")}
-                    phx-submit={JS.push("dialog-message") |> JS.dispatch("chat:clear-value", to: "#dialog-input") |> JS.dispatch("chat:set-input-size", to: "#dialog-input")}  
+                    phx-submit={JS.push("dialog/text-message") |> JS.dispatch("chat:clear-value", to: "#dialog-input") |> JS.dispatch("chat:set-input-size", to: "#dialog-input")}  
                     onkeydown="
                       if (event.key == 'Enter' && event.shiftKey) {
                         document.getElementById('dialog-form-submit-button').click()
@@ -389,6 +390,7 @@
           </div>
         <% end %>
         <%= if @lobby_mode == :rooms do %>
+        <.flash_notification id="inviteSentNotification" /> 
           <div id="chatRoomBar" class='chatRoomBar'>
             <.modal id="create-room-popup" class="">
               <h1 class="text-base font-bold text-grayscale">Create Room</h1>
@@ -397,8 +399,50 @@
                 for={:new_room}
                 id="room-create-form"
                 autocomplete="off"
-                phx-submit={hide_modal("create-room-popup") |> JS.push("create-room")}>  
+                phx-submit={hide_modal("create-room-popup") |> JS.push("room/create")}>  
                 <%= text_input f, :name, placeholder: "Name your Room", class: "w-full h-11 mt-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-0" %>
+                
+                <p class="mt-3 text-black/50 text-sm">Room Type</p>
+                <div class="mt-3 flex flex-col">
+                  <a class="inline">
+                    <input class="cursor-pointer text-orange-500" type="radio" id="typeChoice1" name="new_room[type]" value="public" checked
+                           phx-click={JS.dispatch("room:switch-type", 
+                                        to: "#typeChoice1", 
+                                        detail: %{
+                                          description: "Public room is visible for everyone. Anyone can join.",
+                                          id: "roomTypeDescription"
+                                        }
+                                      )}>
+                    <label class="cursor-pointer ml-1 text-black/50 text-sm" for="typeChoice1">Open</label>
+                  </a>
+                  <a class="inline">
+                    <input class="cursor-pointer text-orange-500" type="radio" id="typeChoice2" name="new_room[type]" value="request"
+                           phx-click={JS.dispatch("room:switch-type",
+                                        to: "#typeChoice2",
+                                        detail: %{
+                                          description: "Private Room is visible for everyone. Anyone can send request and join if approved by a room member",
+                                          id: "roomTypeDescription"
+                                        }
+                                      )}>
+                    <label class="cursor-pointer ml-1 text-black/50 text-sm" for="typeChoice2">Private</label>
+                  </a>
+                  <a class="inline">
+                    <input class="cursor-pointer text-orange-500" type="radio" id="typeChoice3" name="new_room[type]" value="private"
+                           phx-click={JS.dispatch("room:switch-type", 
+                                        to: "#typeChoice3",
+                                        detail: %{
+                                          description: "Secret Room is not visible, only invited users can join",
+                                          id: "roomTypeDescription"
+                                        }
+                                      )}>
+                    <label class="cursor-pointer ml-1 text-black/50 text-sm" for="typeChoice3">Secret</label>
+                  </a>
+                </div>
+                <div class="mt-5 py-1 w-full min-h-fit flex items-center justify-start border-0 rounded-lg bg-black/10"> 
+                  <.icon id="alert" class="basis-1/12 mr-2 w-4 h-4 fill-black/40"/>
+                  <blockquote id="roomTypeDescription" class="basis-11/12 text-xs text-black/50 mr-3">Public room is visible for everyone. Anyone can join.</blockquote>
+                </div>
+      
                 <%= submit "Create", phx_disable_with: "Saving...", class: "w-full h-11 mt-2 text-white border-0 rounded-lg bg-grayscale flex items-center justify-center" %>
               </.form>
             </.modal>
@@ -419,7 +463,7 @@
                   <p class="text-base text-grayscale600 px-7">You have no rooms</p>
                   <% else %>
                     <%= for room <- @joined_rooms do %>
-                    <li phx-click="switch-room" phx-value-room={room.hash} class={classes("hidden sm:flex w-full h-9 flex items-center cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
+                    <li phx-click="room/switch" phx-value-room={room.hash} class={classes("hidden sm:flex w-full h-9 flex items-center cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
                       <a>
                         <div class="flex flex-row px-7">
                           <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
@@ -427,7 +471,7 @@
                         </div>
                       </a>
                     </li>
-                    <li phx-click={JS.push("switch-room") |> open_content()} phx-value-room={room.hash} class={classes("sm:hidden w-full h-9 flex items-center cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
+                    <li phx-click={JS.push("room/switch") |> open_content()} phx-value-room={room.hash} class={classes("sm:hidden w-full h-9 flex items-center cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
                       <a>
                         <div class="flex flex-row px-7">
                           <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
@@ -450,7 +494,7 @@
                 <% else %>
                   <%= for room <- @new_rooms do %>
                     <%= if room |> Rooms.is_requested_by?(@my_id) do %>
-                      <li class="w-full h-9 cursor-pointer hover:bg-stone250">  
+                      <li class="w-full h-9 cursor-pointer flex items-center hover:bg-stone250">  
                         <div class="flex flex-row justify-between px-7 w-full">
                           <div class="flex flex-row">
                             <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
@@ -460,7 +504,7 @@
                         </div>
                       </li>
                     <% else %>
-                      <li class="w-full h-9 cursor-pointer hover:bg-stone250" phx-click="request-room" phx-value-room={room.hash}>  
+                      <li class="w-full h-9 cursor-pointer flex items-center hover:bg-stone250" phx-click="room/send-request" phx-value-room={room.hash}>  
                         <div class="flex flex-row px-7 w-full">
                           <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
                           <div class="ml-1 text-sm"><%= room.name %></div>
@@ -486,18 +530,65 @@
             <div id="chatContent" class="basis-[93%] overflow-y-scroll flex flex-col justify-between relative" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
               <div class="w-full px-8  border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between sticky top-0 right-0" style="min-height: 56px;" >
                 <div class="flex flex-row items-center">
-                  <button phx-click={JS.push("close-room") |> close_content()} class="sm:hidden pr-3">
+                  <button phx-click={JS.push("room/close") |> close_content()} class="sm:hidden pr-3">
                     <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
                   </button>
                   <div class="text-base text-white/60">[<%= short_hash(@room.admin_hash) %>]</div>
-                    <h1 class="ml-1 text-base font-bolt text-white" ><%= @room.name %></h1>
-                  </div>
-                  <button class="flex items-center">
+                  <h1 class="ml-1 text-base font-bolt text-white" ><%= @room.name %></h1>
+                </div>
+                <div class="flex flex-row justify-between">                  
+                  <%= if @room.type == :request do %>
+                    <button class="mr-4 flex items-center" phx-click={if @room_requests == [], do: nil, else: show_modal("room-request-list")}>
+                      <.icon id="requestList" class="w-4 h-4 mr-1 z-20 fill-white"/>
+                      <span class="text-base text-white">Requests</span>
+                    </button>                    
+                  <% end %>
+                  <button class="flex items-center" phx-click={if Chat.User.list() |> length == 1, do: nil, else: show_modal("room-invite-list")}>
                     <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-white"/>
                     <span class="text-base text-white"> Invite</span>
                   </button>
                 </div>
-                <div>
+              </div>
+              <%= if @room.type == :request do %>
+                <.modal id="room-request-list"  class="z-30">
+                  <h1 class="text-base font-bold text-grayscale">Requests</h1>
+                  <div class="mt-3 w-full flex flex-col">
+                    <%= for user <- @room_requests do %>
+                      <div id={"user-#{user.hash}"} class="flex flex-row items-center justify-between">
+                        <div class="inline-flex">
+                          <div class="font-bold text-sm text-purple">[<%= short_hash(user.hash) %>]</div>
+                          <div class="ml-1 font-bold text-sm text-purple"><%= user.name %></div>
+                        </div>
+                        <a class="text-black/50" phx-click={JS.push("room/approve-request") |> JS.dispatch("chat:toggle", to: "#user-#{user.hash}", detail: %{class: "hidden"})} phx-value-hash={user.hash}>Approve</a>
+                      </div>
+                    <% end %>
+                  </div>
+                </.modal>
+              <% end %>
+              <.modal id="room-invite-list"  class="z-30">
+                <h1 class="text-base font-bold text-grayscale">Invite to the Room</h1>
+                <div class="mt-3 w-full flex flex-col">
+                  <%= for user <- Chat.User.list() do %>
+                    <%= unless user.hash == @my_id do %>
+                      <div id={"user-#{user.hash}"} class="flex flex-row items-center justify-between">
+                        <div class="inline-flex">
+                          <div class="text-sm text-black/50">[<%= short_hash(user.hash) %>]</div>
+                          <div class="ml-1 text-sm"><%= user.name %></div>
+                        </div>
+                        <a class="flex items-center justify-between" phx-click={JS.push("room/invite-user") 
+                                                                                |> JS.dispatch("chat:toggle", to: "#user-#{user.hash}", detail: %{class: "hidden"})
+                                                                                |> JS.show(to: "#inviteSentNotification", display: "flex")
+                                                                              }
+                                                                     phx-value-hash={user.hash}>
+                          <p class="text-purple font-semibold">Send invite</p>
+                          <.icon id="send" class="w-4 h-4 ml-2 z-20 fill-purple"/>
+                        </a>
+                      </div>
+                    <% end %>
+                  <% end %>
+                </div>
+              </.modal>
+              <div>
                   <div id="chat-messages" phx-update={@message_update_mode}>
                     <%= for msg <- @messages do %>
                       <div class="messageBlock flex flex-row px-2 sm:px-8"
@@ -513,7 +604,8 @@
                             color={msg.author_hash == @my_id && "bg-purple50" || "bg-white" }
                             msg={msg} 
                             author={Chat.User.by_id(msg.author_hash)}
-                            is_mine={msg.author_hash == @my_id}  
+                            is_mine={msg.author_hash == @my_id}
+                            room={if msg.type == :request, do: @room, else: nil}
                           />
                         </div> 
                         <input type="checkbox" class="selectCheckbox w-6 h-6 ml-3 mt-3 rounded-full text-purple/90 bg-black/10 border-gray-300 focus:ring-2" />
@@ -584,7 +676,7 @@
                     id="room-form"
                     class="basis-[99%] flex items-center justify-between"
                     phx-change={JS.dispatch("chat:set-input-size", to: "#room-input")}
-                    phx-submit={JS.push("room-message") |> JS.dispatch("chat:clear-value", to: "#room-input") |> JS.dispatch("chat:set-input-size", to: "#room-input")}  
+                    phx-submit={JS.push("room/text-message") |> JS.dispatch("chat:clear-value", to: "#room-input") |> JS.dispatch("chat:set-input-size", to: "#room-input")}  
                     onkeydown="
                       if (event.key == 'Enter' && event.shiftKey) {
                         document.getElementById('room-form-submit-button').click()

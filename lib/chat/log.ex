@@ -13,7 +13,9 @@ defmodule Chat.Log do
   def self_backup(me), do: me |> log(:self_backup)
   def logout(me), do: me |> log(:logout)
 
-  def create_room(me, room), do: me |> log(:create_room, room: binhash(room))
+  def create_room(me, room, type),
+    do: me |> log(:create_room, room: binhash(room), room_type: type)
+
   def message_room(me, room), do: me |> log(:message_room, room: binhash(room))
   def delete_room_message(me, room), do: me |> log(:delete_room_message, room: binhash(room))
   def update_room_message(me, room), do: me |> log(:update_room_message, room: binhash(room))

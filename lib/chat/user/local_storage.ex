@@ -1,15 +1,27 @@
 defmodule Chat.User.LocalStorage do
   @moduledoc "Helpers for localStorage interaction"
 
+  alias Chat.Actor
   alias Chat.Identity
 
   def encode(%Identity{} = me, rooms) do
-    %{me: me, rooms: rooms}
-    |> :erlang.term_to_binary()
-    |> Base.encode64()
+    Actor.new(me, rooms, [])
+    |> Actor.to_json()
   end
 
   def decode(data) do
+    decode_v2(data)
+  rescue
+    _ -> decode_v1(data)
+  end
+
+  defp decode_v2(data) do
+    data
+    |> Actor.from_json()
+    |> then(&{&1.me, &1.rooms})
+  end
+
+  defp decode_v1(data) do
     %{me: me, rooms: rooms} =
       data
       |> Base.decode64!()

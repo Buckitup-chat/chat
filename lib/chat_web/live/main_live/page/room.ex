@@ -5,6 +5,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   alias Phoenix.PubSub
 
+  alias Chat.Dialogs
   alias Chat.Identity
   alias Chat.Log
   alias Chat.Memo
@@ -38,6 +39,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:has_more_messages, true)
     |> assign(:message_update_mode, :replace)
     |> assign_messages()
+    |> assign_requests()
   end
 
   def load_more_messages(%{assigns: %{page: page}} = socket) do
@@ -56,10 +58,10 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def send_text(%{assigns: %{room: room, me: me, room_identity: room_identity}} = socket, text) do
-    if is_memo?(text) do
-      room_identity |> Rooms.add_memo(me, text)
-    else
-      room |> Rooms.add_text(me, text)
+    cond do
+      text |> String.trim() == "" -> nil
+      text |> is_memo?() -> room_identity |> Rooms.add_memo(me, text)
+      true -> room |> Rooms.add_text(me, text)
     end
     |> broadcast_new_message(room, me)
 
@@ -183,6 +185,12 @@ defmodule ChatWeb.MainLive.Page.Room do
     socket
   end
 
+  def approve_request(%{assigns: %{room_identity: room_identity}} = socket, user_hash) do
+    Rooms.approve_request(room_identity |> Utils.hash(), user_hash, room_identity)
+
+    socket
+  end
+
   def delete_messages(%{assigns: %{me: me, room_identity: room_identity, room: room}} = socket, %{
         "messages" => messages
       }) do
@@ -203,6 +211,23 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> push_event("chat:toggle", %{to: "#message-block-#{id}", class: "hidden"})
   end
 
+  def invite_user(
+        %{assigns: %{room: %{name: room_name}, room_identity: identity, me: me}} = socket,
+        user_hash
+      ) do
+    full_room_identity =
+      identity
+      |> Map.put(:name, room_name)
+
+    me
+    |> Dialogs.find_or_open(user_hash |> User.by_id())
+    |> Dialogs.add_room_invite(me, full_room_identity)
+
+    socket
+  rescue
+    _ -> socket
+  end
+
   def close(%{assigns: %{room: nil}} = socket), do: socket
 
   def close(%{assigns: %{room: room}} = socket) do
@@ -210,6 +235,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
     socket
     |> assign(:room, nil)
+    |> assign(:room_requests, nil)
     |> assign(:edit_room, nil)
     |> assign(:room_identity, nil)
     |> assign(:messages, nil)
@@ -284,6 +310,19 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:has_more_messages, length(messages) > per_page)
     |> assign(:last_load_timestamp, set_messages_timestamp(messages))
   end
+
+  defp assign_requests(%{assigns: %{room: %{type: :request} = room}} = socket) do
+    request_list =
+      room.pub_key
+      |> Utils.hash()
+      |> Rooms.list_pending_requests()
+      |> Enum.map(fn {hash, _} -> User.by_id(hash) end)
+
+    socket
+    |> assign(:room_requests, request_list)
+  end
+
+  defp assign_requests(socket), do: socket
 
   defp broadcast_message_updated(msg_id, room, me) do
     {:updated_message, msg_id}

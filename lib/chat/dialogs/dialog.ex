@@ -7,6 +7,7 @@ defmodule Chat.Dialogs.Dialog do
   alias Chat.Files
   alias Chat.Images
   alias Chat.Memo
+  alias Chat.RoomInvites
 
   alias Chat.Card
   alias Chat.Content
@@ -68,6 +69,19 @@ defmodule Chat.Dialogs.Dialog do
     |> Images.add()
     |> StorageId.to_json()
     |> add_message(dialog, source, now: now, type: :image)
+  end
+
+  def add_room_invite(
+        %__MODULE__{} = dialog,
+        %Chat.Identity{} = source,
+        %Identity{} = room_identity,
+        now
+      ) do
+    room_identity
+    |> Identity.to_strings()
+    |> RoomInvites.add()
+    |> StorageId.to_json()
+    |> add_message(dialog, source, now: now, type: :room_invite)
   end
 
   def read(%Message{} = msg, identitiy, side, peer_key) when side in [:a_copy, :b_copy] do

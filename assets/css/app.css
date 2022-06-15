@@ -128,6 +128,13 @@ html {
   @apply ml-2
 }
 
+.centered {
+  position: fixed;
+  top: 15%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
 /* Alerts and form errors used by phx.new */
 .alert {
   padding: 15px;

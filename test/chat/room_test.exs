@@ -17,7 +17,7 @@ defmodule Chat.Rooms.RoomTest do
 
     assert %Rooms.Room{} = room
 
-    correct = ~s|#Chat.Rooms.Room<name: "#{room_name}", ...>|
+    correct = ~s|#Chat.Rooms.Room<name: "#{room_name}", type: :public, ...>|
 
     assert correct == inspect(room)
   end
@@ -69,6 +69,8 @@ defmodule Chat.Rooms.RoomTest do
 
     room = room |> Rooms.Room.approve_requests(room_identity)
 
+    room = room |> Rooms.Room.approve_requests(room_identity)
+
     assert [{^bob_hash, ^bob_key, {enc_secret, blob}}] = room.requests
 
     secret =
@@ -78,7 +80,7 @@ defmodule Chat.Rooms.RoomTest do
     decrypted =
       blob
       |> Utils.decrypt_blob(secret)
-      |> :erlang.binary_to_term()
+      |> Identity.from_strings()
 
     assert room_identity == decrypted
 

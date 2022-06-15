@@ -11,14 +11,14 @@ defmodule Chat.Rooms do
   alias Chat.Utils
 
   @doc "Returns new room Identity"
-  def add(me, name) do
+  def add(me, name, type \\ :public) do
     name
     |> Identity.create()
     |> tap(fn room_identity ->
-      Room.create(me, room_identity)
+      Room.create(me, room_identity, type)
       |> Registry.update()
 
-      me |> Log.create_room(room_identity)
+      me |> Log.create_room(room_identity, type)
     end)
   end
 
@@ -26,17 +26,16 @@ defmodule Chat.Rooms do
   def list(my_rooms) do
     my_room_hashes =
       my_rooms
-      |> Enum.map(
-        &(&1
-          |> Identity.pub_key()
-          |> Utils.hash())
-      )
+      |> Enum.map(&Utils.hash/1)
+      |> MapSet.new()
 
     Registry.all()
-    |> Map.values()
-    |> Enum.map(&%Card{name: &1.name, pub_key: &1.pub_key, hash: Utils.hash(&1.pub_key)})
+    |> Map.filter(fn {hash, room} ->
+      room.type in [:public, :request] or MapSet.member?(my_room_hashes, hash)
+    end)
+    |> Enum.map(fn {hash, room} -> %Card{name: room.name, pub_key: room.pub_key, hash: hash} end)
     |> Enum.sort_by(& &1.name)
-    |> Enum.split_with(&(&1.hash in my_room_hashes))
+    |> Enum.split_with(&MapSet.member?(my_room_hashes, &1.hash))
   end
 
   @doc "Returns Room or nil"
@@ -48,6 +47,7 @@ defmodule Chat.Rooms do
   defdelegate add_text(room, me, text, opts \\ []), to: RoomMessages
   defdelegate add_file(room, me, data, opts \\ []), to: RoomMessages
   defdelegate add_image(room, me, data, opts \\ []), to: RoomMessages
+  defdelegate add_request_message(room, author, opts \\ []), to: RoomMessages
 
   def read_message(%Message{} = msg, %Identity{} = identity), do: RoomMessages.read(msg, identity)
 
@@ -73,20 +73,30 @@ defmodule Chat.Rooms do
     room_hash
     |> get()
     |> Room.add_request(user_identity)
-    |> tap(fn room ->
+    |> tap(fn %{type: type} = room ->
+      if type == :request do
+        add_request_message(room, user_identity)
+      end
+
       Log.request_room_key(user_identity, room.pub_key)
     end)
     |> update()
   end
 
-  def approve_requests(room_hash, room_identity) do
-    room = get(room_hash)
+  def approve_request(room_hash, user_hash, room_identity) do
+    if_room_found(room_hash, fn room ->
+      room
+      |> Room.approve_request(user_hash, room_identity)
+      |> update()
+    end)
+  end
 
-    if room do
+  def approve_requests(room_hash, room_identity) do
+    if_room_found(room_hash, fn room ->
       room
       |> Room.approve_requests(room_identity)
       |> update()
-    end
+    end)
   end
 
   def join_approved_requests(room_hash, person_identity) do
@@ -104,11 +114,27 @@ defmodule Chat.Rooms do
     end)
   end
 
+  def is_requested_by?(nil, _), do: false
+
   def is_requested_by?(room_hash, person_hash) do
     room_hash
     |> get()
     |> Room.is_requested_by?(person_hash)
   end
 
+  def list_pending_requests(room_hash) do
+    if_room_found(room_hash, &Room.list_pending_requests/1, [])
+  end
+
   defdelegate update(room), to: Registry
+
+  defp if_room_found(hash, action, default \\ nil) do
+    room = get(hash)
+
+    if room do
+      room |> action.()
+    else
+      default
+    end
+  end
 end

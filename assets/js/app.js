@@ -97,7 +97,12 @@ const listeners = {
       }
       deleteButton.setAttribute('phx-value-messages', JSON.stringify(messages));
     }, 200);
-   },
+  },
+  "room:switch-type": (e) => {
+    e.target.classList.add('checkedBackground');
+    
+    document.getElementById(e.detail.id).textContent = e.detail.description
+  },
   "phx:chat:toggle": (e) => {
     if (e.detail && e.detail.class && e.detail.to) {
       document

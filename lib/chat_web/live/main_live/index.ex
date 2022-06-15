@@ -5,9 +5,11 @@ defmodule ChatWeb.MainLive.Index do
   alias Phoenix.LiveView.JS
 
   alias Chat.Db
-  alias Chat.Rooms
   alias Chat.Files
+  alias Chat.Identity
   alias Chat.Memo
+  alias Chat.RoomInvites
+  alias Chat.Rooms
   alias Chat.Utils.StorageId
   alias ChatWeb.MainLive.Page
 
@@ -141,13 +143,6 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("switch-dialog", %{"user-id" => user_id}, socket) do
-    socket
-    |> Page.Dialog.close()
-    |> Page.Dialog.init(user_id)
-    |> noreply()
-  end
-
   def handle_event("chat:load-more", _, %{assigns: %{dialog: %{}}} = socket) do
     socket
     |> Page.Dialog.load_more_messages()
@@ -157,171 +152,6 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("chat:load-more", _, %{assigns: %{room: %{}}} = socket) do
     socket
     |> Page.Room.load_more_messages()
-    |> noreply()
-  end
-
-  def handle_event("dialog-message", %{"dialog" => %{"text" => text}}, socket) do
-    if String.trim(text) == "" do
-      socket
-      |> noreply()
-    else
-      socket
-      |> Page.Dialog.send_text(text)
-      |> noreply()
-    end
-  end
-
-  def handle_event("dialog/import-images", _, socket) do
-    socket
-    |> push_event("chat:scroll-down", %{})
-    |> noreply()
-  end
-
-  def handle_event("dialog/import-files", _, socket) do
-    socket
-    |> push_event("chat:scroll-down", %{})
-    |> noreply()
-  end
-
-  def handle_event("dialog/cancel-edit", _, socket) do
-    socket
-    |> Page.Dialog.cancel_edit()
-    |> noreply()
-  end
-
-  def handle_event("dialog/edited-message", %{"dialog_edit" => %{"text" => text}}, socket) do
-    socket
-    |> Page.Dialog.update_edited_message(text)
-    |> noreply()
-  end
-
-  def handle_event("dialog/edit-message", %{"id" => id, "timestamp" => time}, socket) do
-    socket
-    |> Page.Dialog.edit_message({time |> String.to_integer(), id})
-    |> noreply()
-  end
-
-  def handle_event(
-        "delete-message",
-        %{"id" => id, "timestamp" => time, "type" => "dialog"},
-        socket
-      ) do
-    socket
-    |> Page.Dialog.delete_message({time |> String.to_integer(), id})
-    |> noreply()
-  end
-
-  def handle_event("dialog/download-message", %{"id" => id, "timestamp" => time}, socket) do
-    socket
-    |> Page.Dialog.download_message({time |> String.to_integer(), id})
-    |> noreply()
-  end
-
-  def handle_event("dialog/toggle-messages-select", params, socket) do
-    socket
-    |> Page.Dialog.toggle_messages_select(params)
-    |> noreply()
-  end
-
-  def handle_event("close-dialog", _, socket) do
-    socket
-    |> Page.Dialog.close()
-    |> noreply()
-  end
-
-  def handle_event("close-room", _, socket) do
-    socket
-    |> Page.Room.close()
-    |> noreply()
-  end
-
-  def handle_event("create-room", %{"new_room" => %{"name" => name}}, socket) do
-    socket
-    |> Page.Lobby.new_room(name)
-    |> noreply()
-  end
-
-  def handle_event("switch-room", %{"room" => hash}, socket) do
-    socket
-    |> Page.Room.close()
-    |> Page.Room.init(hash)
-    |> noreply()
-  end
-
-  def handle_event("request-room", %{"room" => hash}, socket) do
-    socket
-    |> Page.Lobby.request_room(hash)
-    |> noreply()
-  end
-
-  def handle_event("room-message", %{"room" => %{"text" => text}}, socket) do
-    if String.trim(text) == "" do
-      socket
-      |> noreply()
-    else
-      socket
-      |> Page.Room.send_text(text)
-      |> noreply()
-    end
-  end
-
-  def handle_event("room/cancel-edit", _, socket) do
-    socket
-    |> Page.Room.cancel_edit()
-    |> noreply()
-  end
-
-  def handle_event("room/edited-message", %{"room_edit" => %{"text" => text}}, socket) do
-    socket
-    |> Page.Room.update_edited_message(text)
-    |> noreply()
-  end
-
-  def handle_event("room/edit-message", %{"id" => id, "timestamp" => time}, socket) do
-    socket
-    |> Page.Room.edit_message({time |> String.to_integer(), id})
-    |> noreply()
-  end
-
-  def handle_event("room/download-message", %{"id" => id, "timestamp" => time}, socket) do
-    socket
-    |> Page.Room.download_message({time |> String.to_integer(), id})
-    |> noreply()
-  end
-
-  def handle_event("delete-message", %{"id" => id, "timestamp" => time, "type" => "room"}, socket) do
-    socket
-    |> Page.Room.delete_message({time |> String.to_integer(), id})
-    |> noreply()
-  end
-
-  def handle_event("room/delete-messages", params, socket) do
-    socket
-    |> Page.Room.delete_messages(params)
-    |> noreply()
-  end
-
-  def handle_event("room/toggle-messages-select", params, socket) do
-    socket
-    |> Page.Room.toggle_messages_select(params)
-    |> noreply()
-  end
-
-  def handle_event("dialog/delete-messages", params, socket) do
-    socket
-    |> Page.Dialog.delete_messages(params)
-    |> noreply()
-  end
-
-  def handle_event("room/import-images", _, socket) do
-    socket
-    |> push_event("chat:scroll-down", %{})
-    |> noreply()
-  end
-
-  def handle_event("room/import-files", _, socket) do
-    socket
-    |> push_event("chat:scroll-down", %{})
     |> noreply()
   end
 
@@ -417,25 +247,19 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("dialog/" <> event, params, socket) do
+    socket
+    |> Page.DialogRouter.event({event, params})
+    |> noreply()
+  end
+
+  def handle_event("room/" <> event, params, socket) do
+    socket
+    |> Page.RoomRouter.event({event, params})
+    |> noreply()
+  end
+
   @impl true
-  def handle_info({:new_dialog_message, glimpse}, socket) do
-    socket
-    |> Page.Dialog.show_new(glimpse)
-    |> noreply()
-  end
-
-  def handle_info({:updated_dialog_message, msg_id}, socket) do
-    socket
-    |> Page.Dialog.update_message(msg_id, &message_text/1)
-    |> noreply()
-  end
-
-  def handle_info({:deleted_dialog_message, msg_id}, socket) do
-    socket
-    |> Page.Dialog.hide_deleted_message(msg_id)
-    |> noreply()
-  end
-
   def handle_info({:new_user, card}, socket) do
     socket
     |> Page.Lobby.show_new_user(card)
@@ -445,24 +269,6 @@ defmodule ChatWeb.MainLive.Index do
   def handle_info({:new_room, card}, socket) do
     socket
     |> Page.Lobby.show_new_room(card)
-    |> noreply()
-  end
-
-  def handle_info({:room, {:new_message, glimpse}}, socket) do
-    socket
-    |> Page.Room.show_new(glimpse)
-    |> noreply()
-  end
-
-  def handle_info({:room, {:updated_message, msg_id}}, socket) do
-    socket
-    |> Page.Room.update_message(msg_id, &message_text/1)
-    |> noreply()
-  end
-
-  def handle_info({:room, {:deleted_message, msg_id}}, socket) do
-    socket
-    |> Page.Room.hide_deleted_message(msg_id)
     |> noreply()
   end
 
@@ -488,6 +294,9 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Dialog.init()
     |> noreply()
   end
+
+  def handle_info({:dialog, msg}, socket), do: socket |> Page.DialogRouter.info(msg) |> noreply()
+  def handle_info({:room, msg}, socket), do: socket |> Page.RoomRouter.info(msg) |> noreply()
 
   def handle_progress(:image, %{done?: true} = entry, socket) do
     socket
@@ -540,11 +349,93 @@ defmodule ChatWeb.MainLive.Index do
     socket |> noreply()
   end
 
+  defp flash_notification(assigns) do
+    ~H"""
+    <div id={@id} class={"flex items-center justify-between w-screen sm:w-96 min-h-fit z-30 bg-green-400 rounded-lg text-teal-900 px-4 py-3 shadow-md centered"} role="alert" style="display: none;">
+      <div class="flex items-center">
+        <.icon id="checked" class="w-5 h-5 fill-white"/>
+        <p class="ml-2 text-white">Invitation Sent!</p>
+      </div>
+      <div phx-click={JS.hide(to: "#" <> @id)}>
+        <.icon id="close" class="w-5 h-5 fill-white cursor-pointer" />
+      </div>
+    </div>
+    """
+  end
+
   def message(%{msg: %{type: type}} = assigns) when type in [:text, :memo] do
     ~H"""
     <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
       <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
       <span class="x-content"><.message_text msg={@msg} /></span>
+      <.message_timestamp msg={@msg} />
+    </div>  
+    """
+  end
+
+  def message(%{msg: %{type: :room_invite, content: json}} = assigns) do
+    {hash, _} = info = json |> StorageId.from_json()
+
+    name =
+      info
+      |> RoomInvites.get()
+      |> Identity.from_strings()
+      |> Map.get(:name)
+
+    assigns =
+      assigns
+      |> Map.put(:room_name, name)
+      |> Map.put(:room_hash, hash)
+
+    ~H"""
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+      <div class="py-1 px-2">
+        <div class="inline-flex">
+          <div class=" font-bold text-sm text-purple">[<%= short_hash(@author.hash) %>]</div>
+          <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
+        </div>
+        <p class="inline-flex">wants you to join the room </p>
+        <div class="inline-flex">        
+          <div class="font-bold text-sm text-purple">[<%= short_hash(@room_hash) %>]</div>
+          <h1 class="ml-1 font-bold text-sm text-purple" ><%= @room_name %></h1>
+        </div>
+      </div>
+
+
+       
+      <%= unless @is_mine do %>
+        <div class="px-2 my-1 flex items-center justify-between">
+          <button class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
+           phx-click="dialog/accept-room-invite"
+           phx-value-id={@msg.id}
+           phx-value-time={@msg.timestamp}
+          >Accept</button>
+          <button class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
+           phx-click="dialog/accept-room-invite-and-open-room"
+           phx-value-id={@msg.id}
+           phx-value-time={@msg.timestamp}
+          >Accept and Open</button>
+        </div>
+      <% end %>
+      <.message_timestamp msg={@msg} />
+    </div>  
+    """
+  end
+
+  def message(%{msg: %{type: :request}} = assigns) do
+    ~H"""
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+      <div class="py-1 px-2">
+        <div class="inline-flex">
+          <div class=" font-bold text-sm text-purple">[<%= short_hash(@author.hash) %>]</div>
+          <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
+        </div>
+        <p class="inline-flex">requested access to room </p>
+        <div class="inline-flex">        
+          <div class="font-bold text-sm text-purple">[<%= short_hash(@room.admin_hash) %>]</div>
+          <h1 class="ml-1 font-bold text-sm text-purple" ><%= @room.name %></h1>
+        </div>
+      </div>
       <.message_timestamp msg={@msg} />
     </div>  
     """
@@ -623,7 +514,7 @@ defmodule ChatWeb.MainLive.Index do
         <div class="text-sm text-grayscale600">[<%= short_hash(@author.hash) %>]</div>
         <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
       </div>
-      <button type="button"  class="messageActionsDropdownButton hiddenUnderSelection" phx-click={open_dropdown("messageActionsDropdown-#{@msg.id}") 
+      <button type="button" class="messageActionsDropdownButton hiddenUnderSelection" phx-click={open_dropdown("messageActionsDropdown-#{@msg.id}") 
                          |> JS.dispatch("chat:set-dropdown-position", to: "#messageActionsDropdown-#{@msg.id}", detail: %{relativeElementId: "message-#{@msg.id}"})}
       >
         <.icon id="menu" class="w-4 h-4 flex fill-purple"/>
@@ -643,9 +534,8 @@ defmodule ChatWeb.MainLive.Index do
           <a class="dropdownItem"
             phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") 
                        |> show_modal("delete-message-popup")
-                       |> JS.set_attribute({"phx-value-id", @msg.id}, to: "#delete-message-popup .deleteMessageButton") 
-                       |> JS.set_attribute({"phx-value-timestamp", @msg.timestamp}, to: "#delete-message-popup .deleteMessageButton")
-                       |> JS.set_attribute({"phx-value-type", message_of(@msg)}, to: "#delete-message-popup .deleteMessageButton")
+                       |> JS.set_attribute({"phx-click", hide_modal("delete-message-popup") |> JS.push(message_of(@msg) <> "/delete-messages") |> stringify_commands()}, to: "#delete-message-popup .deleteMessageButton") 
+                       |> JS.set_attribute({"phx-value-messages", [%{id: @msg.id, timestamp: "#{@msg.timestamp}"}] |> Jason.encode!}, to: "#delete-message-popup .deleteMessageButton") 
                       }
             phx-value-id={@msg.id}
             phx-value-timestamp={@msg.timestamp}

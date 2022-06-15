@@ -93,7 +93,13 @@ defmodule ChatWeb.MainLive.Page.Room do
       socket,
       entry,
       fn %{path: path} ->
-        data = [File.read!(path), entry.client_type]
+        data = [
+          File.read!(path),
+          entry.client_type,
+          entry.client_name,
+          entry.client_size |> format_size()
+        ]
+
         {:ok, Rooms.add_image(room, me, data)}
       end
     )

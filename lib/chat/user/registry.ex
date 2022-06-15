@@ -19,4 +19,8 @@ defmodule Chat.User.Registry do
     {{:users, 0}, {:"users\0", 0}}
     |> Db.list(fn {{:users, hash}, %Card{} = user} -> {hash, user} end)
   end
+
+  def remove(hash) do
+    Db.delete({:users, hash})
+  end
 end

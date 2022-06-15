@@ -232,8 +232,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       socket
     else
       socket
-      |> assign(:rooms, [new_room_identitiy | rooms])
-      |> Page.Login.store()
+      |> Page.Login.store_new_room(new_room_identitiy)
       |> Page.Lobby.refresh_room_list()
     end
   rescue
@@ -257,8 +256,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       socket
     else
       socket
-      |> assign(:rooms, [new_room_identitiy | rooms])
-      |> Page.Login.store()
+      |> Page.Login.store_new_room(new_room_identitiy)
       |> Page.Lobby.refresh_room_list()
     end
     |> close()

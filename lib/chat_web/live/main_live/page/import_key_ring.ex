@@ -2,9 +2,8 @@ defmodule ChatWeb.MainLive.Page.ImportKeyRing do
   @moduledoc "Import Key Ring Page"
   import Phoenix.LiveView, only: [assign: 3]
 
-  alias Chat.Identity
   alias Chat.KeyRingTokens
-  alias Chat.Utils
+  alias ChatWeb.MainLive.Page
   alias ChatWeb.Router.Helpers, as: Routes
 
   def init(socket) do
@@ -27,9 +26,7 @@ defmodule ChatWeb.MainLive.Page.ImportKeyRing do
 
   def save_key_ring(socket, {me, rooms}) do
     socket
-    |> assign(:me, me)
-    |> assign(:rooms, rooms)
-    |> assign(:my_id, me |> Identity.pub_key() |> Utils.hash())
+    |> Page.Login.load_user(me, rooms)
   end
 
   def close(socket) do

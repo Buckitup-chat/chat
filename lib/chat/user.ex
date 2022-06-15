@@ -37,9 +37,15 @@ defmodule Chat.User do
     |> elem(0)
   end
 
+  def remove(hash), do: Registry.remove(hash)
+
   def device_encode(%Identity{} = identity, rooms \\ []), do: LocalStorage.encode(identity, rooms)
   def device_decode(data), do: LocalStorage.decode(data)
 
   def pub_key(%Card{pub_key: key}), do: key
   def pub_key(%Identity{} = identity), do: identity |> Identity.pub_key()
+
+  def is_first_and_only?(hash) do
+    match?([%{hash: ^hash}], list())
+  end
 end

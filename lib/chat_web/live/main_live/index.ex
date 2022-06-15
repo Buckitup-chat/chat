@@ -259,6 +259,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("admin/" <> event, params, socket) do
+    socket
+    |> Page.AdminPanelRouter.event({event, params})
+    |> noreply()
+  end
+
   @impl true
   def handle_info({:new_user, card}, socket) do
     socket
@@ -295,8 +301,13 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_info({:room, msg}, socket),
+    do: socket |> Page.RoomRouter.info(msg) |> noreply()
+
+  def handle_info({:platform_response, msg}, socket),
+    do: socket |> Page.AdminPanelRouter.info(msg) |> noreply()
+
   def handle_info({:dialog, msg}, socket), do: socket |> Page.DialogRouter.info(msg) |> noreply()
-  def handle_info({:room, msg}, socket), do: socket |> Page.RoomRouter.info(msg) |> noreply()
 
   def handle_progress(:image, %{done?: true} = entry, socket) do
     socket
@@ -488,7 +499,7 @@ defmodule ChatWeb.MainLive.Index do
 
   defp message_file(%{msg: %{type: :file, content: json}} = assigns) do
     {id, secret} = json |> StorageId.from_json()
-    [_, _, name, size] = Files.get(id, secret)
+    [name, size] = Files.get_meta(id, secret)
 
     assigns =
       assigns

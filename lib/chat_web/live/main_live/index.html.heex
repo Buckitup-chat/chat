@@ -172,6 +172,12 @@
               <.icon id="sidebarChats" class={classes("w-6 h-6 hover:fill-purple", %{"fill-purple" => @lobby_mode == :chats, "fill-grayscale" => @lobby_mode != :chats})}/>
               <span class="text-xs">Chats</span>
             </button>
+            <%= if @is_admin do %>
+            <button phx-click="switch-lobby-mode" phx-value-lobby-mode="admin" class="sidebarIcon mt-5">
+              <.icon id="sidebarChats" class={classes("w-6 h-6 hover:fill-purple", %{"fill-purple" => @lobby_mode == :admin, "fill-grayscale" => @lobby_mode != :admin})}/>
+              <span class="text-xs">Admin</span>
+            </button>
+            <% end %>
           </div>
           <div class="flex flex-col items-center">
             <a phx-click="open-feed" style="display: none; cursor: pointer;">News feed</a>
@@ -781,6 +787,119 @@
               </div>
             </div>
           <% end %>
+          <%= if @lobby_mode == :admin  and @is_admin do %>
+            <div class="flex flex-col">
+              <div class="flex flex-row flex-wrap m-2">
+                <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
+                  <header class="text-2xl bg-white/50 rounded-md p-2">Backup and restore</header>
+                  <section class="p-2 text-grayscale600">
+                    <a href="/get/backup">Download Backup data</a>
+                  </section>
+                  <section id="restore-data-mode" class="p-2 text-grayscale600">
+                    <div class="">
+                      <.form
+                        for={:backup_file}
+                        id="backup-file-form"
+                        phx-change="backup-file-submit"
+                        phx-submit="backup-file-submit"
+                        phx-drop-target={@uploads.backup_file.ref}
+                      >
+                          <%= live_file_input @uploads.backup_file, style: "display: none" %>
+                          <input 
+                            type="button"
+                            class="cursor-pointer"
+                            onclick="event.target.parentNode.querySelector('input[type=file]').click()" 
+                            value="Restore data from Backup" 
+                          >
+
+                        <%= for entry <- @uploads.backup_file.entries do %>
+                          <%= if entry.progress > 0 and entry.progress < 100 do %>
+                            <progress value={entry.progress} max="100"> <%= entry.progress %>% </progress>
+                          <% end %>
+
+                          <%= for err <- upload_errors(@uploads.backup_file, entry) do %>
+                            <p class="alert alert-danger"><%= err %></p>
+                          <% end %>
+                        <% end %>
+                      </.form>
+                    </div>
+                  </section>
+                </article>
+                <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
+                  <header class="text-2xl bg-white/50 rounded-md p-2">WiFi settings</header>
+                  <%= if @wifi_loaded do %> 
+                    <.form
+                      for={:admin_wifi}
+                      id="admin-wifi-form"
+                      phx-submit="admin/wifi-submit"
+                    >
+                      <section class="p-2 pb-0 text-right">
+                        SSID: <input name="ssid" class="p-1.5 rounded bg-white/50" type="text" value={@wifi_ssid}>
+                      </section>
+                      <section class="p-2 pb-1 text-right">
+                        Password: <input name="password" class="p-1.5 rounded bg-white/50" type="text" value={@wifi_password}>
+                      </section>
+                      <section class="text-center">
+                        <button 
+                          type="submit"
+                          class="bg-red-500 px-4 py-2 mt-1 text-white rounded"
+                        >Update</button>
+                      </section>
+                    </.form>
+                  <% else %>
+                    <section class="text-center">
+                      loading ...
+                    </section>
+                  <% end %>
+                </article>
+              </div>
+              <div class="flex flex-row flex-wrap m-2">
+                <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
+                  <header class="text-2xl bg-white/50 rounded-md p-2">Admin List</header>
+                  <section>
+                  <%= for admin <- @admin_list do %>
+                    <div><%= admin.name %></div>  
+                  <% end %> 
+                  </section>
+                </article>
+                <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
+                  <header class="text-2xl bg-white/50 rounded-md p-2">Invite new one</header>
+                  <section>
+                  <%= for user <- @user_list do %>
+                    <div 
+                      phx-click="admin/invite-new-user"
+                      phx-value-hash={user.hash}
+                    ><%= user.name %></div>  
+                  <% end %> 
+                  </section>
+                </article>
+              </div>
+              <div class="flex flex-row flex-wrap m-2">
+                <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
+                  <header class="text-2xl bg-white/50 rounded-md p-2">Remove Room</header>
+                  <section>
+                  <%= for room <- @room_list do %>
+                    <div
+                      phx-click="admin/remove-room"
+                      phx-value-hash={room.hash}
+                    ><%= room.name %></div>
+                  <% end %> 
+                  </section>
+                </article>
+                <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
+                  <header class="text-2xl bg-white/50 rounded-md p-2">Remove User</header>
+                  <section>
+                  <%= for user <- @full_user_list do %>
+                    <div 
+                      phx-click="admin/remove-user"
+                      phx-value-hash={user.hash}
+                    ><%= user.name %></div>  
+                  <% end %>   
+                  </section>
+                </article>
+              </div>
+            </div>
+          <% end %> 
         </div>
       <% end %>
     <%= if @mode == :import_key_ring do %>
@@ -876,35 +995,6 @@
       </div>     
     </div>
   <% end %>
-
-  <%= if @mode == :restore_data do %>
-    <div id="restore-data-mode">
-      <button class="x-back-target button button-outline float-right" phx-click="close-data-restore">Back</button>
-      <div class="text-right row">
-        <.form
-          for={:backup_file}
-          id="backup-file-form"
-          class="column column-50 column-offset-50"
-          phx-change="backup-file-submit"
-          phx-submit="backup-file-submit"
-          phx-drop-target={@uploads.backup_file.ref}
-        >
-            <%= live_file_input @uploads.backup_file, style: "display: none" %>
-            <input type="button" value="Upload Backup" onclick="event.target.parentNode.querySelector('input[type=file]').click()" >
-
-          <%= for entry <- @uploads.backup_file.entries do %>
-            <%= if entry.progress > 0 and entry.progress < 100 do %>
-              <progress value={entry.progress} max="100"> <%= entry.progress %>% </progress>
-            <% end %>
-
-            <%= for err <- upload_errors(@uploads.backup_file, entry) do %>
-              <p class="alert alert-danger"><%= err %></p>
-            <% end %>
-          <% end %>
-        </.form>
-      </div>
-    </div>
-  <% end %> 
   <%= if @mode == :import_own_key_ring do %> 
     <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg"/>
     <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg"/>

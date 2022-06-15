@@ -4,7 +4,7 @@ defmodule Chat.Db do
   """
   use GenServer
 
-  @db_version "v.3"
+  @db_version "v.4"
   @db_location Application.compile_env(:chat, :cub_db_file, "priv/db")
 
   @doc false
@@ -76,6 +76,19 @@ defmodule Chat.Db do
   def delete(key) do
     db()
     |> CubDB.delete(key)
+  end
+
+  def bulk_delete({min, max}) do
+    {:ok, key_list} =
+      CubDB.select(db(),
+        min_key: min,
+        max_key: max,
+        pipe: [
+          map: fn {key, _value} -> key end
+        ]
+      )
+
+    CubDB.delete_multi(db(), key_list)
   end
 
   def file_path do

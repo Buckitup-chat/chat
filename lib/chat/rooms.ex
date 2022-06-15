@@ -43,6 +43,11 @@ defmodule Chat.Rooms do
     Registry.find(hash)
   end
 
+  def delete(hash) do
+    Registry.delete(hash)
+    RoomMessages.delete_by_room(hash)
+  end
+
   defdelegate add_memo(room, me, text, opts \\ []), to: RoomMessages
   defdelegate add_text(room, me, text, opts \\ []), to: RoomMessages
   defdelegate add_file(room, me, data, opts \\ []), to: RoomMessages

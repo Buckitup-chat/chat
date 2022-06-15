@@ -10,14 +10,8 @@ defmodule ChatWeb.FileController do
 
   def image(conn, %{"download" => _} = params) do
     with %{"id" => id, "a" => secret} <- params,
-         [data, type] <- Images.get(id, secret |> Base.url_decode64!()),
+         [data, type, name | _] <- Images.get(id, secret |> Base.url_decode64!()),
          true <- type |> String.contains?("/") do
-      name =
-        case type do
-          "image/png" -> id <> ".png"
-          _ -> id <> ".jpg"
-        end
-
       conn
       |> put_resp_header("content-disposition", "attachment; filename=\"#{name}\"")
       |> put_resp_content_type("octet/stream")
@@ -33,7 +27,7 @@ defmodule ChatWeb.FileController do
 
   def image(conn, params) do
     with %{"id" => id, "a" => secret} <- params,
-         [data, type] <- Images.get(id, secret |> Base.url_decode64!()),
+         [data, type | _] <- Images.get(id, secret |> Base.url_decode64!()),
          true <- type |> String.contains?("/") do
       conn
       |> put_resp_content_type(type)

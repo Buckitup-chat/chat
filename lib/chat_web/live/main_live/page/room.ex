@@ -1,7 +1,7 @@
 defmodule ChatWeb.MainLive.Page.Room do
   @moduledoc "Room page"
   import ChatWeb.MainLive.Page.Shared
-  import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entries: 3, push_event: 3]
+  import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entry: 3, push_event: 3]
 
   alias Phoenix.PubSub
 
@@ -32,7 +32,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     socket
     |> assign(:page, 0)
     |> assign(:lobby_mode, :rooms)
-    |> assign(:edit_room, false)
+    |> assign(:room_mode, :plain)
     |> assign(:room, room)
     |> assign(:room_identity, room_identity)
     |> assign(:last_load_timestamp, nil)
@@ -47,24 +47,32 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:page, page + 1)
     |> assign(:message_update_mode, :prepend)
     |> assign_messages()
+    |> case do
+      %{assigns: %{room_mode: :select}} = socket ->
+        socket
+        |> push_event("chat:toggle", %{to: "#chat-messages", class: "selectMode"})
+
+      socket ->
+        socket
+    end
   end
 
   def send_text(%{assigns: %{room: room, me: me, room_identity: room_identity}} = socket, text) do
-    if is_memo?(text) do
-      room_identity |> Rooms.add_memo(me, text)
-    else
-      room |> Rooms.add_text(me, text)
+    cond do
+      text |> String.trim() == "" -> nil
+      text |> is_memo?() -> room_identity |> Rooms.add_memo(me, text)
+      true -> room |> Rooms.add_text(me, text)
     end
     |> broadcast_new_message(room, me)
 
     socket
   end
 
-  def send_file(%{assigns: %{me: me, room: room}} = socket) do
-    consume_uploaded_entries(
+  def send_file(%{assigns: %{me: me, room: room}} = socket, entry) do
+    consume_uploaded_entry(
       socket,
-      :room_file,
-      fn %{path: path}, entry ->
+      entry,
+      fn %{path: path} ->
         data = [
           File.read!(path),
           entry.client_type |> mime_type(),
@@ -75,17 +83,16 @@ defmodule ChatWeb.MainLive.Page.Room do
         {:ok, Rooms.add_file(room, me, data)}
       end
     )
-    |> Enum.at(0)
     |> broadcast_new_message(room, me)
 
     socket
   end
 
-  def send_image(%{assigns: %{me: me, room: room}} = socket) do
-    consume_uploaded_entries(
+  def send_image(%{assigns: %{me: me, room: room}} = socket, entry) do
+    consume_uploaded_entry(
       socket,
-      :room_image,
-      fn %{path: path}, entry ->
+      entry,
+      fn %{path: path} ->
         data = [
           File.read!(path),
           entry.client_type,
@@ -96,7 +103,6 @@ defmodule ChatWeb.MainLive.Page.Room do
         {:ok, Rooms.add_image(room, me, data)}
       end
     )
-    |> Enum.at(0)
     |> broadcast_new_message(room, me)
 
     socket
@@ -111,6 +117,7 @@ defmodule ChatWeb.MainLive.Page.Room do
       |> assign(:page, 0)
       |> assign(:messages, [new_message |> Rooms.read_message(identity)])
       |> assign(:message_update_mode, :append)
+      |> push_event("chat:scroll-down", %{})
     else
       socket
     end
@@ -131,11 +138,10 @@ defmodule ChatWeb.MainLive.Page.Room do
       end)
 
     socket
-    |> assign(:edit_room, true)
+    |> assign(:room_mode, :edit)
     |> assign(:edit_content, content)
     |> assign(:edit_message_id, msg_id)
-    |> assign(:messages, [])
-    |> assign(:message_update_mode, :append)
+    |> forget_current_messages()
     |> push_event("chat:focus", %{to: "#room-edit-input"})
   end
 
@@ -164,14 +170,13 @@ defmodule ChatWeb.MainLive.Page.Room do
       |> render_to_html_string(render_fun)
 
     socket
-    |> assign(:messages, [])
-    |> assign(:message_update_mode, :append)
+    |> forget_current_messages()
     |> push_event("chat:change", %{to: "#room-message-#{id} .x-content", content: content})
   end
 
   def cancel_edit(socket) do
     socket
-    |> assign(:edit_room, false)
+    |> assign(:room_mode, :plain)
     |> assign(:edit_content, nil)
     |> assign(:edit_message_id, nil)
   end
@@ -186,15 +191,30 @@ defmodule ChatWeb.MainLive.Page.Room do
     socket
   end
 
-  def render_deleted_message(socket, msg_id) do
-    socket
-    |> push_event("chat:toggle", %{to: "#room-message-#{msg_id}", class: "hidden"})
-  end
-
   def approve_request(%{assigns: %{room_identity: room_identity}} = socket, user_hash) do
     Rooms.approve_request(room_identity |> Utils.hash(), user_hash, room_identity)
 
     socket
+  end
+
+  def delete_messages(%{assigns: %{me: me, room_identity: room_identity, room: room}} = socket, %{
+        "messages" => messages
+      }) do
+    messages
+    |> Jason.decode!()
+    |> Enum.map(fn %{"id" => msg_id, "timestamp" => time} ->
+      Rooms.delete_message({String.to_integer(time), msg_id}, room_identity, me)
+      broadcast_deleted_message(msg_id, room, me)
+    end)
+
+    socket
+    |> assign(:room_mode, :plain)
+  end
+
+  def hide_deleted_message(socket, id) do
+    socket
+    |> forget_current_messages()
+    |> push_event("chat:toggle", %{to: "#message-block-#{id}", class: "hidden"})
   end
 
   def invite_user(
@@ -254,6 +274,19 @@ defmodule ChatWeb.MainLive.Page.Room do
       _ ->
         socket
     end
+  end
+
+  def toggle_messages_select(%{assigns: %{}} = socket, %{"action" => "on"}) do
+    socket
+    |> forget_current_messages()
+    |> assign(:room_mode, :select)
+    |> push_event("chat:toggle", %{to: "#chat-messages", class: "selectMode"})
+  end
+
+  def toggle_messages_select(%{assigns: %{room_mode: :select}} = socket, %{"action" => "off"}) do
+    socket
+    |> forget_current_messages()
+    |> assign(:room_mode, :plain)
   end
 
   defp room_topic(%Rooms.Room{pub_key: key}) do
@@ -328,4 +361,10 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   defp set_messages_timestamp([]), do: nil
   defp set_messages_timestamp([message | _]), do: message.timestamp
+
+  defp forget_current_messages(socket) do
+    socket
+    |> assign(:messages, [])
+    |> assign(:message_update_mode, :append)
+  end
 end

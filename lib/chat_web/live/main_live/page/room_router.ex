@@ -1,6 +1,8 @@
 defmodule ChatWeb.MainLive.Page.RoomRouter do
   @moduledoc "Route room events"
 
+  import Phoenix.LiveView, only: [push_event: 3]
+
   alias ChatWeb.MainLive.Index
   alias ChatWeb.MainLive.Page
 
@@ -16,6 +18,9 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
       {"invite-user", %{"hash" => hash}} ->
         socket |> Page.Room.invite_user(hash)
 
+      {"send-request", %{"room" => hash}} ->
+        socket |> Page.Lobby.request_room(hash)
+
       {"approve-request", %{"hash" => hash}} ->
         socket |> Page.Room.approve_request(hash)
 
@@ -27,6 +32,30 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
 
       {"edit-message", %{"id" => id, "timestamp" => time}} ->
         socket |> Page.Room.edit_message({time |> String.to_integer(), id})
+
+      {"download-message", %{"id" => id, "timestamp" => time}} ->
+        socket |> Page.Room.download_message({time |> String.to_integer(), id})
+
+      {"delete-messages", params} ->
+        socket |> Page.Room.delete_messages(params)
+
+      {"toggle-messages-select", params} ->
+        socket |> Page.Room.toggle_messages_select(params)
+
+      {"import-images", _} ->
+        socket |> push_event("chat:scroll-down", %{})
+
+      {"import-files", _} ->
+        socket |> push_event("chat:scroll-down", %{})
+
+      {"close", _} ->
+        socket |> Page.Room.close()
+
+      {"text-message", %{"room" => %{"text" => text}}} ->
+        socket |> Page.Room.send_text(text)
+
+      {"switch", %{"room" => hash}} ->
+        socket |> Page.Room.close() |> Page.Room.init(hash)
     end
   end
 
@@ -43,7 +72,7 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
         socket |> Page.Room.update_message(msg_id, &Index.message_text/1)
 
       {:deleted_message, msg_id} ->
-        socket |> Page.Room.render_deleted_message(msg_id)
+        socket |> Page.Room.hide_deleted_message(msg_id)
     end
   end
 end

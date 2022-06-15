@@ -65,6 +65,44 @@ const listeners = {
     
     if (relativeElementRect.width < e.target.offsetWidth) { e.target.style.left = 0 }
   },
+  "chat:select-message": (e) => {
+    setTimeout(() => {
+      if (document.querySelector("#chat-messages").classList.contains('selectMode') == false) { return false }
+      
+      const messageBlock = e.target;
+      const messageBlockCheckbox = messageBlock.querySelector('.selectCheckbox');
+      messageBlock.classList.toggle('selectedMessageBackground');
+      messageBlockCheckbox.classList.toggle('checked');
+      messageBlockCheckbox.checked = !messageBlockCheckbox.checked;
+      if (document.querySelectorAll('.checked').length == 0) {  
+        document.getElementById("chatContent").dispatchEvent(
+          new CustomEvent('chat:toggle-selection-mode', {detail: {chatType: e.detail.chatType}})
+        )
+      }
+  }, 200);
+  },
+  "chat:messages-to-delete": (e) => {
+    setTimeout(() => {
+      const checkboxes = document.querySelectorAll('.selectCheckbox.checked');
+      const deleteButton = e.target.querySelector('.deleteMessageButton');
+      const messages = []
+      for (const checkbox of checkboxes) {
+        const message = checkbox.parentNode;
+        if (message.getAttribute('phx-value-is-mine') == 'true' && message.classList.contains('hidden') == false) {
+          messages.push({
+            id: message.getAttribute('phx-value-id'),
+            timestamp: message.getAttribute('phx-value-timestamp')
+          });
+        }
+      }
+      deleteButton.setAttribute('phx-value-messages', JSON.stringify(messages));
+    }, 200);
+  },
+  "room:switch-type": (e) => {
+    e.target.classList.add('checkedBackground');
+    
+    document.getElementById(e.detail.id).textContent = e.detail.description
+  },
   "phx:chat:toggle": (e) => {
     if (e.detail && e.detail.class && e.detail.to) {
       document
@@ -88,6 +126,17 @@ for (key in listeners) {
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", info => topbar.show())
 window.addEventListener("phx:page-loading-stop", info => topbar.hide())
+
+// back button fix 
+window.addEventListener("popstate", e => {
+  history.pushState(null, null, window.location.pathname);
+
+  const target = document.querySelector('.x-back-target')
+  if (target) {
+    target.click()
+  }
+}, false);
+history.pushState({}, null, null);
 
 // connect if there are any LiveViews on the page
 liveSocket.connect()

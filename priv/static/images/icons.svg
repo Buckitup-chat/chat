@@ -201,4 +201,12 @@
     <path d="M0 8C0 3.58172 3.58172 0 8 0C12.4183 0 16 3.58172 16 8C16 12.4183 12.4183 16 8 16C3.58172 16 0 12.4183 0 8Z" />
     <path d="M4.66663 7.5L7.16663 10L11.1666 6" stroke="#5DAE6C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>
+
+  <svg id="select" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"  >
+    <path stroke-linecap="round" stroke-linejoin="round" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+  </svg>
+
+  <svg id="requestList" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="white" stroke-width="2">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+  </svg>
 </svg>

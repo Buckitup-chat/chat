@@ -788,6 +788,18 @@
             </div>
           <% end %>
           <%= if @lobby_mode == :admin  and @is_admin do %>
+            <.action_confirmation_popup id="invite-user-confirmation" 
+                                        title="Invite new one" 
+                                        description="Are you sure?"></.action_confirmation_popup>
+            <.action_confirmation_popup id="remove-room-confirmation" 
+                                        title="Remove Room" 
+                                        description="Are you sure?"></.action_confirmation_popup>
+            <.action_confirmation_popup id="remove-user-confirmation" 
+                                        title="Remove User" 
+                                        description="Are you sure?"></.action_confirmation_popup>
+
+
+    
             <div class="flex flex-col">
               <div class="flex flex-row flex-wrap m-2">
                 <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
@@ -865,12 +877,18 @@
                 <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
                   <header class="text-2xl bg-white/50 rounded-md p-2">Invite new one</header>
                   <section>
-                  <%= for user <- @user_list do %>
-                    <div 
-                      phx-click="admin/invite-new-user"
-                      phx-value-hash={user.hash}
-                    ><%= user.name %></div>  
-                  <% end %> 
+                    <%= for user <- @user_list do %>
+                      <div
+                        class="cursor-pointer" 
+                        phx-click={show_modal("invite-user-confirmation")
+                                   |> JS.set_attribute({"phx-click", hide_modal("invite-user-confirmation")
+                                                                     |> JS.push("admin/invite-new-user")
+                                                                     |> stringify_commands()
+                                                      }, to: ".confirmButton")
+                                   |> JS.set_attribute({"phx-value-hash", user.hash}, to: ".confirmButton")
+                                  }
+                      ><%= user.name %></div>  
+                    <% end %> 
                   </section>
                 </article>
               </div>
@@ -880,8 +898,14 @@
                   <section>
                   <%= for room <- @room_list do %>
                     <div
-                      phx-click="admin/remove-room"
-                      phx-value-hash={room.hash}
+                      class="cursor-pointer"
+                      phx-click={show_modal("remove-room-confirmation")
+                                  |> JS.set_attribute({"phx-click", hide_modal("remove-room-confirmation")
+                                                                    |> JS.push("admin/remove-room")
+                                                                    |> stringify_commands()
+                                                     }, to: ".confirmButton")
+                                  |> JS.set_attribute({"phx-value-hash", room.hash}, to: ".confirmButton")
+                                }
                     ><%= room.name %></div>
                   <% end %> 
                   </section>
@@ -890,9 +914,15 @@
                   <header class="text-2xl bg-white/50 rounded-md p-2">Remove User</header>
                   <section>
                   <%= for user <- @full_user_list do %>
-                    <div 
-                      phx-click="admin/remove-user"
-                      phx-value-hash={user.hash}
+                    <div
+                      class="cursor-pointer" 
+                      phx-click={show_modal("remove-user-confirmation")
+                                 |> JS.set_attribute({"phx-click", hide_modal("remove-user-confirmation")
+                                                                   |> JS.push("admin/remove-user")
+                                                                   |> stringify_commands()
+                                                    }, to: ".confirmButton")
+                                 |> JS.set_attribute({"phx-value-hash", user.hash}, to: ".confirmButton")
+                                }
                     ><%= user.name %></div>  
                   <% end %>   
                   </section>

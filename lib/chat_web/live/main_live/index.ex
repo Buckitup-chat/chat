@@ -385,18 +385,16 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   def message(%{msg: %{type: :room_invite, content: json}} = assigns) do
-    {hash, _} = info = json |> StorageId.from_json()
-
-    name =
-      info
+    identity =
+      json
+      |> StorageId.from_json()
       |> RoomInvites.get()
       |> Identity.from_strings()
-      |> Map.get(:name)
 
     assigns =
       assigns
-      |> Map.put(:room_name, name)
-      |> Map.put(:room_hash, hash)
+      |> Map.put(:room_name, identity.name)
+      |> Map.put(:room_hash, Chat.Utils.hash(identity))
 
     ~H"""
     <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
@@ -596,6 +594,21 @@ defmodule ChatWeb.MainLive.Index do
     <div class="px-2 text-grayscale600 flex justify-end mr-1" style="font-size: 10px;">
       <%= @msg.timestamp |> DateTime.from_unix!() |> Timex.format!("{h12}:{0m} {AM}, {D}.{M}.{YYYY}") %>
     </div>
+    """
+  end
+
+  defp action_confirmation_popup(assigns) do
+    ~H"""
+    <.modal id={@id} class=""> 
+      <h1 class="text-base font-bold text-grayscale"><%= @title %></h1>
+      <p class="mt-3 text-sm text-black/50"><%= @description %></p>
+      <div class="mt-5 flex items-center justify-between">
+        <button phx-click={hide_modal(@id)} class="w-full mr-1 h-12 border rounded-lg border-black/10">Cancel</button>
+        <button class="confirmButton w-full ml-1 h-12 border-0 rounded-lg bg-grayscale text-white flex items-center justify-center">
+          Confirm
+        </button>
+      </div>
+    </.modal>
     """
   end
 

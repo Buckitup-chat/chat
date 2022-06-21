@@ -28,10 +28,10 @@
             for={:login}
             id="login-form"
             phx-submit="login">
-        
+            
             <%= text_input f, :name, placeholder: "Your name", class: "w-full h-11 bg-transparent border border-white/50 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-0 focus:border-white" %>
             <%= error_tag f, :name %>
-        
+            
             <div class="mt-2.5">
               <%= submit "Log In", phx_disable_with: "Saving...", class: "w-full h-11 focus:outline-none text-white px-4 rounded-lg", style: "background-color: rgb(36, 24, 36);"   %>
             </div>
@@ -54,7 +54,6 @@
     </div>
   <% else %>
     <%= if @mode == :lobby do %>
-      
       <.modal id="logout-backup-popup" hide_event="logout-close" class="">
         <%= if @logout_step == :initial do %> 
           <h1 class="text-base font-bold text-grayscale">Log Out & Back Up</h1>
@@ -220,41 +219,41 @@
           <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
             <%= unless @dialog do %>
             <% else %>
-            <div id="chatContent" class="basis-[93%] overflow-scroll flex flex-col justify-between relative" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
-              <div class="w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start sticky top-0 right-0" style="min-height: 56px;">
-                <button phx-click={JS.push("close-dialog") |> close_content()} class="sm:hidden pr-3">
-                  <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
-                </button>
-                <div class="text-base text-white/60">[<%= short_hash(@peer.hash) %>]</div>
-                <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>
-                <button>
-                  <.icon id="edit" class="w-4 h-4 ml-1 flex fill-white/50"/>
-                </button>
-              </div>
-              <div>
-                <div id="chat-messages" phx-update={@message_update_mode}>
-                  <%= for msg <- @messages do %>
-                    <div class="messageBlock flex flex-row px-2 sm:px-8"
-                      id={"message-block-#{msg.id}"}
-                      phx-click={JS.dispatch("chat:select-message", detail: %{chatType: "dialog"})}
-                      phx-value-id={msg.id}
-                      phx-value-is-mine={"#{msg.is_mine?}"}
-                      phx-value-timestamp={msg.timestamp}
-                      phx-value-type="dialog"
-                    >  
-                      <div class={classes("m-1 w-full flex", %{"justify-end" => msg.is_mine?, "justify-start" => !msg.is_mine?})} id={"dialog-message-#{msg.id}"}>
-                        <.message 
-                          color={msg.is_mine? && "bg-purple50" || "bg-white"}
-                          msg={msg} 
-                          author={msg.is_mine? && Chat.Card.from_identity(@me) || @peer}
-                          is_mine={msg.is_mine?}  
-                        />
-                      </div>
-                      <input type="checkbox" class="selectCheckbox w-6 h-6 ml-3 mt-3 rounded-full text-purple/90 bg-black/10 border-gray-300 focus:ring-2" />
-                    </div>
-                  <% end %>
+              <div id="chatContent" class="basis-[93%] overflow-scroll flex flex-col justify-between relative" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
+                <div class="w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start sticky top-0 right-0" style="min-height: 56px;">
+                  <button phx-click={JS.push("close-dialog") |> close_content()} class="sm:hidden pr-3">
+                    <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
+                  </button>
+                  <div class="text-base text-white/60">[<%= short_hash(@peer.hash) %>]</div>
+                  <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>
+                  <button>
+                    <.icon id="edit" class="w-4 h-4 ml-1 flex fill-white/50"/>
+                  </button>
                 </div>
-                <div class="px-2 sm:px-8" phx-update="replace" id="dialog-uploads">
+                <div>
+                  <div id="chat-messages" phx-update={@message_update_mode}>
+                    <%= for msg <- @messages do %>
+                      <div class="messageBlock flex flex-row px-2 sm:px-8"
+                        id={"message-block-#{msg.id}"}
+                        phx-click={JS.dispatch("chat:select-message", detail: %{chatType: "dialog"})}
+                        phx-value-id={msg.id}
+                        phx-value-is-mine={"#{msg.is_mine?}"}
+                        phx-value-timestamp={msg.timestamp}
+                        phx-value-type="dialog"
+                      >  
+                        <div class={classes("m-1 w-full flex", %{"justify-end" => msg.is_mine?, "justify-start" => !msg.is_mine?})} id={"dialog-message-#{msg.id}"}>
+                          <.message 
+                            color={msg.is_mine? && "bg-purple50" || "bg-white"}
+                            msg={msg} 
+                            author={msg.is_mine? && Chat.Card.from_identity(@me) || @peer}
+                            is_mine={msg.is_mine?}  
+                          />
+                        </div>
+                        <input type="checkbox" class="selectCheckbox w-6 h-6 ml-3 mt-3 rounded-full text-purple/90 bg-black/10 border-gray-300 focus:ring-2" />
+                      </div>
+                    <% end %>
+                  </div>
+                  <div class="px-2 sm:px-8" phx-update="replace" id="dialog-uploads">
                     <%= for %{valid?: true} = entry <- @uploads.image.entries do %>
                       <div id={"upload#{entry.uuid}"} class="m-1 flex justify-end">
                         <div class="flex-col max-w-xxs sm:max-w-md min-w-[180px]">
@@ -396,7 +395,7 @@
           </div>
         <% end %>
         <%= if @lobby_mode == :rooms do %>
-        <.flash_notification id="inviteSentNotification" /> 
+          <.flash_notification id="inviteSentNotification" /> 
           <div id="chatRoomBar" class='chatRoomBar'>
             <.modal id="create-room-popup" class="">
               <h1 class="text-base font-bold text-grayscale">Create Room</h1>
@@ -405,20 +404,23 @@
                 for={:new_room}
                 id="room-create-form"
                 autocomplete="off"
-                phx-submit={hide_modal("create-room-popup") |> JS.push("room/create")}>  
+                phx-submit={hide_modal("create-room-popup") |> JS.push("room/create")}
+              >  
                 <%= text_input f, :name, placeholder: "Name your Room", class: "w-full h-11 mt-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-0" %>
                 
                 <p class="mt-3 text-black/50 text-sm">Room Type</p>
                 <div class="mt-3 flex flex-col">
                   <a class="inline">
-                    <input class="cursor-pointer text-orange-500" type="radio" id="typeChoice1" name="new_room[type]" value="public" checked
-                           phx-click={JS.dispatch("room:switch-type", 
+                    <input 
+                      class="cursor-pointer text-orange-500" type="radio" id="typeChoice1" name="new_room[type]" value="public" checked
+                      phx-click={JS.dispatch("room:switch-type", 
                                         to: "#typeChoice1", 
                                         detail: %{
                                           description: "Public room is visible for everyone. Anyone can join.",
                                           id: "roomTypeDescription"
                                         }
-                                      )}>
+                                      )}
+                    >
                     <label class="cursor-pointer ml-1 text-black/50 text-sm" for="typeChoice1">Open</label>
                   </a>
                   <a class="inline">
@@ -448,7 +450,6 @@
                   <.icon id="alert" class="basis-1/12 mr-2 w-4 h-4 fill-black/40"/>
                   <blockquote id="roomTypeDescription" class="basis-11/12 text-xs text-black/50 mr-3">Public room is visible for everyone. Anyone can join.</blockquote>
                 </div>
-      
                 <%= submit "Create", phx_disable_with: "Saving...", class: "w-full h-11 mt-2 text-white border-0 rounded-lg bg-grayscale flex items-center justify-center" %>
               </.form>
             </.modal>
@@ -466,144 +467,144 @@
               <div class="mt-3 w-full" id="confirmed-rooms">
                 <ul>
                   <%= if @joined_rooms == [] do %>
-                  <p class="text-base text-grayscale600 px-7">You have no rooms</p>
+                    <p class="text-base text-grayscale600 px-7">You have no rooms</p>
                   <% else %>
                     <%= for room <- @joined_rooms do %>
-                    <li phx-click="room/switch" phx-value-room={room.hash} class={classes("hidden sm:flex w-full h-9 flex items-center cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
-                      <a>
-                        <div class="flex flex-row px-7">
-                          <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
-                          <div class="ml-1 text-sm"><%= room.name %></div>
-                        </div>
-                      </a>
-                    </li>
-                    <li phx-click={JS.push("room/switch") |> open_content()} phx-value-room={room.hash} class={classes("sm:hidden w-full h-9 flex items-center cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
-                      <a>
-                        <div class="flex flex-row px-7">
-                          <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
-                          <div class="ml-1 text-sm"><%= room.name %></div>
-                        </div>
-                      </a>
-                    </li>              
-                  <% end %>  
-                <% end %>  
-              </ul>
-            </div>
-            <div phx-click={JS.toggle(to: "#unconfirmed-rooms", in: "fade-in-scale", out: "fade-out-scale")} class="px-7 mt-3 flex items-center">
-              <.icon id="arrowDown" class="w-4 h-4 flex fill-black"/>
-              <span class="ml-1 text-sm  font-bold cursor-pointer">Not Confirmed</span>
-            </div> 
-            <div id="unconfirmed-rooms" class="mt-3 w-full">  
-              <ul>  
-                <%= if @new_rooms == [] do %>
-                  <p class="text-base text-grayscale600 px-7">You have no rooms</p>
-                <% else %>
-                  <%= for room <- @new_rooms do %>
-                    <%= if room |> Rooms.is_requested_by?(@my_id) do %>
-                      <li class="w-full h-9 cursor-pointer flex items-center hover:bg-stone250">  
-                        <div class="flex flex-row justify-between px-7 w-full">
-                          <div class="flex flex-row">
+                      <li phx-click="room/switch" phx-value-room={room.hash} class={classes("hidden sm:flex w-full h-9 flex items-center cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
+                        <a>
+                          <div class="flex flex-row px-7">
                             <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
                             <div class="ml-1 text-sm"><%= room.name %></div>
-                          </div> 
-                          <.icon id="time" class="w-4 h-4 flex fill-black/50"/>
-                        </div>
+                          </div>
+                        </a>
                       </li>
-                    <% else %>
-                      <li class="w-full h-9 cursor-pointer flex items-center hover:bg-stone250" phx-click="room/send-request" phx-value-room={room.hash}>  
-                        <div class="flex flex-row px-7 w-full">
-                          <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
-                          <div class="ml-1 text-sm"><%= room.name %></div>
-                        </div>
-                      </li>
-                    <% end %>
+                      <li phx-click={JS.push("room/switch") |> open_content()} phx-value-room={room.hash} class={classes("sm:hidden w-full h-9 flex items-center cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
+                        <a>
+                          <div class="flex flex-row px-7">
+                            <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
+                            <div class="ml-1 text-sm"><%= room.name %></div>
+                          </div>
+                        </a>
+                      </li>              
+                    <% end %>  
                   <% end %>  
-                <% end %>
-              </ul>  
+                </ul>
+              </div>
+              <div phx-click={JS.toggle(to: "#unconfirmed-rooms", in: "fade-in-scale", out: "fade-out-scale")} class="px-7 mt-3 flex items-center">
+                <.icon id="arrowDown" class="w-4 h-4 flex fill-black"/>
+                <span class="ml-1 text-sm  font-bold cursor-pointer">Not Confirmed</span>
+              </div> 
+              <div id="unconfirmed-rooms" class="mt-3 w-full">  
+                <ul>  
+                  <%= if @new_rooms == [] do %>
+                    <p class="text-base text-grayscale600 px-7">You have no rooms</p>
+                  <% else %>
+                    <%= for room <- @new_rooms do %>
+                      <%= if room |> Rooms.is_requested_by?(@my_id) do %>
+                        <li class="w-full h-9 cursor-pointer flex items-center hover:bg-stone250">  
+                          <div class="flex flex-row justify-between px-7 w-full">
+                            <div class="flex flex-row">
+                              <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
+                              <div class="ml-1 text-sm"><%= room.name %></div>
+                            </div> 
+                            <.icon id="time" class="w-4 h-4 flex fill-black/50"/>
+                          </div>
+                        </li>
+                      <% else %>
+                        <li class="w-full h-9 cursor-pointer flex items-center hover:bg-stone250" phx-click="room/send-request" phx-value-room={room.hash}>  
+                          <div class="flex flex-row px-7 w-full">
+                            <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
+                            <div class="ml-1 text-sm"><%= room.name %></div>
+                          </div>
+                        </li>
+                      <% end %>
+                    <% end %>  
+                  <% end %>
+                </ul>  
+              </div>
             </div>
           </div>
-        </div>
-        <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
-          <%= unless @room do %>
-            <div class="my-auto mx-auto flex flex-col items-center justify-center w-80 h-32 border-9 rounded-lg bg-white/20 ">
-              <span class="my-2 text-sm text-white">Select any Room or create your own</span>
-              <button phx-click={show_modal("create-room-popup")} class="my-2 flex flex-row items-center justify-center border rounded-lg border-white w-72 h-11">
-                <span class="text-sm text-white">Create Room</span>
-                <.icon id="add" class="w-4 h-4 flex fill-white"/>
-              </button>
-            </div>
-          <% else %>
-            <div id="chatContent" class="basis-[93%] overflow-y-scroll flex flex-col justify-between relative" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
-              <div class="w-full px-8  border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between sticky top-0 right-0" style="min-height: 56px;" >
-                <div class="flex flex-row items-center">
-                  <button phx-click={JS.push("room/close") |> close_content()} class="sm:hidden pr-3">
-                    <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
-                  </button>
-                  <div class="text-base text-white/60">[<%= short_hash(@room.admin_hash) %>]</div>
-                  <h1 class="ml-1 text-base font-bolt text-white" ><%= @room.name %></h1>
-                </div>
-                <div class="flex flex-row justify-between">                  
-                  <%= if @room.type == :request do %>
-                    <button class="mr-4 flex items-center" phx-click={if @room_requests == [], do: nil, else: show_modal("room-request-list")}>
-                      <.icon id="requestList" class="w-4 h-4 mr-1 z-20 fill-white"/>
-                      <span class="text-base text-white">Requests</span>
-                    </button>                    
-                  <% end %>
-                  <button class="flex items-center" phx-click={if Chat.User.list() |> length == 1, do: nil, else: show_modal("room-invite-list")}>
-                    <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-white"/>
-                    <span class="text-base text-white"> Invite</span>
-                  </button>
-                </div>
+          <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
+            <%= unless @room do %>
+              <div class="my-auto mx-auto flex flex-col items-center justify-center w-80 h-32 border-9 rounded-lg bg-white/20 ">
+                <span class="my-2 text-sm text-white">Select any Room or create your own</span>
+                <button phx-click={show_modal("create-room-popup")} class="my-2 flex flex-row items-center justify-center border rounded-lg border-white w-72 h-11">
+                  <span class="text-sm text-white">Create Room</span>
+                  <.icon id="add" class="w-4 h-4 flex fill-white"/>
+                </button>
               </div>
-              <%= if @room.type == :request do %>
-                <.modal id="room-request-list"  class="z-30">
-                  <h1 class="text-base font-bold text-grayscale">Requests</h1>
-                  <div class="mt-3 w-full flex flex-col">
-                    <%= for user <- @room_requests do %>
-                      <div id={"user-#{user.hash}"} class="flex flex-row items-center justify-between">
-                        <div class="inline-flex">
-                          <div class="font-bold text-sm text-purple">[<%= short_hash(user.hash) %>]</div>
-                          <div class="ml-1 font-bold text-sm text-purple"><%= user.name %></div>
+            <% else %>
+              <div id="chatContent" class="basis-[93%] overflow-y-scroll flex flex-col justify-between relative" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
+                <div class="w-full px-8  border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between sticky top-0 right-0" style="min-height: 56px;" >
+                  <div class="flex flex-row items-center">
+                    <button phx-click={JS.push("room/close") |> close_content()} class="sm:hidden pr-3">
+                      <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
+                    </button>
+                    <div class="text-base text-white/60">[<%= short_hash(@room.admin_hash) %>]</div>
+                    <h1 class="ml-1 text-base font-bolt text-white" ><%= @room.name %></h1>
+                  </div>
+                  <div class="flex flex-row justify-between">                  
+                    <%= if @room.type == :request do %>
+                      <button class="mr-4 flex items-center" phx-click={if @room_requests == [], do: nil, else: show_modal("room-request-list")}>
+                        <.icon id="requestList" class="w-4 h-4 mr-1 z-20 fill-white"/>
+                        <span class="text-base text-white">Requests</span>
+                      </button>                    
+                    <% end %>
+                    <button class="flex items-center" phx-click={if Chat.User.list() |> length == 1, do: nil, else: show_modal("room-invite-list")}>
+                      <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-white"/>
+                      <span class="text-base text-white"> Invite</span>
+                    </button>
+                  </div>
+                </div>
+                <%= if @room.type == :request do %>
+                  <.modal id="room-request-list"  class="z-30">
+                    <h1 class="text-base font-bold text-grayscale">Requests</h1>
+                    <div class="mt-3 w-full flex flex-col">
+                      <%= for user <- @room_requests do %>
+                        <div id={"user-#{user.hash}"} class="flex flex-row items-center justify-between">
+                          <div class="inline-flex">
+                            <div class="font-bold text-sm text-purple">[<%= short_hash(user.hash) %>]</div>
+                            <div class="ml-1 font-bold text-sm text-purple"><%= user.name %></div>
+                          </div>
+                          <a class="text-black/50" phx-click={JS.push("room/approve-request") |> JS.dispatch("chat:toggle", to: "#user-#{user.hash}", detail: %{class: "hidden"})} phx-value-hash={user.hash}>Approve</a>
                         </div>
-                        <a class="text-black/50" phx-click={JS.push("room/approve-request") |> JS.dispatch("chat:toggle", to: "#user-#{user.hash}", detail: %{class: "hidden"})} phx-value-hash={user.hash}>Approve</a>
-                      </div>
+                      <% end %>
+                    </div>
+                  </.modal>
+                <% end %>
+                <.modal id="room-invite-list"  class="z-30">
+                  <h1 class="text-base font-bold text-grayscale">Invite to the Room</h1>
+                  <div class="mt-3 w-full flex flex-col">
+                    <%= for user <- Chat.User.list() do %>
+                      <%= unless user.hash == @my_id do %>
+                        <div id={"user-#{user.hash}"} class="flex flex-row items-center justify-between">
+                          <div class="inline-flex">
+                            <div class="text-sm text-black/50">[<%= short_hash(user.hash) %>]</div>
+                            <div class="ml-1 text-sm"><%= user.name %></div>
+                          </div>
+                          <a class="flex items-center justify-between" phx-click={JS.push("room/invite-user") 
+                                                                                  |> JS.dispatch("chat:toggle", to: "#user-#{user.hash}", detail: %{class: "hidden"})
+                                                                                  |> JS.show(to: "#inviteSentNotification", display: "flex")
+                                                                                }
+                                                                      phx-value-hash={user.hash}>
+                            <p class="text-purple font-semibold">Send invite</p>
+                            <.icon id="send" class="w-4 h-4 ml-2 z-20 fill-purple"/>
+                          </a>
+                        </div>
+                      <% end %>
                     <% end %>
                   </div>
                 </.modal>
-              <% end %>
-              <.modal id="room-invite-list"  class="z-30">
-                <h1 class="text-base font-bold text-grayscale">Invite to the Room</h1>
-                <div class="mt-3 w-full flex flex-col">
-                  <%= for user <- Chat.User.list() do %>
-                    <%= unless user.hash == @my_id do %>
-                      <div id={"user-#{user.hash}"} class="flex flex-row items-center justify-between">
-                        <div class="inline-flex">
-                          <div class="text-sm text-black/50">[<%= short_hash(user.hash) %>]</div>
-                          <div class="ml-1 text-sm"><%= user.name %></div>
-                        </div>
-                        <a class="flex items-center justify-between" phx-click={JS.push("room/invite-user") 
-                                                                                |> JS.dispatch("chat:toggle", to: "#user-#{user.hash}", detail: %{class: "hidden"})
-                                                                                |> JS.show(to: "#inviteSentNotification", display: "flex")
-                                                                              }
-                                                                     phx-value-hash={user.hash}>
-                          <p class="text-purple font-semibold">Send invite</p>
-                          <.icon id="send" class="w-4 h-4 ml-2 z-20 fill-purple"/>
-                        </a>
-                      </div>
-                    <% end %>
-                  <% end %>
-                </div>
-              </.modal>
-              <div>
+                <div>
                   <div id="chat-messages" phx-update={@message_update_mode}>
                     <%= for msg <- @messages do %>
                       <div class="messageBlock flex flex-row px-2 sm:px-8"
-                         id={"message-block-#{msg.id}"}
-                         phx-click={JS.dispatch("chat:select-message", detail: %{chatType: "room"})}
-                         phx-value-id={msg.id}
-                         phx-value-is-mine={"#{msg.author_hash == @my_id}"}
-                         phx-value-timestamp={msg.timestamp}
-                         phx-value-type="room" 
+                          id={"message-block-#{msg.id}"}
+                          phx-click={JS.dispatch("chat:select-message", detail: %{chatType: "room"})}
+                          phx-value-id={msg.id}
+                          phx-value-is-mine={"#{msg.author_hash == @my_id}"}
+                          phx-value-timestamp={msg.timestamp}
+                          phx-value-type="room" 
                       >
                         <div class={classes("m-1 w-full flex", %{"justify-end" => msg.author_hash == @my_id, "justify-start" => msg.author_hash != @my_id})} id={"room-message-#{msg.id}"}>
                           <.message 
@@ -635,16 +636,16 @@
                         <div class="bg-purple50 max-w-xxs sm:max-w-md min-w-[180px] rounded-lg flex items-center justify-between">
                           <.icon id="document" class="w-14 h-14 flex fill-black/50 animate-pulse"/>
                           <div class="w-36 flex flex-col pr-3">
-                          <span class="truncate text-xs"><%= entry.client_name %></span>
-                          <div class="text-xs text-black/50"><%= entry.progress %>% uploaded</div>
-                        </div>
-                      </div>  
-                    </div>                  
-                  <% end %>
+                            <span class="truncate text-xs"><%= entry.client_name %></span>
+                            <div class="text-xs text-black/50"><%= entry.progress %>% uploaded</div>
+                          </div>
+                        </div>  
+                      </div>                  
+                    <% end %>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="basis-[7%] px-8 border border-white bg-white flex flex-row items-center">
+              <div class="basis-[7%] px-8 border border-white bg-white flex flex-row items-center">
                 <%= if @room_mode == :plain do %>
                   <.form
                     for={:room_file}
@@ -653,7 +654,7 @@
                     phx-change="room/import-files"
                     phx-drop-target={@uploads.room_file.ref}
                   >
-                  <%= live_file_input @uploads.room_file, style: "display: none"  %>
+                    <%= live_file_input @uploads.room_file, style: "display: none"  %>
                   </.form>      
                   <.form
                     for={:room_image}
@@ -687,7 +688,8 @@
                       if (event.key == 'Enter' && event.shiftKey) {
                         document.getElementById('room-form-submit-button').click()
                       }
-                    ">
+                    "
+                  >
                     <%= textarea di, :text,
                       placeholder: "Enter message",
                       class: "w-full h-7 resize-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
@@ -757,256 +759,253 @@
                   </div>
                 <% end %>
                 
-                </div>  
-              <% end %>
-            </div>  
-          <% end %>
-          <%= if @lobby_mode == :feeds do %>
-            <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
-              <div class="overflow-y-auto flex flex-col justify-between">
-                <div class="h-14 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start fixed" >
-                  <a class="sm:hidden mr-2" phx-value-lobby-mode="chats" phx-click={JS.push("switch-lobby-mode") |> JS.push("close-feeds") |> close_content()}><.icon id="arrowBack" class="w-6 h-6 fill-white"/></a>
-                  <h1 class="ml-1 text-base font-bolt text-white">Feeds</h1>
-                </div>
-                <div class="mt-16 mb-8 px-4 sm:px-8 w-full" id="action-feed-list" phx-update={@feed_update_mode}>
-                  <%= if @action_feed_list do %>
-                    <%= for item <- @action_feed_list do %>
-                      <div class="py-1 flex justify-start" id={"item-#{UUID.uuid4()}"}>
-                        <Page.Feed.item item={item} tz={@timezone} />
-                      </div>
-                    <% end %>
+              </div>  
+            <% end %>
+          </div>  
+        <% end %>
+        <%= if @lobby_mode == :feeds do %>
+          <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
+            <div class="overflow-y-auto flex flex-col justify-between">
+              <div class="h-14 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start fixed" >
+                <a class="sm:hidden mr-2" phx-value-lobby-mode="chats" phx-click={JS.push("switch-lobby-mode") |> JS.push("close-feeds") |> close_content()}><.icon id="arrowBack" class="w-6 h-6 fill-white"/></a>
+                <h1 class="ml-1 text-base font-bolt text-white">Feeds</h1>
+              </div>
+              <div class="mt-16 mb-8 px-4 sm:px-8 w-full" id="action-feed-list" phx-update={@feed_update_mode}>
+                <%= if @action_feed_list do %>
+                  <%= for item <- @action_feed_list do %>
+                    <div class="py-1 flex justify-start" id={"item-#{UUID.uuid4()}"}>
+                      <Page.Feed.item item={item} tz={@timezone} />
+                    </div>
                   <% end %>
-                </div>
-                <%= if @action_feed_till > Chat.Log.start_time do %>
-                  <div class="mb-10 px-4 flex flex-row items-center justify-between" >
-                    <hr class="basis-[35%] sm:basis-[45%] border-1 border-white/10">
-                    <a class="basis-[30%] sm:basis-[20%] text-center cursor-pointer text-white/50" phx-click="feed-more">load more</a>
-                    <hr class="basis-[35%] sm:basis-[45%] border-1 border-white/10">
-                  </div>
                 <% end %>
               </div>
+              <%= if @action_feed_till > Chat.Log.start_time do %>
+                <div class="mb-10 px-4 flex flex-row items-center justify-between" >
+                  <hr class="basis-[35%] sm:basis-[45%] border-1 border-white/10">
+                  <a class="basis-[30%] sm:basis-[20%] text-center cursor-pointer text-white/50" phx-click="feed-more">load more</a>
+                  <hr class="basis-[35%] sm:basis-[45%] border-1 border-white/10">
+                </div>
+              <% end %>
             </div>
-          <% end %>
-          <%= if @lobby_mode == :admin  and @is_admin do %>
-            <.action_confirmation_popup id="invite-user-confirmation" 
-                                        title="Invite new one" 
-                                        description="Are you sure?"></.action_confirmation_popup>
-            <.action_confirmation_popup id="remove-room-confirmation" 
-                                        title="Remove Room" 
-                                        description="Are you sure?"></.action_confirmation_popup>
-            <.action_confirmation_popup id="remove-user-confirmation" 
-                                        title="Remove User" 
-                                        description="Are you sure?"></.action_confirmation_popup>
-
-
-    
-            <div class="flex flex-col">
-              <div class="flex flex-row flex-wrap m-2">
-                <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
-                  <header class="text-2xl bg-white/50 rounded-md p-2">Backup and restore</header>
-                  <section class="p-2 text-grayscale600">
-                    <a href="/get/backup">Download Backup data</a>
-                  </section>
-                  <section id="restore-data-mode" class="p-2 text-grayscale600">
-                    <div class="">
-                      <.form
-                        for={:backup_file}
-                        id="backup-file-form"
-                        phx-change="backup-file-submit"
-                        phx-submit="backup-file-submit"
-                        phx-drop-target={@uploads.backup_file.ref}
-                      >
-                          <%= live_file_input @uploads.backup_file, style: "display: none" %>
-                          <input 
-                            type="button"
-                            class="cursor-pointer"
-                            onclick="event.target.parentNode.querySelector('input[type=file]').click()" 
-                            value="Restore data from Backup" 
-                          >
-
-                        <%= for entry <- @uploads.backup_file.entries do %>
-                          <%= if entry.progress > 0 and entry.progress < 100 do %>
-                            <progress value={entry.progress} max="100"> <%= entry.progress %>% </progress>
-                          <% end %>
-
-                          <%= for err <- upload_errors(@uploads.backup_file, entry) do %>
-                            <p class="alert alert-danger"><%= err %></p>
-                          <% end %>
-                        <% end %>
-                      </.form>
-                    </div>
-                  </section>
-                </article>
-                <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
-                  <header class="text-2xl bg-white/50 rounded-md p-2">WiFi settings</header>
-                  <%= if @wifi_loaded do %> 
+          </div>
+        <% end %>
+        <%= if @lobby_mode == :admin  and @is_admin do %>
+          <.action_confirmation_popup
+            id="invite-user-confirmation" 
+            title="Invite new one" 
+            description="Are you sure?"
+          ></.action_confirmation_popup>
+          <.action_confirmation_popup
+            id="remove-room-confirmation" 
+            title="Remove Room" 
+            description="Are you sure?"
+          ></.action_confirmation_popup>
+          <.action_confirmation_popup 
+            id="remove-user-confirmation" 
+            title="Remove User" 
+            description="Are you sure?"
+          ></.action_confirmation_popup>
+          <div class="flex flex-col">
+            <div class="flex flex-row flex-wrap m-2">
+              <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
+                <header class="text-2xl bg-white/50 rounded-md p-2">Backup and restore</header>
+                <section class="p-2 text-grayscale600">
+                  <a href="/get/backup">Download Backup data</a>
+                </section>
+                <section id="restore-data-mode" class="p-2 text-grayscale600">
+                  <div class="">
                     <.form
-                      for={:admin_wifi}
-                      id="admin-wifi-form"
-                      phx-submit="admin/wifi-submit"
+                      for={:backup_file}
+                      id="backup-file-form"
+                      phx-change="backup-file-submit"
+                      phx-submit="backup-file-submit"
+                      phx-drop-target={@uploads.backup_file.ref}
                     >
-                      <section class="p-2 pb-0 text-right">
-                        SSID: <input name="ssid" class="p-1.5 rounded bg-white/50" type="text" value={@wifi_ssid}>
-                      </section>
-                      <section class="p-2 pb-1 text-right">
-                        Password: <input name="password" class="p-1.5 rounded bg-white/50" type="text" value={@wifi_password}>
-                      </section>
-                      <section class="text-center">
-                        <button 
-                          type="submit"
-                          class="bg-red-500 px-4 py-2 mt-1 text-white rounded"
-                        >Update</button>
-                      </section>
+                      <%= live_file_input @uploads.backup_file, style: "display: none" %>
+                      <input 
+                        type="button"
+                        class="cursor-pointer"
+                        onclick="event.target.parentNode.querySelector('input[type=file]').click()" 
+                        value="Restore data from Backup" 
+                      >
+                      <%= for entry <- @uploads.backup_file.entries do %>
+                        <%= if entry.progress > 0 and entry.progress < 100 do %>
+                          <progress value={entry.progress} max="100"> <%= entry.progress %>% </progress>
+                        <% end %>
+
+                        <%= for err <- upload_errors(@uploads.backup_file, entry) do %>
+                          <p class="alert alert-danger"><%= err %></p>
+                        <% end %>
+                      <% end %>
                     </.form>
-                  <% else %>
-                    <section class="text-center">
-                      loading ...
+                  </div>
+                </section>
+              </article>
+              <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
+                <header class="text-2xl bg-white/50 rounded-md p-2">WiFi settings</header>
+                <%= if @wifi_loaded do %> 
+                  <.form
+                    for={:admin_wifi}
+                    id="admin-wifi-form"
+                    phx-submit="admin/wifi-submit"
+                  >
+                    <section class="p-2 pb-0 text-right">
+                      SSID: <input name="ssid" class="p-1.5 rounded bg-white/50" type="text" value={@wifi_ssid}>
                     </section>
-                  <% end %>
-                </article>
-              </div>
-              <div class="flex flex-row flex-wrap m-2">
-                <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
-                  <header class="text-2xl bg-white/50 rounded-md p-2">Admin List</header>
-                  <section>
-                  <%= for admin <- @admin_list do %>
-                    <div><%= admin.name %></div>  
-                  <% end %> 
+                    <section class="p-2 pb-1 text-right">
+                      Password: <input name="password" class="p-1.5 rounded bg-white/50" type="text" value={@wifi_password}>
+                    </section>
+                    <section class="text-center">
+                      <button 
+                        type="submit"
+                        class="bg-red-500 px-4 py-2 mt-1 text-white rounded"
+                      >Update</button>
+                    </section>
+                  </.form>
+                <% else %>
+                  <section class="text-center">
+                    loading ...
                   </section>
-                </article>
-                <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
-                  <header class="text-2xl bg-white/50 rounded-md p-2">Invite new one</header>
-                  <section>
-                    <%= for user <- @user_list do %>
-                      <div
-                        class="cursor-pointer" 
-                        phx-click={show_modal("invite-user-confirmation")
-                                   |> JS.set_attribute({"phx-click", hide_modal("invite-user-confirmation")
-                                                                     |> JS.push("admin/invite-new-user")
-                                                                     |> stringify_commands()
-                                                      }, to: ".confirmButton")
-                                   |> JS.set_attribute({"phx-value-hash", user.hash}, to: ".confirmButton")
-                                  }
-                      ><%= user.name %></div>  
-                    <% end %> 
-                  </section>
-                </article>
-              </div>
-              <div class="flex flex-row flex-wrap m-2">
-                <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
-                  <header class="text-2xl bg-white/50 rounded-md p-2">Remove Room</header>
-                  <section>
-                  <%= for room <- @room_list do %>
-                    <div
-                      class="cursor-pointer"
-                      phx-click={show_modal("remove-room-confirmation")
-                                  |> JS.set_attribute({"phx-click", hide_modal("remove-room-confirmation")
-                                                                    |> JS.push("admin/remove-room")
-                                                                    |> stringify_commands()
-                                                     }, to: ".confirmButton")
-                                  |> JS.set_attribute({"phx-value-hash", room.hash}, to: ".confirmButton")
-                                }
-                    ><%= room.name %></div>
-                  <% end %> 
-                  </section>
-                </article>
-                <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
-                  <header class="text-2xl bg-white/50 rounded-md p-2">Remove User</header>
-                  <section>
-                  <%= for user <- @full_user_list do %>
+                <% end %>
+              </article>
+            </div>
+            <div class="flex flex-row flex-wrap m-2">
+              <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
+                <header class="text-2xl bg-white/50 rounded-md p-2">Admin List</header>
+                <section>
+                <%= for admin <- @admin_list do %>
+                  <div><%= admin.name %></div>  
+                <% end %> 
+                </section>
+              </article>
+              <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
+                <header class="text-2xl bg-white/50 rounded-md p-2">Invite new one</header>
+                <section>
+                  <%= for user <- @user_list do %>
                     <div
                       class="cursor-pointer" 
-                      phx-click={show_modal("remove-user-confirmation")
-                                 |> JS.set_attribute({"phx-click", hide_modal("remove-user-confirmation")
-                                                                   |> JS.push("admin/remove-user")
-                                                                   |> stringify_commands()
+                      phx-click={show_modal("invite-user-confirmation")
+                                  |> JS.set_attribute({"phx-click", hide_modal("invite-user-confirmation")
+                                                                    |> JS.push("admin/invite-new-user")
+                                                                    |> stringify_commands()
                                                     }, to: ".confirmButton")
-                                 |> JS.set_attribute({"phx-value-hash", user.hash}, to: ".confirmButton")
+                                  |> JS.set_attribute({"phx-value-hash", user.hash}, to: ".confirmButton")
                                 }
                     ><%= user.name %></div>  
-                  <% end %>   
-                  </section>
-                </article>
-              </div>
+                  <% end %> 
+                </section>
+              </article>
             </div>
-          <% end %> 
-        </div>
-      <% end %>
-    <%= if @mode == :import_key_ring do %>
-    <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg"/>
-    <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg"/>
-
-    <div class="flex flex-col items-center justify-center w-screen h-screen">
-      <div class="container unauthenticated" >
-        <div class="flex justify-center">
-          <.icon id="logo" class="w-14 h-14 flex fill-white"/>
-        </div>
-        <div class="left-0 mt-10">
-          <a phx-click="login:import-keyring-close" class="x-back-target flex items-center justify-start">
-            <.icon id="arrowLeft" class="w-4 h-4 flex fill-white/70"/>
-            <p class="ml-2 text-sm text-white/70">Back to Log In</p>
-          </a>
-          <h1 style="font-size: 28px; line-height: 34px;" class="mt-5 font-inter font-bold text-white">Login with QR code</h1>
-          <div>
-            <p class="mt-2.5 font-inter text-sm text-white/70">
-              Scan the QR code from device where you logged in and enter the code
-              <span class="font-bold text-white"><%= @code %></span>
-            </p>
+            <div class="flex flex-row flex-wrap m-2">
+              <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
+                <header class="text-2xl bg-white/50 rounded-md p-2">Remove Room</header>
+                <section>
+                <%= for room <- @room_list do %>
+                  <div
+                    class="cursor-pointer"
+                    phx-click={show_modal("remove-room-confirmation")
+                                |> JS.set_attribute({"phx-click", hide_modal("remove-room-confirmation")
+                                                                  |> JS.push("admin/remove-room")
+                                                                  |> stringify_commands()
+                                                    }, to: ".confirmButton")
+                                |> JS.set_attribute({"phx-value-hash", room.hash}, to: ".confirmButton")
+                              }
+                  ><%= room.name %></div>
+                <% end %> 
+                </section>
+              </article>
+              <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
+                <header class="text-2xl bg-white/50 rounded-md p-2">Remove User</header>
+                <section>
+                <%= for user <- @full_user_list do %>
+                  <div
+                    class="cursor-pointer" 
+                    phx-click={show_modal("remove-user-confirmation")
+                                |> JS.set_attribute({"phx-click", hide_modal("remove-user-confirmation")
+                                                                  |> JS.push("admin/remove-user")
+                                                                  |> stringify_commands()
+                                                  }, to: ".confirmButton")
+                                |> JS.set_attribute({"phx-value-hash", user.hash}, to: ".confirmButton")
+                              }
+                  ><%= user.name %></div>  
+                <% end %>   
+                </section>
+              </article>
+            </div>
           </div>
-        </div>
-        <div class="mt-5 border rounded border-white/10 rounded-xl p-10" >
-          <a href={@url} target="_blank">
-            <img class="w-full" src={"data:image/svg+xml;base64, #{@encoded_qr_code}"} />
-          </a>
-        </div>
-      </div>     
-    </div>
-  <% end %>
-  <%= if @mode == :export_key_ring do %>
-    <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg"/>
-    <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg"/>
-    
-
-    <div class="flex flex-col items-center justify-center w-screen h-screen">
-      <div class="container unauthenticated" >
-        <div class="flex justify-center">
-          <.icon id="logo" class="w-14 h-14 flex fill-white"/>
-        </div>
-        <div class="left-0 mt-10">
-          
-          <a phx-click="login:export-code-close" class="x-back-target flex items-center justify-start">
-            <.icon id="arrowLeft" class="w-4 h-4 flex fill-white/70"/>
-            <p class="ml-2 text-sm text-white/70">Back to Log In</p>
-          </a>
-          
-          <h1 style="font-size: 28px; line-height: 34px;" class="mt-5 font-inter font-bold text-white">Login with QR code</h1>
-          <p class="mt-2.5 font-inter text-sm text-white/50">
-            Your identity and all rooms access will be copied to another client, that supplied this link and code to you.
-          </p>
-          <div class="mt-5">
-            <%= unless @export_result do %>
-            <.form
-              let={f}
-              for={:export_key_ring}
-              id="export-key-form"
-              autocomplete="off"
-              phx-submit={JS.hide() |> JS.push("export-keys")}
-            >
-              <%= text_input f, :code, placeholder: "Enter code", type: "number", min: 10, max: 99, class: "w-full  h-11 py-2.5 appearance-none block bg-transparent border border-white/50 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-0 focus:border-white" %>
-              <%= submit "Log In", class: "mt-2.5 w-full h-11 focus:outline-none text-white px-4 rounded-lg", style: "background-color: rgb(36, 24, 36);" %>
-            </.form>
-            <% else %>
-              <%= if @export_result == :error do %>
-                <div class="mt-2.5 p-2.5 w-full bg-transparent border border-white/0 rounded-lg text-white flex flex-row items-strech justify-between" style="background: #F45649;">
-                  <div class="w-44  flex flex-row items-stretch justify-start"> 
-                    <.icon id="alert" class="w-7 h-7 mt-1 fill-white"/>
-                    <p class="ml-2" style="font-size: 14px;">The code is wrong. Fresh link needed.</p> 
-                  </div>
-                  <button type="button">
-                    <.icon id="close" class="w-4 h-4 fill-white"/>
-                  </button>
-                </div>
+        <% end %> 
+      </div>
+    <% end %>
+    <%= if @mode == :import_key_ring do %>
+      <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg"/>
+      <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg"/>
+      <div class="flex flex-col items-center justify-center w-screen h-screen">
+        <div class="container unauthenticated" >
+          <div class="flex justify-center">
+            <.icon id="logo" class="w-14 h-14 flex fill-white"/>
+          </div>
+          <div class="left-0 mt-10">
+            <a phx-click="login:import-keyring-close" class="x-back-target flex items-center justify-start">
+              <.icon id="arrowLeft" class="w-4 h-4 flex fill-white/70"/>
+              <p class="ml-2 text-sm text-white/70">Back to Log In</p>
+            </a>
+            <h1 style="font-size: 28px; line-height: 34px;" class="mt-5 font-inter font-bold text-white">Login with QR code</h1>
+            <div>
+              <p class="mt-2.5 font-inter text-sm text-white/70">
+                Scan the QR code from device where you logged in and enter the code
+                <span class="font-bold text-white"><%= @code %></span>
+              </p>
+            </div>
+          </div>
+          <div class="mt-5 border rounded border-white/10 rounded-xl p-10" >
+            <a href={@url} target="_blank">
+              <img class="w-full" src={"data:image/svg+xml;base64, #{@encoded_qr_code}"} />
+            </a>
+          </div>
+        </div>     
+      </div>
+    <% end %>
+    <%= if @mode == :export_key_ring do %>
+      <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg"/>
+      <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg"/>
+      <div class="flex flex-col items-center justify-center w-screen h-screen">
+        <div class="container unauthenticated" >
+          <div class="flex justify-center">
+            <.icon id="logo" class="w-14 h-14 flex fill-white"/>
+          </div>
+          <div class="left-0 mt-10">
+            <a phx-click="login:export-code-close" class="x-back-target flex items-center justify-start">
+              <.icon id="arrowLeft" class="w-4 h-4 flex fill-white/70"/>
+              <p class="ml-2 text-sm text-white/70">Back to Log In</p>
+            </a>
+            <h1 style="font-size: 28px; line-height: 34px;" class="mt-5 font-inter font-bold text-white">Login with QR code</h1>
+            <p class="mt-2.5 font-inter text-sm text-white/50">
+              Your identity and all rooms access will be copied to another client, that supplied this link and code to you.
+            </p>
+            <div class="mt-5">
+              <%= unless @export_result do %>
+                <.form
+                  let={f}
+                  for={:export_key_ring}
+                  id="export-key-form"
+                  autocomplete="off"
+                  phx-submit={JS.hide() |> JS.push("export-keys")}
+                >
+                  <%= text_input f, :code, placeholder: "Enter code", type: "number", min: 10, max: 99, class: "w-full  h-11 py-2.5 appearance-none block bg-transparent border border-white/50 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-0 focus:border-white" %>
+                  <%= submit "Log In", class: "mt-2.5 w-full h-11 focus:outline-none text-white px-4 rounded-lg", style: "background-color: rgb(36, 24, 36);" %>
+                </.form>
               <% else %>
+                <%= if @export_result == :error do %>
+                  <div class="mt-2.5 p-2.5 w-full bg-transparent border border-white/0 rounded-lg text-white flex flex-row items-strech justify-between" style="background: #F45649;">
+                    <div class="w-44  flex flex-row items-stretch justify-start"> 
+                      <.icon id="alert" class="w-7 h-7 mt-1 fill-white"/>
+                      <p class="ml-2" style="font-size: 14px;">The code is wrong. Fresh link needed.</p> 
+                    </div>
+                    <button type="button">
+                      <.icon id="close" class="w-4 h-4 fill-white"/>
+                    </button>
+                  </div>
+                <% else %>
                   <div class="mt-2.5 p-2.5 w-full bg-transparent border border-white/0 rounded-lg text-white flex flex-row items-strech justify-between" style="background: #6FBC7F;">
                     <div class="w-44  flex flex-row items-stretch justify-start"> 
                       <.icon id="checked" class="w-7 h-7 mt-1 mr-1 fill-white"/>
@@ -1016,101 +1015,94 @@
                       <.icon id="close" class="w-4 h-4 fill-white"/>
                     </button>
                   </div>
+                <% end %>
               <% end %>
-            <%  end %>
-              <div>
             </div>
           </div>
         </div>
-      </div>     
-    </div>
-  <% end %>
-  <%= if @mode == :import_own_key_ring do %> 
-    <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg"/>
-    <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg"/>
-
-    <div class="flex flex-col items-center justify-center w-screen h-screen">
-      <div class="container unauthenticated" >
-        <div class="flex justify-center">
-          <.icon id="logo" class="w-14 h-14 fill-white"/>
-        </div>
-        <div class="left-0 mt-10">
-          <a phx-click="login:import-own-keyring-close" class="x-back-target flex items-center justify-start">
-            <.icon id="arrowLeft" class="w-4 h-4 fill-white/70"/>
-            <p class="ml-2 text-sm text-white/70">Back to Log In</p>
-          </a>
-          <h1 style="font-size: 28px; line-height: 34px;" class="mt-5 font-inter font-bold text-white">Import the recovery keys</h1>
-          <p class="mt-2.5 font-inter text-sm text-white/70">Please, upload the key file and enter the password for decryption</p>
-        </div>
-    <%= if @step == :initial do %>
-      <div class="row">
-        <.form
-          for={:my_keys_file}
-          id="my-keys-file-form"
-          class="column "
-          phx-change="login:my-keys-file-submit"
-          phx-submit="login:my-keys-file-submit"
-          phx-drop-target={@uploads.my_keys_file.ref}
-        >
-            <%= live_file_input @uploads.my_keys_file, style: "display: none" %>
-            <input style="background-color: rgb(36, 24, 36);" class="w-full h-11 mt-7 bg-transparent text-white py-2 px-4 border border-white/0 rounded-lg flex items-center justify-center" type="button" value="Upload Key File" onclick="event.target.parentNode.querySelector('input[type=file]').click()" >
-
-          <%= for entry <- @uploads.my_keys_file.entries do %>
-            <%= if entry.progress > 0 and entry.progress <= 100 do %>
-              <progress value={entry.progress} max="100"> <%= entry.progress %>% </progress>
-            <% end %>
-
-            <%= for err <- upload_errors(@uploads.my_keys_file, entry) do %>
-              <p class="alert alert-danger"><%= err %></p>
-            <% end %>
-          <% end %>
-        </.form>
       </div>
     <% end %>
-    <%= if @step == :decrypt do %>
-      <div class="w-full h-14 mt-7 bg-transparent text-white py-2 px-2.5 border border-white/50 rounded-lg flex flex-row items-center justify-between">
-        <div class="w-44 flex flex-row items-stretch justify-start" > 
-          <div class="border-white/0 bg-white/50 w-7 h-7 flex items-center justify-center" style="border-radius: 50%;">
-            <.icon id="check" class="w-4 h-4 stroke-white fill-white/0"/>
+    <%= if @mode == :import_own_key_ring do %> 
+      <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg"/>
+      <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg"/>
+      <div class="flex flex-col items-center justify-center w-screen h-screen">
+        <div class="container unauthenticated" >
+          <div class="flex justify-center">
+            <.icon id="logo" class="w-14 h-14 fill-white"/>
           </div>
-          <div class="ml-2" style="line-height: 12px;">
-            <p style="font-size: 14px;"><%= @filename %></p> 
-            <p class="text-xs text-white/50">uploaded</p>
+          <div class="left-0 mt-10">
+            <a phx-click="login:import-own-keyring-close" class="x-back-target flex items-center justify-start">
+              <.icon id="arrowLeft" class="w-4 h-4 fill-white/70"/>
+              <p class="ml-2 text-sm text-white/70">Back to Log In</p>
+            </a>
+            <h1 style="font-size: 28px; line-height: 34px;" class="mt-5 font-inter font-bold text-white">Import the recovery keys</h1>
+            <p class="mt-2.5 font-inter text-sm text-white/70">Please, upload the key file and enter the password for decryption</p>
           </div>
-        </div>
-        <button class="w-20 h-9 p-1.5 flex items-center justify-between border rounded-lg bg-white/20 border-white/0 " phx-click="login:import-own-keyring-reupload">
-          <p style="font-size: 14px;">Delete</p>
-          <.icon id="delete" class="w-4 h-4 fill-white"/>
-        </button>
-      </div>
-      
-      <.form
-        let={f}
-        for={:import_own_keyring_password}
-        id="logout-import-own-keyring-password-form"
-        phx-submit="login:import-own-keyring-decrypt"
-        class="mt-2.5"
-      >
-      
-        <%= text_input f, :password, type: "password", placeholder: "Enter Password", phx_debounce: 700, class: "w-full  h-11 py-2.5 appearance-none block bg-transparent border border-white/50 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-0 focus:border-white" %>
-        <%= if @show_invalid do %>
-          <div class="mt-2.5 p-2.5 w-full h-11 bg-transparent border border-white/0 rounded-lg text-white flex flex-row items-strech justify-between" style="background: #F45649;">
-            <div class="w-44 flex flex-row items-stretch justify-start" > 
-              <.icon id="delete" class="w-4 h-4 mt-1 fill-white"/>
-              <p class="ml-1" style="font-size: 14px;">Password Incorrect</p> 
+          <%= if @step == :initial do %>
+            <div class="row">
+              <.form
+                for={:my_keys_file}
+                id="my-keys-file-form"
+                class="column "
+                phx-change="login:my-keys-file-submit"
+                phx-submit="login:my-keys-file-submit"
+                phx-drop-target={@uploads.my_keys_file.ref}
+              >
+                <%= live_file_input @uploads.my_keys_file, style: "display: none" %>
+                <input style="background-color: rgb(36, 24, 36);" class="w-full h-11 mt-7 bg-transparent text-white py-2 px-4 border border-white/0 rounded-lg flex items-center justify-center" type="button" value="Upload Key File" onclick="event.target.parentNode.querySelector('input[type=file]').click()" >
+                <%= for entry <- @uploads.my_keys_file.entries do %>
+                  <%= if entry.progress > 0 and entry.progress <= 100 do %>
+                    <progress value={entry.progress} max="100"> <%= entry.progress %>% </progress>
+                  <% end %>
+                  <%= for err <- upload_errors(@uploads.my_keys_file, entry) do %>
+                    <p class="alert alert-danger"><%= err %></p>
+                  <% end %>
+                <% end %>
+              </.form>
             </div>
-            <button type="button" phx-click="login:import-own-keyring:drop-password-error">
-              <.icon id="close" class="w-4 h-4 fill-white"/>
-            </button>
-          </div>
-        <% end %> 
-        <div>
-          <%= submit "Log In", phx_disable_with: "Checking...", class: "w-full h-11 mt-7 bg-transparent text-white py-2 px-4 border border-white/0 rounded-lg flex items-center justify-center", style: "background-color: rgb(36, 24, 36);" %>
-        </div>
-      </.form>
-    <% end %> 
-      </div>     
-    </div>
+          <% end %>
+          <%= if @step == :decrypt do %>
+            <div class="w-full h-14 mt-7 bg-transparent text-white py-2 px-2.5 border border-white/50 rounded-lg flex flex-row items-center justify-between">
+              <div class="w-44 flex flex-row items-stretch justify-start" > 
+                <div class="border-white/0 bg-white/50 w-7 h-7 flex items-center justify-center" style="border-radius: 50%;">
+                  <.icon id="check" class="w-4 h-4 stroke-white fill-white/0"/>
+                </div>
+                <div class="ml-2" style="line-height: 12px;">
+                  <p style="font-size: 14px;"><%= @filename %></p> 
+                  <p class="text-xs text-white/50">uploaded</p>
+                </div>
+              </div>
+              <button class="w-20 h-9 p-1.5 flex items-center justify-between border rounded-lg bg-white/20 border-white/0 " phx-click="login:import-own-keyring-reupload">
+                <p style="font-size: 14px;">Delete</p>
+                <.icon id="delete" class="w-4 h-4 fill-white"/>
+              </button>
+            </div>
+            <.form
+              let={f}
+              for={:import_own_keyring_password}
+              id="logout-import-own-keyring-password-form"
+              phx-submit="login:import-own-keyring-decrypt"
+              class="mt-2.5"
+            >
+              <%= text_input f, :password, type: "password", placeholder: "Enter Password", phx_debounce: 700, class: "w-full  h-11 py-2.5 appearance-none block bg-transparent border border-white/50 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-0 focus:border-white" %>
+              <%= if @show_invalid do %>
+                <div class="mt-2.5 p-2.5 w-full h-11 bg-transparent border border-white/0 rounded-lg text-white flex flex-row items-strech justify-between" style="background: #F45649;">
+                  <div class="w-44 flex flex-row items-stretch justify-start" > 
+                    <.icon id="delete" class="w-4 h-4 mt-1 fill-white"/>
+                    <p class="ml-1" style="font-size: 14px;">Password Incorrect</p> 
+                  </div>
+                  <button type="button" phx-click="login:import-own-keyring:drop-password-error">
+                    <.icon id="close" class="w-4 h-4 fill-white"/>
+                  </button>
+                </div>
+              <% end %> 
+              <div>
+                <%= submit "Log In", phx_disable_with: "Checking...", class: "w-full h-11 mt-7 bg-transparent text-white py-2 px-4 border border-white/0 rounded-lg flex items-center justify-center", style: "background-color: rgb(36, 24, 36);" %>
+              </div>
+            </.form>
+          <% end %> 
+        </div>     
+      </div>
+    <% end %>
   <% end %>
-<% end %>
 <% end %>

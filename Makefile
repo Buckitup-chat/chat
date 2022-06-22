@@ -20,7 +20,7 @@ server:
 	mix phx.server
 
 iex:
-	iex -S mix phx.server
+	MIX_ENV=dev iex -S mix phx.server
 
 assets:
 	mix assets.deploy

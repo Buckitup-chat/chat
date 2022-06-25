@@ -27,6 +27,10 @@ defmodule ChatWeb.Router do
     live "/export-key-ring/:id", MainLive.Index, :export
   end
 
+  scope "/", ChatWeb do
+    put "/upload_chunk/:key", UploadChunkController, :put
+  end
+
   # Other scopes may use custom stacks.
   # scope "/api", ChatWeb do
   #   pipe_through :api

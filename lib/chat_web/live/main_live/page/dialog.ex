@@ -70,13 +70,15 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     socket
   end
 
-  def send_file(%{assigns: %{dialog: dialog, me: me}} = socket, entry) do
+  def send_file(%{assigns: %{dialog: dialog, me: me}} = socket, entry, {chunk_key, chunk_secret}) do
     consume_uploaded_entry(
       socket,
       entry,
-      fn %{path: path} ->
+      fn _ ->
         data = [
-          File.read!(path),
+          chunk_key,
+          chunk_secret |> Base.encode64(),
+          entry.client_size |> to_string(),
           entry.client_type |> mime_type(),
           entry.client_name,
           entry.client_size |> format_size()
@@ -176,7 +178,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   def delete_messages(%{assigns: %{me: me, dialog: dialog}} = socket, %{"messages" => messages}) do
     messages
     |> Jason.decode!()
-    |> Enum.map(fn %{"id" => msg_id, "timestamp" => time} ->
+    |> Enum.each(fn %{"id" => msg_id, "timestamp" => time} ->
       Dialogs.delete(dialog, me, {String.to_integer(time), msg_id})
       broadcast_message_deleted(msg_id, dialog, me)
     end)

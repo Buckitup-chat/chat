@@ -73,6 +73,10 @@ defmodule Chat.Utils do
     :crypto.crypto_one_time(@cipher, key, iv, data, true)
   end
 
+  def encrypt_blob(data, <<iv::binary-size(8), key::binary-size(16)>>) do
+    :crypto.crypto_one_time(@cipher, key, iv, data, true)
+  end
+
   def decrypt_blob(data, <<iv::bits-size(64), key::bits>> = _secret) when is_list(data) do
     data |> Enum.map(&:crypto.crypto_one_time(@cipher, key, iv, &1, false))
   end
@@ -114,6 +118,12 @@ defmodule Chat.Utils do
     true = is_signed_by?(sign, encrypted, by)
 
     decrypt(encrypted, for)
+  end
+
+  def generate_binary_encrypt_key do
+    {iv, key} = generate_key()
+
+    iv <> key
   end
 
   defp binary({:RSAPublicKey, a, b}), do: "RSAPublicKey|#{a}|#{b}"

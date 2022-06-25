@@ -87,7 +87,9 @@ defmodule Chat.MixProject do
   end
 
   defp build_version do
-    {hash, 0} = System.cmd("git", ~w|log -1 --date=format:%Y-%m-%d --format=%cd_%h|)
-    String.trim(hash)
+    case System.cmd("git", ~w|log -1 --date=format:%Y-%m-%d --format=%cd_%h|) do
+      {hash, 0} -> String.trim(hash)
+      _ -> "gigalixir"
+    end
   end
 end

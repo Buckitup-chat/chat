@@ -19,6 +19,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     socket
     |> assign(:mode, :lobby)
     |> assign(:lobby_mode, :chats)
+    |> assign(:version, get_version())
     |> assign_user_list()
     |> approve_joined_room_requests()
     |> assign_room_list()
@@ -179,4 +180,19 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   defp init_new_mode(%{assigns: %{lobby_mode: :admin}} = socket),
     do: socket |> Page.AdminPanel.init()
+
+  defp get_version do
+    cond do
+      ver = System.get_env("RELEASE_SYS_CONFIG") ->
+        ver
+        |> String.split("/", trim: true)
+        |> Enum.at(3)
+
+      ver = System.get_env("SOURCE_VERSION") ->
+        "Gigalixir: #{ver}"
+
+      true ->
+        "version should be here"
+    end
+  end
 end

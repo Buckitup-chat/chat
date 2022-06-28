@@ -218,6 +218,9 @@
           </div>
           <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
             <%= unless @dialog do %>
+              <div class="text-center bg-white/10 tracking-tightest" >
+                <%= @version %>
+              </div>
             <% else %>
               <div id="chatContent" class="basis-[93%] overflow-scroll flex flex-col justify-between relative" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
                 <div class="w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start sticky top-0 right-0" style="min-height: 56px;">

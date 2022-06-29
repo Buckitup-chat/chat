@@ -4,7 +4,7 @@ defmodule Chat.Db do
   """
   use GenServer
 
-  @db_version "v.4"
+  @db_version "v.5"
   @db_location Application.compile_env(:chat, :cub_db_file, "priv/db")
 
   @doc false
@@ -16,22 +16,33 @@ defmodule Chat.Db do
   @doc false
   @impl true
   def init(_opts) do
-    {:ok, _db} = CubDB.start_link(file_path(), auto_file_sync: true)
+    {:ok, db} = CubDB.start_link(file_path(), auto_file_sync: true)
+
+    {:ok, {db, path_writable?(file_path())}}
   end
 
   @doc false
   @impl true
-  def handle_call(:db, _from, state) do
-    {:reply, state, state}
+  def handle_call(:db, _from, {pid, _} = state) do
+    {:reply, pid, state}
   end
 
-  def handle_call({:swap, pid}, _from, old_pid) do
-    {:reply, old_pid, pid}
+  def handle_call(:writable?, _from, {_, writable} = state) do
+    {:reply, writable, state}
+  end
+
+  def handle_call({:swap, pid}, _from, {old_pid, writable?}) do
+    {:reply, old_pid, {pid, writable?}}
   end
 
   def db do
     __MODULE__
     |> GenServer.call(:db)
+  end
+
+  def writable? do
+    __MODULE__
+    |> GenServer.call(:writable?)
   end
 
   def swap_pid(new_pid) do
@@ -69,26 +80,32 @@ defmodule Chat.Db do
   end
 
   def put(key, value) do
-    db()
-    |> CubDB.put(key, value)
+    if writable?() do
+      db()
+      |> CubDB.put(key, value)
+    end
   end
 
   def delete(key) do
-    db()
-    |> CubDB.delete(key)
+    if writable?() do
+      db()
+      |> CubDB.delete(key)
+    end
   end
 
   def bulk_delete({min, max}) do
-    {:ok, key_list} =
-      CubDB.select(db(),
-        min_key: min,
-        max_key: max,
-        pipe: [
-          map: fn {key, _value} -> key end
-        ]
-      )
+    if writable?() do
+      {:ok, key_list} =
+        CubDB.select(db(),
+          min_key: min,
+          max_key: max,
+          pipe: [
+            map: fn {key, _value} -> key end
+          ]
+        )
 
-    CubDB.delete_multi(db(), key_list)
+      CubDB.delete_multi(db(), key_list)
+    end
   end
 
   def file_path do
@@ -123,5 +140,18 @@ defmodule Chat.Db do
     unless Enum.count(entries) < target_amount do
       copy_data(src_db, dst_db, last_key: last_key, target_amount: target_amount)
     end
+  end
+
+  defp path_writable?(path) do
+    System.cmd("df", ["-P", path])
+    |> elem(0)
+    |> String.split("\n", trim: true)
+    |> List.last()
+    |> String.split(" ", trim: true)
+    |> Enum.at(3)
+    |> String.to_integer()
+    |> then(&(&1 > 10))
+  rescue
+    _ -> false
   end
 end

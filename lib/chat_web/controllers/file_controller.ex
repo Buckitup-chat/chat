@@ -3,6 +3,7 @@ defmodule ChatWeb.FileController do
   use ChatWeb, :controller
 
   alias Chat.Broker
+  alias Chat.ChunkedFiles
   alias Chat.Files
   alias Chat.Images
 
@@ -59,8 +60,11 @@ defmodule ChatWeb.FileController do
 
   def file(conn, params) do
     with %{"id" => id, "a" => secret} <- params,
-         [data, type, name | _] <- Files.get(id, secret |> Base.url_decode64!()),
+         [chunk_key, chunk_secret, _, type, name | _] <-
+           Files.get(id, secret |> Base.url_decode64!()),
          true <- type |> String.contains?("/") do
+      data = ChunkedFiles.read({chunk_key, chunk_secret |> Base.decode64!()})
+
       conn
       |> put_resp_header("content-disposition", "attachment; filename=\"#{name}\"")
       |> put_resp_content_type(type)

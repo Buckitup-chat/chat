@@ -13,6 +13,12 @@ defmodule Chat.MixProject do
       deps: deps(),
       test_coverage: [
         summary: [threshold: 45]
+      ],
+      releases: [
+        chat: [
+          version: build_version(),
+          applications: [chat: :permanent]
+        ]
       ]
     ]
   end
@@ -78,5 +84,12 @@ defmodule Chat.MixProject do
       setup: ["deps.get"],
       "assets.deploy": ["esbuild default --minify", "tailwind default --minify", "phx.digest"]
     ]
+  end
+
+  defp build_version do
+    case System.cmd("git", ~w|log -1 --date=format:%Y-%m-%d --format=%cd_%h|) do
+      {hash, 0} -> String.trim(hash)
+      _ -> "gigalixir"
+    end
   end
 end

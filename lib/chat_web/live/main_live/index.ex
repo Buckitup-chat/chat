@@ -4,6 +4,7 @@ defmodule ChatWeb.MainLive.Index do
 
   alias Phoenix.LiveView.JS
 
+  alias Chat.ChunkedFiles
   alias Chat.Db
   alias Chat.Files
   alias Chat.Identity
@@ -12,6 +13,7 @@ defmodule ChatWeb.MainLive.Index do
   alias Chat.Rooms
   alias Chat.Utils.StorageId
   alias ChatWeb.MainLive.Page
+  alias ChatWeb.Router.Helpers
 
   on_mount ChatWeb.Hooks.LocalTimeHook
 
@@ -36,8 +38,8 @@ defmodule ChatWeb.MainLive.Index do
         |> allow_image_upload(:room_image)
         |> allow_any500m_upload(:backup_file)
         |> allow_any500m_upload(:my_keys_file)
-        |> allow_any500m_upload(:dialog_file, max_entries: 50)
-        |> allow_any500m_upload(:room_file, max_entries: 50)
+        |> allow_chunked_upload(:dialog_file, max_entries: 50)
+        |> allow_chunked_upload(:room_file, max_entries: 50)
         |> Page.Login.check_stored()
         |> ok()
       end
@@ -315,21 +317,9 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_progress(:dialog_file, %{done?: true} = entry, socket) do
-    socket
-    |> Page.Dialog.send_file(entry)
-    |> noreply()
-  end
-
   def handle_progress(:room_image, %{done?: true} = entry, socket) do
     socket
     |> Page.Room.send_image(entry)
-    |> noreply()
-  end
-
-  def handle_progress(:room_file, %{done?: true} = entry, socket) do
-    socket
-    |> Page.Room.send_file(entry)
     |> noreply()
   end
 
@@ -380,23 +370,21 @@ defmodule ChatWeb.MainLive.Index do
       <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
       <span class="x-content"><.message_text msg={@msg} /></span>
       <.message_timestamp msg={@msg} />
-    </div>  
+    </div>
     """
   end
 
   def message(%{msg: %{type: :room_invite, content: json}} = assigns) do
-    {hash, _} = info = json |> StorageId.from_json()
-
-    name =
-      info
+    identity =
+      json
+      |> StorageId.from_json()
       |> RoomInvites.get()
       |> Identity.from_strings()
-      |> Map.get(:name)
 
     assigns =
       assigns
-      |> Map.put(:room_name, name)
-      |> Map.put(:room_hash, hash)
+      |> Map.put(:room_name, identity.name)
+      |> Map.put(:room_hash, Chat.Utils.hash(identity))
 
     ~H"""
     <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
@@ -406,14 +394,14 @@ defmodule ChatWeb.MainLive.Index do
           <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
         </div>
         <p class="inline-flex">wants you to join the room </p>
-        <div class="inline-flex">        
+        <div class="inline-flex">
           <div class="font-bold text-sm text-purple">[<%= short_hash(@room_hash) %>]</div>
           <h1 class="ml-1 font-bold text-sm text-purple" ><%= @room_name %></h1>
         </div>
       </div>
 
 
-       
+
       <%= unless @is_mine do %>
         <div class="px-2 my-1 flex items-center justify-between">
           <button class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
@@ -429,7 +417,7 @@ defmodule ChatWeb.MainLive.Index do
         </div>
       <% end %>
       <.message_timestamp msg={@msg} />
-    </div>  
+    </div>
     """
   end
 
@@ -442,13 +430,13 @@ defmodule ChatWeb.MainLive.Index do
           <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
         </div>
         <p class="inline-flex">requested access to room </p>
-        <div class="inline-flex">        
+        <div class="inline-flex">
           <div class="font-bold text-sm text-purple">[<%= short_hash(@room.admin_hash) %>]</div>
           <h1 class="ml-1 font-bold text-sm text-purple" ><%= @room.name %></h1>
         </div>
       </div>
       <.message_timestamp msg={@msg} />
-    </div>  
+    </div>
     """
   end
 
@@ -463,8 +451,8 @@ defmodule ChatWeb.MainLive.Index do
     <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
       <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
       <.message_timestamp msg={@msg} />
-      <.message_image url={@url} /> 
-    </div>  
+      <.message_image url={@url} />
+    </div>
     """
   end
 
@@ -474,7 +462,7 @@ defmodule ChatWeb.MainLive.Index do
       <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
       <.message_file msg={@msg} />
       <.message_timestamp msg={@msg} />
-    </div>  
+    </div>
     """
   end
 
@@ -499,7 +487,7 @@ defmodule ChatWeb.MainLive.Index do
 
   defp message_file(%{msg: %{type: :file, content: json}} = assigns) do
     {id, secret} = json |> StorageId.from_json()
-    [name, size] = Files.get_meta(id, secret)
+    [_, _, _, _, name, size] = Files.get(id, secret)
 
     assigns =
       assigns
@@ -514,7 +502,7 @@ defmodule ChatWeb.MainLive.Index do
         <span class="truncate text-xs" href={@url}><%= @name %></span>
         <span class="text-xs text-black/50 whitespace-pre-line"><%= @size %></span>
       </div>
-    </div>  
+    </div>
     """
   end
 
@@ -525,7 +513,7 @@ defmodule ChatWeb.MainLive.Index do
         <div class="text-sm text-grayscale600">[<%= short_hash(@author.hash) %>]</div>
         <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
       </div>
-      <button type="button" class="messageActionsDropdownButton hiddenUnderSelection" phx-click={open_dropdown("messageActionsDropdown-#{@msg.id}") 
+      <button type="button" class="messageActionsDropdownButton hiddenUnderSelection" phx-click={open_dropdown("messageActionsDropdown-#{@msg.id}")
                          |> JS.dispatch("chat:set-dropdown-position", to: "#messageActionsDropdown-#{@msg.id}", detail: %{relativeElementId: "message-#{@msg.id}"})}
       >
         <.icon id="menu" class="w-4 h-4 flex fill-purple"/>
@@ -534,29 +522,29 @@ defmodule ChatWeb.MainLive.Index do
         <%= if @is_mine do %>
           <%= if @msg.type in [:text, :memo] do %>
             <a class="dropdownItem"
-              phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{message_of(@msg)}/edit-message")} 
-              phx-value-id={@msg.id} 
+              phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{message_of(@msg)}/edit-message")}
+              phx-value-id={@msg.id}
               phx-value-timestamp={@msg.timestamp}
-            > 
+            >
               <.icon id="edit" class="w-4 h-4 flex fill-black"/>
               <span>Edit</span>
             </a>
-          <% end %> 
+          <% end %>
           <a class="dropdownItem"
-            phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") 
+            phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")
                        |> show_modal("delete-message-popup")
-                       |> JS.set_attribute({"phx-click", hide_modal("delete-message-popup") |> JS.push(message_of(@msg) <> "/delete-messages") |> stringify_commands()}, to: "#delete-message-popup .deleteMessageButton") 
-                       |> JS.set_attribute({"phx-value-messages", [%{id: @msg.id, timestamp: "#{@msg.timestamp}"}] |> Jason.encode!}, to: "#delete-message-popup .deleteMessageButton") 
+                       |> JS.set_attribute({"phx-click", hide_modal("delete-message-popup") |> JS.push(message_of(@msg) <> "/delete-messages") |> stringify_commands()}, to: "#delete-message-popup .deleteMessageButton")
+                       |> JS.set_attribute({"phx-value-messages", [%{id: @msg.id, timestamp: "#{@msg.timestamp}"}] |> Jason.encode!}, to: "#delete-message-popup .deleteMessageButton")
                       }
             phx-value-id={@msg.id}
             phx-value-timestamp={@msg.timestamp}
             phx-value-type="dialog-message"
-          > 
+          >
             <.icon id="delete" class="w-4 h-4 flex fill-black"/>
             <span>Delete</span>
           </a>
-        <% end %> 
-        <a phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")} class="dropdownItem"> 
+        <% end %>
+        <a phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")} class="dropdownItem">
           <.icon id="share" class="w-4 h-4 flex fill-black"/>
           <span>Share</span>
         </a>
@@ -564,21 +552,21 @@ defmodule ChatWeb.MainLive.Index do
            phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")
                      |> JS.push("#{message_of(@msg)}/toggle-messages-select", value: %{action: :on, id: @msg.id, chatType: message_of(@msg)})
                      |> JS.dispatch("chat:select-message", to: "#message-block-#{@msg.id}", detail: %{chatType: message_of(@msg)})
-                     }> 
+                     }>
           <.icon id="select" class="w-4 h-4 flex fill-black"/>
           <span>Select</span>
         </a>
         <%= if @msg.type in [:file, :image] do %>
-          <a 
+          <a
             class="dropdownItem"
-            phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{message_of(@msg)}/download-message")}  
-            phx-value-id={@msg.id} 
+            phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{message_of(@msg)}/download-message")}
+            phx-value-id={@msg.id}
             phx-value-timestamp={@msg.timestamp}
-          > 
+          >
             <.icon id="download" class="w-4 h-4 flex fill-black"/>
             <span>Download</span>
           </a>
-        <% end %> 
+        <% end %>
       </.dropdown>
     </div>
     """
@@ -596,6 +584,21 @@ defmodule ChatWeb.MainLive.Index do
     <div class="px-2 text-grayscale600 flex justify-end mr-1" style="font-size: 10px;">
       <%= @msg.timestamp |> DateTime.from_unix!() |> Timex.format!("{h12}:{0m} {AM}, {D}.{M}.{YYYY}") %>
     </div>
+    """
+  end
+
+  defp action_confirmation_popup(assigns) do
+    ~H"""
+    <.modal id={@id} class="">
+      <h1 class="text-base font-bold text-grayscale"><%= @title %></h1>
+      <p class="mt-3 text-sm text-black/50"><%= @description %></p>
+      <div class="mt-5 flex items-center justify-between">
+        <button phx-click={hide_modal(@id)} class="w-full mr-1 h-12 border rounded-lg border-black/10">Cancel</button>
+        <button class="confirmButton w-full ml-1 h-12 border-0 rounded-lg bg-grayscale text-white flex items-center justify-center">
+          Confirm
+        </button>
+      </div>
+    </.modal>
     """
   end
 
@@ -639,10 +642,57 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> allow_upload(type,
       auto_upload: true,
-      max_file_size: 524_000_000,
+      max_file_size: 1_024_000_000,
       accept: :any,
       max_entries: Keyword.get(opts, :max_entries, 1),
       progress: &handle_progress/3
     )
+  end
+
+  defp allow_chunked_upload(socket, type, opts) do
+    socket
+    |> allow_upload(type,
+      auto_upload: true,
+      max_file_size: 102_400_000_000,
+      accept: :any,
+      max_entries: Keyword.get(opts, :max_entries, 1),
+      external: &chunked_presign_url/2,
+      progress: &handle_chunked_progress/3
+    )
+  end
+
+  def chunked_presign_url(entry, socket) do
+    {key, secret} = ChunkedFiles.new_upload()
+    socket = start_chunked_upload(socket, entry, key, secret)
+    link = Helpers.upload_chunk_url(ChatWeb.Endpoint, :put, key)
+
+    {:ok, %{uploader: "UpChunk", entrypoint: link}, socket}
+  end
+
+  def handle_chunked_progress(
+        file,
+        %{progress: 100, uuid: uuid} = entry,
+        %{assigns: %{chunked_uploads: uploads}} = socket
+      ) do
+    {key, _} = chunked_keys = uploads[uuid]
+    ChunkedFiles.mark_consumed(key)
+
+    case file do
+      :dialog_file -> Page.Dialog.send_file(socket, entry, chunked_keys)
+      :room_file -> Page.Room.send_file(socket, entry, chunked_keys)
+    end
+
+    socket
+    |> assign(:chunked_uploads, uploads |> Map.drop([uuid]))
+    |> noreply()
+  end
+
+  def handle_chunked_progress(_file, _entry, socket), do: noreply(socket)
+
+  defp start_chunked_upload(socket, entry, key, secret) do
+    uploads = Map.get(socket.assigns, :chunked_uploads, %{})
+
+    socket
+    |> assign(:chunked_uploads, uploads |> Map.put(entry.uuid, {key, secret}))
   end
 end

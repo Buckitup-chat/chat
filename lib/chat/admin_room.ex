@@ -4,6 +4,7 @@ defmodule Chat.AdminRoom do
   alias Chat.AdminDb
   alias Chat.Card
   alias Chat.Identity
+  alias Chat.Utils
 
   def created? do
     AdminDb.db()
@@ -32,5 +33,19 @@ defmodule Chat.AdminRoom do
 
   def admin_list do
     AdminDb.values({:new_admin, 0}, {:"new_admin\0", 0})
+  end
+
+  def store_wifi_password(password) do
+    password
+    |> Utils.encrypt(pub_key())
+    |> then(&AdminDb.put(:wifi_password, &1))
+  end
+
+  def get_wifi_password(identity) do
+    :wifi_password
+    |> AdminDb.get()
+    |> Utils.decrypt(identity)
+  rescue
+    _ -> nil
   end
 end

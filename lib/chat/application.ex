@@ -20,7 +20,8 @@ defmodule Chat.Application do
       # Start a worker by calling: Chat.Worker.start_link(arg)
       # {Chat.Worker, arg}
       Chat.KeyRingTokens,
-      Chat.Broker
+      Chat.Broker,
+      Chat.ChunkedFilesBroker
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

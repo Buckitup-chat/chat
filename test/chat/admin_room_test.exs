@@ -56,6 +56,17 @@ defmodule Chat.AdminRoomTest do
     assert [^alice_card] = AdminRoom.admin_list()
   end
 
+  test "Admin should be able to store and read wifi password set" do
+    {_alice, admin_room_identity} = admin_with_room("Alice")
+
+    password = "secret"
+
+    AdminRoom.store_wifi_password(password)
+    assert password != AdminDb.get(:wifi_password)
+
+    assert password == AdminRoom.get_wifi_password(admin_room_identity)
+  end
+
   defp admin_with_room(name) do
     if AdminRoom.created?() do
       raise "Admihn room is already created"

@@ -473,7 +473,7 @@
                     <p class="text-base text-grayscale600 px-7">You have no rooms</p>
                   <% else %>
                     <%= for room <- @joined_rooms do %>
-                      <li phx-click="room/switch" phx-value-room={room.hash} class={classes("hidden sm:flex w-full h-9 flex items-center cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
+                      <li phx-click="room/switch" phx-value-room={room.hash} class={classes("hidden sm:flex w-full h-9 flex items-center cursor-pointer hover:bg-stone250", %{"bg-stone250" => room.pub_key == @room.pub_key})}>
                         <a>
                           <div class="flex flex-row px-7">
                             <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>

@@ -33,7 +33,9 @@ defmodule Chat.Rooms do
     |> Map.filter(fn {hash, room} ->
       room.type in [:public, :request] or MapSet.member?(my_room_hashes, hash)
     end)
-    |> Enum.map(fn {hash, room} -> %Card{name: room.name, pub_key: room.pub_key, hash: hash} end)
+    |> Enum.map(fn {hash, room} ->
+      %{name: room.name, pub_key: room.pub_key, hash: hash, type: room.type}
+    end)
     |> Enum.sort_by(& &1.name)
     |> Enum.split_with(&MapSet.member?(my_room_hashes, &1.hash))
   end

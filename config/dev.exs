@@ -18,15 +18,16 @@ config :chat, ChatWeb.Endpoint,
     # Start the esbuild watcher by calling Esbuild.install_and_run(:default, args)
     esbuild: {Esbuild, :install_and_run, [:default, ~w(--sourcemap=inline --watch)]}
   ]
-  # https: [
-  #   otp_app: :chat,
-  #   port: 4443,
-  #   # host: "buckitup.app",
-  #   cipher_suite: :strong,
-  #   cacertfile: "priv/cert/buckitup_app.ca-bundle",
-  #   certfile: "priv/cert/buckitup_app.crt",
-  #   keyfile: "priv/cert/priv.key"
-  # ]
+
+# https: [
+#   otp_app: :chat,
+#   port: 4443,
+#   # host: "buckitup.app",
+#   cipher_suite: :strong,
+#   cacertfile: "priv/cert/buckitup_app.ca-bundle",
+#   certfile: "priv/cert/buckitup_app.crt",
+#   keyfile: "priv/cert/priv.key"
+# ]
 
 # ## SSL Support
 #

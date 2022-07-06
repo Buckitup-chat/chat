@@ -59,6 +59,363 @@ html {
 
 .contentContainer { @apply basis-[100%] }
 
+.goldGradient {
+  color: rgba(82, 82, 34, 0.72);
+  text-decoration: none;
+  font-weight: bold;
+  text-shadow: 1px 1px 0 #ffdeca;
+  box-shadow:
+    2px 2px 0.5em rgba(155, 122, 89, 0.55),
+    inset 1px 1px 0 rgba(255, 255, 255, 0.9),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.5)
+  ;
+  border: 1px solid #caa173;
+  background:
+  -moz-linear-gradient(
+    -72deg,
+    #ffdea1,
+    #ffffff 16%,
+    #ffdea1 21%,
+    #ffffff 24%,
+    #736445 27%,
+    #ffdea1 36%,
+    #ffffff 45%,
+    #ffffff 60%,
+    #ffdea1 72%,
+    #ffffff 80%,
+    #ffdea1 84%,
+    #736445
+  );
+  background:
+  -webkit-linear-gradient(
+    -72deg,
+    #ffdea1,
+    #ffffff 16%,
+    #ffdea1 21%,
+    #ffffff 24%,
+    #736445 27%,
+    #ffdea1 36%,
+    #ffffff 45%,
+    #ffffff 60%,
+    #ffdea1 72%,
+    #ffffff 80%,
+    #ffdea1 84%,
+    #736445
+  );
+  background:
+  -o-linear-gradient(
+    -72deg,
+    #ffdea1,
+    #ffffff 16%,
+    #ffdea1 21%,
+    #ffffff 24%,
+    #736445 27%,
+    #ffdea1 36%,
+    #ffffff 45%,
+    #ffffff 60%,
+    #ffdea1 72%,
+    #ffffff 80%,
+    #ffdea1 84%,
+    #736445
+  );
+  background:
+  linear-gradient(
+    -72deg,
+    #ffdea1,
+    #ffffff 16%,
+    #ffdea1 21%,
+    #ffffff 24%,
+    #736445 27%,
+    #ffdea1 36%,
+    #ffffff 45%,
+    #ffffff 60%,
+    #ffdea1 72%,
+    #ffffff 80%,
+    #ffdea1 84%,
+    #736445
+  );
+}
+
+.silverGradient {
+  color: rgba(0, 0, 0, 0.5);
+  text-decoration: none;
+  font-weight: bold;
+  text-shadow: 1px 1px 0 #ffffff;
+  box-shadow:
+    2px 2px 0.5em rgba(122, 122, 122, 0.55),
+    inset 1px 1px 0 rgba(255, 255, 255, 0.9),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.34)
+  ;
+  border: 1px solid #dedede;
+  background:
+    -moz-linear-gradient(
+    -72deg,
+    #dedede,
+    #ffffff 16%,
+    #dedede 21%,
+    #ffffff 24%,
+    #454545 27%,
+    #dedede 36%,
+    #ffffff 45%,
+    #ffffff 60%,
+    #dedede 72%,
+    #ffffff 80%,
+    #dedede 84%,
+    #a1a1a1
+  );
+  background:
+  -webkit-linear-gradient(
+    -72deg,
+    #dedede,
+    #ffffff 16%,
+    #dedede 21%,
+    #ffffff 24%,
+    #454545 27%,
+    #dedede 36%,
+    #ffffff 45%,
+    #ffffff 60%,
+    #dedede 72%,
+    #ffffff 80%,
+    #dedede 84%,
+    #a1a1a1
+  );
+  background:
+  -o-linear-gradient(
+    -72deg,
+    #dedede,
+    #ffffff 16%,
+    #dedede 21%,
+    #ffffff 24%,
+    #454545 27%,
+    #dedede 36%,
+    #ffffff 45%,
+    #ffffff 60%,
+    #dedede 72%,
+    #ffffff 80%,
+    #dedede 84%,
+    #a1a1a1
+  );
+  background:
+  linear-gradient(
+    -72deg,
+    #dedede,
+    #ffffff 16%,
+    #dedede 21%,
+    #ffffff 24%,
+    #454545 27%,
+    #dedede 36%,
+    #ffffff 45%,
+    #ffffff 60%,
+    #dedede 72%,
+    #ffffff 80%,
+    #dedede 84%,
+    #a1a1a1
+  );
+}
+
+.woodGradient {
+  color: #e9e9e9;
+  text-decoration: none;
+  font-weight: bold;
+  text-shadow:
+    1px 1px 0 #ffffff,
+    -1px -1px 0 #b7b7b7
+  ;
+  box-shadow:
+    2px 2px 0.5em rgba(98, 73, 122, 0.55),
+    inset 1px 1px 0 rgba(255, 255, 255, 0.75),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.34)
+  ;
+  border: 1px solid #cacaca;
+  background:
+  -moz-linear-gradient(
+    -72deg,
+    #dedede,
+    #ffffff 16%,
+    #dedede 21%,
+    #ffffff 24%,
+    #caa1de 27%,
+    #dea1ca 30%,
+    #dedede 38%,
+    #ffffff 45%,
+    #ffffff 60%,
+    #dedede 72%,
+    #ffffff 80%,
+    #dedede 84%,
+    #caa1de 93%,
+    #dea1ca
+  );
+  background:
+  -webkit-linear-gradient(
+    -72deg,
+    #dedede,
+    #ffffff 16%,
+    #dedede 21%,
+    #ffffff 24%,
+    #caa1de 27%,
+    #dea1ca 30%,
+    #dedede 38%,
+    #ffffff 45%,
+    #ffffff 60%,
+    #dedede 72%,
+    #ffffff 80%,
+    #dedede 84%,
+    #caa1de 93%,
+    #dea1ca
+  );
+  background:
+  -o-linear-gradient(
+    -72deg,
+    #dedede,
+    #ffffff 16%,
+    #dedede 21%,
+    #ffffff 24%,
+    #caa1de 27%,
+    #dea1ca 30%,
+    #dedede 38%,
+    #ffffff 45%,
+    #ffffff 60%,
+    #dedede 72%,
+    #ffffff 80%,
+    #dedede 84%,
+    #caa1de 93%,
+    #dea1ca
+  );
+  background:
+  linear-gradient(
+    -72deg,
+    #dedede,
+    #ffffff 16%,
+    #dedede 21%,
+    #ffffff 24%,
+    #caa1de 27%,
+    #dea1ca 30%,
+    #dedede 38%,
+    #ffffff 45%,
+    #ffffff 60%,
+    #dedede 72%,
+    #ffffff 80%,
+    #dedede 84%,
+    #caa1de 93%,
+    #dea1ca
+  );
+}
+
+.paper {
+  position: relative;
+  background: linear-gradient(
+      to bottom right,
+      var(--paper-dark),
+      20%,
+      var(--transparent)
+    ),
+    var(--paper-color);
+  min-width: 250px;
+  width: 100%;
+  min-height: 130px;
+  display: flex;
+  /* align-items: center; */
+  justify-content: space-between;
+  /* font-family: "Caveat", cursive; */
+  /* font-size: 2rem; */
+  box-shadow: var(--shadow-size) var(--shadow-size) 2px var(--paper-dark);
+  margin: auto;
+  /* margin-top: 50px; */
+}
+
+.paper::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+      var(--transparent),
+      50%,
+      var(--paper-dark),
+      51%,
+      var(--transparent)
+    ),
+    linear-gradient(
+      to right,
+      var(--transparent),
+      50%,
+      var(--paper-dark),
+      51%,
+      var(--transparent)
+    );
+}
+
+:root {
+  --pink: #ecb2ba;
+  --pink-dark: #c6939a;
+  --tape-gray: #dbd8be;
+  --tape-edge-gray: #b7b49d;
+  --transparent: rgba(255, 255, 255, 0);
+}
+
+.blue {
+  --paper-color: #d5e0f9;
+  --paper-dark: #c2d0ea;
+  --shadow-size: 3px;
+  --transparent: rgba(213, 224, 249, 0);
+}
+
+.pink {
+  --paper-color: var(--pink);
+  --paper-dark: var(--pink-dark);
+  --shadow-size: 1px;
+  --transparent: rgba(236, 178, 186, 0);
+}
+
+.tape-section {
+  position: absolute;
+  width: 100%;
+}
+
+.tape-section:first-of-type {
+  top: 0;
+}
+
+.tape-section:last-of-type {
+  bottom: 0;
+}
+
+.tape-section::before,
+.tape-section::after {
+  content: "";
+  width: 10vmin;
+  height: 4vmin;
+  position: absolute;
+  background-color: var(--tape-gray);
+  opacity: 0.5;
+  border-right: 1px dotted var(--tape-edge-gray);
+  border-left: 1px dotted var(--tape-edge-gray);
+}
+
+.tape-section:last-of-type::after {
+  transform: rotate(-45deg);
+  right: -4vmin;
+  top: -3vmin;
+}
+
+.tape-section:first-of-type::before {
+  transform: rotate(-45deg);
+  left: -4vmin;
+  top: 50
+}
+
+.tape-section:first-of-type::after {
+  transform: rotate(45deg);
+  right: -4vmin;
+  top: 0;
+}
+
+.tape-section:last-of-type::before {
+  transform: rotate(45deg);
+  left: -4vmin;
+  bottom: 0;
+}
+
 @media screen and (min-width: 640px) {
   .navbar { @apply h-screen w-[70px] flex flex-none flex-col justify-between bg-white }
 

@@ -116,7 +116,7 @@ const listeners = {
         if (message.getAttribute('phx-value-is-mine') == 'true' && message.classList.contains('hidden') == false) {
           messages.push({
             id: message.getAttribute('phx-value-id'),
-            timestamp: message.getAttribute('phx-value-timestamp')
+            index: message.getAttribute('phx-value-index')
           });
         }
       }

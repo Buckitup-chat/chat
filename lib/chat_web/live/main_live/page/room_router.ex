@@ -12,6 +12,9 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
 
   def event(socket, event) do
     case event do
+      {"message/" <> action, %{"id" => id, "index" => index}} ->
+        socket |> route_message_event({action, {index |> String.to_integer(), id}})
+
       {"create", %{"new_room" => %{"name" => name, "type" => type}}} ->
         socket |> Page.Lobby.new_room(name, type |> String.to_existing_atom())
 
@@ -29,12 +32,6 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
 
       {"edited-message", %{"room_edit" => %{"text" => text}}} ->
         socket |> Page.Room.update_edited_message(text)
-
-      {"edit-message", %{"id" => id, "timestamp" => time}} ->
-        socket |> Page.Room.edit_message({time |> String.to_integer(), id})
-
-      {"download-message", %{"id" => id, "timestamp" => time}} ->
-        socket |> Page.Room.download_message({time |> String.to_integer(), id})
 
       {"delete-messages", params} ->
         socket |> Page.Room.delete_messages(params)
@@ -56,6 +53,16 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
 
       {"switch", %{"room" => hash}} ->
         socket |> Page.Room.close() |> Page.Room.init(hash)
+    end
+  end
+
+  def route_message_event(socket, {action, msg_id}) do
+    case action do
+      "edit" ->
+        socket |> Page.Room.edit_message(msg_id)
+
+      "download-message" ->
+        socket |> Page.Room.download_message(msg_id)
     end
   end
 

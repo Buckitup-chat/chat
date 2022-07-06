@@ -405,14 +405,14 @@ defmodule ChatWeb.MainLive.Index do
       <%= unless @is_mine do %>
         <div class="px-2 my-1 flex items-center justify-between">
           <button class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
-           phx-click="dialog/accept-room-invite"
+           phx-click="dialog/message/accept-room-invite"
            phx-value-id={@msg.id}
-           phx-value-time={@msg.timestamp}
+           phx-value-index={@msg.index}
           >Accept</button>
           <button class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
-           phx-click="dialog/accept-room-invite-and-open-room"
+           phx-click="dialog/message/accept-room-invite-and-open-room"
            phx-value-id={@msg.id}
-           phx-value-time={@msg.timestamp}
+           phx-value-index={@msg.index}
           >Accept and Open</button>
         </div>
       <% end %>
@@ -522,9 +522,9 @@ defmodule ChatWeb.MainLive.Index do
         <%= if @is_mine do %>
           <%= if @msg.type in [:text, :memo] do %>
             <a class="dropdownItem"
-              phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{message_of(@msg)}/edit-message")}
+              phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{message_of(@msg)}/message/edit")}
               phx-value-id={@msg.id}
-              phx-value-timestamp={@msg.timestamp}
+              phx-value-index={@msg.index}
             >
               <.icon id="edit" class="w-4 h-4 flex fill-black"/>
               <span>Edit</span>
@@ -537,7 +537,7 @@ defmodule ChatWeb.MainLive.Index do
                        |> JS.set_attribute({"phx-value-messages", [%{id: @msg.id, timestamp: "#{@msg.timestamp}"}] |> Jason.encode!}, to: "#delete-message-popup .deleteMessageButton")
                       }
             phx-value-id={@msg.id}
-            phx-value-timestamp={@msg.timestamp}
+            phx-value-index={@msg.index}
             phx-value-type="dialog-message"
           >
             <.icon id="delete" class="w-4 h-4 flex fill-black"/>
@@ -559,9 +559,9 @@ defmodule ChatWeb.MainLive.Index do
         <%= if @msg.type in [:file, :image] do %>
           <a
             class="dropdownItem"
-            phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{message_of(@msg)}/download-message")}
+            phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{message_of(@msg)}/message/download")}
             phx-value-id={@msg.id}
-            phx-value-timestamp={@msg.timestamp}
+            phx-value-index={@msg.index}
           >
             <.icon id="download" class="w-4 h-4 flex fill-black"/>
             <span>Download</span>

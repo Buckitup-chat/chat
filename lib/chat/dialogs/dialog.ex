@@ -4,9 +4,11 @@ defmodule Chat.Dialogs.Dialog do
   alias Chat.Db
   alias Chat.Dialogs.Message
   alias Chat.Dialogs.PrivateMessage
+  alias Chat.DryStorable
   alias Chat.Files
   alias Chat.Images
   alias Chat.Memo
+  alias Chat.Ordering
   alias Chat.RoomInvites
 
   alias Chat.Card
@@ -18,33 +20,13 @@ defmodule Chat.Dialogs.Dialog do
   @derive {Inspect, only: []}
   defstruct [:a_key, :b_key]
 
+  @db_prefix :dialog_message
+
   def start(%Identity{} = a, %Card{pub_key: b_key}) do
     %__MODULE__{
       a_key: a |> Identity.pub_key(),
       b_key: b_key
     }
-  end
-
-  def add_text(
-        %__MODULE__{} = dialog,
-        %Identity{} = source,
-        text,
-        now
-      ) do
-    text
-    |> add_message(dialog, source, now: now, type: :text)
-  end
-
-  def add_memo(
-        %__MODULE__{} = dialog,
-        %Chat.Identity{} = source,
-        text,
-        now
-      ) do
-    text
-    |> Memo.add()
-    |> StorageId.to_json()
-    |> add_message(dialog, source, now: now, type: :memo)
   end
 
   def add_file(
@@ -84,12 +66,26 @@ defmodule Chat.Dialogs.Dialog do
     |> add_message(dialog, source, now: now, type: :room_invite)
   end
 
-  def read(%Message{} = msg, identitiy, side, peer_key) when side in [:a_copy, :b_copy] do
+  def add_new_message(
+        message,
+        %Identity{} = source,
+        %__MODULE__{} = dialog
+      ) do
+    type = message |> DryStorable.type()
+    now = message |> DryStorable.timestamp()
+
+    message
+    |> DryStorable.content()
+    |> add_message(dialog, source, now: now, type: type)
+  end
+
+  def read(%Message{} = msg, index, identitiy, side, peer_key) when side in [:a_copy, :b_copy] do
     is_mine? = (side == :a_copy and msg.is_a_to_b?) or (side == :b_copy and !msg.is_a_to_b?)
 
     %PrivateMessage{
       timestamp: msg.timestamp,
       type: msg.type,
+      index: index,
       id: msg.id,
       is_mine?: is_mine?,
       content:
@@ -108,7 +104,9 @@ defmodule Chat.Dialogs.Dialog do
 
     dialog
     |> get_messages(before, amount)
-    |> Enum.map(&read(&1, me, side, peer_key(dialog, side)))
+    |> Enum.map(fn {{_, _, index, _}, message} ->
+      read(message, index, me, side, peer_key(dialog, side))
+    end)
     |> Enum.reverse()
   end
 
@@ -138,11 +136,11 @@ defmodule Chat.Dialogs.Dialog do
   end
 
   def delete(%__MODULE__{} = dialog, %Identity{} = author, msg_id) do
-    fn msg, key ->
+    fn msg, index, key ->
       side = my_side(dialog, author)
 
       msg
-      |> read(author, side, peer_key(dialog, side))
+      |> read(index, author, side, peer_key(dialog, side))
       |> Content.delete()
 
       Db.delete(key)
@@ -152,11 +150,11 @@ defmodule Chat.Dialogs.Dialog do
   end
 
   def update(%__MODULE__{} = dialog, %Identity{} = author, msg_id, new_text) do
-    fn msg, _key ->
+    fn msg, index, _key ->
       side = my_side(dialog, author)
 
       msg
-      |> read(author, side, peer_key(dialog, side))
+      |> read(index, author, side, peer_key(dialog, side))
       |> Content.delete()
 
       {type, content} =
@@ -172,19 +170,46 @@ defmodule Chat.Dialogs.Dialog do
         end
 
       content
-      |> add_message(dialog, author, type: type, now: msg.timestamp, id: msg.id)
+      |> add_message(dialog, author, type: type, now: msg.timestamp, id: msg.id, index: index)
     end
     |> change_my_message(author, dialog, msg_id)
   end
 
-  defp change_my_message(action_fn, author, dialog, {time, id}) do
-    key = dialog |> msg_key(time, id)
+  def msg_key(%__MODULE__{} = dialog, time, 0),
+    do: {@db_prefix, dialog |> dialog_key(), time, 0}
+
+  def msg_key(%__MODULE__{} = dialog, time, id),
+    do: {@db_prefix, dialog |> dialog_key(), time, id |> Utils.binhash()}
+
+  def dialog_key(%__MODULE__{a_key: a_key, b_key: b_key}) do
+    [a_key, b_key]
+    |> Enum.map(&Utils.hash/1)
+    |> Enum.sort()
+    |> Enum.join()
+    |> Utils.hash()
+    |> Utils.binhash()
+  end
+
+  defp change_my_message(action_fn, author, dialog, {index, id}) do
+    key = dialog |> msg_key(index, id)
     msg = Db.get(key)
 
     case dialog |> is_mine?(msg, author) do
-      true -> action_fn.(msg, key)
+      true -> action_fn.(msg, index, key)
       _ -> nil
     end
+  end
+
+  defp add_message(
+         content,
+         %__MODULE__{a_key: a_key, b_key: a_key} = dialog,
+         %Identity{} = source,
+         opts
+       ) do
+    a_copy = content |> Utils.encrypt_and_sign(a_key, source)
+
+    Message.a_to_b(a_copy, a_copy, opts)
+    |> tap(&store_message(&1, dialog, opts[:index]))
   end
 
   defp add_message(
@@ -202,29 +227,22 @@ defmodule Chat.Dialogs.Dialog do
       :a_copy -> Message.a_to_b(a_copy, b_copy, opts)
       :b_copy -> Message.b_to_a(a_copy, b_copy, opts)
     end
-    |> tap(fn %{id: id, timestamp: time} = msg -> dialog |> msg_key(time, id) |> Db.put(msg) end)
+    |> tap(&store_message(&1, dialog, opts[:index]))
   end
 
-  defp get_messages(dialog, {time, id}, amount) do
+  defp store_message(%{id: id} = msg, dialog, index) do
+    next = index || Ordering.next({@db_prefix, dialog |> dialog_key()})
+
+    dialog
+    |> msg_key(next, id)
+    |> Db.put(msg)
+  end
+
+  defp get_messages(dialog, {max_index, id}, amount) do
     {
       msg_key(dialog, 0, 0),
-      msg_key(dialog, time, id)
+      msg_key(dialog, max_index, id)
     }
-    |> Db.values(amount)
-  end
-
-  defp msg_key(%__MODULE__{} = dialog, time, 0),
-    do: {:dialog_message, dialog |> dialog_key(), time, 0}
-
-  defp msg_key(%__MODULE__{} = dialog, time, id),
-    do: {:dialog_message, dialog |> dialog_key(), time, id |> Utils.binhash()}
-
-  def dialog_key(%__MODULE__{a_key: a_key, b_key: b_key}) do
-    [a_key, b_key]
-    |> Enum.map(&Utils.hash/1)
-    |> Enum.sort()
-    |> Enum.join()
-    |> Utils.hash()
-    |> Utils.binhash()
+    |> Db.select(amount)
   end
 end

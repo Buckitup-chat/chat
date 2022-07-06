@@ -241,7 +241,7 @@
                         phx-click={JS.dispatch("chat:select-message", detail: %{chatType: "dialog"})}
                         phx-value-id={msg.id}
                         phx-value-is-mine={"#{msg.is_mine?}"}
-                        phx-value-timestamp={msg.timestamp}
+                        phx-value-index={msg.index}
                         phx-value-type="dialog"
                       >  
                         <div class={classes("m-1 w-full flex", %{"justify-end" => msg.is_mine?, "justify-start" => !msg.is_mine?})} id={"dialog-message-#{msg.id}"}>
@@ -320,12 +320,18 @@
                     id="dialog-form"
                     class="basis-[99%] flex items-center justify-between"
                     phx-change={JS.dispatch("chat:set-input-size", to: "#dialog-input")}
-                    phx-submit={JS.push("dialog/text-message") |> JS.dispatch("chat:clear-value", to: "#dialog-input") |> JS.dispatch("chat:set-input-size", to: "#dialog-input")}  
+                    phx-submit={
+                      JS.push("dialog/text-message") 
+                      |> JS.dispatch("chat:clear-value", to: "#dialog-input") 
+                      |> JS.dispatch("chat:set-input-size", to: "#dialog-input")
+                    }  
                     onkeydown="
                       if (event.key == 'Enter' && event.shiftKey) {
                         document.getElementById('dialog-form-submit-button').click()
                       }
+                      document.getElementById('dialog-input-timestamp').value = Math.floor(Date.now() / 1000)
                     ">
+                    <%= text_input di, :timestamp, type: :hidden, id: "dialog-input-timestamp" %>
                     <%= textarea di, :text,
                       placeholder: "Enter message",
                       class: "w-full h-7 resize-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
@@ -606,7 +612,7 @@
                           phx-click={JS.dispatch("chat:select-message", detail: %{chatType: "room"})}
                           phx-value-id={msg.id}
                           phx-value-is-mine={"#{msg.author_hash == @my_id}"}
-                          phx-value-timestamp={msg.timestamp}
+                          phx-value-index={msg.index}
                           phx-value-type="room" 
                       >
                         <div class={classes("m-1 w-full flex", %{"justify-end" => msg.author_hash == @my_id, "justify-start" => msg.author_hash != @my_id})} id={"room-message-#{msg.id}"}>

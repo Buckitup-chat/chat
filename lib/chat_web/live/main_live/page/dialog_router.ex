@@ -11,11 +11,8 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
 
   def event(socket, event) do
     case event do
-      {"accept-room-invite", %{"id" => id, "time" => time}} ->
-        socket |> Page.Dialog.accept_room_invite({time |> String.to_integer(), id})
-
-      {"accept-room-invite-and-open-room", %{"id" => id, "time" => time}} ->
-        socket |> Page.Dialog.accept_room_invite_and_open_room({time |> String.to_integer(), id})
+      {"message/" <> action, %{"id" => id, "index" => index}} ->
+        socket |> route_message_event({action, {index |> String.to_integer(), id}})
 
       {"import-images", _} ->
         socket |> push_event("chat:scroll-down", %{})
@@ -29,12 +26,6 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
       {"edited-message", %{"dialog_edit" => %{"text" => text}}} ->
         socket |> Page.Dialog.update_edited_message(text)
 
-      {"edit-message", %{"id" => id, "timestamp" => time}} ->
-        socket |> Page.Dialog.edit_message({time |> String.to_integer(), id})
-
-      {"download-message", %{"id" => id, "timestamp" => time}} ->
-        socket |> Page.Dialog.download_message({time |> String.to_integer(), id})
-
       {"toggle-messages-select", params} ->
         socket |> Page.Dialog.toggle_messages_select(params)
 
@@ -44,11 +35,27 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
       {"delete-messages", params} ->
         socket |> Page.Dialog.delete_messages(params)
 
-      {"text-message", %{"dialog" => %{"text" => text}}} ->
-        socket |> Page.Dialog.send_text(text)
+      {"text-message", %{"dialog" => %{"text" => text, "timestamp" => timestamp}}} ->
+        socket |> Page.Dialog.send_text(text, String.to_integer(timestamp))
 
       {"switch", %{"user-id" => user_id}} ->
         socket |> Page.Dialog.close() |> Page.Dialog.init(user_id)
+    end
+  end
+
+  def route_message_event(socket, {action, msg_id}) do
+    case action do
+      "accept-room-invite" ->
+        socket |> Page.Dialog.accept_room_invite(msg_id)
+
+      "accept-room-invite-and-open-room" ->
+        socket |> Page.Dialog.accept_room_invite_and_open_room(msg_id)
+
+      "edit" ->
+        socket |> Page.Dialog.edit_message(msg_id)
+
+      "download-message" ->
+        socket |> Page.Dialog.download_message(msg_id)
     end
   end
 

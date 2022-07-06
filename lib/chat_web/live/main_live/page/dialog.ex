@@ -11,6 +11,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.Identity
   alias Chat.Log
   alias Chat.Memo
+  alias Chat.Messages.Text
   alias Chat.RoomInvites
   alias Chat.User
   alias Chat.Utils
@@ -59,11 +60,14 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     end
   end
 
-  def send_text(%{assigns: %{dialog: dialog, me: me}} = socket, text) do
+  def send_text(%{assigns: %{dialog: dialog, me: me}} = socket, text, timestamp) do
     cond do
-      text |> String.trim() == "" -> nil
-      text |> is_memo?() -> dialog |> Dialogs.add_memo(me, text)
-      true -> dialog |> Dialogs.add_text(me, text)
+      text |> String.trim() == "" ->
+        nil
+
+      true ->
+        %Text{text: text, timestamp: timestamp}
+        |> Dialogs.add_new_message(me, dialog)
     end
     |> broadcast_new_message(dialog, me)
 

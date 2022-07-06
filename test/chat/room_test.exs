@@ -1,7 +1,6 @@
 defmodule Chat.Rooms.RoomTest do
   use ExUnit.Case, async: true
 
-  alias Chat.Card
   alias Chat.Identity
   alias Chat.Memo
   alias Chat.Rooms
@@ -98,7 +97,7 @@ defmodule Chat.Rooms.RoomTest do
 
     {my_rooms, _other} = Rooms.list([room_identity])
 
-    assert [%Card{name: ^room_name}] = my_rooms
+    assert [%{name: ^room_name}] = my_rooms
 
     assert nil == Rooms.get("")
     assert %Rooms.Room{name: ^room_name} = Rooms.get(room_hash)

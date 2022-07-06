@@ -4,10 +4,10 @@ defmodule Chat.ImagesTest do
   alias Chat.Images
 
   test "image should be returned" do
-    {key, secret} = Images.add("image")
+    {key, secret} = Images.add(["image"])
 
     image = Images.get(key, secret)
 
-    assert image == "image"
+    assert image == ["image"]
   end
 end

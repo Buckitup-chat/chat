@@ -6,6 +6,7 @@ defmodule Chat.Dialogs.DialogTest do
   alias Chat.Files
   alias Chat.Images
   alias Chat.Memo
+  alias Chat.Messages.Text
   alias Chat.User
   alias Chat.Utils.StorageId
 
@@ -22,13 +23,15 @@ defmodule Chat.Dialogs.DialogTest do
       alice
       |> Dialogs.open(bob_card)
 
-    dialog |> Dialogs.add_text(alice, text_message, DateTime.utc_now())
+    %Text{text: text_message} |> Dialogs.add_new_message(alice, dialog)
     dialog |> Dialogs.add_image(alice, ["not_image", "text/plain"])
-    dialog |> Dialogs.add_image(bob, ["not_image 2", "text/plain"], DateTime.utc_now())
+    dialog |> Dialogs.add_image(bob, ["not_image 2", "text/plain"])
 
     assert 3 == dialog |> Dialogs.read(bob) |> Enum.count()
 
-    assert_raise RuntimeError, fn -> dialog |> Dialogs.add_text(charlie, "spam") end
+    assert_raise RuntimeError, fn ->
+      %Text{text: "spam"} |> Dialogs.add_new_message(charlie, dialog)
+    end
 
     assert_raise(RuntimeError, fn -> dialog |> Dialogs.read(charlie) end)
   end
@@ -44,9 +47,9 @@ defmodule Chat.Dialogs.DialogTest do
 
     assert initial == dialog
 
-    msg = dialog |> Dialogs.add_text(alice, content)
+    %Text{text: content} |> Dialogs.add_new_message(alice, dialog)
 
-    bob_version = Dialogs.read_message(dialog, msg, bob)
+    [bob_version] = Dialogs.read(dialog, bob)
 
     assert bob_version.content == content
 
@@ -65,13 +68,15 @@ defmodule Chat.Dialogs.DialogTest do
     alice = User.login("Alice")
     bob = User.login("Bob")
     bob_card = bob |> Card.from_identity()
-    content = "hi memo"
+    content = "hi memo" |> String.pad_trailing(160, "-")
 
     dialog = Dialogs.find_or_open(alice, bob_card)
 
-    msg = dialog |> Dialogs.add_memo(alice, content)
+    content
+    |> make_memo_msg()
+    |> Dialogs.add_new_message(alice, dialog)
 
-    bob_version = Dialogs.read_message(dialog, msg, bob)
+    [bob_version] = Dialogs.read(dialog, bob)
 
     assert :memo = bob_version.type
 
@@ -89,9 +94,9 @@ defmodule Chat.Dialogs.DialogTest do
 
     dialog = Dialogs.find_or_open(alice, bob_card)
 
-    msg = dialog |> Dialogs.add_file(alice, content)
+    dialog |> Dialogs.add_file(alice, content)
 
-    bob_version = Dialogs.read_message(dialog, msg, bob)
+    [bob_version] = Dialogs.read(dialog, bob)
 
     assert :file = bob_version.type
 
@@ -111,9 +116,9 @@ defmodule Chat.Dialogs.DialogTest do
       alice
       |> Dialogs.open(bob_card)
 
-    dialog |> Dialogs.add_text(alice, text_message, DateTime.utc_now())
+    %Text{text: text_message} |> Dialogs.add_new_message(alice, dialog)
     dialog |> Dialogs.add_image(alice, ["not_image", "text/plain"])
-    dialog |> Dialogs.add_image(bob, ["not_image 2", "text/plain"], DateTime.utc_now())
+    dialog |> Dialogs.add_image(bob, ["not_image 2", "text/plain"])
 
     msg_id =
       dialog
@@ -121,7 +126,7 @@ defmodule Chat.Dialogs.DialogTest do
       |> Enum.find(&(&1.content == text_message))
       |> then(fn
         nil -> nil
-        x -> {x.timestamp, x.id}
+        x -> {x.index, x.id}
       end)
 
     assert msg_id != nil
@@ -138,9 +143,9 @@ defmodule Chat.Dialogs.DialogTest do
     {alice, bob, _bob_card, dialog} = alice_bob_dialog()
     text_message = "Alice welcomes Bob"
 
-    dialog |> Dialogs.add_text(alice, text_message, DateTime.utc_now())
+    %Text{text: text_message} |> Dialogs.add_new_message(alice, dialog)
     dialog |> Dialogs.add_image(alice, ["not_image", "text/plain"])
-    dialog |> Dialogs.add_image(bob, ["not_image 2", "text/plain"], DateTime.utc_now())
+    dialog |> Dialogs.add_image(bob, ["not_image 2", "text/plain"])
 
     msg_id =
       dialog
@@ -148,7 +153,7 @@ defmodule Chat.Dialogs.DialogTest do
       |> Enum.find(&(&1.content == text_message))
       |> then(fn
         nil -> nil
-        x -> {x.timestamp, x.id}
+        x -> {x.index, x.id}
       end)
 
     assert msg_id != nil
@@ -161,21 +166,20 @@ defmodule Chat.Dialogs.DialogTest do
              |> Enum.find(&(&1.content == text_message))
   end
 
-  test "message removal shoukld remove content as well" do
+  test "message removal should remove content as well" do
     {alice, _, _, dialog} = alice_bob_dialog()
 
-    time = DateTime.utc_now() |> DateTime.add(-10, :second)
-
-    dialog |> Dialogs.add_memo(alice, "memo here", time)
+    "memo here"
+    |> make_memo_msg()
+    |> Dialogs.add_new_message(alice, dialog)
 
     dialog
-    |> Dialogs.add_image(alice, ["not_image", "text/plain"], time |> DateTime.add(1, :second))
+    |> Dialogs.add_image(alice, ["not_image", "text/plain"])
 
     dialog
     |> Dialogs.add_file(
       alice,
-      ["not_image 2", "text/plain", "file.txt", "100 B"],
-      time |> DateTime.add(2, :second)
+      ["not_image 2", "text/plain", "file.txt", "100 B"]
     )
 
     dialog
@@ -183,24 +187,26 @@ defmodule Chat.Dialogs.DialogTest do
     |> Enum.zip([&Memo.get/1, &Images.get/1, &Files.get/1])
     |> Enum.map(fn {msg, getter} ->
       assert nil != msg.content |> StorageId.from_json() |> then(getter)
-      dialog |> Dialogs.delete(alice, {msg.timestamp, msg.id})
+      dialog |> Dialogs.delete(alice, {msg.index, msg.id})
       assert nil == msg.content |> StorageId.from_json() |> then(getter)
     end)
   end
 
   test "message update should replace previous version in dialog" do
     {alice, _, _, dialog} = alice_bob_dialog()
-    time = DateTime.utc_now() |> DateTime.add(-10, :second)
     text = "text here"
     updated_text = "updated text here"
 
-    dialog |> Dialogs.add_memo(alice, "memo here", time)
-    dialog |> Dialogs.add_text(alice, text, time |> DateTime.add(1, :second))
+    "memo here"
+    |> make_memo_msg()
+    |> Dialogs.add_new_message(alice, dialog)
+
+    %Text{text: text} |> Dialogs.add_new_message(alice, dialog)
 
     assert [_, msg] = dialog |> Dialogs.read(alice)
     assert ^text = msg.content
 
-    msg_id = {msg.timestamp, msg.id}
+    msg_id = {msg.index, msg.id}
     dialog |> Dialogs.update(alice, msg_id, {:memo, updated_text})
 
     assert [_, %{type: :memo} = msg] = dialog |> Dialogs.read(alice)
@@ -212,12 +218,22 @@ defmodule Chat.Dialogs.DialogTest do
 
   test "message should be readable by its id" do
     {alice, _, _, dialog} = alice_bob_dialog()
-    dialog |> Dialogs.add_memo(alice, "memo here")
+
+    "memo here "
+    |> make_memo_msg()
+    |> Dialogs.add_new_message(alice, dialog)
+
     assert [msg] = dialog |> Dialogs.read(alice)
 
-    same_msg = Dialogs.read_message(dialog, {msg.timestamp, msg.id}, alice)
+    same_msg = Dialogs.read_message(dialog, {msg.index, msg.id}, alice)
 
     assert same_msg == msg
+  end
+
+  defp make_memo_msg(text) do
+    text
+    |> String.pad_trailing(160, "-")
+    |> then(&%Text{text: &1})
   end
 
   defp alice_bob_dialog do

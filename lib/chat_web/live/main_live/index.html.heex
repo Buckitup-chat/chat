@@ -158,7 +158,7 @@
             <span class="text-xs">Chats</span>
           </button>
           <button phx-click="switch-lobby-mode" phx-value-lobby-mode="admin" class="sidebarIcon">
-            <.icon id="admin" class={classes("w-6 h-6 hover:fill-purple", %{"fill-purple" => @lobby_mode == :admin, "fill-grayscale" => @lobby_mode != :admin})}/>
+            <.icon id="admin" class={classes("w-5 h-5 hover:fill-purple", %{"fill-purple" => @lobby_mode == :admin, "fill-grayscale" => @lobby_mode != :admin})}/>
             <span class="text-xs">Admin</span>
           </button>
         </div>
@@ -177,7 +177,7 @@
             </button>
             <%= if @is_admin do %>
             <button phx-click="switch-lobby-mode" phx-value-lobby-mode="admin" class="sidebarIcon mt-5">
-              <.icon id="admin" class={classes("w-6 h-6 hover:fill-purple", %{"fill-purple" => @lobby_mode == :admin, "fill-grayscale" => @lobby_mode != :admin})}/>
+              <.icon id="admin" class={classes("w-5 h-5 hover:fill-purple", %{"fill-purple" => @lobby_mode == :admin, "fill-grayscale" => @lobby_mode != :admin})}/>
               <span class="text-xs">Admin</span>
             </button>
             <% end %>
@@ -205,7 +205,7 @@
             </div>
             <div class="mt-10 w-full">
               <ul><%= for user <- @users do %>
-                <li phx-click="dialog/switch" phx-value-user-id={user.hash} class={classes("hidden sm:flex w-full cursor-pointer h-9 flex items-center hover:bg-stone250", %{"bg-gradient-to-r from-green-400 to-blue-500" => user == @peer})}>
+                <li phx-click="dialog/switch" phx-value-user-id={user.hash} class={classes("hidden sm:flex w-full cursor-pointer h-9 flex items-center hover:bg-stone250", %{"from-green-400 to-blue-500" => user == @peer})}>
                   <a><div class="flex flex-row px-7">
                     <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(user.hash) %>]</tt>
                     <div class="ml-1 text-sm"><%= user == Chat.Card.from_identity(@me) && "My notes" || user.name %></div>
@@ -220,15 +220,18 @@
               <% end %></ul>
             </div>
           </div>
-          <div id="contentContainer" class="bg-gradient-to-r from-green-400 to-blue-500 hidden sm:flex flex flex-col contentContainer">
+          <div id="contentContainer" class="from-green-400 to-blue-500 hidden sm:flex flex flex-col contentContainer">
             <%= unless @dialog do %>
               <div class="text-center bg-white/10 tracking-tightest" >
                 <%= @version %>
               </div>
             <% else %>
-              <div id="chatContent" class="paper pink basis-[93%] overflow-scroll flex flex-col justify-between relative" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
+              <div id="chatContent" class="basis-[93%] overflow-scroll flex flex-col justify-between relative" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
               
-                <div class="bg-gradient-to-r from-green-400 to-blue-500 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start sticky" style="min-height: 56px;">
+                <div 
+                  class="from-green-400 to-blue-500 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start sticky" 
+                  style="min-height: 56px;"
+                >
                   <button phx-click={JS.push("close-dialog") |> close_content()} class="sm:hidden pr-3">
                     <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
                   </button>
@@ -478,8 +481,11 @@
                     <p class="text-base text-grayscale600 px-7">You have no rooms</p>
                   <% else %>
                     <%= for room <- @joined_rooms do %>
-                      <li phx-click="room/switch" phx-value-room={room.hash} class={classes("hidden sm:flex w-full px-6 h-9 flex items-center cursor-pointer flex justify-between hover:bg-stone250", %{"silverGradient" => (@room && room.pub_key == @room.pub_key) && (@room.type == :request), "goldGradient" => (@room && room.pub_key == @room.pub_key) && (@room.type == :private), "woodGradient" => (@room && room.pub_key == @room.pub_key) && (@room.type == :public  ),})}>
-
+                      <li 
+                        phx-click="room/switch" 
+                        phx-value-room={room.hash} 
+                        class="hidden sm:flex w-full px-6 h-9 flex items-center cursor-pointer flex justify-between hover:bg-stone250"
+                      >
                         <a>
                           <div class="flex flex-row px-2">
                             <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
@@ -552,7 +558,7 @@
                 </button>
               </div>
             <% else %>
-              <div id="chatContent" class="blue paper basis-[93%] overflow-y-scroll flex flex-col justify-between relative" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
+              <div id="chatContent" class="basis-[93%] overflow-y-scroll flex flex-col justify-between relative" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
 
                 <div class={classes("w-full px-8  border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between sticky top-0 right-0", %{"goldGradient" => @room.type == :private, "silverGradient" => @room.type == :request, "woodGradient" => @room.type == :public,})} style="min-height: 56px;" >
                   <div class="flex flex-row items-center">

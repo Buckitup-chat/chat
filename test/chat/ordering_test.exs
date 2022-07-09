@@ -1,10 +1,10 @@
 defmodule Chat.OrderingTest do
   use ExUnit.Case, async: false
 
-  alias Chat.User
-  alias Chat.Ordering
-  alias Chat.Dialogs
   alias Chat.Card
+  alias Chat.Dialogs
+  alias Chat.Ordering
+  alias Chat.User
 
   test "should provide 1 on new key" do
     assert 1 = Ordering.next({:some, "key"})
@@ -20,6 +20,7 @@ defmodule Chat.OrderingTest do
     user = User.login("some")
 
     dialog = Dialogs.find_or_open(user, user |> Card.from_identity())
+
     %Chat.Messages.Text{text: "some message"}
     |> Dialogs.add_new_message(user, dialog)
 

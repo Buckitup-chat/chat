@@ -11,7 +11,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.Identity
   alias Chat.Log
   alias Chat.Memo
-  alias Chat.Messages.Text
+  alias Chat.Messages
   alias Chat.RoomInvites
   alias Chat.User
   alias Chat.Utils
@@ -61,48 +61,38 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def send_text(%{assigns: %{dialog: dialog, me: me}} = socket, text, timestamp) do
-    cond do
-      text |> String.trim() == "" ->
+    text
+    |> String.trim()
+    |> case do
+      "" ->
         nil
 
-      true ->
-        %Text{text: text, timestamp: timestamp}
+      text ->
+        %Messages.Text{text: text, timestamp: timestamp}
         |> Dialogs.add_new_message(me, dialog)
+        |> broadcast_new_message(dialog, me)
     end
-    |> broadcast_new_message(dialog, me)
 
     socket
   end
 
-  def send_file(%{assigns: %{dialog: dialog, me: me}} = socket, entry, {chunk_key, chunk_secret}) do
+  def send_file(
+        %{assigns: %{dialog: dialog, me: me}} = socket,
+        entry,
+        {chunk_key, chunk_secret}
+      ) do
     consume_uploaded_entry(
       socket,
       entry,
       fn _ ->
-        data = [
+        Messages.File.new(
+          entry,
           chunk_key,
-          chunk_secret |> Base.encode64(),
-          entry.client_size |> to_string(),
-          entry.client_type |> mime_type(),
-          entry.client_name,
-          entry.client_size |> format_size()
-        ]
-
-        {:ok, Dialogs.add_file(dialog, me, data)}
-      end
-    )
-    |> broadcast_new_message(dialog, me)
-
-    socket
-  end
-
-  def send_image(%{assigns: %{dialog: dialog, me: me}} = socket, entry) do
-    consume_uploaded_entry(
-      socket,
-      entry,
-      fn %{path: path} ->
-        data = [File.read!(path), entry.client_type]
-        {:ok, Dialogs.add_image(dialog, me, data)}
+          chunk_secret,
+          socket.assigns[:client_timestamp] || 0
+        )
+        |> Dialogs.add_new_message(me, dialog)
+        |> then(&{:ok, &1})
       end
     )
     |> broadcast_new_message(dialog, me)
@@ -182,8 +172,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   def delete_messages(%{assigns: %{me: me, dialog: dialog}} = socket, %{"messages" => messages}) do
     messages
     |> Jason.decode!()
-    |> Enum.each(fn %{"id" => msg_id, "timestamp" => time} ->
-      Dialogs.delete(dialog, me, {String.to_integer(time), msg_id})
+    |> Enum.each(fn %{"id" => msg_id, "index" => index} ->
+      Dialogs.delete(dialog, me, {String.to_integer(index), msg_id})
       broadcast_message_deleted(msg_id, dialog, me)
     end)
 

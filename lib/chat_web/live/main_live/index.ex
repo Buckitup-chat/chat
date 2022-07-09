@@ -311,18 +311,6 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_info({:dialog, msg}, socket), do: socket |> Page.DialogRouter.info(msg) |> noreply()
 
-  def handle_progress(:image, %{done?: true} = entry, socket) do
-    socket
-    |> Page.Dialog.send_image(entry)
-    |> noreply()
-  end
-
-  def handle_progress(:room_image, %{done?: true} = entry, socket) do
-    socket
-    |> Page.Room.send_image(entry)
-    |> noreply()
-  end
-
   def handle_progress(:backup_file, %{done?: true}, socket) do
     consume_uploaded_entries(
       socket,
@@ -534,7 +522,7 @@ defmodule ChatWeb.MainLive.Index do
             phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")
                        |> show_modal("delete-message-popup")
                        |> JS.set_attribute({"phx-click", hide_modal("delete-message-popup") |> JS.push(message_of(@msg) <> "/delete-messages") |> stringify_commands()}, to: "#delete-message-popup .deleteMessageButton")
-                       |> JS.set_attribute({"phx-value-messages", [%{id: @msg.id, timestamp: "#{@msg.timestamp}"}] |> Jason.encode!}, to: "#delete-message-popup .deleteMessageButton")
+                       |> JS.set_attribute({"phx-value-messages", [%{id: @msg.id, index: "#{@msg.index}"}] |> Jason.encode!}, to: "#delete-message-popup .deleteMessageButton")
                       }
             phx-value-id={@msg.id}
             phx-value-index={@msg.index}

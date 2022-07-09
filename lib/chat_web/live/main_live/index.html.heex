@@ -203,8 +203,12 @@
               <ul><%= for user <- @users do %>
                 <li phx-click="dialog/switch" phx-value-user-id={user.hash} class={classes("hidden sm:flex w-full cursor-pointer h-9 flex items-center hover:bg-stone250", %{"bg-stone250" => user == @peer})}>
                   <a><div class="flex flex-row px-7">
-                    <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(user.hash) %>]</tt>
-                    <div class="ml-1 text-sm"><%= user == Chat.Card.from_identity(@me) && "My notes" || user.name %></div>
+                    <%= if @my_id == user.hash do %> 
+                      <div class="ml-1 text-sm"> My notes </div>
+                    <% else %> 
+                      <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(user.hash) %>]</tt>
+                      <div class="ml-1 text-sm"><%= user.name %></div>
+                    <% end %> 
                   </div></a>
                 </li>
                 <li phx-click={JS.push("dialog/switch") |> open_content()} phx-value-user-id={user.hash} class={classes("sm:hidden w-full cursor-pointer h-9 flex items-center hover:bg-stone250", %{"bg-stone250" => user == @peer})}>
@@ -218,20 +222,23 @@
           </div>
           <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
             <%= unless @dialog do %>
-              <div class="text-center bg-white/10 tracking-tightest" >
-                <%= @version %>
-              </div>
             <% else %>
               <div id="chatContent" class="basis-[93%] overflow-scroll flex flex-col justify-between relative" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
                 <div class="w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start sticky top-0 right-0" style="min-height: 56px;">
                   <button phx-click={JS.push("close-dialog") |> close_content()} class="sm:hidden pr-3">
                     <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
                   </button>
-                  <div class="text-base text-white/60">[<%= short_hash(@peer.hash) %>]</div>
-                  <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>
-                  <button>
-                    <.icon id="edit" class="w-4 h-4 ml-1 flex fill-white/50"/>
-                  </button>
+                  <%= if @my_id == @peer.hash do %>
+                    <h1 class="ml-1 text-base font-bolt text-white" >
+                      My private notes
+                    </h1>
+                  <% else %>
+                    <div class="text-base text-white/60">[<%= short_hash(@peer.hash) %>]</div>
+                    <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>
+                    <button>
+                      <.icon id="edit" class="w-4 h-4 ml-1 flex fill-white/50"/>
+                    </button>
+                  <% end %> 
                 </div>
                 <div>
                   <div id="chat-messages" phx-update={@message_update_mode}>
@@ -285,12 +292,14 @@
               <div id="dialogInput" class="basis-[7%] px-8 border border-white bg-white flex items-center">
                 <%= if @dialog_mode == :plain do %>
                   <.form
+                    let={df}
                     for={:dialog_file}
                     id="dialog-file-form"
                     class="column column-50 column-offset-50"
                     phx-change="dialog/import-files"
                     phx-drop-target={@uploads.dialog_file.ref}
                   >
+                    <%= text_input df, :timestamp, type: :hidden, id: "dialog-file-input-timestamp" %>
                     <%= live_file_input @uploads.dialog_file, style: "display: none"  %>
                   </.form>      
                   <.form
@@ -301,10 +310,18 @@
                   >
                     <%= live_file_input @uploads.image, style: "display: none" %>
                   </.form>
-                  <button class="relative" id="attachFileBtn" phx-click={open_dropdown("attachFileDropdown") |> JS.dispatch("chat:set-dropdown-position", to: "#attachFileDropdown", detail: %{relativeElementId: "attachFileBtn"})}>
+                  <button 
+                    id="attachFileBtn"
+                    class="relative" 
+                    phx-click={
+                      open_dropdown("attachFileDropdown")
+                      |> JS.dispatch("chat:client_timestamp", detail: %{to: "#dialog-file-input-timestamp"})
+                      |> JS.dispatch("chat:set-dropdown-position", to: "#attachFileDropdown", detail: %{relativeElementId: "attachFileBtn"})
+                    }
+                  >
                     <.icon id="attach" class="w-7 h-7 mt-3 flex fill-white"/>
                     <.dropdown class="mr-5" id="attachFileDropdown"> 
-                      <a class="dropdownItem" phx-click={JS.dispatch("click", to: "#dialog-file-form input[type=file]")}>
+                      <a class="dropdownItem" phx-click={JS.dispatch("chat:client_timestamp") |> JS.dispatch("click", to: "#dialog-file-form input[type=file]")}>
                         <.icon id="document" class="w-4 h-4 fill-grayscale"/>
                         <span>File</span>
                       </a>
@@ -778,6 +795,9 @@
               <div class="h-14 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start fixed" >
                 <a class="sm:hidden mr-2" phx-value-lobby-mode="chats" phx-click={JS.push("switch-lobby-mode") |> JS.push("close-feeds") |> close_content()}><.icon id="arrowBack" class="w-6 h-6 fill-white"/></a>
                 <h1 class="ml-1 text-base font-bolt text-white">Feeds</h1>
+                <div class="ml-3 text-white/50"> 
+                  [ <%= @version %> ]
+                </div>
               </div>
               <div class="mt-16 mb-8 px-4 sm:px-8 w-full" id="action-feed-list" phx-update={@feed_update_mode}>
                 <%= if @action_feed_list do %>

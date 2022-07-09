@@ -3,6 +3,7 @@ defmodule Chat.Rooms.PrivateRoomTest do
 
   alias Chat.Dialogs
   alias Chat.Identity
+  alias Chat.Messages
   alias Chat.RoomInvites
   alias Chat.Rooms
   alias Chat.User
@@ -51,7 +52,10 @@ defmodule Chat.Rooms.PrivateRoomTest do
     bob_card = User.by_id(bob_hash)
 
     dialog = Dialogs.find_or_open(alice, bob_card)
-    dialog |> Dialogs.add_room_invite(alice, identity)
+
+    identity
+    |> Messages.RoomInvite.new()
+    |> Dialogs.add_new_message(alice, dialog)
 
     [bob_message] = dialog |> Dialogs.read(bob)
     assert :room_invite == bob_message.type

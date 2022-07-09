@@ -1,5 +1,5 @@
 defmodule Chat.Messages.Text do
-  @moduledoc ""
+  @moduledoc "Text and memo"
 
   defstruct text: "", timestamp: 0
 end
@@ -22,7 +22,7 @@ defimpl Chat.DryStorable, for: Chat.Messages.Text do
 
   def timestamp(text), do: text.timestamp
 
-  @spec type(%Chat.Messages.Text{}) :: atom()
+  @spec type(Chat.Messages.Text.t()) :: atom()
   def type(text) do
     if String.length(text.text) > 150 do
       :memo

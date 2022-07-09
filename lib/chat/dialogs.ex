@@ -3,10 +3,10 @@ defmodule Chat.Dialogs do
 
   alias Chat.Card
   alias Chat.Dialogs.Dialog
+  alias Chat.Dialogs.DialogMessaging
   alias Chat.Dialogs.Message
   alias Chat.Dialogs.Registry
   alias Chat.Identity
-  alias Chat.Ordering
   alias Chat.Utils
 
   def find_or_open(%Identity{} = src, %Card{} = dst) do
@@ -26,21 +26,9 @@ defmodule Chat.Dialogs do
 
   defdelegate update(dialog), to: Registry
 
-  def add_file(dialog, src, data) do
-    Dialog.add_file(dialog, src, data, next_key(dialog))
-  end
-
-  def add_image(dialog, src, data) do
-    Dialog.add_image(dialog, src, data, next_key(dialog))
-  end
-
-  def add_room_invite(dialog, src, room_identity) do
-    Dialog.add_room_invite(dialog, src, room_identity, next_key(dialog))
-  end
-
-  defdelegate add_new_message(message, author, dialog), to: Dialog
-  defdelegate update(dialog, author, msg_time_id, content), to: Dialog
-  defdelegate delete(dialog, author, msg_time_id), to: Dialog
+  defdelegate add_new_message(message, author, dialog), to: DialogMessaging
+  defdelegate update(dialog, author, msg_time_id, content), to: DialogMessaging
+  defdelegate delete(dialog, author, msg_time_id), to: DialogMessaging
 
   def read(
         %Dialog{} = dialog,
@@ -48,17 +36,17 @@ defmodule Chat.Dialogs do
         before \\ {nil, 0},
         amount \\ 1000
       ),
-      do: Dialog.read(dialog, reader, before, amount)
+      do: DialogMessaging.read(dialog, reader, before, amount)
 
-  def read_message(%Dialog{} = dialog, {index, msg_id} = _msg_id, %Identity{} = me) do
-    message = Dialog.get_message(dialog, {index, msg_id})
+  def read_message(%Dialog{} = dialog, {index, %Message{} = message}, %Identity{} = me) do
     side = Dialog.my_side(dialog, me)
-    Dialog.read(message, index, me, side, peer(dialog, me))
+    DialogMessaging.read({index, message}, me, side, peer(dialog, me))
   end
 
-  def read_message(%Dialog{} = dialog, %Message{} = message, %Identity{} = me) do
+  def read_message(%Dialog{} = dialog, {index, msg_id} = _msg_id, %Identity{} = me) do
+    message = DialogMessaging.get_message(dialog, {index, msg_id})
     side = Dialog.my_side(dialog, me)
-    Dialog.read(message, me, side, peer(dialog, me))
+    DialogMessaging.read({index, message}, me, side, peer(dialog, me))
   end
 
   def key(%Dialog{} = dialog) do
@@ -71,9 +59,4 @@ defmodule Chat.Dialogs do
   def peer(dialog, %Card{pub_key: key}), do: peer(dialog, key)
   def peer(%Dialog{a_key: my_key, b_key: peer_key}, my_key), do: peer_key
   def peer(%Dialog{a_key: peer_key, b_key: my_key}, my_key), do: peer_key
-
-  defp next_key(dialog) do
-    {a, b, _, _} = Dialog.msg_key(dialog, 0, 0)
-    Ordering.next({a, b})
-  end
 end

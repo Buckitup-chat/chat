@@ -140,6 +140,13 @@ const listeners = {
     url = e.detail.url
     url && openUrl(url)
   },
+  "chat:client_timestamp": (e) => {
+    if (e.detail && e.detail.to) {
+      document
+        .querySelector(e.detail.to)
+        .value = Math.floor(Date.now() / 1000)
+    }
+  },
   "phx:chat:focus": (e) => { const el = document.querySelector(e.detail.to); setTimeout(() => el.focus(), 100); },
   "phx:chat:change": (e) => { const el = document.querySelector(e.detail.to); el.innerHTML = e.detail.content; },
 };

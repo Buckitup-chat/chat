@@ -8,7 +8,9 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.Dialogs
   alias Chat.Identity
   alias Chat.Log
+
   alias Chat.Memo
+  alias Chat.Messages
   alias Chat.Rooms
   alias Chat.User
   alias Chat.Utils
@@ -223,13 +225,12 @@ defmodule ChatWeb.MainLive.Page.Room do
         %{assigns: %{room: %{name: room_name}, room_identity: identity, me: me}} = socket,
         user_hash
       ) do
-    full_room_identity =
-      identity
-      |> Map.put(:name, room_name)
+    dialog = Dialogs.find_or_open(me, user_hash |> User.by_id())
 
-    me
-    |> Dialogs.find_or_open(user_hash |> User.by_id())
-    |> Dialogs.add_room_invite(me, full_room_identity)
+    identity
+    |> Map.put(:name, room_name)
+    |> Messages.RoomInvite.new()
+    |> Dialogs.add_new_message(me, dialog)
 
     socket
   rescue

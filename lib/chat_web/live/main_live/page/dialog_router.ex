@@ -1,7 +1,7 @@
 defmodule ChatWeb.MainLive.Page.DialogRouter do
   @moduledoc "Route dialog events"
 
-  import Phoenix.LiveView, only: [push_event: 3]
+  import Phoenix.LiveView, only: [push_event: 3, assign: 3]
   alias ChatWeb.MainLive.Index
   alias ChatWeb.MainLive.Page
 
@@ -17,8 +17,10 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
       {"import-images", _} ->
         socket |> push_event("chat:scroll-down", %{})
 
-      {"import-files", _} ->
-        socket |> push_event("chat:scroll-down", %{})
+      {"import-files", %{"dialog_file" => %{"timestamp" => timestamp}}} ->
+        socket
+        |> push_event("chat:scroll-down", %{})
+        |> assign(:client_timestamp, timestamp |> String.to_integer())
 
       {"cancel-edit", _} ->
         socket |> Page.Dialog.cancel_edit()
@@ -54,7 +56,7 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
       "edit" ->
         socket |> Page.Dialog.edit_message(msg_id)
 
-      "download-message" ->
+      "download" ->
         socket |> Page.Dialog.download_message(msg_id)
     end
   end

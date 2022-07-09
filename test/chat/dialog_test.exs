@@ -4,9 +4,8 @@ defmodule Chat.Dialogs.DialogTest do
   alias Chat.Card
   alias Chat.Dialogs
   alias Chat.Files
-  alias Chat.Images
   alias Chat.Memo
-  alias Chat.Messages.Text
+  alias Chat.Messages
   alias Chat.User
   alias Chat.Utils.StorageId
 
@@ -23,14 +22,20 @@ defmodule Chat.Dialogs.DialogTest do
       alice
       |> Dialogs.open(bob_card)
 
-    %Text{text: text_message} |> Dialogs.add_new_message(alice, dialog)
-    dialog |> Dialogs.add_image(alice, ["not_image", "text/plain"])
-    dialog |> Dialogs.add_image(bob, ["not_image 2", "text/plain"])
+    %Messages.Text{text: text_message} |> Dialogs.add_new_message(alice, dialog)
+
+    "not_image"
+    |> fake_image
+    |> Dialogs.add_new_message(alice, dialog)
+
+    "not_image 2"
+    |> fake_image
+    |> Dialogs.add_new_message(bob, dialog)
 
     assert 3 == dialog |> Dialogs.read(bob) |> Enum.count()
 
     assert_raise RuntimeError, fn ->
-      %Text{text: "spam"} |> Dialogs.add_new_message(charlie, dialog)
+      %Messages.Text{text: "spam"} |> Dialogs.add_new_message(charlie, dialog)
     end
 
     assert_raise(RuntimeError, fn -> dialog |> Dialogs.read(charlie) end)
@@ -47,7 +52,7 @@ defmodule Chat.Dialogs.DialogTest do
 
     assert initial == dialog
 
-    %Text{text: content} |> Dialogs.add_new_message(alice, dialog)
+    %Messages.Text{text: content} |> Dialogs.add_new_message(alice, dialog)
 
     [bob_version] = Dialogs.read(dialog, bob)
 
@@ -90,20 +95,15 @@ defmodule Chat.Dialogs.DialogTest do
     alice = User.login("Alice")
     bob = User.login("Bob")
     bob_card = bob |> Card.from_identity()
-    content = ["text file", "text/plain", "some.txt", 1000 |> to_string()]
 
     dialog = Dialogs.find_or_open(alice, bob_card)
 
-    dialog |> Dialogs.add_file(alice, content)
+    fake_file()
+    |> Dialogs.add_new_message(alice, dialog)
 
     [bob_version] = Dialogs.read(dialog, bob)
 
     assert :file = bob_version.type
-
-    assert ^content =
-             bob_version.content
-             |> StorageId.from_json()
-             |> Files.get()
   end
 
   test "removed by author message should not be present in dialog" do
@@ -116,9 +116,15 @@ defmodule Chat.Dialogs.DialogTest do
       alice
       |> Dialogs.open(bob_card)
 
-    %Text{text: text_message} |> Dialogs.add_new_message(alice, dialog)
-    dialog |> Dialogs.add_image(alice, ["not_image", "text/plain"])
-    dialog |> Dialogs.add_image(bob, ["not_image 2", "text/plain"])
+    %Messages.Text{text: text_message} |> Dialogs.add_new_message(alice, dialog)
+
+    "not_image"
+    |> fake_image
+    |> Dialogs.add_new_message(alice, dialog)
+
+    "not_image 2"
+    |> fake_image
+    |> Dialogs.add_new_message(bob, dialog)
 
     msg_id =
       dialog
@@ -143,9 +149,15 @@ defmodule Chat.Dialogs.DialogTest do
     {alice, bob, _bob_card, dialog} = alice_bob_dialog()
     text_message = "Alice welcomes Bob"
 
-    %Text{text: text_message} |> Dialogs.add_new_message(alice, dialog)
-    dialog |> Dialogs.add_image(alice, ["not_image", "text/plain"])
-    dialog |> Dialogs.add_image(bob, ["not_image 2", "text/plain"])
+    %Messages.Text{text: text_message} |> Dialogs.add_new_message(alice, dialog)
+
+    "not_image"
+    |> fake_image
+    |> Dialogs.add_new_message(alice, dialog)
+
+    "not_image 2"
+    |> fake_image
+    |> Dialogs.add_new_message(bob, dialog)
 
     msg_id =
       dialog
@@ -173,18 +185,16 @@ defmodule Chat.Dialogs.DialogTest do
     |> make_memo_msg()
     |> Dialogs.add_new_message(alice, dialog)
 
-    dialog
-    |> Dialogs.add_image(alice, ["not_image", "text/plain"])
+    "not_image"
+    |> fake_image
+    |> Dialogs.add_new_message(alice, dialog)
 
-    dialog
-    |> Dialogs.add_file(
-      alice,
-      ["not_image 2", "text/plain", "file.txt", "100 B"]
-    )
+    fake_file()
+    |> Dialogs.add_new_message(alice, dialog)
 
     dialog
     |> Dialogs.read(alice)
-    |> Enum.zip([&Memo.get/1, &Images.get/1, &Files.get/1])
+    |> Enum.zip([&Memo.get/1, &Files.get/1, &Files.get/1])
     |> Enum.map(fn {msg, getter} ->
       assert nil != msg.content |> StorageId.from_json() |> then(getter)
       dialog |> Dialogs.delete(alice, {msg.index, msg.id})
@@ -201,7 +211,7 @@ defmodule Chat.Dialogs.DialogTest do
     |> make_memo_msg()
     |> Dialogs.add_new_message(alice, dialog)
 
-    %Text{text: text} |> Dialogs.add_new_message(alice, dialog)
+    %Messages.Text{text: text} |> Dialogs.add_new_message(alice, dialog)
 
     assert [_, msg] = dialog |> Dialogs.read(alice)
     assert ^text = msg.content
@@ -230,10 +240,26 @@ defmodule Chat.Dialogs.DialogTest do
     assert same_msg == msg
   end
 
+  defp fake_file do
+    key = UUID.uuid4()
+    secret = "12312414132341"
+
+    %{client_size: 123, client_type: "audio/mp3", client_name: "Some file.ext"}
+    |> Messages.File.new(key, secret)
+  end
+
+  defp fake_image(name) do
+    key = UUID.uuid4()
+    secret = "12312414132341"
+
+    %{client_size: 123, client_type: "image/jpeg", client_name: name}
+    |> Messages.File.new(key, secret)
+  end
+
   defp make_memo_msg(text) do
     text
     |> String.pad_trailing(160, "-")
-    |> then(&%Text{text: &1})
+    |> then(&%Messages.Text{text: &1})
   end
 
   defp alice_bob_dialog do

@@ -6,6 +6,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   alias Chat.AdminRoom
   alias Chat.Identity
+  alias Chat.Log
   alias Chat.Rooms
   alias Chat.User
   alias Chat.Utils
@@ -27,11 +28,12 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign_admin()
   end
 
-  def new_room(%{assigns: %{me: me}} = socket, name, type)
+  def new_room(%{assigns: %{me: me, client_timestamp: time}} = socket, name, type)
       when type in [:public, :request, :private] do
     new_room_identity = Rooms.add(me, name, type)
     new_room_card = Chat.Card.from_identity(new_room_identity)
 
+    me |> Log.create_room(time, new_room_identity, type)
     PubSub.broadcast!(Chat.PubSub, @topic, {:new_room, new_room_card})
 
     socket
@@ -67,8 +69,9 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> init_new_mode()
   end
 
-  def request_room(%{assigns: %{me: me}} = socket, room_hash) do
-    Rooms.add_request(room_hash, me)
+  def request_room(%{assigns: %{me: me, client_timestamp: time}} = socket, room_hash) do
+    room = Rooms.add_request(room_hash, me)
+    Log.request_room_key(me, time, room.pub_key)
 
     PubSub.broadcast!(
       Chat.PubSub,
@@ -151,10 +154,13 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     socket
   end
 
-  defp join_approved_rooms(%{assigns: %{new_rooms: new_rooms, rooms: rooms, me: me}} = socket) do
+  defp join_approved_rooms(
+         %{assigns: %{new_rooms: new_rooms, rooms: rooms, me: me, client_timestamp: time}} =
+           socket
+       ) do
     joined_rooms =
       new_rooms
-      |> Enum.flat_map(fn %{hash: hash} -> hash |> Rooms.join_approved_requests(me) end)
+      |> Enum.flat_map(fn %{hash: hash} -> hash |> Rooms.join_approved_requests(me, time) end)
 
     socket
     |> assign(:rooms, joined_rooms ++ rooms)

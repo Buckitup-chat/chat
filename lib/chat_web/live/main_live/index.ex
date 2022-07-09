@@ -32,7 +32,8 @@ defmodule ChatWeb.MainLive.Index do
         socket
         |> assign(
           need_login: true,
-          mode: :user_list
+          mode: :user_list,
+          client_timestamp: 0
         )
         |> allow_image_upload(:image)
         |> allow_image_upload(:room_image)
@@ -75,6 +76,12 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Lobby.init()
     |> Page.Dialog.init()
     |> Page.Logout.init()
+    |> noreply()
+  end
+
+  def handle_event("client-timestamp", %{"timestamp" => timestamp}, socket) do
+    socket
+    |> assign(:client_timestamp, timestamp)
     |> noreply()
   end
 

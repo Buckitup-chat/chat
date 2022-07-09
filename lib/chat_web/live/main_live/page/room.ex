@@ -21,7 +21,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def init(socket), do: socket |> assign(:room, nil)
 
-  def init(%{assigns: %{rooms: rooms, me: me}} = socket, room_hash) do
+  def init(%{assigns: %{rooms: rooms, me: me, client_timestamp: time}} = socket, room_hash) do
     room = Rooms.get(room_hash)
 
     room_identity =
@@ -29,7 +29,7 @@ defmodule ChatWeb.MainLive.Page.Room do
       |> Enum.find(&(room_hash == &1 |> Identity.pub_key() |> Utils.hash()))
 
     PubSub.subscribe(Chat.PubSub, room |> room_topic())
-    Log.visit_room(me, room_identity)
+    Log.visit_room(me, time, room_identity)
 
     socket
     |> assign(:page, 0)
@@ -59,18 +59,26 @@ defmodule ChatWeb.MainLive.Page.Room do
     end
   end
 
-  def send_text(%{assigns: %{room: room, me: me, room_identity: room_identity}} = socket, text) do
+  def send_text(
+        %{assigns: %{room: room, me: me, room_identity: room_identity, client_timestamp: time}} =
+          socket,
+        text
+      ) do
     cond do
       text |> String.trim() == "" -> nil
       text |> is_memo?() -> room_identity |> Rooms.add_memo(me, text)
       true -> room |> Rooms.add_text(me, text)
     end
-    |> broadcast_new_message(room, me)
+    |> broadcast_new_message(room, me, time)
 
     socket
   end
 
-  def send_file(%{assigns: %{me: me, room: room}} = socket, entry, {chunk_key, chunk_secret}) do
+  def send_file(
+        %{assigns: %{me: me, room: room, client_timestamp: time}} = socket,
+        entry,
+        {chunk_key, chunk_secret}
+      ) do
     consume_uploaded_entry(
       socket,
       entry,
@@ -87,12 +95,12 @@ defmodule ChatWeb.MainLive.Page.Room do
         {:ok, Rooms.add_file(room, me, data)}
       end
     )
-    |> broadcast_new_message(room, me)
+    |> broadcast_new_message(room, me, time)
 
     socket
   end
 
-  def send_image(%{assigns: %{me: me, room: room}} = socket, entry) do
+  def send_image(%{assigns: %{me: me, room: room, client_timestamp: time}} = socket, entry) do
     consume_uploaded_entry(
       socket,
       entry,
@@ -107,7 +115,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         {:ok, Rooms.add_image(room, me, data)}
       end
     )
-    |> broadcast_new_message(room, me)
+    |> broadcast_new_message(room, me, time)
 
     socket
   end
@@ -150,14 +158,21 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def update_edited_message(
-        %{assigns: %{room_identity: room_identity, room: room, me: me, edit_message_id: msg_id}} =
-          socket,
+        %{
+          assigns: %{
+            room_identity: room_identity,
+            room: room,
+            me: me,
+            edit_message_id: msg_id,
+            client_timestamp: time
+          }
+        } = socket,
         text
       ) do
     content = if is_memo?(text), do: {:memo, text}, else: text
 
     Rooms.update_message(msg_id, content, room_identity, me)
-    broadcast_message_updated(msg_id, room, me)
+    broadcast_message_updated(msg_id, room, me, time)
 
     socket
     |> cancel_edit()
@@ -186,11 +201,12 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def delete_message(
-        %{assigns: %{me: me, room_identity: room_identity, room: room}} = socket,
-        {time, msg_id}
+        %{assigns: %{me: me, room_identity: room_identity, room: room, client_timestamp: time}} =
+          socket,
+        {index, msg_id}
       ) do
-    Rooms.delete_message({time, msg_id}, room_identity, me)
-    broadcast_deleted_message(msg_id, room, me)
+    Rooms.delete_message({index, msg_id}, room_identity, me)
+    broadcast_deleted_message(msg_id, room, me, time)
 
     socket
   end
@@ -201,14 +217,24 @@ defmodule ChatWeb.MainLive.Page.Room do
     socket
   end
 
-  def delete_messages(%{assigns: %{me: me, room_identity: room_identity, room: room}} = socket, %{
-        "messages" => messages
-      }) do
+  def delete_messages(
+        %{
+          assigns: %{
+            me: me,
+            room_identity: room_identity,
+            room: room,
+            client_timestamp: time
+          }
+        } = socket,
+        %{
+          "messages" => messages
+        }
+      ) do
     messages
     |> Jason.decode!()
-    |> Enum.each(fn %{"id" => msg_id, "timestamp" => time} ->
-      Rooms.delete_message({String.to_integer(time), msg_id}, room_identity, me)
-      broadcast_deleted_message(msg_id, room, me)
+    |> Enum.each(fn %{"id" => msg_id, "index" => index} ->
+      Rooms.delete_message({String.to_integer(index), msg_id}, room_identity, me)
+      broadcast_deleted_message(msg_id, room, me, time)
     end)
 
     socket
@@ -333,25 +359,25 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   defp assign_requests(socket), do: socket
 
-  defp broadcast_message_updated(msg_id, room, me) do
+  defp broadcast_message_updated(msg_id, room, me, time) do
     {:updated_message, msg_id}
     |> room_broadcast(room)
 
-    Log.update_room_message(me, room.pub_key)
+    Log.update_room_message(me, time, room.pub_key)
   end
 
-  defp broadcast_new_message(message, room, me) do
+  defp broadcast_new_message(message, room, me, time) do
     {:new_message, message}
     |> room_broadcast(room)
 
-    Log.message_room(me, room.pub_key)
+    Log.message_room(me, time, room.pub_key)
   end
 
-  defp broadcast_deleted_message(msg_id, room, me) do
+  defp broadcast_deleted_message(msg_id, room, me, time) do
     {:deleted_message, msg_id}
     |> room_broadcast(room)
 
-    Log.delete_room_message(me, room.pub_key)
+    Log.delete_room_message(me, time, room.pub_key)
   end
 
   defp room_broadcast(message, room) do

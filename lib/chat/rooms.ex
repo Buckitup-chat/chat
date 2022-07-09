@@ -17,8 +17,6 @@ defmodule Chat.Rooms do
     |> tap(fn room_identity ->
       Room.create(me, room_identity, type)
       |> Registry.update()
-
-      me |> Log.create_room(room_identity, type)
     end)
   end
 
@@ -84,8 +82,6 @@ defmodule Chat.Rooms do
       if type == :request do
         add_request_message(room, user_identity)
       end
-
-      Log.request_room_key(user_identity, room.pub_key)
     end)
     |> update()
   end
@@ -106,7 +102,9 @@ defmodule Chat.Rooms do
     end)
   end
 
-  def join_approved_requests(room_hash, person_identity) do
+  def join_approved_requests(room_hash, person_identity, time) do
+    :todo_refactor_approve_flow
+
     room_hash
     |> get
     |> Room.join_approved_requests(person_identity)
@@ -114,7 +112,7 @@ defmodule Chat.Rooms do
       update(room)
 
       unless [] == joined_identities do
-        Log.got_room_key(person_identity, room.pub_key)
+        Log.got_room_key(person_identity, time, room.pub_key)
       end
 
       joined_identities

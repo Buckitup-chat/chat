@@ -8,6 +8,11 @@ defmodule Chat.Ordering.Counters do
     |> GenServer.call({:set, key, value})
   end
 
+  def get(key) do
+    __MODULE__
+    |> GenServer.call({:get, key})
+  end
+
   def next(key) do
     __MODULE__
     |> GenServer.call({:next, key})
@@ -27,6 +32,10 @@ defmodule Chat.Ordering.Counters do
   @impl true
   def handle_call({:set, key, value}, _from, data) do
     {:reply, key, data |> Map.put(key, value)}
+  end
+
+  def handle_call({:get, key}, _from, data) do
+    {:reply, data |> Map.get(key), data}
   end
 
   def handle_call({:next, key}, _from, data) do

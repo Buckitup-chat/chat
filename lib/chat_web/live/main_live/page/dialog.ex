@@ -27,12 +27,12 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:peer, nil)
   end
 
-  def init(%{assigns: %{me: me}} = socket, user_id) do
+  def init(%{assigns: %{me: me, client_timestamp: time}} = socket, user_id) do
     peer = User.by_id(user_id)
     dialog = Dialogs.find_or_open(me, peer)
 
     PubSub.subscribe(Chat.PubSub, dialog |> dialog_topic())
-    Log.open_direct(me, peer)
+    Log.open_direct(me, time, peer)
 
     socket
     |> assign(:page, 0)
@@ -60,7 +60,11 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     end
   end
 
-  def send_text(%{assigns: %{dialog: dialog, me: me}} = socket, text, timestamp) do
+  def send_text(
+        %{assigns: %{dialog: dialog, me: me, client_timestamp: time}} = socket,
+        text,
+        timestamp
+      ) do
     text
     |> String.trim()
     |> case do
@@ -70,14 +74,14 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       text ->
         %Messages.Text{text: text, timestamp: timestamp}
         |> Dialogs.add_new_message(me, dialog)
-        |> broadcast_new_message(dialog, me)
+        |> broadcast_new_message(dialog, me, time)
     end
 
     socket
   end
 
   def send_file(
-        %{assigns: %{dialog: dialog, me: me}} = socket,
+        %{assigns: %{dialog: dialog, me: me, client_timestamp: time}} = socket,
         entry,
         {chunk_key, chunk_secret}
       ) do
@@ -95,7 +99,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
         |> then(&{:ok, &1})
       end
     )
-    |> broadcast_new_message(dialog, me)
+    |> broadcast_new_message(dialog, me, time)
 
     socket
   end
@@ -128,13 +132,14 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def update_edited_message(
-        %{assigns: %{dialog: dialog, me: me, edit_message_id: msg_id}} = socket,
+        %{assigns: %{dialog: dialog, me: me, edit_message_id: msg_id, client_timestamp: time}} =
+          socket,
         text
       ) do
     content = if is_memo?(text), do: {:memo, text}, else: text
 
     Dialogs.update(dialog, me, msg_id, content)
-    broadcast_message_updated(msg_id, dialog, me)
+    broadcast_message_updated(msg_id, dialog, me, time)
 
     socket
     |> cancel_edit()
@@ -162,19 +167,24 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:edit_message_id, nil)
   end
 
-  def delete_message(%{assigns: %{me: me, dialog: dialog}} = socket, {time, msg_id}) do
+  def delete_message(
+        %{assigns: %{me: me, dialog: dialog, client_timestamp: time}} = socket,
+        {time, msg_id}
+      ) do
     Dialogs.delete(dialog, me, {time, msg_id})
-    broadcast_message_deleted(msg_id, dialog, me)
+    broadcast_message_deleted(msg_id, dialog, me, time)
 
     socket
   end
 
-  def delete_messages(%{assigns: %{me: me, dialog: dialog}} = socket, %{"messages" => messages}) do
+  def delete_messages(%{assigns: %{me: me, dialog: dialog, client_timestamp: time}} = socket, %{
+        "messages" => messages
+      }) do
     messages
     |> Jason.decode!()
     |> Enum.each(fn %{"id" => msg_id, "index" => index} ->
       Dialogs.delete(dialog, me, {String.to_integer(index), msg_id})
-      broadcast_message_deleted(msg_id, dialog, me)
+      broadcast_message_deleted(msg_id, dialog, me, time)
     end)
 
     socket
@@ -307,27 +317,27 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:last_load_timestamp, set_messages_timestamp(messages))
   end
 
-  defp broadcast_new_message(nil, _, _), do: nil
+  defp broadcast_new_message(nil, _, _, _), do: nil
 
-  defp broadcast_new_message(message, dialog, me) do
+  defp broadcast_new_message(message, dialog, me, time) do
     {:new_dialog_message, message}
     |> dialog_broadcast(dialog)
 
-    Log.message_direct(me, Dialogs.peer(dialog, me))
+    Log.message_direct(me, time, Dialogs.peer(dialog, me))
   end
 
-  defp broadcast_message_updated(message_id, dialog, me) do
+  defp broadcast_message_updated(message_id, dialog, me, time) do
     {:updated_dialog_message, message_id}
     |> dialog_broadcast(dialog)
 
-    Log.update_message_direct(me, Dialogs.peer(dialog, me))
+    Log.update_message_direct(me, time, Dialogs.peer(dialog, me))
   end
 
-  defp broadcast_message_deleted(message_id, dialog, me) do
+  defp broadcast_message_deleted(message_id, dialog, me, time) do
     {:deleted_dialog_message, message_id}
     |> dialog_broadcast(dialog)
 
-    Log.delete_message_direct(me, Dialogs.peer(dialog, me))
+    Log.delete_message_direct(me, time, Dialogs.peer(dialog, me))
   end
 
   defp dialog_broadcast(message, dialog) do

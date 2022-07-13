@@ -808,7 +808,7 @@
                   <% end %>
                 <% end %>
               </div>
-              <%= if @action_feed_till > Chat.Log.start_time do %>
+              <%= if @action_feed_till > 1 do %>
                 <div class="mb-10 px-4 flex flex-row items-center justify-between" >
                   <hr class="basis-[35%] sm:basis-[45%] border-1 border-white/10">
                   <a class="basis-[30%] sm:basis-[20%] text-center cursor-pointer text-white/50" phx-click="feed-more">load more</a>

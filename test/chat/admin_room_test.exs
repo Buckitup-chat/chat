@@ -12,6 +12,8 @@ defmodule Chat.AdminRoomTest do
     Utils
   }
 
+  alias Chat.Messages
+
   setup do
     AdminDb.db() |> CubDB.clear()
   end
@@ -31,7 +33,10 @@ defmodule Chat.AdminRoomTest do
     {bob, bob_card, _} = make_user("Bob")
 
     dialog = Dialogs.find_or_open(alice, bob_card)
-    dialog |> Dialogs.add_room_invite(alice, admin_room_identity)
+
+    admin_room_identity
+    |> Messages.RoomInvite.new()
+    |> Dialogs.add_new_message(alice, dialog)
 
     [bob_message] = dialog |> Dialogs.read(bob)
     assert :room_invite == bob_message.type

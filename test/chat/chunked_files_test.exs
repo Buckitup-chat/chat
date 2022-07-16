@@ -22,5 +22,11 @@ defmodule Chat.ChunkedFilesTest do
     assert recovered == Enum.join([first, second])
   end
 
-  test "should forget key"
+  test "should forget key" do
+    {key, _secret} = ChunkedFiles.new_upload()
+    assert nil != Chat.ChunkedFilesBroker.get(key)
+
+    ChunkedFiles.mark_consumed(key)
+    assert nil == Chat.ChunkedFilesBroker.get(key)
+  end
 end

@@ -5,41 +5,19 @@ defmodule ChatWeb.FileController do
   alias Chat.Broker
   alias Chat.ChunkedFiles
   alias Chat.Files
-  alias Chat.Images
 
   # can do part downloads with https://elixirforum.com/t/question-regarding-send-download-send-file-from-binary-in-memory/32507/4
 
   def image(conn, %{"download" => _} = params) do
-    with %{"id" => id, "a" => secret} <- params,
-         [data, type, name | _] <- Images.get(id, secret |> Base.url_decode64!()),
-         true <- type |> String.contains?("/") do
-      conn
-      |> put_resp_header("content-disposition", "attachment; filename=\"#{name}\"")
-      |> put_resp_content_type("octet/stream")
-      |> send_resp(200, data)
-    else
-      _ -> raise "404"
-    end
-  rescue
-    _ ->
-      conn
-      |> send_resp(404, "")
+    render_file(conn, params, disposition: true, content_type: "octet/stream")
   end
 
   def image(conn, params) do
-    with %{"id" => id, "a" => secret} <- params,
-         [data, type | _] <- Images.get(id, secret |> Base.url_decode64!()),
-         true <- type |> String.contains?("/") do
-      conn
-      |> put_resp_content_type(type)
-      |> send_resp(200, data)
-    else
-      _ -> raise "404"
-    end
-  rescue
-    _ ->
-      conn
-      |> send_resp(404, "")
+    render_file(conn, params, content_type: true)
+  end
+
+  def file(conn, params) do
+    render_file(conn, params, disposition: true, content_type: true)
   end
 
   def backup(conn, params) do
@@ -58,7 +36,7 @@ defmodule ChatWeb.FileController do
       |> send_resp(404, "")
   end
 
-  def file(conn, params) do
+  defp render_file(conn, params, opts) do
     with %{"id" => id, "a" => secret} <- params,
          [chunk_key, chunk_secret, _, type, name | _] <-
            Files.get(id, secret |> Base.url_decode64!()),
@@ -66,8 +44,8 @@ defmodule ChatWeb.FileController do
       data = ChunkedFiles.read({chunk_key, chunk_secret |> Base.decode64!()})
 
       conn
-      |> put_resp_header("content-disposition", "attachment; filename=\"#{name}\"")
-      |> put_resp_content_type(type)
+      |> set_disposition(name, opts[:disposition])
+      |> set_content_type(type, opts[:content_type])
       |> send_resp(200, data)
     else
       _ -> raise "404"
@@ -76,5 +54,18 @@ defmodule ChatWeb.FileController do
     _ ->
       conn
       |> send_resp(404, "")
+  end
+
+  defp set_disposition(conn, name, true),
+    do: put_resp_header(conn, "content-disposition", "attachment; filename=\"#{name}\"")
+
+  defp set_disposition(conn, _, _), do: conn
+
+  defp set_content_type(conn, file_type, content_type) do
+    case content_type do
+      nil -> conn
+      true -> put_resp_content_type(conn, file_type)
+      override_type -> put_resp_content_type(conn, override_type)
+    end
   end
 end

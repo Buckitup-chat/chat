@@ -25,7 +25,8 @@ defmodule ChatWeb.Hooks.LocalTimeHook do
            |> assign(
              locale: locale || "en",
              timezone: timezone || "UTC",
-             timezone_offset: timezone_offset || 0
+             timezone_offset: timezone_offset || 0,
+             client_timestamp: timestamp
            )
 
          {:halt, detach_hook(socket, :local_time, :handle_event)}

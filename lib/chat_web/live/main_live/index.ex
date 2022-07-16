@@ -9,6 +9,7 @@ defmodule ChatWeb.MainLive.Index do
   alias Chat.Files
   alias Chat.Identity
   alias Chat.Memo
+  alias Chat.Ordering
   alias Chat.RoomInvites
   alias Chat.Rooms
   alias Chat.Utils.StorageId
@@ -32,7 +33,8 @@ defmodule ChatWeb.MainLive.Index do
         socket
         |> assign(
           need_login: true,
-          mode: :user_list
+          mode: :user_list,
+          client_timestamp: 0
         )
         |> allow_image_upload(:image)
         |> allow_image_upload(:room_image)
@@ -75,6 +77,12 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Lobby.init()
     |> Page.Dialog.init()
     |> Page.Logout.init()
+    |> noreply()
+  end
+
+  def handle_event("client-timestamp", %{"timestamp" => timestamp}, socket) do
+    socket
+    |> assign(:client_timestamp, timestamp)
     |> noreply()
   end
 
@@ -311,18 +319,6 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_info({:dialog, msg}, socket), do: socket |> Page.DialogRouter.info(msg) |> noreply()
 
-  def handle_progress(:image, %{done?: true} = entry, socket) do
-    socket
-    |> Page.Dialog.send_image(entry)
-    |> noreply()
-  end
-
-  def handle_progress(:room_image, %{done?: true} = entry, socket) do
-    socket
-    |> Page.Room.send_image(entry)
-    |> noreply()
-  end
-
   def handle_progress(:backup_file, %{done?: true}, socket) do
     consume_uploaded_entries(
       socket,
@@ -334,6 +330,7 @@ defmodule ChatWeb.MainLive.Index do
         {:ok, other_db} = CubDB.start_link(dir)
         other_db |> Db.copy_data(Db.db())
         Db.db() |> CubDB.file_sync()
+        Ordering.reset()
 
         CubDB.stop(other_db)
       end
@@ -405,14 +402,14 @@ defmodule ChatWeb.MainLive.Index do
       <%= unless @is_mine do %>
         <div class="px-2 my-1 flex items-center justify-between">
           <button class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
-           phx-click="dialog/accept-room-invite"
+           phx-click="dialog/message/accept-room-invite"
            phx-value-id={@msg.id}
-           phx-value-time={@msg.timestamp}
+           phx-value-index={@msg.index}
           >Accept</button>
           <button class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
-           phx-click="dialog/accept-room-invite-and-open-room"
+           phx-click="dialog/message/accept-room-invite-and-open-room"
            phx-value-id={@msg.id}
-           phx-value-time={@msg.timestamp}
+           phx-value-index={@msg.index}
           >Accept and Open</button>
         </div>
       <% end %>
@@ -522,9 +519,9 @@ defmodule ChatWeb.MainLive.Index do
         <%= if @is_mine do %>
           <%= if @msg.type in [:text, :memo] do %>
             <a class="dropdownItem"
-              phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{message_of(@msg)}/edit-message")}
+              phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{message_of(@msg)}/message/edit")}
               phx-value-id={@msg.id}
-              phx-value-timestamp={@msg.timestamp}
+              phx-value-index={@msg.index}
             >
               <.icon id="edit" class="w-4 h-4 flex fill-black"/>
               <span>Edit</span>
@@ -534,10 +531,10 @@ defmodule ChatWeb.MainLive.Index do
             phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")
                        |> show_modal("delete-message-popup")
                        |> JS.set_attribute({"phx-click", hide_modal("delete-message-popup") |> JS.push(message_of(@msg) <> "/delete-messages") |> stringify_commands()}, to: "#delete-message-popup .deleteMessageButton")
-                       |> JS.set_attribute({"phx-value-messages", [%{id: @msg.id, timestamp: "#{@msg.timestamp}"}] |> Jason.encode!}, to: "#delete-message-popup .deleteMessageButton")
+                       |> JS.set_attribute({"phx-value-messages", [%{id: @msg.id, index: "#{@msg.index}"}] |> Jason.encode!}, to: "#delete-message-popup .deleteMessageButton")
                       }
             phx-value-id={@msg.id}
-            phx-value-timestamp={@msg.timestamp}
+            phx-value-index={@msg.index}
             phx-value-type="dialog-message"
           >
             <.icon id="delete" class="w-4 h-4 flex fill-black"/>
@@ -559,9 +556,9 @@ defmodule ChatWeb.MainLive.Index do
         <%= if @msg.type in [:file, :image] do %>
           <a
             class="dropdownItem"
-            phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{message_of(@msg)}/download-message")}
+            phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{message_of(@msg)}/message/download")}
             phx-value-id={@msg.id}
-            phx-value-timestamp={@msg.timestamp}
+            phx-value-index={@msg.index}
           >
             <.icon id="download" class="w-4 h-4 flex fill-black"/>
             <span>Download</span>

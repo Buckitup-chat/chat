@@ -5,6 +5,10 @@ export const hooks = {
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       timezone_offset: -(new Date().getTimezoneOffset() / 60),
       timestamp: Math.floor((new Date()).getTime() / 1000)
-    })
+    });
+    setInterval(() => {
+      const time = Math.ceil(Date.now() / 1000);
+      this.pushEvent("client-timestamp", {timestamp: time});
+    }, 997);
   }
 }

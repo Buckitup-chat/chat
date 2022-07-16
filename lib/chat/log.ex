@@ -4,29 +4,41 @@ defmodule Chat.Log do
   import Chat.Utils, only: [binhash: 1, hash: 1]
 
   alias Chat.Db
+  alias Chat.Ordering
 
   @db_key :action_log
 
-  def sign_in(me), do: me |> log(:sign_in)
-  def visit(me), do: me |> log(:visit)
-  def export_keys(me), do: me |> log(:export_keys)
-  def self_backup(me), do: me |> log(:self_backup)
-  def logout(me), do: me |> log(:logout)
+  def sign_in(me, time), do: me |> log(time, :sign_in)
+  def visit(me, time), do: me |> log(time, :visit)
+  def export_keys(me, time), do: me |> log(time, :export_keys)
+  def self_backup(me, time), do: me |> log(time, :self_backup)
+  def logout(me, time), do: me |> log(time, :logout)
 
-  def create_room(me, room, type),
-    do: me |> log(:create_room, room: binhash(room), room_type: type)
+  def create_room(me, time, room, type),
+    do: me |> log(time, :create_room, room: binhash(room), room_type: type)
 
-  def message_room(me, room), do: me |> log(:message_room, room: binhash(room))
-  def delete_room_message(me, room), do: me |> log(:delete_room_message, room: binhash(room))
-  def update_room_message(me, room), do: me |> log(:update_room_message, room: binhash(room))
-  def request_room_key(me, room), do: me |> log(:request_room_key, room: binhash(room))
-  def got_room_key(me, room), do: me |> log(:got_room_key, room: binhash(room))
-  def visit_room(me, room), do: me |> log(:visit_room, room: binhash(room))
+  def message_room(me, time, room), do: me |> log(time, :message_room, room: binhash(room))
 
-  def open_direct(me, peer), do: me |> log(:open_direct, to: binhash(peer))
-  def message_direct(me, peer), do: me |> log(:message_direct, to: binhash(peer))
-  def delete_message_direct(me, peer), do: me |> log(:delete_message_direct, to: binhash(peer))
-  def update_message_direct(me, peer), do: me |> log(:update_message_direct, to: binhash(peer))
+  def delete_room_message(me, time, room),
+    do: me |> log(time, :delete_room_message, room: binhash(room))
+
+  def update_room_message(me, time, room),
+    do: me |> log(time, :update_room_message, room: binhash(room))
+
+  def request_room_key(me, time, room),
+    do: me |> log(time, :request_room_key, room: binhash(room))
+
+  def got_room_key(me, time, room), do: me |> log(time, :got_room_key, room: binhash(room))
+  def visit_room(me, time, room), do: me |> log(time, :visit_room, room: binhash(room))
+
+  def open_direct(me, time, peer), do: me |> log(time, :open_direct, to: binhash(peer))
+  def message_direct(me, time, peer), do: me |> log(time, :message_direct, to: binhash(peer))
+
+  def delete_message_direct(me, time, peer),
+    do: me |> log(time, :delete_message_direct, to: binhash(peer))
+
+  def update_message_direct(me, time, peer),
+    do: me |> log(time, :update_message_direct, to: binhash(peer))
 
   @human_actions %{
     open_direct: "reads dialog",
@@ -50,11 +62,11 @@ defmodule Chat.Log do
   def humanize_action(action), do: Map.get(@human_actions, action, "unknown act")
 
   def list do
-    list(time() + 1)
+    list(Ordering.last({@db_key}) + 1)
   end
 
   def list(since) do
-    list(since, since - (time() - since) - 3600)
+    list(since, max(since - 100, 0))
   end
 
   def list(later, earlier) do
@@ -67,19 +79,17 @@ defmodule Chat.Log do
   defp build(later, earlier) do
     {{@db_key, earlier, ""}, {@db_key, later, :binary.copy(<<255>>, 100)}}
     |> Db.list()
-    |> Enum.map(fn {{@db_key, time, who}, action} -> {time, hash(who), action} end)
+    |> Enum.map(fn {{@db_key, _index, who}, data} -> {hash(who), data} end)
     |> Enum.reverse()
   end
 
-  defp log(me, action) do
-    {@db_key, time(), binhash(me)}
-    |> Db.put(action)
+  defp log(me, time, action) do
+    {@db_key, Ordering.next({@db_key}), binhash(me)}
+    |> Db.put({time, action})
   end
 
-  defp log(me, action, opts) do
-    {@db_key, time(), binhash(me)}
-    |> Db.put({action, opts})
+  defp log(me, time, action, opts) do
+    {@db_key, Ordering.next({@db_key}), binhash(me)}
+    |> Db.put({time, action, opts})
   end
-
-  defp time, do: System.system_time(:second)
 end

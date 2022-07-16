@@ -1,13 +1,14 @@
 defmodule Chat.Rooms.RoomTest do
   use ExUnit.Case, async: true
 
-  alias Chat.Card
   alias Chat.Identity
   alias Chat.Memo
+  alias Chat.Messages
   alias Chat.Rooms
   alias Chat.User
   alias Chat.Utils
   alias Chat.Utils.StorageId
+  alias Support.FakeData
 
   test "room creation" do
     alice = User.login("Alice")
@@ -31,23 +32,33 @@ defmodule Chat.Rooms.RoomTest do
     room = Rooms.Room.create(alice, room_identity)
 
     message = "hello, room"
-    image = ["image_content", "image/plain"]
-    file = ["file content", "plain/text", "file.txt", "10 B"]
 
-    room |> Rooms.add_text(alice, message)
-    room |> Rooms.add_memo(alice, message)
-    room |> Rooms.add_file(alice, file)
-    image_msg = room |> Rooms.add_image(alice, image)
+    message
+    |> Messages.Text.new(1)
+    |> Rooms.add_new_message(alice, room.pub_key)
+
+    message
+    |> String.pad_trailing(200, "-")
+    |> Messages.Text.new(2)
+    |> Rooms.add_new_message(alice, room.pub_key)
+
+    FakeData.file()
+    |> Map.put(:timestamp, 3)
+    |> Rooms.add_new_message(alice, room.pub_key)
+
+    image_msg =
+      FakeData.image("2.pp")
+      |> Map.put(:timestamp, 4)
+      |> Rooms.add_new_message(alice, room.pub_key)
 
     assert [
-             %Rooms.PlainMessage{type: :file},
-             %Rooms.PlainMessage{type: :image},
+             %Rooms.PlainMessage{content: ^message, type: :text, author_hash: ^alice_hash},
              %Rooms.PlainMessage{type: :memo},
-             %Rooms.PlainMessage{content: ^message, type: :text, author_hash: ^alice_hash}
+             %Rooms.PlainMessage{type: :file},
+             %Rooms.PlainMessage{type: :image}
            ] =
              room
              |> Rooms.read(room_identity, &User.id_map_builder/1)
-             |> Enum.sort_by(fn %{type: type} -> type end)
 
     assert %Rooms.PlainMessage{type: :image} = image_msg |> Rooms.read_message(room_identity)
   end
@@ -98,7 +109,7 @@ defmodule Chat.Rooms.RoomTest do
 
     {my_rooms, _other} = Rooms.list([room_identity])
 
-    assert [%Card{name: ^room_name}] = my_rooms
+    assert [%{name: ^room_name}] = my_rooms
 
     assert nil == Rooms.get("")
     assert %Rooms.Room{name: ^room_name} = Rooms.get(room_hash)
@@ -112,7 +123,7 @@ defmodule Chat.Rooms.RoomTest do
 
     bob = User.login("Bob")
 
-    Rooms.add_request(room_hash, bob)
+    Rooms.add_request(room_hash, bob, 0)
 
     assert 1 =
              Rooms.list([])
@@ -120,29 +131,30 @@ defmodule Chat.Rooms.RoomTest do
              |> Enum.filter(&Rooms.is_requested_by?(&1.hash, bob |> Utils.hash()))
              |> Enum.count()
 
-    assert [] = Rooms.join_approved_requests(room_hash, bob)
+    assert [] = Rooms.join_approved_requests(room_hash, bob, 1)
 
     Rooms.approve_requests(room_hash, room_identity)
 
-    assert [^room_identity] = Rooms.join_approved_requests(room_hash, bob)
+    assert [^room_identity] = Rooms.join_approved_requests(room_hash, bob, 2)
   end
 
   test "message removed from room should not accessed any more" do
     {alice, room_identity, room} = alice_and_room()
     User.register(alice)
 
-    time = DateTime.utc_now() |> DateTime.add(-10, :second)
-
-    Rooms.add_text(room, alice, "Hello", now: time)
-    Rooms.add_text(room, alice, "1", now: time |> DateTime.add(2, :second))
-    Rooms.add_text(room, alice, "2", now: time |> DateTime.add(5, :second))
+    [
+      Messages.Text.new("Hello", 1),
+      Messages.Text.new("1", 2),
+      Messages.Text.new("2", 3)
+    ]
+    |> Enum.each(&Rooms.add_new_message(&1, alice, room.pub_key))
 
     [msg] =
       Rooms.read(
         room,
         room_identity,
         &User.id_map_builder/1,
-        {time |> DateTime.add(5, :second) |> DateTime.to_unix(), 0},
+        {3, 0},
         1
       )
 
@@ -162,24 +174,27 @@ defmodule Chat.Rooms.RoomTest do
     {alice, room_identity, room} = alice_and_room()
     User.register(alice)
 
-    time = DateTime.utc_now() |> DateTime.add(-10, :second)
-
-    Rooms.add_text(room, alice, "Hello", now: time)
-    Rooms.add_text(room, alice, "1", now: time |> DateTime.add(2, :second))
-    Rooms.add_text(room, alice, "2", now: time |> DateTime.add(5, :second))
+    [
+      Messages.Text.new("Hello", 1),
+      Messages.Text.new("1", 2),
+      Messages.Text.new("2", 3)
+    ]
+    |> Enum.each(&Rooms.add_new_message(&1, alice, room.pub_key))
 
     [msg] =
       Rooms.read(
         room,
         room_identity,
         &User.id_map_builder/1,
-        {time |> DateTime.add(5, :second) |> DateTime.to_unix(), 0},
+        {3, 0},
         1
       )
 
     assert "1" == msg.content
 
-    Rooms.update_message({msg.timestamp, msg.id}, "111", room_identity, alice)
+    "111"
+    |> Messages.Text.new(0)
+    |> Rooms.update_message({msg.index, msg.id}, alice, room_identity)
 
     assert [_, updated_msg, _] =
              Rooms.read(
@@ -195,24 +210,28 @@ defmodule Chat.Rooms.RoomTest do
     {alice, room_identity, room} = alice_and_room()
     User.register(alice)
 
-    time = DateTime.utc_now() |> DateTime.add(-10, :second)
-
-    Rooms.add_text(room, alice, "Hello", now: time)
-    Rooms.add_text(room, alice, "1", now: time |> DateTime.add(2, :second))
-    Rooms.add_text(room, alice, "2", now: time |> DateTime.add(5, :second))
+    [
+      Messages.Text.new("Hello", 1),
+      Messages.Text.new("1", 2),
+      Messages.Text.new("2", 3)
+    ]
+    |> Enum.each(&Rooms.add_new_message(&1, alice, room.pub_key))
 
     [msg] =
       Rooms.read(
         room,
         room_identity,
         &User.id_map_builder/1,
-        {time |> DateTime.add(5, :second) |> DateTime.to_unix(), 0},
+        {3, 0},
         1
       )
 
     assert "1" == msg.content
 
-    Rooms.update_message({msg.timestamp, msg.id}, {:memo, "111"}, room_identity, alice)
+    "111"
+    |> String.pad_trailing(200, "-")
+    |> Messages.Text.new(0)
+    |> Rooms.update_message({msg.index, msg.id}, alice, room_identity)
 
     assert [_, _, _] =
              Rooms.read(
@@ -221,7 +240,7 @@ defmodule Chat.Rooms.RoomTest do
                &User.id_map_builder/1
              )
 
-    assert "111" =
+    assert String.pad_trailing("111", 200, "-") ==
              Rooms.read_message({msg.timestamp, msg.id}, room_identity, &User.id_map_builder/1)
              |> Map.get(:content)
              |> StorageId.from_json()

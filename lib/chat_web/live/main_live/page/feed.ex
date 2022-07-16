@@ -107,7 +107,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
     list_count = list |> Enum.count()
     rest_count = count - list_count
 
-    if rest_count <= 0 or till <= 1 do
+    if rest_count <= 0 or till < 1 do
       {small_list ++ list, till}
     else
       load_more(rest_count, small_list ++ list, till - 1)

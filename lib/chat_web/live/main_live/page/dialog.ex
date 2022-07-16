@@ -62,8 +62,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
   def send_text(
         %{assigns: %{dialog: dialog, me: me, client_timestamp: time}} = socket,
-        text,
-        timestamp
+        text
       ) do
     text
     |> String.trim()
@@ -72,7 +71,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
         nil
 
       text ->
-        %Messages.Text{text: text, timestamp: timestamp}
+        %Messages.Text{text: text, timestamp: time}
         |> Dialogs.add_new_message(me, dialog)
         |> broadcast_new_message(dialog, me, time)
     end

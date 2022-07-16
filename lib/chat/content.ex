@@ -3,7 +3,6 @@ defmodule Chat.Content do
 
   alias Chat.{
     Files,
-    Images,
     Memo,
     RoomInvites
   }
@@ -14,7 +13,6 @@ defmodule Chat.Content do
     do: json |> StorageId.from_json() |> RoomInvites.delete()
 
   def delete(%{content: json, type: :image}) do
-    json |> StorageId.from_json() |> Images.delete()
     json |> StorageId.from_json() |> Files.delete()
   end
 

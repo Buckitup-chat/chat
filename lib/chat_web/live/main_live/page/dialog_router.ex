@@ -17,10 +17,9 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
       {"import-images", _} ->
         socket |> push_event("chat:scroll-down", %{})
 
-      {"import-files", %{"dialog_file" => %{"timestamp" => timestamp}}} ->
+      {"import-files", _} ->
         socket
         |> push_event("chat:scroll-down", %{})
-        |> assign(:client_timestamp, timestamp |> String.to_integer())
 
       {"cancel-edit", _} ->
         socket |> Page.Dialog.cancel_edit()

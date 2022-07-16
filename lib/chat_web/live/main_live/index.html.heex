@@ -299,37 +299,14 @@
                     phx-change="dialog/import-files"
                     phx-drop-target={@uploads.dialog_file.ref}
                   >
-                    <%= text_input df, :timestamp, type: :hidden, id: "dialog-file-input-timestamp" %>
                     <%= live_file_input @uploads.dialog_file, style: "display: none"  %>
                   </.form>      
-                  <.form
-                    for={:dialog_image}
-                    id="dialog-image-form"
-                    phx-change="dialog/import-images"
-                    phx-drop-target={@uploads.image.ref}
-                  >
-                    <%= live_file_input @uploads.image, style: "display: none" %>
-                  </.form>
                   <button 
                     id="attachFileBtn"
                     class="relative" 
-                    phx-click={
-                      open_dropdown("attachFileDropdown")
-                      |> JS.dispatch("chat:client_timestamp", detail: %{to: "#dialog-file-input-timestamp"})
-                      |> JS.dispatch("chat:set-dropdown-position", to: "#attachFileDropdown", detail: %{relativeElementId: "attachFileBtn"})
-                    }
+                    phx-click={JS.dispatch("click", to: "#dialog-file-form input[type=file]")}
                   >
                     <.icon id="attach" class="w-7 h-7 mt-3 flex fill-white"/>
-                    <.dropdown class="mr-5" id="attachFileDropdown"> 
-                      <a class="dropdownItem" phx-click={JS.dispatch("chat:client_timestamp") |> JS.dispatch("click", to: "#dialog-file-form input[type=file]")}>
-                        <.icon id="document" class="w-4 h-4 fill-grayscale"/>
-                        <span>File</span>
-                      </a>
-                      <a class="dropdownItem" phx-click={JS.dispatch("click", to: "#dialog-image-form input[type=file]")}>
-                        <.icon id="image" class="w-4 h-4 fill-grayscale"/>
-                        <span>Image</span>
-                      </a>
-                    </.dropdown>
                   </button>
                   <.form
                     let={di}
@@ -346,9 +323,7 @@
                       if (event.key == 'Enter' && event.shiftKey) {
                         document.getElementById('dialog-form-submit-button').click()
                       }
-                      document.getElementById('dialog-input-timestamp').value = Math.floor(Date.now() / 1000)
                     ">
-                    <%= text_input di, :timestamp, type: :hidden, id: "dialog-input-timestamp" %>
                     <%= textarea di, :text,
                       placeholder: "Enter message",
                       class: "w-full h-7 resize-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
@@ -682,26 +657,8 @@
                   >
                     <%= live_file_input @uploads.room_file, style: "display: none"  %>
                   </.form>      
-                  <.form
-                    for={:room_image}
-                    id="room-image-form"
-                    phx-change="room/import-images"
-                    phx-drop-target={@uploads.room_image.ref}
-                  >
-                    <%= live_file_input @uploads.room_image, style: "display: none" %>
-                  </.form>
-                  <button class="relative" id="attachFileBtn" phx-click={open_dropdown("attachFileDropdown") |> JS.dispatch("chat:set-dropdown-position", to: "#attachFileDropdown", detail: %{relativeElementId: "attachFileBtn"})}>
+                  <button class="relative" id="attachFileBtn" phx-click={JS.dispatch("click", to: "#room-file-form input[type=file]")}>
                     <.icon id="attach" class="w-7 h-7 mt-3 flex fill-white"/>
-                    <.dropdown class="mr-5" id="attachFileDropdown"> 
-                      <a class="dropdownItem" phx-click={JS.dispatch("click", to: "#room-file-form input[type=file]")}>
-                        <.icon id="document" class="w-4 h-4 fill-grayscale"/>
-                        <span>File</span>
-                      </a>
-                      <a class="dropdownItem" phx-click={JS.dispatch("click", to: "#room-image-form input[type=file]")}>
-                        <.icon id="image" class="w-4 h-4 fill-grayscale"/>
-                        <span>Image</span>
-                      </a>
-                    </.dropdown>
                   </button>
                   <.form
                     let={di}

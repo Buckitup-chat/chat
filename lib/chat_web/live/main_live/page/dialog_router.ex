@@ -1,7 +1,7 @@
 defmodule ChatWeb.MainLive.Page.DialogRouter do
   @moduledoc "Route dialog events"
 
-  import Phoenix.LiveView, only: [push_event: 3, assign: 3]
+  import Phoenix.LiveView, only: [push_event: 3]
   alias ChatWeb.MainLive.Index
   alias ChatWeb.MainLive.Page
 
@@ -36,8 +36,8 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
       {"delete-messages", params} ->
         socket |> Page.Dialog.delete_messages(params)
 
-      {"text-message", %{"dialog" => %{"text" => text, "timestamp" => timestamp}}} ->
-        socket |> Page.Dialog.send_text(text, String.to_integer(timestamp))
+      {"text-message", %{"dialog" => %{"text" => text}}} ->
+        socket |> Page.Dialog.send_text(text)
 
       {"switch", %{"user-id" => user_id}} ->
         socket |> Page.Dialog.close() |> Page.Dialog.init(user_id)

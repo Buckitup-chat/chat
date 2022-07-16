@@ -49,6 +49,12 @@ npm-debug.log
 /priv/test_admin_db
 
 
+# OS and IDEs files
 chat.iml
 .DS_Store
+.idea/
+.elixir-ls/
+.vscode/
 node_modules
+
+

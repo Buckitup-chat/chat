@@ -6,6 +6,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
 
   alias Chat.AdminRoom
   alias Chat.Dialogs
+  alias Chat.Messages
   alias Chat.Rooms
   alias Chat.User
   alias Chat.Utils
@@ -68,14 +69,13 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
 
   def invite_user(%{assigns: %{me: me, room_map: rooms}} = socket, hash) do
     if new_user = User.by_id(hash) do
-      room_identity =
-        AdminRoom.pub_key()
-        |> Utils.hash()
-        |> then(&Map.get(rooms, &1))
+      dialog = Dialogs.find_or_open(me, new_user)
 
-      me
-      |> Dialogs.find_or_open(new_user)
-      |> Dialogs.add_room_invite(me, room_identity)
+      AdminRoom.pub_key()
+      |> Utils.hash()
+      |> then(&Map.get(rooms, &1))
+      |> Messages.RoomInvite.new()
+      |> Dialogs.add_new_message(me, dialog)
     end
 
     socket

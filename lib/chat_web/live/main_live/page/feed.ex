@@ -32,13 +32,16 @@ defmodule ChatWeb.MainLive.Page.Feed do
     |> assign(:action_feed_list, nil)
   end
 
-  def item(%{item: {timestamp, who, action}, tz: timezone} = assigns) do
+  def item(%{item: {who, data}, tz: timezone} = assigns) do
     datetime =
-      DateTime.from_unix!(timestamp)
+      data
+      |> elem(0)
+      |> DateTime.from_unix!()
       |> DateTime.shift_zone!(timezone)
       |> Timex.format!("{h12}:{0m} {AM}, {D}.{M}.{YYYY}")
 
     user = User.by_id(who)
+    action = data |> Tuple.delete_at(0)
 
     ~H"""
       <div class="border-0 rounded-md bg-white/20 p-2 flex flex-col justify-start" >
@@ -80,7 +83,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
     """
   end
 
-  def action(%{action: action} = assigns) do
+  def action(%{action: {action}} = assigns) do
     act = Chat.Log.humanize_action(action)
 
     ~H"""
@@ -92,7 +95,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
     {list, till} = Log.list()
     list_count = list |> Enum.count()
 
-    if count <= list_count or till < Log.start_time() do
+    if count <= list_count or till < 1 do
       {list, till}
     else
       load_more(count - list_count, list, till - 1)
@@ -104,7 +107,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
     list_count = list |> Enum.count()
     rest_count = count - list_count
 
-    if rest_count <= 0 or till < Log.start_time() do
+    if rest_count <= 0 or till < 1 do
       {small_list ++ list, till}
     else
       load_more(rest_count, small_list ++ list, till - 1)

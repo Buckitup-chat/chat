@@ -28,7 +28,7 @@ defmodule Chat.Rooms.RequestRoomTest do
     bob_pub_key = bob |> Identity.pub_key()
     bob_hash = bob |> Utils.hash()
 
-    Rooms.add_request(room_hash, bob)
+    Rooms.add_request(room_hash, bob, 0)
     assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
 
     Rooms.approve_requests(room_hash, identity)
@@ -42,7 +42,7 @@ defmodule Chat.Rooms.RequestRoomTest do
     bob_pub_key = bob |> Identity.pub_key()
     bob_hash = bob |> Utils.hash()
 
-    Rooms.add_request(room_hash, bob)
+    Rooms.add_request(room_hash, bob, 0)
     assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
 
     Rooms.approve_request(room_hash, bob_hash, identity)
@@ -55,7 +55,7 @@ defmodule Chat.Rooms.RequestRoomTest do
     assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, _bob_room_key}]} =
              Rooms.get(room_hash)
 
-    assert [^identity] = Rooms.join_approved_requests(room_hash, bob)
+    assert [^identity] = Rooms.join_approved_requests(room_hash, bob, 1)
   end
 
   test "should show a list of pending user requests" do
@@ -65,7 +65,7 @@ defmodule Chat.Rooms.RequestRoomTest do
     bob_pub_key = bob |> Identity.pub_key()
     bob_hash = bob |> Utils.hash()
 
-    Rooms.add_request(room_hash, bob)
+    Rooms.add_request(room_hash, bob, 0)
 
     assert [{^bob_hash, ^bob_pub_key}] = Rooms.list_pending_requests(room_hash)
     Rooms.approve_request(room_hash, bob_hash, identity)
@@ -79,7 +79,7 @@ defmodule Chat.Rooms.RequestRoomTest do
     bob = "Bob" |> User.login()
     User.register(bob)
 
-    Rooms.add_request(room_hash, bob)
+    Rooms.add_request(room_hash, bob, 0)
 
     messages = Rooms.read(room, identity, &User.id_map_builder/1)
 

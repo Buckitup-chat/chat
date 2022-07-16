@@ -21,7 +21,8 @@ defmodule Chat.Application do
       # {Chat.Worker, arg}
       Chat.KeyRingTokens,
       Chat.Broker,
-      Chat.ChunkedFilesBroker
+      Chat.ChunkedFilesBroker,
+      Chat.Ordering.Counters
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

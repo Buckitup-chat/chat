@@ -3,6 +3,7 @@ defmodule Chat.Dialogs.MessageTest do
 
   alias Chat.Card
   alias Chat.Dialogs
+  alias Chat.Messages.Text
   alias Chat.User
 
   test "start dialog" do
@@ -17,7 +18,7 @@ defmodule Chat.Dialogs.MessageTest do
       alice
       |> Dialogs.open(bob_card)
 
-    dialog |> Dialogs.add_text(alice, text_message)
+    %Text{text: text_message} |> Dialogs.add_new_message(alice, dialog)
 
     dialog_messages = Dialogs.read(dialog, alice)
 
@@ -36,15 +37,12 @@ defmodule Chat.Dialogs.MessageTest do
     text_message = "Alice welcomes Bob"
     bob_answer = "Bob welcomes Alice too"
 
-    start_time = DateTime.utc_now() |> DateTime.add(-10)
-    second_time = start_time |> DateTime.add(5)
-
     dialog =
       alice
       |> Dialogs.open(bob_card)
 
-    dialog |> Dialogs.add_text(alice, text_message, start_time)
-    dialog |> Dialogs.add_text(bob, bob_answer, second_time)
+    %Text{text: text_message} |> Dialogs.add_new_message(alice, dialog)
+    %Text{text: bob_answer} |> Dialogs.add_new_message(bob, dialog)
 
     bob_version =
       dialog
@@ -73,7 +71,7 @@ defmodule Chat.Dialogs.MessageTest do
 
     short_bob_version_cont =
       dialog
-      |> Dialogs.read(bob, {second_time |> DateTime.to_unix(), 0})
+      |> Dialogs.read(bob, {2, 0})
 
     assert 1 == short_bob_version_cont |> Enum.count()
     assert text_message == short_bob_version_cont |> Enum.at(0) |> then(& &1.content)

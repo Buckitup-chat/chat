@@ -19,6 +19,7 @@ config :chat, ChatWeb.Endpoint,
     esbuild: {Esbuild, :install_and_run, [:default, ~w(--sourcemap=inline --watch)]}
   ]
 
+# ,
 # https: [
 #   otp_app: :chat,
 #   port: 4443,

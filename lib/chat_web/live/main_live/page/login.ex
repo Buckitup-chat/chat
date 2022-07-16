@@ -4,6 +4,7 @@ defmodule ChatWeb.MainLive.Page.Login do
 
   alias Chat.AdminRoom
   alias Chat.Identity
+  alias Chat.Log
   alias Chat.User
   alias Chat.Utils
   alias ChatWeb.MainLive.Page
@@ -13,6 +14,7 @@ defmodule ChatWeb.MainLive.Page.Login do
   def create_user(socket, name) do
     me = User.login(name |> String.trim())
     id = User.register(me)
+    Log.sign_in(me, socket.assigns.client_timestamp)
 
     socket
     |> assign_logged_user(me, id)
@@ -33,6 +35,8 @@ defmodule ChatWeb.MainLive.Page.Login do
       me
       |> User.login()
       |> User.register()
+
+    Log.visit(me, socket.assigns.client_timestamp)
 
     socket
     |> assign_logged_user(me, id, rooms)

@@ -3,19 +3,16 @@ defmodule Chat.User do
 
   alias Chat.Card
   alias Chat.Identity
-  alias Chat.Log
   alias Chat.User.LocalStorage
   alias Chat.User.Registry
 
   def login(%Identity{} = identity) do
     identity
-    |> tap(&Log.visit/1)
   end
 
   def login(name) when is_binary(name) do
     name
     |> Identity.create()
-    |> tap(&Log.sign_in/1)
   end
 
   def register(%Identity{} = identity), do: Registry.enlist(identity)

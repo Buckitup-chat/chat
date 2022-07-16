@@ -70,7 +70,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   end
 
   def request_room(%{assigns: %{me: me, client_timestamp: time}} = socket, room_hash) do
-    room = Rooms.add_request(room_hash, me)
+    room = Rooms.add_request(room_hash, me, time)
     Log.request_room_key(me, time, room.pub_key)
 
     PubSub.broadcast!(

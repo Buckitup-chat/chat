@@ -8,6 +8,7 @@ defmodule Chat.Dialogs.DialogTest do
   alias Chat.Messages
   alias Chat.User
   alias Chat.Utils.StorageId
+  alias Support.FakeData
 
   test "start dialog" do
     alice = User.login("Alice")
@@ -205,7 +206,7 @@ defmodule Chat.Dialogs.DialogTest do
   test "message update should replace previous version in dialog" do
     {alice, _, _, dialog} = alice_bob_dialog()
     text = "text here"
-    updated_text = "updated text here"
+    updated_text = "updated text here" |> String.pad_trailing(200, "-")
 
     "memo here"
     |> make_memo_msg()
@@ -217,13 +218,19 @@ defmodule Chat.Dialogs.DialogTest do
     assert ^text = msg.content
 
     msg_id = {msg.index, msg.id}
-    dialog |> Dialogs.update(alice, msg_id, {:memo, updated_text})
+
+    updated_text
+    |> Messages.Text.new(0)
+    |> Dialogs.update_message(msg_id, alice, dialog)
 
     assert [_, %{type: :memo} = msg] = dialog |> Dialogs.read(alice)
     assert ^updated_text = msg.content |> StorageId.from_json() |> Memo.get()
 
-    dialog |> Dialogs.update(alice, msg_id, updated_text)
-    assert [_, %{type: :text, content: ^updated_text}] = dialog |> Dialogs.read(alice)
+    text
+    |> Messages.Text.new(0)
+    |> Dialogs.update_message(msg_id, alice, dialog)
+
+    assert [_, %{type: :text, content: ^text}] = dialog |> Dialogs.read(alice)
   end
 
   test "message should be readable by its id" do
@@ -241,19 +248,11 @@ defmodule Chat.Dialogs.DialogTest do
   end
 
   defp fake_file do
-    key = UUID.uuid4()
-    secret = "12312414132341"
-
-    %{client_size: 123, client_type: "audio/mp3", client_name: "Some file.ext"}
-    |> Messages.File.new(key, secret)
+    FakeData.file()
   end
 
   defp fake_image(name) do
-    key = UUID.uuid4()
-    secret = "12312414132341"
-
-    %{client_size: 123, client_type: "image/jpeg", client_name: name}
-    |> Messages.File.new(key, secret)
+    FakeData.image(name)
   end
 
   defp make_memo_msg(text) do

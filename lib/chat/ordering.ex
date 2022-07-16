@@ -12,6 +12,10 @@ defmodule Chat.Ordering do
     key |> get_or_init(&last_counter/1)
   end
 
+  def reset do
+    Counters.drop_all()
+  end
+
   defp get_or_init(key, getter_fn) do
     case getter_fn.(key) do
       nil ->
@@ -38,6 +42,7 @@ defmodule Chat.Ordering do
     case Db.get_max_one(min_key(key), max_key(key)) do
       [] -> nil
       [{{a, b, counter, _}, _}] -> {{a, b}, counter}
+      [{{a, counter, _}, _}] -> {{a}, counter}
     end
   end
 

@@ -60,14 +60,17 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def send_text(
-        %{assigns: %{room: room, me: me, room_identity: room_identity, client_timestamp: time}} =
-          socket,
+        %{assigns: %{room: room, me: me, client_timestamp: time}} = socket,
         text
       ) do
-    cond do
-      text |> String.trim() == "" -> nil
-      text |> is_memo?() -> room_identity |> Rooms.add_memo(me, text)
-      true -> room |> Rooms.add_text(me, text)
+    case String.trim(text) do
+      "" ->
+        nil
+
+      content ->
+        content
+        |> Messages.Text.new(time)
+        |> Rooms.add_new_message(me, room.pub_key)
     end
     |> broadcast_new_message(room, me, time)
 
@@ -83,36 +86,14 @@ defmodule ChatWeb.MainLive.Page.Room do
       socket,
       entry,
       fn _ ->
-        data = [
+        Messages.File.new(
+          entry,
           chunk_key,
-          chunk_secret |> Base.encode64(),
-          entry.client_size |> to_string(),
-          entry.client_type |> mime_type(),
-          entry.client_name,
-          entry.client_size |> format_size()
-        ]
-
-        {:ok, Rooms.add_file(room, me, data)}
-      end
-    )
-    |> broadcast_new_message(room, me, time)
-
-    socket
-  end
-
-  def send_image(%{assigns: %{me: me, room: room, client_timestamp: time}} = socket, entry) do
-    consume_uploaded_entry(
-      socket,
-      entry,
-      fn %{path: path} ->
-        data = [
-          File.read!(path),
-          entry.client_type,
-          entry.client_name,
-          entry.client_size |> format_size()
-        ]
-
-        {:ok, Rooms.add_image(room, me, data)}
+          chunk_secret,
+          time
+        )
+        |> Rooms.add_new_message(me, room.pub_key)
+        |> then(&{:ok, &1})
       end
     )
     |> broadcast_new_message(room, me, time)
@@ -122,12 +103,12 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def show_new(
         %{assigns: %{room_identity: identity}} = socket,
-        %{author_hash: hash, encrypted: {data, sign}} = new_message
+        {index, %{author_hash: hash, encrypted: {data, sign}} = new_message}
       ) do
     if Utils.is_signed_by?(sign, data, User.by_id(hash)) do
       socket
       |> assign(:page, 0)
-      |> assign(:messages, [new_message |> Rooms.read_message(identity)])
+      |> assign(:messages, [{index, new_message} |> Rooms.read_message(identity)])
       |> assign(:message_update_mode, :append)
       |> push_event("chat:scroll-down", %{})
     else
@@ -169,9 +150,10 @@ defmodule ChatWeb.MainLive.Page.Room do
         } = socket,
         text
       ) do
-    content = if is_memo?(text), do: {:memo, text}, else: text
+    text
+    |> Messages.Text.new(0)
+    |> Rooms.update_message(msg_id, me, room_identity)
 
-    Rooms.update_message(msg_id, content, room_identity, me)
     broadcast_message_updated(msg_id, room, me, time)
 
     socket

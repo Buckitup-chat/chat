@@ -18,6 +18,11 @@ defmodule Chat.Ordering.Counters do
     |> GenServer.call({:next, key})
   end
 
+  def drop_all do
+    __MODULE__
+    |> GenServer.call({:drop_all})
+  end
+
   ## Defining GenServer Callbacks
 
   def start_link(opts) do
@@ -43,5 +48,9 @@ defmodule Chat.Ordering.Counters do
       nil -> {:reply, nil, data}
       old -> {:reply, old + 1, data |> Map.put(key, old + 1)}
     end
+  end
+
+  def handle_call({:drop_all}, _from, _data) do
+    {:reply, :ok, %{}}
   end
 end

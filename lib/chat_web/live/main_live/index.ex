@@ -9,6 +9,7 @@ defmodule ChatWeb.MainLive.Index do
   alias Chat.Files
   alias Chat.Identity
   alias Chat.Memo
+  alias Chat.Ordering
   alias Chat.RoomInvites
   alias Chat.Rooms
   alias Chat.Utils.StorageId
@@ -329,6 +330,7 @@ defmodule ChatWeb.MainLive.Index do
         {:ok, other_db} = CubDB.start_link(dir)
         other_db |> Db.copy_data(Db.db())
         Db.db() |> CubDB.file_sync()
+        Ordering.reset()
 
         CubDB.stop(other_db)
       end

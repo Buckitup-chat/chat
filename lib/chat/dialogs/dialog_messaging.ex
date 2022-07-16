@@ -5,13 +5,11 @@ defmodule Chat.Dialogs.DialogMessaging do
   alias Chat.Dialogs.Message
   alias Chat.Dialogs.PrivateMessage
   alias Chat.DryStorable
-  alias Chat.Memo
   alias Chat.Ordering
 
   alias Chat.Content
   alias Chat.Identity
   alias Chat.Utils
-  alias Chat.Utils.StorageId
 
   alias Chat.Dialogs.Dialog
 
@@ -82,7 +80,7 @@ defmodule Chat.Dialogs.DialogMessaging do
     |> change_my_message(author, dialog, msg_id)
   end
 
-  def update(%Dialog{} = dialog, %Identity{} = author, msg_id, new_text) do
+  def update_message(message, msg_id, %Identity{} = author, %Dialog{} = dialog) do
     fn msg, index, _key ->
       side = Dialog.my_side(dialog, author)
 
@@ -90,19 +88,10 @@ defmodule Chat.Dialogs.DialogMessaging do
       |> read(author, side, Dialog.peer_key(dialog, side))
       |> Content.delete()
 
-      {type, content} =
-        case new_text do
-          {:memo, text} ->
-            text
-            |> Memo.add()
-            |> StorageId.to_json()
-            |> then(&{:memo, &1})
+      type = DryStorable.type(message)
 
-          text ->
-            {:text, text}
-        end
-
-      content
+      message
+      |> DryStorable.content()
       |> add_message(dialog, author, type: type, now: msg.timestamp, id: msg.id, index: index)
     end
     |> change_my_message(author, dialog, msg_id)

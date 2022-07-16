@@ -2,6 +2,8 @@ defmodule Chat.Messages.Text do
   @moduledoc "Text and memo"
 
   defstruct text: "", timestamp: 0
+
+  def new(text, timestamp), do: %__MODULE__{text: text, timestamp: timestamp}
 end
 
 defimpl Chat.DryStorable, for: Chat.Messages.Text do

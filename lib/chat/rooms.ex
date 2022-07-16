@@ -1,9 +1,9 @@
 defmodule Chat.Rooms do
   @moduledoc "Rooms context"
 
-  alias Chat.Card
   alias Chat.Identity
   alias Chat.Log
+  alias Chat.Messages
   alias Chat.Rooms.Message
   alias Chat.Rooms.Registry
   alias Chat.Rooms.Room
@@ -48,13 +48,10 @@ defmodule Chat.Rooms do
     RoomMessages.delete_by_room(hash)
   end
 
-  defdelegate add_memo(room, me, text, opts \\ []), to: RoomMessages
-  defdelegate add_text(room, me, text, opts \\ []), to: RoomMessages
-  defdelegate add_file(room, me, data, opts \\ []), to: RoomMessages
-  defdelegate add_image(room, me, data, opts \\ []), to: RoomMessages
-  defdelegate add_request_message(room, author, opts \\ []), to: RoomMessages
+  defdelegate add_new_message(message, author, room_pub_key, opts \\ []), to: RoomMessages
 
-  def read_message(%Message{} = msg, %Identity{} = identity), do: RoomMessages.read(msg, identity)
+  def read_message({_, %Message{}} = msg, %Identity{} = identity),
+    do: RoomMessages.read(msg, identity)
 
   def read_message({_, _} = msg_id, %Identity{} = identity, id_map_builder),
     do: RoomMessages.read(msg_id, identity, id_map_builder)
@@ -68,19 +65,21 @@ defmodule Chat.Rooms do
               ),
               to: RoomMessages
 
-  def update_message(msg_id, content, room, me),
-    do: RoomMessages.update_message(msg_id, room, me, content)
+  def update_message(content, msg_id, me, room),
+    do: RoomMessages.update_message(content, msg_id, me, room)
 
   def delete_message(msg_id, room, me),
     do: msg_id |> RoomMessages.delete_message(room, me)
 
-  def add_request(room_hash, user_identity) do
+  def add_request(room_hash, user_identity, time) do
     room_hash
     |> get()
     |> Room.add_request(user_identity)
     |> tap(fn %{type: type} = room ->
       if type == :request do
-        add_request_message(room, user_identity)
+        time
+        |> Messages.RoomRequest.new()
+        |> add_new_message(user_identity, room.pub_key)
       end
     end)
     |> update()

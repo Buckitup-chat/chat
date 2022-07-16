@@ -27,7 +27,7 @@ defmodule Chat.Dialogs do
   defdelegate update(dialog), to: Registry
 
   defdelegate add_new_message(message, author, dialog), to: DialogMessaging
-  defdelegate update(dialog, author, msg_time_id, content), to: DialogMessaging
+  defdelegate update_message(message, msg_id, author, dialog), to: DialogMessaging
   defdelegate delete(dialog, author, msg_time_id), to: DialogMessaging
 
   def read(

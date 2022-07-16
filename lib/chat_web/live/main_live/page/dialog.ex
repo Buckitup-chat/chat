@@ -93,7 +93,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
           entry,
           chunk_key,
           chunk_secret,
-          socket.assigns[:client_timestamp] || 0
+          time
         )
         |> Dialogs.add_new_message(me, dialog)
         |> then(&{:ok, &1})
@@ -136,9 +136,10 @@ defmodule ChatWeb.MainLive.Page.Dialog do
           socket,
         text
       ) do
-    content = if is_memo?(text), do: {:memo, text}, else: text
+    text
+    |> Messages.Text.new(time)
+    |> Dialogs.update_message(msg_id, me, dialog)
 
-    Dialogs.update(dialog, me, msg_id, content)
     broadcast_message_updated(msg_id, dialog, me, time)
 
     socket

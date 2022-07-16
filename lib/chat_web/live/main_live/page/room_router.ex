@@ -61,7 +61,7 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
       "edit" ->
         socket |> Page.Room.edit_message(msg_id)
 
-      "download-message" ->
+      "download" ->
         socket |> Page.Room.download_message(msg_id)
     end
   end

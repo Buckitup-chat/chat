@@ -222,14 +222,14 @@
                 <%= @version %>
               </div>
             <% else %>
-            <div id="chatGallery" class="hidden relative bg-black opacity-80">
+            <div id="chatGallery" class=" hidden relative bg-black opacity-80">
               <button phx-click={JS.add_class("hidden", to: "#chatGallery") |> JS.remove_class("hidden", to: "#dialogInput") |> JS.remove_class("md:hidden", to: "#chatRoomBar") |> JS.remove_class("hidden", to: "#chatContent")} class="text-white flex relative left-5 top-10"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="white" viewBox="0 0 24 24"><path d="M16.67 0l2.83 2.829-9.339 9.175 9.339 9.167-2.83 2.829-12.17-11.996z"/></svg>
                 <p class="left-3.5 bottom-[-3px] absolute">Back</p>  
               </button>
-              <div class="pt-72 pb-60 h-[100vh] lg:p-20">
-                <img class="w-full h-[70%] lg:h-[100%]" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRQBQQfBzEsqTN91MHwdukq0yaBxWIcn5RjUw&usqp=CAU" alt="book">
+              <div class="h-screen flex justify-center items-center lg:h-[99vh]">
+                <img class="w-full z-10 lg:h-[85vh] lg:p-14" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRQBQQfBzEsqTN91MHwdukq0yaBxWIcn5RjUw&usqp=CAU" alt="book">
               </div>
-              <div class="button-container flex justify-between absolute bottom-[48%] z-10 w-full p-5" >
+              <div class="button-container flex justify-between absolute bottom-[45%] z-10 w-full p-5" >
                 <button>
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="white" viewBox="0 0 24 24"><path d="M16.67 0l2.83 2.829-9.339 9.175 9.339 9.167-2.83 2.829-12.17-11.996z"/></svg>
                 </button>

@@ -5,18 +5,15 @@ defmodule Chat.Rooms.Message do
 
   def new(encrypted, author, opts) do
     id = opts |> Keyword.get(:id, UUID.uuid4())
-    now = opts |> Keyword.get(:now, DateTime.utc_now())
+    now = opts |> Keyword.get(:now)
     type = opts |> Keyword.get(:type, :text)
 
     %__MODULE__{
-      timestamp: now |> unixtime(),
+      timestamp: now,
       author_hash: author,
       encrypted: encrypted,
       type: type,
       id: id
     }
   end
-
-  defp unixtime(%DateTime{} = time), do: time |> DateTime.to_unix()
-  defp unixtime(time), do: time
 end

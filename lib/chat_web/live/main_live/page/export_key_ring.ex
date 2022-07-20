@@ -12,11 +12,15 @@ defmodule ChatWeb.MainLive.Page.ExportKeyRing do
     |> assign(:export_result, false)
   end
 
-  def send_key_ring(%{assigns: %{me: me, rooms: rooms, export_id: export_id}} = socket, code) do
+  def send_key_ring(
+        %{assigns: %{me: me, rooms: rooms, export_id: export_id, client_timestamp: time}} =
+          socket,
+        code
+      ) do
     case KeyRingTokens.get(export_id, code) do
       {:ok, pid} ->
         send(pid, {:exported_key_ring, {me, rooms}})
-        Log.export_keys(me)
+        Log.export_keys(me, time)
 
         socket
         |> assign(:export_result, :ok)

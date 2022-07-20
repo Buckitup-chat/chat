@@ -71,14 +71,17 @@ defmodule ChatWeb.MainLive.Page.Logout do
     end)
   end
 
-  def generate_backup(%{assigns: %{me: me, rooms: rooms}} = socket, password) do
+  def generate_backup(
+        %{assigns: %{me: me, rooms: rooms, client_timestamp: time}} = socket,
+        password
+      ) do
     broker_key =
       Actor.new(me, rooms, %{})
       |> Actor.to_encrypted_json(password)
       |> then(&{"#{me.name}.data", &1})
       |> Broker.store()
 
-    me |> Log.self_backup()
+    me |> Log.self_backup(time)
 
     socket
     |> push_event("chat:redirect", %{url: Routes.file_url(socket, :backup, broker_key)})
@@ -89,8 +92,8 @@ defmodule ChatWeb.MainLive.Page.Logout do
     |> assign(:logout_step, :final)
   end
 
-  def wipe(%{assigns: %{me: me}} = socket) do
-    me |> Log.logout()
+  def wipe(%{assigns: %{me: me, client_timestamp: time}} = socket) do
+    me |> Log.logout(time)
 
     socket
     |> assign(:me, nil)

@@ -28,10 +28,11 @@ defmodule Chat.StructuresTest do
       is_mine?: false,
       content: 2,
       type: 3,
-      id: 4
+      id: 4,
+      index: 5
     }
 
-    assert "%Chat.Dialogs.PrivateMessage{content: 2, id: 4, is_mine?: false, timestamp: 1, type: 3}" ==
+    assert "%Chat.Dialogs.PrivateMessage{content: 2, id: 4, index: 5, is_mine?: false, timestamp: 1, type: 3}" ==
              inspect(struct)
   end
 

@@ -227,8 +227,8 @@
           <div id="contentContainer" class="from-green-400 to-blue-500 hidden sm:flex flex flex-col contentContainer">
             <%= unless @dialog do %>
             <% else %>
-            <div id="chatGallery" class=" hidden relative bg-black opacity-80">
-              <button phx-click={JS.add_class("hidden", to: "#chatGallery") |> JS.remove_class("hidden", to: "#dialogInput") |> JS.remove_class("md:hidden", to: "#chatRoomBar") |> JS.remove_class("hidden", to: "#chatContent")} class="text-white flex relative left-5 top-10"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="white" viewBox="0 0 24 24"><path d="M16.67 0l2.83 2.829-9.339 9.175 9.339 9.167-2.83 2.829-12.17-11.996z"/></svg>
+            <div id="imageGallery" class=" hidden relative bg-black opacity-80">
+              <button phx-click={JS.add_class("hidden", to: "#imageGallery") |> JS.remove_class("hidden", to: "#dialogInput") |> JS.remove_class("md:hidden", to: "#chatRoomBar") |> JS.remove_class("hidden", to: "#chatContent")} class="text-white flex relative left-5 top-10"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="white" viewBox="0 0 24 24"><path d="M16.67 0l2.83 2.829-9.339 9.175 9.339 9.167-2.83 2.829-12.17-11.996z"/></svg>
                 <p class="left-3.5 bottom-[-3px] absolute">Back</p>  
               </button>
               <div class="h-screen flex justify-center items-center lg:h-[99vh]">
@@ -245,11 +245,6 @@
             </div>
               <div id="chatContent" class="basis-[93%] overflow-scroll flex flex-col justify-between relative" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
                 <div id="chatHeader" class="w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start sticky top-0 right-0" style="min-height: 56px;">
-
-                <div 
-                  class="from-green-400 to-blue-500 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start sticky" 
-                  style="min-height: 56px;"
-                >
                   <button phx-click={JS.push("close-dialog") |> close_content()} class="sm:hidden pr-3">
                     <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
                   </button>
@@ -573,6 +568,22 @@
                 </button>
               </div>
             <% else %>
+            <div id="imageGallery" class=" hidden relative bg-black opacity-80">
+              <button phx-click={JS.add_class("hidden", to: "#imageGallery") |> JS.remove_class("hidden", to: "#dialogInput") |> JS.remove_class("md:hidden", to: "#chatRoomBar") |> JS.remove_class("hidden", to: "#chatContent")} class="text-white flex relative left-5 top-10"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="white" viewBox="0 0 24 24"><path d="M16.67 0l2.83 2.829-9.339 9.175 9.339 9.167-2.83 2.829-12.17-11.996z"/></svg>
+                <p class="left-3.5 bottom-[-3px] absolute">Back</p>  
+              </button>
+              <div class="h-screen flex justify-center items-center lg:h-[99vh]">
+                <img class="w-full z-10 lg:h-[85vh] lg:p-14" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRQBQQfBzEsqTN91MHwdukq0yaBxWIcn5RjUw&usqp=CAU" alt="book">
+              </div>
+              <div class="button-container flex justify-between absolute bottom-[45%] z-10 w-full p-5" >
+                <button>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="white" viewBox="0 0 24 24"><path d="M16.67 0l2.83 2.829-9.339 9.175 9.339 9.167-2.83 2.829-12.17-11.996z"/></svg>
+                </button>
+                <button>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="white" viewBox="0 0 24 24"><path d="M5 3l3.057-3 11.943 12-11.943 12-3.057-3 9-9z"/></svg>
+                </button>
+              </div>
+            </div>
               <div id="chatContent" class="basis-[93%] overflow-y-scroll flex flex-col justify-between relative" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
 
                 <div class={classes("w-full px-8  border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between sticky top-0 right-0", %{"goldGradient" => @room.type == :private, "silverGradient" => @room.type == :request, "woodGradient" => @room.type == :public,})} style="min-height: 56px;" >

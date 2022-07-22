@@ -157,10 +157,12 @@
             <.icon id="sidebarChats" class={classes("w-6 h-6 hover:fill-purple", %{"fill-purple" => @lobby_mode == :chats, "fill-grayscale" => @lobby_mode != :chats})}/>
             <span class="text-xs">Chats</span>
           </button>
-          <button phx-click="switch-lobby-mode" phx-value-lobby-mode="admin" class="sidebarIcon">
+          <%= if @is_admin do %>
+          <button phx-click="switch-lobby-mode" phx-value-lobby-mode="admin" class="sidebarIcon ">
             <.icon id="admin" class={classes("w-5 h-5 hover:fill-purple", %{"fill-purple" => @lobby_mode == :admin, "fill-grayscale" => @lobby_mode != :admin})}/>
             <span class="text-xs">Admin</span>
           </button>
+          <% end %>
         </div>
         <div class="navbar">
           <div class="sm:flex flex-col items-center"> 

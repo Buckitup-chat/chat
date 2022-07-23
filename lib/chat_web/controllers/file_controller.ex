@@ -38,17 +38,60 @@ defmodule ChatWeb.FileController do
 
   defp render_file(conn, params, opts) do
     with %{"id" => id, "a" => secret} <- params,
-         [chunk_key, chunk_secret, _, type, name | _] <-
+         [chunk_key, chunk_secret_raw, _, type, name | _] <-
            Files.get(id, secret |> Base.url_decode64!()),
+         chunk_secret <- chunk_secret_raw |> Base.decode64!(),
          true <- type |> String.contains?("/") do
-      data = ChunkedFiles.read({chunk_key, chunk_secret |> Base.decode64!()})
+      size = ChunkedFiles.size(chunk_key)
 
-      conn
-      |> set_disposition(name, opts[:disposition])
-      |> set_content_type(type, opts[:content_type])
-      |> send_resp(200, data)
+      range = Plug.Conn.get_req_header(conn, "range")
+
+      if range == [] do
+        conn =
+          conn
+          |> set_disposition(name, opts[:disposition])
+          |> put_resp_header("content-length", "#{size}")
+          # |> set_content_type(type, opts[:content_type])
+          |> send_chunked(200)
+
+        size
+        |> ChunkedFiles.file_chunk_ranges()
+        |> Enum.reduce_while(conn, fn range, conn ->
+          chunk = ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret}, range) |> elem(1)
+
+          case Plug.Conn.chunk(conn, chunk) do
+            {:ok, conn} ->
+              {:cont, conn}
+
+            {:error, :closed} ->
+              {:halt, conn}
+          end
+        end)
+      else
+        {{first, last}, data} =
+          case parse_range(range) do
+            nil ->
+              ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret})
+
+            {from, to} when is_integer(from) and is_integer(to) and from >= 0 and to >= from ->
+              ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret}, {from, to})
+
+            {from, nil} when is_integer(from) ->
+              ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret}, {from, nil})
+          end
+
+        conn
+        |> set_disposition(name, opts[:disposition])
+        |> set_content_type(type, opts[:content_type])
+        |> put_resp_header("Accept-Ranges", "bytes")
+        |> put_resp_header("Content-Range", "bytes #{first}-#{last}/#{size}")
+        |> resp(:partial_content, data)
+        |> put_resp_header("content-length", "#{size}")
+        |> send_resp()
+      end
     else
-      _ -> raise "404"
+      _ ->
+        raise "404"
     end
   rescue
     _ ->
@@ -56,8 +99,22 @@ defmodule ChatWeb.FileController do
       |> send_resp(404, "")
   end
 
+  defp parse_range(["bytes=" <> range | _]) do
+    range
+    |> String.split("-")
+    |> case do
+      [""] -> nil
+      ["", ""] -> nil
+      [from, ""] -> {from |> String.to_integer(), nil}
+      [from, "*"] -> {from |> String.to_integer(), nil}
+      [from, to] -> {from |> String.to_integer(), to |> String.to_integer()}
+    end
+  end
+
+  defp parse_range(_), do: nil
+
   defp set_disposition(conn, name, true),
-    do: put_resp_header(conn, "content-disposition", "attachment; filename=\"#{name}\"")
+    do: put_resp_header(conn, "Content-Disposition", "attachment; filename=\"#{name}\"")
 
   defp set_disposition(conn, _, _), do: conn
 

@@ -53,4 +53,59 @@ defmodule Chat.ChunkedFiles do
     |> Utils.decrypt_blob(secret)
     |> Enum.join("")
   end
+
+  def size(key) do
+    Db.get_max_one(
+      {:file_chunk, key, 0, 0},
+      {:file_chunk, key, nil, nil}
+    )
+    |> Enum.at(0)
+    |> elem(0)
+    |> elem(3)
+    |> Kernel.+(1)
+  end
+
+  @chunk_size 10 * 1024 * 1024
+
+  def chunk_with_byterange({key, secret}),
+    do: chunk_with_byterange({key, secret}, {0, @chunk_size - 1})
+
+  def chunk_with_byterange({key, secret}, {first, nil}),
+    do: chunk_with_byterange({key, secret}, {first, first + @chunk_size - 1})
+
+  def chunk_with_byterange({key, secret}, {first, last}) do
+    chunk_n = div(first, @chunk_size)
+    chunk_start = chunk_n * @chunk_size
+    start_bypass = first - chunk_start
+
+    [{{_, _, _, chunk_end}, encrypt_blob}] =
+      Db.get_max_one(
+        {:file_chunk, key, chunk_start, 0},
+        {:file_chunk, key, chunk_start, nil}
+      )
+
+    range_length = min(last, chunk_end) - first + 1
+
+    data =
+      encrypt_blob
+      |> Utils.decrypt_blob(secret)
+      |> :binary.part(start_bypass, range_length)
+
+    {{first, first + range_length - 1}, data}
+  end
+
+  def file_chunk_ranges(size) do
+    make_chunk_ranges(0, size - 1, @chunk_size, [])
+  end
+
+  defp make_chunk_ranges(start, max, _chunk_size, acc) when start > max, do: acc |> Enum.reverse()
+
+  defp make_chunk_ranges(start, max, chunk_size, acc) do
+    make_chunk_ranges(
+      start + chunk_size,
+      max,
+      chunk_size,
+      [{start, min(start + chunk_size - 1, max)} | acc]
+    )
+  end
 end

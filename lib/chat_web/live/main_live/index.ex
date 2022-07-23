@@ -453,6 +453,22 @@ defmodule ChatWeb.MainLive.Index do
     """
   end
 
+  def message(%{msg: %{type: :video, content: json}} = assigns) do
+    {id, secret} = json |> StorageId.from_json()
+
+    assigns =
+      assigns
+      |> Map.put(:url, "/get/file/#{id}?a=#{secret |> Base.url_encode64()}")
+
+    ~H"""
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+      <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
+      <.message_timestamp msg={@msg} />
+      <.message_video url={@url} />
+    </div>
+    """
+  end
+
   def message(%{msg: %{type: :file}} = assigns) do
     ~H"""
     <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
@@ -566,6 +582,12 @@ defmodule ChatWeb.MainLive.Index do
         <% end %>
       </.dropdown>
     </div>
+    """
+  end
+
+  defp message_video(assigns) do
+    ~H"""
+    <video src={@url} controls />
     """
   end
 

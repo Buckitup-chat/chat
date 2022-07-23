@@ -7,7 +7,7 @@ defmodule Chat.MixProject do
       version: "0.1.0",
       elixir: "~> 1.12",
       elixirc_paths: elixirc_paths(Mix.env()),
-      compilers: [:gettext] ++ Mix.compilers(),
+      compilers: [] ++ Mix.compilers(),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
@@ -42,6 +42,7 @@ defmodule Chat.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      {:poison, "~> 5.0"},
       {:phoenix_ecto, "~> 4.0"},
       {:ecto, "~> 3.7"},
       {:temp, "~> 0.4.7"},

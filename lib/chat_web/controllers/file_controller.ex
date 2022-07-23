@@ -44,50 +44,77 @@ defmodule ChatWeb.FileController do
          true <- type |> String.contains?("/") do
       size = ChunkedFiles.size(chunk_key)
 
-      range = Plug.Conn.get_req_header(conn, "range")
+      range = get_req_header(conn, "range")
+      proto = get_http_protocol(conn)
 
-      if range == [] do
-        conn =
+      case {proto, range} do
+        #        {:"HTTP/22", _} ->
+        #          "here" |> IO.inspect()
+        #
+        #          conn =
+        #            conn
+        #            |> set_disposition(name, opts[:disposition])
+        #            |> put_resp_header("content-length", "#{size}")
+        #            |> set_content_type(type, opts[:content_type])
+        #            |> send_chunked(200)
+        #
+        #          size
+        #          |> ChunkedFiles.file_chunk_ranges()
+        #          |> Enum.reduce_while(conn, fn range, conn ->
+        #            chunk = ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret}, range) |> elem(1)
+        #
+        #            case Plug.Conn.chunk(conn, chunk) do
+        #              {:ok, conn} ->
+        #                {:cont, conn}
+        #
+        #              {:error, :closed} ->
+        #                {:halt, conn}
+        #            end
+        #          end)
+
+        {_, []} ->
+          conn =
+            conn
+            |> set_disposition(name, opts[:disposition])
+            |> put_resp_header("content-length", "#{size}")
+            |> set_content_type(type, opts[:content_type])
+            |> send_chunked(200)
+
+          size
+          |> ChunkedFiles.file_chunk_ranges()
+          |> Enum.reduce_while(conn, fn range, conn ->
+            chunk = ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret}, range) |> elem(1)
+
+            case Plug.Conn.chunk(conn, chunk) do
+              {:ok, conn} ->
+                {:cont, conn}
+
+              {:error, :closed} ->
+                {:halt, conn}
+            end
+          end)
+
+        {_, range} ->
+          {{first, last}, data} =
+            case parse_range(range) do
+              nil ->
+                ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret})
+
+              {from, to} when is_integer(from) and is_integer(to) and from >= 0 and to >= from ->
+                ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret}, {from, to})
+
+              {from, nil} when is_integer(from) ->
+                ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret}, {from, nil})
+            end
+
           conn
           |> set_disposition(name, opts[:disposition])
+          |> set_content_type(type, opts[:content_type])
+          |> put_resp_header("accept-ranges", "bytes")
+          |> put_resp_header("content-range", "bytes #{first}-#{last}/#{size}")
           |> put_resp_header("content-length", "#{size}")
-          # |> set_content_type(type, opts[:content_type])
-          |> send_chunked(200)
-
-        size
-        |> ChunkedFiles.file_chunk_ranges()
-        |> Enum.reduce_while(conn, fn range, conn ->
-          chunk = ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret}, range) |> elem(1)
-
-          case Plug.Conn.chunk(conn, chunk) do
-            {:ok, conn} ->
-              {:cont, conn}
-
-            {:error, :closed} ->
-              {:halt, conn}
-          end
-        end)
-      else
-        {{first, last}, data} =
-          case parse_range(range) do
-            nil ->
-              ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret})
-
-            {from, to} when is_integer(from) and is_integer(to) and from >= 0 and to >= from ->
-              ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret}, {from, to})
-
-            {from, nil} when is_integer(from) ->
-              ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret}, {from, nil})
-          end
-
-        conn
-        |> set_disposition(name, opts[:disposition])
-        |> set_content_type(type, opts[:content_type])
-        |> put_resp_header("Accept-Ranges", "bytes")
-        |> put_resp_header("Content-Range", "bytes #{first}-#{last}/#{size}")
-        |> resp(:partial_content, data)
-        |> put_resp_header("content-length", "#{size}")
-        |> send_resp()
+          |> resp(:partial_content, data)
+          |> send_resp()
       end
     else
       _ ->
@@ -114,7 +141,7 @@ defmodule ChatWeb.FileController do
   defp parse_range(_), do: nil
 
   defp set_disposition(conn, name, true),
-    do: put_resp_header(conn, "Content-Disposition", "attachment; filename=\"#{name}\"")
+    do: put_resp_header(conn, "content-disposition", "attachment; filename=\"#{name}\"")
 
   defp set_disposition(conn, _, _), do: conn
 

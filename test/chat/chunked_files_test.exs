@@ -29,4 +29,15 @@ defmodule Chat.ChunkedFilesTest do
     ChunkedFiles.mark_consumed(key)
     assert nil == Chat.ChunkedFilesBroker.get(key)
   end
+
+  test "ranges should split correct" do
+    size = 23.5461 |> mb()
+
+    correct = [{0, mb(10) - 1}, {mb(10), mb(20) - 1}, {mb(20), 24_689_874}]
+
+    assert correct == ChunkedFiles.file_chunk_ranges(size)
+  end
+
+  defp mb(n) when is_integer(n), do: n * 1024 * 1024
+  defp mb(n), do: trunc(n * 1024 * 1024)
 end

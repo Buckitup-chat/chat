@@ -73,8 +73,6 @@ defmodule Chat.Log do
     {build(later, earlier), earlier}
   end
 
-  def start_time, do: 1_585_574_426
-
   @spec build(integer, integer) :: [{time :: integer, who :: String.t(), what :: any()}, ...]
   defp build(later, earlier) do
     {{@db_key, earlier, ""}, {@db_key, later, :binary.copy(<<255>>, 100)}}

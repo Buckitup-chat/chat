@@ -9,10 +9,10 @@ defmodule Chat.Messages.File do
     mime_type = entry.client_type |> mime_type()
 
     type =
-      if match?("image/" <> _, mime_type) and entry.client_size < @max_image_size do
-        :image
-      else
-        :file
+      cond do
+        match?("image/" <> _, mime_type) and entry.client_size < @max_image_size -> :image
+        match?("video/" <> _, mime_type) -> :video
+        true -> :file
       end
 
     %__MODULE__{

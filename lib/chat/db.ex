@@ -17,6 +17,7 @@ defmodule Chat.Db do
   @impl true
   def init(_opts) do
     {:ok, db} = CubDB.start_link(file_path(), auto_file_sync: true)
+    schedule_writable_check()
 
     {:ok, {db, path_writable?(file_path())}}
   end
@@ -33,6 +34,18 @@ defmodule Chat.Db do
 
   def handle_call({:swap, pid}, _from, {old_pid, writable?}) do
     {:reply, old_pid, {pid, writable?}}
+  end
+
+  @impl true
+  def handle_info(:check_writable, {pid, _}) do
+    schedule_writable_check()
+
+    writable =
+      pid
+      |> CubDB.data_dir()
+      |> path_writable?()
+
+    {:noreply, {pid, writable}}
   end
 
   def db do
@@ -166,6 +179,12 @@ defmodule Chat.Db do
     end
   end
 
+  defp schedule_writable_check do
+    Process.send_after(self(), :check_writable, 1000)
+  end
+
+  @sectors_100mb 100 * 1024 * 1024 / 512
+
   defp path_writable?(path) do
     System.cmd("df", ["-P", path])
     |> elem(0)
@@ -174,7 +193,7 @@ defmodule Chat.Db do
     |> String.split(" ", trim: true)
     |> Enum.at(3)
     |> String.to_integer()
-    |> then(&(&1 > 10))
+    |> then(&(&1 > @sectors_100mb))
   rescue
     _ -> false
   end

@@ -247,13 +247,15 @@
             </div>
               <div id="chatContent" class="basis-[93%] overflow-scroll flex flex-col justify-between relative" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
                 <div id="chatHeader" class="w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start sticky top-0 right-0" style="min-height: 56px;">
-                  <button phx-click={JS.push("close-dialog") |> close_content()} class="sm:hidden pr-3">
+                  <button phx-click={JS.push("dialog/close") |> close_content()} class="sm:hidden pr-3">
                     <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
                   </button>
                   <%= if @my_id == @peer.hash do %>
                     <h1 class="ml-1 text-base font-bolt text-white" >
                       My private notes
                     </h1>
+                    <div class="text-base text-white/60 ml-2">[<%= short_hash(@peer.hash) %>]</div>
+                    <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>
                   <% else %>
                     <div class="text-base text-white/60">[<%= short_hash(@peer.hash) %>]</div>
                     <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>

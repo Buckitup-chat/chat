@@ -30,7 +30,7 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
       {"toggle-messages-select", params} ->
         socket |> Page.Dialog.toggle_messages_select(params)
 
-      {"close-dialog", _} ->
+      {"close", _} ->
         socket |> Page.Dialog.close()
 
       {"delete-messages", params} ->

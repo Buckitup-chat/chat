@@ -478,7 +478,7 @@ defmodule ChatWeb.MainLive.Index do
     assigns = assigns |> Map.put(:memo, memo)
 
     ~H"""
-    <span class="w-full px-2 flex justify-start break-words whitespace-pre-line"><%= @memo %></span>
+    <span class="w-full px-2 flex justify-start overflow-x-scroll break-words whitespace-pre-line"><%= @memo %></span>
     """
   end
 

@@ -102,7 +102,7 @@ const listeners = {
      
       const allCheckboxes = document.querySelectorAll('.checked')
       
-      if (document.querySelectorAll('.checked').length == 0) {
+      if (allCheckboxes.length == 0) {
         document.getElementById("chatContent").dispatchEvent(
           new CustomEvent('chat:toggle-selection-mode', { detail: { chatType: e.detail.chatType } })
         )
@@ -110,7 +110,7 @@ const listeners = {
       const deleteButton = document.getElementById("delete-btn");
       const icon = document.querySelector('.x-icon');
       const deleteSpan = document.getElementById('delete-span');
-      if (Array.from(allCheckboxes).some(el => el.previousElementSibling.classList.contains('justify-start')) ) {
+      if (Array.from(allCheckboxes).some(el => el.previousElementSibling.classList.contains('x-peer')) ) {
           icon.classList.add('fill-gray-300')
           deleteButton.disabled = true;
           deleteSpan.classList.add('text-gray-300')

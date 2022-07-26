@@ -33,6 +33,7 @@ defmodule Chat.AdminRoom do
 
   def admin_list do
     AdminDb.values({:new_admin, 0}, {:"new_admin\0", 0})
+    |> Enum.to_list()
   end
 
   def store_wifi_password(password) do

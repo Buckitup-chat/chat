@@ -72,7 +72,6 @@ defmodule Chat.Db do
   def list({min, max}) do
     db()
     |> CubDB.select(min_key: min, max_key: max)
-    |> then(fn {:ok, list} -> list end)
   end
 
   def select({min, max}, amount) do
@@ -81,10 +80,9 @@ defmodule Chat.Db do
       min_key: min,
       max_key: max,
       max_key_inclusive: false,
-      reverse: true,
-      pipe: [take: amount]
+      reverse: true
     )
-    |> then(fn {:ok, list} -> list end)
+    |> Stream.take(amount)
   end
 
   def values({min, max}, amount) do
@@ -93,10 +91,10 @@ defmodule Chat.Db do
       min_key: min,
       max_key: max,
       max_key_inclusive: false,
-      reverse: true,
-      pipe: [take: amount, map: fn {_, v} -> v end]
+      reverse: true
     )
-    |> then(fn {:ok, list} -> list end)
+    |> Stream.take(amount)
+    |> Stream.map(fn {_, v} -> v end)
   end
 
   def get_max_one(min, max) do
@@ -105,10 +103,9 @@ defmodule Chat.Db do
       min_key: min,
       max_key: max,
       max_key_inclusive: false,
-      reverse: true,
-      pipe: [take: 1]
+      reverse: true
     )
-    |> then(fn {:ok, list} -> list end)
+    |> Enum.take(1)
   end
 
   def get(key) do
@@ -132,7 +129,7 @@ defmodule Chat.Db do
 
   def bulk_delete({min, max}) do
     if writable?() do
-      {:ok, key_list} =
+      key_list =
         CubDB.select(db(),
           min_key: min,
           max_key: max,
@@ -140,6 +137,7 @@ defmodule Chat.Db do
             map: fn {key, _value} -> key end
           ]
         )
+        |> Enum.map(fn {key, _value} -> key end)
 
       CubDB.delete_multi(db(), key_list)
     end
@@ -151,41 +149,62 @@ defmodule Chat.Db do
 
   def version_path, do: @db_version
 
-  def copy_data(src_db, dst_db, opts \\ []) do
-    target_amount = Keyword.get(opts, :target_amount, 1000)
+  def copy_data(src_db, dst_db, _opts \\ []) do
+    if dst_db |> CubDB.data_dir() |> path_writable?() do
+      sync_preparation(dst_db)
 
-    {:ok, entries} =
-      if Keyword.has_key?(opts, :last_key) do
-        src_db
-        |> CubDB.select(
-          min_key: opts[:last_key],
-          min_key_inclusive: false,
-          pipe: [take: target_amount]
-        )
+      if db_size(src_db) * 1.5 > db_free_space(dst_db) do
+        reckless_copy(src_db, dst_db)
       else
-        src_db |> CubDB.select(pipe: [take: target_amount])
+        cautious_copy(src_db, dst_db)
       end
 
-    last_key =
-      entries
-      |> Enum.map(fn {key, value} ->
-        dst_db |> CubDB.put_new(key, value)
-        key
-      end)
-      |> List.last()
+      if dst_db |> CubDB.data_dir() |> path_writable?() do
+      end
 
-    unless Enum.count(entries) < target_amount do
-      copy_data(src_db, dst_db, last_key: last_key, target_amount: target_amount)
+      sync_finalization(dst_db)
     end
+  end
+
+  defp reckless_copy(src_db, dst_db) do
+    src_db
+    |> CubDB.select()
+    |> Stream.each(fn {k, v} -> dst_db |> CubDB.put_new(k, v) end)
+    |> Stream.run()
+  end
+
+  defp cautious_copy(src_db, dst_db) do
+    src_db
+    |> CubDB.select()
+    # |> Stream.chunk_
+    # |> Stream.reduce_while(fn entries -> 
+    #  
+    # end)
+    |> Stream.each(fn {k, v} -> dst_db |> CubDB.put_new(k, v) end)
+    |> Stream.run()
+  end
+
+  defp sync_preparation(db) do
+    CubDB.set_auto_compact(db, false)
+    CubDB.set_auto_file_sync(db, false)
+  end
+
+  defp sync_finalization(db) do
+    CubDB.set_auto_file_sync(db, true)
+    CubDB.set_auto_compact(db, true)
   end
 
   defp schedule_writable_check do
     Process.send_after(self(), :check_writable, 1000)
   end
 
-  @sectors_100mb 100 * 1024 * 1024 / 512
+  @free_space_buffer_100mb 100 * 1024 * 1024
 
   defp path_writable?(path) do
+    path_free_space(path) > @free_space_buffer_100mb
+  end
+
+  defp path_free_space(path) do
     System.cmd("df", ["-P", path])
     |> elem(0)
     |> String.split("\n", trim: true)
@@ -193,8 +212,21 @@ defmodule Chat.Db do
     |> String.split(" ", trim: true)
     |> Enum.at(3)
     |> String.to_integer()
-    |> then(&(&1 > @sectors_100mb))
+    |> Kernel.*(512)
   rescue
-    _ -> false
+    _ -> 0
+  end
+
+  defp db_free_space(db) do
+    db
+    |> CubDB.data_dir()
+    |> path_free_space()
+  end
+
+  defp db_size(db) do
+    db
+    |> CubDB.current_db_file()
+    |> File.stat!()
+    |> Map.get(:size)
   end
 end

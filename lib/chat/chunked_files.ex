@@ -18,6 +18,7 @@ defmodule Chat.ChunkedFiles do
   end
 
   def complete_upload?(key, filesize) do
+    # todo: rewrite with stream
     Db.list({
       {:file_chunk, key, 0, 0},
       {:file_chunk, key, nil, nil}
@@ -45,6 +46,7 @@ defmodule Chat.ChunkedFiles do
   end
 
   def read({key, secret}) do
+    # todo: rewrite with stream
     Db.list({
       {:file_chunk, key, 0, 0},
       {:file_chunk, key, nil, nil}

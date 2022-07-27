@@ -275,7 +275,7 @@
                         phx-value-index={msg.index}
                         phx-value-type="dialog"
                       >  
-                        <div class={classes("m-1 w-full flex", %{"justify-end" => msg.is_mine?, "justify-start" => !msg.is_mine?})} id={"dialog-message-#{msg.id}"}>
+                        <div class={classes("m-1 w-full flex", %{"justify-end x-mine" => msg.is_mine?, "justify-start x-peer" => !msg.is_mine?})} id={"dialog-message-#{msg.id}"} >
                           <.message 
                             color={msg.is_mine? && "bg-purple50" || "bg-white"}
                             msg={msg} 
@@ -397,7 +397,7 @@
                 <% end %>
                 <%= if @dialog_mode == :select do %>
                   <div class="w-full h-11 bg-white flex justify-between items-center">
-                    <a class="cursor-pointer inline-flex items-center"
+                    <button id="delete-btn" class="cursor-pointer inline-flex items-center disabled:pointer-events-none"
                       phx-click={show_modal("delete-messages-popup") 
                                  |> JS.set_attribute({"phx-click", hide_modal("delete-messages-popup") 
                                                                    |> JS.push("dialog/delete-messages")
@@ -405,9 +405,9 @@
                                                                    to: "#delete-messages-popup .deleteMessageButton") 
                                  |> JS.dispatch("chat:messages-to-delete", to: "#delete-messages-popup") }
                     >
-                      <.icon id="delete" class="w-4 h-4 flex fill-black"/>
-                      <span>Delete</span>
-                    </a>
+                      <.icon id="delete" class="w-4 h-4 flex fill-black x-icon"/>
+                      <span id="delete-span">Delete</span>
+                  </button>
                     
                     <a class="cursor-pointer inline-flex items-center">
                       <span class="text-purple">Download</span>
@@ -664,7 +664,7 @@
                           phx-value-index={msg.index}
                           phx-value-type="room" 
                       >
-                        <div class={classes("m-1 w-full flex", %{"justify-end" => msg.author_hash == @my_id, "justify-start" => msg.author_hash != @my_id})} id={"room-message-#{msg.id}"}>
+                        <div class={classes("m-1 w-full flex", %{"justify-end x-mine" => msg.author_hash == @my_id, "justify-start x-peer" => msg.author_hash != @my_id})} id={"room-message-#{msg.id}"}>
                           <.message 
                             color={msg.author_hash == @my_id && "bg-purple50" || "bg-white" }
                             msg={msg} 
@@ -780,17 +780,17 @@
                 <% end %>
                 <%= if @room_mode == :select do %>
                   <div class="w-full h-11 bg-white flex justify-between items-center">
-                    <a class="cursor-pointer inline-flex items-center"
+                    <button id="delete-btn" class="cursor-pointer inline-flex items-center disabled:pointer-events-none"
                       phx-click={show_modal("delete-messages-popup") 
-                                 |> JS.set_attribute({"phx-click", hide_modal("delete-messages-popup") 
-                                                                   |> JS.push("room/delete-messages")
-                                                                   |> stringify_commands()},
-                                                                   to: "#delete-messages-popup .deleteMessageButton") 
-                                 |> JS.dispatch("chat:messages-to-delete", to: "#delete-messages-popup") }
+                                |> JS.set_attribute({"phx-click", hide_modal("delete-messages-popup") 
+                                                                  |> JS.push("room/delete-messages")
+                                                                  |> stringify_commands()},
+                                                                  to: "#delete-messages-popup .deleteMessageButton") 
+                                |> JS.dispatch("chat:messages-to-delete", to: "#delete-messages-popup") }
                     >
-                      <.icon id="delete" class="w-4 h-4 flex fill-black"/>
-                      <span>Delete</span>
-                    </a>
+                      <.icon id="delete" class="w-4 h-4 flex fill-black x-icon"/>
+                      <span id="delete-span">Delete</span>
+                    </button>
 
                     <a class="cursor-pointer inline-flex items-center">
                       <span class="text-purple">Download</span>

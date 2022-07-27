@@ -245,75 +245,75 @@
                 </button>
               </div>
             </div>
-              <div id="chatContent" class="basis-[93%] overflow-scroll flex flex-col justify-between relative" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
-                <div id="chatHeader" class="w-full md:w-[76.8%] px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start fixed top-0 right-0" style="min-height: 56px;">
-                  <button phx-click={JS.push("dialog/close") |> close_content()} class="sm:hidden pr-3">
-                    <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
-                  </button>
-                  <%= if @my_id == @peer.hash do %>
-                    <h1 class="ml-1 text-base font-bolt text-white" >
-                      My private notes
-                    </h1>
-                    <div class="text-base text-white/60 ml-2">[<%= short_hash(@peer.hash) %>]</div>
-                    <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>
-                  <% else %>
-                    <div class="text-base text-white/60">[<%= short_hash(@peer.hash) %>]</div>
-                    <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>
-                    <button>
-                      <.icon id="edit" class="w-4 h-4 ml-1 flex fill-white/50"/>
+              <div id="chatContent" class="basis-[93%] md:overflow-scroll flex flex-col justify-between relative" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
+                  <div id="chatHeader" class="w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start sticky top-0 right-0" style="min-height: 56px;">
+                    <button phx-click={JS.push("dialog/close") |> close_content()} class="sm:hidden pr-3">
+                      <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
                     </button>
-                  <% end %> 
-                </div>
-                <div>
-                  <div id="chat-messages" phx-update={@message_update_mode}>
-                    <%= for msg <- @messages do %>
-                      <div class="messageBlock flex flex-row px-2 sm:px-8"
-                        id={"message-block-#{msg.id}"}
-                        phx-click={JS.dispatch("chat:select-message", detail: %{chatType: "dialog"})}
-                        phx-value-id={msg.id}
-                        phx-value-is-mine={"#{msg.is_mine?}"}
-                        phx-value-index={msg.index}
-                        phx-value-type="dialog"
-                      >  
-                        <div class={classes("m-1 w-full flex", %{"justify-end" => msg.is_mine?, "justify-start" => !msg.is_mine?})} id={"dialog-message-#{msg.id}"}>
-                          <.message 
-                            color={msg.is_mine? && "bg-purple50" || "bg-white"}
-                            msg={msg} 
-                            author={msg.is_mine? && Chat.Card.from_identity(@me) || @peer}
-                            is_mine={msg.is_mine?}  
-                          />
-                        </div>
-                        <input type="checkbox" class="selectCheckbox w-6 h-6 ml-3 mt-3 rounded-full text-purple/90 bg-black/10 border-gray-300 focus:ring-2" />
-                      </div>
-                    <% end %>
+                    <%= if @my_id == @peer.hash do %>
+                      <h1 class="ml-1 text-base font-bolt text-white" >
+                        My private notes
+                      </h1>
+                      <div class="text-base text-white/60 ml-2">[<%= short_hash(@peer.hash) %>]</div>
+                      <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>
+                    <% else %>
+                      <div class="text-base text-white/60">[<%= short_hash(@peer.hash) %>]</div>
+                      <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>
+                      <button>
+                        <.icon id="edit" class="w-4 h-4 ml-1 flex fill-white/50"/>
+                      </button>
+                    <% end %> 
                   </div>
-                  <div class="px-2 sm:px-8" phx-update="replace" id="dialog-uploads">
-                    <%= for %{valid?: true} = entry <- @uploads.image.entries do %>
-                      <div id={"upload#{entry.uuid}"} class="m-1 flex justify-end">
-                        <div class="flex-col max-w-xxs sm:max-w-md min-w-[180px]">
-                          <%= live_img_preview entry, class: "blur-sm animate-pulse" %>
-                          
-                          <div class="w-full bg-gray-200 h-2 dark:bg-gray-700">
-                            <div class="bg-gray-600 h-2 dark:bg-gray-300" style={"width: #{entry.progress}%"}></div>
+                  <div>
+                    <div id="chat-messages" phx-update={@message_update_mode}>
+                      <%= for msg <- @messages do %>
+                        <div class="messageBlock flex flex-row px-2 sm:px-8"
+                          id={"message-block-#{msg.id}"}
+                          phx-click={JS.dispatch("chat:select-message", detail: %{chatType: "dialog"})}
+                          phx-value-id={msg.id}
+                          phx-value-is-mine={"#{msg.is_mine?}"}
+                          phx-value-index={msg.index}
+                          phx-value-type="dialog"
+                        >  
+                          <div class={classes("m-1 w-full flex", %{"justify-end" => msg.is_mine?, "justify-start" => !msg.is_mine?})} id={"dialog-message-#{msg.id}"}>
+                            <.message 
+                              color={msg.is_mine? && "bg-purple50" || "bg-white"}
+                              msg={msg} 
+                              author={msg.is_mine? && Chat.Card.from_identity(@me) || @peer}
+                              is_mine={msg.is_mine?}  
+                            />
+                          </div>
+                          <input type="checkbox" class="selectCheckbox w-6 h-6 ml-3 mt-3 rounded-full text-purple/90 bg-black/10 border-gray-300 focus:ring-2" />
+                        </div>
+                      <% end %>
+                    </div>
+                    <div class="px-2 sm:px-8" phx-update="replace" id="dialog-uploads">
+                      <%= for %{valid?: true} = entry <- @uploads.image.entries do %>
+                        <div id={"upload#{entry.uuid}"} class="m-1 flex justify-end">
+                          <div class="flex-col max-w-xxs sm:max-w-md min-w-[180px]">
+                            <%= live_img_preview entry, class: "blur-sm animate-pulse" %>
+                            
+                            <div class="w-full bg-gray-200 h-2 dark:bg-gray-700">
+                              <div class="bg-gray-600 h-2 dark:bg-gray-300" style={"width: #{entry.progress}%"}></div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    <% end %>
-                    <%= for %{valid?: true} = entry <- @uploads.dialog_file.entries do %>
-                      <div id={"upload#{entry.uuid}"} class="m-1 flex justify-end">
-                        <div class="bg-purple50 max-w-xxs sm:max-w-md min-w-[180px] rounded-lg flex items-center justify-between">
-                          <.icon id="document" class="w-14 h-14 flex fill-black/50 animate-pulse"/>
-                          <div class="w-36 flex flex-col pr-3">
-                            <span class="truncate text-xs"><%= entry.client_name %></span>
-                            <div class="text-xs text-black/50"><%= entry.progress %>% uploaded</div>
-                          </div>
-                        </div>  
-                      </div>                  
-                    <% end %>
+                      <% end %>
+                      <%= for %{valid?: true} = entry <- @uploads.dialog_file.entries do %>
+                        <div id={"upload#{entry.uuid}"} class="m-1 flex justify-end">
+                          <div class="bg-purple50 max-w-xxs sm:max-w-md min-w-[180px] rounded-lg flex items-center justify-between">
+                            <.icon id="document" class="w-14 h-14 flex fill-black/50 animate-pulse"/>
+                            <div class="w-36 flex flex-col pr-3">
+                              <span class="truncate text-xs"><%= entry.client_name %></span>
+                              <div class="text-xs text-black/50"><%= entry.progress %>% uploaded</div>
+                            </div>
+                          </div>  
+                        </div>                  
+                      <% end %>
+                    </div>
                   </div>
-                </div>
               </div>
-              <div id="dialogInput" class="basis-[7%] px-8 border border-white bg-white flex items-center">
+              <div id="dialogInput" class="basis-[7%] px-8 border border-white bg-white flex items-center sticky bottom-0">
                 <%= if @dialog_mode == :plain do %>
                   <.form
                     let={df}
@@ -588,9 +588,9 @@
                 </button>
               </div>
             </div>
-              <div id="chatContent" class="basis-[93%] overflow-y-scroll flex flex-col justify-between relative" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
+              <div id="chatContent" class="basis-[93%] md:overflow-y-scroll flex flex-col justify-between relative" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
 
-                <div class={classes("w-full md:w-[76.8%] px-8  border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between fixed top-0 right-0", %{"goldGradient" => @room.type == :private, "silverGradient" => @room.type == :request, "woodGradient" => @room.type == :public,})} style="min-height: 56px;" >
+                <div class={classes("w-full px-8  border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between sticky top-0 right-0", %{"goldGradient" => @room.type == :private, "silverGradient" => @room.type == :request, "woodGradient" => @room.type == :public,})} style="min-height: 56px;" >
                   <div class="flex flex-row items-center">
                     <button phx-click={JS.push("room/close") |> close_content()} class="sm:hidden pr-3">
                       <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
@@ -703,7 +703,7 @@
                   </div>
                 </div>
               </div>
-              <div class="basis-[7%] px-8 border border-white bg-white flex flex-row items-center">
+              <div class="basis-[7%] px-8 border border-white bg-white flex flex-row items-center sticky bottom-0">
                 <%= if @room_mode == :plain do %>
                   <.form
                     for={:room_file}
@@ -732,7 +732,7 @@
                   >
                     <%= textarea di, :text,
                       placeholder: "Enter message",
-                      class: "w-full h-7 resize-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
+                      class: "w-full h-7 resize-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0 ",
                       id: "room-input",
                       spellcheck: "false",
                       autocomplete: "off"

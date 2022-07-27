@@ -783,7 +783,7 @@
                     <button id="delete-btn" class="cursor-pointer inline-flex items-center disabled:pointer-events-none"
                       phx-click={show_modal("delete-messages-popup") 
                                 |> JS.set_attribute({"phx-click", hide_modal("delete-messages-popup") 
-                                                                  |> JS.push("dialog/delete-messages")
+                                                                  |> JS.push("room/delete-messages")
                                                                   |> stringify_commands()},
                                                                   to: "#delete-messages-popup .deleteMessageButton") 
                                 |> JS.dispatch("chat:messages-to-delete", to: "#delete-messages-popup") }

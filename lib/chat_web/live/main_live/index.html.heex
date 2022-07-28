@@ -245,7 +245,7 @@
                 </button>
               </div>
             </div>
-              <div id="chatContent" class="basis-[93%] md:overflow-scroll flex flex-col justify-between relative" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
+              <div id="chatContent" class="basis-[93%] md:overflow-scroll flex flex-col justify-between relative a-content-block" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
                   <div id="chatHeader" class="w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start sticky top-0 right-0" style="min-height: 56px;">
                     <button phx-click={JS.push("dialog/close") |> close_content()} class="sm:hidden pr-3">
                       <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
@@ -264,7 +264,7 @@
                       </button>
                     <% end %> 
                   </div>
-                  <div class="a-content-block">
+                  <div>
                     <div id="chat-messages" phx-update={@message_update_mode}>
                       <%= for msg <- @messages do %>
                         <div class="messageBlock flex flex-row px-2 sm:px-8"
@@ -588,7 +588,7 @@
                 </button>
               </div>
             </div>
-              <div id="chatContent" class="basis-[93%] md:overflow-y-scroll flex flex-col justify-between relative" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
+              <div id="chatContent" class="basis-[93%] md:overflow-y-scroll flex flex-col justify-between relative a-content-block" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
 
                 <div class={classes("w-full px-8  border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between sticky top-0 right-0", %{"goldGradient" => @room.type == :private, "silverGradient" => @room.type == :request, "woodGradient" => @room.type == :public,})} style="min-height: 56px;" >
                   <div class="flex flex-row items-center">

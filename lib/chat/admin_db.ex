@@ -38,10 +38,9 @@ defmodule Chat.AdminDb do
     |> CubDB.select(
       min_key: min,
       max_key: max,
-      max_key_inclusive: false,
-      pipe: [map: fn {_, v} -> v end]
+      max_key_inclusive: false
     )
-    |> then(fn {:ok, list} -> list end)
+    |> Stream.map(fn {_, v} -> v end)
   end
 
   def put(key, value) do

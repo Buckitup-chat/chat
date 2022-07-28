@@ -91,19 +91,35 @@ const listeners = {
     if (relativeElementRect.width < e.target.offsetWidth) { e.target.style.left = 0 }
   },
   "chat:select-message": (e) => {
-    setTimeout(() => {
-      if (document.querySelector("#chat-messages").classList.contains('selectMode') == false) { return false }
+    const messageBlock = e.target;
+    const messageBlockCheckbox = messageBlock.querySelector('.selectCheckbox');
+    messageBlock.classList.toggle('selectedMessageBackground');
+    messageBlockCheckbox.classList.toggle('checked');
+    messageBlockCheckbox.checked = !messageBlockCheckbox.checked;
 
-      const messageBlock = e.target;
-      const messageBlockCheckbox = messageBlock.querySelector('.selectCheckbox');
-      messageBlock.classList.toggle('selectedMessageBackground');
-      messageBlockCheckbox.classList.toggle('checked');
-      messageBlockCheckbox.checked = !messageBlockCheckbox.checked;
-      if (document.querySelectorAll('.checked').length == 0) {
+    setTimeout(() => {
+      if (document.querySelector("#chat-messages").classList.contains('selectMode') == false) {return false }
+     
+      const allCheckboxes = document.querySelectorAll('.checked')
+      
+      if (allCheckboxes.length == 0) {
         document.getElementById("chatContent").dispatchEvent(
           new CustomEvent('chat:toggle-selection-mode', { detail: { chatType: e.detail.chatType } })
         )
       }
+      const deleteButton = document.getElementById("delete-btn");
+      const icon = document.querySelector('.x-icon');
+      const deleteSpan = document.getElementById('delete-span');
+      if (Array.from(allCheckboxes).some(el => el.previousElementSibling.classList.contains('x-peer')) ) {
+          icon.classList.add('fill-gray-300')
+          deleteButton.disabled = true;
+          deleteSpan.classList.add('text-gray-300')
+      } else {
+        deleteSpan.classList.remove('text-gray-300')
+        icon.classList.remove('fill-gray-300')
+        deleteButton.disabled = false;
+      }
+    
     }, 200);
   },
   "chat:messages-to-delete": (e) => {

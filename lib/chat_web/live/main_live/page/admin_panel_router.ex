@@ -22,6 +22,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
 
       {"remove-room", %{"hash" => hash}} ->
         socket |> Page.AdminPanel.remove_room(hash)
+
+      {"device-log", _} ->
+        socket |> Page.AdminPanel.request_log()
     end
   end
 
@@ -41,6 +44,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
 
       {:updated_wifi_settings, _} ->
         socket |> Page.AdminPanel.confirm_wifi_updated()
+
+      {:device_log, log} ->
+        socket |> Page.AdminPanel.render_device_log(log)
     end
   end
 end

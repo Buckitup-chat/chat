@@ -41,9 +41,13 @@ defmodule Chat.Db do
     schedule_writable_check()
 
     writable =
-      pid
-      |> CubDB.data_dir()
-      |> path_writable?()
+      if Process.alive?(pid) do
+        pid
+        |> CubDB.data_dir()
+        |> path_writable?()
+      else
+        false
+      end
 
     {:noreply, {pid, writable}}
   end
@@ -132,10 +136,7 @@ defmodule Chat.Db do
       key_list =
         CubDB.select(db(),
           min_key: min,
-          max_key: max,
-          pipe: [
-            map: fn {key, _value} -> key end
-          ]
+          max_key: max
         )
         |> Enum.map(fn {key, _value} -> key end)
 

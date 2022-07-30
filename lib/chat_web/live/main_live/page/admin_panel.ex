@@ -1,15 +1,17 @@
 defmodule ChatWeb.MainLive.Page.AdminPanel do
   @moduledoc "Admin functions page"
-  import Phoenix.LiveView, only: [assign: 3]
+  import Phoenix.LiveView, only: [assign: 3, push_event: 3]
 
   alias Phoenix.PubSub
 
   alias Chat.AdminRoom
+  alias Chat.Db
   alias Chat.Dialogs
   alias Chat.Messages
   alias Chat.Rooms
   alias Chat.User
   alias Chat.Utils
+  alias ChatWeb.Router.Helpers, as: Routes
 
   @incoming_topic "platform->chat"
   @outgoing_topic "chat->platform"
@@ -20,6 +22,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     me |> AdminRoom.visit()
 
     socket
+    |> assign(:ro_mode, not Db.writable?())
     |> assign(:wifi_loaded, false)
     |> request_wifi_settings()
     |> assign_user_lists()
@@ -28,6 +31,12 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
 
   def request_wifi_settings(socket) do
     request_platform(:get_wifi_settings)
+
+    socket
+  end
+
+  def request_log(socket) do
+    request_platform(:get_device_log)
 
     socket
   end
@@ -93,6 +102,19 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
 
     socket
     |> assign_room_list()
+  end
+
+  def render_device_log(socket, log) do
+    key =
+      log
+      |> Enum.map_join("\n", fn {level, {_module, msg, {{a, b, c}, {d, e, f, g}}, _extra}} ->
+        date = NaiveDateTime.new!(a, b, c, d, e, f, g * 1000)
+        "#{date} [#{level}] #{msg}"
+      end)
+      |> Chat.Broker.store()
+
+    socket
+    |> push_event("chat:redirect", %{url: Routes.temp_sync_url(socket, :device_log, key)})
   end
 
   def close(socket) do

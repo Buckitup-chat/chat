@@ -18,11 +18,11 @@ defmodule ChatWeb.Router do
     pipe_through :browser
 
     get "/index", PageController, :index
-    get "/get/file/:id/:a", FileController, :file
     get "/get/file/:id", FileController, :file
     get "/get/image/:id", FileController, :image
     get "/get/backup/:key", FileController, :backup
     get "/get/backup", TempSyncController, :backup
+    get "/get/device_log/:key", TempSyncController, :device_log
 
     live "/", MainLive.Index, :index
     live "/export-key-ring/:id", MainLive.Index, :export

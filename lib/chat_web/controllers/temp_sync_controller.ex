@@ -11,10 +11,19 @@ defmodule ChatWeb.TempSyncController do
     conn
     |> put_resp_header("content-disposition", "attachment; filename=\"#{filename}\"")
     |> put_resp_content_type("application/octet-stream")
-    |> send_resp(200, Db.db() |> CubDB.current_db_file() |> File.read!())
+    |> send_file(200, Db.db() |> CubDB.current_db_file())
   rescue
     _ ->
       conn
       |> send_resp(404, "")
+  end
+
+  def device_log(conn, %{"key" => key}) do
+    body = Chat.Broker.get(key)
+
+    conn
+    |> put_resp_header("content-disposition", "attachment; filename=\"device_log.txt\"")
+    |> put_resp_content_type("text/plain")
+    |> send_resp(200, body)
   end
 end

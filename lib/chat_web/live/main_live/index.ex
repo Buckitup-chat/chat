@@ -13,6 +13,7 @@ defmodule ChatWeb.MainLive.Index do
   alias Chat.RoomInvites
   alias Chat.Rooms
   alias Chat.Utils.StorageId
+  alias ChatWeb.MainLive.Layout
   alias ChatWeb.MainLive.Page
   alias ChatWeb.Router.Helpers
 

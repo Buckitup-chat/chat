@@ -316,7 +316,6 @@
               <div id="dialogInput" class="basis-[7%] px-8 border border-white bg-white flex items-center">
                 <%= if @dialog_mode == :plain do %>
                   <.form
-                    let={df}
                     for={:dialog_file}
                     id="dialog-file-form"
                     class="column column-50 column-offset-50"
@@ -837,21 +836,21 @@
             id="invite-user-confirmation" 
             title="Invite new one" 
             description="Are you sure?"
-          ></.action_confirmation_popup>
+          />
           <.action_confirmation_popup
             id="remove-room-confirmation" 
             title="Remove Room" 
             description="Are you sure?"
-          ></.action_confirmation_popup>
+          />
           <.action_confirmation_popup 
             id="remove-user-confirmation" 
             title="Remove User" 
             description="Are you sure?"
-          ></.action_confirmation_popup>
-          <div class="flex flex-col">
-            <div class="flex flex-row flex-wrap m-2">
-              <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
-                <header class="text-2xl bg-white/50 rounded-md p-2">Backup and restore</header>
+          />
+          <Layout.Admin.container>
+            <Layout.Admin.row>
+              <Layout.Admin.block title="Backup and restore">
+
                 <section class="p-2 text-grayscale600">
                   <a href="/get/backup">Download Backup data</a>
                 </section>
@@ -883,9 +882,10 @@
                     </.form>
                   </div>
                 </section>
-              </article>
-              <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
-                <header class="text-2xl bg-white/50 rounded-md p-2">WiFi settings</header>
+ 
+              </Layout.Admin.block>
+              <Layout.Admin.block title="WiFi settings">
+
                 <%= if @wifi_loaded do %> 
                   <.form
                     for={:admin_wifi}
@@ -910,19 +910,31 @@
                     loading ...
                   </section>
                 <% end %>
-              </article>
-            </div>
-            <div class="flex flex-row flex-wrap m-2">
-              <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
-                <header class="text-2xl bg-white/50 rounded-md p-2">Admin List</header>
+
+              </Layout.Admin.block>
+              <Layout.Admin.block title="Maintenance">
+
                 <section>
-                <%= for admin <- @admin_list do %>
-                  <div><%= admin.name %></div>  
-                <% end %> 
+                  Read Only Mode: <%= if @ro_mode, do: "yes", else: "no" %>
                 </section>
-              </article>
-              <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
-                <header class="text-2xl bg-white/50 rounded-md p-2">Invite new one</header>
+                <section class="p-2 text-grayscale600">
+                  <a href="#" phx-click="admin/device-log">Device Log</a>
+                </section>
+
+              </Layout.Admin.block>
+            </Layout.Admin.row>
+            <Layout.Admin.row>
+              <Layout.Admin.block title="Admin List">
+
+                <section>
+                  <%= for admin <- @admin_list do %>
+                    <div><%= admin.name %></div>  
+                  <% end %> 
+                </section>
+
+              </Layout.Admin.block>
+              <Layout.Admin.block title="Invite new one">
+                
                 <section>
                   <%= for user <- @user_list do %>
                     <div
@@ -937,45 +949,48 @@
                     ><%= user.name %></div>  
                   <% end %> 
                 </section>
-              </article>
-            </div>
-            <div class="flex flex-row flex-wrap m-2">
-              <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
-                <header class="text-2xl bg-white/50 rounded-md p-2">Remove Room</header>
+
+              </Layout.Admin.block>
+            </Layout.Admin.row>
+            <Layout.Admin.row>
+              <Layout.Admin.block title="Remove Room">
+
                 <section>
-                <%= for room <- @room_list do %>
-                  <div
-                    class="cursor-pointer"
-                    phx-click={show_modal("remove-room-confirmation")
-                                |> JS.set_attribute({"phx-click", hide_modal("remove-room-confirmation")
-                                                                  |> JS.push("admin/remove-room")
-                                                                  |> stringify_commands()
+                  <%= for room <- @room_list do %>
+                    <div
+                      class="cursor-pointer"
+                      phx-click={show_modal("remove-room-confirmation")
+                                  |> JS.set_attribute({"phx-click", hide_modal("remove-room-confirmation")
+                                                                    |> JS.push("admin/remove-room")
+                                                                    |> stringify_commands()
+                                                      }, to: ".confirmButton")
+                                  |> JS.set_attribute({"phx-value-hash", room.hash}, to: ".confirmButton")
+                                }
+                    ><%= room.name %></div>
+                  <% end %> 
+                </section>
+
+              </Layout.Admin.block>
+              <Layout.Admin.block title="Remove User">
+
+                <section>
+                  <%= for user <- @full_user_list do %>
+                    <div
+                      class="cursor-pointer" 
+                      phx-click={show_modal("remove-user-confirmation")
+                                  |> JS.set_attribute({"phx-click", hide_modal("remove-user-confirmation")
+                                                                    |> JS.push("admin/remove-user")
+                                                                    |> stringify_commands()
                                                     }, to: ".confirmButton")
-                                |> JS.set_attribute({"phx-value-hash", room.hash}, to: ".confirmButton")
-                              }
-                  ><%= room.name %></div>
-                <% end %> 
+                                  |> JS.set_attribute({"phx-value-hash", user.hash}, to: ".confirmButton")
+                                }
+                    ><%= user.name %></div>  
+                  <% end %>   
                 </section>
-              </article>
-              <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
-                <header class="text-2xl bg-white/50 rounded-md p-2">Remove User</header>
-                <section>
-                <%= for user <- @full_user_list do %>
-                  <div
-                    class="cursor-pointer" 
-                    phx-click={show_modal("remove-user-confirmation")
-                                |> JS.set_attribute({"phx-click", hide_modal("remove-user-confirmation")
-                                                                  |> JS.push("admin/remove-user")
-                                                                  |> stringify_commands()
-                                                  }, to: ".confirmButton")
-                                |> JS.set_attribute({"phx-value-hash", user.hash}, to: ".confirmButton")
-                              }
-                  ><%= user.name %></div>  
-                <% end %>   
-                </section>
-              </article>
-            </div>
-          </div>
+
+              </Layout.Admin.block>
+            </Layout.Admin.row>
+          </Layout.Admin.container>
         <% end %> 
       </div>
     <% end %>

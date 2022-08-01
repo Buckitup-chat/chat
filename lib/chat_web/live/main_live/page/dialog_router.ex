@@ -14,6 +14,9 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
       {"message/" <> action, %{"id" => id, "index" => index}} ->
         socket |> route_message_event({action, {index |> String.to_integer(), id}})
 
+      {"image-gallery/" <> action, _} ->
+        socket |> route_image_gallery_event({action})
+
       {"import-images", _} ->
         socket |> push_event("chat:scroll-down", %{})
 
@@ -57,6 +60,22 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
 
       "download" ->
         socket |> Page.Dialog.download_message(msg_id)
+
+      "open-image-gallery" ->
+        socket |> Page.Dialog.open_image_gallery(msg_id)
+    end
+  end
+
+  def route_image_gallery_event(socket, {action}) do
+    case action do
+      "close" ->
+        socket |> Page.Dialog.close_image_gallery()
+
+      "next" ->
+        socket |> Page.Dialog.image_gallery_next()
+
+      "prev" ->
+        socket |> Page.Dialog.image_gallery_prev()
     end
   end
 
@@ -74,6 +93,12 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
 
       {:deleted_dialog_message, msg_id} ->
         socket |> Page.Dialog.hide_deleted_message(msg_id)
+
+      {:preload_image_gallery, :next} ->
+        socket |> Page.Dialog.image_gallery_preload_next()
+
+      {:preload_image_gallery, :prev} ->
+        socket |> Page.Dialog.image_gallery_preload_prev()
     end
   end
 end

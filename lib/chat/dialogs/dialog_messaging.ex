@@ -66,6 +66,22 @@ defmodule Chat.Dialogs.DialogMessaging do
     |> Db.get()
   end
 
+  def get_next_message(%Dialog{} = dialog, {index, id}, predicate) do
+    Db.get_next(
+      msg_key(dialog, index, id),
+      msg_key(dialog, nil, "some"),
+      predicate
+    )
+  end
+
+  def get_prev_message(%Dialog{} = dialog, {index, id}, predicate) do
+    Db.get_prev(
+      msg_key(dialog, index, id),
+      msg_key(dialog, 0, 0),
+      predicate
+    )
+  end
+
   def delete(%Dialog{} = dialog, %Identity{} = author, msg_id) do
     fn msg, index, key ->
       side = Dialog.my_side(dialog, author)

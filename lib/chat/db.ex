@@ -117,6 +117,24 @@ defmodule Chat.Db do
     |> CubDB.get(key)
   end
 
+  def get_next(key, max_key, predicate) do
+    db()
+    |> CubDB.select(min_key: key, min_key_inclusive: false, max_key: max_key)
+    |> Stream.filter(predicate)
+    |> Stream.take(1)
+    |> Enum.map(fn {{_, _, index, _}, msg} -> {index, msg} end)
+    |> Enum.at(0)
+  end
+
+  def get_prev(key, min_key, predicate) do
+    db()
+    |> CubDB.select(min_key: min_key, max_key: key, max_key_inclusive: false, reverse: true)
+    |> Stream.filter(predicate)
+    |> Stream.take(1)
+    |> Enum.map(fn {{_, _, index, _}, msg} -> {index, msg} end)
+    |> Enum.at(0)
+  end
+
   def put(key, value) do
     if writable?() do
       db()

@@ -49,6 +49,40 @@ defmodule Chat.Dialogs do
     DialogMessaging.read({index, message}, me, side, peer(dialog, me))
   end
 
+  def read_prev_message(
+        %Dialog{} = dialog,
+        {index, msg_id} = _msg_id,
+        %Identity{} = me,
+        predicate
+      ) do
+    DialogMessaging.get_prev_message(dialog, {index, msg_id}, predicate)
+    |> case do
+      nil ->
+        nil
+
+      message ->
+        side = Dialog.my_side(dialog, me)
+        DialogMessaging.read(message, me, side, peer(dialog, me))
+    end
+  end
+
+  def read_next_message(
+        %Dialog{} = dialog,
+        {index, msg_id} = _msg_id,
+        %Identity{} = me,
+        predicate
+      ) do
+    DialogMessaging.get_next_message(dialog, {index, msg_id}, predicate)
+    |> case do
+      nil ->
+        nil
+
+      message ->
+        side = Dialog.my_side(dialog, me)
+        DialogMessaging.read(message, me, side, peer(dialog, me))
+    end
+  end
+
   def key(%Dialog{} = dialog) do
     dialog
     |> Dialog.dialog_key()

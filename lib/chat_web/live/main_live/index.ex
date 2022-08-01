@@ -449,7 +449,7 @@ defmodule ChatWeb.MainLive.Index do
     <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
       <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
       <.message_timestamp msg={@msg} />
-      <.message_image url={@url} />
+      <.message_image url={@url} mode={message_of(@msg)} msg_id={@msg.id} msg_index={@msg.index}/>
     </div>
     """
   end
@@ -593,9 +593,15 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   defp message_image(assigns) do
+    # {JS.dispatch("chat:toggle", detail: %{class: "preview"}) |> JS.add_class("hidden", to: "#dialogInput") |> JS.add_class("md:hidden", to: "#chatRoomBar") |> JS.add_class("hidden", to: "#chatContent") |> JS.remove_class("hidden", to: "#imageGallery") |> JS.remove_class("overflow-scroll", to: "#chatContent")}
     ~H"""
-    <img class=" object-cover overflow-hidden" src={@url} phx-click={JS.dispatch("chat:toggle", detail: %{class: "preview"}) |> JS.add_class("hidden", to: "#dialogInput") |> JS.add_class("md:hidden", to: "#chatRoomBar") |> JS.add_class("hidden", to: "#chatContent") |> JS.remove_class("hidden", to: "#imageGallery") |> JS.remove_class("overflow-scroll", to: "#chatContent")}
-    />
+      <img
+        class="object-cover overflow-hidden"
+        src={@url} 
+        phx-click={"#{@mode}/message/open-image-gallery"}
+        phx-value-id={@msg_id}
+        phx-value-index={@msg_index}
+      />
     """
   end
 

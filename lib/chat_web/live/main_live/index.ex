@@ -482,20 +482,25 @@ defmodule ChatWeb.MainLive.Index do
 
   def message_text(%{msg: %{type: :text}} = assigns) do
     ~H"""
-    <span class="w-full px-2 flex justify-start break-all whitespace-pre-wrap"><%= @msg.content %></span>
+    <div class="px-4 w-full">
+      <span class="flex-initial break-words">
+        <%= @msg.content %>
+      </span>
+    </div>
     """
   end
-
   def message_text(%{msg: %{type: :memo, content: json}} = assigns) do
     memo =
       json
       |> StorageId.from_json()
       |> Memo.get()
-
     assigns = assigns |> Map.put(:memo, memo)
-
     ~H"""
-    <span class="w-full px-2 flex justify-start overflow-x-scroll break-words whitespace-pre-line"><%= @memo %></span>
+    <div class="px-4 w-full ">
+      <span class="flex-initial break-words">
+        <%= @memo %>
+      </span>
+    </div>
     """
   end
 
@@ -597,7 +602,7 @@ defmodule ChatWeb.MainLive.Index do
     ~H"""
       <img
         class="object-cover overflow-hidden"
-        src={@url} 
+        src={@url}
         phx-click={"#{@mode}/message/open-image-gallery"}
         phx-value-id={@msg_id}
         phx-value-index={@msg_index}

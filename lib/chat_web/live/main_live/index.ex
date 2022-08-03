@@ -606,7 +606,7 @@ defmodule ChatWeb.MainLive.Index do
       <img
         class="object-cover overflow-hidden"
         src={@url}
-        phx-click={"#{@mode}/message/open-image-gallery"}
+        phx-click={JS.push("#{@mode}/message/open-image-gallery") |> JS.add_class("hidden", to: "#chatContent")}
         phx-value-id={@msg_id}
         phx-value-index={@msg_index}
       />

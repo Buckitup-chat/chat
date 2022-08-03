@@ -1,17 +1,18 @@
 defmodule ChatWeb.MainLive.Layout.ImageGallery do
   @moduledoc "Image gallery related layout"
   use Phoenix.Component
+  alias Phoenix.LiveView.JS
 
   def render(assigns) do
     ~H"""
       <%= if @mode == assigns[:gallery][:mode] do %>
-        <div id="imageGallery" class="bg-black w-full left-[0%] top-[150%] md:top-[0%] absolute z-30 overflow-hidden">
+        <div id="imageGallery" class="bg-black w-full left-[0%] md:top-[0%] absolute z-30">
 
           <.back_button mode={@mode} />
 
           <div class="h-screen flex justify-center items-center lg:h-[99vh]">
             <img
-              class="w-full z-10 lg:h-[85vh] lg:px-14"
+              class="w-auto z-10 max-h-full lg:px-14"
               src={@gallery[:current][:url]}
             />
           </div>
@@ -31,7 +32,7 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
     ~H"""
       <button
         class="text-white flex relative left-5 top-10"
-        phx-click={"#{@mode}/image-gallery/close"}
+        phx-click={JS.push("#{@mode}/image-gallery/close") |> JS.remove_class("hidden", to: "#chatContent")}
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="white" viewBox="0 0 24 24">
           <path d="M16.67 0l2.83 2.829-9.339 9.175 9.339 9.167-2.83 2.829-12.17-11.996z"/>

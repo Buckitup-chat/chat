@@ -2,8 +2,8 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
   @moduledoc "Route dialog events"
 
   import Phoenix.LiveView, only: [push_event: 3]
-  alias ChatWeb.MainLive.Index
   alias ChatWeb.MainLive.Page
+  alias ChatWeb.MainLive.Layout.Message
 
   #
   # LiveView events
@@ -89,7 +89,7 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
         socket |> Page.Dialog.show_new(glimpse)
 
       {:updated_dialog_message, msg_id} ->
-        socket |> Page.Dialog.update_message(msg_id, &Index.message_text/1)
+        socket |> Page.Dialog.update_message(msg_id, &Message.message_text/1)
 
       {:deleted_dialog_message, msg_id} ->
         socket |> Page.Dialog.hide_deleted_message(msg_id)

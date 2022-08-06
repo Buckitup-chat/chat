@@ -20,6 +20,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     socket
     |> assign(:mode, :lobby)
     |> assign(:lobby_mode, :chats)
+    |> assign(:image_gallery, nil)
     |> assign(:version, get_version())
     |> assign_user_list()
     |> approve_joined_room_requests()

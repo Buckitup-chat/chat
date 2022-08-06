@@ -574,15 +574,25 @@
             </div>
               <div id="chatContent" class="basis-[93%] md:overflow-y-scroll flex flex-col justify-between relative a-content-block" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
 
-                <div class={classes("w-full px-8  border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between sticky top-0 right-0", %{"goldGradient" => @room.type == :private, "silverGradient" => @room.type == :request, "woodGradient" => @room.type == :public,})} style="min-height: 56px;" >
+                <div class={classes("w-full px-8 bg-white  border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between sticky top-0 right-0")} style="min-height: 56px;" >
                   <div class="flex flex-row items-center">
                     <button phx-click={JS.push("room/close") |> close_content()} class="sm:hidden pr-3">
                       <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
                     </button>
+                     <%= if @room.type == :public do %>
+                    <.icon id="public" class="w-4 h-4"/>
+                     <% end %>
+                     <%= if @room.type == :private do %>
+                    <.icon id="privateRoom" class="w-4 h-4"/>
+                     <% end %>
+                     <%= if @room.type == :request do %>
+                    <.icon id="secret" class="w-5 h-5"/>
+                     <% end %>
                     <div class="text-base text-black">[<%= short_hash(@room.admin_hash) %>]</div>
                     <h1 class="ml-1 text-base font-bolt text-fuchsia-900" ><%= @room.name %></h1>
                   </div>
                   <div class="flex flex-row justify-between">
+
                     <%= if @room.type == :request do %>
                       <button class="mr-4 flex items-center" phx-click={if @room_requests == [], do: nil, else: show_modal("room-request-list")}>
                         <.icon id="requestList" class="w-4 h-4 mr-1 z-20 fill-black"/>

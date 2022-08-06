@@ -3,6 +3,8 @@ defmodule ChatWeb.MainLive.Page.Room do
   import ChatWeb.MainLive.Page.Shared
   import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entry: 3, push_event: 3]
 
+  require Logger
+
   alias Phoenix.PubSub
 
   alias Chat.Dialogs
@@ -116,6 +118,14 @@ defmodule ChatWeb.MainLive.Page.Room do
     end
   end
 
+  def show_new(socket, new_message) do
+    identity = socket.assigns[:room_identity] |> inspect()
+    message = new_message |> inspect()
+    Logger.warn("Cannot show new message in room. msg: #{message} room: #{identity}")
+
+    socket
+  end
+
   def edit_message(
         %{assigns: %{room_identity: room_identity}} = socket,
         msg_id
@@ -173,6 +183,16 @@ defmodule ChatWeb.MainLive.Page.Room do
     socket
     |> forget_current_messages()
     |> push_event("chat:change", %{to: "#room-message-#{id} .x-content", content: content})
+  end
+
+  def update_message(socket, msg_id, _) do
+    identity = socket.assigns[:room_identity] |> inspect()
+
+    Logger.warn(
+      "Cannot show upated message in room. msg_id: #{inspect(msg_id)} room: #{identity}"
+    )
+
+    socket
   end
 
   def cancel_edit(socket) do

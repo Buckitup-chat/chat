@@ -66,7 +66,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   def switch_lobby_mode(socket, mode) do
     socket
     |> close_current_mode()
-    |> assign(:lobby_mode, String.to_atom(mode))
+    |> assign(:lobby_mode, String.to_existing_atom(mode))
     |> init_new_mode()
   end
 
@@ -180,6 +180,8 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   defp close_current_mode(%{assigns: %{lobby_mode: :admin}} = socket),
     do: socket |> Page.AdminPanel.close()
+
+  defp close_current_mode(socket), do: socket
 
   defp init_new_mode(%{assigns: %{lobby_mode: :chats}} = socket), do: socket |> Page.Dialog.init()
   defp init_new_mode(%{assigns: %{lobby_mode: :rooms}} = socket), do: socket |> Page.Room.init()

@@ -491,13 +491,13 @@
                           </div>
                         </a>
                         <%= if room.type == :request do %>
-                        <.icon id="secret" class="w-4 h-4" />
+                        <.icon id="private" class="w-5 h-5 stroke-black" />
                         <% end %>
                         <%= if room.type == :private do %>
-                        <.icon id="privateRoom" class="w-4 h-4" />
+                        <.icon id="secret" class="w-4 h-4" />
                         <% end %>
                         <%= if room.type == :public do %>
-                        <.icon id="public" class="w-4 h-4" />
+                        <.icon id="open" class="w-4 h-4" />
                         <% end %>
                       </li>
                       <li phx-click={JS.push("room/switch") |> open_content()} phx-value-room={room.hash} class={classes("sm:hidden w-full h-9 flex items-center cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
@@ -580,27 +580,27 @@
                       <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
                     </button>
                      <%= if @room.type == :public do %>
-                    <.icon id="public" class="w-4 h-4"/>
+                    <.icon id="open" class="w-4 h-4 fill-white" />
                      <% end %>
                      <%= if @room.type == :private do %>
-                    <.icon id="privateRoom" class="w-4 h-4"/>
+                    <.icon id="secret" class="w-4 h-4 fill-white"/>
                      <% end %>
                      <%= if @room.type == :request do %>
-                    <.icon id="secret" class="w-5 h-5"/>
+                    <.icon id="private" class="w-5 h-5 stroke-white"/>
                      <% end %>
-                    <div class="text-base text-black">[<%= short_hash(@room.admin_hash) %>]</div>
+                    <div class="text-base text-white">[<%= short_hash(@room.admin_hash) %>]</div>
                     <h1 class="ml-1 text-base font-bolt text-fuchsia-900" ><%= @room.name %></h1>
                   </div>
                   <div class="flex flex-row justify-between">
                     <%= if @room.type == :request do %>
                       <button class="mr-4 flex items-center" phx-click={if @room_requests == [], do: nil, else: show_modal("room-request-list")}>
-                        <.icon id="requestList" class="w-4 h-4 mr-1 z-20 fill-black"/>
-                        <span class="text-base text-black">Requests</span>
+                        <.icon id="requestList" class="w-4 h-4 mr-1 z-20 stroke-white fill-white"/>
+                        <span class="text-base text-white">Requests</span>
                       </button>
                     <% end %>
                     <button class="flex items-center" phx-click={if Chat.User.list() |> length == 1, do: nil, else: show_modal("room-invite-list")}>
-                      <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-black"/>
-                      <span class="text-base text-black"> Invite</span>
+                      <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-white"/>
+                      <span class="text-base text-white"> Invite</span>
                     </button>
                   </div>
 

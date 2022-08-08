@@ -502,11 +502,20 @@
                       </li>
                       <li phx-click={JS.push("room/switch") |> open_content()} phx-value-room={room.hash} class={classes("sm:hidden w-full h-9 flex items-center cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
                         <a>
-                          <div class="flex flex-row px-7">
+                          <div class="flex flex-row pl-7">
                             <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
                             <div class="ml-1 text-sm"><%= room.name %></div>
                           </div>
                         </a>
+                          <%= if room.type == :request do %>
+                        <.icon id="private" class="w-5 h-5 stroke-black" />
+                        <% end %>
+                        <%= if room.type == :private do %>
+                        <.icon id="secret" class="w-4 h-4" />
+                        <% end %>
+                        <%= if room.type == :public do %>
+                        <.icon id="open" class="w-4 h-4" />
+                        <% end %>
                       </li>
                     <% end %>
                   <% end %>

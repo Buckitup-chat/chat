@@ -239,10 +239,13 @@ defmodule ChatWeb.MainLive.Layout.Message do
           <.icon id="select" class="w-4 h-4 flex fill-black"/>
           <span>Select</span>
         </a>
-        <%= if @msg.type in [:file, :image] do %>
+        <%= if @msg.type in [:file, :image, :video] do %>
           <a
             class="dropdownItem"
-            phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{message_of(@msg)}/message/download")}
+            phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")
+                      |> JS.push("#{message_of(@msg)}/message/download")
+                      |> JS.dispatch("chat:download-video")
+                      }
             phx-value-id={@msg.id}
             phx-value-index={@msg.index}
           >

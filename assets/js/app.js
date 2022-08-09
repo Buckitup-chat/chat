@@ -151,6 +151,11 @@ const listeners = {
         .classList.toggle(e.detail.class)
     }
   },
+  "chat:download-video": (e) => {
+    const path = e.path || (e.composedPath && e.composedPath());
+    const url = path[3].childNodes[5].src;
+    window.location.assign(url);
+  },
   "phx:chat:redirect": (e) => {
     const openUrl = (url) => window.location = url;
     url = e.detail.url

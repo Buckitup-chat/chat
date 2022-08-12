@@ -107,7 +107,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       |> Map.put(:url, "/get/image/#{id}?a=#{secret |> Base.url_encode64()}")
 
     ~H"""
-    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg x-download"}>
       <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
       <.message_timestamp msg={@msg} timezone={@timezone} />
       <.message_image url={@url} mode={message_of(@msg)} msg_id={@msg.id} msg_index={@msg.index}/>
@@ -123,7 +123,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       |> Map.put(:url, "/get/file/#{id}?a=#{secret |> Base.url_encode64()}")
 
     ~H"""
-    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg x-download"}>
       <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
       <.message_timestamp msg={@msg} timezone={@timezone} />
       <.message_video url={@url} />
@@ -133,7 +133,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
   def render_file(%{msg: %{type: :file}} = assigns) do
     ~H"""
-    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg x-download"}>
       <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
       <.message_file msg={@msg} />
       <.message_timestamp msg={@msg} timezone={@timezone} />
@@ -182,7 +182,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
     <div class="flex items-center justify-between">
       <.icon id="document" class="w-14 h-14 flex fill-black/50"/>
       <div class="w-36 flex flex-col pr-3">
-        <span class="truncate text-xs" href={@url}><%= @name %></span>
+        <span class="truncate text-xs x-file" href={@url}><%= @name %></span>
         <span class="text-xs text-black/50 whitespace-pre-line"><%= @size %></span>
       </div>
     </div>
@@ -243,8 +243,8 @@ defmodule ChatWeb.MainLive.Layout.Message do
           <a
             class="dropdownItem"
             phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")
-                      |> JS.push("#{message_of(@msg)}/message/download")
-                      |> JS.dispatch("chat:download-video")
+                      # |> JS.push("#{message_of(@msg)}/message/download")
+                      |> JS.dispatch("chat:download")
                       }
             phx-value-id={@msg.id}
             phx-value-index={@msg.index}

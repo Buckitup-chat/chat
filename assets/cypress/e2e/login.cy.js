@@ -1,12 +1,14 @@
 describe('login a user', () => {
+  const userName = 'Cypres test user';
+  const url = Cypress.env('url');
   it('successfully logined', () => {
-    cy.visit('http://localhost:4000')
-    cy.get('#login-form')
-    .find('[type="text"]').type('Cypres test user',{force:true})
-    cy.get('#login-form').submit()
+    cy.visit(url)
+    cy.get('.t-form')
+    .find('[type="text"]').type(userName,{force:true})
+    cy.get('.t-form').submit()
   })
   it("check if it's mine login", () => {
-    cy.contains("My notes").click()
-    cy.get('#chatHeader').find('h1').last().should('have.text', 'Cypres test user')
+    cy.get('.t-my-notes').click()
+    cy.get('.t-chat-header').find('.t-peer-name').should('have.text', userName)
   })
 })

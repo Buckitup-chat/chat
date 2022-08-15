@@ -27,6 +27,7 @@
             let={f}
             for={:login}
             id="login-form"
+            class="t-form"
             phx-submit="login">
 
             <%= text_input f, :name, placeholder: "Your name", class: "w-full h-11 bg-transparent border border-white/50 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-0 focus:border-white" %>
@@ -210,7 +211,7 @@
                 <li phx-click="dialog/switch" phx-value-user-id={user.hash} class={classes("hidden sm:flex w-full cursor-pointer h-9 flex items-center hover:bg-stone250", %{"from-green-400 to-blue-500" => user == @peer})}>
                   <a><div class="flex flex-row px-7">
                     <%= if @my_id == user.hash do %>
-                      <div class="ml-1 text-sm"> My notes </div>
+                      <div class="ml-1 text-sm t-my-notes"> My notes </div>
                     <% else %>
                       <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(user.hash) %>]</tt>
                       <div class="ml-1 text-sm"><%= user.name %></div>
@@ -231,7 +232,7 @@
             <% else %>
               <Layout.ImageGallery.render mode="dialog" gallery={@image_gallery} />
               <div id="chatContent" class="basis-[93%] md:overflow-scroll flex flex-col justify-between relative a-content-block" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
-                  <div id="chatHeader" class="w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start sticky top-0 right-0" style="min-height: 56px;">
+                  <div id="chatHeader" class="w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start sticky top-0 right-0 t-chat-header" style="min-height: 56px;">
                     <button phx-click={JS.push("dialog/close") |> close_content()} class="sm:hidden pr-3">
                       <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
                     </button>
@@ -240,10 +241,10 @@
                         My private notes
                       </h1>
                       <div class="text-base text-white/60 ml-2">[<%= short_hash(@peer.hash) %>]</div>
-                      <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>
+                      <h1 class="ml-1 text-base font-bolt text-white t-peer-name" ><%= @peer.name %></h1>
                     <% else %>
                       <div class="text-base text-white/60">[<%= short_hash(@peer.hash) %>]</div>
-                      <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>
+                      <h1 class="ml-1 text-base font-bolt text-white t-peer-name" ><%= @peer.name %></h1>
                       <button>
                         <.icon id="edit" class="w-4 h-4 ml-1 flex fill-white/50"/>
                       </button>

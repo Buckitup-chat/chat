@@ -7,6 +7,8 @@ defmodule Chat.Application do
 
   @impl true
   def start(_type, _args) do
+    Logger.put_application_level(:ssl, :error)
+
     children = [
       # Start the Telemetry supervisor
       ChatWeb.Telemetry,

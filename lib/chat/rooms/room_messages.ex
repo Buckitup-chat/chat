@@ -146,7 +146,7 @@ defmodule Chat.Rooms.RoomMessages do
   end
 
   defp db_save(message, room_key, index) do
-    next = index || Chat.Ordering.next({@db_key, room_key})
+    next = index || Chat.Ordering.next({@db_key, room_key |> Utils.binhash()})
 
     room_key
     |> key(next, message.id)

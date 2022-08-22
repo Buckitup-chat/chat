@@ -279,6 +279,8 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:message_update_mode, nil)
   end
 
+  def close(socket), do: socket
+
   def download_message(
         %{assigns: %{room_identity: room_identity}} = socket,
         msg_id

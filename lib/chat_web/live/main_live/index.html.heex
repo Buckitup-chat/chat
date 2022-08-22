@@ -336,7 +336,7 @@
                     ">
                     <%= textarea di, :text,
                       placeholder: "Enter message",
-                      class: "w-full h-7 resize-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
+                      class: "w-full h-7 resize-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0",
                       id: "dialog-input",
                       spellcheck: "false",
                       autocomplete: "off"
@@ -369,7 +369,7 @@
                         document.getElementById('dialog-edit-form-submit-button').click()
                       }
                       ">
-                      <%= textarea dei, :text, class: "w-full px-0 resize-none outline-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
+                      <%= textarea dei, :text, class: "w-full px-0 resize-none outline-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0",
                             id: "dialog-edit-input",
                             spellcheck: "false",
                             autocomplete: "off",
@@ -475,7 +475,7 @@
                 <.icon id="arrowDown" class="w-4 h-4 flex fill-black"/>
                 <span class="ml-1 text-sm  font-bold cursor-pointer">Confirmed</span>
               </div>
-              <div class="mt-3 w-full" id="confirmed-rooms">
+              <div class="mt-3 w-full ml-6 md:ml-10" id="confirmed-rooms">
                 <ul>
                   <%= if @joined_rooms == [] do %>
                     <p class="text-base text-grayscale600 px-7">You have no rooms</p>
@@ -493,22 +493,31 @@
                           </div>
                         </a>
                         <%= if room.type == :request do %>
-                        <.icon id="secret" class="w-4 h-4" />
+                        <.icon id="private" class="w-5 h-5 stroke-black" />
                         <% end %>
                         <%= if room.type == :private do %>
-                        <.icon id="privateRoom" class="w-4 h-4" />
+                        <.icon id="secret" class="w-4 h-4" />
                         <% end %>
                         <%= if room.type == :public do %>
-                        <.icon id="public" class="w-4 h-4" />
+                        <.icon id="open" class="w-4 h-4" />
                         <% end %>
                       </li>
                       <li phx-click={JS.push("room/switch") |> open_content()} phx-value-room={room.hash} class={classes("sm:hidden w-full h-9 flex items-center cursor-pointer hover:bg-stone250", %{"bg-stone250" => room == @room})}>
                         <a>
-                          <div class="flex flex-row px-7">
+                          <div class="flex flex-row pl-7">
                             <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(room.hash) %>]</tt>
                             <div class="ml-1 text-sm"><%= room.name %></div>
                           </div>
                         </a>
+                          <%= if room.type == :request do %>
+                        <.icon id="private" class="w-5 h-5 stroke-black" />
+                        <% end %>
+                        <%= if room.type == :private do %>
+                        <.icon id="secret" class="w-4 h-4" />
+                        <% end %>
+                        <%= if room.type == :public do %>
+                        <.icon id="open" class="w-4 h-4" />
+                        <% end %>
                       </li>
                     <% end %>
                   <% end %>
@@ -576,24 +585,33 @@
             </div>
               <div id="chatContent" class="basis-[93%] md:overflow-y-scroll flex flex-col justify-between relative a-content-block" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
 
-                <div class={classes("w-full px-8  border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between sticky top-0 right-0", %{"goldGradient" => @room.type == :private, "silverGradient" => @room.type == :request, "woodGradient" => @room.type == :public,})} style="min-height: 56px;" >
+                <div class={classes("w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between sticky top-0 right-0")} style="min-height: 56px;" >
                   <div class="flex flex-row items-center">
                     <button phx-click={JS.push("room/close") |> close_content()} class="sm:hidden pr-3">
                       <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
                     </button>
-                    <div class="text-base text-black">[<%= short_hash(@room.admin_hash) %>]</div>
+                     <%= if @room.type == :public do %>
+                    <.icon id="open" class="w-4 h-4 fill-white" />
+                     <% end %>
+                     <%= if @room.type == :private do %>
+                    <.icon id="secret" class="w-4 h-4 fill-white"/>
+                     <% end %>
+                     <%= if @room.type == :request do %>
+                    <.icon id="private" class="w-5 h-5 stroke-white"/>
+                     <% end %>
+                    <div class="text-base text-white">[<%= short_hash(@room.admin_hash) %>]</div>
                     <h1 class="ml-1 text-base font-bolt text-fuchsia-900" ><%= @room.name %></h1>
                   </div>
                   <div class="flex flex-row justify-between">
                     <%= if @room.type == :request do %>
                       <button class="mr-4 flex items-center" phx-click={if @room_requests == [], do: nil, else: show_modal("room-request-list")}>
-                        <.icon id="requestList" class="w-4 h-4 mr-1 z-20 fill-black"/>
-                        <span class="text-base text-black">Requests</span>
+                        <.icon id="requestList" class="w-4 h-4 mr-1 z-20 stroke-white fill-white"/>
+                        <span class="text-base text-white">Requests</span>
                       </button>
                     <% end %>
                     <button class="flex items-center" phx-click={if Chat.User.list() |> length == 1, do: nil, else: show_modal("room-invite-list")}>
-                      <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-black"/>
-                      <span class="text-base text-black"> Invite</span>
+                      <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-white"/>
+                      <span class="text-base text-white"> Invite</span>
                     </button>
                   </div>
 
@@ -719,7 +737,7 @@
                   >
                     <%= textarea di, :text,
                       placeholder: "Enter message",
-                      class: "w-full h-7 resize-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
+                      class: "w-full h-7 resize-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0",
                       id: "room-input",
                       spellcheck: "false",
                       autocomplete: "off"
@@ -753,7 +771,7 @@
                       }
                       ">
                       <%= textarea dei, :text,
-                            class: "w-full px-0 resize-none outline-none border-0 overflow-hidden text-black placeholder-black/50 focus:ring-0",
+                            class: "w-full px-0 resize-none outline-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0",
                             id: "room-edit-input",
                             spellcheck: "false",
                             autocomplete: "off",

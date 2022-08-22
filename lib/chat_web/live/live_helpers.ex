@@ -31,7 +31,7 @@ defmodule ChatWeb.LiveHelpers do
     <div id={@id} class="phx-modal fade-in" phx-remove={hide_modal(@id, @hide_event)} style="display: none;">
       <div
         id={@id <> "-content"}
-        class={"phx-modal-content border-0 rounded-lg bg-white p-4 fade-in-scale flex flex-col #{@class} t-logout-modal"}
+        class={"phx-modal-content border-0 rounded-lg bg-white p-4 fade-in-scale flex flex-col #{@class} t-modal"}
         phx-click-away={JS.dispatch("click", to: "#" <> @id <> "-close")}
         phx-window-keydown={JS.dispatch("click", to: "#" <> @id <> "-close")}
         phx-key="escape"

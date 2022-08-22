@@ -61,12 +61,12 @@
           <p class="mt-3 text-sm text-black/50">To get access again you will need the recovery keys:</p>
           <button class="mt-5 w-full h-12 border-0 rounded-lg bg-grayscale flex items-center justify-center" phx-click="logout-go-middle">
             <div class="flex items-center justify-between">
-              <span class="text-sm text-white">Download the Keys</span>
+              <span class="text-sm text-white t-download-key">Download the Keys</span>
               <.icon id="upload1" class="w-4 h-4 ml-2 fill-white"/>
             </div>
           </button>
-          <button class="mt-3 w-full h-12 border rounded-lg border-black/10" phx-click="logout-wipe">Log Out without the Keys</button>
-          <button phx-click={hide_modal("logout-backup-popup")} class="mt-3 w-full h-12 border rounded-lg border-black/10" >Cancel</button>
+          <button class="mt-3 w-full h-12 border rounded-lg border-black/10 t-logout-without-key" phx-click="logout-wipe">Log Out without the Keys</button>
+          <button phx-click={hide_modal("logout-backup-popup")} class="mt-3 w-full h-12 border rounded-lg border-black/10 t-cancel-logout" >Cancel</button>
         <% end %>
         <%= if @logout_step == :middle do %>
           <h1 class="text-base font-bold text-grayscale">Set Up Password</h1>
@@ -113,7 +113,7 @@
         <%= if @logout_step == :final do %>
           <h1 class="text-base font-bold text-grayscale">Success</h1>
           <p class="mt-3 text-sm text-black/50">If you downloaded the the recovery key, you can log out now, it will erase all the browser data about BuckitUp.</p>
-          <button class="mt-3 w-full h-12 border-0 rounded-lg bg-grayscale text-white" phx-click="logout-wipe">Exit</button>
+          <button class="mt-3 w-full h-12 border-0 rounded-lg bg-grayscale text-white t-exit" phx-click="logout-wipe">Exit</button>
           <button phx-click={hide_modal("logout-backup-popup")} class="mt-3 w-full h-12 border rounded-lg border-black/10">Cancel</button>
         <% end %>
       </.modal>

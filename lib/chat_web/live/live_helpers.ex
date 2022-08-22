@@ -31,16 +31,16 @@ defmodule ChatWeb.LiveHelpers do
     <div id={@id} class="phx-modal fade-in" phx-remove={hide_modal(@id, @hide_event)} style="display: none;">
       <div
         id={@id <> "-content"}
-        class={"phx-modal-content border-0 rounded-lg bg-white p-4 fade-in-scale flex flex-col #{@class}"}
+        class={"phx-modal-content border-0 rounded-lg bg-white p-4 fade-in-scale flex flex-col #{@class} t-logout-modal"}
         phx-click-away={JS.dispatch("click", to: "#" <> @id <> "-close")}
         phx-window-keydown={JS.dispatch("click", to: "#" <> @id <> "-close")}
         phx-key="escape"
         style="display: none;"
-      >   
+      >
         <a id={@id <> "-close"} href="#" class="phx-modal-close w-full flex flex-row justify-end" phx-click={hide_modal(@id, @hide_event)}>
-          <.icon id="close" class="w-4 h-4 flex fill-grayscale"/>
+          <.icon id="close" class="w-4 h-4 flex fill-grayscale t-close-logout-popup"/>
         </a>
-        
+
         <%= render_slot(@inner_block) %>
       </div>
     </div>
@@ -96,7 +96,7 @@ defmodule ChatWeb.LiveHelpers do
         phx-window-keydown={JS.hide(transition: "fade-out", to: "#" <> @id)}
         phx-key="escape"
         style="display: none;"
-      >   
+      >
         <%= render_slot(@inner_block) %>
       </div>
     """

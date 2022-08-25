@@ -38,7 +38,7 @@ defmodule ChatWeb.LiveHelpers do
         style="display: none;"
       >
         <a id={@id <> "-close"} href="#" class="phx-modal-close w-full flex flex-row justify-end" phx-click={hide_modal(@id, @hide_event)}>
-          <.icon id="close" class="w-4 h-4 flex fill-grayscale t-close-logout-popup"/>
+          <.icon id="close" class="w-4 h-4 flex fill-grayscale t-close-popup"/>
         </a>
 
         <%= render_slot(@inner_block) %>

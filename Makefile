@@ -10,7 +10,7 @@ check:
 test: 
 	rm -rf priv/test_db
 	mkdir -p priv/test_db
-	mix test --cover
+	mix test --max-failures=1 --cover
 
 commit: check test
 	gitui

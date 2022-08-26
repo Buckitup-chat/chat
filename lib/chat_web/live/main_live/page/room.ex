@@ -5,19 +5,20 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   require Logger
 
-  alias Phoenix.PubSub
-
+  alias Chat.Db.ModeManager
   alias Chat.Dialogs
   alias Chat.Identity
   alias Chat.Log
-
   alias Chat.Memo
   alias Chat.Messages
   alias Chat.Rooms
   alias Chat.User
   alias Chat.Utils
   alias Chat.Utils.StorageId
+
   alias ChatWeb.Router.Helpers, as: Routes
+
+  alias Phoenix.PubSub
 
   @per_page 15
 
@@ -95,6 +96,7 @@ defmodule ChatWeb.MainLive.Page.Room do
           time
         )
         |> Rooms.add_new_message(me, room.pub_key)
+        |> tap(fn _ -> ModeManager.end_bulk_write() end)
         |> then(&{:ok, &1})
       end
     )

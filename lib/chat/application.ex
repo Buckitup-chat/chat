@@ -15,7 +15,7 @@ defmodule Chat.Application do
       # Start the PubSub system
       {Phoenix.PubSub, name: Chat.PubSub},
       # Start DB
-      Chat.Db,
+      Chat.Db.Supervisor,
       Chat.AdminDb,
       # Start the Endpoint (http/https)
       ChatWeb.Endpoint,

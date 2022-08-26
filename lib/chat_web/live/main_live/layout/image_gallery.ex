@@ -28,7 +28,10 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
   end
 
   def back_button(assigns) do
-    # JS.add_class("hidden", to: "#imageGallery") |> JS.remove_class("hidden", to: "#dialogInput") |> JS.remove_class("md:hidden", to: "#chatRoomBar") |> JS.remove_class("hidden", to: "#chatContent")
+    # JS.add_class("hidden", to: "#imageGallery")
+    #  |> JS.remove_class("hidden", to: "#dialogInput")
+    #  |> JS.remove_class("md:hidden", to: "#chatRoomBar")
+    #  |> JS.remove_class("hidden", to: "#chatContent")
     ~H"""
       <button
         class="text-white flex relative left-5 top-10"

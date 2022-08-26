@@ -1,16 +1,17 @@
 defmodule ChatWeb.MainLive.Layout.Message do
+  @moduledoc "Message layout"
   use Phoenix.Component
 
   import ChatWeb.LiveHelpers
   import ChatWeb.MainLive.Index
 
-  alias Phoenix.LiveView.JS
   alias Chat.Files
   alias Chat.Identity
   alias Chat.Memo
   alias Chat.RoomInvites
   alias Chat.Utils.StorageId
   # alias ChatWeb.Router.Helpers
+  alias Phoenix.LiveView.JS
 
   def render(%{msg: %{type: type}} = assigns) do
     case type do
@@ -262,7 +263,12 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   defp message_image(assigns) do
-    # {JS.dispatch("chat:toggle", detail: %{class: "preview"}) |> JS.add_class("hidden", to: "#dialogInput") |> JS.add_class("md:hidden", to: "#chatRoomBar") |> JS.add_class("hidden", to: "#chatContent") |> JS.remove_class("hidden", to: "#imageGallery") |> JS.remove_class("overflow-scroll", to: "#chatContent")}
+    # {JS.dispatch("chat:toggle", detail: %{class: "preview"})
+    #  |> JS.add_class("hidden", to: "#dialogInput")
+    #  |> JS.add_class("md:hidden", to: "#chatRoomBar")
+    #  |> JS.add_class("hidden", to: "#chatContent")
+    #  |> JS.remove_class("hidden", to: "#imageGallery")
+    #  |> JS.remove_class("overflow-scroll", to: "#chatContent")}
     ~H"""
       <img
         class="object-cover overflow-hidden"

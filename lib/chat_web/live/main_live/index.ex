@@ -435,6 +435,7 @@ defmodule ChatWeb.MainLive.Index do
     {key, secret} = ChunkedFiles.new_upload()
     socket = start_chunked_upload(socket, entry, key, secret)
     link = Helpers.upload_chunk_url(ChatWeb.Endpoint, :put, key)
+    Db.ModeManager.start_bulk_write()
 
     {:ok, %{uploader: "UpChunk", entrypoint: link}, socket}
   end

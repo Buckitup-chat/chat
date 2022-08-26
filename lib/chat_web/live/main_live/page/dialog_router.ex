@@ -2,8 +2,8 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
   @moduledoc "Route dialog events"
 
   import Phoenix.LiveView, only: [push_event: 3]
-  alias ChatWeb.MainLive.Page
   alias ChatWeb.MainLive.Layout.Message
+  alias ChatWeb.MainLive.Page
 
   #
   # LiveView events

@@ -5,8 +5,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
   use Phoenix.Component
 
-  alias Phoenix.PubSub
-
+  alias Chat.Db.ModeManager
   alias Chat.Dialogs
   alias Chat.Identity
   alias Chat.Log
@@ -16,8 +15,11 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.User
   alias Chat.Utils
   alias Chat.Utils.StorageId
+
   alias ChatWeb.MainLive.Page
   alias ChatWeb.Router.Helpers, as: Routes
+
+  alias Phoenix.PubSub
 
   @per_page 15
 
@@ -95,6 +97,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
           time
         )
         |> Dialogs.add_new_message(me, dialog)
+        |> tap(fn _ -> ModeManager.end_bulk_write() end)
         |> then(&{:ok, &1})
       end
     )
@@ -378,7 +381,6 @@ defmodule ChatWeb.MainLive.Page.Dialog do
         %{assigns: %{image_gallery: %{mode: mode, current: current, next: next}}} = socket
       ) do
     send(self(), {:dialog, {:preload_image_gallery, :next}})
-    "in next" |> IO.inspect()
 
     socket
     |> assign(:image_gallery, %{

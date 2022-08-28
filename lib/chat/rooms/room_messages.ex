@@ -12,8 +12,8 @@ defmodule Chat.Rooms.RoomMessages do
 
   @db_key :room_message
 
-  @spec add_new_message(any(), Identity.t(), Dialog.t()) ::
-          {index :: integer(), Message.t()}
+  @spec add_new_message(any(), Identity, Dialog) ::
+          {index :: integer(), Message}
   def add_new_message(
         message,
         %Identity{} = author,

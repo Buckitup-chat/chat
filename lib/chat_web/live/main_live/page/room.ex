@@ -80,6 +80,13 @@ defmodule ChatWeb.MainLive.Page.Room do
     socket
   end
 
+  def send_file(%{assigns: %{room: nil}} = socket, entry, {chunk_key, _secret}) do
+    delete_orphan_chunks(chunk_key)
+
+    consume_uploaded_entry(socket, entry, fn _ -> :ignore end)
+    socket
+  end
+
   def send_file(
         %{assigns: %{me: me, room: room, client_timestamp: time}} = socket,
         entry,
@@ -402,4 +409,6 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:messages, [])
     |> assign(:message_update_mode, :append)
   end
+
+  defp delete_orphan_chunks(key), do: Chat.ChunkedFiles.delete(key)
 end

@@ -24,7 +24,7 @@ defimpl Chat.DryStorable, for: Chat.Messages.Text do
 
   def timestamp(text), do: text.timestamp
 
-  @spec type(Chat.Messages.Text.t()) :: atom()
+  @spec type(Chat.Messages.Text) :: atom()
   def type(text) do
     if String.length(text.text) > 150 do
       :memo

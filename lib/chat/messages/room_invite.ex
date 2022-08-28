@@ -27,6 +27,6 @@ defimpl Chat.DryStorable, for: Chat.Messages.RoomInvite do
 
   def timestamp(%RoomInvite{} = msg), do: msg.timestamp
 
-  @spec type(Chat.Messages.RoomInvite.t()) :: atom()
+  @spec type(Chat.Messages.RoomInvite) :: atom()
   def type(%RoomInvite{} = _), do: :room_invite
 end

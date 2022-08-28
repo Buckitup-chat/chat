@@ -57,6 +57,6 @@ defimpl Chat.DryStorable, for: Chat.Messages.File do
 
   def timestamp(%File{} = msg), do: msg.timestamp
 
-  @spec type(File.t()) :: atom()
+  @spec type(File) :: atom()
   def type(%File{type: type}), do: type
 end

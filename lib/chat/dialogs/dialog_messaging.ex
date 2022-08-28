@@ -2,6 +2,7 @@ defmodule Chat.Dialogs.DialogMessaging do
   @moduledoc "Message reading and writing"
 
   alias Chat.Db
+  alias Chat.Dialogs.Dialog
   alias Chat.Dialogs.Message
   alias Chat.Dialogs.PrivateMessage
   alias Chat.DryStorable
@@ -11,12 +12,11 @@ defmodule Chat.Dialogs.DialogMessaging do
   alias Chat.Identity
   alias Chat.Utils
 
-  alias Chat.Dialogs.Dialog
 
   @db_prefix :dialog_message
 
-  @spec add_new_message(any(), Identity.t(), Dialog.t()) ::
-          {index :: integer(), Message.t()}
+  @spec add_new_message(message :: any(), author :: Identity, dialog :: Dialog) ::
+          {index :: integer(), Message}
   def add_new_message(
         message,
         %Identity{} = source,

@@ -3,7 +3,6 @@
     "deploy": "cd .. && mix assets.deploy && rm -f _build/esbuild"
   },
   "devDependencies": {
-    "cypress": "^10.4.0",
     "tailwindcss-font-inter": "^3.0.1"
   }
 }

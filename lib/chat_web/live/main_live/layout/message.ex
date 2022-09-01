@@ -231,7 +231,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
           <.icon id="share" class="w-4 h-4 flex fill-black"/>
           <span>Share</span>
         </a>
-        <a class="dropdownItem"
+        <a class="dropdownItem t-select-message"
            phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")
                      |> JS.push("#{message_of(@msg)}/toggle-messages-select", value: %{action: :on, id: @msg.id, chatType: message_of(@msg)})
                      |> JS.dispatch("chat:select-message", to: "#message-block-#{@msg.id}", detail: %{chatType: message_of(@msg)})

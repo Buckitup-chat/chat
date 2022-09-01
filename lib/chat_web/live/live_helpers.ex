@@ -91,7 +91,7 @@ defmodule ChatWeb.LiveHelpers do
     ~H"""
       <div
         id={@id}
-        class="dropdown"
+        class="dropdown t-dropdown"
         phx-click-away={JS.hide(transition: "fade-out", to: "#" <> @id)}
         phx-window-keydown={JS.hide(transition: "fade-out", to: "#" <> @id)}
         phx-key="escape"

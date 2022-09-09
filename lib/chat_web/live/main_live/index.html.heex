@@ -231,8 +231,15 @@
             <%= unless @dialog do %>
             <% else %>
               <Layout.ImageGallery.render mode="dialog" gallery={@image_gallery} />
-              <div id="chatContent" class="basis-[93%] overflow-y-auto flex flex-col justify-between relative a-content-block" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
-                  <div id="chatHeader" phx-click={JS.dispatch("phx:scroll-to-bottom")} class="w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start sticky top-0 right-0 t-chat-header" style="min-height: 56px;">
+              <div id="chatContent"
+               phx-hook="Chat"
+               class="basis-[93%] overflow-y-auto flex flex-col justify-between relative a-content-block" id={"chat-#{@peer.hash}"}
+               data-page={@page}
+               data-has-more-messages={"#{@has_more_messages}"}>
+                  <div id="chatHeader"
+                    phx-click={JS.dispatch("phx:scroll-to-bottom")}
+                    class="w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start sticky top-0 right-0 t-chat-header"
+                    style="min-height: 56px;">
                     <button phx-click={JS.push("dialog/close") |> close_content()} class="sm:hidden pr-3">
                       <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
                     </button>
@@ -261,7 +268,7 @@
                           phx-value-index={msg.index}
                           phx-value-type="dialog"
                         >
-                          <div class={classes("m-1 w-full flex", %{"justify-end" => msg.is_mine?, "justify-start" => !msg.is_mine?})} id={"dialog-message-#{msg.id}"}>
+                          <div class={classes("m-1 w-full flex", %{"justify-end t-chat-mine-message" => msg.is_mine?, "justify-start" => !msg.is_mine?})} id={"dialog-message-#{msg.id}"}>
                             <Layout.Message.render
                               color={msg.is_mine? && "bg-purple50" || "bg-white"}
                               msg={msg}
@@ -336,12 +343,12 @@
                     ">
                     <%= textarea di, :text,
                       placeholder: "Enter message",
-                      class: "w-full h-7 resize-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0",
+                      class: "w-full h-7 resize-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0 t-chat-input",
                       id: "dialog-input",
                       spellcheck: "false",
                       autocomplete: "off"
                     %>
-                    <button id="dialog-form-submit-button" type="submit">
+                    <button id="dialog-form-submit-button" class="t-chat-send-message-btn" type="submit">
                       <.icon id="send" class="w-7 h-7 flex fill-purple"/>
                     </button>
                   </.form>
@@ -350,10 +357,10 @@
                   <div class="w-full flex flex-col ">
                     <div class="flex items-center justify-between pb-2 mt-2">
                       <div class="w-[95%]">
-                        <h1 class="text-purple">Editing</h1>
+                        <h1 class="text-purple t-edit">Editing</h1>
                         <span class="truncate block text-xs text-black/50"><%= @edit_content %></span>
                       </div>
-                      <button type="button" phx-click="dialog/cancel-edit">
+                      <button type="button" class="t-cancel-edit" phx-click="dialog/cancel-edit">
                         <.icon id="close" class="w-7 h-7 flex fill-black/50"/>
                       </button>
                     </div>
@@ -369,13 +376,13 @@
                         document.getElementById('dialog-edit-form-submit-button').click()
                       }
                       ">
-                      <%= textarea dei, :text, class: "w-full px-0 resize-none outline-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0",
+                      <%= textarea dei, :text, class: "w-full px-0 resize-none outline-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0 t-chat-edit-input",
                             id: "dialog-edit-input",
                             spellcheck: "false",
                             autocomplete: "off",
                             value: @edit_content
                       %>
-                      <button id="dialog-edit-form-submit-button" type="submit">
+                      <button id="dialog-edit-form-submit-button" class="t-chat-edit-send-btn" type="submit">
                         <.icon id="send" class="w-7 h-7 flex fill-purple"/>
                       </button>
                     </.form>
@@ -383,7 +390,7 @@
                 <% end %>
                 <%= if @dialog_mode == :select do %>
                   <div class="w-full h-11 bg-white flex justify-between items-center">
-                    <button id="delete-btn" class="cursor-pointer inline-flex items-center disabled:pointer-events-none"
+                    <button id="delete-btn" class="cursor-pointer inline-flex items-center disabled:pointer-events-none t-delete-chat-msg-btn"
                       phx-click={show_modal("delete-messages-popup")
                                  |> JS.set_attribute({"phx-click", hide_modal("delete-messages-popup")
                                                                    |> JS.push("dialog/delete-messages")
@@ -395,7 +402,7 @@
                       <span id="delete-span">Delete</span>
                   </button>
 
-                    <a class="cursor-pointer inline-flex items-center">
+                    <a class="cursor-pointer inline-flex items-center t-download-chat-msg-btn">
                       <span class="text-purple">Download</span>
                       <.icon id="download" class="ml-1 w-4 h-4 flex  stroke-purple "/>
                     </a>
@@ -583,7 +590,7 @@
                 </button>
               </div>
             </div>
-              <div id="chatContent" class="basis-[93%] overflow-y-auto flex flex-col justify-between relative a-content-block t-chat-content" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
+              <div id="chatContent" class="basis-[93%] md:overflow-y-scroll flex flex-col justify-between relative a-content-block t-chat-content" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
 
                 <div class={classes("w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between sticky top-0 right-0")} style="min-height: 56px;" >
                   <div class="flex flex-row items-center">

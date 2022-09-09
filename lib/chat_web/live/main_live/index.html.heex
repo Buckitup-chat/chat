@@ -27,6 +27,7 @@
             let={f}
             for={:login}
             id="login-form"
+            class="t-login-form"
             phx-submit="login">
 
             <%= text_input f, :name, placeholder: "Your name", class: "w-full h-11 bg-transparent border border-white/50 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-0 focus:border-white" %>
@@ -60,12 +61,12 @@
           <p class="mt-3 text-sm text-black/50">To get access again you will need the recovery keys:</p>
           <button class="mt-5 w-full h-12 border-0 rounded-lg bg-grayscale flex items-center justify-center" phx-click="logout-go-middle">
             <div class="flex items-center justify-between">
-              <span class="text-sm text-white">Download the Keys</span>
+              <span class="text-sm text-white t-download-key">Download the Keys</span>
               <.icon id="upload1" class="w-4 h-4 ml-2 fill-white"/>
             </div>
           </button>
-          <button class="mt-3 w-full h-12 border rounded-lg border-black/10" phx-click="logout-wipe">Log Out without the Keys</button>
-          <button phx-click={hide_modal("logout-backup-popup")} class="mt-3 w-full h-12 border rounded-lg border-black/10" >Cancel</button>
+          <button class="mt-3 w-full h-12 border rounded-lg border-black/10 t-logout-without-key" phx-click="logout-wipe">Log Out without the Keys</button>
+          <button phx-click={hide_modal("logout-backup-popup")} class="mt-3 w-full h-12 border rounded-lg border-black/10 t-cancel-logout" >Cancel</button>
         <% end %>
         <%= if @logout_step == :middle do %>
           <h1 class="text-base font-bold text-grayscale">Set Up Password</h1>
@@ -112,16 +113,16 @@
         <%= if @logout_step == :final do %>
           <h1 class="text-base font-bold text-grayscale">Success</h1>
           <p class="mt-3 text-sm text-black/50">If you downloaded the the recovery key, you can log out now, it will erase all the browser data about BuckitUp.</p>
-          <button class="mt-3 w-full h-12 border-0 rounded-lg bg-grayscale text-white" phx-click="logout-wipe">Exit</button>
+          <button class="mt-3 w-full h-12 border-0 rounded-lg bg-grayscale text-white t-exit" phx-click="logout-wipe">Exit</button>
           <button phx-click={hide_modal("logout-backup-popup")} class="mt-3 w-full h-12 border rounded-lg border-black/10">Cancel</button>
         <% end %>
       </.modal>
-      <.modal id="delete-message-popup" class="">
+      <.modal id="delete-message-popup" class="t-delete-message-popup">
         <h1 class="text-base font-bold text-grayscale">Delete Message</h1>
         <p class="mt-3 text-sm text-black/50">Are you sure you want to do this?</p>
         <div class="mt-5 flex items-center justify-between">
-          <button phx-click={hide_modal("delete-message-popup")} class="w-full mr-1 h-12 border rounded-lg border-black/10">Cancel</button>
-          <button class="deleteMessageButton w-full ml-1 h-12 border-0 rounded-lg bg-red-500 flex items-center justify-center">
+          <button phx-click={hide_modal("delete-message-popup")} class="w-full mr-1 h-12 border rounded-lg border-black/10 t-delete-cancel">Cancel</button>
+          <button class="deleteMessageButton w-full ml-1 h-12 border-0 rounded-lg bg-red-500 flex items-center justify-center t-delete-message-btn">
             <span class="text-white mr-1">Delete</span>
             <.icon id="delete" class="w-4 h-4 fill-white"/>
           </button>
@@ -131,8 +132,8 @@
         <h1 class="text-base font-bold text-grayscale">Delete Messages</h1>
         <p class="mt-3 text-sm text-black/50">You can only delete your own messages. Are you sure you want to delete this message?</p>
         <div class="mt-5 flex items-center justify-between">
-          <button phx-click={hide_modal("delete-messages-popup")} class="w-full mr-1 h-12 border rounded-lg border-black/10">Cancel</button>
-          <button class="deleteMessageButton w-full ml-1 h-12 border-0 rounded-lg bg-red-500 flex items-center justify-center">
+          <button phx-click={hide_modal("delete-messages-popup")} class="w-full mr-1 h-12 border rounded-lg border-black/10 t-cancel-delete-msg-popup-btn">Cancel</button>
+          <button class="deleteMessageButton w-full ml-1 h-12 border-0 rounded-lg bg-red-500 flex items-center justify-center t-delete-message-popup-btn">
             <span class="text-white mr-1">Delete</span>
             <.icon id="delete" class="w-4 h-4 fill-white"/>
           </button>
@@ -169,7 +170,7 @@
             <div phx-click={JS.push("switch-lobby-mode")} phx-value-lobby-mode="feeds" class="sidebarIcon cursor-pointer mt-3">
               <.icon id="logo" class="w-9 h-9"/>
             </div>
-            <button phx-click="switch-lobby-mode" phx-value-lobby-mode="rooms" class="sidebarIcon mt-9">
+            <button phx-click="switch-lobby-mode" phx-value-lobby-mode="rooms" class="sidebarIcon mt-9 t-rooms">
               <.icon id="sidebarRooms" class={classes("w-6 h-6 hover:fill-purple", %{"fill-purple" => @lobby_mode == :rooms, "fill-grayscale" => @lobby_mode != :rooms})}/>
               <span class="text-xs">Rooms</span>
             </button>
@@ -210,7 +211,7 @@
                 <li phx-click="dialog/switch" phx-value-user-id={user.hash} class={classes("hidden sm:flex w-full cursor-pointer h-9 flex items-center hover:bg-stone250", %{"from-green-400 to-blue-500" => user == @peer})}>
                   <a><div class="flex flex-row px-7">
                     <%= if @my_id == user.hash do %>
-                      <div class="ml-1 text-sm"> My notes </div>
+                      <div class="ml-1 text-sm t-my-notes"> My notes </div>
                     <% else %>
                       <tt class="text-sm tracking-tighter text-grayscale600">[<%= short_hash(user.hash) %>]</tt>
                       <div class="ml-1 text-sm"><%= user.name %></div>
@@ -230,25 +231,32 @@
             <%= unless @dialog do %>
             <% else %>
               <Layout.ImageGallery.render mode="dialog" gallery={@image_gallery} />
-              <div id="chatContent" class="basis-[93%] md:overflow-scroll flex flex-col justify-between relative a-content-block" id={"chat-#{@peer.hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
-                  <div id="chatHeader" class="w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start sticky top-0 right-0" style="min-height: 56px;">
-                    <button phx-click={JS.push("dialog/close") |> close_content()} class="sm:hidden pr-3">
-                      <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
-                    </button>
-                    <%= if @my_id == @peer.hash do %>
-                      <h1 class="ml-1 text-base font-bolt text-white" >
-                        My private notes
-                      </h1>
-                      <div class="text-base text-white/60 ml-2">[<%= short_hash(@peer.hash) %>]</div>
-                      <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>
-                    <% else %>
-                      <div class="text-base text-white/60">[<%= short_hash(@peer.hash) %>]</div>
-                      <h1 class="ml-1 text-base font-bolt text-white" ><%= @peer.name %></h1>
-                      <button>
-                        <.icon id="edit" class="w-4 h-4 ml-1 flex fill-white/50"/>
+            <div id="chatContent"
+                  phx-hook="Chat"
+                  class="basis-[93%] overflow-y-auto flex flex-col justify-between relative a-content-block" id={"chat-#{@peer.hash}"}
+                  data-page={@page}
+                  data-has-more-messages={"#{@has_more_messages}"}>
+                    <div id="chatHeader"
+                      phx-click={JS.dispatch("phx:scroll-to-bottom")}
+                      class="w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start sticky top-0 right-0 t-chat-header"
+                      style="min-height: 56px;">
+                      <button phx-click={JS.push("dialog/close") |> close_content()} class="sm:hidden pr-3">
+                        <.icon id="arrowBack" class="w-6 h-6 fill-white"/>
                       </button>
-                    <% end %>
-                  </div>
+                      <%= if @my_id == @peer.hash do %>
+                        <h1 class="ml-1 text-base font-bolt text-white" >
+                           My private notes
+                        </h1>
+                        <div class="text-base text-white/60 ml-2">[<%= short_hash(@peer.hash) %>]</div>
+                        <h1 class="ml-1 text-base font-bolt text-white t-peer-name" ><%= @peer.name %></h1>
+                      <% else %>
+                        <div class="text-base text-white/60">[<%= short_hash(@peer.hash) %>]</div>
+                        <h1 class="ml-1 text-base font-bolt text-white t-peer-name" ><%= @peer.name %></h1>
+                        <button>
+                          <.icon id="edit" class="w-4 h-4 ml-1 flex fill-white/50"/>
+                        </button>
+                      <% end %>
+                    </div>
                   <div>
                     <div id="chat-messages" phx-update={@message_update_mode}>
                       <%= for msg <- @messages do %>
@@ -260,7 +268,7 @@
                           phx-value-index={msg.index}
                           phx-value-type="dialog"
                         >
-                          <div class={classes("m-1 w-full flex", %{"justify-end" => msg.is_mine?, "justify-start" => !msg.is_mine?})} id={"dialog-message-#{msg.id}"}>
+                          <div class={classes("m-1 w-full flex", %{"justify-end t-chat-mine-message" => msg.is_mine?, "justify-start" => !msg.is_mine?})} id={"dialog-message-#{msg.id}"}>
                             <Layout.Message.render
                               color={msg.is_mine? && "bg-purple50" || "bg-white"}
                               msg={msg}
@@ -335,12 +343,12 @@
                     ">
                     <%= textarea di, :text,
                       placeholder: "Enter message",
-                      class: "w-full h-7 resize-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0",
+                      class: "w-full h-7 resize-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0 t-chat-input",
                       id: "dialog-input",
                       spellcheck: "false",
                       autocomplete: "off"
                     %>
-                    <button id="dialog-form-submit-button" type="submit">
+                    <button id="dialog-form-submit-button" class="t-chat-send-message-btn" type="submit">
                       <.icon id="send" class="w-7 h-7 flex fill-purple"/>
                     </button>
                   </.form>
@@ -349,10 +357,10 @@
                   <div class="w-full flex flex-col ">
                     <div class="flex items-center justify-between pb-2 mt-2">
                       <div class="w-[95%]">
-                        <h1 class="text-purple">Editing</h1>
+                        <h1 class="text-purple t-edit">Editing</h1>
                         <span class="truncate block text-xs text-black/50"><%= @edit_content %></span>
                       </div>
-                      <button type="button" phx-click="dialog/cancel-edit">
+                      <button type="button" class="t-cancel-edit" phx-click="dialog/cancel-edit">
                         <.icon id="close" class="w-7 h-7 flex fill-black/50"/>
                       </button>
                     </div>
@@ -368,13 +376,13 @@
                         document.getElementById('dialog-edit-form-submit-button').click()
                       }
                       ">
-                      <%= textarea dei, :text, class: "w-full px-0 resize-none outline-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0",
+                      <%= textarea dei, :text, class: "w-full px-0 resize-none outline-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0 t-chat-edit-input",
                             id: "dialog-edit-input",
                             spellcheck: "false",
                             autocomplete: "off",
                             value: @edit_content
                       %>
-                      <button id="dialog-edit-form-submit-button" type="submit">
+                      <button id="dialog-edit-form-submit-button" class="t-chat-edit-send-btn" type="submit">
                         <.icon id="send" class="w-7 h-7 flex fill-purple"/>
                       </button>
                     </.form>
@@ -382,7 +390,7 @@
                 <% end %>
                 <%= if @dialog_mode == :select do %>
                   <div class="w-full h-11 bg-white flex justify-between items-center">
-                    <button id="delete-btn" class="cursor-pointer inline-flex items-center disabled:pointer-events-none"
+                    <button id="delete-btn" class="cursor-pointer inline-flex items-center disabled:pointer-events-none t-delete-chat-msg-btn"
                       phx-click={show_modal("delete-messages-popup")
                                  |> JS.set_attribute({"phx-click", hide_modal("delete-messages-popup")
                                                                    |> JS.push("dialog/delete-messages")
@@ -394,7 +402,7 @@
                       <span id="delete-span">Delete</span>
                   </button>
 
-                    <a class="cursor-pointer inline-flex items-center">
+                    <a class="cursor-pointer inline-flex items-center t-download-chat-msg-btn">
                       <span class="text-purple">Download</span>
                       <.icon id="download" class="ml-1 w-4 h-4 flex  stroke-purple "/>
                     </a>
@@ -420,7 +428,7 @@
 
                 <p class="mt-3 text-black/50 text-sm">Room Type</p>
                 <div class="mt-3 flex flex-col">
-                  <a class="inline">
+                  <a class="inline t-open-room">
                     <input
                       class="cursor-pointer text-orange-500" type="radio" id="typeChoice1" name="new_room[type]" value="public" checked
                       phx-click={JS.dispatch("room:switch-type",
@@ -434,7 +442,7 @@
                     <label class="cursor-pointer ml-1 text-black/50 text-sm" for="typeChoice1">Open</label>
                   </a>
                   <a class="inline">
-                    <input class="cursor-pointer text-orange-500" type="radio" id="typeChoice2" name="new_room[type]" value="request"
+                    <input class="cursor-pointer text-orange-500 t-private-room" type="radio" id="typeChoice2" name="new_room[type]" value="request"
                            phx-click={JS.dispatch("room:switch-type",
                                         to: "#typeChoice2",
                                         detail: %{
@@ -445,7 +453,7 @@
                     <label class="cursor-pointer ml-1 text-black/50 text-sm" for="typeChoice2">Private</label>
                   </a>
                   <a class="inline">
-                    <input class="cursor-pointer text-orange-500" type="radio" id="typeChoice3" name="new_room[type]" value="private"
+                    <input class="cursor-pointer text-orange-500 t-secret-room" type="radio" id="typeChoice3" name="new_room[type]" value="private"
                            phx-click={JS.dispatch("room:switch-type",
                                         to: "#typeChoice3",
                                         detail: %{
@@ -460,12 +468,12 @@
                   <.icon id="alert" class="basis-1/12 mr-2 w-4 h-4 fill-black/40"/>
                   <blockquote id="roomTypeDescription" class="basis-11/12 text-xs text-black/50 mr-3">Public room is visible for everyone. Anyone can join.</blockquote>
                 </div>
-                <%= submit "Create", phx_disable_with: "Saving...", class: "w-full h-11 mt-2 text-white border-0 rounded-lg bg-grayscale flex items-center justify-center" %>
+                <%= submit "Create", phx_disable_with: "Saving...", class: "w-full h-11 mt-2 text-white border-0 rounded-lg bg-grayscale flex items-center justify-center t-submit-create" %>
               </.form>
             </.modal>
             <div class='px-7 mt-3 flex items-center justify-between'>
               <h5 class="channel-block-text text-grayscale" style="font-size: 22px;">Rooms</h5>
-              <button id="room-create-toggle" class="w-5 h-5 border rounded-full flex items-center justify-center" style="background: linear-gradient(135deg, #611E87 0%, #A75B63 100%);" phx-click={show_modal("create-room-popup")}>
+              <button id="room-create-toggle" class="w-5 h-5 border rounded-full flex items-center justify-center t-sidebar-create-room" style="background: linear-gradient(135deg, #611E87 0%, #A75B63 100%);" phx-click={show_modal("create-room-popup")}>
                 <.icon id="add" class="w-3 h-3 flex fill-white"/>
               </button>
             </div>
@@ -474,7 +482,7 @@
                 <.icon id="arrowDown" class="w-4 h-4 flex fill-black"/>
                 <span class="ml-1 text-sm  font-bold cursor-pointer">Confirmed</span>
               </div>
-              <div class="mt-3 w-full ml-6 md:ml-10" id="confirmed-rooms">
+              <div class="mt-3 w-full ml-6 md:ml-10 t-confirmed-rooms" id="confirmed-rooms">
                 <ul>
                   <%= if @joined_rooms == [] do %>
                     <p class="text-base text-grayscale600 px-7">You have no rooms</p>
@@ -526,7 +534,7 @@
                 <.icon id="arrowDown" class="w-4 h-4 flex fill-black"/>
                 <span class="ml-1 text-sm  font-bold cursor-pointer">Not Confirmed</span>
               </div>
-              <div id="unconfirmed-rooms" class="mt-3 w-full">
+              <div id="unconfirmed-rooms" class="mt-3 w-full t-unconfirmed-rooms">
                 <ul>
                   <%= if @new_rooms == [] do %>
                     <p class="text-base text-grayscale600 px-7">You have no rooms</p>
@@ -558,9 +566,9 @@
           </div>
           <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
             <%= unless @room do %>
-              <div class="my-auto mx-auto flex flex-col items-center justify-center w-80 h-32 border-9 rounded-lg bg-white/20 ">
+              <div class="my-auto mx-auto flex flex-col items-center justify-center w-80 h-32 border-9 rounded-lg bg-white/20">
                 <span class="my-2 text-sm text-white">Select any Room or create your own</span>
-                <button phx-click={show_modal("create-room-popup")} class="my-2 flex flex-row items-center justify-center border rounded-lg border-white w-72 h-11">
+                <button phx-click={show_modal("create-room-popup")} class="my-2 flex flex-row items-center justify-center border rounded-lg border-white w-72 h-11 t-create-room">
                   <span class="text-sm text-white">Create Room</span>
                   <.icon id="add" class="w-4 h-4 flex fill-white"/>
                 </button>
@@ -582,7 +590,7 @@
                 </button>
               </div>
             </div>
-              <div id="chatContent" class="basis-[93%] md:overflow-y-scroll flex flex-col justify-between relative a-content-block" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
+              <div id="chatContent" class="basis-[93%] md:overflow-y-scroll flex flex-col justify-between relative a-content-block t-chat-content" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
 
                 <div class={classes("w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between sticky top-0 right-0")} style="min-height: 56px;" >
                   <div class="flex flex-row items-center">
@@ -608,7 +616,7 @@
                         <span class="text-base text-white">Requests</span>
                       </button>
                     <% end %>
-                    <button class="flex items-center" phx-click={if Chat.User.list() |> length == 1, do: nil, else: show_modal("room-invite-list")}>
+                    <button class="flex items-center t-invite-btn" phx-click={if Chat.User.list() |> length == 1, do: nil, else: show_modal("room-invite-list")}>
                       <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-white"/>
                       <span class="text-base text-white"> Invite</span>
                     </button>
@@ -634,11 +642,11 @@
                   </.modal>
                 <% end %>
                 <.modal id="room-invite-list"  class="z-30">
-                  <h1 class="text-base font-bold text-grayscale">Invite to the Room</h1>
+                  <h1 class="text-base font-bold text-grayscale t-invite-header">Invite to the Room</h1>
                   <div class="mt-3 w-full flex flex-col">
                     <%= for user <- Chat.User.list() do %>
                       <%= unless user.hash == @my_id do %>
-                        <div id={"user-#{user.hash}"} class="flex flex-row items-center justify-between">
+                        <div id={"user-#{user.hash}"} class="flex flex-row items-center justify-between t-invite">
                           <div class="inline-flex">
                             <div class="text-sm text-black/50">[<%= short_hash(user.hash) %>]</div>
                             <div class="ml-1 text-sm"><%= user.name %></div>
@@ -667,7 +675,7 @@
                           phx-value-index={msg.index}
                           phx-value-type="room"
                       >
-                        <div class={classes("m-1 w-full flex", %{"justify-end x-mine" => msg.author_hash == @my_id, "justify-start x-peer" => msg.author_hash != @my_id})} id={"room-message-#{msg.id}"}>
+                        <div class={classes("m-1 w-full flex t-room-mine-message", %{"justify-end x-mine" => msg.author_hash == @my_id, "justify-start x-peer" => msg.author_hash != @my_id})} id={"room-message-#{msg.id}"}>
                           <Layout.Message.render
                             color={msg.author_hash == @my_id && "bg-purple50" || "bg-white" }
                             msg={msg}
@@ -677,7 +685,7 @@
                             timezone={@timezone}
                           />
                         </div>
-                        <input type="checkbox" class="selectCheckbox w-6 h-6 ml-3 mt-3 rounded-full text-purple/90 bg-black/10 border-gray-300 focus:ring-2" />
+                        <input type="checkbox" class="selectCheckbox w-6 h-6 ml-3 mt-3 rounded-full text-purple/90 bg-black/10 border-gray-300 focus:ring-2 t-selectCheckbox" />
                       </div>
                     <% end %>
                   </div>
@@ -718,7 +726,7 @@
                   >
                     <%= live_file_input @uploads.room_file, style: "display: none"  %>
                   </.form>
-                  <button class="relative" id="attachFileBtn" phx-click={JS.dispatch("click", to: "#room-file-form input[type=file]")}>
+                  <button class="relative t-attach-file" id="attachFileBtn" phx-click={JS.dispatch("click", to: "#room-file-form input[type=file]")}>
                     <.icon id="attach" class="w-7 h-7 mt-3 flex fill-white"/>
                   </button>
                   <.form
@@ -736,12 +744,12 @@
                   >
                     <%= textarea di, :text,
                       placeholder: "Enter message",
-                      class: "w-full h-7 resize-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0",
+                      class: "w-full h-7 resize-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0 t-room-input",
                       id: "room-input",
                       spellcheck: "false",
                       autocomplete: "off"
                     %>
-                    <button id="room-form-submit-button" type="submit">
+                    <button id="room-form-submit-button" class="t-room-send-message-btn" type="submit">
                       <.icon id="send" class="w-7 h-7 flex fill-purple"/>
                     </button>
                   </.form>
@@ -750,10 +758,10 @@
                   <div class="w-full flex flex-col ">
                     <div class="flex items-center justify-between pb-2 mt-2">
                       <div class="w-[95%]">
-                        <h1 class="text-purple">Editing</h1>
+                        <h1 class="text-purple t-edit">Editing</h1>
                         <span class="truncate block text-xs text-black/50"><%= @edit_content %></span>
                       </div>
-                      <button type="button" class="" phx-click="room/cancel-edit" >
+                      <button type="button" class="t-cancel-edit" phx-click="room/cancel-edit" >
                         <.icon id="close" class="w-7 h-7 flex fill-black/50"/>
                       </button>
                     </div>
@@ -770,21 +778,21 @@
                       }
                       ">
                       <%= textarea dei, :text,
-                            class: "w-full px-0 resize-none outline-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0",
+                            class: "w-full px-0 resize-none outline-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0 t-room-edit-input",
                             id: "room-edit-input",
                             spellcheck: "false",
                             autocomplete: "off",
                             value: @edit_content
                       %>
                       <button id="room-edit-form-submit-button" type="submit">
-                        <.icon id="send" class="w-7 h-7 flex fill-purple"/>
+                        <.icon id="send" class="w-7 h-7 flex fill-purple t-room-edit-send-btn"/>
                       </button>
                     </.form>
                   </div>
                 <% end %>
                 <%= if @room_mode == :select do %>
                   <div class="w-full h-11 bg-white flex justify-between items-center">
-                    <button id="delete-btn" class="cursor-pointer inline-flex items-center disabled:pointer-events-none"
+                    <button id="delete-btn" class="cursor-pointer inline-flex items-center disabled:pointer-events-none t-delete-room-msg-btn"
                       phx-click={show_modal("delete-messages-popup")
                                 |> JS.set_attribute({"phx-click", hide_modal("delete-messages-popup")
                                                                   |> JS.push("room/delete-messages")
@@ -796,7 +804,7 @@
                       <span id="delete-span">Delete</span>
                     </button>
 
-                    <a class="cursor-pointer inline-flex items-center">
+                    <a class="cursor-pointer inline-flex items-center t-download-room-msg-btn">
                       <span class="text-purple">Download</span>
                       <.icon id="download" class="ml-1 w-4 h-4 flex  stroke-purple "/>
                     </a>

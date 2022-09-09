@@ -197,7 +197,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
         <div class="text-sm text-grayscale600">[<%= short_hash(@author.hash) %>]</div>
         <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
       </div>
-      <button type="button" class="messageActionsDropdownButton hiddenUnderSelection" phx-click={open_dropdown("messageActionsDropdown-#{@msg.id}")
+      <button type="button" class="messageActionsDropdownButton hiddenUnderSelection t-message-dropdown" phx-click={open_dropdown("messageActionsDropdown-#{@msg.id}")
                          |> JS.dispatch("chat:set-dropdown-position", to: "#messageActionsDropdown-#{@msg.id}", detail: %{relativeElementId: "message-#{@msg.id}"})}
       >
         <.icon id="menu" class="w-4 h-4 flex fill-purple"/>
@@ -205,7 +205,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       <.dropdown class="messageActionsDropdown " id={"messageActionsDropdown-#{@msg.id}"} >
         <%= if @is_mine do %>
           <%= if @msg.type in [:text, :memo] do %>
-            <a class="dropdownItem"
+            <a class="dropdownItem t-edit-message"
               phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{message_of(@msg)}/message/edit")}
               phx-value-id={@msg.id}
               phx-value-index={@msg.index}
@@ -214,7 +214,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
               <span>Edit</span>
             </a>
           <% end %>
-          <a class="dropdownItem"
+          <a class="dropdownItem t-delete-message"
             phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")
                        |> show_modal("delete-message-popup")
                        |> JS.set_attribute({"phx-click", hide_modal("delete-message-popup") |> JS.push(message_of(@msg) <> "/delete-messages") |> stringify_commands()}, to: "#delete-message-popup .deleteMessageButton")
@@ -232,7 +232,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
           <.icon id="share" class="w-4 h-4 flex fill-black"/>
           <span>Share</span>
         </a>
-        <a class="dropdownItem"
+        <a class="dropdownItem t-select-message"
            phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")
                      |> JS.push("#{message_of(@msg)}/toggle-messages-select", value: %{action: :on, id: @msg.id, chatType: message_of(@msg)})
                      |> JS.dispatch("chat:select-message", to: "#message-block-#{@msg.id}", detail: %{chatType: message_of(@msg)})
@@ -273,7 +273,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       <img
         class="object-cover overflow-hidden"
         src={@url}
-        phx-click={"#{@mode}/message/open-image-gallery"}
+        phx-click={JS.push("#{@mode}/message/open-image-gallery") |> JS.add_class("hidden", to: "#chatContent")}
         phx-value-id={@msg_id}
         phx-value-index={@msg_index}
       />

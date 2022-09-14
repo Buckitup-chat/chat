@@ -53,6 +53,36 @@ defmodule Chat.Rooms do
   def read_message({_, %Message{}} = msg, %Identity{} = identity),
     do: RoomMessages.read(msg, identity)
 
+  def read_prev_message(
+        msg_id,
+        %Identity{} = identity,
+        predicate
+      ) do
+    RoomMessages.get_prev_message(msg_id, identity, predicate)
+    |> case do
+      nil ->
+        nil
+
+      message ->
+        RoomMessages.read(message, identity)
+    end
+  end
+
+  def read_next_message(
+        msg_id,
+        %Identity{} = identity,
+        predicate
+      ) do
+    RoomMessages.get_next_message(msg_id, identity, predicate)
+    |> case do
+      nil ->
+        nil
+
+      message ->
+        RoomMessages.read(message, identity)
+    end
+  end
+
   def read_message({_, _} = msg_id, %Identity{} = identity, id_map_builder),
     do: RoomMessages.read(msg_id, identity, id_map_builder)
 

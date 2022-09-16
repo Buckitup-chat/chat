@@ -574,22 +574,7 @@
                 </button>
               </div>
             <% else %>
-            <div id="imageGallery" class=" hidden relative bg-black opacity-80">
-              <button phx-click={JS.add_class("hidden", to: "#imageGallery") |> JS.remove_class("hidden", to: "#dialogInput") |> JS.remove_class("md:hidden", to: "#chatRoomBar") |> JS.remove_class("hidden", to: "#chatContent")} class="text-white flex relative left-5 top-10"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="white" viewBox="0 0 24 24"><path d="M16.67 0l2.83 2.829-9.339 9.175 9.339 9.167-2.83 2.829-12.17-11.996z"/></svg>
-                <p class="left-3.5 bottom-[-3px] absolute">Back</p>
-              </button>
-              <div class="h-screen flex justify-center items-center lg:h-[99vh]">
-                <img class="w-full z-10 lg:h-[85vh] lg:p-14" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRQBQQfBzEsqTN91MHwdukq0yaBxWIcn5RjUw&usqp=CAU" alt="book">
-              </div>
-              <div class="button-container flex justify-between absolute bottom-[45%] z-10 w-full p-5" >
-                <button>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="white" viewBox="0 0 24 24"><path d="M16.67 0l2.83 2.829-9.339 9.175 9.339 9.167-2.83 2.829-12.17-11.996z"/></svg>
-                </button>
-                <button>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="white" viewBox="0 0 24 24"><path d="M5 3l3.057-3 11.943 12-11.943 12-3.057-3 9-9z"/></svg>
-                </button>
-              </div>
-            </div>
+              <Layout.ImageGallery.render mode="room" gallery={@image_gallery} />
               <div id="chatContent" class="basis-[93%] md:overflow-y-scroll flex flex-col justify-between relative a-content-block t-chat-content" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
 
                 <div class={classes("w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between sticky top-0 right-0")} style="min-height: 56px;" >

@@ -575,7 +575,14 @@
               </div>
             <% else %>
               <Layout.ImageGallery.render mode="room" gallery={@image_gallery} />
-              <div id="chatContent" class="basis-[93%] md:overflow-y-scroll flex flex-col justify-between relative a-content-block t-chat-content" id={"room-#{@room.admin_hash}"} phx-hook="Chat" data-page={@page} data-has-more-messages={"#{@has_more_messages}"}>
+              <div
+                id="chatContent"
+                class="basis-[93%] md:overflow-y-scroll flex flex-col justify-between relative a-content-block t-chat-content"
+                id={"room-#{@room.admin_hash}"}
+                phx-hook="Chat" data-page={@page}
+                data-has-more-messages={"#{@has_more_messages}"}
+                phx-click={JS.dispatch("phx:scroll-to-bottom")}
+              >
 
                 <div class={classes("w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-between sticky top-0 right-0")} style="min-height: 56px;" >
                   <div class="flex flex-row items-center">

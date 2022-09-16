@@ -71,6 +71,30 @@ defmodule Chat.Rooms.RoomMessages do
     }
   end
 
+  def get_next_message({index, id} = _msg_id, room_identity, predicate) do
+    with room_key <- Identity.pub_key(room_identity),
+         msg_key <- key(room_key, index, id),
+         msg_key_max <- key(room_key, nil, "some") do
+      Db.get_next(
+        msg_key,
+        msg_key_max,
+        predicate
+      )
+    end
+  end
+
+  def get_prev_message({index, id} = _msg_id, room_identity, predicate) do
+    with room_key <- Identity.pub_key(room_identity),
+         msg_key <- key(room_key, index, id),
+         msg_key_min <- key(room_key, 0, 0) do
+      Db.get_prev(
+        msg_key,
+        msg_key_min,
+        predicate
+      )
+    end
+  end
+
   def update_message(
         new_message,
         {index, id} = _msg_id,

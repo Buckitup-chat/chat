@@ -15,6 +15,9 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
       {"message/" <> action, %{"id" => id, "index" => index}} ->
         socket |> route_message_event({action, {index |> String.to_integer(), id}})
 
+      {"image-gallery/" <> action, _} ->
+        socket |> route_image_gallery_event({action})
+
       {"create", %{"new_room" => %{"name" => name, "type" => type}}} ->
         socket |> Page.Lobby.new_room(name, type |> String.to_existing_atom())
 
@@ -63,6 +66,22 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
 
       "download" ->
         socket |> Page.Room.download_message(msg_id)
+
+      "open-image-gallery" ->
+        socket |> Page.Room.open_image_gallery(msg_id)
+    end
+  end
+
+  def route_image_gallery_event(socket, {action}) do
+    case action do
+      "close" ->
+        socket |> Page.Room.close_image_gallery()
+
+      "next" ->
+        socket |> Page.Room.image_gallery_next()
+
+      "prev" ->
+        socket |> Page.Room.image_gallery_prev()
     end
   end
 
@@ -80,6 +99,12 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
 
       {:deleted_message, msg_id} ->
         socket |> Page.Room.hide_deleted_message(msg_id)
+
+      {:preload_image_gallery, :next} ->
+        socket |> Page.Room.image_gallery_preload_next()
+
+      {:preload_image_gallery, :prev} ->
+        socket |> Page.Room.image_gallery_preload_prev()
     end
   end
 end

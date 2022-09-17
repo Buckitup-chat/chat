@@ -59,14 +59,13 @@ config :phoenix, :json_library, Jason
 config :tzdata, :autoupdate, :disabled
 config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
 
-
-config :chat, :db,
+config :chat,
   data_pid: nil,
   file_pid: nil,
-  write_budget: :infinity,
+  write_budget: 0,
   mode: :initial,
-  flags: []
-
+  flags: [],
+  writable: :checking
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

@@ -331,6 +331,128 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:room_mode, :plain)
   end
 
+  def open_image_gallery(
+        %{assigns: %{room_identity: room_identity}} = socket,
+        {m_index, m_id} = msg_id
+      ) do
+    send(self(), {:room, {:preload_image_gallery, :next}})
+    send(self(), {:room, {:preload_image_gallery, :prev}})
+
+    Rooms.read_message(msg_id, room_identity, &User.id_map_builder/1)
+    |> case do
+      %{type: :image, content: json} ->
+        {id, secret} = json |> StorageId.from_json()
+
+        socket
+        |> assign(:image_gallery, %{
+          mode: "room",
+          current: %{
+            url: Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64()),
+            id: m_id,
+            index: m_index
+          },
+          next: %{url: nil, id: nil, index: nil},
+          prev: %{url: nil, id: nil, index: nil}
+        })
+
+      _ ->
+        socket
+    end
+  end
+
+   def image_gallery_preload_next(
+        %{assigns: %{room_identity: identity, image_gallery: gallery}} = socket
+      ) do
+    msg_id = {gallery.current.index, gallery.current.id}
+
+    msg_id
+    |> Rooms.read_next_message(identity, fn
+      {_, %{type: :image}} -> true
+      _ -> false
+    end)
+    |> case do
+      %{content: json, id: id, index: index} ->
+        {file_id, secret} = json |> StorageId.from_json()
+
+        socket
+        |> assign(
+          :image_gallery,
+          gallery
+          |> put_in([:next], %{
+            url: Routes.file_url(socket, :image, file_id, a: secret |> Base.url_encode64()),
+            id: id,
+            index: index
+          })
+        )
+
+      _ ->
+        socket
+    end
+  end
+
+  def image_gallery_preload_prev(
+        %{assigns: %{room_identity: identity, image_gallery: gallery}} = socket
+      ) do
+    msg_id = {gallery.current.index, gallery.current.id}
+
+    msg_id
+    |> Rooms.read_prev_message(identity, fn
+      {_, %{type: :image}} -> true
+      _ -> false
+    end)
+    |> case do
+      %{content: json, id: id, index: index} ->
+        {file_id, secret} = json |> StorageId.from_json()
+
+        socket
+        |> assign(
+          :image_gallery,
+          gallery
+          |> put_in([:prev], %{
+            url: Routes.file_url(socket, :image, file_id, a: secret |> Base.url_encode64()),
+            id: id,
+            index: index
+          })
+        )
+
+      _ ->
+        socket
+    end
+  end
+
+  def image_gallery_next(
+        %{assigns: %{image_gallery: %{mode: mode, current: current, next: next}}} = socket
+      ) do
+    send(self(), {:room, {:preload_image_gallery, :next}})
+
+    socket
+    |> assign(:image_gallery, %{
+      mode: mode,
+      current: next,
+      prev: current,
+      next: %{url: nil, id: nil, index: nil}
+    })
+  end
+
+  def image_gallery_prev(
+        %{assigns: %{image_gallery: %{mode: mode, current: current, prev: prev}}} = socket
+      ) do
+    send(self(), {:room, {:preload_image_gallery, :prev}})
+
+    socket
+    |> assign(:image_gallery, %{
+      mode: mode,
+      current: prev,
+      next: current,
+      prev: %{url: nil, id: nil, index: nil}
+    })
+  end
+
+  def close_image_gallery(socket) do
+    socket
+    |> assign(:image_gallery, nil)
+  end
+
   defp room_topic(%Rooms.Room{pub_key: key}) do
     key
     |> Utils.hash()

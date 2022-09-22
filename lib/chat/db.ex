@@ -6,10 +6,13 @@ defmodule Chat.Db do
 
   use GenServer
 
+  import Chat.Db.Common
+
   alias Chat.Db.Maintenance
   alias Chat.Db.ModeManager
   alias Chat.Db.Pids
   alias Chat.Db.Queries
+  alias Chat.Db.WritableUpdater
 
   @db_version "v.7"
   @db_location Application.compile_env(:chat, :cub_db_file, "priv/db")
@@ -23,27 +26,29 @@ defmodule Chat.Db do
   def get_next(key, max_key, predicate), do: Queries.get_next(db(), key, max_key, predicate)
   def get_prev(key, min_key, predicate), do: Queries.get_prev(db(), key, min_key, predicate)
 
-  def put(key, value), do: Queries.put(db(), key, value)
-  def delete(key), do: Queries.delete(db(), key)
-  def bulk_delete({_min, _max} = range), do: Queries.bulk_delete(db(), range)
+  def put(key, value),
+    do: writable_action(fn -> budgeted_put(db(), key, value) end)
+
+  def delete(key),
+    do: writable_action(fn -> Queries.delete(db(), key) end)
+
+  def bulk_delete({_min, _max} = range),
+    do: writable_action(fn -> Queries.bulk_delete(db(), range) end)
 
   #
   # GenServer interface
   #
 
   def db do
-    __MODULE__
-    |> GenServer.call(:db)
+    get_chat_db_env(:data_pid)
   end
 
   def file_db do
-    __MODULE__
-    |> GenServer.call(:file_db)
+    get_chat_db_env(:file_pid)
   end
 
   def writable? do
-    __MODULE__
-    |> GenServer.call(:writable?)
+    get_chat_db_env(:writable) != :no
   end
 
   def swap_pid(new_pids) do
@@ -56,7 +61,6 @@ defmodule Chat.Db do
   #
 
   def start_link(opts \\ %{}) do
-    Chat.Time.init_time()
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
@@ -65,23 +69,30 @@ defmodule Chat.Db do
     {:ok, db} = CubDB.start_link(file_path(), auto_file_sync: true)
     {:ok, file_db} = CubDB.start_link(file_db_path(), auto_file_sync: false, auto_compact: false)
 
+    put_chat_db_env(:data_pid, db)
+    put_chat_db_env(:file_pid, file_db)
+
+    WritableUpdater.check()
+
     {:ok, {%Pids{main: db, file: file_db}, 100}}
   end
 
   @impl true
-  def handle_call(:db, _from, {%Pids{main: pid}, _} = state) do
-    {:reply, pid, state}
-  end
+  def handle_call(
+        {:swap, %Pids{main: new_data_db, file: new_file_db} = new},
+        _from,
+        {_, writable_size}
+      ) do
+    put_chat_db_env(:writable, :checking)
+    old_data_pid = get_chat_db_env(:data_pid)
+    old_file_pid = get_chat_db_env(:file_pid)
 
-  def handle_call(:file_db, _from, {%Pids{file: pid}, _} = state) do
-    {:reply, pid, state}
-  end
+    put_chat_db_env(:data_pid, new_data_db)
+    put_chat_db_env(:file_pid, new_file_db)
+    WritableUpdater.check()
 
-  def handle_call(:writable?, _from, {_, writable_size} = state) do
-    {:reply, writable_size > 0, state}
-  end
+    old = %Pids{main: old_data_pid, file: old_file_pid}
 
-  def handle_call({:swap, %Pids{} = new}, _from, {%Pids{} = old, writable_size}) do
     {:reply, old, {new, writable_size}}
   end
 

@@ -4,6 +4,8 @@ defmodule Chat.FileDb do
   """
   require Logger
 
+  import Chat.Db.Common
+
   alias Chat.Db
   alias Chat.Db.Queries
 
@@ -20,7 +22,12 @@ defmodule Chat.FileDb do
   def get_prev(key, min_key, predicate),
     do: Queries.get_prev(Db.file_db(), key, min_key, predicate)
 
-  def put(key, value), do: Queries.put(Db.file_db(), key, value)
-  def delete(key), do: Queries.delete(Db.file_db(), key)
-  def bulk_delete({_min, _max} = range), do: Queries.bulk_delete(Db.file_db(), range)
+  def put(key, value),
+    do: writable_action(fn -> budgeted_put(Db.file_db(), key, value) end)
+
+  def delete(key),
+    do: writable_action(fn -> Queries.delete(Db.file_db(), key) end)
+
+  def bulk_delete({_min, _max} = range),
+    do: writable_action(fn -> Queries.bulk_delete(Db.file_db(), range) end)
 end

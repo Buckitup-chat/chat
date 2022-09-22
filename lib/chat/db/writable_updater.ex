@@ -3,8 +3,21 @@ defmodule Chat.Db.WritableUpdater do
 
   use GenServer
 
-  alias Chat.Db
+  import Chat.Db.Common
+
+  require Logger
+
   alias Chat.Db.Maintenance
+
+  @debounce_buffer_ms :timer.seconds(1)
+  @check_interval :timer.seconds(311)
+
+  defstruct timer: nil, debounce_till: 0
+
+  def check do
+    __MODULE__
+    |> GenServer.cast(:check)
+  end
 
   #
   # GenServer implementation
@@ -16,42 +29,57 @@ defmodule Chat.Db.WritableUpdater do
 
   @impl true
   def init(_opts) do
-    send_db_current_writable_size()
-    schedule_writable_check()
-
-    {:ok, nil}
+    {:ok, do_check(%__MODULE__{})}
   end
 
   @impl true
-  def handle_info(:check_writable, state) do
-    send_db_current_writable_size()
-    schedule_writable_check()
+  def handle_cast(:check, %__MODULE__{} = state) do
+    state
+    |> do_check()
+    |> noreply()
+  end
 
-    {:noreply, state}
+  @impl true
+  def handle_info(:check_writable, %__MODULE__{} = state) do
+    state
+    |> do_check()
+    |> noreply()
   end
 
   #
   # Logic
   #
 
-  defp schedule_writable_check do
-    Process.send_after(self(), :check_writable, 1000)
-  end
+  defp do_check(%__MODULE__{debounce_till: till} = state) do
+    if till < now_ms() do
+      update_current_db_writable_size()
 
-  defp send_db_current_writable_size do
-    pid = Db.db()
-
-    if Process.alive?(pid) do
-      pid
-      |> CubDB.data_dir()
-      |> Maintenance.path_writable_size()
+      %__MODULE__{
+        timer: schedule_writable_check(),
+        debounce_till: now_ms() + @debounce_buffer_ms
+      }
     else
-      0
+      state
     end
-    |> then(fn size ->
-      Db
-      |> Process.whereis()
-      |> send({:writable_size, size})
-    end)
   end
+
+  defp schedule_writable_check do
+    Process.send_after(self(), :check_writable, @check_interval)
+  end
+
+  defp update_current_db_writable_size do
+    :data_pid
+    |> get_chat_db_env()
+    |> Maintenance.calc_write_budget()
+    |> tap(fn size ->
+      put_chat_db_env(:write_budget, size)
+      put_chat_db_env(:writable, Maintenance.writable_by_write_budget(size))
+      Logger.info("[db] free space checked. Budget = #{size}")
+    end)
+  rescue
+    _ -> 0
+  end
+
+  defp now_ms, do: System.system_time(:millisecond)
+  defp noreply(x), do: {:noreply, x}
 end

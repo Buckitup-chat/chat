@@ -4,7 +4,7 @@ defmodule Chat.Db.Supervisor do
 
   alias Chat.Db
   alias Chat.Db.ModeManager
-  #  alias Chat.Db.WritableUpdater
+  alias Chat.Db.WritableUpdater
 
   def start_link(init_arg) do
     Supervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
@@ -14,8 +14,8 @@ defmodule Chat.Db.Supervisor do
   def init(_init_arg) do
     children = [
       ModeManager,
+      WritableUpdater,
       Db
-      #      WritableUpdater
     ]
 
     Supervisor.init(children, strategy: :rest_for_one)

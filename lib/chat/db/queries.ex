@@ -1,8 +1,6 @@
 defmodule Chat.Db.Queries do
   @moduledoc "DB functions to retrieve and store data"
 
-  alias Chat.Db
-
   def list(db, range, transform) do
     db
     |> list(range)
@@ -72,29 +70,23 @@ defmodule Chat.Db.Queries do
   end
 
   def put(db, key, value) do
-    if Db.writable?() do
-      db
-      |> CubDB.put(key, value)
-    end
+    db
+    |> CubDB.put(key, value)
   end
 
   def delete(db, key) do
-    if Db.writable?() do
-      db
-      |> CubDB.delete(key)
-    end
+    db
+    |> CubDB.delete(key)
   end
 
   def bulk_delete(db, {min, max}) do
-    if Db.writable?() do
-      key_list =
-        CubDB.select(db,
-          min_key: min,
-          max_key: max
-        )
-        |> Enum.map(fn {key, _value} -> key end)
+    key_list =
+      CubDB.select(db,
+        min_key: min,
+        max_key: max
+      )
+      |> Enum.map(fn {key, _value} -> key end)
 
-      CubDB.delete_multi(db, key_list)
-    end
+    CubDB.delete_multi(db, key_list)
   end
 end

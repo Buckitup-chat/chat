@@ -174,7 +174,7 @@
               <.icon id="sidebarRooms" class={classes("w-6 h-6 hover:fill-purple", %{"fill-purple" => @lobby_mode == :rooms, "fill-grayscale" => @lobby_mode != :rooms})}/>
               <span class="text-xs">Rooms</span>
             </button>
-            <button phx-click="switch-lobby-mode" phx-value-lobby-mode="chats" class="sidebarIcon mt-5">
+            <button phx-click="switch-lobby-mode" phx-value-lobby-mode="chats" class="sidebarIcon mt-5 t-chats">
               <.icon id="sidebarChats" class={classes("w-6 h-6 hover:fill-purple", %{"fill-purple" => @lobby_mode == :chats, "fill-grayscale" => @lobby_mode != :chats})}/>
               <span class="text-xs">Chats</span>
             </button>
@@ -233,7 +233,7 @@
               <Layout.ImageGallery.render mode="dialog" gallery={@image_gallery} />
             <div id="chatContent"
                   phx-hook="Chat"
-                  class="basis-[93%] overflow-y-auto flex flex-col justify-between relative a-content-block" id={"chat-#{@peer.hash}"}
+                  class="basis-[93%] overflow-y-auto flex flex-col justify-between relative a-content-block t-chat-content" id={"chat-#{@peer.hash}"}
                   data-page={@page}
                   data-has-more-messages={"#{@has_more_messages}"}>
                     <div id="chatHeader"
@@ -483,7 +483,7 @@
                 <span class="ml-1 text-sm  font-bold cursor-pointer">Confirmed</span>
               </div>
               <div class="mt-3 w-full ml-6 md:ml-10 t-confirmed-rooms" id="confirmed-rooms">
-                <ul>
+                <ul class="t-confirmed-rooms-list">
                   <%= if @joined_rooms == [] do %>
                     <p class="text-base text-grayscale600 px-7">You have no rooms</p>
                   <% else %>

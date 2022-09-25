@@ -19,6 +19,11 @@ defmodule Chat.Db.WritableUpdater do
     |> GenServer.cast(:check)
   end
 
+  def force_check do
+    __MODULE__
+    |> GenServer.call(:force_check)
+  end
+
   #
   # GenServer implementation
   #
@@ -30,6 +35,14 @@ defmodule Chat.Db.WritableUpdater do
   @impl true
   def init(_opts) do
     {:ok, do_check(%__MODULE__{})}
+  end
+
+  @impl true
+  def handle_call(:force_check, _, %__MODULE__{} = state) do
+    state
+    |> Map.put(:debounce_till, 0)
+    |> do_check()
+    |> then(&{:reply, :ok, &1})
   end
 
   @impl true
@@ -50,9 +63,10 @@ defmodule Chat.Db.WritableUpdater do
   # Logic
   #
 
-  defp do_check(%__MODULE__{debounce_till: till} = state) do
+  defp do_check(%__MODULE__{debounce_till: till, timer: old_timer} = state) do
     if till < now_ms() do
       update_current_db_writable_size()
+      if old_timer, do: Process.cancel_timer(old_timer)
 
       %__MODULE__{
         timer: schedule_writable_check(),

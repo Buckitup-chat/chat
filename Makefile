@@ -29,6 +29,8 @@ deploy:
 	git push gigalixir 
 
 firmware:
+	rm -rf priv/db
+	rm -rf priv/admin_db
 	mix phx.digest
 	MIX_TARGET=host mix compile assets.deploy
 

@@ -73,6 +73,7 @@ defmodule Chat.Db do
     put_chat_db_env(:file_pid, file_db)
 
     WritableUpdater.check()
+    "[db] Started database" |> Logger.notice()
 
     {:ok, {%Pids{main: db, file: file_db}, 100}}
   end
@@ -90,6 +91,7 @@ defmodule Chat.Db do
     put_chat_db_env(:data_pid, new_data_db)
     put_chat_db_env(:file_pid, new_file_db)
     WritableUpdater.check()
+    "[db] pids swapped" |> Logger.info()
 
     old = %Pids{main: old_data_pid, file: old_file_pid}
 

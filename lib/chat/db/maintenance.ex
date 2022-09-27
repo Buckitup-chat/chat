@@ -8,16 +8,37 @@ defmodule Chat.Db.Maintenance do
   end
 
   def path_free_space(path) do
-    System.cmd("df", ["-P", path])
+    System.cmd("df", ["-Pk", path])
     |> elem(0)
     |> String.split("\n", trim: true)
     |> List.last()
     |> String.split(" ", trim: true)
     |> Enum.at(3)
     |> String.to_integer()
-    |> Kernel.*(512)
+    |> Kernel.*(1024)
   rescue
     _ -> 0
+  end
+
+  def path_to_device(path) do
+    with {data, 0} <- System.cmd("df", ["-P", path]),
+         [_header, row] <- String.split(data, "\n", trim: true),
+         [full_device | _] <- String.split(row, " ", trim: true) do
+      full_device
+    else
+      _ -> nil
+    end
+  end
+
+  def device_to_path(device) do
+    with {data, 0} <- System.cmd("df", ["-P"]),
+         [_header | rows] <- String.split(data, "\n", trim: true),
+         row <- Enum.find(rows, &String.starts_with?(&1, device)),
+         [_, _, _, _, _, path] <- String.split(row, " ", trim: true) do
+      path
+    else
+      _ -> nil
+    end
   end
 
   def db_size(db) do

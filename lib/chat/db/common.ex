@@ -49,12 +49,10 @@ defmodule Chat.Db.Common do
   end
 
   def get_chat_db_env(key) do
-    # IO.write(".")
     Application.fetch_env!(@app_atom, key)
   end
 
   def put_chat_db_env(key, value) do
-    # IO.write("+")
     Application.put_env(@app_atom, key, value)
   end
 end

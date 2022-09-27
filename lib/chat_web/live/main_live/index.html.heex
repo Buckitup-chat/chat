@@ -187,7 +187,7 @@
           </div>
           <div class="flex flex-col items-center">
             <div class="row mt-10">
-              <!-- Layout.DbStatus.render status={@db_status} / -->
+              <Layout.DbStatus.render status={@db_status} />
               <button phx-click={JS.push("logout-open") |> show_modal("logout-backup-popup")} class="sidebarIcon mb-1">
                 <.icon id="logout" class="w-6 h-6 hover:fill-purple"/>
                 <span class="text-xs">Log out & Back Up</span>

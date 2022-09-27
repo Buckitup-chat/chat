@@ -16,12 +16,14 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   def init(socket) do
     PubSub.subscribe(Chat.PubSub, @topic)
+    PubSub.subscribe(Chat.PubSub, Chat.Db.StatusPoller.channel())
 
     socket
     |> assign(:mode, :lobby)
     |> assign(:lobby_mode, :chats)
     |> assign(:image_gallery, nil)
     |> assign(:version, get_version())
+    |> assign(:db_status, Chat.Db.StatusPoller.info())
     |> assign_user_list()
     |> approve_joined_room_requests()
     |> assign_room_list()
@@ -94,6 +96,11 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> join_approved_rooms()
   end
 
+  def set_db_status(socket, status) do
+    socket
+    |> assign(:db_status, status)
+  end
+
   def refresh_room_list(socket),
     do:
       socket
@@ -102,6 +109,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   def close(socket) do
     PubSub.unsubscribe(Chat.PubSub, @topic)
+    PubSub.unsubscribe(Chat.PubSub, Chat.Db.StatusPoller.channel())
 
     socket
   end

@@ -307,6 +307,8 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_info({:db_status, msg}, socket), do: socket |> Page.Lobby.set_db_status(msg) |> noreply()
+
   def handle_info({:room, msg}, socket),
     do: socket |> Page.RoomRouter.info(msg) |> noreply()
 

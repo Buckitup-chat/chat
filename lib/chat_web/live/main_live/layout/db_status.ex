@@ -10,32 +10,52 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
       <button  class="sidebarIcon mb-1">
         <%= if @status.writable == :no do %>
           <!-- Red background on full button -->
-          <span class="text-xs">Read Only</span>
-        <% end %> 
+            <div class="ml-5 mb-2">
+              <.icon id="redDataBase" class="w-6 h-6"/>
+           </div>
+        <% end %>
 
-        <%= if @status.mode == :internal do %> 
+        <%= if @status.mode == :internal do %>
           <!-- Crossed DB icon -->
-          <.icon id="sidebarChats" class="w-6 h-6"/>
+            <div class="ml-5 mb-2">
+              <.icon id="dataBase" class="w-6 h-6"/>
+            </div>
         <% end %>
-        <%= if @status.mode == :main do %> 
+        <%= if @status.mode == :main do %>
           <!-- DB icon -->
-          <.icon id="sidebarRooms" class="w-6 h-6"/>
+            <div class="ml-5 mb-2">
+              <.icon id="crossedDataBase" class="w-6 h-6 animation-pulse"/>
+           </div>
         <% end %>
-        <%= if @status.mode == :internal_to_main do %> 
+        <%= if @status.mode == :internal_to_main do %>
           <!-- Blinking or transparent DB icon -->
-          <.icon id="admin" class="w-6 h-6"/>
+            <div class="ml-5 mb-2">
+              <.icon id="dataBase" class="w-6 h-6 animation-pulse"/>
+           </div>
         <% end %>
-        <%= if @status.mode == :main_to_internal do %> 
+        <%= if @status.mode == :main_to_internal do %>
           <!-- Blinking or transparent Crossed DB icon -->
-          <.icon id="admin" class="w-6 h-6"/>
+            <div class="ml-5 mb-2">
+              <.icon id="crossedDataBase" class="w-6 h-6 animation-pulse"/>
+           </div>
         <% end %>
 
-        <span class="text-xs">
+
           <!-- Saving or downloading icon -->
-          <%= if @status.flags[:backup] do %> backup <% end %>
+          <%= if @status.flags[:backup] do %>
+          <div class="ml-7 mb-1">
+            <.icon id="backUp" class="w-6 h-6"/>
+          </div>
+          <% end %>
           <!-- Syncronization icon, like cirle arrows -->
-          <%= if @status.flags[:replication] do %> repl <% end %>
-        </span>
+          <%= if @status.flags[:replication] do %>
+          <div class="ml-7">
+            <.icon id="replication" class="w-6 h-6"/>
+          </div>
+           <% end %>
+           <div class="ml-7">
+              <.icon id="car" class="w-6 h-6"/>
+           </div>
       </button>
     """
   end

@@ -18,6 +18,8 @@ defmodule Chat.Db.Common do
         if :yes == get_chat_db_env(:writable) do
           action.()
         end
+
+      :no -> :ignored
     end
   end
 
@@ -44,7 +46,10 @@ defmodule Chat.Db.Common do
       {:file_chunk, _, first, last} -> 200 + trunc((last - first + 1) * 1.2)
       {:dialogs, _} -> 200 + 2 * 2_200
       {:dialog_message, _, _, _} -> 300 + 2 * 1_700
-      _ -> 11_000_000
+      {:room_invite, _} -> 200 + 4000
+      {:rooms, _} -> 200 + 2_200
+      {:room_message, _, _, _} -> 300 + 1_700
+      _ -> 12_000_000
     end
   end
 

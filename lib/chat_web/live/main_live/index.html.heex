@@ -914,7 +914,7 @@
               <Layout.Admin.block title="Maintenance">
 
                 <section>
-                  <pre><%= inspect(@db_status, pretty: true) %></pre>
+                  <Layout.Admin.db_status status={@db_status} />
                   Read Only Mode: <%= if @ro_mode, do: "yes", else: "no" %>
                 </section>
                 <section class="p-2 text-grayscale600">

@@ -9,7 +9,6 @@ defmodule Chat.Db do
   import Chat.Db.Common
 
   alias Chat.Db.Maintenance
-  alias Chat.Db.ModeManager
   alias Chat.Db.Pids
   alias Chat.Db.Queries
   alias Chat.Db.WritableUpdater
@@ -117,20 +116,14 @@ defmodule Chat.Db do
   def version_path, do: @db_version
 
   def copy_data(src_db, dst_db, _opts \\ []) do
-    dst_writable_size =
-      dst_db
-      |> CubDB.data_dir()
-      |> Maintenance.path_writable_size()
+    dst_writable_size = Maintenance.db_free_space(dst_db)
 
     if dst_writable_size > 0 do
       if Maintenance.db_size(src_db) * 1.5 > dst_writable_size do
-        fn -> reckless_copy(src_db, dst_db) end
+        reckless_copy(src_db, dst_db)
       else
-        fn ->
-          cautious_copy(src_db, dst_db)
-        end
+        cautious_copy(src_db, dst_db, dst_writable_size)
       end
-      |> then(&bulk_write(dst_db, &1))
     end
   end
 
@@ -141,26 +134,27 @@ defmodule Chat.Db do
     |> Stream.run()
   end
 
-  defp cautious_copy(src_db, dst_db) do
+  defp cautious_copy(src_db, dst_db, initial_size) do
     src_db
     |> CubDB.select()
-    # |> Stream.chunk_
-    # |> Stream.reduce_while(fn entries ->
-    #
-    # end)
-    |> Stream.each(fn {k, v} -> dst_db |> CubDB.put_new(k, v) end)
-    |> Stream.run()
-  end
+    |> Enum.reduce_while(initial_size, fn {k, v}, space_left ->
+      item_size = calc_budget(k, v)
 
-  defp bulk_write(dst_db, action) do
-    if dst_db == db() do
-      ModeManager.start_bulk_write()
-      action.()
-      ModeManager.end_bulk_write()
-    else
-      Maintenance.sync_preparation(dst_db)
-      action.()
-      Maintenance.sync_finalization(dst_db)
-    end
+      disk_space =
+        if item_size > space_left do
+          Maintenance.db_free_space(dst_db) - 70_000_000
+        else
+          space_left
+        end
+
+      if disk_space > item_size do
+        dst_db |> CubDB.put_new(k, v)
+        {:cont, disk_space - item_size}
+      else
+        path = dst_db |> CubDB.data_dir()
+        "[db] No space left while copying to #{path}" |> Logger.warn()
+        {:halt, 0}
+      end
+    end)
   end
 end

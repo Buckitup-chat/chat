@@ -360,7 +360,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     end
   end
 
-   def image_gallery_preload_next(
+  def image_gallery_preload_next(
         %{assigns: %{room_identity: identity, image_gallery: gallery}} = socket
       ) do
     msg_id = {gallery.current.index, gallery.current.id}
@@ -524,7 +524,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   defp set_messages_timestamp([]), do: nil
-  defp set_messages_timestamp([message | _]), do: message.timestamp
+  defp set_messages_timestamp([message | _]), do: message.index
 
   defp forget_current_messages(socket) do
     socket

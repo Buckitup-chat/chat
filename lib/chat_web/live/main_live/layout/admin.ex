@@ -26,4 +26,25 @@ defmodule ChatWeb.MainLive.Layout.Admin do
       </article>
     """
   end
+
+  def db_status(assigns) do
+    flags =
+      assigns.status.flags
+      |> Enum.filter(fn {_, v} -> v == true end)
+      |> Enum.map_join(", ", &elem(&1, 0))
+
+     budget =
+      assigns.status.write_budget
+      |> Integer.digits(1000)
+      |> Enum.map_join(" ", &to_string/1)
+
+    assigns = assign(assigns, flags: flags, budget: budget)
+
+    ~H"""
+      <label class="text-black/50"> Mode: </label><span><%= @status.mode %></span><br/>
+      <label class="text-black/50"> Flags: </label><span><%= @flags %></span><br/>
+      <label class="text-black/50"> Writable: </label><span><%= @status.writable %></span><br/>
+      <label class="text-black/50"> Write Budget: </label><span><%= @budget %> bytes</span><br/>
+    """
+  end
 end

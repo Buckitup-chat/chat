@@ -188,6 +188,13 @@ defmodule ChatWeb.MainLive.Layout.Message do
       </div>
     </div>
     """
+  rescue
+    _ ->
+      ~H"""
+      <div class="flex items-center justify-between">
+        Error getting file
+      </div>  
+      """
   end
 
   defp message_header(assigns) do

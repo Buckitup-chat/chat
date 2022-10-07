@@ -1,5 +1,5 @@
 defmodule ChatWeb.DeviceLogController do
-  @moduledoc "Dump devide log"
+  @moduledoc "Backup functionality that should be moved into system secret room"
   use ChatWeb, :controller
 
   alias Phoenix.PubSub
@@ -9,13 +9,21 @@ defmodule ChatWeb.DeviceLogController do
 
   def log(conn, _) do
     PubSub.subscribe(Chat.PubSub, @incoming_topic)
-    PubSub.broadcast(Chat.PubSub, @outgoing_topic, :device_log)
+    PubSub.broadcast(Chat.PubSub, @outgoing_topic, :get_device_log)
 
     body =
       receive do
-        {:device_log, log} -> log
+        {:platform_response, {:device_log, log}} ->
+          log
+          |> Enum.map_join("\n", fn {level, {_module, msg, {{a, b, c}, {d, e, f, g}}, _extra}} ->
+            date = NaiveDateTime.new!(a, b, c, d, e, f, g * 1000)
+            "#{date} [#{level}] #{msg}"
+          end)
+
+        any ->
+          inspect(any)
       after
-        :timer.seconds(3) ->
+        :timer.seconds(10) ->
           "Timeout"
       end
 

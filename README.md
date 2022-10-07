@@ -11,6 +11,7 @@
 
 1. `x-` prefixed classes are for logic binding, not for layout
 2. `a-` prefixed classes are to aggregate/apply tailwind ones or create our own clases
+3. `t-` prefixed classes are for test anchors
 
 
 

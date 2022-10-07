@@ -33,7 +33,7 @@ defmodule ChatWeb.MainLive.Layout.Admin do
       |> Enum.filter(fn {_, v} -> v == true end)
       |> Enum.map_join(", ", &elem(&1, 0))
 
-     budget =
+    budget =
       assigns.status.write_budget
       |> Integer.digits(1000)
       |> Enum.map_join(" ", &to_string/1)

@@ -19,7 +19,8 @@ defmodule Chat.Db.Common do
           action.()
         end
 
-      :no -> :ignored
+      :no ->
+        :ignored
     end
   end
 

@@ -17,19 +17,21 @@ defmodule Chat.Application do
       # Start DB
       Chat.Db.Supervisor,
       Chat.AdminDb,
-      # Start the Endpoint (http/https)
-      ChatWeb.Endpoint,
-      # Start a worker by calling: Chat.Worker.start_link(arg)
-      # {Chat.Worker, arg}
+      # Application Services
       Chat.KeyRingTokens,
       Chat.Broker,
       Chat.ChunkedFilesBroker,
-      Chat.Ordering.Counters
+      Chat.Ordering.Counters,
+      # Start the Endpoint (http/https)
+      ChatWeb.Endpoint
+      # Start a worker by calling: Chat.Worker.start_link(arg)
+      # {Chat.Worker, arg}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Chat.Supervisor]
+
     Supervisor.start_link(children, opts)
   end
 

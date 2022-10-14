@@ -8,8 +8,7 @@ defmodule Chat.Db do
 
   import Chat.Db.Common
 
-  alias Chat.Db.Maintenance
-  alias Chat.Db.ModeManager
+  # alias Chat.Db.Maintenance
   alias Chat.Db.Pids
   alias Chat.Db.Queries
   alias Chat.Db.WritableUpdater
@@ -43,8 +42,8 @@ defmodule Chat.Db do
     get_chat_db_env(:data_pid)
   end
 
-  def file_db do
-    get_chat_db_env(:file_pid)
+  def file_dir do
+    get_chat_db_env(:files_base_dir)
   end
 
   def writable? do
@@ -67,33 +66,33 @@ defmodule Chat.Db do
   @impl true
   def init(_opts) do
     {:ok, db} = CubDB.start_link(file_path(), auto_file_sync: true)
-    {:ok, file_db} = CubDB.start_link(file_db_path(), auto_file_sync: false, auto_compact: false)
+    files_dir = file_db_path()
 
     put_chat_db_env(:data_pid, db)
-    put_chat_db_env(:file_pid, file_db)
+    put_chat_db_env(:files_base_dir, files_dir)
 
     WritableUpdater.check()
     "[db] Started database" |> Logger.notice()
 
-    {:ok, {%Pids{main: db, file: file_db}, 100}}
+    {:ok, {%Pids{main: db, file: files_dir}, 100}}
   end
 
   @impl true
   def handle_call(
-        {:swap, %Pids{main: new_data_db, file: new_file_db} = new},
+        {:swap, %Pids{main: new_data_db, file: new_file_dir} = new},
         _from,
         {_, writable_size}
       ) do
     put_chat_db_env(:writable, :checking)
     old_data_pid = get_chat_db_env(:data_pid)
-    old_file_pid = get_chat_db_env(:file_pid)
+    old_files_dir = get_chat_db_env(:files_base_dir)
 
     put_chat_db_env(:data_pid, new_data_db)
-    put_chat_db_env(:file_pid, new_file_db)
+    put_chat_db_env(:files_base_dir, new_file_dir)
     WritableUpdater.check()
     "[db] pids swapped" |> Logger.info()
 
-    old = %Pids{main: old_data_pid, file: old_file_pid}
+    old = %Pids{main: old_data_pid, file: old_files_dir}
 
     {:reply, old, {new, writable_size}}
   end
@@ -111,27 +110,21 @@ defmodule Chat.Db do
   end
 
   def file_db_path do
-    "#{@db_location}/files_#{@db_version}"
+    "#{@db_location}/files"
   end
 
   def version_path, do: @db_version
 
   def copy_data(src_db, dst_db, _opts \\ []) do
-    dst_writable_size =
-      dst_db
-      |> CubDB.data_dir()
-      |> Maintenance.path_writable_size()
+    # dst_writable_size = Maintenance.db_free_space(dst_db)
 
-    if dst_writable_size > 0 do
-      if Maintenance.db_size(src_db) * 1.5 > dst_writable_size do
-        fn -> reckless_copy(src_db, dst_db) end
-      else
-        fn ->
-          cautious_copy(src_db, dst_db)
-        end
-      end
-      |> then(&bulk_write(dst_db, &1))
-    end
+    # if dst_writable_size > 0 do
+    #   if Maintenance.db_size(src_db) * 1.5 > dst_writable_size do
+    reckless_copy(src_db, dst_db)
+    #   else
+    #     cautious_copy(src_db, dst_db, dst_writable_size)
+    #   end
+    # end
   end
 
   defp reckless_copy(src_db, dst_db) do
@@ -141,26 +134,31 @@ defmodule Chat.Db do
     |> Stream.run()
   end
 
-  defp cautious_copy(src_db, dst_db) do
-    src_db
-    |> CubDB.select()
-    # |> Stream.chunk_
-    # |> Stream.reduce_while(fn entries ->
-    #
-    # end)
-    |> Stream.each(fn {k, v} -> dst_db |> CubDB.put_new(k, v) end)
-    |> Stream.run()
-  end
+  # defp cautious_copy(src_db, dst_db, initial_size) do
+  #   src_db
+  #   |> CubDB.select()
+  #   |> Enum.reduce_while(initial_size, fn {k, v}, space_left ->
+  #     item_size = calc_budget(k, v)
 
-  defp bulk_write(dst_db, action) do
-    if dst_db == db() do
-      ModeManager.start_bulk_write()
-      action.()
-      ModeManager.end_bulk_write()
-    else
-      Maintenance.sync_preparation(dst_db)
-      action.()
-      Maintenance.sync_finalization(dst_db)
-    end
+  #     disk_space =
+  #       if item_size > space_left do
+  #         Maintenance.db_free_space(dst_db) - 70_000_000
+  #       else
+  #         space_left
+  #       end
+
+  #     if disk_space > item_size do
+  #       dst_db |> CubDB.put_new(k, v)
+  #       {:cont, disk_space - item_size}
+  #     else
+  #       path = dst_db |> CubDB.data_dir()
+  #       "[db] No space left while copying to #{path}" |> Logger.warn()
+  #       {:halt, 0}
+  #     end
+  #   end)
+  # end
+
+  def copy_files(from, to) do
+    File.cp_r(from, to, fn _, _ -> false end)
   end
 end

@@ -12,7 +12,6 @@ defmodule Chat.Dialogs.DialogMessaging do
   alias Chat.Identity
   alias Chat.Utils
 
-
   @db_prefix :dialog_message
 
   @spec add_new_message(message :: any(), author :: Identity, dialog :: Dialog) ::

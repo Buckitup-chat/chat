@@ -33,7 +33,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
   #
 
   def info(socket, message) do
-    Logger.warn("Chat receives: " <> inspect(message, pretty: true))
+    # Logger.warn("Chat receives: " <> inspect(message, pretty: true))
 
     case message do
       {:error, reason} ->

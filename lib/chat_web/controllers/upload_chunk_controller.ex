@@ -16,7 +16,7 @@ defmodule ChatWeb.UploadChunkController do
       |> send_resp(200, "")
     else
       e ->
-        Logger.error(inspect(e))
+        Logger.error("[upload] error processing chunk" <> inspect(e))
         raise "404"
     end
   end

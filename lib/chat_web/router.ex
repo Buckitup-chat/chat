@@ -17,6 +17,7 @@ defmodule ChatWeb.Router do
   scope "/", ChatWeb do
     pipe_through :browser
 
+    get "/log", DeviceLogController, :log
     get "/index", PageController, :index
     get "/get/file/:id", FileController, :file
     get "/get/image/:id", FileController, :image
@@ -44,15 +45,16 @@ defmodule ChatWeb.Router do
   # If your application does not have an admins-only section yet,
   # you can use Plug.BasicAuth to set up some basic authentication
   # as long as you are also using SSL (which you should anyway).
-  if Mix.env() in [:dev, :test] do
-    import Phoenix.LiveDashboard.Router
+  #  if Mix.env() in [:dev, :test] do
+  import Phoenix.LiveDashboard.Router
 
-    scope "/" do
-      pipe_through :browser
+  scope "/" do
+    pipe_through :browser
 
-      live_dashboard "/dashboard", metrics: ChatWeb.Telemetry
-    end
+    live_dashboard "/dashboard", metrics: ChatWeb.Telemetry
   end
+
+  #  end
 
   # Tell all captured traffic to try later
   scope "/", log: false do

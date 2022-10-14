@@ -476,7 +476,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   defp set_messages_timestamp([]), do: nil
-  defp set_messages_timestamp([message | _]), do: message.timestamp
+  defp set_messages_timestamp([message | _]), do: message.index
 
   defp forget_current_messages(socket) do
     socket

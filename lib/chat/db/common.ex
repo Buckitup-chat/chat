@@ -2,7 +2,7 @@ defmodule Chat.Db.Common do
   @moduledoc "DB helper functions"
 
   alias Chat.Db.Queries
-  alias Chat.Db.WritableUpdater
+  # alias Chat.Db.WritableUpdater
 
   @app_atom :chat
   @checking_writable_timeout 500
@@ -25,17 +25,24 @@ defmodule Chat.Db.Common do
   end
 
   def budgeted_put(db, key, value) do
-    budget = calc_budget(key, value)
-    current_budget = get_chat_db_env(:write_budget)
+    # budget = calc_budget(key, value)
+    # current_budget = get_chat_db_env(:write_budget)
 
-    put_chat_db_env(:write_budget, max(0, current_budget - budget))
+    # put_chat_db_env(:write_budget, max(0, current_budget - budget))
 
-    if budget > current_budget do
-      put_chat_db_env(:writable, :checking)
-      WritableUpdater.check()
+    # if budget > current_budget do
+    #   put_chat_db_env(:writable, :checking)
+    #   WritableUpdater.check()
+    # end
+
+    if Process.alive?(db) do
+      Queries.put(db, key, value)
+    else
+      put_chat_db_env(:writable, :no)
+      Phoenix.PubSub.broadcast(Chat.PubSub, "chat->platform", :unmount_main)
+
+      :ignored
     end
-
-    Queries.put(db, key, value)
   end
 
   def calc_budget(key, value) do

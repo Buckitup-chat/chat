@@ -61,7 +61,7 @@ config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
 
 config :chat,
   data_pid: nil,
-  file_pid: nil,
+  files_base_dir: "priv/db/files",
   write_budget: 1_000_000,
   mode: :internal,
   flags: [],

@@ -19,9 +19,6 @@ defmodule ChatWeb.DeviceLogController do
             date = NaiveDateTime.new!(a, b, c, d, e, f, g * 1000)
             "#{date} [#{level}] #{msg}"
           end)
-
-        any ->
-          inspect(any)
       after
         :timer.seconds(10) ->
           "Timeout"

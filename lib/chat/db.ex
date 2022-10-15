@@ -12,6 +12,7 @@ defmodule Chat.Db do
   alias Chat.Db.Pids
   alias Chat.Db.Queries
   alias Chat.Db.WritableUpdater
+  alias Chat.FileFs
 
   @db_version "v.7"
   @db_location Application.compile_env(:chat, :cub_db_file, "priv/db")
@@ -159,6 +160,34 @@ defmodule Chat.Db do
   # end
 
   def copy_files(from, to) do
-    File.cp_r(from, to, fn _, _ -> false end)
+    "[db] files copy: #{from} => #{to}" |> Logger.info()
+    batch_files_copy(from, to)
+  end
+
+  def batch_files_copy(from, to, size \\ 10) do
+    from_keys = from |> FileFs.known_file_keys() |> MapSet.new()
+    to_keys = to |> FileFs.known_file_keys() |> MapSet.new()
+
+    from_length = from |> String.length()
+
+    from_keys
+    |> MapSet.difference(to_keys)
+    |> MapSet.to_list()
+    |> Enum.map(&FileFs.list_file_chunks(&1, from))
+    |> List.flatten()
+    |> Enum.chunk_every(size)
+    |> Enum.each(fn chunk ->
+      chunk
+      |> Enum.each(fn from_file ->
+        to_file = to <> String.slice(from_file, from_length..1500)
+        to_dir = to_file |> String.slice(0, String.length(to_file) - 21)
+
+        File.mkdir_p(to_dir)
+
+        File.copy(from_file, to_file)
+      end)
+
+      Process.sleep(50)
+    end)
   end
 end

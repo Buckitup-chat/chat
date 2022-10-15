@@ -80,20 +80,36 @@ defmodule Chat.FileFs do
     _ -> 0
   end
 
+  def known_file_keys(prefix \\ nil) do
+    prefix
+    |> build_path()
+    |> populate_level()
+    |> Enum.map(&populate_level/1)
+    |> List.flatten()
+    |> Enum.map(&List.last(Path.split(&1)))
+  rescue
+    _ -> []
+  end
+
+  def list_file_chunks(key, prefix \\ nil) do
+    key_path(key, build_path(prefix))
+    |> list_files()
+  end
+
   ##
   ##   Implementations
   ##
 
-  defp list_files(path) do
-    populate_level = fn path ->
-      path
-      |> File.ls!()
-      |> Enum.map(&Path.join([path, &1]))
-    end
-
+  defp populate_level(path) do
     path
-    |> then(populate_level)
-    |> Enum.map(populate_level)
+    |> File.ls!()
+    |> Enum.map(&Path.join([path, &1]))
+  end
+
+  defp list_files(path) do
+    path
+    |> populate_level()
+    |> Enum.map(&populate_level/1)
     |> List.flatten()
   end
 

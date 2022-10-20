@@ -5,7 +5,6 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   require Logger
 
-  alias Chat.Db.ModeManager
   alias Chat.Dialogs
   alias Chat.Identity
   alias Chat.Log
@@ -103,7 +102,6 @@ defmodule ChatWeb.MainLive.Page.Room do
           time
         )
         |> Rooms.add_new_message(me, room.pub_key)
-        |> tap(fn _ -> ModeManager.end_bulk_write() end)
         |> then(&{:ok, &1})
       end
     )

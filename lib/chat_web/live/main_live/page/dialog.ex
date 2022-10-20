@@ -5,7 +5,6 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
   use Phoenix.Component
 
-  alias Chat.Db.ModeManager
   alias Chat.Dialogs
   alias Chat.Identity
   alias Chat.Log
@@ -97,7 +96,6 @@ defmodule ChatWeb.MainLive.Page.Dialog do
           time
         )
         |> Dialogs.add_new_message(me, dialog)
-        |> tap(fn _ -> ModeManager.end_bulk_write() end)
         |> then(&{:ok, &1})
       end
     )

@@ -12,6 +12,7 @@ defmodule Chat.Db.StatusPoller do
     [:write_budget, :mode, :flags, :writable]
     |> Enum.map(&{&1, Common.get_chat_db_env(&1)})
     |> Enum.into(%{})
+    |> Map.put(:compacting, Chat.Db.db() |> CubDB.compacting?())
   end
 
   def channel, do: "chat_db_status"

@@ -45,6 +45,7 @@ defmodule ChatWeb.MainLive.Layout.Admin do
       <label class="text-black/50"> Flags: </label><span><%= @flags %></span><br/>
       <label class="text-black/50"> Writable: </label><span><%= @status.writable %></span><br/>
       <label class="text-black/50"> Write Budget: </label><span><%= @budget %> bytes</span><br/>
+      <label class="text-black/50"> DB compaction: </label><span><%= @status.compacting %></span><br/>
     """
   end
 end

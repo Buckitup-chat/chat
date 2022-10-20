@@ -3,7 +3,7 @@ defmodule Chat.Db.Supervisor do
   use Supervisor
 
   alias Chat.Db
-  alias Chat.Db.ModeManager
+  alias Chat.Db.FileFsProxy
   alias Chat.Db.StatusPoller
   alias Chat.Db.WritableUpdater
 
@@ -14,7 +14,7 @@ defmodule Chat.Db.Supervisor do
   @impl true
   def init(_init_arg) do
     children = [
-      ModeManager,
+      FileFsProxy,
       WritableUpdater,
       Db,
       StatusPoller

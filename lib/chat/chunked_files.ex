@@ -3,6 +3,7 @@ defmodule Chat.ChunkedFiles do
 
   alias Chat.ChunkedFilesBroker
   alias Chat.Db.Common
+  alias Chat.Db.FileFsProxy
   alias Chat.FileFs
   alias Chat.Utils
 
@@ -17,7 +18,7 @@ defmodule Chat.ChunkedFiles do
 
       chunk
       |> Utils.encrypt_blob(secret)
-      |> FileFs.write_file({key, chunk_start, chunk_end})
+      |> FileFsProxy.write_file({key, chunk_start, chunk_end})
     end)
   end
 
@@ -37,7 +38,7 @@ defmodule Chat.ChunkedFiles do
 
   def delete(key) do
     Common.writable_action(fn ->
-      FileFs.delete_file(key)
+      FileFsProxy.delete_file(key)
       ChunkedFilesBroker.forget(key)
     end)
   end

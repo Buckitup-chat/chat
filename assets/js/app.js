@@ -151,30 +151,6 @@ const listeners = {
         .classList.toggle(e.detail.class)
     }
   },
-  "chat:download": (e) => {
-    const path = e.path || (e.composedPath && e.composedPath());
-    const messageToDownload = path.find(el => el.classList.value.includes("x-download")).querySelector("video") 
-    || path.find(el => el.classList.value.includes("x-download")).querySelector("img")
-    || path.find(el => el.classList.value.includes("x-download")).querySelector(".x-file");
-    console.log(messageToDownload.getAttribute('href'))
-    const url = messageToDownload.src || messageToDownload.getAttribute('href');
-    let isVideo = messageToDownload.tagName === 'VIDEO';
-    fetch(url)
-    .then(resp => resp.blob())
-    .then(blobobject => {
-        const blob = window.URL.createObjectURL(blobobject);
-        const anchor = document.createElement('a');
-        anchor.style.display = 'none';
-        anchor.href = blob;
-        if(!isVideo) {
-            anchor.download = "";
-        } 
-        document.body.appendChild(anchor);
-        anchor.click();
-        window.URL.revokeObjectURL(url);
-    })
-    .catch(() => console.error('An error in downloadin gthe file sorry'));
-  },
   "phx:chat:redirect": (e) => {
     const openUrl = (url) => window.location = url;
     url = e.detail.url

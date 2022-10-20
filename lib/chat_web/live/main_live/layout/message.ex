@@ -243,8 +243,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
           <a
             class="dropdownItem"
             phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")
-                      # |> JS.push("#{message_of(@msg)}/message/download")
-                      |> JS.dispatch("chat:download")
+                      |> JS.push("#{message_of(@msg)}/message/download")
                       }
             phx-value-id={@msg.id}
             phx-value-index={@msg.index}

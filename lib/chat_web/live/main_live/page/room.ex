@@ -309,7 +309,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         socket
         |> push_event("chat:redirect", %{
           url:
-            Routes.file_url(socket, :video, id, a: secret |> Base.url_encode64(), download: true)
+            Routes.file_url(socket, :file, id, a: secret |> Base.url_encode64())
         })
 
       _ ->

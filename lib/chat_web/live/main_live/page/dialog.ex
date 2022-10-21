@@ -221,6 +221,16 @@ defmodule ChatWeb.MainLive.Page.Dialog do
             Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64(), download: true)
         })
 
+
+      %{type: :video, content: json} ->
+        {id, secret} = json |> StorageId.from_json()
+
+        socket
+        |> push_event("chat:redirect", %{
+          url:
+            Routes.file_url(socket, :file, id, a: secret |> Base.url_encode64())
+        })
+
       _ ->
         socket
     end

@@ -53,14 +53,4 @@ defmodule ChatWeb.Router do
 
     live_dashboard "/dashboard", metrics: ChatWeb.Telemetry
   end
-
-  #  end
-
-  # Tell all captured traffic to try later
-  scope "/", log: false do
-    match(:*, "/:first", ChatWeb.UnusedTrafficController, :not_available)
-    match(:*, "/:first/:sec", ChatWeb.UnusedTrafficController, :not_available)
-    match(:*, "/:first/:sec/:third", ChatWeb.UnusedTrafficController, :not_available)
-    match(:*, "/:first/:sec/:third/:forth", ChatWeb.UnusedTrafficController, :not_available)
-  end
 end

@@ -3,6 +3,7 @@ defmodule Chat.Db.Supervisor do
   use Supervisor
 
   alias Chat.Db
+  alias Chat.Db.DbSyncWatcher
   alias Chat.Db.FileFsProxy
   alias Chat.Db.StatusPoller
   alias Chat.Db.WritableUpdater
@@ -17,7 +18,8 @@ defmodule Chat.Db.Supervisor do
       FileFsProxy,
       WritableUpdater,
       Db,
-      StatusPoller
+      StatusPoller,
+      DbSyncWatcher
     ]
 
     Supervisor.init(children, strategy: :rest_for_one)

@@ -1,7 +1,7 @@
 defmodule ChatWeb.MainLive.Layout.DbStatus do
   @moduledoc "DB status layout"
 
-  import ChatWeb.LiveHelpers, only: [icon: 1]
+  import ChatWeb.LiveHelpers
 
   use Phoenix.Component
 
@@ -16,15 +16,15 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
         <% end %>
 
         <%= if @status.mode == :internal do %>
-          <!-- DB icon -->
+          <!-- Crossed DB icon -->
             <div class="ml-[23.5px] pb-2.5 pr-1">
-              <.icon id="dataBase" class="w-6 h-6"/>
+              <.icon id="crossedDataBase" class={classes("w-6 h-6 fill-gray-100", %{"fill-red-600" => @status.writable == :no})}/>
             </div>
         <% end %>
         <%= if @status.mode == :main do %>
-          <!-- Crossed DB icon -->
+          <!-- DB icon -->
             <div class="ml-5 mb-2">
-              <.icon id="crossedDataBase" class="w-6 h-6 animation-pulse"/>
+              <.icon id="dataBase" class="w-6 h-6"/>
             </div>
         <% end %>
         <%= if @status.mode == :internal_to_main do %>
@@ -71,15 +71,15 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
         <% end %>
 
         <%= if @status.mode == :internal do %>
-          <!-- DB icon -->
+          <!-- Crossed DB icon -->
             <div class="pb-2 pr-1">
-              <.icon id="dataBase" class="w-5 h-[19.5px]"/>
+              <.icon id="crossedDataBase" class="w-5 h-[19.5px] bg-red-600"/>
             </div>
         <% end %>
         <%= if @status.mode == :main do %>
-          <!-- Crossed DB icon -->
+          <!-- DB icon -->
             <div>
-              <.icon id="crossedDataBase" class="w-6 h-6 animation-pulse"/>
+              <.icon id="dataBase" class="w-6 h-6"/>
             </div>
         <% end %>
         <%= if @status.mode == :internal_to_main do %>

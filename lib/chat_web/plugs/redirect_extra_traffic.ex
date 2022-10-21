@@ -6,7 +6,7 @@ defmodule ChatWeb.Plugs.RedirectExtraTraffic do
       case conn.host do
         "buckitup.app" -> conn
         "localhost" -> conn
-        "offline-chat.gigalixir.com" -> conn
+        "offline-chat.gigalixirapp.com" -> conn
         _other -> redirect(conn)
       end
     else

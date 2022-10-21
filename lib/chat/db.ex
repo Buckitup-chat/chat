@@ -165,21 +165,18 @@ defmodule Chat.Db do
   end
 
   def batch_files_copy(from, to, size \\ 10) do
-    from_keys = from |> FileFs.known_file_keys() |> MapSet.new()
-    to_keys = to |> FileFs.known_file_keys() |> MapSet.new()
+    from_chunks = from |> chunks_set()
+    to_chunks = to |> chunks_set()
 
-    from_length = from |> String.length()
-
-    from_keys
-    |> MapSet.difference(to_keys)
+    from_chunks
+    |> MapSet.difference(to_chunks)
     |> MapSet.to_list()
-    |> Enum.map(&FileFs.list_file_chunks(&1, from))
-    |> List.flatten()
     |> Enum.chunk_every(size)
     |> Enum.each(fn chunk ->
       chunk
-      |> Enum.each(fn from_file ->
-        to_file = to <> String.slice(from_file, from_length..1500)
+      |> Enum.each(fn file ->
+        from_file = from <> file
+        to_file = to <> file
         to_dir = to_file |> String.slice(0, String.length(to_file) - 21)
 
         File.mkdir_p(to_dir)
@@ -189,5 +186,16 @@ defmodule Chat.Db do
 
       Process.sleep(50)
     end)
+  end
+
+  defp chunks_set(prefix) do
+    len = String.length(prefix)
+
+    prefix
+    |> FileFs.known_file_keys()
+    |> Enum.map(&FileFs.list_file_chunks(&1, prefix))
+    |> List.flatten()
+    |> Enum.map(&String.slice(&1, len..1500))
+    |> MapSet.new()
   end
 end

@@ -144,7 +144,8 @@
           <div phx-click={JS.push("switch-lobby-mode") |> open_content()} phx-value-lobby-mode="feeds" class="sidebarIcon">
             <.icon id="logo" class="w-6 h-6"/>
           </div>
-          <button class="flex justify-between" phx-click={JS.push("logout-open") |> show_modal("logout-backup-popup")} class="sidebarIcon mb-1">
+           <Layout.DbStatus.mobile status={@db_status} />
+          <button class="flex justify-between min-w-max" phx-click={JS.push("logout-open") |> show_modal("logout-backup-popup")} class="sidebarIcon mb-1">
             <.icon id="logout" class="w-4 h-4 hover:fill-purple"/>
             <span class="text-xs">Log out & Back Up</span>
           </button>
@@ -187,7 +188,7 @@
           </div>
           <div class="flex flex-col items-center">
             <div class="row mt-10">
-              <Layout.DbStatus.render status={@db_status} />
+              <Layout.DbStatus.desktop status={@db_status} />
               <button phx-click={JS.push("logout-open") |> show_modal("logout-backup-popup")} class="sidebarIcon mb-1">
                 <.icon id="logout" class="w-6 h-6 hover:fill-purple"/>
                 <span class="text-xs">Log out & Back Up</span>

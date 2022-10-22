@@ -2,6 +2,7 @@ defmodule Chat.Db.Common do
   @moduledoc "DB helper functions"
 
   alias Chat.Db.Queries
+  alias Chat.Db.DbSyncWatcher
   # alias Chat.Db.WritableUpdater
 
   @app_atom :chat
@@ -11,12 +12,14 @@ defmodule Chat.Db.Common do
     case get_chat_db_env(:writable) do
       :yes ->
         action.()
+        |> tap(fn _ -> DbSyncWatcher.mark() end)
 
       :checking ->
         Process.sleep(@checking_writable_timeout)
 
         if :yes == get_chat_db_env(:writable) do
           action.()
+          |> tap(fn _ -> DbSyncWatcher.mark() end)
         end
 
       :no ->

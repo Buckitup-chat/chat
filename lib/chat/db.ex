@@ -170,6 +170,9 @@ defmodule Chat.Db do
 
     from_chunks
     |> MapSet.difference(to_chunks)
+    |> tap(fn diff ->
+      "[db] #{MapSet.size(diff)} file chunks to copy" |> Logger.info()
+    end)
     |> MapSet.to_list()
     |> Enum.chunk_every(size)
     |> Enum.each(fn chunk ->

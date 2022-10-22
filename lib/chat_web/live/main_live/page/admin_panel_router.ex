@@ -3,7 +3,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
 
   require Logger
 
-  alias ChatWeb.MainLive.Page
+  alias ChatWeb.MainLive.Page.AdminPanel
 
   #
   # LiveView events
@@ -12,19 +12,22 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
   def event(socket, event) do
     case event do
       {"wifi-submit", %{"ssid" => ssid, "password" => password}} ->
-        socket |> Page.AdminPanel.set_wifi(ssid |> String.trim(), password |> String.trim())
+        socket |> AdminPanel.set_wifi(ssid |> String.trim(), password |> String.trim())
 
       {"invite-new-user", %{"hash" => hash}} ->
-        socket |> Page.AdminPanel.invite_user(hash)
+        socket |> AdminPanel.invite_user(hash)
 
       {"remove-user", %{"hash" => hash}} ->
-        socket |> Page.AdminPanel.remove_user(hash)
+        socket |> AdminPanel.remove_user(hash)
 
       {"remove-room", %{"hash" => hash}} ->
-        socket |> Page.AdminPanel.remove_room(hash)
+        socket |> AdminPanel.remove_room(hash)
 
       {"device-log", _} ->
-        socket |> Page.AdminPanel.request_log()
+        socket |> AdminPanel.request_log()
+
+      {"unmount-main", _} ->
+        socket |> AdminPanel.unmount_main()
     end
   end
 
@@ -37,16 +40,19 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
 
     case message do
       {:error, reason} ->
-        socket |> Page.AdminPanel.show_error(reason)
+        socket |> AdminPanel.show_error(reason)
 
       {:wifi_settings, settings} ->
-        socket |> Page.AdminPanel.show_wifi_settings(settings)
+        socket |> AdminPanel.show_wifi_settings(settings)
 
       {:updated_wifi_settings, _} ->
-        socket |> Page.AdminPanel.confirm_wifi_updated()
+        socket |> AdminPanel.confirm_wifi_updated()
 
       {:device_log, log} ->
-        socket |> Page.AdminPanel.render_device_log(log)
+        socket |> AdminPanel.render_device_log(log)
+
+      {:unmounted_main, _} ->
+        socket
     end
   end
 end

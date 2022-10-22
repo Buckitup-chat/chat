@@ -917,6 +917,7 @@
                 <section>
                   <Layout.Admin.db_status status={@db_status} />
                   Read Only Mode: <%= if @ro_mode, do: "yes", else: "no" %>
+                  <Layout.Admin.unmount_main_button mode={@db_status.mode} />
                 </section>
                 <section class="p-2 text-grayscale600">
                   <a href="#" phx-click="admin/device-log">Device Log</a>

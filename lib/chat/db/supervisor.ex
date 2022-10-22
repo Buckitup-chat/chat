@@ -17,9 +17,9 @@ defmodule Chat.Db.Supervisor do
     children = [
       FileFsProxy,
       WritableUpdater,
+      DbSyncWatcher,
       Db,
-      StatusPoller,
-      DbSyncWatcher
+      StatusPoller
     ]
 
     Supervisor.init(children, strategy: :rest_for_one)

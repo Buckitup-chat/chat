@@ -20,8 +20,12 @@ defmodule Chat.Db.WritableUpdater do
   end
 
   def force_check do
-    __MODULE__
-    |> GenServer.call(:force_check)
+    if get_chat_db_env(:mode) in [:main, :internal] do
+      __MODULE__
+      |> GenServer.call(:force_check, :timer.seconds(31))
+    else
+      check()
+    end
   end
 
   #
@@ -42,7 +46,7 @@ defmodule Chat.Db.WritableUpdater do
     state
     |> Map.put(:debounce_till, 0)
     |> do_check()
-    |> then(&{:reply, :ok, &1})
+    |> reply(:ok)
   end
 
   @impl true
@@ -96,4 +100,5 @@ defmodule Chat.Db.WritableUpdater do
 
   defp now_ms, do: System.system_time(:millisecond)
   defp noreply(x), do: {:noreply, x}
+  defp reply(x, result), do: {:reply, result, x}
 end

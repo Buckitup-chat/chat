@@ -48,4 +48,20 @@ defmodule ChatWeb.MainLive.Layout.Admin do
       <label class="text-black/50"> DB compaction: </label><span><%= @status.compacting %></span><br/>
     """
   end
+
+  def unmount_main_button(assigns) do
+    ~H"""
+    <%= if @mode == :main do %>
+      <div>
+      <button 
+        class="mt-3 w-full h-12 border rounded-lg border-black/10"
+        phx-click="admin/unmount-main"
+      >
+      Unmount
+      </button>
+      </div>
+
+    <% end %>
+    """
+  end
 end

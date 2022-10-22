@@ -3,7 +3,15 @@ defmodule Chat.Db.DbSyncWatcher do
 
   use GenServer
 
-  @interval :timer.seconds(5)
+  defstruct [:cool_down_timer, :count]
+
+  @timeout :timer.seconds(5)
+  @amount 100
+
+  def mark do
+    __MODULE__
+    |> GenServer.cast(:mark)
+  end
 
   #
   # GenServer implementation
@@ -15,14 +23,37 @@ defmodule Chat.Db.DbSyncWatcher do
 
   @impl true
   def init(_opts) do
-    interval = :timer.send_interval(@interval, :tick)
-    {:ok, interval}
+    {:ok, clean_state()}
   end
 
   @impl true
-  def handle_info(:tick, state) do
-    Chat.Db.db() |> CubDB.file_sync()
+  def handle_cast(:mark, %{count: count, cool_down_timer: timer} = state) do
+    if timer do
+      Process.cancel_timer(timer)
+    end
 
-    {:noreply, state}
+    if count > @amount do
+      sync()
+
+      clean_state()
+      |> noreply()
+    end
+
+    %{state | count: count + 1, cool_down_timer: Process.send_after(self(), :sync, @timeout)}
+    |> noreply()
   end
+
+  @impl true
+  def handle_info(:sync, _) do
+    sync()
+
+    clean_state()
+    |> noreply()
+  end
+
+  defp sync, do: Chat.Db.db() |> CubDB.file_sync()
+
+  defp clean_state, do: %__MODULE__{count: 0}
+
+  defp noreply(x), do: {:noreply, x}
 end

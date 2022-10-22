@@ -117,6 +117,12 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     |> push_event("chat:redirect", %{url: Routes.temp_sync_url(socket, :device_log, key)})
   end
 
+  def unmount_main(socket) do
+    request_platform(:unmount_main)
+
+    socket
+  end
+
   def close(socket) do
     PubSub.unsubscribe(Chat.PubSub, @incoming_topic)
 

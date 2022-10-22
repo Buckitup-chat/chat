@@ -66,7 +66,7 @@ defmodule Chat.Db do
 
   @impl true
   def init(_opts) do
-    {:ok, db} = CubDB.start_link(file_path(), auto_file_sync: false)
+    {:ok, db} = CubDB.start_link(file_path(), auto_file_sync: false, auto_compact: false)
     files_dir = file_db_path()
 
     put_chat_db_env(:data_pid, db)

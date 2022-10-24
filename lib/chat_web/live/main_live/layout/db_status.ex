@@ -17,7 +17,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
         <% end %>
         <%= if @status.mode == :main do %>
           <!-- DB icon -->
-            <div class="pb-2.5 pl-2">
+            <div class="pb-2.5 pl-1">
               <.icon id="dataBase" class={classes("w-6 h-6 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}/>
             </div>
         <% end %>

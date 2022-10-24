@@ -164,7 +164,7 @@ defmodule Chat.Db do
     batch_files_copy(from, to)
   end
 
-  def batch_files_copy(from, to, size \\ 10) do
+  def batch_files_copy(from, to, size \\ 3) do
     from_chunks = from |> chunks_set()
     to_chunks = to |> chunks_set()
 
@@ -187,7 +187,7 @@ defmodule Chat.Db do
         File.copy(from_file, to_file)
       end)
 
-      Process.sleep(50)
+      :timer.seconds(3) |> Process.sleep()
     end)
   end
 

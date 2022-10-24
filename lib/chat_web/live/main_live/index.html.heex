@@ -178,7 +178,7 @@
         </div>
         <div class="navbar">
           <div class="sm:flex flex-col items-center">
-            <div phx-click={JS.push("switch-lobby-mode")} phx-value-lobby-mode="feeds" class="sidebarIcon cursor-pointer mt-3">
+            <div phx-click={JS.push("switch-lobby-mode")} phx-value-lobby-mode="feeds" class="sidebarIcon cursor-pointer mt-3 t-feeds">
               <.icon id="logo" class="w-9 h-9"/>
             </div>
             <button phx-click="switch-lobby-mode" phx-value-lobby-mode="rooms" class="sidebarIcon mt-9 t-rooms">
@@ -822,7 +822,7 @@
                   [ <%= @version %> ]
                 </div>
               </div>
-              <div class="mt-16 mb-8 px-4 sm:px-8 w-full" id="action-feed-list" phx-update={@feed_update_mode}>
+              <div class="mt-16 mb-8 px-4 sm:px-8 w-full t-feed-list" id="action-feed-list" phx-update={@feed_update_mode}>
                 <%= if @action_feed_list do %>
                   <%= for item <- @action_feed_list do %>
                     <div class="py-1 flex justify-start" id={"item-#{UUID.uuid4()}"}>
@@ -834,7 +834,7 @@
               <%= if @action_feed_till > 1 do %>
                 <div class="mb-10 px-4 flex flex-row items-center justify-between" >
                   <hr class="basis-[35%] sm:basis-[45%] border-1 border-white/10">
-                  <a class="basis-[30%] sm:basis-[20%] text-center cursor-pointer text-white/50" phx-click="feed-more">load more</a>
+                  <a class="basis-[30%] sm:basis-[20%] text-center cursor-pointer text-white/50 t-load-more" phx-click="feed-more">load more</a>
                   <hr class="basis-[35%] sm:basis-[45%] border-1 border-white/10">
                 </div>
               <% end %>

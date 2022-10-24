@@ -11,7 +11,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
 
         <%= if @status.mode == :internal do %>
           <!-- Crossed DB icon -->
-            <div class="pb-2.5 pl-2">
+            <div class="pb-2.5 pl-1.5">
               <.icon id="crossedDataBase" class={classes("w-6 h-6 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}/>
             </div>
         <% end %>
@@ -91,7 +91,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
           <% end %>
           <!-- Syncronization icon, like cirle arrows -->
           <%= if @status.flags[:replication] do %>
-          <div class="w-[21px]">
+          <div class="w-[21px] pt-0.5">
             <.icon id="replication" class={classes("w-6 h-6 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}/>
           </div>
            <% end %>

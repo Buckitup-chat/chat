@@ -193,7 +193,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       ~H"""
       <div class="flex items-center justify-between">
         Error getting file
-      </div>  
+      </div>
       """
   end
 
@@ -267,7 +267,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
   defp message_video(assigns) do
     ~H"""
-    <video src={@url} controls />
+    <video src={@url} class="a-video" controls />
     """
   end
 

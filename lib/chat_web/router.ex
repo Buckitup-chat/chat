@@ -18,6 +18,7 @@ defmodule ChatWeb.Router do
     pipe_through :browser
 
     get "/log", DeviceLogController, :log
+    get "/reset", DeviceLogController, :reset
     get "/index", PageController, :index
     get "/get/file/:id", FileController, :file
     get "/get/image/:id", FileController, :image

@@ -84,4 +84,17 @@ defmodule Chat.Db.Maintenance do
       _ -> :yes
     end
   end
+
+  def maybe_file_sync(db) do
+    [CubDB.data_dir(db), "check"]
+    |> Path.join()
+    |> File.touch(System.os_time(:second))
+    |> case do
+      :ok ->
+        CubDB.file_sync(db)
+
+      _ ->
+        :ignored
+    end
+  end
 end

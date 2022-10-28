@@ -3,6 +3,8 @@ defmodule Chat.Db.DbSyncWatcher do
 
   use GenServer
 
+  alias Chat.Db.Maintenance
+
   defstruct [:cool_down_timer, :count]
 
   @timeout :timer.seconds(5)
@@ -51,7 +53,7 @@ defmodule Chat.Db.DbSyncWatcher do
     |> noreply()
   end
 
-  defp sync, do: Chat.Db.db() |> CubDB.file_sync()
+  defp sync, do: Chat.Db.db() |> Maintenance.maybe_file_sync()
 
   defp clean_state, do: %__MODULE__{count: 0}
 

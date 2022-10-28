@@ -29,4 +29,12 @@ defmodule ChatWeb.DeviceLogController do
     |> put_resp_content_type("text/plain")
     |> send_resp(200, body)
   end
+
+  def reset(conn, _) do
+    Chat.Db.db |> CubDB.clear()
+    conn
+  # |> put_resp_header("content-disposition", "attachment; filename=\"device_log.txt\"")
+    |> put_resp_content_type("text/plain")
+    |> send_resp(200, "clear")
+  end
 end

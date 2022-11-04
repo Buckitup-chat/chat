@@ -12,6 +12,7 @@ defmodule ChatWeb.Plugs.RedirectExtraTraffic do
 
   defp block(conn) do
     conn
+    |> Plug.Conn.send_resp(400, "Not serving")
     |> Plug.Conn.halt()
   end
 

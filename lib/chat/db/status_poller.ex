@@ -27,18 +27,21 @@ defmodule Chat.Db.StatusPoller do
 
   @impl true
   def init(_opts) do
-    interval = :timer.send_interval(@interval, :tick)
-    {:ok, interval}
+    {:ok, schedule()}
   end
 
   @impl true
-  def handle_info(:tick, state) do
+  def handle_info(:tick, _) do
     PubSub.broadcast(
       Chat.PubSub,
       channel(),
       {:db_status, info()}
     )
 
-    {:noreply, state}
+    {:noreply, schedule()}
+  end
+
+  defp schedule do
+    Process.send_after(self(), :tick, @interval)
   end
 end

@@ -6,6 +6,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   use Phoenix.Component
 
   alias Chat.Dialogs
+  alias Chat.FileIndex
   alias Chat.Identity
   alias Chat.Log
   alias Chat.Memo
@@ -100,6 +101,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       end
     )
     |> broadcast_new_message(dialog, me, time)
+
+    FileIndex.add_file(chunk_key, dialog)
 
     socket
   end
@@ -222,14 +225,12 @@ defmodule ChatWeb.MainLive.Page.Dialog do
             Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64(), download: true)
         })
 
-
       %{type: :video, content: json} ->
         {id, secret} = json |> StorageId.from_json()
 
         socket
         |> push_event("chat:redirect", %{
-          url:
-            Routes.file_url(socket, :file, id, a: secret |> Base.url_encode64())
+          url: Routes.file_url(socket, :file, id, a: secret |> Base.url_encode64())
         })
 
       _ ->

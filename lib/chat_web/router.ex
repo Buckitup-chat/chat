@@ -19,6 +19,7 @@ defmodule ChatWeb.Router do
 
     get "/log", DeviceLogController, :log
     get "/reset", DeviceLogController, :reset
+    get "/data_keys", DeviceLogController, :dump_data_keys
     get "/index", PageController, :index
     get "/get/file/:id", FileController, :file
     get "/get/image/:id", FileController, :image

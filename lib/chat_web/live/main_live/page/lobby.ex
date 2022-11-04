@@ -18,6 +18,9 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     PubSub.subscribe(Chat.PubSub, @topic)
     PubSub.subscribe(Chat.PubSub, Chat.Db.StatusPoller.channel())
 
+    Process.send_after(self(), :room_request, 500)
+    Process.send_after(self(), :room_request_approved, 1500)
+
     socket
     |> assign(:mode, :lobby)
     |> assign(:lobby_mode, :chats)
@@ -25,9 +28,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign(:version, get_version())
     |> assign(:db_status, Chat.Db.StatusPoller.info())
     |> assign_user_list()
-    |> approve_joined_room_requests()
     |> assign_room_list()
-    |> join_approved_rooms()
     |> assign_admin()
   end
 

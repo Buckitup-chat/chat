@@ -65,7 +65,7 @@
               <.icon id="upload1" class="w-4 h-4 ml-2 fill-white"/>
             </div>
           </button>
-          <button class="mt-3 w-full h-12 border rounded-lg border-black/10 t-logout-without-key" phx-click="logout-wipe">Log Out without the Keys</button>
+          <button class="mt-3 w-full h-12 border rounded-lg border-black/10 t-logout-without-key" phx-click={hide_modal("logout-backup-popup") |>show_modal("logout-without-key-popup")}>Log Out without the Keys</button>
           <button phx-click={hide_modal("logout-backup-popup")} class="mt-3 w-full h-12 border rounded-lg border-black/10 t-cancel-logout" >Cancel</button>
         <% end %>
         <%= if @logout_step == :middle do %>
@@ -136,6 +136,16 @@
           <button class="deleteMessageButton w-full ml-1 h-12 border-0 rounded-lg bg-red-500 flex items-center justify-center t-delete-message-popup-btn">
             <span class="text-white mr-1">Delete</span>
             <.icon id="delete" class="w-4 h-4 fill-white"/>
+          </button>
+        </div>
+      </.modal>
+           <.modal id="logout-without-key-popup" class="">
+        <h1 class="text-base font-bold text-grayscale">Log Out without the Key</h1>
+        <p class="mt-3 text-sm text-black/50">Are you sure you want to do this?</p>
+        <div class="mt-5 flex items-center justify-between">
+          <button phx-click={hide_modal("logout-without-key-popup")} class="w-full mr-1 h-12 border rounded-lg border-black/10">Cancel</button>
+          <button class="w-full ml-1 h-12 border-0 rounded-lg bg-grayscale  flex items-center justify-center">
+            <span phx-click="logout-wipe" class="text-white mr-1">Logout</span>
           </button>
         </div>
       </.modal>

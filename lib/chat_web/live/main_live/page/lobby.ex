@@ -32,12 +32,12 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign_admin()
   end
 
-  def new_room(%{assigns: %{me: me, client_timestamp: time}} = socket, name, type)
+  def new_room(%{assigns: %{me: me, monotonic_offset: time_offset}} = socket, name, type)
       when type in [:public, :request, :private] do
     new_room_identity = Rooms.add(me, name, type)
     new_room_card = Chat.Card.from_identity(new_room_identity)
 
-    me |> Log.create_room(time, new_room_identity, type)
+    me |> Log.create_room(Chat.Time.monotonic_to_unix(time_offset), new_room_identity, type)
     PubSub.broadcast!(Chat.PubSub, @topic, {:new_room, new_room_card})
 
     socket
@@ -73,7 +73,8 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> init_new_mode()
   end
 
-  def request_room(%{assigns: %{me: me, client_timestamp: time}} = socket, room_hash) do
+  def request_room(%{assigns: %{me: me, monotonic_offset: time_offset}} = socket, room_hash) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
     room = Rooms.add_request(room_hash, me, time)
     Log.request_room_key(me, time, room.pub_key)
 
@@ -165,9 +166,11 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   end
 
   defp join_approved_rooms(
-         %{assigns: %{new_rooms: new_rooms, rooms: rooms, me: me, client_timestamp: time}} =
+         %{assigns: %{new_rooms: new_rooms, rooms: rooms, me: me, monotonic_offset: time_offset}} =
            socket
        ) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
+
     joined_rooms =
       new_rooms
       |> Enum.flat_map(fn %{hash: hash} -> hash |> Rooms.join_approved_requests(me, time) end)

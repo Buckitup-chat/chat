@@ -13,10 +13,12 @@ defmodule ChatWeb.MainLive.Page.ExportKeyRing do
   end
 
   def send_key_ring(
-        %{assigns: %{me: me, rooms: rooms, export_id: export_id, client_timestamp: time}} =
+        %{assigns: %{me: me, rooms: rooms, export_id: export_id, monotonic_offset: time_offset}} =
           socket,
         code
       ) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
+
     case KeyRingTokens.get(export_id, code) do
       {:ok, pid} ->
         send(pid, {:exported_key_ring, {me, rooms}})

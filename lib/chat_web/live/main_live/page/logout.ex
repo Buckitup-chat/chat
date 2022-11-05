@@ -72,9 +72,11 @@ defmodule ChatWeb.MainLive.Page.Logout do
   end
 
   def generate_backup(
-        %{assigns: %{me: me, rooms: rooms, client_timestamp: time}} = socket,
+        %{assigns: %{me: me, rooms: rooms, monotonic_offset: time_offset}} = socket,
         password
       ) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
+
     broker_key =
       Actor.new(me, rooms, %{})
       |> Actor.to_encrypted_json(password)
@@ -92,7 +94,8 @@ defmodule ChatWeb.MainLive.Page.Logout do
     |> assign(:logout_step, :final)
   end
 
-  def wipe(%{assigns: %{me: me, client_timestamp: time}} = socket) do
+  def wipe(%{assigns: %{me: me, monotonic_offset: time_offset}} = socket) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
     me |> Log.logout(time)
 
     socket

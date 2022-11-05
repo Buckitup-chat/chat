@@ -26,10 +26,12 @@ defmodule ChatWeb.Hooks.LocalTimeHook do
              locale: locale || "en",
              timezone: timezone || "UTC",
              timezone_offset: timezone_offset || 0,
-             client_timestamp: timestamp
+             monotonic_offset: timestamp |> Chat.Time.monotonic_offset()
            )
 
-         {:halt, detach_hook(socket, :local_time, :handle_event)}
+         {:halt, socket}
+
+       # {:halt, detach_hook(socket, :local_time, :handle_event)}
 
        _event, _params, socket ->
          {:cont, socket}

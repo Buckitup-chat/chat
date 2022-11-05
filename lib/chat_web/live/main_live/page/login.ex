@@ -14,7 +14,8 @@ defmodule ChatWeb.MainLive.Page.Login do
   def create_user(socket, name) do
     me = User.login(name |> String.trim())
     id = User.register(me)
-    Log.sign_in(me, socket.assigns.client_timestamp)
+    # todo: check setting time before creating
+    Log.sign_in(me, socket.assigns.monotonic_offset |> Chat.Time.monotonic_to_unix())
 
     socket
     |> assign_logged_user(me, id)
@@ -36,7 +37,7 @@ defmodule ChatWeb.MainLive.Page.Login do
       |> User.login()
       |> User.register()
 
-    Log.visit(me, socket.assigns.client_timestamp)
+    Log.visit(me, socket.assigns.monotonic_offset |> Chat.Time.monotonic_to_unix())
 
     socket
     |> assign_logged_user(me, id, rooms)

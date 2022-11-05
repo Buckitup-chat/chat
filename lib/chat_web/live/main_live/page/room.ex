@@ -24,7 +24,8 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def init(socket), do: socket |> assign(:room, nil)
 
-  def init(%{assigns: %{rooms: rooms, me: me, client_timestamp: time}} = socket, room_hash) do
+  def init(%{assigns: %{rooms: rooms, me: me, monotonic_offset: time_offset}} = socket, room_hash) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
     room = Rooms.get(room_hash)
 
     room_identity =
@@ -63,9 +64,11 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def send_text(
-        %{assigns: %{room: room, me: me, client_timestamp: time}} = socket,
+        %{assigns: %{room: room, me: me, monotonic_offset: time_offset}} = socket,
         text
       ) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
+
     case String.trim(text) do
       "" ->
         nil
@@ -88,10 +91,12 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def send_file(
-        %{assigns: %{me: me, room: room, client_timestamp: time}} = socket,
+        %{assigns: %{me: me, room: room, monotonic_offset: time_offset}} = socket,
         entry,
         {chunk_key, chunk_secret}
       ) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
+
     consume_uploaded_entry(
       socket,
       entry,
@@ -165,11 +170,13 @@ defmodule ChatWeb.MainLive.Page.Room do
             room: room,
             me: me,
             edit_message_id: msg_id,
-            client_timestamp: time
+            monotonic_offset: time_offset
           }
         } = socket,
         text
       ) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
+
     text
     |> Messages.Text.new(0)
     |> Rooms.update_message(msg_id, me, room_identity)
@@ -213,10 +220,17 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def delete_message(
-        %{assigns: %{me: me, room_identity: room_identity, room: room, client_timestamp: time}} =
-          socket,
+        %{
+          assigns: %{
+            me: me,
+            room_identity: room_identity,
+            room: room,
+            monotonic_offset: time_offset
+          }
+        } = socket,
         {index, msg_id}
       ) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
     Rooms.delete_message({index, msg_id}, room_identity, me)
     broadcast_deleted_message(msg_id, room, me, time)
 
@@ -235,13 +249,15 @@ defmodule ChatWeb.MainLive.Page.Room do
             me: me,
             room_identity: room_identity,
             room: room,
-            client_timestamp: time
+            monotonic_offset: time_offset
           }
         } = socket,
         %{
           "messages" => messages
         }
       ) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
+
     messages
     |> Jason.decode!()
     |> Enum.each(fn %{"id" => msg_id, "index" => index} ->

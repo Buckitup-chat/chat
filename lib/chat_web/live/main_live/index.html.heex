@@ -361,7 +361,7 @@
                 <%= if @dialog_mode == :edit do %>
                   <div class="w-full flex flex-col ">
                     <div class="flex items-center justify-between pb-2 mt-2">
-                      <div class="w-[95%]">
+                      <div class="w-[70vw]">
                         <h1 class="text-purple t-edit">Editing</h1>
                         <span class="truncate block text-xs text-black/50"><%= @edit_content %></span>
                       </div>
@@ -374,8 +374,8 @@
                       for={:dialog_edit}
                       id="dialog-edit-form"
                       class="flex items-center justify-start "
-                      phx-change={JS.dispatch("chat:set-input-size", to: "#dialog-input")}
-                      phx-submit={JS.push("dialog/edited-message") |> JS.dispatch("chat:clear-value", to: "#dialog-input") |> JS.dispatch("chat:set-input-size", to: "#dialog-input")}
+                      phx-change={JS.dispatch("chat:set-input-size", to: "#dialog-edit-input")}
+                      phx-submit={JS.push("dialog/edited-message") |> JS.dispatch("chat:clear-value", to: "#dialog-edit-input") |> JS.dispatch("chat:set-input-size", to: "#dialog-edit-input")}
                       onkeydown="
                       if (event.key == 'Enter' && event.shiftKey) {
                         document.getElementById('dialog-edit-form-submit-button').click()

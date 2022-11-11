@@ -493,17 +493,18 @@ defmodule ChatWeb.MainLive.Page.Room do
            assigns: %{
              room: room,
              room_identity: identity,
-             last_load_timestamp: timestamp
+             last_load_timestamp: index
            }
          } = socket,
          per_page
        ) do
-    messages = Rooms.read(room, identity, &User.id_map_builder/1, {timestamp, 0}, per_page + 1)
+    messages = Rooms.read(room, identity, &User.id_map_builder/1, {index, 0}, per_page + 1)
+    page_messages = Enum.take(messages, -per_page)
 
     socket
-    |> assign(:messages, Enum.take(messages, -per_page))
+    |> assign(:messages, page_messages)
     |> assign(:has_more_messages, length(messages) > per_page)
-    |> assign(:last_load_timestamp, set_messages_timestamp(messages))
+    |> assign(:last_load_timestamp, set_messages_timestamp(page_messages))
   end
 
   defp assign_requests(%{assigns: %{room: %{type: :request} = room}} = socket) do

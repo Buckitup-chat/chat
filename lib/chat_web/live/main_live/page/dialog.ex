@@ -465,11 +465,12 @@ defmodule ChatWeb.MainLive.Page.Dialog do
          per_page
        ) do
     messages = Dialogs.read(dialog, me, {timestamp, 0}, per_page + 1)
+    page_messages = Enum.take(messages, -per_page)
 
     socket
-    |> assign(:messages, Enum.take(messages, -per_page))
+    |> assign(:messages, page_messages)
     |> assign(:has_more_messages, length(messages) > per_page)
-    |> assign(:last_load_timestamp, set_messages_timestamp(messages))
+    |> assign(:last_load_timestamp, set_messages_timestamp(page_messages))
   end
 
   defp broadcast_new_message(nil, _, _, _), do: nil

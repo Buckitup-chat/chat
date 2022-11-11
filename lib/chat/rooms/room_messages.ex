@@ -28,10 +28,10 @@ defmodule Chat.Rooms.RoomMessages do
     |> add_message(room_key, author, opts |> Keyword.merge(type: type, now: now))
   end
 
-  def read(%Room{pub_key: room_key}, identity, pub_keys_mapper, {time, id} = _before, amount) do
+  def read(%Room{pub_key: room_key}, identity, pub_keys_mapper, {index, id} = _before, amount) do
     {
       key(room_key, 0, 0),
-      key(room_key, time, id)
+      key(room_key, index, id)
     }
     |> Db.select(amount)
     |> Enum.reverse()

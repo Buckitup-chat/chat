@@ -13,12 +13,21 @@ defmodule ChatWeb.DeviceLogController do
 
     body =
       receive do
-        {:platform_response, {:device_log, log}} ->
-          log
-          |> Enum.map_join("\n", fn {level, {_module, msg, {{a, b, c}, {d, e, f, g}}, _extra}} ->
-            date = NaiveDateTime.new!(a, b, c, d, e, f, g * 1000)
-            "#{date} [#{level}] #{msg}"
-          end)
+        {:platform_response, {:device_log, {ram_log, log}}} ->
+          first =
+            if ram_log do
+              ram_log <> "\n-----------------------------\n\n"
+            else
+              ""
+            end
+
+          second =
+            Enum.map_join(log, "\n", fn {level, {_module, msg, {{a, b, c}, {d, e, f, g}}, _extra}} ->
+              date = NaiveDateTime.new!(a, b, c, d, e, f, g * 1000)
+              "#{date} [#{level}] #{msg}"
+            end)
+
+          first <> second
       after
         :timer.seconds(10) ->
           "Timeout"

@@ -559,7 +559,7 @@
               </div>
             </div>
           </div>
-          <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
+          <div id="contentContainer" class="hidden h-[100vh] sm:flex flex flex-col contentContainer">
             <%= unless @room do %>
               <div class="my-auto mx-auto flex flex-col items-center justify-center w-80 h-32 border-9 rounded-lg bg-white/20">
                 <span class="my-2 text-sm text-white">Select any Room or create your own</span>
@@ -572,7 +572,7 @@
               <Layout.ImageGallery.render mode="room" gallery={@image_gallery} />
               <div
                 id="chatContent"
-                class="basis-[93%] md:overflow-y-scroll flex flex-col justify-between relative a-content-block t-chat-content"
+                class="basis-[93%] overflow-y-scroll flex flex-col justify-between relative a-content-block t-chat-content"
                 id={"room-#{@room.admin_hash}"}
                 phx-hook="Chat" data-page={@page}
                 data-has-more-messages={"#{@has_more_messages}"}

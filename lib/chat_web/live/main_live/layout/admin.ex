@@ -57,7 +57,7 @@ defmodule ChatWeb.MainLive.Layout.Admin do
         class="mt-3 w-full h-12 border rounded-lg border-black/10"
         phx-click="admin/unmount-main"
       >
-      Unmount
+      Switch to internal
       </button>
       </div>
 

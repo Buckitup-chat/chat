@@ -41,7 +41,7 @@ defmodule ChatWeb.Endpoint do
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
 
   plug Plug.Parsers,
-    parsers: [:urlencoded, :multipart, :json],
+    parsers: [:urlencoded, :multipart],
     pass: ["*/*"],
     json_decoder: Phoenix.json_library()
 

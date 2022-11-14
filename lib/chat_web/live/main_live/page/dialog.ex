@@ -6,6 +6,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   use Phoenix.Component
 
   alias Chat.Dialogs
+  alias Chat.FileIndex
   alias Chat.Identity
   alias Chat.Log
   alias Chat.Memo
@@ -28,7 +29,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:peer, nil)
   end
 
-  def init(%{assigns: %{me: me, client_timestamp: time}} = socket, user_id) do
+  def init(%{assigns: %{me: me, monotonic_offset: time_offset}} = socket, user_id) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
     peer = User.by_id(user_id)
     dialog = Dialogs.find_or_open(me, peer)
 
@@ -62,9 +64,11 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def send_text(
-        %{assigns: %{dialog: dialog, me: me, client_timestamp: time}} = socket,
+        %{assigns: %{dialog: dialog, me: me, monotonic_offset: time_offset}} = socket,
         text
       ) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
+
     text
     |> String.trim()
     |> case do
@@ -81,10 +85,12 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def send_file(
-        %{assigns: %{dialog: dialog, me: me, client_timestamp: time}} = socket,
+        %{assigns: %{dialog: dialog, me: me, monotonic_offset: time_offset}} = socket,
         entry,
         {chunk_key, chunk_secret}
       ) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
+
     consume_uploaded_entry(
       socket,
       entry,
@@ -100,6 +106,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       end
     )
     |> broadcast_new_message(dialog, me, time)
+
+    FileIndex.add_file(chunk_key, dialog)
 
     socket
   end
@@ -132,10 +140,18 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def update_edited_message(
-        %{assigns: %{dialog: dialog, me: me, edit_message_id: msg_id, client_timestamp: time}} =
-          socket,
+        %{
+          assigns: %{
+            dialog: dialog,
+            me: me,
+            edit_message_id: msg_id,
+            monotonic_offset: time_offset
+          }
+        } = socket,
         text
       ) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
+
     text
     |> Messages.Text.new(time)
     |> Dialogs.update_message(msg_id, me, dialog)
@@ -169,18 +185,24 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def delete_message(
-        %{assigns: %{me: me, dialog: dialog, client_timestamp: time}} = socket,
-        {time, msg_id}
+        %{assigns: %{me: me, dialog: dialog, monotonic_offset: time_offset}} = socket,
+        {index, msg_id}
       ) do
-    Dialogs.delete(dialog, me, {time, msg_id})
+    time = Chat.Time.monotonic_to_unix(time_offset)
+    Dialogs.delete(dialog, me, {index, msg_id})
     broadcast_message_deleted(msg_id, dialog, me, time)
 
     socket
   end
 
-  def delete_messages(%{assigns: %{me: me, dialog: dialog, client_timestamp: time}} = socket, %{
-        "messages" => messages
-      }) do
+  def delete_messages(
+        %{assigns: %{me: me, dialog: dialog, monotonic_offset: time_offset}} = socket,
+        %{
+          "messages" => messages
+        }
+      ) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
+
     messages
     |> Jason.decode!()
     |> Enum.each(fn %{"id" => msg_id, "index" => index} ->
@@ -222,14 +244,12 @@ defmodule ChatWeb.MainLive.Page.Dialog do
             Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64(), download: true)
         })
 
-
       %{type: :video, content: json} ->
         {id, secret} = json |> StorageId.from_json()
 
         socket
         |> push_event("chat:redirect", %{
-          url:
-            Routes.file_url(socket, :file, id, a: secret |> Base.url_encode64())
+          url: Routes.file_url(socket, :file, id, a: secret |> Base.url_encode64())
         })
 
       _ ->
@@ -445,11 +465,12 @@ defmodule ChatWeb.MainLive.Page.Dialog do
          per_page
        ) do
     messages = Dialogs.read(dialog, me, {timestamp, 0}, per_page + 1)
+    page_messages = Enum.take(messages, -per_page)
 
     socket
-    |> assign(:messages, Enum.take(messages, -per_page))
+    |> assign(:messages, page_messages)
     |> assign(:has_more_messages, length(messages) > per_page)
-    |> assign(:last_load_timestamp, set_messages_timestamp(messages))
+    |> assign(:last_load_timestamp, set_messages_timestamp(page_messages))
   end
 
   defp broadcast_new_message(nil, _, _, _), do: nil

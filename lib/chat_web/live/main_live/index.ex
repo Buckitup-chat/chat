@@ -2,6 +2,8 @@ defmodule ChatWeb.MainLive.Index do
   @moduledoc "Main Liveview"
   use ChatWeb, :live_view
 
+  require Logger
+
   alias Phoenix.LiveView.JS
 
   alias Chat.ChunkedFiles
@@ -30,7 +32,7 @@ defmodule ChatWeb.MainLive.Index do
         |> assign(
           need_login: true,
           mode: :user_list,
-          client_timestamp: 0
+          monotonic_offset: 0
         )
         |> allow_image_upload(:image)
         |> allow_image_upload(:room_image)
@@ -78,7 +80,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_event("client-timestamp", %{"timestamp" => timestamp}, socket) do
     socket
-    |> assign(:client_timestamp, timestamp)
+    |> assign(:monotonic_offset, timestamp |> Chat.Time.monotonic_offset())
     |> noreply()
   end
 
@@ -447,17 +449,23 @@ defmodule ChatWeb.MainLive.Index do
         %{progress: 100, uuid: uuid} = entry,
         %{assigns: %{chunked_uploads: uploads}} = socket
       ) do
+    "[upload] finalizing" |> Logger.warn()
     {key, _} = chunked_keys = uploads[uuid]
     ChunkedFiles.mark_consumed(key)
+
+    "[upload] marked consumed" |> Logger.warn()
 
     case file do
       :dialog_file -> Page.Dialog.send_file(socket, entry, chunked_keys)
       :room_file -> Page.Room.send_file(socket, entry, chunked_keys)
     end
 
+    "[upload] message sent" |> Logger.warn()
+
     socket
     |> assign(:chunked_uploads, uploads |> Map.drop([uuid]))
     |> noreply()
+    |> tap(fn _ -> "[upload] done" |> Logger.warn() end)
   end
 
   def handle_chunked_progress(_file, _entry, socket), do: noreply(socket)

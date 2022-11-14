@@ -146,7 +146,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
     ~H"""
     <div class="px-4 w-full">
       <span class="flex-initial break-words">
-        <%= @msg.content %>
+        <%= @msg.content |> nl2br() %>
       </span>
     </div>
     """
@@ -163,7 +163,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
     ~H"""
     <div class="px-4 w-full ">
       <span class="flex-initial break-words">
-        <%= @memo %>
+        <%= @memo |> nl2br() %>
       </span>
     </div>
     """
@@ -303,5 +303,21 @@ defmodule ChatWeb.MainLive.Layout.Message do
       <%= @time%>
     </div>
     """
+  end
+
+  defp nl2br(str) do
+    str
+    |> String.trim()
+    |> String.split("\n", trim: false)
+    |> Enum.reduce({[], :none}, fn part, {good, count} ->
+      case {part, count} do
+        {"", :enough} -> {good, :enough}
+        {"", :none} -> {[part | good], :enough}
+        _ -> {[part | good], :none}
+      end
+    end)
+    |> elem(0)
+    |> Enum.reverse()
+    |> Enum.intersperse(Phoenix.HTML.Tag.tag(:br))
   end
 end

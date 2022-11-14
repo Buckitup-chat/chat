@@ -19,7 +19,8 @@ config :chat, ChatWeb.Endpoint,
     "https://offline-chat.gigalixirapp.com",
     "https://offline-chat20.gigalixirapp.com/",
     "https://buckitup.app"
-  ]
+  ],
+  allow_reset_data: false
 
 # url: [host: "buckitup.app", port: 443],
 # secret_key_base: Map.fetch!(System.get_env(), "SECRET_KEY_BASE"),

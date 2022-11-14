@@ -42,6 +42,14 @@ defmodule Chat.Time do
     |> set_time()
   end
 
+  def monotonic_offset(unix_timestamp) do
+    unix_timestamp - System.monotonic_time(:second)
+  end
+
+  def monotonic_to_unix(monotonic_offset) do
+    System.monotonic_time(:second) + monotonic_offset
+  end
+
   defp set_system_time(string_time) do
     case System.cmd("date", ["-u", "-s", string_time]) do
       {_result, 0} ->

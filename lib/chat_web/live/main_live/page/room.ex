@@ -6,6 +6,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   require Logger
 
   alias Chat.Dialogs
+  alias Chat.FileIndex
   alias Chat.Identity
   alias Chat.Log
   alias Chat.Memo
@@ -23,7 +24,8 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def init(socket), do: socket |> assign(:room, nil)
 
-  def init(%{assigns: %{rooms: rooms, me: me, client_timestamp: time}} = socket, room_hash) do
+  def init(%{assigns: %{rooms: rooms, me: me, monotonic_offset: time_offset}} = socket, room_hash) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
     room = Rooms.get(room_hash)
 
     room_identity =
@@ -62,9 +64,11 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def send_text(
-        %{assigns: %{room: room, me: me, client_timestamp: time}} = socket,
+        %{assigns: %{room: room, me: me, monotonic_offset: time_offset}} = socket,
         text
       ) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
+
     case String.trim(text) do
       "" ->
         nil
@@ -87,10 +91,12 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def send_file(
-        %{assigns: %{me: me, room: room, client_timestamp: time}} = socket,
+        %{assigns: %{me: me, room: room, monotonic_offset: time_offset}} = socket,
         entry,
         {chunk_key, chunk_secret}
       ) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
+
     consume_uploaded_entry(
       socket,
       entry,
@@ -106,6 +112,8 @@ defmodule ChatWeb.MainLive.Page.Room do
       end
     )
     |> broadcast_new_message(room, me, time)
+
+    FileIndex.add_file(chunk_key, room)
 
     socket
   end
@@ -162,11 +170,13 @@ defmodule ChatWeb.MainLive.Page.Room do
             room: room,
             me: me,
             edit_message_id: msg_id,
-            client_timestamp: time
+            monotonic_offset: time_offset
           }
         } = socket,
         text
       ) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
+
     text
     |> Messages.Text.new(0)
     |> Rooms.update_message(msg_id, me, room_identity)
@@ -210,10 +220,17 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def delete_message(
-        %{assigns: %{me: me, room_identity: room_identity, room: room, client_timestamp: time}} =
-          socket,
+        %{
+          assigns: %{
+            me: me,
+            room_identity: room_identity,
+            room: room,
+            monotonic_offset: time_offset
+          }
+        } = socket,
         {index, msg_id}
       ) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
     Rooms.delete_message({index, msg_id}, room_identity, me)
     broadcast_deleted_message(msg_id, room, me, time)
 
@@ -232,13 +249,15 @@ defmodule ChatWeb.MainLive.Page.Room do
             me: me,
             room_identity: room_identity,
             room: room,
-            client_timestamp: time
+            monotonic_offset: time_offset
           }
         } = socket,
         %{
           "messages" => messages
         }
       ) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
+
     messages
     |> Jason.decode!()
     |> Enum.each(fn %{"id" => msg_id, "index" => index} ->
@@ -311,14 +330,12 @@ defmodule ChatWeb.MainLive.Page.Room do
             Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64(), download: true)
         })
 
-
       %{type: :video, content: json} ->
         {id, secret} = json |> StorageId.from_json()
 
         socket
         |> push_event("chat:redirect", %{
-          url:
-            Routes.file_url(socket, :file, id, a: secret |> Base.url_encode64())
+          url: Routes.file_url(socket, :file, id, a: secret |> Base.url_encode64())
         })
 
       _ ->
@@ -476,17 +493,18 @@ defmodule ChatWeb.MainLive.Page.Room do
            assigns: %{
              room: room,
              room_identity: identity,
-             last_load_timestamp: timestamp
+             last_load_timestamp: index
            }
          } = socket,
          per_page
        ) do
-    messages = Rooms.read(room, identity, &User.id_map_builder/1, {timestamp, 0}, per_page + 1)
+    messages = Rooms.read(room, identity, &User.id_map_builder/1, {index, 0}, per_page + 1)
+    page_messages = Enum.take(messages, -per_page)
 
     socket
-    |> assign(:messages, Enum.take(messages, -per_page))
+    |> assign(:messages, page_messages)
     |> assign(:has_more_messages, length(messages) > per_page)
-    |> assign(:last_load_timestamp, set_messages_timestamp(messages))
+    |> assign(:last_load_timestamp, set_messages_timestamp(page_messages))
   end
 
   defp assign_requests(%{assigns: %{room: %{type: :request} = room}} = socket) do

@@ -12,7 +12,8 @@ config :chat, ChatWeb.Endpoint,
   url: [host: "localhost"],
   render_errors: [view: ChatWeb.ErrorView, accepts: ~w(html json), layout: false],
   pubsub_server: Chat.PubSub,
-  live_view: [signing_salt: "N+hZlbsm"]
+  live_view: [signing_salt: "N+hZlbsm"],
+  allow_reset_data: true
 
 # Configures the mailer
 #

@@ -26,7 +26,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
   def render_text(%{msg: %{type: type}} = assigns) when type in [:text, :memo] do
     ~H"""
-    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
       <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
       <span class="x-content"><.message_text msg={@msg} /></span>
       <.message_timestamp msg={@msg} timezone={@timezone} />

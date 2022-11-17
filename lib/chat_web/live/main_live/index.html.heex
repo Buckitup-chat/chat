@@ -312,7 +312,7 @@
                     </div>
                   </div>
               </div>
-              <div id="dialogInput" class="basis-[7%] px-8 border border-white bg-white flex items-center sticky bottom-0">
+              <div id="dialogInput" class="basis-[7%] w-full h-10 px-8 border border-white bg-white flex items-center fixed md:sticky  bottom-0">
                 <%= if @dialog_mode == :plain do %>
                   <.form
                     for={:dialog_file}
@@ -569,7 +569,7 @@
               </div>
             </div>
           </div>
-          <div id="contentContainer" class="hidden h-[100vh] sm:flex flex flex-col contentContainer">
+          <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
             <%= unless @room do %>
               <div class="my-auto mx-auto flex flex-col items-center justify-center w-80 h-32 border-9 rounded-lg bg-white/20">
                 <span class="my-2 text-sm text-white">Select any Room or create your own</span>
@@ -712,7 +712,7 @@
                   </div>
                 </div>
               </div>
-              <div class="basis-[7%] px-8 border border-white bg-white flex flex-row items-center sticky bottom-0">
+              <div class="basis-[7%] w-full h-10 px-8 border border-white bg-white flex items-center fixed md:sticky  bottom-0">
                 <%= if @room_mode == :plain do %>
                   <.form
                     for={:room_file}

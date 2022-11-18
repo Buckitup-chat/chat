@@ -328,7 +328,7 @@
                     class="relative"
                     phx-click={JS.dispatch("click", to: "#dialog-file-form input[type=file]")}
                   >
-                    <.icon id="attach" class="w-7 h-7 mt-3 flex fill-white"/>
+                    <.icon id="attach" class="w-7 h-7 flex fill-white"/>
                   </button>
                   <.form
                     let={di}
@@ -348,7 +348,7 @@
                     ">
                     <%= textarea di, :text,
                       placeholder: "Enter message",
-                      class: "w-full h-7 resize-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0 t-chat-input",
+                      class: "w-full h-10 resize-none border-0 overflow-y-auto text-black placeholder-black/50 focus:ring-0 t-chat-input",
                       id: "dialog-input",
                       spellcheck: "false",
                       autocomplete: "off"
@@ -724,7 +724,7 @@
                     <%= live_file_input @uploads.room_file, style: "display: none"  %>
                   </.form>
                   <button class="relative t-attach-file" id="attachFileBtn" phx-click={JS.dispatch("click", to: "#room-file-form input[type=file]")}>
-                    <.icon id="attach" class="w-7 h-7 mt-3 flex fill-white"/>
+                    <.icon id="attach" class="w-7 h-7 flex fill-white"/>
                   </button>
                   <.form
                     let={di}
@@ -741,7 +741,7 @@
                   >
                     <%= textarea di, :text,
                       placeholder: "Enter message",
-                      class: "w-full h-7 resize-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0 t-room-input",
+                      class: "w-full h-10 resize-none border-0 overflow-y-auto text-black placeholder-black/50 focus:ring-0 t-room-input",
                       id: "room-input",
                       spellcheck: "false",
                       autocomplete: "off"

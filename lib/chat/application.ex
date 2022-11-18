@@ -5,9 +5,12 @@ defmodule Chat.Application do
 
   use Application
 
+  require Logger
+
   @impl true
   def start(_type, _args) do
     Logger.put_application_level(:ssl, :error)
+    log_version()
 
     children = [
       # Start the Telemetry supervisor
@@ -41,5 +44,16 @@ defmodule Chat.Application do
   def config_change(changed, _new, removed) do
     ChatWeb.Endpoint.config_change(changed, removed)
     :ok
+  end
+
+  defp log_version do
+    ver = System.get_env("RELEASE_SYS_CONFIG")
+
+    if ver do
+      ver
+      |> String.split("/", trim: true)
+      |> Enum.at(3)
+      |> then(&Logger.info("[chat] " <> &1))
+    end
   end
 end

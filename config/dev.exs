@@ -1,5 +1,7 @@
 import Config
 
+config :chat, :handle_all_traffic, true
+
 # For development, we disable any cache and enable
 # debugging and code reloading.
 #

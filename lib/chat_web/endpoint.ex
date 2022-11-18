@@ -1,7 +1,9 @@
 defmodule ChatWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :chat
 
-  plug ChatWeb.Plugs.RedirectExtraTraffic
+  unless Application.compile_env(:chat, :handle_all_traffic) do
+    plug ChatWeb.Plugs.RedirectExtraTraffic
+  end
 
   # The session will be stored in the cookie and signed,
   # this means its contents can be read but not tampered with.

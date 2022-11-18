@@ -1,6 +1,8 @@
 defmodule Chat.Dialogs.DialogMessaging do
   @moduledoc "Message reading and writing"
 
+  require Logger
+
   alias Chat.Db
   alias Chat.Dialogs.Dialog
   alias Chat.Dialogs.Message
@@ -32,6 +34,11 @@ defmodule Chat.Dialogs.DialogMessaging do
   def read({index, %Message{} = msg}, identity, side, peer_key) when side in [:a_copy, :b_copy] do
     is_mine? = (side == :a_copy and msg.is_a_to_b?) or (side == :b_copy and !msg.is_a_to_b?)
 
+    author_pub_key =
+      if is_mine?,
+        do: Identity.pub_key(identity),
+        else: peer_key
+
     %PrivateMessage{
       timestamp: msg.timestamp,
       type: msg.type,
@@ -40,8 +47,14 @@ defmodule Chat.Dialogs.DialogMessaging do
       is_mine?: is_mine?,
       content:
         msg[side]
-        |> Utils.decrypt_signed(identity, (is_mine? && Identity.pub_key(identity)) || peer_key)
+        |> Utils.decrypt_signed(identity, author_pub_key)
     }
+  rescue
+    _ ->
+      ("[chat] [sign] Signature check failed " <> inspect({msg, side, identity, peer_key}))
+      |> Logger.error()
+
+      nil
   end
 
   def read(
@@ -57,6 +70,7 @@ defmodule Chat.Dialogs.DialogMessaging do
     |> Enum.map(fn {{_, _, index, _}, message} ->
       read({index, message}, me, side, Dialog.peer_key(dialog, side))
     end)
+    |> Enum.reject(&is_nil/1)
     |> Enum.reverse()
   end
 

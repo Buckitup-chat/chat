@@ -31,26 +31,54 @@ import * as UpChunk from "./upchunk"
 
 let Uploaders = {}
 
-Uploaders.UpChunk = function (entries, onViewError) {
-  entries.forEach(entry => {
-    // create the upload session with UpChunk
-    let { file, meta: { entrypoint } } = entry
-    let upload = UpChunk.createUpload({ endpoint: entrypoint, file, chunkSize: 10240 })
+Uploaders.UpChunk = function (items, onViewError) {
 
-    // stop uploading in the event of a view error
-    onViewError(() => upload.pause())
+  const entries = [...items];
+  const workers = new Array(5);
 
-    // upload error triggers LiveView error
-    upload.on("error", (e) => entry.error(e.detail.message))
+  const createTask = (entry) => {
+    if (!entry) {
+      return
+    }
+    return new Promise((resolve, reject) => {
+      // create the upload session with UpChunk
+      let { file, meta: { entrypoint } } = entry;
+      let upload = UpChunk.createUpload({ endpoint: entrypoint, file, chunkSize: 10240 });
 
-    // notify progress events to LiveView
-    upload.on("progress", (e) => {
-      if (e.detail < 100) { entry.progress(e.detail) }
+      // stop uploading in the event of a view error
+      onViewError(() => upload.pause())
+
+      // notify progress events to LiveView
+      upload.on("progress", (e) => {
+        if (e.detail < 100) { entry.progress(e.detail) }
+      })
+
+      // success completes the UploadEntry
+      upload.on("success", () => {
+        entry.progress(100);
+        resolve();
+      })
+
+      // upload error triggers LiveView error
+      upload.on("error", (e) => {
+        reject(e);
+        entry.error(e.detail.message);
+      })
     })
+  }
 
-    // success completes the UploadEntry
-    upload.on("success", () => entry.progress(100))
-  })
+  const assignNewTask = (task, i) => {
+    if (!task) {
+      return
+    }
+    task.finally(() => {
+      workers[i] = assignNewTask(createTask(entries.pop()), i);
+    })
+  }
+
+  workers.fill(true).map((_, i) => {
+    return assignNewTask(createTask(entries.pop()), i);
+  });
 }
 
 
@@ -98,10 +126,10 @@ const listeners = {
     messageBlockCheckbox.checked = !messageBlockCheckbox.checked;
 
     setTimeout(() => {
-      if (document.querySelector("#chat-messages").classList.contains('selectMode') == false) {return false }
-     
+      if (document.querySelector("#chat-messages").classList.contains('selectMode') == false) { return false }
+
       const allCheckboxes = document.querySelectorAll('.checked')
-      
+
       if (allCheckboxes.length == 0) {
         document.getElementById("chatContent").dispatchEvent(
           new CustomEvent('chat:toggle-selection-mode', { detail: { chatType: e.detail.chatType } })
@@ -110,16 +138,16 @@ const listeners = {
       const deleteButton = document.getElementById("delete-btn");
       const icon = document.querySelector('.x-icon');
       const deleteSpan = document.getElementById('delete-span');
-      if (Array.from(allCheckboxes).some(el => el.previousElementSibling.classList.contains('x-peer')) ) {
-          icon.classList.add('fill-gray-300')
-          deleteButton.disabled = true;
-          deleteSpan.classList.add('text-gray-300')
+      if (Array.from(allCheckboxes).some(el => el.previousElementSibling.classList.contains('x-peer'))) {
+        icon.classList.add('fill-gray-300')
+        deleteButton.disabled = true;
+        deleteSpan.classList.add('text-gray-300')
       } else {
         deleteSpan.classList.remove('text-gray-300')
         icon.classList.remove('fill-gray-300')
         deleteButton.disabled = false;
       }
-    
+
     }, 200);
   },
   "chat:messages-to-delete": (e) => {

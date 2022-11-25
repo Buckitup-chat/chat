@@ -38,8 +38,8 @@ defmodule ChatWeb.MainLive.Index do
         |> allow_image_upload(:room_image)
         |> allow_any500m_upload(:backup_file)
         |> allow_any500m_upload(:my_keys_file)
-        |> allow_chunked_upload(:dialog_file, max_entries: 50)
-        |> allow_chunked_upload(:room_file, max_entries: 50)
+        |> allow_chunked_upload(:dialog_file, max_entries: 2000)
+        |> allow_chunked_upload(:room_file, max_entries: 2000)
         |> Page.Login.check_stored()
         |> ok()
       end

@@ -1,5 +1,8 @@
 defmodule Chat.Db.FileFsProxy do
   @moduledoc "Write files in only thread (no concurency)"
+
+  # todo: remove
+
   use GenServer
 
   alias Chat.FileFs

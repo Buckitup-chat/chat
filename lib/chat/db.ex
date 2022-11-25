@@ -27,13 +27,18 @@ defmodule Chat.Db do
   def get_prev(key, min_key, predicate), do: Queries.get_prev(db(), key, min_key, predicate)
 
   def put(key, value),
-    do: writable_action(fn -> budgeted_put(db(), key, value) end)
+    do: Chat.Db.WriteQueue.push({key, value}, queue())
 
   def delete(key),
-    do: writable_action(fn -> Queries.delete(db(), key) end)
+    # do: writable_action(fn -> Queries.delete(db(), key) end)
+    do: Chat.Db.WriteQueue.mark_delete(key, queue())
 
   def bulk_delete({_min, _max} = range),
-    do: writable_action(fn -> Queries.bulk_delete(db(), range) end)
+    do: Chat.Db.WriteQueue.mark_delete(range, queue())
+
+  def put_chunk(data) do
+    :ok = Chat.Db.WriteQueue.put_chunk(data, queue())
+  end
 
   #
   # GenServer interface
@@ -42,6 +47,8 @@ defmodule Chat.Db do
   def db do
     get_chat_db_env(:data_pid)
   end
+
+  def queue, do: :data_queue |> get_chat_db_env()
 
   def file_dir do
     get_chat_db_env(:files_base_dir)
@@ -56,6 +63,14 @@ defmodule Chat.Db do
     |> GenServer.call({:swap, new_pids})
   end
 
+  def switch_on(name) do
+    queue = :"#{name}.WriteQueue"
+    status = :"#{name}.DryStatus"
+    put_chat_db_env(:data_queue, queue)
+    put_chat_db_env(:data_pid, name)
+    put_chat_db_env(:data_dry, status)
+  end
+
   #
   # GenServer implementation
   #
@@ -66,10 +81,12 @@ defmodule Chat.Db do
 
   @impl true
   def init(_opts) do
-    {:ok, db} = CubDB.start_link(file_path(), auto_file_sync: false, auto_compact: false)
+    # {:ok, db} = CubDB.start_link(file_path(), auto_file_sync: false, auto_compact: false)
+    db = Chat.Db.InternalDb
     files_dir = file_db_path()
 
-    put_chat_db_env(:data_pid, db)
+    switch_on(db)
+    # put_chat_db_env(:data_pid, db)
     put_chat_db_env(:files_base_dir, files_dir)
 
     WritableUpdater.check()

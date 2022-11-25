@@ -15,11 +15,12 @@ defmodule Chat.Db.Supervisor do
   @impl true
   def init(_init_arg) do
     children = [
-      FileFsProxy,
-      WritableUpdater,
-      DbSyncWatcher,
-      Db,
-      StatusPoller
+      Chat.Db.InternalDbSupervisor,
+      # FileFsProxy,
+      # WritableUpdater,
+      # DbSyncWatcher,
+      Db
+      # StatusPoller,
     ]
 
     Supervisor.init(children, strategy: :rest_for_one)

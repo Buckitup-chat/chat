@@ -3,6 +3,7 @@ defmodule Chat.Db.QueueWriter do
   Consumes the queue. Handles fsync and compaction?
 
   """
+  require Logger
   require Record
 
   Record.defrecord(:w_state,
@@ -19,8 +20,8 @@ defmodule Chat.Db.QueueWriter do
   alias Chat.Db.Maintenance
   alias Chat.Db.WriteQueue
 
-  @fsync_timout_s 3
-  @fsync_trigger_count 100
+  @fsync_timout_s 1
+  @fsync_trigger_count 10
   @compaction_timeout_m 7
   @dry_threshold_b 100 * 1024 * 1024
 
@@ -41,6 +42,7 @@ defmodule Chat.Db.QueueWriter do
   end
 
   def start_compaction(w_state(db: db, dirt_count: 0, compacting: false, dry_run: false) = state) do
+    "[db writer] compaction started" |> Logger.warn()
     CubDB.compact(db)
 
     state
@@ -52,6 +54,7 @@ defmodule Chat.Db.QueueWriter do
   def abort_compaction(w_state(compacting: false) = state), do: state
 
   def abort_compaction(w_state(db: db) = state) do
+    "[db writer] compaction aborted" |> Logger.warn()
     CubDB.halt_compaction(db)
 
     state |> w_state(compacting: false)
@@ -80,9 +83,15 @@ defmodule Chat.Db.QueueWriter do
       |> cancel_compaction_timer
       |> abort_compaction
       |> w_state(dry_run: true)
+      |> tap(fn _ ->
+        "[db writer] decided read only" |> Logger.warn()
+      end)
     else
       state
       |> w_state(dry_run: false)
+      |> tap(fn _ ->
+        "[db writer] decided writable" |> Logger.warn()
+      end)
     end
     |> notify_relay()
   end
@@ -119,12 +128,19 @@ defmodule Chat.Db.QueueWriter do
       |> then(&{:commit, &1, :ok})
     end)
 
-    state |> w_state(dirt_count: old_count + Enum.count(list))
+    case list do
+      [{{:file_chunk, _, _, _}, _}] -> 1000
+      _ -> Enum.count(list)
+    end
+    |> then(fn count ->
+      state |> w_state(dirt_count: old_count + count)
+    end)
   end
 
   def fsync(w_state(dry_run: true) = state), do: state
 
   def fsync(w_state(db: db) = state) do
+    "[db writer] fsyncing" |> Logger.warn()
     CubDB.file_sync(db)
 
     state

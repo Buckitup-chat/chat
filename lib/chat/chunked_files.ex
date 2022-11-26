@@ -11,10 +11,11 @@ defmodule Chat.ChunkedFiles do
   end
 
   def save_upload_chunk(key, {chunk_start, chunk_end}, chunk) do
-    secret = ChunkedFilesBroker.get(key)
-    encoded = Utils.encrypt_blob(chunk, secret)
-
-    Db.put_chunk({{:file_chunk, key, chunk_start, chunk_end}, encoded})
+    with secret <- ChunkedFilesBroker.get(key),
+         false <- is_nil(secret),
+         encoded <- Utils.encrypt_blob(chunk, secret) do
+      Db.put_chunk({{:file_chunk, key, chunk_start, chunk_end}, encoded})
+    end
   end
 
   def complete_upload?(key, filesize) do

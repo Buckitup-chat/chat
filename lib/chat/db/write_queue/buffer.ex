@@ -3,6 +3,8 @@ defmodule Chat.Db.WriteQueue.Buffer do
   Record for write queue manipulations
   """
   import Chat.Db.WriteQueue.ReadStream
+
+  require Logger
   require Record
 
   Record.defrecord(:buffer,
@@ -27,12 +29,28 @@ defmodule Chat.Db.WriteQueue.Buffer do
 
   def buffer_yield(buf) do
     cond do
-      data = buffer(buf, :data) -> {{:write, data}, buffer(buf, data: nil)}
-      keys = buffer(buf, :delete_keys) -> {{:delete, keys}, buffer(buf, delete_keys: nil)}
-      logs = buffer(buf, :log) -> {{:write, logs}, buffer(buf, log: nil)}
-      stream = buffer(buf, :stream) -> handle_stream(buf, stream)
-      chunk = buffer(buf, :chunk) -> {{:write, [chunk]}, buffer(buf, chunk: nil)}
-      true -> {:ignored, buf}
+      data = buffer(buf, :data) ->
+        "data" |> log()
+        {{:write, data}, buffer(buf, data: nil)}
+
+      keys = buffer(buf, :delete_keys) ->
+        "delete" |> log()
+        {{:delete, keys}, buffer(buf, delete_keys: nil)}
+
+      logs = buffer(buf, :log) ->
+        "log" |> log()
+        {{:write, logs}, buffer(buf, log: nil)}
+
+      stream = buffer(buf, :stream) ->
+        "stream" |> log()
+        handle_stream(buf, stream)
+
+      chunk = buffer(buf, :chunk) ->
+        "chunk" |> log()
+        {{:write, [chunk]}, buffer(buf, chunk: nil)}
+
+      true ->
+        {:ignored, buf}
     end
   end
 
@@ -51,6 +69,8 @@ defmodule Chat.Db.WriteQueue.Buffer do
       {data, updated_stream}
     end
   end
+
+  defp log(message), do: Logger.info("[queue] #{message}")
 
   defp append(nil, value), do: [value]
   defp append(list, value), do: [value | list]

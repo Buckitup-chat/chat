@@ -26,18 +26,22 @@ defmodule Chat.Db do
   def get_next(key, max_key, predicate), do: Queries.get_next(db(), key, max_key, predicate)
   def get_prev(key, min_key, predicate), do: Queries.get_prev(db(), key, min_key, predicate)
 
-  def put(key, value),
-    do: Chat.Db.WriteQueue.push({key, value}, queue())
+  def put(key, value) do
+    if match?({:action_log, _, _}, key) do
+      Chat.Db.WriteQueue.put({key, value}, queue())
+    else
+      Chat.Db.WriteQueue.push({key, value}, queue())
+    end
+  end
 
   def delete(key),
-    # do: writable_action(fn -> Queries.delete(db(), key) end)
     do: Chat.Db.WriteQueue.mark_delete(key, queue())
 
   def bulk_delete({_min, _max} = range),
     do: Chat.Db.WriteQueue.mark_delete(range, queue())
 
   def put_chunk(data) do
-    :ok = Chat.Db.WriteQueue.put_chunk(data, queue())
+    Chat.Db.WriteQueue.put_chunk(data, queue())
   end
 
   #
@@ -64,11 +68,38 @@ defmodule Chat.Db do
   end
 
   def switch_on(name) do
-    queue = :"#{name}.WriteQueue"
-    status = :"#{name}.DryStatus"
-    put_chat_db_env(:data_queue, queue)
+    %{queue: queue_name, status: status_relay_name} = names(name)
+    put_chat_db_env(:data_queue, queue_name)
     put_chat_db_env(:data_pid, name)
-    put_chat_db_env(:data_dry, status)
+    put_chat_db_env(:data_dry, status_relay_name)
+  end
+
+  def supervise(db_name, path) do
+    %{
+      status: dry_relay_name,
+      queue: queue_name,
+      writer: writer_name
+    } = names(db_name)
+
+    [
+      # queue
+      {Chat.Db.WriteQueue, name: queue_name},
+      # db
+      %{
+        id: db_name,
+        start:
+          {CubDB, :start_link,
+           [path, [auto_file_sync: false, auto_compact: false, name: db_name]]}
+      },
+      # dry status realy
+      %{
+        id: dry_relay_name,
+        start: {Agent, :start_link, [fn -> false end, [name: dry_relay_name]]}
+      },
+      # writer
+      {Chat.Db.QueueWriter.Process,
+       name: writer_name, db: db_name, queue: queue_name, status_relay: dry_relay_name}
+    ]
   end
 
   #

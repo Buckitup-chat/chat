@@ -8,6 +8,7 @@ defmodule Chat.Db.Common do
   @app_atom :chat
   @checking_writable_timeout 500
 
+  # todo: check if needed
   def writable_action(action) do
     case get_chat_db_env(:writable) do
       :yes ->
@@ -27,6 +28,7 @@ defmodule Chat.Db.Common do
     end
   end
 
+  # todo: check if needed
   def budgeted_put(db, key, value) do
     # budget = calc_budget(key, value)
     # current_budget = get_chat_db_env(:write_budget)
@@ -48,6 +50,7 @@ defmodule Chat.Db.Common do
     end
   end
 
+  # todo: check if needed
   def calc_budget(key, value) do
     case key do
       {:action_log, _, _} -> 100 + 300
@@ -62,6 +65,33 @@ defmodule Chat.Db.Common do
       {:room_message, _, _, _} -> 300 + 1_700
       _ -> 12_000_000
     end
+  end
+
+  def names(name),
+    do: %{
+      queue: :"#{name}.WriteQueue",
+      status: :"#{name}.DryStatus",
+      writer: :"#{name}.QueueWriter"
+    }
+
+  def db_state(name) do
+    names(name)
+    |> Map.new(fn {name, registered_name} ->
+      with pid <- Process.whereis(registered_name),
+           false <- is_nil(pid),
+           state <- :sys.get_state(pid) do
+        {name, state}
+      else
+        _ ->
+          {name, registered_name}
+      end
+    end)
+  end
+
+  def is_dry?, do: Application.fetch_env!(@app_atom, :data_dry) |> is_dry?()
+
+  def is_dry?(relay) do
+    Agent.get(relay, & &1)
   end
 
   def get_chat_db_env(key) do

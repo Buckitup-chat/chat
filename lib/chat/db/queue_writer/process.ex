@@ -22,7 +22,8 @@ defmodule Chat.Db.QueueWriter.Process do
   def init(opts) do
     opts
     |> from_opts()
-    |> ok_continue(:is_dry?)
+    |> decide_if_dry()
+    |> ok_continue(:demand)
   end
 
   @impl true
@@ -56,12 +57,6 @@ defmodule Chat.Db.QueueWriter.Process do
     state
     |> demand_queue()
     |> noreply()
-  end
-
-  def handle_continue(:is_dry?, state) do
-    state
-    |> decide_if_dry()
-    |> noreply_continue(:demand)
   end
 
   @impl true

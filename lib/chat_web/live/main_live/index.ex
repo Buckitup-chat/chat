@@ -320,6 +320,16 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_info({:dialog, msg}, socket), do: socket |> Page.DialogRouter.info(msg) |> noreply()
 
+  def handle_info({:when_file_ready, {file_key, user_key} = key, action}, socket) do
+    if Chat.FileIndex.get(user_key, file_key) do
+      action.()
+    else
+      ChatWeb.MainLive.Page.Shared.when_file_ready(key, action)
+    end
+
+    socket |> noreply()
+  end
+
   def handle_progress(:backup_file, %{done?: true}, socket) do
     consume_uploaded_entries(
       socket,

@@ -91,23 +91,27 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       ) do
     time = Chat.Time.monotonic_to_unix(time_offset)
 
-    consume_uploaded_entry(
-      socket,
-      entry,
-      fn _ ->
-        Messages.File.new(
-          entry,
-          chunk_key,
-          chunk_secret,
-          time
-        )
-        |> Dialogs.add_new_message(me, dialog)
-        |> then(&{:ok, &1})
-      end
-    )
-    |> broadcast_new_message(dialog, me, time)
+    message =
+      consume_uploaded_entry(
+        socket,
+        entry,
+        fn _ ->
+          Messages.File.new(
+            entry,
+            chunk_key,
+            chunk_secret,
+            time
+          )
+          |> Dialogs.add_new_message(me, dialog)
+          |> then(&{:ok, &1})
+        end
+      )
 
     FileIndex.add_file(chunk_key, dialog)
+
+    when_file_ready({chunk_key, Utils.hash(me)}, fn ->
+      broadcast_new_message(message, dialog, me, time)
+    end)
 
     socket
   end

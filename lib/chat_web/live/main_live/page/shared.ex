@@ -3,6 +3,10 @@ defmodule ChatWeb.MainLive.Page.Shared do
 
   alias Phoenix.HTML.Safe
 
+  def when_file_ready(key, action) do
+    Process.send_after(self(), {:when_file_ready, key, action}, 100)
+  end
+
   def mime_type(nil), do: "application/octet-stream"
   def mime_type(""), do: mime_type(nil)
   def mime_type(x), do: x

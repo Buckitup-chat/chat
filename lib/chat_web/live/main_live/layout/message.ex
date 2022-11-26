@@ -170,7 +170,10 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   defp message_file(%{msg: %{type: :file, content: json}} = assigns) do
-    {id, secret} = json |> StorageId.from_json()
+    {id, secret} =
+      json
+      |> StorageId.from_json()
+
     [_, _, _, _, name, size] = Files.get(id, secret)
 
     assigns =

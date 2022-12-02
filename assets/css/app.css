@@ -449,6 +449,10 @@ html {
   
 }
 
+@media screen and (max-height: 300px) {
+  .a-content-block { @apply pb-5}
+}
+
 .selectCheckbox {
   @apply hidden;
 }

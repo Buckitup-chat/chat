@@ -159,8 +159,10 @@ const listeners = {
   "phx:chat:focus": (e) => { const el = document.querySelector(e.detail.to); setTimeout(() => el.focus(), 100); },
   "phx:chat:change": (e) => { const el = document.querySelector(e.detail.to); el.innerHTML = e.detail.content; },
   "phx:scroll-to-bottom": (e) => {
-    const chatContent = document.querySelector('.a-content-block');
-    chatContent.scrollTop = chatContent.scrollHeight;
+    setTimeout(() => {
+      const chatContent = document.querySelector('.a-content-block');
+      chatContent.scrollTo({top: chatContent.scrollHeight})
+    },0)
   },
 };
 for (key in listeners) {

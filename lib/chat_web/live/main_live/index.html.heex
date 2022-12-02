@@ -859,41 +859,6 @@
           />
           <Layout.Admin.container>
             <Layout.Admin.row>
-              <Layout.Admin.block title="Backup and restore">
-
-                <section class="p-2 text-grayscale600">
-                  <a href="/get/backup">Download Backup data</a>
-                </section>
-                <section id="restore-data-mode" class="p-2 text-grayscale600">
-                  <div class="">
-                    <.form
-                      for={:backup_file}
-                      id="backup-file-form"
-                      phx-change="backup-file-submit"
-                      phx-submit="backup-file-submit"
-                      phx-drop-target={@uploads.backup_file.ref}
-                    >
-                      <%= live_file_input @uploads.backup_file, style: "display: none" %>
-                      <input
-                        type="button"
-                        class="cursor-pointer"
-                        onclick="event.target.parentNode.querySelector('input[type=file]').click()"
-                        value="Restore data from Backup"
-                      >
-                      <%= for entry <- @uploads.backup_file.entries do %>
-                        <%= if entry.progress > 0 and entry.progress < 100 do %>
-                          <progress value={entry.progress} max="100"> <%= entry.progress %>% </progress>
-                        <% end %>
-
-                        <%= for err <- upload_errors(@uploads.backup_file, entry) do %>
-                          <p class="alert alert-danger"><%= err %></p>
-                        <% end %>
-                      <% end %>
-                    </.form>
-                  </div>
-                </section>
-
-              </Layout.Admin.block>
               <Layout.Admin.block title="WiFi settings">
 
                 <%= if @wifi_loaded do %>
@@ -926,7 +891,6 @@
 
                 <section>
                   <Layout.Admin.db_status status={@db_status} />
-                  Read Only Mode: <%= if @ro_mode, do: "yes", else: "no" %>
                   <Layout.Admin.unmount_main_button mode={@db_status.mode} />
                 </section>
                 <section class="p-2 text-grayscale600">

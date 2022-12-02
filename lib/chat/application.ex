@@ -18,13 +18,13 @@ defmodule Chat.Application do
       # Start the PubSub system
       {Phoenix.PubSub, name: Chat.PubSub},
       # Start DB
+      Chat.Ordering.Counters,
       Chat.Db.Supervisor,
       Chat.AdminDb,
       # Application Services
       Chat.KeyRingTokens,
       Chat.Broker,
       Chat.ChunkedFilesBroker,
-      Chat.Ordering.Counters,
       # Start the Endpoint (http/https)
       ChatWeb.Endpoint
       # Start a worker by calling: Chat.Worker.start_link(arg)

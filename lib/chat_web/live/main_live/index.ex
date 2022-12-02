@@ -7,8 +7,6 @@ defmodule ChatWeb.MainLive.Index do
   alias Phoenix.LiveView.JS
 
   alias Chat.ChunkedFiles
-  alias Chat.Db
-  alias Chat.Ordering
   alias Chat.Rooms
   alias ChatWeb.MainLive.Layout
   alias ChatWeb.MainLive.Page
@@ -36,7 +34,6 @@ defmodule ChatWeb.MainLive.Index do
         )
         |> allow_image_upload(:image)
         |> allow_image_upload(:room_image)
-        |> allow_any500m_upload(:backup_file)
         |> allow_any500m_upload(:my_keys_file)
         |> allow_chunked_upload(:dialog_file, max_entries: 50)
         |> allow_chunked_upload(:room_file, max_entries: 50)
@@ -328,24 +325,6 @@ defmodule ChatWeb.MainLive.Index do
     end
 
     socket |> noreply()
-  end
-
-  def handle_progress(:backup_file, %{done?: true}, socket) do
-    consume_uploaded_entries(
-      socket,
-      :backup_file,
-      fn %{path: path}, _entry ->
-        dir = Temp.mkdir!("rec")
-        File.rename!(path, Path.join([dir, "0.cub"]))
-
-        {:ok, other_db} = CubDB.start_link(dir)
-        other_db |> Db.copy_data(Db.db())
-        Db.db() |> CubDB.file_sync()
-        Ordering.reset()
-
-        CubDB.stop(other_db)
-      end
-    )
   end
 
   def handle_progress(:my_keys_file, %{done?: true}, socket) do

@@ -6,13 +6,14 @@ defmodule Chat.Db.WriteQueue do
   import Tools.GenServerHelpers
   require Record
 
-  Record.defrecord(:q_state, buffer: buffer(), consumer: nil, in_demand: false)
+  Record.defrecord(:q_state, buffer: buffer(), consumer: nil, in_demand: false, mirror: nil)
 
   use GenServer
 
   def push(data, server), do: GenServer.cast(server, {:push, data})
   def put(data, server), do: GenServer.cast(server, {:put, data})
   def mark_delete(key, server), do: GenServer.cast(server, {:mark_delete, key})
+  def set_mirror(sink, server), do: GenServer.cast(server, {:mirror, sink})
 
   def put_chunk(chunk, server), do: GenServer.call(server, {:put_chunk, chunk})
   def put_stream(stream, server), do: GenServer.call(server, {:put_stream, stream})
@@ -79,11 +80,17 @@ defmodule Chat.Db.WriteQueue do
     |> noreply_continue(:produce)
   end
 
+  def handle_cast({:mirror, sink}, state) do
+    state
+    |> q_state(mirror: sink)
+    |> noreply()
+  end
+
   @impl true
   def handle_continue(:produce, q_state(consumer: nil) = state), do: state |> noreply()
   def handle_continue(:produce, q_state(in_demand: false) = state), do: state |> noreply()
 
-  def handle_continue(:produce, q_state(buffer: buf, consumer: pid) = state) do
+  def handle_continue(:produce, q_state(buffer: buf, consumer: pid, mirror: sink) = state) do
     if Process.alive?(pid) do
       case buffer_yield(buf) do
         {:ignored, _} ->
@@ -91,6 +98,7 @@ defmodule Chat.Db.WriteQueue do
 
         {payload, new_buf} ->
           GenServer.cast(pid, payload)
+          GenServer.cast(sink, payload)
 
           state |> q_state(buffer: new_buf)
       end

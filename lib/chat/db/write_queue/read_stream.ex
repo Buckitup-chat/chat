@@ -7,13 +7,18 @@ defmodule Chat.Db.WriteQueue.ReadStream do
 
   Record.defrecord(:read_stream,
     db: nil,
-    keys: []
+    keys: [],
+    awaiter: nil
   )
 
   def read_stream_empty?(read_stream(keys: list)), do: [] == list
 
-  def read_stream_yield(read_stream(db: db, keys: list) = stream) do
+  def read_stream_yield(read_stream(db: db, keys: list, awaiter: awaiter) = stream) do
     {data, new_list} = read_list(db, list)
+
+    if new_list == [] and awaiter do
+      send(awaiter, :done)
+    end
 
     {data, read_stream(stream, keys: new_list)}
   end

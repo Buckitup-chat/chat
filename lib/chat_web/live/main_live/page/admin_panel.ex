@@ -5,7 +5,6 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Phoenix.PubSub
 
   alias Chat.AdminRoom
-  alias Chat.Db
   alias Chat.Dialogs
   alias Chat.Messages
   alias Chat.Rooms
@@ -22,7 +21,6 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     me |> AdminRoom.visit()
 
     socket
-    |> assign(:ro_mode, not Db.writable?())
     |> assign(:wifi_loaded, false)
     |> request_wifi_settings()
     |> assign_user_lists()

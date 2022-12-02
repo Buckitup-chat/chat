@@ -3,10 +3,7 @@ defmodule Chat.Db.Supervisor do
   use Supervisor
 
   alias Chat.Db
-  alias Chat.Db.DbSyncWatcher
-  alias Chat.Db.FileFsProxy
   alias Chat.Db.StatusPoller
-  alias Chat.Db.WritableUpdater
 
   def start_link(init_arg) do
     Supervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
@@ -16,11 +13,8 @@ defmodule Chat.Db.Supervisor do
   def init(_init_arg) do
     children = [
       Chat.Db.InternalDbSupervisor,
-      # FileFsProxy,
-      # WritableUpdater,
-      # DbSyncWatcher,
-      Db
-      # StatusPoller,
+      Db,
+      StatusPoller
     ]
 
     Supervisor.init(children, strategy: :rest_for_one)

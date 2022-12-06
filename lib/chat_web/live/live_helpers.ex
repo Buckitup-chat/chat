@@ -113,7 +113,7 @@ defmodule ChatWeb.LiveHelpers do
   def icon(assigns) do
     ~H"""
     <svg class={@class}>
-      <use href={"/images/icons.svg##{@id}"}></use>
+      <use href={"/images/icons/#{@id}.svg##{@id}"}></use>
     </svg>
     """
   end

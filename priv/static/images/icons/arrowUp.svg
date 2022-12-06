@@ -1,0 +1,10 @@
+ <svg id="arrowUp" width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+    <g clip-path="url(#clip0_150_38325)">
+      <path d="M4.94333 11L8 7.94333L11.0567 11L12 10.0567L8 6.05667L4 10.0567L4.94333 11Z" />
+    </g>
+    <defs>
+      <clipPath id="clip0_150_38325">
+        <rect width="16" height="16" />
+      </clipPath>
+    </defs>
+  </svg>

@@ -1,0 +1,8 @@
+  <svg id="download" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+    <rect x="1" y="13" width="13" height="1" rx="0.5" fill="#241824" />
+    <rect x="1" y="14" width="4" height="1" rx="0.5" transform="rotate(-90 1 14)" />
+    <rect x="13" y="14" width="4" height="1" rx="0.5" transform="rotate(-90 13 14)" />
+    <rect x="8" width="11" height="1" rx="0.5" transform="rotate(90 8 0)" />
+    <rect x="12" y="6.80273" width="5.93645" height="1.13462" rx="0.567308" transform="rotate(135 12 6.80273)" />
+    <rect width="5.9365" height="1.13462" rx="0.567312" transform="matrix(-0.707107 -0.707107 -0.707107 0.707107 8 10.1992)" />
+  </svg>

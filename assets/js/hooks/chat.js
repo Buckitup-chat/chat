@@ -14,8 +14,24 @@ export const hooks = {
       }
     })
 
+    this.el.addEventListener("chat:download-messages", e => {
+      const checkboxes = document.querySelectorAll(".selectCheckbox.checked");
+      const messages = [];
+      for (const checkbox of checkboxes) {
+        const message = checkbox.parentNode;
+        if (message.getAttribute("phx-value-is-mine") == "true" && message.classList.contains("hidden") == false) {
+          messages.push({
+            id: message.getAttribute("phx-value-id"),
+            index: message.getAttribute("phx-value-index")
+          });
+        }
+      }
+
+      this.pushEvent(`${e.detail.chatType}/download-messages`, { messages: JSON.stringify(messages) })
+    })
+
     this.el.addEventListener("chat:toggle-selection-mode", e => {
-      this.pushEvent(`${e.detail.chatType}/toggle-messages-select`, {action: 'off'})
+      this.pushEvent(`${e.detail.chatType}/toggle-messages-select`, { action: 'off' })
     })
 
     this.handleEvent("chat:scroll-down", e => { setTimeout(() => { this.setScrollTop() }, 300) })

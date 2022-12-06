@@ -24,6 +24,8 @@ defmodule ChatWeb.Endpoint do
     at: "/",
     from: :chat,
     gzip: false,
+    # Need to add downloads dir if we pick
+    # the alternative way of downloading an archive
     only:
       ~w(assets fonts images favicon.ico robots.txt USERTrustRSAAddTrustCA.crt SectigoRSADomainValidationSecureServerCA.crt)
 

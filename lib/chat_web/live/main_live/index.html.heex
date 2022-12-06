@@ -407,10 +407,11 @@
                       <span id="delete-span">Delete</span>
                   </button>
 
-                    <a class="cursor-pointer inline-flex items-center t-download-chat-msg-btn">
+                    <button id="download-btn" class="cursor-pointer inline-flex items-center t-download-chat-msg-btn"
+                    phx-click={JS.dispatch("chat:download-messages", to: "#chatContent", detail: %{chatType: "dialog"})}>
                       <span class="text-purple">Download</span>
                       <.icon id="download" class="ml-1 w-4 h-4 flex  stroke-purple "/>
-                    </a>
+                    </button>
                   </div>
                 <% end %>
               </div>

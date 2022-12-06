@@ -39,6 +39,9 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
       {"delete-messages", params} ->
         socket |> Page.Dialog.delete_messages(params)
 
+      {"download-messages", params} ->
+        socket |> Page.Dialog.download_messages(params)
+
       {"text-message", %{"dialog" => %{"text" => text}}} ->
         socket |> Page.Dialog.send_text(text)
 

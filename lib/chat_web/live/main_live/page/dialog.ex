@@ -5,10 +5,9 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
   use Phoenix.Component
 
-  alias Chat.ChunkedFiles
+  alias Chat.Broker
   alias Chat.Dialogs
   alias Chat.FileIndex
-  alias Chat.Files
   alias Chat.Identity
   alias Chat.Log
   alias Chat.Memo
@@ -259,70 +258,24 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     end
   end
 
-  def download_messages(%{assigns: %{me: me, dialog: dialog}} = socket, %{"messages" => messages}) do
-    files =
+  def download_messages(
+        %{assigns: %{dialog: dialog, me: me, my_id: user_id, rooms: rooms, timezone: timezone}} =
+          socket,
+        %{
+          "messages" => messages
+        }
+      ) do
+    messages_ids =
       messages
       |> Jason.decode!()
-      |> Enum.map(fn %{"id" => msg_id, "index" => index} ->
-        with %{type: type, content: json} when type in [:file, :image, :video] <-
-               Dialogs.read_message(dialog, {String.to_integer(index), msg_id}, me),
-             {id, content} <- StorageId.from_json(json),
-             [chunk_key, chunk_secret_raw, _, _type, filename, _size] <-
-               Files.get(id, content),
-             chunk_secret <- Base.decode64!(chunk_secret_raw),
-             file_content <- ChunkedFiles.read({chunk_key, chunk_secret}) do
-          {String.to_charlist(filename), file_content}
-        else
-          _ ->
-            nil
-        end
+      |> Enum.map(fn %{"id" => message_id, "index" => index} ->
+        {String.to_integer(index), message_id}
       end)
-      |> Enum.reject(&is_nil/1)
 
-    {:ok, {filename, archive_content}} = :zip.create(UUID.uuid4() <> ".zip", files, [:memory])
+    user_data = User.device_encode(me, rooms)
+    key = Broker.store({messages_ids, user_data, user_id, timezone})
 
-    # Primary way of downloading an archive:
-    # 1. saves the chunk
-    # 2. adds the file to the DB
-    # 3. redirects to the file URL
-    #
-    # If the file is greater than 10 MB the download fails.
-    # Might need to create multiple chunks.
-    size = byte_size(archive_content)
-    {chunk_key, chunk_secret} = ChunkedFiles.new_upload()
-
-    file =
-      Messages.File.new(
-        %{
-          client_size: size,
-          client_type: "application/zip",
-          client_name: filename
-        },
-        chunk_key,
-        chunk_secret
-      )
-
-    ChunkedFiles.save_upload_chunk(chunk_key, {0, size - 1}, archive_content)
-    ChunkedFiles.mark_consumed(chunk_key)
-
-    {key, secret} = Files.add(file.data)
-
-    # Alternative way of downloading an archive:
-    # 1. saves the archive inside priv/static/downloads/ directory
-    # 2. redirects to /downloads/<filename> and downloads the archive
-    #
-    # Works no matter the file size.
-    #
-    # dir = Application.app_dir(:chat, "priv/static/downloads/")
-    # File.mkdir_p(dir)
-    # path = Path.join(dir, filename)
-    # File.write!(path, archive_content)
-
-    socket
-    |> push_event("chat:redirect", %{
-      url: Routes.file_url(socket, :file, key, a: Base.url_encode64(secret))
-      # url: Routes.static_url(socket, "/downloads/" <> filename)
-    })
+    push_event(socket, "chat:redirect", %{url: Routes.zip_url(socket, :get, key)})
   end
 
   def accept_room_invite(%{assigns: %{me: me, dialog: dialog, rooms: rooms}} = socket, message_id) do

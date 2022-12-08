@@ -19,7 +19,7 @@ export const hooks = {
       const messages = [];
       for (const checkbox of checkboxes) {
         const message = checkbox.parentNode;
-        if (message.getAttribute("phx-value-is-mine") == "true" && message.classList.contains("hidden") == false) {
+        if (message.classList.contains("hidden") == false) {
           messages.push({
             id: message.getAttribute("phx-value-id"),
             index: message.getAttribute("phx-value-index")

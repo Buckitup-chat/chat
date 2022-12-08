@@ -69,7 +69,8 @@ defmodule Chat.MixProject do
       {:sobelow, "~> 0.8", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
       {:tailwind, "~> 0.1", runtime: Mix.env() == :dev},
-      {:timex, "~> 3.7"}
+      {:timex, "~> 3.7"},
+      {:zstream, "~> 0.6"}
     ]
   end
 

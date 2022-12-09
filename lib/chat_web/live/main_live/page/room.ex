@@ -271,7 +271,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def download_messages(
-        %{assigns: %{room_identity: room_identity, timezone: timezone}} = socket,
+        %{assigns: %{room: room, room_identity: room_identity, timezone: timezone}} = socket,
         %{"messages" => messages}
       ) do
     messages_ids =
@@ -281,7 +281,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         {String.to_integer(index), message_id}
       end)
 
-    key = Broker.store({:room, {messages_ids, room_identity}, timezone})
+    key = Broker.store({:room, {messages_ids, room, room_identity}, timezone})
 
     push_event(socket, "chat:redirect", %{url: Routes.zip_url(socket, :get, key)})
   end

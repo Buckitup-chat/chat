@@ -22,10 +22,12 @@ defmodule ChatWeb.ZipController do
   def get(conn, params) do
     with %{"broker_key" => broker_key} <- params,
          {type, data, timezone} <- Broker.get(broker_key) do
+      filename = get_filename(type, data)
+
       conn =
         conn
         |> put_resp_content_type("application/zip")
-        |> put_resp_header("content-disposition", "attachment; filename=messages.zip")
+        |> put_resp_header("content-disposition", "attachment; filename=#{filename}.zip")
         |> send_chunked(200)
 
       style_stream =
@@ -103,9 +105,16 @@ defmodule ChatWeb.ZipController do
     #     |> send_resp(404, "")
   end
 
-  defp fetch_messages(:dialog, {messages_ids, user_data, user_id}) do
+  defp get_filename(:dialog, {_messages_ids, peer, _user_data}),
+    do: "chat_#{short_hash(peer.hash)}_messages"
+
+  defp get_filename(:room, {_messages_ids, room, _room_identity}),
+    do: "room_#{short_hash(room.admin_hash)}_messages"
+
+  def short_hash(hash), do: hash |> String.split_at(-6) |> elem(1)
+
+  defp fetch_messages(:dialog, {messages_ids, peer, user_data}) do
     {identity, _rooms} = User.device_decode(user_data)
-    peer = User.by_id(user_id)
     dialog = Dialogs.find_or_open(identity, peer)
 
     messages_ids
@@ -113,7 +122,7 @@ defmodule ChatWeb.ZipController do
     |> Enum.reject(&is_nil(elem(&1, 0)))
   end
 
-  defp fetch_messages(:room, {messages_ids, room_identity}) do
+  defp fetch_messages(:room, {messages_ids, _room, room_identity}) do
     messages_ids
     |> Stream.map(fn message_id ->
       case Rooms.read_message(message_id, room_identity, &User.id_map_builder/1) do

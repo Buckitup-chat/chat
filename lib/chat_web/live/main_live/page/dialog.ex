@@ -269,8 +269,9 @@ defmodule ChatWeb.MainLive.Page.Dialog do
         {String.to_integer(index), message_id}
       end)
 
+    peer = User.by_id(user_id)
     user_data = User.device_encode(me, rooms)
-    key = Broker.store({:dialog, {messages_ids, user_data, user_id}, timezone})
+    key = Broker.store({:dialog, {messages_ids, peer, user_data}, timezone})
 
     push_event(socket, "chat:redirect", %{url: Routes.zip_url(socket, :get, key)})
   end

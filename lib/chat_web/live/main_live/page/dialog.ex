@@ -259,11 +259,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def download_messages(
-        %{assigns: %{dialog: dialog, me: me, my_id: user_id, rooms: rooms, timezone: timezone}} =
-          socket,
-        %{
-          "messages" => messages
-        }
+        %{assigns: %{me: me, my_id: user_id, rooms: rooms, timezone: timezone}} = socket,
+        %{"messages" => messages}
       ) do
     messages_ids =
       messages
@@ -273,7 +270,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       end)
 
     user_data = User.device_encode(me, rooms)
-    key = Broker.store({messages_ids, user_data, user_id, timezone})
+    key = Broker.store({:dialog, {messages_ids, user_data, user_id}, timezone})
 
     push_event(socket, "chat:redirect", %{url: Routes.zip_url(socket, :get, key)})
   end

@@ -9,24 +9,19 @@ defmodule ChatWeb.ZipController do
 
   use ChatWeb, :controller
 
-  alias Chat.Rooms.Message
-  alias ChatWeb.MainLive.Layout.ExportedMessage
   alias Chat.Broker
   alias Chat.ChunkedFiles
   alias Chat.Dialogs
-  alias Chat.Dialogs.PrivateMessage
   alias Chat.Files
+  alias Chat.Rooms
+  alias Chat.Rooms.PlainMessage
   alias Chat.User
   alias Chat.Utils.StorageId
+  alias ChatWeb.MainLive.Layout.ExportedMessage
 
   def get(conn, params) do
     with %{"broker_key" => broker_key} <- params,
-         {messages_ids, user_data, user_id, timezone} <- Broker.get(broker_key),
-         {identity, _rooms} = User.device_decode(user_data),
-         peer <- User.by_id(user_id),
-         dialog <- Dialogs.find_or_open(identity, peer),
-         {messages, users} when not is_nil(messages) and not is_nil(users) <-
-           fetch_messages_and_users_ids(dialog, identity, messages_ids) do
+         {type, data, timezone} <- Broker.get(broker_key) do
       conn =
         conn
         |> put_resp_content_type("application/zip")
@@ -39,18 +34,11 @@ defmodule ChatWeb.ZipController do
         |> Path.join("static/assets/app.css")
         |> File.stream!()
 
+      messages = fetch_messages(type, data)
+
       messages_stream =
         messages
-        |> Stream.map(fn message ->
-          author =
-            case message do
-              %PrivateMessage{} ->
-                peer
-
-              %Message{} = message ->
-                Map.get(users, message.author_hash)
-            end
-
+        |> Stream.map(fn {message, author} ->
           %{author: author, message: message, timezone: timezone}
           |> ExportedMessage.message_block()
           |> Phoenix.HTML.Safe.to_iodata()
@@ -70,7 +58,7 @@ defmodule ChatWeb.ZipController do
 
       file_entries =
         messages
-        |> Enum.reduce([], fn message, file_entries ->
+        |> Enum.reduce([], fn {message, _author}, file_entries ->
           with %{type: type, content: json} when type in [:file, :image, :video] <- message,
                {id, content} <- StorageId.from_json(json),
                [chunk_key, chunk_secret_raw, _, _type, filename, _size] <- Files.get(id, content),
@@ -115,31 +103,28 @@ defmodule ChatWeb.ZipController do
     #     |> send_resp(404, "")
   end
 
-  defp fetch_messages_and_users_ids(dialog, identity, messages_ids) do
-    {messages, users_ids} =
-      Enum.map_reduce(messages_ids, MapSet.new(), fn message_id, users_ids ->
-        case Dialogs.read_message(dialog, message_id, identity) do
-          # %Message{} = message ->
-          #   users_ids = MapSet.put(users_ids, message.author_hash)
-          #   {message, users_ids}
+  defp fetch_messages(:dialog, {messages_ids, user_data, user_id}) do
+    {identity, _rooms} = User.device_decode(user_data)
+    peer = User.by_id(user_id)
+    dialog = Dialogs.find_or_open(identity, peer)
 
-          %PrivateMessage{} = message ->
-            {message, users_ids}
+    messages_ids
+    |> Stream.map(&{Dialogs.read_message(dialog, &1, identity), peer})
+    |> Enum.reject(&is_nil(elem(&1, 0)))
+  end
 
-          _ ->
-            {nil, users_ids}
-        end
-      end)
+  defp fetch_messages(:room, {messages_ids, room_identity}) do
+    messages_ids
+    |> Stream.map(fn message_id ->
+      case Rooms.read_message(message_id, room_identity, &User.id_map_builder/1) do
+        %PlainMessage{} = message ->
+          author = User.by_id(message.author_hash)
+          {message, author}
 
-    messages = Enum.reject(messages, &is_nil/1)
-    users = User.id_map_builder(users_ids)
-
-    with true <- length(messages) == length(messages_ids),
-         true <- map_size(users) == MapSet.size(users_ids) do
-      {messages, users}
-    else
-      _ ->
-        {nil, nil}
-    end
+        nil ->
+          {nil, nil}
+      end
+    end)
+    |> Enum.reject(&is_nil(elem(&1, 0)))
   end
 end

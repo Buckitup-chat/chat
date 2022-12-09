@@ -5,6 +5,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   require Logger
 
+  alias Chat.Broker
   alias Chat.Dialogs
   alias Chat.FileIndex
   alias Chat.Identity
@@ -267,6 +268,22 @@ defmodule ChatWeb.MainLive.Page.Room do
 
     socket
     |> assign(:room_mode, :plain)
+  end
+
+  def download_messages(
+        %{assigns: %{room_identity: room_identity, timezone: timezone}} = socket,
+        %{"messages" => messages}
+      ) do
+    messages_ids =
+      messages
+      |> Jason.decode!()
+      |> Enum.map(fn %{"id" => message_id, "index" => index} ->
+        {String.to_integer(index), message_id}
+      end)
+
+    key = Broker.store({:room, {messages_ids, room_identity}, timezone})
+
+    push_event(socket, "chat:redirect", %{url: Routes.zip_url(socket, :get, key)})
   end
 
   def hide_deleted_message(socket, id) do

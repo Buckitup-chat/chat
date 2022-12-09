@@ -76,6 +76,13 @@ defmodule ChatWeb.ZipController do
                [chunk_key, chunk_secret_raw, _, _type, filename, _size] <- Files.get(id, content),
                chunk_secret <- Base.decode64!(chunk_secret_raw),
                file_stream <- ChunkedFiles.stream_chunks(chunk_key, chunk_secret) do
+            {extension, filename} =
+              filename
+              |> String.split(".")
+              |> List.pop_at(-1)
+
+            filename = Enum.join(filename, ".") <> "_" <> id <> "." <> extension
+
             entry = Zstream.entry("files/#{filename}", file_stream)
 
             [entry | file_entries]

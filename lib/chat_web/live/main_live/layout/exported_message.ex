@@ -118,10 +118,17 @@ defmodule ChatWeb.MainLive.Layout.ExportedMessage do
     {id, secret} = StorageId.from_json(json)
     [_, _, _, _, name, size] = Files.get(id, secret)
 
+    {extension, filename} =
+      name
+      |> String.split(".")
+      |> List.pop_at(-1)
+
+    filename = Enum.join(filename, ".") <> "_" <> id <> "." <> extension
+
     Map.put(assigns, :file, %{
       name: name,
       size: size,
-      url: "files/" <> name
+      url: "files/" <> filename
     })
   end
 

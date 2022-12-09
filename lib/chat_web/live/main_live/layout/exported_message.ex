@@ -16,7 +16,7 @@ defmodule ChatWeb.MainLive.Layout.ExportedMessage do
           author={@author}
           color="bg-white"
           message={@message}
-          room={nil}
+          room={@room}
           timezone={@timezone}
         />
       </div>

@@ -38,10 +38,16 @@ defmodule ChatWeb.ZipController do
 
       messages = fetch_messages(type, data)
 
+      room =
+        if type == :room do
+          {_messages_ids, room, _room_identity} = data
+          room
+        end
+
       messages_stream =
         messages
         |> Stream.map(fn {message, author} ->
-          %{author: author, message: message, timezone: timezone}
+          %{author: author, message: message, room: room, timezone: timezone}
           |> ExportedMessage.message_block()
           |> Phoenix.HTML.Safe.to_iodata()
         end)

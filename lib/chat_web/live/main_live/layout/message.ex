@@ -197,6 +197,12 @@ defmodule ChatWeb.MainLive.Layout.Message do
       """
   end
 
+  defp message_header(%{message_header: _message_header} = assigns) do
+    ~H"""
+    <%= render_slot(@message_header) %>
+    """
+  end
+
   defp message_header(assigns) do
     ~H"""
     <div id={"message-header-#{@msg.id}"} class="py-1 px-2 flex items-center justify-between relative">
@@ -289,7 +295,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
     """
   end
 
-  defp message_timestamp(%{msg: %{timestamp: timestamp}, timezone: timezone} = assigns) do
+  def message_timestamp(%{msg: %{timestamp: timestamp}, timezone: timezone} = assigns) do
     time =
       timestamp
       |> DateTime.from_unix!()

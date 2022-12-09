@@ -104,11 +104,9 @@ defmodule ChatWeb.ZipController do
       _ ->
         raise "404"
     end
-
-    # rescue
-    #   _ ->
-    #     conn
-    #     |> send_resp(404, "")
+  rescue
+    _ ->
+      send_resp(conn, 404, "")
   end
 
   defp get_filename(:dialog, {_messages_ids, peer, _user_data}),

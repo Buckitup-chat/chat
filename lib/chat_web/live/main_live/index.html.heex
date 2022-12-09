@@ -586,10 +586,9 @@
                 id={"room-#{@room.admin_hash}"}
                 phx-hook="Chat" data-page={@page}
                 data-has-more-messages={"#{@has_more_messages}"}
-                phx-click={JS.dispatch("phx:scroll-to-bottom")}
               >
 
-                <div class={classes("w-full px-8 border-b border-white/10 backdrop-blur-md bg-black/20 z-10 flex flex-row items-center justify-between sticky top-0 right-0")} style="min-height: 56px;" >
+                <div phx-click={JS.dispatch("phx:scroll-to-bottom")} class={classes("w-full px-8 border-b border-white/10 backdrop-blur-md bg-black/20 z-10 flex flex-row items-center justify-between sticky top-0 right-0")} style="min-height: 56px;" >
                   <div class="flex flex-row items-center">
                     <button phx-click={JS.push("room/close") |> close_content()} class="sm:hidden pr-3">
                       <.icon id="arrowBack" class="w-6 h-6 fill-white"/>

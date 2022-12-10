@@ -10,8 +10,8 @@ defmodule Chat.Db.Switching do
     from_pipe = Common.names(from)
     to_pipe = Common.names(to)
 
-    WriteQueue.set_mirror(from_pipe.queue, to_pipe.writer)
-    WriteQueue.set_mirror(to_pipe.queue, nil)
+    WriteQueue.set_mirror(to_pipe.writer, from_pipe.queue)
+    WriteQueue.set_mirror(nil, to_pipe.queue)
   end
 
   def set_default(name) do

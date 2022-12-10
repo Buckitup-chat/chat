@@ -34,6 +34,7 @@ defmodule Chat.Db.Maintenance do
     with {data, 0} <- System.cmd("df", ["-P"]),
          [_header | rows] <- String.split(data, "\n", trim: true),
          row <- Enum.find(rows, &String.starts_with?(&1, device)),
+         false <- is_nil(row),
          [_, _, _, _, _, path] <- String.split(row, " ", trim: true) do
       path
     else

@@ -1,6 +1,7 @@
 defmodule Chat.Rooms.RequestRoomTest do
   use ExUnit.Case, async: true
 
+  alias Chat.Db.ChangeTracker
   alias Chat.Identity
   alias Chat.Rooms
   alias Chat.User
@@ -29,9 +30,11 @@ defmodule Chat.Rooms.RequestRoomTest do
     bob_hash = bob |> Utils.hash()
 
     Rooms.add_request(room_hash, bob, 0)
+    ChangeTracker.await()
     assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
 
     Rooms.approve_requests(room_hash, identity)
+    ChangeTracker.await()
     assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
   end
 
@@ -43,14 +46,17 @@ defmodule Chat.Rooms.RequestRoomTest do
     bob_hash = bob |> Utils.hash()
 
     Rooms.add_request(room_hash, bob, 0)
+    ChangeTracker.await()
     assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
 
     Rooms.approve_request(room_hash, bob_hash, identity)
+    ChangeTracker.await()
 
     assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, _bob_room_key}]} =
              Rooms.get(room_hash)
 
     Rooms.approve_request(room_hash, bob_hash, identity)
+    ChangeTracker.await()
 
     assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, _bob_room_key}]} =
              Rooms.get(room_hash)
@@ -66,9 +72,11 @@ defmodule Chat.Rooms.RequestRoomTest do
     bob_hash = bob |> Utils.hash()
 
     Rooms.add_request(room_hash, bob, 0)
+    ChangeTracker.await()
 
     assert [{^bob_hash, ^bob_pub_key}] = Rooms.list_pending_requests(room_hash)
     Rooms.approve_request(room_hash, bob_hash, identity)
+    ChangeTracker.await()
 
     assert [] = Rooms.list_pending_requests(room_hash)
   end
@@ -80,6 +88,7 @@ defmodule Chat.Rooms.RequestRoomTest do
     User.register(bob)
 
     Rooms.add_request(room_hash, bob, 0)
+    ChangeTracker.await()
 
     messages = Rooms.read(room, identity, &User.id_map_builder/1)
 
@@ -89,6 +98,7 @@ defmodule Chat.Rooms.RequestRoomTest do
   defp user_and_request_room(name) do
     alice = User.login(name)
     room_identity = Rooms.add(alice, "#{name}'s Request room", :request)
+    Rooms.await_saved(room_identity)
     room = Rooms.get(room_identity |> Utils.hash())
 
     {alice, room_identity, room}

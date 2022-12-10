@@ -71,7 +71,7 @@ defmodule Chat.Db.WriteQueue do
   def handle_cast({:put, data}, q_state(buffer: buf) = state) do
     state
     |> q_state(buffer: buffer_add_log(buf, data))
-    |> noreply()
+    |> noreply_continue(:produce)
   end
 
   def handle_cast({:mark_delete, key}, q_state(buffer: buf) = state) do

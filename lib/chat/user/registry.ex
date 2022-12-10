@@ -3,6 +3,7 @@ defmodule Chat.User.Registry do
 
   alias Chat.Card
   alias Chat.Db
+  alias Chat.Db.ChangeTracker
   alias Chat.Identity
   alias Chat.Utils
 
@@ -22,5 +23,9 @@ defmodule Chat.User.Registry do
 
   def remove(hash) do
     Db.delete({:users, hash})
+  end
+
+  def await_saved(hash) do
+    ChangeTracker.await({:users, hash})
   end
 end

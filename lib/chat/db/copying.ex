@@ -9,12 +9,15 @@ defmodule Chat.Db.Copying do
 
   def stream(from, to, awaiter \\ nil) do
     [from, to]
-    |> Task.async_stream(fn db ->
-      db
-      |> CubDB.select()
-      |> Stream.map(fn {k, _v} -> k end)
-      |> MapSet.new()
+    |> Enum.map(fn db ->
+      Task.async(fn ->
+        db
+        |> CubDB.select()
+        |> Stream.map(fn {k, _v} -> k end)
+        |> MapSet.new()
+      end)
     end)
+    |> Task.await_many(:timer.hours(2))
     |> then(fn [src, dst] ->
       keys =
         src

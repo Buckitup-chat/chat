@@ -77,8 +77,13 @@ defmodule ChatWeb.MainLive.Page.Room do
         content
         |> Messages.Text.new(time)
         |> Rooms.add_new_message(me, room.pub_key)
+        |> tap(fn message ->
+          message
+          |> Rooms.on_saved(room.pub_key, fn ->
+            broadcast_new_message(message, room, me, time)
+          end)
+        end)
     end
-    |> broadcast_new_message(room, me, time)
 
     socket
   end
@@ -115,7 +120,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
     FileIndex.add_file(chunk_key, room)
 
-    when_file_ready({chunk_key, room.pub_key |> Utils.hash()}, fn ->
+    Rooms.on_saved(message, room.pub_key, fn ->
       broadcast_new_message(message, room, me, time)
     end)
 

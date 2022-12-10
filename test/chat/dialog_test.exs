@@ -1,6 +1,7 @@
 defmodule Chat.Dialogs.DialogTest do
   use ExUnit.Case, async: true
 
+  alias Chat.Db.ChangeTracker
   alias Chat.Card
   alias Chat.Dialogs
   alias Chat.Files
@@ -32,6 +33,7 @@ defmodule Chat.Dialogs.DialogTest do
     "not_image 2"
     |> fake_image
     |> Dialogs.add_new_message(bob, dialog)
+    |> Dialogs.await_saved(dialog)
 
     assert 3 == dialog |> Dialogs.read(bob) |> Enum.count()
 
@@ -53,7 +55,9 @@ defmodule Chat.Dialogs.DialogTest do
 
     assert initial == dialog
 
-    %Messages.Text{text: content} |> Dialogs.add_new_message(alice, dialog)
+    %Messages.Text{text: content}
+    |> Dialogs.add_new_message(alice, dialog)
+    |> Dialogs.await_saved(dialog)
 
     [bob_version] = Dialogs.read(dialog, bob)
 
@@ -81,6 +85,7 @@ defmodule Chat.Dialogs.DialogTest do
     content
     |> make_memo_msg()
     |> Dialogs.add_new_message(alice, dialog)
+    |> Dialogs.await_saved(dialog)
 
     [bob_version] = Dialogs.read(dialog, bob)
 
@@ -101,6 +106,7 @@ defmodule Chat.Dialogs.DialogTest do
 
     fake_file()
     |> Dialogs.add_new_message(alice, dialog)
+    |> Dialogs.await_saved(dialog)
 
     [bob_version] = Dialogs.read(dialog, bob)
 
@@ -126,6 +132,7 @@ defmodule Chat.Dialogs.DialogTest do
     "not_image 2"
     |> fake_image
     |> Dialogs.add_new_message(bob, dialog)
+    |> Dialogs.await_saved(dialog)
 
     msg_id =
       dialog
@@ -139,6 +146,7 @@ defmodule Chat.Dialogs.DialogTest do
     assert msg_id != nil
 
     dialog |> Dialogs.delete(alice, msg_id)
+    ChangeTracker.await()
 
     assert nil ==
              dialog
@@ -159,6 +167,7 @@ defmodule Chat.Dialogs.DialogTest do
     "not_image 2"
     |> fake_image
     |> Dialogs.add_new_message(bob, dialog)
+    |> Dialogs.await_saved(dialog)
 
     msg_id =
       dialog
@@ -192,6 +201,7 @@ defmodule Chat.Dialogs.DialogTest do
 
     fake_file()
     |> Dialogs.add_new_message(alice, dialog)
+    |> Dialogs.await_saved(dialog)
 
     dialog
     |> Dialogs.read(alice)
@@ -199,6 +209,7 @@ defmodule Chat.Dialogs.DialogTest do
     |> Enum.map(fn {msg, getter} ->
       assert nil != msg.content |> StorageId.from_json() |> then(getter)
       dialog |> Dialogs.delete(alice, {msg.index, msg.id})
+      ChangeTracker.await()
       assert nil == msg.content |> StorageId.from_json() |> then(getter)
     end)
   end
@@ -212,7 +223,9 @@ defmodule Chat.Dialogs.DialogTest do
     |> make_memo_msg()
     |> Dialogs.add_new_message(alice, dialog)
 
-    %Messages.Text{text: text} |> Dialogs.add_new_message(alice, dialog)
+    %Messages.Text{text: text}
+    |> Dialogs.add_new_message(alice, dialog)
+    |> Dialogs.await_saved(dialog)
 
     assert [_, msg] = dialog |> Dialogs.read(alice)
     assert ^text = msg.content
@@ -222,6 +235,7 @@ defmodule Chat.Dialogs.DialogTest do
     updated_text
     |> Messages.Text.new(0)
     |> Dialogs.update_message(msg_id, alice, dialog)
+    |> Dialogs.await_saved(dialog)
 
     assert [_, %{type: :memo} = msg] = dialog |> Dialogs.read(alice)
     assert ^updated_text = msg.content |> StorageId.from_json() |> Memo.get()
@@ -229,6 +243,7 @@ defmodule Chat.Dialogs.DialogTest do
     text
     |> Messages.Text.new(0)
     |> Dialogs.update_message(msg_id, alice, dialog)
+    |> Dialogs.await_saved(dialog)
 
     assert [_, %{type: :text, content: ^text}] = dialog |> Dialogs.read(alice)
   end
@@ -239,6 +254,7 @@ defmodule Chat.Dialogs.DialogTest do
     "memo here "
     |> make_memo_msg()
     |> Dialogs.add_new_message(alice, dialog)
+    |> Dialogs.await_saved(dialog)
 
     assert [msg] = dialog |> Dialogs.read(alice)
 

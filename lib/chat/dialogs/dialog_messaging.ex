@@ -16,8 +16,6 @@ defmodule Chat.Dialogs.DialogMessaging do
 
   @db_prefix :dialog_message
 
-  @spec add_new_message(message :: any(), author :: Identity, dialog :: Dialog) ::
-          {index :: integer(), Message}
   def add_new_message(
         message,
         %Identity{} = source,
@@ -29,6 +27,18 @@ defmodule Chat.Dialogs.DialogMessaging do
     message
     |> DryStorable.content()
     |> add_message(dialog, source, now: now, type: type)
+  end
+
+  def on_saved({next, %{id: id}}, dialog, ok_fn) do
+    dialog
+    |> msg_key(next, id)
+    |> Chat.Db.ChangeTracker.promise(ok_fn)
+  end
+
+  def await_saved({next, %{id: id}}, dialog) do
+    dialog
+    |> msg_key(next, id)
+    |> Chat.Db.ChangeTracker.await()
   end
 
   def read({index, %Message{} = msg}, identity, side, peer_key) when side in [:a_copy, :b_copy] do

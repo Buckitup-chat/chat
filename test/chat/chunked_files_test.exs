@@ -12,9 +12,11 @@ defmodule Chat.ChunkedFilesTest do
     second = "another part"
 
     ChunkedFiles.save_upload_chunk(key, {1, 18}, first)
+    Chat.Db.ChangeTracker.await({:file_chunk, key, 1, 18})
     assert false == ChunkedFiles.complete_upload?(key, 30)
 
     ChunkedFiles.save_upload_chunk(key, {19, 30}, second)
+    Chat.Db.ChangeTracker.await({:file_chunk, key, 19, 30})
     assert ChunkedFiles.complete_upload?(key, 30)
 
     recovered = ChunkedFiles.read({key, secret})

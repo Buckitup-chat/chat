@@ -24,10 +24,10 @@ defmodule Chat.Db do
   def get_prev(key, min_key, predicate), do: Queries.get_prev(db(), key, min_key, predicate)
 
   def put(key, value) do
-    if match?({:action_log, _, _}, key) do
-      WriteQueue.put({key, value}, queue())
-    else
-      WriteQueue.push({key, value}, queue())
+    case key do
+      {:action_log, _, _} -> WriteQueue.put({key, value}, queue())
+      {:change_tracking_marker, _} -> WriteQueue.put({key, value}, queue())
+      _ -> WriteQueue.push({key, value}, queue())
     end
   end
 

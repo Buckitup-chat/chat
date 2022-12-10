@@ -18,7 +18,9 @@ defmodule Chat.Dialogs.MessageTest do
       alice
       |> Dialogs.open(bob_card)
 
-    %Text{text: text_message} |> Dialogs.add_new_message(alice, dialog)
+    %Text{text: text_message}
+    |> Dialogs.add_new_message(alice, dialog)
+    |> Dialogs.await_saved(dialog)
 
     dialog_messages = Dialogs.read(dialog, alice)
 
@@ -42,7 +44,7 @@ defmodule Chat.Dialogs.MessageTest do
       |> Dialogs.open(bob_card)
 
     %Text{text: text_message} |> Dialogs.add_new_message(alice, dialog)
-    %Text{text: bob_answer} |> Dialogs.add_new_message(bob, dialog)
+    %Text{text: bob_answer} |> Dialogs.add_new_message(bob, dialog) |> Dialogs.await_saved(dialog)
 
     bob_version =
       dialog

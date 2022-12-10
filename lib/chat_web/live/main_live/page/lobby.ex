@@ -2,6 +2,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   @moduledoc "Lobby part of chat. User list and room list"
   import Phoenix.LiveView, only: [assign: 3]
 
+  alias Chat.Db.ChangeTracker
   alias Phoenix.PubSub
 
   alias Chat.AdminRoom
@@ -38,7 +39,12 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     new_room_card = Chat.Card.from_identity(new_room_identity)
 
     me |> Log.create_room(Chat.Time.monotonic_to_unix(time_offset), new_room_identity, type)
-    PubSub.broadcast!(Chat.PubSub, @topic, {:new_room, new_room_card})
+
+    ChangeTracker.on_saved(fn ->
+      PubSub.broadcast!(Chat.PubSub, @topic, {:new_room, new_room_card})
+    end)
+
+    # todo: Interface should have room creating stage and enter room upon it is saved
 
     socket
     |> Page.Login.store_new_room(new_room_identity)
@@ -47,11 +53,13 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   end
 
   def notify_new_user(socket, user_card) do
-    PubSub.broadcast!(
-      Chat.PubSub,
-      @topic,
-      {:new_user, user_card}
-    )
+    ChangeTracker.on_saved(fn ->
+      PubSub.broadcast!(
+        Chat.PubSub,
+        @topic,
+        {:new_user, user_card}
+      )
+    end)
 
     socket
   end
@@ -78,11 +86,13 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     room = Rooms.add_request(room_hash, me, time)
     Log.request_room_key(me, time, room.pub_key)
 
-    PubSub.broadcast!(
-      Chat.PubSub,
-      @topic,
-      :room_request
-    )
+    ChangeTracker.on_saved(fn ->
+      PubSub.broadcast!(
+        Chat.PubSub,
+        @topic,
+        :room_request
+      )
+    end)
 
     socket
     |> assign_room_list()
@@ -156,11 +166,13 @@ defmodule ChatWeb.MainLive.Page.Lobby do
       |> Rooms.approve_requests(room_identity)
     end)
 
-    PubSub.broadcast!(
-      Chat.PubSub,
-      @topic,
-      :room_request_approved
-    )
+    ChangeTracker.on_saved(fn ->
+      PubSub.broadcast!(
+        Chat.PubSub,
+        @topic,
+        :room_request_approved
+      )
+    end)
 
     socket
   end
@@ -171,9 +183,13 @@ defmodule ChatWeb.MainLive.Page.Lobby do
        ) do
     time = Chat.Time.monotonic_to_unix(time_offset)
 
+    ChangeTracker.await()
+
     joined_rooms =
       new_rooms
       |> Enum.flat_map(fn %{hash: hash} -> hash |> Rooms.join_approved_requests(me, time) end)
+
+    ChangeTracker.await()
 
     socket
     |> assign(:rooms, joined_rooms ++ rooms)

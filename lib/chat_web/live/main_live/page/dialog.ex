@@ -78,7 +78,11 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       text ->
         %Messages.Text{text: text, timestamp: time}
         |> Dialogs.add_new_message(me, dialog)
-        |> broadcast_new_message(dialog, me, time)
+        |> then(fn message ->
+          Dialogs.on_saved(message, dialog, fn ->
+            broadcast_new_message(message, dialog, me, time)
+          end)
+        end)
     end
 
     socket
@@ -109,7 +113,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
     FileIndex.add_file(chunk_key, dialog)
 
-    when_file_ready({chunk_key, Utils.hash(me)}, fn ->
+    message
+    |> Dialogs.on_saved(dialog, fn ->
       broadcast_new_message(message, dialog, me, time)
     end)
 

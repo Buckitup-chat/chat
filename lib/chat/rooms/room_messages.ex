@@ -1,6 +1,7 @@
 defmodule Chat.Rooms.RoomMessages do
   @moduledoc "Room messages logic"
 
+  alias Chat.Db.ChangeTracker
   alias Chat.Content
   alias Chat.Db
   alias Chat.DryStorable
@@ -12,8 +13,6 @@ defmodule Chat.Rooms.RoomMessages do
 
   @db_key :room_message
 
-  @spec add_new_message(any(), Identity, Dialog) ::
-          {index :: integer(), Message}
   def add_new_message(
         message,
         %Identity{} = author,
@@ -26,6 +25,18 @@ defmodule Chat.Rooms.RoomMessages do
     message
     |> DryStorable.content()
     |> add_message(room_key, author, opts |> Keyword.merge(type: type, now: now))
+  end
+
+  def on_saved({index, msg}, room_hash, ok_fn) do
+    room_hash
+    |> key(index, msg.id)
+    |> ChangeTracker.promise(ok_fn)
+  end
+
+  def await_saved({index, msg}, room_hash) do
+    room_hash
+    |> key(index, msg.id)
+    |> ChangeTracker.await()
   end
 
   def read(%Room{pub_key: room_key}, identity, pub_keys_mapper, {index, id} = _before, amount) do

@@ -1,6 +1,7 @@
 defmodule Chat.Rooms.RoomTest do
   use ExUnit.Case, async: true
 
+  alias Chat.Db.ChangeTracker
   alias Chat.Identity
   alias Chat.Memo
   alias Chat.Messages
@@ -50,6 +51,9 @@ defmodule Chat.Rooms.RoomTest do
       FakeData.image("2.pp")
       |> Map.put(:timestamp, 4)
       |> Rooms.add_new_message(alice, room.pub_key)
+
+    image_msg
+    |> Rooms.await_saved(room.pub_key)
 
     assert [
              %Rooms.PlainMessage{content: ^message, type: :text, author_hash: ^alice_hash},
@@ -105,6 +109,7 @@ defmodule Chat.Rooms.RoomTest do
     alice = User.login("Alice")
     room_name = "Some my room"
     room_identity = alice |> Rooms.add(room_name)
+    Rooms.await_saved(room_identity)
     room_hash = room_identity |> Utils.hash()
 
     {my_rooms, _other} = Rooms.list([room_identity])
@@ -134,6 +139,7 @@ defmodule Chat.Rooms.RoomTest do
     assert [] = Rooms.join_approved_requests(room_hash, bob, 1)
 
     Rooms.approve_requests(room_hash, room_identity)
+    ChangeTracker.await()
 
     assert [^room_identity] = Rooms.join_approved_requests(room_hash, bob, 2)
   end
@@ -147,7 +153,9 @@ defmodule Chat.Rooms.RoomTest do
       Messages.Text.new("1", 2),
       Messages.Text.new("2", 3)
     ]
-    |> Enum.each(&Rooms.add_new_message(&1, alice, room.pub_key))
+    |> Enum.map(&Rooms.add_new_message(&1, alice, room.pub_key))
+    |> List.last()
+    |> Rooms.await_saved(room.pub_key)
 
     [msg] =
       Rooms.read(
@@ -161,6 +169,7 @@ defmodule Chat.Rooms.RoomTest do
     assert "1" == msg.content
 
     Rooms.delete_message({msg.timestamp, msg.id}, room_identity, alice)
+    ChangeTracker.await()
 
     assert [_, _] =
              Rooms.read(
@@ -172,14 +181,18 @@ defmodule Chat.Rooms.RoomTest do
 
   test "updated message should be stored" do
     {alice, room_identity, room} = alice_and_room()
+
     User.register(alice)
+    |> User.await_saved()
 
     [
       Messages.Text.new("Hello", 1),
       Messages.Text.new("1", 2),
       Messages.Text.new("2", 3)
     ]
-    |> Enum.each(&Rooms.add_new_message(&1, alice, room.pub_key))
+    |> Enum.map(&Rooms.add_new_message(&1, alice, room.pub_key))
+    |> List.last()
+    |> Rooms.await_saved(room.pub_key)
 
     [msg] =
       Rooms.read(
@@ -195,6 +208,7 @@ defmodule Chat.Rooms.RoomTest do
     "111"
     |> Messages.Text.new(0)
     |> Rooms.update_message({msg.index, msg.id}, alice, room_identity)
+    |> Rooms.await_saved(room_identity |> Identity.pub_key())
 
     assert [_, updated_msg, _] =
              Rooms.read(

@@ -3,6 +3,8 @@ defmodule Tools.GenServerHelpers do
   Common functions to make GenServer responce
   """
 
+  def ok(state), do: {:ok, state}
+
   def ok_continue(state, msg), do: {:ok, state, {:continue, msg}}
   def noreply(state), do: {:noreply, state}
   def reply(state, result), do: {:reply, result, state}

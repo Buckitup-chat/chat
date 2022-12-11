@@ -2,6 +2,7 @@ defmodule Chat.OrderingTest do
   use ExUnit.Case, async: false
 
   alias Chat.Card
+  alias Chat.Db.ChangeTracker
   alias Chat.Dialogs
   alias Chat.Messages
   alias Chat.Ordering
@@ -51,12 +52,19 @@ defmodule Chat.OrderingTest do
 
     message = "hello, room  "
 
-    for num <- 1..5 do
-      message
-      |> Kernel.<>(to_string(num))
-      |> Messages.Text.new(num)
-      |> Rooms.add_new_message(alice, room.pub_key)
-    end
+    last =
+      for num <- 1..5 do
+        message
+        |> Kernel.<>(to_string(num))
+        |> Messages.Text.new(num)
+        |> Rooms.add_new_message(alice, room.pub_key)
+      end
+      |> List.last()
+      |> elem(1)
+
+    ChangeTracker.await(
+      {:room_message, room.pub_key |> Utils.binhash(), last.timestamp, last.id |> Utils.binhash()}
+    )
 
     {:room_message, room.pub_key |> Utils.binhash()}
   end

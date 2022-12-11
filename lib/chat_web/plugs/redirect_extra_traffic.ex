@@ -1,4 +1,8 @@
 defmodule ChatWeb.Plugs.RedirectExtraTraffic do
+  @moduledoc """
+  Blocks or redirects traffic captured
+  """
+
   def init(opts), do: opts
 
   def call(conn, _) do

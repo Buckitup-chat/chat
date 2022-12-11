@@ -1,6 +1,7 @@
 defmodule Chat.Ordering do
   @moduledoc "Ordering context"
 
+  require Logger
   alias Chat.Db
   alias Chat.Ordering.Counters
 
@@ -13,6 +14,7 @@ defmodule Chat.Ordering do
   end
 
   def reset do
+    "[chat] Ordering reset" |> Logger.debug()
     Counters.drop_all()
   end
 

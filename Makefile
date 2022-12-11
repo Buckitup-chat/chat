@@ -4,6 +4,7 @@ check:
 	mix compile --warnings-as-errors
 	mix format --check-formatted
 	mix credo --strict
+	mix deps.unlock --check-unused
 	mix sobelow --verbose
 	mix dialyzer --ignore-exit-status
 
@@ -13,7 +14,7 @@ test:
 	mix test --max-failures=1 --cover
 
 commit: check test
-	gitui
+	lazygit
 	
 
 server:

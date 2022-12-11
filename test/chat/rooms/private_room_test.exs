@@ -1,6 +1,7 @@
 defmodule Chat.Rooms.PrivateRoomTest do
   use ExUnit.Case, async: true
 
+  alias Chat.Db.ChangeTracker
   alias Chat.Dialogs
   alias Chat.Identity
   alias Chat.Messages
@@ -49,6 +50,7 @@ defmodule Chat.Rooms.PrivateRoomTest do
     {alice, identity, _room} = "Alice" |> make_user_and_private_room()
     bob = "Bob" |> User.login()
     bob_hash = User.register(bob)
+    User.await_saved(bob_hash)
     bob_card = User.by_id(bob_hash)
 
     dialog = Dialogs.find_or_open(alice, bob_card)
@@ -56,6 +58,7 @@ defmodule Chat.Rooms.PrivateRoomTest do
     identity
     |> Messages.RoomInvite.new()
     |> Dialogs.add_new_message(alice, dialog)
+    |> Dialogs.await_saved(dialog)
 
     [bob_message] = dialog |> Dialogs.read(bob)
     assert :room_invite == bob_message.type
@@ -74,6 +77,7 @@ defmodule Chat.Rooms.PrivateRoomTest do
   def make_user_and_private_room(name) do
     alice = User.login(name)
     room_identity = Rooms.add(alice, "#{name}'s Private room", :private)
+    ChangeTracker.await({:rooms, room_identity |> Utils.hash()})
     room = Rooms.get(room_identity |> Utils.hash())
 
     {alice, room_identity, room}

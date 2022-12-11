@@ -2,11 +2,9 @@ defmodule Chat.Db.Supervisor do
   @moduledoc "DB processes supervisor"
   use Supervisor
 
-  alias Chat.Db
-  alias Chat.Db.DbSyncWatcher
-  alias Chat.Db.FileFsProxy
-  alias Chat.Db.StatusPoller
-  alias Chat.Db.WritableUpdater
+  require Logger
+
+  alias Chat.Db.Switching
 
   def start_link(init_arg) do
     Supervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
@@ -15,11 +13,19 @@ defmodule Chat.Db.Supervisor do
   @impl true
   def init(_init_arg) do
     children = [
-      FileFsProxy,
-      WritableUpdater,
-      DbSyncWatcher,
-      Db,
-      StatusPoller
+      # DB changes tracking
+      {Task.Supervisor, name: Chat.Db.ChangeTracker.Tasks},
+      Chat.Db.ChangeTracker,
+      # DB part
+      Chat.Db.InternalDbSupervisor,
+      {Task,
+       fn ->
+         Chat.Db.InternalDb |> Switching.set_default()
+
+         "[db] Started database" |> Logger.notice()
+       end},
+      # DB status broadcaster
+      Chat.Db.StatusPoller
     ]
 
     Supervisor.init(children, strategy: :rest_for_one)

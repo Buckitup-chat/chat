@@ -81,7 +81,7 @@
             id="logout-form"
             phx-change="logout-check-password"
             phx-submit="logout-download-with-password"
-            as="logout"
+            as={:logout}
             class="mt-3 w-full">
             <div class="w-ull relative">
               <%= if @is_password_visible do %>

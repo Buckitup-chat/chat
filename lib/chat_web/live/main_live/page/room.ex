@@ -1,7 +1,8 @@
 defmodule ChatWeb.MainLive.Page.Room do
   @moduledoc "Room page"
   import ChatWeb.MainLive.Page.Shared
-  import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entry: 3, push_event: 3]
+  import Phoenix.Component, only: [assign: 3]
+  import Phoenix.LiveView, only: [consume_uploaded_entry: 3, push_event: 3]
 
   require Logger
 

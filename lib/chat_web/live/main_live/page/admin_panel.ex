@@ -1,6 +1,7 @@
 defmodule ChatWeb.MainLive.Page.AdminPanel do
   @moduledoc "Admin functions page"
-  import Phoenix.LiveView, only: [assign: 3, push_event: 3]
+  import Phoenix.Component, only: [assign: 3]
+  import Phoenix.LiveView, only: [push_event: 3]
 
   alias Phoenix.PubSub
 

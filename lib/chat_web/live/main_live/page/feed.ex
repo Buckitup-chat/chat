@@ -1,7 +1,6 @@
 defmodule ChatWeb.MainLive.Page.Feed do
   @moduledoc "Lobby part of chat. User list and room list"
-  import Phoenix.LiveView, only: [assign: 3]
-  import Phoenix.LiveView.Helpers
+  import Phoenix.Component
 
   alias Chat.Log
   alias Chat.User
@@ -40,13 +39,17 @@ defmodule ChatWeb.MainLive.Page.Feed do
       |> DateTime.shift_zone!(timezone)
       |> Timex.format!("{h12}:{0m} {AM}, {D}.{M}.{YYYY}")
 
-    user = User.by_id(who)
-    action = data |> Tuple.delete_at(0)
+    assigns =
+      assign(assigns,
+        user: User.by_id(who),
+        action: data |> Tuple.delete_at(0),
+        datetime: datetime
+      )
 
     ~H"""
       <div class="border-0 rounded-md bg-white/20 p-2 flex flex-col justify-start" >
-        <span class="text-white"><%= user && user.name %> <.action action={action}/></span>
-        <div class="text-white/70" style="font-size: 10px;"><%= datetime %></div>
+        <span class="text-white"><%= @user && @user.name %> <.action action={@action}/></span>
+        <div class="text-white/70" style="font-size: 10px;"><%= @datetime %></div>
       </div>
     """
   end
@@ -70,24 +73,34 @@ defmodule ChatWeb.MainLive.Page.Feed do
         |> Chat.Rooms.get()
       end
 
+    assigns =
+      assign(assigns,
+        room: room,
+        to: to,
+        act: act
+      )
+
     ~H"""
-      <%= act %>
+      <%= @act %>
       
-      <%= if to do %>
-        to <%= to.name %>
+      <%= if @to do %>
+        to <%= @to.name %>
       <% end %> 
 
-      <%= if room do %>
-        <%= room.name %> 
+      <%= if @room do %>
+        <%= @room.name %> 
       <% end %>
     """
   end
 
   def action(%{action: {action}} = assigns) do
-    act = Chat.Log.humanize_action(action)
+    assigns =
+      assign(assigns,
+        act: Chat.Log.humanize_action(action)
+      )
 
     ~H"""
-      <%= act %>
+      <%= @act %>
     """
   end
 

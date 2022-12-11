@@ -56,7 +56,7 @@ defmodule ChatWeb.Router do
     live_dashboard "/dashboard",
       metrics: ChatWeb.Telemetry,
       additional_pages: [
-        flame_on: FlameOn.DashboardPage
+        # flame_on: FlameOn.DashboardPage
       ]
   end
 end

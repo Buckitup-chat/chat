@@ -1,6 +1,7 @@
 defmodule ChatWeb.MainLive.Page.Login do
   @moduledoc "Login part of chat"
-  import Phoenix.LiveView, only: [assign: 3, push_event: 3]
+  import Phoenix.Component, only: [assign: 3]
+  import Phoenix.LiveView, only: [push_event: 3]
 
   alias Chat.AdminRoom
   alias Chat.Identity

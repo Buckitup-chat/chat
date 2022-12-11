@@ -1,6 +1,7 @@
 defmodule ChatWeb.MainLive.Page.ImportOwnKeyRing do
   @moduledoc "Import Own Key Ring  from uploaded file"
-  import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entries: 3]
+  import Phoenix.Component, only: [assign: 3]
+  import Phoenix.LiveView, only: [consume_uploaded_entries: 3]
 
   alias Chat.Actor
 

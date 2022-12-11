@@ -1,6 +1,6 @@
 defmodule ChatWeb.MainLive.Page.ImportKeyRing do
   @moduledoc "Import Key Ring Page"
-  import Phoenix.LiveView, only: [assign: 3]
+  import Phoenix.Component, only: [assign: 3]
 
   alias Chat.KeyRingTokens
   alias ChatWeb.MainLive.Page

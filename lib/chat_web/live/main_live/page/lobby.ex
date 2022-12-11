@@ -1,6 +1,6 @@
 defmodule ChatWeb.MainLive.Page.Lobby do
   @moduledoc "Lobby part of chat. User list and room list"
-  import Phoenix.LiveView, only: [assign: 3]
+  import Phoenix.Component, only: [assign: 3]
 
   alias Chat.Db.ChangeTracker
   alias Phoenix.PubSub

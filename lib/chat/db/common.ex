@@ -24,9 +24,9 @@ defmodule Chat.Db.Common do
     end)
   end
 
-  def is_dry?, do: Application.fetch_env!(@app_atom, :data_dry) |> is_dry?()
+  def dry?, do: Application.fetch_env!(@app_atom, :data_dry) |> dry?()
 
-  def is_dry?(relay) do
+  def dry?(relay) do
     Agent.get(relay, & &1)
   end
 

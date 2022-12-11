@@ -74,14 +74,14 @@ defmodule ChatWeb.MainLive.Page.Room do
         nil
 
       content ->
-        content
-        |> Messages.Text.new(time)
-        |> Rooms.add_new_message(me, room.pub_key)
-        |> tap(fn message ->
-          message
-          |> Rooms.on_saved(room.pub_key, fn ->
-            broadcast_new_message(message, room, me, time)
-          end)
+        message =
+          content
+          |> Messages.Text.new(time)
+          |> Rooms.add_new_message(me, room.pub_key)
+
+        message
+        |> Rooms.on_saved(room.pub_key, fn ->
+          broadcast_new_message(message, room, me, time)
         end)
     end
 

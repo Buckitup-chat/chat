@@ -2,6 +2,7 @@ defmodule Chat.ChunkedFilesTest do
   use ExUnit.Case, async: false
 
   alias Chat.ChunkedFiles
+  alias Chat.Db.ChangeTracker
 
   test "should generate a key and a secret on upload start, save chunks by key and able to read full file decrypting with secret" do
     {key, secret} = ChunkedFiles.new_upload()
@@ -12,11 +13,11 @@ defmodule Chat.ChunkedFilesTest do
     second = "another part"
 
     ChunkedFiles.save_upload_chunk(key, {1, 18}, first)
-    Chat.Db.ChangeTracker.await({:file_chunk, key, 1, 18})
+    ChangeTracker.await({:file_chunk, key, 1, 18})
     assert false == ChunkedFiles.complete_upload?(key, 30)
 
     ChunkedFiles.save_upload_chunk(key, {19, 30}, second)
-    Chat.Db.ChangeTracker.await({:file_chunk, key, 19, 30})
+    ChangeTracker.await({:file_chunk, key, 19, 30})
     assert ChunkedFiles.complete_upload?(key, 30)
 
     recovered = ChunkedFiles.read({key, secret})

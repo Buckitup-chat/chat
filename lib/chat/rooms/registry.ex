@@ -1,8 +1,8 @@
 defmodule Chat.Rooms.Registry do
   @moduledoc "Holds all rooms"
 
-  alias Chat.Db.ChangeTracker
   alias Chat.Db
+  alias Chat.Db.ChangeTracker
   alias Chat.Rooms.Room
   alias Chat.Utils
 

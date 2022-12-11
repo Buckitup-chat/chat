@@ -76,12 +76,12 @@ defmodule ChatWeb.MainLive.Page.Dialog do
         nil
 
       text ->
-        %Messages.Text{text: text, timestamp: time}
-        |> Dialogs.add_new_message(me, dialog)
-        |> then(fn message ->
-          Dialogs.on_saved(message, dialog, fn ->
-            broadcast_new_message(message, dialog, me, time)
-          end)
+        message =
+          %Messages.Text{text: text, timestamp: time}
+          |> Dialogs.add_new_message(me, dialog)
+
+        Dialogs.on_saved(message, dialog, fn ->
+          broadcast_new_message(message, dialog, me, time)
         end)
     end
 

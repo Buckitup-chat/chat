@@ -2,6 +2,7 @@ defmodule Chat.OrderingTest do
   use ExUnit.Case, async: false
 
   alias Chat.Card
+  alias Chat.Db.ChangeTracker
   alias Chat.Dialogs
   alias Chat.Messages
   alias Chat.Ordering
@@ -61,7 +62,7 @@ defmodule Chat.OrderingTest do
       |> List.last()
       |> elem(1)
 
-    Chat.Db.ChangeTracker.await(
+    ChangeTracker.await(
       {:room_message, room.pub_key |> Utils.binhash(), last.timestamp, last.id |> Utils.binhash()}
     )
 

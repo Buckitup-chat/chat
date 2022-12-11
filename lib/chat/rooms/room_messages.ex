@@ -1,9 +1,9 @@
 defmodule Chat.Rooms.RoomMessages do
   @moduledoc "Room messages logic"
 
-  alias Chat.Db.ChangeTracker
   alias Chat.Content
   alias Chat.Db
+  alias Chat.Db.ChangeTracker
   alias Chat.DryStorable
   alias Chat.Identity
   alias Chat.Rooms.Message

@@ -6,6 +6,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   alias Phoenix.PubSub
 
   alias Chat.AdminRoom
+  alias Chat.Db.StatusPoller
   alias Chat.Identity
   alias Chat.Log
   alias Chat.Rooms
@@ -17,7 +18,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   def init(socket) do
     PubSub.subscribe(Chat.PubSub, @topic)
-    PubSub.subscribe(Chat.PubSub, Chat.Db.StatusPoller.channel())
+    PubSub.subscribe(Chat.PubSub, StatusPoller.channel())
 
     Process.send_after(self(), :room_request, 500)
     Process.send_after(self(), :room_request_approved, 1500)
@@ -27,7 +28,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign(:lobby_mode, :chats)
     |> assign(:image_gallery, nil)
     |> assign(:version, get_version())
-    |> assign(:db_status, Chat.Db.StatusPoller.info())
+    |> assign(:db_status, StatusPoller.info())
     |> assign_user_list()
     |> assign_room_list()
     |> assign_admin()
@@ -121,7 +122,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   def close(socket) do
     PubSub.unsubscribe(Chat.PubSub, @topic)
-    PubSub.unsubscribe(Chat.PubSub, Chat.Db.StatusPoller.channel())
+    PubSub.unsubscribe(Chat.PubSub, StatusPoller.channel())
 
     socket
   end

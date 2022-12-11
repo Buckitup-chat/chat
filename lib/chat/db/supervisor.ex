@@ -4,6 +4,8 @@ defmodule Chat.Db.Supervisor do
 
   require Logger
 
+  alias Chat.Db.Switching
+
   def start_link(init_arg) do
     Supervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
   end
@@ -18,7 +20,7 @@ defmodule Chat.Db.Supervisor do
       Chat.Db.InternalDbSupervisor,
       {Task,
        fn ->
-         Chat.Db.InternalDb |> Chat.Db.Switching.set_default()
+         Chat.Db.InternalDb |> Switching.set_default()
 
          "[db] Started database" |> Logger.notice()
        end},

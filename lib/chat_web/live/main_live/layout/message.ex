@@ -10,7 +10,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   alias Chat.Memo
   alias Chat.RoomInvites
   alias Chat.Utils.StorageId
-  # alias ChatWeb.Router.Helpers
+  alias Phoenix.HTML.Tag
   alias Phoenix.LiveView.JS
 
   def render(%{msg: %{type: type}} = assigns) do
@@ -321,6 +321,6 @@ defmodule ChatWeb.MainLive.Layout.Message do
     end)
     |> elem(0)
     |> Enum.reverse()
-    |> Enum.intersperse(Phoenix.HTML.Tag.tag(:br))
+    |> Enum.intersperse(Tag.tag(:br))
   end
 end

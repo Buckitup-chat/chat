@@ -1,9 +1,10 @@
 defmodule Chat.LogTest do
   use ExUnit.Case, async: false
 
-  alias Chat.Ordering
-  alias Chat.Identity
   alias Chat.Card
+  alias Chat.Db.ChangeTracker
+  alias Chat.Identity
+  alias Chat.Ordering
   alias Chat.Rooms
   alias Chat.User
   alias Chat.Utils
@@ -44,7 +45,7 @@ defmodule Chat.LogTest do
   test "room related logs should save correct" do
     me = User.login("me")
     room_identity = Rooms.add(me, "Room name")
-    Chat.Db.ChangeTracker.await({:rooms, room_identity |> Identity.pub_key() |> Utils.hash()})
+    ChangeTracker.await({:rooms, room_identity |> Identity.pub_key() |> Utils.hash()})
     room = Rooms.get(room_identity |> Utils.hash())
     base = Ordering.last({:action_log})
 
@@ -62,18 +63,23 @@ defmodule Chat.LogTest do
 
   test "message humanization should work well for all types" do
     me = User.login("me")
-    base = Ordering.last({:action_log})
 
+    await()
+    base = Ordering.last({:action_log})
     Log.sign_in(me, base + 1)
-    await(me, base + 1)
-    assert {_, {_, action}} = Log.list() |> elem(0) |> List.last()
+    await()
+    assert {_, {_, action}} = Log.list() |> elem(0) |> List.first()
 
     assert "signs in" = Log.humanize_action(action)
     assert "unknown act" = Log.humanize_action(:some_strange_unlisted_action)
   end
 
+  defp await do
+    ChangeTracker.await()
+  end
+
   defp await(user, index) do
-    Chat.Db.ChangeTracker.await({:action_log, index, user |> Utils.binhash()})
+    ChangeTracker.await({:action_log, index, user |> Utils.binhash()})
   end
 
   defp assert_added(count, action) do

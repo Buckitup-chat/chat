@@ -105,15 +105,17 @@ defmodule Chat.Db.QueueWriter do
   def db_delete(w_state(dry_run: true) = state, _list), do: state
 
   def db_delete(w_state(db: db, dirt_count: old_count) = state, list) do
-    CubDB.transaction(db, fn tx ->
-      Enum.reduce(list, tx, fn
-        {min, max}, tx when is_tuple(min) and is_tuple(max) ->
-          CubDB.Tx.select(tx, min_key: min, max_key: max)
-          |> Enum.map(fn {k, _} -> CubDB.Tx.delete(tx, k) end)
+    reducer = fn
+      {min, max}, tx when is_tuple(min) and is_tuple(max) ->
+        CubDB.Tx.select(tx, min_key: min, max_key: max)
+        |> Enum.map(fn {k, _} -> CubDB.Tx.delete(tx, k) end)
 
-        key, tx ->
-          CubDB.Tx.delete(tx, key)
-      end)
+      key, tx ->
+        CubDB.Tx.delete(tx, key)
+    end
+
+    CubDB.transaction(db, fn tx ->
+      Enum.reduce(list, tx, reducer)
       |> then(&{:commit, &1, :ok})
     end)
 

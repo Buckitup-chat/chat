@@ -4,6 +4,7 @@ defmodule Chat.Dialogs.DialogMessaging do
   require Logger
 
   alias Chat.Db
+  alias Chat.Db.ChangeTracker
   alias Chat.Dialogs.Dialog
   alias Chat.Dialogs.Message
   alias Chat.Dialogs.PrivateMessage
@@ -32,13 +33,13 @@ defmodule Chat.Dialogs.DialogMessaging do
   def on_saved({next, %{id: id}}, dialog, ok_fn) do
     dialog
     |> msg_key(next, id)
-    |> Chat.Db.ChangeTracker.promise(ok_fn)
+    |> ChangeTracker.promise(ok_fn)
   end
 
   def await_saved({next, %{id: id}}, dialog) do
     dialog
     |> msg_key(next, id)
-    |> Chat.Db.ChangeTracker.await()
+    |> ChangeTracker.await()
   end
 
   def read({index, %Message{} = msg}, identity, side, peer_key) when side in [:a_copy, :b_copy] do

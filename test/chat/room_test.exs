@@ -229,7 +229,9 @@ defmodule Chat.Rooms.RoomTest do
       Messages.Text.new("1", 2),
       Messages.Text.new("2", 3)
     ]
-    |> Enum.each(&Rooms.add_new_message(&1, alice, room.pub_key))
+    |> Enum.map(&Rooms.add_new_message(&1, alice, room.pub_key))
+    |> List.last()
+    |> Rooms.await_saved(room.pub_key)
 
     [msg] =
       Rooms.read(

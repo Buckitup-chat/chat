@@ -4,14 +4,12 @@ defmodule Chat.Db do
   """
   require Logger
 
-  use GenServer
-
   import Chat.Db.Common
 
   alias Chat.Db.Queries
   alias Chat.Db.WriteQueue
 
-  @db_version "v.7"
+  @db_version "v.8"
   @db_location Application.compile_env(:chat, :cub_db_file, "priv/db")
 
   def list(range, transform), do: Queries.list(db(), range, transform)
@@ -40,10 +38,6 @@ defmodule Chat.Db do
   def put_chunk(data) do
     WriteQueue.put_chunk(data, queue())
   end
-
-  #
-  # GenServer interface
-  #
 
   def db do
     get_chat_db_env(:data_pid)
@@ -78,29 +72,6 @@ defmodule Chat.Db do
        name: writer_name, db: db_name, queue: queue_name, status_relay: dry_relay_name}
     ]
   end
-
-  #
-  # GenServer implementation
-  #
-
-  def start_link(opts \\ %{}) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
-  end
-
-  @impl true
-  def init(_opts) do
-    # {:ok, db} = CubDB.start_link(file_path(), auto_file_sync: false, auto_compact: false)
-    Chat.Db.InternalDb
-    |> Chat.Db.Switching.set_default()
-
-    "[db] Started database" |> Logger.notice()
-
-    {:ok, nil}
-  end
-
-  #
-  # Extra logic
-  #
 
   def file_path do
     "#{@db_location}/#{@db_version}"

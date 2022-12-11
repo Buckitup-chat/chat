@@ -15,6 +15,7 @@ defmodule Chat.ChunkedFiles do
          false <- is_nil(secret),
          encoded <- Utils.encrypt_blob(chunk, secret) do
       Db.put_chunk({{:file_chunk, key, chunk_start, chunk_end}, encoded})
+      Db.put({:chunk_key, {:file_chunk, key, chunk_start, chunk_end}}, true)
     end
   end
 
@@ -42,6 +43,11 @@ defmodule Chat.ChunkedFiles do
       {:file_chunk, key, nil, nil}
     })
 
+    Db.bulk_delete({
+      {:chunk_key, {:file_chunk, key, 0, 0}},
+      {:chunk_key, {:file_chunk, key, nil, nil}}
+    })
+
     ChunkedFilesBroker.forget(key)
   end
 
@@ -56,11 +62,12 @@ defmodule Chat.ChunkedFiles do
 
   def size(key) do
     Db.get_max_one(
-      {:file_chunk, key, 0, 0},
-      {:file_chunk, key, nil, nil}
+      {:chunk_key, {:file_chunk, key, 0, 0}},
+      {:chunk_key, {:file_chunk, key, nil, nil}}
     )
     |> Enum.at(0)
     |> elem(0)
+    |> elem(1)
     |> elem(3)
     |> Kernel.+(1)
   rescue

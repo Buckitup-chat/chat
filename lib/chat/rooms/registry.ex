@@ -2,6 +2,7 @@ defmodule Chat.Rooms.Registry do
   @moduledoc "Holds all rooms"
 
   alias Chat.Db
+  alias Chat.Db.ChangeTracker
   alias Chat.Rooms.Room
   alias Chat.Utils
 
@@ -17,6 +18,8 @@ defmodule Chat.Rooms.Registry do
 
     room
   end
+
+  def await_saved(hash), do: ChangeTracker.await({:rooms, hash})
 
   def delete(hash), do: Db.delete({:rooms, hash})
 end

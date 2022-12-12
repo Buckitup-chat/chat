@@ -34,6 +34,7 @@ defmodule Chat.Db.Maintenance do
     with {data, 0} <- System.cmd("df", ["-P"]),
          [_header | rows] <- String.split(data, "\n", trim: true),
          row <- Enum.find(rows, &String.starts_with?(&1, device)),
+         false <- is_nil(row),
          [_, _, _, _, _, path] <- String.split(row, " ", trim: true) do
       path
     else
@@ -52,49 +53,5 @@ defmodule Chat.Db.Maintenance do
     db
     |> CubDB.data_dir()
     |> path_free_space()
-  end
-
-  def sync_preparation(db) do
-    CubDB.set_auto_compact(db, false)
-    CubDB.set_auto_file_sync(db, false)
-  end
-
-  def sync_finalization(db) do
-    CubDB.set_auto_file_sync(db, true)
-    CubDB.set_auto_compact(db, true)
-  end
-
-  def calc_write_budget(db_pid) do
-    if Process.alive?(db_pid) do
-      db_pid
-      |> CubDB.data_dir()
-      |> path_free_space()
-      |> case do
-        x when x > @free_space_buffer_100mb -> trunc(x / 2)
-        _ -> 0
-      end
-    else
-      0
-    end
-  end
-
-  def writable_by_write_budget(budget) do
-    case budget do
-      0 -> :no
-      _ -> :yes
-    end
-  end
-
-  def maybe_file_sync(db) do
-    [CubDB.data_dir(db), "check"]
-    |> Path.join()
-    |> File.touch(System.os_time(:second))
-    |> case do
-      :ok ->
-        CubDB.file_sync(db)
-
-      _ ->
-        :ignored
-    end
   end
 end

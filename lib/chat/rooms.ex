@@ -48,6 +48,12 @@ defmodule Chat.Rooms do
     RoomMessages.delete_by_room(hash)
   end
 
+  def await_saved(%Identity{} = identity),
+    do: Registry.await_saved(identity |> Identity.pub_key() |> Utils.hash())
+
+  def await_saved(msg_data, hash), do: RoomMessages.await_saved(msg_data, hash)
+  def on_saved(msg_data, hash, ok_fn), do: RoomMessages.on_saved(msg_data, hash, ok_fn)
+
   defdelegate add_new_message(message, author, room_pub_key, opts \\ []), to: RoomMessages
 
   def read_message({_, %Message{}} = msg, %Identity{} = identity),

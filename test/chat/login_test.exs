@@ -28,7 +28,7 @@ defmodule Chat.LoginTest do
 
     assert ~s|#Chat.Identity<name: "#{alice.name}", ...>| == inspect(alice)
 
-    assert ~s|#Chat.Card<hash: "#{alice_card.hash}", name: "#{alice_card.name}", ...>| ==
+    assert ~s|#Chat.Card<name: "#{alice_card.name}", hash: "#{alice_card.hash}", ...>| ==
              inspect(alice_card)
   end
 

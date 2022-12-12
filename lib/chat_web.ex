@@ -16,14 +16,19 @@ defmodule ChatWeb do
   below. Instead, define any helper function in modules
   and import those modules here.
   """
+  def static_paths do
+    ~w(assets fonts images favicon.ico robots.txt)
+  end
 
   def controller do
     quote do
       use Phoenix.Controller, namespace: ChatWeb
 
-      import Plug.Conn
+      import Plug.Conn, except: [assign: 3]
       import ChatWeb.Gettext
       alias ChatWeb.Router.Helpers, as: Routes
+
+      unquote(verified_routes())
     end
   end
 
@@ -45,7 +50,7 @@ defmodule ChatWeb do
   def live_view do
     quote do
       use Phoenix.LiveView,
-        layout: {ChatWeb.LayoutView, "live.html"}
+        layout: {ChatWeb.LayoutView, :live}
 
       unquote(view_helpers())
       unquote(live_helpers())
@@ -86,13 +91,22 @@ defmodule ChatWeb do
     end
   end
 
+  def verified_routes do
+    quote do
+      use Phoenix.VerifiedRoutes,
+        endpoint: ChatWeb.Endpoint,
+        router: ChatWeb.Router,
+        statics: ChatWeb.static_paths()
+    end
+  end
+
   defp view_helpers do
     quote do
       # Use all HTML functionality (forms, tags, etc)
       use Phoenix.HTML
 
       # Import LiveView and .heex helpers (live_render, live_patch, <.form>, etc)
-      import Phoenix.LiveView.Helpers
+      import Phoenix.Component
       import ChatWeb.LiveHelpers
 
       # Import basic rendering functionality (render, render_layout, etc)
@@ -101,6 +115,8 @@ defmodule ChatWeb do
       import ChatWeb.ErrorHelpers
       import ChatWeb.Gettext
       alias ChatWeb.Router.Helpers, as: Routes
+
+      unquote(verified_routes())
     end
   end
 

@@ -14,6 +14,10 @@ defmodule Chat.FileIndex do
     save(key, room_key |> Utils.hash())
   end
 
+  def get(reader_hash, file_key) do
+    Chat.Db.get({:file_index, reader_hash, file_key})
+  end
+
   defp save(file_key, reader_hash) do
     Chat.Db.put({:file_index, reader_hash, file_key}, true)
   end

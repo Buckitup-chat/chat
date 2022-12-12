@@ -9,21 +9,28 @@ defmodule ChatWeb.UploadChunkController do
     with %{"key" => key} <- params,
          {:ok, chunk, conn} <- read_out_chunk(conn),
          [range] <- get_req_header(conn, "content-range"),
-         {range_start, range_end, _size} <- parse_range(range) do
-      ChunkedFiles.save_upload_chunk(key, {range_start, range_end}, chunk)
-
+         {range_start, range_end, _size} <- parse_range(range),
+         :ok <- save_chunk_till({key, {range_start, range_end}, chunk}, time_mark() + 10) do
       conn
       |> send_resp(200, "")
     else
       e ->
         Logger.error("[upload] error processing chunk " <> inspect(e))
-        raise "404"
+
+        conn
+        |> send_resp(503, "Busy")
     end
-  rescue
-    e ->
-      Logger.error("[upload] error processing chunk " <> inspect(e))
-      raise "404"
   end
+
+  defp save_chunk_till({key, range, chunk} = data, till) do
+    cond do
+      :ok == ChunkedFiles.save_upload_chunk(key, range, chunk) -> :ok
+      time_mark() > till -> :failed
+      true -> save_chunk_till(data, till)
+    end
+  end
+
+  defp time_mark, do: System.monotonic_time(:second)
 
   defp read_out_chunk(conn, acc \\ [""]) do
     case read_body(conn) do

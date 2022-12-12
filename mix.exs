@@ -5,9 +5,9 @@ defmodule Chat.MixProject do
     [
       app: :chat,
       version: "0.1.0",
-      elixir: "~> 1.12",
+      elixir: "~> 1.14",
       elixirc_paths: elixirc_paths(Mix.env()),
-      compilers: [] ++ Mix.compilers(),
+      # compilers: [] ++ Mix.compilers(),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
@@ -42,6 +42,7 @@ defmodule Chat.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      # {:flame_on, "~> 0.5.2"},
       {:poison, "~> 5.0"},
       {:phoenix_ecto, "~> 4.0"},
       {:ecto, "~> 3.7"},
@@ -53,12 +54,13 @@ defmodule Chat.MixProject do
       {:struct_access, "~> 1.1"},
       {:uuid, "~> 1.1"},
       {:x509, "~> 0.8"},
-      {:phoenix, "~> 1.6.6"},
+      {:phoenix, "~> 1.7.0-rc.0", override: true},
       {:phoenix_html, "~> 3.0"},
+      {:phoenix_view, "~> 2.0"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 0.17.5"},
+      {:phoenix_live_view, "~> 0.18.3"},
       {:floki, ">= 0.30.0", only: :test},
-      {:phoenix_live_dashboard, "~> 0.6"},
+      {:phoenix_live_dashboard, "~> 0.7.2"},
       {:esbuild, "~> 0.3", runtime: Mix.env() == :dev && Mix.target() == :host},
       {:telemetry_metrics, "~> 0.6"},
       {:telemetry_poller, "~> 1.0"},

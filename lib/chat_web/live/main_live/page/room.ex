@@ -1,7 +1,8 @@
 defmodule ChatWeb.MainLive.Page.Room do
   @moduledoc "Room page"
   import ChatWeb.MainLive.Page.Shared
-  import Phoenix.LiveView, only: [assign: 3, consume_uploaded_entry: 3, push_event: 3]
+  import Phoenix.Component, only: [assign: 3]
+  import Phoenix.LiveView, only: [consume_uploaded_entry: 3, push_event: 3]
 
   require Logger
 
@@ -75,11 +76,16 @@ defmodule ChatWeb.MainLive.Page.Room do
         nil
 
       content ->
-        content
-        |> Messages.Text.new(time)
-        |> Rooms.add_new_message(me, room.pub_key)
+        message =
+          content
+          |> Messages.Text.new(time)
+          |> Rooms.add_new_message(me, room.pub_key)
+
+        message
+        |> Rooms.on_saved(room.pub_key, fn ->
+          broadcast_new_message(message, room, me, time)
+        end)
     end
-    |> broadcast_new_message(room, me, time)
 
     socket
   end
@@ -98,23 +104,27 @@ defmodule ChatWeb.MainLive.Page.Room do
       ) do
     time = Chat.Time.monotonic_to_unix(time_offset)
 
-    consume_uploaded_entry(
-      socket,
-      entry,
-      fn _ ->
-        Messages.File.new(
-          entry,
-          chunk_key,
-          chunk_secret,
-          time
-        )
-        |> Rooms.add_new_message(me, room.pub_key)
-        |> then(&{:ok, &1})
-      end
-    )
-    |> broadcast_new_message(room, me, time)
+    message =
+      consume_uploaded_entry(
+        socket,
+        entry,
+        fn _ ->
+          Messages.File.new(
+            entry,
+            chunk_key,
+            chunk_secret,
+            time
+          )
+          |> Rooms.add_new_message(me, room.pub_key)
+          |> then(&{:ok, &1})
+        end
+      )
 
     FileIndex.add_file(chunk_key, room)
+
+    Rooms.on_saved(message, room.pub_key, fn ->
+      broadcast_new_message(message, room, me, time)
+    end)
 
     socket
   end

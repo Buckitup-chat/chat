@@ -29,6 +29,8 @@ defmodule Chat.Dialogs do
   defdelegate add_new_message(message, author, dialog), to: DialogMessaging
   defdelegate update_message(message, msg_id, author, dialog), to: DialogMessaging
   defdelegate delete(dialog, author, msg_time_id), to: DialogMessaging
+  defdelegate await_saved(added_message, dialog), to: DialogMessaging
+  defdelegate on_saved(added_message, dialog, action), to: DialogMessaging
 
   def read(
         %Dialog{} = dialog,

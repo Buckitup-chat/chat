@@ -37,6 +37,7 @@ defmodule Chat.AdminRoomTest do
     admin_room_identity
     |> Messages.RoomInvite.new()
     |> Dialogs.add_new_message(alice, dialog)
+    |> Dialogs.await_saved(dialog)
 
     [bob_message] = dialog |> Dialogs.read(bob)
     assert :room_invite == bob_message.type

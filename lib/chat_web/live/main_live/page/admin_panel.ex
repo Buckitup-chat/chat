@@ -1,11 +1,11 @@
 defmodule ChatWeb.MainLive.Page.AdminPanel do
   @moduledoc "Admin functions page"
-  import Phoenix.LiveView, only: [assign: 3, push_event: 3]
+  import Phoenix.Component, only: [assign: 3]
+  import Phoenix.LiveView, only: [push_event: 3]
 
   alias Phoenix.PubSub
 
   alias Chat.AdminRoom
-  alias Chat.Db
   alias Chat.Dialogs
   alias Chat.Messages
   alias Chat.Rooms
@@ -22,7 +22,6 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     me |> AdminRoom.visit()
 
     socket
-    |> assign(:ro_mode, not Db.writable?())
     |> assign(:wifi_loaded, false)
     |> request_wifi_settings()
     |> assign_user_lists()

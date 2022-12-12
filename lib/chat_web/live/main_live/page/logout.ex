@@ -1,11 +1,14 @@
 defmodule ChatWeb.MainLive.Page.Logout do
   @moduledoc "Logout page"
-  import Phoenix.LiveView, only: [assign: 3, push_event: 3]
+  use ChatWeb, :controller
+
+  import Phoenix.Component, only: [assign: 3]
+  import Phoenix.LiveView, only: [push_event: 3]
+  import Phoenix.VerifiedRoutes, only: [url: 1]
 
   alias Chat.Actor
   alias Chat.Broker
   alias Chat.Log
-  alias ChatWeb.Router.Helpers, as: Routes
 
   alias Ecto.Changeset
 
@@ -86,7 +89,7 @@ defmodule ChatWeb.MainLive.Page.Logout do
     me |> Log.self_backup(time)
 
     socket
-    |> push_event("chat:redirect", %{url: Routes.file_url(socket, :backup, broker_key)})
+    |> push_event("chat:redirect", %{url: url(~p"/get/backup/#{broker_key}")})
   end
 
   def go_final(%{assigns: %{}} = socket) do

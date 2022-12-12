@@ -19,6 +19,7 @@ defmodule ChatWeb.ConnCase do
 
   using do
     quote do
+      use ChatWeb, :verified_routes
       # Import conveniences for testing with connections
       import Plug.Conn
       import Phoenix.ConnTest

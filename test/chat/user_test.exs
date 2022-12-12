@@ -7,6 +7,7 @@ defmodule Chat.UserTest do
     old_count = User.list() |> Enum.count()
 
     user_key = User.login("new") |> User.register()
+    User.await_saved(user_key)
 
     new_count = User.list() |> Enum.count()
 

@@ -34,11 +34,13 @@ defmodule Chat.Db.WriteQueue.Buffer do
         {{:write, data}, buffer(buf, data: nil)}
 
       keys = buffer(buf, :delete_keys) ->
-        "delete" |> log()
+        [k | _] = keys
+        "delete #{inspect(k)} ..." |> log()
         {{:delete, keys}, buffer(buf, delete_keys: nil)}
 
       logs = buffer(buf, :log) ->
-        "log" |> log()
+        [{k, _} | _] = logs
+        "log #{inspect(k)} ..." |> log()
         {{:write, logs}, buffer(buf, log: nil)}
 
       stream = buffer(buf, :stream) ->

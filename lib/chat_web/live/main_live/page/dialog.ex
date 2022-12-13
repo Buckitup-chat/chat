@@ -4,7 +4,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [consume_uploaded_entry: 3, push_event: 3]
 
-  use Phoenix.Component
+  use ChatWeb, :component
 
   alias Chat.Broker
   alias Chat.Dialogs
@@ -283,7 +283,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     user_data = User.device_encode(me, rooms)
     key = Broker.store({:dialog, {messages_ids, peer, user_data}, timezone})
 
-    push_event(socket, "chat:redirect", %{url: Routes.zip_url(socket, :get, key)})
+    push_event(socket, "chat:redirect", %{url: url(~p"/get/zip/#{key}")})
   end
 
   def accept_room_invite(%{assigns: %{me: me, dialog: dialog, rooms: rooms}} = socket, message_id) do

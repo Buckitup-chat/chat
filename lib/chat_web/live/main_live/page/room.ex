@@ -1,5 +1,8 @@
 defmodule ChatWeb.MainLive.Page.Room do
   @moduledoc "Room page"
+
+  use ChatWeb, :component
+
   import ChatWeb.MainLive.Page.Shared
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [consume_uploaded_entry: 3, push_event: 3]
@@ -293,7 +296,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
     key = Broker.store({:room, {messages_ids, room, room_identity}, timezone})
 
-    push_event(socket, "chat:redirect", %{url: Routes.zip_url(socket, :get, key)})
+    push_event(socket, "chat:redirect", %{url: url(~p"/get/zip/#{key}")})
   end
 
   def hide_deleted_message(socket, id) do

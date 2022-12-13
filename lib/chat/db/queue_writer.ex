@@ -108,7 +108,7 @@ defmodule Chat.Db.QueueWriter do
     reducer = fn
       {min, max}, tx when is_tuple(min) and is_tuple(max) ->
         CubDB.Tx.select(tx, min_key: min, max_key: max)
-        |> Enum.map(fn {k, _} -> CubDB.Tx.delete(tx, k) end)
+        |> Enum.reduce(tx, fn {k, _}, tx -> CubDB.Tx.delete(tx, k) end)
 
       key, tx ->
         CubDB.Tx.delete(tx, key)

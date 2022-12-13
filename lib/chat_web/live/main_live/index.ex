@@ -10,9 +10,10 @@ defmodule ChatWeb.MainLive.Index do
   alias Chat.Rooms
   alias ChatWeb.MainLive.Layout
   alias ChatWeb.MainLive.Page
+  alias ChatWeb.Hooks.LocalTimeHook
   alias ChatWeb.Router.Helpers
 
-  on_mount ChatWeb.Hooks.LocalTimeHook
+  on_mount LocalTimeHook
 
   @impl true
   def mount(params, _session, %{assigns: %{live_action: action}} = socket) do
@@ -32,6 +33,7 @@ defmodule ChatWeb.MainLive.Index do
           mode: :user_list,
           monotonic_offset: 0
         )
+        |> LocalTimeHook.assign_time(Phoenix.LiveView.get_connect_params(socket)["tz_info"])
         |> allow_image_upload(:image)
         |> allow_image_upload(:room_image)
         |> allow_any500m_upload(:my_keys_file)

@@ -98,7 +98,7 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
         socket |> Page.Room.show_new(glimpse)
 
       {:updated_message, msg_id} ->
-        socket |> Page.Room.update_message(msg_id, &Message.message_text/1)
+        socket |> Page.Room.update_message(msg_id, &Message.text/1)
 
       {:deleted_message, msg_id} ->
         socket |> Page.Room.hide_deleted_message(msg_id)

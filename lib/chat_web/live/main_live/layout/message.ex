@@ -1,68 +1,151 @@
 defmodule ChatWeb.MainLive.Layout.Message do
-  @moduledoc "Message layout"
-  use Phoenix.Component
+  @moduledoc """
+  Message layout
+  Used both for rendering regular and exported messages.
+  Can be either a dialog or room message.
+  """
 
-  import ChatWeb.LiveHelpers
-  import ChatWeb.MainLive.Index
+  use ChatWeb, :component
 
+  alias Chat.Card
   alias Chat.Files
   alias Chat.Identity
   alias Chat.Memo
+  alias Chat.Messages.ExportHelper
   alias Chat.RoomInvites
+  alias Chat.User
+  alias Chat.Utils
   alias Chat.Utils.StorageId
   alias Phoenix.HTML.Tag
   alias Phoenix.LiveView.JS
 
-  def render(%{msg: %{type: type}} = assigns) do
-    case type do
-      :file -> render_file(assigns)
-      :video -> render_video(assigns)
-      :image -> render_image(assigns)
-      :request -> render_room_request(assigns)
-      :room_invite -> render_room_invite(assigns)
-      _ -> render_text(assigns)
-    end
-  end
+  def message_block(assigns) do
+    assigns =
+      assigns
+      |> assign_new(:export?, fn -> false end)
+      |> assign_new(:room, fn -> nil end)
+      |> assign_new(:is_mine?, fn
+        %{export?: true} ->
+          false
 
-  def render_text(%{msg: %{type: type}} = assigns) when type in [:text, :memo] do
+        %{chat_type: :dialog, msg: msg} ->
+          msg.is_mine?
+
+        %{chat_type: :room, msg: msg, my_id: my_id} ->
+          msg.author_hash == my_id
+      end)
+      |> assign_new(:author, fn
+        %{chat_type: :dialog, is_mine?: is_mine?, me: me, peer: peer} ->
+          (is_mine? && Card.from_identity(me)) || peer
+
+        %{chat_type: :room, msg: msg} ->
+          User.by_id(msg.author_hash)
+      end)
+      |> assign_new(:dynamic_attrs, fn
+        %{export?: true} ->
+          []
+
+        %{chat_type: chat_type, export?: false, is_mine?: is_mine?, msg: msg} ->
+          [
+            phx_click:
+              JS.dispatch("chat:select-message", detail: %{chatType: Atom.to_string(chat_type)}),
+            phx_value_id: msg.id,
+            phx_value_index: msg.index,
+            phx_value_is_mine: Atom.to_string(is_mine?),
+            phx_value_type: chat_type
+          ]
+      end)
+
     ~H"""
-    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
-      <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
-      <span class="x-content"><.message_text msg={@msg} /></span>
-      <.message_timestamp msg={@msg} timezone={@timezone} />
+    <div class="messageBlock flex flex-row px-2 sm:px-8" id={"message-block-#{@msg.id}"} {@dynamic_attrs}>
+      <div class={"m-1 w-full flex " <> if(@is_mine?, do: "justify-end t-#{@chat_type}-mine-message x-mine", else: "justify-start x-peer")} id={"#{@chat_type}-message-#{@msg.id}"}>
+        <.message
+          author={@author}
+          chat_type={@chat_type}
+          color={if(@is_mine?, do: "bg-purple50", else: "bg-white")}
+          export?={@export?}
+          is_mine?={@is_mine?}
+          msg={@msg}
+          room={@room}
+          timezone={@timezone}
+        />
+      </div>
+
+      <%= unless @export? do %>
+        <input type="checkbox" class="selectCheckbox w-6 h-6 ml-3 mt-3 rounded-full text-purple/90 bg-black/10 border-gray-300 focus:ring-2 t-selectCheckbox" />
+      <% end %>
     </div>
     """
   end
 
-  def render_room_invite(%{msg: %{type: :room_invite, content: json}} = assigns) do
-    identity =
-      json
-      |> StorageId.from_json()
-      |> RoomInvites.get()
-      |> Identity.from_strings()
+  defp message(%{msg: %{type: :file}} = assigns) do
+    ~H"""
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg x-download"}>
+      <.header author={@author} chat_type={@chat_type} is_mine?={@is_mine?} msg={@msg} />
+      <.file msg={@msg} />
+      <.timestamp msg={@msg} timezone={@timezone} />
+    </div>
+    """
+  end
 
+  defp message(%{msg: %{type: :image}} = assigns) do
+    assigns = assign_file(assigns)
+
+    ~H"""
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg x-download"}>
+      <.header author={@author} chat_type={@chat_type} is_mine?={@is_mine?} msg={@msg} />
+      <.timestamp msg={@msg} timezone={@timezone} />
+      <.image chat_type={@chat_type} msg={@msg} export?={@export?} file={@file} />
+    </div>
+    """
+  end
+
+  defp message(%{msg: %{type: :request}} = assigns) do
+    ~H"""
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+      <div class="py-1 px-2">
+        <div class="inline-flex">
+          <div class="font-bold text-sm text-purple">[<%= short_hash(@author.hash) %>]</div>
+          <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
+        </div>
+        <p class="inline-flex">requested access to room </p>
+        <div class="inline-flex">
+          <div class="font-bold text-sm text-purple">[<%= short_hash(@room.admin_hash) %>]</div>
+          <h1 class="ml-1 font-bold text-sm text-purple" ><%= @room.name %></h1>
+        </div>
+      </div>
+      <.timestamp msg={@msg} timezone={@timezone} />
+    </div>
+    """
+  end
+
+  defp message(%{msg: %{type: :room_invite}} = assigns) do
     assigns =
       assigns
-      |> Map.put(:room_name, identity.name)
-      |> Map.put(:room_hash, Chat.Utils.hash(identity))
+      |> assign_new(:identity, fn %{content: json} ->
+        json
+        |> StorageId.from_json()
+        |> RoomInvites.get()
+        |> Identity.from_strings()
+      end)
+      |> assign_new(:room_hash, fn %{identity: identity} -> Utils.hash(identity) end)
+      |> assign_new(:room_name, fn %{identity: identity} -> identity.name end)
 
     ~H"""
     <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
       <div class="py-1 px-2">
         <div class="inline-flex">
-          <div class=" font-bold text-sm text-purple">[<%= short_hash(@author.hash) %>]</div>
+          <div class="font-bold text-sm text-purple">[<%= short_hash(@author.hash) %>]</div>
           <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
         </div>
         <p class="inline-flex">wants you to join the room </p>
         <div class="inline-flex">
           <div class="font-bold text-sm text-purple">[<%= short_hash(@room_hash) %>]</div>
-          <h1 class="ml-1 font-bold text-sm text-purple" ><%= @room_name %></h1>
+          <h1 class="ml-1 font-bold text-sm text-purple"><%= @room_name %></h1>
         </div>
       </div>
 
-
-
-      <%= unless @is_mine do %>
+      <%= unless @export? or @is_mine? do %>
         <div class="px-2 my-1 flex items-center justify-between">
           <button class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
            phx-click="dialog/message/accept-room-invite"
@@ -76,137 +159,46 @@ defmodule ChatWeb.MainLive.Layout.Message do
           >Accept and Open</button>
         </div>
       <% end %>
-      <.message_timestamp msg={@msg} timezone={@timezone} />
+
+      <.timestamp msg={@msg} timezone={@timezone} />
     </div>
     """
   end
 
-  def render_room_request(assigns) do
+  defp message(%{msg: %{type: type}} = assigns) when type in [:memo, :text] do
     ~H"""
-    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
-      <div class="py-1 px-2">
-        <div class="inline-flex">
-          <div class=" font-bold text-sm text-purple">[<%= short_hash(@author.hash) %>]</div>
-          <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
-        </div>
-        <p class="inline-flex">requested access to room </p>
-        <div class="inline-flex">
-          <div class="font-bold text-sm text-purple">[<%= short_hash(@room.admin_hash) %>]</div>
-          <h1 class="ml-1 font-bold text-sm text-purple" ><%= @room.name %></h1>
-        </div>
-      </div>
-      <.message_timestamp msg={@msg} timezone={@timezone} />
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+      <.header author={@author} chat_type={@chat_type} is_mine?={@is_mine?} msg={@msg} />
+      <span class="x-content"><.text msg={@msg} /></span>
+      <.timestamp msg={@msg} timezone={@timezone} />
     </div>
     """
   end
 
-  def render_image(%{msg: %{type: :image, content: json}} = assigns) do
-    {id, secret} = json |> StorageId.from_json()
-
-    assigns =
-      assigns
-      |> Map.put(:url, "/get/image/#{id}?a=#{secret |> Base.url_encode64()}")
+  defp message(%{msg: %{type: :video}} = assigns) do
+    assigns = assign_file(assigns)
 
     ~H"""
     <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg x-download"}>
-      <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
-      <.message_timestamp msg={@msg} timezone={@timezone} />
-      <.message_image url={@url} mode={message_of(@msg)} msg_id={@msg.id} msg_index={@msg.index}/>
+      <.header author={@author} chat_type={@chat_type} is_mine?={@is_mine?} msg={@msg} />
+      <.timestamp msg={@msg} timezone={@timezone} />
+      <video src={@file.url} class="a-video" controls />
     </div>
     """
   end
 
-  def render_video(%{msg: %{type: :video, content: json}} = assigns) do
-    {id, secret} = json |> StorageId.from_json()
-
-    assigns =
-      assigns
-      |> Map.put(:url, "/get/file/#{id}?a=#{secret |> Base.url_encode64()}")
-
+  defp header(%{export?: true} = assigns) do
     ~H"""
-    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg x-download"}>
-      <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
-      <.message_timestamp msg={@msg} timezone={@timezone} />
-      <.message_video url={@url} />
-    </div>
-    """
-  end
-
-  def render_file(%{msg: %{type: :file}} = assigns) do
-    ~H"""
-    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg x-download"}>
-      <.message_header msg={@msg} author={@author} is_mine={@is_mine} />
-      <.message_file msg={@msg} />
-      <.message_timestamp msg={@msg} timezone={@timezone} />
-    </div>
-    """
-  end
-
-  def message_text(%{msg: %{type: :text}} = assigns) do
-    ~H"""
-    <div class="px-4 w-full">
-      <span class="flex-initial break-words">
-        <%= @msg.content |> nl2br() %>
-      </span>
-    </div>
-    """
-  end
-
-  def message_text(%{msg: %{type: :memo, content: json}} = assigns) do
-    memo =
-      json
-      |> StorageId.from_json()
-      |> Memo.get()
-
-    assigns = assigns |> Map.put(:memo, memo)
-
-    ~H"""
-    <div class="px-4 w-full ">
-      <span class="flex-initial break-words">
-        <%= @memo |> nl2br() %>
-      </span>
-    </div>
-    """
-  end
-
-  defp message_file(%{msg: %{type: :file, content: json}} = assigns) do
-    {id, secret} =
-      json
-      |> StorageId.from_json()
-
-    [_, _, _, _, name, size] = Files.get(id, secret)
-
-    assigns =
-      assigns
-      |> Map.put(:url, "/get/file/#{id}?a=#{secret |> Base.url_encode64()}")
-      |> Map.put(:name, name)
-      |> Map.put(:size, size)
-
-    ~H"""
-    <div class="flex items-center justify-between">
-      <.icon id="document" class="w-14 h-14 flex fill-black/50"/>
-      <div class="w-36 flex flex-col pr-3">
-        <span class="truncate text-xs x-file" href={@url}><%= @name %></span>
-        <span class="text-xs text-black/50 whitespace-pre-line"><%= @size %></span>
+    <div id={"message-header-" <> @msg.id} class="py-1 px-2 flex items-center justify-between relative">
+      <div class="flex flex-row">
+        <div class="text-sm text-grayscale600">[<%= short_hash(@author.hash) %>]</div>
+        <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
       </div>
     </div>
     """
-  rescue
-    _ ->
-      ~H"""
-      <div class="flex items-center justify-between">
-        Error getting file
-      </div>
-      """
   end
 
-  defp message_header(%{message_header: _message_header} = assigns) do
-    ~H"""
-    <%= render_slot(@message_header) %>
-    """
-  end
-
-  defp message_header(assigns) do
+  defp header(assigns) do
     ~H"""
     <div id={"message-header-#{@msg.id}"} class="py-1 px-2 flex items-center justify-between relative">
       <div class="flex flex-row">
@@ -219,10 +211,10 @@ defmodule ChatWeb.MainLive.Layout.Message do
         <.icon id="menu" class="w-4 h-4 flex fill-purple"/>
       </button>
       <.dropdown class="messageActionsDropdown " id={"messageActionsDropdown-#{@msg.id}"} >
-        <%= if @is_mine do %>
+        <%= if @is_mine? do %>
           <%= if @msg.type in [:text, :memo] do %>
             <a class="dropdownItem t-edit-message"
-              phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{message_of(@msg)}/message/edit")}
+              phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("#{@chat_type}/message/edit")}
               phx-value-id={@msg.id}
               phx-value-index={@msg.index}
             >
@@ -233,7 +225,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
           <a class="dropdownItem t-delete-message"
             phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")
                        |> show_modal("delete-message-popup")
-                       |> JS.set_attribute({"phx-click", hide_modal("delete-message-popup") |> JS.push(message_of(@msg) <> "/delete-messages") |> stringify_commands()}, to: "#delete-message-popup .deleteMessageButton")
+                       |> JS.set_attribute({"phx-click", hide_modal("delete-message-popup") |> JS.push("#{@chat_type}/delete-messages") |> stringify_commands()}, to: "#delete-message-popup .deleteMessageButton")
                        |> JS.set_attribute({"phx-value-messages", [%{id: @msg.id, index: "#{@msg.index}"}] |> Jason.encode!}, to: "#delete-message-popup .deleteMessageButton")
                       }
             phx-value-id={@msg.id}
@@ -250,8 +242,8 @@ defmodule ChatWeb.MainLive.Layout.Message do
         </a>
         <a class="dropdownItem t-select-message"
            phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")
-                     |> JS.push("#{message_of(@msg)}/toggle-messages-select", value: %{action: :on, id: @msg.id, chatType: message_of(@msg)})
-                     |> JS.dispatch("chat:select-message", to: "#message-block-#{@msg.id}", detail: %{chatType: message_of(@msg)})
+                     |> JS.push("#{@chat_type}/toggle-messages-select", value: %{action: :on, id: @msg.id, chatType: @chat_type})
+                     |> JS.dispatch("chat:select-message", to: "#message-block-#{@msg.id}", detail: %{chatType: @chat_type})
                      }>
           <.icon id="select" class="w-4 h-4 flex fill-black"/>
           <span>Select</span>
@@ -260,7 +252,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
           <a
             class="dropdownItem"
             phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")
-                      |> JS.push("#{message_of(@msg)}/message/download")
+                      |> JS.push("#{@chat_type}/message/download")
                       }
             phx-value-id={@msg.id}
             phx-value-index={@msg.index}
@@ -274,13 +266,112 @@ defmodule ChatWeb.MainLive.Layout.Message do
     """
   end
 
-  defp message_video(assigns) do
+  defp timestamp(assigns) do
+    assigns =
+      assign_new(assigns, :time, fn %{msg: %{timestamp: timestamp}, timezone: timezone} ->
+        timestamp
+        |> DateTime.from_unix!()
+        |> DateTime.shift_zone!(timezone)
+        |> Timex.format!("{h12}:{0m} {AM}, {D}.{M}.{YYYY}")
+      end)
+
     ~H"""
-    <video src={@url} class="a-video" controls />
+    <div class="px-2 text-grayscale600 flex justify-end mr-1" style="font-size: 10px;">
+      <%= @time%>
+    </div>
     """
   end
 
-  defp message_image(assigns) do
+  defp assign_file(%{export?: true, msg: %{content: json}} = assigns) do
+    {id, secret} = StorageId.from_json(json)
+    [_, _, _, _, name, size] = Files.get(id, secret)
+
+    filename = ExportHelper.get_filename(name, id)
+
+    assign(assigns, :file, %{
+      name: name,
+      size: size,
+      url: "files/" <> filename
+    })
+  end
+
+  defp assign_file(%{msg: %{content: json, type: :file}} = assigns) do
+    {id, secret} = StorageId.from_json(json)
+    [_, _, _, _, name, size] = Files.get(id, secret)
+
+    assign(assigns, :file, %{
+      name: name,
+      size: size,
+      url: get_file_url(:file, id, secret)
+    })
+  end
+
+  defp assign_file(%{msg: %{content: json, type: type}} = assigns) do
+    {id, secret} = StorageId.from_json(json)
+
+    assign(assigns, :file, %{url: get_file_url(type, id, secret)})
+  end
+
+  defp get_file_url(type, id, secret) do
+    file_type =
+      if type == :image do
+        "image"
+      else
+        "file"
+      end
+
+    "/get/#{file_type}/#{id}?a=#{Base.url_encode64(secret)}"
+  end
+
+  defp short_hash(hash) do
+    hash
+    |> String.split_at(-6)
+    |> elem(1)
+  end
+
+  defp file(assigns) do
+    assigns = assign_file(assigns)
+
+    ~H"""
+    <div class="flex items-center justify-between">
+      <.file_icon export?={@export?} />
+
+      <div class="w-36 flex flex-col pr-3">
+        <span class="truncate text-xs x-file" href={@file.url}><%= @file.name %></span>
+        <span class="text-xs text-black/50 whitespace-pre-line"><%= @file.size %></span>
+      </div>
+    </div>
+    """
+  rescue
+    _ ->
+      ~H"""
+      <div class="flex items-center justify-between">
+        Error getting file
+      </div>
+      """
+  end
+
+  defp file_icon(%{export?: true} = assigns) do
+    ~H"""
+    <svg id="document" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="w-14 h-14 flex fill-black/50">
+      <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" />
+    </svg>
+    """
+  end
+
+  defp file_icon(assigns) do
+    ~H"""
+    <.icon id="document" class="w-14 h-14 flex fill-black/50"/>
+    """
+  end
+
+  defp image(%{export?: true} = assigns) do
+    ~H"""
+    <img class="object-cover overflow-hidden" src={@file.url} />
+    """
+  end
+
+  defp image(assigns) do
     # {JS.dispatch("chat:toggle", detail: %{class: "preview"})
     #  |> JS.add_class("hidden", to: "#dialogInput")
     #  |> JS.add_class("md:hidden", to: "#chatRoomBar")
@@ -290,26 +381,43 @@ defmodule ChatWeb.MainLive.Layout.Message do
     ~H"""
       <img
         class="object-cover overflow-hidden"
-        src={@url}
-        phx-click={JS.push("#{@mode}/message/open-image-gallery") |> JS.add_class("hidden", to: "#chatContent")}
-        phx-value-id={@msg_id}
-        phx-value-index={@msg_index}
+        src={@file.url}
+        phx-click={open_galery(@chat_type)}
+        phx-value-id={@msg.id}
+        phx-value-index={@msg.index}
       />
     """
   end
 
-  def message_timestamp(%{msg: %{timestamp: timestamp}, timezone: timezone} = assigns) do
-    time =
-      timestamp
-      |> DateTime.from_unix!()
-      |> DateTime.shift_zone!(timezone)
-      |> Timex.format!("{h12}:{0m} {AM}, {D}.{M}.{YYYY}")
+  defp open_galery(chat_type, js \\ %JS{}) do
+    js
+    |> JS.push("#{chat_type}/message/open-image-gallery")
+    |> JS.add_class("hidden", to: "#chatContent")
+  end
 
-    assigns = Map.put(assigns, :time, time)
+  def text(%{msg: %{type: :memo}} = assigns) do
+    assigns =
+      assign_new(assigns, :memo, fn %{msg: %{content: json}} ->
+        json
+        |> StorageId.from_json()
+        |> Memo.get()
+      end)
 
     ~H"""
-    <div class="px-2 text-grayscale600 flex justify-end mr-1" style="font-size: 10px;">
-      <%= @time%>
+    <div class="px-4 w-full">
+      <span class="flex-initial break-words">
+        <%= nl2br(@memo) %>
+      </span>
+    </div>
+    """
+  end
+
+  def text(%{msg: %{type: :text}} = assigns) do
+    ~H"""
+    <div class="px-4 w-full">
+      <span class="flex-initial break-words">
+        <%= nl2br(@msg.content) %>
+      </span>
     </div>
     """
   end

@@ -13,11 +13,12 @@ defmodule ChatWeb.ZipController do
   alias Chat.ChunkedFiles
   alias Chat.Dialogs
   alias Chat.Files
+  alias Chat.Messages.ExportHelper
   alias Chat.Rooms
   alias Chat.Rooms.PlainMessage
   alias Chat.User
   alias Chat.Utils.StorageId
-  alias ChatWeb.MainLive.Layout.ExportedMessage
+  alias ChatWeb.MainLive.Layout.Message
 
   def get(conn, params) do
     with %{"broker_key" => broker_key} <- params,
@@ -46,9 +47,19 @@ defmodule ChatWeb.ZipController do
 
       messages_stream =
         messages
-        |> Stream.map(fn {message, author} ->
-          %{author: author, message: message, room: room, timezone: timezone}
-          |> ExportedMessage.message_block()
+        |> Stream.map(fn {msg, author} ->
+          Phoenix.LiveView.HTMLEngine.component(
+            &Message.message_block/1,
+            [
+              author: author,
+              chat_type: type,
+              export?: true,
+              msg: msg,
+              room: room,
+              timezone: timezone
+            ],
+            {__ENV__.module, __ENV__.function, __ENV__.file, __ENV__.line}
+          )
           |> Phoenix.HTML.Safe.to_iodata()
         end)
 
@@ -66,18 +77,13 @@ defmodule ChatWeb.ZipController do
 
       file_entries =
         messages
-        |> Enum.reduce([], fn {message, _author}, file_entries ->
-          with %{type: type, content: json} when type in [:file, :image, :video] <- message,
+        |> Enum.reduce([], fn {msg, _author}, file_entries ->
+          with %{type: type, content: json} when type in [:file, :image, :video] <- msg,
                {id, content} <- StorageId.from_json(json),
                [chunk_key, chunk_secret_raw, _, _type, filename, _size] <- Files.get(id, content),
                chunk_secret <- Base.decode64!(chunk_secret_raw),
                file_stream <- ChunkedFiles.stream_chunks(chunk_key, chunk_secret) do
-            {extension, filename} =
-              filename
-              |> String.split(".")
-              |> List.pop_at(-1)
-
-            filename = Enum.join(filename, ".") <> "_" <> id <> "." <> extension
+            filename = ExportHelper.get_filename(filename, id)
 
             entry = Zstream.entry("files/#{filename}", file_stream)
 
@@ -128,11 +134,11 @@ defmodule ChatWeb.ZipController do
 
   defp fetch_messages(:room, {messages_ids, _room, room_identity}) do
     messages_ids
-    |> Stream.map(fn message_id ->
-      case Rooms.read_message(message_id, room_identity, &User.id_map_builder/1) do
-        %PlainMessage{} = message ->
-          author = User.by_id(message.author_hash)
-          {message, author}
+    |> Stream.map(fn msg_id ->
+      case Rooms.read_message(msg_id, room_identity, &User.id_map_builder/1) do
+        %PlainMessage{} = msg ->
+          author = User.by_id(msg.author_hash)
+          {msg, author}
 
         nil ->
           {nil, nil}

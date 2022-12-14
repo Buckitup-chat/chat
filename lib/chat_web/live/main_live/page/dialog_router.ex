@@ -92,7 +92,7 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
         socket |> Page.Dialog.show_new(glimpse)
 
       {:updated_dialog_message, msg_id} ->
-        socket |> Page.Dialog.update_message(msg_id, &Message.message_text/1)
+        socket |> Page.Dialog.update_message(msg_id, &Message.text/1)
 
       {:deleted_dialog_message, msg_id} ->
         socket |> Page.Dialog.hide_deleted_message(msg_id)

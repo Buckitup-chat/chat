@@ -72,7 +72,8 @@ defmodule Chat.Db.WriteQueue.Buffer do
     end
   end
 
-  defp log(message), do: Logger.info("[queue] #{message}")
+  # Logger.info("[queue] #{message}")
+  defp log(_message), do: :ok
 
   defp append(nil, value), do: [value]
   defp append(list, value), do: [value | list]

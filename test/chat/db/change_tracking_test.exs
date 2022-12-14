@@ -20,7 +20,7 @@ defmodule Chat.Db.ChangeTrackingTest do
 
     Tracking.new()
     |> Tracking.add_promise(:to_be_found, {fn -> send(pid, :got_it) end, fn -> :exp end}, 1)
-    |> Tracking.extract_keys_found(fn _ -> [:to_be_found] end)
+    |> Tracking.extract_keys_found([:to_be_found])
 
     assert_receive :got_it, 100
   end
@@ -45,11 +45,9 @@ defmodule Chat.Db.ChangeTrackingTest do
     Tracking.new()
     |> Tracking.add_promise(:to_be_found, {fn -> send(pid, :got_it) end, fn -> :exp end}, 1)
     |> Tracking.add_promise(:to_be_found, {fn -> send(pid, :got_it_too) end, fn -> :exp end}, 1)
-    |> Tracking.extract_keys_found(fn _ -> [:to_be_found] end)
+    |> Tracking.extract_keys_found([:to_be_found])
 
     assert_receive :got_it, 100
     assert_receive :got_it_too, 100
   end
-
-  # test "" do end
 end

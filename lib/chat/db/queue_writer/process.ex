@@ -29,7 +29,6 @@ defmodule Chat.Db.QueueWriter.Process do
   @impl true
   def handle_cast({operation, list}, state) do
     state
-    |> cancel_fsync_timer()
     |> cancel_compaction_timer()
     |> abort_compaction()
     |> then(fn st ->
@@ -39,19 +38,11 @@ defmodule Chat.Db.QueueWriter.Process do
       end
     end)
     |> start_fsync_timer()
-    |> noreply_continue(:should_fsync?)
+    |> may_fsync()
+    |> noreply_continue(:demand)
   end
 
   @impl true
-  def handle_continue(:should_fsync?, state) do
-    if fsync_needed?(state) do
-      state
-      |> fsync()
-      |> noreply_continue(:demand)
-    else
-      noreply_continue(state, :demand)
-    end
-  end
 
   def handle_continue(:demand, state) do
     state
@@ -73,5 +64,13 @@ defmodule Chat.Db.QueueWriter.Process do
     |> cancel_compaction_timer()
     |> fsync()
     |> noreply()
+  end
+
+  defp may_fsync(state) do
+    if fsync_needed?(state) do
+      state |> fsync()
+    else
+      state
+    end
   end
 end

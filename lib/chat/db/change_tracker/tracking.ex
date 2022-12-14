@@ -31,22 +31,17 @@ defmodule Chat.Db.ChangeTracker.Tracking do
     |> add_action(key, actions, expiration)
   end
 
-  def check_written(state, time) do
+  def check_written(state, time, keys \\ []) do
     state
-    |> extract_keys_found()
+    |> extract_keys_found(keys)
     |> extract_expired(time)
     |> cleanup()
   end
 
   def extract_keys_found(
         tracker(keys: keys, items: items) = state,
-        finder_fn \\ &find_in_db/1
+        found_keys
       ) do
-    found_keys =
-      keys
-      |> Map.keys()
-      |> then(finder_fn)
-
     ids =
       keys
       |> Map.take(found_keys)
@@ -112,15 +107,5 @@ defmodule Chat.Db.ChangeTracker.Tracking do
 
     state
     |> tracker(next_id: id + 1, keys: new_keys, items: items |> Map.put(id, item))
-  end
-
-  defp find_in_db(keys) do
-    Chat.Db.db()
-    |> CubDB.with_snapshot(fn snap ->
-      keys
-      |> Enum.filter(fn key ->
-        CubDB.Snapshot.has_key?(snap, key)
-      end)
-    end)
   end
 end

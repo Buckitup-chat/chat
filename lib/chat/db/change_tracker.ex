@@ -13,8 +13,8 @@ defmodule Chat.Db.ChangeTracker do
   alias Chat.Db
   alias Chat.Db.ChangeTracker.Tracking
 
-  @timeout :timer.seconds(11)
-  @check_delay 500
+  @timeout :timer.seconds(131)
+  @check_delay :timer.seconds(10)
 
   def await do
     key = {:change_tracking_marker, UUID.uuid4()}
@@ -49,6 +49,11 @@ defmodule Chat.Db.ChangeTracker do
     |> GenServer.cast({:promise, key, success_fn, error_fn, expires(@timeout)})
   end
 
+  def set_written(keys) do
+    __MODULE__
+    |> GenServer.cast({:written, keys})
+  end
+
   # Implementation
 
   def start_link(_) do
@@ -72,6 +77,12 @@ defmodule Chat.Db.ChangeTracker do
   def handle_cast({:promise, key, ok_fn, error_fn, expiration}, state) do
     state
     |> Tracking.add_promise(key, {ok_fn, error_fn}, expiration)
+    |> noreply()
+  end
+
+  def handle_cast({:written, keys}, state) do
+    state
+    |> Tracking.check_written(now(), keys)
     |> noreply()
   end
 

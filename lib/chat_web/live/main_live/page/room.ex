@@ -75,15 +75,16 @@ defmodule ChatWeb.MainLive.Page.Room do
         nil
 
       content ->
-        message =
-          content
-          |> Messages.Text.new(time)
-          |> Rooms.add_new_message(me, room.pub_key)
+        # message =
+        content
+        |> Messages.Text.new(time)
+        |> Rooms.add_new_message(me, room.pub_key)
+        |> broadcast_new_message(room, me, time)
 
-        message
-        |> Rooms.on_saved(room.pub_key, fn ->
-          broadcast_new_message(message, room, me, time)
-        end)
+        # message
+        # |> Rooms.on_saved(room.pub_key, fn ->
+        #   broadcast_new_message(message, room, me, time)
+        # end)
     end
 
     socket

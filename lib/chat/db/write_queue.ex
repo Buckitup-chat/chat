@@ -38,7 +38,8 @@ defmodule Chat.Db.WriteQueue do
   def handle_call(:demand, {to_pid, _}, state) do
     state
     |> q_state(consumer: to_pid, in_demand: true)
-    |> reply_continue(:ok, :produce)
+    |> produce()
+    |> reply(:ok)
   end
 
   def handle_call({:put_stream, stream}, _, q_state(buffer: buf) = state) do
@@ -47,7 +48,8 @@ defmodule Chat.Db.WriteQueue do
     else
       state
       |> q_state(buffer: buffer_stream(buf, stream))
-      |> reply_continue(:ok, :produce)
+      |> produce()
+      |> reply(:ok)
     end
   end
 
@@ -57,7 +59,8 @@ defmodule Chat.Db.WriteQueue do
     else
       state
       |> q_state(buffer: buffer_chunk(buf, chunk))
-      |> reply_continue(:ok, :produce)
+      |> produce()
+      |> reply(:ok)
     end
   end
 
@@ -65,19 +68,22 @@ defmodule Chat.Db.WriteQueue do
   def handle_cast({:push, data}, q_state(buffer: buf) = state) do
     state
     |> q_state(buffer: buffer_add_data(buf, data))
-    |> noreply_continue(:produce)
+    |> produce()
+    |> noreply()
   end
 
   def handle_cast({:put, data}, q_state(buffer: buf) = state) do
     state
     |> q_state(buffer: buffer_add_log(buf, data))
-    |> noreply_continue(:produce)
+    |> produce()
+    |> noreply()
   end
 
   def handle_cast({:mark_delete, key}, q_state(buffer: buf) = state) do
     state
     |> q_state(buffer: buffer_add_deleted(buf, key))
-    |> noreply_continue(:produce)
+    |> produce()
+    |> noreply()
   end
 
   def handle_cast({:mirror, sink}, state) do
@@ -86,11 +92,10 @@ defmodule Chat.Db.WriteQueue do
     |> noreply()
   end
 
-  @impl true
-  def handle_continue(:produce, q_state(consumer: nil) = state), do: state |> noreply()
-  def handle_continue(:produce, q_state(in_demand: false) = state), do: state |> noreply()
+  defp produce(q_state(consumer: nil) = state), do: state
+  defp produce(q_state(in_demand: false) = state), do: state
 
-  def handle_continue(:produce, q_state(buffer: buf, consumer: pid, mirror: sink) = state) do
+  defp produce(q_state(buffer: buf, consumer: pid, mirror: sink) = state) do
     if Process.alive?(pid) do
       case buffer_yield(buf) do
         {:ignored, _} ->
@@ -100,11 +105,10 @@ defmodule Chat.Db.WriteQueue do
           GenServer.cast(pid, payload)
           GenServer.cast(sink, payload)
 
-          state |> q_state(buffer: new_buf)
+          state |> q_state(buffer: new_buf, in_demand: false)
       end
     else
       state |> q_state(consumer: nil)
     end
-    |> noreply()
   end
 end

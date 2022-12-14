@@ -12,11 +12,13 @@ defmodule Chat.Db.QueueWriter do
     status_relay: nil,
     dry_run: false,
     dirt_count: 0,
+    written_keys: [],
     fsync_timer: nil,
     compacting: false,
     compaction_timer: nil
   )
 
+  alias Chat.Db.ChangeTracker
   alias Chat.Db.Maintenance
   alias Chat.Db.WriteQueue
 
@@ -42,11 +44,14 @@ defmodule Chat.Db.QueueWriter do
   end
 
   def start_compaction(w_state(db: db, dirt_count: 0, compacting: false, dry_run: false) = state) do
-    "[db writer] compaction started" |> Logger.warn()
-    CubDB.compact(db)
+    if has_enoght_space?(db) do
+      "[db writer] compaction started" |> Logger.warn()
+      CubDB.compact(db)
+    end
 
     state
-    |> w_state(compacting: true, compaction_timer: nil)
+    |> cancel_compaction_timer()
+    |> w_state(compacting: true)
   end
 
   def start_compaction(state), do: state
@@ -124,33 +129,39 @@ defmodule Chat.Db.QueueWriter do
 
   def db_write(w_state(dry_run: true) = state, _list), do: state
 
-  def db_write(w_state(db: db, dirt_count: old_count) = state, list) do
-    CubDB.transaction(db, fn tx ->
-      Enum.reduce(list, tx, fn {key, value}, tx -> CubDB.Tx.put(tx, key, value) end)
-      |> then(&{:commit, &1, :ok})
-    end)
+  def db_write(w_state(db: db, dirt_count: old_count, written_keys: written_keys) = state, list) do
+    new_keys =
+      CubDB.transaction(db, fn tx ->
+        Enum.reduce(list, {tx, []}, fn {key, value}, {tx, acc} ->
+          {CubDB.Tx.put(tx, key, value), [key | acc]}
+        end)
+        |> then(fn {tx, keys} -> {:commit, tx, keys} end)
+      end)
 
     case list do
       [{{:file_chunk, _, _, _}, _}] -> 1000
       _ -> Enum.count(list)
     end
     |> then(fn count ->
-      state |> w_state(dirt_count: old_count + count)
+      state |> w_state(dirt_count: old_count + count, written_keys: new_keys ++ written_keys)
     end)
   end
 
-  def fsync(w_state(dry_run: true) = state), do: state
+  def fsync(w_state(db: db, dry_run: is_dry, written_keys: keys) = state) do
+    unless is_dry do
+      "[db writer] fsyncing" |> Logger.warn()
+      CubDB.file_sync(db)
+    end
 
-  def fsync(w_state(db: db) = state) do
-    "[db writer] fsyncing" |> Logger.warn()
-    CubDB.file_sync(db)
+    keys
+    |> ChangeTracker.set_written()
 
     state
     |> start_compaction_timer()
-    |> w_state(dirt_count: 0)
+    |> w_state(dirt_count: 0, written_keys: [])
   end
 
-  def start_compaction_timer(w_state(compaction_timer: nil) = state) do
+  def start_compaction_timer(w_state(dry_run: false, compaction_timer: nil) = state) do
     state
     |> w_state(
       compaction_timer:
@@ -166,4 +177,8 @@ defmodule Chat.Db.QueueWriter do
   end
 
   def start_fsync_timer(state), do: state
+
+  defp has_enoght_space?(db) do
+    Maintenance.db_free_space(db) > 2 * Maintenance.db_size(db)
+  end
 end

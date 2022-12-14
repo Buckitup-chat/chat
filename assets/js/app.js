@@ -34,7 +34,7 @@ let Uploaders = {}
 Uploaders.UpChunk = function(items, onViewError) {
 
   const entries = [...items];
-  const workers = new Array(5);
+  const workers = new Array(2);
 
   const createTask = (entry) => {
     if (!entry) {
@@ -90,8 +90,7 @@ Hooks.Chat = Chat.hooks
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
-  params: { _csrf_token: csrfToken, tz_info: Hooks.LocalTime.info() },
-  hooks: Hooks,
+  params: { _csrf_token: csrfToken, tz_info: Hooks.LocalTime.info() }, hooks: Hooks,
   uploaders: Uploaders
 })
 
@@ -202,7 +201,7 @@ topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" })
 let topBarScheduled = undefined;
 window.addEventListener("phx:page-loading-start", () => {
   if (!topBarScheduled) {
-    topBarScheduled = setTimeout(() => topbar.show(), 250);
+    topBarScheduled = setTimeout(() => topbar.show(), 120);
   };
 });
 window.addEventListener("phx:page-loading-stop", () => {

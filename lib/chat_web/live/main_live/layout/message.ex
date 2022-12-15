@@ -78,6 +78,33 @@ defmodule ChatWeb.MainLive.Layout.Message do
     """
   end
 
+  def text(%{msg: %{type: :memo}} = assigns) do
+    assigns =
+      assign_new(assigns, :memo, fn %{msg: %{content: json}} ->
+        json
+        |> StorageId.from_json()
+        |> Memo.get()
+      end)
+
+    ~H"""
+    <div class="px-4 w-full">
+      <span class="flex-initial break-words">
+        <%= nl2br(@memo) %>
+      </span>
+    </div>
+    """
+  end
+
+  def text(%{msg: %{type: :text}} = assigns) do
+    ~H"""
+    <div class="px-4 w-full">
+      <span class="flex-initial break-words">
+        <%= nl2br(@msg.content) %>
+      </span>
+    </div>
+    """
+  end
+
   defp message(%{msg: %{type: :file}} = assigns) do
     ~H"""
     <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg x-download"}>
@@ -393,33 +420,6 @@ defmodule ChatWeb.MainLive.Layout.Message do
     js
     |> JS.push("#{chat_type}/message/open-image-gallery")
     |> JS.add_class("hidden", to: "#chatContent")
-  end
-
-  def text(%{msg: %{type: :memo}} = assigns) do
-    assigns =
-      assign_new(assigns, :memo, fn %{msg: %{content: json}} ->
-        json
-        |> StorageId.from_json()
-        |> Memo.get()
-      end)
-
-    ~H"""
-    <div class="px-4 w-full">
-      <span class="flex-initial break-words">
-        <%= nl2br(@memo) %>
-      </span>
-    </div>
-    """
-  end
-
-  def text(%{msg: %{type: :text}} = assigns) do
-    ~H"""
-    <div class="px-4 w-full">
-      <span class="flex-initial break-words">
-        <%= nl2br(@msg.content) %>
-      </span>
-    </div>
-    """
   end
 
   defp nl2br(str) do

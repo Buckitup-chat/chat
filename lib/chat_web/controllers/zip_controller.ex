@@ -15,7 +15,6 @@ defmodule ChatWeb.ZipController do
   alias Chat.Files
   alias Chat.Messages.ExportHelper
   alias Chat.Rooms
-  alias Chat.Rooms.PlainMessage
   alias Chat.User
   alias Chat.Utils.StorageId
   alias ChatWeb.MainLive.Layout.Message
@@ -39,25 +38,29 @@ defmodule ChatWeb.ZipController do
 
       messages = fetch_messages(type, data)
 
-      {room, my_id} =
-        if type == :room do
-          {_messages_ids, room, my_id, _room_identity} = data
-          {room, my_id}
-        else
-          {nil, nil}
+      {room, my_id, me, peer} =
+        case type do
+          :dialog ->
+            {_dialog, _messages_ids, me, peer} = data
+            {nil, nil, me, peer}
+
+          :room ->
+            {_messages_ids, room, my_id, _room_identity} = data
+            {room, my_id, nil, nil}
         end
 
       messages_stream =
         messages
-        |> Stream.map(fn {msg, author} ->
+        |> Stream.map(fn msg ->
           Phoenix.LiveView.HTMLEngine.component(
             &Message.message_block/1,
             [
-              author: author,
               chat_type: type,
               export?: true,
               msg: msg,
+              me: me,
               my_id: my_id,
+              peer: peer,
               room: room,
               timezone: timezone
             ],
@@ -80,7 +83,7 @@ defmodule ChatWeb.ZipController do
 
       file_entries =
         messages
-        |> Enum.reduce([], fn {msg, _author}, file_entries ->
+        |> Enum.reduce([], fn msg, file_entries ->
           with %{type: type, content: json} when type in [:file, :image, :video] <- msg,
                {id, content} <- StorageId.from_json(json),
                [chunk_key, chunk_secret_raw, _, _type, filename, _size] <- Files.get(id, content),
@@ -118,7 +121,7 @@ defmodule ChatWeb.ZipController do
       send_resp(conn, 404, "")
   end
 
-  defp get_filename(:dialog, {_messages_ids, peer, _user_data}),
+  defp get_filename(:dialog, {_dialog, _messages_ids, _me, peer}),
     do: "chat_#{short_hash(peer.hash)}_messages"
 
   defp get_filename(:room, {_messages_ids, room, _my_id, _room_identity}),
@@ -126,27 +129,15 @@ defmodule ChatWeb.ZipController do
 
   def short_hash(hash), do: hash |> String.split_at(-6) |> elem(1)
 
-  defp fetch_messages(:dialog, {messages_ids, peer, user_data}) do
-    {identity, _rooms} = User.device_decode(user_data)
-    dialog = Dialogs.find_or_open(identity, peer)
-
+  defp fetch_messages(:dialog, {dialog, messages_ids, me, _peer}) do
     messages_ids
-    |> Stream.map(&{Dialogs.read_message(dialog, &1, identity), peer})
-    |> Enum.reject(&is_nil(elem(&1, 0)))
+    |> Stream.map(&Dialogs.read_message(dialog, &1, me))
+    |> Enum.reject(&is_nil/1)
   end
 
   defp fetch_messages(:room, {messages_ids, _room, _my_id, room_identity}) do
     messages_ids
-    |> Stream.map(fn msg_id ->
-      case Rooms.read_message(msg_id, room_identity, &User.id_map_builder/1) do
-        %PlainMessage{} = msg ->
-          author = User.by_id(msg.author_hash)
-          {msg, author}
-
-        nil ->
-          {nil, nil}
-      end
-    end)
-    |> Enum.reject(&is_nil(elem(&1, 0)))
+    |> Stream.map(fn msg -> Rooms.read_message(msg, room_identity, &User.id_map_builder/1) end)
+    |> Enum.reject(&is_nil/1)
   end
 end

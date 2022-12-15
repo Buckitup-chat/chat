@@ -39,10 +39,12 @@ defmodule ChatWeb.ZipController do
 
       messages = fetch_messages(type, data)
 
-      room =
+      {room, my_id} =
         if type == :room do
-          {_messages_ids, room, _room_identity} = data
-          room
+          {_messages_ids, room, my_id, _room_identity} = data
+          {room, my_id}
+        else
+          {nil, nil}
         end
 
       messages_stream =
@@ -55,6 +57,7 @@ defmodule ChatWeb.ZipController do
               chat_type: type,
               export?: true,
               msg: msg,
+              my_id: my_id,
               room: room,
               timezone: timezone
             ],
@@ -118,7 +121,7 @@ defmodule ChatWeb.ZipController do
   defp get_filename(:dialog, {_messages_ids, peer, _user_data}),
     do: "chat_#{short_hash(peer.hash)}_messages"
 
-  defp get_filename(:room, {_messages_ids, room, _room_identity}),
+  defp get_filename(:room, {_messages_ids, room, _my_id, _room_identity}),
     do: "room_#{short_hash(room.admin_hash)}_messages"
 
   def short_hash(hash), do: hash |> String.split_at(-6) |> elem(1)
@@ -132,7 +135,7 @@ defmodule ChatWeb.ZipController do
     |> Enum.reject(&is_nil(elem(&1, 0)))
   end
 
-  defp fetch_messages(:room, {messages_ids, _room, room_identity}) do
+  defp fetch_messages(:room, {messages_ids, _room, _my_id, room_identity}) do
     messages_ids
     |> Stream.map(fn msg_id ->
       case Rooms.read_message(msg_id, room_identity, &User.id_map_builder/1) do

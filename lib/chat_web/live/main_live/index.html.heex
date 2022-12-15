@@ -646,7 +646,7 @@
                 <div>
                   <div id="chat-messages" phx-update={@message_update_mode}>
                     <%= for msg <- @messages do %>
-                      <Layout.Message.message_block chat_type={:room} msg={msg} room={@room} timezone={@timezone} />
+                      <Layout.Message.message_block chat_type={:room} msg={msg} my_id={@my_id} room={@room} timezone={@timezone} />
                     <% end %>
                   </div>
                   <div class="px-2 sm:px-8" phx-update="replace" id="ddd">

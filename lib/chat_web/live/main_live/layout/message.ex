@@ -25,9 +25,6 @@ defmodule ChatWeb.MainLive.Layout.Message do
       |> assign_new(:export?, fn -> false end)
       |> assign_new(:room, fn -> nil end)
       |> assign_new(:is_mine?, fn
-        %{export?: true} ->
-          false
-
         %{chat_type: :dialog, msg: msg} ->
           msg.is_mine?
 

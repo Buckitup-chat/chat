@@ -26,6 +26,7 @@ defmodule ChatWeb.Router do
     get "/get/backup/:key", FileController, :backup
     get "/get/backup", TempSyncController, :backup
     get "/get/device_log/:key", TempSyncController, :device_log
+    get "/get/zip/:broker_key", ZipController, :get
 
     live "/", MainLive.Index, :index
     live "/export-key-ring/:id", MainLive.Index, :export

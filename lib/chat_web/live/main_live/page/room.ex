@@ -1,11 +1,15 @@
 defmodule ChatWeb.MainLive.Page.Room do
   @moduledoc "Room page"
+
+  use ChatWeb, :component
+
   import ChatWeb.MainLive.Page.Shared
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [consume_uploaded_entry: 3, push_event: 3]
 
   require Logger
 
+  alias Chat.Broker
   alias Chat.Dialogs
   alias Chat.FileIndex
   alias Chat.Identity
@@ -277,6 +281,23 @@ defmodule ChatWeb.MainLive.Page.Room do
 
     socket
     |> assign(:room_mode, :plain)
+  end
+
+  def download_messages(
+        %{assigns: %{my_id: my_id, room: room, room_identity: room_identity, timezone: timezone}} =
+          socket,
+        %{"messages" => messages}
+      ) do
+    messages_ids =
+      messages
+      |> Jason.decode!()
+      |> Enum.map(fn %{"id" => message_id, "index" => index} ->
+        {String.to_integer(index), message_id}
+      end)
+
+    key = Broker.store({:room, {messages_ids, room, my_id, room_identity}, timezone})
+
+    push_event(socket, "chat:redirect", %{url: url(~p"/get/zip/#{key}")})
   end
 
   def hide_deleted_message(socket, id) do

@@ -265,25 +265,7 @@
                   <div>
                     <div id="chat-messages" phx-update={@message_update_mode}>
                       <%= for msg <- @messages do %>
-                        <div class="messageBlock flex flex-row px-2 sm:px-8"
-                          id={"message-block-#{msg.id}"}
-                          phx-click={JS.dispatch("chat:select-message", detail: %{chatType: "dialog"})}
-                          phx-value-id={msg.id}
-                          phx-value-is-mine={"#{msg.is_mine?}"}
-                          phx-value-index={msg.index}
-                          phx-value-type="dialog"
-                        >
-                          <div class={classes("m-1 w-full flex", %{"justify-end t-chat-mine-message" => msg.is_mine?, "justify-start" => !msg.is_mine?})} id={"dialog-message-#{msg.id}"}>
-                            <Layout.Message.render
-                              color={msg.is_mine? && "bg-purple50" || "bg-white"}
-                              msg={msg}
-                              author={msg.is_mine? && Chat.Card.from_identity(@me) || @peer}
-                              is_mine={msg.is_mine?}
-                              timezone={@timezone}
-                            />
-                          </div>
-                          <input type="checkbox" class="selectCheckbox w-6 h-6 ml-3 mt-3 rounded-full text-purple/90 bg-black/10 border-gray-300 focus:ring-2" />
-                        </div>
+                        <Layout.Message.message_block chat_type={:dialog} me={@me} msg={msg} peer={@peer} timezone={@timezone} />
                       <% end %>
                     </div>
                     <div class="px-2 sm:px-8" phx-update="replace" id="dialog-uploads">
@@ -407,10 +389,11 @@
                       <span id="delete-span">Delete</span>
                   </button>
 
-                    <a class="cursor-pointer inline-flex items-center t-download-chat-msg-btn">
+                    <button id="download-btn" class="cursor-pointer inline-flex items-center t-download-chat-msg-btn"
+                    phx-click={JS.dispatch("chat:download-messages", to: "#chatContent", detail: %{chatType: "dialog"})}>
                       <span class="text-purple">Download</span>
                       <.icon id="download" class="ml-1 w-4 h-4 flex  stroke-purple "/>
-                    </a>
+                    </button>
                   </div>
                 <% end %>
               </div>
@@ -663,26 +646,7 @@
                 <div>
                   <div id="chat-messages" phx-update={@message_update_mode}>
                     <%= for msg <- @messages do %>
-                      <div class="messageBlock flex flex-row px-2 sm:px-8"
-                          id={"message-block-#{msg.id}"}
-                          phx-click={JS.dispatch("chat:select-message", detail: %{chatType: "room"})}
-                          phx-value-id={msg.id}
-                          phx-value-is-mine={"#{msg.author_hash == @my_id}"}
-                          phx-value-index={msg.index}
-                          phx-value-type="room"
-                      >
-                        <div class={classes("m-1 w-full flex t-room-mine-message", %{"justify-end x-mine" => msg.author_hash == @my_id, "justify-start x-peer" => msg.author_hash != @my_id})} id={"room-message-#{msg.id}"}>
-                          <Layout.Message.render
-                            color={msg.author_hash == @my_id && "bg-purple50" || "bg-white" }
-                            msg={msg}
-                            author={Chat.User.by_id(msg.author_hash)}
-                            is_mine={msg.author_hash == @my_id}
-                            room={if msg.type == :request, do: @room, else: nil}
-                            timezone={@timezone}
-                          />
-                        </div>
-                        <input type="checkbox" class="selectCheckbox w-6 h-6 ml-3 mt-3 rounded-full text-purple/90 bg-black/10 border-gray-300 focus:ring-2 t-selectCheckbox" />
-                      </div>
+                      <Layout.Message.message_block chat_type={:room} msg={msg} my_id={@my_id} room={@room} timezone={@timezone} />
                     <% end %>
                   </div>
                   <div class="px-2 sm:px-8" phx-update="replace" id="ddd">
@@ -800,10 +764,11 @@
                       <span id="delete-span">Delete</span>
                     </button>
 
-                    <a class="cursor-pointer inline-flex items-center t-download-room-msg-btn">
+                    <button id="download-btn" class="cursor-pointer inline-flex items-center t-download-room-msg-btn"
+                    phx-click={JS.dispatch("chat:download-messages", to: "#chatContent", detail: %{chatType: "room"})}>
                       <span class="text-purple">Download</span>
                       <.icon id="download" class="ml-1 w-4 h-4 flex  stroke-purple "/>
-                    </a>
+                    </button>
                   </div>
                 <% end %>
 

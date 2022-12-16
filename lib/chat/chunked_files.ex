@@ -52,12 +52,17 @@ defmodule Chat.ChunkedFiles do
   end
 
   def read({key, secret}) do
+    key
+    |> stream_chunks(secret)
+    |> Enum.join("")
+  end
+
+  def stream_chunks(key, secret) do
     Db.list({
       {:file_chunk, key, 0, 0},
       {:file_chunk, key, nil, nil}
     })
     |> Stream.map(fn {_, data} -> Utils.decrypt_blob(data, secret) end)
-    |> Enum.join("")
   end
 
   def size(key) do

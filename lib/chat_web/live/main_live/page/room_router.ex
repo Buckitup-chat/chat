@@ -39,6 +39,9 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
       {"delete-messages", params} ->
         socket |> Page.Room.delete_messages(params)
 
+      {"download-messages", params} ->
+        socket |> Page.Room.download_messages(params)
+
       {"toggle-messages-select", params} ->
         socket |> Page.Room.toggle_messages_select(params)
 
@@ -95,7 +98,7 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
         socket |> Page.Room.show_new(glimpse)
 
       {:updated_message, msg_id} ->
-        socket |> Page.Room.update_message(msg_id, &Message.message_text/1)
+        socket |> Page.Room.update_message(msg_id, &Message.text/1)
 
       {:deleted_message, msg_id} ->
         socket |> Page.Room.hide_deleted_message(msg_id)

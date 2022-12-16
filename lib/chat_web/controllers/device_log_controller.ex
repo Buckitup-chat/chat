@@ -43,7 +43,7 @@ defmodule ChatWeb.DeviceLogController do
     body =
       if Application.get_env(:chat, ChatWeb.Endpoint, [])[:allow_reset_data] do
         Chat.Db.db() |> CubDB.clear()
-        "clear"
+        "<html><body>clear</body></html>"
       else
         "skip"
       end

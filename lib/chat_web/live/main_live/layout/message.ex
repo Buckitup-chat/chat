@@ -106,7 +106,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
     ~H"""
     <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg x-download"}>
       <.header author={@author} chat_type={@chat_type} is_mine?={@is_mine?} msg={@msg} />
-      <.file msg={@msg} />
+      <.file msg={@msg} export?={@export?} />
       <.timestamp msg={@msg} timezone={@timezone} />
     </div>
     """

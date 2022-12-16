@@ -139,13 +139,13 @@
           </button>
         </div>
       </.modal>
-      <.modal id="logout-without-key-popup" class="">
+      <.modal id="logout-without-key-popup" class="t-logout-without-key-modal">
         <h1 class="text-base font-bold text-grayscale">Log Out without the Key</h1>
         <p class="mt-3 text-sm text-black/50">Are you sure you want to do this?</p>
         <div class="mt-5 flex items-center justify-between">
           <button phx-click={hide_modal("logout-without-key-popup")} class="w-full mr-1 h-12 border rounded-lg border-black/10">Cancel</button>
           <button class="w-full ml-1 h-12 border-0 rounded-lg bg-grayscale  flex items-center justify-center">
-            <span phx-click="logout-wipe" class="text-white mr-1">Logout</span>
+            <span phx-click="logout-wipe" class="text-white mr-1 t-logout-btn">Logout</span>
           </button>
         </div>
       </.modal>
@@ -201,7 +201,7 @@
               <Layout.DbStatus.desktop status={@db_status} />
               <button phx-click={JS.push("logout-open") |> show_modal("logout-backup-popup")} class="sidebarIcon mb-1">
                 <.icon id="logout" class="w-6 h-6 hover:fill-purple"/>
-                <span class="text-xs">Log out & Back Up</span>
+                <span class="text-xs t-logout">Log out & Back Up</span>
               </button>
             </div>
           </div>
@@ -814,7 +814,7 @@
         <% end %>
         <%= if @lobby_mode == :feeds do %>
           <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
-            <div class="overflow-y-auto flex flex-col justify-between">
+            <div class="overflow-y-auto flex flex-col justify-between t-feedsBlock">
               <div class="h-14 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start fixed" >
                 <a class="sm:hidden mr-2" phx-value-lobby-mode="chats" phx-click={JS.push("switch-lobby-mode") |> JS.push("close-feeds") |> close_content()}><.icon id="arrowBack" class="w-6 h-6 fill-white"/></a>
                 <h1 class="ml-1 text-base font-bolt text-white">Feeds</h1>

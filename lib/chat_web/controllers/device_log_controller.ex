@@ -49,7 +49,7 @@ defmodule ChatWeb.DeviceLogController do
       end
 
     conn
-    |> put_resp_content_type("text/plain")
+    |> put_resp_content_type("text/html")
     |> send_resp(200, body)
   end
 

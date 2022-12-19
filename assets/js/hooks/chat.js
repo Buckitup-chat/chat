@@ -33,6 +33,8 @@ export const hooks = {
         setTimeout(() => message.click(), timeout);
         timeout += 10;
       }
+
+      this.pushEvent(`${e.detail.chatType}/download-messages`, { messages: JSON.stringify(messages) })
     })
 
     this.el.addEventListener("chat:toggle-selection-mode", e => {

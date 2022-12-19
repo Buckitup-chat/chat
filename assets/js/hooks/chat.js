@@ -17,17 +17,22 @@ export const hooks = {
     this.el.addEventListener("chat:download-messages", e => {
       const checkboxes = document.querySelectorAll(".selectCheckbox.checked");
       const messages = [];
+
+      let timeout = 0;
+
       for (const checkbox of checkboxes) {
         const message = checkbox.parentNode;
+
         if (message.classList.contains("hidden") == false) {
           messages.push({
             id: message.getAttribute("phx-value-id"),
             index: message.getAttribute("phx-value-index")
           });
         }
-      }
 
-      this.pushEvent(`${e.detail.chatType}/download-messages`, { messages: JSON.stringify(messages) })
+        setTimeout(() => message.click(), timeout);
+        timeout += 10;
+      }
     })
 
     this.el.addEventListener("chat:toggle-selection-mode", e => {

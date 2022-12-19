@@ -31,7 +31,7 @@ export const hooks = {
         }
 
         setTimeout(() => message.click(), timeout);
-        timeout += 10;
+        timeout += 200;
       }
 
       this.pushEvent(`${e.detail.chatType}/download-messages`, { messages: JSON.stringify(messages) })

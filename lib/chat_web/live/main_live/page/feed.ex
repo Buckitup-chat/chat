@@ -47,10 +47,10 @@ defmodule ChatWeb.MainLive.Page.Feed do
       )
 
     ~H"""
-      <div class="border-0 rounded-md bg-white/20 p-2 flex flex-col justify-start" >
-        <span class="text-white"><%= @user && @user.name %> <.action action={@action}/></span>
-        <div class="text-white/70" style="font-size: 10px;"><%= @datetime %></div>
-      </div>
+    <div class="border-0 rounded-md bg-white/20 p-2 flex flex-col justify-start">
+      <span class="text-white"><%= @user && @user.name %> <.action action={@action} /></span>
+      <div class="text-white/70" style="font-size: 10px;"><%= @datetime %></div>
+    </div>
     """
   end
 
@@ -81,15 +81,15 @@ defmodule ChatWeb.MainLive.Page.Feed do
       )
 
     ~H"""
-      <%= @act %>
-      
-      <%= if @to do %>
-        to <%= @to.name %>
-      <% end %> 
+    <%= @act %>
 
-      <%= if @room do %>
-        <%= @room.name %> 
-      <% end %>
+    <%= if @to do %>
+      to <%= @to.name %>
+    <% end %>
+
+    <%= if @room do %>
+      <%= @room.name %>
+    <% end %>
     """
   end
 
@@ -100,7 +100,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
       )
 
     ~H"""
-      <%= @act %>
+    <%= @act %>
     """
   end
 

@@ -2,7 +2,10 @@ defmodule ChatWeb.MainLive.Layout.Message do
   @moduledoc """
   Message layout
   Used both for rendering regular and exported messages.
-  Can be either a dialog or room message.
+
+  Message is passed under :msg attribute as either
+  either %Chat.Dialogs.PrivateMessage{} (dialog message)
+  or Chat.Rooms.PlainMessage{} (room message).
   """
 
   use ChatWeb, :component
@@ -13,17 +16,28 @@ defmodule ChatWeb.MainLive.Layout.Message do
   alias Chat.Memo
   alias Chat.Messages.ExportHelper
   alias Chat.RoomInvites
+  alias Chat.Rooms.Room
   alias Chat.User
   alias Chat.Utils
   alias Chat.Utils.StorageId
   alias Phoenix.HTML.Tag
   alias Phoenix.LiveView.JS
 
+  attr :author, Card, doc: "message author card"
+  attr :chat_type, :atom, required: true, doc: ":dialog or :room"
+  attr :dynamic_attrs, :list, doc: "HTML attributes for the message block"
+  attr :export?, :boolean, default: false, doc: "hide options and set path for exported file"
+  attr :is_mine?, :boolean, doc: "is current user the author of the message?"
+  attr :me, Identity, doc: "current user - used only for :dialog chat type"
+  attr :msg, :map, required: true, doc: "message struct"
+  attr :my_id, :string, doc: "current user's ID - used only for :room chat type"
+  attr :peer, Card, doc: "the other user - used only for :dialog chat type"
+  attr :room, Room, default: nil, doc: "room access was requested to"
+  attr :timezone, :string, required: true, doc: "needed to render the timestamp"
+
   def message_block(assigns) do
     assigns =
       assigns
-      |> assign_new(:export?, fn -> false end)
-      |> assign_new(:room, fn -> nil end)
       |> assign_new(:is_mine?, fn
         %{chat_type: :dialog, msg: msg} ->
           msg.is_mine?
@@ -75,6 +89,8 @@ defmodule ChatWeb.MainLive.Layout.Message do
     """
   end
 
+  attr :msg, :map, required: true, doc: "message struct"
+
   def text(%{msg: %{type: :memo}} = assigns) do
     assigns =
       assign_new(assigns, :memo, fn %{msg: %{content: json}} ->
@@ -102,11 +118,20 @@ defmodule ChatWeb.MainLive.Layout.Message do
     """
   end
 
+  attr :author, Card, required: true, doc: "message author card"
+  attr :chat_type, :atom, required: true, doc: ":dialog or :room"
+  attr :color, :string, required: true, doc: "color class - either bg-purple50 or bg-white"
+  attr :export?, :boolean, required: true, doc: "hide options and set path for exported file"
+  attr :is_mine?, :boolean, required: true, doc: "is current user the author of the message?"
+  attr :msg, :map, required: true, doc: "message struct"
+  attr :room, Room, default: nil, doc: "room access was requested to"
+  attr :timezone, :string, required: true, doc: "needed to render the timestamp"
+
   defp message(%{msg: %{type: :file}} = assigns) do
     ~H"""
     <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg x-download"}>
-      <.header author={@author} chat_type={@chat_type} is_mine?={@is_mine?} msg={@msg} />
-      <.file msg={@msg} export?={@export?} />
+      <.header author={@author} chat_type={@chat_type} export?={@export?} is_mine?={@is_mine?} msg={@msg} />
+      <.file export?={@export?} msg={@msg} />
       <.timestamp msg={@msg} timezone={@timezone} />
     </div>
     """
@@ -117,9 +142,19 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
     ~H"""
     <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg x-download"}>
-      <.header author={@author} chat_type={@chat_type} is_mine?={@is_mine?} msg={@msg} />
+      <.header author={@author} chat_type={@chat_type} export?={@export?} is_mine?={@is_mine?} msg={@msg} />
       <.timestamp msg={@msg} timezone={@timezone} />
       <.image chat_type={@chat_type} msg={@msg} export?={@export?} file={@file} />
+    </div>
+    """
+  end
+
+  defp message(%{msg: %{type: type}} = assigns) when type in [:memo, :text] do
+    ~H"""
+    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
+      <.header author={@author} chat_type={@chat_type} export?={@export?} is_mine?={@is_mine?} msg={@msg} />
+      <span class="x-content"><.text msg={@msg} /></span>
+      <.timestamp msg={@msg} timezone={@timezone} />
     </div>
     """
   end
@@ -189,27 +224,23 @@ defmodule ChatWeb.MainLive.Layout.Message do
     """
   end
 
-  defp message(%{msg: %{type: type}} = assigns) when type in [:memo, :text] do
-    ~H"""
-    <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}>
-      <.header author={@author} chat_type={@chat_type} is_mine?={@is_mine?} msg={@msg} />
-      <span class="x-content"><.text msg={@msg} /></span>
-      <.timestamp msg={@msg} timezone={@timezone} />
-    </div>
-    """
-  end
-
   defp message(%{msg: %{type: :video}} = assigns) do
     assigns = assign_file(assigns)
 
     ~H"""
     <div id={"message-#{@msg.id}"} class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg x-download"}>
-      <.header author={@author} chat_type={@chat_type} is_mine?={@is_mine?} msg={@msg} />
+      <.header author={@author} chat_type={@chat_type} export?={@export?} is_mine?={@is_mine?} msg={@msg} />
       <.timestamp msg={@msg} timezone={@timezone} />
       <video src={@file.url} class="a-video" controls />
     </div>
     """
   end
+
+  attr :author, Card, required: true, doc: "message author card"
+  attr :chat_type, :atom, required: true, doc: ":dialog or :room"
+  attr :export?, :boolean, required: true, doc: "hide options and set path for exported file"
+  attr :is_mine?, :boolean, required: true, doc: "is current user the author of the message?"
+  attr :msg, :map, required: true, doc: "message struct"
 
   defp header(%{export?: true} = assigns) do
     ~H"""
@@ -290,6 +321,9 @@ defmodule ChatWeb.MainLive.Layout.Message do
     """
   end
 
+  attr :msg, :map, required: true, doc: "message struct"
+  attr :timezone, :string, required: true, doc: "user's timezone"
+
   defp timestamp(assigns) do
     assigns =
       assign_new(assigns, :time, fn %{msg: %{timestamp: timestamp}, timezone: timezone} ->
@@ -301,7 +335,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
     ~H"""
     <div class="px-2 text-grayscale600 flex justify-end mr-1" style="font-size: 10px;">
-      <%= @time%>
+      <%= @time %>
     </div>
     """
   end
@@ -353,6 +387,9 @@ defmodule ChatWeb.MainLive.Layout.Message do
     |> elem(1)
   end
 
+  attr :export?, :boolean, required: true, doc: "embed file icon SVG?"
+  attr :msg, :map, required: true, doc: "message struct"
+
   defp file(assigns) do
     assigns = assign_file(assigns)
 
@@ -375,6 +412,8 @@ defmodule ChatWeb.MainLive.Layout.Message do
       """
   end
 
+  attr :export?, :boolean, required: true, doc: "embed SVG?"
+
   defp file_icon(%{export?: true} = assigns) do
     ~H"""
     <svg id="document" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="w-14 h-14 flex fill-black/50">
@@ -388,6 +427,11 @@ defmodule ChatWeb.MainLive.Layout.Message do
     <.icon id="document" class="w-14 h-14 flex fill-black/50"/>
     """
   end
+
+  attr :chat_type, :atom, required: true, doc: ":dialog or :room"
+  attr :export?, :boolean, required: true, doc: "disable image gallery?"
+  attr :file, :map, required: true, doc: "file map"
+  attr :msg, :map, required: true, doc: "message struct"
 
   defp image(%{export?: true} = assigns) do
     ~H"""

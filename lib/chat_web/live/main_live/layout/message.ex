@@ -66,6 +66,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
             phx_value_type: chat_type
           ]
       end)
+      |> assign_file()
 
     ~H"""
     <div
@@ -82,6 +83,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
           chat_type={@chat_type}
           color={if(@is_mine?, do: "bg-purple50", else: "bg-white")}
           export?={@export?}
+          file={@file}
           is_mine?={@is_mine?}
           msg={@msg}
           room={@room}
@@ -132,6 +134,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :chat_type, :atom, required: true, doc: ":dialog or :room"
   attr :color, :string, required: true, doc: "color class - either bg-purple50 or bg-white"
   attr :export?, :boolean, required: true, doc: "hide options and set path for exported file"
+  attr :file, :map, required: true, doc: "file map"
   attr :is_mine?, :boolean, required: true, doc: "is current user the author of the message?"
   attr :msg, :map, required: true, doc: "message struct"
   attr :room, Room, default: nil, doc: "room access was requested to"
@@ -147,18 +150,17 @@ defmodule ChatWeb.MainLive.Layout.Message do
         author={@author}
         chat_type={@chat_type}
         export?={@export?}
+        file={@file}
         is_mine?={@is_mine?}
         msg={@msg}
       />
-      <.file export?={@export?} msg={@msg} />
+      <.file export?={@export?} file={@file} msg={@msg} />
       <.timestamp msg={@msg} timezone={@timezone} />
     </div>
     """
   end
 
   defp message(%{msg: %{type: :image}} = assigns) do
-    assigns = assign_file(assigns)
-
     ~H"""
     <div
       id={"message-#{@msg.id}"}
@@ -168,6 +170,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
         author={@author}
         chat_type={@chat_type}
         export?={@export?}
+        file={@file}
         is_mine?={@is_mine?}
         msg={@msg}
       />
@@ -187,6 +190,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
         author={@author}
         chat_type={@chat_type}
         export?={@export?}
+        file={@file}
         is_mine?={@is_mine?}
         msg={@msg}
       />
@@ -274,8 +278,6 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   defp message(%{msg: %{type: :video}} = assigns) do
-    assigns = assign_file(assigns)
-
     ~H"""
     <div
       id={"message-#{@msg.id}"}
@@ -285,6 +287,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
         author={@author}
         chat_type={@chat_type}
         export?={@export?}
+        file={@file}
         is_mine?={@is_mine?}
         msg={@msg}
       />
@@ -297,119 +300,162 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :author, Card, required: true, doc: "message author card"
   attr :chat_type, :atom, required: true, doc: ":dialog or :room"
   attr :export?, :boolean, required: true, doc: "hide options and set path for exported file"
+  attr :file, :map, required: true, doc: "file map"
   attr :is_mine?, :boolean, required: true, doc: "is current user the author of the message?"
   attr :msg, :map, required: true, doc: "message struct"
 
-  defp header(%{export?: true} = assigns) do
+  defp header(assigns) do
     ~H"""
-    <div
-      id={"message-header-" <> @msg.id}
+    <.header_wrapper
       class="py-1 px-2 flex items-center justify-between relative"
+      id={"message-header-#{@msg.id}"}
+      export?={@export?}
+      file={@file}
+      msg_type={@msg.type}
     >
-      <div class="flex flex-row">
-        <div class="text-sm text-grayscale600">[<%= short_hash(@author.hash) %>]</div>
-        <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
-      </div>
+      <.header_content
+        author={@author}
+        chat_type={@chat_type}
+        export?={@export?}
+        file={@file}
+        is_mine?={@is_mine?}
+        msg={@msg}
+      />
+    </.header_wrapper>
+    """
+  end
+
+  attr :class, :string, doc: "header wrapper class"
+  attr :export?, :boolean, required: true, doc: "hide options and set path for exported file"
+  attr :file, :map, required: true, doc: "file map"
+  attr :id, :string, doc: "header wrapper id"
+  attr :msg_type, :atom, required: true, doc: "message type"
+  slot :inner_block, required: true
+
+  defp header_wrapper(%{export?: true, msg_type: :video} = assigns) do
+    ~H"""
+    <.link class={@class} id={@id} href={@file.url}>
+      <%= render_slot(@inner_block) %>
+    </.link>
+    """
+  end
+
+  defp header_wrapper(assigns) do
+    ~H"""
+    <div class={@class} id={@id}>
+      <%= render_slot(@inner_block) %>
     </div>
     """
   end
 
-  defp header(assigns) do
+  defp header_content(%{export?: true} = assigns) do
     ~H"""
-    <div id={"message-header-#{@msg.id}"} class="py-1 px-2 flex items-center justify-between relative">
-      <div class="flex flex-row">
-        <div class="text-sm text-grayscale600">[<%= short_hash(@author.hash) %>]</div>
-        <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
-      </div>
-      <button
-        type="button"
-        class="messageActionsDropdownButton hiddenUnderSelection t-message-dropdown"
+    <.author_details author={@author} />
+    """
+  end
+
+  defp header_content(assigns) do
+    ~H"""
+    <.author_details author={@author} />
+    <button
+      type="button"
+      class="messageActionsDropdownButton hiddenUnderSelection t-message-dropdown"
+      phx-click={
+        open_dropdown("messageActionsDropdown-#{@msg.id}")
+        |> JS.dispatch("chat:set-dropdown-position",
+          to: "#messageActionsDropdown-#{@msg.id}",
+          detail: %{relativeElementId: "message-#{@msg.id}"}
+        )
+      }
+    >
+      <.icon id="menu" class="w-4 h-4 flex fill-purple" />
+    </button>
+    <.dropdown class="messageActionsDropdown " id={"messageActionsDropdown-#{@msg.id}"}>
+      <%= if @is_mine? do %>
+        <%= if @msg.type in [:text, :memo] do %>
+          <a
+            class="dropdownItem t-edit-message"
+            phx-click={
+              hide_dropdown("messageActionsDropdown-#{@msg.id}")
+              |> JS.push("#{@chat_type}/message/edit")
+            }
+            phx-value-id={@msg.id}
+            phx-value-index={@msg.index}
+          >
+            <.icon id="edit" class="w-4 h-4 flex fill-black" />
+            <span>Edit</span>
+          </a>
+        <% end %>
+        <a
+          class="dropdownItem t-delete-message"
+          phx-click={
+            hide_dropdown("messageActionsDropdown-#{@msg.id}")
+            |> show_modal("delete-message-popup")
+            |> JS.set_attribute(
+              {"phx-click",
+               hide_modal("delete-message-popup")
+               |> JS.push("#{@chat_type}/delete-messages")
+               |> stringify_commands()},
+              to: "#delete-message-popup .deleteMessageButton"
+            )
+            |> JS.set_attribute(
+              {"phx-value-messages", [%{id: @msg.id, index: "#{@msg.index}"}] |> Jason.encode!()},
+              to: "#delete-message-popup .deleteMessageButton"
+            )
+          }
+          phx-value-id={@msg.id}
+          phx-value-index={@msg.index}
+          phx-value-type="dialog-message"
+        >
+          <.icon id="delete" class="w-4 h-4 flex fill-black" />
+          <span>Delete</span>
+        </a>
+      <% end %>
+      <a phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")} class="dropdownItem">
+        <.icon id="share" class="w-4 h-4 flex fill-black" />
+        <span>Share</span>
+      </a>
+      <a
+        class="dropdownItem t-select-message"
         phx-click={
-          open_dropdown("messageActionsDropdown-#{@msg.id}")
-          |> JS.dispatch("chat:set-dropdown-position",
-            to: "#messageActionsDropdown-#{@msg.id}",
-            detail: %{relativeElementId: "message-#{@msg.id}"}
+          hide_dropdown("messageActionsDropdown-#{@msg.id}")
+          |> JS.push("#{@chat_type}/toggle-messages-select",
+            value: %{action: :on, id: @msg.id, chatType: @chat_type}
+          )
+          |> JS.dispatch("chat:select-message",
+            to: "#message-block-#{@msg.id}",
+            detail: %{chatType: @chat_type}
           )
         }
       >
-        <.icon id="menu" class="w-4 h-4 flex fill-purple" />
-      </button>
-      <.dropdown class="messageActionsDropdown " id={"messageActionsDropdown-#{@msg.id}"}>
-        <%= if @is_mine? do %>
-          <%= if @msg.type in [:text, :memo] do %>
-            <a
-              class="dropdownItem t-edit-message"
-              phx-click={
-                hide_dropdown("messageActionsDropdown-#{@msg.id}")
-                |> JS.push("#{@chat_type}/message/edit")
-              }
-              phx-value-id={@msg.id}
-              phx-value-index={@msg.index}
-            >
-              <.icon id="edit" class="w-4 h-4 flex fill-black" />
-              <span>Edit</span>
-            </a>
-          <% end %>
-          <a
-            class="dropdownItem t-delete-message"
-            phx-click={
-              hide_dropdown("messageActionsDropdown-#{@msg.id}")
-              |> show_modal("delete-message-popup")
-              |> JS.set_attribute(
-                {"phx-click",
-                 hide_modal("delete-message-popup")
-                 |> JS.push("#{@chat_type}/delete-messages")
-                 |> stringify_commands()},
-                to: "#delete-message-popup .deleteMessageButton"
-              )
-              |> JS.set_attribute(
-                {"phx-value-messages", [%{id: @msg.id, index: "#{@msg.index}"}] |> Jason.encode!()},
-                to: "#delete-message-popup .deleteMessageButton"
-              )
-            }
-            phx-value-id={@msg.id}
-            phx-value-index={@msg.index}
-            phx-value-type="dialog-message"
-          >
-            <.icon id="delete" class="w-4 h-4 flex fill-black" />
-            <span>Delete</span>
-          </a>
-        <% end %>
-        <a phx-click={hide_dropdown("messageActionsDropdown-#{@msg.id}")} class="dropdownItem">
-          <.icon id="share" class="w-4 h-4 flex fill-black" />
-          <span>Share</span>
-        </a>
+        <.icon id="select" class="w-4 h-4 flex fill-black" />
+        <span>Select</span>
+      </a>
+      <%= if @msg.type in [:file, :image, :video] do %>
         <a
-          class="dropdownItem t-select-message"
+          class="dropdownItem"
           phx-click={
             hide_dropdown("messageActionsDropdown-#{@msg.id}")
-            |> JS.push("#{@chat_type}/toggle-messages-select",
-              value: %{action: :on, id: @msg.id, chatType: @chat_type}
-            )
-            |> JS.dispatch("chat:select-message",
-              to: "#message-block-#{@msg.id}",
-              detail: %{chatType: @chat_type}
-            )
+            |> JS.push("#{@chat_type}/message/download")
           }
+          phx-value-id={@msg.id}
+          phx-value-index={@msg.index}
         >
-          <.icon id="select" class="w-4 h-4 flex fill-black" />
-          <span>Select</span>
+          <.icon id="download" class="w-4 h-4 flex fill-black" />
+          <span>Download</span>
         </a>
-        <%= if @msg.type in [:file, :image, :video] do %>
-          <a
-            class="dropdownItem"
-            phx-click={
-              hide_dropdown("messageActionsDropdown-#{@msg.id}")
-              |> JS.push("#{@chat_type}/message/download")
-            }
-            phx-value-id={@msg.id}
-            phx-value-index={@msg.index}
-          >
-            <.icon id="download" class="w-4 h-4 flex fill-black" />
-            <span>Download</span>
-          </a>
-        <% end %>
-      </.dropdown>
+      <% end %>
+    </.dropdown>
+    """
+  end
+
+  attr :author, Card, doc: "message author card"
+
+  defp author_details(assigns) do
+    ~H"""
+    <div class="flex flex-row">
+      <div class="text-sm text-grayscale600">[<%= short_hash(@author.hash) %>]</div>
+      <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
     </div>
     """
   end
@@ -433,7 +479,8 @@ defmodule ChatWeb.MainLive.Layout.Message do
     """
   end
 
-  defp assign_file(%{export?: true, msg: %{content: json}} = assigns) do
+  defp assign_file(%{export?: true, msg: %{content: json, type: type}} = assigns)
+       when type in [:file, :image, :video] do
     {id, secret} = StorageId.from_json(json)
     [_, _, _, _, name, size] = Files.get(id, secret)
 
@@ -457,11 +504,14 @@ defmodule ChatWeb.MainLive.Layout.Message do
     })
   end
 
-  defp assign_file(%{msg: %{content: json, type: type}} = assigns) do
+  defp assign_file(%{msg: %{content: json, type: type}} = assigns)
+       when type in [:image, :video] do
     {id, secret} = StorageId.from_json(json)
 
     assign(assigns, :file, %{url: get_file_url(type, id, secret)})
   end
+
+  defp assign_file(assigns), do: assign(assigns, :file, nil)
 
   defp get_file_url(type, id, secret) do
     file_type =
@@ -481,20 +531,19 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   attr :export?, :boolean, required: true, doc: "embed file icon SVG?"
+  attr :file, :map, required: true, doc: "file map"
   attr :msg, :map, required: true, doc: "message struct"
 
   defp file(assigns) do
-    assigns = assign_file(assigns)
-
     ~H"""
-    <div class="flex items-center justify-between">
+    <.link class="flex items-center justify-between" href={@file.url}>
       <.file_icon export?={@export?} />
 
       <div class="w-36 flex flex-col pr-3">
         <span class="truncate text-xs x-file" href={@file.url}><%= @file.name %></span>
         <span class="text-xs text-black/50 whitespace-pre-line"><%= @file.size %></span>
       </div>
-    </div>
+    </.link>
     """
   rescue
     _ ->
@@ -537,7 +586,9 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
   defp image(%{export?: true} = assigns) do
     ~H"""
-    <img class="object-cover overflow-hidden" src={@file.url} />
+    <.link href={@file.url}>
+      <img class="object-cover overflow-hidden" src={@file.url} />
+    </.link>
     """
   end
 

@@ -41,5 +41,8 @@ defmodule Chat.Db.WriteQueue.ReadStream do
     |> Enum.map(&{&1, CubDB.get(db, &1)})
     |> Enum.reject(fn {_, x} -> is_nil(x) end)
     |> then(&{&1, new_list})
+  rescue
+    # in case source DB is dead we finish with the stream
+    _ -> {[], []}
   end
 end

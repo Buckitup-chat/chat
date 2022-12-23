@@ -72,6 +72,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
     <div
       class="messageBlock flex flex-row px-2 sm:px-8"
       id={"message-block-#{@msg.id}"}
+      data-type={@msg.type}
       {@dynamic_attrs}
     >
       <div

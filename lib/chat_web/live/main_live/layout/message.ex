@@ -226,11 +226,12 @@ defmodule ChatWeb.MainLive.Layout.Message do
   defp message(%{msg: %{type: :room_invite}} = assigns) do
     assigns =
       assigns
-      |> assign_new(:identity, fn %{content: json} ->
-        json
-        |> StorageId.from_json()
-        |> RoomInvites.get()
-        |> Identity.from_strings()
+      |> assign_new(:identity, fn
+        %{msg: %{content: json}} ->
+          json
+          |> StorageId.from_json()
+          |> RoomInvites.get()
+          |> Identity.from_strings()
       end)
       |> assign_new(:room_hash, fn %{identity: identity} -> Utils.hash(identity) end)
       |> assign_new(:room_name, fn %{identity: identity} -> identity.name end)

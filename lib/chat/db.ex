@@ -2,7 +2,6 @@ defmodule Chat.Db do
   @moduledoc """
   Manages the state of the CubDB instance.
   """
-  require Logger
 
   import Chat.Db.Common
 

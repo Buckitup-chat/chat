@@ -54,7 +54,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       end)
 
     ~H"""
-    <div class="messageBlock flex flex-row px-2 sm:px-8" id={"message-block-#{@msg.id}"} {@dynamic_attrs}>
+    <div class="messageBlock flex flex-row px-2 sm:px-8" id={"message-block-#{@msg.id}"} data-type={@msg.type} {@dynamic_attrs}>
       <div class={"m-1 w-full flex " <> if(@is_mine?, do: "justify-end t-#{@chat_type}-mine-message x-mine", else: "justify-start x-peer")} id={"#{@chat_type}-message-#{@msg.id}"}>
         <.message
           author={@author}

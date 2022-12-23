@@ -331,9 +331,14 @@ defmodule ChatWeb.MainLive.Index do
 
   defp flash_notification(assigns) do
     ~H"""
-    <div id={@id} class={"flex items-center t-inv-sent justify-between w-screen sm:w-96 min-h-fit z-30 bg-green-400 rounded-lg text-teal-900 px-4 py-3 shadow-md centered"} role="alert" style="display: none;">
+    <div
+      id={@id}
+      class="flex items-center t-inv-sent justify-between w-screen sm:w-96 min-h-fit z-30 bg-green-400 rounded-lg text-teal-900 px-4 py-3 shadow-md centered"
+      role="alert"
+      style="display: none;"
+    >
       <div class="flex items-center">
-        <.icon id="checked" class="w-5 h-5 fill-white"/>
+        <.icon id="checked" class="w-5 h-5 fill-white" />
         <p class="ml-2 text-white">Invitation Sent!</p>
       </div>
       <div phx-click={JS.hide(to: "#" <> @id)}>
@@ -349,7 +354,9 @@ defmodule ChatWeb.MainLive.Index do
       <h1 class="text-base font-bold text-grayscale"><%= @title %></h1>
       <p class="mt-3 text-sm text-black/50"><%= @description %></p>
       <div class="mt-5 flex items-center justify-between">
-        <button phx-click={hide_modal(@id)} class="w-full mr-1 h-12 border rounded-lg border-black/10">Cancel</button>
+        <button phx-click={hide_modal(@id)} class="w-full mr-1 h-12 border rounded-lg border-black/10">
+          Cancel
+        </button>
         <button class="confirmButton w-full ml-1 h-12 border-0 rounded-lg bg-grayscale text-white flex items-center justify-center">
           Confirm
         </button>

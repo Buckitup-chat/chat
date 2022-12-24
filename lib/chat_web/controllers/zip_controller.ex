@@ -71,7 +71,7 @@ defmodule ChatWeb.ZipController do
 
       exported_messages =
         Stream.concat([
-          ["<html><head>"],
+          [~S(<html><head><meta charset="utf-8" />)],
           ["<style>"],
           style_stream,
           ["</style></head><body>"],

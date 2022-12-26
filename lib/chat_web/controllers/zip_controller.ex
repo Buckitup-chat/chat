@@ -16,6 +16,7 @@ defmodule ChatWeb.ZipController do
   alias Chat.Messages.ExportHelper
   alias Chat.Rooms
   alias Chat.User
+  alias Chat.Utils
   alias Chat.Utils.StorageId
   alias ChatWeb.MainLive.Layout.Message
 
@@ -122,12 +123,10 @@ defmodule ChatWeb.ZipController do
   end
 
   defp get_filename(:dialog, {_dialog, _messages_ids, _me, peer}),
-    do: "chat_#{short_hash(peer.hash)}_messages"
+    do: "chat_#{Utils.short_hash(peer.hash)}_messages"
 
   defp get_filename(:room, {_messages_ids, room, _my_id, _room_identity}),
-    do: "room_#{short_hash(room.admin_hash)}_messages"
-
-  def short_hash(hash), do: hash |> String.split_at(-6) |> elem(1)
+    do: "room_#{Utils.short_hash(room.admin_hash)}_messages"
 
   defp fetch_messages(:dialog, {dialog, messages_ids, me, _peer}) do
     messages_ids

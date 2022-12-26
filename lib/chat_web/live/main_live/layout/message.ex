@@ -209,12 +209,12 @@ defmodule ChatWeb.MainLive.Layout.Message do
     >
       <div class="py-1 px-2">
         <div class="inline-flex">
-          <div class="font-bold text-sm text-purple">[<%= short_hash(@author.hash) %>]</div>
+          <div class="font-bold text-sm text-purple">[<%= Utils.short_hash(@author.hash) %>]</div>
           <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
         </div>
         <p class="inline-flex">requested access to room</p>
         <div class="inline-flex">
-          <div class="font-bold text-sm text-purple">[<%= short_hash(@room.admin_hash) %>]</div>
+          <div class="font-bold text-sm text-purple">[<%= Utils.short_hash(@room.admin_hash) %>]</div>
           <h1 class="ml-1 font-bold text-sm text-purple"><%= @room.name %></h1>
         </div>
       </div>
@@ -242,12 +242,12 @@ defmodule ChatWeb.MainLive.Layout.Message do
     >
       <div class="py-1 px-2">
         <div class="inline-flex">
-          <div class="font-bold text-sm text-purple">[<%= short_hash(@author.hash) %>]</div>
+          <div class="font-bold text-sm text-purple">[<%= Utils.short_hash(@author.hash) %>]</div>
           <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
         </div>
         <p class="inline-flex">wants you to join the room</p>
         <div class="inline-flex">
-          <div class="font-bold text-sm text-purple">[<%= short_hash(@room_hash) %>]</div>
+          <div class="font-bold text-sm text-purple">[<%= Utils.short_hash(@room_hash) %>]</div>
           <h1 class="ml-1 font-bold text-sm text-purple"><%= @room_name %></h1>
         </div>
       </div>
@@ -455,7 +455,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   defp author_details(assigns) do
     ~H"""
     <div class="flex flex-row">
-      <div class="text-sm text-grayscale600">[<%= short_hash(@author.hash) %>]</div>
+      <div class="text-sm text-grayscale600">[<%= Utils.short_hash(@author.hash) %>]</div>
       <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
     </div>
     """
@@ -523,12 +523,6 @@ defmodule ChatWeb.MainLive.Layout.Message do
       end
 
     "/get/#{file_type}/#{id}?a=#{Base.url_encode64(secret)}"
-  end
-
-  defp short_hash(hash) do
-    hash
-    |> String.split_at(-6)
-    |> elem(1)
   end
 
   attr :export?, :boolean, required: true, doc: "embed file icon SVG?"

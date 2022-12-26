@@ -412,7 +412,7 @@
                           <div class="ml-1 text-sm t-my-notes">My notes</div>
                         <% else %>
                           <tt class="text-sm tracking-tighter text-grayscale600">
-                            [<%= short_hash(user.hash) %>]
+                            [<%= Utils.short_hash(user.hash) %>]
                           </tt>
                           <div class="ml-1 text-sm"><%= user.name %></div>
                         <% end %>
@@ -432,7 +432,7 @@
                     <a>
                       <div class="flex flex-row px-7">
                         <tt class="text-sm tracking-tighter text-grayscale600">
-                          [<%= short_hash(user.hash) %>]
+                          [<%= Utils.short_hash(user.hash) %>]
                         </tt>
                         <div class="ml-1 text-sm">
                           <%= (user == Chat.Card.from_identity(@me) && "My notes") || user.name %>
@@ -476,13 +476,15 @@
                       My private notes
                     </h1>
                     <div class="text-base text-white/60 ml-2">
-                      [<%= short_hash(@peer.hash) %>]
+                      [<%= Utils.short_hash(@peer.hash) %>]
                     </div>
                     <h1 class="ml-1 text-base font-bolt text-white t-peer-name">
                       <%= @peer.name %>
                     </h1>
                   <% else %>
-                    <div class="text-base text-white/60">[<%= short_hash(@peer.hash) %>]</div>
+                    <div class="text-base text-white/60">
+                      [<%= Utils.short_hash(@peer.hash) %>]
+                    </div>
                     <h1 class="ml-1 text-base font-bolt text-white t-peer-name">
                       <%= @peer.name %>
                     </h1>
@@ -821,7 +823,7 @@
                         <a>
                           <div class="flex flex-row px-2">
                             <tt class="text-sm tracking-tighter text-grayscale600">
-                              [<%= short_hash(room.hash) %>]
+                              [<%= Utils.short_hash(room.hash) %>]
                             </tt>
                             <div class={
                               classes("ml-1 text-sm", %{
@@ -855,7 +857,7 @@
                         <a>
                           <div class="flex flex-row pl-7">
                             <tt class="text-sm tracking-tighter text-grayscale600">
-                              [<%= short_hash(room.hash) %>]
+                              [<%= Utils.short_hash(room.hash) %>]
                             </tt>
                             <div class="ml-1 text-sm"><%= room.name %></div>
                           </div>
@@ -894,7 +896,7 @@
                           <div class="flex flex-row justify-between px-7 w-full">
                             <div class="flex flex-row">
                               <tt class="text-sm tracking-tighter text-grayscale600">
-                                [<%= short_hash(room.hash) %>]
+                                [<%= Utils.short_hash(room.hash) %>]
                               </tt>
                               <div class="ml-1 text-sm"><%= room.name %></div>
                             </div>
@@ -909,7 +911,7 @@
                         >
                           <div class="flex flex-row px-7 w-full">
                             <tt class="text-sm tracking-tighter text-grayscale600">
-                              [<%= short_hash(room.hash) %>]
+                              [<%= Utils.short_hash(room.hash) %>]
                             </tt>
                             <div class="ml-1 text-sm"><%= room.name %></div>
                           </div>
@@ -968,7 +970,9 @@
                     <%= if @room.type == :request do %>
                       <.icon id="private" class="w-5 h-5 stroke-white" />
                     <% end %>
-                    <div class="text-base text-white">[<%= short_hash(@room.admin_hash) %>]</div>
+                    <div class="text-base text-white">
+                      [<%= Utils.short_hash(@room.admin_hash) %>]
+                    </div>
                     <h1 class="ml-1 text-base font-bolt text-white"><%= @room.name %></h1>
                   </div>
                   <div class="flex flex-row justify-between">
@@ -1008,7 +1012,7 @@
                         >
                           <div class="inline-flex">
                             <div class="font-bold text-sm text-purple">
-                              [<%= short_hash(user.hash) %>]
+                              [<%= Utils.short_hash(user.hash) %>]
                             </div>
                             <div class="ml-1 font-bold text-sm text-purple"><%= user.name %></div>
                           </div>
@@ -1043,7 +1047,7 @@
                         >
                           <div class="inline-flex">
                             <div class="text-sm text-black/50">
-                              [<%= short_hash(user.hash) %>]
+                              [<%= Utils.short_hash(user.hash) %>]
                             </div>
                             <div class="ml-1 text-sm"><%= user.name %></div>
                           </div>

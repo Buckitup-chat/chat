@@ -411,10 +411,7 @@
                         <%= if @my_id == user.hash do %>
                           <div class="ml-1 text-sm t-my-notes">My notes</div>
                         <% else %>
-                          <tt class="text-sm tracking-tighter text-grayscale600">
-                            [<%= Utils.short_hash(user.hash) %>]
-                          </tt>
-                          <div class="ml-1 text-sm"><%= user.name %></div>
+                          <Layout.User.username user={user} />
                         <% end %>
                       </div>
                     </a>
@@ -431,12 +428,10 @@
                   >
                     <a>
                       <div class="flex flex-row px-7">
-                        <tt class="text-sm tracking-tighter text-grayscale600">
-                          [<%= Utils.short_hash(user.hash) %>]
-                        </tt>
-                        <div class="ml-1 text-sm">
-                          <%= (user == Chat.Card.from_identity(@me) && "My notes") || user.name %>
-                        </div>
+                        <Layout.User.username user={
+                          (user == Chat.Card.from_identity(@me) &&
+                             Map.put(user, :name, "My notes")) || user
+                        } />
                       </div>
                     </a>
                   </li>
@@ -475,19 +470,17 @@
                     <h1 class="ml-1 text-base font-bolt text-white">
                       My private notes
                     </h1>
-                    <div class="text-base text-white/60 ml-2">
-                      [<%= Utils.short_hash(@peer.hash) %>]
-                    </div>
-                    <h1 class="ml-1 text-base font-bolt text-white t-peer-name">
-                      <%= @peer.name %>
-                    </h1>
+                    <Layout.User.username
+                      user={@peer}
+                      hash_style="ml-2 text-base text-white/60"
+                      name_style="text-base font-bolt text-white t-peer-name"
+                    />
                   <% else %>
-                    <div class="text-base text-white/60">
-                      [<%= Utils.short_hash(@peer.hash) %>]
-                    </div>
-                    <h1 class="ml-1 text-base font-bolt text-white t-peer-name">
-                      <%= @peer.name %>
-                    </h1>
+                    <Layout.User.username
+                      user={@peer}
+                      hash_style="text-base text-white/60"
+                      name_style="text-base font-bolt text-white t-peer-name"
+                    />
                     <button>
                       <.icon id="edit" class="w-4 h-4 ml-1 flex fill-white/50" />
                     </button>
@@ -1010,12 +1003,11 @@
                           id={"user-#{user.hash}"}
                           class="flex flex-row items-center justify-between"
                         >
-                          <div class="inline-flex">
-                            <div class="font-bold text-sm text-purple">
-                              [<%= Utils.short_hash(user.hash) %>]
-                            </div>
-                            <div class="ml-1 font-bold text-sm text-purple"><%= user.name %></div>
-                          </div>
+                          <Layout.User.username
+                            user={user}
+                            hash_style="text-sm font-bold text-purple"
+                            name_style="text-sm font-bold text-purple"
+                          />
                           <a
                             class="text-black/50"
                             phx-click={
@@ -1045,12 +1037,7 @@
                           id={"user-#{user.hash}"}
                           class="flex flex-row items-center justify-between t-invite"
                         >
-                          <div class="inline-flex">
-                            <div class="text-sm text-black/50">
-                              [<%= Utils.short_hash(user.hash) %>]
-                            </div>
-                            <div class="ml-1 text-sm"><%= user.name %></div>
-                          </div>
+                          <Layout.User.username user={user} />
                           <a
                             class="flex items-center justify-between"
                             phx-click={

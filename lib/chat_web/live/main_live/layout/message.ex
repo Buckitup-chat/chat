@@ -20,6 +20,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   alias Chat.User
   alias Chat.Utils
   alias Chat.Utils.StorageId
+  alias ChatWeb.MainLive.Layout
   alias Phoenix.HTML.Tag
   alias Phoenix.LiveView.JS
 
@@ -208,10 +209,11 @@ defmodule ChatWeb.MainLive.Layout.Message do
       class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}
     >
       <div class="py-1 px-2">
-        <div class="inline-flex">
-          <div class="font-bold text-sm text-purple">[<%= Utils.short_hash(@author.hash) %>]</div>
-          <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
-        </div>
+        <Layout.User.username
+          user={@author}
+          hash_style="font-bold text-sm text-purple"
+          name_style="font-bold text-sm text-purple"
+        />
         <p class="inline-flex">requested access to room</p>
         <div class="inline-flex">
           <div class="font-bold text-sm text-purple">[<%= Utils.short_hash(@room.admin_hash) %>]</div>
@@ -241,10 +243,11 @@ defmodule ChatWeb.MainLive.Layout.Message do
       class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}
     >
       <div class="py-1 px-2">
-        <div class="inline-flex">
-          <div class="font-bold text-sm text-purple">[<%= Utils.short_hash(@author.hash) %>]</div>
-          <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
-        </div>
+        <Layout.User.username
+          user={@author}
+          hash_style="font-bold text-sm text-purple"
+          name_style="font-bold text-sm text-purple"
+        />
         <p class="inline-flex">wants you to join the room</p>
         <div class="inline-flex">
           <div class="font-bold text-sm text-purple">[<%= Utils.short_hash(@room_hash) %>]</div>
@@ -351,13 +354,13 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
   defp header_content(%{export?: true} = assigns) do
     ~H"""
-    <.author_details author={@author} />
+    <Layout.User.username user={@author} name_style="text-sm font-bold text-purple" />
     """
   end
 
   defp header_content(assigns) do
     ~H"""
-    <.author_details author={@author} />
+    <Layout.User.username user={@author} name_style="text-sm font-bold text-purple" />
     <button
       type="button"
       class="messageActionsDropdownButton hiddenUnderSelection t-message-dropdown"
@@ -447,17 +450,6 @@ defmodule ChatWeb.MainLive.Layout.Message do
         </a>
       <% end %>
     </.dropdown>
-    """
-  end
-
-  attr :author, Card, doc: "message author card"
-
-  defp author_details(assigns) do
-    ~H"""
-    <div class="flex flex-row">
-      <div class="text-sm text-grayscale600">[<%= Utils.short_hash(@author.hash) %>]</div>
-      <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
-    </div>
     """
   end
 

@@ -408,11 +408,7 @@
                   >
                     <a>
                       <div class="flex flex-row px-7">
-                        <%= if @my_id == user.hash do %>
-                          <div class="ml-1 text-sm t-my-notes">My notes</div>
-                        <% else %>
-                          <Layout.User.username user={user} />
-                        <% end %>
+                        <Layout.Card.details card={user} me={@me} />
                       </div>
                     </a>
                   </li>
@@ -428,10 +424,7 @@
                   >
                     <a>
                       <div class="flex flex-row px-7">
-                        <Layout.User.username user={
-                          (user == Chat.Card.from_identity(@me) &&
-                             Map.put(user, :name, "My notes")) || user
-                        } />
+                        <Layout.Card.details card={user} me={@me} />
                       </div>
                     </a>
                   </li>
@@ -467,20 +460,12 @@
                     <.icon id="arrowBack" class="w-6 h-6 fill-white" />
                   </button>
                   <%= if @my_id == @peer.hash do %>
-                    <h1 class="ml-1 text-base font-bolt text-white">
+                    <h1 class="ml-1 mr-1 text-base font-bolt text-white">
                       My private notes
                     </h1>
-                    <Layout.User.username
-                      user={@peer}
-                      hash_style="ml-2 text-base text-white/60"
-                      name_style="text-base font-bolt text-white t-peer-name"
-                    />
+                    <Layout.Card.details card={@peer} stylized_as={:chat_header} />
                   <% else %>
-                    <Layout.User.username
-                      user={@peer}
-                      hash_style="text-base text-white/60"
-                      name_style="text-base font-bolt text-white t-peer-name"
-                    />
+                    <Layout.Card.details card={@peer} stylized_as={:chat_header} />
                     <button>
                       <.icon id="edit" class="w-4 h-4 ml-1 flex fill-white/50" />
                     </button>
@@ -815,6 +800,7 @@
                       >
                         <a>
                           <div class="flex flex-row px-2">
+                            <Layout.Card.details room={room} />
                             <tt class="text-sm tracking-tighter text-grayscale600">
                               [<%= Utils.short_hash(room.hash) %>]
                             </tt>
@@ -849,10 +835,7 @@
                       >
                         <a>
                           <div class="flex flex-row pl-7">
-                            <tt class="text-sm tracking-tighter text-grayscale600">
-                              [<%= Utils.short_hash(room.hash) %>]
-                            </tt>
-                            <div class="ml-1 text-sm"><%= room.name %></div>
+                            <Layout.Card.details room={room} />
                           </div>
                         </a>
                         <%= if room.type == :request do %>
@@ -888,10 +871,7 @@
                         <li class="w-full h-9 cursor-pointer flex items-center hover:bg-stone250">
                           <div class="flex flex-row justify-between px-7 w-full">
                             <div class="flex flex-row">
-                              <tt class="text-sm tracking-tighter text-grayscale600">
-                                [<%= Utils.short_hash(room.hash) %>]
-                              </tt>
-                              <div class="ml-1 text-sm"><%= room.name %></div>
+                              <Layout.Card.details room={room} />
                             </div>
                             <.icon id="time" class="w-4 h-4 flex fill-black/50" />
                           </div>
@@ -903,10 +883,7 @@
                           phx-value-room={room.hash}
                         >
                           <div class="flex flex-row px-7 w-full">
-                            <tt class="text-sm tracking-tighter text-grayscale600">
-                              [<%= Utils.short_hash(room.hash) %>]
-                            </tt>
-                            <div class="ml-1 text-sm"><%= room.name %></div>
+                            <Layout.Card.details room={room} />
                           </div>
                         </li>
                       <% end %>
@@ -963,10 +940,7 @@
                     <%= if @room.type == :request do %>
                       <.icon id="private" class="w-5 h-5 stroke-white" />
                     <% end %>
-                    <div class="text-base text-white">
-                      [<%= Utils.short_hash(@room.admin_hash) %>]
-                    </div>
-                    <h1 class="ml-1 text-base font-bolt text-white"><%= @room.name %></h1>
+                    <Layout.Card.details room={@room} stylized_as={:chat_header} />
                   </div>
                   <div class="flex flex-row justify-between">
                     <%= if @room.type == :request do %>
@@ -1003,11 +977,7 @@
                           id={"user-#{user.hash}"}
                           class="flex flex-row items-center justify-between"
                         >
-                          <Layout.User.username
-                            user={user}
-                            hash_style="text-sm font-bold text-purple"
-                            name_style="text-sm font-bold text-purple"
-                          />
+                          <Layout.Card.details card={user} stylized_as={:room_request_list} />
                           <a
                             class="text-black/50"
                             phx-click={
@@ -1037,7 +1007,7 @@
                           id={"user-#{user.hash}"}
                           class="flex flex-row items-center justify-between t-invite"
                         >
-                          <Layout.User.username user={user} />
+                          <Layout.Card.details card={user} />
                           <a
                             class="flex items-center justify-between"
                             phx-click={

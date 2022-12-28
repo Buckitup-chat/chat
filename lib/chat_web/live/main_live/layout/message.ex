@@ -15,10 +15,8 @@ defmodule ChatWeb.MainLive.Layout.Message do
   alias Chat.Identity
   alias Chat.Memo
   alias Chat.Messages.ExportHelper
-  alias Chat.RoomInvites
   alias Chat.Rooms.Room
   alias Chat.User
-  alias Chat.Utils
   alias Chat.Utils.StorageId
   alias ChatWeb.MainLive.Layout
   alias Phoenix.HTML.Tag
@@ -209,16 +207,9 @@ defmodule ChatWeb.MainLive.Layout.Message do
       class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}
     >
       <div class="py-1 px-2">
-        <Layout.User.username
-          user={@author}
-          hash_style="font-bold text-sm text-purple"
-          name_style="font-bold text-sm text-purple"
-        />
+        <Layout.Card.details card={@author} stylized_as={:room_request_message} />
         <p class="inline-flex">requested access to room</p>
-        <div class="inline-flex">
-          <div class="font-bold text-sm text-purple">[<%= Utils.short_hash(@room.admin_hash) %>]</div>
-          <h1 class="ml-1 font-bold text-sm text-purple"><%= @room.name %></h1>
-        </div>
+        <Layout.Card.details room={@room} stylized_as={:room_request_message} />
       </div>
       <.timestamp msg={@msg} timezone={@timezone} />
     </div>
@@ -226,33 +217,15 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   defp message(%{msg: %{type: :room_invite}} = assigns) do
-    assigns =
-      assigns
-      |> assign_new(:identity, fn %{content: json} ->
-        json
-        |> StorageId.from_json()
-        |> RoomInvites.get()
-        |> Identity.from_strings()
-      end)
-      |> assign_new(:room_hash, fn %{identity: identity} -> Utils.hash(identity) end)
-      |> assign_new(:room_name, fn %{identity: identity} -> identity.name end)
-
     ~H"""
     <div
       id={"message-#{@msg.id}"}
       class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}
     >
       <div class="py-1 px-2">
-        <Layout.User.username
-          user={@author}
-          hash_style="font-bold text-sm text-purple"
-          name_style="font-bold text-sm text-purple"
-        />
+        <Layout.Card.details card={@author} stylized_as={:room_invite}/>
         <p class="inline-flex">wants you to join the room</p>
-        <div class="inline-flex">
-          <div class="font-bold text-sm text-purple">[<%= Utils.short_hash(@room_hash) %>]</div>
-          <h1 class="ml-1 font-bold text-sm text-purple"><%= @room_name %></h1>
-        </div>
+        <Layout.Card.details room={@room} stylized_as={:room_invite}/>
       </div>
 
       <%= unless @export? or @is_mine? do %>
@@ -354,13 +327,13 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
   defp header_content(%{export?: true} = assigns) do
     ~H"""
-    <Layout.User.username user={@author} name_style="text-sm font-bold text-purple" />
+    <Layout.Card.details card={@author} stylized_as={:message_header} />
     """
   end
 
   defp header_content(assigns) do
     ~H"""
-    <Layout.User.username user={@author} name_style="text-sm font-bold text-purple" />
+    <Layout.Card.details card={@author} stylized_as={:message_header} />
     <button
       type="button"
       class="messageActionsDropdownButton hiddenUnderSelection t-message-dropdown"

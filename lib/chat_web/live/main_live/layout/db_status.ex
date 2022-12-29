@@ -32,7 +32,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
           <.icon
             id="dataBase"
             class={
-              classes("w-6 h-6 fill-gray-300 animate-pulse", %{
+              classes("w-6 h-6 fill-gray-500 animate-pulse", %{
                 "fill-red-600" => @status.writable == :no
               })
             }
@@ -45,7 +45,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
           <.icon
             id="crossedDataBase"
             class={
-              classes("w-6 h-6 fill-gray-300 animate-pulse", %{
+              classes("w-6 h-6 fill-gray-500 animate-pulse", %{
                 "fill-red-600" => @status.writable == :no
               })
             }

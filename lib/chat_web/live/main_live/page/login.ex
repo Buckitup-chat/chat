@@ -88,15 +88,12 @@ defmodule ChatWeb.MainLive.Page.Login do
     |> assign(:need_login, false)
   end
 
-  defp maybe_create_admin_room(%{assigns: %{my_id: my_id}} = socket) do
-    with true <- User.is_first_and_only?(my_id),
-         false <- AdminRoom.created?() do
-      admin_room = AdminRoom.create()
-
+  defp maybe_create_admin_room(socket) do
+    if AdminRoom.created?() do
       socket
-      |> store_new_room(admin_room)
     else
-      _ -> socket
+      socket
+      |> store_new_room(AdminRoom.create())
     end
   end
 end

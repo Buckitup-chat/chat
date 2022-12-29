@@ -13,8 +13,8 @@ defmodule Chat.Db.ChangeTracker do
   alias Chat.Db
   alias Chat.Db.ChangeTracker.Tracking
 
-  @timeout :timer.seconds(131)
-  @check_delay :timer.seconds(10)
+  @timeout :timer.seconds(31)
+  @check_delay :timer.seconds(1)
 
   def await do
     key = {:change_tracking_marker, UUID.uuid4()}

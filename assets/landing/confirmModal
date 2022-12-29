@@ -1,0 +1,100 @@
+<style type="text/css"> 
+    .confirmPopup {
+        z-index: 30;
+        padding:10px;
+        padding-left:25px;
+        width: 23rem;
+        height: 8rem;
+        display:flex;
+        justify-content: space-between;
+        flex-direction: column;
+        border-radius: 0.5rem;
+        background-color: white;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    }
+
+    .description {
+        color: rgb(0 0 0 / 0.5);
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        padding: 10px 0;
+    }
+
+    .confirmLogoutButton {
+        height: 3rem;
+        background-color: black;
+        border: 1px ridge;
+        border-radius: 0.5rem;
+        color: white;
+        width: 10rem;
+        cursor: pointer;
+    }
+
+    .confirmCancelBtn {
+        height: 3rem;
+        background-color: white;
+        border: 1px ridge;
+        border-radius: 0.5rem;
+        width: 10rem;
+        cursor: pointer;
+    }
+
+    .confirmCloseBtn {
+        width: 15px;
+        height: 15px;
+        margin-left: 22rem;
+        border: none;
+        background: none;
+        cursor: pointer;
+    }
+  
+    .confirmModalContainer {
+        visibility: hidden; 
+        z-index: 10;
+        width:100vw;
+        height: 100vh;
+        background: rgba(0,0,0,0.5);
+        position: absolute;
+        bottom: 0vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+</style>
+
+
+<div id="confirmModalContainer" class="confirmModalContainer">
+    <div id='confirm' class="confirmPopup">
+        <button id="confirmCloseBtn" class="confirmCloseBtn">X</button>
+        <h5 class="title">Log Out without the key</h5>
+        <p class="description">Are you sure you want to do this?</p>
+        <div>
+            <button id="confirmLogoutButton" class="confirmLogoutButton">Log Out</button>
+            <button id="confirmCancelBtn"  class="confirmCancelBtn">Cancel</button> 
+        </div>
+    </div>
+</div>
+
+
+<script>
+    const confirmLogout = document.getElementById("confirmLogoutButton");
+    const confirmModal = document.getElementById("confirmModalContainer");
+    
+    confirmLogout.addEventListener("click", () => {
+        localStorage.clear()
+        window.location.reload();
+    })
+    
+    const confirmCancelBtn = document.getElementById('confirmCancelBtn');
+    
+    confirmCancelBtn.addEventListener('click', () => {
+        confirmModal.style.visibility = "hidden"
+    })
+    
+    const confirmCloseBtn = document.getElementById('confirmCloseBtn');
+    
+    confirmCloseBtn.addEventListener('click', () => {
+        confirmModal.style.visibility = "hidden"
+    })
+</script>
+

@@ -126,6 +126,8 @@ defmodule Chat.Utils do
     iv <> key
   end
 
+  def short_hash(<<_::binary-size(58)>> <> code), do: code
+
   defp binary({:RSAPublicKey, a, b}), do: "RSAPublicKey|#{a}|#{b}"
   defp binary(%Card{pub_key: key}), do: key |> binary()
   defp binary(%Identity{} = ident), do: ident |> Identity.pub_key() |> binary()

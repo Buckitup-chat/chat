@@ -408,7 +408,7 @@
                   >
                     <a>
                       <div class="flex flex-row px-7">
-                        <Layout.Card.details card={user} me={@me} />
+                        <Layout.Card.hashed_name card={user} me={@me} />
                       </div>
                     </a>
                   </li>
@@ -424,7 +424,7 @@
                   >
                     <a>
                       <div class="flex flex-row px-7">
-                        <Layout.Card.details card={user} me={@me} />
+                        <Layout.Card.hashed_name card={user} me={@me} />
                       </div>
                     </a>
                   </li>
@@ -463,9 +463,9 @@
                     <h1 class="ml-1 mr-1 text-base font-bolt text-white">
                       My private notes
                     </h1>
-                    <Layout.Card.details card={@peer} stylized_as={:chat_header} />
+                    <Layout.Card.hashed_name card={@peer} style_spec={:chat_header} />
                   <% else %>
-                    <Layout.Card.details card={@peer} stylized_as={:chat_header} />
+                    <Layout.Card.hashed_name card={@peer} style_spec={:chat_header} />
                     <button>
                       <.icon id="edit" class="w-4 h-4 ml-1 flex fill-white/50" />
                     </button>
@@ -800,17 +800,11 @@
                       >
                         <a>
                           <div class="flex flex-row px-2">
-                            <Layout.Card.details room={room} />
-                            <tt class="text-sm tracking-tighter text-grayscale600">
-                              [<%= Utils.short_hash(room.hash) %>]
-                            </tt>
-                            <div class={
-                              classes("ml-1 text-sm", %{
-                                "text-fuchsia-900" => @room && room.pub_key == @room.pub_key
-                              })
-                            }>
-                              <%= room.name %>
-                            </div>
+                            <Layout.Card.hashed_name
+                              room={room}
+                              style_spec={:room_selection}
+                              selected_room={@room}
+                            />
                           </div>
                         </a>
                         <%= if room.type == :request do %>
@@ -835,7 +829,7 @@
                       >
                         <a>
                           <div class="flex flex-row pl-7">
-                            <Layout.Card.details room={room} />
+                            <Layout.Card.hashed_name room={room} />
                           </div>
                         </a>
                         <%= if room.type == :request do %>
@@ -871,7 +865,7 @@
                         <li class="w-full h-9 cursor-pointer flex items-center hover:bg-stone250">
                           <div class="flex flex-row justify-between px-7 w-full">
                             <div class="flex flex-row">
-                              <Layout.Card.details room={room} />
+                              <Layout.Card.hashed_name room={room} />
                             </div>
                             <.icon id="time" class="w-4 h-4 flex fill-black/50" />
                           </div>
@@ -883,7 +877,7 @@
                           phx-value-room={room.hash}
                         >
                           <div class="flex flex-row px-7 w-full">
-                            <Layout.Card.details room={room} />
+                            <Layout.Card.hashed_name room={room} />
                           </div>
                         </li>
                       <% end %>
@@ -940,7 +934,7 @@
                     <%= if @room.type == :request do %>
                       <.icon id="private" class="w-5 h-5 stroke-white" />
                     <% end %>
-                    <Layout.Card.details room={@room} stylized_as={:chat_header} />
+                    <Layout.Card.hashed_name room={@room} style_spec={:chat_header} />
                   </div>
                   <div class="flex flex-row justify-between">
                     <%= if @room.type == :request do %>
@@ -977,7 +971,7 @@
                           id={"user-#{user.hash}"}
                           class="flex flex-row items-center justify-between"
                         >
-                          <Layout.Card.details card={user} stylized_as={:room_request_list} />
+                          <Layout.Card.hashed_name card={user} style_spec={:room_request_list} />
                           <a
                             class="text-black/50"
                             phx-click={
@@ -1007,7 +1001,7 @@
                           id={"user-#{user.hash}"}
                           class="flex flex-row items-center justify-between t-invite"
                         >
-                          <Layout.Card.details card={user} />
+                          <Layout.Card.hashed_name card={user} />
                           <a
                             class="flex items-center justify-between"
                             phx-click={

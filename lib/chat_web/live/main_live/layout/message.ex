@@ -207,9 +207,9 @@ defmodule ChatWeb.MainLive.Layout.Message do
       class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}
     >
       <div class="py-1 px-2">
-        <Layout.Card.details card={@author} stylized_as={:room_request_message} />
+        <Layout.Card.hashed_name card={@author} style_spec={:room_request_message} />
         <p class="inline-flex">requested access to room</p>
-        <Layout.Card.details room={@room} stylized_as={:room_request_message} />
+        <Layout.Card.hashed_name room={@room} style_spec={:room_request_message} />
       </div>
       <.timestamp msg={@msg} timezone={@timezone} />
     </div>
@@ -223,9 +223,9 @@ defmodule ChatWeb.MainLive.Layout.Message do
       class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}
     >
       <div class="py-1 px-2">
-        <Layout.Card.details card={@author} stylized_as={:room_invite}/>
+        <Layout.Card.hashed_name card={@author} style_spec={:room_invite} />
         <p class="inline-flex">wants you to join the room</p>
-        <Layout.Card.details room={@room} stylized_as={:room_invite}/>
+        <Layout.Card.hashed_name room={@room} style_spec={:room_invite} />
       </div>
 
       <%= unless @export? or @is_mine? do %>
@@ -327,13 +327,13 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
   defp header_content(%{export?: true} = assigns) do
     ~H"""
-    <Layout.Card.details card={@author} stylized_as={:message_header} />
+    <Layout.Card.hashed_name card={@author} style_spec={:message_header} />
     """
   end
 
   defp header_content(assigns) do
     ~H"""
-    <Layout.Card.details card={@author} stylized_as={:message_header} />
+    <Layout.Card.hashed_name card={@author} style_spec={:message_header} />
     <button
       type="button"
       class="messageActionsDropdownButton hiddenUnderSelection t-message-dropdown"

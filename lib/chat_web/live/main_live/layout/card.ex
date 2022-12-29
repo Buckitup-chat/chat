@@ -1,5 +1,6 @@
 defmodule ChatWeb.MainLive.Layout.Card do
-  @moduledoc false
+  @moduledoc "Card rendering component"
+
   use ChatWeb, :component
 
   alias Chat.Card
@@ -10,15 +11,27 @@ defmodule ChatWeb.MainLive.Layout.Card do
   @grayscale_text_style "text-sm tracking-tighter text-grayscale600"
   @white_hash_text_style "text-base text-white/60"
   @white_name_text_style "text-base font-bolt text-white t-peer-name"
-  @purple_text_style "font-bold text-sm text-purple"
+  @purple_text_style "text-sm text-purple"
+  @purple_bold_text_style "font-bold text-sm text-purple"
+
+  @style_config %{
+    dialog_selection: %{hash: @grayscale_text_style, name: @basic_text_style},
+    chat_header: %{hash: @white_hash_text_style, name: @white_name_text_style},
+    room_invite: %{hash: @purple_bold_text_style, name: @purple_bold_text_style},
+    room_request_list: %{hash: @purple_bold_text_style, name: @purple_bold_text_style},
+    room_request_message: %{hash: @grayscale_text_style, name: @basic_text_style},
+    message_header: %{hash: @grayscale_text_style, name: @purple_bold_text_style},
+    room_selection: %{hash: @grayscale_text_style, name: @basic_text_style}
+  }
 
   attr :card, Card, doc: "room/user card"
-  attr :room, Room, doc: "room sctruct"
   attr :me, Identity, doc: "current user"
   attr :is_me?, :boolean, doc: "is this the current user's card?"
-  attr :stylized_as, :atom, default: :chat_list
+  attr :room, Room, doc: "room sctruct"
+  attr :selected_room, Room, doc: "selected room sctruct"
+  attr :style_spec, :atom, default: :dialog_selection, doc: "style spec"
 
-  def details(assigns) do
+  def hashed_name(assigns) do
     assigns =
       assigns
       |> assign_new(:card, fn
@@ -30,22 +43,8 @@ defmodule ChatWeb.MainLive.Layout.Card do
         %{card: card, me: me} -> Card.from_identity(me) == card
         _ -> false
       end)
-      |> assign_new(:hash_style, fn
-        %{stylized_as: :chat_list} -> @grayscale_text_style
-        %{stylized_as: :chat_header} -> @white_hash_text_style
-        %{stylized_as: :room_invite} -> @purple_text_style
-        %{stylized_as: :room_request_list} -> @purple_text_style
-        %{stylized_as: :room_request_message} -> @grayscale_text_style
-        %{stylized_as: :message_header} -> @grayscale_text_style
-      end)
-      |> assign_new(:name_style, fn
-        %{stylized_as: :chat_list} -> @basic_text_style
-        %{stylized_as: :chat_header} -> @white_name_text_style
-        %{stylized_as: :room_invite} -> @purple_text_style
-        %{stylized_as: :room_request_list} -> @purple_text_style
-        %{stylized_as: :room_request_message} -> @basic_text_style
-        %{stylized_as: :message_header} -> @purple_text_style
-      end)
+      |> assign_new(:hash_style, fn %{style_spec: spec} -> @style_config[spec][:hash] end)
+      |> assign_new(:name_style, &set_name_style/1)
 
     ~H"""
     <div class="inline-flex">
@@ -58,4 +57,14 @@ defmodule ChatWeb.MainLive.Layout.Card do
     </div>
     """
   end
+
+  defp set_name_style(%{style_spec: :room_selection, room: room, selected_room: selected_room}) do
+    if selected_room && room.pub_key == selected_room.pub_key do
+      @purple_text_style
+    else
+      @style_config[:room_selection][:name]
+    end
+  end
+
+  defp set_name_style(%{style_spec: spec}), do: @style_config[spec][:name]
 end

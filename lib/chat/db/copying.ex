@@ -40,13 +40,6 @@ defmodule Chat.Db.Copying do
     Task.await(awaiter, :infinity)
   end
 
-  # def get_data_keys_plain(db) do
-  #   db
-  #   |> CubDB.select()
-  #   |> Stream.map(fn {k, _v} -> k end)
-  #   |> MapSet.new()
-  # end
-
   def get_data_keys_set(db) do
     CubDB.with_snapshot(db, fn snap ->
       {snap, MapSet.new()}

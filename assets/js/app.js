@@ -28,6 +28,7 @@ import * as LocalStateStore from "./hooks/local-storage"
 import * as LocalTime from "./hooks/local-time"
 import * as Chat from "./hooks/chat"
 import * as UpChunk from "./upchunk"
+import * as Flash from "./hooks/flash"
 
 let Uploaders = {}
 
@@ -87,6 +88,7 @@ let Hooks = {}
 Hooks.LocalStateStore = LocalStateStore.hooks
 Hooks.LocalTime = LocalTime.hooks
 Hooks.Chat = Chat.hooks
+Hooks.Flash = Flash.hooks
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
@@ -190,7 +192,7 @@ const listeners = {
       const chatContent = document.querySelector('.a-content-block');
       chatContent.scrollTo({ top: chatContent.scrollHeight })
     }, 0)
-  },
+  }
 };
 for (key in listeners) {
   window.addEventListener(key, listeners[key]);

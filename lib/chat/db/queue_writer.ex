@@ -138,6 +138,8 @@ defmodule Chat.Db.QueueWriter do
         |> then(fn {tx, keys} -> {:commit, tx, keys} end)
       end)
 
+    # "#{inspect(db)}: #{inspect(new_keys)}" |> Logger.debug()
+
     case list do
       [{{:file_chunk, _, _, _}, _}] -> 1000
       _ -> Enum.count(list)
@@ -149,7 +151,7 @@ defmodule Chat.Db.QueueWriter do
 
   def fsync(w_state(db: db, dry_run: is_dry, written_keys: keys) = state) do
     unless is_dry do
-      "[db writer] fsyncing" |> Logger.warn()
+      "[db writer] fsyncing #{inspect(db)}" |> Logger.warn()
       CubDB.file_sync(db)
     end
 

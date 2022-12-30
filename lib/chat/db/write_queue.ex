@@ -6,6 +6,8 @@ defmodule Chat.Db.WriteQueue do
   import Tools.GenServerHelpers
   require Record
 
+  # require Logger
+
   Record.defrecord(:q_state, buffer: buffer(), consumer: nil, in_demand: false, mirror: nil)
 
   use GenServer
@@ -36,6 +38,9 @@ defmodule Chat.Db.WriteQueue do
 
   @impl true
   def handle_call(:demand, {to_pid, _}, q_state(mirror: mirror) = state) do
+    # "demand in #{inspect(self())} from #{inspect(to_pid)} with mirror: #{inspect(mirror)}"
+    # |> Logger.debug()
+
     if mirror_pid?(to_pid, mirror) do
       state |> reply(:ok)
     else

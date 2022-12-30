@@ -15,7 +15,10 @@ defmodule Chat.ChunkedFiles do
          false <- is_nil(secret),
          encoded <- Utils.encrypt_blob(chunk, secret) do
       Db.put_chunk({{:file_chunk, key, chunk_start, chunk_end}, encoded})
-      Db.put({:chunk_key, {:file_chunk, key, chunk_start, chunk_end}}, true)
+      |> tap(fn
+        :ok -> Db.put({:chunk_key, {:file_chunk, key, chunk_start, chunk_end}}, true)
+        _ -> :ignore
+      end)
     end
   end
 

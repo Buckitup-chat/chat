@@ -24,9 +24,18 @@ defmodule ChatWeb.UploadChunkController do
 
   defp save_chunk_till({key, range, chunk} = data, till) do
     cond do
-      :ok == ChunkedFiles.save_upload_chunk(key, range, chunk) -> :ok
-      time_mark() > till -> :failed
-      true -> save_chunk_till(data, till)
+      :ok == ChunkedFiles.save_upload_chunk(key, range, chunk) ->
+        # Logger.debug("+")
+        :ok
+
+      time_mark() > till ->
+        # Logger.debug("-")
+        :failed
+
+      true ->
+        # Logger.debug("_")
+        Process.sleep(100)
+        save_chunk_till(data, till)
     end
   end
 

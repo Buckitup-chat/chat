@@ -7,7 +7,6 @@ defmodule ChatWeb.MainLive.Index do
 
   alias Chat.ChunkedFiles
   alias Chat.Rooms
-  alias Chat.Utils
   alias ChatWeb.MainLive.Layout
   alias ChatWeb.MainLive.Page
   alias ChatWeb.Hooks.LocalTimeHook

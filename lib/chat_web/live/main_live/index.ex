@@ -3,11 +3,11 @@ defmodule ChatWeb.MainLive.Index do
   use ChatWeb, :live_view
 
   require Logger
-
   alias Phoenix.LiveView.JS
 
   alias Chat.ChunkedFiles
   alias Chat.Rooms
+  alias Chat.Utils
   alias ChatWeb.MainLive.Layout
   alias ChatWeb.MainLive.Page
   alias ChatWeb.Hooks.LocalTimeHook
@@ -387,8 +387,6 @@ defmodule ChatWeb.MainLive.Index do
 
   def message_of(%{author_hash: _}), do: "room"
   def message_of(_), do: "dialog"
-
-  def short_hash(hash), do: hash |> String.split_at(-6) |> elem(1)
 
   defp allow_image_upload(socket, type) do
     socket

@@ -15,11 +15,10 @@ defmodule ChatWeb.MainLive.Layout.Message do
   alias Chat.Identity
   alias Chat.Memo
   alias Chat.Messages.ExportHelper
-  alias Chat.RoomInvites
   alias Chat.Rooms.Room
   alias Chat.User
-  alias Chat.Utils
   alias Chat.Utils.StorageId
+  alias ChatWeb.MainLive.Layout
   alias Phoenix.HTML.Tag
   alias Phoenix.LiveView.JS
 
@@ -208,15 +207,9 @@ defmodule ChatWeb.MainLive.Layout.Message do
       class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}
     >
       <div class="py-1 px-2">
-        <div class="inline-flex">
-          <div class="font-bold text-sm text-purple">[<%= short_hash(@author.hash) %>]</div>
-          <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
-        </div>
+        <Layout.Card.hashed_name card={@author} style_spec={:room_request_message} />
         <p class="inline-flex">requested access to room</p>
-        <div class="inline-flex">
-          <div class="font-bold text-sm text-purple">[<%= short_hash(@room.admin_hash) %>]</div>
-          <h1 class="ml-1 font-bold text-sm text-purple"><%= @room.name %></h1>
-        </div>
+        <Layout.Card.hashed_name room={@room} style_spec={:room_request_message} />
       </div>
       <.timestamp msg={@msg} timezone={@timezone} />
     </div>
@@ -224,33 +217,15 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   defp message(%{msg: %{type: :room_invite}} = assigns) do
-    assigns =
-      assigns
-      |> assign_new(:identity, fn
-        %{msg: %{content: json}} ->
-          json
-          |> StorageId.from_json()
-          |> RoomInvites.get()
-          |> Identity.from_strings()
-      end)
-      |> assign_new(:room_hash, fn %{identity: identity} -> Utils.hash(identity) end)
-      |> assign_new(:room_name, fn %{identity: identity} -> identity.name end)
-
     ~H"""
     <div
       id={"message-#{@msg.id}"}
       class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}
     >
       <div class="py-1 px-2">
-        <div class="inline-flex">
-          <div class="font-bold text-sm text-purple">[<%= short_hash(@author.hash) %>]</div>
-          <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
-        </div>
+        <Layout.Card.hashed_name card={@author} style_spec={:room_invite} />
         <p class="inline-flex">wants you to join the room</p>
-        <div class="inline-flex">
-          <div class="font-bold text-sm text-purple">[<%= short_hash(@room_hash) %>]</div>
-          <h1 class="ml-1 font-bold text-sm text-purple"><%= @room_name %></h1>
-        </div>
+        <Layout.Card.hashed_name room={@room} style_spec={:room_invite} />
       </div>
 
       <%= unless @export? or @is_mine? do %>
@@ -352,13 +327,13 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
   defp header_content(%{export?: true} = assigns) do
     ~H"""
-    <.author_details author={@author} />
+    <Layout.Card.hashed_name card={@author} style_spec={:message_header} />
     """
   end
 
   defp header_content(assigns) do
     ~H"""
-    <.author_details author={@author} />
+    <Layout.Card.hashed_name card={@author} style_spec={:message_header} />
     <button
       type="button"
       class="messageActionsDropdownButton hiddenUnderSelection t-message-dropdown"
@@ -451,17 +426,6 @@ defmodule ChatWeb.MainLive.Layout.Message do
     """
   end
 
-  attr :author, Card, doc: "message author card"
-
-  defp author_details(assigns) do
-    ~H"""
-    <div class="flex flex-row">
-      <div class="text-sm text-grayscale600">[<%= short_hash(@author.hash) %>]</div>
-      <div class="ml-1 font-bold text-sm text-purple"><%= @author.name %></div>
-    </div>
-    """
-  end
-
   attr :msg, :map, required: true, doc: "message struct"
   attr :timezone, :string, required: true, doc: "user's timezone"
 
@@ -524,12 +488,6 @@ defmodule ChatWeb.MainLive.Layout.Message do
       end
 
     "/get/#{file_type}/#{id}?a=#{Base.url_encode64(secret)}"
-  end
-
-  defp short_hash(hash) do
-    hash
-    |> String.split_at(-6)
-    |> elem(1)
   end
 
   attr :export?, :boolean, required: true, doc: "embed file icon SVG?"

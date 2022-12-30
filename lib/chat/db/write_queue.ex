@@ -35,11 +35,15 @@ defmodule Chat.Db.WriteQueue do
   end
 
   @impl true
-  def handle_call(:demand, {to_pid, _}, state) do
-    state
-    |> q_state(consumer: to_pid, in_demand: true)
-    |> produce()
-    |> reply(:ok)
+  def handle_call(:demand, {to_pid, _}, q_state(mirror: mirror) = state) do
+    if mirror_pid?(to_pid, mirror) do
+      state |> reply(:ok)
+    else
+      state
+      |> q_state(consumer: to_pid, in_demand: true)
+      |> produce()
+      |> reply(:ok)
+    end
   end
 
   def handle_call({:put_stream, stream}, _, q_state(buffer: buf) = state) do
@@ -109,6 +113,15 @@ defmodule Chat.Db.WriteQueue do
       end
     else
       state |> q_state(consumer: nil)
+    end
+  end
+
+  defp mirror_pid?(pid, mirror) do
+    cond do
+      is_nil(mirror) -> false
+      pid == mirror -> true
+      is_atom(mirror) and Process.whereis(mirror) == pid -> true
+      true -> false
     end
   end
 end

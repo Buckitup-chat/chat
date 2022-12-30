@@ -318,7 +318,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> Map.put(:name, room_name)
     |> Messages.RoomInvite.new()
     |> Dialogs.add_new_message(me, dialog)
-        
+
     socket
     |> put_flash(:info, "Invitation Sent!")
   rescue

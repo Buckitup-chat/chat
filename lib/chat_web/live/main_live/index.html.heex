@@ -1311,7 +1311,7 @@
               <Layout.Admin.block title="Admin List">
                 <section>
                   <%= for admin <- @admin_list do %>
-                    <div><%= admin.name %></div>
+                    <Layout.Card.hashed_name card={admin} />
                   <% end %>
                 </section>
               </Layout.Admin.block>
@@ -1332,7 +1332,7 @@
                         |> JS.set_attribute({"phx-value-hash", user.hash}, to: ".confirmButton")
                       }
                     >
-                      <%= user.name %>
+                      <Layout.Card.hashed_name card={user} />
                     </div>
                   <% end %>
                 </section>
@@ -1356,7 +1356,7 @@
                         |> JS.set_attribute({"phx-value-hash", room.hash}, to: ".confirmButton")
                       }
                     >
-                      <%= room.name %>
+                      <Layout.Card.hashed_name card={room} />
                     </div>
                   <% end %>
                 </section>
@@ -1378,7 +1378,7 @@
                         |> JS.set_attribute({"phx-value-hash", user.hash}, to: ".confirmButton")
                       }
                     >
-                      <%= user.name %>
+                      <Layout.Card.hashed_name card={user} />
                     </div>
                   <% end %>
                 </section>

@@ -328,25 +328,6 @@ defmodule ChatWeb.MainLive.Index do
     socket |> noreply()
   end
 
-  defp flash_notification(assigns) do
-    ~H"""
-    <div
-      id={@id}
-      class="flex items-center t-inv-sent justify-between w-screen sm:w-96 min-h-fit z-30 bg-green-400 rounded-lg text-teal-900 px-4 py-3 shadow-md centered"
-      role="alert"
-      style="display: none;"
-    >
-      <div class="flex items-center">
-        <.icon id="checked" class="w-5 h-5 fill-white" />
-        <p class="ml-2 text-white">Invitation Sent!</p>
-      </div>
-      <div phx-click={JS.hide(to: "#" <> @id)}>
-        <.icon id="close" class="w-5 h-5 fill-white cursor-pointer t-close-flash-notification" />
-      </div>
-    </div>
-    """
-  end
-
   defp action_confirmation_popup(assigns) do
     ~H"""
     <.modal id={@id} class="">

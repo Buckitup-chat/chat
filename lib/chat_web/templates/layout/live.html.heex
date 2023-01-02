@@ -1,19 +1,20 @@
 <main class="container">
-  <p
-    class="alert alert-info"
-    role="alert"
-    phx-click="lv:clear-flash"
-    phx-value-key="info"
-    phx-no-format
-  ><%= live_flash(@flash, :info) %></p>
-
-  <p
-    class="alert alert-danger"
-    role="alert"
-    phx-click="lv:clear-flash"
-    phx-value-key="error"
-    phx-no-format
-  ><%= live_flash(@flash, :error) %></p>
-
+  <div id="flash" phx-hook="Flash">
+    <%= if Map.has_key?(@flash, "info") do %>
+      <div
+        id="flash-info"
+        class="flash   flex items-center t-inv-sent justify-between w-screen sm:w-96 min-h-fit z-30 bg-green-400 rounded-lg text-teal-900 px-4 py-3 shadow-md centered"
+        role="alert"
+      >
+        <div class="flex items-center">
+          <.icon id="checked" class="w-5 h-5 fill-white" />
+          <p class="ml-2 text-white"><%= Phoenix.Flash.get(@flash, :info) %></p>
+        </div>
+        <div phx-click="lv:clear-flash" phx-value-key="info" phx-no-format>
+          <.icon id="close" class="w-5 h-5 fill-white cursor-pointer t-close-flash-notification" />
+        </div>
+      </div>
+    <% end %>
+  </div>
   <%= @inner_content %>
 </main>

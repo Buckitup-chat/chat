@@ -15,6 +15,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   alias Chat.Identity
   alias Chat.Memo
   alias Chat.Messages.ExportHelper
+  alias Chat.RoomInvites
   alias Chat.Rooms.Room
   alias Chat.User
   alias Chat.Utils.StorageId
@@ -217,6 +218,17 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   defp message(%{msg: %{type: :room_invite}} = assigns) do
+    assigns =
+      assigns
+      |> assign_new(:room_card, fn
+        %{msg: %{content: json}} ->
+          json
+          |> StorageId.from_json()
+          |> RoomInvites.get()
+          |> Identity.from_strings()
+          |> Card.from_identity()
+      end)
+
     ~H"""
     <div
       id={"message-#{@msg.id}"}
@@ -225,7 +237,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       <div class="py-1 px-2">
         <Layout.Card.hashed_name card={@author} style_spec={:room_invite} />
         <p class="inline-flex">wants you to join the room</p>
-        <Layout.Card.hashed_name room={@room} style_spec={:room_invite} />
+        <Layout.Card.hashed_name room={@room_card} style_spec={:room_invite} />
       </div>
 
       <%= unless @export? or @is_mine? do %>

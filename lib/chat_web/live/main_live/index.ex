@@ -7,6 +7,7 @@ defmodule ChatWeb.MainLive.Index do
 
   alias Chat.ChunkedFiles
   alias Chat.Rooms
+  alias Chat.UploadMetadata
   alias ChatWeb.MainLive.Layout
   alias ChatWeb.MainLive.Page
   alias ChatWeb.Hooks.LocalTimeHook
@@ -33,11 +34,8 @@ defmodule ChatWeb.MainLive.Index do
           monotonic_offset: 0
         )
         |> LocalTimeHook.assign_time(Phoenix.LiveView.get_connect_params(socket)["tz_info"])
-        |> allow_image_upload(:image)
-        |> allow_image_upload(:room_image)
         |> allow_any500m_upload(:my_keys_file)
-        |> allow_chunked_upload(:dialog_file, max_entries: 2000)
-        |> allow_chunked_upload(:room_file, max_entries: 2000)
+        |> allow_file_upload()
         |> Page.Login.check_stored()
         |> ok()
       end
@@ -368,17 +366,6 @@ defmodule ChatWeb.MainLive.Index do
   def message_of(%{author_hash: _}), do: "room"
   def message_of(_), do: "dialog"
 
-  defp allow_image_upload(socket, type) do
-    socket
-    |> allow_upload(type,
-      accept: ~w(.jpg .jpeg .png),
-      auto_upload: true,
-      max_entries: 50,
-      max_file_size: 60_000_000,
-      progress: &handle_progress/3
-    )
-  end
-
   defp allow_any500m_upload(socket, type, opts \\ []) do
     socket
     |> allow_upload(type,
@@ -390,16 +377,17 @@ defmodule ChatWeb.MainLive.Index do
     )
   end
 
-  defp allow_chunked_upload(socket, type, opts) do
+  defp allow_file_upload(socket) do
     socket
-    |> allow_upload(type,
-      auto_upload: true,
-      max_file_size: 102_400_000_000,
+    |> allow_upload(:file,
       accept: :any,
-      max_entries: Keyword.get(opts, :max_entries, 1),
+      auto_upload: true,
       external: &chunked_presign_url/2,
+      max_entries: 2000,
+      max_file_size: 102_400_000_000,
       progress: &handle_chunked_progress/3
     )
+    |> assign(:uploads_metadata, %{})
   end
 
   def chunked_presign_url(entry, socket) do
@@ -411,35 +399,51 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   def handle_chunked_progress(
-        file,
+        _name,
         %{progress: 100, uuid: uuid} = entry,
-        %{assigns: %{chunked_uploads: uploads}} = socket
+        %{assigns: %{uploads_metadata: uploads}} = socket
       ) do
     "[upload] finalizing" |> Logger.warn()
-    {key, _} = chunked_keys = uploads[uuid]
+    %UploadMetadata{} = metadata = uploads[uuid]
+    {key, _} = metadata.credentials
     ChunkedFiles.mark_consumed(key)
 
     "[upload] marked consumed" |> Logger.warn()
 
-    case file do
-      :dialog_file -> Page.Dialog.send_file(socket, entry, chunked_keys)
-      :room_file -> Page.Room.send_file(socket, entry, chunked_keys)
+    case metadata.destination.type do
+      :dialog -> Page.Dialog.send_file(socket, entry, metadata)
+      :room -> Page.Room.send_file(socket, entry, metadata)
     end
 
     "[upload] message sent" |> Logger.warn()
 
     socket
-    |> assign(:chunked_uploads, uploads |> Map.drop([uuid]))
+    |> assign(:uploads_metadata, Map.delete(uploads, uuid))
     |> noreply()
     |> tap(fn _ -> "[upload] done" |> Logger.warn() end)
   end
 
-  def handle_chunked_progress(_file, _entry, socket), do: noreply(socket)
+  def handle_chunked_progress(_name, _entry, socket), do: noreply(socket)
 
   defp start_chunked_upload(socket, entry, key, secret) do
-    uploads = Map.get(socket.assigns, :chunked_uploads, %{})
+    uploads = Map.get(socket.assigns, :uploads_metadata, %{})
 
-    socket
-    |> assign(:chunked_uploads, uploads |> Map.put(entry.uuid, {key, secret}))
+    metadata =
+      %UploadMetadata{}
+      |> Map.put(:credentials, {key, secret})
+      |> Map.put(:destination, file_upload_destination(socket))
+
+    assign(socket, :uploads_metadata, Map.put(uploads, entry.uuid, metadata))
   end
+
+  defp file_upload_destination(
+         %{assigns: %{dialog: dialog, lobby_mode: :chats, peer: %{pub_key: peer_pub_key}}} =
+           _socket
+       ),
+       do: %{dialog: dialog, pub_key: peer_pub_key, type: :dialog}
+
+  defp file_upload_destination(
+         %{assigns: %{lobby_mode: :rooms, room: %{pub_key: room_pub_key} = room}} = _socket
+       ),
+       do: %{pub_key: room_pub_key, room: room, type: :room}
 end

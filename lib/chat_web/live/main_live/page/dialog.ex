@@ -14,6 +14,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.Memo
   alias Chat.Messages
   alias Chat.RoomInvites
+  alias Chat.UploadMetadata
   alias Chat.User
   alias Chat.Utils
   alias Chat.Utils.StorageId
@@ -92,9 +93,10 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def send_file(
-        %{assigns: %{dialog: dialog, me: me, monotonic_offset: time_offset}} = socket,
+        %{assigns: %{me: me, monotonic_offset: time_offset}} = socket,
         entry,
-        {chunk_key, chunk_secret}
+        %UploadMetadata{credentials: {chunk_key, chunk_secret}, destination: %{dialog: dialog}} =
+          _metadata
       ) do
     time = Chat.Time.monotonic_to_unix(time_offset)
 

@@ -431,6 +431,8 @@
                 <% end %>
               </ul>
             </div>
+
+            <Layout.Uploader.list config={@uploads.file} />
           </div>
           <div
             id="contentContainer"
@@ -483,36 +485,8 @@
                       />
                     <% end %>
                   </div>
-                  <div class="px-2 sm:px-8" phx-update="replace" id="dialog-uploads">
-                    <%= for %{valid?: true} = entry <- @uploads.image.entries do %>
-                      <div id={"upload#{entry.uuid}"} class="m-1 flex justify-end">
-                        <div class="flex-col max-w-xxs sm:max-w-md min-w-[180px]">
-                          <%= live_img_preview(entry, class: "blur-sm animate-pulse") %>
 
-                          <div class="w-full bg-gray-200 h-2 dark:bg-gray-700">
-                            <div
-                              class="bg-gray-600 h-2 dark:bg-gray-300"
-                              style={"width: #{entry.progress}%"}
-                            >
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    <% end %>
-                    <%= for %{valid?: true} = entry <- @uploads.dialog_file.entries do %>
-                      <div id={"upload#{entry.uuid}"} class="m-1 flex justify-end">
-                        <div class="bg-purple50 max-w-xxs sm:max-w-md min-w-[180px] rounded-lg flex items-center justify-between">
-                          <.icon id="document" class="w-14 h-14 flex fill-black/50 animate-pulse" />
-                          <div class="w-36 flex flex-col pr-3">
-                            <span class="truncate text-xs"><%= entry.client_name %></span>
-                            <div class="text-xs text-black/50">
-                              <%= entry.progress %>% uploaded
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    <% end %>
-                  </div>
+                  <Layout.Uploader.in_progress? pub_key={@peer.pub_key} type={:dialog} uploads={@uploads_metadata} />
                 </div>
               </div>
               <div
@@ -520,22 +494,8 @@
                 class="basis-[7%] w-full py-1.5 px-8 border border-white bg-white flex items-center fixed md:sticky bottom-0"
               >
                 <%= if @dialog_mode == :plain do %>
-                  <.form
-                    for={:dialog_file}
-                    id="dialog-file-form"
-                    class="column column-50 column-offset-50"
-                    phx-change="dialog/import-files"
-                    phx-drop-target={@uploads.dialog_file.ref}
-                  >
-                    <%= live_file_input(@uploads.dialog_file, style: "display: none") %>
-                  </.form>
-                  <button
-                    id="attachFileBtn"
-                    class="relative"
-                    phx-click={JS.dispatch("click", to: "#dialog-file-form input[type=file]")}
-                  >
-                    <.icon id="attach" class="w-7 h-7 flex fill-white" />
-                  </button>
+                  <Layout.Uploader.file_form config={@uploads.file} type="dialog" />
+
                   <.form
                     :let={di}
                     for={:dialog}
@@ -885,6 +845,8 @@
                 </ul>
               </div>
             </div>
+
+            <Layout.Uploader.list config={@uploads.file} />
           </div>
           <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
             <%= unless @room do %>
@@ -1032,56 +994,14 @@
                       />
                     <% end %>
                   </div>
-                  <div class="px-2 sm:px-8" phx-update="replace" id="ddd">
-                    <%= for %{valid?: true} = entry <- @uploads.room_image.entries do %>
-                      <div id={"upload#{entry.uuid}"} class="m-1 flex justify-end">
-                        <div class="flex-col max-w-xxs sm:max-w-md min-w-[180px]">
-                          <%= live_img_preview(entry, class: "blur-sm animate-pulse") %>
 
-                          <div class="w-full bg-gray-200 h-2 dark:bg-gray-700">
-                            <div
-                              class="bg-gray-600 h-2 dark:bg-gray-300"
-                              style={"width: #{entry.progress}%"}
-                            >
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    <% end %>
-                    <%= for %{valid?: true} = entry <- @uploads.room_file.entries do %>
-                      <div id={"upload#{entry.uuid}"} class="m-1 flex justify-end">
-                        <div class="bg-purple50 max-w-xxs sm:max-w-md min-w-[180px] rounded-lg flex items-center justify-between">
-                          <.icon id="document" class="w-14 h-14 flex fill-black/50 animate-pulse" />
-                          <div class="w-36 flex flex-col pr-3">
-                            <span class="truncate text-xs"><%= entry.client_name %></span>
-                            <div class="text-xs text-black/50">
-                              <%= entry.progress %>% uploaded
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    <% end %>
-                  </div>
+                  <Layout.Uploader.in_progress? pub_key={@room.pub_key} type={:room} uploads={@uploads_metadata} />
                 </div>
               </div>
               <div class="basis-[7%] w-full py-1.5 px-8 border border-white bg-white flex items-center fixed md:sticky bottom-0">
                 <%= if @room_mode == :plain do %>
-                  <.form
-                    for={:room_file}
-                    id="room-file-form"
-                    class="column column-50 column-offset-50"
-                    phx-change="room/import-files"
-                    phx-drop-target={@uploads.room_file.ref}
-                  >
-                    <%= live_file_input(@uploads.room_file, style: "display: none") %>
-                  </.form>
-                  <button
-                    class="relative t-attach-file"
-                    id="attachFileBtn"
-                    phx-click={JS.dispatch("click", to: "#room-file-form input[type=file]")}
-                  >
-                    <.icon id="attach" class="w-7 h-7 flex fill-white" />
-                  </button>
+                  <Layout.Uploader.file_form config={@uploads.file} type="room" />
+
                   <.form
                     :let={di}
                     for={:room}

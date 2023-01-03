@@ -395,7 +395,7 @@ defmodule ChatWeb.MainLive.Index do
     socket = start_chunked_upload(socket, entry, key, secret)
     link = Helpers.upload_chunk_url(ChatWeb.Endpoint, :put, key)
 
-    {:ok, %{uploader: "UpChunk", entrypoint: link}, socket}
+    {:ok, %{uploader: "UpChunk", entrypoint: link, uuid: entry.uuid}, socket}
   end
 
   def handle_chunked_progress(

@@ -30,6 +30,8 @@ import * as Chat from "./hooks/chat"
 import * as UpChunk from "./upchunk"
 import * as Flash from "./hooks/flash"
 
+window.uploads = {}
+
 let Uploaders = {}
 
 Uploaders.UpChunk = function(items, onViewError) {
@@ -37,14 +39,52 @@ Uploaders.UpChunk = function(items, onViewError) {
   const entries = [...items];
   const workers = new Array(2);
 
+  const activeUploads = () => {
+    let count = 0
+
+    for (const uuid in uploads) {
+      if (Object.hasOwnProperty.call(uploads, uuid)) {
+        const upload = uploads[uuid]
+
+        if (!upload.paused) {
+          count++
+        }
+      }
+    }
+
+    return count
+  }
+
+  const removeUpload = (uuid) => {
+    delete window.uploads[uuid]
+  }
+
+  const resumeNextUpload = () => {
+    for (const uuid in uploads) {
+      if (Object.hasOwnProperty.call(uploads, uuid)) {
+        const upload = uploads[uuid]
+
+        if (upload.paused) {
+          return upload.resume()
+        }
+      }
+    }
+  }
+
   const createTask = (entry) => {
     if (!entry) {
       return
     }
     return new Promise((resolve, reject) => {
       // create the upload session with UpChunk
-      let { file, meta: { entrypoint } } = entry;
+      let { file, meta: { entrypoint, uuid } } = entry;
       let upload = UpChunk.createUpload({ endpoint: entrypoint, file, chunkSize: 10240 });
+
+      if (activeUploads() >= 2) {
+        upload.pause()
+      }
+
+      window.uploads[uuid] = upload
 
       // stop uploading in the event of a view error
       onViewError(() => upload.pause())
@@ -58,12 +98,16 @@ Uploaders.UpChunk = function(items, onViewError) {
       upload.on("success", () => {
         entry.progress(100);
         resolve();
+        removeUpload(uuid)
+        resumeNextUpload()
       })
 
       // upload error triggers LiveView error
       upload.on("error", (e) => {
         reject(e);
         entry.error(e.detail.message);
+        removeUpload(uuid)
+        resumeNextUpload()
       })
     })
   }

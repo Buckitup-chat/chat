@@ -23,6 +23,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     Process.send_after(self(), :room_request, 500)
     Process.send_after(self(), :room_request_approved, 1500)
 
+    #IO.inspect "Init"
     socket
     |> assign(:mode, :lobby)
     |> assign(:lobby_mode, :chats)
@@ -46,7 +47,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     end)
 
     # todo: Interface should have room creating stage and enter room upon it is saved
-
+    #IO.inspect "NEW ROOM"
     socket
     |> Page.Login.store_new_room(new_room_identity)
     |> assign_room_list()
@@ -71,6 +72,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   end
 
   def show_new_room(socket, _room_card) do
+    #IO.inspect "SHOW NEW ROOM"
     socket
     |> assign_room_list()
   end
@@ -88,6 +90,8 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     Log.request_room_key(me, time, room.pub_key)
 
     ChangeTracker.on_saved(fn ->
+      IO.inspect "me"
+      IO.inspect me
       PubSub.broadcast!(
         Chat.PubSub,
         @topic,
@@ -95,6 +99,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
       )
     end)
 
+    #IO.inspect "REQUEST ROOM"
     socket
     |> assign_room_list()
   end
@@ -114,11 +119,12 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign(:db_status, status)
   end
 
-  def refresh_room_list(socket),
-    do:
+  def refresh_room_list(socket) do
+    #IO.inspect "REFRESH ROOM LIST"
       socket
       |> assign_room_list()
       |> assign_admin()
+  end
 
   def close(socket) do
     PubSub.unsubscribe(Chat.PubSub, @topic)
@@ -135,7 +141,8 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   defp assign_room_list(%{assigns: %{rooms: rooms}} = socket) do
     {joined, new} = Rooms.list(rooms)
-
+    #IO.inspect "assign room list"
+    #IO.inspect new, label: :new
     socket
     |> assign(:joined_rooms, joined)
     |> assign(:new_rooms, new)
@@ -191,7 +198,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
       |> Enum.flat_map(fn %{hash: hash} -> hash |> Rooms.join_approved_requests(me, time) end)
 
     ChangeTracker.await()
-
+    #IO.inspect "JOIN APPROVED ROOMS"
     socket
     |> assign(:rooms, joined_rooms ++ rooms)
     |> Page.Login.store()

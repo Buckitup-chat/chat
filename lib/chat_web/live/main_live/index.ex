@@ -11,7 +11,7 @@ defmodule ChatWeb.MainLive.Index do
   alias ChatWeb.MainLive.Page
   alias ChatWeb.Hooks.LocalTimeHook
   alias ChatWeb.Router.Helpers
-
+    
   on_mount LocalTimeHook
 
   @impl true
@@ -343,26 +343,6 @@ defmodule ChatWeb.MainLive.Index do
       </div>
     </.modal>
     """
-  end
-
-  def open_content(%JS{} = js, time \\ 100) do
-    js
-    |> JS.hide(transition: "fade-out", to: "#navbarTop", time: 0)
-    |> JS.hide(transition: "fade-out", to: "#navbarBottom", time: 0)
-    |> JS.remove_class("hidden sm:flex",
-      transition: "fade-in",
-      to: "#contentContainer",
-      time: time
-    )
-    |> JS.add_class("hidden", to: "#chatRoomBar", transition: "fade-out", time: 0)
-  end
-
-  def close_content(%JS{} = js, time \\ 100) do
-    js
-    |> JS.show(transition: "fade-in", to: "#navbarTop", display: "flex", time: time)
-    |> JS.show(transition: "fade-in", to: "#navbarBottom", display: "flex", time: time)
-    |> JS.add_class("hidden sm:flex", transition: "fade-out", to: "#contentContainer", time: 0)
-    |> JS.remove_class("hidden", to: "#chatRoomBar", transition: "fade-in", time: time)
   end
 
   def message_of(%{author_hash: _}), do: "room"

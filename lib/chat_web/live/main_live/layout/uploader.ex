@@ -11,16 +11,24 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   alias Phoenix.LiveView.{JS, UploadConfig, UploadEntry}
 
   attr :config, UploadConfig, required: true, doc: "upload config"
+  attr :uploads, :map, required: true, doc: "uploads metadata"
 
   def list(assigns) do
     ~H"""
     <%= for %UploadEntry{valid?: true} = entry <- @config.entries do %>
-      <.entry entry={entry} />
+      <.entry entry={entry} metadata={@uploads[entry.uuid]} />
     <% end %>
     """
   end
 
   attr :entry, UploadEntry, required: true, doc: "upload entry"
+  attr :metadata, UploadMetadata, doc: "upload metadata"
+
+  defp entry(%{metadata: nil} = assigns) do
+    ~H"""
+
+    """
+  end
 
   defp entry(assigns) do
     ~H"""
@@ -31,6 +39,20 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
           <div class="text-xs text-black/50">
             <%= @entry.progress %>%
           </div>
+
+          <%= if @metadata.status == :active do %>
+            <.link href="#" phx-click="upload:pause" phx-value-uuid={@entry.uuid}>Pause</.link>
+          <% else %>
+            <.link href="#" phx-click="upload:resume" phx-value-uuid={@entry.uuid}>Resume</.link>
+          <% end %>
+          <.link
+            href="#"
+            phx-click="upload:cancel"
+            phx-value-ref={@entry.ref}
+            phx-value-uuid={@entry.uuid}
+          >
+            Cancel
+          </.link>
         </div>
       </div>
     </div>

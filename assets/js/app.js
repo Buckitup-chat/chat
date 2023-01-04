@@ -30,102 +30,36 @@ import * as Chat from "./hooks/chat"
 import * as UpChunk from "./upchunk"
 import * as Flash from "./hooks/flash"
 
-window.uploads = {}
-
+let uploads = {}
 let Uploaders = {}
 
-Uploaders.UpChunk = function(items, onViewError) {
+Uploaders.UpChunk = (entries, onViewError) => {
+  entries.forEach(entry => {
+    // create the upload session with UpChunk
+    let { file, meta: { entrypoint, status, uuid } } = entry
+    let upload = UpChunk.createUpload({ endpoint: entrypoint, file, chunkSize: 10240 })
 
-  const entries = [...items];
-  const workers = new Array(2);
-
-  const activeUploads = () => {
-    let count = 0
-
-    for (const uuid in uploads) {
-      if (Object.hasOwnProperty.call(uploads, uuid)) {
-        const upload = uploads[uuid]
-
-        if (!upload.paused) {
-          count++
-        }
-      }
+    if (status == "paused") {
+      upload.pause()
     }
 
-    return count
-  }
+    uploads[uuid] = upload
 
-  const removeUpload = (uuid) => {
-    delete window.uploads[uuid]
-  }
+    // stop uploading in the event of a view error
+    onViewError(() => upload.pause())
 
-  const resumeNextUpload = () => {
-    for (const uuid in uploads) {
-      if (Object.hasOwnProperty.call(uploads, uuid)) {
-        const upload = uploads[uuid]
+    // upload error triggers LiveView error
+    upload.on("error", (e) => entry.error(e.detail.message))
 
-        if (upload.paused) {
-          return upload.resume()
-        }
-      }
-    }
-  }
-
-  const createTask = (entry) => {
-    if (!entry) {
-      return
-    }
-    return new Promise((resolve, reject) => {
-      // create the upload session with UpChunk
-      let { file, meta: { entrypoint, uuid } } = entry;
-      let upload = UpChunk.createUpload({ endpoint: entrypoint, file, chunkSize: 10240 });
-
-      if (activeUploads() >= 2) {
-        upload.pause()
-      }
-
-      window.uploads[uuid] = upload
-
-      // stop uploading in the event of a view error
-      onViewError(() => upload.pause())
-
-      // notify progress events to LiveView
-      upload.on("progress", (e) => {
-        if (e.detail < 100) { entry.progress(e.detail) }
-      })
-
-      // success completes the UploadEntry
-      upload.on("success", () => {
-        entry.progress(100);
-        resolve();
-        removeUpload(uuid)
-        resumeNextUpload()
-      })
-
-      // upload error triggers LiveView error
-      upload.on("error", (e) => {
-        reject(e);
-        entry.error(e.detail.message);
-        removeUpload(uuid)
-        resumeNextUpload()
-      })
+    // notify progress events to LiveView
+    upload.on("progress", (e) => {
+      if (e.detail < 100) { entry.progress(e.detail) }
     })
-  }
 
-  const assignNewTask = (task, i) => {
-    if (!task) {
-      return
-    }
-    task.finally(() => {
-      workers[i] = assignNewTask(createTask(entries.pop()), i);
-    })
-  }
-
-  workers.fill(true).map((_, i) => {
-    return assignNewTask(createTask(entries.pop()), i);
-  });
+    // success completes the UploadEntry
+    upload.on("success", () => entry.progress(100))
+  })
 }
-
 
 let Hooks = {}
 
@@ -236,7 +170,13 @@ const listeners = {
       const chatContent = document.querySelector('.a-content-block');
       chatContent.scrollTo({ top: chatContent.scrollHeight })
     }, 0)
-  }
+  },
+  "phx:upload:cancel": (e) => {
+    uploads[e.detail.uuid].abort()
+    delete uploads[e.detail.uuid]
+  },
+  "phx:upload:pause": (e) => { uploads[e.detail.uuid].pause() },
+  "phx:upload:resume": (e) => { uploads[e.detail.uuid].resume() }
 };
 for (key in listeners) {
   window.addEventListener(key, listeners[key]);

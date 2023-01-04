@@ -432,7 +432,7 @@
               </ul>
             </div>
 
-            <Layout.Uploader.list config={@uploads.file} />
+            <Layout.Uploader.list config={@uploads.file} uploads={@uploads_metadata} />
           </div>
           <div
             id="contentContainer"
@@ -846,7 +846,7 @@
               </div>
             </div>
 
-            <Layout.Uploader.list config={@uploads.file} />
+            <Layout.Uploader.list config={@uploads.file} uploads={@uploads_metadata} />
           </div>
           <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
             <%= unless @room do %>

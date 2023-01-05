@@ -18,8 +18,14 @@ defmodule ChatWeb.MainLive.Index do
   on_mount LocalTimeHook
 
   @impl true
-  def mount(params, _session, %{assigns: %{live_action: action}} = socket) do
+  def mount(
+        params,
+        %{"operating_system" => operating_system},
+        %{assigns: %{live_action: action}} = socket
+      ) do
     Process.flag(:sensitive, true)
+
+    socket = assign(socket, :operating_system, operating_system)
 
     if connected?(socket) do
       if action == :export do

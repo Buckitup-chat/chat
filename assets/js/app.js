@@ -24,6 +24,7 @@ import "phoenix_html"
 import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
+import AndroidMediaFileInput from "./hooks/android-media-file-input"
 import * as LocalStateStore from "./hooks/local-storage"
 import * as LocalTime from "./hooks/local-time"
 import * as Chat from "./hooks/chat"
@@ -61,7 +62,9 @@ Uploaders.UpChunk = (entries, onViewError) => {
   })
 }
 
-let Hooks = {}
+let Hooks = {
+  AndroidMediaFileInput
+}
 
 Hooks.LocalStateStore = LocalStateStore.hooks
 Hooks.LocalTime = LocalTime.hooks

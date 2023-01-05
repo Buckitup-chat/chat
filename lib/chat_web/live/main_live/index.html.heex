@@ -432,7 +432,7 @@
               </ul>
             </div>
 
-            <Layout.Uploader.list config={@uploads.file} uploads={@uploads_metadata} />
+            <Layout.Uploader.uploader config={@uploads.file} uploads={@uploads_metadata} />
           </div>
           <div
             id="contentContainer"
@@ -486,7 +486,13 @@
                     <% end %>
                   </div>
 
-                  <Layout.Uploader.in_progress? pub_key={@peer.pub_key} type={:dialog} uploads={@uploads_metadata} />
+                  <Layout.Uploader.in_progress?
+                    pub_key={@peer.pub_key}
+                    type={:dialog}
+                    uploads={@uploads_metadata}
+                  />
+
+                  <Layout.Uploader.mobile_uploader config={@uploads.file} operating_system={@operating_system} uploads={@uploads_metadata} />
                 </div>
               </div>
               <div
@@ -494,7 +500,7 @@
                 class="basis-[7%] w-full py-1.5 px-8 border border-white bg-white flex items-center fixed md:sticky bottom-0"
               >
                 <%= if @dialog_mode == :plain do %>
-                  <Layout.Uploader.file_form config={@uploads.file} type="dialog" />
+                  <Layout.Uploader.button type="dialog" />
 
                   <.form
                     :let={di}
@@ -846,7 +852,7 @@
               </div>
             </div>
 
-            <Layout.Uploader.list config={@uploads.file} uploads={@uploads_metadata} />
+            <Layout.Uploader.uploader config={@uploads.file} uploads={@uploads_metadata} />
           </div>
           <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
             <%= unless @room do %>
@@ -995,12 +1001,18 @@
                     <% end %>
                   </div>
 
-                  <Layout.Uploader.in_progress? pub_key={@room.pub_key} type={:room} uploads={@uploads_metadata} />
+                  <Layout.Uploader.in_progress?
+                    pub_key={@room.pub_key}
+                    type={:room}
+                    uploads={@uploads_metadata}
+                  />
+
+                  <Layout.Uploader.mobile_uploader config={@uploads.file} operating_system={@operating_system} uploads={@uploads_metadata} />
                 </div>
               </div>
               <div class="basis-[7%] w-full py-1.5 px-8 border border-white bg-white flex items-center fixed md:sticky bottom-0">
                 <%= if @room_mode == :plain do %>
-                  <Layout.Uploader.file_form config={@uploads.file} type="room" />
+                  <Layout.Uploader.button type="room" />
 
                   <.form
                     :let={di}

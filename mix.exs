@@ -72,7 +72,8 @@ defmodule Chat.MixProject do
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
       {:tailwind, "~> 0.1", runtime: Mix.env() == :dev},
       {:timex, "~> 3.7"},
-      {:zstream, "~> 0.6"}
+      {:zstream, "~> 0.6"},
+      {:ua_parser, github: "beam-community/ua_parser"}
     ]
   end
 

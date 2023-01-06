@@ -1,0 +1,100 @@
+# DB structures
+
+## User
+
+### User identity
+
+User account represented by name and a private key (generated on first login). It is stored on user side along with room keys(room private keys) that user has.
+
+```javascript
+[
+  [name, private_key],
+  [room_key1, room_key2, ...],
+  [] // contacts
+]
+```
+
+### User list
+
+User list is used to provide dialogs (chats) between users. Users are stored in following format
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:users, pub_key_hash},
+ %Card{name, pub_key_hash, pub_key}}
+```
+
+## Dialog (chat)
+
+Dialog binds together two users. They are references as `a` and `b`.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:dialogs, dialog_key},
+ %Dialog{a_pub_key, b_pub_key}}
+```
+
+Dialog key combines hashes of peer pub_keys
+
+#### Messages
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:dialog_message, dialog_key, index, message_id},
+ %Message{timestamp, is_a_to_b, a_enc_copy, b_enc_copy, type, message_id, version}}
+```
+
+## Room
+
+Since room has many users, it has its own private key. It allows holder of a key to read and write into room. Having a rooml key provides an access to it.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:rooms, room_pub_key_hash}
+ %Room{name, pub_key, room_type, requests, creator_pub_key_hash}}
+```
+
+#### Messages
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:room_message, room_pub_key_binhash, index, message
+ %Message{timestamp, author_hash, enc_content, message_type, version}}
+```
+
+## Messaging
+
+Room and dialog messages are the same in terms of content.
+
+Message types are
+
+* `:text` - short text message that can be encrypted w/ public key
+* `:memo` - longer text message
+* `:image`
+* `:file`
+* `:video`
+* `:room_request` - simple placeholder to draw private room members attention to room requests
+
+#### Memo
+
+```json
+{}
+```
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+
+{{:memo, }}
+```
+
+#### Image
+
+#### File
+
+#### Video

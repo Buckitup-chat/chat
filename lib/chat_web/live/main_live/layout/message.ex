@@ -236,7 +236,13 @@ defmodule ChatWeb.MainLive.Layout.Message do
     >
       <div class="py-1 px-2">
         <Layout.Card.hashed_name card={@author} style_spec={:room_invite} />
-        <p class="inline-flex">wants you to join the room</p>
+        <p class="inline-flex">
+          <%= if @is_mine? do %>
+            is invited by you into
+          <% else %>
+            wants you to join the room
+          <% end %>
+        </p>
         <Layout.Card.hashed_name room={@room_card} style_spec={:room_invite} />
       </div>
 

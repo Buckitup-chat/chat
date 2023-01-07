@@ -73,28 +73,152 @@ Room and dialog messages are the same in terms of content.
 
 Message types are
 
-* `:text` - short text message that can be encrypted w/ public key
+* `:text` - short text message that can be encrypted w/ public key (less than 200 bytes)
 * `:memo` - longer text message
 * `:image`
 * `:file`
 * `:video`
+* `:room_invite` - dialog message to invite user in a room. contains private room key
 * `:room_request` - simple placeholder to draw private room members attention to room requests
 
-#### Memo
+All the message types beside `:text` store content in different tables. Message itself becomes a key and a password in json format. Content in different tebles is encrypted with password stored in the message.
 
 ```json
-{}
+{key: password_base_64_endcoded}
 ```
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Memo
+
+Content of memo - plain text, encoded with the password.
 
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-
-{{:memo, }}
+{{:memo, memo_key}, enc_text}
 ```
 
-#### Image
+Memo index tracks who can read it
 
-#### File
+<!-- livebook:{"force_markdown":true} -->
 
-#### Video
+```elixir
+{{:memo_index, reader_key,}}
+*need memo_index to understand who has access to this*
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Files (image/video/file)
+
+File storing is more complex. We need to store file properties, as well as file body.
+
+File uploads chunk by chunk. Chunk size is 10 Mb.
+
+#### Upload process
+
+1. Generate chunk key and secret. Give client chunk key.
+2. Receive all the file chunks, encrypting them with secret and storing in db.
+3. When everything is uploaded, store file information and chunk key and secret.
+
+#### File structures
+
+Message contents
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:file, file_key}, enc_file_data}
+```
+
+The encoded data has following format
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%File{data: [
+  chunk_key,
+  chunk_secret,
+  file_size,
+  file_mime_type,
+  file_name,
+  human_file_size
+],
+timestamp,
+file_type
+}
+```
+
+#### Chunks
+
+Each chunk (up to 10Mb data content) stored as following
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:file_chunk, key, chunk_start, chunk_end},
+ enc_content}
+```
+
+Chunk keys are needed to speedup `:file_chunk` traversal skipping 10M of chunk content
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:chunk_key, {:file_chunk, key, chunk_start, chunk_end}},
+ true}
+```
+
+File index entries keep track of who can read a file.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:file_index, reader_hash, file_key},
+ true}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+#### Room invites
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:room_invite, invite_key},
+ enc_room_key}
+```
+
+Room invite index tracks who can reed it.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:room_invite_index, reader_hash, invite_key},
+ true}
+```
+
+## Action log (Feed)
+
+Action log keeps track of user actions
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:action_log, index, user_binhash},
+ {time, action, opts?}}
+```
+
+## Change Tracker
+
+Change tracker is used on places where we need to ensure that some data was written in DB.
+
+In the perfect world, we should not use it and split data flows to UI flow (for online users) and DB flow (for offline users). Offline users have no requirement of data being written right now.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:change_tracking_marker, uuid},
+ true}
+```

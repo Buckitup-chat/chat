@@ -4,6 +4,7 @@ defmodule ChatWeb.MainLive.Index do
 
   require Logger
   alias Phoenix.LiveView.JS
+  alias Phoenix.LiveView.UploadEntry
 
   alias Chat.ChunkedFiles
   alias Chat.Rooms
@@ -424,11 +425,37 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   def chunked_presign_url(entry, socket) do
-    {key, secret} = ChunkedFiles.new_upload()
-    {socket, status} = start_chunked_upload(socket, entry, key, secret)
+    key = get_file_key(entry, socket)
+
+    {next_chunk, secret} =
+      case ChunkedFiles.get_file(key) do
+        nil ->
+          {_key, secret} = ChunkedFiles.new_upload(key)
+          {0, secret}
+
+        secret ->
+          next_chunk = ChunkedFiles.next_chunk(key)
+          {next_chunk, secret}
+      end
+
+    {socket, uploader_data} = start_chunked_upload(socket, entry, key, secret, next_chunk)
     link = Helpers.upload_chunk_url(ChatWeb.Endpoint, :put, key)
 
-    {:ok, %{uploader: "UpChunk", entrypoint: link, status: status, uuid: entry.uuid}, socket}
+    uploader_data =
+      Map.merge(%{uploader: "UpChunk", entrypoint: link, uuid: entry.uuid}, uploader_data)
+
+    {:ok, uploader_data, socket}
+  end
+
+  defp get_file_key(%UploadEntry{} = entry, %{assigns: %{my_id: id}} = socket) do
+    destination =
+      socket
+      |> file_upload_destination()
+      |> Jason.encode!()
+      |> Base.encode64()
+
+    "#{id}:#{destination}:#{entry.client_relative_path}/#{entry.client_name}:#{entry.client_type}:#{entry.client_size}:#{entry.client_last_modified}"
+    |> Base.encode64()
   end
 
   def handle_chunked_progress(
@@ -459,7 +486,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_chunked_progress(_name, _entry, socket), do: noreply(socket)
 
-  defp start_chunked_upload(socket, entry, key, secret) do
+  defp start_chunked_upload(socket, entry, key, secret, next_chunk) do
     uploads = Map.get(socket.assigns, :uploads_metadata, %{})
 
     active_uploads =
@@ -480,7 +507,13 @@ defmodule ChatWeb.MainLive.Index do
       |> Map.put(:destination, file_upload_destination(socket))
       |> Map.put(:status, status)
 
-    {assign(socket, :uploads_metadata, Map.put(uploads, entry.uuid, metadata)), status}
+    uploader_data = %{
+      # chunkCount: next_chunk,
+      chunk_count: next_chunk,
+      status: status
+    }
+
+    {assign(socket, :uploads_metadata, Map.put(uploads, entry.uuid, metadata)), uploader_data}
   end
 
   defp file_upload_destination(

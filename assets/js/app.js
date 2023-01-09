@@ -25,10 +25,10 @@ import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import AndroidMediaFileInput from "./hooks/android-media-file-input"
+import * as UpChunk from "./upchunk"
 import * as LocalStateStore from "./hooks/local-storage"
 import * as LocalTime from "./hooks/local-time"
 import * as Chat from "./hooks/chat"
-import * as UpChunk from "./upchunk"
 import * as Flash from "./hooks/flash"
 
 let uploads = {}
@@ -37,8 +37,9 @@ let Uploaders = {}
 Uploaders.UpChunk = (entries, onViewError) => {
   entries.forEach(entry => {
     // create the upload session with UpChunk
-    let { file, meta: { entrypoint, status, uuid } } = entry
-    let upload = UpChunk.createUpload({ endpoint: entrypoint, file, chunkSize: 10240 })
+    let { file, meta: { chunk_count: chunkCount, entrypoint, status, uuid } } = entry
+    let upload = UpChunk.createUpload({ chunkSize: 10240, endpoint: entrypoint, file })
+    upload.chunkCount = chunkCount
 
     if (status == "paused") {
       upload.pause()
@@ -199,7 +200,7 @@ window.addEventListener("phx:page-loading-stop", () => {
   topbar.hide();
 });
 
-// back button fix 
+// back button fix
 window.addEventListener("popstate", e => {
   history.pushState(null, null, window.location.pathname);
 

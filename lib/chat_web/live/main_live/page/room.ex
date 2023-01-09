@@ -15,7 +15,9 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.Identity
   alias Chat.Log
   alias Chat.Memo
+  alias Chat.MemoIndex
   alias Chat.Messages
+  alias Chat.RoomInviteIndex
   alias Chat.Rooms
   alias Chat.UploadMetadata
   alias Chat.User
@@ -70,7 +72,8 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def send_text(
-        %{assigns: %{room: room, me: me, monotonic_offset: time_offset}} = socket,
+        %{assigns: %{room: room, me: me, room_map: rooms, monotonic_offset: time_offset}} =
+          socket,
         text
       ) do
     time = Chat.Time.monotonic_to_unix(time_offset)
@@ -80,16 +83,11 @@ defmodule ChatWeb.MainLive.Page.Room do
         nil
 
       content ->
-        # message =
         content
         |> Messages.Text.new(time)
         |> Rooms.add_new_message(me, room.pub_key)
+        |> MemoIndex.add(room, rooms[room.pub_key |> Utils.hash()])
         |> broadcast_new_message(room, me, time)
-
-        # message
-        # |> Rooms.on_saved(room.pub_key, fn ->
-        #   broadcast_new_message(message, room, me, time)
-        # end)
     end
 
     socket
@@ -190,6 +188,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     text
     |> Messages.Text.new(0)
     |> Rooms.update_message(msg_id, me, room_identity)
+    |> MemoIndex.add(room, room_identity)
 
     broadcast_message_updated(msg_id, room, me, time)
 
@@ -313,6 +312,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> Map.put(:name, room_name)
     |> Messages.RoomInvite.new()
     |> Dialogs.add_new_message(me, dialog)
+    |> RoomInviteIndex.add(dialog, me)
 
     socket
     |> put_flash(:info, "Invitation Sent!")

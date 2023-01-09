@@ -12,6 +12,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.Identity
   alias Chat.Log
   alias Chat.Memo
+  alias Chat.MemoIndex
   alias Chat.Messages
   alias Chat.RoomInvites
   alias Chat.UploadMetadata
@@ -79,14 +80,10 @@ defmodule ChatWeb.MainLive.Page.Dialog do
         nil
 
       text ->
-        # message =
         %Messages.Text{text: text, timestamp: time}
         |> Dialogs.add_new_message(me, dialog)
+        |> MemoIndex.add(dialog, me)
         |> broadcast_new_message(dialog, me, time)
-
-        # Dialogs.on_saved(message, dialog, fn ->
-        #   broadcast_new_message(message, dialog, me, time)
-        # end)
     end
 
     socket
@@ -169,6 +166,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     text
     |> Messages.Text.new(time)
     |> Dialogs.update_message(msg_id, me, dialog)
+    |> MemoIndex.add(dialog, me)
 
     broadcast_message_updated(msg_id, dialog, me, time)
 

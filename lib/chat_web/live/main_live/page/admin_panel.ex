@@ -3,6 +3,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [push_event: 3]
 
+  alias Chat.RoomInviteIndex
   alias Phoenix.PubSub
 
   alias Chat.AdminRoom
@@ -84,6 +85,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
       |> then(&Map.get(rooms, &1))
       |> Messages.RoomInvite.new()
       |> Dialogs.add_new_message(me, dialog)
+      |> RoomInviteIndex.add(dialog, me)
     end
 
     socket

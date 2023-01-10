@@ -3,6 +3,8 @@ defmodule ChatWeb.Hooks.LocalTimeHook do
   import Phoenix.Component, only: [assign: 2]
   import Phoenix.LiveView, only: [attach_hook: 4]
 
+  alias Chat.StaleUploadsPruner
+
   require Logger
 
   def on_mount(:default, _params, _session, socket) do
@@ -26,6 +28,8 @@ defmodule ChatWeb.Hooks.LocalTimeHook do
     timestamp
     |> DateTime.from_unix!()
     |> Chat.Time.set_time()
+
+    StaleUploadsPruner.maybe_set_timestamp(timestamp)
 
     socket
     |> assign(

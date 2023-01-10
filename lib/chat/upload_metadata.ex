@@ -9,8 +9,9 @@ defmodule Chat.UploadMetadata do
     - :dialog (optional)
     - :pub_key - used for destination identification
     - :type - can be either :dialog or :room
+  - :upload_key - key for the Chat.UploadIndex entry
   - :status - either :active or :paused
   """
 
-  defstruct [:credentials, :status, destination: %{}]
+  defstruct [:credentials, :status, :upload_key, destination: %{}]
 end

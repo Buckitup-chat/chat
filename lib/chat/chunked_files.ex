@@ -8,9 +8,9 @@ defmodule Chat.ChunkedFiles do
   @type key :: String.t()
   @type secret :: String.t()
 
-  @spec new_upload(key()) :: {key(), secret()}
-  def new_upload(key) do
-    ChunkedFilesBroker.generate(key)
+  @spec new_upload() :: {key(), secret()}
+  def new_upload() do
+    ChunkedFilesBroker.generate()
   end
 
   def get_file(key) do

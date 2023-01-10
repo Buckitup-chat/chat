@@ -433,12 +433,12 @@ defmodule ChatWeb.MainLive.Index do
       case UploadIndex.get(upload_key) do
         nil ->
           {key, secret} = ChunkedFiles.new_upload()
-          timestamp = Chat.Time.monotonic_to_unix(socket.assigns.monotonic_offset)
-          upload = %Upload{key: key, secret: secret, timestamp: timestamp}
-          UploadIndex.add(upload_key, upload)
+          add_upload_to_index(socket, upload_key, key, secret)
           {0, key, secret}
 
         %Upload{} = upload ->
+          UploadIndex.delete(upload_key)
+          add_upload_to_index(socket, upload_key, upload.key, upload.secret)
           next_chunk = ChunkedFiles.next_chunk(upload.key)
           {next_chunk, upload.key, upload.secret}
       end
@@ -463,6 +463,12 @@ defmodule ChatWeb.MainLive.Index do
 
     "#{id}:#{destination}:#{entry.client_relative_path}/#{entry.client_name}:#{entry.client_type}:#{entry.client_size}:#{entry.client_last_modified}"
     |> Base.encode64()
+  end
+
+  defp add_upload_to_index(socket, upload_key, key, secret) do
+    timestamp = Chat.Time.monotonic_to_unix(socket.assigns.monotonic_offset)
+    upload = %Upload{key: key, secret: secret, timestamp: timestamp}
+    UploadIndex.add(upload_key, upload)
   end
 
   def handle_chunked_progress(

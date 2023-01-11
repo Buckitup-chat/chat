@@ -25,6 +25,7 @@ import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import AndroidMediaFileInput from "./hooks/android-media-file-input"
+import UploadInProgress from "./hooks/upload-in-progress"
 import * as UpChunk from "./upchunk"
 import * as LocalStateStore from "./hooks/local-storage"
 import * as LocalTime from "./hooks/local-time"
@@ -64,7 +65,8 @@ Uploaders.UpChunk = (entries, onViewError) => {
 }
 
 let Hooks = {
-  AndroidMediaFileInput
+  AndroidMediaFileInput,
+  UploadInProgress
 }
 
 Hooks.LocalStateStore = LocalStateStore.hooks

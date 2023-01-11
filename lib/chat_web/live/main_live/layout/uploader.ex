@@ -15,7 +15,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
 
   def uploader(assigns) do
     ~H"""
-    <div id="file-uploader">
+    <div class="flex flex-col m-2 bg-purple50 rounded-lg" id="file-uploader">
       <.entries config={@config} uploads={@uploads} />
     </div>
     """
@@ -27,7 +27,11 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
 
   def mobile_uploader(assigns) do
     ~H"""
-    <div id="mobile-file-uploader" style="display: none;">
+    <div
+      class="flex flex-col m-2 bg-purple50 rounded-lg"
+      id="mobile-file-uploader"
+      style="display: none;"
+    >
       <.file_form config={@config} operating_system={@operating_system} />
 
       <.entries config={@config} mobile?={true} uploads={@uploads} />
@@ -58,11 +62,19 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   attr :mobile?, :boolean, default: false, doc: "whether it's a mobile file uploader"
   attr :uploads, :map, required: true, doc: "uploads metadata"
 
+  defp entries(%{uploads: uploads} = assigns) when map_size(uploads) > 0 do
+    ~H"""
+    <div class="px-2 py-1">
+      <%= for %UploadEntry{valid?: true} = entry <- @config.entries do %>
+        <.entry entry={entry} metadata={@uploads[entry.uuid]} mobile?={@mobile?} />
+      <% end %>
+    </div>
+    """
+  end
+
   defp entries(assigns) do
     ~H"""
-    <%= for %UploadEntry{valid?: true} = entry <- @config.entries do %>
-      <.entry entry={entry} metadata={@uploads[entry.uuid]} mobile?={@mobile?} />
-    <% end %>
+
     """
   end
 
@@ -79,32 +91,50 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   defp entry(assigns) do
     ~H"""
     <div
-      class="m-1 flex justify-end"
+      class="flex my-2 bg-white border-purple relative rounded-lg w-full z-0"
       id={if(@mobile?, do: "mobile-", else: "") <> "upload-#{@entry.uuid}"}
     >
-      <div class="bg-purple50 max-w-xxs sm:max-w-md min-w-[180px] rounded-lg flex items-center justify-between">
-        <div class="w-36 flex flex-col pr-3">
-          <span class="truncate text-xs"><%= @entry.client_name %></span>
-          <div class="text-xs text-black/50">
-            <%= @entry.progress %>%
-          </div>
-
-          <%= if @metadata.status == :active do %>
-            <.link href="#" phx-click="upload:pause" phx-value-uuid={@entry.uuid}>Pause</.link>
-          <% else %>
-            <.link href="#" phx-click="upload:resume" phx-value-uuid={@entry.uuid}>Resume</.link>
-          <% end %>
-          <.link
-            href="#"
-            phx-click="upload:cancel"
-            phx-value-ref={@entry.ref}
-            phx-value-uuid={@entry.uuid}
-          >
-            Cancel
-          </.link>
+      <div
+        class={"absolute top-0 left-0 h-full bg-purple z-10 transition-all " <> if(@entry.progress == 100, do: "rounded-lg", else: "rounded-l-lg")}
+        style={"width: #{@entry.progress}%;"}
+      >
+      </div>
+      <div class="flex flex-row w-full p-2 items-center justify-between z-20 text-black/50">
+        <div class="flex text-xs min-w-[20%] max-w-[50%]">
+          <span class="truncate"><%= @entry.client_name %></span>
         </div>
+        <div class="flex text-xs text-black/50"><%= @entry.progress %>%</div>
+
+        <%= if @metadata.status == :active do %>
+          <.upload_control phx-click="upload:pause" phx-value-uuid={@entry.uuid}>
+            Pause
+          </.upload_control>
+        <% else %>
+          <.upload_control phx-click="upload:resume" phx-value-uuid={@entry.uuid}>
+            Resume
+          </.upload_control>
+        <% end %>
+        <.upload_control
+          phx-click="upload:cancel"
+          phx-value-ref={@entry.ref}
+          phx-value-uuid={@entry.uuid}
+        >
+          Cancel
+        </.upload_control>
       </div>
     </div>
+    """
+  end
+
+  attr :class, :string, default: nil, doc: "classes to append"
+  attr :rest, :global, doc: "rest of the attrs"
+  slot :inner_block, required: true
+
+  defp upload_control(assigns) do
+    ~H"""
+    <.link class={"flex text-xs" <> if(@class, do: " #{@class}", else: "")} href="#" {@rest}>
+      <%= render_slot(@inner_block) %>
+    </.link>
     """
   end
 
@@ -128,14 +158,18 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     <.form
       for={:file}
       id="uploader-file-form"
-      class="column column-50 column-offset-50"
+      class="flex flex-col m-2 column column-50 column-offset-50"
       phx-drop-target={@config.ref}
     >
-      <.live_file_input class="file-input" upload={@config} />
+      <.live_file_input
+        class="file-input block p-2 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"
+        upload={@config}
+      />
 
       <%= if @operating_system == "Android" do %>
         <input
           accept="audio/*,image/*,video/*"
+          class="block p-2 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"
           data-ref={@config.ref}
           id={"#{@config.ref}-android"}
           phx-hook="AndroidMediaFileInput"
@@ -154,7 +188,26 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   def in_progress?(assigns) do
     ~H"""
     <%= if Enum.any?(@uploads, fn {_uuid, %UploadMetadata{} = metadata} -> metadata.destination.type == @type and metadata.destination.pub_key == @pub_key end) do %>
-      Upload in progress
+      <div class="flex flex-row justify-end" id="upload-in-progress" phx-hook="UploadInProgress">
+        <div class="m-1 sm:mx-8 bg-purple50 rounded-lg shadow-lg inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm text-black/50 shadow transition ease-in-out duration-150">
+          <svg
+            class="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle class="opacity-50" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+            </circle>
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            >
+            </path>
+          </svg>
+          Upload in progress...
+        </div>
+      </div>
     <% end %>
     """
   end

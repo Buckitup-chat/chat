@@ -180,6 +180,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       />
       <.timestamp msg={@msg} timezone={@timezone} />
       <.image chat_type={@chat_type} msg={@msg} export?={@export?} file={@file} />
+      <.media_file_info file={@file} />
     </div>
     """
   end
@@ -302,6 +303,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       />
       <.timestamp msg={@msg} timezone={@timezone} />
       <video src={@file.url} class="a-video" controls />
+      <.media_file_info file={@file} />
     </div>
     """
   end
@@ -491,7 +493,8 @@ defmodule ChatWeb.MainLive.Layout.Message do
     })
   end
 
-  defp assign_file(%{msg: %{content: json, type: :file}} = assigns) do
+  defp assign_file(%{msg: %{content: json, type: type}} = assigns)
+       when type in [:file, :image, :video] do
     {id, secret} = StorageId.from_json(json)
     [_, _, _, _, name, size] = Files.get(id, secret)
 
@@ -500,13 +503,6 @@ defmodule ChatWeb.MainLive.Layout.Message do
       size: size,
       url: get_file_url(:file, id, secret)
     })
-  end
-
-  defp assign_file(%{msg: %{content: json, type: type}} = assigns)
-       when type in [:image, :video] do
-    {id, secret} = StorageId.from_json(json)
-
-    assign(assigns, :file, %{url: get_file_url(type, id, secret)})
   end
 
   defp assign_file(assigns), do: assign(assigns, :file, nil)
@@ -568,6 +564,17 @@ defmodule ChatWeb.MainLive.Layout.Message do
   defp file_icon(assigns) do
     ~H"""
     <.icon id="document" class="w-14 h-14 flex fill-black/50" />
+    """
+  end
+
+  attr :file, :map, required: true, doc: "file map"
+
+  defp media_file_info(assigns) do
+    ~H"""
+    <div class="w-full flex flex-row justify-between px-3 py-2">
+      <span class="truncate text-xs x-file" href={@file.url}><%= @file.name %></span>
+      <span class="text-xs text-black/50 whitespace-pre-line"><%= @file.size %></span>
+    </div>
     """
   end
 

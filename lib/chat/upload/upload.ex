@@ -1,3 +1,3 @@
-defmodule Chat.Upload do
+defmodule Chat.Upload.Upload do
   defstruct [:key, :secret, :timestamp]
 end

@@ -1,9 +1,8 @@
-defmodule Chat.StaleUploadsPruner do
+defmodule Chat.Upload.StaleUploadsPruner do
   use GenServer
 
   alias Chat.ChunkedFiles
-  alias Chat.Upload
-  alias Chat.UploadIndex
+  alias Chat.Upload.{Upload, UploadIndex}
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, :ok, Keyword.merge([name: __MODULE__], opts))

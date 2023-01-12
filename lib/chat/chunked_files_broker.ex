@@ -4,7 +4,7 @@ defmodule Chat.ChunkedFilesBroker do
 
   alias Chat.Utils
 
-  def generate() do
+  def generate do
     key = UUID.uuid4()
     secret = Utils.generate_binary_encrypt_key()
 

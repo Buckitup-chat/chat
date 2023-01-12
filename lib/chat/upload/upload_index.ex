@@ -1,8 +1,8 @@
-defmodule Chat.UploadIndex do
+defmodule Chat.Upload.UploadIndex do
   @moduledoc "Keeps an index of uploads"
 
   alias Chat.Db
-  alias Chat.Upload
+  alias Chat.Upload.Upload
 
   def add(key, %Upload{} = upload) do
     Db.put({:upload_index, key}, upload)

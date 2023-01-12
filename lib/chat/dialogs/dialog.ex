@@ -35,13 +35,18 @@ defmodule Chat.Dialogs.Dialog do
     end)
   end
 
-  def dialog_key(%__MODULE__{a_key: a_key, b_key: b_key}) do
+  def dialog_key(%__MODULE__{} = dialog) do
+    dialog
+    |> dialog_hash()
+    |> Utils.binhash()
+  end
+
+  def dialog_hash(%__MODULE__{a_key: a_key, b_key: b_key}) do
     [a_key, b_key]
     |> Enum.map(&Utils.hash/1)
     |> Enum.sort()
     |> Enum.join()
     |> Utils.hash()
-    |> Utils.binhash()
   end
 end
 
@@ -49,12 +54,9 @@ defimpl Jason.Encoder, for: Chat.Dialogs.Dialog do
   alias Chat.Dialogs.Dialog
   alias Chat.Utils
 
-  def encode(%Dialog{a_key: a_key, b_key: b_key}, opts) do
-    [a_key, b_key]
-    |> Enum.map(&Utils.hash/1)
-    |> Enum.sort()
-    |> Enum.join()
-    |> Utils.hash()
+  def encode(%Dialog{a_key: a_key, b_key: b_key} = dialog, opts) do
+    dialog
+    |> Dialog.dialog_hash()
     |> Jason.Encode.string(opts)
   end
 end

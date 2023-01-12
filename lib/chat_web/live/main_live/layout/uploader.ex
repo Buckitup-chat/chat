@@ -7,7 +7,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
 
   use ChatWeb, :component
 
-  alias Chat.UploadMetadata
+  alias Chat.Upload.UploadMetadata
   alias Phoenix.LiveView.{JS, UploadConfig, UploadEntry}
 
   attr :config, UploadConfig, required: true, doc: "upload config"

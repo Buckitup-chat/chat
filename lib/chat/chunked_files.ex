@@ -9,7 +9,7 @@ defmodule Chat.ChunkedFiles do
   @type secret :: String.t()
 
   @spec new_upload() :: {key(), secret()}
-  def new_upload() do
+  def new_upload do
     ChunkedFilesBroker.generate()
   end
 
@@ -19,8 +19,8 @@ defmodule Chat.ChunkedFiles do
 
   def next_chunk(key) do
     Db.list({
-      {:file_chunk, key, 0, 0},
-      {:file_chunk, key, nil, nil}
+      {:chunk_key, {:file_chunk, key, 0, 0}},
+      {:chunk_key, {:file_chunk, key, nil, nil}}
     })
     |> Enum.count()
   end

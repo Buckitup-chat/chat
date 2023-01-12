@@ -8,9 +8,8 @@ defmodule ChatWeb.MainLive.Index do
 
   alias Chat.ChunkedFiles
   alias Chat.Rooms
-  alias Chat.Upload
-  alias Chat.UploadIndex
-  alias Chat.UploadMetadata
+  alias Chat.Upload.{Upload, UploadIndex, UploadMetadata}
+  alias Chat.Utils
   alias ChatWeb.MainLive.Layout
   alias ChatWeb.MainLive.Page
   alias ChatWeb.Hooks.LocalTimeHook
@@ -461,8 +460,17 @@ defmodule ChatWeb.MainLive.Index do
       |> Jason.encode!()
       |> Base.encode64()
 
-    "#{id}:#{destination}:#{entry.client_relative_path}/#{entry.client_name}:#{entry.client_type}:#{entry.client_size}:#{entry.client_last_modified}"
-    |> Base.encode64()
+    [
+      id,
+      destination,
+      entry.client_relative_path,
+      entry.client_name,
+      entry.client_type,
+      entry.client_size,
+      entry.client_last_modified
+    ]
+    |> Enum.join(":")
+    |> Utils.hash()
   end
 
   defp add_upload_to_index(socket, upload_key, key, secret) do
@@ -537,9 +545,9 @@ defmodule ChatWeb.MainLive.Index do
        do: %{dialog: dialog, pub_key: peer_pub_key, type: :dialog}
 
   defp file_upload_destination(
-         %{assigns: %{lobby_mode: :rooms, room: %{pub_key: room_pub_key} = room}} = _socket
+         %{assigns: %{lobby_mode: :rooms, room: %{pub_key: room_pub_key}}} = _socket
        ),
-       do: %{pub_key: room_pub_key, room: room, type: :room}
+       do: %{pub_key: room_pub_key, type: :room}
 
   defp maybe_resume_next_upload(%{assigns: %{uploads_metadata: uploads}} = socket) do
     active_uploads =

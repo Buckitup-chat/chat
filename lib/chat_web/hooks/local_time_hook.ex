@@ -3,7 +3,7 @@ defmodule ChatWeb.Hooks.LocalTimeHook do
   import Phoenix.Component, only: [assign: 2]
   import Phoenix.LiveView, only: [attach_hook: 4]
 
-  alias Chat.StaleUploadsPruner
+  alias Chat.Upload.StaleUploadsPruner
 
   require Logger
 

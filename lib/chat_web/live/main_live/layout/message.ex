@@ -34,7 +34,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :peer, Card, doc: "the other user - used only for :dialog chat type"
   attr :room, Room, default: nil, doc: "room access was requested to"
   attr :timezone, :string, required: true, doc: "needed to render the timestamp"
-  attr :room_map, :map, default: %{}, doc: "the list of room keys"
+  attr :room_keys, :map, default: [], doc: "the list of room keys"
 
   def message_block(assigns) do
     assigns =
@@ -90,7 +90,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
           msg={@msg}
           room={@room}
           timezone={@timezone}
-          room_map={@room_map}
+          room_keys={@room_keys}
         />
       </div>
 
@@ -142,7 +142,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :msg, :map, required: true, doc: "message struct"
   attr :room, Room, default: nil, doc: "room access was requested to"
   attr :timezone, :string, required: true, doc: "needed to render the timestamp"
-  attr :room_map, :map, doc: "the list of room keys"
+  attr :room_keys, :map, doc: "the list of room keys"
 
   defp message(%{msg: %{type: :file}} = assigns) do
     ~H"""
@@ -251,7 +251,16 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
       <%= unless @export? or @is_mine? do %>
         <div class="px-2 my-1 flex items-center justify-between">
-          <%= unless @room_map[@room_card.hash] do %>
+          <%= if @room_card.hash in @room_keys do %>
+            <button
+              class="w-full h-12 border-0 rounded-lg bg-grayscale text-white"
+              phx-click="dialog/message/accept-room-invite-and-open-room"
+              phx-value-id={@msg.id}
+              phx-value-index={@msg.index}
+            >
+              Go to Room
+            </button>
+          <% else %>
             <button
               class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
               phx-click="dialog/message/accept-room-invite"
@@ -267,15 +276,6 @@ defmodule ChatWeb.MainLive.Layout.Message do
               phx-value-index={@msg.index}
             >
               Accept and Open
-            </button>
-          <% else %>
-            <button
-              class="w-full h-12 border-0 rounded-lg bg-grayscale text-white"
-              phx-click="dialog/message/accept-room-invite-and-open-room"
-              phx-value-id={@msg.id}
-              phx-value-index={@msg.index}
-            >
-              Go to Room
             </button>
           <% end %>
         </div>

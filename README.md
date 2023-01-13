@@ -17,4 +17,5 @@
 # Technical info
 
   * [DB structure](./lib/chat/db_structures.livemd)
+  * [Room approval flow](./lib/chat/rooms/approve_flow.livemd)
 

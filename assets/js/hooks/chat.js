@@ -1,16 +1,14 @@
 export const hooks = {
   mounted() {
+    this.loader = document.getElementById('chat-loader')
     this.pending = this.page();
     this.setScrollTop();
+    this.loadMorePages(2);
 
     this.el.addEventListener("scroll", e => {
       if (this.pending === this.page() && this.el.scrollTop === 0 && this.hasMoreMessagesToLoad()) {
         this.oldScrollHeight = this.el.scrollHeight;
-        this.pending = Number(this.page()) + 1;
-
-        this.pushEvent("chat:load-more", {}, (reply, ref) => {
-          this.setScrollTop(this.oldScrollHeight)
-        })
+        this.loadMorePages(3);
       }
     })
 
@@ -86,5 +84,30 @@ export const hooks = {
 
   hasMoreMessagesToLoad() {
     return this.el.dataset.hasMoreMessages === 'true'
+  },
+
+  loadMorePages(pages) {
+    if (this.pending === this.page() && this.hasMoreMessagesToLoad()) {
+      this.showLoader()
+      this.pending = Number(this.page()) + 1;
+
+      this.pushEvent("chat:load-more", {}, (reply, ref) => {
+        this.setScrollTop(this.oldScrollHeight);
+
+        if (pages > 1) {
+          setTimeout(() => { this.loadMorePages(pages - 1) }, 500);
+        } else {
+          this.hideLoader()
+        }
+      })
+    }
+  },
+
+  hideLoader() {
+    this.loader.classList.add('hidden')
+  },
+
+  showLoader() {
+    this.loader.classList.remove('hidden')
   }
 }

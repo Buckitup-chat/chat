@@ -426,7 +426,7 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   def chunked_presign_url(entry, socket) do
-    upload_key = get_upload_key(entry, socket)
+    upload_key = get_upload_key(entry, socket.assigns)
 
     {next_chunk, key, secret} =
       case UploadIndex.get(upload_key) do
@@ -453,9 +453,9 @@ defmodule ChatWeb.MainLive.Index do
     {:ok, uploader_data, socket}
   end
 
-  defp get_upload_key(%UploadEntry{} = entry, %{assigns: %{my_id: id}} = socket) do
+  defp get_upload_key(%UploadEntry{} = entry, %{my_id: id} = assigns) do
     destination =
-      socket
+      assigns
       |> file_upload_destination()
       |> Jason.encode!()
       |> Base.encode64()
@@ -526,7 +526,7 @@ defmodule ChatWeb.MainLive.Index do
     metadata =
       %UploadMetadata{}
       |> Map.put(:credentials, {key, secret})
-      |> Map.put(:destination, file_upload_destination(socket))
+      |> Map.put(:destination, file_upload_destination(socket.assigns))
       |> Map.put(:status, status)
       |> Map.put(:upload_key, upload_key)
 
@@ -538,16 +538,15 @@ defmodule ChatWeb.MainLive.Index do
     {assign(socket, :uploads_metadata, Map.put(uploads, entry.uuid, metadata)), uploader_data}
   end
 
-  defp file_upload_destination(
-         %{assigns: %{dialog: dialog, lobby_mode: :chats, peer: %{pub_key: peer_pub_key}}} =
-           _socket
-       ),
+  defp file_upload_destination(%{
+         dialog: dialog,
+         lobby_mode: :chats,
+         peer: %{pub_key: peer_pub_key}
+       }),
        do: %{dialog: dialog, pub_key: peer_pub_key, type: :dialog}
 
-  defp file_upload_destination(
-         %{assigns: %{lobby_mode: :rooms, room: %{pub_key: room_pub_key}}} = _socket
-       ),
-       do: %{pub_key: room_pub_key, type: :room}
+  defp file_upload_destination(%{lobby_mode: :rooms, room: %{pub_key: room_pub_key}}),
+    do: %{pub_key: room_pub_key, type: :room}
 
   defp maybe_resume_next_upload(%{assigns: %{uploads_metadata: uploads}} = socket) do
     active_uploads =

@@ -4,19 +4,30 @@ defmodule ChatWeb.MainLive.Index do
 
   require Logger
   alias Phoenix.LiveView.JS
+  alias Phoenix.LiveView.UploadEntry
 
   alias Chat.ChunkedFiles
   alias Chat.Rooms
+  alias Chat.Upload.{Upload, UploadIndex, UploadMetadata}
+  alias Chat.Utils
   alias ChatWeb.MainLive.Layout
   alias ChatWeb.MainLive.Page
   alias ChatWeb.Hooks.LocalTimeHook
   alias ChatWeb.Router.Helpers
 
+  @max_concurrent_uploads 2
+
   on_mount LocalTimeHook
 
   @impl true
-  def mount(params, _session, %{assigns: %{live_action: action}} = socket) do
+  def mount(
+        params,
+        %{"operating_system" => operating_system},
+        %{assigns: %{live_action: action}} = socket
+      ) do
     Process.flag(:sensitive, true)
+
+    socket = assign(socket, :operating_system, operating_system)
 
     if connected?(socket) do
       if action == :export do
@@ -33,11 +44,8 @@ defmodule ChatWeb.MainLive.Index do
           monotonic_offset: 0
         )
         |> LocalTimeHook.assign_time(Phoenix.LiveView.get_connect_params(socket)["tz_info"])
-        |> allow_image_upload(:image)
-        |> allow_image_upload(:room_image)
         |> allow_any500m_upload(:my_keys_file)
-        |> allow_chunked_upload(:dialog_file, max_entries: 2000)
-        |> allow_chunked_upload(:room_file, max_entries: 2000)
+        |> allow_file_upload()
         |> Page.Login.check_stored()
         |> ok()
       end
@@ -271,6 +279,31 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("upload:cancel", %{"ref" => ref, "uuid" => uuid}, socket) do
+    uploads = Map.get(socket.assigns, :uploads_metadata, %{})
+
+    {:noreply,
+     socket
+     |> assign(:uploads_metadata, Map.delete(uploads, uuid))
+     |> cancel_upload(:file, ref)
+     |> push_event("upload:cancel", %{uuid: uuid})
+     |> maybe_resume_next_upload()}
+  end
+
+  def handle_event("upload:pause", %{"uuid" => uuid}, socket) do
+    uploads = Map.get(socket.assigns, :uploads_metadata, %{})
+    metadata = Map.put(uploads[uuid], :status, :paused)
+
+    {:noreply,
+     socket
+     |> assign(:uploads_metadata, Map.put(uploads, uuid, metadata))
+     |> push_event("upload:pause", %{uuid: uuid})}
+  end
+
+  def handle_event("upload:resume", %{"uuid" => uuid}, socket) do
+    {:noreply, resume_upload(socket, uuid)}
+  end
+
   @impl true
   def handle_info({:new_user, card}, socket) do
     socket
@@ -368,17 +401,6 @@ defmodule ChatWeb.MainLive.Index do
   def message_of(%{author_hash: _}), do: "room"
   def message_of(_), do: "dialog"
 
-  defp allow_image_upload(socket, type) do
-    socket
-    |> allow_upload(type,
-      accept: ~w(.jpg .jpeg .png),
-      auto_upload: true,
-      max_entries: 50,
-      max_file_size: 60_000_000,
-      progress: &handle_progress/3
-    )
-  end
-
   defp allow_any500m_upload(socket, type, opts \\ []) do
     socket
     |> allow_upload(type,
@@ -390,56 +412,167 @@ defmodule ChatWeb.MainLive.Index do
     )
   end
 
-  defp allow_chunked_upload(socket, type, opts) do
+  defp allow_file_upload(socket) do
     socket
-    |> allow_upload(type,
-      auto_upload: true,
-      max_file_size: 102_400_000_000,
+    |> allow_upload(:file,
       accept: :any,
-      max_entries: Keyword.get(opts, :max_entries, 1),
+      auto_upload: true,
       external: &chunked_presign_url/2,
+      max_entries: 2000,
+      max_file_size: 102_400_000_000,
       progress: &handle_chunked_progress/3
     )
+    |> assign(:uploads_metadata, %{})
   end
 
   def chunked_presign_url(entry, socket) do
-    {key, secret} = ChunkedFiles.new_upload()
-    socket = start_chunked_upload(socket, entry, key, secret)
-    link = Helpers.upload_chunk_url(ChatWeb.Endpoint, :put, key)
+    upload_key = get_upload_key(entry, socket.assigns)
 
-    {:ok, %{uploader: "UpChunk", entrypoint: link}, socket}
+    {next_chunk, secret} =
+      case UploadIndex.get(upload_key) do
+        nil ->
+          secret = ChunkedFiles.new_upload(upload_key)
+          add_upload_to_index(socket, upload_key, secret)
+          {0, secret}
+
+        %Upload{} = upload ->
+          UploadIndex.delete(upload_key)
+          add_upload_to_index(socket, upload_key, upload.secret)
+          next_chunk = ChunkedFiles.next_chunk(upload_key)
+          {next_chunk, upload.secret}
+      end
+
+    {socket, uploader_data} = start_chunked_upload(socket, entry, upload_key, secret, next_chunk)
+
+    link = Helpers.upload_chunk_url(ChatWeb.Endpoint, :put, upload_key)
+
+    uploader_data =
+      Map.merge(%{uploader: "UpChunk", entrypoint: link, uuid: entry.uuid}, uploader_data)
+
+    {:ok, uploader_data, socket}
+  end
+
+  defp get_upload_key(%UploadEntry{} = entry, %{my_id: id} = assigns) do
+    destination =
+      assigns
+      |> file_upload_destination()
+      |> Jason.encode!()
+      |> Base.encode64()
+
+    [
+      id,
+      destination,
+      entry.client_relative_path,
+      entry.client_name,
+      entry.client_type,
+      entry.client_size,
+      entry.client_last_modified
+    ]
+    |> Enum.join(":")
+    |> Utils.hash()
+  end
+
+  defp add_upload_to_index(socket, key, secret) do
+    timestamp = Chat.Time.monotonic_to_unix(socket.assigns.monotonic_offset)
+    upload = %Upload{secret: secret, timestamp: timestamp}
+    UploadIndex.add(key, upload)
   end
 
   def handle_chunked_progress(
-        file,
+        _name,
         %{progress: 100, uuid: uuid} = entry,
-        %{assigns: %{chunked_uploads: uploads}} = socket
+        %{assigns: %{uploads_metadata: uploads}} = socket
       ) do
     "[upload] finalizing" |> Logger.warn()
-    {key, _} = chunked_keys = uploads[uuid]
+    %UploadMetadata{} = metadata = uploads[uuid]
+    {key, _} = metadata.credentials
     ChunkedFiles.mark_consumed(key)
+    UploadIndex.delete(key)
 
     "[upload] marked consumed" |> Logger.warn()
 
-    case file do
-      :dialog_file -> Page.Dialog.send_file(socket, entry, chunked_keys)
-      :room_file -> Page.Room.send_file(socket, entry, chunked_keys)
+    case metadata.destination.type do
+      :dialog -> Page.Dialog.send_file(socket, entry, metadata)
+      :room -> Page.Room.send_file(socket, entry, metadata)
     end
 
     "[upload] message sent" |> Logger.warn()
 
     socket
-    |> assign(:chunked_uploads, uploads |> Map.drop([uuid]))
+    |> assign(:uploads_metadata, Map.delete(uploads, uuid))
+    |> maybe_resume_next_upload()
     |> noreply()
     |> tap(fn _ -> "[upload] done" |> Logger.warn() end)
   end
 
-  def handle_chunked_progress(_file, _entry, socket), do: noreply(socket)
+  def handle_chunked_progress(_name, _entry, socket), do: noreply(socket)
 
-  defp start_chunked_upload(socket, entry, key, secret) do
-    uploads = Map.get(socket.assigns, :chunked_uploads, %{})
+  defp start_chunked_upload(socket, entry, key, secret, next_chunk) do
+    uploads = Map.get(socket.assigns, :uploads_metadata, %{})
+
+    active_uploads =
+      uploads
+      |> Enum.filter(fn {_uuid, metadata} -> metadata.status == :active end)
+      |> length()
+
+    status =
+      if active_uploads < @max_concurrent_uploads do
+        :active
+      else
+        :paused
+      end
+
+    metadata =
+      %UploadMetadata{}
+      |> Map.put(:credentials, {key, secret})
+      |> Map.put(:destination, file_upload_destination(socket.assigns))
+      |> Map.put(:status, status)
+
+    uploader_data = %{
+      chunk_count: next_chunk,
+      status: status
+    }
+
+    {assign(socket, :uploads_metadata, Map.put(uploads, entry.uuid, metadata)), uploader_data}
+  end
+
+  defp file_upload_destination(%{
+         dialog: dialog,
+         lobby_mode: :chats,
+         peer: %{pub_key: peer_pub_key}
+       }),
+       do: %{dialog: dialog, pub_key: peer_pub_key, type: :dialog}
+
+  defp file_upload_destination(%{lobby_mode: :rooms, room: %{pub_key: room_pub_key}}),
+    do: %{pub_key: room_pub_key, type: :room}
+
+  defp maybe_resume_next_upload(%{assigns: %{uploads_metadata: uploads}} = socket) do
+    active_uploads =
+      uploads
+      |> Enum.filter(fn {_uuid, metadata} -> metadata.status == :active end)
+      |> length()
+
+    next_upload = Enum.find(uploads, fn {_uuid, metadata} -> metadata.status == :paused end)
+
+    cond do
+      active_uploads >= @max_concurrent_uploads ->
+        socket
+
+      is_nil(next_upload) ->
+        socket
+
+      true ->
+        {next_upload_uuid, _metadata} = next_upload
+        resume_upload(socket, next_upload_uuid)
+    end
+  end
+
+  defp resume_upload(socket, uuid) do
+    uploads = Map.get(socket.assigns, :uploads_metadata, %{})
+    metadata = Map.put(uploads[uuid], :status, :active)
 
     socket
-    |> assign(:chunked_uploads, uploads |> Map.put(entry.uuid, {key, secret}))
+    |> assign(:uploads_metadata, Map.put(uploads, uuid, metadata))
+    |> push_event("upload:resume", %{uuid: uuid})
   end
 end

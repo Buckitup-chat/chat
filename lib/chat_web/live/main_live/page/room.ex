@@ -19,6 +19,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.Messages
   alias Chat.RoomInviteIndex
   alias Chat.Rooms
+  alias Chat.Upload.UploadMetadata
   alias Chat.User
   alias Chat.Utils
   alias Chat.Utils.StorageId
@@ -39,7 +40,7 @@ defmodule ChatWeb.MainLive.Page.Room do
       rooms
       |> Enum.find(&(room_hash == &1 |> Identity.pub_key() |> Utils.hash()))
 
-    PubSub.subscribe(Chat.PubSub, room |> room_topic())
+    PubSub.subscribe(Chat.PubSub, room.pub_key |> room_topic())
     Log.visit_room(me, time, room_identity)
 
     socket
@@ -86,23 +87,17 @@ defmodule ChatWeb.MainLive.Page.Room do
         |> Messages.Text.new(time)
         |> Rooms.add_new_message(me, room.pub_key)
         |> MemoIndex.add(room, rooms[room.pub_key |> Utils.hash()])
-        |> broadcast_new_message(room, me, time)
+        |> broadcast_new_message(room.pub_key, me, time)
     end
 
     socket
   end
 
-  def send_file(%{assigns: %{room: nil}} = socket, entry, {chunk_key, _secret}) do
-    delete_orphan_chunks(chunk_key)
-
-    consume_uploaded_entry(socket, entry, fn _ -> :ignore end)
-    socket
-  end
-
   def send_file(
-        %{assigns: %{me: me, room: room, monotonic_offset: time_offset}} = socket,
+        %{assigns: %{me: me, monotonic_offset: time_offset}} = socket,
         entry,
-        {chunk_key, chunk_secret}
+        %UploadMetadata{credentials: {chunk_key, chunk_secret}, destination: %{pub_key: pub_key}} =
+          _metadata
       ) do
     time = Chat.Time.monotonic_to_unix(time_offset)
 
@@ -117,15 +112,15 @@ defmodule ChatWeb.MainLive.Page.Room do
             chunk_secret,
             time
           )
-          |> Rooms.add_new_message(me, room.pub_key)
+          |> Rooms.add_new_message(me, pub_key)
           |> then(&{:ok, &1})
         end
       )
 
-    FileIndex.add_file(chunk_key, room)
+    FileIndex.add_file(chunk_key, pub_key)
 
-    Rooms.on_saved(message, room.pub_key, fn ->
-      broadcast_new_message(message, room, me, time)
+    Rooms.on_saved(message, pub_key, fn ->
+      broadcast_new_message(message, pub_key, me, time)
     end)
 
     socket
@@ -195,7 +190,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> Rooms.update_message(msg_id, me, room_identity)
     |> MemoIndex.add(room, room_identity)
 
-    broadcast_message_updated(msg_id, room, me, time)
+    broadcast_message_updated(msg_id, room.pub_key, me, time)
 
     socket
     |> cancel_edit()
@@ -328,7 +323,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   def close(%{assigns: %{room: nil}} = socket), do: socket
 
   def close(%{assigns: %{room: room}} = socket) do
-    PubSub.unsubscribe(Chat.PubSub, room |> room_topic())
+    PubSub.unsubscribe(Chat.PubSub, room.pub_key |> room_topic())
 
     socket
     |> assign(:room, nil)
@@ -512,8 +507,8 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:image_gallery, nil)
   end
 
-  defp room_topic(%Rooms.Room{pub_key: key}) do
-    key
+  defp room_topic(pub_key) do
+    pub_key
     |> Utils.hash()
     |> then(&"room:#{&1}")
   end
@@ -554,31 +549,31 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   defp assign_requests(socket), do: socket
 
-  defp broadcast_message_updated(msg_id, room, me, time) do
+  defp broadcast_message_updated(msg_id, pub_key, me, time) do
     {:updated_message, msg_id}
-    |> room_broadcast(room)
+    |> room_broadcast(pub_key)
 
-    Log.update_room_message(me, time, room.pub_key)
+    Log.update_room_message(me, time, pub_key)
   end
 
-  defp broadcast_new_message(message, room, me, time) do
+  defp broadcast_new_message(message, pub_key, me, time) do
     {:new_message, message}
-    |> room_broadcast(room)
+    |> room_broadcast(pub_key)
 
-    Log.message_room(me, time, room.pub_key)
+    Log.message_room(me, time, pub_key)
   end
 
-  defp broadcast_deleted_message(msg_id, room, me, time) do
+  defp broadcast_deleted_message(msg_id, pub_key, me, time) do
     {:deleted_message, msg_id}
-    |> room_broadcast(room)
+    |> room_broadcast(pub_key)
 
-    Log.delete_room_message(me, time, room.pub_key)
+    Log.delete_room_message(me, time, pub_key)
   end
 
-  defp room_broadcast(message, room) do
+  defp room_broadcast(message, pub_key) do
     PubSub.broadcast!(
       Chat.PubSub,
-      room |> room_topic(),
+      pub_key |> room_topic(),
       {:room, message}
     )
   end

@@ -474,6 +474,7 @@
                   <% end %>
                 </div>
                 <div>
+                  <Layout.Chat.loader />
                   <div id="chat-messages" phx-update={@message_update_mode}>
                     <%= for msg <- @messages do %>
                       <Layout.Message.message_block
@@ -994,6 +995,7 @@
                   </div>
                 </.modal>
                 <div>
+                  <Layout.Chat.loader />
                   <div id="chat-messages" phx-update={@message_update_mode}>
                     <%= for msg <- @messages do %>
                       <Layout.Message.message_block

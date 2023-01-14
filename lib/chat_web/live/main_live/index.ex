@@ -431,9 +431,9 @@ defmodule ChatWeb.MainLive.Index do
     {next_chunk, key, secret} =
       case UploadIndex.get(upload_key) do
         nil ->
-          {key, secret} = ChunkedFiles.new_upload()
-          add_upload_to_index(socket, upload_key, key, secret)
-          {0, key, secret}
+          secret = ChunkedFiles.new_upload(upload_key)
+          add_upload_to_index(socket, upload_key, upload_key, secret)
+          {0, upload_key, secret}
 
         %Upload{} = upload ->
           UploadIndex.delete(upload_key)

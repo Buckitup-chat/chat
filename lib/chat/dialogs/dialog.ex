@@ -52,9 +52,8 @@ end
 
 defimpl Jason.Encoder, for: Chat.Dialogs.Dialog do
   alias Chat.Dialogs.Dialog
-  alias Chat.Utils
 
-  def encode(%Dialog{a_key: a_key, b_key: b_key} = dialog, opts) do
+  def encode(%Dialog{} = dialog, opts) do
     dialog
     |> Dialog.dialog_hash()
     |> Jason.Encode.string(opts)

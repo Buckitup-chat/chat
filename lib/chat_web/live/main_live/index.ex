@@ -428,24 +428,23 @@ defmodule ChatWeb.MainLive.Index do
   def chunked_presign_url(entry, socket) do
     upload_key = get_upload_key(entry, socket.assigns)
 
-    {next_chunk, key, secret} =
+    {next_chunk, secret} =
       case UploadIndex.get(upload_key) do
         nil ->
           secret = ChunkedFiles.new_upload(upload_key)
-          add_upload_to_index(socket, upload_key, upload_key, secret)
-          {0, upload_key, secret}
+          add_upload_to_index(socket, upload_key, secret)
+          {0, secret}
 
         %Upload{} = upload ->
           UploadIndex.delete(upload_key)
-          add_upload_to_index(socket, upload_key, upload.key, upload.secret)
-          next_chunk = ChunkedFiles.next_chunk(upload.key)
-          {next_chunk, upload.key, upload.secret}
+          add_upload_to_index(socket, upload_key, upload.secret)
+          next_chunk = ChunkedFiles.next_chunk(upload_key)
+          {next_chunk, upload.secret}
       end
 
-    {socket, uploader_data} =
-      start_chunked_upload(socket, entry, upload_key, key, secret, next_chunk)
+    {socket, uploader_data} = start_chunked_upload(socket, entry, upload_key, secret, next_chunk)
 
-    link = Helpers.upload_chunk_url(ChatWeb.Endpoint, :put, key)
+    link = Helpers.upload_chunk_url(ChatWeb.Endpoint, :put, upload_key)
 
     uploader_data =
       Map.merge(%{uploader: "UpChunk", entrypoint: link, uuid: entry.uuid}, uploader_data)
@@ -473,10 +472,10 @@ defmodule ChatWeb.MainLive.Index do
     |> Utils.hash()
   end
 
-  defp add_upload_to_index(socket, upload_key, key, secret) do
+  defp add_upload_to_index(socket, key, secret) do
     timestamp = Chat.Time.monotonic_to_unix(socket.assigns.monotonic_offset)
-    upload = %Upload{key: key, secret: secret, timestamp: timestamp}
-    UploadIndex.add(upload_key, upload)
+    upload = %Upload{secret: secret, timestamp: timestamp}
+    UploadIndex.add(key, upload)
   end
 
   def handle_chunked_progress(
@@ -488,7 +487,7 @@ defmodule ChatWeb.MainLive.Index do
     %UploadMetadata{} = metadata = uploads[uuid]
     {key, _} = metadata.credentials
     ChunkedFiles.mark_consumed(key)
-    UploadIndex.delete(metadata.upload_key)
+    UploadIndex.delete(key)
 
     "[upload] marked consumed" |> Logger.warn()
 
@@ -508,7 +507,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_chunked_progress(_name, _entry, socket), do: noreply(socket)
 
-  defp start_chunked_upload(socket, entry, upload_key, key, secret, next_chunk) do
+  defp start_chunked_upload(socket, entry, key, secret, next_chunk) do
     uploads = Map.get(socket.assigns, :uploads_metadata, %{})
 
     active_uploads =
@@ -528,7 +527,6 @@ defmodule ChatWeb.MainLive.Index do
       |> Map.put(:credentials, {key, secret})
       |> Map.put(:destination, file_upload_destination(socket.assigns))
       |> Map.put(:status, status)
-      |> Map.put(:upload_key, upload_key)
 
     uploader_data = %{
       chunk_count: next_chunk,

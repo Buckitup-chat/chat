@@ -120,8 +120,8 @@ Also, each file upload is saved in file index for resumable uploads.
 
 #### Upload process
 
-1. Generate hash out of file info and use it as an upload key.
-2. Generate chunk key and secret.
+1. Generate hash out of file info and use it both as an upload key and a chunk key.
+2. Generate chunk secret.
 3. Save upload to the upload index.
 4. Give client chunk key.
 5. Receive all the file chunks, encrypting them with secret and storing in db.
@@ -190,7 +190,7 @@ Each entry contains
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-{{:upload_index, upload_key}, %Chat.Upload.Upload{}}
+{{:upload_index, chunk_key}, %Chat.Upload.Upload{}}
 ```
 
 <!-- livebook:{"break_markdown":true} -->

@@ -340,37 +340,29 @@ defmodule ChatWeb.MainLive.Page.Room do
         %{assigns: %{room_identity: room_identity}} = socket,
         msg_id
       ) do
-    Rooms.read_message(msg_id, room_identity, &User.id_map_builder/1)
-    |> case do
-      %{type: :file, content: json} ->
-        {file_id, secret} = json |> StorageId.from_json()
-
-        socket
-        |> push_event("chat:redirect", %{
-          url: Routes.file_url(socket, :file, file_id, a: secret |> Base.url_encode64())
-        })
-
-      %{type: :image, content: json} ->
-        {id, secret} = json |> StorageId.from_json()
-
-        socket
-        |> push_event("chat:redirect", %{
-          url:
-            Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64(), download: true)
-        })
-
-      %{type: :video, content: json} ->
-        {id, secret} = json |> StorageId.from_json()
-
-        socket
-        |> push_event("chat:redirect", %{
-          url: Routes.file_url(socket, :file, id, a: secret |> Base.url_encode64())
-        })
-
-      _ ->
-        socket
-    end
+    msg_id
+    |> Rooms.read_message(room_identity, &User.id_map_builder/1)
+    |> maybe_redirect_to_file(socket)
   end
+
+  defp maybe_redirect_to_file(%{type: type, content: json}, socket)
+       when type in [:audio, :file, :image, :video] do
+    {params, file_type} =
+      case type do
+        :image ->
+          {%{download: true}, :image}
+
+        _ ->
+          {%{}, :file}
+      end
+
+    {file_id, secret} = StorageId.from_json(json)
+    params = Map.merge(params, %{a: Base.url_encode64(secret)})
+
+    push_event(socket, "chat:redirect", %{url: ~p"/get/#{file_type}/#{file_id}?#{params}"})
+  end
+
+  defp maybe_redirect_to_file(_message, socket), do: socket
 
   def toggle_messages_select(%{assigns: %{}} = socket, %{"action" => "on"}) do
     socket

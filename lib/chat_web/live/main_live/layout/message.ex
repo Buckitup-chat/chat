@@ -144,6 +144,27 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :timezone, :string, required: true, doc: "needed to render the timestamp"
   attr :room_keys, :map, doc: "the list of room keys"
 
+  defp message(%{msg: %{type: :audio}} = assigns) do
+    ~H"""
+    <div
+      id={"message-#{@msg.id}"}
+      class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg x-download"}
+    >
+      <.header
+        author={@author}
+        chat_type={@chat_type}
+        export?={@export?}
+        file={@file}
+        is_mine?={@is_mine?}
+        msg={@msg}
+      />
+      <.timestamp msg={@msg} timezone={@timezone} />
+      <audio src={@file.url} class="a-audio" controls />
+      <.media_file_info file={@file} />
+    </div>
+    """
+  end
+
   defp message(%{msg: %{type: :file}} = assigns) do
     ~H"""
     <div
@@ -343,7 +364,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :msg_type, :atom, required: true, doc: "message type"
   slot :inner_block, required: true
 
-  defp header_wrapper(%{export?: true, msg_type: :video} = assigns) do
+  defp header_wrapper(%{export?: true, msg_type: type} = assigns) when type in [:audio, :video] do
     ~H"""
     <.link class={@class} id={@id} href={@file.url}>
       <%= render_slot(@inner_block) %>
@@ -442,7 +463,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
         <.icon id="select" class="w-4 h-4 flex fill-black" />
         <span>Select</span>
       </a>
-      <%= if @msg.type in [:file, :image, :video] do %>
+      <%= if @msg.type in [:audio, :file, :image, :video] do %>
         <a
           class="dropdownItem"
           phx-click={
@@ -480,7 +501,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   defp assign_file(%{export?: true, msg: %{content: json, type: type}} = assigns)
-       when type in [:file, :image, :video] do
+       when type in [:audio, :file, :image, :video] do
     {id, secret} = StorageId.from_json(json)
     [_, _, _, _, name, size] = Files.get(id, secret)
 
@@ -494,7 +515,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   defp assign_file(%{msg: %{content: json, type: type}} = assigns)
-       when type in [:file, :image, :video] do
+       when type in [:audio, :file, :image, :video] do
     {id, secret} = StorageId.from_json(json)
     [_, _, _, _, name, size] = Files.get(id, secret)
 

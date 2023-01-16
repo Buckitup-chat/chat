@@ -91,7 +91,7 @@ defmodule ChatWeb.ZipController do
       file_entries =
         messages
         |> Enum.reduce([], fn msg, file_entries ->
-          with %{type: type, content: json} when type in [:file, :image, :video] <- msg,
+          with %{type: type, content: json} when type in [:audio, :file, :image, :video] <- msg,
                {id, content} <- StorageId.from_json(json),
                [chunk_key, chunk_secret_raw, _, _type, filename, _size] <- Files.get(id, content),
                chunk_secret <- Base.decode64!(chunk_secret_raw),

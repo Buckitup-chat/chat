@@ -50,5 +50,20 @@ export default {
       pauseButton.classList.add('hidden')
       playButton.classList.remove('hidden')
     })
+
+    mediaElement.addEventListener('ended', () => {
+      const messageBlock = this.el.closest('.messageBlock')
+      const parent = messageBlock.parentElement
+      const index = [].slice.call(parent.children).indexOf(messageBlock) + 1
+      const nextAudioMessage = parent.querySelector(`:nth-child(${index}) ~ .messageBlock[data-type="audio"] [phx-hook="AudioFile"]`)
+
+      if (nextAudioMessage) {
+        nextAudioMessage.dispatchEvent(new CustomEvent('chat:play-audio'))
+      }
+    })
+
+    this.el.addEventListener('chat:play-audio', () => {
+      mediaElement.play()
+    })
   }
 }

@@ -149,6 +149,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
     <div
       id={"message-#{@msg.id}"}
       class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg x-download"}
+      phx-hook="AudioFile"
     >
       <.header
         author={@author}
@@ -159,7 +160,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
         msg={@msg}
       />
       <.timestamp msg={@msg} timezone={@timezone} />
-      <audio src={@file.url} class="a-audio" controls />
+      <.audio export?={@export?} file={@file} msg={@msg} />
       <.media_file_info file={@file} />
     </div>
     """
@@ -596,6 +597,48 @@ defmodule ChatWeb.MainLive.Layout.Message do
       <span class="truncate text-xs x-file" href={@file.url}><%= @file.name %></span>
       <span class="text-xs text-black/50 whitespace-pre-line"><%= @file.size %></span>
     </div>
+    """
+  end
+
+  attr :export?, :boolean, required: true, doc: "show waveform?"
+  attr :file, :map, required: true, doc: "file map"
+  attr :msg, :map, required: true, doc: "message struct"
+
+  defp audio(%{export?: true} = assigns) do
+    ~H"""
+    <audio src={@file.url} class="a-audio" controls />
+    """
+  end
+
+  defp audio(assigns) do
+    ~H"""
+    <div class="flex flex-row w-full h-12">
+      <button class="play rounder flex justify-center items-center w-3/12">
+        <svg class="pause-circle w-9 hidden" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">
+          <path
+            class="fill-purple"
+            d="M24,4A20,20,0,1,0,44,24,20,20,0,0,0,24,4ZM21,33H16V15h5Zm11,0H27V15h5Z"
+            transform="translate(-4 -4)"
+          >
+          </path>
+        </svg>
+        <svg class="play-circle w-9" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">
+          <path
+            class="fill-purple"
+            d="M24,4A20,20,0,1,0,44,24,20,20,0,0,0,24,4ZM17,33V15l18,9Z"
+            transform="translate(-4 -4)"
+          >
+          </path>
+        </svg>
+      </button>
+      <div
+        class="peaks-overview-container flex w-9/12 h-12"
+        id={"message-#{@msg.id}-peaks"}
+        phx-update="ignore"
+      >
+      </div>
+    </div>
+    <audio src={@file.url} class="a-audio hidden" controls />
     """
   end
 

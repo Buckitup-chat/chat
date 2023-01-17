@@ -4,5 +4,8 @@
   },
   "devDependencies": {
     "tailwindcss-font-inter": "^3.0.1"
+  },
+  "dependencies": {
+    "peaks.js": "^2.1.0"
   }
 }

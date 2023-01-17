@@ -8,10 +8,12 @@ defmodule Chat.Dialogs.Dialog do
   @derive {Inspect, only: []}
   defstruct [:a_key, :b_key]
 
-  def start(%Identity{} = a, %Card{pub_key: b_key}) do
+  def start(%Identity{} = identity, %Card{pub_key: card_key}) do
+    identity_key = Identity.pub_key(identity)
+
     %__MODULE__{
-      a_key: a |> Identity.pub_key(),
-      b_key: b_key
+      a_key: max(identity_key, card_key),
+      b_key: min(identity_key, card_key)
     }
   end
 

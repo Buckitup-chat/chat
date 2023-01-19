@@ -30,6 +30,8 @@ jobs:
         restore-keys: ${{ runner.os }}-mix-
     - name: Install dependencies
       run: mix deps.get
+    - name: Compile dependencies
+      run: mix deps.compile
     - name: Check code
       run: make ci-check
     - name: Run tests

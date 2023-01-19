@@ -2,10 +2,10 @@ defmodule Chat.RoomInviteIndex do
   @moduledoc """
   Index room invites
   """
-  alias Chat.Identity
+  alias Chat.Db
   alias Chat.Dialogs
   alias Chat.Dialogs.Dialog
-  alias Chat.Db
+  alias Chat.Identity
   alias Chat.Utils
 
   def add({_, _} = indexed_message, %Dialog{} = dialog, %Identity{} = me) do

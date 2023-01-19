@@ -586,6 +586,4 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:messages, [])
     |> assign(:message_update_mode, :append)
   end
-
-  defp delete_orphan_chunks(key), do: Chat.ChunkedFiles.delete(key)
 end

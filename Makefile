@@ -1,4 +1,4 @@
-.PHONY: check test
+.PHONY: check test ci-check
 
 check:
 	mix compile --warnings-as-errors
@@ -7,6 +7,12 @@ check:
 	mix deps.unlock --check-unused
 	mix sobelow --verbose
 	mix dialyzer --ignore-exit-status
+
+ci-check: 
+	mix compile --warnings-as-errors
+	mix format --check-formatted
+	mix credo --strict
+	mix deps.unlock --check-unused
 
 test: 
 	rm -rf priv/test_db

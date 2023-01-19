@@ -3,6 +3,7 @@ defmodule ChatWeb.MainLive.Index do
   use ChatWeb, :live_view
 
   require Logger
+
   alias Phoenix.LiveView.JS
   alias Phoenix.LiveView.UploadEntry
 
@@ -10,9 +11,10 @@ defmodule ChatWeb.MainLive.Index do
   alias Chat.Rooms
   alias Chat.Upload.{Upload, UploadIndex, UploadMetadata}
   alias Chat.Utils
+
+  alias ChatWeb.Hooks.LocalTimeHook
   alias ChatWeb.MainLive.Layout
   alias ChatWeb.MainLive.Page
-  alias ChatWeb.Hooks.LocalTimeHook
   alias ChatWeb.Router.Helpers
 
   @max_concurrent_uploads 2

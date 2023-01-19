@@ -129,3 +129,51 @@ All the processes marked as mounter traps its exit. I.e. handle its termination.
 `Switcher` switches Current DB to main. And reverts Current DB back to internal when terminated.
 
 `Stoper` starts extra leb blinking and makes `Platform BackupDbSupervision` to stop. On termination stops led blinking.
+
+## Media drive supervision (proposal)
+
+_This section is proposal. Everything is subject to consider. Naming as well._
+
+<!-- livebook:{"break_markdown":true} -->
+
+The idea is to have `MediaSupervisor` in place of `Platform BackupDbSupervisor`. Which will mount drive, and decide which functionality to start in DynamicSupervisor.
+
+`Backup-`, `Onliners-` or `Cargo-` supervisors will have no mount step and will be started under `MediaSupervisor`'s DynamicSupervisor.
+
+Here is chart for Backup mounted this way.
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph TD;
+  ms(MediaSupervisor)
+
+  mts(Task.Supervisor)
+  mm[[Mounter]]
+  fds{{FunctionalityDynamicSupervisor}}
+  md[Decider]
+
+  ms --> mts
+  ms --> mm
+  ms --> fds
+  ms --> md
+
+  pbds(Platform BackupDbSupervisor)
+
+  bts(Task.Supervisor)
+  bdt[DirTask]
+  bbds(Chat BackupDbSupervisor)
+  bs[[Starter]]
+  bc[[Copier]]
+  bst[[Stoper]]
+
+  fds --> pbds
+
+  pbds --> bts
+  pbds --> bdt
+  pbds --> bbds
+  pbds --> bs
+  pbds --> bc
+  pbds --> bst
+
+```

@@ -1,4 +1,7 @@
 defmodule Chat.Upload.StaleUploadsPruner do
+  @moduledoc """
+  Clears Uploads that had not been resumed and completed
+  """
   use GenServer
 
   alias Chat.ChunkedFiles
@@ -44,8 +47,8 @@ defmodule Chat.Upload.StaleUploadsPruner do
     |> Stream.filter(fn {_key, %Upload{} = upload} ->
       upload.timestamp < one_day_ago
     end)
-    |> Enum.each(fn {key, %Upload{} = upload} ->
-      ChunkedFiles.delete(upload.key)
+    |> Enum.each(fn {key, %Upload{}} ->
+      ChunkedFiles.delete(key)
       UploadIndex.delete(key)
     end)
 

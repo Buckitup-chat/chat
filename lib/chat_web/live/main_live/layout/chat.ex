@@ -1,4 +1,7 @@
 defmodule ChatWeb.MainLive.Layout.Chat do
+  @moduledoc """
+  Chat components
+  """
   use ChatWeb, :component
 
   def loader(assigns) do

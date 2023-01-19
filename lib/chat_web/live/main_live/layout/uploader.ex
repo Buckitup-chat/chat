@@ -94,8 +94,8 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       class="flex mb-5 bg-white border-purple relative w-full z-0"
       id={if(@mobile?, do: "mobile-", else: "") <> "upload-#{@entry.uuid}"}
     >
-    <div
-        class={"absolute top-[-13px] left-0 h-3 bg-gray-500 z-10 transition-all"}
+      <div
+        class="absolute top-[-13px] left-0 h-3 bg-gray-500 z-10 transition-all"
         style={"width: #{@entry.progress}%;"}
       >
       </div>

@@ -5,9 +5,24 @@ defmodule Chat.ChunkedFiles do
   alias Chat.Db
   alias Chat.Utils
 
-  @spec new_upload() :: {key :: String.t(), secret :: String.t()}
-  def new_upload do
-    ChunkedFilesBroker.generate()
+  @type key :: String.t()
+  @type secret :: String.t()
+
+  @spec new_upload(key()) :: secret()
+  def new_upload(key) do
+    ChunkedFilesBroker.generate(key)
+  end
+
+  def get_file(key) do
+    ChunkedFilesBroker.get(key)
+  end
+
+  def next_chunk(key) do
+    Db.list({
+      {:chunk_key, {:file_chunk, key, 0, 0}},
+      {:chunk_key, {:file_chunk, key, nil, nil}}
+    })
+    |> Enum.count()
   end
 
   def save_upload_chunk(key, {chunk_start, chunk_end}, chunk) do

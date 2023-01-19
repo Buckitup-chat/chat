@@ -34,6 +34,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :peer, Card, doc: "the other user - used only for :dialog chat type"
   attr :room, Room, default: nil, doc: "room access was requested to"
   attr :timezone, :string, required: true, doc: "needed to render the timestamp"
+  attr :room_keys, :map, default: [], doc: "the list of room keys"
 
   def message_block(assigns) do
     assigns =
@@ -89,6 +90,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
           msg={@msg}
           room={@room}
           timezone={@timezone}
+          room_keys={@room_keys}
         />
       </div>
 
@@ -140,6 +142,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :msg, :map, required: true, doc: "message struct"
   attr :room, Room, default: nil, doc: "room access was requested to"
   attr :timezone, :string, required: true, doc: "needed to render the timestamp"
+  attr :room_keys, :map, doc: "the list of room keys"
 
   defp message(%{msg: %{type: :file}} = assigns) do
     ~H"""
@@ -177,6 +180,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       />
       <.timestamp msg={@msg} timezone={@timezone} />
       <.image chat_type={@chat_type} msg={@msg} export?={@export?} file={@file} />
+      <.media_file_info file={@file} />
     </div>
     """
   end
@@ -248,22 +252,33 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
       <%= unless @export? or @is_mine? do %>
         <div class="px-2 my-1 flex items-center justify-between">
-          <button
-            class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
-            phx-click="dialog/message/accept-room-invite"
-            phx-value-id={@msg.id}
-            phx-value-index={@msg.index}
-          >
-            Accept
-          </button>
-          <button
-            class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
-            phx-click="dialog/message/accept-room-invite-and-open-room"
-            phx-value-id={@msg.id}
-            phx-value-index={@msg.index}
-          >
-            Accept and Open
-          </button>
+          <%= if @room_card.hash in @room_keys do %>
+            <button
+              class="w-full h-12 border-0 rounded-lg bg-grayscale text-white"
+              phx-click="dialog/message/accept-room-invite-and-open-room"
+              phx-value-id={@msg.id}
+              phx-value-index={@msg.index}
+            >
+              Go to Room
+            </button>
+          <% else %>
+            <button
+              class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
+              phx-click="dialog/message/accept-room-invite"
+              phx-value-id={@msg.id}
+              phx-value-index={@msg.index}
+            >
+              Accept
+            </button>
+            <button
+              class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
+              phx-click="dialog/message/accept-room-invite-and-open-room"
+              phx-value-id={@msg.id}
+              phx-value-index={@msg.index}
+            >
+              Accept and Open
+            </button>
+          <% end %>
         </div>
       <% end %>
 
@@ -288,6 +303,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       />
       <.timestamp msg={@msg} timezone={@timezone} />
       <video src={@file.url} class="a-video" controls />
+      <.media_file_info file={@file} />
     </div>
     """
   end
@@ -477,7 +493,8 @@ defmodule ChatWeb.MainLive.Layout.Message do
     })
   end
 
-  defp assign_file(%{msg: %{content: json, type: :file}} = assigns) do
+  defp assign_file(%{msg: %{content: json, type: type}} = assigns)
+       when type in [:file, :image, :video] do
     {id, secret} = StorageId.from_json(json)
     [_, _, _, _, name, size] = Files.get(id, secret)
 
@@ -486,13 +503,6 @@ defmodule ChatWeb.MainLive.Layout.Message do
       size: size,
       url: get_file_url(:file, id, secret)
     })
-  end
-
-  defp assign_file(%{msg: %{content: json, type: type}} = assigns)
-       when type in [:image, :video] do
-    {id, secret} = StorageId.from_json(json)
-
-    assign(assigns, :file, %{url: get_file_url(type, id, secret)})
   end
 
   defp assign_file(assigns), do: assign(assigns, :file, nil)
@@ -554,6 +564,17 @@ defmodule ChatWeb.MainLive.Layout.Message do
   defp file_icon(assigns) do
     ~H"""
     <.icon id="document" class="w-14 h-14 flex fill-black/50" />
+    """
+  end
+
+  attr :file, :map, required: true, doc: "file map"
+
+  defp media_file_info(assigns) do
+    ~H"""
+    <div class="w-full flex flex-row justify-between px-3 py-2">
+      <span class="truncate text-xs x-file" href={@file.url}><%= @file.name %></span>
+      <span class="text-xs text-black/50 whitespace-pre-line"><%= @file.size %></span>
+    </div>
     """
   end
 

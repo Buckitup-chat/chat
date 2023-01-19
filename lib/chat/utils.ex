@@ -69,8 +69,8 @@ defmodule Chat.Utils do
     {data_blob, iv <> key}
   end
 
-  def encrypt_blob(data, <<iv::binary-size(8), key::binary-size(16), _::binary-size(8)>>) do
-    :crypto.crypto_one_time(@cipher, key, iv, data, true)
+  def encrypt_blob(data, <<iv::binary-size(8), key::binary-size(16), iv2::binary-size(8)>>) do
+    :crypto.crypto_one_time(@cipher, key, :crypto.exor(iv, iv2), data, true)
   end
 
   def encrypt_blob(data, <<iv::binary-size(8), key::binary-size(16)>>) do
@@ -81,8 +81,8 @@ defmodule Chat.Utils do
     data |> Enum.map(&:crypto.crypto_one_time(@cipher, key, iv, &1, false))
   end
 
-  def decrypt_blob(data, <<iv::binary-size(8), key::binary-size(16), _::binary-size(8)>>) do
-    :crypto.crypto_one_time(@cipher, key, iv, data, false)
+  def decrypt_blob(data, <<iv::binary-size(8), key::binary-size(16), iv2::binary-size(8)>>) do
+    :crypto.crypto_one_time(@cipher, key, :crypto.exor(iv, iv2), data, false)
   end
 
   def decrypt_blob(data, <<iv::bits-size(64), key::bits>> = _secret) do

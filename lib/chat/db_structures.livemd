@@ -116,11 +116,16 @@ File storing is more complex. We need to store file properties, as well as file 
 
 File uploads chunk by chunk. Chunk size is 10 Mb.
 
+Also, each file upload is saved in file index for resumable uploads.
+
 #### Upload process
 
-1. Generate chunk key and secret. Give client chunk key.
-2. Receive all the file chunks, encrypting them with secret and storing in db.
-3. When everything is uploaded, store file information and chunk key and secret.
+1. Generate hash out of file info and use it both as an upload key and a chunk key.
+2. Generate chunk secret.
+3. Save upload to the upload index.
+4. Give client chunk key.
+5. Receive all the file chunks, encrypting them with secret and storing in db.
+6. When everything is uploaded, store file information and chunk key and secret.
 
 #### File structures
 
@@ -177,6 +182,15 @@ File index entries keep track of who can read a file.
 ```elixir
 {{:file_index, reader_hash, file_key},
  true}
+```
+
+Upload index entries keep track of started uploads.
+Each entry contains
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:upload_index, chunk_key}, %Chat.Upload.Upload{}}
 ```
 
 <!-- livebook:{"break_markdown":true} -->

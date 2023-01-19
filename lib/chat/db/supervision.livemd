@@ -1,0 +1,179 @@
+# DB/Device Supervision
+
+## DB Supervisor
+
+DB Supervisior wraps every DB in Queue, Writer and Dry Status Relay.
+
+Queue and Writer described in [DB Prioritization](./prioritization.livemd).
+
+Dry Status Realy is Agent that holds read only state of DB. It is updated by Writer. And read by UI to show red indication.
+
+The supervision strategy is `rest for one`. Which means that all peers to the right will get restated if children failed. I.e. if CubDB fails, Dry Status Relay and Writer gets restarted as well. Queue continues to work, agregationg all the changes User generated. This provides seamless switching into Read Only mode when there is no room to write data.
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph TD;
+  s(DB Supervisor)
+
+  s --> Queue
+  s --> db[(CubDB)]
+  s --> ds[Dry Status Relay]
+  s --> Writer
+```
+
+This approach used in all DB Supervisors. Each handles its own DB, otherwise they are identical
+
+* `Chat.Db.InternalDbSupervisor`
+* `Chat.Db.MainDbSupervisor`
+* `Chat.Db.BackupDbSupervisor`
+
+## Device Supervision
+
+Device managing happens in `Platform` project. (It incorporates `Chat` as dependency)
+
+Here is a bit simplified supervision tree.
+
+<!-- livebook:{"break_markdown":true} -->
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph LR;
+  subgraph Chat
+    ids(InternalDbSupervisor)
+    mds(MainDbSupervisor)
+    bds(BackupDbSupervisor)
+    ca(Application)
+
+    ca -.-> ids
+  end 
+  
+  pa(Application)
+  ds(DeviceSupervisor)
+  cb[ChatBridge]
+  uw[UsbWatcher]
+  dmds{{DynamicMainDbSupervisor}}
+  dbds{{DynamicBackupDbSupervisor}}
+  pmds(Platform MainDbSupervisor)
+  pbds(Platform BackupDbSupervisor)
+
+  pa --> ds
+  pa --> cb
+
+  ds --> dmds --> pmds
+  ds --> dbds ---> pbds
+  ds --> uw
+
+  mts(Task.Supervisor)
+  mm[[Mounter]]
+  mdt[DirTask]
+  mmds(Chat MainDbSupervisor)
+  ms[[Starter]]
+  mc[[Copier]]
+  mr[[Replicator]]
+  msw[[Switcher]]
+
+  pmds --> mts
+  pmds --> mm
+  pmds --> mdt
+  pmds --> mmds
+  pmds --> ms
+  pmds --> mc
+  pmds --> mr
+  pmds --> msw
+
+  bts(Task.Supervisor)
+  bm[[Mounter]]
+  bdt[DirTask]
+  bbds(Chat BackupDbSupervisor)
+  bs[[Starter]]
+  bc[[Copier]]
+  bst[[Stoper]]
+
+  pbds --> bts
+  pbds --> bm
+  pbds --> bdt
+  pbds --> bbds
+  pbds --> bs
+  pbds --> bc
+  pbds --> bst
+
+  mmds -...- mds
+  bbds -..- bds
+
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+`UsbWatcher` subscribes to system events to detect USB devices plug/unplug.
+
+We need Dynamic Supervisors to start or shutdown supervision subtrees, since devices are not allways present.
+
+`Platform MainDbSupervisor` and `Platform BackupDbSupervisor` do `rest for one` strategy that will restart all later started peers in case of failing.
+
+All the processes marked as mounter traps its exit. I.e. handle its termination. Combining this with `rest_for_one` srtategy of supervisor makes it `Plug` like behaviour in supervisor.
+
+`Mounter` mounts device into folder specified. And unmounts when terminated.
+
+`DirTask` ensures that device filesystem has the folder to hold DB.
+
+`Chat MainDbSupervisor` and `Chat BackupDbSupervisor` are DB Supervisors from `Chat` application described above.
+
+`Starter` changes global DB status (in application config). And revers it back when terminated.
+
+`Copier` starts blinking leds and copies data. And finishing blinking when terminated.
+
+`Replicator` starts sync to internal DB every 5 mins. And stops when terminated.
+
+`Switcher` switches Current DB to main. And reverts Current DB back to internal when terminated.
+
+`Stoper` starts extra leb blinking and makes `Platform BackupDbSupervision` to stop. On termination stops led blinking.
+
+## Media drive supervision (proposal)
+
+_This section is proposal. Everything is subject to consider. Naming as well._
+
+<!-- livebook:{"break_markdown":true} -->
+
+The idea is to have `MediaSupervisor` in place of `Platform BackupDbSupervisor`. Which will mount drive, and decide which functionality to start in DynamicSupervisor.
+
+`Backup-`, `Onliners-` or `Cargo-` supervisors will have no mount step and will be started under `MediaSupervisor`'s DynamicSupervisor.
+
+Here is chart for Backup mounted this way.
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph TD;
+  ms(MediaSupervisor)
+
+  mts(Task.Supervisor)
+  mm[[Mounter]]
+  fds{{FunctionalityDynamicSupervisor}}
+  md[Decider]
+
+  ms --> mts
+  ms --> mm
+  ms --> fds
+  ms --> md
+
+  pbds(Platform BackupDbSupervisor)
+
+  bts(Task.Supervisor)
+  bdt[DirTask]
+  bbds(Chat BackupDbSupervisor)
+  bs[[Starter]]
+  bc[[Copier]]
+  bst[[Stoper]]
+
+  fds --> pbds
+
+  pbds --> bts
+  pbds --> bdt
+  pbds --> bbds
+  pbds --> bs
+  pbds --> bc
+  pbds --> bst
+
+```

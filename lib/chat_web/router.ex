@@ -8,6 +8,7 @@ defmodule ChatWeb.Router do
     plug :put_root_layout, {ChatWeb.LayoutView, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug ChatWeb.Plugs.OperatingSystemDetector
   end
 
   pipeline :api do

@@ -42,7 +42,7 @@ defmodule Chat.Rooms.PrivateRoomTest do
     Rooms.add_request(room_hash, bob, 0)
     assert %Rooms.Room{requests: []} = Rooms.get(room_hash)
 
-    Rooms.approve_requests(room_hash, identity)
+    Rooms.approve_request(room_hash, bob |> Utils.hash(), identity)
     assert %Rooms.Room{requests: []} = Rooms.get(room_hash)
   end
 

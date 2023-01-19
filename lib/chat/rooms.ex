@@ -2,7 +2,6 @@ defmodule Chat.Rooms do
   @moduledoc "Rooms context"
 
   alias Chat.Identity
-  alias Chat.Log
   alias Chat.Messages
   alias Chat.Rooms.Message
   alias Chat.Rooms.Registry
@@ -121,40 +120,29 @@ defmodule Chat.Rooms do
     |> update()
   end
 
-  def approve_request(room_hash, user_hash, room_identity) do
+  def get_request(room, user_hash), do: Room.get_request(room, user_hash)
+
+  @doc """
+  Approves the room request for user.
+  Opts: 
+    * :public_only - Ignores aproval for a non-public room if `true`. Defaults to `false`.
+  """
+  def approve_request(room_hash, user_hash, room_identity, opts \\ []) do
     if_room_found(room_hash, fn room ->
       room
-      |> Room.approve_request(user_hash, room_identity)
+      |> Room.approve_request(user_hash, room_identity, opts)
       |> update()
     end)
   end
 
-  def approve_requests(room_hash, room_identity) do
-    if_room_found(room_hash, fn room ->
-      room
-      |> Room.approve_requests(room_identity)
-      |> update()
-    end)
+  def join_approved_request(room_identity, person_identity) do
+    room_identity
+    |> Identity.pub_key()
+    |> Utils.hash()
+    |> get()
+    |> Room.join_approved_request(person_identity)
+    |> update()
   end
-
-  def join_approved_requests(room_hash, person_identity, time) do
-    :todo_refactor_approve_flow
-
-    room_hash
-    |> get
-    |> Room.join_approved_requests(person_identity)
-    |> then(fn {room, joined_identities} ->
-      update(room)
-
-      unless [] == joined_identities do
-        Log.got_room_key(person_identity, time, room.pub_key)
-      end
-
-      joined_identities
-    end)
-  end
-
-  def is_requested_by?(nil, _), do: false
 
   def is_requested_by?(room_hash, person_hash) do
     room_hash
@@ -166,7 +154,17 @@ defmodule Chat.Rooms do
     if_room_found(room_hash, &Room.list_pending_requests/1, [])
   end
 
+  def list_approved_requests_for(room_hash, user_hash) do
+    room_hash
+    |> get()
+    |> case do
+      nil -> []
+      room -> Room.list_approved_requests_for(room, user_hash)
+    end
+  end
+
   defdelegate update(room), to: Registry
+  defdelegate decrypt_identity(encrypted_room_identity, person_identity), to: Room
 
   defp if_room_found(hash, action, default \\ nil) do
     room = get(hash)

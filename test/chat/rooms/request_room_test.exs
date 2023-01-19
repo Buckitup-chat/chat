@@ -33,9 +33,9 @@ defmodule Chat.Rooms.RequestRoomTest do
     ChangeTracker.await()
     assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
 
-    Rooms.approve_requests(room_hash, identity)
+    Rooms.approve_request(room_hash, bob_hash, identity)
     ChangeTracker.await()
-    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
+    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, {_, _}}]} = Rooms.get(room_hash)
   end
 
   test "should be approved individually by any room key holder" do
@@ -61,7 +61,23 @@ defmodule Chat.Rooms.RequestRoomTest do
     assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, _bob_room_key}]} =
              Rooms.get(room_hash)
 
-    assert [^identity] = Rooms.join_approved_requests(room_hash, bob, 1)
+    assert %Rooms.Room{requests: []} = Rooms.join_approved_request(identity, bob)
+  end
+
+  test "should NOT be approved individually when flag public_only is applied" do
+    {_alice, identity, _room} = "Alice" |> user_and_request_room()
+    room_hash = identity |> Utils.hash()
+    bob = "Bob" |> User.login()
+    bob_pub_key = bob |> Identity.pub_key()
+    bob_hash = bob |> Utils.hash()
+
+    Rooms.add_request(room_hash, bob, 0)
+    ChangeTracker.await()
+    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
+
+    Rooms.approve_request(room_hash, bob_hash, identity, public_only: true)
+    ChangeTracker.await()
+    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
   end
 
   test "should show a list of pending user requests" do

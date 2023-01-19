@@ -284,15 +284,15 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_info(:room_request, socket) do
+  def handle_info({:room_request, room_hash, user_hash}, socket) do
     socket
-    |> Page.Lobby.approve_requests()
+    |> Page.Lobby.approve_room_request(room_hash, user_hash)
     |> noreply()
   end
 
-  def handle_info(:room_request_approved, socket) do
+  def handle_info({:room_request_approved, encrypted_room_entity, user_hash}, socket) do
     socket
-    |> Page.Lobby.join_rooms()
+    |> Page.Lobby.join_approved_room(encrypted_room_entity, user_hash)
     |> noreply()
   end
 
@@ -317,6 +317,20 @@ defmodule ChatWeb.MainLive.Index do
     do: socket |> Page.AdminPanelRouter.info(msg) |> noreply()
 
   def handle_info({:dialog, msg}, socket), do: socket |> Page.DialogRouter.info(msg) |> noreply()
+
+  def handle_info({ref, :ok}, socket) do
+    Process.demonitor(ref, [:flush])
+
+    socket |> noreply()
+  end
+
+  def handle_info({ref, {:error, task, _reason}}, socket) do
+    Process.demonitor(ref, [:flush])
+
+    socket
+    |> Page.Lobby.process(task)
+    |> noreply()
+  end
 
   def handle_progress(:my_keys_file, %{done?: true}, socket) do
     socket

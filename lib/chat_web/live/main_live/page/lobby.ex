@@ -8,8 +8,8 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   alias Chat.AdminRoom
   alias Chat.Db.StatusPoller
-  alias Chat.Log
   alias Chat.Identity
+  alias Chat.Log
   alias Chat.Rooms
   alias Chat.User
   alias Chat.Utils

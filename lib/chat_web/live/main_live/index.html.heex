@@ -506,6 +506,8 @@
                 class="basis-[7%] w-full py-1.5 px-8 border border-white bg-white flex items-center fixed md:sticky bottom-0"
               >
                 <%= if @dialog_mode == :plain do %>
+                  <Layout.Uploader.push_to_talk_button config={@uploads.file} type="dialog" />
+
                   <Layout.Uploader.button type="dialog" />
 
                   <.form
@@ -1023,6 +1025,8 @@
               </div>
               <div class="basis-[7%] w-full py-1.5 px-8 border border-white bg-white flex items-center fixed md:sticky bottom-0">
                 <%= if @room_mode == :plain do %>
+                  <Layout.Uploader.push_to_talk_button config={@uploads.file} type="room" />
+
                   <Layout.Uploader.button type="room" />
 
                   <.form

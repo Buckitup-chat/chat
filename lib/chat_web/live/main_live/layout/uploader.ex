@@ -39,6 +39,38 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     """
   end
 
+  attr :config, UploadConfig, required: true, doc: "upload config"
+  attr :type, :string, required: true, doc: "dialog or room"
+
+  def push_to_talk_button(assigns) do
+    ~H"""
+    <div id="push-to-talk-wrapper" phx-update="ignore">
+      <div
+        class="cursor-pointer mr-2 hidden"
+        id="push-to-talk-button"
+        phx-hook="PushToTalk"
+        data-ref={@config.ref}
+      >
+        <svg class="w-7 h-7 p-1 bg-purple rounded-full fill-white" viewbox="0 0 490.9 490.9">
+          <g class="start">
+            <path d="M245.5,322.9c53,0,96.2-43.2,96.2-96.2V96.2c0-53-43.2-96.2-96.2-96.2s-96.2,43.2-96.2,96.2v130.5
+            C149.3,279.8,192.5,322.9,245.5,322.9z M173.8,96.2c0-39.5,32.2-71.7,71.7-71.7s71.7,32.2,71.7,71.7v130.5
+            c0,39.5-32.2,71.7-71.7,71.7s-71.7-32.2-71.7-71.7V96.2z" />
+            <path d="M94.4,214.5c-6.8,0-12.3,5.5-12.3,12.3c0,85.9,66.7,156.6,151.1,162.8v76.7h-63.9c-6.8,0-12.3,5.5-12.3,12.3
+            s5.5,12.3,12.3,12.3h152.3c6.8,0,12.3-5.5,12.3-12.3s-5.5-12.3-12.3-12.3h-63.9v-76.7c84.4-6.3,151.1-76.9,151.1-162.8
+            c0-6.8-5.5-12.3-12.3-12.3s-12.3,5.5-12.3,12.3c0,76.6-62.3,138.9-138.9,138.9s-138.9-62.3-138.9-138.9
+            C106.6,220,101.2,214.5,94.4,214.5z" />
+          </g>
+
+          <g class="stop hidden">
+            <rect width="300.9" height="300.9" rx="25" x="100" y="100" />
+          </g>
+        </svg>
+      </div>
+    </div>
+    """
+  end
+
   attr :type, :string, required: true, doc: "dialog or room"
 
   def button(assigns) do

@@ -82,26 +82,16 @@ defmodule Chat.Rooms.RoomTest do
 
     assert room |> Rooms.Room.is_requested_by?(bob_hash)
 
-    room = room |> Rooms.Room.approve_requests(room_identity)
+    room = room |> Rooms.Room.approve_request(bob_hash, room_identity, [])
 
-    room = room |> Rooms.Room.approve_requests(room_identity)
+    assert [{^bob_hash, ^bob_key, encrypted_identity}] = room.requests
 
-    assert [{^bob_hash, ^bob_key, {enc_secret, blob}}] = room.requests
+    decrypted_identity = Rooms.decrypt_identity(encrypted_identity, bob)
 
-    secret =
-      enc_secret
-      |> Utils.decrypt(bob)
+    assert room_identity == decrypted_identity
 
-    decrypted =
-      blob
-      |> Utils.decrypt_blob(secret)
-      |> Identity.from_strings()
+    room = room_identity |> Rooms.join_approved_request(bob)
 
-    assert room_identity == decrypted
-
-    {room, [joined_identitiy]} = room |> Rooms.Room.join_approved_requests(bob)
-
-    assert room_identity == joined_identitiy
     assert [] = room.requests
   end
 
@@ -127,21 +117,17 @@ defmodule Chat.Rooms.RoomTest do
     room_hash = room_identity |> Utils.hash()
 
     bob = User.login("Bob")
+    bob_pub_key = bob |> Identity.pub_key()
+    bob_hash = bob |> Utils.hash()
 
     Rooms.add_request(room_hash, bob, 0)
-
-    assert 1 =
-             Rooms.list([])
-             |> elem(1)
-             |> Enum.filter(&Rooms.is_requested_by?(&1.hash, bob |> Utils.hash()))
-             |> Enum.count()
-
-    assert [] = Rooms.join_approved_requests(room_hash, bob, 1)
-
-    Rooms.approve_requests(room_hash, room_identity)
     ChangeTracker.await()
+    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
+    assert Rooms.is_requested_by?(room_hash, bob_hash)
 
-    assert [^room_identity] = Rooms.join_approved_requests(room_hash, bob, 2)
+    Rooms.approve_request(room_hash, bob_hash, room_identity)
+    ChangeTracker.await()
+    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, {_, _}}]} = Rooms.get(room_hash)
   end
 
   test "message removed from room should not accessed any more" do

@@ -190,8 +190,13 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign(:users, User.list())
   end
 
-  defp assign_room_list(%{assigns: %{rooms: rooms}} = socket) do
+  defp assign_room_list(%{assigns: %{rooms: rooms, my_id: my_id}} = socket) do
     {joined, new} = Rooms.list(rooms)
+
+    new =
+      Enum.map(new, fn room ->
+        Map.put(room, :is_requested?, Rooms.is_requested_by?(room.hash, my_id))
+      end)
 
     socket
     |> assign(:joined_rooms, joined)

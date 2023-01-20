@@ -42,15 +42,16 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   attr :config, UploadConfig, required: true, doc: "upload config"
   attr :type, :string, required: true, doc: "dialog or room"
 
-  def push_to_talk_button(assigns) do
+  def push_to_talk(assigns) do
     ~H"""
-    <div id="push-to-talk-wrapper" phx-update="ignore">
-      <div
-        class="cursor-pointer mr-2 hidden"
-        id="push-to-talk-button"
-        phx-hook="PushToTalk"
-        data-ref={@config.ref}
-      >
+    <div
+      class="flex flex-row items-center"
+      data-ref={@config.ref}
+      id="push-to-talk-wrapper"
+      phx-hook="PushToTalk"
+      phx-update="ignore"
+    >
+      <button class="cursor-pointer mr-2 hidden" id="push-to-talk-button">
         <svg class="w-7 h-7 p-1 bg-purple rounded-full fill-white" viewbox="0 0 490.9 490.9">
           <g class="start">
             <path d="M245.5,322.9c53,0,96.2-43.2,96.2-96.2V96.2c0-53-43.2-96.2-96.2-96.2s-96.2,43.2-96.2,96.2v130.5
@@ -66,6 +67,13 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
             <rect width="300.9" height="300.9" rx="25" x="100" y="100" />
           </g>
         </svg>
+      </button>
+
+      <div class="hidden flex flex-row items-center p-2" id="push-to-talk-details">
+        <div class="animate-recording rounded-full bg-red-400 h-3 w-3" id="push-to-talk-indicator">
+        </div>
+        <div class="mx-2" id="push-to-talk-status"></div>
+        <div class="text-black/50" id="push-to-talk-duration"></div>
       </div>
     </div>
     """

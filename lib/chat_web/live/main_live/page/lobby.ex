@@ -46,7 +46,6 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     end)
 
     # todo: Interface should have room creating stage and enter room upon it is saved
-
     socket
     |> Page.Login.store_new_room(new_room_identity)
     |> assign_room_list()
@@ -149,11 +148,11 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign(:db_status, status)
   end
 
-  def refresh_room_list(socket),
-    do:
-      socket
-      |> assign_room_list()
-      |> assign_admin()
+  def refresh_room_list(socket) do
+    socket
+    |> assign_room_list()
+    |> assign_admin()
+  end
 
   def close(socket) do
     PubSub.unsubscribe(Chat.PubSub, @topic)

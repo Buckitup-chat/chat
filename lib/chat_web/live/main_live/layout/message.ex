@@ -232,6 +232,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
           |> Identity.from_strings()
           |> Card.from_identity()
       end)
+      IO.inspect assigns.msg
 
     ~H"""
     <div

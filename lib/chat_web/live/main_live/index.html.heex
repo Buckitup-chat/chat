@@ -759,60 +759,12 @@
                     <p class="text-base text-grayscale600 px-7">You have no rooms</p>
                   <% else %>
                     <%= for room <- @joined_rooms do %>
-                      <li
-                        phx-click="room/switch"
-                        phx-value-room={room.hash}
-                        class={
-                          classes(
-                            "hidden sm:flex w-full h-9 flex items-center cursor-pointer hover:bg-stone250",
-                            %{"bg-stone250" => @room && room.pub_key == @room.pub_key}
-                          )
-                        }
-                      >
-                        <a>
-                          <div class="flex flex-row px-2">
-                            <Layout.Card.hashed_name
-                              room={room}
-                              style_spec={:room_selection}
-                              selected_room={@room}
-                            />
-                          </div>
-                        </a>
-                        <%= if room.type == :request do %>
-                          <.icon id="private" class="w-5 h-5 stroke-black" />
-                        <% end %>
-                        <%= if room.type == :private do %>
-                          <.icon id="secret" class="w-4 h-4" />
-                        <% end %>
-                        <%= if room.type == :public do %>
-                          <.icon id="open" class="w-4 h-4" />
-                        <% end %>
-                      </li>
-                      <li
-                        phx-click={JS.push("room/switch") |> open_content()}
-                        phx-value-room={room.hash}
-                        class={
-                          classes(
-                            "sm:hidden w-full h-9 flex items-center cursor-pointer hover:bg-stone250",
-                            %{"bg-stone250" => room == @room}
-                          )
-                        }
-                      >
-                        <a>
-                          <div class="flex flex-row pl-7">
-                            <Layout.Card.hashed_name room={room} />
-                          </div>
-                        </a>
-                        <%= if room.type == :request do %>
-                          <.icon id="private" class="w-5 h-5 stroke-black" />
-                        <% end %>
-                        <%= if room.type == :private do %>
-                          <.icon id="secret" class="w-4 h-4" />
-                        <% end %>
-                        <%= if room.type == :public do %>
-                          <.icon id="open" class="w-4 h-4" />
-                        <% end %>
-                      </li>
+                      <Layout.RoomItem.render
+                        room={room}
+                        confirmed?={true}
+                        selected_room={@room}
+                        click_event="room/switch"
+                      />
                     <% end %>
                   <% end %>
                 </ul>
@@ -832,26 +784,7 @@
                     <p class="text-base text-grayscale600 px-7">You have no rooms</p>
                   <% else %>
                     <%= for room <- @new_rooms do %>
-                      <%= if room |> Rooms.is_requested_by?(@my_id) do %>
-                        <li class="w-full h-9 cursor-pointer flex items-center hover:bg-stone250">
-                          <div class="flex flex-row justify-between px-7 w-full">
-                            <div class="flex flex-row">
-                              <Layout.Card.hashed_name room={room} />
-                            </div>
-                            <.icon id="time" class="w-4 h-4 flex fill-black/50" />
-                          </div>
-                        </li>
-                      <% else %>
-                        <li
-                          class="w-full h-9 cursor-pointer flex items-center hover:bg-stone250"
-                          phx-click="room/send-request"
-                          phx-value-room={room.hash}
-                        >
-                          <div class="flex flex-row px-7 w-full">
-                            <Layout.Card.hashed_name room={room} />
-                          </div>
-                        </li>
-                      <% end %>
+                      <Layout.RoomItem.render room={room} click_event="room/send-request" />
                     <% end %>
                   <% end %>
                 </ul>

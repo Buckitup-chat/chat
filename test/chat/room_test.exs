@@ -234,6 +234,7 @@ defmodule Chat.Rooms.RoomTest do
     |> String.pad_trailing(200, "-")
     |> Messages.Text.new(0)
     |> Rooms.update_message({msg.index, msg.id}, alice, room_identity)
+    |> Rooms.await_saved(room.pub_key)
 
     assert [_, _, _] =
              Rooms.read(

@@ -99,12 +99,16 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign_room_list()
   end
 
-  def approve_room_request(%{assigns: %{room_map: room_map}} = socket, room_hash, user_hash)
+  def approve_room_request(
+        %{assigns: %{room_map: room_map, me: me, monotonic_offset: time_offset}} = socket,
+        room_hash,
+        user_hash
+      )
       when is_map_key(room_map, room_hash) do
-    {_, _, {encrypted, blob}} =
-      room_hash
-      |> Rooms.approve_request(user_hash, room_map[room_hash], public_only: true)
-      |> Rooms.get_request(user_hash)
+    time = Chat.Time.monotonic_to_unix(time_offset)
+    room = Rooms.approve_request(room_hash, user_hash, room_map[room_hash], public_only: true)
+    {_, _, {encrypted, blob}} = Rooms.get_request(room, user_hash)
+    Log.approve_room_request(me, time, room.pub_key)
 
     PubSub.broadcast!(
       Chat.PubSub,
@@ -237,14 +241,25 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   defp init_new_mode(%{assigns: %{lobby_mode: :admin}} = socket),
     do: socket |> Page.AdminPanel.init()
 
-  defp approve_pending_requests(%{assigns: %{room_map: room_map}}) do
+  defp approve_pending_requests(%{
+         assigns: %{room_map: room_map, me: me, monotonic_offset: time_offset}
+       }) do
     room_map
     |> Map.keys()
     |> Enum.each(fn room_hash ->
       room_hash
       |> Rooms.list_pending_requests()
       |> Enum.each(fn {user_hash, _} ->
-        Rooms.approve_request(room_hash, user_hash, room_map[room_hash], public_only: true)
+        time = Chat.Time.monotonic_to_unix(time_offset)
+        room = Rooms.approve_request(room_hash, user_hash, room_map[room_hash], public_only: true)
+        {_, _, {encrypted, blob}} = Rooms.get_request(room, user_hash)
+        Log.approve_room_request(me, time, room.pub_key)
+
+        PubSub.broadcast!(
+          Chat.PubSub,
+          @topic,
+          {:room_request_approved, {encrypted, blob}, user_hash}
+        )
       end)
     end)
   end

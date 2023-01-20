@@ -246,8 +246,15 @@ defmodule ChatWeb.MainLive.Page.Lobby do
       |> Rooms.list_pending_requests()
       |> Enum.each(fn {user_hash, _} ->
         time = Chat.Time.monotonic_to_unix(time_offset)
-        Rooms.approve_request(room_hash, user_hash, room_map[room_hash], public_only: true)
-        Log.approve_room_request(me, time, room_map[room_hash] |> Identity.pub_key())
+        room = Rooms.approve_request(room_hash, user_hash, room_map[room_hash], public_only: true)
+        {_, _, {encrypted, blob}} = Rooms.get_request(room, user_hash)
+        Log.approve_room_request(me, time, room.pub_key)
+
+        PubSub.broadcast!(
+          Chat.PubSub,
+          @topic,
+          {:room_request_approved, {encrypted, blob}, user_hash}
+        )
       end)
     end)
   end

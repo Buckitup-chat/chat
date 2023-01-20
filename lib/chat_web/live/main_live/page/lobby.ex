@@ -36,7 +36,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   def new_room(%{assigns: %{me: me, monotonic_offset: time_offset}} = socket, name, type)
       when type in [:public, :request, :private] do
-    new_room_identity = Rooms.add(me, name, type)
+    {new_room_identity, new_room} = Rooms.add(me, name, type)
     new_room_card = Chat.Card.from_identity(new_room_identity)
 
     me |> Log.create_room(Chat.Time.monotonic_to_unix(time_offset), new_room_identity, type)
@@ -45,12 +45,10 @@ defmodule ChatWeb.MainLive.Page.Lobby do
       PubSub.broadcast!(Chat.PubSub, @topic, {:new_room, new_room_card})
     end)
 
-    # todo: Interface should have room creating stage and enter room upon it is saved
-
     socket
     |> Page.Login.store_new_room(new_room_identity)
     |> assign_room_list()
-    |> Page.Room.init(new_room_card.hash)
+    |> Page.Room.init({new_room_identity, new_room})
   end
 
   def notify_new_user(socket, user_card) do

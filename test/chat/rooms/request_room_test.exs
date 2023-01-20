@@ -113,7 +113,7 @@ defmodule Chat.Rooms.RequestRoomTest do
 
   defp user_and_request_room(name) do
     alice = User.login(name)
-    room_identity = Rooms.add(alice, "#{name}'s Request room", :request)
+    {room_identity, _room} = Rooms.add(alice, "#{name}'s Request room", :request)
     Rooms.await_saved(room_identity)
     room = Rooms.get(room_identity |> Utils.hash())
 

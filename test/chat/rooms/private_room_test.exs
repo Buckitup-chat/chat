@@ -76,7 +76,7 @@ defmodule Chat.Rooms.PrivateRoomTest do
 
   def make_user_and_private_room(name) do
     alice = User.login(name)
-    room_identity = Rooms.add(alice, "#{name}'s Private room", :private)
+    {room_identity, _room} = Rooms.add(alice, "#{name}'s Private room", :private)
     ChangeTracker.await({:rooms, room_identity |> Utils.hash()})
     room = Rooms.get(room_identity |> Utils.hash())
 

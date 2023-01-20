@@ -68,7 +68,11 @@ defmodule Chat.Db do
       },
       # writer
       {Chat.Db.QueueWriter.Process,
-       name: writer_name, db: db_name, queue: queue_name, status_relay: dry_relay_name}
+       name: writer_name,
+       db: db_name,
+       queue: queue_name,
+       status_relay: dry_relay_name,
+       files_path: path <> "_files"}
     ]
   end
 

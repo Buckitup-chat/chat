@@ -181,6 +181,6 @@ defmodule Chat.Db.QueueWriter do
   def start_fsync_timer(state), do: state
 
   defp has_enoght_space?(db) do
-    Maintenance.db_free_space(db) > 2 * Maintenance.db_size(db)
+    Maintenance.db_free_space(db) > Maintenance.db_size(db)
   end
 end

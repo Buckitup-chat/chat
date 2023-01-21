@@ -2,13 +2,17 @@
 
 ## DB Supervisor
 
-DB Supervisior wraps every DB in Queue, Writer and Dry Status Relay.
+DB Supervisior wraps every DB in Queue, Writer, Dry Status Relay, Decider and Compactor.
 
 Queue and Writer described in [DB Prioritization](./prioritization.livemd).
 
-Dry Status Realy is Agent that holds read only state of DB. It is updated by Writer. And read by UI to show red indication.
+Dry Status Realy is Agent that holds read only state of DB. It is updated by Decider. And read by UI to show red indication.
 
-The supervision strategy is `rest for one`. Which means that all peers to the right will get restated if children failed. I.e. if CubDB fails, Dry Status Relay and Writer gets restarted as well. Queue continues to work, agregationg all the changes User generated. This provides seamless switching into Read Only mode when there is no room to write data.
+Decider checks space left on device and starts writing or read only configuration under WriteSupervisor. For write it starts Writer and Compactor. For read only - DryWriter, which does no writes in DB or filesystem.
+
+Compactor awaits for period of inactivity (7 minutes) and starts DB compaction. When Writer has something to write, it lets Compactor know, so compaction will get canceled if unfinished.
+
+The supervision strategy is `rest for one`. Which means that all peers to the right will get restated if children failed. I.e. if CubDB fails, Dry Status Relay, WriteSupervisor and Decider get restarted as well. Queue continues to work, aggregating all the changes User generated. This provides seamless switching into Read Only mode when there is no room to write data.
 
 <!-- Learn more at https://mermaid-js.github.io/mermaid -->
 
@@ -19,7 +23,12 @@ graph TD;
   s --> Queue
   s --> db[(CubDB)]
   s --> ds[Dry Status Relay]
-  s --> Writer
+  s --> ws{{WriteSupervisor}}
+  s --> Decider
+  
+  ws --> Compactor
+  ws --> Writer
+  ws -.-> DryWriter
 ```
 
 This approach used in all DB Supervisors. Each handles its own DB, otherwise they are identical

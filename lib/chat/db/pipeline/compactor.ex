@@ -3,14 +3,15 @@ defmodule Chat.Db.Pipeline.Compactor do
   Awaits no activity to start compaction.
   If activity comes when compaction is sterted - cancels it
   """
-
   use GenServer
 
   import Tools.GenServerHelpers
 
+  alias Chat.Db.Maintenance
+
   @no_activity_timeout_m 7
 
-  def activity, do: __MODULE__ |> GenServer.cast(:activity)
+  def activity(proc), do: proc |> GenServer.cast(:activity)
 
   #
   #   Implementation
@@ -26,7 +27,7 @@ defmodule Chat.Db.Pipeline.Compactor do
   def init(opts) do
     {
       false,
-      opts |> Keyword.fetch!(:db_name),
+      opts |> Keyword.fetch!(:db),
       schedule_timer()
     }
     |> ok()
@@ -34,7 +35,7 @@ defmodule Chat.Db.Pipeline.Compactor do
 
   @impl true
   def handle_cast(:activity, {started?, db, timer}) do
-    Process.cancel_timer(timer)
+    cancel_timer(timer)
 
     if started? do
       stop_compaction(db)
@@ -45,23 +46,27 @@ defmodule Chat.Db.Pipeline.Compactor do
   end
 
   @impl true
-  def handle_info(:start, {started?, db, timer} = state) do
+  def handle_info(:start, {started?, db, timer}) do
     if not started? and there_is_free_space?(db) do
-      CubDB.compact(db)
+      start_compaction(db)
 
       {true, db, timer} |> noreply()
     else
-      state |> noreply()
+      {false, db, timer}
+      |> noreply()
     end
   end
 
-  defp there_is_free_space?(_db), do: false
+  defp there_is_free_space?(db) do
+    Maintenance.db_free_space(db) > Maintenance.db_size(db)
+  end
 
   defp schedule_timer do
     Process.send_after(self(), :start, :timer.minutes(@no_activity_timeout_m))
   end
 
-  defp stop_compaction(db) do
-    CubDB.halt_compaction(db)
-  end
+  defp cancel_timer(timer), do: Process.cancel_timer(timer)
+
+  defp start_compaction(db), do: CubDB.compact(db)
+  defp stop_compaction(db), do: CubDB.halt_compaction(db)
 end

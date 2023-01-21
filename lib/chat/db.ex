@@ -48,7 +48,10 @@ defmodule Chat.Db do
     %{
       status: dry_relay_name,
       queue: queue_name,
-      writer: writer_name
+      writer: writer_name,
+      compactor: compactor,
+      decider: decider,
+      write_supervisor: write_supervisor
     } = names(db_name)
 
     [
@@ -66,12 +69,17 @@ defmodule Chat.Db do
         id: dry_relay_name,
         start: {Agent, :start_link, [fn -> false end, [name: dry_relay_name]]}
       },
-      # writer
-      {Chat.Db.QueueWriter.Process,
-       name: writer_name,
-       db: db_name,
+      # write supervisor
+      {DynamicSupervisor, name: write_supervisor, strategy: :one_for_one},
+      # decider
+      {Chat.Db.Pipeline.Decider,
+       name: decider,
        queue: queue_name,
+       writer: writer_name,
+       compactor: compactor,
        status_relay: dry_relay_name,
+       write_supervisor: write_supervisor,
+       db: db_name,
        files_path: path <> "_files"}
     ]
   end

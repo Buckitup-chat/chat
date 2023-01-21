@@ -9,14 +9,14 @@ defmodule Chat.Rooms do
   alias Chat.Rooms.RoomMessages
   alias Chat.Utils
 
-  @doc "Returns new room Identity"
+  @doc "Returns new room {Identity, Room}"
   def add(me, name, type \\ :public) do
-    name
-    |> Identity.create()
-    |> tap(fn room_identity ->
-      Room.create(me, room_identity, type)
-      |> Registry.update()
-    end)
+    room_identity = name |> Identity.create()
+    room = Room.create(me, room_identity, type)
+
+    room |> Registry.update()
+
+    {room_identity, room}
   end
 
   @doc "Returns room Cards {my_rooms, available_rooms}"

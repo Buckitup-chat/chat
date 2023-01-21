@@ -32,15 +32,21 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def init(socket), do: socket |> assign(:room, nil)
 
-  def init(%{assigns: %{rooms: rooms, me: me, monotonic_offset: time_offset}} = socket, room_hash) do
-    time = Chat.Time.monotonic_to_unix(time_offset)
+  def init(%{assigns: %{room_map: rooms}} = socket, room_hash) when is_binary(room_hash) do
     room = Rooms.get(room_hash)
+    room_identity = rooms |> Map.get(room_hash)
 
-    room_identity =
-      rooms
-      |> Enum.find(&(room_hash == &1 |> Identity.pub_key() |> Utils.hash()))
+    socket
+    |> init({room_identity, room})
+  end
 
+  def init(
+        %{assigns: %{me: me, monotonic_offset: time_offset}} = socket,
+        {%Identity{} = room_identity, room}
+      ) do
     PubSub.subscribe(Chat.PubSub, room.pub_key |> room_topic())
+
+    time = Chat.Time.monotonic_to_unix(time_offset)
     Log.visit_room(me, time, room_identity)
 
     socket

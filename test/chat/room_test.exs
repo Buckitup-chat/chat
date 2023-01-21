@@ -14,8 +14,7 @@ defmodule Chat.Rooms.RoomTest do
   test "room creation" do
     alice = User.login("Alice")
     room_name = "Alice's room"
-    room_identity = alice |> Rooms.add(room_name)
-    room = Rooms.Room.create(alice, room_identity)
+    {room_identity, room} = alice |> Rooms.add(room_name)
 
     assert %Rooms.Room{} = room
 
@@ -29,8 +28,7 @@ defmodule Chat.Rooms.RoomTest do
     alice |> User.register()
     alice_hash = alice |> Identity.pub_key() |> Utils.hash()
 
-    room_identity = alice |> Rooms.add("some room")
-    room = Rooms.Room.create(alice, room_identity)
+    {room_identity, room} = alice |> Rooms.add("some room")
 
     message = "hello, room"
 
@@ -98,7 +96,7 @@ defmodule Chat.Rooms.RoomTest do
   test "room list should return my created room" do
     alice = User.login("Alice")
     room_name = "Some my room"
-    room_identity = alice |> Rooms.add(room_name)
+    {room_identity, _room} = alice |> Rooms.add(room_name)
     Rooms.await_saved(room_identity)
     room_hash = room_identity |> Utils.hash()
 
@@ -113,7 +111,7 @@ defmodule Chat.Rooms.RoomTest do
   test "requesting room should work" do
     alice = User.login("Alice")
     room_name = "Some my room"
-    room_identity = alice |> Rooms.add(room_name)
+    {room_identity, _room} = alice |> Rooms.add(room_name)
     room_hash = room_identity |> Utils.hash()
 
     bob = User.login("Bob")
@@ -253,8 +251,7 @@ defmodule Chat.Rooms.RoomTest do
   defp alice_and_room do
     alice = User.login("Alice")
 
-    room_identity = alice |> Rooms.add("Alice room")
-    room = Rooms.Room.create(alice, room_identity)
+    {room_identity, room} = alice |> Rooms.add("Alice room")
 
     {alice, room_identity, room}
   end

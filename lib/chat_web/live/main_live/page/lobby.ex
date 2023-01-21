@@ -36,7 +36,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   def new_room(%{assigns: %{me: me, monotonic_offset: time_offset}} = socket, name, type)
       when type in [:public, :request, :private] do
-    new_room_identity = Rooms.add(me, name, type)
+    {new_room_identity, new_room} = Rooms.add(me, name, type)
     new_room_card = Chat.Card.from_identity(new_room_identity)
 
     me |> Log.create_room(Chat.Time.monotonic_to_unix(time_offset), new_room_identity, type)
@@ -45,12 +45,10 @@ defmodule ChatWeb.MainLive.Page.Lobby do
       PubSub.broadcast!(Chat.PubSub, @topic, {:new_room, new_room_card})
     end)
 
-    # todo: Interface should have room creating stage and enter room upon it is saved
-
     socket
     |> Page.Login.store_new_room(new_room_identity)
     |> assign_room_list()
-    |> Page.Room.init(new_room_card.hash)
+    |> Page.Room.init({new_room_identity, new_room})
   end
 
   def notify_new_user(socket, user_card) do
@@ -99,12 +97,16 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign_room_list()
   end
 
-  def approve_room_request(%{assigns: %{room_map: room_map}} = socket, room_hash, user_hash)
+  def approve_room_request(
+        %{assigns: %{room_map: room_map, me: me, monotonic_offset: time_offset}} = socket,
+        room_hash,
+        user_hash
+      )
       when is_map_key(room_map, room_hash) do
-    {_, _, {encrypted, blob}} =
-      room_hash
-      |> Rooms.approve_request(user_hash, room_map[room_hash], public_only: true)
-      |> Rooms.get_request(user_hash)
+    time = Chat.Time.monotonic_to_unix(time_offset)
+    room = Rooms.approve_request(room_hash, user_hash, room_map[room_hash], public_only: true)
+    {_, _, {encrypted, blob}} = Rooms.get_request(room, user_hash)
+    Log.approve_room_request(me, time, room.pub_key)
 
     PubSub.broadcast!(
       Chat.PubSub,
@@ -186,8 +188,13 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign(:users, User.list())
   end
 
-  defp assign_room_list(%{assigns: %{rooms: rooms}} = socket) do
+  defp assign_room_list(%{assigns: %{rooms: rooms, my_id: my_id}} = socket) do
     {joined, new} = Rooms.list(rooms)
+
+    new =
+      Enum.map(new, fn room ->
+        Map.put(room, :is_requested?, Rooms.is_requested_by?(room.hash, my_id))
+      end)
 
     socket
     |> assign(:joined_rooms, joined)
@@ -232,14 +239,25 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   defp init_new_mode(%{assigns: %{lobby_mode: :admin}} = socket),
     do: socket |> Page.AdminPanel.init()
 
-  defp approve_pending_requests(%{assigns: %{room_map: room_map}}) do
+  defp approve_pending_requests(%{
+         assigns: %{room_map: room_map, me: me, monotonic_offset: time_offset}
+       }) do
     room_map
     |> Map.keys()
     |> Enum.each(fn room_hash ->
       room_hash
       |> Rooms.list_pending_requests()
       |> Enum.each(fn {user_hash, _} ->
-        Rooms.approve_request(room_hash, user_hash, room_map[room_hash], public_only: true)
+        time = Chat.Time.monotonic_to_unix(time_offset)
+        room = Rooms.approve_request(room_hash, user_hash, room_map[room_hash], public_only: true)
+        {_, _, {encrypted, blob}} = Rooms.get_request(room, user_hash)
+        Log.approve_room_request(me, time, room.pub_key)
+
+        PubSub.broadcast!(
+          Chat.PubSub,
+          @topic,
+          {:room_request_approved, {encrypted, blob}, user_hash}
+        )
       end)
     end)
   end

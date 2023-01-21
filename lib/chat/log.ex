@@ -31,6 +31,9 @@ defmodule Chat.Log do
   def got_room_key(me, time, room), do: me |> log(time, :got_room_key, room: binhash(room))
   def visit_room(me, time, room), do: me |> log(time, :visit_room, room: binhash(room))
 
+  def approve_room_request(me, time, room),
+    do: me |> log(time, :approve_room_request, room: binhash(room))
+
   def open_direct(me, time, peer), do: me |> log(time, :open_direct, to: binhash(peer))
   def message_direct(me, time, peer), do: me |> log(time, :message_direct, to: binhash(peer))
 
@@ -55,6 +58,7 @@ defmodule Chat.Log do
     update_room_message: "edits in room",
     delete_room_message: "deletes in room",
     request_room_key: "requests key of room",
+    approve_room_request: "approves request for room",
     got_room_key: "got key for room",
     visit_room: "reads room"
   }

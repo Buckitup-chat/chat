@@ -112,7 +112,7 @@ defmodule Chat.Dialogs.DialogMessaging do
 
       {index, msg}
       |> read(author, side, Dialog.peer_key(dialog, side))
-      |> Content.delete()
+      |> Content.delete([dialog.a_key |> Utils.hash(), dialog.b_key |> Utils.hash()])
 
       Db.delete(key)
       :ok
@@ -126,7 +126,7 @@ defmodule Chat.Dialogs.DialogMessaging do
 
       {index, msg}
       |> read(author, side, Dialog.peer_key(dialog, side))
-      |> Content.delete()
+      |> Content.delete([dialog.a_key |> Utils.hash(), dialog.b_key |> Utils.hash()])
 
       type = DryStorable.type(message)
 

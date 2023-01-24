@@ -3,8 +3,8 @@ defmodule Chat.ChunkedFiles do
 
   alias Chat.ChunkedFilesBroker
   alias Chat.Db
-  alias Chat.Utils
   alias Chat.FileFs
+  alias Chat.Utils
 
   @type key :: String.t()
   @type secret :: String.t()

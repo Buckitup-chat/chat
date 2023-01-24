@@ -1,6 +1,7 @@
 defmodule Chat.FileIndex do
   @moduledoc "Keeps an index of files and keys it"
 
+  alias Chat.Db
   alias Chat.Dialogs.Dialog
   alias Chat.Utils
 
@@ -14,10 +15,22 @@ defmodule Chat.FileIndex do
   end
 
   def get(reader_hash, file_key) do
-    Chat.Db.get({:file_index, reader_hash, file_key})
+    reader_hash
+    |> db_key(file_key)
+    |> Db.get()
+  end
+
+  def delete(reader_hash, file_key) do
+    reader_hash
+    |> db_key(file_key)
+    |> Db.delete()
   end
 
   defp save(file_key, reader_hash) do
-    Chat.Db.put({:file_index, reader_hash, file_key}, true)
+    reader_hash
+    |> db_key(file_key)
+    |> Db.put(true)
   end
+
+  defp db_key(reader_hash, file_key), do: {:file_index, reader_hash, file_key}
 end

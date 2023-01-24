@@ -7,8 +7,8 @@ defmodule Chat.Db.Pipeline.Decider do
 
   import Tools.GenServerHelpers
 
-  alias Chat.Db.Pipeline.DryWriter
   alias Chat.Db.Pipeline.Compactor
+  alias Chat.Db.Pipeline.DryWriter
   alias Chat.Db.Pipeline.WriterProcess
 
   alias Chat.Db.Maintenance

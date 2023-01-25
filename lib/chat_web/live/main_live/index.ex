@@ -8,6 +8,7 @@ defmodule ChatWeb.MainLive.Index do
   alias Phoenix.LiveView.UploadEntry
 
   alias Chat.ChunkedFiles
+  alias Chat.FileIndex
   alias Chat.Upload.{Upload, UploadIndex, UploadMetadata}
   alias Chat.Utils
 
@@ -423,28 +424,35 @@ defmodule ChatWeb.MainLive.Index do
   def chunked_presign_url(entry, socket) do
     upload_key = get_upload_key(entry, socket.assigns)
 
-    {next_chunk, secret} =
-      case UploadIndex.get(upload_key) do
-        nil ->
-          secret = ChunkedFiles.new_upload(upload_key)
-          add_upload_to_index(socket, upload_key, secret)
-          {0, secret}
+    case FileIndex.get(upload_key, reader_hash(socket.assigns)) do
+      nil ->
+        {next_chunk, secret} = maybe_resume_existing_upload(upload_key, socket.assigns)
 
-        %Upload{} = upload ->
-          UploadIndex.delete(upload_key)
-          add_upload_to_index(socket, upload_key, upload.secret)
-          next_chunk = ChunkedFiles.next_chunk(upload_key)
-          {next_chunk, upload.secret}
-      end
+        {socket, uploader_data} =
+          start_chunked_upload(socket, entry, upload_key, secret, next_chunk)
 
-    {socket, uploader_data} = start_chunked_upload(socket, entry, upload_key, secret, next_chunk)
+        link = Helpers.upload_chunk_url(ChatWeb.Endpoint, :put, upload_key)
 
-    link = Helpers.upload_chunk_url(ChatWeb.Endpoint, :put, upload_key)
+        uploader_data =
+          Map.merge(%{uploader: "UpChunk", entrypoint: link, uuid: entry.uuid}, uploader_data)
 
-    uploader_data =
-      Map.merge(%{uploader: "UpChunk", entrypoint: link, uuid: entry.uuid}, uploader_data)
+        {:ok, uploader_data, socket}
 
-    {:ok, uploader_data, socket}
+      secret ->
+        entry = Map.put(entry, :done?, true)
+
+        metadata =
+          %UploadMetadata{}
+          |> Map.put(:credentials, {upload_key, secret})
+          |> Map.put(:destination, file_upload_destination(socket.assigns))
+
+        case metadata.destination.type do
+          :dialog -> Page.Dialog.send_file(socket, entry, metadata)
+          :room -> Page.Room.send_file(socket, entry, metadata)
+        end
+
+        {:error, %{}, socket}
+    end
   end
 
   defp get_upload_key(%UploadEntry{} = entry, %{my_id: id} = assigns) do
@@ -467,8 +475,29 @@ defmodule ChatWeb.MainLive.Index do
     |> Utils.hash()
   end
 
-  defp add_upload_to_index(socket, key, secret) do
-    timestamp = Chat.Time.monotonic_to_unix(socket.assigns.monotonic_offset)
+  defp reader_hash(%{lobby_mode: :chats, peer: %{pub_key: peer_pub_key}}),
+    do: Utils.hash(peer_pub_key)
+
+  defp reader_hash(%{lobby_mode: :rooms, room: %{pub_key: room_pub_key}}),
+    do: Utils.hash(room_pub_key)
+
+  defp maybe_resume_existing_upload(upload_key, assigns) do
+    case UploadIndex.get(upload_key) do
+      nil ->
+        secret = ChunkedFiles.new_upload(upload_key)
+        add_upload_to_index(assigns, upload_key, secret)
+        {0, secret}
+
+      %Upload{} = upload ->
+        UploadIndex.delete(upload_key)
+        add_upload_to_index(assigns, upload_key, upload.secret)
+        next_chunk = ChunkedFiles.next_chunk(upload_key)
+        {next_chunk, upload.secret}
+    end
+  end
+
+  defp add_upload_to_index(assigns, key, secret) do
+    timestamp = Chat.Time.monotonic_to_unix(assigns.monotonic_offset)
     upload = %Upload{secret: secret, timestamp: timestamp}
     UploadIndex.add(key, upload)
   end

@@ -180,7 +180,7 @@ File index entries keep track of who can read a file.
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-{{:file_index, reader_hash, file_key},
+{{:file_index, reader_hash, file_key, message_id},
  true}
 ```
 

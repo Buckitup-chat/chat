@@ -113,7 +113,9 @@ defmodule ChatWeb.MainLive.Page.Dialog do
         end
       )
 
-    FileIndex.add_file(chunk_key, dialog)
+    {_index, msg} = message
+
+    FileIndex.add_file(chunk_key, dialog, msg.id, chunk_secret)
 
     message
     |> Dialogs.on_saved(dialog, fn ->

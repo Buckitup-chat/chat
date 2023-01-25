@@ -26,7 +26,7 @@ defmodule Chat.Content do
     end
   end
 
-  def delete(_), do: :ok
+  def delete(_, _, _), do: :ok
 
   defp can_be_deleted?(key, msg_id, dialog_or_room_hash) do
     key

@@ -12,6 +12,8 @@ defmodule Chat.FileFs do
     |> File.open([:binary, :write], &IO.binwrite(&1, data))
   end
 
+  @spec read_file_chunk(offset :: non_neg_integer(), key :: String.t()) ::
+          {binary(), non_neg_integer()}
   def read_file_chunk(first, key, prefix \\ nil) do
     key_path(key, build_path(prefix))
     |> list_files()

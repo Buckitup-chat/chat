@@ -14,16 +14,14 @@ defmodule Chat.Content do
 
   alias Chat.Utils.StorageId
 
-  @spec delete(map(), reader_hash_list :: list(String.t())) :: :ok
+  @spec delete(any(), reader_hash_list :: list(String.t())) :: :ok
   def delete(%{content: json, type: type}, list) do
-    key = StorageId.from_json_to_key(json)
-
     case type do
-      :file -> delete_file(key, list)
-      :image -> delete_file(key, list)
-      :video -> delete_file(key, list)
-      :memo -> delete_memo(key, list)
-      :room_invite -> delete_room_invite(key, list)
+      :file -> delete_file(key(json), list)
+      :image -> delete_file(key(json), list)
+      :video -> delete_file(key(json), list)
+      :memo -> delete_memo(key(json), list)
+      :room_invite -> delete_room_invite(key(json), list)
       _ -> :ok
     end
   end
@@ -56,4 +54,6 @@ defmodule Chat.Content do
       RoomInviteIndex.delete(hash, key)
     end)
   end
+
+  defp key(json), do: StorageId.from_json_to_key(json)
 end

@@ -71,7 +71,9 @@ defmodule Chat.ChunkedFiles do
 
   def stream_chunks(key, secret) do
     FileFs.stream_file_chunks(key)
-    |> Stream.map(fn {_, data} -> Utils.decrypt_blob(data, secret) end)
+    |> Stream.map(fn data ->
+      Utils.decrypt_blob(data, secret)
+    end)
   end
 
   def size(key) do

@@ -45,7 +45,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:page, 0)
     |> assign(:peer, peer)
     |> assign(:dialog, dialog)
-    |> assign(:dialog_mode, :plain)
+    |> assign(:input_mode, :plain)
+    |> assign(:edit_content, nil)
     |> assign(:has_more_messages, true)
     |> assign(:last_load_timestamp, nil)
     |> assign(:message_update_mode, :replace)
@@ -58,7 +59,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:message_update_mode, :prepend)
     |> assign_messages()
     |> case do
-      %{assigns: %{dialog_mode: :select}} = socket ->
+      %{assigns: %{input_mode: :select}} = socket ->
         socket
         |> push_event("chat:toggle", %{to: "#chat-messages", class: "selectMode"})
 
@@ -145,7 +146,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       end)
 
     socket
-    |> assign(:dialog_mode, :edit)
+    |> assign(:input_mode, :edit)
     |> assign(:edit_content, content)
     |> assign(:edit_message_id, msg_id)
     |> forget_current_messages()
@@ -193,7 +194,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
   def cancel_edit(socket) do
     socket
-    |> assign(:dialog_mode, :plain)
+    |> assign(:input_mode, :plain)
     |> assign(:edit_content, nil)
     |> assign(:edit_message_id, nil)
   end
@@ -225,7 +226,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     end)
 
     socket
-    |> assign(:dialog_mode, :plain)
+    |> assign(:input_mode, :plain)
   end
 
   def hide_deleted_message(socket, id) do
@@ -335,14 +336,14 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   def toggle_messages_select(%{assigns: %{}} = socket, %{"action" => "on"}) do
     socket
     |> forget_current_messages()
-    |> assign(:dialog_mode, :select)
+    |> assign(:input_mode, :select)
     |> push_event("chat:toggle", %{to: "#chat-messages", class: "selectMode"})
   end
 
-  def toggle_messages_select(%{assigns: %{dialog_mode: :select}} = socket, %{"action" => "off"}) do
+  def toggle_messages_select(%{assigns: %{input_mode: :select}} = socket, %{"action" => "off"}) do
     socket
     |> forget_current_messages()
-    |> assign(:dialog_mode, :plain)
+    |> assign(:input_mode, :plain)
   end
 
   def open_image_gallery(

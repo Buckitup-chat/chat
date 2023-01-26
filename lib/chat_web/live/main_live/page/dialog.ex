@@ -106,7 +106,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
           Messages.File.new(
             entry,
             chunk_key,
-            chunk_secret,
+            Utils.decrypt_chunk_secret(chunk_secret, me),
             time
           )
           |> Dialogs.add_new_message(me, dialog)

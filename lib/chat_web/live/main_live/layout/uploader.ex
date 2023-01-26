@@ -73,7 +73,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
         <div class="animate-recording rounded-full bg-red-400 h-3 w-3" id="push-to-talk-indicator">
         </div>
         <div class="mx-2" id="push-to-talk-status"></div>
-        <div class="text-black/50" id="push-to-talk-duration"></div>
+        <div class="text-black/50" id="push-to-talk-progress"></div>
       </div>
     </div>
     """

@@ -6,6 +6,7 @@
     "tailwindcss-font-inter": "^3.0.1"
   },
   "dependencies": {
+    "audio-encoder": "1.0.2",
     "konva": "^8.4.2",
     "luxon": "^3.2.1",
     "peaks.js": "^2.1.0",

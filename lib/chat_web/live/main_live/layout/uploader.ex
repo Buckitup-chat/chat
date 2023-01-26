@@ -15,7 +15,10 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
 
   def uploader(assigns) do
     ~H"""
-    <div class="flex bottom-[6%] w-full left-30 flex-col fixed h-[27%] md:bottom-[-10px] md:w-[18%] md:h-[50%] overflow-scroll" id="file-uploader">
+    <div
+      class="flex bottom-[6%] w-full left-30 flex-col fixed h-[27%] md:bottom-[-10px] md:w-[18%] md:h-[50%] overflow-scroll"
+      id="file-uploader"
+    >
       <.entries config={@config} uploads={@uploads} />
     </div>
     """
@@ -188,7 +191,11 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   def in_progress?(assigns) do
     ~H"""
     <%= if Enum.any?(@uploads, fn {_uuid, %UploadMetadata{} = metadata} -> metadata.destination.type == @type and metadata.destination.pub_key == @pub_key end) do %>
-      <div class="hidden flex-row justify-end md:flex" id="upload-in-progress" phx-hook="UploadInProgress">
+      <div
+        class="hidden flex-row justify-end md:flex"
+        id="upload-in-progress"
+        phx-hook="UploadInProgress"
+      >
         <div class="m-1 sm:mx-8 bg-purple50 rounded-lg shadow-lg inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm text-black/50 shadow transition ease-in-out duration-150">
           <svg
             class="animate-spin -ml-1 mr-3 h-5 w-5 text-white"

@@ -23,6 +23,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
 
   attr :config, UploadConfig, required: true, doc: "upload config"
   attr :operating_system, :string, doc: "client's operating system"
+  attr :type, :string, required: true, doc: "dialog or room"
   attr :uploads, :map, required: true, doc: "uploads metadata"
 
   def mobile_uploader(assigns) do
@@ -32,7 +33,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       id="mobile-file-uploader"
       style="display: none;"
     >
-      <.file_form config={@config} operating_system={@operating_system} />
+      <.file_form config={@config} operating_system={@operating_system} type={@type} />
 
       <.entries config={@config} mobile?={true} uploads={@uploads} />
     </div>
@@ -84,14 +85,11 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   def button(assigns) do
     ~H"""
     <div id="uploader-button">
-      <button
-        class="hidden sm:block relative t-attach-file"
-        phx-click={open_file_upload_dialog(@type)}
-      >
+      <button class="hidden sm:block relative t-attach-file" phx-click={open_file_upload_dialog()}>
         <.icon id="attach" class="w-7 h-7 flex fill-white" />
       </button>
 
-      <button class="sm:hidden relative t-attach-file" phx-click={toggle_uploader(@type)}>
+      <button class="sm:hidden relative t-attach-file" phx-click={toggle_uploader()}>
         <.icon id="attach" class="w-7 h-7 flex fill-white" />
       </button>
     </div>
@@ -178,20 +176,17 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     """
   end
 
-  defp open_file_upload_dialog(type) do
-    %JS{}
-    |> JS.set_attribute({"phx-change", "#{type}/import-files"}, to: "#uploader-file-form")
-    |> JS.dispatch("click", to: "#uploader-file-form .file-input")
+  defp open_file_upload_dialog do
+    JS.dispatch("click", to: "#uploader-file-form .file-input")
   end
 
-  defp toggle_uploader(type) do
-    %JS{}
-    |> JS.set_attribute({"phx-change", "#{type}/import-files"}, to: "#uploader-file-form")
-    |> JS.toggle(to: "#mobile-file-uploader")
+  defp toggle_uploader do
+    JS.toggle(to: "#mobile-file-uploader")
   end
 
   attr :config, UploadConfig, required: true, doc: "upload config"
   attr :operating_system, :string, doc: "client's operating system"
+  attr :type, :string, required: true, doc: "dialog or room"
 
   defp file_form(assigns) do
     ~H"""
@@ -199,6 +194,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       for={:file}
       id="uploader-file-form"
       class="flex flex-col m-2 column column-50 column-offset-50"
+      phx-change={"#{@type}/import-files"}
       phx-drop-target={@config.ref}
     >
       <.live_file_input

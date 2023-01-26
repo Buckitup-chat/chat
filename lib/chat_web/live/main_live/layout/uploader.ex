@@ -15,7 +15,10 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
 
   def uploader(assigns) do
     ~H"""
-    <div class="flex fixed bottom-[-10px] w-[18%] left-30 flex-col mb-auto m-2" id="file-uploader">
+    <div
+      class="flex bottom-[6%] w-full left-30 flex-col fixed h-[27%] md:bottom-[-10px] md:w-[18%] md:h-[50%] overflow-scroll"
+      id="file-uploader"
+    >
       <.entries config={@config} uploads={@uploads} />
     </div>
     """
@@ -28,7 +31,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   def mobile_uploader(assigns) do
     ~H"""
     <div
-      class="flex flex-col m-2 bg-purple50 rounded-lg"
+      class="flex flex-col m-2 bg-purple50 rounded-lg fixed bottom-14 w-[96%] h-[280px] overflow-scroll"
       id="mobile-file-uploader"
       style="display: none;"
     >
@@ -64,7 +67,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
 
   defp entries(%{uploads: uploads} = assigns) when map_size(uploads) > 0 do
     ~H"""
-    <div class="px-2 py-1">
+    <div class="px-2 py-4">
       <%= for %UploadEntry{valid?: true} = entry <- @config.entries do %>
         <.entry entry={entry} metadata={@uploads[entry.uuid]} mobile?={@mobile?} />
       <% end %>
@@ -188,7 +191,11 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   def in_progress?(assigns) do
     ~H"""
     <%= if Enum.any?(@uploads, fn {_uuid, %UploadMetadata{} = metadata} -> metadata.destination.type == @type and metadata.destination.pub_key == @pub_key end) do %>
-      <div class="flex flex-row justify-end" id="upload-in-progress" phx-hook="UploadInProgress">
+      <div
+        class="hidden flex-row justify-end md:flex"
+        id="upload-in-progress"
+        phx-hook="UploadInProgress"
+      >
         <div class="m-1 sm:mx-8 bg-purple50 rounded-lg shadow-lg inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm text-black/50 shadow transition ease-in-out duration-150">
           <svg
             class="animate-spin -ml-1 mr-3 h-5 w-5 text-white"

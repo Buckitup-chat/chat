@@ -47,8 +47,7 @@ defmodule Chat.OrderingTest do
     alice = User.login("Alice")
     alice |> User.register()
 
-    room_identity = alice |> Rooms.add("some room")
-    room = Rooms.Room.create(alice, room_identity)
+    {room_identity, room} = alice |> Rooms.add("some room")
 
     message = "hello, room  "
 

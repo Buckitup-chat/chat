@@ -15,7 +15,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
 
   def uploader(assigns) do
     ~H"""
-    <div class="flex flex-col m-2 bg-purple50 rounded-lg" id="file-uploader">
+    <div class="flex fixed bottom-[-10px] w-[18%] left-30 flex-col mb-auto m-2" id="file-uploader">
       <.entries config={@config} uploads={@uploads} />
     </div>
     """
@@ -131,11 +131,11 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   defp entry(assigns) do
     ~H"""
     <div
-      class="flex my-2 bg-white border-purple relative rounded-lg w-full z-0"
+      class="flex mb-5 bg-white border-purple relative w-full z-0"
       id={if(@mobile?, do: "mobile-", else: "") <> "upload-#{@entry.uuid}"}
     >
       <div
-        class={"absolute top-0 left-0 h-full bg-purple z-10 transition-all " <> if(@entry.progress == 100, do: "rounded-lg", else: "rounded-l-lg")}
+        class="absolute top-[-13px] left-0 h-3 bg-gray-500 z-10 transition-all"
         style={"width: #{@entry.progress}%;"}
       >
       </div>

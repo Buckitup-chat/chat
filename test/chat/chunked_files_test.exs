@@ -5,7 +5,8 @@ defmodule Chat.ChunkedFilesTest do
   alias Chat.Db.ChangeTracker
 
   test "should generate a key and a secret on upload start, save chunks by key and able to read full file decrypting with secret" do
-    {key, secret} = ChunkedFiles.new_upload()
+    key = UUID.uuid4()
+    secret = ChunkedFiles.new_upload(key)
 
     assert 24 = byte_size(secret)
 
@@ -26,7 +27,8 @@ defmodule Chat.ChunkedFilesTest do
   end
 
   test "should forget key" do
-    {key, _secret} = ChunkedFiles.new_upload()
+    key = UUID.uuid4()
+    _secret = ChunkedFiles.new_upload(key)
     assert nil != Chat.ChunkedFilesBroker.get(key)
 
     ChunkedFiles.mark_consumed(key)

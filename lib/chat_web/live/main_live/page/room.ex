@@ -32,21 +32,28 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def init(socket), do: socket |> assign(:room, nil)
 
-  def init(%{assigns: %{rooms: rooms, me: me, monotonic_offset: time_offset}} = socket, room_hash) do
-    time = Chat.Time.monotonic_to_unix(time_offset)
+  def init(%{assigns: %{room_map: rooms}} = socket, room_hash) when is_binary(room_hash) do
     room = Rooms.get(room_hash)
+    room_identity = rooms |> Map.get(room_hash)
 
-    room_identity =
-      rooms
-      |> Enum.find(&(room_hash == &1 |> Identity.pub_key() |> Utils.hash()))
+    socket
+    |> init({room_identity, room})
+  end
 
+  def init(
+        %{assigns: %{me: me, monotonic_offset: time_offset}} = socket,
+        {%Identity{} = room_identity, room}
+      ) do
     PubSub.subscribe(Chat.PubSub, room.pub_key |> room_topic())
+
+    time = Chat.Time.monotonic_to_unix(time_offset)
     Log.visit_room(me, time, room_identity)
 
     socket
     |> assign(:page, 0)
     |> assign(:lobby_mode, :rooms)
-    |> assign(:room_mode, :plain)
+    |> assign(:input_mode, :plain)
+    |> assign(:edit_content, nil)
     |> assign(:room, room)
     |> assign(:room_identity, room_identity)
     |> assign(:last_load_timestamp, nil)
@@ -62,7 +69,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:message_update_mode, :prepend)
     |> assign_messages()
     |> case do
-      %{assigns: %{room_mode: :select}} = socket ->
+      %{assigns: %{input_mode: :select}} = socket ->
         socket
         |> push_event("chat:toggle", %{to: "#chat-messages", class: "selectMode"})
 
@@ -164,7 +171,7 @@ defmodule ChatWeb.MainLive.Page.Room do
       end)
 
     socket
-    |> assign(:room_mode, :edit)
+    |> assign(:input_mode, :edit)
     |> assign(:edit_content, content)
     |> assign(:edit_message_id, msg_id)
     |> forget_current_messages()
@@ -223,7 +230,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def cancel_edit(socket) do
     socket
-    |> assign(:room_mode, :plain)
+    |> assign(:input_mode, :plain)
     |> assign(:edit_content, nil)
     |> assign(:edit_message_id, nil)
   end
@@ -276,7 +283,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     end)
 
     socket
-    |> assign(:room_mode, :plain)
+    |> assign(:input_mode, :plain)
   end
 
   def download_messages(
@@ -367,14 +374,14 @@ defmodule ChatWeb.MainLive.Page.Room do
   def toggle_messages_select(%{assigns: %{}} = socket, %{"action" => "on"}) do
     socket
     |> forget_current_messages()
-    |> assign(:room_mode, :select)
+    |> assign(:input_mode, :select)
     |> push_event("chat:toggle", %{to: "#chat-messages", class: "selectMode"})
   end
 
-  def toggle_messages_select(%{assigns: %{room_mode: :select}} = socket, %{"action" => "off"}) do
+  def toggle_messages_select(%{assigns: %{input_mode: :select}} = socket, %{"action" => "off"}) do
     socket
     |> forget_current_messages()
-    |> assign(:room_mode, :plain)
+    |> assign(:input_mode, :plain)
   end
 
   def open_image_gallery(
@@ -578,6 +585,4 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:messages, [])
     |> assign(:message_update_mode, :append)
   end
-
-  defp delete_orphan_chunks(key), do: Chat.ChunkedFiles.delete(key)
 end

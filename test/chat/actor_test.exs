@@ -9,8 +9,8 @@ defmodule Chat.ActorTest do
   test "should build json string on to_json" do
     me = User.login("Alice")
 
-    room1 = Rooms.add(me, "1")
-    room2 = Rooms.add(me, "2")
+    {room1, _} = Rooms.add(me, "1")
+    {room2, _} = Rooms.add(me, "2")
 
     me_actor = Actor.new(me, [room1, room2], %{})
 
@@ -20,8 +20,8 @@ defmodule Chat.ActorTest do
   test "should restore from json" do
     me = User.login("Alice")
 
-    room1 = %{priv_key: room1_key} = Rooms.add(me, "1")
-    room2 = %{priv_key: room2_key} = Rooms.add(me, "2")
+    {room1 = %{priv_key: room1_key}, _} = Rooms.add(me, "1")
+    {room2 = %{priv_key: room2_key}, _} = Rooms.add(me, "2")
 
     me_actor = Actor.new(me, [room1, room2], %{})
 
@@ -33,8 +33,8 @@ defmodule Chat.ActorTest do
   test "encrypted with no password is same as to json" do
     me = User.login("Alice")
 
-    room1 = Rooms.add(me, "1")
-    room2 = Rooms.add(me, "2")
+    {room1, _} = Rooms.add(me, "1")
+    {room2, _} = Rooms.add(me, "2")
 
     me_actor = Actor.new(me, [room1, room2], %{})
 

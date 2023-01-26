@@ -42,7 +42,7 @@ defmodule Chat.Rooms.PrivateRoomTest do
     Rooms.add_request(room_hash, bob, 0)
     assert %Rooms.Room{requests: []} = Rooms.get(room_hash)
 
-    Rooms.approve_requests(room_hash, identity)
+    Rooms.approve_request(room_hash, bob |> Utils.hash(), identity)
     assert %Rooms.Room{requests: []} = Rooms.get(room_hash)
   end
 
@@ -76,7 +76,7 @@ defmodule Chat.Rooms.PrivateRoomTest do
 
   def make_user_and_private_room(name) do
     alice = User.login(name)
-    room_identity = Rooms.add(alice, "#{name}'s Private room", :private)
+    {room_identity, _room} = Rooms.add(alice, "#{name}'s Private room", :private)
     ChangeTracker.await({:rooms, room_identity |> Utils.hash()})
     room = Rooms.get(room_identity |> Utils.hash())
 

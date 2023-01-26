@@ -27,7 +27,9 @@ defmodule Chat.Application do
       Chat.ChunkedFilesBroker,
       Chat.Upload.StaleUploadsPruner,
       # Start the Endpoint (http/https)
-      ChatWeb.Endpoint
+      ChatWeb.Endpoint,
+      # Supervised tasks caller
+      {Task.Supervisor, name: Chat.TaskSupervisor}
       # Start a worker by calling: Chat.Worker.start_link(arg)
       # {Chat.Worker, arg}
     ]

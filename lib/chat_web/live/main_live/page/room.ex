@@ -354,19 +354,20 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   defp maybe_redirect_to_file(%{type: type, content: json}, socket)
        when type in [:audio, :file, :image, :video] do
-    {params, file_type} =
+    {file_id, secret} = StorageId.from_json(json)
+    params = %{a: Base.url_encode64(secret)}
+
+    url =
       case type do
         :image ->
-          {%{download: true}, :image}
+          params = Map.put(params, :download, true)
+          ~p"/get/image/#{file_id}?#{params}"
 
         _ ->
-          {%{}, :file}
+          ~p"/get/file/#{file_id}?#{params}"
       end
 
-    {file_id, secret} = StorageId.from_json(json)
-    params = Map.merge(params, %{a: Base.url_encode64(secret)})
-
-    push_event(socket, "chat:redirect", %{url: ~p"/get/#{file_type}/#{file_id}?#{params}"})
+    push_event(socket, "chat:redirect", %{url: url})
   end
 
   defp maybe_redirect_to_file(_message, socket), do: socket

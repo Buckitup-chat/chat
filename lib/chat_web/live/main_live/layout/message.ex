@@ -666,17 +666,18 @@ defmodule ChatWeb.MainLive.Layout.Message do
     <img
       class="object-cover overflow-hidden"
       src={@file.url}
-      phx-click={open_galery(@chat_type)}
+      phx-click={open_gallery(@chat_type)}
       phx-value-id={@msg.id}
       phx-value-index={@msg.index}
     />
     """
   end
 
-  defp open_galery(chat_type, js \\ %JS{}) do
+  defp open_gallery(chat_type, js \\ %JS{}) do
     js
     |> JS.push("#{chat_type}/message/open-image-gallery")
     |> JS.add_class("hidden", to: "#chatContent")
+    |> JS.remove_class("hidden", to: "#imageGallery")
   end
 
   defp nl2br(str) do

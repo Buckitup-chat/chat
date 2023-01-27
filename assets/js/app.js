@@ -186,7 +186,17 @@ const listeners = {
     delete uploads[e.detail.uuid]
   },
   "phx:upload:pause": (e) => { uploads[e.detail.uuid].pause() },
-  "phx:upload:resume": (e) => { uploads[e.detail.uuid].resume() }
+  "phx:upload:resume": (e) => { uploads[e.detail.uuid].resume() },
+  "phx:gallery:preload": (e) => {
+    const img = new Image();
+    img.onload = function() {
+      const preloadedList = document.getElementById(e.detail.to);
+      preloadedList.appendChild(img);
+      setTimeout(() => { img.remove() }, '30000');
+    }
+    img.classList.add('hidden')
+    img.src = e.detail.url;
+  },
 };
 for (key in listeners) {
   window.addEventListener(key, listeners[key]);

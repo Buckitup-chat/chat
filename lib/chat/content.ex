@@ -17,7 +17,7 @@ defmodule Chat.Content do
     do: json |> StorageId.from_json() |> Memo.delete()
 
   def delete(%{content: json, type: type}, msg_id, dialog_or_room_hash)
-      when type in [:file, :image, :video] do
+      when type in [:audio, :file, :image, :video] do
     key = StorageId.from_json_to_key(json)
     FileIndex.delete(key, dialog_or_room_hash, msg_id)
 

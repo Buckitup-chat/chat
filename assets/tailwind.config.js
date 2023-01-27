@@ -21,6 +21,15 @@ module.exports = {
         purple: '#8E2B77',
         purple50: '#F7E0F7',
         stone250: '#5325611a'
+      },
+      keyframes: {
+        'recording': {
+          '0%, 100%': { opacity: 1 },
+          '50%': { opacity: 0 },
+        }
+      },
+      animation: {
+        'recording': 'recording 2s normal infinite',
       }
     },
   },

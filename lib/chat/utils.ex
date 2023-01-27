@@ -146,16 +146,4 @@ defmodule Chat.Utils do
 
     {iv, key}
   end
-
-  def encrypt_chunk_secret(secret, %Identity{} = me) do
-    secret
-    |> Base.encode64()
-    |> encrypt(me)
-  end
-
-  def decrypt_chunk_secret(encrypted_secret, %Identity{} = me) do
-    encrypted_secret
-    |> decrypt(me)
-    |> Base.decode64!()
-  end
 end

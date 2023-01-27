@@ -10,6 +10,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   require Logger
 
   alias Chat.Broker
+  alias Chat.ChunkedFiles
   alias Chat.Dialogs
   alias Chat.FileIndex
   alias Chat.Identity
@@ -116,7 +117,7 @@ defmodule ChatWeb.MainLive.Page.Room do
           Messages.File.new(
             entry,
             chunk_key,
-            Utils.decrypt_chunk_secret(chunk_secret, me),
+            ChunkedFiles.decrypt_secret(chunk_secret, me),
             time
           )
           |> Rooms.add_new_message(me, pub_key)

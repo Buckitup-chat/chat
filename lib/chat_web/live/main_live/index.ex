@@ -487,7 +487,7 @@ defmodule ChatWeb.MainLive.Index do
         secret =
           upload_key
           |> ChunkedFiles.new_upload()
-          |> Utils.encrypt_chunk_secret(assigns.me)
+          |> ChunkedFiles.encrypt_secret(assigns.me)
 
         add_upload_to_index(assigns, upload_key, secret)
         {0, secret}

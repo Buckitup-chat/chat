@@ -497,6 +497,7 @@
                   <Layout.Uploader.mobile_uploader
                     config={@uploads.file}
                     operating_system={@operating_system}
+                    type="dialog"
                     uploads={@uploads_metadata}
                   />
                 </div>
@@ -505,6 +506,7 @@
                 type="dialog"
                 input_mode={@input_mode}
                 edit_content={@edit_content}
+                uploads={@uploads}
               />
             <% end %>
           </div>
@@ -829,6 +831,7 @@
                   <Layout.Uploader.mobile_uploader
                     config={@uploads.file}
                     operating_system={@operating_system}
+                    type="room"
                     uploads={@uploads_metadata}
                   />
                 </div>
@@ -837,6 +840,7 @@
                 type="room"
                 input_mode={@input_mode}
                 edit_content={@edit_content}
+                uploads={@uploads}
               />
             <% end %>
           </div>

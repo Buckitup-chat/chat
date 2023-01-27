@@ -239,36 +239,28 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       ) do
     dialog
     |> Dialogs.read_message(msg_id, me)
-    |> case do
-      %{type: :file, content: json} ->
-        {file_id, secret} = json |> StorageId.from_json()
-
-        socket
-        |> push_event("chat:redirect", %{
-          url: Routes.file_url(socket, :file, file_id, a: secret |> Base.url_encode64())
-        })
-
-      %{type: :image, content: json} ->
-        {id, secret} = json |> StorageId.from_json()
-
-        socket
-        |> push_event("chat:redirect", %{
-          url:
-            Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64(), download: true)
-        })
-
-      %{type: :video, content: json} ->
-        {id, secret} = json |> StorageId.from_json()
-
-        socket
-        |> push_event("chat:redirect", %{
-          url: Routes.file_url(socket, :file, id, a: secret |> Base.url_encode64())
-        })
-
-      _ ->
-        socket
-    end
+    |> maybe_redirect_to_file(socket)
   end
+
+  defp maybe_redirect_to_file(%{type: type, content: json}, socket)
+       when type in [:audio, :file, :image, :video] do
+    {file_id, secret} = StorageId.from_json(json)
+    params = %{a: Base.url_encode64(secret)}
+
+    url =
+      case type do
+        :image ->
+          params = Map.put(params, :download, true)
+          ~p"/get/image/#{file_id}?#{params}"
+
+        _ ->
+          ~p"/get/file/#{file_id}?#{params}"
+      end
+
+    push_event(socket, "chat:redirect", %{url: url})
+  end
+
+  defp maybe_redirect_to_file(_message, socket), do: socket
 
   def download_messages(
         %{assigns: %{dialog: dialog, me: me, peer: peer, timezone: timezone}} = socket,

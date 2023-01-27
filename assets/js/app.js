@@ -25,6 +25,8 @@ import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import AndroidMediaFileInput from "./hooks/android-media-file-input"
+import AudioFile from "./hooks/audio-file"
+import PushToTalk from './hooks/push-to-talk'
 import UploadInProgress from "./hooks/upload-in-progress"
 import * as UpChunk from "./upchunk"
 import * as LocalStateStore from "./hooks/local-storage"
@@ -66,6 +68,8 @@ Uploaders.UpChunk = (entries, onViewError) => {
 
 let Hooks = {
   AndroidMediaFileInput,
+  AudioFile,
+  PushToTalk,
   UploadInProgress
 }
 
@@ -182,7 +186,17 @@ const listeners = {
     delete uploads[e.detail.uuid]
   },
   "phx:upload:pause": (e) => { uploads[e.detail.uuid].pause() },
-  "phx:upload:resume": (e) => { uploads[e.detail.uuid].resume() }
+  "phx:upload:resume": (e) => { uploads[e.detail.uuid].resume() },
+  "phx:gallery:preload": (e) => {
+    const img = new Image();
+    img.onload = function() {
+      const preloadedList = document.getElementById(e.detail.to);
+      preloadedList.appendChild(img);
+      setTimeout(() => { img.remove() }, '30000');
+    }
+    img.classList.add('hidden')
+    img.src = e.detail.url;
+  },
 };
 for (key in listeners) {
   window.addEventListener(key, listeners[key]);

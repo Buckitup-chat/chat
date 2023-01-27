@@ -144,6 +144,28 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :timezone, :string, required: true, doc: "needed to render the timestamp"
   attr :room_keys, :map, doc: "the list of room keys"
 
+  defp message(%{msg: %{type: :audio}} = assigns) do
+    ~H"""
+    <div
+      id={"message-#{@msg.id}"}
+      class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg x-download"}
+      phx-hook="AudioFile"
+    >
+      <.header
+        author={@author}
+        chat_type={@chat_type}
+        export?={@export?}
+        file={@file}
+        is_mine?={@is_mine?}
+        msg={@msg}
+      />
+      <.timestamp msg={@msg} timezone={@timezone} />
+      <.audio export?={@export?} file={@file} msg={@msg} />
+      <.media_file_info file={@file} />
+    </div>
+    """
+  end
+
   defp message(%{msg: %{type: :file}} = assigns) do
     ~H"""
     <div
@@ -343,7 +365,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :msg_type, :atom, required: true, doc: "message type"
   slot :inner_block, required: true
 
-  defp header_wrapper(%{export?: true, msg_type: :video} = assigns) do
+  defp header_wrapper(%{export?: true, msg_type: type} = assigns) when type in [:audio, :video] do
     ~H"""
     <.link class={@class} id={@id} href={@file.url}>
       <%= render_slot(@inner_block) %>
@@ -442,7 +464,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
         <.icon id="select" class="w-4 h-4 flex fill-black" />
         <span>Select</span>
       </a>
-      <%= if @msg.type in [:file, :image, :video] do %>
+      <%= if @msg.type in [:audio, :file, :image, :video] do %>
         <a
           class="dropdownItem"
           phx-click={
@@ -480,7 +502,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   defp assign_file(%{export?: true, msg: %{content: json, type: type}} = assigns)
-       when type in [:file, :image, :video] do
+       when type in [:audio, :file, :image, :video] do
     {id, secret} = StorageId.from_json(json)
     [_, _, _, _, name, size] = Files.get(id, secret)
 
@@ -494,7 +516,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   defp assign_file(%{msg: %{content: json, type: type}} = assigns)
-       when type in [:file, :image, :video] do
+       when type in [:audio, :file, :image, :video] do
     {id, secret} = StorageId.from_json(json)
     [_, _, _, _, name, size] = Files.get(id, secret)
 
@@ -578,6 +600,48 @@ defmodule ChatWeb.MainLive.Layout.Message do
     """
   end
 
+  attr :export?, :boolean, required: true, doc: "show waveform?"
+  attr :file, :map, required: true, doc: "file map"
+  attr :msg, :map, required: true, doc: "message struct"
+
+  defp audio(%{export?: true} = assigns) do
+    ~H"""
+    <audio src={@file.url} class="a-audio" controls />
+    """
+  end
+
+  defp audio(assigns) do
+    ~H"""
+    <div class="flex flex-row w-full h-12">
+      <button class="play rounder flex justify-center items-center w-3/12">
+        <svg class="pause-circle w-9 hidden" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">
+          <path
+            class="fill-purple"
+            d="M24,4A20,20,0,1,0,44,24,20,20,0,0,0,24,4ZM21,33H16V15h5Zm11,0H27V15h5Z"
+            transform="translate(-4 -4)"
+          >
+          </path>
+        </svg>
+        <svg class="play-circle w-9" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">
+          <path
+            class="fill-purple"
+            d="M24,4A20,20,0,1,0,44,24,20,20,0,0,0,24,4ZM17,33V15l18,9Z"
+            transform="translate(-4 -4)"
+          >
+          </path>
+        </svg>
+      </button>
+      <div
+        class="peaks-overview-container flex w-9/12 h-12"
+        id={"message-#{@msg.id}-peaks"}
+        phx-update="ignore"
+      >
+      </div>
+    </div>
+    <audio src={@file.url} class="a-audio hidden" controls />
+    """
+  end
+
   attr :chat_type, :atom, required: true, doc: ":dialog or :room"
   attr :export?, :boolean, required: true, doc: "disable image gallery?"
   attr :file, :map, required: true, doc: "file map"
@@ -602,17 +666,18 @@ defmodule ChatWeb.MainLive.Layout.Message do
     <img
       class="object-cover overflow-hidden"
       src={@file.url}
-      phx-click={open_galery(@chat_type)}
+      phx-click={open_gallery(@chat_type)}
       phx-value-id={@msg.id}
       phx-value-index={@msg.index}
     />
     """
   end
 
-  defp open_galery(chat_type, js \\ %JS{}) do
+  defp open_gallery(chat_type, js \\ %JS{}) do
     js
     |> JS.push("#{chat_type}/message/open-image-gallery")
     |> JS.add_class("hidden", to: "#chatContent")
+    |> JS.remove_class("hidden", to: "#imageGallery")
   end
 
   defp nl2br(str) do

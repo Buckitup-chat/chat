@@ -15,7 +15,10 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
 
   def uploader(assigns) do
     ~H"""
-    <div class="flex fixed bottom-[-10px] w-[18%] left-30 flex-col mb-auto m-2" id="file-uploader">
+    <div
+      class="flex bottom-[6%] w-full left-30 flex-col fixed h-[27%] md:bottom-[-10px] md:w-[18%] md:h-[50%] overflow-scroll"
+      id="file-uploader"
+    >
       <.entries config={@config} uploads={@uploads} />
     </div>
     """
@@ -23,18 +26,59 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
 
   attr :config, UploadConfig, required: true, doc: "upload config"
   attr :operating_system, :string, doc: "client's operating system"
+  attr :type, :string, required: true, doc: "dialog or room"
   attr :uploads, :map, required: true, doc: "uploads metadata"
 
   def mobile_uploader(assigns) do
     ~H"""
     <div
-      class="flex flex-col m-2 bg-purple50 rounded-lg"
+      class="flex flex-col m-2 bg-purple50 rounded-lg fixed bottom-14 w-[96%] h-[280px] overflow-scroll"
       id="mobile-file-uploader"
       style="display: none;"
     >
-      <.file_form config={@config} operating_system={@operating_system} />
+      <.file_form config={@config} operating_system={@operating_system} type={@type} />
 
       <.entries config={@config} mobile?={true} uploads={@uploads} />
+    </div>
+    """
+  end
+
+  attr :config, UploadConfig, required: true, doc: "upload config"
+  attr :type, :string, required: true, doc: "dialog or room"
+
+  def push_to_talk(assigns) do
+    ~H"""
+    <div
+      class="flex flex-row items-center"
+      data-ref={@config.ref}
+      id="push-to-talk-wrapper"
+      phx-hook="PushToTalk"
+      phx-update="ignore"
+    >
+      <button class="cursor-pointer mr-2 hidden" id="push-to-talk-button">
+        <svg class="w-7 h-7 p-1 bg-purple rounded-full fill-white" viewbox="0 0 490.9 490.9">
+          <g class="start">
+            <path d="M245.5,322.9c53,0,96.2-43.2,96.2-96.2V96.2c0-53-43.2-96.2-96.2-96.2s-96.2,43.2-96.2,96.2v130.5
+            C149.3,279.8,192.5,322.9,245.5,322.9z M173.8,96.2c0-39.5,32.2-71.7,71.7-71.7s71.7,32.2,71.7,71.7v130.5
+            c0,39.5-32.2,71.7-71.7,71.7s-71.7-32.2-71.7-71.7V96.2z" />
+            <path d="M94.4,214.5c-6.8,0-12.3,5.5-12.3,12.3c0,85.9,66.7,156.6,151.1,162.8v76.7h-63.9c-6.8,0-12.3,5.5-12.3,12.3
+            s5.5,12.3,12.3,12.3h152.3c6.8,0,12.3-5.5,12.3-12.3s-5.5-12.3-12.3-12.3h-63.9v-76.7c84.4-6.3,151.1-76.9,151.1-162.8
+            c0-6.8-5.5-12.3-12.3-12.3s-12.3,5.5-12.3,12.3c0,76.6-62.3,138.9-138.9,138.9s-138.9-62.3-138.9-138.9
+            C106.6,220,101.2,214.5,94.4,214.5z" />
+          </g>
+
+          <g class="stop hidden">
+            <rect width="300.9" height="300.9" rx="25" x="100" y="100" />
+          </g>
+        </svg>
+      </button>
+
+      <div class="hidden flex flex-row items-center p-2" id="push-to-talk-details">
+        <div class="animate-recording rounded-full bg-red-400 h-3 w-3" id="push-to-talk-indicator">
+        </div>
+        <div class="mx-2" id="push-to-talk-status"></div>
+        <div class="text-black/50" id="push-to-talk-progress"></div>
+      </div>
     </div>
     """
   end
@@ -44,14 +88,11 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   def button(assigns) do
     ~H"""
     <div id="uploader-button">
-      <button
-        class="hidden sm:block relative t-attach-file"
-        phx-click={open_file_upload_dialog(@type)}
-      >
+      <button class="hidden sm:block relative t-attach-file" phx-click={open_file_upload_dialog()}>
         <.icon id="attach" class="w-7 h-7 flex fill-white" />
       </button>
 
-      <button class="sm:hidden relative t-attach-file" phx-click={toggle_uploader(@type)}>
+      <button class="sm:hidden relative t-attach-file" phx-click={toggle_uploader()}>
         <.icon id="attach" class="w-7 h-7 flex fill-white" />
       </button>
     </div>
@@ -64,7 +105,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
 
   defp entries(%{uploads: uploads} = assigns) when map_size(uploads) > 0 do
     ~H"""
-    <div class="px-2 py-1">
+    <div class="px-2 py-4">
       <%= for %UploadEntry{valid?: true} = entry <- @config.entries do %>
         <.entry entry={entry} metadata={@uploads[entry.uuid]} mobile?={@mobile?} />
       <% end %>
@@ -138,20 +179,17 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     """
   end
 
-  defp open_file_upload_dialog(type) do
-    %JS{}
-    |> JS.set_attribute({"phx-change", "#{type}/import-files"}, to: "#uploader-file-form")
-    |> JS.dispatch("click", to: "#uploader-file-form .file-input")
+  defp open_file_upload_dialog do
+    JS.dispatch("click", to: "#uploader-file-form .file-input")
   end
 
-  defp toggle_uploader(type) do
-    %JS{}
-    |> JS.set_attribute({"phx-change", "#{type}/import-files"}, to: "#uploader-file-form")
-    |> JS.toggle(to: "#mobile-file-uploader")
+  defp toggle_uploader do
+    JS.toggle(to: "#mobile-file-uploader")
   end
 
   attr :config, UploadConfig, required: true, doc: "upload config"
   attr :operating_system, :string, doc: "client's operating system"
+  attr :type, :string, required: true, doc: "dialog or room"
 
   defp file_form(assigns) do
     ~H"""
@@ -159,6 +197,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       for={:file}
       id="uploader-file-form"
       class="flex flex-col m-2 column column-50 column-offset-50"
+      phx-change={"#{@type}/import-files"}
       phx-drop-target={@config.ref}
     >
       <.live_file_input
@@ -188,7 +227,11 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   def in_progress?(assigns) do
     ~H"""
     <%= if Enum.any?(@uploads, fn {_uuid, %UploadMetadata{} = metadata} -> metadata.destination.type == @type and metadata.destination.pub_key == @pub_key end) do %>
-      <div class="flex flex-row justify-end" id="upload-in-progress" phx-hook="UploadInProgress">
+      <div
+        class="hidden flex-row justify-end md:flex"
+        id="upload-in-progress"
+        phx-hook="UploadInProgress"
+      >
         <div class="m-1 sm:mx-8 bg-purple50 rounded-lg shadow-lg inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm text-black/50 shadow transition ease-in-out duration-150">
           <svg
             class="animate-spin -ml-1 mr-3 h-5 w-5 text-white"

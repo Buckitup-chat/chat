@@ -56,7 +56,7 @@ defmodule Chat.Rooms.RoomTest do
     assert [
              %Rooms.PlainMessage{content: ^message, type: :text, author_hash: ^alice_hash},
              %Rooms.PlainMessage{type: :memo},
-             %Rooms.PlainMessage{type: :file},
+             %Rooms.PlainMessage{type: :audio},
              %Rooms.PlainMessage{type: :image}
            ] =
              room

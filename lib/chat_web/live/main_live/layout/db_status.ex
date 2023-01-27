@@ -10,7 +10,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
     <div class="sidebarIcon mb-1">
       <%= if @status.mode == :internal do %>
         <!-- Crossed DB icon -->
-        <div class="pb-2.5 pl-1.5">
+        <div class="pb-2.5 pl-[3.25px]">
           <.icon
             id="crossedDataBase"
             class={classes("w-6 h-6 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}
@@ -19,7 +19,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
       <% end %>
       <%= if @status.mode == :main do %>
         <!-- DB icon -->
-        <div class="pb-2.5 pl-1">
+        <div class="pb-2.5 pl-[1.25px]">
           <.icon
             id="dataBase"
             class={classes("w-6 h-6 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}
@@ -28,7 +28,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
       <% end %>
       <%= if @status.mode == :internal_to_main do %>
         <!-- Blinking or transparent DB icon -->
-        <div class="pb-2.5 pl-1.5">
+        <div class="pb-2.5 pl-[1.25px]">
           <.icon
             id="dataBase"
             class={
@@ -41,7 +41,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
       <% end %>
       <%= if @status.mode == :main_to_internal do %>
         <!-- Blinking or transparent Crossed DB icon -->
-        <div class="pb-2.5 pl-1.5">
+        <div class="pb-2.5 pl-[3.25px]">
           <.icon
             id="crossedDataBase"
             class={
@@ -54,7 +54,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
       <% end %>
       <!-- Saving or downloading icon -->
       <%= if @status.flags[:backup] do %>
-        <div class="pb-1 pl-3">
+        <div class="pb-1 pl-[9px]">
           <.icon
             id="backUp"
             class={classes("w-6 h-6 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}
@@ -63,7 +63,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
       <% end %>
       <!-- Syncronization icon, like cirle arrows -->
       <%= if @status.flags[:replication] do %>
-        <div class="pl-3">
+        <div class="pl-[9px]">
           <.icon
             id="replication"
             class={classes("w-6 h-6 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}
@@ -108,7 +108,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
           <.icon
             id="dataBase"
             class={
-              classes("w-5 h-[19.5px] fill-gray-300 animate-pulse", %{
+              classes("w-5 h-[19.5px] fill-gray-500 animate-pulse", %{
                 "fill-red-600" => @status.writable == :no
               })
             }
@@ -121,7 +121,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
           <.icon
             id="crossedDataBase"
             class={
-              classes("w-5 h-[19.5px] fill-gray-300 animate-pulse", %{
+              classes("w-5 h-[19.5px] fill-gray-500 animate-pulse", %{
                 "fill-red-600" => @status.writable == :no
               })
             }

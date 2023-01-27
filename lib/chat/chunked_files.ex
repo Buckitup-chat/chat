@@ -4,6 +4,7 @@ defmodule Chat.ChunkedFiles do
   alias Chat.ChunkedFilesBroker
   alias Chat.Db
   alias Chat.FileFs
+  alias Chat.Identity
   alias Chat.Utils
 
   @type key :: String.t()
@@ -105,6 +106,18 @@ defmodule Chat.ChunkedFiles do
       |> :binary.part(start_bypass, range_length)
 
     {{first, first + range_length - 1}, data}
+  end
+
+  def encrypt_secret(secret, %Identity{} = me) do
+    secret
+    |> Base.encode64()
+    |> Utils.encrypt(me)
+  end
+
+  def decrypt_secret(encrypted_secret, %Identity{} = me) do
+    encrypted_secret
+    |> Utils.decrypt(me)
+    |> Base.decode64!()
   end
 
   def file_chunk_ranges(size) do

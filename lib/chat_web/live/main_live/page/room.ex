@@ -5,11 +5,14 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   import ChatWeb.MainLive.Page.Shared
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [consume_uploaded_entry: 3, push_event: 3, put_flash: 3]
+
+  import Phoenix.LiveView,
+    only: [consume_uploaded_entry: 3, push_event: 3, put_flash: 3, send_update: 2]
 
   require Logger
 
   alias Chat.Broker
+  alias Chat.ChunkedFiles
   alias Chat.Dialogs
   alias Chat.FileIndex
   alias Chat.Identity
@@ -24,7 +27,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.Utils
   alias Chat.Utils.StorageId
 
-  alias ChatWeb.Router.Helpers, as: Routes
+  alias ChatWeb.MainLive.Layout
 
   alias Phoenix.PubSub
 
@@ -116,7 +119,7 @@ defmodule ChatWeb.MainLive.Page.Room do
           Messages.File.new(
             entry,
             chunk_key,
-            chunk_secret,
+            ChunkedFiles.decrypt_secret(chunk_secret, me),
             time
           )
           |> Rooms.add_new_message(me, pub_key)
@@ -124,7 +127,9 @@ defmodule ChatWeb.MainLive.Page.Room do
         end
       )
 
-    FileIndex.add_file(chunk_key, pub_key)
+    {_index, msg} = message
+
+    FileIndex.add_file(chunk_key, pub_key, msg.id, chunk_secret)
 
     Rooms.on_saved(message, pub_key, fn ->
       broadcast_new_message(message, pub_key, me, time)
@@ -347,37 +352,30 @@ defmodule ChatWeb.MainLive.Page.Room do
         %{assigns: %{room_identity: room_identity}} = socket,
         msg_id
       ) do
-    Rooms.read_message(msg_id, room_identity, &User.id_map_builder/1)
-    |> case do
-      %{type: :file, content: json} ->
-        {file_id, secret} = json |> StorageId.from_json()
-
-        socket
-        |> push_event("chat:redirect", %{
-          url: Routes.file_url(socket, :file, file_id, a: secret |> Base.url_encode64())
-        })
-
-      %{type: :image, content: json} ->
-        {id, secret} = json |> StorageId.from_json()
-
-        socket
-        |> push_event("chat:redirect", %{
-          url:
-            Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64(), download: true)
-        })
-
-      %{type: :video, content: json} ->
-        {id, secret} = json |> StorageId.from_json()
-
-        socket
-        |> push_event("chat:redirect", %{
-          url: Routes.file_url(socket, :file, id, a: secret |> Base.url_encode64())
-        })
-
-      _ ->
-        socket
-    end
+    msg_id
+    |> Rooms.read_message(room_identity, &User.id_map_builder/1)
+    |> maybe_redirect_to_file(socket)
   end
+
+  defp maybe_redirect_to_file(%{type: type, content: json}, socket)
+       when type in [:audio, :file, :image, :video] do
+    {file_id, secret} = StorageId.from_json(json)
+    params = %{a: Base.url_encode64(secret)}
+
+    url =
+      case type do
+        :image ->
+          params = Map.put(params, :download, true)
+          ~p"/get/image/#{file_id}?#{params}"
+
+        _ ->
+          ~p"/get/file/#{file_id}?#{params}"
+      end
+
+    push_event(socket, "chat:redirect", %{url: url})
+  end
+
+  defp maybe_redirect_to_file(_message, socket), do: socket
 
   def toggle_messages_select(%{assigns: %{}} = socket, %{"action" => "on"}) do
     socket
@@ -392,126 +390,21 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:input_mode, :plain)
   end
 
-  def open_image_gallery(
-        %{assigns: %{room_identity: room_identity}} = socket,
-        {m_index, m_id} = msg_id
-      ) do
-    send(self(), {:room, {:preload_image_gallery, :next}})
-    send(self(), {:room, {:preload_image_gallery, :prev}})
-
-    Rooms.read_message(msg_id, room_identity, &User.id_map_builder/1)
-    |> case do
-      %{type: :image, content: json} ->
-        {id, secret} = json |> StorageId.from_json()
-
-        socket
-        |> assign(:image_gallery, %{
-          mode: "room",
-          current: %{
-            url: Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64()),
-            id: m_id,
-            index: m_index
-          },
-          next: %{url: nil, id: nil, index: nil},
-          prev: %{url: nil, id: nil, index: nil}
-        })
-
-      _ ->
-        socket
-    end
+  def open_image_gallery(socket, msg_id) do
+    send_update(Layout.ImageGallery, id: "imageGallery", action: :open, incoming_msg_id: msg_id)
+    socket
   end
 
-  def image_gallery_preload_next(
-        %{assigns: %{room_identity: identity, image_gallery: gallery}} = socket
-      ) do
-    msg_id = {gallery.current.index, gallery.current.id}
-
-    msg_id
-    |> Rooms.read_next_message(identity, fn
-      {_, %{type: :image}} -> true
-      _ -> false
-    end)
-    |> case do
-      %{content: json, id: id, index: index} ->
-        {file_id, secret} = json |> StorageId.from_json()
-
-        socket
-        |> assign(
-          :image_gallery,
-          gallery
-          |> put_in([:next], %{
-            url: Routes.file_url(socket, :image, file_id, a: secret |> Base.url_encode64()),
-            id: id,
-            index: index
-          })
-        )
-
-      _ ->
-        socket
-    end
-  end
-
-  def image_gallery_preload_prev(
-        %{assigns: %{room_identity: identity, image_gallery: gallery}} = socket
-      ) do
-    msg_id = {gallery.current.index, gallery.current.id}
-
-    msg_id
-    |> Rooms.read_prev_message(identity, fn
-      {_, %{type: :image}} -> true
-      _ -> false
-    end)
-    |> case do
-      %{content: json, id: id, index: index} ->
-        {file_id, secret} = json |> StorageId.from_json()
-
-        socket
-        |> assign(
-          :image_gallery,
-          gallery
-          |> put_in([:prev], %{
-            url: Routes.file_url(socket, :image, file_id, a: secret |> Base.url_encode64()),
-            id: id,
-            index: index
-          })
-        )
-
-      _ ->
-        socket
-    end
-  end
-
-  def image_gallery_next(
-        %{assigns: %{image_gallery: %{mode: mode, current: current, next: next}}} = socket
-      ) do
-    send(self(), {:room, {:preload_image_gallery, :next}})
+  def image_gallery_preload_next(socket) do
+    send_update(Layout.ImageGallery, id: "imageGallery", action: :preload_next)
 
     socket
-    |> assign(:image_gallery, %{
-      mode: mode,
-      current: next,
-      prev: current,
-      next: %{url: nil, id: nil, index: nil}
-    })
   end
 
-  def image_gallery_prev(
-        %{assigns: %{image_gallery: %{mode: mode, current: current, prev: prev}}} = socket
-      ) do
-    send(self(), {:room, {:preload_image_gallery, :prev}})
+  def image_gallery_preload_prev(socket) do
+    send_update(Layout.ImageGallery, id: "imageGallery", action: :preload_prev)
 
     socket
-    |> assign(:image_gallery, %{
-      mode: mode,
-      current: prev,
-      next: current,
-      prev: %{url: nil, id: nil, index: nil}
-    })
-  end
-
-  def close_image_gallery(socket) do
-    socket
-    |> assign(:image_gallery, nil)
   end
 
   defp room_topic(pub_key) do

@@ -73,6 +73,7 @@ Room and dialog messages are the same in terms of content.
 
 Message types are
 
+* `:audio`
 * `:text` - short text message that can be encrypted w/ public key (less than 200 bytes)
 * `:memo` - longer text message
 * `:image`
@@ -110,7 +111,7 @@ Memo index tracks who can read it
 
 <!-- livebook:{"break_markdown":true} -->
 
-### Files (image/video/file)
+### Files (audio/image/video/file)
 
 File storing is more complex. We need to store file properties, as well as file body.
 
@@ -181,7 +182,7 @@ File index entries keep track of who can read a file.
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-{{:file_index, reader_hash, file_key},
+{{:file_index, reader_hash, file_key, message_id},
  true}
 ```
 

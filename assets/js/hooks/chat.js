@@ -15,7 +15,7 @@ export const hooks = {
     this.el.addEventListener("chat:download-messages", (e) => {
       const checkboxes = document.querySelectorAll(".selectCheckbox.checked");
       const messages = [];
-      const mediaTypes = ["file", "image", "video"];
+      const mediaTypes = ["audio", "file", "image", "video"];
       let nonMedia = false;
       let timeout = 0;
 

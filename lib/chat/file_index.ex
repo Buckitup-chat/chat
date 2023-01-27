@@ -5,15 +5,6 @@ defmodule Chat.FileIndex do
   alias Chat.Dialogs.Dialog
   alias Chat.Utils
 
-  def add_file(key, %Dialog{a_key: a, b_key: b}) do
-    save(key, a |> Utils.hash())
-    save(key, b |> Utils.hash())
-  end
-
-  def add_file(key, room_key) do
-    save(key, room_key |> Utils.hash())
-  end
-
   def get(reader_hash, file_key) do
     reader_hash
     |> db_key(file_key)
@@ -26,11 +17,27 @@ defmodule Chat.FileIndex do
     |> Db.delete()
   end
 
-  defp save(file_key, reader_hash) do
+  def save(file_key, reader_hash, message_id, secret) do
     reader_hash
-    |> db_key(file_key)
-    |> Db.put(true)
+    |> db_key(file_key, message_id)
+    |> Db.put(secret)
   end
 
-  defp db_key(reader_hash, file_key), do: {:file_index, reader_hash, file_key}
+  def last_key?(file_key, reader_list, message_id) do
+    reader_list
+    |> Enum.map(fn hash ->
+      Db.list({
+        key(hash, file_key, 0),
+        key(hash, file_key <> "\0", 0)
+      })
+      |> Stream.map(fn {{:file_index, _reader_hash, _key, msg_id}, _secret} -> msg_id end)
+      |> Stream.reject(&(message_id == &1))
+      |> Enum.at(0)
+    end)
+    |> Enum.any?()
+    |> Kernel.not()
+  end
+
+  defp db_key(reader_hash, file_key, message_id),
+    do: {:file_index, reader_hash, file_key, message_id}
 end

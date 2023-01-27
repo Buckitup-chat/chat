@@ -17,7 +17,7 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
       class="basis-[7%] w-full py-1.5 px-8 border border-white bg-white flex items-center fixed md:sticky bottom-0"
     >
       <%= if @input_mode == :plain do %>
-        <Layout.Uploader.push_to_talk config={@uploads.file} type={@type} />
+        <Layout.Uploader.push_to_talk config={@uploads.file} disabled={true} type={@type} />
         <Layout.Uploader.button type={@type} />
         <.form
           :let={di}
@@ -135,7 +135,7 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
     ~H"""
     <div class="basis-[7%] w-full py-1.5 px-8 border border-white bg-white flex items-center fixed md:sticky bottom-0">
       <%= if @input_mode == :plain do %>
-        <Layout.Uploader.push_to_talk config={@uploads.file} type={@type} />
+        <Layout.Uploader.push_to_talk config={@uploads.file} disabled={true} type={@type} />
         <Layout.Uploader.button type={@type} />
         <.form
           :let={di}

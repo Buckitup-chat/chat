@@ -2,18 +2,22 @@ defmodule Chat.FileIndex do
   @moduledoc "Keeps an index of files and keys it"
 
   alias Chat.Db
-  alias Chat.Dialogs.Dialog
-  alias Chat.Utils
 
   def get(reader_hash, file_key) do
-    reader_hash
-    |> db_key(file_key)
-    |> Db.get()
+    Db.select(
+      {
+        db_key(reader_hash, file_key, 0),
+        db_key(reader_hash, file_key <> "\0", 0)
+      },
+      1
+    )
+    |> Enum.map(&elem(&1, 1))
+    |> List.first()
   end
 
-  def delete(reader_hash, file_key) do
+  def delete(reader_hash, file_key, msg_id) do
     reader_hash
-    |> db_key(file_key)
+    |> db_key(file_key, msg_id)
     |> Db.delete()
   end
 
@@ -27,8 +31,8 @@ defmodule Chat.FileIndex do
     reader_list
     |> Enum.map(fn hash ->
       Db.list({
-        key(hash, file_key, 0),
-        key(hash, file_key <> "\0", 0)
+        db_key(hash, file_key, 0),
+        db_key(hash, file_key <> "\0", 0)
       })
       |> Stream.map(fn {{:file_index, _reader_hash, _key, msg_id}, _secret} -> msg_id end)
       |> Stream.reject(&(message_id == &1))

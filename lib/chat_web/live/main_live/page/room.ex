@@ -27,7 +27,6 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.Utils.StorageId
 
   alias ChatWeb.MainLive.Layout
-  alias ChatWeb.Router.Helpers, as: Routes
 
   alias Phoenix.PubSub
 

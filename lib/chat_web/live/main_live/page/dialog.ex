@@ -22,7 +22,6 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
   alias ChatWeb.MainLive.Layout
   alias ChatWeb.MainLive.Page
-  alias ChatWeb.Router.Helpers, as: Routes
 
   alias Phoenix.PubSub
 

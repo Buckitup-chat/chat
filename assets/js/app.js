@@ -188,6 +188,7 @@ const listeners = {
     img.onload = function() {
       const preloadedList = document.getElementById(e.detail.to);
       preloadedList.appendChild(img);
+      setTimeout(() => { img.remove() }, '30000');
     }
     img.classList.add('hidden')
     img.src = e.detail.url;

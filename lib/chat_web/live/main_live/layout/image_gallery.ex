@@ -22,11 +22,15 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
     |> ok()
   end
 
-  def update(assigns, socket) do
+  def update(%{action: action} = assigns, socket) do
     socket
-    |> assign(assigns)
-    |> handle_action()
+    |> assign(Map.drop(assigns, [:action]))
+    |> handle_action(action)
     |> ok()
+  end
+
+  def update(assigns, socket) do
+    socket |> assign(assigns) |> ok()
   end
 
   def handle_event("switch-next", _, socket) do
@@ -55,9 +59,28 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
 
         <div class="h-screen flex justify-center items-center lg:h-[99vh]">
           <img
-            phx-click={JS.toggle(to: "#backBtn") |> JS.toggle(to: "#prev") |> JS.toggle(to: "#next")}
+            id="galleryImage"
             class="w-auto z-10 max-h-full lg:px-14"
+            phx-click={JS.toggle(to: "#backBtn") |> JS.toggle(to: "#prev") |> JS.toggle(to: "#next")}
             src={@current[:url]}
+            onload="
+            function handleArrows() {
+              const prevBtn = document.getElementById('prev');
+              const nextBtn = document.getElementById('next');
+              const image = document.getElementById('galleryImage');              
+              
+              setTimeout(() => {
+                if (image.naturalWidth > 0 && image.naturalHeight > 0 && image.complete) {
+                  prevBtn.classList.remove('hidden');
+                  nextBtn.classList.remove('hidden');
+                } else {
+                  handleArrows();
+                }
+              }, '300');
+            }
+            
+            handleArrows();            
+            "
           />
         </div>
 
@@ -72,8 +95,8 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
     """
   end
 
-  defp handle_action(socket) do
-    case socket.assigns[:action] do
+  defp handle_action(socket, action) do
+    case action do
       :open -> socket |> open()
       :preload_next -> socket |> preload_next()
       :preload_prev -> socket |> preload_prev()
@@ -346,7 +369,11 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
       id="prev"
       class={(@enabled && "z-10") || "invisible"}
       phx-target={@target}
-      phx-click="switch-prev"
+      phx-click={
+        JS.push("switch-prev")
+        |> JS.add_class("hidden", to: "#prev")
+        |> JS.add_class("hidden", to: "#next")
+      }
     >
       <svg
         class="a-outline"
@@ -367,7 +394,11 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
     <button
       id="next"
       class={(@enabled && "z-10") || "invisible"}
-      phx-click={JS.push("switch-next")}
+      phx-click={
+        JS.push("switch-next")
+        |> JS.add_class("hidden", to: "#next")
+        |> JS.add_class("hidden", to: "#prev")
+      }
       phx-target={@target}
     >
       <svg

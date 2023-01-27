@@ -44,7 +44,14 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   end
 
   attr :config, UploadConfig, required: true, doc: "upload config"
+  attr :disabled, :boolean, doc: "temporarily disables push-to-talk"
   attr :type, :string, required: true, doc: "dialog or room"
+
+  def push_to_talk(%{disabled: true} = assigns) do
+    ~H"""
+
+    """
+  end
 
   def push_to_talk(assigns) do
     ~H"""

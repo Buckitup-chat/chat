@@ -129,7 +129,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
     {_index, msg} = message
 
-    FileIndex.add_file(chunk_key, pub_key, msg.id, chunk_secret)
+    FileIndex.save(chunk_key, pub_key |> Utils.hash(), msg.id, chunk_secret)
 
     Rooms.on_saved(message, pub_key, fn ->
       broadcast_new_message(message, pub_key, me, time)

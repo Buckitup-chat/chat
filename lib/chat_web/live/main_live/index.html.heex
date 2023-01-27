@@ -440,7 +440,13 @@
           >
             <%= unless @dialog do %>
             <% else %>
-              <Layout.ImageGallery.render mode="dialog" gallery={@image_gallery} />
+              <.live_component
+                module={Layout.ImageGallery}
+                id="imageGallery"
+                type="dialog"
+                dialog={@dialog}
+                me={@me}
+              />
               <div
                 id="chatContent"
                 phx-hook="Chat"
@@ -685,7 +691,13 @@
                 </button>
               </div>
             <% else %>
-              <Layout.ImageGallery.render mode="room" gallery={@image_gallery} />
+              <.live_component
+                module={Layout.ImageGallery}
+                id="imageGallery"
+                type="room"
+                room_identity={@room_identity}
+              />
+
               <div
                 id="chatContent"
                 class="basis-[93%] pb-1 md:pb-0 overflow-y-scroll flex flex-col justify-between relative a-content-block t-chat-content"

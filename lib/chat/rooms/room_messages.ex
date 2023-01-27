@@ -118,7 +118,7 @@ defmodule Chat.Rooms.RoomMessages do
          true <- msg.author_hash == author |> Utils.hash() do
       {index, msg}
       |> read(room_identity)
-      |> Content.delete()
+      |> Content.delete(msg.id, Utils.hash(room_key))
 
       type = DryStorable.type(new_message)
 
@@ -139,7 +139,7 @@ defmodule Chat.Rooms.RoomMessages do
          true <- msg.author_hash == author |> Utils.hash() do
       {index, msg}
       |> read(room_identity)
-      |> Content.delete()
+      |> Content.delete(msg.id, Utils.hash(room_key))
 
       Db.delete(msg_key)
     end

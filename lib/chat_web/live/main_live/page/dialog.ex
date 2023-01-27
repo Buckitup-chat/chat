@@ -7,6 +7,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   use ChatWeb, :component
 
   alias Chat.Broker
+  alias Chat.ChunkedFiles
   alias Chat.Dialogs
   alias Chat.FileIndex
   alias Chat.Identity
@@ -106,7 +107,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
           Messages.File.new(
             entry,
             chunk_key,
-            chunk_secret,
+            ChunkedFiles.decrypt_secret(chunk_secret, me),
             time
           )
           |> Dialogs.add_new_message(me, dialog)
@@ -114,7 +115,9 @@ defmodule ChatWeb.MainLive.Page.Dialog do
         end
       )
 
-    FileIndex.add_file(chunk_key, dialog)
+    {_index, msg} = message
+
+    FileIndex.add_file(chunk_key, dialog, msg.id, chunk_secret)
 
     message
     |> Dialogs.on_saved(dialog, fn ->

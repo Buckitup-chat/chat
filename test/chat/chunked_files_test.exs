@@ -3,6 +3,7 @@ defmodule Chat.ChunkedFilesTest do
 
   alias Chat.ChunkedFiles
   alias Chat.Db.ChangeTracker
+  alias Chat.FileFs
 
   test "should generate a key and a secret on upload start, save chunks by key and able to read full file decrypting with secret" do
     key = UUID.uuid4()
@@ -12,18 +13,21 @@ defmodule Chat.ChunkedFilesTest do
 
     first = "some part of info "
     second = "another part"
+    size = String.length(first) + String.length(second)
 
-    ChunkedFiles.save_upload_chunk(key, {1, 18}, first)
-    ChangeTracker.await({:file_chunk, key, 1, 18})
-    assert false == ChunkedFiles.complete_upload?(key, 30)
+    ChunkedFiles.save_upload_chunk(key, {0, 17}, first)
+    ChangeTracker.await({:file_chunk, key, 0, 17})
+    assert false == ChunkedFiles.complete_upload?(key, size)
 
-    ChunkedFiles.save_upload_chunk(key, {19, 30}, second)
-    ChangeTracker.await({:file_chunk, key, 19, 30})
-    assert ChunkedFiles.complete_upload?(key, 30)
+    ChunkedFiles.save_upload_chunk(key, {18, 29}, second)
+    ChangeTracker.await({:file_chunk, key, 18, 29})
+    assert ChunkedFiles.complete_upload?(key, size)
 
     recovered = ChunkedFiles.read({key, secret})
 
     assert recovered == Enum.join([first, second])
+
+    assert ^size = FileFs.file_size(key)
   end
 
   test "should forget key" do

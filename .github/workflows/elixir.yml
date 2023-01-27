@@ -35,4 +35,4 @@ jobs:
     - name: Check code
       run: make ci-check
     - name: Run tests
-      run: mix test
+      run: make ci-test

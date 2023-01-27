@@ -65,8 +65,6 @@ defmodule Chat.FileFs do
       |> then(fn [first, last] -> max(last - first + 1, 0) end)
     end)
     |> Enum.sum()
-  rescue
-    _ -> 0
   end
 
   def file_size(key, prefix \\ nil) do
@@ -80,22 +78,6 @@ defmodule Chat.FileFs do
     |> Kernel.+(1)
   rescue
     _ -> 0
-  end
-
-  def known_file_keys(prefix \\ nil) do
-    prefix
-    |> build_path()
-    |> populate_level()
-    |> Enum.map(&populate_level/1)
-    |> List.flatten()
-    |> Enum.map(&List.last(Path.split(&1)))
-  rescue
-    _ -> []
-  end
-
-  def list_file_chunks(key, prefix \\ nil) do
-    key_path(key, build_path(prefix))
-    |> list_files()
   end
 
   ##

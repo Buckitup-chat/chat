@@ -39,8 +39,13 @@ let Uploaders = {}
 
 Uploaders.UpChunk = (entries, onViewError) => {
   entries.forEach(entry => {
-    // create the upload session with UpChunk
-    let { file, meta: { chunk_count: chunkCount, entrypoint, status, uuid } } = entry
+    let { file, meta: { chunk_count: chunkCount, entrypoint, skip, status, uuid } } = entry
+
+    // Skip uploading duplicate file
+    if (skip) {
+      return
+    }
+
     let upload = UpChunk.createUpload({ chunkSize: 10240, endpoint: entrypoint, file })
     upload.chunkCount = chunkCount
 

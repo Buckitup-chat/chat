@@ -424,35 +424,39 @@ defmodule ChatWeb.MainLive.Index do
   def chunked_presign_url(entry, socket) do
     upload_key = get_upload_key(entry, socket.assigns)
 
-    case FileIndex.get(upload_key, reader_hash(socket.assigns)) do
-      nil ->
-        {next_chunk, secret} = maybe_resume_existing_upload(upload_key, socket.assigns)
+    {uploader_data, socket} =
+      case FileIndex.get(upload_key, reader_hash(socket.assigns)) do
+        nil ->
+          {next_chunk, secret} = maybe_resume_existing_upload(upload_key, socket.assigns)
 
-        {socket, uploader_data} =
-          start_chunked_upload(socket, entry, upload_key, secret, next_chunk)
+          {socket, uploader_data} =
+            start_chunked_upload(socket, entry, upload_key, secret, next_chunk)
 
-        link = Helpers.upload_chunk_url(ChatWeb.Endpoint, :put, upload_key)
+          link = Helpers.upload_chunk_url(ChatWeb.Endpoint, :put, upload_key)
 
-        uploader_data =
-          Map.merge(%{uploader: "UpChunk", entrypoint: link, uuid: entry.uuid}, uploader_data)
+          uploader_data = Map.merge(%{entrypoint: link, uuid: entry.uuid}, uploader_data)
 
-        {:ok, uploader_data, socket}
+          {uploader_data, socket}
 
-      secret ->
-        entry = Map.put(entry, :done?, true)
+        secret ->
+          entry = Map.put(entry, :done?, true)
 
-        metadata =
-          %UploadMetadata{}
-          |> Map.put(:credentials, {upload_key, secret})
-          |> Map.put(:destination, file_upload_destination(socket.assigns))
+          metadata =
+            %UploadMetadata{}
+            |> Map.put(:credentials, {upload_key, secret})
+            |> Map.put(:destination, file_upload_destination(socket.assigns))
 
-        case metadata.destination.type do
-          :dialog -> Page.Dialog.send_file(socket, entry, metadata)
-          :room -> Page.Room.send_file(socket, entry, metadata)
-        end
+          case metadata.destination.type do
+            :dialog -> Page.Dialog.send_file(socket, entry, metadata)
+            :room -> Page.Room.send_file(socket, entry, metadata)
+          end
 
-        {:error, %{}, socket}
-    end
+          {%{skip: true}, socket}
+      end
+
+    uploader_data = Map.merge(%{uploader: "UpChunk"}, uploader_data)
+
+    {:ok, uploader_data, socket}
   end
 
   defp get_upload_key(%UploadEntry{} = entry, %{my_id: id} = assigns) do

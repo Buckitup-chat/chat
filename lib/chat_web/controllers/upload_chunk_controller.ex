@@ -10,7 +10,7 @@ defmodule ChatWeb.UploadChunkController do
          {:ok, chunk, conn} <- read_out_chunk(conn),
          [range] <- get_req_header(conn, "content-range"),
          {range_start, range_end, _size} <- parse_range(range),
-         :ok <- save_chunk_till({key, {range_start, range_end}, chunk}, time_mark() + 10) do
+         :ok <- save_chunk_till({key, {range_start, range_end}, chunk}, time_mark() + 20) do
       conn
       |> send_resp(200, "")
     else

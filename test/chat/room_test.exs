@@ -14,7 +14,7 @@ defmodule Chat.Rooms.RoomTest do
   test "room creation" do
     alice = User.login("Alice")
     room_name = "Alice's room"
-    {room_identity, room} = alice |> Rooms.add(room_name)
+    {_room_identity, room} = alice |> Rooms.add(room_name)
 
     assert %Rooms.Room{} = room
 

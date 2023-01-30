@@ -1,6 +1,10 @@
 defmodule Chat.Content do
   @moduledoc "Content handling functions common for dialogs and rooms"
 
+  alias Chat.ChunkedFiles
+  alias Chat.MemoIndex
+  alias Chat.RoomInviteIndex
+
   alias Chat.{
     FileIndex,
     Files,
@@ -10,29 +14,48 @@ defmodule Chat.Content do
 
   alias Chat.Utils.StorageId
 
-  def delete(%{content: json, type: :room_invite}, _msg_id, _dialog_or_room_hash),
-    do: json |> StorageId.from_json() |> RoomInvites.delete()
-
-  def delete(%{content: json, type: :memo}, _msg_id, _dialog_or_room_hash),
-    do: json |> StorageId.from_json() |> Memo.delete()
-
-  def delete(%{content: json, type: type}, msg_id, dialog_or_room_hash)
-      when type in [:audio, :file, :image, :video] do
-    key = StorageId.from_json_to_key(json)
-    FileIndex.delete(key, dialog_or_room_hash, msg_id)
-
-    if can_be_deleted?(key, msg_id, dialog_or_room_hash) do
-      Files.delete(key)
+  @spec delete(any(), reader_hash_list :: list(String.t()), msg_id :: any()) :: :ok
+  def delete(%{content: json, type: type}, list, msg_id) do
+    case type do
+      :file -> delete_file(key(json), list, msg_id)
+      :image -> delete_file(key(json), list, msg_id)
+      :video -> delete_file(key(json), list, msg_id)
+      :audio -> delete_file(key(json), list, msg_id)
+      :memo -> delete_memo(key(json), list)
+      :room_invite -> delete_room_invite(key(json), list)
+      _ -> :ok
     end
   end
 
-  def delete(_, _, _), do: :ok
+  defp delete_file(key, reader_hash_list, msg_id) do
+    if FileIndex.last_key?(key, reader_hash_list, msg_id) do
+      Files.delete(key)
+      ChunkedFiles.delete(key)
+    end
 
-  defp can_be_deleted?(key, msg_id, dialog_or_room_hash) do
-    key
-    |> FileIndex.list_references(dialog_or_room_hash)
-    # References are deleted asynchronously so we can't guarantee current message references is removed.
-    |> MapSet.delete(msg_id)
-    |> Enum.empty?()
+    reader_hash_list
+    |> Enum.each(fn hash ->
+      FileIndex.delete(hash, key, msg_id)
+    end)
   end
+
+  defp delete_memo(key, reader_hash_list) do
+    Memo.delete(key)
+
+    reader_hash_list
+    |> Enum.each(fn hash ->
+      MemoIndex.delete(hash, key)
+    end)
+  end
+
+  defp delete_room_invite(key, reader_hash_list) do
+    RoomInvites.delete(key)
+
+    reader_hash_list
+    |> Enum.each(fn hash ->
+      RoomInviteIndex.delete(hash, key)
+    end)
+  end
+
+  defp key(json), do: StorageId.from_json_to_key(json)
 end

@@ -1,9 +1,9 @@
-defmodule Chat.Db.QueueWriter.Process do
+defmodule Chat.Db.Pipeline.WriterProcess do
   @moduledoc """
-  Genserver to host QueueWriter
+  Genserver to host Writer
 
   """
-  import Chat.Db.QueueWriter
+  import Chat.Db.Pipeline.Writer
   import Tools.GenServerHelpers
 
   use GenServer
@@ -22,15 +22,13 @@ defmodule Chat.Db.QueueWriter.Process do
   def init(opts) do
     opts
     |> from_opts()
-    |> decide_if_dry()
     |> ok_continue(:demand)
   end
 
   @impl true
   def handle_cast({operation, list}, state) do
     state
-    |> cancel_compaction_timer()
-    |> abort_compaction()
+    |> notify_compactor()
     |> then(fn st ->
       case operation do
         :write -> db_write(st, list)
@@ -51,17 +49,10 @@ defmodule Chat.Db.QueueWriter.Process do
   end
 
   @impl true
-  def handle_info(:compact, state) do
-    state
-    |> start_compaction()
-    |> noreply()
-  end
-
   def handle_info(:fsync, state) do
     state
     |> cancel_fsync_timer()
-    |> abort_compaction()
-    |> cancel_compaction_timer()
+    |> notify_compactor()
     |> fsync()
     |> noreply()
   end

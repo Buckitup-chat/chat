@@ -29,19 +29,18 @@ defmodule Chat.Db.WriteQueue.ReadStream do
   defp chunk_keys([{:file_chunk, _, _, _} = key | rest], keys, _), do: {[key | keys], rest}
   defp chunk_keys([key | rest], keys, amount), do: chunk_keys(rest, [key | keys], amount - 1)
 
-  # defp chunk_keys([head | tail], keys, amount) do
-  #   if match?({:file_chunk, _, _, _}, head) do
-  #     {[head | keys], tail}
-  #   else
-  #     chunk_keys(tail, [head | keys], amount - 1)
-  #   end
-  # end
-
   defp read_list(db, list) do
     {keys, new_list} = chunk_keys(list, [], 100)
+    files_path = CubDB.data_dir(db) <> "_files"
 
     keys
-    |> Enum.map(&{&1, CubDB.get(db, &1)})
+    |> Enum.map(fn
+      {:file_chunk, chunk_key, first, _} = key ->
+        {key, Chat.FileFs.read_file_chunk(first, chunk_key, files_path) |> elem(0)}
+
+      key ->
+        {key, CubDB.get(db, key)}
+    end)
     |> Enum.reject(fn {_, x} -> is_nil(x) end)
     |> then(&{&1, new_list})
   rescue

@@ -41,4 +41,8 @@ defmodule Chat.MemoIndex do
   end
 
   def add(x, _, _), do: x
+
+  def delete(reader_hash, key) do
+    Db.delete({:memo_index, reader_hash, key})
+  end
 end

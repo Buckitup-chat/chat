@@ -7,6 +7,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   either %Chat.Dialogs.PrivateMessage{} (dialog message)
   or Chat.Rooms.PlainMessage{} (room message).
   """
+  require Logger
 
   use ChatWeb, :component
 
@@ -327,6 +328,14 @@ defmodule ChatWeb.MainLive.Layout.Message do
       <video src={@file.url} class="a-video" controls />
       <.media_file_info file={@file} />
     </div>
+    """
+  end
+
+  defp message(assigns) do
+    ["[message] ", "error rendering ", inspect(assigns[:msg], pretty: true)] |> Logger.warn()
+
+    ~H"""
+    <!-- error rendering message -->
     """
   end
 

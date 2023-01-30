@@ -186,12 +186,22 @@ const listeners = {
       chatContent.scrollTo({ top: chatContent.scrollHeight })
     }, 0)
   },
-  "phx:upload:cancel": (e) => {
-    uploads[e.detail.uuid].abort()
-    delete uploads[e.detail.uuid]
+  "upload:cancel": (e) => {
+    if (uploads[e.detail.uuid]) {
+      uploads[e.detail.uuid].abort()
+      delete uploads[e.detail.uuid]
+    }
   },
-  "phx:upload:pause": (e) => { uploads[e.detail.uuid].pause() },
-  "phx:upload:resume": (e) => { uploads[e.detail.uuid].resume() },
+  "upload:pause": (e) => {
+    if (uploads[e.detail.uuid]) {
+      uploads[e.detail.uuid].pause()
+    }
+  },
+  "upload:resume": (e) => {
+    if (uploads[e.detail.uuid]) {
+      uploads[e.detail.uuid].resume()
+    }
+  },
   "phx:gallery:preload": (e) => {
     const img = new Image();
     img.onload = function() {

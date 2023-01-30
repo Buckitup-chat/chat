@@ -424,7 +424,7 @@ defmodule ChatWeb.MainLive.Index do
   def chunked_presign_url(entry, socket) do
     upload_key = get_upload_key(entry, socket.assigns)
 
-    case FileIndex.get(upload_key, reader_hash(socket.assigns)) do
+    case FileIndex.get(reader_hash(socket.assigns), upload_key) do
       nil ->
         {next_chunk, secret} = maybe_resume_existing_upload(upload_key, socket.assigns)
 

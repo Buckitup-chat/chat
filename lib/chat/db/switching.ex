@@ -18,6 +18,7 @@ defmodule Chat.Db.Switching do
     %{queue: queue_name, status: status_relay_name} = Common.names(name)
     Common.put_chat_db_env(:data_queue, queue_name)
     Common.put_chat_db_env(:data_pid, name)
+    Common.put_chat_db_env(:files_base_dir, CubDB.data_dir(name) <> "_files")
     Common.put_chat_db_env(:data_dry, status_relay_name)
 
     Chat.Ordering.reset()

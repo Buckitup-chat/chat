@@ -19,4 +19,8 @@ defmodule Chat.RoomInviteIndex do
 
     indexed_message
   end
+
+  def delete(reader_hash, key) do
+    Db.delete({:room_invite_index, reader_hash, key})
+  end
 end

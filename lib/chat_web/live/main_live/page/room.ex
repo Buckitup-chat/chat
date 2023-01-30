@@ -129,7 +129,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
     {_index, msg} = message
 
-    FileIndex.add_file(chunk_key, pub_key, msg.id, chunk_secret)
+    FileIndex.save(chunk_key, pub_key |> Utils.hash(), msg.id, chunk_secret)
 
     Rooms.on_saved(message, pub_key, fn ->
       broadcast_new_message(message, pub_key, me, time)
@@ -253,7 +253,7 @@ defmodule ChatWeb.MainLive.Page.Room do
       ) do
     time = Chat.Time.monotonic_to_unix(time_offset)
     Rooms.delete_message({index, msg_id}, room_identity, me)
-    broadcast_deleted_message(msg_id, room, me, time)
+    broadcast_deleted_message(msg_id, room.pub_key, me, time)
 
     socket
   end
@@ -284,7 +284,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> Jason.decode!()
     |> Enum.each(fn %{"id" => msg_id, "index" => index} ->
       Rooms.delete_message({String.to_integer(index), msg_id}, room_identity, me)
-      broadcast_deleted_message(msg_id, room, me, time)
+      broadcast_deleted_message(msg_id, room.pub_key, me, time)
     end)
 
     socket

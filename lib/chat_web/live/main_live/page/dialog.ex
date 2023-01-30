@@ -1,5 +1,8 @@
 defmodule ChatWeb.MainLive.Page.Dialog do
   @moduledoc "Dialog page"
+
+  require Logger
+
   import ChatWeb.MainLive.Page.Shared
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [consume_uploaded_entry: 3, push_event: 3, send_update: 2]
@@ -35,12 +38,16 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def init(%{assigns: %{me: me, monotonic_offset: time_offset}} = socket, user_id) do
+    ["[dialog] ", "init"] |> Logger.debug()
+
     time = Chat.Time.monotonic_to_unix(time_offset)
     peer = User.by_id(user_id)
     dialog = Dialogs.find_or_open(me, peer)
 
+    ["[dialog] ", "before subscribe"] |> Logger.debug()
     PubSub.subscribe(Chat.PubSub, dialog |> dialog_topic())
     Log.open_direct(me, time, peer)
+    ["[dialog] ", "before assigns"] |> Logger.debug()
 
     socket
     |> assign(:page, 0)
@@ -117,7 +124,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
     {_index, msg} = message
 
-    FileIndex.add_file(chunk_key, dialog, msg.id, chunk_secret)
+    FileIndex.save(chunk_key, dialog.a_key |> Utils.hash(), msg.id, chunk_secret)
+    FileIndex.save(chunk_key, dialog.b_key |> Utils.hash(), msg.id, chunk_secret)
 
     message
     |> Dialogs.on_saved(dialog, fn ->
@@ -382,8 +390,10 @@ defmodule ChatWeb.MainLive.Page.Dialog do
          %{assigns: %{dialog: dialog, me: me, last_load_timestamp: timestamp}} = socket,
          per_page
        ) do
+    ["[dialog] ", "before msg read"] |> Logger.debug()
     messages = Dialogs.read(dialog, me, {timestamp, 0}, per_page + 1)
     page_messages = Enum.take(messages, -per_page)
+    ["[dialog] ", "after msg read"] |> Logger.debug()
 
     socket
     |> assign(:messages, page_messages)

@@ -1,0 +1,38 @@
+<html>
+
+<head>
+  <script src="assets-fe/index.js"></script>
+  <script type="module">
+    import blowfish from 'https://cdn.jsdelivr.net/gh/sergey-lukianov/node-blowfish-js/blowfish.mjs'
+    // import jsSHA from 'https://cdn.jsdelivr.net/gh/Caligatio/jsSHA/dist/sha3.mjs'
+
+    var correctLocalStorage = [["test login", "MIIEowIBAAKCAQEA8rNlOLXoK+l2u8gQ9pFPVsaeXSwHmXBo88n2LiLqqqRt7I459HnhnlDuGpBTZ+bmqdm+pXf/LhnX74skL4FRfiJWeZ1ri427zmF1hYFjiD1DcSuSf2/wYTDeiito/k/EMQ8xsM3T66gO4/qWPweCJNtsTTupnkRaFRWrs1DawI/UaNj96Wow0ZEDx6/qD9ZQP5p/7lsrL9+n+mUSPLaSD98dOx4LWcE6Yrg6AFhy3nR+v+YqGOKah7UQCndBWRHrkOnuc1whwvlbEFX9IqFDq95+uyNe8PeW/jZwUNxZ3PnCN6YyUkrcYwayk6yyKOkUMhtL01ghzOgmxoIv3vgTbQIDAQABAoIBAFa5F8BN7+pRACZVdQpGHi2Jx2jPpN+FNVt3nUobG/Nh0g2nPLpJGv+xN4Oycrs73MxwjBkgacSVY32rIIEBGpeRuYi3YYh6WtOCK7ZK57/09DZqNWzoGOMBzWNd46SL6DUHkt/0jHc2lCuOjUV0b2KwLWDjotZ04iOKnNH0YFZR3Iq3ck6qf7IEjl1kkttcleaYRvnc8ZA872tnPF3cEqZiKJs8AwpqkCGoE3gMu2z+KqGYULw8y9rY8PcwDDKCk9Y+wFzAGeCzsZLwjVaNHMuBdNX4JDFp1jrqEwMSpkGX7MLCJjrQLgIEzmOXKzsftzn7MtrFwC9B2b9OUXICxZkCgYEA/zeF57FY11BNXSazDqZ38Wop0SsJ1UPZgyz7H5VCOoVSXs+o0V8Zm3y19TKSWUGKBBtCE2RHw8Z2VjOJCvL9HZ8mhm7dhn32e2WWOy6ipK1SMACmnfszqjLHzGowsR1cttVHVoIAScDypprxjJPYk/iWQZKDSQ4IJRQY9jm/J/cCgYEA83IKbFD7vpiiNNoE9zkDOr78AHGMjF7/sqCbu871ANNTGctHa104SSAerdW1RVfPTowIvqewSTbcsSLwXKHINncD2nTpZyj3CuJeVKrKZXFZxvZWxmit//BbOeqAF65tPzcXuc4qgwrRSv/zah8I6RBHyosSxotMcFBPBkM0rrsCgYAa+7LToUOEWEAlth6+UMljo9bR/5vliWvo24uddjlvWIMx9QCjSku5zcCrMPKaLzy5XGxrAnI397axPHejybcLN7VqBzSysISr3Ty5+x9FC/IhkyAKmfGHcCEBssR9JV6VEg2dztba9WRySvV46HTAiErSmfv5cFtaGDrfZZGZVwKBgQCXjoeupzwSjDNvc8tjnbrE9+Eq5YX6XaoSKqrJYS5mNSmnBUaRMJe57qUq08DmSqRk4gkPqJW2/tCl9nptMMrUHYPonKAx+O7Td9oCG9GlFcwucW3UV5b7n0cr5zGXjJ+2mzXKFu+gZTum1XFUv71sWxZWof4uXMpZoaWQ4IYLwQKBgD6wnWzcpSCtND7XVv1qaWzt8phlyIS9mX09ICmCNkMseBruuRg2wv/36DopMi/AS9peXfR1wxG7X2/uLAnELuRFKL2XG4C2ZuN0aYmwg97pOvFS/mWXzeKL8jqxwYzpEFn5Du7Gb1J3bmsf9TnZbx7G1sK9vEoC2lzB4aB5cq69"], [], {}];
+
+    var password = "testpasswordtest";
+    var cipheredContentB64 = "d/iWInVjNmrjEsY5dbDTFEW6X9WIs9fKA3nXp8Nerp22F+3UFJ6k3aacM03Xu+X10On4D2DHD88jtc5k5wKRGK6EZb3k+yrN460Wc6K+zyGUeYagyVFott+pGpthJUSwk26MVmSgFAC0HMX/EpCXsSxqmqqKEFxzhvB0Tk1Se7n+YItYYy7kbGbn4xJwJEUXI8n1uvZI0D5EzUXkcfjQduofnWaqskTVRThs64EGGcrnlUBQsXkqCo5vHFtZq3SAZBfTuo+L8uYpYiJOGQD7xIuaiLsddwHef5ZHiaun8462BuJcuqMZOkdG3ft1HyLumCTsMFtuoqZZZrALzpBzSCmF4pJLOm3tmcJtnq3n4H3HiifF/Zpv2uOI9btQZ71soOYk9K0smCXDwKWhYJgaFLN3cAzVok27z7zEv72zfWDwCUbwT0BvtgKDSBrL5qt69FeYvFC92+CypU09KdwiyFJEOdzES6xFpCBC3xDLmCQkPYFeJyR3QvmLXzWVr7bwcWLcGNbxap1H5FZaZTvQBOk+i9XIScRCV1gF5RidPw7NAEVHxb4stUl9URxO/BeO6aQ6uyV7jcL4DjMXsMftWxE/5qRb+u9PmAXrqY8AxaCiBt9gAmmCjYrSuLP7YY9oy0wZ2sZV+Xq34TB8gqXJklRXbic/CJV+GTFcz1tdzyLw5H+WsZmWR6Vtf2xEhOIZwjifyX7zXObrqo9O+jO3KV9q+4z7os15ZUGXbPKoDO88S5PLCiNnm/D8n4nvSGQy6U5Qkd+CY004KDsQjqlbfBynN5DRh3eYXK7Aicnf0gC3HNOe3IBm1FJJ7iyByPsxxyhm41q73YuTK4ZJxS4JDSpIIIxl8d0IRASezmYLG2+JTCjQpSU80bt107+yNDFFxxABaemGK5kxeCLTma/vrqROCcqV8Ydgd5u7pA1eqfhOfzqGWFLNjWCEqhA+NNT34ZzVJ9z4bg8/WG5EWqTF4Ej0K7SXXwtjL7iZbXaHinvEdPuxKnNCdxDQlL52KhgxA+Ne4aLAw/R+ZcXlsTkJpxqnyKl+LcCAStBuK3SAlqc4o5VE/WI2kvW8gWBrcWPQjEC3SLp9UGOsKrfI/suNoz6MB0FCi0N8jtvca6pgSdMneyBZjjN4Zp6WGr74d44amQftvU9ylucdmaAHVbSIuyEpnlE1RGkGvm4ldXPdINlU4gP+Itpq7aMlSxC4h5d2CTrIrTZsgyGr5D70V+H+dDNEGu274KeOS2Hm+j0JUTeZVNsZvttEullYqrXP3XOa2uRjwMzMU787u3Vph5K3ba92YwPcQZNpkBfUR/1q9JI3V/q+jRCm8AP56nMO4Mc/IbBSRla6PihUpjSJEpITnK6cUWf0x+NJMCV4iM8LXPpfKkLWMlwY392r2+V1LqMmarVzUcLnoCivQMfmSoRyoFbpJyTz4Jv3nLaNV+1kaMQsW5L2+ycWQ2soP3OQIoH/nJmyLjUXoD6Q3RXZEYa30ppE6ysBIU0eMYKvhh4hSQlPAV33uc4mZn6YO9/OIjEDlwkgXBWgdLg1bVrOxYorCtygZgaBkAc8HsqGUVdHZMS+6BCGmn1NZFHOBnx3gmTgpLtNFSHg0RU35T1xhz9CSFGJoX/z4cBC94O/qGWx7KaoQ5A6Aae+cC05RddLEQGLdCGh4/ZxPwtCc75wfLUfKgDGMgoCBGq6PUNKnxWLyGC4hjiCxui/oqENWe6GK+6fTqcN0DECehPF1NbmS6FFfAI644zf9VY+Tq3EDAtNe2jh05bqIUV6kHPI7z4hfHg09SMtdrmI+x44dTURX+hnSP64nJMYE7wwdWTYjCI6LXpAShnxngQF+r7CWGqS3x52VcGzyPJNCeHja17oZivKbyW6usLspUQV49IZggHLblS1UXVWjXptVayNffT7AwYl4GSVcK05NJcX7inmVDVmM/Ai6UgueMtFqnFEGAt4dVr0dLQr2fsDt6VZcj11wee5t30oanluCs8ps/Oft5iTQmTUX0CQ/7zFmWHx3H77WC5pppwucXx/JxbXkCu+mfiM8ozbPE2wHQIca2cL+XesExoheYI3eUnwWFJBcD7RbpsLdPs9IMHhyyWZYM7j0rHre9ZPVyK6Ai3pbjxJhVvgJvECeF54TXqTh5QblQY="
+
+    // var passwordHash = new jsSHA("SHA3-256", "TEXT").update(password)
+    //var passHashArray = passwordHash.getHash("UINT8ARRAY")
+    var passwordHash = enigma.hash(btoa(password))
+    const correctB64PasswordHash = "9SXzCP6VM1+5fMjLLoPoi8cBN4unROj6xzJ5Xc9em5A="
+
+    console.log("Hashing correct ", correctB64PasswordHash == passwordHash)
+
+    /**
+        let key = crypto.randomBytes(16);
+        let iv = crypto.randomBytes(8);
+        let context = blowfish.key(key);
+        let plaintext = 'Same with CFB. Full blocks only! 1';
+        let ciphertext = blf.cfb(context, iv, Buffer.from(plaintext, 'utf8'));
+        let decrypted = blf.cfb(context, iv, ciphertext, true);
+        
+        console.log([key, plaintext, ciphertext, decrypted])
+    **/
+    console.log("Hi")
+    console.log(passwordHash)
+    console.log(blowfish)
+
+  </script>
+</head>
+
+</html>

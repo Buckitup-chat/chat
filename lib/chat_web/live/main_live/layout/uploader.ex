@@ -154,38 +154,24 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
         <div class="flex text-xs text-black/50"><%= @entry.progress %>%</div>
 
         <%= if @metadata.status == :active do %>
-          <.upload_control phx-click={pause_upload(@entry.uuid)}>
+          <.upload_control phx-click="upload:pause" phx-value-uuid={@entry.uuid}>
             Pause
           </.upload_control>
         <% else %>
-          <.upload_control phx-click={resume_upload(@entry.uuid)}>
+          <.upload_control phx-click="upload:resume" phx-value-uuid={@entry.uuid}>
             Resume
           </.upload_control>
         <% end %>
-        <.upload_control phx-click={cancel_upload(@entry.ref, @entry.uuid)}>
+        <.upload_control
+          phx-click="upload:cancel"
+          phx-value-ref={@entry.ref}
+          phx-value-uuid={@entry.uuid}
+        >
           Cancel
         </.upload_control>
       </div>
     </div>
     """
-  end
-
-  defp cancel_upload(ref, uuid) do
-    %JS{}
-    |> JS.dispatch("upload:cancel", detail: %{uuid: uuid})
-    |> JS.push("upload:cancel", value: %{ref: ref, uuid: uuid})
-  end
-
-  defp pause_upload(uuid) do
-    %JS{}
-    |> JS.dispatch("upload:pause", detail: %{uuid: uuid})
-    |> JS.push("upload:pause", value: %{uuid: uuid})
-  end
-
-  defp resume_upload(uuid) do
-    %JS{}
-    |> JS.dispatch("upload:resume", detail: %{uuid: uuid})
-    |> JS.push("upload:resume", value: %{uuid: uuid})
   end
 
   attr :class, :string, default: nil, doc: "classes to append"

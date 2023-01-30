@@ -288,6 +288,7 @@ defmodule ChatWeb.MainLive.Index do
      socket
      |> assign(:uploads_metadata, Map.delete(uploads, uuid))
      |> cancel_upload(:file, ref)
+     |> push_event("upload:cancel", %{uuid: uuid})
      |> maybe_resume_next_upload()}
   end
 
@@ -295,7 +296,10 @@ defmodule ChatWeb.MainLive.Index do
     uploads = Map.get(socket.assigns, :uploads_metadata, %{})
     metadata = Map.put(uploads[uuid], :status, :paused)
 
-    {:noreply, assign(socket, :uploads_metadata, Map.put(uploads, uuid, metadata))}
+    {:noreply,
+     socket
+     |> assign(:uploads_metadata, Map.put(uploads, uuid, metadata))
+     |> push_event("upload:pause", %{uuid: uuid})}
   end
 
   def handle_event("upload:resume", %{"uuid" => uuid}, socket) do
@@ -603,10 +607,7 @@ defmodule ChatWeb.MainLive.Index do
 
       true ->
         {next_upload_uuid, _metadata} = next_upload
-
-        socket
-        |> resume_upload(next_upload_uuid)
-        |> push_event("upload:resume", %{uuid: next_upload_uuid})
+        resume_upload(socket, next_upload_uuid)
     end
   end
 
@@ -614,6 +615,8 @@ defmodule ChatWeb.MainLive.Index do
     uploads = Map.get(socket.assigns, :uploads_metadata, %{})
     metadata = Map.put(uploads[uuid], :status, :active)
 
-    assign(socket, :uploads_metadata, Map.put(uploads, uuid, metadata))
+    socket
+    |> assign(:uploads_metadata, Map.put(uploads, uuid, metadata))
+    |> push_event("upload:resume", %{uuid: uuid})
   end
 end

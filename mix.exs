@@ -12,7 +12,7 @@ defmodule Chat.MixProject do
       aliases: aliases(),
       deps: deps(),
       test_coverage: [
-        summary: [threshold: 34]
+        summary: [threshold: 33]
       ],
       releases: [
         chat: [

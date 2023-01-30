@@ -9,7 +9,10 @@ defmodule Chat.FileFs do
     keys
     |> file_path(build_path(prefix))
     |> tap(&create_dirs/1)
-    |> File.open([:binary, :write, :sync], &IO.binwrite(&1, data))
+    |> File.open([:write, :sync], fn file ->
+      :ok = IO.binwrite(file, data)
+      :file.datasync(file)
+    end)
   end
 
   @spec read_file_chunk(offset :: non_neg_integer(), key :: String.t()) ::

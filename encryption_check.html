@@ -3,7 +3,7 @@
 <head>
   <script src="assets-fe/index.js"></script>
   <script type="module">
-    import blowfish from 'https://cdn.jsdelivr.net/gh/sergey-lukianov/node-blowfish-js/blowfish.mjs'
+    //import blowfish from 'https://cdn.jsdelivr.net/gh/sergey-lukianov/node-blowfish-js/blowfish.mjs'
     // import jsSHA from 'https://cdn.jsdelivr.net/gh/Caligatio/jsSHA/dist/sha3.mjs'
 
     var correctLocalStorage = [["test login", "MIIEowIBAAKCAQEA8rNlOLXoK+l2u8gQ9pFPVsaeXSwHmXBo88n2LiLqqqRt7I459HnhnlDuGpBTZ+bmqdm+pXf/LhnX74skL4FRfiJWeZ1ri427zmF1hYFjiD1DcSuSf2/wYTDeiito/k/EMQ8xsM3T66gO4/qWPweCJNtsTTupnkRaFRWrs1DawI/UaNj96Wow0ZEDx6/qD9ZQP5p/7lsrL9+n+mUSPLaSD98dOx4LWcE6Yrg6AFhy3nR+v+YqGOKah7UQCndBWRHrkOnuc1whwvlbEFX9IqFDq95+uyNe8PeW/jZwUNxZ3PnCN6YyUkrcYwayk6yyKOkUMhtL01ghzOgmxoIv3vgTbQIDAQABAoIBAFa5F8BN7+pRACZVdQpGHi2Jx2jPpN+FNVt3nUobG/Nh0g2nPLpJGv+xN4Oycrs73MxwjBkgacSVY32rIIEBGpeRuYi3YYh6WtOCK7ZK57/09DZqNWzoGOMBzWNd46SL6DUHkt/0jHc2lCuOjUV0b2KwLWDjotZ04iOKnNH0YFZR3Iq3ck6qf7IEjl1kkttcleaYRvnc8ZA872tnPF3cEqZiKJs8AwpqkCGoE3gMu2z+KqGYULw8y9rY8PcwDDKCk9Y+wFzAGeCzsZLwjVaNHMuBdNX4JDFp1jrqEwMSpkGX7MLCJjrQLgIEzmOXKzsftzn7MtrFwC9B2b9OUXICxZkCgYEA/zeF57FY11BNXSazDqZ38Wop0SsJ1UPZgyz7H5VCOoVSXs+o0V8Zm3y19TKSWUGKBBtCE2RHw8Z2VjOJCvL9HZ8mhm7dhn32e2WWOy6ipK1SMACmnfszqjLHzGowsR1cttVHVoIAScDypprxjJPYk/iWQZKDSQ4IJRQY9jm/J/cCgYEA83IKbFD7vpiiNNoE9zkDOr78AHGMjF7/sqCbu871ANNTGctHa104SSAerdW1RVfPTowIvqewSTbcsSLwXKHINncD2nTpZyj3CuJeVKrKZXFZxvZWxmit//BbOeqAF65tPzcXuc4qgwrRSv/zah8I6RBHyosSxotMcFBPBkM0rrsCgYAa+7LToUOEWEAlth6+UMljo9bR/5vliWvo24uddjlvWIMx9QCjSku5zcCrMPKaLzy5XGxrAnI397axPHejybcLN7VqBzSysISr3Ty5+x9FC/IhkyAKmfGHcCEBssR9JV6VEg2dztba9WRySvV46HTAiErSmfv5cFtaGDrfZZGZVwKBgQCXjoeupzwSjDNvc8tjnbrE9+Eq5YX6XaoSKqrJYS5mNSmnBUaRMJe57qUq08DmSqRk4gkPqJW2/tCl9nptMMrUHYPonKAx+O7Td9oCG9GlFcwucW3UV5b7n0cr5zGXjJ+2mzXKFu+gZTum1XFUv71sWxZWof4uXMpZoaWQ4IYLwQKBgD6wnWzcpSCtND7XVv1qaWzt8phlyIS9mX09ICmCNkMseBruuRg2wv/36DopMi/AS9peXfR1wxG7X2/uLAnELuRFKL2XG4C2ZuN0aYmwg97pOvFS/mWXzeKL8jqxwYzpEFn5Du7Gb1J3bmsf9TnZbx7G1sK9vEoC2lzB4aB5cq69"], [], {}];
@@ -16,7 +16,7 @@
     var passwordHash = enigma.hash(btoa(password))
     const correctB64PasswordHash = "9SXzCP6VM1+5fMjLLoPoi8cBN4unROj6xzJ5Xc9em5A="
 
-    console.log("Hashing correct ", correctB64PasswordHash == passwordHash)
+    console.log("Hashing check ", correctB64PasswordHash == passwordHash)
 
     /**
         let key = crypto.randomBytes(16);
@@ -28,9 +28,20 @@
         
         console.log([key, plaintext, ciphertext, decrypted])
     **/
-    console.log("Hi")
-    console.log(passwordHash)
-    console.log(blowfish)
+    const cipheredContent = Buffer.from(cipheredContentB64, 'base64')
+    //console.log(cipheredContent)
+
+    const deciphered = enigma.decipher(cipheredContentB64, passwordHash)
+
+    //console.log(deciphered)
+    //console.log(deciphered.toString())
+
+    console.log("Decipher check ", deciphered.toString() == JSON.stringify(correctLocalStorage))
+
+    //console.log("Hi")
+    //console.log(passwordHash)
+
+    //console.log(blowfish)
 
   </script>
 </head>

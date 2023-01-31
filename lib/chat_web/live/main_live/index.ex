@@ -425,20 +425,8 @@ defmodule ChatWeb.MainLive.Index do
     upload_key = get_upload_key(entry, socket.assigns)
 
     {uploader_data, socket} =
-      case FileIndex.get(reader_hash(socket.assigns), upload_key) do
-        nil ->
-          {next_chunk, secret} = maybe_resume_existing_upload(upload_key, socket.assigns)
-
-          {socket, uploader_data} =
-            start_chunked_upload(socket, entry, upload_key, secret, next_chunk)
-
-          link = Helpers.upload_chunk_url(ChatWeb.Endpoint, :put, upload_key)
-
-          uploader_data = Map.merge(%{entrypoint: link, uuid: entry.uuid}, uploader_data)
-
-          {uploader_data, socket}
-
-        secret ->
+      cond do
+        secret = FileIndex.get(reader_hash(socket.assigns), upload_key) ->
           entry = Map.put(entry, :done?, true)
 
           metadata =
@@ -452,6 +440,21 @@ defmodule ChatWeb.MainLive.Index do
           end
 
           {%{skip: true}, socket}
+
+        upload_in_progress?(socket.assigns, upload_key) ->
+          {%{skip: true}, socket}
+
+        true ->
+          {next_chunk, secret} = maybe_resume_existing_upload(upload_key, socket.assigns)
+
+          {socket, uploader_data} =
+            start_chunked_upload(socket, entry, upload_key, secret, next_chunk)
+
+          link = Helpers.upload_chunk_url(ChatWeb.Endpoint, :put, upload_key)
+
+          uploader_data = Map.merge(%{entrypoint: link, uuid: entry.uuid}, uploader_data)
+
+          {uploader_data, socket}
       end
 
     uploader_data = Map.merge(%{uploader: "UpChunk"}, uploader_data)
@@ -508,6 +511,15 @@ defmodule ChatWeb.MainLive.Index do
     timestamp = Chat.Time.monotonic_to_unix(assigns.monotonic_offset)
     upload = %Upload{secret: secret, timestamp: timestamp}
     UploadIndex.add(key, upload)
+  end
+
+  defp upload_in_progress?(%{uploads_metadata: uploads} = _assigns, upload_key) do
+    Enum.any?(uploads, fn {_uuid,
+                           %UploadMetadata{
+                             credentials: {key, _secret}
+                           }} ->
+      key == upload_key
+    end)
   end
 
   def handle_chunked_progress(

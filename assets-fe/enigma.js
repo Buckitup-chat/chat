@@ -12,13 +12,26 @@ const Enigma = {
   cipher: "todo",
   decipher: function(b64_ciphered_data, b64_password) {
     const pass_buffer = Buffer.from(b64_password, 'base64')
-    pass = new Uint8Array(pass_buffer.buffer, 8, 16)
-    key1 = new Uint8Array(pass_buffer.buffer, 0, 8)
-    key2 = new Uint8Array(pass_buffer.buffer, 24, 8)
+    pass = Buffer.from(new Uint8Array(pass_buffer.buffer, 8, 16))
+    key1 = Buffer.from(new Uint8Array(pass_buffer.buffer, 0, 8))
+    key2 = Buffer.from(new Uint8Array(pass_buffer.buffer, 24, 8))
+
+    key = new Array(8)
+
+    for (i = 0; i < 8; i += 1) {
+      console.log(key1[i], key2[i], key1[i] ^ key2[i])
+      key[i] = key1[i] ^ key2[i]
+    }
+
+
+    console.log(pass_buffer)
+    console.log(key1, pass, key2)
+    console.log(key)
 
 
 
-    let context = blf.key(Buffer.from(pass));
+
+    let context = blf.key(Buffer.from(key1));
     //let plaintext = 'Same with CFB. Full blocks only!';
     //let ciphertext = blf.cfb(context, iv, Buffer.from(plaintext, 'utf8'));
     let deciphered = blf.cfb(context, Buffer.from(key1), Buffer.from(b64_ciphered_data, 'base64'), true);

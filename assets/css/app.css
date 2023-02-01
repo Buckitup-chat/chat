@@ -2,6 +2,8 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
+@import '/fonts/Inter/inter.css';
+
 /* This file is for your main application CSS */
 
 html {

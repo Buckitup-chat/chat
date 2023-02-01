@@ -35,7 +35,9 @@ module.exports = {
   },
   plugins: [
     require('@tailwindcss/forms'),
-    require('tailwindcss-font-inter'),
+    require('tailwindcss-font-inter')({
+      importFontFace: false,
+    }),
     plugin(({ addVariant }) =>
       addVariant('phx-no-feedback', ['.phx-no-feedback&', '.phx-no-feedback &'])
     ),

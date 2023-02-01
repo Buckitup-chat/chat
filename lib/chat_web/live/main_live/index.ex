@@ -284,22 +284,33 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("upload:cancel", %{"ref" => ref, "uuid" => uuid}, socket) do
     uploads = Map.get(socket.assigns, :uploads_metadata, %{})
 
-    {:noreply,
-     socket
-     |> assign(:uploads_metadata, Map.delete(uploads, uuid))
-     |> cancel_upload(:file, ref)
-     |> push_event("upload:cancel", %{uuid: uuid})
-     |> maybe_resume_next_upload()}
+    case Map.get(uploads, uuid) do
+      %UploadMetadata{} ->
+        socket
+        |> assign(:uploads_metadata, Map.delete(uploads, uuid))
+        |> cancel_upload(:file, ref)
+        |> push_event("upload:cancel", %{uuid: uuid})
+        |> maybe_resume_next_upload()
+
+      nil ->
+        socket
+    end
   end
 
   def handle_event("upload:pause", %{"uuid" => uuid}, socket) do
     uploads = Map.get(socket.assigns, :uploads_metadata, %{})
-    metadata = Map.put(uploads[uuid], :status, :paused)
 
-    {:noreply,
-     socket
-     |> assign(:uploads_metadata, Map.put(uploads, uuid, metadata))
-     |> push_event("upload:pause", %{uuid: uuid})}
+    case Map.get(uploads, uuid) do
+      %UploadMetadata{} ->
+        metadata = Map.put(uploads[uuid], :status, :paused)
+
+        socket
+        |> assign(:uploads_metadata, Map.put(uploads, uuid, metadata))
+        |> push_event("upload:pause", %{uuid: uuid})
+
+      nil ->
+        socket
+    end
   end
 
   def handle_event("upload:resume", %{"uuid" => uuid}, socket) do
@@ -613,10 +624,17 @@ defmodule ChatWeb.MainLive.Index do
 
   defp resume_upload(socket, uuid) do
     uploads = Map.get(socket.assigns, :uploads_metadata, %{})
-    metadata = Map.put(uploads[uuid], :status, :active)
 
-    socket
-    |> assign(:uploads_metadata, Map.put(uploads, uuid, metadata))
-    |> push_event("upload:resume", %{uuid: uuid})
+    case Map.get(uploads, uuid) do
+      %UploadMetadata{} ->
+        metadata = Map.put(uploads[uuid], :status, :active)
+
+        socket
+        |> assign(:uploads_metadata, Map.put(uploads, uuid, metadata))
+        |> push_event("upload:resume", %{uuid: uuid})
+
+      nil ->
+        socket
+    end
   end
 end

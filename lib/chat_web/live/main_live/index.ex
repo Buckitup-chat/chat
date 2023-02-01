@@ -607,18 +607,26 @@ defmodule ChatWeb.MainLive.Index do
       |> Enum.filter(fn {_uuid, metadata} -> metadata.status == :active end)
       |> length()
 
-    next_upload = Enum.find(uploads, fn {_uuid, metadata} -> metadata.status == :paused end)
+    next_entry =
+      Enum.find(socket.assigns.uploads.file.entries, fn %UploadEntry{} = entry ->
+        case Map.get(uploads, entry.uuid) do
+          nil ->
+            false
+
+          %UploadMetadata{} = metadata ->
+            entry.valid? and metadata.status == :paused
+        end
+      end)
 
     cond do
       active_uploads >= @max_concurrent_uploads ->
         socket
 
-      is_nil(next_upload) ->
+      is_nil(next_entry) ->
         socket
 
       true ->
-        {next_upload_uuid, _metadata} = next_upload
-        resume_upload(socket, next_upload_uuid)
+        resume_upload(socket, next_entry.uuid)
     end
   end
 

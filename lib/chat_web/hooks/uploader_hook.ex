@@ -5,16 +5,15 @@ defmodule ChatWeb.Hooks.UploaderHook do
 
   import Phoenix.LiveView
 
-  alias Phoenix.LiveView.Session
-  alias Phoenix.LiveView.Socket
   alias ChatWeb.LiveHelpers.Uploader
+  alias Phoenix.LiveView.{Session, Socket}
 
   @type name :: atom()
   @type params :: map()
   @type session :: %Session{}
   @type socket :: Socket.t()
 
-  @spec on_mount(name(), params(), session(), socket) :: {:cont, socket()}
+  @spec on_mount(name(), params(), session(), socket()) :: {:cont, socket()}
   def on_mount(:default, _params, _session, socket) do
     {:cont,
      socket

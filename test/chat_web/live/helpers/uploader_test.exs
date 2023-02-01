@@ -5,14 +5,14 @@ defmodule ChatWeb.Helpers.UploaderTest do
   import Phoenix.LiveViewTest
   import Support.{FakeData, RetryHelper}
 
-  alias Chat.Rooms.PlainMessage
-  alias Chat.User
-  alias Chat.Rooms
   alias Chat.ChunkedFiles
   alias Chat.Dialogs
   alias Chat.Dialogs.{Dialog, PrivateMessage}
   alias Chat.Files
+  alias Chat.Rooms
+  alias Chat.Rooms.PlainMessage
   alias Chat.Upload.{Upload, UploadIndex, UploadMetadata}
+  alias Chat.User
   alias Chat.Utils.StorageId
   alias ChatWeb.LiveHelpers.Uploader
   alias Phoenix.LiveView.{Socket, UploadConfig, UploadEntry, Utils}

@@ -494,11 +494,15 @@
                     uploads={@uploads_metadata}
                   />
 
-                  <Layout.Uploader.mobile_uploader
-                    config={@uploads.file}
-                    operating_system={@operating_system}
-                    uploads={@uploads_metadata}
-                  />
+                  <div class="max-h-[280px] bottom-16 fixed w-full overflow-y-scroll flex flex-col-reverse">
+                    <div class='h-full'>
+                      <Layout.Uploader.mobile_uploader
+                        config={@uploads.file}
+                        operating_system={@operating_system}
+                        uploads={@uploads_metadata}
+                      />
+                  </div>
+                  </div>
                 </div>
               </div>
               <div

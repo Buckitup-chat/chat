@@ -9,6 +9,10 @@ defmodule Chat.Dialogs do
   alias Chat.Identity
   alias Chat.Utils
 
+  def find_or_open(%Identity{} = me) do
+    find_or_open(me, Card.from_identity(me))
+  end
+
   def find_or_open(%Identity{} = src, %Card{} = dst) do
     case Registry.find(src, dst) do
       nil ->

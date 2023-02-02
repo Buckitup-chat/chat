@@ -15,6 +15,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.Memo
   alias Chat.MemoIndex
   alias Chat.Messages
+  alias Chat.RoomInviteIndex
   alias Chat.RoomInvites
   alias Chat.Upload.UploadMetadata
   alias Chat.User
@@ -293,6 +294,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       socket
     else
       socket
+      |> store_room_key_copy(new_room_identitiy)
       |> Page.Login.store_new_room(new_room_identitiy)
       |> Page.Lobby.refresh_room_list()
     end
@@ -317,6 +319,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       socket
     else
       socket
+      |> store_room_key_copy(new_room_identitiy)
       |> Page.Login.store_new_room(new_room_identitiy)
       |> Page.Lobby.refresh_room_list()
     end
@@ -324,6 +327,17 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> Page.Room.init(room_hash)
   rescue
     _ -> socket
+  end
+
+  def store_room_key_copy(%{assigns: %{me: me}} = socket, room_identity) do
+    my_notes = Dialogs.find_or_open(me)
+
+    room_identity
+    |> Messages.RoomInvite.new()
+    |> Dialogs.add_new_message(me, my_notes)
+    |> RoomInviteIndex.add(my_notes, me)
+
+    socket
   end
 
   def toggle_messages_select(%{assigns: %{}} = socket, %{"action" => "on"}) do

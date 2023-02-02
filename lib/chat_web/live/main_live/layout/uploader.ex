@@ -30,11 +30,18 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   attr :uploads, :map, required: true, doc: "uploads metadata"
 
   def mobile_uploader(assigns) do
+    assigns =
+      assign_new(assigns, :active?, fn %{uploads: uploads} ->
+        Enum.any?(uploads, fn {_uuid, %UploadMetadata{} = metadata} ->
+          metadata.status == :active
+        end)
+      end)
+
     ~H"""
     <div
       class="flex flex-col m-2 bg-purple50 rounded-lg fixed bottom-14 w-[96%] h-[280px] overflow-scroll"
       id="mobile-file-uploader"
-      style="display: none;"
+      style={unless(@active?, do: "display: none;")}
     >
       <.file_form config={@config} operating_system={@operating_system} type={@type} />
 

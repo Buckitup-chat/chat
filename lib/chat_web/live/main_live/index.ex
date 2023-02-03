@@ -306,6 +306,12 @@ defmodule ChatWeb.MainLive.Index do
     {:noreply, resume_upload(socket, uuid)}
   end
 
+  def handle_event("put-flash", %{"key" => key, "message" => message}, socket) do
+    socket
+    |> put_flash(key, message)
+    |> noreply()
+  end
+
   @impl true
   def handle_info({:new_user, card}, socket) do
     socket

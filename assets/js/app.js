@@ -61,9 +61,16 @@ Uploaders.UpChunk = (entries, onViewError) => {
     // upload error triggers LiveView error
     upload.on("error", (e) => entry.error(e.detail.message))
 
+    let lastProgressUpdate = 0
+
     // notify progress events to LiveView
     upload.on("progress", (e) => {
-      if (e.detail < 100) { entry.progress(e.detail) }
+      const now = new Date().getTime()
+
+      if (e.detail < 100 && now - lastProgressUpdate > 1000) {
+        entry.progress(e.detail)
+        lastProgressUpdate = now
+      }
     })
 
     // success completes the UploadEntry

@@ -14,6 +14,9 @@ ci-check:
 	mix credo --strict
 	mix deps.unlock --check-unused
 
+ci-test:
+	mix test --max-failures=3 --cover 
+
 test: 
 	rm -rf priv/test_db
 	mkdir -p priv/test_db

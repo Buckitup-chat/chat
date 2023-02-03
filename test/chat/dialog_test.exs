@@ -110,7 +110,7 @@ defmodule Chat.Dialogs.DialogTest do
 
     [bob_version] = Dialogs.read(dialog, bob)
 
-    assert :file = bob_version.type
+    assert :audio = bob_version.type
   end
 
   test "removed by author message should not be present in dialog" do

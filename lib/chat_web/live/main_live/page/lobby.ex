@@ -46,6 +46,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     end)
 
     socket
+    |> Page.Dialog.store_room_key_copy(new_room_identity)
     |> Page.Login.store_new_room(new_room_identity)
     |> assign_room_list()
     |> Page.Room.init({new_room_identity, new_room})
@@ -139,6 +140,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
       Log.got_room_key(me, time, new_room_identity |> Identity.pub_key())
 
       socket
+      |> Page.Dialog.store_room_key_copy(new_room_identity)
       |> Page.Login.store_new_room(new_room_identity)
       |> assign_room_list()
     end

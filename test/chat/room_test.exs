@@ -14,7 +14,7 @@ defmodule Chat.Rooms.RoomTest do
   test "room creation" do
     alice = User.login("Alice")
     room_name = "Alice's room"
-    {room_identity, room} = alice |> Rooms.add(room_name)
+    {_room_identity, room} = alice |> Rooms.add(room_name)
 
     assert %Rooms.Room{} = room
 
@@ -56,7 +56,7 @@ defmodule Chat.Rooms.RoomTest do
     assert [
              %Rooms.PlainMessage{content: ^message, type: :text, author_hash: ^alice_hash},
              %Rooms.PlainMessage{type: :memo},
-             %Rooms.PlainMessage{type: :file},
+             %Rooms.PlainMessage{type: :audio},
              %Rooms.PlainMessage{type: :image}
            ] =
              room

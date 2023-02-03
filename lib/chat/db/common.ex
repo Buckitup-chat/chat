@@ -5,9 +5,12 @@ defmodule Chat.Db.Common do
 
   def names(name),
     do: %{
-      queue: :"#{name}.WriteQueue",
+      queue: :"#{name}.Queue",
       status: :"#{name}.DryStatus",
-      writer: :"#{name}.QueueWriter"
+      decider: :"#{name}.Decider",
+      write_supervisor: :"#{name}.WriteSupervisor",
+      compactor: :"#{name}.Compactor",
+      writer: :"#{name}.Writer"
     }
 
   def db_state(name) do

@@ -98,16 +98,31 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   end
 
   attr :type, :string, required: true, doc: "dialog or room"
+  attr :enabled, :boolean, default: true, doc: "to allow or to restrict upload"
 
   def button(assigns) do
     ~H"""
     <div id="uploader-button">
-      <button class="hidden sm:block relative t-attach-file" phx-click={open_file_upload_dialog()}>
-        <.icon id="attach" class="w-7 h-7 flex fill-white" />
+      <button
+        class="hidden sm:block relative t-attach-file"
+        phx-click={
+          if @enabled, do: open_file_upload_dialog(), else: show_modal("restrict-write-actions")
+        }
+      >
+        <.icon
+          id="attach"
+          class={classes("w-7 h-7 flex", %{"fill-red-500" => !@enabled, "fill-gray-400" => @enabled})}
+        />
       </button>
 
-      <button class="sm:hidden relative t-attach-file" phx-click={toggle_uploader()}>
-        <.icon id="attach" class="w-7 h-7 flex fill-white" />
+      <button
+        class="sm:hidden relative t-attach-file"
+        phx-click={if @enabled, do: toggle_uploader(), else: show_modal("restrict-write-actions")}
+      >
+        <.icon
+          id="attach"
+          class={classes("w-7 h-7 flex", %{"fill-red-500" => !@enabled, "fill-gray-400" => @enabled})}
+        />
       </button>
     </div>
     """

@@ -7,7 +7,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   import Phoenix.Component, only: [assign: 3]
 
   import Phoenix.LiveView,
-    only: [consume_uploaded_entry: 3, push_event: 3, put_flash: 3, send_update: 2]
+    only: [consume_uploaded_entry: 3, push_event: 3, send_update: 2]
 
   require Logger
 
@@ -262,7 +262,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     Rooms.approve_request(room_identity |> Utils.hash(), user_hash, room_identity)
 
     socket
-    |> put_flash(:info, "Request approved!")
+    |> push_event("put-flash", %{key: :info, message: "Request approved!"})
   end
 
   def delete_messages(
@@ -327,7 +327,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> RoomInviteIndex.add(dialog, me)
 
     socket
-    |> put_flash(:info, "Invitation Sent!")
+    |> push_event("put-flash", %{key: :info, message: "Invitation Sent!"})
   rescue
     _ -> socket
   end

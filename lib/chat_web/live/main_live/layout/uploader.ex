@@ -32,7 +32,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   def mobile_uploader(assigns) do
     ~H"""
     <div
-      class="flex flex-col m-2 bg-purple50 rounded-lg fixed bottom-14 w-[96%] h-[280px] overflow-scroll"
+      class="flex flex-col m-2 bg-purple50 rounded-lg h-fit overflow-scroll"
       id="mobile-file-uploader"
       style="display: none;"
     >
@@ -112,7 +112,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
 
   defp entries(%{uploads: uploads} = assigns) when map_size(uploads) > 0 do
     ~H"""
-    <div class="px-2 py-4">
+    <div class="px-2 pb-2 pt-2">
       <%= for %UploadEntry{valid?: true} = entry <- @config.entries do %>
         <.entry entry={entry} metadata={@uploads[entry.uuid]} mobile?={@mobile?} />
       <% end %>
@@ -139,7 +139,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   defp entry(assigns) do
     ~H"""
     <div
-      class="flex mb-5 bg-white border-purple relative w-full z-0"
+      class="flex mb-2 bg-white border-purple relative w-full z-0"
       id={if(@mobile?, do: "mobile-", else: "") <> "upload-#{@entry.uuid}"}
     >
       <div
@@ -208,14 +208,14 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       phx-drop-target={@config.ref}
     >
       <.live_file_input
-        class="file-input block p-2 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"
+        class="file-input block p-1 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"
         upload={@config}
       />
 
       <%= if @operating_system == "Android" do %>
         <input
           accept="audio/*,image/*,video/*"
-          class="block p-2 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"
+          class="block p-1 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"
           data-ref={@config.ref}
           id={"#{@config.ref}-android"}
           phx-hook="AndroidMediaFileInput"

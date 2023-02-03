@@ -2,6 +2,9 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
   @moduledoc "Message input rendering component"
   use ChatWeb, :component
 
+  import ChatWeb.LiveHelpers,
+    only: [show_modal: 1, hide_modal: 1, stringify_commands: 1, icon: 1, classes: 2]
+
   alias ChatWeb.MainLive.Layout
   alias Phoenix.LiveView.JS
 
@@ -9,8 +12,13 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
   attr :input_mode, :atom, doc: "one of [:plain, :edit, :select]"
   attr :edit_content, :string, doc: "text to edit"
   attr :uploads, :map, doc: "map containing LiveView Upload configs"
+  attr :db_status, :map, required: true, doc: "map containing db status info"
 
   def render(%{type: "dialog"} = assigns) do
+    assigns =
+      assigns
+      |> assign_new(:writable, fn %{db_status: %{writable: writable}} -> writable == :yes end)
+
     ~H"""
     <div
       id="dialogInput"
@@ -18,18 +26,14 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
     >
       <%= if @input_mode == :plain do %>
         <Layout.Uploader.push_to_talk config={@uploads.file} disabled={true} type={@type} />
-        <Layout.Uploader.button type={@type} />
+        <Layout.Uploader.button type={@type} enabled={@writable} />
         <.form
           :let={di}
           for={:dialog}
           id="dialog-form"
           class="basis-[99%] flex items-center justify-between"
           phx-change={JS.dispatch("chat:set-input-size", to: "#dialog-input")}
-          phx-submit={
-            JS.push("dialog/text-message")
-            |> JS.dispatch("chat:clear-value", to: "#dialog-input")
-            |> JS.dispatch("chat:set-input-size", to: "#dialog-input")
-          }
+          phx-submit={submit_dialog_text_message(%{writable: @writable})}
           onkeydown="if (!event.shiftKey && !event.ctrlKey && event.key == 'Enter') {
                       document.getElementById('dialog-form-submit-button').click()
                     }"
@@ -37,13 +41,18 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
           <%= textarea(di, :text,
             placeholder: "Enter message",
             class:
-              "w-full h-10 resize-none border-0 overflow-y-auto text-black placeholder-black/50 focus:ring-0 t-chat-input",
+              classes("w-full h-10 resize-none border-0 overflow-y-auto focus:ring-0 t-chat-input", %{
+                "placeholder-red-500 text-red-500" => !@writable
+              }),
             id: "dialog-input",
             spellcheck: "false",
             autocomplete: "off"
           ) %>
           <button id="dialog-form-submit-button" class="t-chat-send-message-btn" type="submit">
-            <.icon id="send" class="w-7 h-7 flex fill-purple" />
+            <.icon
+              id="send"
+              class={classes("w-7 h-7 flex fill-purple", %{"fill-red-500" => !@writable})}
+            />
           </button>
         </.form>
       <% end %>
@@ -132,22 +141,22 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
   end
 
   def render(%{type: "room"} = assigns) do
+    assigns =
+      assigns
+      |> assign_new(:writable, fn %{db_status: %{writable: writable}} -> writable == :yes end)
+
     ~H"""
     <div class="basis-[7%] w-full py-1.5 px-8 border border-white bg-white flex items-center fixed md:sticky bottom-0">
       <%= if @input_mode == :plain do %>
         <Layout.Uploader.push_to_talk config={@uploads.file} disabled={true} type={@type} />
-        <Layout.Uploader.button type={@type} />
+        <Layout.Uploader.button type={@type} enabled={@writable} />
         <.form
           :let={di}
           for={:room}
           id="room-form"
           class="basis-[99%] flex items-center justify-between"
           phx-change={JS.dispatch("chat:set-input-size", to: "#room-input")}
-          phx-submit={
-            JS.push("room/text-message")
-            |> JS.dispatch("chat:clear-value", to: "#room-input")
-            |> JS.dispatch("chat:set-input-size", to: "#room-input")
-          }
+          phx-submit={submit_room_text_message(%{writable: @writable})}
           onkeydown="if (!event.shiftKey && !event.ctrlKey && event.key == 'Enter') {
                       document.getElementById('room-form-submit-button').click()
                     }"
@@ -155,13 +164,18 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
           <%= textarea(di, :text,
             placeholder: "Enter message",
             class:
-              "w-full h-10 resize-none border-0 overflow-y-auto text-black placeholder-black/50 focus:ring-0 t-room-input",
+              classes("w-full h-10 resize-none border-0 overflow-y-auto focus:ring-0 t-room-input", %{
+                "placeholder-red-500 text-red-500" => !@writable
+              }),
             id: "room-input",
             spellcheck: "false",
             autocomplete: "off"
           ) %>
           <button id="room-form-submit-button" class="t-room-send-message-btn" type="submit">
-            <.icon id="send" class="w-7 h-7 flex fill-purple" />
+            <.icon
+              id="send"
+              class={classes("w-7 h-7 flex fill-purple", %{"fill-red-500" => !@writable})}
+            />
           </button>
         </.form>
       <% end %>
@@ -247,5 +261,25 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
       <% end %>
     </div>
     """
+  end
+
+  defp submit_dialog_text_message(%{writable: writable}) do
+    if writable do
+      JS.push("dialog/text-message")
+      |> JS.dispatch("chat:clear-value", to: "#dialog-input")
+      |> JS.dispatch("chat:set-input-size", to: "#dialog-input")
+    else
+      show_modal("restrict-write-actions")
+    end
+  end
+
+  defp submit_room_text_message(%{writable: writable}) do
+    if writable do
+      JS.push("room/text-message")
+      |> JS.dispatch("chat:clear-value", to: "#room-input")
+      |> JS.dispatch("chat:set-input-size", to: "#room-input")
+    else
+      show_modal("restrict-write-actions")
+    end
   end
 end

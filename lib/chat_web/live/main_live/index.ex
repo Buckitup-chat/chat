@@ -28,7 +28,6 @@ defmodule ChatWeb.MainLive.Index do
         %{assigns: %{live_action: action}} = socket
       ) do
     Process.flag(:sensitive, true)
-
     socket = assign(socket, :operating_system, operating_system)
 
     if connected?(socket) do
@@ -397,6 +396,42 @@ defmodule ChatWeb.MainLive.Index do
         </button>
       </div>
     </.modal>
+    """
+  end
+
+  defp room_request_button(assigns) do
+    ~H"""
+    <button
+      class="mr-4 flex items-center"
+      phx-click={
+        cond do
+          @restricted -> show_modal("restrict-write-actions")
+          @requests == [] -> nil
+          true -> show_modal("room-request-list")
+        end
+      }
+    >
+      <.icon id="requestList" class="w-4 h-4 mr-1 z-20 stroke-white fill-white" />
+      <span class="text-base text-white">Requests</span>
+    </button>
+    """
+  end
+
+  defp room_invite_button(assigns) do
+    ~H"""
+    <button
+      class="flex items-center t-invite-btn"
+      phx-click={
+        cond do
+          @restricted -> show_modal("restrict-write-actions")
+          @users |> length == 1 -> nil
+          true -> show_modal("room-invite-list")
+        end
+      }
+    >
+      <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-white" />
+      <span class="text-base text-white"> Invite</span>
+    </button>
     """
   end
 

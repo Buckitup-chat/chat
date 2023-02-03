@@ -516,11 +516,12 @@
                 </div>
               </div>
               <Layout.MessageInput.render
-                type="dialog"
-                input_mode={@input_mode}
-                edit_content={@edit_content}
-                uploads={@uploads}
                 db_status={@db_status}
+                edit_content={@edit_content}
+                input_mode={@input_mode}
+                operating_system={@operating_system}
+                type="dialog"
+                uploads={@uploads}
               />
             <% end %>
           </div>
@@ -858,11 +859,12 @@
                 </div>
               </div>
               <Layout.MessageInput.render
-                type="room"
-                input_mode={@input_mode}
-                edit_content={@edit_content}
-                uploads={@uploads}
                 db_status={@db_status}
+                edit_content={@edit_content}
+                input_mode={@input_mode}
+                operating_system={@operating_system}
+                type="room"
+                uploads={@uploads}
               />
             <% end %>
           </div>

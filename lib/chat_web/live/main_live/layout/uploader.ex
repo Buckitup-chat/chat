@@ -106,33 +106,63 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     """
   end
 
-  attr :type, :string, required: true, doc: "dialog or room"
   attr :enabled, :boolean, default: true, doc: "to allow or to restrict upload"
+  attr :operating_system, :string, doc: "client's operating system"
+  attr :type, :string, required: true, doc: "dialog or room"
 
   def button(assigns) do
     ~H"""
     <div id="uploader-button">
-      <button
-        class="hidden sm:block relative t-attach-file"
-        phx-click={
-          if @enabled, do: open_file_upload_dialog(), else: show_modal("restrict-write-actions")
-        }
-      >
-        <.icon
-          id="attach"
-          class={classes("w-7 h-7 flex", %{"fill-red-500" => !@enabled, "fill-gray-400" => @enabled})}
-        />
-      </button>
-
-      <button
-        class="sm:hidden relative t-attach-file"
-        phx-click={if @enabled, do: toggle_uploader(), else: show_modal("restrict-write-actions")}
-      >
-        <.icon
-          id="attach"
-          class={classes("w-7 h-7 flex", %{"fill-red-500" => !@enabled, "fill-gray-400" => @enabled})}
-        />
-      </button>
+      <%= if @operating_system == "Android" do %>
+        <button
+          class="relative"
+          id="attachFileBtn"
+          phx-click={
+            if @enabled,
+              do: open_file_upload_dialog(@operating_system),
+              else: show_modal("restrict-write-actions")
+          }
+        >
+          <.icon
+            id="attach"
+            class={
+              classes("w-7 h-7 flex", %{"fill-red-500" => !@enabled, "fill-gray-400" => @enabled})
+            }
+          />
+          <.dropdown class="mr-5" id="attachFileDropdown">
+            <a
+              class="dropdownItem"
+              phx-click={JS.dispatch("click", to: "#uploader-file-form .file-input")}
+            >
+              <.icon id="document" class="w-4 h-4 fill-grayscale" />
+              <span>File</span>
+            </a>
+            <a
+              class="dropdownItem"
+              phx-click={JS.dispatch("click", to: "#uploader-file-form .image-input")}
+            >
+              <.icon id="image" class="w-4 h-4 fill-grayscale" />
+              <span>Image</span>
+            </a>
+          </.dropdown>
+        </button>
+      <% else %>
+        <button
+          class="relative t-attach-file"
+          phx-click={
+            if @enabled,
+              do: open_file_upload_dialog(@operating_system),
+              else: show_modal("restrict-write-actions")
+          }
+        >
+          <.icon
+            id="attach"
+            class={
+              classes("w-7 h-7 flex", %{"fill-red-500" => !@enabled, "fill-gray-400" => @enabled})
+            }
+          />
+        </button>
+      <% end %>
     </div>
     """
   end
@@ -241,12 +271,16 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     """
   end
 
-  defp open_file_upload_dialog do
-    JS.dispatch("click", to: "#uploader-file-form .file-input")
+  defp open_file_upload_dialog("Android") do
+    open_dropdown("attachFileDropdown")
+    |> JS.dispatch("chat:set-dropdown-position",
+      to: "#attachFileDropdown",
+      detail: %{relativeElementId: "attachFileBtn"}
+    )
   end
 
-  defp toggle_uploader do
-    JS.toggle(to: "#mobile-file-uploader")
+  defp open_file_upload_dialog(_operating_system) do
+    JS.dispatch("click", to: "#uploader-file-form .file-input")
   end
 
   attr :config, UploadConfig, required: true, doc: "upload config"
@@ -263,14 +297,14 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       phx-drop-target={@config.ref}
     >
       <.live_file_input
-        class="file-input block p-2 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"
+        class="file-input hidden p-2 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"
         upload={@config}
       />
 
       <%= if @operating_system == "Android" do %>
         <input
-          accept="audio/*,image/*,video/*"
-          class="block p-2 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"
+          accept="image/*"
+          class="image-input hidden p-2 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"
           data-ref={@config.ref}
           id={"#{@config.ref}-android"}
           phx-hook="AndroidMediaFileInput"

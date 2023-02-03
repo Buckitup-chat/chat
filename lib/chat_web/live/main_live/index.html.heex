@@ -433,7 +433,12 @@
               </ul>
             </div>
 
-            <Layout.Uploader.uploader config={@uploads.file} uploads={@uploads_metadata} />
+            <Layout.Uploader.uploader
+              config={@uploads.file}
+              pub_key={@peer && @peer.pub_key}
+              type={:dialog}
+              uploads={@uploads_metadata}
+            />
           </div>
           <div
             id="contentContainer"
@@ -504,6 +509,7 @@
                   <Layout.Uploader.mobile_uploader
                     config={@uploads.file}
                     operating_system={@operating_system}
+                    pub_key={@peer.pub_key}
                     type="dialog"
                     uploads={@uploads_metadata}
                   />
@@ -684,7 +690,12 @@
               </div>
             </div>
 
-            <Layout.Uploader.uploader config={@uploads.file} uploads={@uploads_metadata} />
+            <Layout.Uploader.uploader
+              config={@uploads.file}
+              pub_key={@room && @room.pub_key}
+              type={:room}
+              uploads={@uploads_metadata}
+            />
           </div>
           <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
             <%= unless @room do %>
@@ -840,6 +851,7 @@
                   <Layout.Uploader.mobile_uploader
                     config={@uploads.file}
                     operating_system={@operating_system}
+                    pub_key={@room.pub_key}
                     type="room"
                     uploads={@uploads_metadata}
                   />

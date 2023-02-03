@@ -11,6 +11,8 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   alias Phoenix.LiveView.{JS, UploadConfig, UploadEntry, Utils}
 
   attr :config, UploadConfig, required: true, doc: "upload config"
+  attr :pub_key, :string, required: true, doc: "peer or room pub key"
+  attr :type, :atom, required: true, doc: ":dialog or :room"
   attr :uploads, :map, required: true, doc: "uploads metadata"
 
   def uploader(assigns) do
@@ -19,13 +21,14 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       class="flex bottom-[6%] w-full left-30 flex-col fixed h-[27%] md:bottom-[-10px] md:w-[18%] md:h-[50%] overflow-scroll"
       id="file-uploader"
     >
-      <.entries config={@config} uploads={@uploads} />
+      <.entries config={@config} pub_key={@pub_key} type={@type} uploads={@uploads} />
     </div>
     """
   end
 
   attr :config, UploadConfig, required: true, doc: "upload config"
   attr :operating_system, :string, doc: "client's operating system"
+  attr :pub_key, :string, required: true, doc: "peer or room pub key"
   attr :type, :string, required: true, doc: "dialog or room"
   attr :uploads, :map, required: true, doc: "uploads metadata"
 
@@ -45,7 +48,13 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     >
       <.file_form config={@config} operating_system={@operating_system} type={@type} />
 
-      <.entries config={@config} mobile?={true} uploads={@uploads} />
+      <.entries
+        config={@config}
+        mobile?={true}
+        pub_key={@pub_key}
+        type={String.to_existing_atom(@type)}
+        uploads={@uploads}
+      />
     </div>
     """
   end
@@ -130,13 +139,21 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
 
   attr :config, UploadConfig, required: true, doc: "upload config"
   attr :mobile?, :boolean, default: false, doc: "whether it's a mobile file uploader"
+  attr :pub_key, :string, required: true, doc: "peer or room pub key"
+  attr :type, :atom, required: true, doc: ":dialog or :room"
   attr :uploads, :map, required: true, doc: "uploads metadata"
 
   defp entries(%{uploads: uploads} = assigns) when map_size(uploads) > 0 do
     ~H"""
     <div class="px-2 py-4" id={Utils.random_id()} phx-hook="SortableUploadEntries">
       <%= for %UploadEntry{valid?: true} = entry <- @config.entries do %>
-        <.entry entry={entry} metadata={@uploads[entry.uuid]} mobile?={@mobile?} />
+        <.entry
+          entry={entry}
+          metadata={@uploads[entry.uuid]}
+          mobile?={@mobile?}
+          pub_key={@pub_key}
+          type={@type}
+        />
       <% end %>
     </div>
     """
@@ -151,6 +168,8 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   attr :entry, UploadEntry, required: true, doc: "upload entry"
   attr :mobile?, :boolean, required: true
   attr :metadata, UploadMetadata, doc: "upload metadata"
+  attr :pub_key, :string, required: true, doc: "peer or room pub key"
+  attr :type, :atom, required: true, doc: ":dialog or :room"
 
   defp entry(%{metadata: nil} = assigns) do
     ~H"""
@@ -161,7 +180,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   defp entry(assigns) do
     ~H"""
     <div
-      class="flex mb-5 bg-white border-purple relative w-full z-0"
+      class={"flex mb-5 border-purple relative w-full z-0 " <> if(not @mobile? or @metadata.destination.type == @type and @metadata.destination.pub_key == @pub_key, do: "bg-white", else: "bg-pink-100")}
       id={if(@mobile?, do: "mobile-", else: "") <> "upload-#{@entry.uuid}"}
       data-uuid={@entry.uuid}
     >

@@ -98,6 +98,77 @@ defmodule ChatWeb.Helpers.UploaderTest do
     end
   end
 
+  describe "move_upload/2" do
+    setup [:prepare_view, :open_dialog]
+
+    test "when upload doesn't exist it doesn't crash", %{socket: socket} do
+      Uploader.move_upload(socket, %{"index" => 0, "uuid" => UUID.uuid4()})
+    end
+
+    test "when new index is higher than the number of uploads it doesn't crash", %{
+      view: view
+    } do
+      %{entry: %UploadEntry{} = entry_1} = start_upload(%{view: view})
+      %{socket: socket} = start_upload(%{view: view})
+
+      Uploader.move_upload(socket, %{"index" => 10, "uuid" => entry_1.uuid})
+    end
+
+    test "moves upload higher", %{view: view} do
+      %{entry: %UploadEntry{} = entry_1} = start_upload(%{view: view})
+      %{entry: %UploadEntry{} = entry_2} = start_upload(%{view: view})
+      %{entry: %UploadEntry{} = entry_3, socket: socket} = start_upload(%{view: view})
+
+      socket = Uploader.move_upload(socket, %{"index" => 0, "uuid" => entry_2.uuid})
+
+      uuids =
+        socket.assigns.uploads.file.entries
+        |> Enum.map(& &1.uuid)
+
+      assert uuids == [
+               entry_2.uuid,
+               entry_1.uuid,
+               entry_3.uuid
+             ]
+    end
+
+    test "moves upload lower", %{view: view} do
+      %{entry: %UploadEntry{} = entry_1} = start_upload(%{view: view})
+      %{entry: %UploadEntry{} = entry_2} = start_upload(%{view: view})
+      %{entry: %UploadEntry{} = entry_3, socket: socket} = start_upload(%{view: view})
+
+      socket = Uploader.move_upload(socket, %{"index" => 2, "uuid" => entry_2.uuid})
+
+      uuids =
+        socket.assigns.uploads.file.entries
+        |> Enum.map(& &1.uuid)
+
+      assert uuids == [
+               entry_1.uuid,
+               entry_3.uuid,
+               entry_2.uuid
+             ]
+    end
+
+    test "leaves upload in the same place", %{view: view} do
+      %{entry: %UploadEntry{} = entry_1} = start_upload(%{view: view})
+      %{entry: %UploadEntry{} = entry_2} = start_upload(%{view: view})
+      %{entry: %UploadEntry{} = entry_3, socket: socket} = start_upload(%{view: view})
+
+      socket = Uploader.move_upload(socket, %{"index" => 1, "uuid" => entry_2.uuid})
+
+      uuids =
+        socket.assigns.uploads.file.entries
+        |> Enum.map(& &1.uuid)
+
+      assert uuids == [
+               entry_1.uuid,
+               entry_2.uuid,
+               entry_3.uuid
+             ]
+    end
+  end
+
   describe "pause_upload/2" do
     setup [:prepare_view, :open_dialog]
 

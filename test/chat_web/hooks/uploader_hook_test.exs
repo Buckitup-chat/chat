@@ -19,6 +19,7 @@ defmodule ChatWeb.Hooks.UploaderHookTest do
       open_dialog(%{view: view})
       %{entry: %UploadEntry{ref: ref, uuid: uuid}} = start_upload(%{view: view})
 
+      render_hook(view, "upload:move", %{"index" => 0, "uuid" => uuid})
       render_hook(view, "upload:pause", %{"uuid" => uuid})
       render_hook(view, "upload:resume", %{"uuid" => uuid})
       render_hook(view, "upload:cancel", %{"ref" => ref, "uuid" => uuid})

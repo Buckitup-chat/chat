@@ -22,6 +22,9 @@ defmodule ChatWeb.Hooks.UploaderHook do
        "upload:cancel", params, socket ->
          {:halt, Uploader.cancel_upload(socket, params)}
 
+       "upload:move", params, socket ->
+         {:halt, Uploader.move_upload(socket, params)}
+
        "upload:pause", params, socket ->
          {:halt, Uploader.pause_upload(socket, params)}
 

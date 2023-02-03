@@ -60,6 +60,23 @@ defmodule ChatWeb.LiveHelpers.Uploader do
     end
   end
 
+  @spec move_upload(socket(), params()) :: socket()
+  def move_upload(%Socket{} = socket, %{"index" => new_index, "uuid" => uuid}) do
+    uploads = socket.assigns.uploads
+    entries = Map.get(uploads.file, :entries, [])
+
+    case Enum.find_index(entries, &(&1.uuid == uuid)) do
+      nil ->
+        socket
+
+      old_index ->
+        {entry, entries} = List.pop_at(entries, old_index)
+        entries = List.insert_at(entries, new_index, entry)
+        uploads = update_in(uploads.file.entries, fn _old_entries -> entries end)
+        assign(socket, :uploads, uploads)
+    end
+  end
+
   @spec pause_upload(socket(), params()) :: socket()
   def pause_upload(%Socket{} = socket, %{"uuid" => uuid}) do
     uploads = Map.get(socket.assigns, :uploads_metadata, %{})

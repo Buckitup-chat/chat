@@ -8,7 +8,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   use ChatWeb, :component
 
   alias Chat.Upload.UploadMetadata
-  alias Phoenix.LiveView.{JS, UploadConfig, UploadEntry}
+  alias Phoenix.LiveView.{JS, UploadConfig, UploadEntry, Utils}
 
   attr :config, UploadConfig, required: true, doc: "upload config"
   attr :uploads, :map, required: true, doc: "uploads metadata"
@@ -134,7 +134,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
 
   defp entries(%{uploads: uploads} = assigns) when map_size(uploads) > 0 do
     ~H"""
-    <div class="px-2 py-4">
+    <div class="px-2 py-4" id={Utils.random_id()} phx-hook="SortableUploadEntries">
       <%= for %UploadEntry{valid?: true} = entry <- @config.entries do %>
         <.entry entry={entry} metadata={@uploads[entry.uuid]} mobile?={@mobile?} />
       <% end %>
@@ -163,6 +163,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     <div
       class="flex mb-5 bg-white border-purple relative w-full z-0"
       id={if(@mobile?, do: "mobile-", else: "") <> "upload-#{@entry.uuid}"}
+      data-uuid={@entry.uuid}
     >
       <div
         class="absolute top-[-13px] left-0 h-3 bg-gray-500 z-10 transition-all"
@@ -170,6 +171,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       >
       </div>
       <div class="flex flex-row w-full p-2 items-center justify-between z-20 text-black/50">
+        <.sorting_handle />
         <div class="flex text-xs min-w-[20%] max-w-[50%]">
           <span class="truncate"><%= @entry.client_name %></span>
         </div>
@@ -192,6 +194,18 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
           Cancel
         </.upload_control>
       </div>
+    </div>
+    """
+  end
+
+  defp sorting_handle(assigns) do
+    ~H"""
+    <div class="flex justify-center items-center w-4 h-4 cursor-pointer sorting-handle">
+      <svg viewBox="0 0 100 80" width="40" height="40">
+        <rect width="100" height="20" rx="8"></rect>
+        <rect y="30" width="100" height="20" rx="8"></rect>
+        <rect y="60" width="100" height="20" rx="8"></rect>
+      </svg>
     </div>
     """
   end

@@ -26,7 +26,8 @@ import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import AndroidMediaFileInput from "./hooks/android-media-file-input"
 import AudioFile from "./hooks/audio-file"
-import PushToTalk from './hooks/push-to-talk'
+import PushToTalk from "./hooks/push-to-talk"
+import SortableUploadEntries from "./hooks/sortable-upload-entries"
 import UploadInProgress from "./hooks/upload-in-progress"
 import * as UpChunk from "./upchunk"
 import * as LocalStateStore from "./hooks/local-storage"
@@ -82,6 +83,7 @@ let Hooks = {
   AndroidMediaFileInput,
   AudioFile,
   PushToTalk,
+  SortableUploadEntries,
   UploadInProgress
 }
 

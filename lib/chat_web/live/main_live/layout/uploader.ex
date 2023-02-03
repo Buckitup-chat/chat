@@ -31,15 +31,15 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
 
   def mobile_uploader(assigns) do
     assigns =
-      assign_new(assigns, :active?, fn %{uploads: uploads} ->
-        Enum.any?(uploads, fn {_uuid, %UploadMetadata{} = metadata} ->
-          metadata.status == :active
+      assign_new(assigns, :active?, fn %{config: %UploadConfig{} = config} ->
+        Enum.any?(config.entries, fn %UploadEntry{} = entry ->
+          entry.valid? and not (entry.done? or entry.cancelled?)
         end)
       end)
 
     ~H"""
     <div
-      class="flex flex-col m-2 bg-purple50 rounded-lg fixed bottom-14 w-[96%] h-[280px] overflow-scroll"
+      class="flex flex-col m-2 bg-purple50 rounded-lg fixed bottom-14 w-[96%] h-[280px] overflow-scroll sm:hidden"
       id="mobile-file-uploader"
       style={unless(@active?, do: "display: none;")}
     >

@@ -66,6 +66,7 @@
       </div>
     </div>
   <% else %>
+    <Layout.Popup.restrict_write_actions />
     <%= if @mode == :lobby do %>
       <.modal id="logout-backup-popup" hide_event="logout-close" class="">
         <%= if @logout_step == :initial do %>
@@ -513,6 +514,7 @@
                 input_mode={@input_mode}
                 edit_content={@edit_content}
                 uploads={@uploads}
+                db_status={@db_status}
               />
             <% end %>
           </div>
@@ -625,7 +627,11 @@
                 id="room-create-toggle"
                 class="w-5 h-5 border rounded-full flex items-center justify-center t-sidebar-create-room"
                 style="background: linear-gradient(135deg, #611E87 0%, #A75B63 100%);"
-                phx-click={show_modal("create-room-popup")}
+                phx-click={
+                  if @db_status.writable == :yes,
+                    do: show_modal("create-room-popup"),
+                    else: show_modal("restrict-write-actions")
+                }
               >
                 <.icon id="add" class="w-3 h-3 flex fill-white" />
               </button>
@@ -685,7 +691,11 @@
               <div class="my-auto mx-auto flex flex-col items-center justify-center w-80 h-32 border-9 rounded-lg bg-white/20">
                 <span class="my-2 text-sm text-white">Select any Room or create your own</span>
                 <button
-                  phx-click={show_modal("create-room-popup")}
+                  phx-click={
+                    if @db_status.writable == :yes,
+                      do: show_modal("create-room-popup"),
+                      else: show_modal("restrict-write-actions")
+                  }
                   class="my-2 flex flex-row items-center justify-center border rounded-lg border-white w-72 h-11 t-create-room"
                 >
                   <span class="text-sm text-white">Create Room</span>
@@ -736,27 +746,15 @@
                   </div>
                   <div class="flex flex-row justify-between">
                     <%= if @room.type == :request do %>
-                      <button
-                        class="mr-4 flex items-center"
-                        phx-click={
-                          if @room_requests == [], do: nil, else: show_modal("room-request-list")
-                        }
-                      >
-                        <.icon id="requestList" class="w-4 h-4 mr-1 z-20 stroke-white fill-white" />
-                        <span class="text-base text-white">Requests</span>
-                      </button>
+                      <.room_request_button
+                        requests={@room_requests}
+                        restricted={@db_status.writable == :no}
+                      />
                     <% end %>
-                    <button
-                      class="flex items-center t-invite-btn"
-                      phx-click={
-                        if Chat.User.list() |> length == 1,
-                          do: nil,
-                          else: show_modal("room-invite-list")
-                      }
-                    >
-                      <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-white" />
-                      <span class="text-base text-white"> Invite</span>
-                    </button>
+                    <.room_invite_button
+                      users={Chat.User.list()}
+                      restricted={@db_status.writable == :no}
+                    />
                   </div>
                 </div>
 
@@ -852,6 +850,7 @@
                 input_mode={@input_mode}
                 edit_content={@edit_content}
                 uploads={@uploads}
+                db_status={@db_status}
               />
             <% end %>
           </div>

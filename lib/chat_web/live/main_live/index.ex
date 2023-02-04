@@ -28,7 +28,6 @@ defmodule ChatWeb.MainLive.Index do
         %{assigns: %{live_action: action}} = socket
       ) do
     Process.flag(:sensitive, true)
-
     socket = assign(socket, :operating_system, operating_system)
 
     if connected?(socket) do
@@ -306,6 +305,12 @@ defmodule ChatWeb.MainLive.Index do
     {:noreply, resume_upload(socket, uuid)}
   end
 
+  def handle_event("put-flash", %{"key" => key, "message" => message}, socket) do
+    socket
+    |> put_flash(key, message)
+    |> noreply()
+  end
+
   @impl true
   def handle_info({:new_user, card}, socket) do
     socket
@@ -394,6 +399,42 @@ defmodule ChatWeb.MainLive.Index do
     """
   end
 
+  defp room_request_button(assigns) do
+    ~H"""
+    <button
+      class="mr-4 flex items-center"
+      phx-click={
+        cond do
+          @restricted -> show_modal("restrict-write-actions")
+          @requests == [] -> nil
+          true -> show_modal("room-request-list")
+        end
+      }
+    >
+      <.icon id="requestList" class="w-4 h-4 mr-1 z-20 stroke-white fill-white" />
+      <span class="text-base text-white">Requests</span>
+    </button>
+    """
+  end
+
+  defp room_invite_button(assigns) do
+    ~H"""
+    <button
+      class="flex items-center t-invite-btn"
+      phx-click={
+        cond do
+          @restricted -> show_modal("restrict-write-actions")
+          @users |> length == 1 -> nil
+          true -> show_modal("room-invite-list")
+        end
+      }
+    >
+      <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-white" />
+      <span class="text-base text-white"> Invite</span>
+    </button>
+    """
+  end
+
   def message_of(%{author_hash: _}), do: "room"
   def message_of(_), do: "dialog"
 
@@ -425,20 +466,8 @@ defmodule ChatWeb.MainLive.Index do
     upload_key = get_upload_key(entry, socket.assigns)
 
     {uploader_data, socket} =
-      case FileIndex.get(reader_hash(socket.assigns), upload_key) do
-        nil ->
-          {next_chunk, secret} = maybe_resume_existing_upload(upload_key, socket.assigns)
-
-          {socket, uploader_data} =
-            start_chunked_upload(socket, entry, upload_key, secret, next_chunk)
-
-          link = Helpers.upload_chunk_url(ChatWeb.Endpoint, :put, upload_key)
-
-          uploader_data = Map.merge(%{entrypoint: link, uuid: entry.uuid}, uploader_data)
-
-          {uploader_data, socket}
-
-        secret ->
+      cond do
+        secret = FileIndex.get(reader_hash(socket.assigns), upload_key) ->
           entry = Map.put(entry, :done?, true)
 
           metadata =
@@ -452,6 +481,21 @@ defmodule ChatWeb.MainLive.Index do
           end
 
           {%{skip: true}, socket}
+
+        upload_in_progress?(socket.assigns, upload_key) ->
+          {%{skip: true}, socket}
+
+        true ->
+          {next_chunk, secret} = maybe_resume_existing_upload(upload_key, socket.assigns)
+
+          {socket, uploader_data} =
+            start_chunked_upload(socket, entry, upload_key, secret, next_chunk)
+
+          link = Helpers.upload_chunk_url(ChatWeb.Endpoint, :put, upload_key)
+
+          uploader_data = Map.merge(%{entrypoint: link, uuid: entry.uuid}, uploader_data)
+
+          {uploader_data, socket}
       end
 
     uploader_data = Map.merge(%{uploader: "UpChunk"}, uploader_data)
@@ -508,6 +552,15 @@ defmodule ChatWeb.MainLive.Index do
     timestamp = Chat.Time.monotonic_to_unix(assigns.monotonic_offset)
     upload = %Upload{secret: secret, timestamp: timestamp}
     UploadIndex.add(key, upload)
+  end
+
+  defp upload_in_progress?(%{uploads_metadata: uploads} = _assigns, upload_key) do
+    Enum.any?(uploads, fn {_uuid,
+                           %UploadMetadata{
+                             credentials: {key, _secret}
+                           }} ->
+      key == upload_key
+    end)
   end
 
   def handle_chunked_progress(

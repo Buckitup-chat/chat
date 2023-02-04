@@ -92,6 +92,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
           room={@room}
           timezone={@timezone}
           room_keys={@room_keys}
+          receiver={@peer}
         />
       </div>
 
@@ -135,6 +136,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   attr :author, Card, required: true, doc: "message author card"
+  attr :receiver, Card, doc: "peer in dialog"
   attr :chat_type, :atom, required: true, doc: ":dialog or :room"
   attr :color, :string, required: true, doc: "color class - either bg-purple50 or bg-white"
   attr :export?, :boolean, required: true, doc: "hide options and set path for exported file"
@@ -262,47 +264,52 @@ defmodule ChatWeb.MainLive.Layout.Message do
       class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}
     >
       <div class="py-1 px-2">
-        <Layout.Card.hashed_name card={@author} style_spec={:room_invite} />
-        <p class="inline-flex">
-          <%= if @is_mine? do %>
-            is invited by you into
+        <%= if @is_mine? do %>
+          <%= if @receiver == @author do %>
+            <p class="inline-flex">You got the key copy of the room</p>
           <% else %>
-            wants you to join the room
+            <Layout.Card.hashed_name card={@receiver} style_spec={:room_invite} />
+            <p class="inline-flex">is invited by you into</p>
           <% end %>
-        </p>
+        <% else %>
+          <Layout.Card.hashed_name card={@author} style_spec={:room_invite} />
+          <p class="inline-flex">wants you to join the room</p>
+        <% end %>
         <Layout.Card.hashed_name room={@room_card} style_spec={:room_invite} />
       </div>
 
-      <%= unless @export? or @is_mine? do %>
-        <div class="px-2 my-1 flex items-center justify-between">
-          <%= if @room_card.hash in @room_keys do %>
-            <button
-              class="w-full h-12 border-0 rounded-lg bg-grayscale text-white"
-              phx-click="dialog/message/accept-room-invite-and-open-room"
-              phx-value-id={@msg.id}
-              phx-value-index={@msg.index}
-            >
-              Go to Room
-            </button>
-          <% else %>
-            <button
-              class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
-              phx-click="dialog/message/accept-room-invite"
-              phx-value-id={@msg.id}
-              phx-value-index={@msg.index}
-            >
-              Accept
-            </button>
-            <button
-              class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
-              phx-click="dialog/message/accept-room-invite-and-open-room"
-              phx-value-id={@msg.id}
-              phx-value-index={@msg.index}
-            >
-              Accept and Open
-            </button>
-          <% end %>
-        </div>
+      <%= unless @export? do %>
+        <%= if (@is_mine? and @author == @receiver) or not @is_mine? do %>
+          <div class="px-2 my-1 flex items-center justify-between">
+            <%= if @room_card.hash in @room_keys do %>
+              <button
+                class="w-full h-12 border-0 rounded-lg bg-grayscale text-white"
+                phx-click="dialog/message/accept-room-invite-and-open-room"
+                phx-value-id={@msg.id}
+                phx-value-index={@msg.index}
+              >
+                Go to Room
+              </button>
+            <% else %>
+              <button
+                class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
+                phx-click="dialog/message/accept-room-invite"
+                phx-value-id={@msg.id}
+                phx-value-index={@msg.index}
+              >
+                Accept
+              </button>
+              <button
+                class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
+                phx-click="dialog/message/accept-room-invite-and-open-room"
+                phx-value-id={@msg.id}
+                phx-value-index={@msg.index}
+              >
+                Accept and Open
+              </button>
+            <% end %>
+          </div>
+        <% end %>
       <% end %>
 
       <.timestamp msg={@msg} timezone={@timezone} />

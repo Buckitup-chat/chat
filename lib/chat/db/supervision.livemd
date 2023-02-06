@@ -2,13 +2,13 @@
 
 ## DB Supervisor
 
-DB Supervisior wraps every DB in Queue, Writer, Dry Status Relay, Decider and Compactor.
+DB Supervisor wraps every DB in Queue, Writer, Dry Status Relay, Decider and Compactor.
 
-Queue and Writer described in [DB Prioritization](./prioritization.livemd).
+Queue and Writer are described in [DB Prioritization](./prioritization.livemd).
 
-Dry Status Realy is Agent that holds read only state of DB. It is updated by Decider. And read by UI to show red indication.
+Dry Status Relay is Agent that holds read-only state of DB. It is updated by Decider. And read by UI to show red indication.
 
-Decider checks space left on device and starts writing or read only configuration under WriteSupervisor. For write it starts Writer and Compactor. For read only - DryWriter, which does no writes in DB or filesystem.
+Decider checks space left on device and starts writing or read-only configuration under WriteSupervisor. For write it starts Writer and Compactor. For read-only - DryWriter, which does no writes in DB or filesystem.
 
 Compactor awaits for period of inactivity (7 minutes) and starts DB compaction. When Writer has something to write, it lets Compactor know, so compaction will get canceled if unfinished.
 
@@ -117,11 +117,11 @@ graph LR;
 
 `UsbWatcher` subscribes to system events to detect USB devices plug/unplug.
 
-We need Dynamic Supervisors to start or shutdown supervision subtrees, since devices are not allways present.
+We need Dynamic Supervisors to start or shutdown supervision subtrees, since devices are not always present.
 
 `Platform MainDbSupervisor` and `Platform BackupDbSupervisor` do `rest for one` strategy that will restart all later started peers in case of failing.
 
-All the processes marked as mounter traps its exit. I.e. handle its termination. Combining this with `rest_for_one` srtategy of supervisor makes it `Plug` like behaviour in supervisor.
+All the processes marked as mounter traps its exit. I.e. handle its termination. Combining this with `rest_for_one` strategy of supervisor makes it `Plug`-like behaviour in supervisor.
 
 `Mounter` mounts device into folder specified. And unmounts when terminated.
 
@@ -129,7 +129,7 @@ All the processes marked as mounter traps its exit. I.e. handle its termination.
 
 `Chat MainDbSupervisor` and `Chat BackupDbSupervisor` are DB Supervisors from `Chat` application described above.
 
-`Starter` changes global DB status (in application config). And revers it back when terminated.
+`Starter` changes global DB status (in application config). And reverts it back when terminated.
 
 `Copier` starts blinking leds and copies data. And finishing blinking when terminated.
 
@@ -137,7 +137,7 @@ All the processes marked as mounter traps its exit. I.e. handle its termination.
 
 `Switcher` switches Current DB to main. And reverts Current DB back to internal when terminated.
 
-`Stoper` starts extra leb blinking and makes `Platform BackupDbSupervision` to stop. On termination stops led blinking.
+`Stoper` starts extra LED blinking and makes `Platform BackupDbSupervision` to stop. On termination stops LED blinking.
 
 ## Media drive supervision (proposal)
 

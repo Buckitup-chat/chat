@@ -115,13 +115,8 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     <div id="uploader-button">
       <%= if @operating_system == "Android" do %>
         <button
-          class="relative"
-          id="attachFileBtn"
-          phx-click={
-            if @enabled,
-              do: open_file_upload_dialog(@operating_system),
-              else: show_modal("restrict-write-actions")
-          }
+          class="relative t-attach-file"
+          phx-click={if @enabled, do: toggle_uploader(), else: show_modal("restrict-write-actions")}
         >
           <.icon
             id="attach"
@@ -129,29 +124,13 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
               classes("w-7 h-7 flex", %{"fill-red-500" => !@enabled, "fill-gray-400" => @enabled})
             }
           />
-          <.dropdown class="mr-5" id="attachFileDropdown">
-            <a
-              class="dropdownItem"
-              phx-click={JS.dispatch("click", to: "#uploader-file-form .file-input")}
-            >
-              <.icon id="document" class="w-4 h-4 fill-grayscale" />
-              <span>File</span>
-            </a>
-            <a
-              class="dropdownItem"
-              phx-click={JS.dispatch("click", to: "#uploader-file-form .image-input")}
-            >
-              <.icon id="image" class="w-4 h-4 fill-grayscale" />
-              <span>Image</span>
-            </a>
-          </.dropdown>
         </button>
       <% else %>
         <button
           class="relative t-attach-file"
           phx-click={
             if @enabled,
-              do: open_file_upload_dialog(@operating_system),
+              do: open_file_upload_dialog(),
               else: show_modal("restrict-write-actions")
           }
         >
@@ -271,16 +250,12 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     """
   end
 
-  defp open_file_upload_dialog("Android") do
-    open_dropdown("attachFileDropdown")
-    |> JS.dispatch("chat:set-dropdown-position",
-      to: "#attachFileDropdown",
-      detail: %{relativeElementId: "attachFileBtn"}
-    )
+  defp open_file_upload_dialog do
+    JS.dispatch("click", to: "#uploader-file-form .file-input")
   end
 
-  defp open_file_upload_dialog(_operating_system) do
-    JS.dispatch("click", to: "#uploader-file-form .file-input")
+  defp toggle_uploader do
+    JS.toggle(to: "#mobile-file-uploader")
   end
 
   attr :config, UploadConfig, required: true, doc: "upload config"
@@ -302,6 +277,23 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       />
 
       <%= if @operating_system == "Android" do %>
+        <div class="flex flex-row justify-around">
+          <a
+            class="flex justify-center items-center h-11 px-10 cursor-pointer rounded-md bg-white hover:bg-white/50"
+            phx-click={JS.dispatch("click", to: "#uploader-file-form .file-input")}
+          >
+            <.icon id="document" class="w-4 h-4 fill-grayscale" />
+            <span class="ml-2">File</span>
+          </a>
+          <a
+            class="flex justify-center items-center h-11 px-10 cursor-pointer rounded-md bg-white hover:bg-white/50"
+            phx-click={JS.dispatch("click", to: "#uploader-file-form .image-input")}
+          >
+            <.icon id="image" class="w-4 h-4 fill-grayscale" />
+            <span class="ml-2">Image</span>
+          </a>
+        </div>
+
         <input
           accept="image/*"
           class="image-input hidden p-2 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"

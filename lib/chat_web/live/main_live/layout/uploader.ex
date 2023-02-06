@@ -32,18 +32,18 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   def mobile_uploader(assigns) do
     ~H"""
     <div class="max-h-[280px] bottom-16 fixed w-full overflow-y-scroll flex flex-col-reverse">
-        <div class="h-full">
-          <div
-            class="flex flex-col m-2 bg-purple50 rounded-lg h-fit overflow-scroll"
-            id="mobile-file-uploader"
-            style="display: none;"
-          >
-            <.file_form config={@config} operating_system={@operating_system} type={@type} />
+      <div class="h-full">
+        <div
+          class="flex flex-col m-2 bg-purple50 rounded-lg h-fit overflow-scroll"
+          id="mobile-file-uploader"
+          style="display: none;"
+        >
+          <.file_form config={@config} operating_system={@operating_system} type={@type} />
 
-            <.entries config={@config} mobile?={true} uploads={@uploads} />
-          </div>
+          <.entries config={@config} mobile?={true} uploads={@uploads} />
         </div>
       </div>
+    </div>
     """
   end
 

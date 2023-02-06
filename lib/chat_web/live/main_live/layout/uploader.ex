@@ -229,7 +229,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
 
       <%= if @operating_system == "Android" do %>
         <input
-          accept="audio/*,image/*,video/*"
+          accept=".jpg,.jpeg,.png,.mp4"
           class="block p-2 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"
           data-ref={@config.ref}
           id={"#{@config.ref}-android"}

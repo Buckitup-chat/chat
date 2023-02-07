@@ -64,7 +64,29 @@ defmodule Chat.Db.Scope.KeyScope do
   end
 
   defp add_content(acc_set, snap, {_, hashes}) do
+    IO.inspect(hashes, label: :hashes)
+
+    files =
+      snap
+      |> db_keys_stream({:file, 0}, {:"file\0", 0})
+      |> Stream.filter(fn {:file, key} ->
+        IO.inspect(key, label: :file_check)
+        MapSet.member?(hashes, key)
+      end)
+      |> MapSet.new()
+
+    memo =
+      snap
+      |> db_keys_stream({:memo, 0}, {:"memo\0", 0})
+      |> Stream.filter(fn {:memo, key} ->
+        IO.inspect(key, label: :memo_check)
+        MapSet.member?(hashes, key)
+      end)
+      |> MapSet.new()
+
     acc_set
+    |> union_set(files)
+    |> union_set(memo)
   end
 
   defp db_keys_stream(snap, min, max) do

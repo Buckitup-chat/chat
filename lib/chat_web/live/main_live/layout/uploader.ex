@@ -8,9 +8,11 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   use ChatWeb, :component
 
   alias Chat.Upload.UploadMetadata
-  alias Phoenix.LiveView.{JS, UploadConfig, UploadEntry}
+  alias Phoenix.LiveView.{JS, UploadConfig, UploadEntry, Utils}
 
   attr :config, UploadConfig, required: true, doc: "upload config"
+  attr :pub_key, :string, required: true, doc: "peer or room pub key"
+  attr :type, :atom, required: true, doc: ":dialog or :room"
   attr :uploads, :map, required: true, doc: "uploads metadata"
 
   def uploader(assigns) do
@@ -19,28 +21,42 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       class="flex bottom-[6%] w-full left-30 flex-col fixed h-[27%] md:bottom-[-10px] md:w-[18%] md:h-[50%] overflow-scroll"
       id="file-uploader"
     >
-      <.entries config={@config} uploads={@uploads} />
+      <.entries config={@config} pub_key={@pub_key} type={@type} uploads={@uploads} />
     </div>
     """
   end
 
   attr :config, UploadConfig, required: true, doc: "upload config"
   attr :operating_system, :string, doc: "client's operating system"
+  attr :pub_key, :string, required: true, doc: "peer or room pub key"
   attr :type, :string, required: true, doc: "dialog or room"
   attr :uploads, :map, required: true, doc: "uploads metadata"
 
   def mobile_uploader(assigns) do
+    assigns =
+      assign_new(assigns, :active?, fn %{config: %UploadConfig{} = config} ->
+        Enum.any?(config.entries, fn %UploadEntry{} = entry ->
+          entry.valid? and not (entry.done? or entry.cancelled?)
+        end)
+      end)
+
     ~H"""
     <div class="max-h-[280px] bottom-16 fixed w-full overflow-y-scroll flex flex-col-reverse">
       <div class="h-full">
         <div
-          class="flex flex-col m-2 bg-purple50 rounded-lg h-fit overflow-scroll"
+          class="flex flex-col m-2 bg-purple50 rounded-lg h-fit overflow-scroll sm:hidden"
           id="mobile-file-uploader"
-          style="display: none;"
+          style={unless(@active?, do: "display: none;")}
         >
           <.file_form config={@config} operating_system={@operating_system} type={@type} />
 
-          <.entries config={@config} mobile?={true} uploads={@uploads} />
+          <.entries
+            config={@config}
+            mobile?={true}
+            pub_key={@pub_key}
+            type={String.to_existing_atom(@type)}
+            uploads={@uploads}
+          />
         </div>
       </div>
     </div>
@@ -94,46 +110,63 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     """
   end
 
-  attr :type, :string, required: true, doc: "dialog or room"
   attr :enabled, :boolean, default: true, doc: "to allow or to restrict upload"
+  attr :operating_system, :string, doc: "client's operating system"
+  attr :type, :string, required: true, doc: "dialog or room"
 
   def button(assigns) do
     ~H"""
     <div id="uploader-button">
-      <button
-        class="hidden sm:block relative t-attach-file"
-        phx-click={
-          if @enabled, do: open_file_upload_dialog(), else: show_modal("restrict-write-actions")
-        }
-      >
-        <.icon
-          id="attach"
-          class={classes("w-7 h-7 flex", %{"fill-red-500" => !@enabled, "fill-gray-400" => @enabled})}
-        />
-      </button>
-
-      <button
-        class="sm:hidden relative t-attach-file"
-        phx-click={if @enabled, do: toggle_uploader(), else: show_modal("restrict-write-actions")}
-      >
-        <.icon
-          id="attach"
-          class={classes("w-7 h-7 flex", %{"fill-red-500" => !@enabled, "fill-gray-400" => @enabled})}
-        />
-      </button>
+      <%= if @operating_system == "Android" do %>
+        <button
+          class="relative t-attach-file"
+          phx-click={if @enabled, do: toggle_uploader(), else: show_modal("restrict-write-actions")}
+        >
+          <.icon
+            id="attach"
+            class={
+              classes("w-7 h-7 flex", %{"fill-red-500" => !@enabled, "fill-gray-400" => @enabled})
+            }
+          />
+        </button>
+      <% else %>
+        <button
+          class="relative t-attach-file"
+          phx-click={
+            if @enabled,
+              do: open_file_upload_dialog(),
+              else: show_modal("restrict-write-actions")
+          }
+        >
+          <.icon
+            id="attach"
+            class={
+              classes("w-7 h-7 flex", %{"fill-red-500" => !@enabled, "fill-gray-400" => @enabled})
+            }
+          />
+        </button>
+      <% end %>
     </div>
     """
   end
 
   attr :config, UploadConfig, required: true, doc: "upload config"
   attr :mobile?, :boolean, default: false, doc: "whether it's a mobile file uploader"
+  attr :pub_key, :string, required: true, doc: "peer or room pub key"
+  attr :type, :atom, required: true, doc: ":dialog or :room"
   attr :uploads, :map, required: true, doc: "uploads metadata"
 
   defp entries(%{uploads: uploads} = assigns) when map_size(uploads) > 0 do
     ~H"""
-    <div class="px-2 pb-2 pt-2">
+    <div class="p-2" id={Utils.random_id()} phx-hook="SortableUploadEntries">
       <%= for %UploadEntry{valid?: true} = entry <- @config.entries do %>
-        <.entry entry={entry} metadata={@uploads[entry.uuid]} mobile?={@mobile?} />
+        <.entry
+          entry={entry}
+          metadata={@uploads[entry.uuid]}
+          mobile?={@mobile?}
+          pub_key={@pub_key}
+          type={@type}
+        />
       <% end %>
     </div>
     """
@@ -148,6 +181,8 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   attr :entry, UploadEntry, required: true, doc: "upload entry"
   attr :mobile?, :boolean, required: true
   attr :metadata, UploadMetadata, doc: "upload metadata"
+  attr :pub_key, :string, required: true, doc: "peer or room pub key"
+  attr :type, :atom, required: true, doc: ":dialog or :room"
 
   defp entry(%{metadata: nil} = assigns) do
     ~H"""
@@ -158,8 +193,9 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   defp entry(assigns) do
     ~H"""
     <div
-      class="flex mb-2 bg-white border-purple relative w-full z-0"
+      class={"flex mb-2 border-purple relative w-full z-0 " <> if(@metadata.destination.type == @type and @metadata.destination.pub_key == @pub_key, do: "bg-white", else: "bg-pink-100")}
       id={if(@mobile?, do: "mobile-", else: "") <> "upload-#{@entry.uuid}"}
+      data-uuid={@entry.uuid}
     >
       <div
         class="absolute top-[-13px] left-0 h-3 bg-gray-500 z-10 transition-all"
@@ -167,6 +203,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       >
       </div>
       <div class="flex flex-row w-full p-2 items-center justify-between z-20 text-black/50">
+        <.sorting_handle />
         <div class="flex text-xs min-w-[20%] max-w-[50%]">
           <span class="truncate"><%= @entry.client_name %></span>
         </div>
@@ -189,6 +226,18 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
           Cancel
         </.upload_control>
       </div>
+    </div>
+    """
+  end
+
+  defp sorting_handle(assigns) do
+    ~H"""
+    <div class="flex justify-center items-center w-4 h-4 cursor-pointer sorting-handle">
+      <svg viewBox="0 0 100 80" width="40" height="40">
+        <rect width="100" height="20" rx="8"></rect>
+        <rect y="30" width="100" height="20" rx="8"></rect>
+        <rect y="60" width="100" height="20" rx="8"></rect>
+      </svg>
     </div>
     """
   end
@@ -227,14 +276,31 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       phx-drop-target={@config.ref}
     >
       <.live_file_input
-        class="file-input block p-1 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"
+        class="file-input hidden p-1 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"
         upload={@config}
       />
 
       <%= if @operating_system == "Android" do %>
+        <div class="flex flex-row justify-around">
+          <a
+            class="flex justify-center items-center h-11 px-10 cursor-pointer rounded-md bg-white hover:bg-white/50"
+            phx-click={JS.dispatch("click", to: "#uploader-file-form .file-input")}
+          >
+            <.icon id="document" class="w-4 h-4 fill-grayscale" />
+            <span class="ml-2">File</span>
+          </a>
+          <a
+            class="flex justify-center items-center h-11 px-10 cursor-pointer rounded-md bg-white hover:bg-white/50"
+            phx-click={JS.dispatch("click", to: "#uploader-file-form .image-input")}
+          >
+            <.icon id="image" class="w-4 h-4 fill-grayscale" />
+            <span class="ml-2">Image</span>
+          </a>
+        </div>
+
         <input
-          accept="audio/*,image/*,video/*"
-          class="block p-1 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"
+          accept="image/*"
+          class="image-input hidden p-1 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"
           data-ref={@config.ref}
           id={"#{@config.ref}-android"}
           phx-hook="AndroidMediaFileInput"

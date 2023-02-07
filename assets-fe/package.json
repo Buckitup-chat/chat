@@ -1,0 +1,17 @@
+{
+  "name": "assets-fe",
+  "version": "1.0.0",
+  "description": "FE bundle for chat",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "browserify enigma.js -o index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "blowfish-js": "^1.0.0",
+    "buffer": "^6.0.3",
+    "jssha": "^3.3.0"
+  }
+}

@@ -5,6 +5,13 @@ defmodule Chat.Rooms.Room do
   alias Chat.Utils
 
   @type room_type() :: :public | :request | :private
+  @type t() :: %__MODULE__{
+          admin_hash: String.t(),
+          name: String.t(),
+          pub_key: String.t(),
+          requests: list(),
+          type: room_type()
+        }
 
   @derive {Inspect, only: [:name, :type]}
   defstruct [:admin_hash, :name, :pub_key, :requests, type: :public]
@@ -30,6 +37,10 @@ defmodule Chat.Rooms.Room do
     %{room | requests: [{hash, key, :pending} | requests]}
   end
 
+  def get_request(%__MODULE__{requests: requests}, user_hash) do
+    Enum.find(requests, fn {hash, _, _} -> hash == user_hash end)
+  end
+
   def is_requested_by?(%__MODULE__{requests: requests}, user_hash) do
     requests
     |> Enum.any?(fn {hash, _, _} -> hash == user_hash end)
@@ -37,7 +48,8 @@ defmodule Chat.Rooms.Room do
 
   def is_requested_by?(_, _), do: false
 
-  def list_pending_requests(%__MODULE__{requests: requests, type: :request}) do
+  def list_pending_requests(%__MODULE__{requests: requests, type: type})
+      when type in [:public, :request] do
     requests
     |> Enum.map(fn
       {hash, key, :pending} -> {hash, key}
@@ -46,66 +58,56 @@ defmodule Chat.Rooms.Room do
     |> Enum.reject(&(&1 == nil))
   end
 
+  def list_pending_requests(_), do: []
+
+  def list_approved_requests_for(%__MODULE__{requests: requests}, user_hash) do
+    requests
+    |> Enum.filter(&match?({^user_hash, _, {_, _}}, &1))
+  end
+
   def approve_request(
-        %__MODULE__{requests: requests, type: :request} = room,
+        %__MODULE__{requests: requests, type: type} = room,
         user_hash,
-        %Identity{} = room_identity
-      ) do
+        %Identity{} = room_identity,
+        opts
+      )
+      when type in [:public, :request] do
+    public_only? = Keyword.get(opts, :public_only, false)
+
+    if public_only? and type != :public do
+      room
+    else
+      new_requests =
+        requests
+        |> Enum.map(fn
+          {^user_hash, key, :pending} -> {user_hash, key, room_identity |> encrypt_identity(key)}
+          {_, _, _} = x -> x
+        end)
+
+      %{room | requests: new_requests}
+    end
+  end
+
+  def approve_request(room, _, _, _), do: room
+
+  def join_approved_request(%__MODULE__{type: :private} = room, _), do: room
+
+  def join_approved_request(%__MODULE__{requests: requests} = room, %Identity{} = me) do
+    user_hash = me |> Identity.pub_key() |> Utils.hash()
+
     new_requests =
       requests
-      |> Enum.map(fn
-        {^user_hash, key, :pending} -> {user_hash, key, room_identity |> encrypt_identity(key)}
-        {_, _, _} = x -> x
-      end)
+      |> Enum.filter(fn {hash, _, _} -> hash !== user_hash end)
 
     %{room | requests: new_requests}
   end
 
-  def approve_requests(
-        %__MODULE__{requests: requests, type: :public} = room,
-        %Identity{} = room_identity
-      ) do
-    new_requests =
-      requests
-      |> Enum.map(fn
-        {hash, key, :pending} -> {hash, key, room_identity |> encrypt_identity(key)}
-        {_, _, _} = x -> x
-      end)
+  def decrypt_identity({encrypted_secret, blob}, %Identity{priv_key: key}) do
+    secret = encrypted_secret |> Utils.decrypt(key)
 
-    %{room | requests: new_requests}
-  end
-
-  def approve_requests(room, _), do: room
-
-  def join_approved_requests(%__MODULE__{type: :private} = room, _), do: {room, []}
-
-  def join_approved_requests(%__MODULE__{requests: requests} = room, %Identity{} = me) do
-    pub_key = me |> Identity.pub_key()
-    hash = pub_key |> Utils.hash()
-
-    {new_requests, rooms} =
-      requests
-      |> Enum.reduce({[], []}, fn
-        {^hash, ^pub_key, {enc_secret, blob}}, {reqs, rooms} ->
-          secret =
-            enc_secret
-            |> Utils.decrypt(me)
-
-          decrypted =
-            blob
-            |> Utils.decrypt_blob(secret)
-            |> Identity.from_strings()
-
-          {reqs, [decrypted | rooms]}
-
-        x, {reqs, rooms} ->
-          {[x | reqs], rooms}
-      end)
-
-    {
-      %{room | requests: new_requests},
-      rooms
-    }
+    blob
+    |> Utils.decrypt_blob(secret)
+    |> Identity.from_strings()
   end
 
   defp encrypt_identity(room_identity, key) do

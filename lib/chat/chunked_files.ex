@@ -3,11 +3,28 @@ defmodule Chat.ChunkedFiles do
 
   alias Chat.ChunkedFilesBroker
   alias Chat.Db
+  alias Chat.FileFs
+  alias Chat.Identity
   alias Chat.Utils
 
-  @spec new_upload() :: {key :: String.t(), secret :: String.t()}
-  def new_upload do
-    ChunkedFilesBroker.generate()
+  @type key :: String.t()
+  @type secret :: String.t()
+
+  @spec new_upload(key()) :: secret()
+  def new_upload(key) do
+    ChunkedFilesBroker.generate(key)
+  end
+
+  def get_file(key) do
+    ChunkedFilesBroker.get(key)
+  end
+
+  def next_chunk(key) do
+    Db.list({
+      {:chunk_key, {:file_chunk, key, 0, 0}},
+      {:chunk_key, {:file_chunk, key, nil, nil}}
+    })
+    |> Enum.count()
   end
 
   def save_upload_chunk(key, {chunk_start, chunk_end}, chunk) do
@@ -23,12 +40,8 @@ defmodule Chat.ChunkedFiles do
   end
 
   def complete_upload?(key, filesize) do
-    Db.list({
-      {:file_chunk, key, 0, 0},
-      {:file_chunk, key, nil, nil}
-    })
-    |> Stream.map(fn {_, data} -> byte_size(data) end)
-    |> Enum.sum()
+    key
+    |> FileFs.count_size_stored()
     |> then(&(&1 == filesize))
     |> tap(fn
       true -> ChunkedFilesBroker.forget(key)
@@ -41,10 +54,7 @@ defmodule Chat.ChunkedFiles do
   end
 
   def delete(key) do
-    Db.bulk_delete({
-      {:file_chunk, key, 0, 0},
-      {:file_chunk, key, nil, nil}
-    })
+    FileFs.delete_file(key)
 
     Db.bulk_delete({
       {:chunk_key, {:file_chunk, key, 0, 0}},
@@ -61,23 +71,14 @@ defmodule Chat.ChunkedFiles do
   end
 
   def stream_chunks(key, secret) do
-    Db.list({
-      {:file_chunk, key, 0, 0},
-      {:file_chunk, key, nil, nil}
-    })
-    |> Stream.map(fn {_, data} -> Utils.decrypt_blob(data, secret) end)
+    FileFs.stream_file_chunks(key)
+    |> Stream.map(fn data ->
+      Utils.decrypt_blob(data, secret)
+    end)
   end
 
   def size(key) do
-    Db.get_max_one(
-      {:chunk_key, {:file_chunk, key, 0, 0}},
-      {:chunk_key, {:file_chunk, key, nil, nil}}
-    )
-    |> Enum.at(0)
-    |> elem(0)
-    |> elem(1)
-    |> elem(3)
-    |> Kernel.+(1)
+    FileFs.file_size(key)
   rescue
     _ -> 0
   end
@@ -95,11 +96,7 @@ defmodule Chat.ChunkedFiles do
     chunk_start = chunk_n * @chunk_size
     start_bypass = first - chunk_start
 
-    [{{_, _, _, chunk_end}, encrypt_blob}] =
-      Db.get_max_one(
-        {:file_chunk, key, chunk_start, 0},
-        {:file_chunk, key, chunk_start, nil}
-      )
+    {encrypt_blob, chunk_end} = FileFs.read_file_chunk(chunk_start, key)
 
     range_length = min(last, chunk_end) - first + 1
 
@@ -109,6 +106,18 @@ defmodule Chat.ChunkedFiles do
       |> :binary.part(start_bypass, range_length)
 
     {{first, first + range_length - 1}, data}
+  end
+
+  def encrypt_secret(secret, %Identity{} = me) do
+    secret
+    |> Base.encode64()
+    |> Utils.encrypt(me)
+  end
+
+  def decrypt_secret(encrypted_secret, %Identity{} = me) do
+    encrypted_secret
+    |> Utils.decrypt(me)
+    |> Base.decode64!()
   end
 
   def file_chunk_ranges(size) do

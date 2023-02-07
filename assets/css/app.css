@@ -2,6 +2,8 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
+@import '/fonts/Inter/inter.css';
+
 /* This file is for your main application CSS */
 
 html {
@@ -602,6 +604,10 @@ html {
 }
 .fade-out {
   animation: 0.2s ease-out 0s normal forwards 1 fade-out-keys;
+}
+
+.fade-out-flash {
+  animation: 2.0s ease-out 0s normal forwards 1 fade-out-keys;
 }
 
 @keyframes fade-in-scale-keys{

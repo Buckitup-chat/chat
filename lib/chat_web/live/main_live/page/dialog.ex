@@ -1,12 +1,16 @@
 defmodule ChatWeb.MainLive.Page.Dialog do
   @moduledoc "Dialog page"
+
+  require Logger
+
   import ChatWeb.MainLive.Page.Shared
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [consume_uploaded_entry: 3, push_event: 3]
+  import Phoenix.LiveView, only: [consume_uploaded_entry: 3, push_event: 3, send_update: 2]
 
   use ChatWeb, :component
 
   alias Chat.Broker
+  alias Chat.ChunkedFiles
   alias Chat.Dialogs
   alias Chat.FileIndex
   alias Chat.Identity
@@ -14,13 +18,15 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.Memo
   alias Chat.MemoIndex
   alias Chat.Messages
+  alias Chat.RoomInviteIndex
   alias Chat.RoomInvites
+  alias Chat.Upload.UploadMetadata
   alias Chat.User
   alias Chat.Utils
   alias Chat.Utils.StorageId
 
+  alias ChatWeb.MainLive.Layout
   alias ChatWeb.MainLive.Page
-  alias ChatWeb.Router.Helpers, as: Routes
 
   alias Phoenix.PubSub
 
@@ -33,18 +39,23 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def init(%{assigns: %{me: me, monotonic_offset: time_offset}} = socket, user_id) do
+    ["[dialog] ", "init"] |> Logger.debug()
+
     time = Chat.Time.monotonic_to_unix(time_offset)
     peer = User.by_id(user_id)
     dialog = Dialogs.find_or_open(me, peer)
 
+    ["[dialog] ", "before subscribe"] |> Logger.debug()
     PubSub.subscribe(Chat.PubSub, dialog |> dialog_topic())
     Log.open_direct(me, time, peer)
+    ["[dialog] ", "before assigns"] |> Logger.debug()
 
     socket
     |> assign(:page, 0)
     |> assign(:peer, peer)
     |> assign(:dialog, dialog)
-    |> assign(:dialog_mode, :plain)
+    |> assign(:input_mode, :plain)
+    |> assign(:edit_content, nil)
     |> assign(:has_more_messages, true)
     |> assign(:last_load_timestamp, nil)
     |> assign(:message_update_mode, :replace)
@@ -57,7 +68,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:message_update_mode, :prepend)
     |> assign_messages()
     |> case do
-      %{assigns: %{dialog_mode: :select}} = socket ->
+      %{assigns: %{input_mode: :select}} = socket ->
         socket
         |> push_event("chat:toggle", %{to: "#chat-messages", class: "selectMode"})
 
@@ -89,9 +100,10 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def send_file(
-        %{assigns: %{dialog: dialog, me: me, monotonic_offset: time_offset}} = socket,
+        %{assigns: %{me: me, monotonic_offset: time_offset}} = socket,
         entry,
-        {chunk_key, chunk_secret}
+        %UploadMetadata{credentials: {chunk_key, chunk_secret}, destination: %{dialog: dialog}} =
+          _metadata
       ) do
     time = Chat.Time.monotonic_to_unix(time_offset)
 
@@ -103,7 +115,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
           Messages.File.new(
             entry,
             chunk_key,
-            chunk_secret,
+            ChunkedFiles.decrypt_secret(chunk_secret, me),
             time
           )
           |> Dialogs.add_new_message(me, dialog)
@@ -111,7 +123,10 @@ defmodule ChatWeb.MainLive.Page.Dialog do
         end
       )
 
-    FileIndex.add_file(chunk_key, dialog)
+    {_index, msg} = message
+
+    FileIndex.save(chunk_key, dialog.a_key |> Utils.hash(), msg.id, chunk_secret)
+    FileIndex.save(chunk_key, dialog.b_key |> Utils.hash(), msg.id, chunk_secret)
 
     message
     |> Dialogs.on_saved(dialog, fn ->
@@ -141,7 +156,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       end)
 
     socket
-    |> assign(:dialog_mode, :edit)
+    |> assign(:input_mode, :edit)
     |> assign(:edit_content, content)
     |> assign(:edit_message_id, msg_id)
     |> forget_current_messages()
@@ -189,7 +204,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
   def cancel_edit(socket) do
     socket
-    |> assign(:dialog_mode, :plain)
+    |> assign(:input_mode, :plain)
     |> assign(:edit_content, nil)
     |> assign(:edit_message_id, nil)
   end
@@ -221,7 +236,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     end)
 
     socket
-    |> assign(:dialog_mode, :plain)
+    |> assign(:input_mode, :plain)
   end
 
   def hide_deleted_message(socket, id) do
@@ -236,36 +251,28 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       ) do
     dialog
     |> Dialogs.read_message(msg_id, me)
-    |> case do
-      %{type: :file, content: json} ->
-        {file_id, secret} = json |> StorageId.from_json()
-
-        socket
-        |> push_event("chat:redirect", %{
-          url: Routes.file_url(socket, :file, file_id, a: secret |> Base.url_encode64())
-        })
-
-      %{type: :image, content: json} ->
-        {id, secret} = json |> StorageId.from_json()
-
-        socket
-        |> push_event("chat:redirect", %{
-          url:
-            Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64(), download: true)
-        })
-
-      %{type: :video, content: json} ->
-        {id, secret} = json |> StorageId.from_json()
-
-        socket
-        |> push_event("chat:redirect", %{
-          url: Routes.file_url(socket, :file, id, a: secret |> Base.url_encode64())
-        })
-
-      _ ->
-        socket
-    end
+    |> maybe_redirect_to_file(socket)
   end
+
+  defp maybe_redirect_to_file(%{type: type, content: json}, socket)
+       when type in [:audio, :file, :image, :video] do
+    {file_id, secret} = StorageId.from_json(json)
+    params = %{a: Base.url_encode64(secret)}
+
+    url =
+      case type do
+        :image ->
+          params = Map.put(params, :download, true)
+          ~p"/get/image/#{file_id}?#{params}"
+
+        _ ->
+          ~p"/get/file/#{file_id}?#{params}"
+      end
+
+    push_event(socket, "chat:redirect", %{url: url})
+  end
+
+  defp maybe_redirect_to_file(_message, socket), do: socket
 
   def download_messages(
         %{assigns: %{dialog: dialog, me: me, peer: peer, timezone: timezone}} = socket,
@@ -295,6 +302,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       socket
     else
       socket
+      |> store_room_key_copy(new_room_identitiy)
       |> Page.Login.store_new_room(new_room_identitiy)
       |> Page.Lobby.refresh_room_list()
     end
@@ -319,6 +327,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       socket
     else
       socket
+      |> store_room_key_copy(new_room_identitiy)
       |> Page.Login.store_new_room(new_room_identitiy)
       |> Page.Lobby.refresh_room_list()
     end
@@ -328,140 +337,45 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     _ -> socket
   end
 
+  def store_room_key_copy(%{assigns: %{me: me}} = socket, room_identity) do
+    my_notes = Dialogs.find_or_open(me)
+
+    room_identity
+    |> Messages.RoomInvite.new()
+    |> Dialogs.add_new_message(me, my_notes)
+    |> RoomInviteIndex.add(my_notes, me)
+
+    socket
+  end
+
   def toggle_messages_select(%{assigns: %{}} = socket, %{"action" => "on"}) do
     socket
     |> forget_current_messages()
-    |> assign(:dialog_mode, :select)
+    |> assign(:input_mode, :select)
     |> push_event("chat:toggle", %{to: "#chat-messages", class: "selectMode"})
   end
 
-  def toggle_messages_select(%{assigns: %{dialog_mode: :select}} = socket, %{"action" => "off"}) do
+  def toggle_messages_select(%{assigns: %{input_mode: :select}} = socket, %{"action" => "off"}) do
     socket
     |> forget_current_messages()
-    |> assign(:dialog_mode, :plain)
+    |> assign(:input_mode, :plain)
   end
 
-  def open_image_gallery(
-        %{assigns: %{me: me, dialog: dialog}} = socket,
-        {m_index, m_id} = msg_id
-      ) do
-    send(self(), {:dialog, {:preload_image_gallery, :next}})
-    send(self(), {:dialog, {:preload_image_gallery, :prev}})
-
-    dialog
-    |> Dialogs.read_message(msg_id, me)
-    |> case do
-      %{type: :image, content: json} ->
-        {id, secret} = json |> StorageId.from_json()
-
-        socket
-        |> assign(:image_gallery, %{
-          mode: "dialog",
-          current: %{
-            url: Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64()),
-            id: m_id,
-            index: m_index
-          },
-          next: %{url: nil, id: nil, index: nil},
-          prev: %{url: nil, id: nil, index: nil}
-        })
-
-      _ ->
-        socket
-    end
+  def open_image_gallery(socket, msg_id) do
+    send_update(Layout.ImageGallery, id: "imageGallery", action: :open, incoming_msg_id: msg_id)
+    socket
   end
 
-  def image_gallery_preload_next(
-        %{assigns: %{dialog: dialog, me: me, image_gallery: gallery}} = socket
-      ) do
-    msg_id = {gallery.current.index, gallery.current.id}
-
-    dialog
-    |> Dialogs.read_next_message(msg_id, me, fn
-      {_, %{type: :image}} -> true
-      _ -> false
-    end)
-    |> case do
-      %{content: json, id: id, index: index} ->
-        {file_id, secret} = json |> StorageId.from_json()
-
-        socket
-        |> assign(
-          :image_gallery,
-          gallery
-          |> put_in([:next], %{
-            url: Routes.file_url(socket, :image, file_id, a: secret |> Base.url_encode64()),
-            id: id,
-            index: index
-          })
-        )
-
-      _ ->
-        socket
-    end
-  end
-
-  def image_gallery_preload_prev(
-        %{assigns: %{dialog: dialog, me: me, image_gallery: gallery}} = socket
-      ) do
-    msg_id = {gallery.current.index, gallery.current.id}
-
-    dialog
-    |> Dialogs.read_prev_message(msg_id, me, fn
-      {_, %{type: :image}} -> true
-      _ -> false
-    end)
-    |> case do
-      %{content: json, id: id, index: index} ->
-        {file_id, secret} = json |> StorageId.from_json()
-
-        socket
-        |> assign(
-          :image_gallery,
-          gallery
-          |> put_in([:prev], %{
-            url: Routes.file_url(socket, :image, file_id, a: secret |> Base.url_encode64()),
-            id: id,
-            index: index
-          })
-        )
-
-      _ ->
-        socket
-    end
-  end
-
-  def image_gallery_next(
-        %{assigns: %{image_gallery: %{mode: mode, current: current, next: next}}} = socket
-      ) do
-    send(self(), {:dialog, {:preload_image_gallery, :next}})
+  def image_gallery_preload_next(socket) do
+    send_update(Layout.ImageGallery, id: "imageGallery", action: :preload_next)
 
     socket
-    |> assign(:image_gallery, %{
-      mode: mode,
-      current: next,
-      prev: current,
-      next: %{url: nil, id: nil, index: nil}
-    })
   end
 
-  def image_gallery_prev(
-        %{assigns: %{image_gallery: %{mode: mode, current: current, prev: prev}}} = socket
-      ) do
-    send(self(), {:dialog, {:preload_image_gallery, :prev}})
+  def image_gallery_preload_prev(socket) do
+    send_update(Layout.ImageGallery, id: "imageGallery", action: :preload_prev)
 
     socket
-    |> assign(:image_gallery, %{
-      mode: mode,
-      current: prev,
-      next: current,
-      prev: %{url: nil, id: nil, index: nil}
-    })
-  end
-
-  def close_image_gallery(socket) do
-    socket
-    |> assign(:image_gallery, nil)
   end
 
   def close(%{assigns: %{dialog: nil}} = socket), do: socket
@@ -490,8 +404,10 @@ defmodule ChatWeb.MainLive.Page.Dialog do
          %{assigns: %{dialog: dialog, me: me, last_load_timestamp: timestamp}} = socket,
          per_page
        ) do
+    ["[dialog] ", "before msg read"] |> Logger.debug()
     messages = Dialogs.read(dialog, me, {timestamp, 0}, per_page + 1)
     page_messages = Enum.take(messages, -per_page)
+    ["[dialog] ", "after msg read"] |> Logger.debug()
 
     socket
     |> assign(:messages, page_messages)

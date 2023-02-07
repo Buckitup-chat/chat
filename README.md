@@ -18,4 +18,6 @@
 
   * [DB structure](./lib/chat/db_structures.livemd)
   * [Room approval flow](./lib/chat/rooms/approve_flow.livemd)
+  * [DB Prioritization](./lib/chat/db/prioritization.livemd)
+  * [DB and Device Supervision](./lib/chat/db/supervision.livemd)
 

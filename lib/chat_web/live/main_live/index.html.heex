@@ -66,6 +66,7 @@
       </div>
     </div>
   <% else %>
+    <Layout.Popup.restrict_write_actions />
     <%= if @mode == :lobby do %>
       <.modal id="logout-backup-popup" hide_event="logout-close" class="">
         <%= if @logout_step == :initial do %>
@@ -271,7 +272,7 @@
             <span class="text-xs">Log out & Back Up</span>
           </button>
         </div>
-        <div id="navbarBottom" class="navbarBottom px-20">
+        <div id="navbarBottom" class="navbarBottom px-20 z-20">
           <button phx-click="switch-lobby-mode" phx-value-lobby-mode="rooms" class="sidebarIcon">
             <.icon
               id="sidebarRooms"
@@ -431,6 +432,8 @@
                 <% end %>
               </ul>
             </div>
+
+            <Layout.Uploader.uploader config={@uploads.file} uploads={@uploads_metadata} />
           </div>
           <div
             id="contentContainer"
@@ -438,7 +441,13 @@
           >
             <%= unless @dialog do %>
             <% else %>
-              <Layout.ImageGallery.render mode="dialog" gallery={@image_gallery} />
+              <.live_component
+                module={Layout.ImageGallery}
+                id="imageGallery"
+                type="dialog"
+                dialog={@dialog}
+                me={@me}
+              />
               <div
                 id="chatContent"
                 phx-hook="Chat"
@@ -472,6 +481,7 @@
                   <% end %>
                 </div>
                 <div>
+                  <Layout.Chat.loader />
                   <div id="chat-messages" phx-update={@message_update_mode}>
                     <%= for msg <- @messages do %>
                       <Layout.Message.message_block
@@ -484,178 +494,28 @@
                       />
                     <% end %>
                   </div>
-                  <div class="px-2 sm:px-8" phx-update="replace" id="dialog-uploads">
-                    <%= for %{valid?: true} = entry <- @uploads.image.entries do %>
-                      <div id={"upload#{entry.uuid}"} class="m-1 flex justify-end">
-                        <div class="flex-col max-w-xxs sm:max-w-md min-w-[180px]">
-                          <%= live_img_preview(entry, class: "blur-sm animate-pulse") %>
 
-                          <div class="w-full bg-gray-200 h-2 dark:bg-gray-700">
-                            <div
-                              class="bg-gray-600 h-2 dark:bg-gray-300"
-                              style={"width: #{entry.progress}%"}
-                            >
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    <% end %>
-                    <%= for %{valid?: true} = entry <- @uploads.dialog_file.entries do %>
-                      <div id={"upload#{entry.uuid}"} class="m-1 flex justify-end">
-                        <div class="bg-purple50 max-w-xxs sm:max-w-md min-w-[180px] rounded-lg flex items-center justify-between">
-                          <.icon id="document" class="w-14 h-14 flex fill-black/50 animate-pulse" />
-                          <div class="w-36 flex flex-col pr-3">
-                            <span class="truncate text-xs"><%= entry.client_name %></span>
-                            <div class="text-xs text-black/50">
-                              <%= entry.progress %>% uploaded
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    <% end %>
-                  </div>
+                  <Layout.Uploader.in_progress?
+                    pub_key={@peer.pub_key}
+                    type={:dialog}
+                    uploads={@uploads_metadata}
+                  />
+
+                  <Layout.Uploader.mobile_uploader
+                    config={@uploads.file}
+                    operating_system={@operating_system}
+                    type="dialog"
+                    uploads={@uploads_metadata}
+                  />
                 </div>
               </div>
-              <div
-                id="dialogInput"
-                class="basis-[7%] w-full py-1.5 px-8 border border-white bg-white flex items-center fixed md:sticky bottom-0"
-              >
-                <%= if @dialog_mode == :plain do %>
-                  <.form
-                    for={:dialog_file}
-                    id="dialog-file-form"
-                    class="column column-50 column-offset-50"
-                    phx-change="dialog/import-files"
-                    phx-drop-target={@uploads.dialog_file.ref}
-                  >
-                    <%= live_file_input(@uploads.dialog_file, style: "display: none") %>
-                  </.form>
-                  <button
-                    id="attachFileBtn"
-                    class="relative"
-                    phx-click={JS.dispatch("click", to: "#dialog-file-form input[type=file]")}
-                  >
-                    <.icon id="attach" class="w-7 h-7 flex fill-white" />
-                  </button>
-                  <.form
-                    :let={di}
-                    for={:dialog}
-                    id="dialog-form"
-                    class="basis-[99%] flex items-center justify-between"
-                    phx-change={JS.dispatch("chat:set-input-size", to: "#dialog-input")}
-                    phx-submit={
-                      JS.push("dialog/text-message")
-                      |> JS.dispatch("chat:clear-value", to: "#dialog-input")
-                      |> JS.dispatch("chat:set-input-size", to: "#dialog-input")
-                    }
-                    onkeydown="
-                      if (event.key == 'Enter' && event.shiftKey) {
-                        document.getElementById('dialog-form-submit-button').click()
-                      }
-                    "
-                  >
-                    <%= textarea(di, :text,
-                      placeholder: "Enter message",
-                      class:
-                        "w-full h-10 resize-none border-0 overflow-y-auto text-black placeholder-black/50 focus:ring-0 t-chat-input",
-                      id: "dialog-input",
-                      spellcheck: "false",
-                      autocomplete: "off"
-                    ) %>
-                    <button
-                      id="dialog-form-submit-button"
-                      class="t-chat-send-message-btn"
-                      type="submit"
-                    >
-                      <.icon id="send" class="w-7 h-7 flex fill-purple" />
-                    </button>
-                  </.form>
-                <% end %>
-                <%= if @dialog_mode == :edit do %>
-                  <div class="w-full flex flex-col ">
-                    <div class="flex items-center justify-between pb-2 mt-2">
-                      <div class="w-[70vw]">
-                        <h1 class="text-purple t-edit">Editing</h1>
-                        <span class="truncate block text-xs text-black/50">
-                          <%= @edit_content %>
-                        </span>
-                      </div>
-                      <button type="button" class="t-cancel-edit" phx-click="dialog/cancel-edit">
-                        <.icon id="close" class="w-7 h-7 flex fill-black/50" />
-                      </button>
-                    </div>
-                    <.form
-                      :let={dei}
-                      for={:dialog_edit}
-                      id="dialog-edit-form"
-                      class="flex items-center justify-start "
-                      phx-change={JS.dispatch("chat:set-input-size", to: "#dialog-edit-input")}
-                      phx-submit={
-                        JS.push("dialog/edited-message")
-                        |> JS.dispatch("chat:clear-value", to: "#dialog-edit-input")
-                        |> JS.dispatch("chat:set-input-size", to: "#dialog-edit-input")
-                      }
-                      onkeydown="
-                      if (event.key == 'Enter' && event.shiftKey) {
-                        document.getElementById('dialog-edit-form-submit-button').click()
-                      }
-                      "
-                    >
-                      <%= textarea(dei, :text,
-                        class:
-                          "w-full px-0 resize-none outline-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0 t-chat-edit-input",
-                        id: "dialog-edit-input",
-                        spellcheck: "false",
-                        autocomplete: "off",
-                        value: @edit_content
-                      ) %>
-                      <button
-                        id="dialog-edit-form-submit-button"
-                        class="t-chat-edit-send-btn"
-                        type="submit"
-                      >
-                        <.icon id="send" class="w-7 h-7 flex fill-purple" />
-                      </button>
-                    </.form>
-                  </div>
-                <% end %>
-                <%= if @dialog_mode == :select do %>
-                  <div class="w-full h-11 bg-white flex justify-between items-center">
-                    <button
-                      id="delete-btn"
-                      class="cursor-pointer inline-flex items-center disabled:pointer-events-none t-delete-chat-msg-btn"
-                      phx-click={
-                        show_modal("delete-messages-popup")
-                        |> JS.set_attribute(
-                          {"phx-click",
-                           hide_modal("delete-messages-popup")
-                           |> JS.push("dialog/delete-messages")
-                           |> stringify_commands()},
-                          to: "#delete-messages-popup .deleteMessageButton"
-                        )
-                        |> JS.dispatch("chat:messages-to-delete", to: "#delete-messages-popup")
-                      }
-                    >
-                      <.icon id="delete" class="w-4 h-4 flex fill-black x-icon" />
-                      <span id="delete-span">Delete</span>
-                    </button>
-
-                    <button
-                      id="download-btn"
-                      class="cursor-pointer inline-flex items-center t-download-chat-msg-btn"
-                      phx-click={
-                        JS.dispatch("chat:download-messages",
-                          to: "#chatContent",
-                          detail: %{chatType: "dialog"}
-                        )
-                      }
-                    >
-                      <span class="text-purple">Download</span>
-                      <.icon id="download" class="ml-1 w-4 h-4 flex  stroke-purple " />
-                    </button>
-                  </div>
-                <% end %>
-              </div>
+              <Layout.MessageInput.render
+                type="dialog"
+                input_mode={@input_mode}
+                edit_content={@edit_content}
+                uploads={@uploads}
+                db_status={@db_status}
+              />
             <% end %>
           </div>
         <% end %>
@@ -767,7 +627,11 @@
                 id="room-create-toggle"
                 class="w-5 h-5 border rounded-full flex items-center justify-center t-sidebar-create-room"
                 style="background: linear-gradient(135deg, #611E87 0%, #A75B63 100%);"
-                phx-click={show_modal("create-room-popup")}
+                phx-click={
+                  if @db_status.writable == :yes,
+                    do: show_modal("create-room-popup"),
+                    else: show_modal("restrict-write-actions")
+                }
               >
                 <.icon id="add" class="w-3 h-3 flex fill-white" />
               </button>
@@ -788,60 +652,12 @@
                     <p class="text-base text-grayscale600 px-7">You have no rooms</p>
                   <% else %>
                     <%= for room <- @joined_rooms do %>
-                      <li
-                        phx-click="room/switch"
-                        phx-value-room={room.hash}
-                        class={
-                          classes(
-                            "hidden sm:flex w-full h-9 flex items-center cursor-pointer hover:bg-stone250",
-                            %{"bg-stone250" => @room && room.pub_key == @room.pub_key}
-                          )
-                        }
-                      >
-                        <a>
-                          <div class="flex flex-row px-2">
-                            <Layout.Card.hashed_name
-                              room={room}
-                              style_spec={:room_selection}
-                              selected_room={@room}
-                            />
-                          </div>
-                        </a>
-                        <%= if room.type == :request do %>
-                          <.icon id="private" class="w-5 h-5 stroke-black" />
-                        <% end %>
-                        <%= if room.type == :private do %>
-                          <.icon id="secret" class="w-4 h-4" />
-                        <% end %>
-                        <%= if room.type == :public do %>
-                          <.icon id="open" class="w-4 h-4" />
-                        <% end %>
-                      </li>
-                      <li
-                        phx-click={JS.push("room/switch") |> open_content()}
-                        phx-value-room={room.hash}
-                        class={
-                          classes(
-                            "sm:hidden w-full h-9 flex items-center cursor-pointer hover:bg-stone250",
-                            %{"bg-stone250" => room == @room}
-                          )
-                        }
-                      >
-                        <a>
-                          <div class="flex flex-row pl-7">
-                            <Layout.Card.hashed_name room={room} />
-                          </div>
-                        </a>
-                        <%= if room.type == :request do %>
-                          <.icon id="private" class="w-5 h-5 stroke-black" />
-                        <% end %>
-                        <%= if room.type == :private do %>
-                          <.icon id="secret" class="w-4 h-4" />
-                        <% end %>
-                        <%= if room.type == :public do %>
-                          <.icon id="open" class="w-4 h-4" />
-                        <% end %>
-                      </li>
+                      <Layout.RoomItem.render
+                        room={room}
+                        confirmed?={true}
+                        selected_room={@room}
+                        click_event="room/switch"
+                      />
                     <% end %>
                   <% end %>
                 </ul>
@@ -861,38 +677,25 @@
                     <p class="text-base text-grayscale600 px-7">You have no rooms</p>
                   <% else %>
                     <%= for room <- @new_rooms do %>
-                      <%= if room |> Rooms.is_requested_by?(@my_id) do %>
-                        <li class="w-full h-9 cursor-pointer flex items-center hover:bg-stone250">
-                          <div class="flex flex-row justify-between px-7 w-full">
-                            <div class="flex flex-row">
-                              <Layout.Card.hashed_name room={room} />
-                            </div>
-                            <.icon id="time" class="w-4 h-4 flex fill-black/50" />
-                          </div>
-                        </li>
-                      <% else %>
-                        <li
-                          class="w-full h-9 cursor-pointer flex items-center hover:bg-stone250"
-                          phx-click="room/send-request"
-                          phx-value-room={room.hash}
-                        >
-                          <div class="flex flex-row px-7 w-full">
-                            <Layout.Card.hashed_name room={room} />
-                          </div>
-                        </li>
-                      <% end %>
+                      <Layout.RoomItem.render room={room} click_event="room/send-request" />
                     <% end %>
                   <% end %>
                 </ul>
               </div>
             </div>
+
+            <Layout.Uploader.uploader config={@uploads.file} uploads={@uploads_metadata} />
           </div>
           <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
             <%= unless @room do %>
               <div class="my-auto mx-auto flex flex-col items-center justify-center w-80 h-32 border-9 rounded-lg bg-white/20">
                 <span class="my-2 text-sm text-white">Select any Room or create your own</span>
                 <button
-                  phx-click={show_modal("create-room-popup")}
+                  phx-click={
+                    if @db_status.writable == :yes,
+                      do: show_modal("create-room-popup"),
+                      else: show_modal("restrict-write-actions")
+                  }
                   class="my-2 flex flex-row items-center justify-center border rounded-lg border-white w-72 h-11 t-create-room"
                 >
                   <span class="text-sm text-white">Create Room</span>
@@ -900,7 +703,12 @@
                 </button>
               </div>
             <% else %>
-              <Layout.ImageGallery.render mode="room" gallery={@image_gallery} />
+              <.live_component
+                module={Layout.ImageGallery}
+                id="imageGallery"
+                type="room"
+                room_identity={@room_identity}
+              />
               <div
                 id="chatContent"
                 class="basis-[93%] pb-1 md:pb-0 overflow-y-scroll flex flex-col justify-between relative a-content-block t-chat-content"
@@ -938,27 +746,15 @@
                   </div>
                   <div class="flex flex-row justify-between">
                     <%= if @room.type == :request do %>
-                      <button
-                        class="mr-4 flex items-center"
-                        phx-click={
-                          if @room_requests == [], do: nil, else: show_modal("room-request-list")
-                        }
-                      >
-                        <.icon id="requestList" class="w-4 h-4 mr-1 z-20 stroke-white fill-white" />
-                        <span class="text-base text-white">Requests</span>
-                      </button>
+                      <.room_request_button
+                        requests={@room_requests}
+                        restricted={@db_status.writable == :no}
+                      />
                     <% end %>
-                    <button
-                      class="flex items-center t-invite-btn"
-                      phx-click={
-                        if Chat.User.list() |> length == 1,
-                          do: nil,
-                          else: show_modal("room-invite-list")
-                      }
-                    >
-                      <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-white" />
-                      <span class="text-base text-white"> Invite</span>
-                    </button>
+                    <.room_invite_button
+                      users={Chat.User.list()}
+                      restricted={@db_status.writable == :no}
+                    />
                   </div>
                 </div>
 
@@ -1022,6 +818,7 @@
                   </div>
                 </.modal>
                 <div>
+                  <Layout.Chat.loader />
                   <div id="chat-messages" phx-update={@message_update_mode}>
                     <%= for msg <- @messages do %>
                       <Layout.Message.message_block
@@ -1033,171 +830,28 @@
                       />
                     <% end %>
                   </div>
-                  <div class="px-2 sm:px-8" phx-update="replace" id="ddd">
-                    <%= for %{valid?: true} = entry <- @uploads.room_image.entries do %>
-                      <div id={"upload#{entry.uuid}"} class="m-1 flex justify-end">
-                        <div class="flex-col max-w-xxs sm:max-w-md min-w-[180px]">
-                          <%= live_img_preview(entry, class: "blur-sm animate-pulse") %>
 
-                          <div class="w-full bg-gray-200 h-2 dark:bg-gray-700">
-                            <div
-                              class="bg-gray-600 h-2 dark:bg-gray-300"
-                              style={"width: #{entry.progress}%"}
-                            >
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    <% end %>
-                    <%= for %{valid?: true} = entry <- @uploads.room_file.entries do %>
-                      <div id={"upload#{entry.uuid}"} class="m-1 flex justify-end">
-                        <div class="bg-purple50 max-w-xxs sm:max-w-md min-w-[180px] rounded-lg flex items-center justify-between">
-                          <.icon id="document" class="w-14 h-14 flex fill-black/50 animate-pulse" />
-                          <div class="w-36 flex flex-col pr-3">
-                            <span class="truncate text-xs"><%= entry.client_name %></span>
-                            <div class="text-xs text-black/50">
-                              <%= entry.progress %>% uploaded
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    <% end %>
-                  </div>
+                  <Layout.Uploader.in_progress?
+                    pub_key={@room.pub_key}
+                    type={:room}
+                    uploads={@uploads_metadata}
+                  />
+
+                  <Layout.Uploader.mobile_uploader
+                    config={@uploads.file}
+                    operating_system={@operating_system}
+                    type="room"
+                    uploads={@uploads_metadata}
+                  />
                 </div>
               </div>
-              <div class="basis-[7%] w-full py-1.5 px-8 border border-white bg-white flex items-center fixed md:sticky bottom-0">
-                <%= if @room_mode == :plain do %>
-                  <.form
-                    for={:room_file}
-                    id="room-file-form"
-                    class="column column-50 column-offset-50"
-                    phx-change="room/import-files"
-                    phx-drop-target={@uploads.room_file.ref}
-                  >
-                    <%= live_file_input(@uploads.room_file, style: "display: none") %>
-                  </.form>
-                  <button
-                    class="relative t-attach-file"
-                    id="attachFileBtn"
-                    phx-click={JS.dispatch("click", to: "#room-file-form input[type=file]")}
-                  >
-                    <.icon id="attach" class="w-7 h-7 flex fill-white" />
-                  </button>
-                  <.form
-                    :let={di}
-                    for={:room}
-                    id="room-form"
-                    class="basis-[99%] flex items-center justify-between"
-                    phx-change={JS.dispatch("chat:set-input-size", to: "#room-input")}
-                    phx-submit={
-                      JS.push("room/text-message")
-                      |> JS.dispatch("chat:clear-value", to: "#room-input")
-                      |> JS.dispatch("chat:set-input-size", to: "#room-input")
-                    }
-                    onkeydown="
-                      if (event.key == 'Enter' && event.shiftKey) {
-                        document.getElementById('room-form-submit-button').click()
-                      }
-                    "
-                  >
-                    <%= textarea(di, :text,
-                      placeholder: "Enter message",
-                      class:
-                        "w-full h-10 resize-none border-0 overflow-y-auto text-black placeholder-black/50 focus:ring-0 t-room-input",
-                      id: "room-input",
-                      spellcheck: "false",
-                      autocomplete: "off"
-                    ) %>
-                    <button
-                      id="room-form-submit-button"
-                      class="t-room-send-message-btn"
-                      type="submit"
-                    >
-                      <.icon id="send" class="w-7 h-7 flex fill-purple" />
-                    </button>
-                  </.form>
-                <% end %>
-                <%= if @room_mode == :edit do %>
-                  <div class="w-full flex flex-col ">
-                    <div class="flex items-center justify-between pb-2 mt-2">
-                      <div class="w-[95%]">
-                        <h1 class="text-purple t-edit">Editing</h1>
-                        <span class="truncate block text-xs text-black/50">
-                          <%= @edit_content %>
-                        </span>
-                      </div>
-                      <button type="button" class="t-cancel-edit" phx-click="room/cancel-edit">
-                        <.icon id="close" class="w-7 h-7 flex fill-black/50" />
-                      </button>
-                    </div>
-                    <.form
-                      :let={dei}
-                      for={:room_edit}
-                      id="rooom-edit-form"
-                      class="flex items-center justify-start "
-                      phx-change={JS.dispatch("chat:set-input-size", to: "#room-input")}
-                      phx-submit={
-                        JS.push("room/edited-message")
-                        |> JS.dispatch("chat:clear-value", to: "#room-input")
-                        |> JS.dispatch("chat:set-input-size", to: "#room-input")
-                      }
-                      onkeydown="
-                      if (event.key == 'Enter' && event.shiftKey) {
-                        document.getElementById('room-edit-form-submit-button').click()
-                      }
-                      "
-                    >
-                      <%= textarea(dei, :text,
-                        class:
-                          "w-full px-0 resize-none outline-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0 t-room-edit-input",
-                        id: "room-edit-input",
-                        spellcheck: "false",
-                        autocomplete: "off",
-                        value: @edit_content
-                      ) %>
-                      <button id="room-edit-form-submit-button" type="submit">
-                        <.icon id="send" class="w-7 h-7 flex fill-purple t-room-edit-send-btn" />
-                      </button>
-                    </.form>
-                  </div>
-                <% end %>
-                <%= if @room_mode == :select do %>
-                  <div class="w-full h-11 bg-white flex justify-between items-center">
-                    <button
-                      id="delete-btn"
-                      class="cursor-pointer inline-flex items-center disabled:pointer-events-none t-delete-room-msg-btn"
-                      phx-click={
-                        show_modal("delete-messages-popup")
-                        |> JS.set_attribute(
-                          {"phx-click",
-                           hide_modal("delete-messages-popup")
-                           |> JS.push("room/delete-messages")
-                           |> stringify_commands()},
-                          to: "#delete-messages-popup .deleteMessageButton"
-                        )
-                        |> JS.dispatch("chat:messages-to-delete", to: "#delete-messages-popup")
-                      }
-                    >
-                      <.icon id="delete" class="w-4 h-4 flex fill-black x-icon" />
-                      <span id="delete-span">Delete</span>
-                    </button>
-
-                    <button
-                      id="download-btn"
-                      class="cursor-pointer inline-flex items-center t-download-room-msg-btn"
-                      phx-click={
-                        JS.dispatch("chat:download-messages",
-                          to: "#chatContent",
-                          detail: %{chatType: "room"}
-                        )
-                      }
-                    >
-                      <span class="text-purple">Download</span>
-                      <.icon id="download" class="ml-1 w-4 h-4 flex  stroke-purple " />
-                    </button>
-                  </div>
-                <% end %>
-              </div>
+              <Layout.MessageInput.render
+                type="room"
+                input_mode={@input_mode}
+                edit_content={@edit_content}
+                uploads={@uploads}
+                db_status={@db_status}
+              />
             <% end %>
           </div>
         <% end %>

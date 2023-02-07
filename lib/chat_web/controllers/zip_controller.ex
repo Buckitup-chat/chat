@@ -20,6 +20,9 @@ defmodule ChatWeb.ZipController do
   alias Chat.Utils.StorageId
   alias ChatWeb.MainLive.Layout.Message
 
+  alias Phoenix.HTML.Safe
+  alias Phoenix.LiveView.HTMLEngine
+
   def get(conn, params) do
     with %{"broker_key" => broker_key} <- params,
          {type, data, timezone} <- Broker.get(broker_key) do
@@ -53,7 +56,7 @@ defmodule ChatWeb.ZipController do
       messages_stream =
         messages
         |> Stream.map(fn msg ->
-          Phoenix.LiveView.HTMLEngine.component(
+          HTMLEngine.component(
             &Message.message_block/1,
             [
               chat_type: type,
@@ -67,7 +70,7 @@ defmodule ChatWeb.ZipController do
             ],
             {__ENV__.module, __ENV__.function, __ENV__.file, __ENV__.line}
           )
-          |> Phoenix.HTML.Safe.to_iodata()
+          |> Safe.to_iodata()
         end)
 
       exported_messages =
@@ -91,7 +94,7 @@ defmodule ChatWeb.ZipController do
       file_entries =
         messages
         |> Enum.reduce([], fn msg, file_entries ->
-          with %{type: type, content: json} when type in [:file, :image, :video] <- msg,
+          with %{type: type, content: json} when type in [:audio, :file, :image, :video] <- msg,
                {id, content} <- StorageId.from_json(json),
                [chunk_key, chunk_secret_raw, _, _type, filename, _size] <- Files.get(id, content),
                chunk_secret <- Base.decode64!(chunk_secret_raw),

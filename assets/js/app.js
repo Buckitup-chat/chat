@@ -24,66 +24,59 @@ import "phoenix_html"
 import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
+import AndroidMediaFileInput from "./hooks/android-media-file-input"
+import AudioFile from "./hooks/audio-file"
+import PushToTalk from './hooks/push-to-talk'
+import UploadInProgress from "./hooks/upload-in-progress"
+import * as UpChunk from "./upchunk"
 import * as LocalStateStore from "./hooks/local-storage"
 import * as LocalTime from "./hooks/local-time"
 import * as Chat from "./hooks/chat"
-import * as UpChunk from "./upchunk"
 import * as Flash from "./hooks/flash"
 
+let uploads = {}
 let Uploaders = {}
 
-Uploaders.UpChunk = function(items, onViewError) {
+Uploaders.UpChunk = (entries, onViewError) => {
+  entries.forEach(entry => {
+    let { file, meta: { chunk_count: chunkCount, entrypoint, skip, status, uuid } } = entry
 
-  const entries = [...items];
-  const workers = new Array(2);
-
-  const createTask = (entry) => {
-    if (!entry) {
+    // Skip uploading duplicate file
+    if (skip) {
       return
     }
-    return new Promise((resolve, reject) => {
-      // create the upload session with UpChunk
-      let { file, meta: { entrypoint } } = entry;
-      let upload = UpChunk.createUpload({ endpoint: entrypoint, file, chunkSize: 10240 });
 
-      // stop uploading in the event of a view error
-      onViewError(() => upload.pause())
+    let upload = UpChunk.createUpload({ chunkSize: 10240, endpoint: entrypoint, file })
+    upload.chunkCount = chunkCount
 
-      // notify progress events to LiveView
-      upload.on("progress", (e) => {
-        if (e.detail < 100) { entry.progress(e.detail) }
-      })
-
-      // success completes the UploadEntry
-      upload.on("success", () => {
-        entry.progress(100);
-        resolve();
-      })
-
-      // upload error triggers LiveView error
-      upload.on("error", (e) => {
-        reject(e);
-        entry.error(e.detail.message);
-      })
-    })
-  }
-
-  const assignNewTask = (task, i) => {
-    if (!task) {
-      return
+    if (status == "paused") {
+      upload.pause()
     }
-    task.finally(() => {
-      workers[i] = assignNewTask(createTask(entries.pop()), i);
-    })
-  }
 
-  workers.fill(true).map((_, i) => {
-    return assignNewTask(createTask(entries.pop()), i);
-  });
+    uploads[uuid] = upload
+
+    // stop uploading in the event of a view error
+    onViewError(() => upload.pause())
+
+    // upload error triggers LiveView error
+    upload.on("error", (e) => entry.error(e.detail.message))
+
+    // notify progress events to LiveView
+    upload.on("progress", (e) => {
+      if (e.detail < 100) { entry.progress(e.detail) }
+    })
+
+    // success completes the UploadEntry
+    upload.on("success", () => entry.progress(100))
+  })
 }
 
-
-let Hooks = {}
+let Hooks = {
+  AndroidMediaFileInput,
+  AudioFile,
+  PushToTalk,
+  UploadInProgress
+}
 
 Hooks.LocalStateStore = LocalStateStore.hooks
 Hooks.LocalTime = LocalTime.hooks
@@ -192,7 +185,23 @@ const listeners = {
       const chatContent = document.querySelector('.a-content-block');
       chatContent.scrollTo({ top: chatContent.scrollHeight })
     }, 0)
-  }
+  },
+  "phx:upload:cancel": (e) => {
+    uploads[e.detail.uuid].abort()
+    delete uploads[e.detail.uuid]
+  },
+  "phx:upload:pause": (e) => { uploads[e.detail.uuid].pause() },
+  "phx:upload:resume": (e) => { uploads[e.detail.uuid].resume() },
+  "phx:gallery:preload": (e) => {
+    const img = new Image();
+    img.onload = function() {
+      const preloadedList = document.getElementById(e.detail.to);
+      preloadedList.appendChild(img);
+      setTimeout(() => { img.remove() }, '30000');
+    }
+    img.classList.add('hidden')
+    img.src = e.detail.url;
+  },
 };
 for (key in listeners) {
   window.addEventListener(key, listeners[key]);
@@ -212,7 +221,7 @@ window.addEventListener("phx:page-loading-stop", () => {
   topbar.hide();
 });
 
-// back button fix 
+// back button fix
 window.addEventListener("popstate", e => {
   history.pushState(null, null, window.location.pathname);
 

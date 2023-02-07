@@ -3,14 +3,14 @@ defmodule Chat.MemoIndex do
   Index for memos
   """
 
+  alias Chat.Db
   alias Chat.Dialogs
   alias Chat.Dialogs.Dialog
   alias Chat.Dialogs.Message
   alias Chat.Identity
   alias Chat.Rooms
-  alias Chat.Rooms.Room
   alias Chat.Rooms.Message, as: RoomMessage
-  alias Chat.Db
+  alias Chat.Rooms.Room
   alias Chat.Utils
 
   def add({_, %Message{type: :memo}} = indexed_message, %Dialog{} = dialog, me) do
@@ -41,4 +41,8 @@ defmodule Chat.MemoIndex do
   end
 
   def add(x, _, _), do: x
+
+  def delete(reader_hash, key) do
+    Db.delete({:memo_index, reader_hash, key})
+  end
 end

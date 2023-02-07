@@ -44,7 +44,7 @@ defmodule Chat.LogTest do
 
   test "room related logs should save correct" do
     me = User.login("me")
-    room_identity = Rooms.add(me, "Room name")
+    {room_identity, _room} = Rooms.add(me, "Room name")
     ChangeTracker.await({:rooms, room_identity |> Identity.pub_key() |> Utils.hash()})
     room = Rooms.get(room_identity |> Utils.hash())
     base = Ordering.last({:action_log})

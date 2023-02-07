@@ -8,6 +8,7 @@ defmodule ChatWeb.Router do
     plug :put_root_layout, {ChatWeb.LayoutView, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug ChatWeb.Plugs.OperatingSystemDetector
   end
 
   pipeline :api do
@@ -17,7 +18,7 @@ defmodule ChatWeb.Router do
   scope "/", ChatWeb do
     pipe_through :browser
 
-    get "/log", DeviceLogController, :log
+    # get "/log", DeviceLogController, :log
     get "/reset", DeviceLogController, :reset
     get "/data_keys", DeviceLogController, :dump_data_keys
     get "/index", PageController, :index

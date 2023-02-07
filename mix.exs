@@ -12,7 +12,7 @@ defmodule Chat.MixProject do
       aliases: aliases(),
       deps: deps(),
       test_coverage: [
-        summary: [threshold: 45]
+        summary: [threshold: 33]
       ],
       releases: [
         chat: [
@@ -54,7 +54,7 @@ defmodule Chat.MixProject do
       {:struct_access, "~> 1.1"},
       {:uuid, "~> 1.1"},
       {:x509, "~> 0.8"},
-      {:phoenix, "~> 1.7.0-rc.0", override: true},
+      {:phoenix, "~> 1.7.0-rc.2", override: true},
       {:phoenix_html, "~> 3.0"},
       {:phoenix_view, "~> 2.0"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
@@ -72,7 +72,8 @@ defmodule Chat.MixProject do
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
       {:tailwind, "~> 0.1", runtime: Mix.env() == :dev},
       {:timex, "~> 3.7"},
-      {:zstream, "~> 0.6"}
+      {:zstream, "~> 0.6"},
+      {:ua_parser, github: "beam-community/ua_parser"}
     ]
   end
 

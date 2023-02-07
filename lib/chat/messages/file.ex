@@ -10,6 +10,7 @@ defmodule Chat.Messages.File do
 
     type =
       cond do
+        match?("audio/" <> _, mime_type) -> :audio
         match?("image/" <> _, mime_type) and entry.client_size < @max_image_size -> :image
         match?("video/" <> _, mime_type) -> :video
         true -> :file

@@ -73,6 +73,7 @@ Room and dialog messages are the same in terms of content.
 
 Message types are
 
+* `:audio`
 * `:text` - short text message that can be encrypted w/ public key (less than 200 bytes)
 * `:memo` - longer text message
 * `:image`
@@ -110,17 +111,22 @@ Memo index tracks who can read it
 
 <!-- livebook:{"break_markdown":true} -->
 
-### Files (image/video/file)
+### Files (audio/image/video/file)
 
 File storing is more complex. We need to store file properties, as well as file body.
 
 File uploads chunk by chunk. Chunk size is 10 Mb.
 
+Also, each file upload is saved in file index for resumable uploads.
+
 #### Upload process
 
-1. Generate chunk key and secret. Give client chunk key.
-2. Receive all the file chunks, encrypting them with secret and storing in db.
-3. When everything is uploaded, store file information and chunk key and secret.
+1. Generate hash out of file info and use it both as an upload key and a chunk key.
+2. Generate chunk secret.
+3. Save upload to the upload index.
+4. Give client chunk key.
+5. Receive all the file chunks, cipher them with secret and store (in FS).
+6. When everything is uploaded, store file information and chunk key and secret (in DB).
 
 #### File structures
 
@@ -152,7 +158,8 @@ file_type
 
 #### Chunks
 
-Each chunk (up to 10Mb data content) stored as following
+Each chunk (up to 10Mb data content) virtually stored as below. In fact it is written in filesystem. In a folder beside the database.
+We pretend as it is  in database to have usual API for getting and storing.
 
 <!-- livebook:{"force_markdown":true} -->
 
@@ -175,8 +182,17 @@ File index entries keep track of who can read a file.
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-{{:file_index, reader_hash, file_key},
+{{:file_index, reader_hash, file_key, message_id},
  true}
+```
+
+Upload index entries keep track of started uploads.
+Each entry contains
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:upload_index, chunk_key}, %Chat.Upload.Upload{}}
 ```
 
 <!-- livebook:{"break_markdown":true} -->

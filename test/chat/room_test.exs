@@ -14,8 +14,7 @@ defmodule Chat.Rooms.RoomTest do
   test "room creation" do
     alice = User.login("Alice")
     room_name = "Alice's room"
-    room_identity = alice |> Rooms.add(room_name)
-    room = Rooms.Room.create(alice, room_identity)
+    {_room_identity, room} = alice |> Rooms.add(room_name)
 
     assert %Rooms.Room{} = room
 
@@ -29,8 +28,7 @@ defmodule Chat.Rooms.RoomTest do
     alice |> User.register()
     alice_hash = alice |> Identity.pub_key() |> Utils.hash()
 
-    room_identity = alice |> Rooms.add("some room")
-    room = Rooms.Room.create(alice, room_identity)
+    {room_identity, room} = alice |> Rooms.add("some room")
 
     message = "hello, room"
 
@@ -58,7 +56,7 @@ defmodule Chat.Rooms.RoomTest do
     assert [
              %Rooms.PlainMessage{content: ^message, type: :text, author_hash: ^alice_hash},
              %Rooms.PlainMessage{type: :memo},
-             %Rooms.PlainMessage{type: :file},
+             %Rooms.PlainMessage{type: :audio},
              %Rooms.PlainMessage{type: :image}
            ] =
              room
@@ -82,33 +80,23 @@ defmodule Chat.Rooms.RoomTest do
 
     assert room |> Rooms.Room.is_requested_by?(bob_hash)
 
-    room = room |> Rooms.Room.approve_requests(room_identity)
+    room = room |> Rooms.Room.approve_request(bob_hash, room_identity, [])
 
-    room = room |> Rooms.Room.approve_requests(room_identity)
+    assert [{^bob_hash, ^bob_key, encrypted_identity}] = room.requests
 
-    assert [{^bob_hash, ^bob_key, {enc_secret, blob}}] = room.requests
+    decrypted_identity = Rooms.decrypt_identity(encrypted_identity, bob)
 
-    secret =
-      enc_secret
-      |> Utils.decrypt(bob)
+    assert room_identity == decrypted_identity
 
-    decrypted =
-      blob
-      |> Utils.decrypt_blob(secret)
-      |> Identity.from_strings()
+    room = room_identity |> Rooms.join_approved_request(bob)
 
-    assert room_identity == decrypted
-
-    {room, [joined_identitiy]} = room |> Rooms.Room.join_approved_requests(bob)
-
-    assert room_identity == joined_identitiy
     assert [] = room.requests
   end
 
   test "room list should return my created room" do
     alice = User.login("Alice")
     room_name = "Some my room"
-    room_identity = alice |> Rooms.add(room_name)
+    {room_identity, _room} = alice |> Rooms.add(room_name)
     Rooms.await_saved(room_identity)
     room_hash = room_identity |> Utils.hash()
 
@@ -123,25 +111,21 @@ defmodule Chat.Rooms.RoomTest do
   test "requesting room should work" do
     alice = User.login("Alice")
     room_name = "Some my room"
-    room_identity = alice |> Rooms.add(room_name)
+    {room_identity, _room} = alice |> Rooms.add(room_name)
     room_hash = room_identity |> Utils.hash()
 
     bob = User.login("Bob")
+    bob_pub_key = bob |> Identity.pub_key()
+    bob_hash = bob |> Utils.hash()
 
     Rooms.add_request(room_hash, bob, 0)
-
-    assert 1 =
-             Rooms.list([])
-             |> elem(1)
-             |> Enum.filter(&Rooms.is_requested_by?(&1.hash, bob |> Utils.hash()))
-             |> Enum.count()
-
-    assert [] = Rooms.join_approved_requests(room_hash, bob, 1)
-
-    Rooms.approve_requests(room_hash, room_identity)
     ChangeTracker.await()
+    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
+    assert Rooms.is_requested_by?(room_hash, bob_hash)
 
-    assert [^room_identity] = Rooms.join_approved_requests(room_hash, bob, 2)
+    Rooms.approve_request(room_hash, bob_hash, room_identity)
+    ChangeTracker.await()
+    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, {_, _}}]} = Rooms.get(room_hash)
   end
 
   test "message removed from room should not accessed any more" do
@@ -248,6 +232,7 @@ defmodule Chat.Rooms.RoomTest do
     |> String.pad_trailing(200, "-")
     |> Messages.Text.new(0)
     |> Rooms.update_message({msg.index, msg.id}, alice, room_identity)
+    |> Rooms.await_saved(room.pub_key)
 
     assert [_, _, _] =
              Rooms.read(
@@ -266,8 +251,7 @@ defmodule Chat.Rooms.RoomTest do
   defp alice_and_room do
     alice = User.login("Alice")
 
-    room_identity = alice |> Rooms.add("Alice room")
-    room = Rooms.Room.create(alice, room_identity)
+    {room_identity, room} = alice |> Rooms.add("Alice room")
 
     {alice, room_identity, room}
   end

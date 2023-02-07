@@ -435,7 +435,7 @@
 
             <Layout.Uploader.uploader
               config={@uploads.file}
-              pub_key={@peer && @peer.pub_key}
+              pub_key={assigns[:peer][:pub_key]}
               type={:dialog}
               uploads={@uploads_metadata}
             />
@@ -693,7 +693,7 @@
 
             <Layout.Uploader.uploader
               config={@uploads.file}
-              pub_key={@room && @room.pub_key}
+              pub_key={assigns[:room][:pub_key]}
               type={:room}
               uploads={@uploads_metadata}
             />

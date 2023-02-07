@@ -39,7 +39,7 @@ defmodule Chat.Db.Scope.KeyScope do
 
     snap
     |> db_keys_stream({:dialog_message, 0, 0, 0}, {:"dialog_message\0", 0, 0, 0})
-    |> Stream.filter(fn {:dialog_message, binhash} ->
+    |> Stream.filter(fn {:dialog_message, binhash, _, _} ->
       MapSet.member?(dialog_binhashes, binhash)
     end)
     |> union_set(dialog_keys)
@@ -63,8 +63,8 @@ defmodule Chat.Db.Scope.KeyScope do
     |> union_set(with_rooms)
   end
 
-  defp add_content(acc_set, snap, {_, hashses}) do
-    
+  defp add_content(acc_set, snap, {_, hashes}) do
+    acc_set
   end
 
   defp db_keys_stream(snap, min, max) do

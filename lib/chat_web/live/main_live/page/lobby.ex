@@ -169,14 +169,14 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   def process(socket, task) do
     Task.Supervisor.async_nolink(Chat.TaskSupervisor, fn ->
       try do
-        Logger.warn("[task] #{Function.info(task)[:name]} started")
+        Logger.warn(["[task] ", Function.info(task)[:name], " started"])
         socket |> task.()
 
         :ok
       rescue
         reason ->
-          Logger.warn("[task] #{Function.info(task)[:name]} failed")
-          Logger.error(inspect(reason))
+          Logger.warn(["[task] ", Function.info(task)[:name], " failed"])
+          Logger.error([inspect(reason)])
           {:error, task, reason}
       end
     end)

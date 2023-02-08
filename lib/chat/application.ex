@@ -56,7 +56,7 @@ defmodule Chat.Application do
       ver
       |> String.split("/", trim: true)
       |> Enum.at(3)
-      |> then(&Logger.info("[chat] " <> &1))
+      |> then(&Logger.info(["[chat] ", &1]))
     end
   end
 end

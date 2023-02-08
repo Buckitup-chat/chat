@@ -34,6 +34,7 @@ defmodule ChatWeb.MainLive.Index do
       if action == :export do
         socket
         |> assign(:need_login, false)
+        |> assign(:keys_retrieved, true)
         |> Page.ExportKeyRing.init(params["id"])
         |> Page.Login.check_stored()
         |> ok()
@@ -41,6 +42,7 @@ defmodule ChatWeb.MainLive.Index do
         socket
         |> assign(
           need_login: true,
+          keys_retrieved: false,
           mode: :user_list,
           monotonic_offset: 0
         )
@@ -67,7 +69,9 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   def handle_event("restoreAuth", nil, socket) do
-    socket |> noreply()
+    socket
+    |> assign(:keys_retrieved, true)
+    |> noreply()
   end
 
   def handle_event("restoreAuth", data, %{assigns: %{live_action: :export}} = socket) do
@@ -78,6 +82,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_event("restoreAuth", data, socket) do
     socket
+    |> assign(:keys_retrieved, true)
     |> Page.Login.load_user(data)
     |> Page.Lobby.init()
     |> Page.Dialog.init()
@@ -380,6 +385,19 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_progress(_file, _entry, socket) do
     socket |> noreply()
+  end
+
+  def loading_screen(assigns) do
+    ~H"""
+    <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg" />
+    <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg" />
+
+    <div class="flex flex-col items-center justify-center w-screen h-screen">
+      <div class="container unauthenticated z-10">
+        <img src="/images/logo.png" />
+      </div>
+    </div>
+    """
   end
 
   defp action_confirmation_popup(assigns) do

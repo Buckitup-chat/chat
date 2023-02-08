@@ -1,6 +1,8 @@
 defmodule Chat.Card do
   @moduledoc "User/Room representation in registry"
 
+  use StructAccess
+
   alias Chat.Identity
   alias Chat.Utils
 

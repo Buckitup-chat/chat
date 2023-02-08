@@ -26,7 +26,8 @@ import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import AndroidMediaFileInput from "./hooks/android-media-file-input"
 import AudioFile from "./hooks/audio-file"
-import PushToTalk from './hooks/push-to-talk'
+import PushToTalk from "./hooks/push-to-talk"
+import SortableUploadEntries from "./hooks/sortable-upload-entries"
 import UploadInProgress from "./hooks/upload-in-progress"
 import * as UpChunk from "./upchunk"
 import * as LocalStateStore from "./hooks/local-storage"
@@ -61,9 +62,16 @@ Uploaders.UpChunk = (entries, onViewError) => {
     // upload error triggers LiveView error
     upload.on("error", (e) => entry.error(e.detail.message))
 
+    let lastProgressUpdate = 0
+
     // notify progress events to LiveView
     upload.on("progress", (e) => {
-      if (e.detail < 100) { entry.progress(e.detail) }
+      const now = new Date().getTime()
+
+      if (e.detail < 100 && now - lastProgressUpdate > 1000) {
+        entry.progress(e.detail)
+        lastProgressUpdate = now
+      }
     })
 
     // success completes the UploadEntry
@@ -75,6 +83,7 @@ let Hooks = {
   AndroidMediaFileInput,
   AudioFile,
   PushToTalk,
+  SortableUploadEntries,
   UploadInProgress
 }
 

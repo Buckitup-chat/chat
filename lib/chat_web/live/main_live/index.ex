@@ -568,26 +568,26 @@ defmodule ChatWeb.MainLive.Index do
         %{progress: 100, uuid: uuid} = entry,
         %{assigns: %{uploads_metadata: uploads}} = socket
       ) do
-    "[upload] finalizing" |> Logger.warn()
+    ["[upload] ", "finalizing"] |> Logger.warn()
     %UploadMetadata{} = metadata = uploads[uuid]
     {key, _} = metadata.credentials
     ChunkedFiles.mark_consumed(key)
     UploadIndex.delete(key)
 
-    "[upload] marked consumed" |> Logger.warn()
+    ["[upload] ", "marked consumed"] |> Logger.warn()
 
     case metadata.destination.type do
       :dialog -> Page.Dialog.send_file(socket, entry, metadata)
       :room -> Page.Room.send_file(socket, entry, metadata)
     end
 
-    "[upload] message sent" |> Logger.warn()
+    ["[upload] ", "message sent"] |> Logger.warn()
 
     socket
     |> assign(:uploads_metadata, Map.delete(uploads, uuid))
     |> maybe_resume_next_upload()
     |> noreply()
-    |> tap(fn _ -> "[upload] done" |> Logger.warn() end)
+    |> tap(fn _ -> ["[upload] ", "done"] |> Logger.warn() end)
   end
 
   def handle_chunked_progress(_name, _entry, socket), do: noreply(socket)

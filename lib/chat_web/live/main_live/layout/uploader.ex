@@ -215,7 +215,11 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
           </.upload_control>
         <% else %>
           <.upload_control phx-click="upload:resume" phx-value-uuid={@entry.uuid}>
-            Resume
+            <%= if @metadata.status == :pending do %>
+              Start
+            <% else %>
+              Resume
+            <% end %>
           </.upload_control>
         <% end %>
         <.upload_control

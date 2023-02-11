@@ -50,7 +50,7 @@ Uploaders.UpChunk = (entries, onViewError) => {
     let upload = UpChunk.createUpload({ chunkSize: 10240, endpoint: entrypoint, file })
     upload.chunkCount = chunkCount
 
-    if (status == "paused") {
+    if (status == "paused" || status == "pending") {
       upload.pause()
     }
 
@@ -203,7 +203,7 @@ const listeners = {
   "phx:upload:resume": (e) => { uploads[e.detail.uuid].resume() },
   "phx:gallery:preload": (e) => {
     const img = new Image();
-    img.onload = function() {
+    img.onload = function () {
       const preloadedList = document.getElementById(e.detail.to);
       preloadedList.appendChild(img);
       setTimeout(() => { img.remove() }, '30000');

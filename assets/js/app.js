@@ -24,9 +24,8 @@ import "phoenix_html"
 import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
-import AndroidMediaFileInput from "./hooks/android-media-file-input"
 import AudioFile from "./hooks/audio-file"
-import PushToTalk from "./hooks/push-to-talk"
+import MediaFileInput from "./hooks/media-file-input"
 import SortableUploadEntries from "./hooks/sortable-upload-entries"
 import UploadInProgress from "./hooks/upload-in-progress"
 import * as UpChunk from "./upchunk"
@@ -50,7 +49,7 @@ Uploaders.UpChunk = (entries, onViewError) => {
     let upload = UpChunk.createUpload({ chunkSize: 10240, endpoint: entrypoint, file })
     upload.chunkCount = chunkCount
 
-    if (status == "paused") {
+    if (status == "paused" || status == "pending") {
       upload.pause()
     }
 
@@ -68,7 +67,7 @@ Uploaders.UpChunk = (entries, onViewError) => {
     upload.on("progress", (e) => {
       const now = new Date().getTime()
 
-      if (e.detail < 100 && now - lastProgressUpdate > 1000) {
+      if (!window.uploaderReorderInProgress && e.detail < 100 && now - lastProgressUpdate > 1000) {
         entry.progress(e.detail)
         lastProgressUpdate = now
       }
@@ -80,9 +79,8 @@ Uploaders.UpChunk = (entries, onViewError) => {
 }
 
 let Hooks = {
-  AndroidMediaFileInput,
   AudioFile,
-  PushToTalk,
+  MediaFileInput,
   SortableUploadEntries,
   UploadInProgress
 }
@@ -203,7 +201,7 @@ const listeners = {
   "phx:upload:resume": (e) => { uploads[e.detail.uuid].resume() },
   "phx:gallery:preload": (e) => {
     const img = new Image();
-    img.onload = function() {
+    img.onload = function () {
       const preloadedList = document.getElementById(e.detail.to);
       preloadedList.appendChild(img);
       setTimeout(() => { img.remove() }, '30000');

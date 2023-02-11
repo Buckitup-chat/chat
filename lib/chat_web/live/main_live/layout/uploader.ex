@@ -189,20 +189,23 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
         style={"width: #{@entry.progress}%;"}
       >
       </div>
-      <div class="sorting-handle flex flex-row w-full p-2 items-center justify-between z-20 text-black/50 cursor-pointer">
-        <div class="flex justify-center items-center w-4 h-4">
-          <svg viewBox="0 0 100 80" width="40" height="40">
-            <rect width="100" height="20" rx="8"></rect>
-            <rect y="30" width="100" height="20" rx="8"></rect>
-            <rect y="60" width="100" height="20" rx="8"></rect>
-          </svg>
-        </div>
 
-        <div class="flex text-xs ml-2 min-w-[20%] max-w-[50%]">
-          <span class="truncate"><%= @entry.client_name %></span>
-        </div>
+      <div class="flex flex-row w-full p-2 items-center justify-between z-20 text-black/50">
+        <div class="sorting-handle flex cursor-pointer w-[70%]">
+          <div class="flex justify-center items-center w-4 h-4">
+            <svg viewBox="0 0 100 80" width="40" height="40">
+              <rect width="100" height="20" rx="8"></rect>
+              <rect y="30" width="100" height="20" rx="8"></rect>
+              <rect y="60" width="100" height="20" rx="8"></rect>
+            </svg>
+          </div>
 
-        <div class="flex text-xs text-black/50"><%= @entry.progress %>%</div>
+          <div class="flex text-xs ml-2 min-w-[20%] max-w-[50%]">
+            <span class="truncate"><%= @entry.client_name %></span>
+          </div>
+
+          <div class="flex text-xs ml-auto text-black/50"><%= @entry.progress %>%</div>
+        </div>
 
         <%= if @metadata.status == :active do %>
           <.upload_control phx-click="upload:pause" phx-value-uuid={@entry.uuid}>

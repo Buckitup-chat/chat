@@ -67,7 +67,7 @@ Uploaders.UpChunk = (entries, onViewError) => {
     upload.on("progress", (e) => {
       const now = new Date().getTime()
 
-      if (e.detail < 100 && now - lastProgressUpdate > 1000) {
+      if (!window.uploaderReorderInProgress && e.detail < 100 && now - lastProgressUpdate > 1000) {
         entry.progress(e.detail)
         lastProgressUpdate = now
       }

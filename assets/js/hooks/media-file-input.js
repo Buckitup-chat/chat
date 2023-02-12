@@ -1,7 +1,7 @@
 export default {
   mounted() {
-    const androidMediaFileinput = this.el
-    const ref = androidMediaFileinput.dataset.ref
+    const mediaFileInput = this.el
+    const ref = mediaFileInput.dataset.ref
     const fileInput = document.getElementById(ref)
 
     this.el.addEventListener('change', () => {

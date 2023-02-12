@@ -62,7 +62,7 @@ defmodule Chat.Dialogs.DialogMessaging do
     }
   rescue
     _ ->
-      ("[chat] [sign] Signature check failed " <> inspect({msg, side, identity, peer_key}))
+      ["[chat] ", "[sign] ", "Signature check failed ", inspect({msg, side, identity, peer_key})]
       |> Logger.error()
 
       nil

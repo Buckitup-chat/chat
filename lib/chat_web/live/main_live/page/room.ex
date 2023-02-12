@@ -156,7 +156,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   def show_new(socket, new_message) do
     identity = socket.assigns[:room_identity] |> inspect()
     message = new_message |> inspect()
-    Logger.warn("Cannot show new message in room. msg: #{message} room: #{identity}")
+    Logger.warn(["Cannot show new message in room. ", "msg: ", message, " room: ", identity])
 
     socket
   end
@@ -226,9 +226,13 @@ defmodule ChatWeb.MainLive.Page.Room do
   def update_message(socket, msg_id, _) do
     identity = socket.assigns[:room_identity] |> inspect()
 
-    Logger.warn(
-      "Cannot show upated message in room. msg_id: #{inspect(msg_id)} room: #{identity}"
-    )
+    Logger.warn([
+      "Cannot show upated message in room. ",
+      "msg_id: ",
+      inspect(msg_id),
+      " room: ",
+      identity
+    ])
 
     socket
   end

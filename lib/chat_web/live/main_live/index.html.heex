@@ -71,6 +71,7 @@
       <.modal id="logout-backup-popup" hide_event="logout-close" class="">
         <%= if @logout_step == :initial do %>
           <h1 class="text-base font-bold text-grayscale">Log Out & Back Up</h1>
+          <.room_count_to_backup_message count={@room_count_to_backup} />
           <p class="mt-3 text-sm text-black/50">
             To get access again you will need the recovery keys:
           </p>

@@ -21,6 +21,10 @@ defmodule Chat.Identity do
     [name, key |> Codec.private_key_to_string()]
   end
 
+  def priv_key_to_string(%__MODULE__{priv_key: key}) do
+    Codec.private_key_to_string(key)
+  end
+
   def from_strings([name, key_str]) do
     %__MODULE__{
       name: name,

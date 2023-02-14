@@ -55,10 +55,6 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("restoreAuth", nil, socket) do
-    socket |> noreply()
-  end
-
   def handle_event("restoreAuth", data, %{assigns: %{live_action: :export}} = socket) do
     socket
     |> Page.Login.load_user(data)
@@ -300,6 +296,19 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_info({:sync_stored_room, key, room_count}, socket) do
+    socket
+    |> Page.Login.sync_stored_room(key, room_count)
+    |> Page.Lobby.show_new_room(%{})
+    |> noreply()
+  end
+
+  def handle_info(:reset_rooms_to_backup, socket) do
+    socket
+    |> Page.Login.reset_rooms_to_backup()
+    |> noreply()
+  end
+
   def handle_info({:exported_key_ring, keys}, socket) do
     socket
     |> Page.ImportKeyRing.save_key_ring(keys)
@@ -396,6 +405,23 @@ defmodule ChatWeb.MainLive.Index do
       <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-white" />
       <span class="text-base text-white"> Invite</span>
     </button>
+    """
+  end
+
+  defp room_count_to_backup_message(%{count: 0} = assigns), do: ~H""
+
+  defp room_count_to_backup_message(assigns) do
+    assigns =
+      assigns
+      |> assign_new(:output, fn
+        %{count: 1} -> "1 room"
+        %{count: count} -> "#{count} rooms"
+      end)
+
+    ~H"""
+    <p class="mt-3 text-sm text-red-500">
+      You have <%= @output %> not backed up. Download the keys to make sure you have access to them after logging out.
+    </p>
     """
   end
 

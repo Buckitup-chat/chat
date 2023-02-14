@@ -240,7 +240,17 @@
       </.modal>
       <.modal id="logout-without-key-popup" class="t-logout-without-key-modal">
         <h1 class="text-base font-bold text-grayscale">Log Out without the Key</h1>
-        <p class="mt-3 text-sm text-black/50">Are you sure you want to do this?</p>
+        <p class="mt-3 text-sm text-black/50">
+          You are deleting your keys to the BuckitUp, everything will become permanently inaccessible from this browser without the <a
+            phx-click={
+              hide_modal("logout-without-key-popup")
+              |> show_modal("logout-backup-popup")
+              |> JS.push("logout-go-middle")
+            }
+            class="cursor-pointer text-blue-600 after:content-['_↗'] ..."
+          >keyring backup</a>.
+        </p>
+        <p class="text-sm text-black/50">Are you sure?</p>
         <div class="mt-5 flex items-center justify-between">
           <button
             phx-click={hide_modal("logout-without-key-popup")}

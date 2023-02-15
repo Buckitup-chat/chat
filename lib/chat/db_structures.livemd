@@ -105,8 +105,7 @@ Memo index tracks who can read it
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-{{:memo_index, reader_key,}}
-*need memo_index to understand who has access to this*
+{{:memo_index, reader_hash, key}}
 ```
 
 <!-- livebook:{"break_markdown":true} -->

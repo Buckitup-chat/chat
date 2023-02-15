@@ -33,6 +33,10 @@ defmodule ChatWeb.ConnCase do
   end
 
   setup _tags do
-    {:ok, conn: Phoenix.ConnTest.build_conn()}
+    conn =
+      Phoenix.ConnTest.build_conn()
+      |> Map.put(:host, "buckitup.app")
+
+    {:ok, conn: conn}
   end
 end

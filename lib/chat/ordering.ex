@@ -14,7 +14,7 @@ defmodule Chat.Ordering do
   end
 
   def reset do
-    "[chat] Ordering reset" |> Logger.debug()
+    ["[chat] ", "Ordering reset"] |> Logger.debug()
     Counters.drop_all()
   end
 

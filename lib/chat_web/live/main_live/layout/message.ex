@@ -89,10 +89,10 @@ defmodule ChatWeb.MainLive.Layout.Message do
           file={@file}
           is_mine?={@is_mine?}
           msg={@msg}
+          receiver={assigns[:peer]}
           room={@room}
-          timezone={@timezone}
           room_keys={@room_keys}
-          receiver={@peer}
+          timezone={@timezone}
         />
       </div>
 
@@ -136,16 +136,16 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   attr :author, Card, required: true, doc: "message author card"
-  attr :receiver, Card, doc: "peer in dialog"
   attr :chat_type, :atom, required: true, doc: ":dialog or :room"
   attr :color, :string, required: true, doc: "color class - either bg-purple50 or bg-white"
   attr :export?, :boolean, required: true, doc: "hide options and set path for exported file"
   attr :file, :map, required: true, doc: "file map"
   attr :is_mine?, :boolean, required: true, doc: "is current user the author of the message?"
   attr :msg, :map, required: true, doc: "message struct"
+  attr :receiver, Card, doc: "peer in dialog"
   attr :room, Room, default: nil, doc: "room access was requested to"
-  attr :timezone, :string, required: true, doc: "needed to render the timestamp"
   attr :room_keys, :map, doc: "the list of room keys"
+  attr :timezone, :string, required: true, doc: "needed to render the timestamp"
 
   defp message(%{msg: %{type: :audio}} = assigns) do
     ~H"""

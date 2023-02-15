@@ -1,6 +1,8 @@
 defmodule Chat.Rooms.Room do
   @moduledoc "Room struct"
 
+  use StructAccess
+
   alias Chat.Identity
   alias Chat.Utils
 

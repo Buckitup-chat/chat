@@ -22,7 +22,7 @@ defmodule Chat.Db.Supervisor do
        fn ->
          Chat.Db.InternalDb |> Switching.set_default()
 
-         "[db] Started database" |> Logger.notice()
+         ["[db] ", "Started database"] |> Logger.notice()
        end},
       # DB status broadcaster
       Chat.Db.StatusPoller

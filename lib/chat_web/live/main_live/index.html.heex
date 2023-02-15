@@ -4,7 +4,7 @@
   <.loading_screen />
 <% else %>
   <%= if @need_login do %>
-    <%= if @keys_retrieved do %>
+    <%= if @handshaked do %>
       <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg" />
       <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg" />
       <div class="flex flex-col items-center justify-center w-screen h-screen">
@@ -54,6 +54,7 @@
             <.icon id="qrcode" class="w-4 h-4 ml-2 fill-white" />
           </button>
           <button
+            id="importKeyButton"
             phx-click="login:import-own-key-ring"
             class="w-full h-11 mt-2.5 bg-transparent text-white py-2 px-4 border border-white/50 rounded-lg flex items-center justify-center"
           >
@@ -71,6 +72,7 @@
       <.modal id="logout-backup-popup" hide_event="logout-close" class="">
         <%= if @logout_step == :initial do %>
           <h1 class="text-base font-bold text-grayscale">Log Out & Back Up</h1>
+          <.room_count_to_backup_message count={@room_count_to_backup} />
           <p class="mt-3 text-sm text-black/50">
             To get access again you will need the recovery keys:
           </p>
@@ -240,7 +242,17 @@
       </.modal>
       <.modal id="logout-without-key-popup" class="t-logout-without-key-modal">
         <h1 class="text-base font-bold text-grayscale">Log Out without the Key</h1>
-        <p class="mt-3 text-sm text-black/50">Are you sure you want to do this?</p>
+        <p class="mt-3 text-sm text-black/50">
+          You are deleting your keys to the BuckitUp, everything will become permanently inaccessible from this browser without the <a
+            phx-click={
+              hide_modal("logout-without-key-popup")
+              |> show_modal("logout-backup-popup")
+              |> JS.push("logout-go-middle")
+            }
+            class="cursor-pointer text-blue-600 after:content-['_↗'] ..."
+          >keyring backup</a>.
+        </p>
+        <p class="text-sm text-black/50">Are you sure?</p>
         <div class="mt-5 flex items-center justify-between">
           <button
             phx-click={hide_modal("logout-without-key-popup")}
@@ -433,7 +445,12 @@
               </ul>
             </div>
 
-            <Layout.Uploader.uploader config={@uploads.file} uploads={@uploads_metadata} />
+            <Layout.Uploader.uploader
+              config={@uploads.file}
+              pub_key={assigns[:peer][:pub_key]}
+              type={:dialog}
+              uploads={@uploads_metadata}
+            />
           </div>
           <div
             id="contentContainer"
@@ -504,17 +521,19 @@
                   <Layout.Uploader.mobile_uploader
                     config={@uploads.file}
                     operating_system={@operating_system}
+                    pub_key={@peer.pub_key}
                     type="dialog"
                     uploads={@uploads_metadata}
                   />
                 </div>
               </div>
               <Layout.MessageInput.render
-                type="dialog"
-                input_mode={@input_mode}
-                edit_content={@edit_content}
-                uploads={@uploads}
                 db_status={@db_status}
+                edit_content={@edit_content}
+                input_mode={@input_mode}
+                operating_system={@operating_system}
+                type="dialog"
+                uploads={@uploads}
               />
             <% end %>
           </div>
@@ -684,7 +703,12 @@
               </div>
             </div>
 
-            <Layout.Uploader.uploader config={@uploads.file} uploads={@uploads_metadata} />
+            <Layout.Uploader.uploader
+              config={@uploads.file}
+              pub_key={assigns[:room][:pub_key]}
+              type={:room}
+              uploads={@uploads_metadata}
+            />
           </div>
           <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
             <%= unless @room do %>
@@ -840,17 +864,19 @@
                   <Layout.Uploader.mobile_uploader
                     config={@uploads.file}
                     operating_system={@operating_system}
+                    pub_key={@room.pub_key}
                     type="room"
                     uploads={@uploads_metadata}
                   />
                 </div>
               </div>
               <Layout.MessageInput.render
-                type="room"
-                input_mode={@input_mode}
-                edit_content={@edit_content}
-                uploads={@uploads}
                 db_status={@db_status}
+                edit_content={@edit_content}
+                input_mode={@input_mode}
+                operating_system={@operating_system}
+                type="room"
+                uploads={@uploads}
               />
             <% end %>
           </div>

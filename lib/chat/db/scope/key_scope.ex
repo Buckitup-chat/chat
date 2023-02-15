@@ -69,34 +69,18 @@ defmodule Chat.Db.Scope.KeyScope do
   end
 
   defp add_content(acc_set, snap, {_, hashes}) do
-    file_index =
-      snap
-      |> db_keys_stream({:file_index, 0, 0, 0}, {:"file_index\0", 0, 0, 0})
-      |> Stream.filter(fn {:file_index, reader_hash, _file_key, _message_id} ->
-        MapSet.member?(hashes, reader_hash)
-      end)
-      |> MapSet.new()
-
-    file_keys =
-      file_index
-      |> Enum.map(fn {:file_index, _reader_hash, file_key, _message_id} -> file_key end)
-      |> MapSet.new()
-
-    file_chunks =
-      snap
-      |> db_keys_stream({:file_chunk, 0, 0, 0}, {:"file_chunk\0", 0, 0, 0})
-      |> Stream.filter(fn {:file_chunk, file_key, _chunk_start, _chunk_end} ->
-        MapSet.member?(file_keys, file_key)
-      end)
-      |> MapSet.new()
-
-    files =
-      snap
-      |> db_keys_stream({:file, 0}, {:"file\0", 0})
-      |> Stream.filter(fn {:file, file_key} ->
-        MapSet.member?(file_keys, file_key)
-      end)
-      |> MapSet.new()
+    [file_index, file_keys, files] =
+      fetch_index_and_records(
+        snap,
+        hashes,
+        "file",
+        min_key: {:file_index, 0, 0, 0},
+        max_key: {:"file_index\0", 0, 0, 0},
+        reader_hash_getter: fn {:file_index, reader_hash, _file_key, _message_id} ->
+          reader_hash
+        end,
+        record_key_getter: fn {:file_index, _reader_hash, file_key, _message_id} -> file_key end
+      )
 
     chunk_keys =
       snap
@@ -109,51 +93,30 @@ defmodule Chat.Db.Scope.KeyScope do
       end)
       |> MapSet.new()
 
-    memo_index =
-      snap
-      |> db_keys_stream({:memo_index, 0, 0}, {:"memo_index\0", 0, 0})
-      |> Stream.filter(fn {:memo_index, reader_hash, _memo_key} ->
-        MapSet.member?(hashes, reader_hash)
-      end)
-      |> MapSet.new()
+    [memo_index, _memo_keys, memos] =
+      fetch_index_and_records(
+        snap,
+        hashes,
+        "memo",
+        min_key: {:memo_index, 0, 0},
+        max_key: {:"memo_index\0", 0, 0},
+        reader_hash_getter: fn {:memo_index, reader_hash, _memo_key} -> reader_hash end,
+        record_key_getter: fn {:memo_index, _reader_hash, memo_key} -> memo_key end
+      )
 
-    memo_keys =
-      memo_index
-      |> Enum.map(fn {:memo_index, _reader_hash, key} -> key end)
-      |> MapSet.new()
-
-    memos =
-      snap
-      |> db_keys_stream({:memo, 0}, {:"memo\0", 0})
-      |> Stream.filter(fn {:memo, key} ->
-        MapSet.member?(memo_keys, key)
-      end)
-      |> MapSet.new()
-
-    room_invite_index =
-      snap
-      |> db_keys_stream({:room_invite_index, 0, 0}, {:"room_invite_index\0", 0, 0})
-      |> Stream.filter(fn {:room_invite_index, reader_hash, _invite_key} ->
-        MapSet.member?(hashes, reader_hash)
-      end)
-      |> MapSet.new()
-
-    room_invite_keys =
-      room_invite_index
-      |> Enum.map(fn {:room_invite_index, _reader_hash, invite_key} -> invite_key end)
-      |> MapSet.new()
-
-    room_invites =
-      snap
-      |> db_keys_stream({:room_invite, 0}, {:"room_invite\0", 0})
-      |> Stream.filter(fn {:room_invite, invite_key} ->
-        MapSet.member?(room_invite_keys, invite_key)
-      end)
-      |> MapSet.new()
+    [room_invite_index, _room_invite_keys, room_invites] =
+      fetch_index_and_records(
+        snap,
+        hashes,
+        "room_invite",
+        min_key: {:room_invite_index, 0, 0},
+        max_key: {:"room_invite_index\0", 0, 0},
+        reader_hash_getter: fn {:room_invite_index, reader_hash, _invite_key} -> reader_hash end,
+        record_key_getter: fn {:room_invite_index, _reader_hash, invite_key} -> invite_key end
+      )
 
     acc_set
     |> union_set(chunk_keys)
-    |> union_set(file_chunks)
     |> union_set(file_index)
     |> union_set(files)
     |> union_set(memo_index)
@@ -180,5 +143,34 @@ defmodule Chat.Db.Scope.KeyScope do
     hashes = Enum.map(binhashes, &Utils.hash/1)
 
     {MapSet.new(binhashes), MapSet.new(hashes)}
+  end
+
+  defp fetch_index_and_records(snap, hashes, record_name, opts) do
+    reader_hash_getter = opts[:reader_hash_getter]
+    record_key_getter = opts[:record_key_getter]
+
+    index =
+      snap
+      |> db_keys_stream(opts[:min_key], opts[:max_key])
+      |> Stream.filter(fn key ->
+        reader_hash = reader_hash_getter.(key)
+        MapSet.member?(hashes, reader_hash)
+      end)
+      |> MapSet.new()
+
+    keys =
+      index
+      |> Enum.map(&record_key_getter.(&1))
+      |> MapSet.new()
+
+    records =
+      snap
+      |> db_keys_stream({String.to_existing_atom(record_name), 0}, {:"#{record_name}\0", 0})
+      |> Stream.filter(fn {_record_name, record_key} ->
+        MapSet.member?(keys, record_key)
+      end)
+      |> MapSet.new()
+
+    [index, keys, records]
   end
 end

@@ -25,10 +25,10 @@ defmodule Chat.AdminRoom do
     AdminDb.get(:pub_key)
   end
 
-  def visit(%Identity{} = admin) do
-    %{hash: hash} = admin_card = admin |> Card.from_identity()
+  def visit(%Identity{public_key: admin_pub_key} = admin) do
+    admin_card = admin |> Card.from_identity()
 
-    AdminDb.put({:new_admin, hash}, admin_card)
+    AdminDb.put({:new_admin, admin_pub_key}, admin_card)
   end
 
   def admin_list do
@@ -36,16 +36,23 @@ defmodule Chat.AdminRoom do
     |> Enum.to_list()
   end
 
-  def store_wifi_password(password) do
-    password
-    |> Utils.encrypt(pub_key())
-    |> then(&AdminDb.put(:wifi_password, &1))
+  def store_wifi_password(
+        password,
+        %Identity{private_key: private, public_key: public} = _admin_room_identity
+      ) do
+    secret = Enigma.compute_secret(private, public)
+
+    AdminDb.put(:wifi_password, Enigma.cipher(password, secret))
   end
 
-  def get_wifi_password(identity) do
+  def get_wifi_password(
+        %Identity{private_key: private, public_key: public} = _admin_room_identity
+      ) do
+    secret = Enigma.compute_secret(private, public)
+
     :wifi_password
     |> AdminDb.get()
-    |> Utils.decrypt(identity)
+    |> Enigma.decipher(secret)
   rescue
     _ -> nil
   end

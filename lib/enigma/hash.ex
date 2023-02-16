@@ -7,24 +7,17 @@ defmodule Enigma.Hash do
   def hash(hashable) do
     hashable
     |> Enigma.Hash.Protocol.to_iodata()
-    |> maybe_binhash()
-    |> Base.encode16(case: :lower)
+    |> binhash()
   end
 
   def short_hash(hashable) do
     hashable
-    |> binhash()
+    |> hash()
     |> then(fn <<code::binary-size(4)>> <> _ -> code end)
     |> Base.encode16(case: :lower)
   end
 
-  def binhash(hashable) do
-    hashable
-    |> Enigma.Hash.Protocol.to_iodata()
-    |> maybe_binhash()
-  end
-
-  defp maybe_binhash(data) do
+  defp binhash(data) do
     :crypto.hash(@hasher, data)
   end
 end

@@ -21,8 +21,8 @@ User list is used to provide dialogs (chats) between users. Users are stored in 
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-{{:users, pub_key_hash},
- %Card{name, pub_key_hash, pub_key}}
+{{:users, public_key},
+ %Card{name, public_key}}
 ```
 
 ## Dialog (chat)
@@ -44,7 +44,7 @@ Dialog key combines hashes of peer pub_keys
 
 ```elixir
 {{:dialog_message, dialog_key, index, message_id},
- %Message{timestamp, is_a_to_b, a_enc_copy, b_enc_copy, type, message_id, version}}
+ %Message{timestamp, is_a_to_b, encrypted_and_signed_message, type, message_id, version}}
 ```
 
 ## Room
@@ -64,7 +64,81 @@ Since room has many users, it has its own private key. It allows holder of a key
 
 ```elixir
 {{:room_message, room_pub_key_binhash, index, message
- %Message{timestamp, author_hash, enc_content, message_type, version}}
+ %Message{timestamp, author_hash, encrypted_and_signed_message, message_type, id, version}}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+classDiagram
+  class Identity {
+    name
+    public_key
+    private_key
+  }
+  class Card {
+    name
+    public_key
+  }
+  class Actor {
+    me: Identity
+    rooms: Identity[]
+    contacts
+  }
+  Actor *-- Identity
+  Identity --o Card
+
+  class Dialog {
+    a_key: public_key
+    b_key: public_key
+  }
+  class DialogMessage {
+    timestamp
+    is_a_to_b: bool
+    message: SafeMessage
+    type: MessageType
+    message_id
+    version
+  }
+  Dialog "1" -- "n" DialogMessage
+
+  class Room {
+    name
+    public_key
+    type
+    requests: []
+    creator_public_key
+  }
+  class RoomMessage {
+    timestamp
+    author_public_key
+    message: SafeMessage
+    type: MessageType
+    message_id
+    version
+  }
+  Room "1" -- "n" RoomMessage
+
+  class SafeMessage {
+    encrypted: text or secretId
+    sign
+  }
+  
+  DialogMessage o-- SafeMessage 
+  RoomMessage o-- SafeMessage 
+
+
+  DB .. "n" Card : public_key
+
+  DB .. "n" Dialog : dialog_key
+  DB .. "n" DialogMessage: dialog_key, index, message_id
+
+  DB .. "n" Room : room_public_key
+  DB .. "n" RoomMessage : room_public_key, index, message_id
+  
+
 ```
 
 ## Messaging
@@ -82,10 +156,12 @@ Message types are
 * `:room_invite` - dialog message to invite user in a room. contains private room key
 * `:room_request` - simple placeholder to draw private room members attention to room requests
 
-All the message types beside `:text` store content in different tables. Message itself becomes a key and a password in json format. Content in different tebles is encrypted with password stored in the message.
+All the message types beside `:text` store content in different tables. Message itself becomes a `id` and a `secret` in binary. Content in different tebles is encrypted with password stored in the message.
 
-```json
-{key: password_base_64_endcoded}
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+secret <> id
 ```
 
 <!-- livebook:{"break_markdown":true} -->

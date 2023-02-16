@@ -30,7 +30,7 @@ defmodule Chat.ChunkedFiles do
   def save_upload_chunk(key, {chunk_start, chunk_end}, chunk) do
     with secret <- ChunkedFilesBroker.get(key),
          false <- is_nil(secret),
-         encoded <- Utils.encrypt_blob(chunk, secret) do
+         encoded <- Enigma.cipher(chunk, secret) do
       Db.put_chunk({{:file_chunk, key, chunk_start, chunk_end}, encoded})
       |> tap(fn
         :ok -> Db.put({:chunk_key, {:file_chunk, key, chunk_start, chunk_end}}, true)
@@ -73,7 +73,7 @@ defmodule Chat.ChunkedFiles do
   def stream_chunks(key, secret) do
     FileFs.stream_file_chunks(key)
     |> Stream.map(fn data ->
-      Utils.decrypt_blob(data, secret)
+      Enigma.decipher(data, secret)
     end)
   end
 
@@ -102,22 +102,22 @@ defmodule Chat.ChunkedFiles do
 
     data =
       encrypt_blob
-      |> Utils.decrypt_blob(secret)
+      |> Enigma.decipher(secret)
       |> :binary.part(start_bypass, range_length)
 
     {{first, first + range_length - 1}, data}
   end
 
-  def encrypt_secret(secret, %Identity{} = me) do
-    secret
-    |> Base.encode64()
-    |> Utils.encrypt(me)
+  def encrypt_secret(secret, %Identity{private_key: private, public_key: public} = _me) do
+    my_secret = Enigma.compute_secret(private, public)
+
+    Enigma.cipher(secret, my_secret)
   end
 
-  def decrypt_secret(encrypted_secret, %Identity{} = me) do
-    encrypted_secret
-    |> Utils.decrypt(me)
-    |> Base.decode64!()
+  def decrypt_secret(encrypted_secret, %Identity{private_key: private, public_key: public} = _me) do
+    my_secret = Enigma.compute_secret(private, public)
+
+    Enigma.decipher(encrypted_secret, my_secret)
   end
 
   def file_chunk_ranges(size) do

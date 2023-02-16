@@ -1,34 +1,38 @@
 defmodule Chat.Identity do
   @moduledoc "Identity to be stored on user device. Can be used for User as well as for Room"
 
-  alias Chat.Codec
-
   @derive {Inspect, only: [:name]}
-  defstruct [:name, :priv_key]
+  defstruct [:name, :private_key, :public_key]
 
   def create(name) do
+    {private, public} = Enigma.generate_keys()
+
     %__MODULE__{
       name: name,
-      priv_key: generate_key()
+      private_key: private,
+      public_key: public
     }
   end
 
-  def pub_key(%__MODULE__{} = identitiy) do
-    X509.PublicKey.derive(identitiy.priv_key)
-  end
+  def pub_key(%__MODULE__{public_key: public}), do: public
 
-  def to_strings(%__MODULE__{name: name, priv_key: key}) do
-    [name, key |> Codec.private_key_to_string()]
+  def to_strings(%__MODULE__{name: name, private_key: private, public_key: public}) do
+    [name, Base.encode64(private <> public)]
   end
 
   def from_strings([name, key_str]) do
-    %__MODULE__{
-      name: name,
-      priv_key: key_str |> Codec.private_key_from_string()
-    }
+    key_str
+    |> Base.decode64!()
+    |> then(fn <<private::binary-size(32), public::binary-size(33)>> ->
+      %__MODULE__{
+        name: name,
+        private_key: private,
+        public_key: public
+      }
+    end)
   end
+end
 
-  defp generate_key do
-    X509.PrivateKey.new_rsa(2048)
-  end
+defimpl Enigma.Hash.Protocol, for: Chat.Identity do
+  def to_iodata(%Chat.Identity{public_key: public}), do: public
 end

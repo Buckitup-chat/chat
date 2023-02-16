@@ -23,8 +23,14 @@ defmodule Enigma.EncryptionTest do
 
     {encrypted, sign} = Enigma.encrypt_and_sign(message, alice_priv_key, bob_pub_key)
 
-    assert {:ok, ^message} = Enigma.decrypt_signed({encrypted, sign}, bob_priv_key, alice_pub_key)
-    assert :error = Enigma.decrypt_signed({encrypted, sign}, bob_priv_key, bob_pub_key)
+    assert {:ok, ^message} =
+             Enigma.decrypt_signed({encrypted, sign}, bob_priv_key, alice_pub_key, alice_pub_key)
+
+    assert {:ok, ^message} =
+             Enigma.decrypt_signed({encrypted, sign}, alice_priv_key, bob_pub_key, alice_pub_key)
+
+    assert :error =
+             Enigma.decrypt_signed({encrypted, sign}, bob_priv_key, bob_pub_key, alice_pub_key)
   end
 
   test "generated secret should be same size and do not repeat" do

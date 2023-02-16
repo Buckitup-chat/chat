@@ -42,10 +42,10 @@ defmodule Enigma.Crypt do
     |> Cipher.decipher(secret)
   end
 
-  def decrypt_signed({encrypted_data, sign}, private, public) do
+  def decrypt_signed({encrypted_data, sign}, private, public, author_public) do
     decrypted = encrypted_data |> decrypt(private, public)
 
-    if Curvy.verify(sign, decrypted, public) do
+    if Curvy.verify(sign, decrypted, author_public) do
       {:ok, decrypted}
     else
       :error

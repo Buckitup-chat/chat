@@ -15,6 +15,8 @@ defmodule ChatWeb.MainLive.Page.Login do
   @local_store_auth_key "buckitUp-chat-auth"
   @local_store_room_count_key "buckitUp-room-count"
 
+  def handshaked(socket), do: socket |> assign(:handshaked, true)
+
   def create_user(socket, name) do
     me = User.login(name |> String.trim())
     id = User.register(me)

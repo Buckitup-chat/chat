@@ -17,10 +17,8 @@ export const hooks = {
   restore(obj) {
     var authData = localStorage.getItem(obj.auth_key)
     var roomCount = localStorage.getItem(obj.room_count_key)
-   
-    if (authData && roomCount) {
-      this.pushEvent(obj.event, {auth: authData, room_count: Number(roomCount)})
-    }
+    var responseData = authData ? {auth: authData, room_count: Number(roomCount)} : {}
+    this.pushEvent(obj.event, responseData)
   },
 
   clear(obj) {

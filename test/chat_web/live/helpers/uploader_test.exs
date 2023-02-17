@@ -8,7 +8,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
   alias Chat.ChunkedFiles
   alias Chat.Dialogs
   alias Chat.Dialogs.{Dialog, PrivateMessage}
-  alias Chat.Files
+  alias Chat.Content.Files
   alias Chat.Rooms
   alias Chat.Rooms.PlainMessage
   alias Chat.Upload.{Upload, UploadIndex, UploadMetadata}

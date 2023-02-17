@@ -15,11 +15,11 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.FileIndex
   alias Chat.Identity
   alias Chat.Log
-  alias Chat.Memo
+  alias Chat.Content.Memo
   alias Chat.MemoIndex
   alias Chat.Messages
   alias Chat.RoomInviteIndex
-  alias Chat.RoomInvites
+  alias Chat.Content.RoomInvites
   alias Chat.Upload.UploadMetadata
   alias Chat.User
   alias Chat.Utils
@@ -125,8 +125,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
     {_index, msg} = message
 
-    FileIndex.save(chunk_key, dialog.a_key |> Utils.hash(), msg.id, chunk_secret)
-    FileIndex.save(chunk_key, dialog.b_key |> Utils.hash(), msg.id, chunk_secret)
+    FileIndex.save(chunk_key, dialog.a_key, msg.id, chunk_secret)
+    FileIndex.save(chunk_key, dialog.b_key, msg.id, chunk_secret)
 
     message
     |> Dialogs.on_saved(dialog, fn ->

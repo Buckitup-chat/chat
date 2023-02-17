@@ -12,11 +12,11 @@ defmodule ChatWeb.MainLive.Layout.Message do
   use ChatWeb, :component
 
   alias Chat.Card
-  alias Chat.Files
+  alias Chat.Content.Files
   alias Chat.Identity
-  alias Chat.Memo
+  alias Chat.Content.Memo
   alias Chat.Messages.ExportHelper
-  alias Chat.RoomInvites
+  alias Chat.Content.RoomInvites
   alias Chat.Rooms.Room
   alias Chat.User
   alias Chat.Utils.StorageId

@@ -39,26 +39,15 @@ defmodule Chat.Rooms.RoomMessages do
     |> ChangeTracker.await()
   end
 
-  def read(%Room{pub_key: room_key}, identity, pub_keys_mapper, {index, id} = _before, amount) do
+  def read(%Room{pub_key: room_key}, identity, {index, id} = _before, amount) do
     {
       key(room_key, 0, 0),
       key(room_key, index, id)
     }
     |> Db.select(amount)
     |> Enum.reverse()
-    |> filter_signed(pub_keys_mapper)
     |> Enum.map(fn {{_, _, index, _}, msg} -> read({index, msg}, identity) end)
-  end
-
-  def read({index, id} = _msg_id, identity, pub_keys_mapper) do
-    identity
-    |> Identity.pub_key()
-    |> key(index, id)
-    |> Db.get()
-    |> then(&[{{nil, nil, index, nil}, &1}])
-    |> filter_signed(pub_keys_mapper)
-    |> Enum.map(fn {{_, _, index, _}, msg} -> read({index, msg}, identity) end)
-    |> List.first()
+    |> Enum.reject(&is_nil/1)
   end
 
   def read(
@@ -66,20 +55,33 @@ defmodule Chat.Rooms.RoomMessages do
          %Message{
            timestamp: timestamp,
            type: type,
-           author_hash: author_hash,
+           author_key: author_key,
            id: id,
-           encrypted: {encrypted, _}
+           encrypted: encrypted
          }},
         identity
       ) do
-    %PlainMessage{
-      timestamp: timestamp,
-      type: type,
-      author_hash: author_hash,
-      index: index,
-      id: id,
-      content: encrypted |> Utils.decrypt(identity)
-    }
+    with {:ok, content} <-
+           encrypted |> Enigma.decrypt_signed(identity.private_key, author_key, author_key) do
+      %PlainMessage{
+        timestamp: timestamp,
+        type: type,
+        author_key: author_key,
+        index: index,
+        id: id,
+        content: content
+      }
+    else
+      _ -> nil
+    end
+  end
+
+  def read({index, id} = _msg_id, identity) do
+    identity
+    |> Identity.pub_key()
+    |> key(index, id)
+    |> Db.get()
+    |> then(&read({index, &1}, identity))
   end
 
   def get_next_message({index, id} = _msg_id, room_identity, predicate) do
@@ -115,7 +117,7 @@ defmodule Chat.Rooms.RoomMessages do
     with room_key <- room_identity |> Identity.pub_key(),
          msg_key <- room_key |> key(index, id),
          msg <- Db.get(msg_key),
-         true <- msg.author_hash == author |> Utils.hash() do
+         true <- msg.author_key == author.public_key do
       {index, msg}
       |> read(room_identity)
       |> Content.delete([room_key |> Utils.hash()], msg.id)
@@ -136,52 +138,38 @@ defmodule Chat.Rooms.RoomMessages do
     with room_key <- room_identity |> Identity.pub_key(),
          msg_key <- room_key |> key(index, id),
          msg <- Db.get(msg_key),
-         true <- msg.author_hash == author |> Utils.hash() do
+         true <- msg.author_key == author.public_key do
       {index, msg}
       |> read(room_identity)
-      |> Content.delete([room_key |> Utils.hash()], msg.id)
+      |> Content.delete([room_key], msg.id)
 
       Db.delete(msg_key)
     end
   end
 
-  def filter_signed(messages, pub_keys_mapper) do
-    ids =
-      messages
-      |> Enum.map(fn {_, %Message{author_hash: id}} -> id end)
-      |> Enum.uniq()
-
-    map = ids |> then(pub_keys_mapper)
-
-    messages
-    |> Enum.filter(fn {_, %Message{encrypted: {data, sign}, author_hash: author}} ->
-      Utils.is_signed_by?(sign, data, map |> Map.get(author))
-    end)
-  end
-
   def key(room_key, time, 0),
-    do: {@db_key, room_key |> Utils.binhash(), time, 0}
+    do: {@db_key, room_key, time, 0}
 
   def key(room_key, time, id),
-    do: {@db_key, room_key |> Utils.binhash(), time, id |> Utils.binhash()}
+    do: {@db_key, room_key, time, id |> Enigma.hash()}
 
-  def delete_by_room(hash) do
+  def delete_by_room(room_key) do
     {
-      {@db_key, hash |> Utils.binhash(), -1, 0},
-      {@db_key, hash |> Utils.binhash(), nil, 0}
+      {@db_key, room_key, -1, 0},
+      {@db_key, room_key, nil, 0}
     }
     |> Db.bulk_delete()
   end
 
   defp add_message(content, room_key, author, opts) do
     content
-    |> Utils.encrypt_and_sign(room_key, author)
-    |> Message.new(author |> Utils.hash(), opts)
+    |> Enigma.encrypt_and_sign(author.private_key, room_key)
+    |> Message.new(author.public_key, opts)
     |> db_save(room_key, opts[:index])
   end
 
   defp db_save(message, room_key, index) do
-    next = index || Chat.Ordering.next({@db_key, room_key |> Utils.binhash()})
+    next = index || Chat.Ordering.next({@db_key, room_key})
 
     room_key
     |> key(next, message.id)

@@ -2,7 +2,7 @@ defmodule Chat.StructuresTest do
   use ExUnit.Case, async: true
 
   test "dialog message" do
-    struct = %Chat.Dialogs.Message{timestamp: 1, is_a_to_b?: false, a_copy: 2, b_copy: 3, id: 4}
+    struct = %Chat.Dialogs.Message{timestamp: 1, is_a_to_b?: false, content: 23, id: 4}
 
     assert "#Chat.Dialogs.Message<timestamp: 1, is_a_to_b?: false, type: nil, id: 4, ...>" ==
              inspect(struct)
@@ -16,9 +16,9 @@ defmodule Chat.StructuresTest do
   end
 
   test "card" do
-    struct = %Chat.Card{name: 1, pub_key: 2, hash: 3}
+    struct = %Chat.Card{name: 1, pub_key: 2}
 
-    assert "#Chat.Card<name: 1, hash: 3, ...>" ==
+    assert "#Chat.Card<name: 1, ...>" ==
              inspect(struct)
   end
 
@@ -43,9 +43,9 @@ defmodule Chat.StructuresTest do
   end
 
   test "room.message" do
-    struct = %Chat.Rooms.Message{timestamp: 0, author_hash: 1, encrypted: 2, type: 3, id: 4}
+    struct = %Chat.Rooms.Message{timestamp: 0, author_key: 1, encrypted: 2, type: 3, id: 4}
 
-    assert "%Chat.Rooms.Message{timestamp: 0, author_hash: 1, encrypted: 2, type: 3, id: 4, version: 1}" ==
+    assert "%Chat.Rooms.Message{timestamp: 0, author_key: 1, encrypted: 2, type: 3, id: 4, version: 1}" ==
              inspect(struct)
   end
 end

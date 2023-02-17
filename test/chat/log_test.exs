@@ -79,7 +79,7 @@ defmodule Chat.LogTest do
   end
 
   defp await(user, index) do
-    ChangeTracker.await({:action_log, index, user |> Utils.binhash()})
+    ChangeTracker.await({:action_log, index, user |> Enigma.hash()})
   end
 
   defp assert_added(count, action) do

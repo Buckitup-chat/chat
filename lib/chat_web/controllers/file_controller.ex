@@ -4,7 +4,7 @@ defmodule ChatWeb.FileController do
 
   alias Chat.Broker
   alias Chat.ChunkedFiles
-  alias Chat.Files
+  alias Chat.Content.Files
 
   # can do part downloads with https://elixirforum.com/t/question-regarding-send-download-send-file-from-binary-in-memory/32507/4
 

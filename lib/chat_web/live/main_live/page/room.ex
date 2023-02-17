@@ -17,7 +17,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.FileIndex
   alias Chat.Identity
   alias Chat.Log
-  alias Chat.Memo
+  alias Chat.Content.Memo
   alias Chat.MemoIndex
   alias Chat.Messages
   alias Chat.RoomInviteIndex

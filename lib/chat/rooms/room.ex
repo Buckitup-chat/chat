@@ -4,11 +4,12 @@ defmodule Chat.Rooms.Room do
   use StructAccess
 
   alias Chat.Identity
+  alias Chat.Rooms.RoomRequest
   alias Chat.Utils
 
   @type room_type() :: :public | :request | :private
   @type t() :: %__MODULE__{
-          admin_hash: String.t(),
+          admin: String.t(),
           name: String.t(),
           pub_key: String.t(),
           requests: list(),
@@ -16,13 +17,11 @@ defmodule Chat.Rooms.Room do
         }
 
   @derive {Inspect, only: [:name, :type]}
-  defstruct [:admin_hash, :name, :pub_key, :requests, type: :public]
+  defstruct [:admin, :name, :pub_key, :requests, type: :public]
 
   def create(%Identity{} = admin, %Identity{name: name} = room, type \\ :public) do
-    admin_hash = admin |> Identity.pub_key() |> Utils.hash()
-
     %__MODULE__{
-      admin_hash: admin_hash,
+      admin: admin |> Identity.pub_key(),
       name: name,
       pub_key: room |> Identity.pub_key(),
       requests: [],
@@ -33,19 +32,16 @@ defmodule Chat.Rooms.Room do
   def add_request(%__MODULE__{type: :private} = room, _), do: room
 
   def add_request(%__MODULE__{requests: requests} = room, %Identity{} = me) do
-    key = me |> Identity.pub_key()
-    hash = key |> Utils.hash()
-
-    %{room | requests: [{hash, key, :pending} | requests]}
+    %{room | requests: [RoomRequest.new(me) | requests]}
   end
 
-  def get_request(%__MODULE__{requests: requests}, user_hash) do
-    Enum.find(requests, fn {hash, _, _} -> hash == user_hash end)
+  def get_request(%__MODULE__{requests: requests}, user_public_key) do
+    Enum.find(requests, &match?(%RoomRequest{requester_key: ^user_public_key}, &1))
   end
 
-  def is_requested_by?(%__MODULE__{requests: requests}, user_hash) do
+  def is_requested_by?(%__MODULE__{requests: requests}, user_public_key) do
     requests
-    |> Enum.any?(fn {hash, _, _} -> hash == user_hash end)
+    |> Enum.any?(&match?(%RoomRequest{requester_key: ^user_public_key}, &1))
   end
 
   def is_requested_by?(_, _), do: false
@@ -53,23 +49,19 @@ defmodule Chat.Rooms.Room do
   def list_pending_requests(%__MODULE__{requests: requests, type: type})
       when type in [:public, :request] do
     requests
-    |> Enum.map(fn
-      {hash, key, :pending} -> {hash, key}
-      {_, _, _} -> nil
-    end)
-    |> Enum.reject(&(&1 == nil))
+    |> Enum.filter(&match?(%RoomRequest{pending?: true}, &1))
   end
 
   def list_pending_requests(_), do: []
 
-  def list_approved_requests_for(%__MODULE__{requests: requests}, user_hash) do
+  def list_approved_requests_for(%__MODULE__{requests: requests}, user_public_key) do
     requests
-    |> Enum.filter(&match?({^user_hash, _, {_, _}}, &1))
+    |> Enum.filter(&match?(%RoomRequest{requester_key: ^user_public_key, pending?: false}, &1))
   end
 
   def approve_request(
         %__MODULE__{requests: requests, type: type} = room,
-        user_hash,
+        user_public_key,
         %Identity{} = room_identity,
         opts
       )
@@ -82,8 +74,15 @@ defmodule Chat.Rooms.Room do
       new_requests =
         requests
         |> Enum.map(fn
-          {^user_hash, key, :pending} -> {user_hash, key, room_identity |> encrypt_identity(key)}
-          {_, _, _} = x -> x
+          %RoomRequest{requester_key: ^user_public_key, pending?: true} ->
+            %RoomRequest{
+              requester_key: user_public_key,
+              pending?: false,
+              ciphered_room_identity: encrypt_identity(room_identity, user_public_key)
+            }
+
+          x ->
+            x
         end)
 
       %{room | requests: new_requests}
@@ -92,32 +91,34 @@ defmodule Chat.Rooms.Room do
 
   def approve_request(room, _, _, _), do: room
 
-  def join_approved_request(%__MODULE__{type: :private} = room, _), do: room
+  def clear_approved_request(%__MODULE__{type: :private} = room, _), do: room
 
-  def join_approved_request(%__MODULE__{requests: requests} = room, %Identity{} = me) do
-    user_hash = me |> Identity.pub_key() |> Utils.hash()
-
+  def clear_approved_request(
+        %__MODULE__{requests: requests} = room,
+        %Identity{public_key: user_public_key} = _me
+      ) do
     new_requests =
       requests
-      |> Enum.filter(fn {hash, _, _} -> hash !== user_hash end)
+      |> Enum.reject(&match?(%RoomRequest{requester_key: ^user_public_key, pending?: false}, &1))
 
     %{room | requests: new_requests}
   end
 
-  def decrypt_identity({encrypted_secret, blob}, %Identity{priv_key: key}) do
-    secret = encrypted_secret |> Utils.decrypt(key)
+  def decrypt_identity(ciphered, %Identity{} = me, room_public_key) do
+    secret = Enigma.compute_secret(me.private_key, room_public_key)
 
-    blob
-    |> Utils.decrypt_blob(secret)
+    ciphered
+    |> Enigma.decipher(secret)
+    |> then(&["", &1])
     |> Identity.from_strings()
   end
 
-  defp encrypt_identity(room_identity, key) do
-    {blob, secret} =
-      room_identity
-      |> Identity.to_strings()
-      |> Utils.encrypt_blob()
+  defp encrypt_identity(room_identity, user_public_key) do
+    secret = Enigma.compute_secret(room_identity.private_key, user_public_key)
 
-    {secret |> Utils.encrypt(key), blob}
+    room_identity
+    |> Identity.to_strings()
+    |> Enum.at(1)
+    |> Enigma.cipher(secret)
   end
 end

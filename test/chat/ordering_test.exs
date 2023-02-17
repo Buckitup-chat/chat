@@ -62,9 +62,9 @@ defmodule Chat.OrderingTest do
       |> elem(1)
 
     ChangeTracker.await(
-      {:room_message, room.pub_key |> Utils.binhash(), last.timestamp, last.id |> Utils.binhash()}
+      {:room_message, room |> Enigma.hash(), last.timestamp, last.id |> Enigma.hash()}
     )
 
-    {:room_message, room.pub_key |> Utils.binhash()}
+    {:room_message, room |> Enigma.hash()}
   end
 end

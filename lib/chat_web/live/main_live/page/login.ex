@@ -83,7 +83,13 @@ defmodule ChatWeb.MainLive.Page.Login do
     |> assign(:room_count_to_backup, 0)
   end
 
-  def clear(%{assigns: %{rooms: _rooms, me: _me}} = socket) do
+  def clear(%{assigns: %{rooms: _rooms, me: me}} = socket, opts \\ []) do
+    topic = login_topic(me)
+    sync = Keyword.get(opts, :sync, false)
+
+    if sync, do: PubSub.broadcast_from(Chat.PubSub, self(), topic, :refresh)
+    PubSub.unsubscribe(Chat.PubSub, topic)
+
     socket
     |> push_event("clear", %{
       auth_key: @local_store_auth_key,

@@ -9,11 +9,9 @@ defmodule Chat.Db.Copying do
   alias Chat.Db.Common
   alias Chat.Db.WriteQueue
 
-  def stream(from, to, awaiter \\ nil) do
-    [from, to]
-    |> Stream.map(fn db ->
-      Task.async(fn -> get_data_keys_set(db) end)
-    end)
+  def stream(from, to, awaiter \\ nil, keys \\ nil) do
+    [{from, keys}, {to, nil}]
+    |> Stream.map(fn {db, keys} -> Task.async(fn -> get_data_keys_set(db, keys) end) end)
     |> Enum.to_list()
     |> Task.await_many(:timer.hours(1))
     |> then(fn [src, dst] ->
@@ -26,20 +24,27 @@ defmodule Chat.Db.Copying do
     end)
   end
 
-  def await_copied(from, to) do
+  def await_copied(from, to, keys \\ nil) do
     to_pipe = Common.names(to)
 
     awaiter = Task.async(&wait_till_done/0)
 
-    stream(from, to, awaiter.pid)
+    stream(from, to, awaiter.pid, keys)
     |> WriteQueue.put_stream(to_pipe.queue)
 
     Task.await(awaiter, :infinity)
   end
 
-  def get_data_keys_set(db) do
+  def get_data_keys_set(db, keys) do
+    keys =
+      if is_nil(keys) do
+        MapSet.new()
+      else
+        keys
+      end
+
     CubDB.with_snapshot(db, fn snap ->
-      {snap, MapSet.new()}
+      {snap, keys}
       |> before_change_tracking()
       |> after_change_tracking_till_chunk_keys()
       |> chunk_keys()

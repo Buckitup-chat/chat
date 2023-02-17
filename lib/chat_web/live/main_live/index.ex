@@ -5,11 +5,12 @@ defmodule ChatWeb.MainLive.Index do
   require Logger
 
   alias Phoenix.LiveView.JS
-  alias ChatWeb.Hooks.{LocalTimeHook, UploaderHook}
+  alias ChatWeb.Hooks.{LocalTimeHook, OnlinersSyncHook, UploaderHook}
   alias ChatWeb.MainLive.{Layout, Page}
 
   on_mount LocalTimeHook
   on_mount UploaderHook
+  on_mount OnlinersSyncHook
 
   @impl true
   def mount(

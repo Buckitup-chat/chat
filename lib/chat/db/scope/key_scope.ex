@@ -14,7 +14,6 @@ defmodule Chat.Db.Scope.KeyScope do
       |> add_dialogs(snap, hashes)
       |> add_rooms(snap, hashes)
       |> add_content(snap, hashes)
-      |> MapSet.to_list()
     end)
   end
 

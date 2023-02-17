@@ -13,8 +13,8 @@ defmodule Chat.Identity do
     }
   end
 
-  def pub_key(%__MODULE__{} = identitiy) do
-    X509.PublicKey.derive(identitiy.priv_key)
+  def pub_key(%__MODULE__{} = identity) do
+    X509.PublicKey.derive(identity.priv_key)
   end
 
   def to_strings(%__MODULE__{name: name, priv_key: key}) do

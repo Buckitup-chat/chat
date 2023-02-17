@@ -16,6 +16,8 @@ defmodule ChatWeb.LiveTestHelpers do
   def prepare_view(%{conn: conn}) do
     {:ok, view, _html} = live(conn, "/")
 
+    render_hook(view, "restoreAuth")
+
     view
     |> form("#login-form", login: %{name: "User"})
     |> render_submit()
@@ -40,6 +42,8 @@ defmodule ChatWeb.LiveTestHelpers do
   @spec login_by_key(%{conn: Plug.Conn.t()}) :: %{socket: Socket.t(), view: view()}
   def login_by_key(%{conn: conn}) do
     {:ok, view, _html} = live(conn, "/")
+
+    render_hook(view, "restoreAuth")
 
     view
     |> element("#importKeyButton")

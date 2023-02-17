@@ -304,7 +304,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
         </div>
 
         <input
-          accept="image/*"
+          accept="image/*, video/*"
           class="image-input hidden p-1 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"
           data-ref={@config.ref}
           id={"#{@config.ref}-android"}

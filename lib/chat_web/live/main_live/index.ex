@@ -32,6 +32,7 @@ defmodule ChatWeb.MainLive.Index do
         socket
         |> assign(
           need_login: true,
+          handshaked: false,
           mode: :user_list,
           monotonic_offset: 0
         )
@@ -56,6 +57,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("restoreAuth", data, socket) when data == %{} do
+    socket
+    |> Page.Login.handshaked()
+    |> noreply()
+  end
+
   def handle_event("restoreAuth", data, %{assigns: %{live_action: :export}} = socket) do
     socket
     |> Page.Login.load_user(data)
@@ -64,6 +71,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_event("restoreAuth", data, socket) do
     socket
+    |> Page.Login.handshaked()
     |> Page.Login.load_user(data)
     |> Page.Lobby.init()
     |> Page.Dialog.init()
@@ -237,7 +245,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_event("logout-wipe", _, socket) do
     socket
-    |> Page.Login.clear()
+    |> Page.Login.clear(sync: true)
     |> Page.Logout.wipe()
     |> noreply()
   end
@@ -310,6 +318,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_info(:refresh, socket) do
+    socket
+    |> redirect(to: "/")
+    |> noreply()
+  end
+
   def handle_info({:exported_key_ring, keys}, socket) do
     socket
     |> Page.ImportKeyRing.save_key_ring(keys)
@@ -354,6 +368,19 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_progress(_file, _entry, socket) do
     socket |> noreply()
+  end
+
+  def loading_screen(assigns) do
+    ~H"""
+    <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg" />
+    <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg" />
+
+    <div class="flex flex-col items-center justify-center w-screen h-screen">
+      <div class="container unauthenticated z-10">
+        <img src="/images/logo.png" />
+      </div>
+    </div>
+    """
   end
 
   defp action_confirmation_popup(assigns) do

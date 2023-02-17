@@ -15,6 +15,8 @@ defmodule ChatWeb.MainLive.Page.Login do
   @local_store_auth_key "buckitUp-chat-auth"
   @local_store_room_count_key "buckitUp-room-count"
 
+  def handshaked(socket), do: socket |> assign(:handshaked, true)
+
   def create_user(socket, name) do
     me = User.login(name |> String.trim())
     id = User.register(me)
@@ -81,7 +83,13 @@ defmodule ChatWeb.MainLive.Page.Login do
     |> assign(:room_count_to_backup, 0)
   end
 
-  def clear(%{assigns: %{rooms: _rooms, me: _me}} = socket) do
+  def clear(%{assigns: %{rooms: _rooms, me: me}} = socket, opts \\ []) do
+    topic = login_topic(me)
+    sync = Keyword.get(opts, :sync, false)
+
+    if sync, do: PubSub.broadcast_from(Chat.PubSub, self(), topic, :refresh)
+    PubSub.unsubscribe(Chat.PubSub, topic)
+
     socket
     |> push_event("clear", %{
       auth_key: @local_store_auth_key,

@@ -7,7 +7,6 @@ defmodule Chat.LogTest do
   alias Chat.Ordering
   alias Chat.Rooms
   alias Chat.User
-  alias Chat.Utils
 
   alias Chat.Log
 
@@ -45,8 +44,8 @@ defmodule Chat.LogTest do
   test "room related logs should save correct" do
     me = User.login("me")
     {room_identity, _room} = Rooms.add(me, "Room name")
-    ChangeTracker.await({:rooms, room_identity |> Identity.pub_key() |> Utils.hash()})
-    room = Rooms.get(room_identity |> Utils.hash())
+    ChangeTracker.await({:rooms, room_identity |> Identity.pub_key()})
+    room = Rooms.get(room_identity |> Identity.pub_key())
     base = Ordering.last({:action_log})
 
     assert_added(6, fn ->

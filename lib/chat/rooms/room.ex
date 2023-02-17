@@ -122,3 +122,7 @@ defmodule Chat.Rooms.Room do
     |> Enigma.cipher(secret)
   end
 end
+
+defimpl Enigma.Hash.Protocol, for: Chat.Rooms.Room do
+  def to_iodata(room), do: room.pub_key
+end

@@ -2,7 +2,6 @@ defmodule Chat.LoginTest do
   use ExUnit.Case, async: true
 
   alias Chat.User
-  alias Chat.Utils
 
   test "login with no identity" do
     correct_name = "Some Name Here"
@@ -19,17 +18,19 @@ defmodule Chat.LoginTest do
   test "message passing" do
     alice = "Alice" |> Chat.Identity.create()
     alice_card = alice |> Chat.Card.from_identity()
+    bob = "Bob" |> Chat.Identity.create()
 
     message = "some message in string"
 
-    assert Utils.encrypt(message, alice_card) != message
+    assert Enigma.encrypt(message, bob.private_key, alice.public_key) != message
 
-    assert ^message = message |> Utils.encrypt(alice_card) |> Utils.decrypt(alice)
+    assert ^message =
+             message
+             |> Enigma.encrypt(bob.private_key, alice.public_key)
+             |> Enigma.decrypt(alice.private_key, bob.public_key)
 
     assert ~s|#Chat.Identity<name: "#{alice.name}", ...>| == inspect(alice)
-
-    assert ~s|#Chat.Card<name: "#{alice_card.name}", hash: "#{alice_card.hash}", ...>| ==
-             inspect(alice_card)
+    assert ~s|#Chat.Card<name: "#{alice_card.name}", ...>| == inspect(alice_card)
   end
 
   test "device codec" do

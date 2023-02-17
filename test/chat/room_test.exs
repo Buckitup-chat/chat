@@ -121,6 +121,7 @@ defmodule Chat.Rooms.RoomTest do
 
     bob = User.login("Bob")
     bob_pub_key = bob |> Identity.pub_key()
+    ChangeTracker.await()
 
     Rooms.add_request(room_key, bob, 0)
     ChangeTracker.await()

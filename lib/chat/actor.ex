@@ -31,7 +31,7 @@ defmodule Chat.Actor do
       [me, rooms, contacts] -> [me, rooms, contacts]
       [me, rooms] -> [me, rooms, %{}]
     end
-    |> then(fn me, rooms, contacts ->
+    |> then(fn [me, rooms, contacts] ->
       new(
         Identity.from_strings(me),
         rooms |> Enum.map(&Identity.from_strings(["", &1])),

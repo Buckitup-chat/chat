@@ -90,7 +90,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
       PubSub.broadcast!(
         Chat.PubSub,
         @topic,
-        {:room_request, room_hash, me |> Identity.pub_key() |> Utils.hash()}
+        {:room_request, room_hash, me |> Identity.pub_key()}
       )
     end)
 
@@ -130,13 +130,13 @@ defmodule ChatWeb.MainLive.Page.Lobby do
       )
       when my_id == user_hash do
     new_room_identity = Rooms.decrypt_identity(encrypted_room_identity, me)
-    room_hash = new_room_identity |> Identity.pub_key() |> Utils.hash()
+    room_hash = new_room_identity |> Identity.pub_key()
 
     if Map.has_key?(room_map, room_hash) do
       socket
     else
       time = Chat.Time.monotonic_to_unix(time_offset)
-      Rooms.join_approved_request(new_room_identity, me)
+      Rooms.clear_approved_request(new_room_identity, me)
       Log.got_room_key(me, time, new_room_identity |> Identity.pub_key())
 
       socket
@@ -190,7 +190,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign(:users, User.list())
   end
 
-  defp assign_room_list(%{assigns: %{rooms: rooms, my_id: my_id}} = socket) do
+  defp assign_room_list(%{assigns: %{room_map: rooms, my_id: my_id}} = socket) do
     {joined, new} = Rooms.list(rooms)
 
     new =
@@ -207,11 +207,11 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     has_admin_key =
       with admin_pub_key <- AdminRoom.pub_key(),
            false <- is_nil(admin_pub_key),
-           admin_hash <- admin_pub_key |> Utils.hash(),
-           identitiy <- rooms[admin_hash],
+           some_data <- admin_pub_key |> Enigma.hash(),
+           identitiy <- rooms[admin_pub_key],
            false <- is_nil(identitiy),
-           sign <- Utils.sign(admin_hash, identitiy),
-           true <- Utils.is_signed_by?(sign, admin_hash, admin_pub_key) do
+           sign <- Enigma.sign(some_data, identitiy.private_key),
+           true <- Enigma.is_valid_sign?(sign, some_data, admin_pub_key) do
         true
       else
         _ -> false

@@ -20,6 +20,9 @@ defmodule Enigma do
               ),
               to: Enigma.Crypt
 
+  defdelegate sign(data, private_key), to: Enigma.Crypt
+  defdelegate is_valid_sign?(sign, data, public_key), to: Enigma.Crypt
+
   defdelegate cipher(plain_iodata, secret), to: Enigma.Cipher
   defdelegate decipher(ciphered_iodata, secret), to: Enigma.Cipher
 

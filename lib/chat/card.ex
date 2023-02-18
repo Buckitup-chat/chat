@@ -6,7 +6,7 @@ defmodule Chat.Card do
   alias Chat.Identity
 
   @derive {Inspect, only: [:name]}
-  defstruct [:name, :pub_key]
+  defstruct [:name, :pub_key, :hash]
 
   def from_identity(%Identity{name: name} = identity) do
     pub_key = identity |> Identity.pub_key()
@@ -17,7 +17,8 @@ defmodule Chat.Card do
   def new(name, pub_key) do
     %__MODULE__{
       name: name,
-      pub_key: pub_key
+      pub_key: pub_key,
+      hash: pub_key |> Base.encode16(case: :lower)
     }
   end
 

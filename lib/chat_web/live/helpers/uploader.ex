@@ -170,14 +170,14 @@ defmodule ChatWeb.LiveHelpers.Uploader do
       entry.client_last_modified
     ]
     |> Enum.join(":")
-    |> Utils.hash()
+    |> Enigma.hash()
   end
 
   defp reader_hash(%{lobby_mode: :chats, peer: %{pub_key: peer_pub_key}}),
-    do: Utils.hash(peer_pub_key)
+    do: peer_pub_key
 
   defp reader_hash(%{lobby_mode: :rooms, room: %{pub_key: room_pub_key}}),
-    do: Utils.hash(room_pub_key)
+    do: room_pub_key
 
   defp maybe_resume_existing_upload(upload_key, assigns) do
     case UploadIndex.get(upload_key) do

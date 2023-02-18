@@ -96,7 +96,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         content
         |> Messages.Text.new(time)
         |> Rooms.add_new_message(me, room.pub_key)
-        |> MemoIndex.add(room, rooms[room.pub_key |> Utils.hash()])
+        |> MemoIndex.add(room, rooms[room.pub_key])
         |> broadcast_new_message(room.pub_key, me, time)
     end
 
@@ -129,7 +129,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
     {_index, msg} = message
 
-    FileIndex.save(chunk_key, pub_key |> Utils.hash(), msg.id, chunk_secret)
+    FileIndex.save(chunk_key, pub_key, msg.id, chunk_secret)
 
     Rooms.on_saved(message, pub_key, fn ->
       broadcast_new_message(message, pub_key, me, time)
@@ -166,7 +166,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         msg_id
       ) do
     content =
-      Rooms.read_message(msg_id, room_identity, &User.id_map_builder/1)
+      Rooms.read_message(msg_id, room_identity)
       |> then(fn
         %{type: :text, content: text} ->
           text
@@ -214,7 +214,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         render_fun
       ) do
     content =
-      Rooms.read_message(msg_id, room_identity, &User.id_map_builder/1)
+      Rooms.read_message(msg_id, room_identity)
       |> then(&%{msg: &1, my_id: my_id})
       |> render_to_html_string(render_fun)
 
@@ -263,7 +263,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def approve_request(%{assigns: %{room_identity: room_identity}} = socket, user_hash) do
-    Rooms.approve_request(room_identity |> Utils.hash(), user_hash, room_identity)
+    Rooms.approve_request(room_identity |> Identity.pub_key(), user_hash, room_identity)
 
     socket
     |> push_event("put-flash", %{key: :info, message: "Request approved!"})
@@ -357,7 +357,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         msg_id
       ) do
     msg_id
-    |> Rooms.read_message(room_identity, &User.id_map_builder/1)
+    |> Rooms.read_message(room_identity)
     |> maybe_redirect_to_file(socket)
   end
 
@@ -413,7 +413,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   defp room_topic(pub_key) do
     pub_key
-    |> Utils.hash()
+    |> Base.encode16(case: :lower)
     |> then(&"room:#{&1}")
   end
 
@@ -431,7 +431,7 @@ defmodule ChatWeb.MainLive.Page.Room do
          } = socket,
          per_page
        ) do
-    messages = Rooms.read(room, identity, &User.id_map_builder/1, {index, 0}, per_page + 1)
+    messages = Rooms.read(room, identity, {index, 0}, per_page + 1)
     page_messages = Enum.take(messages, -per_page)
 
     socket
@@ -443,9 +443,8 @@ defmodule ChatWeb.MainLive.Page.Room do
   defp assign_requests(%{assigns: %{room: %{type: :request} = room}} = socket) do
     request_list =
       room.pub_key
-      |> Utils.hash()
       |> Rooms.list_pending_requests()
-      |> Enum.map(fn {hash, _} -> User.by_id(hash) end)
+      |> Enum.map(fn {pub_key, _} -> User.by_id(pub_key) end)
 
     socket
     |> assign(:room_requests, request_list)

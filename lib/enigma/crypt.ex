@@ -51,4 +51,12 @@ defmodule Enigma.Crypt do
       :error
     end
   end
+
+  def sign(data, private) do
+    Curvy.sign(data, private)
+  end
+
+  def is_valid_sign?(sign, data, public) do
+    match?(true, Curvy.verify(sign, data, public))
+  end
 end

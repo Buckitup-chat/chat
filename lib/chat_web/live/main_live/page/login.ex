@@ -10,7 +10,7 @@ defmodule ChatWeb.MainLive.Page.Login do
   alias Chat.Utils
   alias ChatWeb.MainLive.Page
 
-  @local_store_key "buckitUp-chat-auth"
+  @local_store_key "buckitUp-chat-auth-v2"
 
   def create_user(socket, name) do
     me = User.login(name |> String.trim())
@@ -49,7 +49,10 @@ defmodule ChatWeb.MainLive.Page.Login do
   def store_new_room(%{assigns: %{rooms: rooms, room_map: room_map}} = socket, new_room_identity) do
     socket
     |> assign(:rooms, [new_room_identity | rooms])
-    |> assign(:room_map, Map.put(room_map, Utils.hash(new_room_identity), new_room_identity))
+    |> assign(
+      :room_map,
+      Map.put(room_map, new_room_identity |> Identity.pub_key(), new_room_identity)
+    )
     |> store()
   end
 
@@ -78,7 +81,7 @@ defmodule ChatWeb.MainLive.Page.Login do
     |> assign(:rooms, rooms)
     |> assign(
       :room_map,
-      rooms |> Enum.map(fn room -> {room |> Utils.hash(), room} end) |> Map.new()
+      rooms |> Enum.map(fn room -> {room |> Identity.pub_key(), room} end) |> Map.new()
     )
     |> maybe_create_admin_room()
   end

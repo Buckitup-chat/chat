@@ -42,7 +42,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     ["[dialog] ", "init"] |> Logger.debug()
 
     time = Chat.Time.monotonic_to_unix(time_offset)
-    peer = User.by_id(user_id)
+    peer = User.by_id(user_id |> Base.decode16!(case: :lower))
     dialog = Dialogs.find_or_open(me, peer)
 
     ["[dialog] ", "before subscribe"] |> Logger.debug()
@@ -311,7 +311,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def accept_room_invite_and_open_room(
-        %{assigns: %{me: me, dialog: dialog, rooms: rooms}} = socket,
+        %{assigns: %{me: me, dialog: dialog, room_map: rooms}} = socket,
         message_id
       ) do
     new_room_identitiy =
@@ -321,9 +321,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       |> RoomInvites.get()
       |> Identity.from_strings()
 
-    room_hash = new_room_identitiy |> Utils.hash()
-
-    if rooms |> Enum.any?(&(&1.priv_key == new_room_identitiy.priv_key)) do
+    if rooms[new_room_identitiy.public_key].private_key == new_room_identitiy.private_key do
       socket
     else
       socket
@@ -332,7 +330,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       |> Page.Lobby.refresh_room_list()
     end
     |> close()
-    |> Page.Room.init(room_hash)
+    |> Page.Room.init(new_room_identitiy.public_key |> Base.encode16(case: :lower))
   rescue
     _ -> socket
   end

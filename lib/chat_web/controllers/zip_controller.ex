@@ -15,7 +15,6 @@ defmodule ChatWeb.ZipController do
   alias Chat.Content.Files
   alias Chat.Messages.ExportHelper
   alias Chat.Rooms
-  alias Chat.User
   alias Chat.Utils.StorageId
   alias ChatWeb.MainLive.Layout.Message
 
@@ -144,7 +143,7 @@ defmodule ChatWeb.ZipController do
 
   defp fetch_messages(:room, {messages_ids, _room, _my_id, room_identity}) do
     messages_ids
-    |> Stream.map(fn msg -> Rooms.read_message(msg, room_identity, &User.id_map_builder/1) end)
+    |> Stream.map(fn msg -> Rooms.read_message(msg, room_identity) end)
     |> Enum.reject(&is_nil/1)
   end
 end

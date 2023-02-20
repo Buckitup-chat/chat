@@ -40,9 +40,10 @@ defmodule ChatWeb.UploadChunkController do
         # Logger.debug("+")
         :ok
 
-      time_mark() > till ->
-        # Logger.debug("-")
-        :failed
+      # Slows down upload tremendeously
+      # time_mark() > till ->
+      #   # Logger.debug("-")
+      #   :failed
 
       true ->
         # Logger.debug("_")

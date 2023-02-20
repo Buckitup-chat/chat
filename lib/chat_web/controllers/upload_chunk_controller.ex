@@ -4,12 +4,14 @@ defmodule ChatWeb.UploadChunkController do
   require Logger
 
   alias Chat.ChunkedFiles
+  alias Chat.Upload.UploadStatus
 
   def put(conn, params) do
     with %{"key" => key} <- params,
          {:ok, chunk, conn} <- read_out_chunk(conn),
          [range] <- get_req_header(conn, "content-range"),
          {range_start, range_end, _size} <- parse_range(range),
+         true <- upload_is_active?(key),
          :ok <- save_chunk_till({key, {range_start, range_end}, chunk}, time_mark() + 20) do
       conn
       |> send_resp(200, "")
@@ -19,6 +21,16 @@ defmodule ChatWeb.UploadChunkController do
 
         conn
         |> send_resp(503, "Busy")
+    end
+  end
+
+  defp upload_is_active?(key) do
+    case UploadStatus.get(key) do
+      :active ->
+        true
+
+      _status ->
+        {:error, "upload is inactive"}
     end
   end
 

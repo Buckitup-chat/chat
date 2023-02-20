@@ -26,6 +26,7 @@ defmodule Chat.Application do
       Chat.Broker,
       Chat.ChunkedFilesBroker,
       Chat.Upload.StaleUploadsPruner,
+      {DynamicSupervisor, name: Chat.Upload.UploadSupervisor},
       # Start the Endpoint (http/https)
       ChatWeb.Endpoint,
       # Supervised tasks caller

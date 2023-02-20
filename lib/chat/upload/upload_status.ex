@@ -1,4 +1,8 @@
 defmodule Chat.Upload.UploadStatus do
+  @moduledoc """
+  Holds an upload status for a specific upload.
+  """
+
   use GenServer
 
   @type key :: String.t()

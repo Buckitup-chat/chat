@@ -15,7 +15,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
   alias Chat.User
   alias Chat.Utils.StorageId
   alias ChatWeb.LiveHelpers.Uploader
-  alias Phoenix.LiveView.{Socket, UploadConfig, UploadEntry}
+  alias Phoenix.LiveView.{Socket, UploadConfig, UploadEntry, Utils}
 
   describe "allow_file_upload/3" do
     test "configures file upload" do
@@ -242,6 +242,8 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       assert upload_metadata.status == :active
       assert length(socket.assigns.uploads.file.entries) == 1
+      assert [push_event | _rest] = Utils.get_push_events(socket)
+      assert push_event == ["upload:resume", %{uuid: entry.uuid}]
       {key, _secret} = upload_metadata.credentials
       assert UploadStatus.get(key) == :active
     end

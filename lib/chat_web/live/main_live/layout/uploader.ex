@@ -241,9 +241,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   end
 
   defp resume_upload(uuid) do
-    %JS{}
-    |> JS.dispatch("upload:resume", detail: %{uuid: uuid})
-    |> JS.push("upload:resume", value: %{"uuid" => uuid})
+    JS.push("upload:resume", value: %{"uuid" => uuid})
   end
 
   attr :class, :string, default: nil, doc: "classes to append"

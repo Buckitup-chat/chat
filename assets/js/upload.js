@@ -71,7 +71,7 @@ const uploadEventHandlers = {
 
     uploadInitializers[uuid](chunkCount, status)
   },
-  "upload:resume": (e) => {
+  "phx:upload:resume": (e) => {
     uploads[e.detail.uuid].resume()
   }
 }

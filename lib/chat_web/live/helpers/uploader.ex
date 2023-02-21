@@ -108,7 +108,9 @@ defmodule ChatWeb.LiveHelpers.Uploader do
         {key, _secret} = metadata.credentials
         UploadStatus.put(key, :active)
 
-        assign(socket, :uploads_metadata, Map.put(uploads, uuid, metadata))
+        socket
+        |> assign(:uploads_metadata, Map.put(uploads, uuid, metadata))
+        |> push_event("upload:resume", %{uuid: uuid})
 
       nil ->
         socket

@@ -12,6 +12,7 @@ export const hooks = {
   store(obj) {
     localStorage.setItem(obj.auth_key, obj.auth_data)
     localStorage.setItem(obj.room_count_key, obj.room_count)
+    this.setupAuthEvents(obj.auth_key);
   },
 
   restore(obj) {
@@ -19,6 +20,7 @@ export const hooks = {
     var roomCount = localStorage.getItem(obj.room_count_key)
     var responseData = authData ? {auth: authData, room_count: Number(roomCount)} : {}
     this.pushEvent(obj.event, responseData)
+    if (authData) { this.setupAuthEvents(obj.auth_key) }
   },
 
   clear(obj) {
@@ -42,5 +44,13 @@ export const hooks = {
     }
   },
 
-  resetRoomsToBackup(obj) { localStorage.setItem(obj.key, 0) }
+  resetRoomsToBackup(obj) { localStorage.setItem(obj.key, 0) },
+
+  setupAuthEvents(key) {
+    window.addEventListener('storage', event => {
+      if (event.key === key && event.newValue === null) { 
+        location.reload() 
+      }
+   })
+  }
 }

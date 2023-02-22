@@ -5,6 +5,8 @@ defmodule Chat.Db.CopyingTest do
   alias Chat.Db
   alias Chat.Db.ChangeTracker
   alias Chat.Db.Copying
+  alias Chat.Db.InternalDb
+  alias Chat.Db.MainDb
   alias Chat.Db.MainDbSupervisor
 
   test "one way copying should make a perfect copy" do
@@ -16,10 +18,27 @@ defmodule Chat.Db.CopyingTest do
     |> stop_second_db()
   end
 
+  test "is able to copy only part of the data" do
+    keys =
+      make_some_data()
+      |> Enum.take(10)
+      |> MapSet.new()
+
+    start_second_db()
+    |> copy_from_first_to_second(keys)
+    |> refute_first_is_equal_second()
+    |> stop_second_db()
+  end
+
   defp make_some_data do
-    for i <- 1..200 do
-      Db.put({:some_test_data, UUID.uuid4()}, i)
-    end
+    keys =
+      Enum.reduce(1..200, [], fn i, keys ->
+        key = {:some_test_data, UUID.uuid4()}
+
+        Db.put(key, i)
+
+        [key | keys]
+      end)
 
     key = UUID.uuid4()
     _secret = ChunkedFiles.new_upload(key)
@@ -31,6 +50,8 @@ defmodule Chat.Db.CopyingTest do
     ChunkedFiles.save_upload_chunk(key, {19, 30}, second)
 
     ChangeTracker.await()
+
+    keys
   end
 
   defp start_second_db do
@@ -45,23 +66,23 @@ defmodule Chat.Db.CopyingTest do
     pid
   end
 
-  defp copy_from_first_to_second(pid) do
-    Copying.await_copied(Chat.Db.InternalDb, Chat.Db.MainDb)
+  defp copy_from_first_to_second(pid, keys \\ nil) do
+    Copying.await_copied(Chat.Db.InternalDb, Chat.Db.MainDb, keys)
     Process.sleep(1000)
 
     pid
   end
 
   defp assert_first_is_equal_second(pid) do
-    internal_size = CubDB.size(Chat.Db.InternalDb)
-    second_size = CubDB.size(Chat.Db.MainDb)
+    assert CubDB.size(MainDb) == CubDB.size(InternalDb)
+    assert db_files_dir_hash(InternalDb) == db_files_dir_hash(MainDb)
 
-    assert second_size == internal_size
+    pid
+  end
 
-    internal_dir_hash = Chat.Db.InternalDb |> file_path() |> dir_hash()
-    second_dir_hash = Chat.Db.MainDb |> file_path() |> dir_hash()
-
-    assert internal_dir_hash == second_dir_hash
+  defp refute_first_is_equal_second(pid) do
+    refute CubDB.size(MainDb) == CubDB.size(InternalDb)
+    refute db_files_dir_hash(InternalDb) == db_files_dir_hash(MainDb)
 
     pid
   end
@@ -72,6 +93,12 @@ defmodule Chat.Db.CopyingTest do
 
   defp file_path(db) do
     CubDB.data_dir(db) <> "_files"
+  end
+
+  defp db_files_dir_hash(db) do
+    db
+    |> file_path()
+    |> dir_hash()
   end
 
   defp dir_hash(path) do

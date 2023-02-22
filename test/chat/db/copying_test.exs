@@ -38,6 +38,10 @@ defmodule Chat.Db.CopyingTest do
       "#{Db.file_path()}-main"
       |> MainDbSupervisor.start_link()
 
+    Chat.Db.MainDb
+    |> file_path()
+    |> File.mkdir()
+
     pid
   end
 
@@ -71,7 +75,7 @@ defmodule Chat.Db.CopyingTest do
   end
 
   defp dir_hash(path) do
-    System.cmd("sh", ["-c", "ls -aR #{path} | sha256sum"])
-    |> elem(1)
+    System.cmd("sh", ["-c", "cd #{path} && ls -aR . | sha256sum"])
+    |> elem(0)
   end
 end

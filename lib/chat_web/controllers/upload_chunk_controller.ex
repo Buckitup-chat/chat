@@ -6,7 +6,8 @@ defmodule ChatWeb.UploadChunkController do
   alias Chat.ChunkedFiles
 
   def put(conn, params) do
-    with %{"key" => key} <- params,
+    with %{"key" => text_key} <- params,
+         {:ok, key} <- Base.decode16(text_key, case: :lower),
          {:ok, chunk, conn} <- read_out_chunk(conn),
          [range] <- get_req_header(conn, "content-range"),
          {range_start, range_end, _size} <- parse_range(range),

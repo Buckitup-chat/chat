@@ -4,7 +4,6 @@ defmodule Chat.AdminRoom do
   alias Chat.AdminDb
   alias Chat.Card
   alias Chat.Identity
-  alias Chat.Utils
 
   def created? do
     AdminDb.db()

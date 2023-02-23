@@ -9,7 +9,6 @@ defmodule Chat.Rooms.RoomMessages do
   alias Chat.Rooms.Message
   alias Chat.Rooms.PlainMessage
   alias Chat.Rooms.Room
-  alias Chat.Utils
 
   @db_key :room_message
 

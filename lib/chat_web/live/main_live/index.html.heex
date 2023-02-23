@@ -724,7 +724,7 @@
               <div
                 id="chatContent"
                 class="basis-[93%] pb-1 md:pb-0 overflow-y-scroll flex flex-col justify-between relative a-content-block t-chat-content"
-                id={"room-#{@room.admin_hash}"}
+                id={"room-#{@room.hash}"}
                 phx-hook="Chat"
                 data-page={@page}
                 data-has-more-messages={"#{@has_more_messages}"}

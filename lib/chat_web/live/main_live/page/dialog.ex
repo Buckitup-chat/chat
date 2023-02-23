@@ -22,7 +22,6 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.Content.RoomInvites
   alias Chat.Upload.UploadMetadata
   alias Chat.User
-  alias Chat.Utils
   alias Chat.Utils.StorageId
 
   alias ChatWeb.MainLive.Layout

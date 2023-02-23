@@ -5,7 +5,6 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
 
   alias Chat.Dialogs
   alias Chat.Rooms
-  alias Chat.User
   alias Chat.Utils.StorageId
 
   alias Phoenix.LiveView.JS

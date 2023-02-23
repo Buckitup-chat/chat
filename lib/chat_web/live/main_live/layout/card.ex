@@ -5,7 +5,6 @@ defmodule ChatWeb.MainLive.Layout.Card do
 
   alias Chat.Card
   alias Chat.Rooms.Room
-  alias Chat.Utils
 
   @basic_text_style "text-sm"
   @grayscale_text_style "text-sm tracking-tighter text-grayscale600"

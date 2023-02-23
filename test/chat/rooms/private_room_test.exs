@@ -8,7 +8,7 @@ defmodule Chat.Rooms.PrivateRoomTest do
   alias Chat.Content.RoomInvites
   alias Chat.Rooms
   alias Chat.User
-  alias Chat.Utils
+  alias Chat.Utils.StorageId
 
   test "should create as usual" do
     {_alice, _identity, room} = "Alice" |> make_user_and_private_room()
@@ -65,7 +65,7 @@ defmodule Chat.Rooms.PrivateRoomTest do
 
     bob_room_identity =
       bob_message.content
-      |> Utils.StorageId.from_json()
+      |> StorageId.from_json()
       |> RoomInvites.get()
       |> Identity.from_strings()
 

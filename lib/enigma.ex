@@ -28,6 +28,5 @@ defmodule Enigma do
 
   defdelegate hash(hashable), to: Enigma.Hash
 
-  @deprecated "implement? render_data protocol"
   defdelegate short_hash(hashable), to: Enigma.Hash
 end

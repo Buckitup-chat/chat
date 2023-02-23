@@ -3,7 +3,6 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [push_event: 3]
 
-  alias Chat.AdminDb
   alias Chat.RoomInviteIndex
   alias Phoenix.PubSub
 
@@ -12,7 +11,6 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Chat.Messages
   alias Chat.Rooms
   alias Chat.User
-  alias Chat.Utils
   alias ChatWeb.Router.Helpers, as: Routes
 
   @incoming_topic "platform->chat"

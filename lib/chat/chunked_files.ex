@@ -5,7 +5,6 @@ defmodule Chat.ChunkedFiles do
   alias Chat.Db
   alias Chat.FileFs
   alias Chat.Identity
-  alias Chat.Utils
 
   @type key :: String.t()
   @type secret :: String.t()

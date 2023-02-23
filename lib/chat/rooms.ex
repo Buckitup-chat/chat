@@ -7,7 +7,6 @@ defmodule Chat.Rooms do
   alias Chat.Rooms.Registry
   alias Chat.Rooms.Room
   alias Chat.Rooms.RoomMessages
-  alias Chat.Utils
 
   @doc "Returns new room {Identity, Room}"
   def add(me, name, type \\ :public) do

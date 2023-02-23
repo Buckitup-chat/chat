@@ -5,7 +5,6 @@ defmodule Chat.Rooms.Room do
 
   alias Chat.Identity
   alias Chat.Rooms.RoomRequest
-  alias Chat.Utils
 
   @type room_type() :: :public | :request | :private
   @type t() :: %__MODULE__{
@@ -17,7 +16,7 @@ defmodule Chat.Rooms.Room do
         }
 
   @derive {Inspect, only: [:name, :type]}
-  defstruct [:admin, :name, :pub_key, :requests, type: :public]
+  defstruct [:admin, :name, :pub_key, :hash, :requests, type: :public]
 
   def create(%Identity{} = admin, %Identity{name: name} = room, type \\ :public) do
     %__MODULE__{
@@ -25,7 +24,8 @@ defmodule Chat.Rooms.Room do
       name: name,
       pub_key: room |> Identity.pub_key(),
       requests: [],
-      type: type
+      type: type,
+      hash: room |> Identity.pub_key() |> Base.encode16(case: :lower)
     }
   end
 

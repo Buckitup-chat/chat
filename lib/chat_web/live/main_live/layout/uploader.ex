@@ -64,25 +64,19 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   end
 
   attr :config, UploadConfig, required: true, doc: "upload config"
-  attr :disabled, :boolean, doc: "temporarily disables push-to-talk"
+  attr :enabled, :boolean, default: true, doc: "to allow or to restrict upload"
   attr :type, :string, required: true, doc: "dialog or room"
 
-  def push_to_talk(%{disabled: true} = assigns) do
+  def push_to_talk_button(assigns) do
     ~H"""
-
-    """
-  end
-
-  def push_to_talk(assigns) do
-    ~H"""
-    <div
-      class="flex flex-row items-center"
-      data-ref={@config.ref}
-      id="push-to-talk-wrapper"
-      phx-hook="PushToTalk"
-      phx-update="ignore"
-    >
-      <button class="cursor-pointer mr-2 hidden" id="push-to-talk-button">
+    <div class="flex flex-row items-center">
+      <button
+        class="cursor-pointer mr-2"
+        id="push-to-talk-button"
+        phx-click={
+          if(@enabled, do: open_audio_file_upload_dialog(), else: show_modal("restrict-write-actions"))
+        }
+      >
         <svg class="w-7 h-7 p-1 bg-purple rounded-full fill-white" viewbox="0 0 490.9 490.9">
           <g class="start">
             <path d="M245.5,322.9c53,0,96.2-43.2,96.2-96.2V96.2c0-53-43.2-96.2-96.2-96.2s-96.2,43.2-96.2,96.2v130.5
@@ -99,13 +93,6 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
           </g>
         </svg>
       </button>
-
-      <div class="hidden flex flex-row items-center p-2" id="push-to-talk-details">
-        <div class="animate-recording rounded-full bg-red-400 h-3 w-3" id="push-to-talk-indicator">
-        </div>
-        <div class="mx-2" id="push-to-talk-status"></div>
-        <div class="text-black/50" id="push-to-talk-progress"></div>
-      </div>
     </div>
     """
   end
@@ -202,12 +189,23 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
         style={"width: #{@entry.progress}%;"}
       >
       </div>
+
       <div class="flex flex-row w-full p-2 items-center justify-between z-20 text-black/50">
-        <.sorting_handle />
-        <div class="flex text-xs min-w-[20%] max-w-[50%]">
-          <span class="truncate"><%= @entry.client_name %></span>
+        <div class="sorting-handle flex cursor-pointer w-[70%]">
+          <div class="flex justify-center items-center w-4 h-4">
+            <svg viewBox="0 0 100 80" width="40" height="40">
+              <rect width="100" height="20" rx="8"></rect>
+              <rect y="30" width="100" height="20" rx="8"></rect>
+              <rect y="60" width="100" height="20" rx="8"></rect>
+            </svg>
+          </div>
+
+          <div class="flex text-xs ml-2 min-w-[20%] max-w-[50%]">
+            <span class="truncate"><%= @entry.client_name %></span>
+          </div>
+
+          <div class="flex text-xs ml-auto text-black/50"><%= @entry.progress %>%</div>
         </div>
-        <div class="flex text-xs text-black/50"><%= @entry.progress %>%</div>
 
         <%= if @metadata.status == :active do %>
           <.upload_control phx-click="upload:pause" phx-value-uuid={@entry.uuid}>
@@ -215,7 +213,11 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
           </.upload_control>
         <% else %>
           <.upload_control phx-click="upload:resume" phx-value-uuid={@entry.uuid}>
-            Resume
+            <%= if @metadata.status == :pending do %>
+              Start
+            <% else %>
+              Resume
+            <% end %>
           </.upload_control>
         <% end %>
         <.upload_control
@@ -230,18 +232,6 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     """
   end
 
-  defp sorting_handle(assigns) do
-    ~H"""
-    <div class="flex justify-center items-center w-4 h-4 cursor-pointer sorting-handle">
-      <svg viewBox="0 0 100 80" width="40" height="40">
-        <rect width="100" height="20" rx="8"></rect>
-        <rect y="30" width="100" height="20" rx="8"></rect>
-        <rect y="60" width="100" height="20" rx="8"></rect>
-      </svg>
-    </div>
-    """
-  end
-
   attr :class, :string, default: nil, doc: "classes to append"
   attr :rest, :global, doc: "rest of the attrs"
   slot :inner_block, required: true
@@ -252,6 +242,10 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       <%= render_slot(@inner_block) %>
     </.link>
     """
+  end
+
+  defp open_audio_file_upload_dialog do
+    JS.dispatch("click", to: "#uploader-file-form .audio-file-input")
   end
 
   defp open_file_upload_dialog do
@@ -280,6 +274,17 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
         upload={@config}
       />
 
+      <input
+        accept="audio/*"
+        class="audio-file-input hidden"
+        data-ref={@config.ref}
+        id={"#{@config.ref}-push-to-talk"}
+        name="audio_file"
+        phx-hook="MediaFileInput"
+        type="file"
+        multiple={if(@config.max_entries > 1, do: true)}
+      />
+
       <%= if @operating_system == "Android" do %>
         <div class="flex flex-row justify-around">
           <a
@@ -299,11 +304,12 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
         </div>
 
         <input
-          accept="image/*"
+          accept="image/*, video/*"
           class="image-input hidden p-1 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"
           data-ref={@config.ref}
           id={"#{@config.ref}-android"}
-          phx-hook="AndroidMediaFileInput"
+          name="media_file"
+          phx-hook="MediaFileInput"
           type="file"
           multiple={if(@config.max_entries > 1, do: true)}
         />

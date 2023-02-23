@@ -14,8 +14,8 @@ defmodule Chat.RoomInviteIndex do
       |> Map.fetch!(:content)
       |> StorageId.from_json_to_key()
 
-    Db.put({:room_invite_index, key, dialog.a_key}, true)
-    Db.put({:room_invite_index, key, dialog.b_key}, true)
+    Db.put({:room_invite_index, dialog.a_key, key}, true)
+    Db.put({:room_invite_index, dialog.b_key, key}, true)
 
     indexed_message
   end

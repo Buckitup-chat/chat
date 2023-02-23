@@ -249,7 +249,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
       if active_uploads < @max_concurrent_uploads do
         :active
       else
-        :paused
+        :pending
       end
 
     metadata =
@@ -289,7 +289,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
             false
 
           %UploadMetadata{} = metadata ->
-            entry.valid? and metadata.status == :paused
+            entry.valid? and metadata.status == :pending
         end
       end)
 

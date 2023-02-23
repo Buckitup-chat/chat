@@ -70,7 +70,9 @@ defmodule ChatWeb.Helpers.UploaderTest do
       %{entry: %UploadEntry{} = entry_1} = start_upload(%{view: view})
       %{entry: %UploadEntry{} = entry_2} = start_upload(%{view: view})
       %{entry: %UploadEntry{} = entry_3} = start_upload(%{view: view})
-      %{entry: %UploadEntry{} = entry_4, socket: socket} = start_upload(%{view: view})
+      %{entry: %UploadEntry{} = entry_4} = start_upload(%{view: view})
+      %{entry: %UploadEntry{} = entry_5, socket: socket} = start_upload(%{view: view})
+      socket = Uploader.pause_upload(socket, %{"uuid" => entry_3.uuid})
 
       socket = Uploader.cancel_upload(socket, %{"ref" => entry_1.ref, "uuid" => entry_1.uuid})
 
@@ -79,11 +81,14 @@ defmodule ChatWeb.Helpers.UploaderTest do
       assert %UploadMetadata{status: :active} =
                Map.get(socket.assigns.uploads_metadata, entry_2.uuid)
 
-      assert %UploadMetadata{status: :active} =
+      assert %UploadMetadata{status: :paused} =
                Map.get(socket.assigns.uploads_metadata, entry_3.uuid)
 
-      assert %UploadMetadata{status: :paused} =
+      assert %UploadMetadata{status: :active} =
                Map.get(socket.assigns.uploads_metadata, entry_4.uuid)
+
+      assert %UploadMetadata{status: :pending} =
+               Map.get(socket.assigns.uploads_metadata, entry_5.uuid)
 
       uuids =
         socket.assigns.uploads.file.entries
@@ -94,6 +99,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
       assert MapSet.member?(uuids, entry_2.uuid)
       assert MapSet.member?(uuids, entry_3.uuid)
       assert MapSet.member?(uuids, entry_4.uuid)
+      assert MapSet.member?(uuids, entry_5.uuid)
     end
   end
 
@@ -507,6 +513,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
       %{entry: %UploadEntry{} = entry_2} = start_upload(%{view: view})
       %{entry: %UploadEntry{} = entry_3} = start_upload(%{view: view})
       %{entry: %UploadEntry{} = entry_4, socket: socket} = start_upload(%{view: view})
+      socket = Uploader.pause_upload(socket, %{"uuid" => entry_3.uuid})
 
       entry_1 = %{entry_1 | done?: true, progress: 100}
       assert {:noreply, socket} = Uploader.handle_progress(:file, entry_1, socket)
@@ -516,10 +523,10 @@ defmodule ChatWeb.Helpers.UploaderTest do
       assert %UploadMetadata{status: :active} =
                Map.get(socket.assigns.uploads_metadata, entry_2.uuid)
 
-      assert %UploadMetadata{status: :active} =
+      assert %UploadMetadata{status: :paused} =
                Map.get(socket.assigns.uploads_metadata, entry_3.uuid)
 
-      assert %UploadMetadata{status: :paused} =
+      assert %UploadMetadata{status: :active} =
                Map.get(socket.assigns.uploads_metadata, entry_4.uuid)
     end
   end

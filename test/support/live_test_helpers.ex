@@ -16,6 +16,8 @@ defmodule ChatWeb.LiveTestHelpers do
   def prepare_view(%{conn: conn}) do
     {:ok, view, _html} = live(conn, "/")
 
+    render_hook(view, "restoreAuth")
+
     view
     |> form("#login-form", login: %{name: "User"})
     |> render_submit()
@@ -26,6 +28,38 @@ defmodule ChatWeb.LiveTestHelpers do
       "timezone" => "Europe/Sarajevo",
       "timezone_offset" => 1
     })
+
+    state = :sys.get_state(view.pid)
+    %{socket: state.socket, view: view}
+  end
+
+  @spec reload_view(%{view: view()}) :: %{socket: Socket.t(), view: view()}
+  def reload_view(%{view: view}) do
+    state = :sys.get_state(view.pid)
+    %{socket: state.socket, view: view}
+  end
+
+  @spec login_by_key(%{conn: Plug.Conn.t()}) :: %{socket: Socket.t(), view: view()}
+  def login_by_key(%{conn: conn}) do
+    {:ok, view, _html} = live(conn, "/")
+
+    render_hook(view, "restoreAuth")
+
+    view
+    |> element("#importKeyButton")
+    |> render_click()
+
+    view
+    |> file_input("#my-keys-file-form", :my_keys_file, [
+      %{
+        last_modified: 1_594_171_879_000,
+        name: "TestUser.data",
+        content: File.read!("test/support/fixtures/import_keys/TestUser.data"),
+        size: 1611,
+        type: "text/plain"
+      }
+    ])
+    |> render_upload("TestUser.data")
 
     state = :sys.get_state(view.pid)
     %{socket: state.socket, view: view}

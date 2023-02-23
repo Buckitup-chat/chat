@@ -245,7 +245,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_event("logout-wipe", _, socket) do
     socket
-    |> Page.Login.clear(sync: true)
+    |> Page.Login.clear()
     |> Page.Logout.wipe()
     |> noreply()
   end
@@ -315,12 +315,6 @@ defmodule ChatWeb.MainLive.Index do
   def handle_info(:reset_rooms_to_backup, socket) do
     socket
     |> Page.Login.reset_rooms_to_backup()
-    |> noreply()
-  end
-
-  def handle_info(:refresh, socket) do
-    socket
-    |> redirect(to: "/")
     |> noreply()
   end
 

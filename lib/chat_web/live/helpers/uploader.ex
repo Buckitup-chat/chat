@@ -8,7 +8,6 @@ defmodule ChatWeb.LiveHelpers.Uploader do
 
   alias Chat.{ChunkedFiles, FileIndex}
   alias Chat.Upload.{Upload, UploadIndex, UploadMetadata}
-  alias Chat.Utils
   alias ChatWeb.Endpoint
   alias ChatWeb.MainLive.Page
   alias ChatWeb.Router.Helpers
@@ -141,7 +140,8 @@ defmodule ChatWeb.LiveHelpers.Uploader do
           {socket, uploader_data} =
             start_chunked_upload(socket, entry, upload_key, secret, next_chunk)
 
-          link = Helpers.upload_chunk_url(Endpoint, :put, upload_key)
+          link =
+            Helpers.upload_chunk_url(Endpoint, :put, upload_key |> Base.encode16(case: :lower))
 
           uploader_data = Map.merge(%{entrypoint: link, uuid: entry.uuid}, uploader_data)
 
@@ -271,10 +271,10 @@ defmodule ChatWeb.LiveHelpers.Uploader do
          lobby_mode: :chats,
          peer: %{pub_key: peer_pub_key}
        }),
-       do: %{dialog: dialog, pub_key: peer_pub_key, type: :dialog}
+       do: %{dialog: dialog, pub_key: peer_pub_key |> Base.encode16(case: :lower), type: :dialog}
 
   defp file_upload_destination(%{lobby_mode: :rooms, room: %{pub_key: room_pub_key}}),
-    do: %{pub_key: room_pub_key, type: :room}
+    do: %{pub_key: room_pub_key |> Base.encode16(case: :lower), type: :room}
 
   defp maybe_resume_next_upload(%{assigns: %{uploads_metadata: uploads}} = socket) do
     active_uploads =

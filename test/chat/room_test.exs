@@ -1,9 +1,9 @@
 defmodule Chat.Rooms.RoomTest do
   use ExUnit.Case, async: true
 
+  alias Chat.Content.Memo
   alias Chat.Db.ChangeTracker
   alias Chat.Identity
-  alias Chat.Content.Memo
   alias Chat.Messages
   alias Chat.Rooms
   alias Chat.Rooms.RoomRequest

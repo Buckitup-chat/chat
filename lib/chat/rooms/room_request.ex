@@ -2,8 +2,8 @@ defmodule Chat.Rooms.RoomRequest do
   @moduledoc """
   Room request structure
   """
-  alias Chat.Identity
   alias Chat.Card
+  alias Chat.Identity
 
   defstruct requester_key: nil, pending?: true, ciphered_room_identity: nil
 

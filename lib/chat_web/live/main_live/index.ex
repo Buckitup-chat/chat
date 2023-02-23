@@ -399,7 +399,7 @@ defmodule ChatWeb.MainLive.Index do
     """
   end
 
-  def message_of(%{author_hash: _}), do: "room"
+  def message_of(%{author_key: _}), do: "room"
   def message_of(_), do: "dialog"
 
   defp allow_any500m_upload(socket, type, opts \\ []) do

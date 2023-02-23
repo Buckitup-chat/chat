@@ -51,15 +51,21 @@ defmodule Chat.Dialogs.DialogMessaging do
     author_key = (is_mine? && identity.public_key) || peer_key
 
     with {:ok, content} <-
-           Enigma.decrypt_signed(msg.content, identity.private_key, peer_key, author_key) do
-      %PrivateMessage{
-        timestamp: msg.timestamp,
-        type: msg.type,
-        index: index,
-        id: msg.id,
-        is_mine?: is_mine?,
-        content: content
-      }
+           Enigma.decrypt_signed(
+             msg.content,
+             identity.private_key,
+             peer_key,
+             author_key
+           ),
+         message <- %PrivateMessage{
+           timestamp: msg.timestamp,
+           type: msg.type,
+           index: index,
+           id: msg.id,
+           is_mine?: is_mine?,
+           content: content
+         } do
+      message
     else
       _ ->
         [

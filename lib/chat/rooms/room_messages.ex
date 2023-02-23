@@ -61,15 +61,22 @@ defmodule Chat.Rooms.RoomMessages do
         identity
       ) do
     with {:ok, content} <-
-           encrypted |> Enigma.decrypt_signed(identity.private_key, author_key, author_key) do
-      %PlainMessage{
-        timestamp: timestamp,
-        type: type,
-        author_key: author_key,
-        index: index,
-        id: id,
-        content: content
-      }
+           Enigma.decrypt_signed(
+             encrypted,
+             identity.private_key,
+             author_key,
+             author_key
+           ),
+         message <-
+           %PlainMessage{
+             timestamp: timestamp,
+             type: type,
+             author_key: author_key,
+             index: index,
+             id: id,
+             content: content
+           } do
+      message
     else
       _ -> nil
     end

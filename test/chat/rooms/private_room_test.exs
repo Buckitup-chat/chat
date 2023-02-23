@@ -1,11 +1,11 @@
 defmodule Chat.Rooms.PrivateRoomTest do
   use ExUnit.Case, async: true
 
+  alias Chat.Content.RoomInvites
   alias Chat.Db.ChangeTracker
   alias Chat.Dialogs
   alias Chat.Identity
   alias Chat.Messages
-  alias Chat.Content.RoomInvites
   alias Chat.Rooms
   alias Chat.User
   alias Chat.Utils.StorageId

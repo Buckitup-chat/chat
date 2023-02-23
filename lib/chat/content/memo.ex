@@ -1,8 +1,8 @@
 defmodule Chat.Content.Memo do
   @moduledoc "Context for Memo(long text)"
 
-  alias Chat.Db
   alias Chat.Content.Storage
+  alias Chat.Db
 
   def get({key, secret}), do: get(key, secret)
   def get(key, secret), do: Storage.get_ciphered(db_key(key), secret)

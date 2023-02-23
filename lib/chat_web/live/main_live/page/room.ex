@@ -13,18 +13,17 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   alias Chat.Broker
   alias Chat.ChunkedFiles
+  alias Chat.Content.Memo
   alias Chat.Dialogs
   alias Chat.FileIndex
   alias Chat.Identity
   alias Chat.Log
-  alias Chat.Content.Memo
   alias Chat.MemoIndex
   alias Chat.Messages
   alias Chat.RoomInviteIndex
   alias Chat.Rooms
   alias Chat.Upload.UploadMetadata
   alias Chat.User
-  alias Chat.Utils
   alias Chat.Utils.StorageId
 
   alias ChatWeb.MainLive.Layout
@@ -35,9 +34,9 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def init(socket), do: socket |> assign(:room, nil)
 
-  def init(%{assigns: %{room_map: rooms}} = socket, room_hash) when is_binary(room_hash) do
-    room = Rooms.get(room_hash)
-    room_identity = rooms |> Map.get(room_hash)
+  def init(%{assigns: %{room_map: rooms}} = socket, room_key) when is_binary(room_key) do
+    room = Rooms.get(room_key)
+    room_identity = rooms |> Map.get(room_key)
 
     socket
     |> init({room_identity, room})
@@ -106,10 +105,13 @@ defmodule ChatWeb.MainLive.Page.Room do
   def send_file(
         %{assigns: %{me: me, monotonic_offset: time_offset}} = socket,
         entry,
-        %UploadMetadata{credentials: {chunk_key, chunk_secret}, destination: %{pub_key: pub_key}} =
-          _metadata
+        %UploadMetadata{
+          credentials: {chunk_key, chunk_secret},
+          destination: %{pub_key: text_pub_key}
+        } = _metadata
       ) do
     time = Chat.Time.monotonic_to_unix(time_offset)
+    pub_key = text_pub_key |> Base.decode16!(case: :lower)
 
     message =
       consume_uploaded_entry(
@@ -139,13 +141,15 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def show_new(
-        %{assigns: %{room_identity: identity}} = socket,
-        {index, %{author_hash: hash, encrypted: {data, sign}} = new_message}
+        %{assigns: %{room_identity: %Identity{} = identity}} = socket,
+        {index, new_message}
       ) do
-    if Utils.is_signed_by?(sign, data, User.by_id(hash)) do
+    verified_message = Rooms.read_message({index, new_message}, identity)
+
+    if verified_message do
       socket
       |> assign(:page, 0)
-      |> assign(:messages, [{index, new_message} |> Rooms.read_message(identity)])
+      |> assign(:messages, [verified_message])
       |> assign(:message_update_mode, :append)
       |> push_event("chat:scroll-down", %{})
     else

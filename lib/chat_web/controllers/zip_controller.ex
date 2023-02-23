@@ -11,8 +11,8 @@ defmodule ChatWeb.ZipController do
 
   alias Chat.Broker
   alias Chat.ChunkedFiles
-  alias Chat.Dialogs
   alias Chat.Content.Files
+  alias Chat.Dialogs
   alias Chat.Messages.ExportHelper
   alias Chat.Rooms
   alias Chat.Utils.StorageId

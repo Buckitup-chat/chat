@@ -11,15 +11,15 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
   alias Chat.Broker
   alias Chat.ChunkedFiles
+  alias Chat.Content.Memo
+  alias Chat.Content.RoomInvites
   alias Chat.Dialogs
   alias Chat.FileIndex
   alias Chat.Identity
   alias Chat.Log
-  alias Chat.Content.Memo
   alias Chat.MemoIndex
   alias Chat.Messages
   alias Chat.RoomInviteIndex
-  alias Chat.Content.RoomInvites
   alias Chat.Upload.UploadMetadata
   alias Chat.User
   alias Chat.Utils.StorageId

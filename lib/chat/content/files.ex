@@ -1,8 +1,8 @@
 defmodule Chat.Content.Files do
   @moduledoc "Context for File oprations"
 
-  alias Chat.Db
   alias Chat.Content.Storage
+  alias Chat.Db
 
   def get({key, secret}), do: get(key, secret)
   def get(key, secret), do: Storage.get_ciphered(db_key(key), secret)

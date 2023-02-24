@@ -23,4 +23,6 @@ defmodule ChatWeb.Helpers.OnlinersSync do
 
     socket
   end
+
+  def get_user_keys(socket), do: socket
 end

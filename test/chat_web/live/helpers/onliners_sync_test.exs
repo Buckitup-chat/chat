@@ -3,7 +3,6 @@ defmodule ChatWeb.Helpers.OnlinersSyncTest do
 
   import ChatWeb.LiveTestHelpers
   import Phoenix.LiveViewTest
-  import Support.{FakeData, RetryHelper}
 
   alias ChatWeb.Helpers.OnlinersSync
   alias Phoenix.PubSub
@@ -25,6 +24,17 @@ defmodule ChatWeb.Helpers.OnlinersSyncTest do
 
       assert_receive {:user_keys, keys}
       assert MapSet.size(keys) == 3
+    end
+
+    test "doesn't crash when user is not logged in", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/")
+      state = :sys.get_state(view.pid)
+
+      PubSub.subscribe(Chat.PubSub, "chat_onliners->platform_onliners")
+
+      OnlinersSync.get_user_keys(state.socket)
+
+      refute_receive {:user_keys, _keys}
     end
   end
 end

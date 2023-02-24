@@ -1,14 +1,14 @@
-defmodule Chat.ChunkedFilesMultikey do
-  @moduledoc false
+defmodule Chat.ChunkedFilesMultisecret do
+  @moduledoc "Multisecret handler for chunks ciphering of large files (>~1GB)"
 
   alias Chat.Db
   alias Chat.Utils
 
-  @chunk_group_size 1000 * 1024 * 1024
+  @hundred_chunks_size 1000 * 1024 * 1024
   @secret_size 32
 
-  def generate(file_key, file_size, <<initial_secret::binary-size(@secret_size)>>) do
-    secrets_needed_amount = trunc(file_size / @chunk_group_size)
+  def generate(file_key, file_size, initial_secret) do
+    secrets_needed_amount = trunc(file_size / @hundred_chunks_size)
 
     secrets_needed =
       for amount <- 0..secrets_needed_amount,
@@ -20,16 +20,16 @@ defmodule Chat.ChunkedFilesMultikey do
       else: Db.put({:file_secrets, file_key}, secrets_needed |> Enum.join(""))
   end
 
-  def get_secret(_file_key, offset, <<initial_secret::binary-size(@secret_size)>>)
-      when offset <= @chunk_group_size,
+  def get_secret(_file_key, offset, initial_secret)
+      when offset <= @hundred_chunks_size,
       do: initial_secret
 
-  def get_secret(file_key, offset, <<initial_secret::binary-size(@secret_size)>>) do
+  def get_secret(file_key, offset, initial_secret) do
     secrets = Db.get({:file_secrets, file_key})
-    secret_offset_start = (trunc(offset / @chunk_group_size) - 1) * @secret_size
+    secret_offset_start = (trunc(offset / @hundred_chunks_size) - 1) * @secret_size
 
     secrets
-    |> String.slice(secret_offset_start, @secret_size)
+    |> slice_binary(secret_offset_start, @secret_size)
     |> decrypt_secret(initial_secret)
   end
 
@@ -44,4 +44,6 @@ defmodule Chat.ChunkedFilesMultikey do
   end
 
   defp additional_secret, do: :crypto.strong_rand_bytes(@secret_size)
+
+  defp slice_binary(bin, start, length), do: :binary.part(bin, {start, length})
 end

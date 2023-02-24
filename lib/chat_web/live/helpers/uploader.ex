@@ -6,7 +6,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
   import Phoenix.LiveView
   import Phoenix.Component
 
-  alias Chat.{ChunkedFiles, FileIndex}
+  alias Chat.{ChunkedFiles, ChunkedFilesMultisecret, FileIndex}
   alias Chat.Upload.{Upload, UploadIndex, UploadMetadata}
   alias Chat.Utils
   alias ChatWeb.Endpoint
@@ -138,11 +138,13 @@ defmodule ChatWeb.LiveHelpers.Uploader do
         true ->
           {next_chunk, secret} = maybe_resume_existing_upload(upload_key, socket.assigns)
 
+          initial_secret = ChunkedFiles.get_file(upload_key)
+          ChunkedFilesMultisecret.generate(upload_key, entry.client_size, initial_secret)
+
           {socket, uploader_data} =
             start_chunked_upload(socket, entry, upload_key, secret, next_chunk)
 
           link = Helpers.upload_chunk_url(Endpoint, :put, upload_key)
-
           uploader_data = Map.merge(%{entrypoint: link, uuid: entry.uuid}, uploader_data)
 
           {uploader_data, socket}

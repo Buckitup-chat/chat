@@ -181,7 +181,7 @@ Memo index tracks who can read it
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-{{:memo_index, reader_hash, key}}
+{{:memo_index, reader_key, key}}
 ```
 
 <!-- livebook:{"break_markdown":true} -->
@@ -290,6 +290,74 @@ Room invite index tracks who can reed it.
  true}
 ```
 
+<!-- livebook:{"break_markdown":true} -->
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+classDiagram 
+  class DB
+
+  class RoomInvite {
+    encrypted room identity
+  }
+  RoomInvite -- RoomInviteIndex
+
+
+  class Memo {
+    encrypted text
+  }
+  Memo -- MemoIndex
+
+  class File {
+    data: encrypted FileMeta
+    timestamp
+    filetype
+  }
+
+  class FileMeta {
+    file_key
+    intial_secret
+    file_size
+    file_mime_type
+    file_name
+    human_file_size
+  }
+
+  
+  class FileChunk {
+    encrypted data
+  }
+
+  class ChunkKey
+
+  class UploadIndex {
+    secret
+    timestamp
+  }
+  File o.. FileMeta
+  File -- FileIndex
+  File -- FileChunk
+  File -- UploadIndex
+  FileChunk -- ChunkKey
+
+
+
+
+  DB .. "n" RoomInvite : invite_key
+  DB .. "n" RoomInviteIndex : reader_key, invite_key
+  DB .. "n" Memo : memo_key
+  DB .. "n" MemoIndex : reader_key, memo_key
+  DB .. "n" File : file_key
+  DB .. "n" FileIndex : reader_key, file_key
+  DB .. "n" FileChunk : file_key, chunk_start, chunk_end
+  DB .. "n" ChunkKey : FileChunk key
+  DB .. "n" UploadIndex : file_key
+
+
+  
+```
+
 ## Action log (Feed)
 
 Action log keeps track of user actions
@@ -312,4 +380,21 @@ In the perfect world, we should not use it and split data flows to UI flow (for 
 ```elixir
 {{:change_tracking_marker, uuid},
  true}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+classDiagram
+  class DB
+  class ActionLog {
+    timestamp
+    action
+    opts?
+  }
+
+  DB .. "n" ActionLog : index, user_key
+  DB .. "n" ChangeTrackerMarker : uuid
 ```

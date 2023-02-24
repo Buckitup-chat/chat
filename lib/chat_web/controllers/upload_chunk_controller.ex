@@ -4,6 +4,7 @@ defmodule ChatWeb.UploadChunkController do
   require Logger
 
   alias Chat.ChunkedFiles
+  alias Chat.Upload.UploadStatus
 
   def put(conn, params) do
     with %{"key" => text_key} <- params,
@@ -11,6 +12,7 @@ defmodule ChatWeb.UploadChunkController do
          {:ok, chunk, conn} <- read_out_chunk(conn),
          [range] <- get_req_header(conn, "content-range"),
          {range_start, range_end, _size} <- parse_range(range),
+         true <- upload_is_active?(key),
          :ok <- save_chunk_till({key, {range_start, range_end}, chunk}, time_mark() + 20) do
       conn
       |> send_resp(200, "")
@@ -23,21 +25,31 @@ defmodule ChatWeb.UploadChunkController do
     end
   end
 
-  defp save_chunk_till({key, range, chunk} = data, till) do
-    cond do
-      :ok == ChunkedFiles.save_upload_chunk(key, range, chunk) ->
-        # Logger.debug("+")
-        :ok
+  defp upload_is_active?(key) do
+    case UploadStatus.get(key) do
+      :active ->
+        true
 
-      time_mark() > till ->
-        # Logger.debug("-")
-        :failed
-
-      true ->
-        # Logger.debug("_")
-        Process.sleep(100)
-        save_chunk_till(data, till)
+      _status ->
+        {:error, "upload is inactive"}
     end
+  end
+
+  defp save_chunk_till({key, range, chunk} = data, till) do
+    if ChunkedFiles.save_upload_chunk(key, range, chunk) == :ok do
+      # Logger.debug("+")
+      :ok
+    else
+      # Logger.debug("_")
+      Process.sleep(100)
+      save_chunk_till(data, till)
+    end
+
+    # Slows down upload tremendeously
+    #
+    # time_mark() > till ->
+    #   # Logger.debug("-")
+    #   :failed
   end
 
   defp time_mark, do: System.monotonic_time(:second)

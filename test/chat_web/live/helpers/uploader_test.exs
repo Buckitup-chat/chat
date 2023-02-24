@@ -11,7 +11,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
   alias Chat.Dialogs.{Dialog, PrivateMessage}
   alias Chat.Rooms
   alias Chat.Rooms.PlainMessage
-  alias Chat.Upload.{Upload, UploadIndex, UploadMetadata}
+  alias Chat.Upload.{Upload, UploadIndex, UploadMetadata, UploadStatus}
   alias Chat.Utils.StorageId
   alias ChatWeb.LiveHelpers.Uploader
   alias Phoenix.LiveView.{Socket, UploadConfig, UploadEntry, Utils}
@@ -45,6 +45,16 @@ defmodule ChatWeb.Helpers.UploaderTest do
                metadata.status == :active
              end)
              |> length() == 2
+
+      statuses =
+        socket.assigns.uploads_metadata
+        |> Enum.map(fn {_uuid, %UploadMetadata{} = metadata} ->
+          {key, _secret} = metadata.credentials
+          UploadStatus.get(key)
+        end)
+        |> Enum.frequencies()
+
+      assert %{active: 2, inactive: 1} = statuses
     end
   end
 
@@ -57,17 +67,18 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
     test "cancels an upload", %{view: view} do
       %{entry: %UploadEntry{} = entry, socket: socket} = start_upload(%{view: view})
+      {key, _secret} = socket.assigns.uploads_metadata[entry.uuid].credentials
 
       socket = Uploader.cancel_upload(socket, %{"ref" => entry.ref, "uuid" => entry.uuid})
 
       assert Enum.empty?(socket.assigns.uploads_metadata)
       assert Enum.empty?(socket.assigns.uploads.file.entries)
-      assert [push_event | _rest] = Utils.get_push_events(socket)
-      assert push_event == ["upload:cancel", %{uuid: entry.uuid}]
+      assert catch_exit(UploadStatus.get(key))
     end
 
     test "starts the next upload", %{view: view} do
-      %{entry: %UploadEntry{} = entry_1} = start_upload(%{view: view})
+      %{entry: %UploadEntry{} = entry_1, socket: socket} = start_upload(%{view: view})
+      {key, _secret} = socket.assigns.uploads_metadata[entry_1.uuid].credentials
       %{entry: %UploadEntry{} = entry_2} = start_upload(%{view: view})
       %{entry: %UploadEntry{} = entry_3} = start_upload(%{view: view})
       %{entry: %UploadEntry{} = entry_4} = start_upload(%{view: view})
@@ -77,18 +88,27 @@ defmodule ChatWeb.Helpers.UploaderTest do
       socket = Uploader.cancel_upload(socket, %{"ref" => entry_1.ref, "uuid" => entry_1.uuid})
 
       refute Map.get(socket.assigns.uploads_metadata, entry_1.uuid)
+      assert catch_exit(UploadStatus.get(key))
 
-      assert %UploadMetadata{status: :active} =
+      assert %UploadMetadata{credentials: {key, _secret}, status: :active} =
                Map.get(socket.assigns.uploads_metadata, entry_2.uuid)
 
-      assert %UploadMetadata{status: :paused} =
+      assert UploadStatus.get(key) == :active
+
+      assert %UploadMetadata{credentials: {key, _secret}, status: :paused} =
                Map.get(socket.assigns.uploads_metadata, entry_3.uuid)
 
-      assert %UploadMetadata{status: :active} =
+      assert UploadStatus.get(key) == :inactive
+
+      assert %UploadMetadata{credentials: {key, _secret}, status: :active} =
                Map.get(socket.assigns.uploads_metadata, entry_4.uuid)
 
-      assert %UploadMetadata{status: :pending} =
+      assert UploadStatus.get(key) == :active
+
+      assert %UploadMetadata{credentials: {key, _secret}, status: :pending} =
                Map.get(socket.assigns.uploads_metadata, entry_5.uuid)
+
+      assert UploadStatus.get(key) == :inactive
 
       uuids =
         socket.assigns.uploads.file.entries
@@ -191,8 +211,8 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       assert upload_metadata.status == :paused
       assert length(socket.assigns.uploads.file.entries) == 1
-      assert [push_event | _rest] = Utils.get_push_events(socket)
-      assert push_event == ["upload:pause", %{uuid: entry.uuid}]
+      {key, _secret} = upload_metadata.credentials
+      assert UploadStatus.get(key) == :inactive
     end
 
     test "pausing an already paused upload doesn't crash", %{view: view} do
@@ -221,8 +241,10 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       assert upload_metadata.status == :active
       assert length(socket.assigns.uploads.file.entries) == 1
-      assert [_pause_event, push_event | _rest] = Utils.get_push_events(socket)
+      assert [push_event | _rest] = Utils.get_push_events(socket)
       assert push_event == ["upload:resume", %{uuid: entry.uuid}]
+      {key, _secret} = upload_metadata.credentials
+      assert UploadStatus.get(key) == :active
     end
 
     test "resuming an active upload doesn't crash", %{view: view} do
@@ -248,7 +270,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
                chunk_count: 0,
                entrypoint: entrypoint,
                status: :active,
-               uploader: "UpChunk",
+               uploader: "UpChunkUploader",
                uuid: ^uuid
              } = uploader_data
 
@@ -291,7 +313,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
                chunk_count: 0,
                entrypoint: entrypoint,
                status: :active,
-               uploader: "UpChunk",
+               uploader: "UpChunkUploader",
                uuid: ^uuid
              } = uploader_data
 
@@ -350,7 +372,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
                chunk_count: 0,
                entrypoint: entrypoint,
                status: :active,
-               uploader: "UpChunk",
+               uploader: "UpChunkUploader",
                uuid: ^uuid
              } = uploader_data
 

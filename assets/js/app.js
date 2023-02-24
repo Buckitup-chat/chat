@@ -28,61 +28,21 @@ import AudioFile from "./hooks/audio-file"
 import MediaFileInput from "./hooks/media-file-input"
 import SortableUploadEntries from "./hooks/sortable-upload-entries"
 import UploadInProgress from "./hooks/upload-in-progress"
-import * as UpChunk from "./upchunk"
+import { UpChunkUploader, uploadEventHandlers } from "./upchunk_upload"
 import * as LocalStateStore from "./hooks/local-storage"
 import * as LocalTime from "./hooks/local-time"
 import * as Chat from "./hooks/chat"
 import * as Flash from "./hooks/flash"
-
-let uploads = {}
-let Uploaders = {}
-
-Uploaders.UpChunk = (entries, onViewError) => {
-  entries.forEach(entry => {
-    let { file, meta: { chunk_count: chunkCount, entrypoint, skip, status, uuid } } = entry
-
-    // Skip uploading duplicate file
-    if (skip) {
-      return
-    }
-
-    let upload = UpChunk.createUpload({ chunkSize: 10240, endpoint: entrypoint, file })
-    upload.chunkCount = chunkCount
-
-    if (status == "paused" || status == "pending") {
-      upload.pause()
-    }
-
-    uploads[uuid] = upload
-
-    // stop uploading in the event of a view error
-    onViewError(() => upload.pause())
-
-    // upload error triggers LiveView error
-    upload.on("error", (e) => entry.error(e.detail.message))
-
-    let lastProgressUpdate = 0
-
-    // notify progress events to LiveView
-    upload.on("progress", (e) => {
-      const now = new Date().getTime()
-
-      if (!window.uploaderReorderInProgress && e.detail < 100 && now - lastProgressUpdate > 1000) {
-        entry.progress(e.detail)
-        lastProgressUpdate = now
-      }
-    })
-
-    // success completes the UploadEntry
-    upload.on("success", () => entry.progress(100))
-  })
-}
 
 let Hooks = {
   AudioFile,
   MediaFileInput,
   SortableUploadEntries,
   UploadInProgress
+}
+
+let Uploaders = {
+  UpChunkUploader
 }
 
 Hooks.LocalStateStore = LocalStateStore.hooks
@@ -193,12 +153,6 @@ const listeners = {
       chatContent.scrollTo({ top: chatContent.scrollHeight })
     }, 0)
   },
-  "phx:upload:cancel": (e) => {
-    uploads[e.detail.uuid].abort()
-    delete uploads[e.detail.uuid]
-  },
-  "phx:upload:pause": (e) => { uploads[e.detail.uuid].pause() },
-  "phx:upload:resume": (e) => { uploads[e.detail.uuid].resume() },
   "phx:gallery:preload": (e) => {
     const img = new Image();
     img.onload = function () {
@@ -209,6 +163,7 @@ const listeners = {
     img.classList.add('hidden')
     img.src = e.detail.url;
   },
+  ...uploadEventHandlers
 };
 for (key in listeners) {
   window.addEventListener(key, listeners[key]);

@@ -449,7 +449,6 @@ defmodule ChatWeb.MainLive.Index do
     """
   end
 
-
   defp allow_any500m_upload(socket, type, opts \\ []) do
     socket
     |> allow_upload(type,

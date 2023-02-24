@@ -127,7 +127,10 @@ defmodule ChatWeb.MainLive.Page.Login do
 
     socket
     |> assign(:rooms, [new_room_identity | rooms])
-    |> assign(:room_map, Map.put(room_map, Utils.hash(new_room_identity), new_room_identity))
+    |> assign(
+      :room_map,
+      Map.put(room_map, new_room_identity |> Identity.pub_key(), new_room_identity)
+    )
     |> assign(:room_count_to_backup, room_count)
   end
 
@@ -143,7 +146,8 @@ defmodule ChatWeb.MainLive.Page.Login do
     |> assign(:room_count_to_backup, 0)
   end
 
-  defp login_topic(person), do: "login:" <> Utils.hash(person)
+  defp login_topic(person),
+    do: "login:" <> (person |> Enigma.hash() |> Base.encode16(case: :lower))
 
   defp assign_logged_user(socket, me, id, rooms \\ []) do
     socket
@@ -163,7 +167,7 @@ defmodule ChatWeb.MainLive.Page.Login do
     |> assign(:rooms, rooms)
     |> assign(
       :room_map,
-      rooms |> Enum.map(fn room -> {room |> Utils.hash(), room} end) |> Map.new()
+      rooms |> Enum.map(fn room -> {room.pub_key, room} end) |> Map.new()
     )
   end
 

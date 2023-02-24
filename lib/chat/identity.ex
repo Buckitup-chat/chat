@@ -20,8 +20,10 @@ defmodule Chat.Identity do
     [name, Base.encode64(private <> public)]
   end
 
-  def priv_key_to_string(%__MODULE__{priv_key: key}) do
-    Codec.private_key_to_string(key)
+  def priv_key_to_string(%__MODULE__{} = identity) do
+    identity
+    |> to_strings()
+    |> Enum.at(1)
   end
 
   def from_strings([name, key_str]) do

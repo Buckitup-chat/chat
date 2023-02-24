@@ -456,8 +456,7 @@
             id="contentContainer"
             class="from-green-400 to-blue-500 hidden sm:flex flex flex-col contentContainer"
           >
-            <%= unless @dialog do %>
-            <% else %>
+            <%= if @dialog do %>
               <.live_component
                 module={Layout.ImageGallery}
                 id="imageGallery"

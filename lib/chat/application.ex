@@ -7,6 +7,8 @@ defmodule Chat.Application do
 
   require Logger
 
+  @env Application.compile_env(:chat, :env)
+
   @impl true
   def start(_type, _args) do
     Logger.put_application_level(:ssl, :error)
@@ -25,7 +27,7 @@ defmodule Chat.Application do
       Chat.KeyRingTokens,
       Chat.Broker,
       Chat.ChunkedFilesBroker,
-      Chat.Upload.StaleUploadsPruner,
+      {DynamicSupervisor, name: Chat.Upload.UploadSupervisor},
       # Start the Endpoint (http/https)
       ChatWeb.Endpoint,
       # Supervised tasks caller
@@ -38,8 +40,11 @@ defmodule Chat.Application do
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Chat.Supervisor]
 
-    Supervisor.start_link(children, opts)
+    Supervisor.start_link(children ++ more_children(@env), opts)
   end
+
+  defp more_children(:test), do: []
+  defp more_children(_env), do: [Chat.Upload.StaleUploadsPruner]
 
   # Tell Phoenix to update the endpoint configuration
   # whenever the application is updated.

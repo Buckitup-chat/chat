@@ -3,6 +3,8 @@ defmodule ChatWeb.MainLive.Page.Login do
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [push_event: 3]
 
+  require Logger
+
   alias Phoenix.PubSub
 
   alias Chat.AdminRoom
@@ -30,12 +32,18 @@ defmodule ChatWeb.MainLive.Page.Login do
     |> Page.Lobby.notify_new_user(me |> Chat.Card.from_identity())
   end
 
-  def load_user(socket, %{"auth" => data, "room_count" => room_count}) do
+  def load_user(socket, %{"auth" => data} = params) do
     {me, rooms} = User.device_decode(data)
 
     socket
     |> load_user(me, rooms)
-    |> assign(:room_count_to_backup, room_count)
+    |> assign(:room_count_to_backup, Map.get(params, "room_count", 0))
+  end
+
+  def load_user(socket, x) do
+    x |> inspect() |> Logger.warn()
+
+    socket
   end
 
   def load_user(socket, %Identity{} = me, rooms) do
@@ -51,6 +59,12 @@ defmodule ChatWeb.MainLive.Page.Login do
     |> assign_logged_user(me, id, rooms)
     |> close()
     |> Page.Lobby.notify_new_user(me |> Chat.Card.from_identity())
+  end
+
+  def load_user(socket, x, y) do
+    {x, y} |> inspect() |> Logger.warn()
+
+    socket
   end
 
   def sync_stored_room(%{assigns: %{me: me}} = socket, %{"room_count" => count, "key" => key}) do
@@ -83,12 +97,8 @@ defmodule ChatWeb.MainLive.Page.Login do
     |> assign(:room_count_to_backup, 0)
   end
 
-  def clear(%{assigns: %{rooms: _rooms, me: me}} = socket, opts \\ []) do
-    topic = login_topic(me)
-    sync = Keyword.get(opts, :sync, false)
-
-    if sync, do: PubSub.broadcast_from(Chat.PubSub, self(), topic, :refresh)
-    PubSub.unsubscribe(Chat.PubSub, topic)
+  def clear(%{assigns: %{rooms: _rooms, me: me}} = socket) do
+    PubSub.unsubscribe(Chat.PubSub, login_topic(me))
 
     socket
     |> push_event("clear", %{

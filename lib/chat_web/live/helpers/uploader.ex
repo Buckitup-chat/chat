@@ -7,7 +7,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
   import Phoenix.Component
 
   alias Chat.{ChunkedFiles, FileIndex}
-  alias Chat.Upload.{Upload, UploadIndex, UploadMetadata}
+  alias Chat.Upload.{Upload, UploadIndex, UploadMetadata, UploadStatus, UploadSupervisor}
   alias Chat.Utils
   alias ChatWeb.Endpoint
   alias ChatWeb.MainLive.Page
@@ -48,11 +48,13 @@ defmodule ChatWeb.LiveHelpers.Uploader do
     uploads = Map.get(socket.assigns, :uploads_metadata, %{})
 
     case Map.get(uploads, uuid) do
-      %UploadMetadata{} ->
+      %UploadMetadata{} = metadata ->
+        {key, _secret} = metadata.credentials
+        UploadStatus.stop(key)
+
         socket
         |> assign(:uploads_metadata, Map.delete(uploads, uuid))
         |> cancel_upload(:file, ref)
-        |> push_event("upload:cancel", %{uuid: uuid})
         |> maybe_resume_next_upload()
 
       nil ->
@@ -85,9 +87,10 @@ defmodule ChatWeb.LiveHelpers.Uploader do
       %UploadMetadata{} ->
         metadata = Map.put(uploads[uuid], :status, :paused)
 
-        socket
-        |> assign(:uploads_metadata, Map.put(uploads, uuid, metadata))
-        |> push_event("upload:pause", %{uuid: uuid})
+        {key, _secret} = metadata.credentials
+        UploadStatus.put(key, :inactive)
+
+        assign(socket, :uploads_metadata, Map.put(uploads, uuid, metadata))
 
       nil ->
         socket
@@ -101,6 +104,9 @@ defmodule ChatWeb.LiveHelpers.Uploader do
     case Map.get(uploads, uuid) do
       %UploadMetadata{} ->
         metadata = Map.put(uploads[uuid], :status, :active)
+
+        {key, _secret} = metadata.credentials
+        UploadStatus.put(key, :active)
 
         socket
         |> assign(:uploads_metadata, Map.put(uploads, uuid, metadata))
@@ -148,7 +154,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
           {uploader_data, socket}
       end
 
-    uploader_data = Map.merge(%{uploader: "UpChunk"}, uploader_data)
+    uploader_data = Map.merge(%{uploader: "UpChunkUploader"}, uploader_data)
 
     {:ok, uploader_data, socket}
   end
@@ -262,6 +268,14 @@ defmodule ChatWeb.LiveHelpers.Uploader do
       chunk_count: next_chunk,
       status: status
     }
+
+    child_spec =
+      UploadStatus.child_spec(
+        key: key,
+        status: if(status == :active, do: :active, else: :inactive)
+      )
+
+    DynamicSupervisor.start_child(UploadSupervisor, child_spec)
 
     {assign(socket, :uploads_metadata, Map.put(uploads, entry.uuid, metadata)), uploader_data}
   end

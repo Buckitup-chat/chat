@@ -21,15 +21,9 @@ defmodule Chat.Upload.UploadStatus do
     }
   end
 
-  @spec start_link(key(), status()) :: {:ok, pid} | :ignore
+  @spec start_link(key(), status()) :: {:ok, pid()}
   def start_link(key, status) do
-    case GenServer.start_link(__MODULE__, status, name: get_name(key)) do
-      {:ok, pid} ->
-        {:ok, pid}
-
-      {:error, {:already_started, _pid}} ->
-        :ignore
-    end
+    GenServer.start_link(__MODULE__, status, name: get_name(key))
   end
 
   @spec get(key()) :: status()

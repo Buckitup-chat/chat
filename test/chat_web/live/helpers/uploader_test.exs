@@ -271,7 +271,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
                chunk_count: 0,
                entrypoint: entrypoint,
                status: :active,
-               uploader: "UpChunk",
+               uploader: "UpChunkUploader",
                uuid: ^uuid
              } = uploader_data
 
@@ -310,7 +310,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
                chunk_count: 0,
                entrypoint: entrypoint,
                status: :active,
-               uploader: "UpChunk",
+               uploader: "UpChunkUploader",
                uuid: ^uuid
              } = uploader_data
 
@@ -367,7 +367,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
                chunk_count: 0,
                entrypoint: entrypoint,
                status: :active,
-               uploader: "UpChunk",
+               uploader: "UpChunkUploader",
                uuid: ^uuid
              } = uploader_data
 

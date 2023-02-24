@@ -154,7 +154,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
           {uploader_data, socket}
       end
 
-    uploader_data = Map.merge(%{uploader: "UpChunk"}, uploader_data)
+    uploader_data = Map.merge(%{uploader: "UpChunkUploader"}, uploader_data)
 
     {:ok, uploader_data, socket}
   end

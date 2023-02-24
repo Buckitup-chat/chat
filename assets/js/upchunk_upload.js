@@ -1,6 +1,5 @@
 import * as UpChunk from "./upchunk"
 
-let Uploaders = {}
 let uploads = {}
 let uploadInitializers = {}
 
@@ -48,7 +47,7 @@ const uploadInitializer = (entry, onViewError) => {
   }
 }
 
-Uploaders.UpChunk = (entries, onViewError) => {
+const UpChunkUploader = (entries, onViewError) => {
   entries.forEach(entry => {
     const { meta: { uuid } } = entry
     uploadInitializers[uuid] = uploadInitializer(entry, onViewError)
@@ -76,4 +75,4 @@ const uploadEventHandlers = {
   }
 }
 
-export { Uploaders, uploadEventHandlers }
+export { UpChunkUploader, uploadEventHandlers }

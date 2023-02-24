@@ -28,7 +28,7 @@ import AudioFile from "./hooks/audio-file"
 import MediaFileInput from "./hooks/media-file-input"
 import SortableUploadEntries from "./hooks/sortable-upload-entries"
 import UploadInProgress from "./hooks/upload-in-progress"
-import { Uploaders, uploadEventHandlers } from "./upload"
+import { UpChunkUploader, uploadEventHandlers } from "./upchunk_upload"
 import * as LocalStateStore from "./hooks/local-storage"
 import * as LocalTime from "./hooks/local-time"
 import * as Chat from "./hooks/chat"
@@ -39,6 +39,10 @@ let Hooks = {
   MediaFileInput,
   SortableUploadEntries,
   UploadInProgress
+}
+
+let Uploaders = {
+  UpChunkUploader
 }
 
 Hooks.LocalStateStore = LocalStateStore.hooks

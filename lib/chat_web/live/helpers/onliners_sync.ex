@@ -14,7 +14,11 @@ defmodule ChatWeb.Helpers.OnlinersSync do
 
   @spec get_user_keys(socket()) :: socket()
   def get_user_keys(%Socket{assigns: %{me: me, rooms: rooms}} = socket) do
-    keys = Enum.map([me | rooms], &Identity.pub_key/1)
+    keys =
+      [me | rooms]
+      |> Enum.map(&Identity.pub_key/1)
+      |> MapSet.new()
+
     PubSub.broadcast(Chat.PubSub, @outgoing_topic, {:user_keys, keys})
 
     socket

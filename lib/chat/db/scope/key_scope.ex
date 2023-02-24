@@ -92,6 +92,11 @@ defmodule Chat.Db.Scope.KeyScope do
       end)
       |> MapSet.new()
 
+    file_chunks =
+      chunk_keys
+      |> Enum.map(fn {:chunk_key, file_chunk} -> file_chunk end)
+      |> MapSet.new()
+
     [memo_index, _memo_keys, memos] =
       fetch_index_and_records(
         snap,
@@ -117,6 +122,7 @@ defmodule Chat.Db.Scope.KeyScope do
     acc_set
     |> union_set(chunk_keys)
     |> union_set(file_index)
+    |> union_set(file_chunks)
     |> union_set(files)
     |> union_set(memo_index)
     |> union_set(memos)
@@ -164,7 +170,7 @@ defmodule Chat.Db.Scope.KeyScope do
 
     records =
       snap
-      |> db_keys_stream({String.to_existing_atom(record_name), 0}, {:"#{record_name}\0", 0})
+      |> db_keys_stream({:"#{record_name}", 0}, {:"#{record_name}\0", 0})
       |> Stream.filter(fn {_record_name, record_key} ->
         MapSet.member?(keys, record_key)
       end)

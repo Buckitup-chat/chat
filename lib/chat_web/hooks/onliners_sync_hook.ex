@@ -8,7 +8,6 @@ defmodule ChatWeb.Hooks.OnlinersSyncHook do
   alias ChatWeb.Helpers.OnlinersSync
   alias Phoenix.LiveView.{Session, Socket}
   alias Phoenix.PubSub
-  alias Phoenix.Socket.Broadcast
 
   @type name :: atom()
   @type params :: map()
@@ -24,7 +23,7 @@ defmodule ChatWeb.Hooks.OnlinersSyncHook do
     {:cont,
      socket
      |> attach_hook(:onliners_sync, :handle_info, fn
-       %Broadcast{event: "get_user_keys"}, socket ->
+       "get_user_keys", socket ->
          {:halt, OnlinersSync.get_user_keys(socket)}
 
        _message, socket ->

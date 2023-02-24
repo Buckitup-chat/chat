@@ -3,14 +3,14 @@ defmodule ChatWeb.Hooks.OnlinersSyncHookTest do
 
   import ChatWeb.LiveTestHelpers
 
-  alias Phoenix.Socket.Broadcast
+  alias Phoenix.PubSub
 
   describe "on_mount/4" do
     test "handles get_user_keys messages", %{conn: conn} do
       %{view: view} = prepare_view(%{conn: conn})
       open_dialog(%{view: view})
 
-      assert %Broadcast{} = send(view.pid, %Broadcast{event: "get_user_keys"})
+      PubSub.broadcast(Chat.PubSub, "platform_onliners->chat_onliners", "get_user_keys")
       :timer.sleep(100)
     end
   end

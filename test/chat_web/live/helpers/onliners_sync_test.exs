@@ -24,7 +24,7 @@ defmodule ChatWeb.Helpers.OnlinersSyncTest do
       OnlinersSync.get_user_keys(socket)
 
       assert_receive {:user_keys, keys}
-      assert length(keys) == 3
+      assert MapSet.size(keys) == 3
     end
   end
 end

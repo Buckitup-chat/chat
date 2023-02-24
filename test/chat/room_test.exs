@@ -252,6 +252,13 @@ defmodule Chat.Rooms.RoomTest do
              |> Memo.get()
   end
 
+  test "room hash" do
+    {_alice, room_identity, room} = alice_and_room()
+
+    assert room_identity |> Enigma.hash() == room |> Enigma.hash()
+    assert room_identity.public_key |> Enigma.hash() == room |> Enigma.hash()
+  end
+
   defp alice_and_room do
     alice = User.login("Alice")
 

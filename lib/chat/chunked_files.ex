@@ -2,6 +2,7 @@ defmodule Chat.ChunkedFiles do
   @moduledoc "Chunked files logic"
 
   alias Chat.ChunkedFilesBroker
+  alias Chat.ChunkedFilesMultisecret
   alias Chat.Db
   alias Chat.FileFs
   alias Chat.Identity
@@ -27,8 +28,9 @@ defmodule Chat.ChunkedFiles do
   end
 
   def save_upload_chunk(key, {chunk_start, chunk_end}, chunk) do
-    with secret <- ChunkedFilesBroker.get(key),
-         false <- is_nil(secret),
+    with initial_secret <- ChunkedFilesBroker.get(key),
+         false <- is_nil(initial_secret),
+         secret <- ChunkedFilesMultisecret.get_secret(key, chunk_start, initial_secret),
          encoded <- Enigma.cipher(chunk, secret) do
       Db.put_chunk({{:file_chunk, key, chunk_start, chunk_end}, encoded})
       |> tap(fn

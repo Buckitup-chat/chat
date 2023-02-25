@@ -20,8 +20,7 @@ defmodule Chat.Files do
     Db.delete({:file, key})
   end
 
-  def add(data) do
-    key = UUID.uuid4()
+  def add([key, _, _, _, _, _] = data) do
     {blob, secret} = Utils.encrypt_blob(data)
     Db.put({:file, key}, blob)
 

@@ -203,6 +203,11 @@ defmodule Chat.Db.Scope.KeyScopeTest do
                Kernel.match?({:file_chunk, _file_key, _chunk_start, _chunk_end}, key)
              end) == 2
 
+      assert Enum.member?(keys, {:file, first_file_key})
+      refute Enum.member?(keys, {:file, second_file_key})
+
+      assert Enum.count(keys, fn key -> Kernel.match?({:file, _file_key}, key) end) == 1
+
       alice_bob_dialog_binhash =
         [alice_hash, bob_hash]
         |> Enum.sort()

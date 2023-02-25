@@ -58,6 +58,9 @@ defmodule Chat.Rooms do
   def read_message({_, %Message{}} = msg, %Identity{} = identity),
     do: RoomMessages.read(msg, identity)
 
+  def read_message({_, _} = msg_id, %Identity{} = identity, id_map_builder),
+    do: RoomMessages.read(msg_id, identity, id_map_builder)
+
   def read_prev_message(
         msg_id,
         %Identity{} = identity,
@@ -87,9 +90,6 @@ defmodule Chat.Rooms do
         RoomMessages.read(message, identity)
     end
   end
-
-  def read_message({_, _} = msg_id, %Identity{} = identity, id_map_builder),
-    do: RoomMessages.read(msg_id, identity, id_map_builder)
 
   defdelegate read(
                 room,
@@ -124,7 +124,7 @@ defmodule Chat.Rooms do
 
   @doc """
   Approves the room request for user.
-  Opts: 
+  Opts:
     * :public_only - Ignores aproval for a non-public room if `true`. Defaults to `false`.
   """
   def approve_request(room_hash, user_hash, room_identity, opts \\ []) do

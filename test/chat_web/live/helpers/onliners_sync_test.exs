@@ -37,4 +37,18 @@ defmodule ChatWeb.Helpers.OnlinersSyncTest do
       refute_receive {:user_keys, _keys}
     end
   end
+
+  test "doesn't crash when user has logged out recently", %{conn: conn} do
+    %{view: view} = prepare_view(%{conn: conn})
+
+    view
+    |> element(~S{[phx-click="logout-wipe"]})
+    |> render_click()
+
+    state = :sys.get_state(view.pid)
+
+    OnlinersSync.get_user_keys(state.socket)
+
+    refute_receive {:user_keys, _keys}
+  end
 end

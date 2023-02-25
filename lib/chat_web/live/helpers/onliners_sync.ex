@@ -13,7 +13,8 @@ defmodule ChatWeb.Helpers.OnlinersSync do
   @outgoing_topic "chat_onliners->platform_onliners"
 
   @spec get_user_keys(socket()) :: socket()
-  def get_user_keys(%Socket{assigns: %{me: me, rooms: rooms}} = socket) do
+  def get_user_keys(%Socket{assigns: %{me: me, rooms: rooms}} = socket)
+      when not is_nil(me) and not is_nil(rooms) do
     keys =
       [me | rooms]
       |> Enum.map(&Identity.pub_key/1)

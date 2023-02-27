@@ -73,6 +73,12 @@ defmodule Chat.Utils do
     :crypto.crypto_one_time(@cipher, key, :crypto.exor(iv, iv2), data, true)
   end
 
+  def encrypt_blob(data, <<iv::binary-size(8), key::binary-size(16)>>) when is_list(data) do
+    data
+    |> Enum.map(&:crypto.crypto_one_time(@cipher, key, iv, &1, true))
+    |> then(&{&1, iv <> key})
+  end
+
   def encrypt_blob(data, <<iv::binary-size(8), key::binary-size(16)>>) do
     :crypto.crypto_one_time(@cipher, key, iv, data, true)
   end

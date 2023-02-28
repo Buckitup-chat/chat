@@ -167,7 +167,7 @@ defmodule ChatWeb.MainLive.Page.Login do
     |> assign(:rooms, rooms)
     |> assign(
       :room_map,
-      rooms |> Enum.map(fn room -> {room.pub_key, room} end) |> Map.new()
+      rooms |> Enum.map(fn room -> {room.public_key, room} end) |> Map.new()
     )
   end
 

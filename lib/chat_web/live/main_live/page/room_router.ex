@@ -55,7 +55,7 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
         socket |> Page.Room.send_text(text)
 
       {"switch", %{"room" => hash}} ->
-        socket |> Page.Room.close() |> Page.Room.init(hash)
+        socket |> Page.Room.close() |> Page.Room.init(hash |> Base.decode16!(case: :lower))
 
       {"sync-stored", data} ->
         socket |> Page.Login.sync_stored_room(data)

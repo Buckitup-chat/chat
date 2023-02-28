@@ -1,5 +1,5 @@
 defmodule Chat.Db.Scope.KeyScopeTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Chat.Db.ChangeTracker
 

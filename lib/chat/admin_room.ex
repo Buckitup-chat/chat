@@ -1,6 +1,7 @@
 defmodule Chat.AdminRoom do
   @moduledoc "Admin Room functions"
 
+  alias Chat.Admin.MediaSettings
   alias Chat.AdminDb
   alias Chat.Card
   alias Chat.Identity
@@ -15,6 +16,8 @@ defmodule Chat.AdminRoom do
     if created?() do
       raise "Admin room already created"
     end
+
+    AdminDb.put(:media_settings, %MediaSettings{})
 
     "Admin room"
     |> Identity.create()
@@ -49,4 +52,17 @@ defmodule Chat.AdminRoom do
   rescue
     _ -> nil
   end
+
+  def get_media_settings do
+    media_settings = AdminDb.get(:media_settings)
+
+    if media_settings do
+      media_settings
+    else
+      %MediaSettings{}
+    end
+  end
+
+  def store_media_settings(%MediaSettings{} = media_settings),
+    do: AdminDb.put(:media_settings, media_settings)
 end

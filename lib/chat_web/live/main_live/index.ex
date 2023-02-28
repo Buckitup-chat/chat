@@ -6,6 +6,7 @@ defmodule ChatWeb.MainLive.Index do
 
   alias Phoenix.LiveView.JS
   alias ChatWeb.Hooks.{LocalTimeHook, OnlinersSyncHook, UploaderHook}
+  alias ChatWeb.MainLive.Admin.MediaSettingsForm
   alias ChatWeb.MainLive.{Layout, Page}
 
   on_mount LocalTimeHook

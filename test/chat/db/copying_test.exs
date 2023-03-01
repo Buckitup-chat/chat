@@ -9,6 +9,16 @@ defmodule Chat.Db.CopyingTest do
   alias Chat.Db.MainDb
   alias Chat.Db.MainDbSupervisor
 
+  setup_all do
+    Db.db()
+    |> CubDB.clear()
+
+    File.rm_rf!("priv/test_admin_db")
+    File.rm_rf!("priv/test_db")
+
+    :ok
+  end
+
   test "one way copying should make a perfect copy" do
     make_some_data()
 

@@ -98,6 +98,8 @@ defmodule Chat.Db.Scope.KeyScopeTest do
         |> Map.fetch!(:content)
         |> Utils.StorageId.from_json_to_key()
 
+      ChangeTracker.await()
+
       Rooms.add_request(first_room_hash, charlie, 1)
       Rooms.approve_request(first_room_hash, charlie_hash, room_identity, [])
       Rooms.join_approved_request(room_identity, charlie)

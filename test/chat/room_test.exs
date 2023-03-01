@@ -88,6 +88,8 @@ defmodule Chat.Rooms.RoomTest do
 
     assert room_identity == decrypted_identity
 
+    ChangeTracker.await()
+
     room = room_identity |> Rooms.join_approved_request(bob)
 
     assert [] = room.requests
@@ -117,6 +119,8 @@ defmodule Chat.Rooms.RoomTest do
     bob = User.login("Bob")
     bob_pub_key = bob |> Identity.pub_key()
     bob_hash = bob |> Utils.hash()
+
+    ChangeTracker.await()
 
     Rooms.add_request(room_hash, bob, 0)
     ChangeTracker.await()

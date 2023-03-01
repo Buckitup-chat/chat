@@ -105,6 +105,8 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     |> assign_room_list()
   end
 
+  def render_device_log(socket, {nil, log}), do: render_device_log(socket, log)
+
   def render_device_log(socket, log) do
     key =
       log

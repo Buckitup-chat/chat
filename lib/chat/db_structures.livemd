@@ -270,6 +270,14 @@ Each entry contains
 {{:upload_index, chunk_key}, %Chat.Upload.Upload{}}
 ```
 
+This approach has been proposed that involves the use of a new key and initialization vector (IV) for every 100 file chunks, or approximately 1GB of data.The first secret and IV will be used to decipher the first 100 file chunks. Subsequently, the :file_secrets for the file_key will be resecreted for the next 100 file chunks. The resecrets will be generated using the previous secret and IV. The first resecret generated will be used to decipher the second GB of the file, and so on.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:file_secrets, file_key}, resecrets}
+```
+
 <!-- livebook:{"break_markdown":true} -->
 
 #### Room invites
@@ -329,6 +337,10 @@ classDiagram
     encrypted data
   }
 
+  class FileSecrets {
+    encrypted secrets
+  }
+
   class ChunkKey
 
   class UploadIndex {
@@ -338,6 +350,7 @@ classDiagram
   File o.. FileMeta
   File -- FileIndex
   File -- FileChunk
+  File -- FileSecrets
   File -- UploadIndex
   FileChunk -- ChunkKey
 
@@ -351,6 +364,7 @@ classDiagram
   DB .. "n" File : file_key
   DB .. "n" FileIndex : reader_key, file_key
   DB .. "n" FileChunk : file_key, chunk_start, chunk_end
+  DB .. "n" FileSecrets : file_key
   DB .. "n" ChunkKey : FileChunk key
   DB .. "n" UploadIndex : file_key
 

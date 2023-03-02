@@ -18,7 +18,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   def uploader(assigns) do
     ~H"""
     <div
-    class={classes("flex bottom-[6%] w-full bg-white/90 left-30 flex-col fixed h-[27%] md:bottom-[-10px] md:w-[18%] md:h-[50%] overflow-scroll", %{"hidden" => @uploads == %{}})}
+      class={classes("flex bottom-[6%] w-full bg-white/90 left-30 flex-col fixed h-[27%] md:bottom-[-10px] md:w-[18%] md:h-[50%] overflow-scroll", %{"hidden" => @uploads == %{}})}
       id="file-uploader"
     >
       <.entries config={@config} pub_key={@pub_key} type={@type} uploads={@uploads} />

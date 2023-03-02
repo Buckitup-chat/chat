@@ -214,7 +214,19 @@ graph LR;
 
 ## Bird's-eye view
 
-<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+### Private key usage scheme
+
+Private keys are stored on user browser only. For operational needs the keys are copied in memory of a device.
+
+The system uses private keys for
+
+* Messaging - ecrypting and decrypting messages
+* Rooms approval - encrypting room key for a new member of a room
+* Upload reviving - encrypting File secret while file is being uploaded to make possible upload continuation after user disconnect.
+
+On new  room approval for the user new room key is sent to a browser.
+
+<!-- livebook:{"break_markdown":true} -->
 
 ```mermaid
 graph TD;
@@ -243,10 +255,50 @@ graph TD;
 
 <!-- livebook:{"break_markdown":true} -->
 
-Current client split
+### Client side private keys
 
-Client side encryption
+We may move private key usage on client side for stronger security.
+This way private keys never leave client.
+
+The server will send encrypted messages to the client. Client will decrypt them (having private key).
+To send new message client will need to encrypt it first, then send to server side.
+
+Room approval will need client to encode room private key for a particular user.
+
+Upload secret may be stored on client side while upload is in progress.
+
+Messages export as zip-file has messages decrypted. To do so on server-side we wouuld need to ask client to provide decrypted messages. Or consiider moving this functionality on client side.
+
+<!-- livebook:{"break_markdown":true} -->
+
+```mermaid
+graph TD;
+  subgraph Browser
+    direction TB;
+
+    uk(User key)
+    rk(Room keys)
+
+    m{{Messaging}}
+    upl{{Revived upload}}
+
+    uk -.-> m
+    uk -.-> upl
+    rk -.-> m
+  end
+  subgraph RPi
+    direction TB;
+    r{{Rooms approval}}
+
+    db[(DB)]
+
+  end  
+  m <--encrypted messasages--> db
+  rk <--encrypted room approval----> r
+```
 
 ## Developer guidelines
 
 No secret, no private key, no message, no file get written unprotected into DB.
+
+Every bit of client content should be protected by private key (user or room), eventualy.

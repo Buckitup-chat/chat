@@ -68,6 +68,8 @@ defmodule Chat.Rooms.RoomTest do
   test "room invite" do
     {_alice, room_identity, room} = alice_and_room()
 
+    refute is_nil(room_identity)
+
     bob = User.login("Bob")
     bob_key = bob |> Identity.pub_key()
 

@@ -146,14 +146,13 @@ flowchart LR;
   mk[Memo key]
   p(payload)
   cm[[Ciphered memo]]
-  s( )
-  mng( )
+  s((fa:fa-key))
+  mng((fa:fa-key))
   cs[Conversation secret]
   db[(DB)]
 
   m --> s --> cm -...-> db
-  s --> mk
-  s --> ms
+  ms --> s
   ms --> p
   mk --> p
 
@@ -190,14 +189,14 @@ graph LR;
   fk[File key]
   fs[File secret]
   as[Additional secrets]
-  as_s( )
+  as_s((fa:fa-key))
 
   c[/Chunks/]
   p(Payload)
   cs[Conversation secret]
   c_s{choose secret} 
-  p_s( )
-  m_s( )
+  p_s((fa:fa-plus))
+  m_s((fa:fa-key))
 
   fs --> as_s -.-> db
   as ---> as_s

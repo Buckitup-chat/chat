@@ -214,7 +214,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
     ~H"""
     <div
       id={"message-#{@msg.id}"}
-      class={"#{@color} max-w-xs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}
+      class={"#{@color} max-w-xs sm:max-w-md min-w-[180px] t-chat-mine-message rounded-lg shadow-lg"}
     >
       <.header
         author={@author}

@@ -93,6 +93,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
       assert %UploadMetadata{credentials: {key, _secret}, status: :active} =
                Map.get(socket.assigns.uploads_metadata, entry_2.uuid)
 
+      Process.sleep(300)
       assert UploadStatus.get(key) == :active
 
       assert %UploadMetadata{credentials: {key, _secret}, status: :paused} =

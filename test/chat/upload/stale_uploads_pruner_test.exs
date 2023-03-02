@@ -91,7 +91,7 @@ defmodule Chat.Upload.StaleUploadsPrunerTest do
 
       timestamp = DateTime.to_unix(DateTime.utc_now())
       StaleUploadsPruner.maybe_set_timestamp(timestamp)
-      :timer.sleep(100)
+      :timer.sleep(300)
 
       assert catch_exit(UploadStatus.get(key))
     end

@@ -218,11 +218,12 @@ graph LR;
 
 ```mermaid
 graph TD;
-  uk --copy--> ukc; 
-  rk --copy--> rkc;
-  rkc --new room--> rk
+  uk --> ukc; 
+  rk <--> rkc
 
   subgraph Browser
+    direction LR
+
     uk(User key)
     rk(Room keys)
   end
@@ -233,15 +234,11 @@ graph TD;
     upl{{Revived upload}}
     r{{Rooms approval}}
 
-    ukc --> m
-    rkc --> m
-    rkc --> r --new room--> rkc
-    ukc --> upl
+    ukc -.-> m
+    rkc -.-> m
+    rkc -.-> r -.new room.-> rkc
+    ukc -.-> upl
   end  
-
-
-
- 
 ```
 
 <!-- livebook:{"break_markdown":true} -->

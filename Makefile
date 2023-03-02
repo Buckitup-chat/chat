@@ -20,7 +20,7 @@ ci-test:
 test: 
 	rm -rf priv/test_db
 	mkdir -p priv/test_db
-	MIX_ENV=test mix test --max-failures=1 --cover
+	MIX_ENV=test mix test --max-failures=3 --cover
 
 commit: check test
 	lazygit

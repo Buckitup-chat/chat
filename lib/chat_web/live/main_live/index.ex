@@ -292,15 +292,15 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_info({:room_request, room_hash, user_hash}, socket) do
+  def handle_info({:room_request, room_key, user_key}, socket) do
     socket
-    |> Page.Lobby.approve_room_request(room_hash, user_hash)
+    |> Page.Lobby.approve_room_request(room_key, user_key)
     |> noreply()
   end
 
-  def handle_info({:room_request_approved, encrypted_room_entity, user_hash}, socket) do
+  def handle_info({:room_request_approved, encrypted_room_entity, user_key, room_key}, socket) do
     socket
-    |> Page.Lobby.join_approved_room(encrypted_room_entity, user_hash)
+    |> Page.Lobby.join_approved_room(encrypted_room_entity, user_key, room_key)
     |> noreply()
   end
 

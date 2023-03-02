@@ -144,19 +144,29 @@ defmodule Chat.Rooms do
     if_room_found(room_key, &Room.list_pending_requests/1, [])
   end
 
+  def list_approved_requests_for(%Room{} = room, user_public_key) do
+    Room.list_approved_requests_for(room, user_public_key)
+  end
+
   def list_approved_requests_for(room_key, user_public_key) do
     room_key
     |> get()
     |> case do
       nil -> []
-      room -> Room.list_approved_requests_for(room, user_public_key)
+      room -> list_approved_requests_for(room, user_public_key)
     end
   end
 
   defdelegate update(room), to: Registry
   defdelegate decrypt_identity(encrypted_room_identity, person_identity, room_pub_key), to: Room
 
-  defp if_room_found(room_key, action, default \\ nil) do
+  defp if_room_found(room_or_key, action, default \\ nil)
+
+  defp if_room_found(%Room{} = room, action, _) do
+    action.(room)
+  end
+
+  defp if_room_found(room_key, action, default) do
     room_key
     |> get
     |> case do

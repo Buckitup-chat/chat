@@ -11,6 +11,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   require Logger
 
+  alias Chat.Rooms.RoomRequest
   alias Chat.Broker
   alias Chat.ChunkedFiles
   alias Chat.Content.Memo
@@ -36,7 +37,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def init(%{assigns: %{room_map: rooms}} = socket, room_key) when is_binary(room_key) do
     room = Rooms.get(room_key)
-    room_identity = rooms |> Map.get(room_key)
+    room_identity = rooms |> Map.fetch!(room_key)
 
     socket
     |> init({room_identity, room})
@@ -266,8 +267,8 @@ defmodule ChatWeb.MainLive.Page.Room do
     socket
   end
 
-  def approve_request(%{assigns: %{room_identity: room_identity}} = socket, user_hash) do
-    Rooms.approve_request(room_identity |> Identity.pub_key(), user_hash, room_identity)
+  def approve_request(%{assigns: %{room_identity: room_identity}} = socket, user_key) do
+    Rooms.approve_request(room_identity |> Identity.pub_key(), user_key, room_identity)
 
     socket
     |> push_event("put-flash", %{key: :info, message: "Request approved!"})
@@ -324,9 +325,9 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def invite_user(
         %{assigns: %{room: %{name: room_name}, room_identity: identity, me: me}} = socket,
-        user_hash
+        user_key
       ) do
-    dialog = Dialogs.find_or_open(me, user_hash |> User.by_id())
+    dialog = Dialogs.find_or_open(me, user_key |> User.by_id())
 
     identity
     |> Map.put(:name, room_name)
@@ -448,7 +449,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     request_list =
       room.pub_key
       |> Rooms.list_pending_requests()
-      |> Enum.map(fn {pub_key, _} -> User.by_id(pub_key) end)
+      |> Enum.map(fn %RoomRequest{requester_key: pub_key} -> User.by_id(pub_key) end)
 
     socket
     |> assign(:room_requests, request_list)

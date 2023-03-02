@@ -297,7 +297,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       |> RoomInvites.get()
       |> Identity.from_strings()
 
-    if rooms |> Enum.any?(&(&1.priv_key == new_room_identitiy.priv_key)) do
+    if rooms |> Enum.any?(&(&1.private_key == new_room_identitiy.private_key)) do
       socket
     else
       socket

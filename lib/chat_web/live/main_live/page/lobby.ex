@@ -11,6 +11,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   alias Chat.Identity
   alias Chat.Log
   alias Chat.Rooms
+  alias Chat.Rooms.RoomRequest
   alias Chat.User
   alias ChatWeb.MainLive.Page
 
@@ -80,18 +81,16 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> init_new_mode()
   end
 
-  def request_room(%{assigns: %{me: me, monotonic_offset: time_offset}} = socket, room_hash) do
+  def request_room(%{assigns: %{me: me, monotonic_offset: time_offset}} = socket, room_key) do
     time = Chat.Time.monotonic_to_unix(time_offset)
-    room = Rooms.add_request(room_hash |> Base.decode16!(case: :lower), me, time)
+    room = Rooms.add_request(room_key, me, time)
     Log.request_room_key(me, time, room.pub_key)
 
-    ChangeTracker.on_saved(fn ->
-      PubSub.broadcast!(
-        Chat.PubSub,
-        @topic,
-        {:room_request, room, me |> Identity.pub_key()}
-      )
-    end)
+    PubSub.broadcast!(
+      Chat.PubSub,
+      @topic,
+      {:room_request, room, me |> Identity.pub_key()}
+    )
 
     socket
     |> assign_room_list()
@@ -99,20 +98,33 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   def approve_room_request(
         %{assigns: %{room_map: room_map, me: me, monotonic_offset: time_offset}} = socket,
-        room_hash,
-        user_hash
+        room_or_hash,
+        user_key
       ) do
-    room_key = room_hash |> Base.decode16!(case: :lower)
-    time = Chat.Time.monotonic_to_unix(time_offset)
-    room = Rooms.approve_request(room_key, user_hash, room_map[room_key], public_only: true)
-    {_, _, {encrypted, blob}} = Rooms.get_request(room, user_hash)
-    Log.approve_room_request(me, time, room.pub_key)
+    room =
+      case room_or_hash do
+        %Rooms.Room{} = room ->
+          Rooms.approve_request(room, user_key, room_map[room.pub_key], public_only: true)
 
-    PubSub.broadcast!(
-      Chat.PubSub,
-      @topic,
-      {:room_request_approved, {encrypted, blob}, user_hash}
-    )
+        room_hash ->
+          room_key = room_hash |> Base.decode16!(case: :lower)
+          Rooms.approve_request(room_key, user_key, room_map[room_key], public_only: true)
+      end
+
+    case Rooms.get_request(room, user_key) do
+      %RoomRequest{ciphered_room_identity: ciphered} when is_bitstring(ciphered) ->
+        time = Chat.Time.monotonic_to_unix(time_offset)
+        Log.approve_room_request(me, time, room.pub_key)
+
+        PubSub.broadcast!(
+          Chat.PubSub,
+          @topic,
+          {:room_request_approved, ciphered, user_key, room.pub_key}
+        )
+
+      _ ->
+        :ok
+    end
 
     socket
   rescue
@@ -123,17 +135,15 @@ defmodule ChatWeb.MainLive.Page.Lobby do
         %{assigns: %{me: me, my_id: my_id, monotonic_offset: time_offset, room_map: room_map}} =
           socket,
         encrypted_room_identity,
-        user_hash
+        user_key,
+        room_key
       )
-      when my_id == user_hash do
-    new_room_identity =
-      Rooms.decrypt_identity(encrypted_room_identity, me, encrypted_room_identity.public_key)
-
-    room_key = new_room_identity |> Identity.pub_key()
-
+      when my_id == user_key do
     if Map.has_key?(room_map, room_key) do
       socket
     else
+      new_room_identity = Rooms.decrypt_identity(encrypted_room_identity, me, room_key)
+
       time = Chat.Time.monotonic_to_unix(time_offset)
       Rooms.clear_approved_request(new_room_identity, me)
       Log.got_room_key(me, time, new_room_identity |> Identity.pub_key())
@@ -145,7 +155,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     end
   end
 
-  def join_approved_room(socket, _, _), do: socket
+  def join_approved_room(socket, _, _, _), do: socket
 
   def set_db_status(socket, status) do
     socket
@@ -241,32 +251,33 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   defp approve_pending_requests(%{
          assigns: %{room_map: room_map, me: me, monotonic_offset: time_offset}
        }) do
-    room_map
-    |> Map.keys()
-    |> Enum.each(fn room_key ->
-      room_key
-      |> Rooms.list_pending_requests()
-      |> Enum.each(fn {user_hash, _} ->
-        time = Chat.Time.monotonic_to_unix(time_offset)
-        room = Rooms.approve_request(room_key, user_hash, room_map[room_key], public_only: true)
-        {_, _, {encrypted, blob}} = Rooms.get_request(room, user_hash)
-        Log.approve_room_request(me, time, room.pub_key)
+    for room_key <- Map.keys(room_map),
+        %RoomRequest{requester_key: user_key} <- Rooms.list_pending_requests(room_key),
+        room = Rooms.approve_request(room_key, user_key, room_map[room_key], public_only: true) do
+      case Rooms.get_request(room, user_key) do
+        %RoomRequest{ciphered_room_identity: ciphered} when is_bitstring(ciphered) ->
+          time = Chat.Time.monotonic_to_unix(time_offset)
+          Log.approve_room_request(me, time, room.pub_key)
 
-        PubSub.broadcast!(
-          Chat.PubSub,
-          @topic,
-          {:room_request_approved, {encrypted, blob}, user_hash}
-        )
-      end)
-    end)
+          PubSub.broadcast!(
+            Chat.PubSub,
+            @topic,
+            {:room_request_approved, ciphered, user_key, room.pub_key}
+          )
+
+        _ ->
+          :ok
+      end
+    end
   end
 
   defp join_approved_requests(%{assigns: %{new_rooms: rooms, my_id: my_id}, root_pid: root_pid}) do
-    rooms
-    |> Enum.flat_map(fn room -> Rooms.list_approved_requests_for(room.hash, my_id) end)
-    |> Enum.each(fn {_, _, encrypted} ->
-      send(root_pid, {:room_request_approved, encrypted, my_id})
-    end)
+    for %Rooms.Room{} = room <- rooms,
+        request <- Rooms.list_approved_requests_for(room, my_id),
+        ciphered = request.ciphered_room_identity,
+        true == is_bitstring(ciphered) do
+      send(root_pid, {:room_request_approved, ciphered, my_id, room.pub_key})
+    end
   end
 
   defp get_version do

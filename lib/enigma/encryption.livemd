@@ -25,7 +25,7 @@ Alice wants to send a message to Bob. To do so Alice needs to know Bob's public 
 
 ```mermaid
 graph LR;
-  secret[Secret]
+  secret[Conversation Secret]
   b_pb{{Bob public key}} --> secret
   a_pr{{Alice private key}} --> secret
 
@@ -58,7 +58,7 @@ When Bob receives a message heneeds to know Alice public key to read and autheni
 graph LR;
   ciphered[[Ciphered Message]]
   sign[[Message Sign]]
-  secret[Secret]
+  secret[Conversation Secret]
   b_pr{{Bob private key}}
   a_pb{{Alice public key}}
   msg[/Message/]
@@ -194,15 +194,16 @@ graph LR;
 
   c[/Chunks/]
   p(Payload)
-  cs[Coversation secret]
-  c_s( )
+  cs[Conversation secret]
+  c_s{choose secret} 
   p_s( )
   m_s( )
 
   fs --> as_s -.-> db
   as ---> as_s
 
-  c ---> c_s -.-> db
+  c --> c_s -.-> db
+  as --> c_s
   fs --> c_s
 
   fs --> p_s --> p
@@ -213,6 +214,38 @@ graph LR;
 ```
 
 ## Bird's-eye view
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph TD;
+  uk --copy--> ukc; 
+  rk --copy--> rkc;
+  rkc --new room--> rk
+
+  subgraph Browser
+    uk(User key)
+    rk(Room keys)
+  end
+  subgraph RPi
+    ukc(User key)
+    rkc(Room keys)
+    m{{Messaging}}
+    upl{{Revived upload}}
+    r{{Rooms approval}}
+
+    ukc --> m
+    rkc --> m
+    rkc --> r --new room--> rkc
+    ukc --> upl
+  end  
+
+
+
+ 
+```
+
+<!-- livebook:{"break_markdown":true} -->
 
 Current client split
 

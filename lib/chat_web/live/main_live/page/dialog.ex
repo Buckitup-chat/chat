@@ -20,6 +20,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.MemoIndex
   alias Chat.Messages
   alias Chat.RoomInviteIndex
+  alias Chat.Rooms
   alias Chat.Upload.UploadMetadata
   alias Chat.User
   alias Chat.Utils.StorageId
@@ -313,23 +314,23 @@ defmodule ChatWeb.MainLive.Page.Dialog do
         %{assigns: %{me: me, dialog: dialog, room_map: rooms}} = socket,
         message_id
       ) do
-    new_room_identitiy =
+    new_room_identity =
       Dialogs.read_message(dialog, message_id, me)
       |> then(fn %{type: :room_invite, content: json} -> json end)
       |> StorageId.from_json()
       |> RoomInvites.get()
       |> Identity.from_strings()
 
-    if rooms[new_room_identitiy.public_key].private_key == new_room_identitiy.private_key do
+    if rooms[new_room_identity.public_key].private_key == new_room_identity.private_key do
       socket
     else
       socket
-      |> store_room_key_copy(new_room_identitiy)
-      |> Page.Login.store_new_room(new_room_identitiy)
+      |> store_room_key_copy(new_room_identity)
+      |> Page.Login.store_new_room(new_room_identity)
       |> Page.Lobby.refresh_room_list()
     end
     |> close()
-    |> Page.Room.init(new_room_identitiy.public_key |> Base.encode16(case: :lower))
+    |> Page.Room.init({new_room_identity, new_room_identity |> Identity.pub_key() |> Rooms.get()})
   rescue
     _ -> socket
   end

@@ -11,7 +11,6 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   require Logger
 
-  alias Chat.Rooms.RoomRequest
   alias Chat.Broker
   alias Chat.ChunkedFiles
   alias Chat.Content.Memo
@@ -23,6 +22,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.Messages
   alias Chat.RoomInviteIndex
   alias Chat.Rooms
+  alias Chat.Rooms.RoomRequest
   alias Chat.Upload.UploadMetadata
   alias Chat.User
   alias Chat.Utils.StorageId

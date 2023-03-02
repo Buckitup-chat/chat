@@ -49,7 +49,7 @@ defmodule ChatWeb.MainLive.Layout.Card do
     ~H"""
     <div class="inline-flex">
       <%= if @is_me? do %>
-        <div class="text-sm">My notes</div>
+        <div class="text-sm t-my-notes">My notes</div>
       <% else %>
         <tt class={"#{@hash_style}"}>[<%= Utils.short_hash(@card.hash) %>]</tt>
         <div class={"ml-1 #{@name_style}"}><%= @card.name %></div>

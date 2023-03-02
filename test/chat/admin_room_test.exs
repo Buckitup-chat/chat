@@ -7,11 +7,11 @@ defmodule Chat.AdminRoomTest do
     Card,
     Dialogs,
     Identity,
-    RoomInvites,
     User,
     Utils
   }
 
+  alias Chat.Content.RoomInvites
   alias Chat.Messages
 
   setup do
@@ -67,7 +67,7 @@ defmodule Chat.AdminRoomTest do
 
     password = "secret"
 
-    AdminRoom.store_wifi_password(password)
+    AdminRoom.store_wifi_password(password, admin_room_identity)
     assert password != AdminDb.get(:wifi_password)
 
     assert password == AdminRoom.get_wifi_password(admin_room_identity)

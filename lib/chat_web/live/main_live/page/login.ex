@@ -11,11 +11,10 @@ defmodule ChatWeb.MainLive.Page.Login do
   alias Chat.Identity
   alias Chat.Log
   alias Chat.User
-  alias Chat.Utils
   alias ChatWeb.MainLive.Page
 
-  @local_store_auth_key "buckitUp-chat-auth"
-  @local_store_room_count_key "buckitUp-room-count"
+  @local_store_auth_key "buckitUp-chat-auth-v2"
+  @local_store_room_count_key "buckitUp-room-count-v2"
 
   def handshaked(socket), do: socket |> assign(:handshaked, true)
 
@@ -77,7 +76,10 @@ defmodule ChatWeb.MainLive.Page.Login do
   def store_new_room(%{assigns: %{rooms: rooms, room_map: room_map}} = socket, new_room_identity) do
     socket
     |> assign(:rooms, [new_room_identity | rooms])
-    |> assign(:room_map, Map.put(room_map, Utils.hash(new_room_identity), new_room_identity))
+    |> assign(
+      :room_map,
+      Map.put(room_map, new_room_identity |> Identity.pub_key(), new_room_identity)
+    )
     |> push_event("store-room", %{
       auth_key: @local_store_auth_key,
       room_count_key: @local_store_room_count_key,
@@ -125,7 +127,10 @@ defmodule ChatWeb.MainLive.Page.Login do
 
     socket
     |> assign(:rooms, [new_room_identity | rooms])
-    |> assign(:room_map, Map.put(room_map, Utils.hash(new_room_identity), new_room_identity))
+    |> assign(
+      :room_map,
+      Map.put(room_map, new_room_identity |> Identity.pub_key(), new_room_identity)
+    )
     |> assign(:room_count_to_backup, room_count)
   end
 
@@ -141,7 +146,8 @@ defmodule ChatWeb.MainLive.Page.Login do
     |> assign(:room_count_to_backup, 0)
   end
 
-  defp login_topic(person), do: "login:" <> Utils.hash(person)
+  defp login_topic(person),
+    do: "login:" <> (person |> Enigma.hash() |> Base.encode16(case: :lower))
 
   defp assign_logged_user(socket, me, id, rooms \\ []) do
     socket
@@ -161,7 +167,7 @@ defmodule ChatWeb.MainLive.Page.Login do
     |> assign(:rooms, rooms)
     |> assign(
       :room_map,
-      rooms |> Enum.map(fn room -> {room |> Utils.hash(), room} end) |> Map.new()
+      rooms |> Enum.map(fn room -> {room.public_key, room} end) |> Map.new()
     )
   end
 

@@ -7,7 +7,7 @@ defmodule Chat.Messages.Text do
 end
 
 defimpl Chat.DryStorable, for: Chat.Messages.Text do
-  alias Chat.Memo
+  alias Chat.Content.Memo
   alias Chat.Utils.StorageId
 
   def content(text) do

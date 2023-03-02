@@ -103,7 +103,9 @@ defmodule Chat.FileFs do
   defp build_path(nil), do: Common.get_chat_db_env(:files_base_dir)
   defp build_path(str), do: str
 
-  defp file_path({key, first, last}, prefix) do
+  defp file_path({binary_key, first, last}, prefix) do
+    key = binary_key |> Base.encode16(case: :lower)
+
     [dir, file] =
       [first, last]
       |> Enum.map(fn int ->
@@ -115,7 +117,9 @@ defmodule Chat.FileFs do
     [prefix, hc(key), key, dir, file] |> Path.join()
   end
 
-  defp key_path(key, prefix) do
+  defp key_path(binary_key, prefix) do
+    key = binary_key |> Base.encode16(case: :lower)
+
     [prefix, hc(key), key] |> Path.join()
   end
 

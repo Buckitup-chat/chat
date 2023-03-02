@@ -12,11 +12,11 @@ defmodule ChatWeb.MainLive.Layout.Message do
   use ChatWeb, :component
 
   alias Chat.Card
-  alias Chat.Files
+  alias Chat.Content.Files
+  alias Chat.Content.Memo
+  alias Chat.Content.RoomInvites
   alias Chat.Identity
-  alias Chat.Memo
   alias Chat.Messages.ExportHelper
-  alias Chat.RoomInvites
   alias Chat.Rooms.Room
   alias Chat.User
   alias Chat.Utils.StorageId
@@ -45,14 +45,14 @@ defmodule ChatWeb.MainLive.Layout.Message do
           msg.is_mine?
 
         %{chat_type: :room, msg: msg, my_id: my_id} ->
-          msg.author_hash == my_id
+          msg.author_key == my_id
       end)
       |> assign_new(:author, fn
         %{chat_type: :dialog, is_mine?: is_mine?, me: me, peer: peer} ->
           (is_mine? && Card.from_identity(me)) || peer
 
         %{chat_type: :room, msg: msg} ->
-          User.by_id(msg.author_hash)
+          User.by_id(msg.author_key)
       end)
       |> assign_new(:dynamic_attrs, fn
         %{export?: true} ->

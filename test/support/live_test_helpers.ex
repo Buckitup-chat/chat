@@ -55,7 +55,7 @@ defmodule ChatWeb.LiveTestHelpers do
         last_modified: 1_594_171_879_000,
         name: "TestUser.data",
         content: File.read!("test/support/fixtures/import_keys/TestUser.data"),
-        size: 1611,
+        size: 113,
         type: "text/plain"
       }
     ])

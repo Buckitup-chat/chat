@@ -5,7 +5,6 @@ defmodule Chat.ChunkedFilesMultisecretTest do
   alias Chat.ChunkedFilesMultisecret
   alias Chat.Db
   alias Chat.Db.ChangeTracker
-  alias Chat.Utils
 
   @hundred_chunks_size 1000 * 1024 * 1024
 
@@ -42,7 +41,7 @@ defmodule Chat.ChunkedFilesMultisecretTest do
       assert secret != initial_secret
 
       assert secret ==
-               additional_secrets |> :binary.part({0, 32}) |> Utils.decrypt_blob(initial_secret)
+               additional_secrets |> :binary.part({0, 32}) |> Enigma.decipher(initial_secret)
     end
   end
 

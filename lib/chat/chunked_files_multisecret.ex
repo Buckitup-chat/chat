@@ -20,7 +20,7 @@ defmodule Chat.ChunkedFilesMultisecret do
   end
 
   def get_secret(_file_key, offset, initial_secret)
-      when offset <= @hundred_chunks_size,
+      when offset < @hundred_chunks_size,
       do: initial_secret
 
   def get_secret(file_key, offset, initial_secret) do

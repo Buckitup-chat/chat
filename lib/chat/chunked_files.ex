@@ -71,10 +71,15 @@ defmodule Chat.ChunkedFiles do
     |> Enum.join("")
   end
 
-  def stream_chunks(key, secret) do
+  @chunk_size 10 * 1024 * 1024
+
+  def stream_chunks(key, initial_secret) do
     FileFs.stream_file_chunks(key)
-    |> Stream.map(fn data ->
-      Enigma.decipher(data, secret)
+    |> Stream.with_index()
+    |> Stream.map(fn {chunk, index} ->
+      chunk_start = index * @chunk_size
+      secret = get_secret_from_multisecret(key, chunk_start, initial_secret)
+      Enigma.decipher(chunk, secret)
     end)
   end
 
@@ -84,19 +89,18 @@ defmodule Chat.ChunkedFiles do
     _ -> 0
   end
 
-  @chunk_size 10 * 1024 * 1024
-
   def chunk_with_byterange({key, secret}),
     do: chunk_with_byterange({key, secret}, {0, @chunk_size - 1})
 
   def chunk_with_byterange({key, secret}, {first, nil}),
     do: chunk_with_byterange({key, secret}, {first, first + @chunk_size - 1})
 
-  def chunk_with_byterange({key, secret}, {first, last}) do
+  def chunk_with_byterange({key, initial_secret}, {first, last}) do
     chunk_n = div(first, @chunk_size)
     chunk_start = chunk_n * @chunk_size
     start_bypass = first - chunk_start
 
+    secret = get_secret_from_multisecret(key, chunk_start, initial_secret)
     {encrypt_blob, chunk_end} = FileFs.read_file_chunk(chunk_start, key)
 
     range_length = min(last, chunk_end) - first + 1
@@ -134,5 +138,9 @@ defmodule Chat.ChunkedFiles do
       chunk_size,
       [{start, min(start + chunk_size - 1, max)} | acc]
     )
+  end
+
+  defp get_secret_from_multisecret(key, chunk_start, initial_secret) do
+    ChunkedFilesMultisecret.get_secret(key, chunk_start, initial_secret)
   end
 end

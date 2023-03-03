@@ -8,7 +8,6 @@ defmodule Chat.OrderingTest do
   alias Chat.Ordering
   alias Chat.Rooms
   alias Chat.User
-  alias Chat.Utils
 
   test "should provide 1 on new key" do
     assert 1 = Ordering.next({:some, "key"})
@@ -40,7 +39,7 @@ defmodule Chat.OrderingTest do
     %Chat.Messages.Text{text: "some message"}
     |> Dialogs.add_new_message(user, dialog)
 
-    {:dialog_message, dialog |> Dialogs.Dialog.dialog_key()}
+    {:dialog_message, dialog |> Enigma.hash()}
   end
 
   defp prefix_for_room_with_5_msgs do
@@ -51,20 +50,15 @@ defmodule Chat.OrderingTest do
 
     message = "hello, room  "
 
-    last =
-      for num <- 1..5 do
-        message
-        |> Kernel.<>(to_string(num))
-        |> Messages.Text.new(num)
-        |> Rooms.add_new_message(alice, room.pub_key)
-      end
-      |> List.last()
-      |> elem(1)
+    for num <- 1..5 do
+      message
+      |> Kernel.<>(to_string(num))
+      |> Messages.Text.new(num)
+      |> Rooms.add_new_message(alice, room.pub_key)
+    end
 
-    ChangeTracker.await(
-      {:room_message, room.pub_key |> Utils.binhash(), last.timestamp, last.id |> Utils.binhash()}
-    )
+    ChangeTracker.await()
 
-    {:room_message, room.pub_key |> Utils.binhash()}
+    {:room_message, room.pub_key}
   end
 end

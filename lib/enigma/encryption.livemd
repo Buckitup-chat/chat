@@ -1,0 +1,304 @@
+# Encryption
+
+## Overview
+
+Safe messaging is one of key features. 
+It is achieved by a combination symmetric and asymmetric encryption.
+
+Asymmetric encryption uses Elliptic Curve. It provides a way to compute same secret for two user's communication. Also it provides a way to generate a sign of a message to confirm authencity of an author.
+
+Symmetric encryption uses Blowfish. It provides a way to encrypt data with a secret, so that it can be decrypted with the same secret only. It can enctrypt messages of any length. Blowfish may become vulnerable ecrypting more than 4Gb of data. We mitigate this providing secret change after each Gb of data.
+
+Further on we use term `encryption/decryption` for asymmetric encryption, and `cipher/decipher` for symmetric encryption.
+
+<!-- livebook:{"break_markdown":true} -->
+
+#### Message transfer example
+
+Alice wants to send a message to Bob. To do so Alice needs to know Bob's public key.
+
+1. Alice calculates secret from Alice private key and Bob public key
+2. Alice ciphers the message with secret
+3. Alice signs the message with her private key
+4. Alice sends to Bob ciphered message and signature
+   <!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph LR;
+  secret[Conversation Secret]
+  b_pb{{Bob public key}} --> secret
+  a_pr{{Alice private key}} --> secret
+
+  msg[/Message/]
+  ciphered[[Ciphered Message]]
+  sign[[Message Sign]]
+
+  secret --> ciphered
+  msg ---> ciphered
+
+  msg ---> sign
+  a_pr ---> sign
+
+  bob(((Bob)))
+
+  ciphered ---> bob
+  sign ---> bob
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+When Bob receives a message heneeds to know Alice public key to read and authenicate the message.
+
+1. Bob calculates secret from Bob private key and Alice public key
+2. Bob deciphers Ciphered Message with secret
+3. Bob verifies Alice signature with the message and Alice public key
+   <!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph LR;
+  ciphered[[Ciphered Message]]
+  sign[[Message Sign]]
+  secret[Conversation Secret]
+  b_pr{{Bob private key}}
+  a_pb{{Alice public key}}
+  msg[/Message/]
+  ver(Confirmed Signature)
+
+  b_pr --> secret
+  a_pb --> secret
+  secret --> msg
+  ciphered ----> msg
+
+  msg --> ver
+  sign -----> ver
+  a_pb --> ver
+```
+
+## The flow
+
+Each user is identified by keypair generated on first visit. Public key and user name gets stored in DB.
+Private key is stored on user device. We never store user private keys in DB.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Chats
+
+We use users public keys to make chats(dialogs) between users. Anyone can chat to user that already visited the system (and got his public key stored in DB).
+
+Messages exchange happpens the same way as showed in diagrams above.
+Sharing the same secret makes it possible to read own messages and write messages with it. 
+Signing each message makes possible to authenicate the author.
+
+DB stores public keys of both sides upon chat initiation.
+Messages store ciphered message, its signature, authors timestamp, and message index.
+
+```mermaid
+flowchart LR
+  a(Alice)
+  b(Bob)
+
+  a --> b
+  b --> a
+
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Rooms
+
+Each room has its own keypair. It is given to every member of a room. This way many users can write to room (using theirs keys) and read messages of other users (using room keys).
+
+Room private keys stored on user devices only. DB stores public key and room name. Also, room keeps a list of request in it.
+Room messages store ciphered message, its signature, author's timestamp, message index and author's public key.
+
+```mermaid
+flowchart TD
+  a(Alice)
+  b(Bob)
+  c(Charlie)
+  r((room))
+  a --> r
+  b --> r
+  c --> r
+```
+
+## Messaging security
+
+All long messages (more than 150 symbols) and files are stored separatly from chat or room messages.
+Short messages ciphered with conversation secret (computed from private and public key) and stored inside a message.
+
+This keeps ciphered conversation under Blowfish 4Gb vulnerability limit.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Memo
+
+Long text (memo) gets ciphered with random `Memo secret`. Resulting `Ciphered memo` gets stored in the DB under `Memo key`.
+
+`Memo secret` and `Memo key` forms `payload`. Which is ciphered with `Conversation secret` and stored as part of a message in the DB.
+
+<!-- livebook:{"break_markdown":true} -->
+
+```mermaid
+flowchart LR;
+  m[/memo/]
+  ms[Memo secret]
+  mk[Memo key]
+  p(payload)
+  cm[[Ciphered memo]]
+  s((fa:fa-key))
+  mng((fa:fa-key))
+  cs[Conversation secret]
+  db[(DB)]
+
+  m --> s --> cm -...-> db
+  ms --> s
+  ms --> p
+  mk --> p
+
+  cs --> mng
+  p --> mng
+  mng -. part of a message .-> db
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+Deciphering message we are getting `Memo key` and `Memo secret`. `Memo key` allows us to find `Ciphered memo` in the DB. Decipering it with `Memo secret` we are recovering original `memo`
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Files
+
+Files represent image, audio, video and file content. They are stored in 10Mb chunks
+
+1. `File key` generated as a hash of a file metadata, user uploading a file and destination  chat or room.
+2. `File secret` is generated. `Additional secrets` are generated to have different secret for every 1000Mb of data. I.e. `File secret` ciphers first 1000Mb of data, first of `Additional secrets` ciphers second 1000Mb of data, and so on.
+3. `Additional secrets` cipered with `File secret` and stored in the DB under `File key`
+4. Every file chunk ciphered with `File secret` or one of `Additional secrets`
+5. Upon upload completion file metadata is ciphered with `File secret` and stored in the DB
+6. Payload is formed from `File key` and `File secret`
+7. Payload ciphered with `Conversation secret` and stored in the DB as a part of a message.
+
+<!-- livebook:{"break_markdown":true} -->
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph LR;
+  db[(DB)]
+  fk[File key]
+  fs[File secret]
+  as[Additional secrets]
+  as_s((fa:fa-key))
+
+  c[/Chunks/]
+  p(Payload)
+  cs[Conversation secret]
+  c_s{choose secret} 
+  p_s((fa:fa-plus))
+  m_s((fa:fa-key))
+
+  fs --> as_s -.-> db
+  as ---> as_s
+
+  c --> c_s -.-> db
+  as --> c_s
+  fs --> c_s
+
+  fs --> p_s --> p
+  fk --> p_s 
+
+  p --> m_s -.-> db
+  cs --> m_s
+```
+
+## Bird's-eye view
+
+### Private key usage scheme
+
+Private keys are stored on user browser only. For operational needs the keys are copied in memory of a device.
+
+The system uses private keys for
+
+* Messaging - ecrypting and decrypting messages
+* Rooms approval - encrypting room key for a new member of a room
+* Upload reviving - encrypting File secret while file is being uploaded to make possible upload continuation after user disconnect.
+
+On new  room approval for the user new room key is sent to a browser.
+
+<!-- livebook:{"break_markdown":true} -->
+
+```mermaid
+graph TD;
+  uk --> ukc; 
+  rk <--> rkc
+
+  subgraph Browser
+    direction LR
+
+    uk(User key)
+    rk(Room keys)
+  end
+  subgraph RPi
+    ukc(User key)
+    rkc(Room keys)
+    m{{Messaging}}
+    upl{{Revived upload}}
+    r{{Rooms approval}}
+
+    ukc -.-> m
+    rkc -.-> m
+    rkc -.-> r -.new room.-> rkc
+    ukc -.-> upl
+  end  
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Client side private keys
+
+We may move private key usage on client side for stronger security.
+This way private keys never leave client.
+
+The server will send encrypted messages to the client. Client will decrypt them (having private key).
+To send new message client will need to encrypt it first, then send to server side.
+
+Room approval will need client to encode room private key for a particular user.
+
+Upload secret may be stored on client side while upload is in progress.
+
+Messages export as zip-file has messages decrypted. To do so on server-side we wouuld need to ask client to provide decrypted messages. Or consiider moving this functionality on client side.
+
+<!-- livebook:{"break_markdown":true} -->
+
+```mermaid
+graph TD;
+  subgraph Browser
+    direction TB;
+
+    uk(User key)
+    rk(Room keys)
+
+    m{{Messaging}}
+    upl{{Revived upload}}
+
+    uk -.-> m
+    uk -.-> upl
+    rk -.-> m
+  end
+  subgraph RPi
+    direction TB;
+    r{{Rooms approval}}
+
+    db[(DB)]
+
+  end  
+  m <--encrypted messasages--> db
+  rk <--encrypted room approval----> r
+```
+
+## Developer guidelines
+
+No secret, no private key, no message, no file get written unprotected into DB.
+
+Every bit of client content should be protected by private key (user or room), eventualy.

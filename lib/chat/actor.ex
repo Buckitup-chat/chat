@@ -1,10 +1,7 @@
 defmodule Chat.Actor do
   @moduledoc "Perpresents acting person in the system"
 
-  import Chat.Codec
-
   alias Chat.Identity
-  alias Chat.Utils
 
   defstruct [:me, rooms: [], contacts: %{}]
 
@@ -17,37 +14,30 @@ defmodule Chat.Actor do
   end
 
   def to_json(%__MODULE__{
-        me: %Identity{name: name, priv_key: priv_key},
+        me: %Identity{} = identity,
         rooms: rooms,
         contacts: contacts
       }) do
     [
-      [name, private_key_to_string(priv_key)],
-      rooms |> Enum.map(fn %Identity{priv_key: key} -> private_key_to_string(key) end),
-      contacts |> Enum.map(fn {k, v} -> {k |> public_key_to_string(), v} end) |> Enum.into(%{})
+      identity |> Identity.to_strings(),
+      rooms |> Enum.map(&(&1 |> Identity.to_strings() |> Enum.at(1))),
+      contacts
     ]
     |> Jason.encode!()
   end
 
   def from_json(json) do
-    [[name, key], room_keys, contacts] =
-      case Jason.decode!(json) do
-        [me, rooms, contacts] -> [me, rooms, contacts]
-        [me, rooms] -> [me, rooms, %{}]
-      end
-
-    me = %Identity{name: name, priv_key: private_key_from_string(key)}
-
-    rooms =
-      room_keys
-      |> Enum.map(fn key -> %Identity{name: "", priv_key: private_key_from_string(key)} end)
-
-    contacts =
-      contacts
-      |> Enum.map(fn {key, name} -> {key |> public_key_from_string(), name} end)
-      |> Enum.into(%{})
-
-    new(me, rooms, contacts)
+    case Jason.decode!(json) do
+      [me, rooms, contacts] -> [me, rooms, contacts]
+      [me, rooms] -> [me, rooms, %{}]
+    end
+    |> then(fn [me, rooms, contacts] ->
+      new(
+        Identity.from_strings(me),
+        rooms |> Enum.map(&Identity.from_strings(["", &1])),
+        contacts
+      )
+    end)
   end
 
   def to_encrypted_json(%__MODULE__{} = actor, password) when password in ["", nil, false],
@@ -56,14 +46,14 @@ defmodule Chat.Actor do
   def to_encrypted_json(%__MODULE__{} = actor, password) do
     actor
     |> to_json()
-    |> Utils.encrypt_blob(password |> Utils.binhash())
+    |> Enigma.cipher(password |> Enigma.hash())
   end
 
   def from_encrypted_json(data, password) when password in ["", nil, false], do: from_json(data)
 
   def from_encrypted_json(data, password) do
     data
-    |> Utils.decrypt_blob(password |> Utils.binhash())
+    |> Enigma.decipher(password |> Enigma.hash())
     |> from_json()
   end
 end

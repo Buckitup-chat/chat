@@ -5,7 +5,6 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
 
   alias Chat.Dialogs
   alias Chat.Rooms
-  alias Chat.User
   alias Chat.Utils.StorageId
 
   alias Phoenix.LiveView.JS
@@ -139,7 +138,7 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
          %{assigns: %{incoming_msg_id: {m_index, m_id} = msg_id, room_identity: room_identity}} =
            socket
        ) do
-    Rooms.read_message(msg_id, room_identity, &User.id_map_builder/1)
+    Rooms.read_message(msg_id, room_identity)
     |> case do
       %{type: :image, content: json} ->
         {id, secret} = json |> StorageId.from_json()

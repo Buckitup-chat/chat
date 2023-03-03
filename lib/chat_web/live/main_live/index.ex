@@ -294,15 +294,15 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_info({:room_request, room_hash, user_hash}, socket) do
+  def handle_info({:room_request, room_key, user_key}, socket) do
     socket
-    |> Page.Lobby.approve_room_request(room_hash, user_hash)
+    |> Page.Lobby.approve_room_request(room_key, user_key)
     |> noreply()
   end
 
-  def handle_info({:room_request_approved, encrypted_room_entity, user_hash}, socket) do
+  def handle_info({:room_request_approved, encrypted_room_entity, user_key, room_key}, socket) do
     socket
-    |> Page.Lobby.join_approved_room(encrypted_room_entity, user_hash)
+    |> Page.Lobby.join_approved_room(encrypted_room_entity, user_key, room_key)
     |> noreply()
   end
 
@@ -378,6 +378,9 @@ defmodule ChatWeb.MainLive.Index do
     """
   end
 
+  def message_of(%{author_key: _}), do: "room"
+  def message_of(_), do: "dialog"
+
   defp action_confirmation_popup(assigns) do
     ~H"""
     <.modal id={@id} class="">
@@ -447,9 +450,6 @@ defmodule ChatWeb.MainLive.Index do
     </p>
     """
   end
-
-  def message_of(%{author_hash: _}), do: "room"
-  def message_of(_), do: "dialog"
 
   defp allow_any500m_upload(socket, type, opts \\ []) do
     socket

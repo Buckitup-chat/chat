@@ -11,7 +11,6 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Chat.Messages
   alias Chat.Rooms
   alias Chat.User
-  alias Chat.Utils
   alias ChatWeb.Router.Helpers, as: Routes
 
   @incoming_topic "platform->chat"
@@ -42,8 +41,10 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   end
 
   def set_wifi(socket, ssid, password) do
+    admin_room_identity = socket.room_map[AdminRoom.pub_key()]
+
     request_platform({:set_wifi, ssid, password})
-    AdminRoom.store_wifi_password(password)
+    AdminRoom.store_wifi_password(password, admin_room_identity)
 
     socket
     |> assign(:wifi_password, password)
@@ -60,7 +61,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
         password: password
       }) do
     password =
-      case AdminRoom.get_wifi_password(rooms[AdminRoom.pub_key() |> Utils.hash()]) do
+      case AdminRoom.get_wifi_password(rooms[AdminRoom.pub_key()]) do
         nil -> password
         stored -> stored
       end
@@ -81,7 +82,6 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
       dialog = Dialogs.find_or_open(me, new_user)
 
       AdminRoom.pub_key()
-      |> Utils.hash()
       |> then(&Map.get(rooms, &1))
       |> Messages.RoomInvite.new()
       |> Dialogs.add_new_message(me, dialog)
@@ -156,7 +156,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   end
 
   defp assign_room_list(%{assigns: %{room_map: rooms}} = socket) do
-    {my, other} = Rooms.list(rooms |> Map.values())
+    {my, other} = Rooms.list(rooms)
     room_list = my ++ other
 
     socket

@@ -7,7 +7,6 @@ defmodule Chat.Dialogs do
   alias Chat.Dialogs.Message
   alias Chat.Dialogs.Registry
   alias Chat.Identity
-  alias Chat.Utils
 
   def find_or_open(%Identity{} = me) do
     find_or_open(me, Card.from_identity(me))
@@ -45,14 +44,12 @@ defmodule Chat.Dialogs do
       do: DialogMessaging.read(dialog, reader, before, amount)
 
   def read_message(%Dialog{} = dialog, {index, %Message{} = message}, %Identity{} = me) do
-    side = Dialog.my_side(dialog, me)
-    DialogMessaging.read({index, message}, me, side, peer(dialog, me))
+    DialogMessaging.read({index, message}, me, dialog)
   end
 
   def read_message(%Dialog{} = dialog, {index, msg_id} = _msg_id, %Identity{} = me) do
     message = DialogMessaging.get_message(dialog, {index, msg_id})
-    side = Dialog.my_side(dialog, me)
-    DialogMessaging.read({index, message}, me, side, peer(dialog, me))
+    DialogMessaging.read({index, message}, me, dialog)
   end
 
   def read_prev_message(
@@ -67,8 +64,7 @@ defmodule Chat.Dialogs do
         nil
 
       message ->
-        side = Dialog.my_side(dialog, me)
-        DialogMessaging.read(message, me, side, peer(dialog, me))
+        DialogMessaging.read(message, me, dialog)
     end
   end
 
@@ -84,15 +80,13 @@ defmodule Chat.Dialogs do
         nil
 
       message ->
-        side = Dialog.my_side(dialog, me)
-        DialogMessaging.read(message, me, side, peer(dialog, me))
+        DialogMessaging.read(message, me, dialog)
     end
   end
 
   def key(%Dialog{} = dialog) do
     dialog
-    |> Dialog.dialog_key()
-    |> Utils.hash()
+    |> Enigma.hash()
   end
 
   def peer(dialog, %Identity{} = me), do: peer(dialog, me |> Identity.pub_key())

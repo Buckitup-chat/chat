@@ -5,7 +5,7 @@ defmodule Support.FakeData do
 
   def file do
     key = UUID.uuid4()
-    secret = Chat.Utils.generate_binary_encrypt_key()
+    secret = Enigma.generate_secret()
 
     %{client_size: 123, client_type: "audio/mp3", client_name: "Some file.ext"}
     |> Messages.File.new(key, secret)
@@ -13,7 +13,7 @@ defmodule Support.FakeData do
 
   def image(name) do
     key = UUID.uuid4()
-    secret = Chat.Utils.generate_binary_encrypt_key()
+    secret = Enigma.generate_secret()
 
     %{client_size: 123, client_type: "image/jpeg", client_name: name}
     |> Messages.File.new(key, secret)

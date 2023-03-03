@@ -46,7 +46,7 @@ defmodule Chat.Messages.File do
 end
 
 defimpl Chat.DryStorable, for: Chat.Messages.File do
-  alias Chat.Files
+  alias Chat.Content.Files
   alias Chat.Messages.File
   alias Chat.Utils.StorageId
 

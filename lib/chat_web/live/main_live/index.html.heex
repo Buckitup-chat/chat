@@ -456,8 +456,7 @@
             id="contentContainer"
             class="from-green-400 to-blue-500 hidden sm:flex flex flex-col contentContainer"
           >
-            <%= unless @dialog do %>
-            <% else %>
+            <%= if @dialog do %>
               <.live_component
                 module={Layout.ImageGallery}
                 id="imageGallery"
@@ -736,7 +735,7 @@
               <div
                 id="chatContent"
                 class="basis-[93%] pb-1 md:pb-0 overflow-y-scroll flex flex-col justify-between relative a-content-block t-chat-content"
-                id={"room-#{@room.admin_hash}"}
+                id={"room-#{@room.hash}"}
                 phx-hook="Chat"
                 data-page={@page}
                 data-has-more-messages={"#{@has_more_messages}"}
@@ -816,7 +815,7 @@
                   </h1>
                   <div id="#user-list" class="mt-3 w-full flex flex-col" phx-update="ignore">
                     <%= for user <- Chat.User.list() do %>
-                      <%= unless user.hash == @my_id do %>
+                      <%= unless user == Chat.Card.from_identity(@me) do %>
                         <div
                           id={"user-#{user.hash}"}
                           class="flex flex-row items-center justify-between t-invite"

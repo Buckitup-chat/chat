@@ -7,7 +7,6 @@ defmodule Chat.Rooms do
   alias Chat.Rooms.Registry
   alias Chat.Rooms.Room
   alias Chat.Rooms.RoomMessages
-  alias Chat.Utils
 
   @doc "Returns new room {Identity, Room}"
   def add(me, name, type \\ :public) do
@@ -19,47 +18,34 @@ defmodule Chat.Rooms do
     {room_identity, room}
   end
 
-  @doc "Returns room Cards {my_rooms, available_rooms}"
-  def list(my_rooms) do
-    my_room_hashes =
-      my_rooms
-      |> Enum.map(&Utils.hash/1)
-      |> MapSet.new()
-
+  @doc "Returns rooms {my_rooms, available_rooms}"
+  def list(%{} = room_map) do
     Registry.all()
-    |> Map.filter(fn {hash, room} ->
-      room.type in [:public, :request] or MapSet.member?(my_room_hashes, hash)
+    |> Enum.filter(fn {room_key, room} ->
+      room.type in [:public, :request] or Map.has_key?(room_map, room_key)
     end)
-    |> Enum.map(fn {hash, room} ->
-      %{name: room.name, pub_key: room.pub_key, hash: hash, type: room.type}
-    end)
+    |> Enum.map(&elem(&1, 1))
     |> Enum.sort_by(& &1.name)
-    |> Enum.split_with(&MapSet.member?(my_room_hashes, &1.hash))
+    |> Enum.split_with(&Map.has_key?(room_map, &1.pub_key))
   end
 
   @doc "Returns Room or nil"
-  def get(hash) do
-    Registry.find(hash)
+  def get(room_key) do
+    Registry.find(room_key)
   end
 
-  def delete(hash) do
-    Registry.delete(hash)
-    RoomMessages.delete_by_room(hash)
+  def delete(room_key) do
+    Registry.delete(room_key)
+    RoomMessages.delete_by_room(room_key)
   end
 
   def await_saved(%Identity{} = identity),
-    do: Registry.await_saved(identity |> Identity.pub_key() |> Utils.hash())
+    do: Registry.await_saved(identity |> Identity.pub_key())
 
   def await_saved(msg_data, hash), do: RoomMessages.await_saved(msg_data, hash)
   def on_saved(msg_data, hash, ok_fn), do: RoomMessages.on_saved(msg_data, hash, ok_fn)
 
   defdelegate add_new_message(message, author, room_pub_key, opts \\ []), to: RoomMessages
-
-  def read_message({_, %Message{}} = msg, %Identity{} = identity),
-    do: RoomMessages.read(msg, identity)
-
-  def read_message({_, _} = msg_id, %Identity{} = identity, id_map_builder),
-    do: RoomMessages.read(msg_id, identity, id_map_builder)
 
   def read_prev_message(
         msg_id,
@@ -91,10 +77,15 @@ defmodule Chat.Rooms do
     end
   end
 
+  def read_message({_, %Message{}} = msg, %Identity{} = identity),
+    do: RoomMessages.read(msg, identity)
+
+  def read_message({_, _} = msg_id, %Identity{} = identity),
+    do: RoomMessages.read(msg_id, identity)
+
   defdelegate read(
                 room,
                 room_identity,
-                id_map_builder,
                 before \\ {nil, 0},
                 amount \\ 1000
               ),
@@ -106,8 +97,8 @@ defmodule Chat.Rooms do
   def delete_message(msg_id, room, me),
     do: msg_id |> RoomMessages.delete_message(room, me)
 
-  def add_request(room_hash, user_identity, time) do
-    room_hash
+  def add_request(room_key, user_identity, time) do
+    room_key
     |> get()
     |> Room.add_request(user_identity)
     |> tap(fn %{type: type} = room ->
@@ -120,59 +111,67 @@ defmodule Chat.Rooms do
     |> update()
   end
 
-  def get_request(room, user_hash), do: Room.get_request(room, user_hash)
+  def get_request(room, user_public_key), do: Room.get_request(room, user_public_key)
 
   @doc """
   Approves the room request for user.
   Opts:
     * :public_only - Ignores aproval for a non-public room if `true`. Defaults to `false`.
   """
-  def approve_request(room_hash, user_hash, room_identity, opts \\ []) do
-    if_room_found(room_hash, fn room ->
+  def approve_request(room_key, user_key, room_identity, opts \\ []) do
+    if_room_found(room_key, fn room ->
       room
-      |> Room.approve_request(user_hash, room_identity, opts)
+      |> Room.approve_request(user_key, room_identity, opts)
       |> update()
     end)
   end
 
-  def join_approved_request(room_identity, person_identity) do
+  def clear_approved_request(room_identity, person_identity) do
     room_identity
     |> Identity.pub_key()
-    |> Utils.hash()
     |> get()
-    |> Room.join_approved_request(person_identity)
+    |> Room.clear_approved_request(person_identity)
     |> update()
   end
 
-  def is_requested_by?(room_hash, person_hash) do
-    room_hash
+  def is_requested_by?(room_pub_key, person_public_key) do
+    room_pub_key
     |> get()
-    |> Room.is_requested_by?(person_hash)
+    |> Room.is_requested_by?(person_public_key)
   end
 
-  def list_pending_requests(room_hash) do
-    if_room_found(room_hash, &Room.list_pending_requests/1, [])
+  def list_pending_requests(room_key) do
+    if_room_found(room_key, &Room.list_pending_requests/1, [])
   end
 
-  def list_approved_requests_for(room_hash, user_hash) do
-    room_hash
+  def list_approved_requests_for(%Room{} = room, user_public_key) do
+    Room.list_approved_requests_for(room, user_public_key)
+  end
+
+  def list_approved_requests_for(room_key, user_public_key) do
+    room_key
     |> get()
     |> case do
       nil -> []
-      room -> Room.list_approved_requests_for(room, user_hash)
+      room -> list_approved_requests_for(room, user_public_key)
     end
   end
 
   defdelegate update(room), to: Registry
-  defdelegate decrypt_identity(encrypted_room_identity, person_identity), to: Room
+  defdelegate decrypt_identity(encrypted_room_identity, person_identity, room_pub_key), to: Room
 
-  defp if_room_found(hash, action, default \\ nil) do
-    room = get(hash)
+  defp if_room_found(room_or_key, action, default \\ nil)
 
-    if room do
-      room |> action.()
-    else
-      default
+  defp if_room_found(%Room{} = room, action, _) do
+    action.(room)
+  end
+
+  defp if_room_found(room_key, action, default) do
+    room_key
+    |> get
+    |> case do
+      %Room{} = room -> action.(room)
+      _ -> default
     end
   end
 end

@@ -25,19 +25,16 @@ defmodule Chat.Db.Scope.KeyScopeTest do
       alice = User.login("Alice")
       User.register(alice)
       alice_key = Identity.pub_key(alice)
-      alice_hash = Utils.hash(alice_key)
 
       bob = User.login("Bob")
       User.register(bob)
       bob_card = Card.from_identity(bob)
       bob_key = Identity.pub_key(bob)
-      bob_hash = Utils.hash(bob_key)
 
       charlie = User.login("Charlie")
       User.register(charlie)
       charlie_card = Card.from_identity(charlie)
       charlie_key = Identity.pub_key(charlie)
-      charlie_hash = Utils.hash(charlie_key)
 
       alice_bob_dialog = Dialogs.find_or_open(alice, bob_card)
 
@@ -85,7 +82,7 @@ defmodule Chat.Db.Scope.KeyScopeTest do
         |> Utils.StorageId.from_json_to_key()
 
       {room_identity, first_room} = Rooms.add(alice, "Alice, Bob and Charlie room", :request)
-      first_room_hash = Utils.hash(first_room.pub_key)
+      first_room_key = room_identity |> Identity.pub_key()
 
       room_invite =
         room_identity
@@ -100,9 +97,8 @@ defmodule Chat.Db.Scope.KeyScopeTest do
 
       ChangeTracker.await()
 
-      Rooms.add_request(first_room_hash, charlie, 1)
-      Rooms.approve_request(first_room_hash, charlie_hash, room_identity, [])
-      Rooms.join_approved_request(room_identity, charlie)
+      Rooms.add_request(first_room_key, charlie, 1)
+      Rooms.approve_request(first_room_key, charlie_key, room_identity, [])
 
       {_index, alice_first_room_message} =
         "Hello first room from Alice"
@@ -130,7 +126,7 @@ defmodule Chat.Db.Scope.KeyScopeTest do
 
       FileIndex.save(
         first_file_key,
-        Utils.hash(first_room.pub_key),
+        first_room.pub_key,
         first_image_message.id,
         chunk_secret
       )
@@ -141,11 +137,10 @@ defmodule Chat.Db.Scope.KeyScopeTest do
       ChunkedFiles.save_upload_chunk(first_file_key, {18, 29}, "another part")
 
       {room_identity, second_room} = Rooms.add(bob, "Bob and Charlie room")
-      second_room_hash = Utils.hash(second_room.pub_key)
-      Rooms.Registry.await_saved(second_room_hash)
-      Rooms.add_request(second_room_hash, charlie, 1)
-      Rooms.approve_request(second_room_hash, charlie_hash, room_identity, [])
-      Rooms.join_approved_request(room_identity, charlie)
+      second_room_key = second_room.pub_key
+      Rooms.Registry.await_saved(second_room_key)
+      Rooms.add_request(second_room_key, charlie, 1)
+      Rooms.approve_request(second_room_key, charlie_key, room_identity, [])
 
       {_index, bob_second_room_message} =
         "Hello second room from Bob"
@@ -168,7 +163,7 @@ defmodule Chat.Db.Scope.KeyScopeTest do
 
       FileIndex.save(
         second_file_key,
-        Utils.hash(second_room.pub_key),
+        second_room.pub_key,
         second_image_message.id,
         chunk_secret
       )
@@ -210,42 +205,35 @@ defmodule Chat.Db.Scope.KeyScopeTest do
 
       assert Enum.count(keys, fn key -> Kernel.match?({:file, _file_key}, key) end) == 1
 
-      alice_bob_dialog_binhash =
-        [alice_hash, bob_hash]
-        |> Enum.sort()
-        |> Enum.join()
-
-      bob_charlie_dialog_binhash =
-        [bob_hash, charlie_hash]
-        |> Enum.sort()
-        |> Enum.join()
+      alice_bob_dialog_binhash = alice_bob_dialog |> Dialogs.key()
+      bob_charlie_dialog_binhash = bob_charlie_dialog |> Dialogs.key()
 
       assert Enum.member?(keys, {:dialogs, alice_bob_dialog_binhash})
       refute Enum.member?(keys, {:dialogs, bob_charlie_dialog_binhash})
       assert Enum.count(keys, fn key -> Kernel.match?({:dialogs, _dialog_binhash}, key) end) == 1
 
       assert Enum.any?(keys, fn key ->
-               message_hash = Utils.binhash(alice_bob_message.id)
+               message_hash = alice_bob_message.id |> Enigma.hash()
                Kernel.match?({:dialog_message, _dialog_key, _index, ^message_hash}, key)
              end)
 
       assert Enum.any?(keys, fn key ->
-               message_hash = Utils.binhash(bob_alice_message.id)
+               message_hash = bob_alice_message.id |> Enigma.hash()
                Kernel.match?({:dialog_message, _dialog_key, _index, ^message_hash}, key)
              end)
 
       assert Enum.any?(keys, fn key ->
-               message_hash = Utils.binhash(bob_alice_memo_message.id)
+               message_hash = bob_alice_memo_message.id |> Enigma.hash()
                Kernel.match?({:dialog_message, _dialog_key, _index, ^message_hash}, key)
              end)
 
       refute Enum.any?(keys, fn key ->
-               message_hash = Utils.binhash(bob_charlie_message.id)
+               message_hash = bob_charlie_message.id |> Enigma.hash()
                Kernel.match?({:dialog_message, _dialog_key, _index, ^message_hash}, key)
              end)
 
       refute Enum.any?(keys, fn key ->
-               message_hash = Utils.binhash(bob_charlie_memo_message.id)
+               message_hash = bob_charlie_memo_message.id |> Enigma.hash()
                Kernel.match?({:dialog_message, _dialog_key, _index, ^message_hash}, key)
              end)
 
@@ -255,12 +243,12 @@ defmodule Chat.Db.Scope.KeyScopeTest do
 
       assert Enum.member?(
                keys,
-               {:file_index, first_room_hash, first_file_key, first_image_message.id}
+               {:file_index, first_room_key, first_file_key, first_image_message.id}
              )
 
       refute Enum.member?(
                keys,
-               {:file_index, second_room_hash, second_file_key, second_image_message.id}
+               {:file_index, second_room_key, second_file_key, second_image_message.id}
              )
 
       assert Enum.count(keys, fn key ->
@@ -271,55 +259,55 @@ defmodule Chat.Db.Scope.KeyScopeTest do
       refute Enum.member?(keys, {:memo, bob_charlie_memo_key})
       assert Enum.count(keys, fn key -> Kernel.match?({:memo, _memo_key}, key) end) == 1
 
-      assert Enum.member?(keys, {:memo_index, alice_hash, bob_alice_memo_key})
+      assert Enum.member?(keys, {:memo_index, alice_key, bob_alice_memo_key})
 
       assert Enum.count(keys, fn key ->
                Kernel.match?({:memo_index, _reader_hash, _memo_key}, key)
              end) == 1
 
-      assert Enum.member?(keys, {:rooms, first_room_hash})
-      refute Enum.member?(keys, {:rooms, second_room_hash})
+      assert Enum.member?(keys, {:rooms, first_room_key})
+      refute Enum.member?(keys, {:rooms, second_room_key})
       assert Enum.count(keys, fn key -> Kernel.match?({:rooms, _room_hash}, key) end) == 1
       assert Enum.member?(keys, {:room_invite, room_invite_key})
       assert Enum.count(keys, fn key -> Kernel.match?({:room_invite, _invite_key}, key) end) == 1
-      assert Enum.member?(keys, {:room_invite_index, alice_hash, room_invite_key})
+      assert Enum.member?(keys, {:room_invite_index, alice_key, room_invite_key})
 
       assert Enum.count(keys, fn key ->
                Kernel.match?({:room_invite_index, _reader_hash, _invite_key}, key)
              end) == 1
 
       assert Enum.any?(keys, fn key ->
-               message_hash = Utils.binhash(alice_first_room_message.id)
+               message_hash = alice_first_room_message.id |> Enigma.hash()
                Kernel.match?({:room_message, _room_key, _index, ^message_hash}, key)
              end)
 
       assert Enum.any?(keys, fn key ->
-               message_hash = Utils.binhash(bob_first_room_message.id)
+               message_hash = bob_first_room_message.id |> Enigma.hash()
                Kernel.match?({:room_message, _room_key, _index, ^message_hash}, key)
              end)
 
       assert Enum.any?(keys, fn key ->
-               message_hash = Utils.binhash(charlie_first_room_message.id)
+               message_hash = charlie_first_room_message.id |> Enigma.hash()
                Kernel.match?({:room_message, _room_key, _index, ^message_hash}, key)
              end)
 
       assert Enum.any?(keys, fn key ->
-               message_hash = Utils.binhash(first_image_message.id)
+               message_hash = first_image_message.id |> Enigma.hash()
                Kernel.match?({:room_message, _room_key, _index, ^message_hash}, key)
              end)
 
       refute Enum.any?(keys, fn key ->
-               message_hash = Utils.binhash(bob_second_room_message.id)
+               message_hash = bob_second_room_message.id |> Enigma.hash()
                Kernel.match?({:room_message, _room_key, _index, ^message_hash}, key)
              end)
 
       refute Enum.any?(keys, fn key ->
-               message_hash = Utils.binhash(charlie_second_room_message.id)
+               message_hash = charlie_second_room_message.id |> Enigma.hash()
                Kernel.match?({:room_message, _room_key, _index, ^message_hash}, key)
              end)
 
       refute Enum.any?(keys, fn key ->
-               message_hash = Utils.binhash(second_image_message.id)
+               message_hash = second_image_message.id |> Enigma.hash()
                Kernel.match?({:room_message, _room_key, _index, ^message_hash}, key)
              end)
 
@@ -327,9 +315,9 @@ defmodule Chat.Db.Scope.KeyScopeTest do
                Kernel.match?({:room_message, _room_key, _index, _message_hash}, key)
              end) == 5
 
-      assert Enum.member?(keys, {:users, alice_hash})
-      assert Enum.member?(keys, {:users, bob_hash})
-      assert Enum.member?(keys, {:users, charlie_hash})
+      assert Enum.member?(keys, {:users, alice_key})
+      assert Enum.member?(keys, {:users, bob_key})
+      assert Enum.member?(keys, {:users, charlie_key})
     end
   end
 end

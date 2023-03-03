@@ -9,7 +9,7 @@ defmodule Chat.ChunkedFilesTest do
     key = UUID.uuid4()
     secret = ChunkedFiles.new_upload(key)
 
-    assert 24 = byte_size(secret)
+    assert 32 = byte_size(secret)
 
     first = "some part of info "
     second = "another part"

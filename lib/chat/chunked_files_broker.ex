@@ -2,10 +2,8 @@ defmodule Chat.ChunkedFilesBroker do
   @moduledoc "Keep secret while chunks are being uploaded"
   use GenServer
 
-  alias Chat.Utils
-
   def generate(key) do
-    secret = Utils.generate_binary_encrypt_key()
+    secret = Enigma.generate_secret()
 
     GenServer.call(__MODULE__, {:put, key, secret})
 

@@ -43,6 +43,8 @@ defmodule Chat.MixProject do
   defp deps do
     [
       # {:flame_on, "~> 0.5.2"},
+      {:absinthe, "~> 1.7"},
+      {:absinthe_plug, "~> 1.5"},
       {:poison, "~> 5.0"},
       {:phoenix_ecto, "~> 4.0"},
       {:ecto, "~> 3.7"},

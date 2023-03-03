@@ -302,3 +302,11 @@ graph TD;
 No secret, no private key, no message, no file get written unprotected into DB.
 
 Every bit of client content should be protected by private key (user or room), eventualy.
+
+### Tech details
+
+Hash: SHA3-256
+
+Cipher: Blowfish CFB
+
+Encryption: ECC secp256k1

@@ -81,9 +81,13 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> init_new_mode()
   end
 
-  def request_room(%{assigns: %{me: me, monotonic_offset: time_offset}} = socket, room_key) do
+  def request_room(
+        %{assigns: %{me: me, monotonic_offset: time_offset, new_rooms: rooms}} = socket,
+        room_key
+      ) do
     time = Chat.Time.monotonic_to_unix(time_offset)
     room = Rooms.add_request(room_key, me, time)
+
     Log.request_room_key(me, time, room.pub_key)
 
     PubSub.broadcast!(
@@ -93,7 +97,13 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     )
 
     socket
-    |> assign_room_list()
+    |> assign(
+      :new_rooms,
+      Enum.map(rooms, fn
+        %{pub_key: pub_key} when pub_key == room.pub_key -> Map.put(room, :is_requested?, true)
+        other_room -> other_room
+      end)
+    )
   end
 
   def approve_room_request(
@@ -202,7 +212,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
     new =
       Enum.map(new, fn room ->
-        Map.put(room, :is_requested?, Rooms.is_requested_by?(room.hash, my_id))
+        Map.put(room, :is_requested?, Rooms.is_requested_by?(room.pub_key, my_id))
       end)
 
     socket

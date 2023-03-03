@@ -281,7 +281,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       <%= unless @export? do %>
         <%= if (@is_mine? and @author == @receiver) or not @is_mine? do %>
           <div class="px-2 my-1 flex items-center justify-between">
-            <%= if @room_card.hash in @room_keys do %>
+            <%= if @room_card.pub_key in @room_keys do %>
               <button
                 class="w-full h-12 border-0 rounded-lg bg-grayscale text-white"
                 phx-click="dialog/message/accept-room-invite-and-open-room"

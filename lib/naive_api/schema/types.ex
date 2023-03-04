@@ -58,36 +58,46 @@ defmodule NaiveApi.Schema.Types do
     field(:id, :id |> non_null)
   end
 
-  # enum :file_content_type do
-  #   value(:file)
-  #   value(:image)
-  #   value(:video)
-  #   value(:audio)
-  # end
+  @desc "File content type"
+  enum :file_content_type do
+    value(:file, description: "Generic file")
+    value(:image, description: "Image file")
+    value(:video, description: "Video file")
+    value(:audio, description: "Audio file")
+  end
 
-  # object :room_invite_content do
-  #   field(:room_card, :card |> non_null)
-  #   field(:invitation, :bitstring |> non_null)
-  # end
+  @desc "Room invite content"
+  object :room_invite_content do
+    field(:room_card, :card |> non_null)
+    field(:invitation, :bitstring |> non_null)
+  end
 
-  # object :file_content do
-  #   field(:url, :string |> non_null)
-  #   field(:type, :file_content_type |> non_null)
-  #   field(:size_bytes, :integer |> non_null)
-  #   field(:initial_name, :string |> non_null)
-  # end
+  @desc "File content"
+  object :file_content do
+    field(:url, :string |> non_null)
+    field(:type, :file_content_type |> non_null)
+    field(:size_bytes, :integer |> non_null)
+    field(:initial_name, :string |> non_null)
+  end
 
-  # union :content do
-  #   types([:file_content, :room_invite_content, :string])
-  # end
+  @desc "Text content"
+  object :text_content do
+    field(:text, :string |> non_null)
+  end
 
-  # object :msg do
-  #   # field(:author, :card |> not_null)
-  #   # field(:content, :content |> not_null)
-  #   # field(:timestamp, :integer |> not_null)
-  #   # field(:index, :integer |> not_null)
-  #   field(:id, not_null(:id))
-  # end
+  @desc "Message content"
+  union :message_content do
+    types([:file_content, :room_invite_content, :text_content])
+  end
+
+  @desc "Message"
+  object :message do
+    field(:author, :card |> non_null)
+    field(:content, :message_content |> non_null)
+    field(:timestamp, :integer |> non_null)
+    field(:index, :integer |> non_null)
+    field(:id, :id |> non_null)
+  end
 
   ###################
   #  Input objects

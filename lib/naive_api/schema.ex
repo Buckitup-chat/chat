@@ -16,33 +16,33 @@ defmodule NaiveApi.Schema do
       arg(:my_public_key, :public_key |> non_null)
     end
 
-    # @desc """
-    # Reads chat messages.
+    @desc """
+    Reads chat messages.
 
-    # `before` and `amount` are in indexes. One index contains at least one message.
-    # If `before` omitted, most recent messaages will be returned.
-    # If `amount` omitted, messages in 20 indexes will be returned.
-    # """
-    # field :room_chat, list_of(:message |> non_null) do
-    #   arg(:peer_public_key, non_null(:public_key))
-    #   arg(:my_keypair, non_null(:input_key_pair))
-    #   arg(:before, :integer)
-    #   arg(:amount, :integer)
-    # end
+    `before` and `amount` are in indexes. One index contains at least one message.
+    If `before` omitted, most recent messaages will be returned.
+    If `amount` omitted, messages in 20 indexes will be returned.
+    """
+    field :chat_read, list_of(:message |> non_null) do
+      arg(:peer_public_key, non_null(:public_key))
+      arg(:my_keypair, non_null(:input_key_pair))
+      arg(:before, :integer)
+      arg(:amount, :integer)
+    end
 
-    # @desc """
-    # Reads room messages.
+    @desc """
+    Reads room messages.
 
-    # `before` and `amount` are in indexes. One index contains at least one message.
-    # If `before` omitted, most recent messaages will be returned.
-    # If `amount` omitted, messages in 20 indexes will be returned.
-    # """
-    # field :room_read, list_of(:message |> non_null) do
-    #   arg(:room_keypair, non_null(:input_key_pair))
-    #   arg(:my_keypair, non_null(:input_key_pair))
-    #   arg(:before, :integer)
-    #   arg(:amount, :integer)
-    # end
+    `before` and `amount` are in indexes. One index contains at least one message.
+    If `before` omitted, most recent messaages will be returned.
+    If `amount` omitted, messages in 20 indexes will be returned.
+    """
+    field :room_read, list_of(:message |> non_null) do
+      arg(:room_keypair, non_null(:input_key_pair))
+      arg(:my_keypair, non_null(:input_key_pair))
+      arg(:before, :integer)
+      arg(:amount, :integer)
+    end
   end
 
   mutation do

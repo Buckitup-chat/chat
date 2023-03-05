@@ -5,9 +5,9 @@ defmodule ChatWeb.Helpers.UploaderTest do
   import Phoenix.LiveViewTest
   import Support.{FakeData, RetryHelper}
 
-  alias Chat.Db.ChangeTracker
   alias Chat.ChunkedFiles
   alias Chat.Content.Files
+  alias Chat.Db.ChangeTracker
   alias Chat.Dialogs
   alias Chat.Dialogs.{Dialog, PrivateMessage}
   alias Chat.Rooms

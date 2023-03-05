@@ -5,6 +5,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
   import Phoenix.LiveViewTest
   import Support.{FakeData, RetryHelper}
 
+  alias Chat.Db.ChangeTracker
   alias Chat.ChunkedFiles
   alias Chat.Content.Files
   alias Chat.Dialogs
@@ -442,19 +443,19 @@ defmodule ChatWeb.Helpers.UploaderTest do
       refute Map.get(socket.assigns.uploads_metadata, existing_entry.uuid)
       refute Map.get(socket.assigns.uploads_metadata, uuid)
 
-      retry_until(1_000, fn ->
-        assert [%PlainMessage{} = message_1, %PlainMessage{} = message_2] =
-                 Rooms.read(
-                   socket.assigns.room,
-                   socket.assigns.room_identity
-                 )
+      ChangeTracker.await()
 
-        assert message_1.type == :image
-        assert {id_1, secret_1} = StorageId.from_json(message_1.content)
-        assert message_2.type == :image
-        assert {id_2, secret_2} = StorageId.from_json(message_2.content)
-        assert Files.get(id_1, secret_1) == Files.get(id_2, secret_2)
-      end)
+      assert [%PlainMessage{} = message_1, %PlainMessage{} = message_2] =
+               Rooms.read(
+                 socket.assigns.room,
+                 socket.assigns.room_identity
+               )
+
+      assert message_1.type == :image
+      assert {id_1, secret_1} = StorageId.from_json(message_1.content)
+      assert message_2.type == :image
+      assert {id_2, secret_2} = StorageId.from_json(message_2.content)
+      assert Files.get(id_1, secret_1) == Files.get(id_2, secret_2)
     end
   end
 

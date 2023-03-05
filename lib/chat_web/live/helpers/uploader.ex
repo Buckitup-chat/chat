@@ -179,7 +179,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
       entry.client_last_modified
     ]
     |> Enum.join(":")
-    |> Enigma.hash()
+    |> Enigma.short_hash()
   end
 
   defp reader_hash(%{lobby_mode: :chats, peer: %{pub_key: peer_pub_key}}),

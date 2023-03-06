@@ -1,0 +1,162 @@
+# Cargo options
+
+## 1. Central BuckitUp
+
+One BuckitUp device. Many sensors (at least one per checkpoint)
+
+##### Checkpoint deploy
+
+1. Checkpoint creates a user for itself into system and stores keys on its hard drive
+
+##### Route start
+
+1. Anyone creates a room with truck number
+2. Invites checkpoints into the room
+
+##### Checkpoint algo
+
+1. Driver pushes the button.
+2. Truck number is recognised. Sensor lights in-progress LED.
+3. Sensor uses API to find room by truck number.
+4. Sensor finds the key of the room in chats (can be background job)
+5. Sensor writes image and weight info to the room.
+6. Sensor turns off in-progress LED, Driver is free to go.
+
+<!-- livebook:{"break_markdown":true} -->
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph TD;
+b(BuckitUp)
+  subgraph Checkpoint_1
+    s1(Sensor)
+  end
+  subgraph Checkpoint_2
+    s2(Sensor)
+  end  
+  subgraph Checkpoint_N
+    sn(Sensor)
+  end 
+  b -.- Checkpoint_1
+  b -.- Checkpoint_2
+  b -.- Checkpoint_N
+
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+#### Pros:
+
+* no or minimal driver actions
+* no USB drive handling = no `cargo_db` drive type
+* no special room handling
+
+#### Cons:
+
+* outage of central chat blocks the process
+* network outage blocks the process
+* requires permanent network connection
+
+<!-- livebook:{"break_markdown":true} -->
+
+#### Left to do
+
+* BuckitUp: minimal API
+* Sensor: truck number recognition
+* Sensor: API client
+* Sensor: weigh and camera
+* Sensor: progress indication
+
+## 2. Smart Sensor and BuckitUp per Checkpoint
+
+Sensor and BuckitUp can be on same or separate devices.
+
+In this case we replacing centralizerd network with USB drive to transfer data. Also flash drive gives us truck number.
+
+<!-- livebook:{"break_markdown":true} -->
+
+##### Checkpoint deploy
+
+1. Checkpoint creates a user for itself into system and stores keys on its hard drive
+2. Sensor url and public key stored in BuckitUp admin panel
+
+##### Route start
+
+1. Starter creates special room with truck number
+2. Invites checkpoints into the room
+3. Cargo USB gets written with track room and chevkpoint invitations into the room
+4. Driver takes USB drive
+
+##### Checkpoint algo
+
+1. Driver inserts USB drive at checkpoint
+2. BuckitUp recognizes cargo USB drive and notifies sensor with room and peer name sent invitation
+3. Sensor lights in-progress LED.
+4. Sensor finds the key of the room in chat
+5. Sensor writes image and weight info to the room.
+6. BuckitUp finds new info in a room and unmounts flash drive.
+7. Sensor turns off in-progress LED
+8. Driver takes USB drive.
+
+<!-- livebook:{"break_markdown":true} -->
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph TD;
+d{{USB drive}}
+  subgraph Checkpoint_1
+    b1(BuckitUp) <-->
+    s1(Sensor)
+  end
+  subgraph Checkpoint_2
+    b2(BuckitUp) <-->
+    s2(Sensor)
+  end  
+  subgraph Checkpoint_N
+    bn(BuckitUp) <--> sn(Sensor)
+  end 
+  d -.- Checkpoint_1
+  d -.- Checkpoint_2
+  d -.- Checkpoint_N
+
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+#### Pros:
+
+* no network needed
+* decentralised, stable and copied over checkpoints
+
+#### Cons:
+
+* driver needs to insert USB drive
+
+<!-- livebook:{"break_markdown":true} -->
+
+#### Left to do
+
+* BuckitUp: minimal API
+* BuckitUp: roomstarting
+* BuckitUp: `cargo_db` handling
+* BuckitUp: sensor configuration
+* Sensor: API client
+* Sensor: weigh and camera
+* Sensor: progress indication
+
+## 3. Simple Sensor and BuckitUp per Checkpoint
+
+In this case Sensor provides simple interface to get weight info and camera image.
+It is likely to be run on one device.
+
+Sensor should provide HTTP or CLI interface.
+
+TBD
+
+## 4. BuckitUp per Checkpoint
+
+Everything done in BuckitUp system.
+
+TBD

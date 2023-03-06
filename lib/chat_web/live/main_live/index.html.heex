@@ -407,7 +407,11 @@
               <h5 class="text-grayscale" style="font-size: 22px;">Chats</h5>
             </div>
             <div class="mt-10 w-full">
-              <ul>
+              <ul class={
+                classes(
+                        "",
+                        %{"md:max-h-[415px] overflow-scroll" => @uploads_metadata !== %{}}
+                      )}>
                 <%= for user <- @users do %>
                   <li
                     phx-click="dialog/switch"

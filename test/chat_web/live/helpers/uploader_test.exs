@@ -7,6 +7,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
   alias Chat.ChunkedFiles
   alias Chat.Content.Files
+  alias Chat.Db.ChangeTracker
   alias Chat.Dialogs
   alias Chat.Dialogs.{Dialog, PrivateMessage}
   alias Chat.Rooms
@@ -14,6 +15,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
   alias Chat.Upload.{Upload, UploadIndex, UploadMetadata, UploadStatus}
   alias Chat.Utils.StorageId
   alias ChatWeb.LiveHelpers.Uploader
+  alias ChatWeb.MainLive.Index
   alias Phoenix.LiveView.{Socket, UploadConfig, UploadEntry, Utils}
 
   describe "allow_file_upload/3" do
@@ -406,16 +408,47 @@ defmodule ChatWeb.Helpers.UploaderTest do
       refute Map.get(socket.assigns.uploads_metadata, existing_entry.uuid)
       refute Map.get(socket.assigns.uploads_metadata, uuid)
 
-      retry_until(1_000, fn ->
-        assert [%PrivateMessage{} = message_1, %PrivateMessage{} = message_2] =
-                 Dialogs.read(socket.assigns.dialog, socket.assigns.me)
+      ChangeTracker.await()
 
-        assert message_1.type == :image
-        assert {id_1, secret_1} = StorageId.from_json(message_1.content)
-        assert message_2.type == :image
-        assert {id_2, secret_2} = StorageId.from_json(message_2.content)
-        assert Files.get(id_1, secret_1) == Files.get(id_2, secret_2)
-      end)
+      assert [%PrivateMessage{} = message_1, %PrivateMessage{} = message_2] =
+               Dialogs.read(socket.assigns.dialog, socket.assigns.me)
+
+      assert message_1.type == :image
+      assert credentials_1 = StorageId.from_json(message_1.content)
+      assert message_2.type == :image
+      assert credentials_2 = StorageId.from_json(message_2.content)
+      assert Files.get(credentials_1) == Files.get(credentials_2)
+
+      state = :sys.get_state(view.pid)
+      socket = state.socket
+
+      Index.handle_event(
+        "dialog/delete-messages",
+        %{
+          "messages" =>
+            Jason.encode!([%{id: message_1.id, index: Integer.to_string(message_1.index)}])
+        },
+        socket
+      )
+
+      ChangeTracker.await()
+
+      assert Files.get(credentials_1)
+      assert Files.get(credentials_2)
+
+      Index.handle_event(
+        "dialog/delete-messages",
+        %{
+          "messages" =>
+            Jason.encode!([%{id: message_2.id, index: Integer.to_string(message_2.index)}])
+        },
+        socket
+      )
+
+      ChangeTracker.await()
+
+      refute Files.get(credentials_1)
+      refute Files.get(credentials_2)
     end
 
     test "when file has already been uploaded to the room commands uploader to skip", %{
@@ -442,19 +475,50 @@ defmodule ChatWeb.Helpers.UploaderTest do
       refute Map.get(socket.assigns.uploads_metadata, existing_entry.uuid)
       refute Map.get(socket.assigns.uploads_metadata, uuid)
 
-      retry_until(1_000, fn ->
-        assert [%PlainMessage{} = message_1, %PlainMessage{} = message_2] =
-                 Rooms.read(
-                   socket.assigns.room,
-                   socket.assigns.room_identity
-                 )
+      ChangeTracker.await()
 
-        assert message_1.type == :image
-        assert {id_1, secret_1} = StorageId.from_json(message_1.content)
-        assert message_2.type == :image
-        assert {id_2, secret_2} = StorageId.from_json(message_2.content)
-        assert Files.get(id_1, secret_1) == Files.get(id_2, secret_2)
-      end)
+      assert [%PlainMessage{} = message_1, %PlainMessage{} = message_2] =
+               Rooms.read(
+                 socket.assigns.room,
+                 socket.assigns.room_identity
+               )
+
+      assert message_1.type == :image
+      assert credentials_1 = StorageId.from_json(message_1.content)
+      assert message_2.type == :image
+      assert credentials_2 = StorageId.from_json(message_2.content)
+      assert Files.get(credentials_1) == Files.get(credentials_2)
+
+      state = :sys.get_state(view.pid)
+      socket = state.socket
+
+      Index.handle_event(
+        "room/delete-messages",
+        %{
+          "messages" =>
+            Jason.encode!([%{id: message_1.id, index: Integer.to_string(message_1.index)}])
+        },
+        socket
+      )
+
+      ChangeTracker.await()
+
+      assert Files.get(credentials_1)
+      assert Files.get(credentials_2)
+
+      Index.handle_event(
+        "room/delete-messages",
+        %{
+          "messages" =>
+            Jason.encode!([%{id: message_2.id, index: Integer.to_string(message_2.index)}])
+        },
+        socket
+      )
+
+      ChangeTracker.await()
+
+      refute Files.get(credentials_1)
+      refute Files.get(credentials_2)
     end
   end
 

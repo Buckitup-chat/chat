@@ -1,13 +1,13 @@
 defmodule Chat.Rooms.RoomTest do
   use ExUnit.Case, async: true
 
+  alias Chat.Content.Memo
   alias Chat.Db.ChangeTracker
   alias Chat.Identity
-  alias Chat.Memo
   alias Chat.Messages
   alias Chat.Rooms
+  alias Chat.Rooms.RoomRequest
   alias Chat.User
-  alias Chat.Utils
   alias Chat.Utils.StorageId
   alias Support.FakeData
 
@@ -26,7 +26,7 @@ defmodule Chat.Rooms.RoomTest do
   test "room messages" do
     alice = User.login("Alice")
     alice |> User.register()
-    alice_hash = alice |> Identity.pub_key() |> Utils.hash()
+    alice_key = alice |> Identity.pub_key()
 
     {room_identity, room} = alice |> Rooms.add("some room")
 
@@ -54,13 +54,13 @@ defmodule Chat.Rooms.RoomTest do
     |> Rooms.await_saved(room.pub_key)
 
     assert [
-             %Rooms.PlainMessage{content: ^message, type: :text, author_hash: ^alice_hash},
+             %Rooms.PlainMessage{content: ^message, type: :text, author_key: ^alice_key},
              %Rooms.PlainMessage{type: :memo},
              %Rooms.PlainMessage{type: :audio},
              %Rooms.PlainMessage{type: :image}
            ] =
              room
-             |> Rooms.read(room_identity, &User.id_map_builder/1)
+             |> Rooms.read(room_identity)
 
     assert %Rooms.PlainMessage{type: :image} = image_msg |> Rooms.read_message(room_identity)
   end
@@ -68,27 +68,36 @@ defmodule Chat.Rooms.RoomTest do
   test "room invite" do
     {_alice, room_identity, room} = alice_and_room()
 
+    refute is_nil(room_identity)
+
     bob = User.login("Bob")
     bob_key = bob |> Identity.pub_key()
-    bob_hash = bob_key |> Utils.hash()
 
     assert [] = room.requests
 
     room = room |> Rooms.Room.add_request(bob)
 
-    assert [{bob_hash, bob_key, :pending}] == room.requests
+    assert [%{requester_key: ^bob_key, pending?: true}] = room.requests
 
-    assert room |> Rooms.Room.is_requested_by?(bob_hash)
+    assert room |> Rooms.Room.is_requested_by?(bob_key)
 
-    room = room |> Rooms.Room.approve_request(bob_hash, room_identity, [])
+    room = room |> Rooms.Room.approve_request(bob_key, room_identity, [])
 
-    assert [{^bob_hash, ^bob_key, encrypted_identity}] = room.requests
+    assert [
+             %RoomRequest{
+               requester_key: ^bob_key,
+               pending?: false,
+               ciphered_room_identity: encrypted_identity
+             }
+           ] = room.requests
 
-    decrypted_identity = Rooms.decrypt_identity(encrypted_identity, bob)
+    decrypted_identity = Rooms.decrypt_identity(encrypted_identity, bob, room.pub_key)
 
-    assert room_identity == decrypted_identity
+    assert room_identity == %{decrypted_identity | name: room_identity.name}
 
-    room = room_identity |> Rooms.join_approved_request(bob)
+    refute is_nil(room_identity)
+
+    room = room_identity |> Rooms.clear_approved_request(bob)
 
     assert [] = room.requests
   end
@@ -98,34 +107,39 @@ defmodule Chat.Rooms.RoomTest do
     room_name = "Some my room"
     {room_identity, _room} = alice |> Rooms.add(room_name)
     Rooms.await_saved(room_identity)
-    room_hash = room_identity |> Utils.hash()
+    room_key = room_identity |> Identity.pub_key()
 
-    {my_rooms, _other} = Rooms.list([room_identity])
+    {my_rooms, _other} = Rooms.list(%{room_key => room_identity})
 
     assert [%{name: ^room_name}] = my_rooms
 
     assert nil == Rooms.get("")
-    assert %Rooms.Room{name: ^room_name} = Rooms.get(room_hash)
+    assert %Rooms.Room{name: ^room_name} = Rooms.get(room_key)
   end
 
   test "requesting room should work" do
     alice = User.login("Alice")
     room_name = "Some my room"
     {room_identity, _room} = alice |> Rooms.add(room_name)
-    room_hash = room_identity |> Utils.hash()
+    room_key = room_identity |> Identity.pub_key()
 
     bob = User.login("Bob")
     bob_pub_key = bob |> Identity.pub_key()
-    bob_hash = bob |> Utils.hash()
-
-    Rooms.add_request(room_hash, bob, 0)
     ChangeTracker.await()
-    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
-    assert Rooms.is_requested_by?(room_hash, bob_hash)
 
-    Rooms.approve_request(room_hash, bob_hash, room_identity)
+    Rooms.add_request(room_key, bob, 0)
     ChangeTracker.await()
-    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, {_, _}}]} = Rooms.get(room_hash)
+
+    assert %Rooms.Room{requests: [%{requester_key: ^bob_pub_key, pending?: true}]} =
+             Rooms.get(room_key)
+
+    assert Rooms.is_requested_by?(room_key, bob_pub_key)
+
+    Rooms.approve_request(room_key, bob_pub_key, room_identity)
+    ChangeTracker.await()
+
+    assert %Rooms.Room{requests: [%{requester_key: ^bob_pub_key, pending?: false}]} =
+             Rooms.get(room_key)
   end
 
   test "message removed from room should not accessed any more" do
@@ -145,7 +159,6 @@ defmodule Chat.Rooms.RoomTest do
       Rooms.read(
         room,
         room_identity,
-        &User.id_map_builder/1,
         {3, 0},
         1
       )
@@ -158,8 +171,7 @@ defmodule Chat.Rooms.RoomTest do
     assert [_, _] =
              Rooms.read(
                room,
-               room_identity,
-               &User.id_map_builder/1
+               room_identity
              )
   end
 
@@ -182,7 +194,6 @@ defmodule Chat.Rooms.RoomTest do
       Rooms.read(
         room,
         room_identity,
-        &User.id_map_builder/1,
         {3, 0},
         1
       )
@@ -197,8 +208,7 @@ defmodule Chat.Rooms.RoomTest do
     assert [_, updated_msg, _] =
              Rooms.read(
                room,
-               room_identity,
-               &User.id_map_builder/1
+               room_identity
              )
 
     assert "111" = updated_msg.content
@@ -221,7 +231,6 @@ defmodule Chat.Rooms.RoomTest do
       Rooms.read(
         room,
         room_identity,
-        &User.id_map_builder/1,
         {3, 0},
         1
       )
@@ -237,15 +246,21 @@ defmodule Chat.Rooms.RoomTest do
     assert [_, _, _] =
              Rooms.read(
                room,
-               room_identity,
-               &User.id_map_builder/1
+               room_identity
              )
 
     assert String.pad_trailing("111", 200, "-") ==
-             Rooms.read_message({msg.timestamp, msg.id}, room_identity, &User.id_map_builder/1)
+             Rooms.read_message({msg.timestamp, msg.id}, room_identity)
              |> Map.get(:content)
              |> StorageId.from_json()
              |> Memo.get()
+  end
+
+  test "room hash" do
+    {_alice, room_identity, room} = alice_and_room()
+
+    assert room_identity |> Enigma.hash() == room |> Enigma.hash()
+    assert room_identity.public_key |> Enigma.hash() == room |> Enigma.hash()
   end
 
   defp alice_and_room do

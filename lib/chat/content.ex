@@ -2,11 +2,11 @@ defmodule Chat.Content do
   @moduledoc "Content handling functions common for dialogs and rooms"
 
   alias Chat.ChunkedFiles
+  alias Chat.FileIndex
   alias Chat.MemoIndex
   alias Chat.RoomInviteIndex
 
-  alias Chat.{
-    FileIndex,
+  alias Chat.Content.{
     Files,
     Memo,
     RoomInvites

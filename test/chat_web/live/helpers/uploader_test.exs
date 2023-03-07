@@ -6,13 +6,12 @@ defmodule ChatWeb.Helpers.UploaderTest do
   import Support.{FakeData, RetryHelper}
 
   alias Chat.ChunkedFiles
+  alias Chat.Content.Files
   alias Chat.Dialogs
   alias Chat.Dialogs.{Dialog, PrivateMessage}
-  alias Chat.Files
   alias Chat.Rooms
   alias Chat.Rooms.PlainMessage
   alias Chat.Upload.{Upload, UploadIndex, UploadMetadata, UploadStatus}
-  alias Chat.User
   alias Chat.Utils.StorageId
   alias ChatWeb.LiveHelpers.Uploader
   alias Phoenix.LiveView.{Socket, UploadConfig, UploadEntry, Utils}
@@ -94,6 +93,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
       assert %UploadMetadata{credentials: {key, _secret}, status: :active} =
                Map.get(socket.assigns.uploads_metadata, entry_2.uuid)
 
+      Process.sleep(300)
       assert UploadStatus.get(key) == :active
 
       assert %UploadMetadata{credentials: {key, _secret}, status: :paused} =
@@ -275,12 +275,16 @@ defmodule ChatWeb.Helpers.UploaderTest do
                uuid: ^uuid
              } = uploader_data
 
-      upload_key =
+      text_key =
         entrypoint
         |> String.split("/")
         |> List.last()
 
-      assert entrypoint =~ ~p"/upload_chunk/#{upload_key}"
+      upload_key =
+        text_key
+        |> Base.decode16!(case: :lower)
+
+      assert entrypoint =~ ~p"/upload_chunk/#{text_key}"
 
       refute Map.has_key?(old_uploads_index, upload_key)
 
@@ -292,7 +296,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
       assert {^upload_key, _secret} = metadata.credentials
       assert %{dialog: %Dialog{}, pub_key: pub_key, type: :dialog} = metadata.destination
       assert metadata.status == :active
-      assert pub_key == socket.assigns.peer.pub_key
+      assert Base.decode16!(pub_key, case: :lower) == socket.assigns.peer.pub_key
     end
 
     test "returns data for a new room file upload", %{view: view} do
@@ -314,12 +318,14 @@ defmodule ChatWeb.Helpers.UploaderTest do
                uuid: ^uuid
              } = uploader_data
 
-      upload_key =
+      text_key =
         entrypoint
         |> String.split("/")
         |> List.last()
 
-      assert entrypoint =~ ~p"/upload_chunk/#{upload_key}"
+      upload_key = text_key |> Base.decode16!(case: :lower)
+
+      assert entrypoint =~ ~p"/upload_chunk/#{text_key}"
 
       refute Map.has_key?(old_uploads_index, upload_key)
 
@@ -331,7 +337,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
       assert {^upload_key, _secret} = metadata.credentials
       assert %{pub_key: pub_key, type: :room} = metadata.destination
       assert metadata.status == :active
-      assert pub_key == socket.assigns.room.pub_key
+      assert pub_key |> Base.decode16!(case: :lower) == socket.assigns.room.pub_key
     end
 
     test "when upload is already in progress commands uploader to skip", %{view: view} do
@@ -371,7 +377,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
                uuid: ^uuid
              } = uploader_data
 
-      assert entrypoint =~ ~p"/upload_chunk/#{upload_key}"
+      assert entrypoint =~ ~p"/upload_chunk/#{upload_key |> Base.encode16(case: :lower)}"
 
       assert %UploadMetadata{} = metadata = Map.get(socket.assigns.uploads_metadata, uuid)
       assert {^upload_key, _secret} = metadata.credentials
@@ -440,8 +446,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
         assert [%PlainMessage{} = message_1, %PlainMessage{} = message_2] =
                  Rooms.read(
                    socket.assigns.room,
-                   socket.assigns.room_identity,
-                   &User.id_map_builder/1
+                   socket.assigns.room_identity
                  )
 
         assert message_1.type == :image
@@ -507,8 +512,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
         assert [%PlainMessage{} = message] =
                  Rooms.read(
                    socket.assigns.room,
-                   socket.assigns.room_identity,
-                   &User.id_map_builder/1
+                   socket.assigns.room_identity
                  )
 
         assert message.type == :image

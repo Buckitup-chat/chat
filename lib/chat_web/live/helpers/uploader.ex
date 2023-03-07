@@ -8,7 +8,6 @@ defmodule ChatWeb.LiveHelpers.Uploader do
 
   alias Chat.{ChunkedFiles, ChunkedFilesMultisecret, FileIndex}
   alias Chat.Upload.{Upload, UploadIndex, UploadMetadata, UploadStatus, UploadSupervisor}
-  alias Chat.Utils
   alias ChatWeb.Endpoint
   alias ChatWeb.MainLive.Page
   alias ChatWeb.Router.Helpers
@@ -150,7 +149,9 @@ defmodule ChatWeb.LiveHelpers.Uploader do
           {socket, uploader_data} =
             start_chunked_upload(socket, entry, upload_key, secret, next_chunk)
 
-          link = Helpers.upload_chunk_url(Endpoint, :put, upload_key)
+          link =
+            Helpers.upload_chunk_url(Endpoint, :put, upload_key |> Base.encode16(case: :lower))
+
           uploader_data = Map.merge(%{entrypoint: link, uuid: entry.uuid}, uploader_data)
 
           {uploader_data, socket}
@@ -178,14 +179,14 @@ defmodule ChatWeb.LiveHelpers.Uploader do
       entry.client_last_modified
     ]
     |> Enum.join(":")
-    |> Utils.hash()
+    |> Enigma.hash()
   end
 
   defp reader_hash(%{lobby_mode: :chats, peer: %{pub_key: peer_pub_key}}),
-    do: Utils.hash(peer_pub_key)
+    do: peer_pub_key
 
   defp reader_hash(%{lobby_mode: :rooms, room: %{pub_key: room_pub_key}}),
-    do: Utils.hash(room_pub_key)
+    do: room_pub_key
 
   defp maybe_resume_existing_upload(upload_key, assigns) do
     case UploadIndex.get(upload_key) do
@@ -287,10 +288,10 @@ defmodule ChatWeb.LiveHelpers.Uploader do
          lobby_mode: :chats,
          peer: %{pub_key: peer_pub_key}
        }),
-       do: %{dialog: dialog, pub_key: peer_pub_key, type: :dialog}
+       do: %{dialog: dialog, pub_key: peer_pub_key |> Base.encode16(case: :lower), type: :dialog}
 
   defp file_upload_destination(%{lobby_mode: :rooms, room: %{pub_key: room_pub_key}}),
-    do: %{pub_key: room_pub_key, type: :room}
+    do: %{pub_key: room_pub_key |> Base.encode16(case: :lower), type: :room}
 
   defp maybe_resume_next_upload(%{assigns: %{uploads_metadata: uploads}} = socket) do
     active_uploads =

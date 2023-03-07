@@ -5,27 +5,25 @@ defmodule Chat.User.Registry do
   alias Chat.Db
   alias Chat.Db.ChangeTracker
   alias Chat.Identity
-  alias Chat.Utils
 
   def enlist(%Identity{} = user) do
     card = user |> Card.from_identity()
-    hash = card.pub_key |> Utils.hash()
 
-    Db.put({:users, hash}, card)
+    Db.put({:users, card.pub_key}, card)
 
-    hash
+    card.pub_key
   end
 
   def all do
     {{:users, 0}, {:"users\0", 0}}
-    |> Db.list(fn {{:users, hash}, %Card{} = user} -> {hash, user} end)
+    |> Db.list(fn {{:users, pub_key}, %Card{} = user} -> {pub_key, user} end)
   end
 
-  def remove(hash) do
-    Db.delete({:users, hash})
+  def remove(pub_key) do
+    Db.delete({:users, pub_key})
   end
 
-  def await_saved(hash) do
-    ChangeTracker.await({:users, hash})
+  def await_saved(pub_key) do
+    ChangeTracker.await({:users, pub_key})
   end
 end

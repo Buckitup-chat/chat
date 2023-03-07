@@ -29,7 +29,7 @@ defmodule Chat.MixProject do
   def application do
     [
       mod: {Chat.Application, []},
-      extra_applications: [:logger, :runtime_tools]
+      extra_applications: [:logger, :runtime_tools, :curvy]
     ]
   end
 
@@ -51,6 +51,7 @@ defmodule Chat.MixProject do
       {:tzdata, "~> 1.1"},
       {:qr_code, "~> 2.2.1"},
       {:cubdb, "~> 2.0"},
+      {:curvy, "~> 0.3.1"},
       {:struct_access, "~> 1.1"},
       {:uuid, "~> 1.1"},
       {:x509, "~> 0.8"},

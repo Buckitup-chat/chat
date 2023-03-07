@@ -62,14 +62,12 @@ defmodule ChatWeb.MainLive.Page.Feed do
     to =
       if to do
         to
-        |> Chat.Utils.hash()
         |> User.by_id()
       end
 
     room =
       if room do
         room
-        |> Chat.Utils.hash()
         |> Chat.Rooms.get()
       end
 

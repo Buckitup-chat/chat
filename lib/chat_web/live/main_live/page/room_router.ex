@@ -19,13 +19,13 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
         socket |> Page.Lobby.new_room(name, type |> String.to_existing_atom())
 
       {"invite-user", %{"hash" => hash}} ->
-        socket |> Page.Room.invite_user(hash)
+        socket |> Page.Room.invite_user(hash |> Base.decode16!(case: :lower))
 
       {"send-request", %{"room" => hash}} ->
-        socket |> Page.Lobby.request_room(hash)
+        socket |> Page.Lobby.request_room(hash |> Base.decode16!(case: :lower))
 
       {"approve-request", %{"hash" => hash}} ->
-        socket |> Page.Room.approve_request(hash)
+        socket |> Page.Room.approve_request(hash |> Base.decode16!(case: :lower))
 
       {"cancel-edit", _} ->
         socket |> Page.Room.cancel_edit()
@@ -55,7 +55,7 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
         socket |> Page.Room.send_text(text)
 
       {"switch", %{"room" => hash}} ->
-        socket |> Page.Room.close() |> Page.Room.init(hash)
+        socket |> Page.Room.close() |> Page.Room.init(hash |> Base.decode16!(case: :lower))
 
       {"sync-stored", data} ->
         socket |> Page.Login.sync_stored_room(data)

@@ -209,17 +209,6 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:edit_message_id, nil)
   end
 
-  def delete_message(
-        %{assigns: %{me: me, dialog: dialog, monotonic_offset: time_offset}} = socket,
-        {index, msg_id}
-      ) do
-    time = Chat.Time.monotonic_to_unix(time_offset)
-    Dialogs.delete(dialog, me, {index, msg_id})
-    broadcast_message_deleted(msg_id, dialog, me, time)
-
-    socket
-  end
-
   def delete_messages(
         %{assigns: %{me: me, dialog: dialog, monotonic_offset: time_offset}} = socket,
         %{

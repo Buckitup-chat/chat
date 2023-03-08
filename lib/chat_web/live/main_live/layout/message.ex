@@ -539,21 +539,14 @@ defmodule ChatWeb.MainLive.Layout.Message do
     assign(assigns, :file, %{
       name: name,
       size: size,
-      url: get_file_url(:file, id, secret)
+      url: get_file_url(id, secret)
     })
   end
 
   defp assign_file(assigns), do: assign(assigns, :file, nil)
 
-  defp get_file_url(type, id, secret) do
-    file_type =
-      if type == :image do
-        "image"
-      else
-        "file"
-      end
-
-    "/get/#{file_type}/#{id}?a=#{Base.url_encode64(secret)}"
+  defp get_file_url(id, secret) do
+    ~p"/get/file/#{Base.encode16(id, case: :lower)}?a=#{Base.url_encode64(secret)}"
   end
 
   attr :export?, :boolean, required: true, doc: "embed file icon SVG?"

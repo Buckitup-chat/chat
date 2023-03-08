@@ -4,7 +4,7 @@ defmodule Chat.AdminDb do
   """
   use GenServer
 
-  @db_location Application.compile_env(:chat, :admin_cub_db_file, "priv/admin_db")
+  @db_location Application.compile_env(:chat, :admin_cub_db_file, "priv/admin_db_v2")
 
   @doc false
   def start_link(opts) do

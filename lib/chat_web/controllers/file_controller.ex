@@ -39,7 +39,7 @@ defmodule ChatWeb.FileController do
   defp render_file(conn, params, opts) do
     with %{"id" => id, "a" => secret} <- params,
          [chunk_key, chunk_secret_raw, _, type, name | _] <-
-           Files.get(id, secret |> Base.url_decode64!()),
+           Files.get(id |> Base.decode16!(case: :lower), secret |> Base.url_decode64!()),
          chunk_secret <- chunk_secret_raw |> Base.decode64!(),
          true <- type |> String.contains?("/") do
       size = ChunkedFiles.size(chunk_key)

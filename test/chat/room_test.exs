@@ -96,6 +96,7 @@ defmodule Chat.Rooms.RoomTest do
     assert room_identity == %{decrypted_identity | name: room_identity.name}
 
     ChangeTracker.await()
+
     refute is_nil(room_identity)
 
     room = room_identity |> Rooms.clear_approved_request(bob)

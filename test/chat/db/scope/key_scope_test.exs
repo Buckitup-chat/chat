@@ -1,5 +1,5 @@
 defmodule Chat.Db.Scope.KeyScopeTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Chat.Db.ChangeTracker
 
@@ -191,8 +191,21 @@ defmodule Chat.Db.Scope.KeyScopeTest do
                )
              end) == 2
 
-      alice_bob_dialog_binhash = alice_bob_dialog |> Dialogs.key()
+      assert Enum.member?(keys, {:file_chunk, first_file_key, 0, 17})
+      assert Enum.member?(keys, {:file_chunk, first_file_key, 18, 29})
+      refute Enum.member?(keys, {:file_chunk, second_file_key, 0, 17})
+      refute Enum.member?(keys, {:file_chunk, second_file_key, 18, 29})
 
+      assert Enum.count(keys, fn key ->
+               Kernel.match?({:file_chunk, _file_key, _chunk_start, _chunk_end}, key)
+             end) == 2
+
+      assert Enum.member?(keys, {:file, first_file_key})
+      refute Enum.member?(keys, {:file, second_file_key})
+
+      assert Enum.count(keys, fn key -> Kernel.match?({:file, _file_key}, key) end) == 1
+
+      alice_bob_dialog_binhash = alice_bob_dialog |> Dialogs.key()
       bob_charlie_dialog_binhash = bob_charlie_dialog |> Dialogs.key()
 
       assert Enum.member?(keys, {:dialogs, alice_bob_dialog_binhash})

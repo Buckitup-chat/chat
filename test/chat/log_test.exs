@@ -2,6 +2,7 @@ defmodule Chat.LogTest do
   use ExUnit.Case, async: false
 
   alias Chat.Card
+  alias Chat.Db
   alias Chat.Db.ChangeTracker
   alias Chat.Identity
   alias Chat.Ordering
@@ -9,6 +10,11 @@ defmodule Chat.LogTest do
   alias Chat.User
 
   alias Chat.Log
+
+  setup_all do
+    Db.db()
+    |> CubDB.clear()
+  end
 
   test "login related logs should save correct" do
     me = User.login("me")

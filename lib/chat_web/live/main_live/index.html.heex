@@ -986,6 +986,9 @@
                   <a href="#" phx-click="admin/device-log">Device Log</a>
                 </section>
               </Layout.Admin.block>
+              <Layout.Admin.block title="Media settings">
+                <.live_component id={:media_settings_form} module={MediaSettingsForm} />
+              </Layout.Admin.block>
             </Layout.Admin.row>
             <Layout.Admin.row>
               <Layout.Admin.block title="Admin List">

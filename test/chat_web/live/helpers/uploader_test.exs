@@ -530,7 +530,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
       assert {:noreply, ^socket} = Uploader.handle_progress(:file, entry, socket)
     end
 
-    test "when upload is finished adds the file to the dialog", %{view: view} do
+    test "when upload is finished adds the file to the dialog", %{conn: conn, view: view} do
       %{entry: entry, socket: socket} = start_upload(%{view: view})
 
       %UploadMetadata{} = metadata = Map.get(socket.assigns.uploads_metadata, entry.uuid)
@@ -540,27 +540,38 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       refute Map.get(socket.assigns.uploads_metadata, entry.uuid)
 
-      retry_until(1_000, fn ->
-        assert [%PrivateMessage{} = message] =
-                 Dialogs.read(socket.assigns.dialog, socket.assigns.me)
+      ChangeTracker.await()
 
-        assert message.type == :image
-        assert {id, secret} = StorageId.from_json(message.content)
+      assert [%PrivateMessage{} = message] =
+               Dialogs.read(socket.assigns.dialog, socket.assigns.me)
 
-        assert [chunk_key, encoded_chunk_secret, _, type, filename, size] = Files.get(id, secret)
+      assert message.type == :image
+      assert {id, secret} = StorageId.from_json(message.content)
 
-        assert {^chunk_key, encrypted_secret} = metadata.credentials
+      assert [chunk_key, encoded_chunk_secret, _, type, filename, size] = Files.get(id, secret)
 
-        assert Base.decode64!(encoded_chunk_secret) ==
-                 ChunkedFiles.decrypt_secret(encrypted_secret, socket.assigns.me)
+      assert {^chunk_key, encrypted_secret} = metadata.credentials
 
-        assert type == entry.client_type
-        assert filename == entry.client_name
-        assert size == "#{entry.client_size} b"
-      end)
+      assert Base.decode64!(encoded_chunk_secret) ==
+               ChunkedFiles.decrypt_secret(encrypted_secret, socket.assigns.me)
+
+      assert type == entry.client_type
+      assert filename == entry.client_name
+      assert size == "#{entry.client_size} b"
+
+      html = render(view)
+
+      assert %{"url" => file_url} =
+               Regex.named_captures(
+                 ~r|<img class="object-cover overflow-hidden" src="(?<url>[^"]+)"|,
+                 html
+               )
+
+      conn = get(conn, file_url)
+      assert conn.status == 200
     end
 
-    test "when upload is finished adds the file to the room", %{view: view} do
+    test "when upload is finished adds the file to the room", %{conn: conn, view: view} do
       create_and_open_room(%{view: view})
 
       %{entry: entry, socket: socket} = start_upload(%{view: view})
@@ -572,27 +583,38 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       refute Map.get(socket.assigns.uploads_metadata, entry.uuid)
 
-      retry_until(1_000, fn ->
-        assert [%PlainMessage{} = message] =
-                 Rooms.read(
-                   socket.assigns.room,
-                   socket.assigns.room_identity
-                 )
+      ChangeTracker.await()
 
-        assert message.type == :image
-        assert {id, secret} = StorageId.from_json(message.content)
+      assert [%PlainMessage{} = message] =
+               Rooms.read(
+                 socket.assigns.room,
+                 socket.assigns.room_identity
+               )
 
-        assert [chunk_key, encoded_chunk_secret, _, type, filename, size] = Files.get(id, secret)
+      assert message.type == :image
+      assert {id, secret} = StorageId.from_json(message.content)
 
-        assert {^chunk_key, encrypted_secret} = metadata.credentials
+      assert [chunk_key, encoded_chunk_secret, _, type, filename, size] = Files.get(id, secret)
 
-        assert Base.decode64!(encoded_chunk_secret) ==
-                 ChunkedFiles.decrypt_secret(encrypted_secret, socket.assigns.me)
+      assert {^chunk_key, encrypted_secret} = metadata.credentials
 
-        assert type == entry.client_type
-        assert filename == entry.client_name
-        assert size == "#{entry.client_size} b"
-      end)
+      assert Base.decode64!(encoded_chunk_secret) ==
+               ChunkedFiles.decrypt_secret(encrypted_secret, socket.assigns.me)
+
+      assert type == entry.client_type
+      assert filename == entry.client_name
+      assert size == "#{entry.client_size} b"
+
+      html = render(view)
+
+      assert %{"url" => file_url} =
+               Regex.named_captures(
+                 ~r|<img class="object-cover overflow-hidden" src="(?<url>[^"]+)"|,
+                 html
+               )
+
+      conn = get(conn, file_url)
+      assert conn.status == 200
     end
 
     test "when upload is finished starts the next upload", %{view: view} do

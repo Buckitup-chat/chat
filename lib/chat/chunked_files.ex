@@ -1,10 +1,10 @@
 defmodule Chat.ChunkedFiles do
   @moduledoc "Chunked files logic"
 
-  alias Chat.Db.ChangeTracker
   alias Chat.ChunkedFilesBroker
   alias Chat.ChunkedFilesMultisecret
   alias Chat.Db
+  alias Chat.Db.ChangeTracker
   alias Chat.FileFs
   alias Chat.Identity
 

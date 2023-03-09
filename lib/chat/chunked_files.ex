@@ -1,6 +1,7 @@
 defmodule Chat.ChunkedFiles do
   @moduledoc "Chunked files logic"
 
+  alias Chat.Db.ChangeTracker
   alias Chat.ChunkedFilesBroker
   alias Chat.ChunkedFilesMultisecret
   alias Chat.Db
@@ -27,7 +28,7 @@ defmodule Chat.ChunkedFiles do
     |> Enum.count()
   end
 
-  def save_upload_chunk(key, {chunk_start, chunk_end}, chunk) do
+  def save_upload_chunk(key, {chunk_start, chunk_end}, size, chunk) do
     with initial_secret <- ChunkedFilesBroker.get(key),
          false <- is_nil(initial_secret),
          secret <- ChunkedFilesMultisecret.get_secret(key, chunk_start, initial_secret),
@@ -36,6 +37,11 @@ defmodule Chat.ChunkedFiles do
       |> tap(fn
         :ok -> Db.put({:chunk_key, {:file_chunk, key, chunk_start, chunk_end}}, true)
         _ -> :ignore
+      end)
+      |> tap(fn _ ->
+        if chunk_end + 1 == size do
+          ChangeTracker.await({:file_chunk, key, chunk_start, chunk_end})
+        end
       end)
     end
   end

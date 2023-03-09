@@ -56,10 +56,9 @@ defmodule Chat.Db.CopyingTest do
     first = "some part of info "
     second = "another part"
 
-    ChunkedFiles.save_upload_chunk(key, {1, 18}, first)
-    ChunkedFiles.save_upload_chunk(key, {19, 30}, second)
-
+    ChunkedFiles.save_upload_chunk(key, {0, 17}, 30, first)
     ChangeTracker.await()
+    ChunkedFiles.save_upload_chunk(key, {18, 29}, 30, second)
 
     keys
   end

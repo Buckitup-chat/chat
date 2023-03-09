@@ -132,9 +132,9 @@ defmodule Chat.Db.Scope.KeyScopeTest do
       )
 
       ChunkedFiles.new_upload(first_file_key)
-      ChunkedFiles.save_upload_chunk(first_file_key, {0, 17}, "some part of info ")
+      ChunkedFiles.save_upload_chunk(first_file_key, {0, 17}, 30, "some part of info ")
       ChangeTracker.await({:file_chunk, first_file_key, 0, 17})
-      ChunkedFiles.save_upload_chunk(first_file_key, {18, 29}, "another part")
+      ChunkedFiles.save_upload_chunk(first_file_key, {18, 29}, 30, "another part")
 
       {room_identity, second_room} = Rooms.add(bob, "Bob and Charlie room")
       second_room_key = second_room.pub_key
@@ -169,9 +169,9 @@ defmodule Chat.Db.Scope.KeyScopeTest do
       )
 
       ChunkedFiles.new_upload(second_file_key)
-      ChunkedFiles.save_upload_chunk(second_file_key, {0, 17}, "some part of info ")
+      ChunkedFiles.save_upload_chunk(second_file_key, {0, 17}, 30, "some part of info ")
       ChangeTracker.await({:file_chunk, second_file_key, 0, 17})
-      ChunkedFiles.save_upload_chunk(second_file_key, {18, 29}, "another part")
+      ChunkedFiles.save_upload_chunk(second_file_key, {18, 29}, 30, "another part")
 
       assert keys =
                KeyScope.get_keys(Chat.Db.db(), [

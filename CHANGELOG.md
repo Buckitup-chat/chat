@@ -15,6 +15,7 @@ straightforward as possible.
 ### Changed
  
 ### Fixed
+- UI: uploader covering chat/room list
 
 
 

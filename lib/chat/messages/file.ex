@@ -5,6 +5,8 @@ defmodule Chat.Messages.File do
 
   @max_image_size 30_000_000
 
+  @type t :: %__MODULE__{}
+
   def new(entry, chunk_key, chunk_secret) do
     mime_type = entry.client_type |> mime_type()
 
@@ -58,6 +60,6 @@ defimpl Chat.DryStorable, for: Chat.Messages.File do
 
   def timestamp(%File{} = msg), do: msg.timestamp
 
-  @spec type(File) :: atom()
+  @spec type(File.t()) :: atom()
   def type(%File{type: type}), do: type
 end

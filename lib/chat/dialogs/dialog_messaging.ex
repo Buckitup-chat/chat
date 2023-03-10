@@ -120,7 +120,7 @@ defmodule Chat.Dialogs.DialogMessaging do
     fn msg, index, key ->
       {index, msg}
       |> read(author, dialog)
-      |> Content.delete([dialog.a_key, dialog.b_key], msg_id)
+      |> Content.delete([dialog.a_key, dialog.b_key], msg.id)
 
       Db.delete(key)
       :ok
@@ -132,7 +132,7 @@ defmodule Chat.Dialogs.DialogMessaging do
     fn msg, index, _key ->
       {index, msg}
       |> read(author, dialog)
-      |> Content.delete([dialog.a_key, dialog.b_key], msg_id)
+      |> Content.delete([dialog.a_key, dialog.b_key], msg.id)
 
       type = DryStorable.type(message)
 
@@ -154,7 +154,7 @@ defmodule Chat.Dialogs.DialogMessaging do
     msg = Db.get(key)
 
     case {msg.is_a_to_b?, public_key == dialog.a_key, public_key == dialog.b_key} do
-      {true, true, false} -> action_fn.(msg, index, key)
+      {true, true, _} -> action_fn.(msg, index, key)
       {false, false, true} -> action_fn.(msg, index, key)
       _ -> nil
     end

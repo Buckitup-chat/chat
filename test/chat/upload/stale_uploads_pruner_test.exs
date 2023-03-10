@@ -65,7 +65,7 @@ defmodule Chat.Upload.StaleUploadsPrunerTest do
     test "prunes old chunks" do
       key = UUID.uuid4()
       ChunkedFiles.new_upload(key)
-      ChunkedFiles.save_upload_chunk(key, {0, 17}, "some part of info ")
+      ChunkedFiles.save_upload_chunk(key, {0, 17}, 18, "some part of info ")
       timestamp = DateTime.to_unix(DateTime.utc_now()) - @day_in_seconds - 1
       upload = %Upload{secret: "1234", timestamp: timestamp}
       UploadIndex.add(key, upload)

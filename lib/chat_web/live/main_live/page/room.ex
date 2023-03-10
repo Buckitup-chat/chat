@@ -249,24 +249,6 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:edit_message_id, nil)
   end
 
-  def delete_message(
-        %{
-          assigns: %{
-            me: me,
-            room_identity: room_identity,
-            room: room,
-            monotonic_offset: time_offset
-          }
-        } = socket,
-        {index, msg_id}
-      ) do
-    time = Chat.Time.monotonic_to_unix(time_offset)
-    Rooms.delete_message({index, msg_id}, room_identity, me)
-    broadcast_deleted_message(msg_id, room.pub_key, me, time)
-
-    socket
-  end
-
   def approve_request(%{assigns: %{room_identity: room_identity}} = socket, user_key) do
     Rooms.approve_request(room_identity |> Identity.pub_key(), user_key, room_identity)
 

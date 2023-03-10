@@ -305,18 +305,25 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       <%= if @operating_system == "Android" do %>
         <div class="flex flex-row justify-around">
           <a
-            class="flex justify-center items-center h-11 px-10 cursor-pointer rounded-md bg-white hover:bg-white/50"
+            class="flex justify-center items-center h-11 w-[30%] pr-2 cursor-pointer rounded-md bg-white hover:bg-white/50"
             phx-click={JS.dispatch("click", to: "#uploader-file-form .file-input")}
           >
             <.icon id="document" class="w-4 h-4 fill-grayscale" />
             <span class="ml-2">File</span>
           </a>
           <a
-            class="flex justify-center items-center h-11 px-10 cursor-pointer rounded-md bg-white hover:bg-white/50"
+            class="flex justify-center items-center h-11 w-[30%] pr-2 cursor-pointer rounded-md bg-white hover:bg-white/50"
             phx-click={JS.dispatch("click", to: "#uploader-file-form .image-input")}
           >
             <.icon id="image" class="w-4 h-4 fill-grayscale" />
             <span class="ml-2">Image</span>
+          </a>
+          <a
+            class="flex justify-center items-center h-11 w-[30%] pr-2 cursor-pointer rounded-md bg-white"
+            phx-click={JS.dispatch("click", to: "#uploader-file-form .audio-file-input")}
+          >
+            <.icon id="audio" class="w-4 h-4 fill-grayscale" />
+            <span class="ml-2">Audio</span>
           </a>
         </div>
 

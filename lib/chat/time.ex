@@ -4,7 +4,7 @@ defmodule Chat.Time do
 
   alias Chat.Db
 
-  def init_time do
+  def decide_time do
     if time = db_time() do
       time
     else
@@ -12,6 +12,10 @@ defmodule Chat.Time do
     end
     |> Enum.max()
     |> DateTime.from_unix!()
+  end
+
+  def init_time do
+    decide_time()
     |> set_time()
   end
 

@@ -13,18 +13,18 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   alias Chat.Broker
   alias Chat.ChunkedFiles
+  alias Chat.Content.Memo
   alias Chat.Dialogs
   alias Chat.FileIndex
   alias Chat.Identity
   alias Chat.Log
-  alias Chat.Memo
   alias Chat.MemoIndex
   alias Chat.Messages
   alias Chat.RoomInviteIndex
   alias Chat.Rooms
+  alias Chat.Rooms.RoomRequest
   alias Chat.Upload.UploadMetadata
   alias Chat.User
-  alias Chat.Utils
   alias Chat.Utils.StorageId
 
   alias ChatWeb.MainLive.Layout
@@ -35,9 +35,9 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def init(socket), do: socket |> assign(:room, nil)
 
-  def init(%{assigns: %{room_map: rooms}} = socket, room_hash) when is_binary(room_hash) do
-    room = Rooms.get(room_hash)
-    room_identity = rooms |> Map.get(room_hash)
+  def init(%{assigns: %{room_map: rooms}} = socket, room_key) when is_binary(room_key) do
+    room = Rooms.get(room_key)
+    room_identity = rooms |> Map.fetch!(room_key)
 
     socket
     |> init({room_identity, room})
@@ -96,7 +96,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         content
         |> Messages.Text.new(time)
         |> Rooms.add_new_message(me, room.pub_key)
-        |> MemoIndex.add(room, rooms[room.pub_key |> Utils.hash()])
+        |> MemoIndex.add(room, rooms[room.pub_key])
         |> broadcast_new_message(room.pub_key, me, time)
     end
 
@@ -106,10 +106,13 @@ defmodule ChatWeb.MainLive.Page.Room do
   def send_file(
         %{assigns: %{me: me, monotonic_offset: time_offset}} = socket,
         entry,
-        %UploadMetadata{credentials: {chunk_key, chunk_secret}, destination: %{pub_key: pub_key}} =
-          _metadata
+        %UploadMetadata{
+          credentials: {chunk_key, chunk_secret},
+          destination: %{pub_key: text_pub_key}
+        } = _metadata
       ) do
     time = Chat.Time.monotonic_to_unix(time_offset)
+    pub_key = text_pub_key |> Base.decode16!(case: :lower)
 
     message =
       consume_uploaded_entry(
@@ -129,7 +132,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
     {_index, msg} = message
 
-    FileIndex.save(chunk_key, pub_key |> Utils.hash(), msg.id, chunk_secret)
+    FileIndex.save(chunk_key, pub_key, msg.id, chunk_secret)
 
     Rooms.on_saved(message, pub_key, fn ->
       broadcast_new_message(message, pub_key, me, time)
@@ -139,13 +142,15 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def show_new(
-        %{assigns: %{room_identity: identity}} = socket,
-        {index, %{author_hash: hash, encrypted: {data, sign}} = new_message}
+        %{assigns: %{room_identity: %Identity{} = identity}} = socket,
+        {index, new_message}
       ) do
-    if Utils.is_signed_by?(sign, data, User.by_id(hash)) do
+    verified_message = Rooms.read_message({index, new_message}, identity)
+
+    if verified_message do
       socket
       |> assign(:page, 0)
-      |> assign(:messages, [{index, new_message} |> Rooms.read_message(identity)])
+      |> assign(:messages, [verified_message])
       |> assign(:message_update_mode, :append)
       |> push_event("chat:scroll-down", %{})
     else
@@ -166,7 +171,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         msg_id
       ) do
     content =
-      Rooms.read_message(msg_id, room_identity, &User.id_map_builder/1)
+      Rooms.read_message(msg_id, room_identity)
       |> then(fn
         %{type: :text, content: text} ->
           text
@@ -214,7 +219,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         render_fun
       ) do
     content =
-      Rooms.read_message(msg_id, room_identity, &User.id_map_builder/1)
+      Rooms.read_message(msg_id, room_identity)
       |> then(&%{msg: &1, my_id: my_id})
       |> render_to_html_string(render_fun)
 
@@ -244,26 +249,8 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:edit_message_id, nil)
   end
 
-  def delete_message(
-        %{
-          assigns: %{
-            me: me,
-            room_identity: room_identity,
-            room: room,
-            monotonic_offset: time_offset
-          }
-        } = socket,
-        {index, msg_id}
-      ) do
-    time = Chat.Time.monotonic_to_unix(time_offset)
-    Rooms.delete_message({index, msg_id}, room_identity, me)
-    broadcast_deleted_message(msg_id, room.pub_key, me, time)
-
-    socket
-  end
-
-  def approve_request(%{assigns: %{room_identity: room_identity}} = socket, user_hash) do
-    Rooms.approve_request(room_identity |> Utils.hash(), user_hash, room_identity)
+  def approve_request(%{assigns: %{room_identity: room_identity}} = socket, user_key) do
+    Rooms.approve_request(room_identity |> Identity.pub_key(), user_key, room_identity)
 
     socket
     |> push_event("put-flash", %{key: :info, message: "Request approved!"})
@@ -320,9 +307,9 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def invite_user(
         %{assigns: %{room: %{name: room_name}, room_identity: identity, me: me}} = socket,
-        user_hash
+        user_key
       ) do
-    dialog = Dialogs.find_or_open(me, user_hash |> User.by_id())
+    dialog = Dialogs.find_or_open(me, user_key |> User.by_id())
 
     identity
     |> Map.put(:name, room_name)
@@ -357,7 +344,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         msg_id
       ) do
     msg_id
-    |> Rooms.read_message(room_identity, &User.id_map_builder/1)
+    |> Rooms.read_message(room_identity)
     |> maybe_redirect_to_file(socket)
   end
 
@@ -413,7 +400,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   defp room_topic(pub_key) do
     pub_key
-    |> Utils.hash()
+    |> Base.encode16(case: :lower)
     |> then(&"room:#{&1}")
   end
 
@@ -431,7 +418,7 @@ defmodule ChatWeb.MainLive.Page.Room do
          } = socket,
          per_page
        ) do
-    messages = Rooms.read(room, identity, &User.id_map_builder/1, {index, 0}, per_page + 1)
+    messages = Rooms.read(room, identity, {index, 0}, per_page + 1)
     page_messages = Enum.take(messages, -per_page)
 
     socket
@@ -443,9 +430,8 @@ defmodule ChatWeb.MainLive.Page.Room do
   defp assign_requests(%{assigns: %{room: %{type: :request} = room}} = socket) do
     request_list =
       room.pub_key
-      |> Utils.hash()
       |> Rooms.list_pending_requests()
-      |> Enum.map(fn {hash, _} -> User.by_id(hash) end)
+      |> Enum.map(fn %RoomRequest{requester_key: pub_key} -> User.by_id(pub_key) end)
 
     socket
     |> assign(:room_requests, request_list)

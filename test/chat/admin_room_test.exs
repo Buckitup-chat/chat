@@ -1,17 +1,19 @@
 defmodule Chat.AdminRoomTest do
   use ExUnit.Case, async: false
 
+  alias Chat.Admin.MediaSettings
+
   alias Chat.{
     AdminDb,
     AdminRoom,
     Card,
     Dialogs,
     Identity,
-    RoomInvites,
     User,
     Utils
   }
 
+  alias Chat.Content.RoomInvites
   alias Chat.Messages
 
   setup do
@@ -67,10 +69,23 @@ defmodule Chat.AdminRoomTest do
 
     password = "secret"
 
-    AdminRoom.store_wifi_password(password)
+    AdminRoom.store_wifi_password(password, admin_room_identity)
     assert password != AdminDb.get(:wifi_password)
 
     assert password == AdminRoom.get_wifi_password(admin_room_identity)
+  end
+
+  test "admin should be able to read and store media settings" do
+    admin_with_room("Alice")
+
+    assert %MediaSettings{} = media_settings = AdminRoom.get_media_settings()
+    assert media_settings.functionality == :backup
+
+    media_settings = %MediaSettings{functionality: :onliners}
+    AdminRoom.store_media_settings(media_settings)
+
+    assert %MediaSettings{} = media_settings = AdminRoom.get_media_settings()
+    assert media_settings.functionality == :onliners
   end
 
   defp admin_with_room(name) do

@@ -19,8 +19,8 @@ defmodule Chat.MemoIndex do
       |> Map.fetch!(:content)
       |> Utils.StorageId.from_json_to_key()
 
-    Db.put({:memo_index, dialog.a_key |> Utils.hash(), key}, true)
-    Db.put({:memo_index, dialog.b_key |> Utils.hash(), key}, true)
+    Db.put({:memo_index, dialog.a_key, key}, true)
+    Db.put({:memo_index, dialog.b_key, key}, true)
 
     indexed_message
   end
@@ -35,7 +35,7 @@ defmodule Chat.MemoIndex do
       |> Map.fetch!(:content)
       |> Utils.StorageId.from_json_to_key()
 
-    Db.put({:memo_index, room.pub_key |> Utils.hash(), key}, true)
+    Db.put({:memo_index, room.pub_key, key}, true)
 
     indexed_message
   end

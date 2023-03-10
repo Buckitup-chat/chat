@@ -2,13 +2,13 @@
 
 ## DB Supervisor
 
-DB Supervisior wraps every DB in Queue, Writer, Dry Status Relay, Decider and Compactor.
+DB Supervisor wraps every DB in Queue, Writer, Dry Status Relay, Decider and Compactor.
 
-Queue and Writer described in [DB Prioritization](./prioritization.livemd).
+Queue and Writer are described in [DB Prioritization](./prioritization.livemd).
 
-Dry Status Realy is Agent that holds read only state of DB. It is updated by Decider. And read by UI to show red indication.
+Dry Status Relay is Agent that holds read-only state of DB. It is updated by Decider. And read by UI to show red indication.
 
-Decider checks space left on device and starts writing or read only configuration under WriteSupervisor. For write it starts Writer and Compactor. For read only - DryWriter, which does no writes in DB or filesystem.
+Decider checks space left on device and starts writing or read-only configuration under WriteSupervisor. For write it starts Writer and Compactor. For read-only - DryWriter, which does no writes in DB or filesystem.
 
 Compactor awaits for period of inactivity (7 minutes) and starts DB compaction. When Writer has something to write, it lets Compactor know, so compaction will get canceled if unfinished.
 
@@ -25,7 +25,7 @@ graph TD;
   s --> ds[Dry Status Relay]
   s --> ws{{WriteSupervisor}}
   s --> Decider
-  
+
   ws --> Compactor
   ws --> Writer
   ws -.-> DryWriter
@@ -56,24 +56,53 @@ graph LR;
     ca(Application)
 
     ca -.-> ids
-  end 
-  
+  end
+
   pa(Application)
   ds(DeviceSupervisor)
   cb[ChatBridge]
   uw[UsbWatcher]
   dmds{{DynamicMainDbSupervisor}}
-  dbds{{DynamicBackupDbSupervisor}}
+  dms{{DynamicMediaSupervisor}}
   pmds(Platform MainDbSupervisor)
-  pbds(Platform BackupDbSupervisor)
+  pms(Platform MediaSupervisor)
+  mmds(Chat MainDbSupervisor)
+  bbds(Chat BackupDbSupervisor)
 
   pa --> ds
   pa --> cb
 
   ds --> dmds --> pmds
-  ds --> dbds ---> pbds
+  ds --> dms --> pms
   ds --> uw
 
+  pmds ---> mmds
+  pms -..- bbds
+
+  mmds -..- mds
+  bbds -..- bds
+
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+`UsbWatcher` subscribes to system events to detect USB devices plug/unplug.
+
+We need Dynamic Supervisors to start or shutdown supervision subtrees, since devices are not always present.
+
+`Platform MainDbSupervisor` and `Platform MediaSupervisor` do `rest for one` strategy that will restart all later started peers in case of failing.
+
+All the processes marked as mounter traps its exit. I.e. handle its termination. Combining this with `rest_for_one` strategy of supervisor makes it `Plug`-like behaviour in supervisor.
+
+`Chat MainDbSupervisor` and `Chat BackupDbSupervisor` are DB Supervisors from `Chat` application described above.
+
+## Main drive supervision
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph TD;
+  pmds(Platform MainDbSupervisor)
   mts(Task.Supervisor)
   mm[[Mounter]]
   mdt[DirTask]
@@ -82,6 +111,7 @@ graph LR;
   mc[[Copier]]
   mr[[Replicator]]
   msw[[Switcher]]
+  mmds(Chat MainDbSupervisor)
 
   pmds --> mts
   pmds --> mm
@@ -91,45 +121,17 @@ graph LR;
   pmds --> mc
   pmds --> mr
   pmds --> msw
-
-  bts(Task.Supervisor)
-  bm[[Mounter]]
-  bdt[DirTask]
-  bbds(Chat BackupDbSupervisor)
-  bs[[Starter]]
-  bc[[Copier]]
-  bst[[Stoper]]
-
-  pbds --> bts
-  pbds --> bm
-  pbds --> bdt
-  pbds --> bbds
-  pbds --> bs
-  pbds --> bc
-  pbds --> bst
-
-  mmds -...- mds
-  bbds -..- bds
-
 ```
 
 <!-- livebook:{"break_markdown":true} -->
-
-`UsbWatcher` subscribes to system events to detect USB devices plug/unplug.
-
-We need Dynamic Supervisors to start or shutdown supervision subtrees, since devices are not allways present.
-
-`Platform MainDbSupervisor` and `Platform BackupDbSupervisor` do `rest for one` strategy that will restart all later started peers in case of failing.
-
-All the processes marked as mounter traps its exit. I.e. handle its termination. Combining this with `rest_for_one` srtategy of supervisor makes it `Plug` like behaviour in supervisor.
 
 `Mounter` mounts device into folder specified. And unmounts when terminated.
 
 `DirTask` ensures that device filesystem has the folder to hold DB.
 
-`Chat MainDbSupervisor` and `Chat BackupDbSupervisor` are DB Supervisors from `Chat` application described above.
+`Chat MainDbSupervisor` is DB Supervisor from `Chat` application described above.
 
-`Starter` changes global DB status (in application config). And revers it back when terminated.
+`Starter` changes global DB status (in application config). And reverts it back when terminated.
 
 `Copier` starts blinking leds and copies data. And finishing blinking when terminated.
 
@@ -137,52 +139,96 @@ All the processes marked as mounter traps its exit. I.e. handle its termination.
 
 `Switcher` switches Current DB to main. And reverts Current DB back to internal when terminated.
 
-`Stoper` starts extra leb blinking and makes `Platform BackupDbSupervision` to stop. On termination stops led blinking.
-
-## Media drive supervision (proposal)
-
-_This section is proposal. Everything is subject to consider. Naming as well._
-
-<!-- livebook:{"break_markdown":true} -->
-
-The idea is to have `MediaSupervisor` in place of `Platform BackupDbSupervisor`. Which will mount drive, and decide which functionality to start in DynamicSupervisor.
-
-`Backup-`, `Onliners-` or `Cargo-` supervisors will have no mount step and will be started under `MediaSupervisor`'s DynamicSupervisor.
-
-Here is chart for Backup mounted this way.
+## Media drive supervision
 
 <!-- Learn more at https://mermaid-js.github.io/mermaid -->
 
 ```mermaid
 graph TD;
-  ms(MediaSupervisor)
+  pms(MediaSupervisor)
 
-  mts(Task.Supervisor)
-  mm[[Mounter]]
-  fds{{FunctionalityDynamicSupervisor}}
-  md[Decider]
+  mets(Task.Supervisor)
+  mem[[Mounter]]
+  fds[FunctionalityDynamicSupervisor]
+  d[MediaDecider]
 
-  ms --> mts
-  ms --> mm
-  ms --> fds
-  ms --> md
+  pms --> mets
+  pms --> mem
+  pms --> fds
+  pms --> d
 
   pbds(Platform BackupDbSupervisor)
+  poss(Platform OnlinersSyncSupervisor)
 
-  bts(Task.Supervisor)
+  fds ---> pbds
+  fds ---> poss
+
   bdt[DirTask]
   bbds(Chat BackupDbSupervisor)
   bs[[Starter]]
   bc[[Copier]]
-  bst[[Stoper]]
+  bst[[Stopper]]
 
-  fds --> pbds
-
-  pbds --> bts
   pbds --> bdt
   pbds --> bbds
   pbds --> bs
   pbds --> bc
   pbds --> bst
 
+  osdt[DirTask]
+  osbds(Chat BackupDbSupervisor)
+  oss[[Starter]]
+  osods[[OnlinersDynamicSupervisor]]
+  osl[[Logic]]
+  osc[[Copier]]
+  osst[[Stopper]]
+
+  poss --> osdt
+  poss --> osbds
+  poss --> oss
+  poss --> osods
+  poss --> osl
+
+  osods --> osc
+  osods --> osst
 ```
+
+<!-- livebook:{"break_markdown":true} -->
+
+`Mounter` mounts device into folder specified. And unmounts when terminated.
+
+`Decider` figures out which functionality to start under `FunctionalityDynamicSupervisor`.
+It does it by checking whether device contains appropriate directory (`bdb` for backup or `onliners_db` for onliners sync).
+If not, it checks the media settings in the Chat Admin room.
+If it's not set yet, the default functionality is used (backup).
+
+Some of the modules are reused between the functionalities. We'll describe them here
+while the unique aspects of the functionalities will be described in the below sections.
+
+`DirTask` ensures that device filesystem has the folder to hold DB.
+
+`Chat BackupDbSupervisor` is DB Supervisor from `Chat` application described above.
+
+`Starter` changes global DB status (in application config). And reverts it back when terminated.
+
+`Copier` starts blinking leds and copies data. And finishing blinking when terminated.
+
+`Stopper` starts extra LED blinking and makes `Platform MediaSupervisor` to stop. On termination stops LED blinking.
+
+### Platform BackupDbSupervisor
+
+Synchronizes MainDb and BackupDb by copying the data that's available on the
+device, but not in the MainDb and vice versa.
+
+### Platform OnlinersSyncSupervisor
+
+Backs data up for the online users. If there's some data data on the device,
+it restores it, but again only for the online users. Accomplishes this by sending
+a request for the keys to each online users' LiveView process. After receiving
+keys for all online users and their rooms, it gathers the content on the device
+belonging to them and copies it from the device, then gathers the content in
+the MainDb and copies it to the device.
+
+`Logic` is responsible for sending and receiving PubSub requests, getting the keys for
+the content that needs to be copied both from and to BackupDb, and starting
+`Copier` and `Stopper` under `OnlinersDynamicSupervisor`.

@@ -5,7 +5,6 @@ defmodule ChatWeb.MainLive.Layout.Card do
 
   alias Chat.Card
   alias Chat.Rooms.Room
-  alias Chat.Utils
 
   @basic_text_style "text-sm"
   @grayscale_text_style "text-sm tracking-tighter text-grayscale600"
@@ -51,7 +50,7 @@ defmodule ChatWeb.MainLive.Layout.Card do
       <%= if @is_me? do %>
         <div class="text-sm t-my-notes">My notes</div>
       <% else %>
-        <tt class={"#{@hash_style}"}>[<%= Utils.short_hash(@card.hash) %>]</tt>
+        <tt class={"#{@hash_style}"}>[<%= Enigma.short_hash(@card) %>]</tt>
         <div class={"ml-1 #{@name_style}"}><%= @card.name %></div>
       <% end %>
     </div>

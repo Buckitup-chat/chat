@@ -22,7 +22,7 @@ defmodule Chat.User do
     do:
       Registry.all()
       |> Map.values()
-      |> Enum.sort_by(&"#{&1.name} #{&1.hash}")
+      |> Enum.sort_by(&"#{&1.name} #{&1.pub_key}")
 
   def by_id(id) do
     Registry.all()

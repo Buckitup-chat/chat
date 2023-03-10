@@ -52,6 +52,8 @@ defmodule ChatWeb.MainLive.Page.ImportOwnKeyRing do
         |> Page.Login.load_user(me, rooms)
         |> Page.Login.store()
         |> Page.Lobby.init()
+        |> Page.Dialog.init()
+        |> Page.Logout.init()
 
       _ ->
         socket

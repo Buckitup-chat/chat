@@ -4,9 +4,9 @@ defmodule Chat.ChunkedFiles do
   alias Chat.ChunkedFilesBroker
   alias Chat.ChunkedFilesMultisecret
   alias Chat.Db
+  alias Chat.Db.ChangeTracker
   alias Chat.FileFs
   alias Chat.Identity
-  alias Chat.Utils
 
   @type key :: String.t()
   @type secret :: String.t()
@@ -28,15 +28,20 @@ defmodule Chat.ChunkedFiles do
     |> Enum.count()
   end
 
-  def save_upload_chunk(key, {chunk_start, chunk_end}, chunk) do
+  def save_upload_chunk(key, {chunk_start, chunk_end}, size, chunk) do
     with initial_secret <- ChunkedFilesBroker.get(key),
          false <- is_nil(initial_secret),
          secret <- ChunkedFilesMultisecret.get_secret(key, chunk_start, initial_secret),
-         encoded <- Utils.encrypt_blob(chunk, secret) do
+         encoded <- Enigma.cipher(chunk, secret) do
       Db.put_chunk({{:file_chunk, key, chunk_start, chunk_end}, encoded})
       |> tap(fn
         :ok -> Db.put({:chunk_key, {:file_chunk, key, chunk_start, chunk_end}}, true)
         _ -> :ignore
+      end)
+      |> tap(fn _ ->
+        if chunk_end + 1 == size do
+          ChangeTracker.await({:file_chunk, key, chunk_start, chunk_end})
+        end
       end)
     end
   end
@@ -80,7 +85,7 @@ defmodule Chat.ChunkedFiles do
     |> Stream.map(fn {chunk, index} ->
       chunk_start = index * @chunk_size
       secret = get_secret_from_multisecret(key, chunk_start, initial_secret)
-      Utils.decrypt_blob(chunk, secret)
+      Enigma.decipher(chunk, secret)
     end)
   end
 
@@ -108,22 +113,22 @@ defmodule Chat.ChunkedFiles do
 
     data =
       encrypt_blob
-      |> Utils.decrypt_blob(secret)
+      |> Enigma.decipher(secret)
       |> :binary.part(start_bypass, range_length)
 
     {{first, first + range_length - 1}, data}
   end
 
-  def encrypt_secret(secret, %Identity{} = me) do
-    secret
-    |> Base.encode64()
-    |> Utils.encrypt(me)
+  def encrypt_secret(secret, %Identity{private_key: private, public_key: public} = _me) do
+    my_secret = Enigma.compute_secret(private, public)
+
+    Enigma.cipher(secret, my_secret)
   end
 
-  def decrypt_secret(encrypted_secret, %Identity{} = me) do
-    encrypted_secret
-    |> Utils.decrypt(me)
-    |> Base.decode64!()
+  def decrypt_secret(encrypted_secret, %Identity{private_key: private, public_key: public} = _me) do
+    my_secret = Enigma.compute_secret(private, public)
+
+    Enigma.decipher(encrypted_secret, my_secret)
   end
 
   def file_chunk_ranges(size) do

@@ -13,7 +13,8 @@ straightforward as possible.
 ### Added
  
 ### Changed
- 
+- UI: audio button moved into paperclip menu
+
 ### Fixed
 
 

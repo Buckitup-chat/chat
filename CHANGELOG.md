@@ -18,6 +18,7 @@ straightforward as possible.
 ### Fixed
 - UI: uploader covering chat/room list
 - lost feed names
+- admin room user actions
 
 
 

@@ -97,7 +97,6 @@ defmodule Chat.Log do
     |> Db.put({time, action, opts})
   end
 
-
   defp pub_key(%Identity{public_key: key}), do: key
   defp pub_key(%Card{pub_key: key}), do: key
   defp pub_key(%Room{pub_key: key}), do: key

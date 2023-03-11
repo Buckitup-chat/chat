@@ -15,13 +15,13 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
         socket |> AdminPanel.set_wifi(ssid |> String.trim(), password |> String.trim())
 
       {"invite-new-user", %{"hash" => hash}} ->
-        socket |> AdminPanel.invite_user(hash)
+        socket |> AdminPanel.invite_user(hash |> decode)
 
       {"remove-user", %{"hash" => hash}} ->
-        socket |> AdminPanel.remove_user(hash)
+        socket |> AdminPanel.remove_user(hash |> decode)
 
       {"remove-room", %{"hash" => hash}} ->
-        socket |> AdminPanel.remove_room(hash)
+        socket |> AdminPanel.remove_room(hash |> decode)
 
       {"device-log", _} ->
         socket |> AdminPanel.request_log()
@@ -55,4 +55,6 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
         socket
     end
   end
+
+  defp decode(x), do: Base.decode16!(x, case: :lower)
 end

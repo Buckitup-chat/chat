@@ -64,4 +64,3 @@ const Enigma = {
 
 window.enigma = Enigma;
 window.Buffer = Buffer;
-window.blf = blf;

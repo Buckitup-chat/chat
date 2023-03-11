@@ -11,6 +11,7 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+- extra front end encryption check 
  
 ### Changed
 - UI: audio button moved into paperclip menu

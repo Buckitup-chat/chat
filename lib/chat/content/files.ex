@@ -1,5 +1,5 @@
 defmodule Chat.Content.Files do
-  @moduledoc "Context for File oprations"
+  @moduledoc "Context for File operations"
 
   alias Chat.Content.Storage
   alias Chat.Db

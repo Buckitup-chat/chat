@@ -64,7 +64,7 @@ defmodule Chat.Db do
           {CubDB, :start_link,
            [path, [auto_file_sync: false, auto_compact: false, name: db_name]]}
       },
-      # dry status realy
+      # dry status really
       %{
         id: dry_relay_name,
         start: {Agent, :start_link, [fn -> false end, [name: dry_relay_name]]}

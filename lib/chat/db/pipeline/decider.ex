@@ -1,7 +1,7 @@
 defmodule Chat.Db.Pipeline.Decider do
   @moduledoc """
-  Checks free space and devides writing mode
-  Starts differrent set of processes
+  Checks free space and devices writing mode
+  Starts different set of processes
   """
   use GenServer
 

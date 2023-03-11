@@ -5,10 +5,10 @@ defmodule ChatWeb.MainLive.Page.Feed do
   alias Chat.Log
   alias Chat.User
 
-  @items_treshold 100
+  @items_threshold 100
 
   def init(socket) do
-    {list, till} = load_actions(@items_treshold)
+    {list, till} = load_actions(@items_threshold)
 
     socket
     |> assign(:action_feed_till, till)
@@ -17,7 +17,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
   end
 
   def more(%{assigns: %{action_feed_till: since}} = socket) do
-    {list, till} = load_more(@items_treshold, [], since - 1)
+    {list, till} = load_more(@items_threshold, [], since - 1)
 
     socket
     |> assign(:action_feed_till, till)

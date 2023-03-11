@@ -232,7 +232,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     identity = socket.assigns[:room_identity] |> inspect()
 
     Logger.warn([
-      "Cannot show upated message in room. ",
+      "Cannot show updated message in room. ",
       "msg_id: ",
       inspect(msg_id),
       " room: ",

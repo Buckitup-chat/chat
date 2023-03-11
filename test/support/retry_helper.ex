@@ -1,7 +1,7 @@
 defmodule Support.RetryHelper do
   @moduledoc """
-  Test helper enabling assertation retry until it starts being true
-  or the it times out. In case assertation is false it tries again in 10 ms.
+  Test helper enabling assertion retry until it starts being true
+  or the it times out. In case assertion is false it tries again in 10 ms.
   """
 
   def retry_until(0, fun), do: fun.()

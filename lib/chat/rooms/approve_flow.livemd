@@ -81,7 +81,7 @@ sequenceDiagram
 
 ### Mixed flows
 
-Users partially meet online. Both Channel and Room (DB) are used for resulting approve comunication.
+Users partially meet online. Both Channel and Room (DB) are used for resulting approve communication.
 
 <!-- Learn more at https://mermaid-js.github.io/mermaid -->
 

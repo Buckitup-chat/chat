@@ -325,7 +325,7 @@ classDiagram
 
   class FileMeta {
     file_key
-    intial_secret
+    initial_secret
     file_size
     file_mime_type
     file_name

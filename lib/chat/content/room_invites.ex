@@ -1,5 +1,5 @@
 defmodule Chat.Content.RoomInvites do
-  @moduledoc "Context for Room Invites oprations"
+  @moduledoc "Context for Room Invites operations"
 
   alias Chat.Content.Storage
   alias Chat.Db

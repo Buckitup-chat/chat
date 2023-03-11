@@ -21,7 +21,7 @@ defmodule Chat.Db.Pipeline.Writer do
 
   alias Chat.FileFs
 
-  @fsync_timout_s 1
+  @fsync_timeout_s 1
   @fsync_trigger_count 10
 
   def write(proc, list), do: GenServer.cast(proc, {:write, list})
@@ -95,7 +95,7 @@ defmodule Chat.Db.Pipeline.Writer do
 
   def start_fsync_timer(w_state(fsync_timer: nil) = state) do
     state
-    |> w_state(fsync_timer: Process.send_after(self(), :fsync, :timer.seconds(@fsync_timout_s)))
+    |> w_state(fsync_timer: Process.send_after(self(), :fsync, :timer.seconds(@fsync_timeout_s)))
   end
 
   def start_fsync_timer(state), do: state

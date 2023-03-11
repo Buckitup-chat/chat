@@ -280,19 +280,19 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def accept_room_invite(%{assigns: %{me: me, dialog: dialog, rooms: rooms}} = socket, message_id) do
-    new_room_identitiy =
+    new_room_identity =
       Dialogs.read_message(dialog, message_id, me)
       |> then(fn %{type: :room_invite, content: json} -> json end)
       |> StorageId.from_json()
       |> RoomInvites.get()
       |> Identity.from_strings()
 
-    if rooms |> Enum.any?(&(&1.private_key == new_room_identitiy.private_key)) do
+    if rooms |> Enum.any?(&(&1.private_key == new_room_identity.private_key)) do
       socket
     else
       socket
-      |> store_room_key_copy(new_room_identitiy)
-      |> Page.Login.store_new_room(new_room_identitiy)
+      |> store_room_key_copy(new_room_identity)
+      |> Page.Login.store_new_room(new_room_identity)
       |> Page.Lobby.refresh_room_list()
     end
   rescue

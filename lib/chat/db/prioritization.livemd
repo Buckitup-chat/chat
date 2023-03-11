@@ -8,7 +8,7 @@ We write in DB from several sources
 * User uploads
 * DB synchronizations (backup, replication, etc.)
 
-Having no priorities makes UI waiting for more than 30 sec on RPi, which leads to LiveVew reload.
+Having no priorities makes UI waiting for more than 30 sec on RPi, which leads to LiveView reload.
 That is why we need to separate UI from DB writing and make user input as the top priority.
 
 <!-- livebook:{"break_markdown":true} -->
@@ -81,7 +81,7 @@ graph TD;
 
 <!-- livebook:{"break_markdown":true} -->
 
-When Diff is written to MainDB, CurrentDB gets switched to MainDB. And mirroring gets switched from MainDB to InternalDB. This way InternalDB gets updates that happen while MainDB is currrent one.
+When Diff is written to MainDB, CurrentDB gets switched to MainDB. And mirroring gets switched from MainDB to InternalDB. This way InternalDB gets updates that happen while MainDB is current one.
 
 Every 5 minutes Diff of MainDB data that is absent in Internal DB formed and being written into Internal DB. After both DBs are synchronized each next replication carries no data and finishes immediately.
 
@@ -172,4 +172,4 @@ graph TD;
   db --> mq
 ```
 
-When data transfered, the Backup USB drive gets unmounted.
+When data transferred, the Backup USB drive gets unmounted.

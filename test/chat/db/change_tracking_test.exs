@@ -3,7 +3,7 @@ defmodule Chat.Db.ChangeTrackingTest do
 
   alias Chat.Db.ChangeTracker.Tracking
 
-  test "should add awaits and responces into state" do
+  test "should add awaits and responses into state" do
     empty = Tracking.new()
     one_await = Tracking.add_await(empty, :some, self(), 1)
 

@@ -61,7 +61,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
           />
         </div>
       <% end %>
-      <!-- Syncronization icon, like cirle arrows -->
+      <!-- Synchronization icon, like circle arrows -->
       <%= if @status.flags[:replication] do %>
         <div class="pl-[9px]">
           <.icon
@@ -137,7 +137,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
           />
         </div>
       <% end %>
-      <!-- Syncronization icon, like cirle arrows -->
+      <!-- Synchronization icon, like circle arrows -->
       <%= if @status.flags[:replication] do %>
         <div class="w-[21px] pt-0.5">
           <.icon

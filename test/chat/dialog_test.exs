@@ -97,7 +97,7 @@ defmodule Chat.Dialogs.DialogTest do
              |> Memo.get()
   end
 
-  test "dialog with fle should work" do
+  test "dialog with file should work" do
     alice = User.login("Alice")
     bob = User.login("Bob")
     bob_card = bob |> Card.from_identity()

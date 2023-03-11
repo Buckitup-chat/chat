@@ -1,6 +1,6 @@
 defmodule Tools.GenServerHelpers do
   @moduledoc """
-  Common functions to make GenServer responce
+  Common functions to make GenServer response
   """
 
   def ok(state), do: {:ok, state}

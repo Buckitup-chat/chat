@@ -116,7 +116,7 @@ defmodule Chat.Rooms do
   @doc """
   Approves the room request for user.
   Opts:
-    * :public_only - Ignores aproval for a non-public room if `true`. Defaults to `false`.
+    * :public_only - Ignores approval for a non-public room if `true`. Defaults to `false`.
   """
   def approve_request(room_key, user_key, room_identity, opts \\ []) do
     if_room_found(room_key, fn room ->

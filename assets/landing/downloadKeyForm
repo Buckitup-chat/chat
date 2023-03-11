@@ -98,7 +98,7 @@
             <input class="input" type="password" name="input" placeholder="Enter password">
             <input class="input" type="password" name="input" placeholder="Repeat password">
             <p class="description">At least 12 symbols</p>
-            <button class="downloadBtn">Dowload</button>
+            <button class="downloadBtn">Download</button>
         </form>
         <button class="downloadWithoutPassword" id="downloadWithoutPassword">Download without password</button>
     </div>

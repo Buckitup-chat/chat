@@ -1,6 +1,6 @@
 defmodule Enigma do
   @moduledoc """
-  Encription related functions
+  Encryption related functions
   """
 
   defdelegate generate_keys, to: Enigma.Crypt

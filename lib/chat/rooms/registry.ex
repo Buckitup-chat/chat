@@ -4,22 +4,21 @@ defmodule Chat.Rooms.Registry do
   alias Chat.Db
   alias Chat.Db.ChangeTracker
   alias Chat.Rooms.Room
-  alias Chat.Utils
 
-  def find(hash), do: Db.get({:rooms, hash})
+  def find(room_public_key), do: Db.get({:rooms, room_public_key})
 
   def all,
     do:
       {{:rooms, 0}, {:"rooms\0", 0}}
-      |> Db.list(fn {{:rooms, hash}, %Room{} = room} -> {hash, room} end)
+      |> Db.list(fn {{:rooms, room_public_key}, %Room{} = room} -> {room_public_key, room} end)
 
   def update(%Room{pub_key: pub_key} = room) do
-    Db.put({:rooms, pub_key |> Utils.hash()}, room)
+    Db.put({:rooms, pub_key}, room)
 
     room
   end
 
-  def await_saved(hash), do: ChangeTracker.await({:rooms, hash})
+  def await_saved(room_public_key), do: ChangeTracker.await({:rooms, room_public_key})
 
-  def delete(hash), do: Db.delete({:rooms, hash})
+  def delete(room_public_key), do: Db.delete({:rooms, room_public_key})
 end

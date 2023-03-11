@@ -12,11 +12,11 @@ defmodule ChatWeb.MainLive.Layout.Message do
   use ChatWeb, :component
 
   alias Chat.Card
-  alias Chat.Files
+  alias Chat.Content.Files
+  alias Chat.Content.Memo
+  alias Chat.Content.RoomInvites
   alias Chat.Identity
-  alias Chat.Memo
   alias Chat.Messages.ExportHelper
-  alias Chat.RoomInvites
   alias Chat.Rooms.Room
   alias Chat.User
   alias Chat.Utils.StorageId
@@ -45,14 +45,14 @@ defmodule ChatWeb.MainLive.Layout.Message do
           msg.is_mine?
 
         %{chat_type: :room, msg: msg, my_id: my_id} ->
-          msg.author_hash == my_id
+          msg.author_key == my_id
       end)
       |> assign_new(:author, fn
         %{chat_type: :dialog, is_mine?: is_mine?, me: me, peer: peer} ->
           (is_mine? && Card.from_identity(me)) || peer
 
         %{chat_type: :room, msg: msg} ->
-          User.by_id(msg.author_hash)
+          User.by_id(msg.author_key)
       end)
       |> assign_new(:dynamic_attrs, fn
         %{export?: true} ->
@@ -89,10 +89,10 @@ defmodule ChatWeb.MainLive.Layout.Message do
           file={@file}
           is_mine?={@is_mine?}
           msg={@msg}
+          receiver={assigns[:peer]}
           room={@room}
-          timezone={@timezone}
           room_keys={@room_keys}
-          receiver={@peer}
+          timezone={@timezone}
         />
       </div>
 
@@ -136,16 +136,16 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   attr :author, Card, required: true, doc: "message author card"
-  attr :receiver, Card, doc: "peer in dialog"
   attr :chat_type, :atom, required: true, doc: ":dialog or :room"
   attr :color, :string, required: true, doc: "color class - either bg-purple50 or bg-white"
   attr :export?, :boolean, required: true, doc: "hide options and set path for exported file"
   attr :file, :map, required: true, doc: "file map"
   attr :is_mine?, :boolean, required: true, doc: "is current user the author of the message?"
   attr :msg, :map, required: true, doc: "message struct"
+  attr :receiver, Card, doc: "peer in dialog"
   attr :room, Room, default: nil, doc: "room access was requested to"
-  attr :timezone, :string, required: true, doc: "needed to render the timestamp"
   attr :room_keys, :map, doc: "the list of room keys"
+  attr :timezone, :string, required: true, doc: "needed to render the timestamp"
 
   defp message(%{msg: %{type: :audio}} = assigns) do
     ~H"""
@@ -214,7 +214,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
     ~H"""
     <div
       id={"message-#{@msg.id}"}
-      class={"#{@color} max-w-xs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}
+      class={"#{@color} max-w-xs sm:max-w-md min-w-[180px] t-chat-mine-message rounded-lg shadow-lg"}
     >
       <.header
         author={@author}
@@ -281,7 +281,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       <%= unless @export? do %>
         <%= if (@is_mine? and @author == @receiver) or not @is_mine? do %>
           <div class="px-2 my-1 flex items-center justify-between">
-            <%= if @room_card.hash in @room_keys do %>
+            <%= if @room_card.pub_key in @room_keys do %>
               <button
                 class="w-full h-12 border-0 rounded-lg bg-grayscale text-white"
                 phx-click="dialog/message/accept-room-invite-and-open-room"
@@ -539,21 +539,14 @@ defmodule ChatWeb.MainLive.Layout.Message do
     assign(assigns, :file, %{
       name: name,
       size: size,
-      url: get_file_url(:file, id, secret)
+      url: get_file_url(id, secret)
     })
   end
 
   defp assign_file(assigns), do: assign(assigns, :file, nil)
 
-  defp get_file_url(type, id, secret) do
-    file_type =
-      if type == :image do
-        "image"
-      else
-        "file"
-      end
-
-    "/get/#{file_type}/#{id}?a=#{Base.url_encode64(secret)}"
+  defp get_file_url(id, secret) do
+    ~p"/get/file/#{Base.encode16(id, case: :lower)}?a=#{Base.url_encode64(secret)}"
   end
 
   attr :export?, :boolean, required: true, doc: "embed file icon SVG?"

@@ -4,7 +4,7 @@ defmodule Chat.Time do
 
   alias Chat.Db
 
-  def init_time do
+  def decide_time do
     if time = db_time() do
       time
     else
@@ -12,6 +12,10 @@ defmodule Chat.Time do
     end
     |> Enum.max()
     |> DateTime.from_unix!()
+  end
+
+  def init_time do
+    decide_time()
     |> set_time()
   end
 
@@ -29,7 +33,7 @@ defmodule Chat.Time do
       if Application.get_env(:chat, :set_time, false) do
         set_system_time(string_time)
       else
-        Logger.debug("Set clock to #{string_time} UTC")
+        Logger.debug(["Set clock to ", string_time, " UTC"])
         :ok
       end
     end
@@ -53,13 +57,18 @@ defmodule Chat.Time do
   defp set_system_time(string_time) do
     case System.cmd("date", ["-u", "-s", string_time]) do
       {_result, 0} ->
-        Logger.info("nerves_time set system clock to #{string_time} UTC")
+        Logger.info(["nerves_time set system clock to ", string_time, " UTC"])
         :ok
 
       {message, code} ->
-        Logger.error(
-          "nerves_time can't set system clock to '#{string_time}': #{code} #{inspect(message)}"
-        )
+        Logger.error([
+          "nerves_time can't set system clock to '",
+          string_time,
+          "': ",
+          Integer.to_string(code),
+          " ",
+          inspect(message)
+        ])
 
         :error
     end

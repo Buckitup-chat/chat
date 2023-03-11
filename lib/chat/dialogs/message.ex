@@ -4,17 +4,17 @@ defmodule Chat.Dialogs.Message do
   use StructAccess
 
   @derive {Inspect, only: [:timestamp, :is_a_to_b?, :type, :id]}
-  defstruct [:timestamp, :is_a_to_b?, :a_copy, :b_copy, :type, :id, version: 1]
+  defstruct [:timestamp, :is_a_to_b?, :content, :type, :id, version: 1]
 
-  def a_to_b(a_copy, b_copy, opts) do
-    new(a_copy, b_copy, opts |> Keyword.merge(is_a_to_b?: true))
+  def a_to_b(content, opts) do
+    new(content, opts |> Keyword.merge(is_a_to_b?: true))
   end
 
-  def b_to_a(a_copy, b_copy, opts) do
-    new(a_copy, b_copy, opts |> Keyword.merge(is_a_to_b?: false))
+  def b_to_a(content, opts) do
+    new(content, opts |> Keyword.merge(is_a_to_b?: false))
   end
 
-  defp new(a_copy, b_copy, opts) do
+  defp new(content, opts) do
     now = opts |> Keyword.get(:now, DateTime.utc_now())
     type = opts |> Keyword.get(:type, :text)
     id = opts |> Keyword.get(:id, UUID.uuid4())
@@ -23,8 +23,7 @@ defmodule Chat.Dialogs.Message do
     %__MODULE__{
       timestamp: now |> unixtime(),
       is_a_to_b?: is_a_to_b?,
-      a_copy: a_copy,
-      b_copy: b_copy,
+      content: content,
       type: type,
       id: id
     }

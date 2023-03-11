@@ -24,58 +24,25 @@ import "phoenix_html"
 import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
-import AndroidMediaFileInput from "./hooks/android-media-file-input"
 import AudioFile from "./hooks/audio-file"
-import PushToTalk from './hooks/push-to-talk'
+import MediaFileInput from "./hooks/media-file-input"
+import SortableUploadEntries from "./hooks/sortable-upload-entries"
 import UploadInProgress from "./hooks/upload-in-progress"
-import * as UpChunk from "./upchunk"
+import { UpChunkUploader, uploadEventHandlers } from "./upchunk_upload"
 import * as LocalStateStore from "./hooks/local-storage"
 import * as LocalTime from "./hooks/local-time"
 import * as Chat from "./hooks/chat"
 import * as Flash from "./hooks/flash"
 
-let uploads = {}
-let Uploaders = {}
-
-Uploaders.UpChunk = (entries, onViewError) => {
-  entries.forEach(entry => {
-    let { file, meta: { chunk_count: chunkCount, entrypoint, skip, status, uuid } } = entry
-
-    // Skip uploading duplicate file
-    if (skip) {
-      return
-    }
-
-    let upload = UpChunk.createUpload({ chunkSize: 10240, endpoint: entrypoint, file })
-    upload.chunkCount = chunkCount
-
-    if (status == "paused") {
-      upload.pause()
-    }
-
-    uploads[uuid] = upload
-
-    // stop uploading in the event of a view error
-    onViewError(() => upload.pause())
-
-    // upload error triggers LiveView error
-    upload.on("error", (e) => entry.error(e.detail.message))
-
-    // notify progress events to LiveView
-    upload.on("progress", (e) => {
-      if (e.detail < 100) { entry.progress(e.detail) }
-    })
-
-    // success completes the UploadEntry
-    upload.on("success", () => entry.progress(100))
-  })
+let Hooks = {
+  AudioFile,
+  MediaFileInput,
+  SortableUploadEntries,
+  UploadInProgress
 }
 
-let Hooks = {
-  AndroidMediaFileInput,
-  AudioFile,
-  PushToTalk,
-  UploadInProgress
+let Uploaders = {
+  UpChunkUploader
 }
 
 Hooks.LocalStateStore = LocalStateStore.hooks
@@ -186,15 +153,9 @@ const listeners = {
       chatContent.scrollTo({ top: chatContent.scrollHeight })
     }, 0)
   },
-  "phx:upload:cancel": (e) => {
-    uploads[e.detail.uuid].abort()
-    delete uploads[e.detail.uuid]
-  },
-  "phx:upload:pause": (e) => { uploads[e.detail.uuid].pause() },
-  "phx:upload:resume": (e) => { uploads[e.detail.uuid].resume() },
   "phx:gallery:preload": (e) => {
     const img = new Image();
-    img.onload = function() {
+    img.onload = function () {
       const preloadedList = document.getElementById(e.detail.to);
       preloadedList.appendChild(img);
       setTimeout(() => { img.remove() }, '30000');
@@ -202,6 +163,7 @@ const listeners = {
     img.classList.add('hidden')
     img.src = e.detail.url;
   },
+  ...uploadEventHandlers
 };
 for (key in listeners) {
   window.addEventListener(key, listeners[key]);

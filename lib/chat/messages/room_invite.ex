@@ -15,7 +15,7 @@ end
 defimpl Chat.DryStorable, for: Chat.Messages.RoomInvite do
   alias Chat.Identity
   alias Chat.Messages.RoomInvite
-  alias Chat.RoomInvites
+  alias Chat.Content.RoomInvites
   alias Chat.Utils.StorageId
 
   def content(%RoomInvite{} = msg) do

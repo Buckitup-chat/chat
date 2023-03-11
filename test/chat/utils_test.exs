@@ -8,12 +8,13 @@ defmodule Chat.UtilsTest do
   test "blob crypt" do
     data = "1234"
     type = "text/plain"
+    secret = Enigma.generate_secret()
 
-    {encrypted, secret} = Utils.encrypt_blob([data, type])
+    encrypted = Enigma.cipher([data, type], secret)
 
     assert encrypted != {data, type}
 
-    assert [^data, ^type] = Utils.decrypt_blob(encrypted, secret)
+    assert [^data, ^type] = Enigma.decipher(encrypted, secret)
   end
 
   test "pagination" do
@@ -32,17 +33,11 @@ defmodule Chat.UtilsTest do
            ] = Utils.page(list, 19, 2)
   end
 
-  test "test binhash" do
-    bin = :binary.copy(<<255>>, 32)
-
-    assert "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" == Utils.hash(bin)
-  end
-
   test "" do
     me = Identity.create("Alice")
     card = Chat.Card.from_identity(me)
 
-    assert Utils.hash(me) == Utils.hash(card)
+    assert Enigma.hash(me) == Enigma.hash(card)
   end
 
   test "Actor encoding should work fine" do
@@ -63,18 +58,7 @@ defmodule Chat.UtilsTest do
 
     assert decrypted.me == actor.me
 
-    assert decrypted.rooms |> Enum.map(& &1.priv_key) == actor.rooms |> Enum.map(& &1.priv_key)
-  end
-
-  test "Identity encrypt should work" do
-    me = Identity.create("me")
-
-    text = "hello world"
-
-    encrypted = text |> Utils.encrypt(me)
-
-    assert encrypted != text
-
-    assert ^text = Utils.decrypt(encrypted, me)
+    assert decrypted.rooms |> Enum.map(& &1.private_key) ==
+             actor.rooms |> Enum.map(& &1.private_key)
   end
 end

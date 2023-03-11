@@ -14,8 +14,16 @@
 3. `t-` prefixed classes are for test anchors
 
 
+# Logging recommendation
+
+Using IO data as arguments to the logging function will give a little performance:
+  * https://elixirforum.com/t/understanding-iodata/3932/3
+  * https://10consulting.com/2016/10/28/elixir-io-lists/
+
+
 # Technical info
 
+  * [Encryption](./lib/enigma/encryption.livemd)
   * [DB structure](./lib/chat/db_structures.livemd)
   * [Room approval flow](./lib/chat/rooms/approve_flow.livemd)
   * [DB Prioritization](./lib/chat/db/prioritization.livemd)

@@ -5,7 +5,7 @@ defmodule Chat.Upload.StaleUploadsPruner do
   use GenServer
 
   alias Chat.ChunkedFiles
-  alias Chat.Upload.{Upload, UploadIndex}
+  alias Chat.Upload.{Upload, UploadIndex, UploadStatus}
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, :ok, Keyword.merge([name: __MODULE__], opts))
@@ -50,6 +50,7 @@ defmodule Chat.Upload.StaleUploadsPruner do
     |> Enum.each(fn {key, %Upload{}} ->
       ChunkedFiles.delete(key)
       UploadIndex.delete(key)
+      UploadStatus.stop(key)
     end)
 
     Process.send_after(self(), :prune, :timer.hours(1))

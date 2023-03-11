@@ -12,6 +12,8 @@ defmodule ChatWeb.MainLive.Page.Logout do
 
   alias Ecto.Changeset
 
+  alias ChatWeb.MainLive.Page
+
   def init(%{assigns: %{}} = socket) do
     socket
     |> assign(:logout_step, nil)
@@ -89,6 +91,7 @@ defmodule ChatWeb.MainLive.Page.Logout do
     me |> Log.self_backup(time)
 
     socket
+    |> Page.Login.reset_rooms_to_backup(sync: true)
     |> push_event("chat:redirect", %{url: url(~p"/get/backup/#{broker_key}")})
   end
 

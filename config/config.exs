@@ -66,7 +66,8 @@ config :chat,
   write_budget: 1_000_000,
   mode: :internal,
   flags: [],
-  writable: :yes
+  writable: :yes,
+  env: config_env()
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

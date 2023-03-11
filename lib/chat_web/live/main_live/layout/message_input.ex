@@ -8,11 +8,12 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
   alias ChatWeb.MainLive.Layout
   alias Phoenix.LiveView.JS
 
-  attr :type, :string, required: true, doc: "dialog or room type"
-  attr :input_mode, :atom, doc: "one of [:plain, :edit, :select]"
-  attr :edit_content, :string, doc: "text to edit"
-  attr :uploads, :map, doc: "map containing LiveView Upload configs"
   attr :db_status, :map, required: true, doc: "map containing db status info"
+  attr :edit_content, :string, doc: "text to edit"
+  attr :input_mode, :atom, doc: "one of [:plain, :edit, :select]"
+  attr :operating_system, :string, doc: "client's operating system"
+  attr :type, :string, required: true, doc: "dialog or room type"
+  attr :uploads, :map, doc: "map containing LiveView Upload configs"
 
   def render(%{type: "dialog"} = assigns) do
     assigns =
@@ -25,8 +26,7 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
       class="basis-[7%] w-full py-1.5 px-8 border border-white bg-white flex items-center fixed md:sticky bottom-0"
     >
       <%= if @input_mode == :plain do %>
-        <Layout.Uploader.push_to_talk config={@uploads.file} disabled={true} type={@type} />
-        <Layout.Uploader.button type={@type} enabled={@writable} />
+        <Layout.Uploader.button enabled={@writable} operating_system={@operating_system} type={@type} />
         <.form
           :let={di}
           for={:dialog}
@@ -148,8 +148,7 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
     ~H"""
     <div class="basis-[7%] w-full py-1.5 px-8 border border-white bg-white flex items-center fixed md:sticky bottom-0">
       <%= if @input_mode == :plain do %>
-        <Layout.Uploader.push_to_talk config={@uploads.file} disabled={true} type={@type} />
-        <Layout.Uploader.button type={@type} enabled={@writable} />
+        <Layout.Uploader.button enabled={@writable} operating_system={@operating_system} type={@type} />
         <.form
           :let={di}
           for={:room}

@@ -2,10 +2,10 @@ defmodule Chat.Dialogs.DialogTest do
   use ExUnit.Case, async: true
 
   alias Chat.Card
+  alias Chat.Content.Files
+  alias Chat.Content.Memo
   alias Chat.Db.ChangeTracker
   alias Chat.Dialogs
-  alias Chat.Files
-  alias Chat.Memo
   alias Chat.Messages
   alias Chat.User
   alias Chat.Utils.StorageId
@@ -37,11 +37,11 @@ defmodule Chat.Dialogs.DialogTest do
 
     assert 3 == dialog |> Dialogs.read(bob) |> Enum.count()
 
-    assert_raise RuntimeError, fn ->
+    assert_raise CaseClauseError, fn ->
       %Messages.Text{text: "spam"} |> Dialogs.add_new_message(charlie, dialog)
     end
 
-    assert_raise(RuntimeError, fn -> dialog |> Dialogs.read(charlie) end)
+    assert_raise(CaseClauseError, fn -> dialog |> Dialogs.read(charlie) end)
   end
 
   test "should create dialog, repoen it, add message and check peer" do

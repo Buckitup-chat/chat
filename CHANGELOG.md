@@ -15,6 +15,7 @@ straightforward as possible.
  
 ### Changed
 - UI: audio button moved into paperclip menu
+- `Chat.Db.BackupDbSupervisor` now receives the name of the DB it needs to supervise as an argument
 
 ### Fixed
 - UI: uploader covering chat/room list

@@ -1,4 +1,10 @@
 defmodule Chat.Sync.OnlinersSync do
+  @moduledoc """
+  Waits for onliners sync messages from platform.
+  After receiving a "get_keys" message, it gathers online users' keys
+  and sends them back to platform.
+  """
+
   use GenServer
 
   alias ChatWeb.Presence

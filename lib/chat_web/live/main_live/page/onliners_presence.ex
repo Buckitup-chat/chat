@@ -1,4 +1,8 @@
 defmodule ChatWeb.MainLive.Page.OnlinersPresence do
+  @moduledoc """
+  Tracks current user's keys for purpose of onliners sync.
+  """
+
   alias Chat.Identity
   alias ChatWeb.Presence
   alias Phoenix.LiveView.Socket

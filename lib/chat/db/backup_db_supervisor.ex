@@ -5,13 +5,13 @@ defmodule Chat.Db.BackupDbSupervisor do
 
   use Supervisor
 
-  def start_link(path) do
-    Supervisor.start_link(__MODULE__, path, name: __MODULE__)
+  def start_link(args) do
+    Supervisor.start_link(__MODULE__, args, name: __MODULE__)
   end
 
   @impl true
-  def init(path) do
-    Chat.Db.BackupDb
+  def init([db, path]) do
+    db
     |> Chat.Db.supervise(path)
     |> Supervisor.init(strategy: :rest_for_one)
   end

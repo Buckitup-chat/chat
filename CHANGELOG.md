@@ -6,14 +6,18 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
+
+### Added
  
 ### Changed
 - Continuous backup
 - Main and backup drives are interchangeable
 - Unplugging main while backup is in makes backup the main drive
 
-## [0.1.0] - 2023-03-11
+### Fixed
 
+## 2023-03-11_2200db4___2023-03-11_acb5424
+ 
 ### Added
 - extra front end encryption check 
  

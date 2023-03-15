@@ -333,7 +333,10 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
   defp is_prev_before?([first | _], current), do: first !== current
 
   defp image_url(id, secret) do
-    ~p"/get/image/#{id |> Base.encode16(case: :lower)}?a=#{secret |> Base.url_encode64()}"
+    key = id |> Base.encode16(case: :lower)
+    code = secret |> Base.url_encode64()
+
+    ~p"/get/image/#{key}?a=#{code}"
     |> url()
   end
 

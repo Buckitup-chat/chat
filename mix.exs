@@ -13,7 +13,7 @@ defmodule Chat.MixProject do
       deps: deps(),
       test_coverage: [
         ignore_modules: [ChatWeb.ChannelCase, ChatWeb.Gettext, ChatWeb.Router],
-        summary: [threshold: 62]
+        summary: [threshold: 63]
       ],
       releases: [
         chat: [

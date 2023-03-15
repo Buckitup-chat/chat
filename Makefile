@@ -16,7 +16,7 @@ ci-check:
 
 ci-test:
 	npm install --prefix ./assets
- 	mix assets.deploy
+	mix assets.deploy
 	MIX_ENV=test mix test --max-failures=3 --cover 
 
 test: 

@@ -1,3 +1,6 @@
+// https://www.npmjs.com/package/@noble/secp256k1
+const secp = require('@noble/secp256k1');
+
 const jsSHA3 = require("jssha/dist/sha3");
 const blf = require('blowfish-js');
 var Buffer = require('buffer/').Buffer  // note: the trailing slash is important!
@@ -64,3 +67,4 @@ const Enigma = {
 
 window.enigma = Enigma;
 window.Buffer = Buffer;
+window.secp = secp;

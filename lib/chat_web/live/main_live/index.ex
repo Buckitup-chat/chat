@@ -54,7 +54,7 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Lobby.init()
     |> Page.Dialog.init()
     |> Page.Logout.init()
-    |> Page.OnlinersPresence.track()
+    |> Page.Shared.track_onliners_presence()
     |> noreply()
   end
 
@@ -77,7 +77,7 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Lobby.init()
     |> Page.Dialog.init()
     |> Page.Logout.init()
-    |> Page.OnlinersPresence.track()
+    |> Page.Shared.track_onliners_presence()
     |> noreply()
   end
 
@@ -247,7 +247,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_event("logout-wipe", _, socket) do
     socket
-    |> Page.OnlinersPresence.untrack()
+    |> Page.Shared.untrack_onliners_presence()
     |> Page.Login.clear()
     |> Page.Logout.wipe()
     |> noreply()
@@ -329,7 +329,7 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Lobby.init()
     |> Page.Logout.init()
     |> Page.Dialog.init()
-    |> Page.OnlinersPresence.track()
+    |> Page.Shared.track_onliners_presence()
     |> noreply()
   end
 

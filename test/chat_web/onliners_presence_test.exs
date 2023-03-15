@@ -1,4 +1,4 @@
-defmodule ChatWeb.MainLive.Page.OnlinersPresenceTest do
+defmodule ChatWeb.OnlinersPresenceTest do
   use ChatWeb.ConnCase, async: false
 
   import ChatWeb.LiveTestHelpers

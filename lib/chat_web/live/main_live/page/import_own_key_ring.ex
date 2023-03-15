@@ -34,7 +34,7 @@ defmodule ChatWeb.MainLive.Page.ImportOwnKeyRing do
         |> Page.Lobby.init()
         |> Page.Dialog.init()
         |> Page.Logout.init()
-        |> Page.OnlinersPresence.track()
+        |> Page.Shared.track_onliners_presence()
 
       _ ->
         socket
@@ -55,7 +55,7 @@ defmodule ChatWeb.MainLive.Page.ImportOwnKeyRing do
         |> Page.Lobby.init()
         |> Page.Dialog.init()
         |> Page.Logout.init()
-        |> Page.OnlinersPresence.track()
+        |> Page.Shared.track_onliners_presence()
 
       _ ->
         socket

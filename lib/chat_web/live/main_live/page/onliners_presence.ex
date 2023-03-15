@@ -36,9 +36,11 @@ defmodule ChatWeb.MainLive.Page.OnlinersPresence do
     Enigma.hash(me)
   end
 
-  defp get_user_keys(%Socket{assigns: %{me: me, rooms: rooms}})
-       when not is_nil(me) and not is_nil(rooms) do
-    [me | rooms]
+  defp get_user_keys(%Socket{assigns: %{me: me, room_map: room_map}})
+       when not is_nil(me) and not is_nil(room_map) do
+    room_map
+    |> Stream.map(fn {_key, room} -> room end)
+    |> Stream.concat([me])
     |> Enum.map(&Identity.pub_key/1)
     |> MapSet.new()
   end

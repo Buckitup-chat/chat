@@ -1,7 +1,7 @@
 defmodule Chat.Sync.OnlinersSync do
   @moduledoc """
   Waits for onliners sync messages from platform.
-  After receiving a "get_keys" message, it gathers online users' keys
+  After receiving a "get_online_users_keys" message, it gathers online users' keys
   and sends them back to platform.
   """
 
@@ -23,7 +23,7 @@ defmodule Chat.Sync.OnlinersSync do
     {:ok, nil}
   end
 
-  def handle_info("get_keys", state) do
+  def handle_info("get_online_users_keys", state) do
     keys =
       @presence_topic
       |> Presence.list()

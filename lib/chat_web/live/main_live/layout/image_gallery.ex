@@ -113,7 +113,10 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
         {id, secret} = json |> StorageId.from_json()
 
         current = %{
-          url: Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64()),
+          url:
+            Routes.file_url(socket, :image, id |> Base.encode16(case: :lower),
+              a: secret |> Base.url_encode64()
+            ),
           id: m_id,
           index: m_index
         }
@@ -144,7 +147,10 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
         {id, secret} = json |> StorageId.from_json()
 
         current = %{
-          url: Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64()),
+          url:
+            Routes.file_url(socket, :image, id |> Base.encode16(case: :lower),
+              a: secret |> Base.url_encode64()
+            ),
           id: m_id,
           index: m_index
         }
@@ -181,7 +187,10 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
         {file_id, secret} = json |> StorageId.from_json()
 
         last = %{
-          url: Routes.file_url(socket, :image, file_id, a: secret |> Base.url_encode64()),
+          url:
+            Routes.file_url(socket, :image, file_id |> Base.encode16(case: :lower),
+              a: secret |> Base.url_encode64()
+            ),
           id: id,
           index: index
         }
@@ -210,7 +219,10 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
         {file_id, secret} = json |> StorageId.from_json()
 
         last = %{
-          url: Routes.file_url(socket, :image, file_id, a: secret |> Base.url_encode64()),
+          url:
+            Routes.file_url(socket, :image, file_id |> Base.encode16(case: :lower),
+              a: secret |> Base.url_encode64()
+            ),
           id: id,
           index: index
         }
@@ -241,7 +253,10 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
         {file_id, secret} = json |> StorageId.from_json()
 
         first = %{
-          url: Routes.file_url(socket, :image, file_id, a: secret |> Base.url_encode64()),
+          url:
+            Routes.file_url(socket, :image, file_id |> Base.encode16(case: :lower),
+              a: secret |> Base.url_encode64()
+            ),
           id: id,
           index: index
         }
@@ -270,7 +285,10 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
         {file_id, secret} = json |> StorageId.from_json()
 
         first = %{
-          url: Routes.file_url(socket, :image, file_id, a: secret |> Base.url_encode64()),
+          url:
+            Routes.file_url(socket, :image, file_id |> Base.encode16(case: :lower),
+              a: secret |> Base.url_encode64()
+            ),
           id: id,
           index: index
         }

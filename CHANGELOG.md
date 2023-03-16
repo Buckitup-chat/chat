@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Unplugging main while backup is in makes backup the main drive
 
 ### Fixed
+- File corruption during sync
 
 ## 2023-03-11_2200db4___2023-03-11_acb5424
  

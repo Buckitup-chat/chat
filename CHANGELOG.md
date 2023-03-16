@@ -49,3 +49,6 @@ straightforward as possible.
   MINOR Fix module foo tests
 - [PROJECTNAME-RRRR](http://tickets.projectname.com/browse/PROJECTNAME-RRRR)
   MAJOR Module foo's timeline uses the browser timezone for date resolution 
+
+### Fixed
+- markup breaking when key name is long

@@ -11,6 +11,16 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+ 
+### Changed
+
+### Fixed
+- gallery url fix
+
+
+## 2023-03-11_2200db4___2023-03-11_acb5424
+ 
+### Added
 - extra front end encryption check 
  
 ### Changed
@@ -24,7 +34,7 @@ straightforward as possible.
 
 
 
-## [0.1.0] - 2023-03-10
+## [0.1.0] - 2023-00-00
  
 ### Added
 - [PROJECTNAME-XXXX](http://tickets.projectname.com/browse/PROJECTNAME-XXXX)

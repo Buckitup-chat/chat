@@ -133,7 +133,7 @@
             let passwordHash = enigma.hash(Buffer.from(password).toString('base64'))
             const downloadData = localStorage.getItem('buckitUp-chat-auth');
             console.log('downloadData', downloadData)
-            const contentB64 = Buffer.from(JSON.stringify(downloadData)).toString('base64');
+            const contentB64 = Buffer.from(downloadData).toString('base64');
             const ciphered = enigma.cipher(contentB64, passwordHash);
             const userName = JSON.parse(downloadData)[0][0];
             const file = new Blob([ciphered], {type: 'application/octet-stream'});

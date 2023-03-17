@@ -13,9 +13,11 @@ straightforward as possible.
 ### Added
 
 ### Changed
+- Refactored communication between chat and platform during onliners sync
 
 ### Fixed
 - File download
+- gallery url fix
 
 
 ## 2023-03-11_2200db4___2023-03-11_acb5424

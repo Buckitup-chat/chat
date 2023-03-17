@@ -27,7 +27,9 @@ defmodule Chat.Application do
       Chat.KeyRingTokens,
       Chat.Broker,
       Chat.ChunkedFilesBroker,
+      Chat.Sync.OnlinersSync,
       {DynamicSupervisor, name: Chat.Upload.UploadSupervisor},
+      ChatWeb.Presence,
       # Start the Endpoint (http/https)
       ChatWeb.Endpoint,
       # Supervised tasks caller

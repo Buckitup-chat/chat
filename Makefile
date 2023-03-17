@@ -15,6 +15,8 @@ ci-check:
 	mix deps.unlock --check-unused
 
 ci-test:
+	npm install --prefix ./assets
+	mix assets.deploy
 	MIX_ENV=test mix test --max-failures=3 --cover 
 
 test: 

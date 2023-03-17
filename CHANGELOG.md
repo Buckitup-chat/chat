@@ -14,11 +14,14 @@ straightforward as possible.
 
 ### Changed
 - Refactored communication between chat and platform during onliners sync
+- Continuous backup
+- Main and backup drives are interchangeable
+- Unplugging main while backup is in makes backup the main drive
 
 ### Fixed
 - File download
 - gallery url fix
-
+- File corruption during sync
 
 ## 2023-03-11_2200db4___2023-03-11_acb5424
  

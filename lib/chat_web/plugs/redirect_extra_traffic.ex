@@ -10,6 +10,7 @@ defmodule ChatWeb.Plugs.RedirectExtraTraffic do
       "buckitup.app" -> conn
       "localhost" -> conn
       "offline-chat.gigalixirapp.com" -> conn
+      "nerves.local" -> conn
       _other -> block(conn)
     end
   end

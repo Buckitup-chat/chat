@@ -37,6 +37,51 @@ defmodule ChatWeb.MainLive.IndexTest do
   describe "downloading messages" do
     setup [:prepare_view, :open_dialog]
 
+    test "multiple at once", %{conn: conn, view: view} do
+      %{file: file, filename: filename, socket: socket} = start_upload(%{view: view})
+
+      {key, _secret} =
+        socket.assigns.uploads_metadata
+        |> Enum.to_list()
+        |> List.first()
+        |> elem(1)
+        |> Map.get(:credentials)
+
+      upload_conn =
+        conn
+        |> put_req_header("content-length", "4")
+        |> put_req_header("content-range", "bytes 0-3/4")
+        |> put_req_header("content-type", "text/plain")
+        |> put("/upload_chunk/#{Base.encode16(key, case: :lower)}", IO.iodata_to_binary("1234"))
+
+      assert upload_conn.status == 200
+
+      render_upload(file, filename, 100)
+
+      view
+      |> form("#dialog-form", %{"dialog" => %{"text" => "Dialog message text"}})
+      |> render_submit()
+
+      assert has_element?(view, ".messageBlock", "Dialog message text")
+
+      messages =
+        socket.assigns.dialog
+        |> Dialogs.read(socket.assigns.me)
+        |> Enum.map(fn %PrivateMessage{} = message ->
+          %{"id" => message.id, "index" => Integer.to_string(message.index)}
+        end)
+        |> Jason.encode!()
+
+      render_hook(view, "dialog/download-messages", %{"messages" => messages})
+
+      assert_push_event(view, "chat:redirect", %{url: url})
+
+      conn = get(conn, url)
+
+      assert conn.status == 200
+      assert conn.resp_body =~ "Created by Zstream"
+    end
+
     test "one at a time", %{conn: conn, view: view} do
       %{file: file, filename: filename, socket: socket} = start_upload(%{view: view})
 

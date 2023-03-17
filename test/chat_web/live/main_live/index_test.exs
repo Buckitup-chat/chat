@@ -81,5 +81,45 @@ defmodule ChatWeb.MainLive.IndexTest do
       assert conn.status == 200
       assert conn.resp_body =~ "Created by Zstream"
     end
+
+    test "one at a time", %{conn: conn, view: view} do
+      %{file: file, filename: filename, socket: socket} = start_upload(%{view: view})
+
+      {key, _secret} =
+        socket.assigns.uploads_metadata
+        |> Enum.to_list()
+        |> List.first()
+        |> elem(1)
+        |> Map.get(:credentials)
+
+      upload_conn =
+        conn
+        |> put_req_header("content-length", "4")
+        |> put_req_header("content-range", "bytes 0-3/4")
+        |> put_req_header("content-type", "text/plain")
+        |> put("/upload_chunk/#{Base.encode16(key, case: :lower)}", IO.iodata_to_binary("1234"))
+
+      assert upload_conn.status == 200
+
+      render_upload(file, filename, 100)
+
+      %PrivateMessage{} =
+        message =
+        socket.assigns.dialog
+        |> Dialogs.read(socket.assigns.me)
+        |> List.first()
+
+      render_hook(view, "dialog/message/download", %{
+        "id" => message.id,
+        "index" => Integer.to_string(message.index)
+      })
+
+      assert_push_event(view, "chat:redirect", %{url: url})
+
+      conn = get(conn, url)
+
+      assert conn.status == 200
+      assert conn.resp_body =~ "1234"
+    end
   end
 end

@@ -351,6 +351,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   defp maybe_redirect_to_file(%{type: type, content: json}, socket)
        when type in [:audio, :file, :image, :video] do
     {file_id, secret} = StorageId.from_json(json)
+    file_id = Base.encode16(file_id, case: :lower)
     params = %{a: Base.url_encode64(secret)}
 
     url =

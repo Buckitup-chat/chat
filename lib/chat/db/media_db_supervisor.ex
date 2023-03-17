@@ -1,6 +1,6 @@
-defmodule Chat.Db.BackupDbSupervisor do
+defmodule Chat.Db.MediaDbSupervisor do
   @moduledoc """
-  Supervisor for backup DB
+  Supervisor for media DB
   """
 
   use Supervisor

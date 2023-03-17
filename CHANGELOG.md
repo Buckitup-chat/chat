@@ -16,6 +16,7 @@ straightforward as possible.
 - Refactored communication between chat and platform during onliners sync
 
 ### Fixed
+- File download
 - gallery url fix
 
 

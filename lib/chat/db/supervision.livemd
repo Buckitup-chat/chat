@@ -198,7 +198,7 @@ graph TD;
 `Mounter` mounts device into folder specified. And unmounts when terminated.
 
 `Decider` figures out which functionality to start under `FunctionalityDynamicSupervisor`.
-It does it by checking whether device contains appropriate directory (`bdb` for backup or `onliners_db` for onliners sync).
+It does it by checking whether device contains appropriate directory (`main_db` for backup or `onliners_db` for onliners sync).
 If not, it checks the media settings in the Chat Admin room.
 If it's not set yet, the default functionality is used (backup).
 

@@ -113,7 +113,7 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
         {id, secret} = json |> StorageId.from_json()
 
         current = %{
-          url: Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64()),
+          url: image_url(id, secret),
           id: m_id,
           index: m_index
         }
@@ -144,7 +144,7 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
         {id, secret} = json |> StorageId.from_json()
 
         current = %{
-          url: Routes.file_url(socket, :image, id, a: secret |> Base.url_encode64()),
+          url: image_url(id, secret),
           id: m_id,
           index: m_index
         }
@@ -181,7 +181,7 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
         {file_id, secret} = json |> StorageId.from_json()
 
         last = %{
-          url: Routes.file_url(socket, :image, file_id, a: secret |> Base.url_encode64()),
+          url: image_url(file_id, secret),
           id: id,
           index: index
         }
@@ -210,7 +210,7 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
         {file_id, secret} = json |> StorageId.from_json()
 
         last = %{
-          url: Routes.file_url(socket, :image, file_id, a: secret |> Base.url_encode64()),
+          url: image_url(file_id, secret),
           id: id,
           index: index
         }
@@ -241,7 +241,7 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
         {file_id, secret} = json |> StorageId.from_json()
 
         first = %{
-          url: Routes.file_url(socket, :image, file_id, a: secret |> Base.url_encode64()),
+          url: image_url(file_id, secret),
           id: id,
           index: index
         }
@@ -270,7 +270,7 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
         {file_id, secret} = json |> StorageId.from_json()
 
         first = %{
-          url: Routes.file_url(socket, :image, file_id, a: secret |> Base.url_encode64()),
+          url: image_url(file_id, secret),
           id: id,
           index: index
         }
@@ -331,6 +331,14 @@ defmodule ChatWeb.MainLive.Layout.ImageGallery do
 
   defp is_next_after?(list, current), do: List.last(list) !== current
   defp is_prev_before?([first | _], current), do: first !== current
+
+  defp image_url(id, secret) do
+    key = id |> Base.encode16(case: :lower)
+    code = secret |> Base.url_encode64()
+
+    ~p"/get/image/#{key}?a=#{code}"
+    |> url()
+  end
 
   def back_button(assigns) do
     ~H"""

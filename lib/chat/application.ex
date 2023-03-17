@@ -27,7 +27,9 @@ defmodule Chat.Application do
       Chat.KeyRingTokens,
       Chat.Broker,
       Chat.ChunkedFilesBroker,
+      Chat.Sync.OnlinersSync,
       {DynamicSupervisor, name: Chat.Upload.UploadSupervisor},
+      ChatWeb.Presence,
       # Start the Endpoint (http/https)
       ChatWeb.Endpoint,
       # Supervised tasks caller
@@ -44,6 +46,7 @@ defmodule Chat.Application do
   end
 
   defp more_children(:test), do: []
+  # coveralls-ignore-start
   defp more_children(_env), do: [Chat.Upload.StaleUploadsPruner]
 
   # Tell Phoenix to update the endpoint configuration
@@ -53,6 +56,8 @@ defmodule Chat.Application do
     ChatWeb.Endpoint.config_change(changed, removed)
     :ok
   end
+
+  # coveralls-ignore-end
 
   defp log_version do
     ver = System.get_env("RELEASE_SYS_CONFIG")

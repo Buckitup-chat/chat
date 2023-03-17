@@ -9,6 +9,8 @@ defmodule Chat.Messages.ExportHelper do
       |> String.split(".")
       |> List.pop_at(-1)
 
+    id = Base.encode16(id, case: :lower)
+
     Enum.join(filename, ".") <> "_" <> id <> "." <> extension
   end
 end

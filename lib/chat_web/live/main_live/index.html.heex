@@ -1260,7 +1260,7 @@
           <% end %>
           <%= if @step == :decrypt do %>
             <div class="w-full h-14 mt-7 bg-transparent text-white py-2 px-2.5 border border-white/50 rounded-lg flex flex-row items-center justify-between">
-              <div class="w-44 flex flex-row items-stretch justify-start">
+              <div class="flex flex-row items-stretch justify-start">
                 <div
                   class="border-white/0 bg-white/50 w-7 h-7 flex items-center justify-center"
                   style="border-radius: 50%;"
@@ -1268,7 +1268,12 @@
                   <.icon id="check" class="w-4 h-4 stroke-white fill-white/0" />
                 </div>
                 <div class="ml-2" style="line-height: 12px;">
-                  <p style="font-size: 14px;"><%= @filename %></p>
+                  <p
+                    class="w-[200px] h-[14px] text-ellipsis overflow-hidden"
+                    style="font-size: 14px;"
+                  >
+                    <%= @filename %>
+                  </p>
                   <p class="text-xs text-white/50">uploaded</p>
                 </div>
               </div>

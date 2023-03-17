@@ -22,6 +22,7 @@ straightforward as possible.
 - File download
 - gallery url fix
 - File corruption during sync
+- markup breaking when key name is long
 
 ## 2023-03-11_2200db4___2023-03-11_acb5424
  

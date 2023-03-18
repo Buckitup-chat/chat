@@ -13,10 +13,12 @@ straightforward as possible.
 ### Added
 
 ### Changed
+- mirroring mechanics
 
 ### Fixed
 - file absence ignoring
 - fix read only mode 
+
 
 ## 2023-03-17_4ed6f98___2023-03-17_191b7bc
 
@@ -31,6 +33,7 @@ straightforward as possible.
 - gallery url fix
 - File corruption during sync
 - markup breaking when key name is long
+
 
 ## 2023-03-11_2200db4___2023-03-11_acb5424
  

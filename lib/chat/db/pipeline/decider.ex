@@ -58,7 +58,7 @@ defmodule Chat.Db.Pipeline.Decider do
   end
 
   defp start_dry_writer(opts) do
-    dyn_supervisor = Keyword.fetch!(opts, :dynamic_supervisor)
+    dyn_supervisor = Keyword.fetch!(opts, :write_supervisor)
     writer = Keyword.fetch!(opts, :writer)
 
     DynamicSupervisor.start_child(

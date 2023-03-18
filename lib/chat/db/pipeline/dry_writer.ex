@@ -45,7 +45,7 @@ defmodule Chat.Db.Pipeline.DryWriter do
   end
 
   @impl true
-  def handle_continue(:demand, {queue} = state) do
+  def handle_continue(:demand, queue = state) do
     Queue.demand(queue)
     state |> noreply()
   end

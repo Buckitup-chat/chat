@@ -15,6 +15,7 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
+- file absence ignoring
 - fix read only mode 
 
 ## 2023-03-17_4ed6f98___2023-03-17_191b7bc

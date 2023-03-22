@@ -26,12 +26,10 @@ defmodule ChatWeb.UploadChunkController do
   end
 
   defp upload_is_active?(key) do
-    case UploadStatus.get(key) do
-      :active ->
-        true
-
-      _status ->
-        {:error, "upload is inactive"}
+    cond do
+      not UploadStatus.started?(key) -> true
+      UploadStatus.get(key) == :active -> true
+      true -> {:error, "upload is inactive"}
     end
   end
 

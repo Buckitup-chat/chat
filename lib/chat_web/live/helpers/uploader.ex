@@ -7,7 +7,16 @@ defmodule ChatWeb.LiveHelpers.Uploader do
   import Phoenix.Component
 
   alias Chat.{ChunkedFiles, ChunkedFilesMultisecret, FileIndex}
-  alias Chat.Upload.{Upload, UploadIndex, UploadMetadata, UploadStatus, UploadSupervisor}
+
+  alias Chat.Upload.{
+    Upload,
+    UploadIndex,
+    UploadKey,
+    UploadMetadata,
+    UploadStatus,
+    UploadSupervisor
+  }
+
   alias ChatWeb.Endpoint
   alias ChatWeb.MainLive.Page
   alias ChatWeb.Router.Helpers
@@ -163,23 +172,9 @@ defmodule ChatWeb.LiveHelpers.Uploader do
   end
 
   defp get_upload_key(%UploadEntry{} = entry, %{my_id: id} = assigns) do
-    destination =
-      assigns
-      |> file_upload_destination()
-      |> Jason.encode!()
-      |> Base.encode64()
-
-    [
-      id,
-      destination,
-      entry.client_relative_path,
-      entry.client_name,
-      entry.client_type,
-      entry.client_size,
-      entry.client_last_modified
-    ]
-    |> Enum.join(":")
-    |> Enigma.hash()
+    assigns
+    |> file_upload_destination()
+    |> UploadKey.new(id, entry)
   end
 
   defp reader_hash(%{lobby_mode: :chats, peer: %{pub_key: peer_pub_key}}),

@@ -4,6 +4,11 @@ defmodule NaiveApi.Schema do
   """
   use Absinthe.Schema
 
+  alias NaiveApi.Chat
+  alias NaiveApi.Room
+  alias NaiveApi.User
+  alias NaiveApi.Upload
+
   import_types(NaiveApi.Schema.Types)
 
   query do
@@ -14,6 +19,7 @@ defmodule NaiveApi.Schema do
     @desc "List all users excluding requesting one"
     field :user_list, list_of(non_null(:card)) do
       arg(:my_public_key, :public_key |> non_null)
+      resolve(&User.list/3)
     end
 
     @desc """
@@ -28,6 +34,7 @@ defmodule NaiveApi.Schema do
       arg(:my_keypair, non_null(:input_key_pair))
       arg(:before, :integer)
       arg(:amount, :integer)
+      resolve(&Chat.read/3)
     end
 
     @desc """
@@ -39,9 +46,9 @@ defmodule NaiveApi.Schema do
     """
     field :room_read, list_of(:message |> non_null) do
       arg(:room_keypair, non_null(:input_key_pair))
-      arg(:my_keypair, non_null(:input_key_pair))
       arg(:before, :integer)
       arg(:amount, :integer)
+      resolve(&Room.read/3)
     end
   end
 
@@ -54,6 +61,15 @@ defmodule NaiveApi.Schema do
     """
     field :user_sign_up, non_null(:identity) do
       arg(:name, non_null(:string))
+      resolve(&User.signup/3)
+    end
+
+    @desc "Creates the upload key."
+    field :upload_key, non_null(:file_key) do
+      arg(:my_keypair, non_null(:input_key_pair))
+      arg(:destination, non_null(:input_upload_destination))
+      arg(:entry, non_null(:input_upload_entry))
+      resolve(&Upload.create_key/3)
     end
 
     @desc """
@@ -65,8 +81,17 @@ defmodule NaiveApi.Schema do
     field :room_send_text, non_null(:message_reference) do
       arg(:room_keypair, non_null(:input_key_pair))
       arg(:my_keypair, non_null(:input_key_pair))
-      arg(:text, :string |> non_null)
+      arg(:text, non_null(:string))
       arg(:timestamp, :integer)
+      resolve(&Room.send_text/3)
+    end
+
+    @desc "Send file in the room."
+    field :room_send_file, non_null(:message_reference) do
+      arg(:room_keypair, non_null(:input_key_pair))
+      arg(:my_keypair, non_null(:input_key_pair))
+      arg(:upload_key, non_null(:file_key))
+      resolve(&Room.send_file/3)
     end
   end
 end

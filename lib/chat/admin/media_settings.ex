@@ -11,7 +11,7 @@ defmodule Chat.Admin.MediaSettings do
   embedded_schema do
     field(:functionality, Ecto.Enum,
       default: :backup,
-      values: [backup: "Backup", onliners: "Onliners sync"]
+      values: [backup: "Backup", cargo: "Cargo", onliners: "Onliners sync"]
     )
   end
 

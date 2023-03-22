@@ -532,19 +532,20 @@ defmodule ChatWeb.MainLive.Layout.Message do
     })
   end
 
-  defp assign_file(%{msg: %{content: json, type: type}} = assigns)
-       when type in [:audio, :file, :image, :video] do
-    {id, secret} = StorageId.from_json(json)
-    [_, _, _, _, name, size] = Files.get(id, secret)
-
-    assign(assigns, :file, %{
-      name: name,
-      size: size,
-      url: Utils.get_file_url(:file, id, secret)
-    })
+  defp assign_file(%{msg: %{content: json, type: type}} = assigns) do
+    with true <- type in [:audio, :image, :video, :file],
+         {id, secret} <- StorageId.from_json(json),
+         [_, _, _, _, name, size] <- Files.get(id, secret) do
+      %{
+        name: name,
+        size: size,
+        url: Utils.get_file_url(:file, id, secret)
+      }
+    else
+      _ -> nil
+    end
+    |> then(&assign(assigns, :file, &1))
   end
-
-  defp assign_file(assigns), do: assign(assigns, :file, nil)
 
   attr :export?, :boolean, required: true, doc: "embed file icon SVG?"
   attr :file, :map, required: true, doc: "file map"

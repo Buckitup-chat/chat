@@ -1,7 +1,9 @@
 defmodule Chat.Log do
   @moduledoc "All acrions log"
 
-  import Enigma, only: [hash: 1]
+  alias Chat.Card
+  alias Chat.Identity
+  alias Chat.Rooms.Room
 
   alias Chat.Db
   alias Chat.Ordering
@@ -15,33 +17,33 @@ defmodule Chat.Log do
   def logout(me, time), do: me |> log(time, :logout)
 
   def create_room(me, time, room, type),
-    do: me |> log(time, :create_room, room: hash(room), room_type: type)
+    do: me |> log(time, :create_room, room: pub_key(room), room_type: type)
 
-  def message_room(me, time, room), do: me |> log(time, :message_room, room: hash(room))
+  def message_room(me, time, room), do: me |> log(time, :message_room, room: pub_key(room))
 
   def delete_room_message(me, time, room),
-    do: me |> log(time, :delete_room_message, room: hash(room))
+    do: me |> log(time, :delete_room_message, room: pub_key(room))
 
   def update_room_message(me, time, room),
-    do: me |> log(time, :update_room_message, room: hash(room))
+    do: me |> log(time, :update_room_message, room: pub_key(room))
 
   def request_room_key(me, time, room),
-    do: me |> log(time, :request_room_key, room: hash(room))
+    do: me |> log(time, :request_room_key, room: pub_key(room))
 
-  def got_room_key(me, time, room), do: me |> log(time, :got_room_key, room: hash(room))
-  def visit_room(me, time, room), do: me |> log(time, :visit_room, room: hash(room))
+  def got_room_key(me, time, room), do: me |> log(time, :got_room_key, room: pub_key(room))
+  def visit_room(me, time, room), do: me |> log(time, :visit_room, room: pub_key(room))
 
   def approve_room_request(me, time, room),
-    do: me |> log(time, :approve_room_request, room: hash(room))
+    do: me |> log(time, :approve_room_request, room: pub_key(room))
 
-  def open_direct(me, time, peer), do: me |> log(time, :open_direct, to: hash(peer))
-  def message_direct(me, time, peer), do: me |> log(time, :message_direct, to: hash(peer))
+  def open_direct(me, time, peer), do: me |> log(time, :open_direct, to: pub_key(peer))
+  def message_direct(me, time, peer), do: me |> log(time, :message_direct, to: pub_key(peer))
 
   def delete_message_direct(me, time, peer),
-    do: me |> log(time, :delete_message_direct, to: hash(peer))
+    do: me |> log(time, :delete_message_direct, to: pub_key(peer))
 
   def update_message_direct(me, time, peer),
-    do: me |> log(time, :update_message_direct, to: hash(peer))
+    do: me |> log(time, :update_message_direct, to: pub_key(peer))
 
   @human_actions %{
     open_direct: "reads dialog",
@@ -81,17 +83,22 @@ defmodule Chat.Log do
   defp build(later, earlier) do
     {{@db_key, earlier, ""}, {@db_key, later, :binary.copy(<<255>>, 100)}}
     |> Db.list()
-    |> Enum.map(fn {{@db_key, _index, who}, data} -> {Base.encode16(who), data} end)
+    |> Enum.map(fn {{@db_key, _index, who}, data} -> {who, data} end)
     |> Enum.reverse()
   end
 
   defp log(me, time, action) do
-    {@db_key, Ordering.next({@db_key}), hash(me)}
+    {@db_key, Ordering.next({@db_key}), pub_key(me)}
     |> Db.put({time, action})
   end
 
   defp log(me, time, action, opts) do
-    {@db_key, Ordering.next({@db_key}), hash(me)}
+    {@db_key, Ordering.next({@db_key}), pub_key(me)}
     |> Db.put({time, action, opts})
   end
+
+  defp pub_key(%Identity{public_key: key}), do: key
+  defp pub_key(%Card{pub_key: key}), do: key
+  defp pub_key(%Room{pub_key: key}), do: key
+  defp pub_key(x), do: x
 end

@@ -11,9 +11,9 @@ defmodule ChatWeb.UploadChunkController do
          {:ok, key} <- Base.decode16(text_key, case: :lower),
          {:ok, chunk, conn} <- read_out_chunk(conn),
          [range] <- get_req_header(conn, "content-range"),
-         {range_start, range_end, _size} <- parse_range(range),
+         {range_start, range_end, size} <- parse_range(range),
          true <- upload_is_active?(key),
-         :ok <- save_chunk_till({key, {range_start, range_end}, chunk}, time_mark() + 20) do
+         :ok <- save_chunk_till({key, {range_start, range_end}, size, chunk}, time_mark() + 20) do
       conn
       |> send_resp(200, "")
     else
@@ -33,8 +33,8 @@ defmodule ChatWeb.UploadChunkController do
     end
   end
 
-  defp save_chunk_till({key, range, chunk} = data, till) do
-    if ChunkedFiles.save_upload_chunk(key, range, chunk) == :ok do
+  defp save_chunk_till({key, range, size, chunk} = data, till) do
+    if ChunkedFiles.save_upload_chunk(key, range, size, chunk) == :ok do
       # Logger.debug("+")
       :ok
     else

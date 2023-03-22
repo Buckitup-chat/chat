@@ -15,6 +15,8 @@ ci-check:
 	mix deps.unlock --check-unused
 
 ci-test:
+	npm install --prefix ./assets
+	mix assets.deploy
 	MIX_ENV=test mix test --max-failures=3 --cover 
 
 test: 
@@ -41,8 +43,7 @@ deploy:
 firmware:
 	rm -rf priv/db
 	rm -rf priv/admin_db
-	mix phx.digest
-	MIX_TARGET=host mix compile assets.deploy
+	MIX_TARGET=host mix do compile, assets.deploy
 
 clean:
 	mix phx.digest.clean

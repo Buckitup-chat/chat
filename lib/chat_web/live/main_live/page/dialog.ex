@@ -209,17 +209,6 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:edit_message_id, nil)
   end
 
-  def delete_message(
-        %{assigns: %{me: me, dialog: dialog, monotonic_offset: time_offset}} = socket,
-        {index, msg_id}
-      ) do
-    time = Chat.Time.monotonic_to_unix(time_offset)
-    Dialogs.delete(dialog, me, {index, msg_id})
-    broadcast_message_deleted(msg_id, dialog, me, time)
-
-    socket
-  end
-
   def delete_messages(
         %{assigns: %{me: me, dialog: dialog, monotonic_offset: time_offset}} = socket,
         %{
@@ -257,6 +246,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   defp maybe_redirect_to_file(%{type: type, content: json}, socket)
        when type in [:audio, :file, :image, :video] do
     {file_id, secret} = StorageId.from_json(json)
+    file_id = Base.encode16(file_id, case: :lower)
     params = %{a: Base.url_encode64(secret)}
 
     url =

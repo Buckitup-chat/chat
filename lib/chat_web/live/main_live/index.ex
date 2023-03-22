@@ -6,6 +6,7 @@ defmodule ChatWeb.MainLive.Index do
 
   alias Phoenix.LiveView.JS
   alias ChatWeb.Hooks.{LocalTimeHook, UploaderHook}
+  alias ChatWeb.MainLive.Admin.MediaSettingsForm
   alias ChatWeb.MainLive.{Layout, Page}
 
   on_mount LocalTimeHook
@@ -53,6 +54,7 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Lobby.init()
     |> Page.Dialog.init()
     |> Page.Logout.init()
+    |> Page.Shared.track_onliners_presence()
     |> noreply()
   end
 
@@ -75,6 +77,7 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Lobby.init()
     |> Page.Dialog.init()
     |> Page.Logout.init()
+    |> Page.Shared.track_onliners_presence()
     |> noreply()
   end
 
@@ -244,6 +247,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_event("logout-wipe", _, socket) do
     socket
+    |> Page.Shared.untrack_onliners_presence()
     |> Page.Login.clear()
     |> Page.Logout.wipe()
     |> noreply()
@@ -325,6 +329,7 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Lobby.init()
     |> Page.Logout.init()
     |> Page.Dialog.init()
+    |> Page.Shared.track_onliners_presence()
     |> noreply()
   end
 

@@ -11,14 +11,17 @@ defmodule Chat.MixProject do
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
-      test_coverage: [
-        summary: [threshold: 58]
-      ],
+      test_coverage: [tool: ExCoveralls],
       releases: [
         chat: [
           version: build_version(),
           applications: [chat: :permanent]
         ]
+      ],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.html": :test
       ]
     ]
   end
@@ -77,7 +80,8 @@ defmodule Chat.MixProject do
       {:tailwind, "~> 0.1", runtime: Mix.env() == :dev},
       {:timex, "~> 3.7"},
       {:zstream, "~> 0.6"},
-      {:ua_parser, github: "beam-community/ua_parser"}
+      {:ua_parser, github: "beam-community/ua_parser"},
+      {:excoveralls, "~> 0.14", only: [:test]}
     ]
   end
 

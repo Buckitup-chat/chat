@@ -18,7 +18,12 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   def uploader(assigns) do
     ~H"""
     <div
-      class="flex bottom-[6%] w-full left-30 flex-col fixed h-[27%] md:bottom-[-10px] md:w-[18%] md:h-[50%] overflow-scroll"
+      class={
+        classes(
+          "flex flex-col-reverse bottom-[6%] w-full flex-col h-[27%] fixed md:bottom-[-10px] md:w-[18%] md:left-[78px] md:h-[49%] overflow-scroll",
+          %{"hidden" => @uploads == %{}}
+        )
+      }
       id="file-uploader"
     >
       <.entries config={@config} pub_key={@pub_key} type={@type} uploads={@uploads} />
@@ -300,18 +305,25 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       <%= if @operating_system == "Android" do %>
         <div class="flex flex-row justify-around">
           <a
-            class="flex justify-center items-center h-11 px-10 cursor-pointer rounded-md bg-white hover:bg-white/50"
+            class="flex justify-center items-center h-11 w-[30%] pr-2 cursor-pointer rounded-md bg-white hover:bg-white/50"
             phx-click={JS.dispatch("click", to: "#uploader-file-form .file-input")}
           >
             <.icon id="document" class="w-4 h-4 fill-grayscale" />
             <span class="ml-2">File</span>
           </a>
           <a
-            class="flex justify-center items-center h-11 px-10 cursor-pointer rounded-md bg-white hover:bg-white/50"
+            class="flex justify-center items-center h-11 w-[30%] pr-2 cursor-pointer rounded-md bg-white hover:bg-white/50"
             phx-click={JS.dispatch("click", to: "#uploader-file-form .image-input")}
           >
             <.icon id="image" class="w-4 h-4 fill-grayscale" />
             <span class="ml-2">Image</span>
+          </a>
+          <a
+            class="flex justify-center items-center h-11 w-[30%] pr-2 cursor-pointer rounded-md bg-white"
+            phx-click={JS.dispatch("click", to: "#uploader-file-form .audio-file-input")}
+          >
+            <.icon id="audio" class="w-4 h-4 fill-grayscale" />
+            <span class="ml-2">Audio</span>
           </a>
         </div>
 

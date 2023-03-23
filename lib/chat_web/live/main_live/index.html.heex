@@ -561,72 +561,12 @@
 
                 <p class="mt-3 text-black/50 text-sm">Room Type</p>
                 <div class="mt-3 flex flex-col">
-                  <a class="inline t-open-room">
-                    <input
-                      class="cursor-pointer text-orange-500"
-                      type="radio"
-                      id="typeChoice1"
-                      name="new_room[type]"
-                      value="public"
-                      checked
-                      phx-click={
-                        JS.dispatch("room:switch-type",
-                          to: "#typeChoice1",
-                          detail: %{
-                            description: "Public room is visible for everyone. Anyone can join.",
-                            id: "roomTypeDescription"
-                          }
-                        )
-                      }
-                    />
-                    <label class="cursor-pointer ml-1 text-black/50 text-sm" for="typeChoice1">
-                      Open
-                    </label>
-                  </a>
-                  <a class="inline">
-                    <input
-                      class="cursor-pointer text-orange-500 t-private-room"
-                      type="radio"
-                      id="typeChoice2"
-                      name="new_room[type]"
-                      value="request"
-                      phx-click={
-                        JS.dispatch("room:switch-type",
-                          to: "#typeChoice2",
-                          detail: %{
-                            description:
-                              "Private Room is visible for everyone. Anyone can send request and join if approved by a room member",
-                            id: "roomTypeDescription"
-                          }
-                        )
-                      }
-                    />
-                    <label class="cursor-pointer ml-1 text-black/50 text-sm" for="typeChoice2">
-                      Private
-                    </label>
-                  </a>
-                  <a class="inline">
-                    <input
-                      class="cursor-pointer text-orange-500 t-secret-room"
-                      type="radio"
-                      id="typeChoice3"
-                      name="new_room[type]"
-                      value="private"
-                      phx-click={
-                        JS.dispatch("room:switch-type",
-                          to: "#typeChoice3",
-                          detail: %{
-                            description:
-                              "Secret Room is not visible, only invited users can join",
-                            id: "roomTypeDescription"
-                          }
-                        )
-                      }
-                    />
-                    <label class="cursor-pointer ml-1 text-black/50 text-sm" for="typeChoice3">
-                      Secret
-                    </label>
-                  </a>
+                  <Layout.Room.type_option checked={true} class="t-open-room" description="Public room is visible for everyone. Anyone can join." id="typeChoice1" name="Open" value="public" />
+                  <Layout.Room.type_option description="Private Room is visible for everyone. Anyone can send request and join if approved by a room member" id="typeChoice2" name="Private" value="request" />
+                  <Layout.Room.type_option class="t-secret-room" description="Secret Room is not visible, only invited users can join" id="typeChoice3" name="Secret" value="private" />
+                  <%= if @media_settings.functionality == :cargo do %>
+                    <Layout.Room.type_option description="Cargo room is special" id="typeChoice4" name="Cargo" value="cargo" />
+                  <% end %>
                 </div>
                 <div class="mt-5 py-1 w-full min-h-fit flex items-center justify-start border-0 rounded-lg bg-black/10">
                   <.icon id="alert" class="basis-1/12 mr-2 w-4 h-4 fill-black/40" />

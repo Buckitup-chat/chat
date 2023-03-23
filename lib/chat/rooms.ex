@@ -1,6 +1,7 @@
 defmodule Chat.Rooms do
   @moduledoc "Rooms context"
 
+  alias Chat.Sync.CargoRoom
   alias Chat.Identity
   alias Chat.Messages
   alias Chat.Rooms.Message
@@ -9,7 +10,17 @@ defmodule Chat.Rooms do
   alias Chat.Rooms.RoomMessages
 
   @doc "Returns new room {Identity, Room}"
-  def add(me, name, type \\ :public) do
+  def add(me, name, type \\ :public)
+
+  def add(me, name, :cargo) do
+    {_room_identity, %Room{} = room} = result = add(me, name, :public)
+
+    CargoRoom.set(room.pub_key)
+
+    result
+  end
+
+  def add(me, name, type) do
     room_identity = name |> Identity.create()
     room = Room.create(me, room_identity, type)
 

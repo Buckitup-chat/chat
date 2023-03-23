@@ -13,6 +13,7 @@ straightforward as possible.
 ### Added
 - Cargo DB sync
 - Naive API initial endpoints
+- Cargo room type
 
 ### Changed
 - mirroring mechanics

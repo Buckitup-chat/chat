@@ -35,7 +35,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   end
 
   def new_room(%{assigns: %{me: me, monotonic_offset: time_offset}} = socket, name, type)
-      when type in [:public, :request, :private] do
+      when type in [:public, :request, :private, :cargo] do
     {new_room_identity, new_room} = Rooms.add(me, name, type)
     new_room_card = Chat.Card.from_identity(new_room_identity)
 

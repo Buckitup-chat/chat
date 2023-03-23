@@ -4,10 +4,11 @@ defmodule ChatWeb.MainLive.Index do
 
   require Logger
 
-  alias Phoenix.LiveView.JS
+  alias Chat.AdminRoom
   alias ChatWeb.Hooks.{LocalTimeHook, UploaderHook}
   alias ChatWeb.MainLive.Admin.MediaSettingsForm
   alias ChatWeb.MainLive.{Layout, Page}
+  alias Phoenix.LiveView.JS
 
   on_mount LocalTimeHook
   on_mount UploaderHook
@@ -19,7 +20,11 @@ defmodule ChatWeb.MainLive.Index do
         %{assigns: %{live_action: action}} = socket
       ) do
     Process.flag(:sensitive, true)
-    socket = assign(socket, :operating_system, operating_system)
+
+    socket =
+      socket
+      |> assign(:operating_system, operating_system)
+      |> assign_media_settings()
 
     if connected?(socket) do
       if action == :export do
@@ -358,6 +363,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_info(:update_media_settings, socket) do
+    socket
+    |> assign_media_settings()
+    |> noreply()
+  end
+
   def handle_progress(:my_keys_file, %{done?: true}, socket) do
     socket
     |> Page.ImportOwnKeyRing.read_file()
@@ -383,6 +394,11 @@ defmodule ChatWeb.MainLive.Index do
 
   def message_of(%{author_key: _}), do: "room"
   def message_of(_), do: "dialog"
+
+  defp assign_media_settings(socket) do
+    media_settings = AdminRoom.get_media_settings()
+    assign(socket, :media_settings, media_settings)
+  end
 
   defp action_confirmation_popup(assigns) do
     ~H"""

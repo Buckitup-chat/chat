@@ -11,6 +11,15 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+
+### Changed
+
+### Fixed
+
+
+## 2023-03-22_4082136___2023-03-23_e2c9aa8
+
+### Added
 - Cargo DB sync
 - Naive API initial endpoints
 

@@ -41,18 +41,11 @@ defmodule Chat.Db.WriteQueue do
   end
 
   @impl true
-  def handle_call(:demand, {to_pid, _}, q_state(mirrors: mirrors) = state) do
-    # "demand in #{inspect(self())} from #{inspect(to_pid)} with mirror: #{inspect(mirror)}"
-    # |> Logger.debug()
-
-    if mirror_pid?(to_pid, mirrors) do
-      state |> reply(:ok)
-    else
-      state
-      |> q_state(consumer: to_pid, in_demand: true)
-      |> produce()
-      |> reply(:ok)
-    end
+  def handle_call(:demand, {to_pid, _}, state) do
+    state
+    |> q_state(consumer: to_pid, in_demand: true)
+    |> produce()
+    |> reply(:ok)
   end
 
   def handle_call({:put_stream, stream}, _, q_state(buffer: buf) = state) do
@@ -118,32 +111,13 @@ defmodule Chat.Db.WriteQueue do
           GenServer.cast(pid, payload)
 
           if mirrors do
-            Enum.each(mirrors, &GenServer.cast(&1, payload))
+            Enum.each(mirrors, &GenServer.cast(&1, {:mirror, payload}))
           end
 
           state |> q_state(buffer: new_buf, in_demand: false)
       end
     else
       state |> q_state(consumer: nil)
-    end
-  end
-
-  defp mirror_pid?(pid, mirrors) do
-    cond do
-      is_nil(mirrors) ->
-        false
-
-      Enum.empty?(mirrors) ->
-        false
-
-      Enum.any?(mirrors, &(&1 == pid)) ->
-        true
-
-      Enum.any?(mirrors, fn mirror -> is_atom(mirror) and Process.whereis(mirror) == pid end) ->
-        true
-
-      true ->
-        false
     end
   end
 end

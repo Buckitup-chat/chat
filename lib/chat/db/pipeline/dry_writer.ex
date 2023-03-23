@@ -30,6 +30,10 @@ defmodule Chat.Db.Pipeline.DryWriter do
   end
 
   @impl true
+  def handle_cast({:mirror, {_operation, _list}}, state) do
+    state |> noreply()
+  end
+
   def handle_cast({operation, list}, state) do
     case operation do
       :write ->

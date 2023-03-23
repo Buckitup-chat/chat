@@ -4,7 +4,7 @@ defmodule Chat.ChunkedFiles do
   alias Chat.ChunkedFilesBroker
   alias Chat.ChunkedFilesMultisecret
   alias Chat.Db
-  alias Chat.Db.ChangeTracker
+  # alias Chat.Db.ChangeTracker
   alias Chat.FileFs
   alias Chat.Identity
 
@@ -28,21 +28,34 @@ defmodule Chat.ChunkedFiles do
     |> Enum.count()
   end
 
-  def save_upload_chunk(key, {chunk_start, chunk_end}, size, chunk) do
+  def save_upload_chunk(key, {chunk_start, chunk_end}, _size, chunk) do
     with initial_secret <- ChunkedFilesBroker.get(key),
          false <- is_nil(initial_secret),
          secret <- ChunkedFilesMultisecret.get_secret(key, chunk_start, initial_secret),
          encoded <- Enigma.cipher(chunk, secret) do
-      Db.put_chunk({{:file_chunk, key, chunk_start, chunk_end}, encoded})
-      |> tap(fn
-        :ok -> Db.put({:chunk_key, {:file_chunk, key, chunk_start, chunk_end}}, true)
-        _ -> :ignore
-      end)
-      |> tap(fn _ ->
-        if chunk_end + 1 == size do
-          ChangeTracker.await({:file_chunk, key, chunk_start, chunk_end})
-        end
-      end)
+      # if chunk_end + 1 == size do
+      #   task =
+      #     Task.async(fn ->
+      #       ChangeTracker.await({:file_chunk, key, chunk_start, chunk_end})
+      #     end)
+
+      #   res = Db.put_chunk({{:file_chunk, key, chunk_start, chunk_end}, encoded})
+
+      #   if res == :ok do
+      #     Db.put({:chunk_key, {:file_chunk, key, chunk_start, chunk_end}}, true)
+      #   end
+
+      #   task |> Task.await(:infinity)
+      #   res
+      # else
+      res = Db.put_chunk({{:file_chunk, key, chunk_start, chunk_end}, encoded})
+
+      if res == :ok do
+        Db.put({:chunk_key, {:file_chunk, key, chunk_start, chunk_end}}, true)
+      end
+
+      res
+      # end
     end
   end
 

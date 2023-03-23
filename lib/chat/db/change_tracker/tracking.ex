@@ -3,6 +3,7 @@ defmodule Chat.Db.ChangeTracker.Tracking do
   Tracking logic
   """
   require Record
+  require Logger
 
   Record.defrecordp(:tracker,
     next_id: 1,
@@ -32,6 +33,10 @@ defmodule Chat.Db.ChangeTracker.Tracking do
   end
 
   def check_written(state, time, keys \\ []) do
+    # unless keys == [] do
+    #   ["++ CT ", inspect(keys)] |> Logger.debug()
+    # end
+
     state
     |> extract_keys_found(keys)
     |> extract_expired(time)
@@ -107,5 +112,7 @@ defmodule Chat.Db.ChangeTracker.Tracking do
 
     state
     |> tracker(next_id: id + 1, keys: new_keys, items: items |> Map.put(id, item))
+
+    # |> tap(fn x -> ["___ CT ___ ", inspect(x)] |> Logger.warn() end)
   end
 end

@@ -37,6 +37,14 @@ defmodule Chat.Identity do
       }
     end)
   end
+
+  def from_keys(%{private_key: private, public_key: public}) do
+    %__MODULE__{
+      name: "",
+      private_key: private,
+      public_key: public
+    }
+  end
 end
 
 defimpl Enigma.Hash.Protocol, for: Chat.Identity do

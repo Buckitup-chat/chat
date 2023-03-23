@@ -12,6 +12,11 @@ defmodule ChatWeb.Router do
   end
 
   pipeline :api do
+    plug Plug.Parsers,
+      parsers: [:urlencoded, :multipart, :json],
+      pass: ["*/*"],
+      json_decoder: Phoenix.json_library()
+
     plug :accepts, ["json"]
   end
 
@@ -35,6 +40,13 @@ defmodule ChatWeb.Router do
 
   scope "/", ChatWeb do
     put "/upload_chunk/:key", UploadChunkController, :put
+  end
+
+  scope "/" do
+    pipe_through :api
+
+    forward "/naive_api", Absinthe.Plug, schema: NaiveApi.Schema
+    forward "/naive_api_console", Absinthe.Plug.GraphiQL, schema: NaiveApi.Schema
   end
 
   # Other scopes may use custom stacks.

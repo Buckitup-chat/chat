@@ -28,4 +28,4 @@ Using IO data as arguments to the logging function will give a little performanc
   * [Room approval flow](./lib/chat/rooms/approve_flow.livemd)
   * [DB Prioritization](./lib/chat/db/prioritization.livemd)
   * [DB and Device Supervision](./lib/chat/db/supervision.livemd)
-
+  * [Naive API File upload](./lib/naive_api/upload_files.livemd)

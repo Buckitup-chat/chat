@@ -46,6 +46,8 @@ defmodule Chat.MixProject do
   defp deps do
     [
       # {:flame_on, "~> 0.5.2"},
+      {:absinthe, "~> 1.7"},
+      {:absinthe_plug, "~> 1.5"},
       {:poison, "~> 5.0"},
       {:phoenix_ecto, "~> 4.0"},
       {:ecto, "~> 3.7"},
@@ -74,6 +76,7 @@ defmodule Chat.MixProject do
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
       {:sobelow, "~> 0.8", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:mock, "~> 0.3.0", only: :test},
       {:tailwind, "~> 0.1", runtime: Mix.env() == :dev},
       {:timex, "~> 3.7"},
       {:zstream, "~> 0.6"},

@@ -19,8 +19,10 @@ defmodule ChatWeb.MainLive.Layout.Message do
   alias Chat.Messages.ExportHelper
   alias Chat.Rooms.Room
   alias Chat.User
+  alias Chat.Utils
   alias Chat.Utils.StorageId
   alias ChatWeb.MainLive.Layout
+  alias ChatWeb.Utils, as: WebUtils
   alias Phoenix.HTML.Tag
   alias Phoenix.LiveView.JS
 
@@ -538,16 +540,12 @@ defmodule ChatWeb.MainLive.Layout.Message do
       %{
         name: name,
         size: size,
-        url: get_file_url(id, secret)
+        url: WebUtils.get_file_url(:file, id, secret)
       }
     else
       _ -> nil
     end
     |> then(&assign(assigns, :file, &1))
-  end
-
-  defp get_file_url(id, secret) do
-    ~p"/get/file/#{Base.encode16(id, case: :lower)}?a=#{Base.url_encode64(secret)}"
   end
 
   attr :export?, :boolean, required: true, doc: "embed file icon SVG?"
@@ -690,19 +688,5 @@ defmodule ChatWeb.MainLive.Layout.Message do
     |> JS.remove_class("hidden", to: "#imageGallery")
   end
 
-  defp nl2br(str) do
-    str
-    |> String.trim()
-    |> String.split("\n", trim: false)
-    |> Enum.reduce({[], :none}, fn part, {good, count} ->
-      case {part, count} do
-        {"", :enough} -> {good, :enough}
-        {"", :none} -> {[part | good], :enough}
-        _ -> {[part | good], :none}
-      end
-    end)
-    |> elem(0)
-    |> Enum.reverse()
-    |> Enum.intersperse(Tag.tag(:br))
-  end
+  defp nl2br(str), do: Utils.trim_text(str) |> Enum.intersperse(Tag.tag(:br))
 end

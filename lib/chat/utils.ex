@@ -18,4 +18,19 @@ defmodule Chat.Utils do
     end)
     |> then(&elem(&1, 0))
   end
+
+  def trim_text(str) when is_binary(str) do
+    str
+    |> String.trim()
+    |> String.split("\n", trim: false)
+    |> Enum.reduce({[], :none}, fn part, {good, count} ->
+      case {part, count} do
+        {"", :enough} -> {good, :enough}
+        {"", :none} -> {[part | good], :enough}
+        _ -> {[part | good], :none}
+      end
+    end)
+    |> elem(0)
+    |> Enum.reverse()
+  end
 end

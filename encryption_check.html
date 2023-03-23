@@ -27,8 +27,8 @@
 
 
     const hashCheckingB64 = {
-      "ysXSpU4FtIREs9IlbrSEcsdyHbpKpxYXc6jAXWHhTIU=" : "+KjHpjIVIbzG+wQltIR+jRU3lXnmLkUtH4UA8JNhmVg=", 
-      "MdFfqBGHdHvA6BYTC0TedglWfmzldjGczFRFvdAwBzQ=":"LksCBue9Isq8wVyYHow3XkxhLpI+mBKh8ysdYRIZLkI=",
+      "ysXSpU4FtIREs9IlbrSEcsdyHbpKpxYXc6jAXWHhTIU=": "+KjHpjIVIbzG+wQltIR+jRU3lXnmLkUtH4UA8JNhmVg=",
+      "MdFfqBGHdHvA6BYTC0TedglWfmzldjGczFRFvdAwBzQ=": "LksCBue9Isq8wVyYHow3XkxhLpI+mBKh8ysdYRIZLkI=",
     }
 
     for (let data_b64 in hashCheckingB64) {
@@ -38,7 +38,7 @@
       console.log(hash_b64 == hashed, hash_b64, hashed, data_b64)
     }
 
-    const local_storage_json = [["Enc Test","/Lww78qGiSHKkoc2gvwqY4UBK8hCh1RD54H9ZobkPKACfz90ZJoAWpiSLEpl/ZDF/nq9Q3U3ifHBxPoZ3jbQ6RI="],[],[]];
+    const local_storage_json = [["Enc Test", "/Lww78qGiSHKkoc2gvwqY4UBK8hCh1RD54H9ZobkPKACfz90ZJoAWpiSLEpl/ZDF/nq9Q3U3ifHBxPoZ3jbQ6RI="], [], []];
     const plain_b64 = "W1siRW5jIFRlc3QiLCIvTHd3NzhxR2lTSEtrb2MyZ3Z3cVk0VUJLOGhDaDFSRDU0SDlab2JrUEtBQ2Z6OTBaSm9BV3BpU0xFcGwvWkRGL25xOVEzVTNpZkhCeFBvWjNqYlE2Ukk9Il0sW10se31d"
     const enc_b64 = "Xh7/vgdkX7PfXAbY7p2ohyoaWU2QUo8TbShn7/971LC5fFxRVIuEskjTVUxVGKImnv5aJu/BUaIjhCnDPOrhNBKq/X+QvksVnbvz1Ek1hehC8pLuSyKp5ggC1phs7gVIg++IETTo7mdNJHAnXZ5+"
     const pass = "test12test12"
@@ -54,16 +54,32 @@
     ])
 
     console.log([
-        enigma.hash(Buffer.from(pass).toString('base64')),
-        Buffer.from(
-        enigma.decipher(enc_b64,
+      enigma.hash(Buffer.from(pass).toString('base64')),
+      Buffer.from(
+        enigma.decipher(
+          enc_b64,
           enigma.hash(Buffer.from(pass).toString('base64'))
         )
-        ).toString()
-        
-      
+      ).toString()
+
+
     ])
 
+    let passwordHash_2 = enigma.hash(Buffer.from(pass).toString('base64'))
+    const downloadData = local_storage_json
+    // const downloadData = localStorage.getItem('buckitUp-chat-auth');
+    console.log('downloadData', [downloadData, JSON.stringify(downloadData)])
+    const contentB64_2 = Buffer.from(JSON.stringify(downloadData)).toString('base64');
+    const ciphered_2 = enigma.cipher(contentB64_2, passwordHash_2);
+    const userName = downloadData[0][0];
+    const file = new Blob([ciphered_2], {type: 'application/octet-stream'});
+    const fileURL = URL.createObjectURL(file);
+    const linkElement = document.createElement("a");
+    linkElement.setAttribute('href', fileURL);
+    linkElement.setAttribute('download', `${userName}.data`);
+    linkElement.click();
+    //localStorage.clear()
+    //window.location.reload();
   </script>
 </head>
 

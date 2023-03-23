@@ -33,15 +33,4 @@ defmodule Chat.Utils do
     |> elem(0)
     |> Enum.reverse()
   end
-
-  def get_file_url(type, id, secret) do
-    file_type =
-      if type == :image do
-        "image"
-      else
-        "file"
-      end
-
-    "/get/#{file_type}/#{id}?a=#{Base.url_encode64(secret)}"
-  end
 end

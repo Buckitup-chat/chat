@@ -5,9 +5,9 @@ defmodule NaiveApi.Schema.Types do
   use Absinthe.Schema.Notation
 
   alias Absinthe.Blueprint.Input.String
-  alias NaiveApi.Types.Bitstring
   alias NaiveApi.Message
   alias NaiveApi.Shared
+  alias NaiveApi.Types.Bitstring
 
   ###################
   #  Scalars

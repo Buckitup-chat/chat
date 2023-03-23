@@ -41,9 +41,19 @@ Expected result:
 
 ## Step 2: Upload your file
 
-Once you have the upload key, you can start upload your file by 2 ways. In any case the chunk size should be 10Mb unless last chunk.
+Once you have the upload key, you can start upload your file.  The chunk size should be 10Mb unless last chunk.
+If you are using JS for your client then you can choose https://github.com/muxinc/upchunk as a chunked uploader. 
+If not just write your own script.
+Objective:
 
-### Option 1
+* Split the file into chunks 10MB each. You need each one to be 10_485_760 bytes (10 * 1024 * 1024). The exception is the final chunk, which can just be the remainder of the file. Bigger chunks will be a faster upload, but think about each one as its own upload in the sense of needing to restart that one if it fails, but needing to upload fewer chunks can be faster.
+* Set a couple of headers:
+  Content-Length: the size of the current chunk you're uploading.
+  Content-Range: what bytes you're currently uploading. For example, if you've got a 1GB file and you're uploading in 10MB chunks, this header would look like Content-Range: bytes 0-10485759/10485760000 for the first chunk.
+* Now use a PUT request like we were for "normal" uploads, just with those additional headers and each individual chunk as the body.
+* If the server responds with a 200 - the upload is being progressed or is completed.
+
+Here is the lite version of the script like that implemetend in Bash. To use this script, save it as a file (e.g. `upload.sh`), make it executable (`chmod +x upload.sh`), and then run it with the input file and URL as the arguments (e.g. `./upload.sh myfile.txt http://example.com/upload`). This will split `myfile.txt` into 10MB chunks with the suffix .chunk, put them in a temporary directory, send each chunk to the given URL using curl including the headers you specified, and remove the chunks afterwards.
 
 ```bash
 #!/bin/bash
@@ -85,24 +95,6 @@ rmdir "$temp_dir"
 
 echo "File split into $num_chunks chunks of 10MB each and sent to $url."
 ```
-
-To use this script, save it as a file (e.g. split_and_send.sh), make it executable (chmod +x split_and_send.sh), and then run it with the input file and URL as the arguments (e.g. ./split_and_send.sh myfile.txt http://example.com/upload`). This will split myfile.txt` into 10MB chunks with the suffix .chunk, put them in a temporary directory, send each chunk to the given URL using curl including the headers you specified, and remove the chunks afterwards.
-
-<!-- livebook:{"break_markdown":true} -->
-
-### Option 2
-
-<!-- livebook:{"break_markdown":true} -->
-
-If you are using JS for your client then you can choose https://github.com/muxinc/upchunk as a chunked uploader. If not just write your own script.
-Objective:
-
-* Split the file into chunks 10MB each. You need each one to be 10_485_760 bytes (10 * 1024 * 1024). The exception is the final chunk, which can just be the remainder of the file. Bigger chunks will be a faster upload, but think about each one as its own upload in the sense of needing to restart that one if it fails, but needing to upload fewer chunks can be faster.
-* Set a couple of headers:
-  Content-Length: the size of the current chunk you're uploading.
-  Content-Range: what bytes you're currently uploading. For example, if you've got a 1GB file and you're uploading in 10MB chunks, this header would look like Content-Range: bytes 0-10485759/10485760000 for the first chunk.
-* Now use a PUT request like we were for "normal" uploads, just with those additional headers and each individual chunk as the body.
-* If the server responds with a 200 - the upload is being progressed or is completed.
 
 ## Step 3: Create message with assigned file
 

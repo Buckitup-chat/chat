@@ -1,6 +1,6 @@
 defmodule NaiveApi.RoomTest do
   use ExUnit.Case
-  alias Chat.Rooms
+  alias Chat.Db.ChangeTracker
   alias Chat.Messages
   alias Chat.Rooms
   alias Chat.User
@@ -90,6 +90,8 @@ defmodule NaiveApi.RoomTest do
     setup do
       me = User.login("Pedro") |> tap(&User.register/1)
       {room_identity, _room} = Rooms.add(me, "Escuela de amor")
+
+      ChangeTracker.await()
 
       [me: me, room_identity: room_identity]
     end

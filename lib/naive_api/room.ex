@@ -79,5 +79,5 @@ defmodule NaiveApi.Room do
 
   defp make_sure_timestamp_exists(nil), do: now()
   defp make_sure_timestamp_exists(time), do: time
-  defp now(), do: DateTime.utc_now() |> DateTime.to_unix()
+  defp now, do: DateTime.utc_now() |> DateTime.to_unix()
 end

@@ -5,6 +5,7 @@ defmodule NaiveApi.Message do
   alias Chat.Identity
   alias Chat.Utils
   alias Chat.Utils.StorageId
+  alias ChatWeb.Utils, as: WebUtils
 
   def fill_content(%{type: :text, content: content}, _, _),
     do: %{__typename: :text_content, text: Utils.trim_text(content)} |> ok()
@@ -27,7 +28,7 @@ defmodule NaiveApi.Message do
       initial_name: name,
       size_bytes: String.to_integer(size_str),
       type: type,
-      url: Utils.get_file_url(type, id, secret)
+      url: WebUtils.get_file_url(type, id, secret)
     }
     |> ok()
   end

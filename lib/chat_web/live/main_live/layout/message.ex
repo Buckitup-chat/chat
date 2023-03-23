@@ -22,6 +22,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   alias Chat.Utils
   alias Chat.Utils.StorageId
   alias ChatWeb.MainLive.Layout
+  alias ChatWeb.Utils, as: WebUtils
   alias Phoenix.HTML.Tag
   alias Phoenix.LiveView.JS
 
@@ -539,7 +540,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       %{
         name: name,
         size: size,
-        url: Utils.get_file_url(:file, id, secret)
+        url: WebUtils.get_file_url(:file, id, secret)
       }
     else
       _ -> nil

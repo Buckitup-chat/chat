@@ -6,8 +6,8 @@ defmodule NaiveApi.Schema do
 
   alias NaiveApi.Chat
   alias NaiveApi.Room
-  alias NaiveApi.User
   alias NaiveApi.Upload
+  alias NaiveApi.User
 
   import_types(NaiveApi.Schema.Types)
 

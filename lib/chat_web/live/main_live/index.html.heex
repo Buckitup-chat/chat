@@ -546,43 +546,7 @@
           <div id="chatRoomBar" class="chatRoomBar">
             <.modal id="create-room-popup" class="">
               <h1 class="text-base font-bold text-grayscale">Create Room</h1>
-              <.form
-                :let={f}
-                for={:new_room}
-                id="room-create-form"
-                autocomplete="off"
-                phx-submit={hide_modal("create-room-popup") |> JS.push("room/create")}
-              >
-                <%= text_input(f, :name,
-                  placeholder: "Name your Room",
-                  class:
-                    "w-full h-11 mt-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-0"
-                ) %>
-
-                <p class="mt-3 text-black/50 text-sm">Room Type</p>
-                <div class="mt-3 flex flex-col">
-                  <Layout.Room.type_option checked={true} class="t-open-room" description="Public room is visible for everyone. Anyone can join." id="typeChoice1" name="Open" value="public" />
-                  <Layout.Room.type_option description="Private Room is visible for everyone. Anyone can send request and join if approved by a room member" id="typeChoice2" name="Private" value="request" />
-                  <Layout.Room.type_option class="t-secret-room" description="Secret Room is not visible, only invited users can join" id="typeChoice3" name="Secret" value="private" />
-                  <%= if @media_settings.functionality == :cargo do %>
-                    <Layout.Room.type_option description="Cargo room is special" id="typeChoice4" name="Cargo" value="cargo" />
-                  <% end %>
-                </div>
-                <div class="mt-5 py-1 w-full min-h-fit flex items-center justify-start border-0 rounded-lg bg-black/10">
-                  <.icon id="alert" class="basis-1/12 mr-2 w-4 h-4 fill-black/40" />
-                  <blockquote
-                    id="roomTypeDescription"
-                    class="basis-11/12 text-xs text-black/50 mr-3"
-                  >
-                    Public room is visible for everyone. Anyone can join.
-                  </blockquote>
-                </div>
-                <%= submit("Create",
-                  phx_disable_with: "Saving...",
-                  class:
-                    "w-full h-11 mt-2 text-white border-0 rounded-lg bg-grayscale flex items-center justify-center t-submit-create"
-                ) %>
-              </.form>
+              <.live_component id={:room_form} media_settings={@media_settings}  module={RoomForm} />
             </.modal>
             <div class="px-7 mt-3 flex items-center justify-between">
               <h5 class="channel-block-text text-grayscale" style="font-size: 22px;">Rooms</h5>
@@ -937,7 +901,7 @@
                 </section>
               </Layout.Admin.block>
               <Layout.Admin.block title="Media settings">
-                <.live_component id={:media_settings_form} module={MediaSettingsForm} />
+                <.live_component id={:media_settings_form} media_settings={@media_settings} module={MediaSettingsForm} />
               </Layout.Admin.block>
             </Layout.Admin.row>
             <Layout.Admin.row>

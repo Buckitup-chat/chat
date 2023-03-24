@@ -128,11 +128,6 @@ const listeners = {
       deleteButton.setAttribute('phx-value-messages', JSON.stringify(messages));
     }, 200);
   },
-  "room:switch-type": (e) => {
-    e.target.classList.add('checkedBackground');
-
-    document.getElementById(e.detail.id).textContent = e.detail.description
-  },
   "phx:chat:toggle": (e) => {
     if (e.detail && e.detail.class && e.detail.to) {
       document
@@ -162,6 +157,11 @@ const listeners = {
     }
     img.classList.add('hidden')
     img.src = e.detail.url;
+  },
+  "phx:js-exec": ({ detail }) => {
+    document.querySelectorAll(detail.to).forEach(el => {
+      liveSocket.execJS(el, el.getAttribute(detail.attr))
+    })
   },
   ...uploadEventHandlers
 };

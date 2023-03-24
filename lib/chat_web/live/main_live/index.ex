@@ -8,6 +8,7 @@ defmodule ChatWeb.MainLive.Index do
   alias ChatWeb.Hooks.{LocalTimeHook, UploaderHook}
   alias ChatWeb.MainLive.Admin.MediaSettingsForm
   alias ChatWeb.MainLive.{Layout, Page}
+  alias ChatWeb.MainLive.Page.RoomForm
   alias Phoenix.LiveView.JS
 
   on_mount LocalTimeHook
@@ -366,6 +367,12 @@ defmodule ChatWeb.MainLive.Index do
   def handle_info(:update_media_settings, socket) do
     socket
     |> assign_media_settings()
+    |> noreply()
+  end
+
+  def handle_info({:create_new_room, %{name: name, type: type}}, socket) do
+    socket
+    |> Page.Lobby.new_room(name, type)
     |> noreply()
   end
 

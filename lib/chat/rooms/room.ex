@@ -6,7 +6,7 @@ defmodule Chat.Rooms.Room do
   alias Chat.Identity
   alias Chat.Rooms.RoomRequest
 
-  @type room_type() :: :public | :request | :private
+  @type room_type() :: :public | :request | :private | :cargo
   @type t() :: %__MODULE__{
           admin: String.t(),
           name: String.t(),
@@ -65,10 +65,10 @@ defmodule Chat.Rooms.Room do
         %Identity{} = room_identity,
         opts
       )
-      when type in [:public, :request] do
+      when type in [:public, :request, :cargo] do
     public_only? = Keyword.get(opts, :public_only, false)
 
-    if public_only? and type != :public do
+    if public_only? and type not in [:public, :cargo] do
       room
     else
       new_requests =

@@ -13,7 +13,7 @@ defmodule Chat.Rooms do
   def add(me, name, type \\ :public)
 
   def add(me, name, :cargo) do
-    {_room_identity, %Room{} = room} = result = add(me, name, :public)
+    {_room_identity, %Room{} = room} = result = add(me, name, :cargo)
 
     CargoRoom.set(room.pub_key)
 
@@ -33,7 +33,7 @@ defmodule Chat.Rooms do
   def list(%{} = room_map) do
     Registry.all()
     |> Enum.filter(fn {room_key, room} ->
-      room.type in [:public, :request] or Map.has_key?(room_map, room_key)
+      room.type in [:public, :request, :cargo] or Map.has_key?(room_map, room_key)
     end)
     |> Enum.map(&elem(&1, 1))
     |> Enum.sort_by(& &1.name)

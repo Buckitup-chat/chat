@@ -14,6 +14,7 @@ straightforward as possible.
 - Cargo DB sync
 - Naive API initial endpoints
 - Cargo room type
+- Unique name constraint for Cargo rooms
 
 ### Changed
 - mirroring mechanics

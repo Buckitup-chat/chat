@@ -11,6 +11,8 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+- Cargo room type
+- Unique name constraint for Cargo rooms
 
 ### Changed
 
@@ -22,8 +24,6 @@ straightforward as possible.
 ### Added
 - Cargo DB sync
 - Naive API initial endpoints
-- Cargo room type
-- Unique name constraint for Cargo rooms
 
 ### Changed
 - mirroring mechanics

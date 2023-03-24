@@ -553,23 +553,24 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :msg, :map, required: true, doc: "message struct"
 
   defp file(assigns) do
-    ~H"""
-    <.link class="flex items-center justify-between" href={@file.url}>
-      <.file_icon export?={@export?} />
+    if assigns.file do
+      ~H"""
+      <.link class="flex items-center justify-between" href={@file.url}>
+        <.file_icon export?={@export?} />
 
-      <div class="w-36 flex flex-col pr-3">
-        <span class="truncate text-xs x-file" href={@file.url}><%= @file.name %></span>
-        <span class="text-xs text-black/50 whitespace-pre-line"><%= @file.size %></span>
-      </div>
-    </.link>
-    """
-  rescue
-    _ ->
+        <div class="w-36 flex flex-col pr-3">
+          <span class="truncate text-xs x-file" href={@file.url}><%= @file.name %></span>
+          <span class="text-xs text-black/50 whitespace-pre-line"><%= @file.size %></span>
+        </div>
+      </.link>
+      """
+    else
       ~H"""
       <div class="flex items-center justify-between">
         Error getting file
       </div>
       """
+    end
   end
 
   attr :export?, :boolean, required: true, doc: "embed SVG?"

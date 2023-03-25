@@ -13,6 +13,7 @@ straightforward as possible.
 ### Added
 
 ### Changed
+- uploading in one thread
 
 ### Fixed
 

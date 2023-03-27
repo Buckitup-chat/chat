@@ -59,3 +59,6 @@ straightforward as possible.
 - UI: uploader covering chat/room list
 - lost feed names
 - admin room user actions
+
+### Fixed
+- UI: uploads scroll to top on uploader mount 

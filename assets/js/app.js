@@ -25,6 +25,7 @@ import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import AudioFile from "./hooks/audio-file"
+import DraggableCheckpoints from "./hooks/draggable-checkpoints"
 import MediaFileInput from "./hooks/media-file-input"
 import SortableUploadEntries from "./hooks/sortable-upload-entries"
 import UploadInProgress from "./hooks/upload-in-progress"
@@ -36,6 +37,7 @@ import * as Flash from "./hooks/flash"
 
 let Hooks = {
   AudioFile,
+  DraggableCheckpoints,
   MediaFileInput,
   SortableUploadEntries,
   UploadInProgress

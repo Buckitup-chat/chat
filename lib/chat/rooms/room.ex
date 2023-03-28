@@ -47,7 +47,7 @@ defmodule Chat.Rooms.Room do
   def is_requested_by?(_, _), do: false
 
   def list_pending_requests(%__MODULE__{requests: requests, type: type})
-      when type in [:public, :request] do
+      when type in [:public, :request, :cargo] do
     requests
     |> Enum.filter(&match?(%RoomRequest{pending?: true}, &1))
   end

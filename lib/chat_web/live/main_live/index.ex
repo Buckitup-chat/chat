@@ -4,9 +4,10 @@ defmodule ChatWeb.MainLive.Index do
 
   require Logger
 
-  alias Chat.AdminRoom
+  alias Chat.Admin.CargoSettings
+  alias Chat.{AdminRoom, Dialogs, Identity, Messages, RoomInviteIndex, User}
   alias ChatWeb.Hooks.{LocalTimeHook, UploaderHook}
-  alias ChatWeb.MainLive.Admin.MediaSettingsForm
+  alias ChatWeb.MainLive.Admin.{CargoSettingsForm, MediaSettingsForm}
   alias ChatWeb.MainLive.{Layout, Page}
   alias ChatWeb.MainLive.Page.RoomForm
   alias Phoenix.LiveView.JS
@@ -25,6 +26,7 @@ defmodule ChatWeb.MainLive.Index do
     socket =
       socket
       |> assign(:operating_system, operating_system)
+      |> assign_cargo_settings()
       |> assign_media_settings()
 
     if connected?(socket) do
@@ -364,6 +366,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_info(:update_cargo_settings, socket) do
+    socket
+    |> assign_cargo_settings()
+    |> noreply()
+  end
+
   def handle_info(:update_media_settings, socket) do
     socket
     |> assign_media_settings()
@@ -375,6 +383,27 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Lobby.new_room(name, type)
     |> noreply()
   end
+
+  def handle_info({:maybe_invite_checkpoints, :cargo, room_name, room_identity}, socket) do
+    %CargoSettings{} = cargo_settings = socket.assigns.cargo_settings
+    %Identity{} = me = socket.assigns.me
+
+    cargo_settings.checkpoints
+    |> Enum.each(fn checkpoint_pub_key ->
+      dialog = Dialogs.find_or_open(me, checkpoint_pub_key |> User.by_id())
+
+      room_identity
+      |> Map.put(:name, room_name)
+      |> Messages.RoomInvite.new()
+      |> Dialogs.add_new_message(me, dialog)
+      |> RoomInviteIndex.add(dialog, me)
+    end)
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:maybe_invite_checkpoints, _room_type, _room_name, _room_identity}, socket),
+    do: {:noreply, socket}
 
   def handle_progress(:my_keys_file, %{done?: true}, socket) do
     socket
@@ -401,6 +430,11 @@ defmodule ChatWeb.MainLive.Index do
 
   def message_of(%{author_key: _}), do: "room"
   def message_of(_), do: "dialog"
+
+  defp assign_cargo_settings(socket) do
+    cargo_settings = AdminRoom.get_cargo_settings()
+    assign(socket, :cargo_settings, cargo_settings)
+  end
 
   defp assign_media_settings(socket) do
     media_settings = AdminRoom.get_media_settings()

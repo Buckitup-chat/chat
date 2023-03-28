@@ -546,7 +546,7 @@
           <div id="chatRoomBar" class="chatRoomBar">
             <.modal id="create-room-popup" class="">
               <h1 class="text-base font-bold text-grayscale">Create Room</h1>
-              <.live_component id={:room_form} media_settings={@media_settings}  module={RoomForm} />
+              <.live_component id={:room_form} media_settings={@media_settings} module={RoomForm} />
             </.modal>
             <div class="px-7 mt-3 flex items-center justify-between">
               <h5 class="channel-block-text text-grayscale" style="font-size: 22px;">Rooms</h5>
@@ -670,7 +670,7 @@
                     >
                       <.icon id="arrowBack" class="w-6 h-6 fill-white" />
                     </button>
-                    <%= if @room.type == :public do %>
+                    <%= if @room.type in [:public, :cargo] do %>
                       <.icon id="open" class="w-4 h-4 fill-white" />
                     <% end %>
                     <%= if @room.type == :private do %>
@@ -901,7 +901,11 @@
                 </section>
               </Layout.Admin.block>
               <Layout.Admin.block title="Media settings">
-                <.live_component id={:media_settings_form} media_settings={@media_settings} module={MediaSettingsForm} />
+                <.live_component
+                  id={:media_settings_form}
+                  media_settings={@media_settings}
+                  module={MediaSettingsForm}
+                />
               </Layout.Admin.block>
             </Layout.Admin.row>
             <Layout.Admin.row>
@@ -979,6 +983,15 @@
                     </div>
                   <% end %>
                 </section>
+              </Layout.Admin.block>
+            </Layout.Admin.row>
+            <Layout.Admin.row>
+              <Layout.Admin.block title="Cargo checkpoints preset">
+                <.live_component
+                  id={:cargo_settings_form}
+                  cargo_settings={@cargo_settings}
+                  module={CargoSettingsForm}
+                />
               </Layout.Admin.block>
             </Layout.Admin.row>
           </Layout.Admin.container>

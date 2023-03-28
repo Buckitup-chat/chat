@@ -13,6 +13,7 @@ straightforward as possible.
 ### Added
 - Cargo room type
 - Unique name constraint for Cargo rooms
+- Checkpoints preset
 
 ### Changed
 

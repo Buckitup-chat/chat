@@ -1,8 +1,13 @@
 defmodule Chat.Sync.CargoRoom do
+  @moduledoc """
+  Holds pub key of the last cargo room created to facilitate cargo sync.
+  """
+
   use GenServer
 
   @type room_pub_key :: String.t()
 
+  @spec start_link(any) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(_args) do
     GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
   end

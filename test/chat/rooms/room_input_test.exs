@@ -1,8 +1,8 @@
 defmodule Chat.Rooms.RoomInputTest do
   use ChatWeb.DataCase, async: false
 
-  alias Chat.Db.ChangeTracker
   alias Chat.Admin.MediaSettings
+  alias Chat.Db.ChangeTracker
   alias Chat.Rooms.{Registry, Room, RoomInput}
 
   setup do

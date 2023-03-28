@@ -1,13 +1,13 @@
 defmodule Chat.Rooms do
   @moduledoc "Rooms context"
 
-  alias Chat.Sync.CargoRoom
   alias Chat.Identity
   alias Chat.Messages
   alias Chat.Rooms.Message
   alias Chat.Rooms.Registry
   alias Chat.Rooms.Room
   alias Chat.Rooms.RoomMessages
+  alias Chat.Sync.CargoRoom
 
   @doc "Returns new room {Identity, Room}"
   def add(me, name, type \\ :public) do

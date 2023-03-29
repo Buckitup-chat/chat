@@ -10,18 +10,24 @@ defmodule Chat.Rooms do
   alias Chat.Sync.CargoRoom
 
   @doc "Returns new room {Identity, Room}"
-  def add(me, name, type \\ :public) do
+  def add(me, name, type \\ :public)
+
+  def add(me, name, :cargo) do
+    {_room_identity, %Room{} = room} = result = add(me, name, :public)
+
+    CargoRoom.set(room.pub_key)
+
+    result
+  end
+
+  def add(me, name, type) do
     room_identity = name |> Identity.create()
     room = Room.create(me, room_identity, type)
-    maybe_set_cargo_room(room, type)
 
     room |> Registry.update()
 
     {room_identity, room}
   end
-
-  defp maybe_set_cargo_room(%Room{} = room, :cargo), do: CargoRoom.set(room.pub_key)
-  defp maybe_set_cargo_room(_room, _type), do: nil
 
   @doc "Returns rooms {my_rooms, available_rooms}"
   def list(%{} = room_map) do

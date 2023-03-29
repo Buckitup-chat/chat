@@ -19,7 +19,6 @@ defmodule Chat.Rooms.RoomInputTest do
     }
 
     test "with valid params returns valid changeset" do
-      Registry.update(%Room{name: "Room name", pub_key: "1234", type: :cargo})
       ChangeTracker.await({:rooms, "1234"})
 
       assert %Ecto.Changeset{} = changeset = RoomInput.changeset(%RoomInput{}, @valid_params)
@@ -54,7 +53,7 @@ defmodule Chat.Rooms.RoomInputTest do
     end
 
     test "with duplicate room name for cargo type returns an error" do
-      Registry.update(%Room{name: Map.get(@valid_params, :name), pub_key: "1234", type: :cargo})
+      Registry.update(%Room{name: Map.get(@valid_params, :name), pub_key: "1234"})
       ChangeTracker.await({:rooms, "1234"})
 
       media_settings = %MediaSettings{functionality: :cargo}

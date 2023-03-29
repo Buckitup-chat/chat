@@ -49,7 +49,7 @@ defmodule Chat.Rooms.RoomInput do
   defp is_unique?(name) do
     Registry.all()
     |> Stream.filter(fn {_room_pub_key, %Room{} = room} ->
-      room.type == :cargo and room.name == name
+      room.name == name
     end)
     |> Enum.empty?()
   end

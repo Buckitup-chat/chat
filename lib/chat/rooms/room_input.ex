@@ -48,10 +48,10 @@ defmodule Chat.Rooms.RoomInput do
 
   defp is_unique?(name) do
     Registry.all()
-    |> Stream.filter(fn {_room_pub_key, %Room{} = room} ->
+    |> Enum.any?(fn {_room_pub_key, %Room{} = room} ->
       room.name == name
     end)
-    |> Enum.empty?()
+    |> Kernel.not()
   end
 
   defp validate_type(%Ecto.Changeset{} = changeset, %MediaSettings{} = media_settings) do

@@ -6,7 +6,7 @@ defmodule Chat.Rooms.Room do
   alias Chat.Identity
   alias Chat.Rooms.RoomRequest
 
-  @type room_type() :: :public | :request | :private | :cargo
+  @type room_type() :: :public | :request | :private
   @type t() :: %__MODULE__{
           admin: String.t(),
           name: String.t(),
@@ -47,7 +47,7 @@ defmodule Chat.Rooms.Room do
   def is_requested_by?(_, _), do: false
 
   def list_pending_requests(%__MODULE__{requests: requests, type: type})
-      when type in [:public, :request, :cargo] do
+      when type in [:public, :request] do
     requests
     |> Enum.filter(&match?(%RoomRequest{pending?: true}, &1))
   end
@@ -65,10 +65,10 @@ defmodule Chat.Rooms.Room do
         %Identity{} = room_identity,
         opts
       )
-      when type in [:public, :request, :cargo] do
+      when type in [:public, :request] do
     public_only? = Keyword.get(opts, :public_only, false)
 
-    if public_only? and type not in [:public, :cargo] do
+    if public_only? and type != :public do
       room
     else
       new_requests =

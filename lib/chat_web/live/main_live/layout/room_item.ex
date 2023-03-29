@@ -94,7 +94,7 @@ defmodule ChatWeb.MainLive.Layout.RoomItem do
     """
   end
 
-  defp item_icon(%{type: type} = assigns) when type in [:public, :cargo] do
+  defp item_icon(%{type: :public} = assigns) do
     ~H"""
     <.icon id="open" class="w-4 h-4" />
     """

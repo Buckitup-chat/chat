@@ -33,7 +33,7 @@ defmodule Chat.Rooms do
   def list(%{} = room_map) do
     Registry.all()
     |> Enum.filter(fn {room_key, room} ->
-      room.type in [:public, :request, :cargo] or Map.has_key?(room_map, room_key)
+      room.type in [:public, :request] or Map.has_key?(room_map, room_key)
     end)
     |> Enum.map(&elem(&1, 1))
     |> Enum.sort_by(& &1.name)

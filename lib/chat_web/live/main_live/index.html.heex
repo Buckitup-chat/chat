@@ -670,7 +670,7 @@
                     >
                       <.icon id="arrowBack" class="w-6 h-6 fill-white" />
                     </button>
-                    <%= if @room.type in [:public, :cargo] do %>
+                    <%= if @room.type == :public do %>
                       <.icon id="open" class="w-4 h-4 fill-white" />
                     <% end %>
                     <%= if @room.type == :private do %>

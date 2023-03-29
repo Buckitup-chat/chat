@@ -985,15 +985,17 @@
                 </section>
               </Layout.Admin.block>
             </Layout.Admin.row>
-            <Layout.Admin.row>
-              <Layout.Admin.block title="Cargo checkpoints preset">
-                <.live_component
-                  id={:cargo_settings_form}
-                  cargo_settings={@cargo_settings}
-                  module={CargoSettingsForm}
-                />
-              </Layout.Admin.block>
-            </Layout.Admin.row>
+            <%= if @media_settings.functionality == :cargo do %>
+              <Layout.Admin.row>
+                <Layout.Admin.block title="Cargo checkpoints preset">
+                  <.live_component
+                    id={:cargo_settings_form}
+                    cargo_settings={@cargo_settings}
+                    module={CargoSettingsForm}
+                  />
+                </Layout.Admin.block>
+              </Layout.Admin.row>
+            <% end %>
           </Layout.Admin.container>
         <% end %>
       </div>

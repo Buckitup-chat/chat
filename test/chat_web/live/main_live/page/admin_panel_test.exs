@@ -45,6 +45,14 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
         |> element(".navbar button", "Admin")
         |> render_click()
 
+      refute html =~ "Cargo checkpoints preset"
+
+      view
+      |> form("#media_settings", %{"media_settings" => %{"functionality" => "cargo"}})
+      |> render_submit()
+
+      html = render(view)
+
       assert html =~ "Cargo checkpoints preset"
       assert html =~ "Checkpoints are automatically invited to the Cargo rooms you create."
 

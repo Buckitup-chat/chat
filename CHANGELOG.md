@@ -16,6 +16,10 @@ straightforward as possible.
 
 ### Fixed
 
+## 2023-03-29_86e51e5
+
+### Fixed
+- submitting of edited message by keyword
 
 ## 2023-03-22_4082136___2023-03-23_e2c9aa8
 

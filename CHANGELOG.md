@@ -56,9 +56,8 @@ straightforward as possible.
 - `Chat.Db.BackupDbSupervisor` now receives the name of the DB it needs to supervise as an argument
 
 ### Fixed
+- UI: uploads scroll to top on uploader mount 
 - UI: uploader covering chat/room list
 - lost feed names
 - admin room user actions
 
-### Fixed
-- UI: uploads scroll to top on uploader mount 

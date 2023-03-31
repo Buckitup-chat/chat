@@ -290,7 +290,9 @@
               id="sidebarRooms"
               class={
                 classes("w-6 h-6 hover:fill-purple", %{
-                  "fill-purple" => @lobby_mode == :rooms && assigns[:cargo_room][:pub_key] != assigns[:room][:pub_key],
+                  "fill-purple" =>
+                    @lobby_mode == :rooms &&
+                      assigns[:cargo_room][:pub_key] != assigns[:room][:pub_key],
                   "fill-grayscale" => @lobby_mode != :rooms
                 })
               }
@@ -328,7 +330,11 @@
             </button>
           <% end %>
           <%= if assigns[:cargo_room][:status] == :complete do %>
-            <button phx-click="room/switch" phx-value-room={Room.hash(@cargo_room.pub_key)} class="sidebarIcon">
+            <button
+              phx-click="room/switch"
+              phx-value-room={Room.hash(@cargo_room.pub_key)}
+              class="sidebarIcon"
+            >
               <.icon
                 id="sidebarRooms"
                 class={"w-6 h-6 hover:fill-purple " <> if(@cargo_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}
@@ -355,7 +361,9 @@
                 id="sidebarRooms"
                 class={
                   classes("w-6 h-6 hover:fill-purple", %{
-                    "fill-purple" => @lobby_mode == :rooms && assigns[:cargo_room][:pub_key] != assigns[:room][:pub_key],
+                    "fill-purple" =>
+                      @lobby_mode == :rooms &&
+                        assigns[:cargo_room][:pub_key] != assigns[:room][:pub_key],
                     "fill-grayscale" => @lobby_mode != :rooms
                   })
                 }
@@ -397,7 +405,11 @@
               </button>
             <% end %>
             <%= if assigns[:cargo_room][:status] == :complete do %>
-              <button phx-click="room/switch" phx-value-room={Room.hash(@cargo_room.pub_key)} class="sidebarIcon mt-5 t-cargo-room">
+              <button
+                phx-click="room/switch"
+                phx-value-room={Room.hash(@cargo_room.pub_key)}
+                class="sidebarIcon mt-5 t-cargo-room"
+              >
                 <.icon
                   id="sidebarRooms"
                   class={"w-6 h-6 hover:fill-purple " <> if(@cargo_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}

@@ -14,6 +14,9 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
       {"message/" <> action, %{"id" => id, "index" => index}} ->
         socket |> route_message_event({action, {index |> String.to_integer(), id}})
 
+      {"message/accept-all-room-invites", _} ->
+        socket |> Page.Dialog.accept_all_room_invites()
+
       {"import-images", _} ->
         socket |> push_event("chat:scroll-down", %{})
 
@@ -50,7 +53,7 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
   def route_message_event(socket, {action, msg_id}) do
     case action do
       "accept-room-invite" ->
-        socket |> Page.Dialog.accept_room_invite(msg_id)
+        socket |> Page.Dialog.accept_room_invite(msg_id, &Message.room_invite_navigation/1)
 
       "accept-room-invite-and-open-room" ->
         socket |> Page.Dialog.accept_room_invite_and_open_room(msg_id)
@@ -86,6 +89,9 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
 
       {:preload_image_gallery, :prev} ->
         socket |> Page.Dialog.image_gallery_preload_prev()
+
+      {:accept_room_invite, invite} ->
+        socket |> Page.Dialog.accept_room_invite(invite, &Message.room_invite_navigation/1)
     end
   end
 end

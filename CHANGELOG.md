@@ -14,6 +14,7 @@ straightforward as possible.
 - Cargo room type
 - Unique name constraint for Cargo rooms
 - Checkpoints preset
+- Cargo sync flow
 
 ### Changed
 

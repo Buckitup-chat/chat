@@ -15,6 +15,9 @@ defmodule Chat.Sync.CargoRoom do
   @start_timeout 2 * 60
   @sync_timeout 60
 
+  @cargo_topic "chat::cargo_room"
+  @lobby_topic "chat::lobby"
+
   defstruct [:pub_key, :successful?, status: :pending, timer: @start_timeout]
 
   @spec start_link(any) :: :ignore | {:error, any} | {:ok, pid}
@@ -92,7 +95,7 @@ defmodule Chat.Sync.CargoRoom do
           %__MODULE__{pub_key: room_key}
       end
 
-    PubSub.broadcast(Chat.PubSub, "chat::cargo_room", {:update_cargo_room, cargo_room})
+    PubSub.broadcast(Chat.PubSub, @cargo_topic, {:update_cargo_room, cargo_room})
 
     {:noreply, cargo_room}
   end
@@ -102,7 +105,7 @@ defmodule Chat.Sync.CargoRoom do
 
     Process.send_after(self(), {:sync_timeout, room_key}, @sync_timeout * 1000)
 
-    PubSub.broadcast(Chat.PubSub, "chat::cargo_room", {:update_cargo_room, cargo_room})
+    PubSub.broadcast(Chat.PubSub, @cargo_topic, {:update_cargo_room, cargo_room})
 
     {:noreply, cargo_room}
   end
@@ -132,7 +135,9 @@ defmodule Chat.Sync.CargoRoom do
 
     cargo_room = %{cargo_room | status: status}
 
-    PubSub.broadcast(Chat.PubSub, "chat::cargo_room", {:update_cargo_room, cargo_room})
+    PubSub.broadcast(Chat.PubSub, @cargo_topic, {:update_cargo_room, cargo_room})
+    PubSub.broadcast(Chat.PubSub, @lobby_topic, {:new_room, cargo_room.pub_key})
+    PubSub.broadcast(Chat.PubSub, @lobby_topic, {:new_user, nil})
 
     {:noreply, cargo_room}
   end
@@ -147,7 +152,7 @@ defmodule Chat.Sync.CargoRoom do
           cargo_room
       end
 
-    PubSub.broadcast(Chat.PubSub, "chat::cargo_room", {:update_cargo_room, cargo_room})
+    PubSub.broadcast(Chat.PubSub, @cargo_topic, {:update_cargo_room, cargo_room})
 
     {:noreply, cargo_room}
   end
@@ -171,7 +176,7 @@ defmodule Chat.Sync.CargoRoom do
           nil
       end
 
-    PubSub.broadcast(Chat.PubSub, "chat::cargo_room", {:update_cargo_room, cargo_room})
+    PubSub.broadcast(Chat.PubSub, @cargo_topic, {:update_cargo_room, cargo_room})
 
     {:noreply, cargo_room}
   end
@@ -186,7 +191,7 @@ defmodule Chat.Sync.CargoRoom do
           cargo_room
       end
 
-    PubSub.broadcast(Chat.PubSub, "chat::cargo_room", {:update_cargo_room, cargo_room})
+    PubSub.broadcast(Chat.PubSub, @cargo_topic, {:update_cargo_room, cargo_room})
 
     {:noreply, cargo_room}
   end

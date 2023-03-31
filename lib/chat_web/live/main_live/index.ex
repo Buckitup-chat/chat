@@ -6,6 +6,7 @@ defmodule ChatWeb.MainLive.Index do
 
   alias Chat.Admin.{CargoSettings, MediaSettings}
   alias Chat.{AdminRoom, Dialogs, Identity, Messages, RoomInviteIndex, User}
+  alias Chat.Rooms.Room
   alias Chat.Sync.CargoRoom
   alias ChatWeb.Hooks.{LocalTimeHook, UploaderHook}
   alias ChatWeb.MainLive.Admin.{CargoSettingsForm, MediaSettingsForm}
@@ -398,7 +399,9 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_info({:maybe_invite_checkpoints, :cargo, room_name, room_identity}, socket) do
+  def handle_info({:maybe_activate_cargo_room, true, %Room{} = room, room_identity}, socket) do
+    CargoRoom.activate(room.pub_key)
+
     %CargoSettings{} = cargo_settings = socket.assigns.cargo_settings
     %Identity{} = me = socket.assigns.me
 
@@ -407,7 +410,7 @@ defmodule ChatWeb.MainLive.Index do
       dialog = Dialogs.find_or_open(me, checkpoint_pub_key |> User.by_id())
 
       room_identity
-      |> Map.put(:name, room_name)
+      |> Map.put(:name, room.name)
       |> Messages.RoomInvite.new()
       |> Dialogs.add_new_message(me, dialog)
       |> RoomInviteIndex.add(dialog, me)
@@ -416,7 +419,7 @@ defmodule ChatWeb.MainLive.Index do
     {:noreply, socket}
   end
 
-  def handle_info({:maybe_invite_checkpoints, _room_type, _room_name, _room_identity}, socket),
+  def handle_info({:maybe_activate_cargo_room, _cargo?, _room, _room_identity}, socket),
     do: {:noreply, socket}
 
   def handle_info({:update_cargo_room, cargo_room}, socket) do

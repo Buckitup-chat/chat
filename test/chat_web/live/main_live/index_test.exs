@@ -221,7 +221,7 @@ defmodule ChatWeb.MainLive.IndexTest do
 
       Process.sleep(100)
 
-      assert has_element?(view, ".t-cargo-room")
+      refute has_element?(view, ".t-cargo-room")
       refute has_element?(view, ".t-cargo-activate")
       assert has_element?(view, ".t-cargo-remove")
       html = render(view)
@@ -244,6 +244,7 @@ defmodule ChatWeb.MainLive.IndexTest do
       Process.sleep(100)
 
       assert render(view) =~ "Complete!"
+      assert has_element?(view, ".t-cargo-room")
       assert has_element?(view, ".t-cargo-remove")
 
       view
@@ -272,7 +273,7 @@ defmodule ChatWeb.MainLive.IndexTest do
       |> element(".t-cargo-activate")
       |> render_click()
 
-      assert has_element?(view, ".t-cargo-room")
+      refute has_element?(view, ".t-cargo-room")
       refute has_element?(view, ".t-cargo-activate")
       assert has_element?(view, ".t-cargo-remove")
       html = render(view)
@@ -292,17 +293,44 @@ defmodule ChatWeb.MainLive.IndexTest do
       })
       |> render_submit()
 
+      %{socket: socket} = reload_view(%{view: view})
+      room_key = socket.assigns.room.pub_key
+
+      view
+      |> form("#room-create-form", %{
+        "room_input" => %{"name" => "Another Regular Room", "type" => "public"}
+      })
+      |> render_submit()
+
       refute has_element?(view, ".t-cargo-room")
       assert has_element?(view, ".t-cargo-activate")
 
-      %{socket: socket} = reload_view(%{view: view})
-      CargoRoom.sync(socket.assigns.room.pub_key)
+      CargoRoom.sync(room_key)
+      Process.sleep(100)
+
+      refute has_element?(view, ".t-cargo-room")
+      refute has_element?(view, ".t-cargo-activate")
+      refute has_element?(view, ".t-cargo-remove")
+      refute render(view) =~ "Cargo sync activated"
+
+      CargoRoom.mark_successful()
+      CargoRoom.complete()
       Process.sleep(100)
 
       assert has_element?(view, ".t-cargo-room")
-      refute has_element?(view, ".t-cargo-activate")
+      assert has_element?(view, ".t-cargo-activate")
       refute has_element?(view, ".t-cargo-remove")
-      assert render(view) =~ "Syncing..."
+      refute render(view) =~ "Cargo sync activated"
+
+      view
+      |> element(".t-cargo-room", "Cargo Room")
+      |> render_click()
+
+      refute has_element?(view, ".t-cargo-activate")
+      assert has_element?(view, ".t-cargo-remove")
+      html = render(view)
+      assert html =~ "Cargo sync activated"
+      assert html =~ "Complete!"
     end
 
     test "fails syncing", %{view: view} do
@@ -330,6 +358,7 @@ defmodule ChatWeb.MainLive.IndexTest do
       Process.sleep(100)
 
       assert render(view) =~ "Failed!"
+      refute has_element?(view, ".t-cargo-room")
       assert has_element?(view, ".t-cargo-remove")
 
       view

@@ -25,7 +25,7 @@ defmodule Chat.Rooms.Room do
       pub_key: room |> Identity.pub_key(),
       requests: [],
       type: type,
-      hash: room |> Identity.pub_key() |> Base.encode16(case: :lower)
+      hash: room |> Identity.pub_key() |> hash()
     }
   end
 
@@ -103,6 +103,8 @@ defmodule Chat.Rooms.Room do
 
     %{room | requests: new_requests}
   end
+
+  def hash(pub_key), do: Base.encode16(pub_key, case: :lower)
 
   def decrypt_identity(ciphered, %Identity{} = me, room_public_key) do
     secret = Enigma.compute_secret(me.private_key, room_public_key)

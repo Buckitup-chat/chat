@@ -7,7 +7,6 @@ defmodule ChatWeb.MainLive.Layout.RoomItem do
   alias ChatWeb.MainLive.Layout
   alias Phoenix.LiveView.JS
 
-  attr :cargo_room, :map, doc: "cargo room struct"
   attr :room, :map, required: true, doc: "room sctruct"
   attr :selected_room, Room, doc: "selected room sctruct"
   attr :confirmed?, :boolean, default: false, doc: "is that coonfirmed room?"
@@ -36,10 +35,6 @@ defmodule ChatWeb.MainLive.Layout.RoomItem do
         </div>
       </a>
       <.item_icon type={@room.type} />
-
-      <%= if assigns[:cargo_room][:pub_key] == @room.pub_key do %>
-        <span class="t-cargo-room">Cargo</span>
-      <% end %>
     </li>
     <!-- Mobile view -->
     <li
@@ -58,10 +53,6 @@ defmodule ChatWeb.MainLive.Layout.RoomItem do
         </div>
       </a>
       <.item_icon type={@room.type} />
-
-      <%= if assigns[:cargo_room][:pub_key] == @room.pub_key do %>
-        <span class="t-cargo-room">Cargo</span>
-      <% end %>
     </li>
     """
   end

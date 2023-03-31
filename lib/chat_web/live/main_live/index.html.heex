@@ -290,7 +290,7 @@
               id="sidebarRooms"
               class={
                 classes("w-6 h-6 hover:fill-purple", %{
-                  "fill-purple" => @lobby_mode == :rooms,
+                  "fill-purple" => @lobby_mode == :rooms && assigns[:cargo_room][:pub_key] != assigns[:room][:pub_key],
                   "fill-grayscale" => @lobby_mode != :rooms
                 })
               }
@@ -327,6 +327,15 @@
               <span class="text-xs">Admin</span>
             </button>
           <% end %>
+          <%= if assigns[:cargo_room][:status] == :complete do %>
+            <button phx-click="room/switch" phx-value-room={Room.hash(@cargo_room.pub_key)} class="sidebarIcon">
+              <.icon
+                id="sidebarRooms"
+                class={"w-6 h-6 hover:fill-purple " <> if(@cargo_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}
+              />
+              <span class="text-xs">Cargo Room</span>
+            </button>
+          <% end %>
         </div>
         <div class="navbar">
           <div class="sm:flex flex-col items-center">
@@ -346,7 +355,7 @@
                 id="sidebarRooms"
                 class={
                   classes("w-6 h-6 hover:fill-purple", %{
-                    "fill-purple" => @lobby_mode == :rooms,
+                    "fill-purple" => @lobby_mode == :rooms && assigns[:cargo_room][:pub_key] != assigns[:room][:pub_key],
                     "fill-grayscale" => @lobby_mode != :rooms
                   })
                 }
@@ -385,6 +394,15 @@
                   }
                 />
                 <span class="text-xs">Admin</span>
+              </button>
+            <% end %>
+            <%= if assigns[:cargo_room][:status] == :complete do %>
+              <button phx-click="room/switch" phx-value-room={Room.hash(@cargo_room.pub_key)} class="sidebarIcon mt-5 t-cargo-room">
+                <.icon
+                  id="sidebarRooms"
+                  class={"w-6 h-6 hover:fill-purple " <> if(@cargo_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}
+                />
+                <span class="text-xs">Cargo Room</span>
               </button>
             <% end %>
           </div>
@@ -585,7 +603,6 @@
                   <% else %>
                     <%= for room <- @joined_rooms do %>
                       <Layout.RoomItem.render
-                        cargo_room={assigns[:cargo_room]}
                         room={room}
                         confirmed?={true}
                         selected_room={@room}

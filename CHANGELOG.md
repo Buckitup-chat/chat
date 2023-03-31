@@ -14,6 +14,7 @@ straightforward as possible.
 - Accept all invites in dialog
 
 ### Changed
+- uploading in one thread
 
 ### Fixed
 - UI: uploads scroll to top on uploader mount 

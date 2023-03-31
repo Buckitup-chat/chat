@@ -22,7 +22,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
   alias ChatWeb.Router.Helpers
   alias Phoenix.LiveView.{Socket, UploadEntry}
 
-  @max_concurrent_uploads 2
+  @max_concurrent_uploads 1
 
   @type entry :: UploadEntry.t()
   @type params :: map()

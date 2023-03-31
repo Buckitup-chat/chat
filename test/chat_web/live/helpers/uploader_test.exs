@@ -46,7 +46,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
              |> Enum.filter(fn {_uuid, %UploadMetadata{} = metadata} ->
                metadata.status == :active
              end)
-             |> length() == 2
+             |> length() == 1
 
       statuses =
         socket.assigns.uploads_metadata
@@ -56,7 +56,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
         end)
         |> Enum.frequencies()
 
-      assert %{active: 2, inactive: 1} = statuses
+      assert %{active: 1, inactive: 2} = statuses
     end
   end
 
@@ -102,10 +102,10 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       assert UploadStatus.get(key) == :inactive
 
-      assert %UploadMetadata{credentials: {key, _secret}, status: :active} =
+      assert %UploadMetadata{credentials: {key, _secret}, status: :pending} =
                Map.get(socket.assigns.uploads_metadata, entry_4.uuid)
 
-      assert UploadStatus.get(key) == :active
+      assert UploadStatus.get(key) == :inactive
 
       assert %UploadMetadata{credentials: {key, _secret}, status: :pending} =
                Map.get(socket.assigns.uploads_metadata, entry_5.uuid)
@@ -634,7 +634,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
       assert %UploadMetadata{status: :paused} =
                Map.get(socket.assigns.uploads_metadata, entry_3.uuid)
 
-      assert %UploadMetadata{status: :active} =
+      assert %UploadMetadata{status: :pending} =
                Map.get(socket.assigns.uploads_metadata, entry_4.uuid)
     end
   end

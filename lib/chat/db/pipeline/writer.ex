@@ -3,7 +3,6 @@ defmodule Chat.Db.Pipeline.Writer do
   Consumes the queue. Handles fsync and FS write for files
 
   """
-  require Logger
   require Record
 
   Record.defrecord(:w_state,
@@ -111,7 +110,6 @@ defmodule Chat.Db.Pipeline.Writer do
   def fsync_needed?(w_state(dirt_count: count)), do: count > @fsync_trigger_count
 
   def fsync(w_state(db: db) = state) do
-    ["[db writer] ", "fsyncing ", inspect(db)] |> Logger.warn()
     CubDB.file_sync(db)
 
     state |> w_state(dirt_count: 0)

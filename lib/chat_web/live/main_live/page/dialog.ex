@@ -10,6 +10,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   use ChatWeb, :component
 
   alias Chat.Broker
+  alias Chat.Card
   alias Chat.ChunkedFiles
   alias Chat.Content.Memo
   alias Chat.Content.RoomInvites
@@ -280,28 +281,37 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     push_event(socket, "chat:redirect", %{url: url(~p"/get/zip/#{key}")})
   end
 
-  def accept_room_invite(%{assigns: %{me: me, dialog: dialog, rooms: rooms}} = socket, message_id) do
-    new_room_identitiy =
-      Dialogs.read_message(dialog, message_id, me)
-      |> then(fn %{type: :room_invite, content: json} -> json end)
+  def accept_room_invite(
+        %{assigns: %{room_map: room_map}} = socket,
+        %{type: :room_invite, content: content} = msg,
+        render_fun
+      ) do
+    new_room_identity =
+      content
       |> StorageId.from_json()
       |> RoomInvites.get()
       |> Identity.from_strings()
 
-    if rooms |> Enum.any?(&(&1.private_key == new_room_identitiy.private_key)) do
+    if Map.has_key?(room_map, Identity.pub_key(new_room_identity)) do
       socket
     else
       socket
-      |> store_room_key_copy(new_room_identitiy)
-      |> Page.Login.store_new_room(new_room_identitiy)
+      |> store_room_key_copy(new_room_identity)
+      |> Page.Login.store_new_room(new_room_identity)
       |> Page.Lobby.refresh_room_list()
+      |> update_invite_navigation(msg, new_room_identity, render_fun)
     end
   rescue
     _ -> socket
   end
 
+  def accept_room_invite(%{assigns: %{me: me, dialog: dialog}} = socket, message_id, render_fun) do
+    socket
+    |> accept_room_invite(Dialogs.read_message(dialog, message_id, me), render_fun)
+  end
+
   def accept_room_invite_and_open_room(
-        %{assigns: %{me: me, dialog: dialog, room_map: rooms}} = socket,
+        %{assigns: %{me: me, dialog: dialog, room_map: room_map}} = socket,
         message_id
       ) do
     new_room_identity =
@@ -311,7 +321,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       |> RoomInvites.get()
       |> Identity.from_strings()
 
-    if rooms[new_room_identity.public_key].private_key == new_room_identity.private_key do
+    if Map.has_key?(room_map, Identity.pub_key(new_room_identity)) do
       socket
     else
       socket
@@ -323,6 +333,16 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> Page.Room.init({new_room_identity, new_room_identity |> Identity.pub_key() |> Rooms.get()})
   rescue
     _ -> socket
+  end
+
+  def accept_all_room_invites(%{assigns: %{dialog: dialog, me: me}} = socket) do
+    Dialogs.list_room_invites(dialog, me)
+    |> Enum.reverse()
+    |> Enum.each(fn invite ->
+      send(self(), {:dialog, {:accept_room_invite, invite}})
+    end)
+
+    socket
   end
 
   def store_room_key_copy(%{assigns: %{me: me}} = socket, room_identity) do
@@ -441,5 +461,25 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     socket
     |> assign(:messages, [])
     |> assign(:message_update_mode, :append)
+  end
+
+  defp update_invite_navigation(
+         %{assigns: %{room_map: room_map}} = socket,
+         msg,
+         room_identity,
+         render_fun
+       ) do
+    room_hash = room_identity |> Card.from_identity() |> Enigma.short_hash()
+    room_key = room_identity |> Identity.pub_key()
+
+    socket
+    |> push_event("chat:bulk-change", %{
+      to: ".x-invite-navigation[data-room='#{room_hash}']",
+      content:
+        render_to_html_string(
+          %{msg: msg, room_key: room_key, room_keys: Map.keys(room_map)},
+          render_fun
+        )
+    })
   end
 end

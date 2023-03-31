@@ -144,11 +144,21 @@ const listeners = {
   },
   "phx:chat:focus": (e) => { const el = document.querySelector(e.detail.to); setTimeout(() => el.focus(), 100); },
   "phx:chat:change": (e) => { const el = document.querySelector(e.detail.to); el.innerHTML = e.detail.content; },
+  "phx:chat:bulk-change": (e) => {
+    const elements = document.querySelectorAll(e.detail.to);
+    elements.forEach((el) => { el.innerHTML = e.detail.content; });
+  },
   "phx:scroll-to-bottom": (e) => {
     setTimeout(() => {
       const chatContent = document.querySelector('.a-content-block');
       chatContent.scrollTo({ top: chatContent.scrollHeight })
     }, 0)
+  },
+  "phx:scroll-uploads-to-top": (e) => {
+      const uploader = document.querySelector('.a-uploader');
+      const mobileUploader = document.querySelector('.a-mobile-uploader');
+      uploader.scrollTop = -331.5;
+      mobileUploader.scrollTop = -331.5;
   },
   "phx:gallery:preload": (e) => {
     const img = new Image();

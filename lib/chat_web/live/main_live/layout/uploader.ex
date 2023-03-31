@@ -20,7 +20,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     <div
       class={
         classes(
-          "flex flex-col-reverse bottom-[6%] w-full flex-col h-[27%] fixed md:bottom-[-10px] md:w-[18%] md:left-[78px] md:h-[49%] overflow-scroll",
+          "flex flex-col-reverse bottom-[6%] w-full flex-col h-[27%] fixed md:bottom-[-10px] md:w-[18%] md:left-[78px] md:h-[49%] overflow-scroll a-uploader",
           %{"hidden" => @uploads == %{}}
         )
       }
@@ -46,7 +46,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       end)
 
     ~H"""
-    <div class="max-h-[280px] bottom-16 fixed w-full overflow-y-scroll flex flex-col-reverse">
+    <div class="max-h-[280px] bottom-16 fixed w-full overflow-y-scroll flex flex-col-reverse a-mobile-uploader">
       <div class="h-full">
         <div
           class="flex flex-col m-2 bg-purple50 rounded-lg h-fit overflow-scroll sm:hidden"
@@ -150,7 +150,12 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
 
   defp entries(%{uploads: uploads} = assigns) when map_size(uploads) > 0 do
     ~H"""
-    <div class="p-2" id={Utils.random_id()} phx-hook="SortableUploadEntries">
+    <div
+      class="p-2"
+      id={Utils.random_id()}
+      phx-mounted={JS.dispatch("phx:scroll-uploads-to-top")}
+      phx-hook="SortableUploadEntries"
+    >
       <%= for %UploadEntry{valid?: true} = entry <- @config.entries do %>
         <.entry
           entry={entry}

@@ -6,8 +6,6 @@ defmodule Chat.Db.WriteQueue do
   import Tools.GenServerHelpers
   require Record
 
-  # require Logger
-
   Record.defrecord(:q_state, buffer: buffer(), consumer: nil, in_demand: false, mirrors: [])
 
   use GenServer

@@ -282,34 +282,11 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
       <%= unless @export? do %>
         <%= if (@is_mine? and @author == @receiver) or not @is_mine? do %>
-          <div class="px-2 my-1 flex items-center justify-between">
-            <%= if @room_card.pub_key in @room_keys do %>
-              <button
-                class="w-full h-12 border-0 rounded-lg bg-grayscale text-white"
-                phx-click="dialog/message/accept-room-invite-and-open-room"
-                phx-value-id={@msg.id}
-                phx-value-index={@msg.index}
-              >
-                Go to Room
-              </button>
-            <% else %>
-              <button
-                class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
-                phx-click="dialog/message/accept-room-invite"
-                phx-value-id={@msg.id}
-                phx-value-index={@msg.index}
-              >
-                Accept
-              </button>
-              <button
-                class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
-                phx-click="dialog/message/accept-room-invite-and-open-room"
-                phx-value-id={@msg.id}
-                phx-value-index={@msg.index}
-              >
-                Accept and Open
-              </button>
-            <% end %>
+          <div
+            data-room={Enigma.short_hash(@room_card)}
+            class="x-invite-navigation flex flex-col sm:flex-row sm:items-center sm:justify-between px-2 my-1"
+          >
+            <.room_invite_navigation room_key={@room_card.pub_key} room_keys={@room_keys} msg={@msg} />
           </div>
         <% end %>
       <% end %>
@@ -500,6 +477,48 @@ defmodule ChatWeb.MainLive.Layout.Message do
     """
   end
 
+  attr :room_key, :string, required: true, doc: "room public key"
+  attr :room_keys, :list, required: true, doc: "room_map keys"
+  attr :msg, :map, required: true, doc: "message struct"
+
+  def room_invite_navigation(assigns) do
+    ~H"""
+    <%= if @room_key in @room_keys do %>
+      <button
+        class="w-full h-12 border-0 rounded-lg bg-grayscale text-white"
+        phx-click="dialog/message/accept-room-invite-and-open-room"
+        phx-value-id={@msg.id}
+        phx-value-index={@msg.index}
+      >
+        Go to Room
+      </button>
+    <% else %>
+      <button
+        class="w-full sm:w-[30%] h-12 border-0 rounded-lg bg-grayscale text-white mb-2 sm:mb-0 sm:mr-2"
+        phx-click="dialog/message/accept-room-invite"
+        phx-value-id={@msg.id}
+        phx-value-index={@msg.index}
+      >
+        Accept
+      </button>
+      <button
+        class="w-full sm:w-[40%] h-12 border-0 rounded-lg bg-grayscale text-white mb-2 sm:mb-0 sm:mr-2"
+        phx-click="dialog/message/accept-room-invite-and-open-room"
+        phx-value-id={@msg.id}
+        phx-value-index={@msg.index}
+      >
+        Accept and Open
+      </button>
+      <button
+        class="w-full sm:w-[30%] h-12 border-0 rounded-lg bg-grayscale text-white mb-2 sm:mb-0 sm:mr-2"
+        phx-click="dialog/message/accept-all-room-invites"
+      >
+        Accept all
+      </button>
+    <% end %>
+    """
+  end
+
   attr :msg, :map, required: true, doc: "message struct"
   attr :timezone, :string, required: true, doc: "user's timezone"
 
@@ -553,23 +572,24 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :msg, :map, required: true, doc: "message struct"
 
   defp file(assigns) do
-    ~H"""
-    <.link class="flex items-center justify-between" href={@file.url}>
-      <.file_icon export?={@export?} />
+    if assigns.file do
+      ~H"""
+      <.link class="flex items-center justify-between" href={@file.url}>
+        <.file_icon export?={@export?} />
 
-      <div class="w-36 flex flex-col pr-3">
-        <span class="truncate text-xs x-file" href={@file.url}><%= @file.name %></span>
-        <span class="text-xs text-black/50 whitespace-pre-line"><%= @file.size %></span>
-      </div>
-    </.link>
-    """
-  rescue
-    _ ->
+        <div class="w-36 flex flex-col pr-3">
+          <span class="truncate text-xs x-file" href={@file.url}><%= @file.name %></span>
+          <span class="text-xs text-black/50 whitespace-pre-line"><%= @file.size %></span>
+        </div>
+      </.link>
+      """
+    else
       ~H"""
       <div class="flex items-center justify-between">
         Error getting file
       </div>
       """
+    end
   end
 
   attr :export?, :boolean, required: true, doc: "embed SVG?"

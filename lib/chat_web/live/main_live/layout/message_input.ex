@@ -81,7 +81,7 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
               |> JS.dispatch("chat:set-input-size", to: "#dialog-edit-input")
             }
             onkeydown="
-                      if (event.key == 'Enter' && event.shiftKey) {
+                      if (event.key == 'Enter' && !event.shiftKey) {
                         document.getElementById('dialog-edit-form-submit-button').click()
                       }
                       "
@@ -203,7 +203,7 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
               |> JS.dispatch("chat:set-input-size", to: "#room-input")
             }
             onkeydown="
-                      if (event.key == 'Enter' && event.shiftKey) {
+                      if (event.key == 'Enter' && !event.shiftKey) {
                         document.getElementById('room-edit-form-submit-button').click()
                       }
                       "

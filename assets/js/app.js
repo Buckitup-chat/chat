@@ -157,6 +157,12 @@ const listeners = {
       chatContent.scrollTo({ top: chatContent.scrollHeight })
     }, 0)
   },
+  "phx:scroll-uploads-to-top": (e) => {
+      const uploader = document.querySelector('.a-uploader');
+      const mobileUploader = document.querySelector('.a-mobile-uploader');
+      uploader.scrollTop = -331.5;
+      mobileUploader.scrollTop = -331.5;
+  },
   "phx:gallery:preload": (e) => {
     const img = new Image();
     img.onload = function () {

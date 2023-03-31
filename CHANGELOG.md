@@ -16,6 +16,7 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
+- UI: uploads scroll to top on uploader mount 
 - submitting of edited message by keyword
 
 ## 2023-03-22_4082136___2023-03-23_e2c9aa8
@@ -60,3 +61,4 @@ straightforward as possible.
 - UI: uploader covering chat/room list
 - lost feed names
 - admin room user actions
+

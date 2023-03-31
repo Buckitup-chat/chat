@@ -95,6 +95,14 @@ defmodule Chat.Dialogs.DialogMessaging do
     |> Enum.reverse()
   end
 
+  def list_room_invites(%Dialog{} = dialog, %Identity{} = me) do
+    dialog
+    |> get_room_invites()
+    |> Enum.filter(fn {_, message} -> message.type == :room_invite end)
+    |> Enum.map(fn {{_, _, index, _}, message} -> read({index, message}, me, dialog) end)
+    |> Enum.reject(&is_nil/1)
+  end
+
   def get_message(%Dialog{} = dialog, {index, id}) do
     msg_key(dialog, index, id)
     |> Db.get()
@@ -201,5 +209,13 @@ defmodule Chat.Dialogs.DialogMessaging do
       msg_key(dialog, max_index, id)
     }
     |> Db.select(amount)
+  end
+
+  defp get_room_invites(dialog) do
+    {
+      msg_key(dialog, 0, 0),
+      msg_key(dialog, nil, 0)
+    }
+    |> Db.list()
   end
 end

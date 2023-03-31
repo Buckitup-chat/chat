@@ -15,7 +15,7 @@ defmodule Chat.Rooms do
   def add(me, name, :cargo) do
     {_room_identity, %Room{} = room} = result = add(me, name, :public)
 
-    CargoRoom.set(room.pub_key)
+    CargoRoom.activate(room.pub_key)
 
     result
   end

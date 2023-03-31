@@ -1,11 +1,21 @@
 defmodule Chat.Sync.CargoRoom do
   @moduledoc """
-  Holds pub key of the last cargo room created to facilitate cargo sync.
+  Holds state of the current cargo room.
   """
 
   use GenServer
+  use StructAccess
 
-  @type room_pub_key :: String.t()
+  alias Phoenix.PubSub
+
+  @type room_key :: String.t()
+  @type t :: %__MODULE__{}
+  @type time :: integer()
+
+  @start_timeout 2 * 60
+  @sync_timeout 60
+
+  defstruct [:pub_key, :successful?, status: :pending, timer: @start_timeout]
 
   @spec start_link(any) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(_args) do
@@ -17,23 +27,167 @@ defmodule Chat.Sync.CargoRoom do
     {:ok, nil}
   end
 
-  @spec set(room_pub_key()) :: :ok
-  def set(room_pub_key) do
-    GenServer.cast(__MODULE__, {:set, room_pub_key})
-  end
-
-  @spec get() :: room_pub_key()
+  @spec get() :: t() | nil
   def get do
     GenServer.call(__MODULE__, :get)
   end
 
-  @impl GenServer
-  def handle_call(:get, _from, room_pub_key) do
-    {:reply, room_pub_key, room_pub_key}
+  @spec get_room_key() :: room_key() | nil
+  def get_room_key do
+    GenServer.call(__MODULE__, :get_room_key)
+  end
+
+  @spec activate(room_key()) :: :ok
+  def activate(room_key) do
+    GenServer.cast(__MODULE__, {:activate, room_key})
+  end
+
+  @spec sync(room_key()) :: :ok
+  def sync(room_key) do
+    GenServer.cast(__MODULE__, {:sync, room_key})
+  end
+
+  @spec mark_successful() :: :ok
+  def mark_successful do
+    GenServer.cast(__MODULE__, :mark_successful)
+  end
+
+  @spec complete() :: :ok
+  def complete do
+    GenServer.cast(__MODULE__, :complete)
+  end
+
+  @spec remove() :: :ok
+  def remove do
+    GenServer.cast(__MODULE__, :remove)
   end
 
   @impl GenServer
-  def handle_cast({:set, room_pub_key}, _room_pub_key) do
-    {:noreply, room_pub_key}
+  def handle_call(:get, _from, cargo_room) do
+    {:reply, cargo_room, cargo_room}
+  end
+
+  def handle_call(:get_room_key, _from, state) do
+    room_key =
+      case state do
+        %__MODULE__{} = cargo_room ->
+          cargo_room.pub_key
+
+        nil ->
+          nil
+      end
+
+    {:reply, room_key, state}
+  end
+
+  @impl GenServer
+  def handle_cast({:activate, room_key}, cargo_room) do
+    cargo_room =
+      case cargo_room do
+        %__MODULE__{status: :syncing} = cargo_room ->
+          cargo_room
+
+        _ ->
+          Process.send_after(self(), :update_timer, 1000)
+          %__MODULE__{pub_key: room_key}
+      end
+
+    PubSub.broadcast(Chat.PubSub, "chat::cargo_room", {:update_cargo_room, cargo_room})
+
+    {:noreply, cargo_room}
+  end
+
+  def handle_cast({:sync, room_key}, _cargo_room) do
+    cargo_room = %__MODULE__{pub_key: room_key, status: :syncing}
+
+    Process.send_after(self(), {:sync_timeout, room_key}, @sync_timeout * 1000)
+
+    PubSub.broadcast(Chat.PubSub, "chat::cargo_room", {:update_cargo_room, cargo_room})
+
+    {:noreply, cargo_room}
+  end
+
+  def handle_cast(:mark_successful, cargo_room) do
+    cargo_room =
+      case cargo_room do
+        %__MODULE__{status: :syncing} = cargo_room ->
+          %{cargo_room | successful?: true}
+
+        cargo_room ->
+          cargo_room
+      end
+
+    {:noreply, cargo_room}
+  end
+
+  def handle_cast(:complete, cargo_room) do
+    status =
+      case cargo_room do
+        %__MODULE__{successful?: true} ->
+          :complete
+
+        _ ->
+          :failed
+      end
+
+    cargo_room = %{cargo_room | status: status}
+
+    PubSub.broadcast(Chat.PubSub, "chat::cargo_room", {:update_cargo_room, cargo_room})
+
+    {:noreply, cargo_room}
+  end
+
+  def handle_cast(:remove, cargo_room) do
+    cargo_room =
+      case cargo_room do
+        %__MODULE__{status: status} when status in [:pending, :complete, :failed] ->
+          nil
+
+        cargo_room ->
+          cargo_room
+      end
+
+    PubSub.broadcast(Chat.PubSub, "chat::cargo_room", {:update_cargo_room, cargo_room})
+
+    {:noreply, cargo_room}
+  end
+
+  @impl GenServer
+  def handle_info(:update_timer, cargo_room) do
+    cargo_room =
+      cond do
+        is_nil(cargo_room) ->
+          nil
+
+        cargo_room.status != :pending ->
+          cargo_room
+
+        cargo_room.timer - 1 > 0 ->
+          Process.send_after(self(), :update_timer, 1000)
+          new_timer = cargo_room.timer - 1
+          %{cargo_room | timer: new_timer}
+
+        true ->
+          nil
+      end
+
+    PubSub.broadcast(Chat.PubSub, "chat::cargo_room", {:update_cargo_room, cargo_room})
+
+    {:noreply, cargo_room}
+  end
+
+  def handle_info({:sync_timeout, room_key}, cargo_room) do
+    cargo_room =
+      case cargo_room do
+        %__MODULE__{pub_key: ^room_key, status: :syncing} ->
+          %{cargo_room | status: :failed}
+
+        cargo_room ->
+          cargo_room
+      end
+
+    PubSub.broadcast(Chat.PubSub, "chat::cargo_room", {:update_cargo_room, cargo_room})
+
+    {:noreply, cargo_room}
   end
 end

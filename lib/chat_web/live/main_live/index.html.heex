@@ -585,6 +585,7 @@
                   <% else %>
                     <%= for room <- @joined_rooms do %>
                       <Layout.RoomItem.render
+                        cargo_room={assigns[:cargo_room]}
                         room={room}
                         confirmed?={true}
                         selected_room={@room}
@@ -655,44 +656,57 @@
                 data-has-more-messages={"#{@has_more_messages}"}
               >
                 <div
+                  class="w-full sticky top-0 right-0"
                   phx-click={JS.dispatch("phx:scroll-to-bottom")}
-                  class={
-                    classes(
-                      "w-full px-8 border-b border-white/10 backdrop-blur-md bg-black/20 z-10 flex flex-row items-center justify-between sticky top-0 right-0"
-                    )
-                  }
-                  style="min-height: 56px;"
                 >
-                  <div class="flex flex-row items-center">
-                    <button
-                      phx-click={JS.push("room/close") |> close_content()}
-                      class="sm:hidden pr-3"
-                    >
-                      <.icon id="arrowBack" class="w-6 h-6 fill-white" />
-                    </button>
-                    <%= if @room.type == :public do %>
-                      <.icon id="open" class="w-4 h-4 fill-white" />
-                    <% end %>
-                    <%= if @room.type == :private do %>
-                      <.icon id="secret" class="w-4 h-4 fill-white" />
-                    <% end %>
-                    <%= if @room.type == :request do %>
-                      <.icon id="private" class="w-5 h-5 stroke-white" />
-                    <% end %>
-                    <Layout.Card.hashed_name room={@room} style_spec={:chat_header} />
-                  </div>
-                  <div class="flex flex-row justify-between">
-                    <%= if @room.type == :request do %>
-                      <.room_request_button
-                        requests={@room_requests}
+                  <div
+                    class="w-full px-8 border-b border-white/10 backdrop-blur-md bg-black/20 z-10 flex flex-row items-center justify-between"
+                    style="min-height: 56px;"
+                  >
+                    <div class="flex flex-row items-center">
+                      <button
+                        phx-click={JS.push("room/close") |> close_content()}
+                        class="sm:hidden pr-3"
+                      >
+                        <.icon id="arrowBack" class="w-6 h-6 fill-white" />
+                      </button>
+                      <%= if @room.type == :public do %>
+                        <.icon id="open" class="w-4 h-4 fill-white" />
+                      <% end %>
+                      <%= if @room.type == :private do %>
+                        <.icon id="secret" class="w-4 h-4 fill-white" />
+                      <% end %>
+                      <%= if @room.type == :request do %>
+                        <.icon id="private" class="w-5 h-5 stroke-white" />
+                      <% end %>
+                      <Layout.Card.hashed_name room={@room} style_spec={:chat_header} />
+                    </div>
+
+                    <div class="flex flex-row justify-between">
+                      <Layout.CargoRoom.button
+                        cargo_room={assigns[:cargo_room]}
+                        media_settings={@media_settings}
+                        room={@room}
+                      />
+
+                      <%= if @room.type == :request do %>
+                        <.room_request_button
+                          requests={@room_requests}
+                          restricted={@db_status.writable == :no}
+                        />
+                      <% end %>
+                      <.room_invite_button
+                        users={Chat.User.list()}
                         restricted={@db_status.writable == :no}
                       />
-                    <% end %>
-                    <.room_invite_button
-                      users={Chat.User.list()}
-                      restricted={@db_status.writable == :no}
-                    />
+                    </div>
                   </div>
+
+                  <Layout.CargoRoom.bar
+                    cargo_room={assigns[:cargo_room]}
+                    media_settings={@media_settings}
+                    room={@room}
+                  />
                 </div>
 
                 <%= if @room.type == :request do %>

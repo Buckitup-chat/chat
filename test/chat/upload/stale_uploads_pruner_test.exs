@@ -1,5 +1,5 @@
 defmodule Chat.Upload.StaleUploadsPrunerTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Chat.{ChunkedFiles, ChunkedFilesBroker}
   alias Chat.Db.ChangeTracker

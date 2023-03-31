@@ -12,6 +12,10 @@ straightforward as possible.
 
 ### Added
 - Accept all invites in dialog
+- Cargo room type
+- Unique name constraint for Cargo rooms
+- Checkpoints preset
+- Cargo sync flow
 
 ### Changed
 - uploading in one thread

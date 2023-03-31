@@ -25,6 +25,7 @@ import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import AudioFile from "./hooks/audio-file"
+import DraggableCheckpoints from "./hooks/draggable-checkpoints"
 import MediaFileInput from "./hooks/media-file-input"
 import SortableUploadEntries from "./hooks/sortable-upload-entries"
 import UploadInProgress from "./hooks/upload-in-progress"
@@ -36,6 +37,7 @@ import * as Flash from "./hooks/flash"
 
 let Hooks = {
   AudioFile,
+  DraggableCheckpoints,
   MediaFileInput,
   SortableUploadEntries,
   UploadInProgress
@@ -128,11 +130,6 @@ const listeners = {
       deleteButton.setAttribute('phx-value-messages', JSON.stringify(messages));
     }, 200);
   },
-  "room:switch-type": (e) => {
-    e.target.classList.add('checkedBackground');
-
-    document.getElementById(e.detail.id).textContent = e.detail.description
-  },
   "phx:chat:toggle": (e) => {
     if (e.detail && e.detail.class && e.detail.to) {
       document
@@ -172,6 +169,11 @@ const listeners = {
     }
     img.classList.add('hidden')
     img.src = e.detail.url;
+  },
+  "phx:js-exec": ({ detail }) => {
+    document.querySelectorAll(detail.to).forEach(el => {
+      liveSocket.execJS(el, el.getAttribute(detail.attr))
+    })
   },
   ...uploadEventHandlers
 };

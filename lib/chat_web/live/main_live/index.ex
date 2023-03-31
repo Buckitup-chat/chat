@@ -4,10 +4,16 @@ defmodule ChatWeb.MainLive.Index do
 
   require Logger
 
-  alias Phoenix.LiveView.JS
+  alias Chat.Admin.{CargoSettings, MediaSettings}
+  alias Chat.{AdminRoom, Dialogs, Identity, Messages, RoomInviteIndex, User}
+  alias Chat.Rooms.Room
+  alias Chat.Sync.CargoRoom
   alias ChatWeb.Hooks.{LocalTimeHook, UploaderHook}
-  alias ChatWeb.MainLive.Admin.MediaSettingsForm
+  alias ChatWeb.MainLive.Admin.{CargoSettingsForm, MediaSettingsForm}
   alias ChatWeb.MainLive.{Layout, Page}
+  alias ChatWeb.MainLive.Page.RoomForm
+  alias Phoenix.LiveView.JS
+  alias Phoenix.PubSub
 
   on_mount LocalTimeHook
   on_mount UploaderHook
@@ -19,7 +25,12 @@ defmodule ChatWeb.MainLive.Index do
         %{assigns: %{live_action: action}} = socket
       ) do
     Process.flag(:sensitive, true)
-    socket = assign(socket, :operating_system, operating_system)
+
+    socket =
+      socket
+      |> assign(:operating_system, operating_system)
+      |> assign_cargo_settings()
+      |> assign_media_settings()
 
     if connected?(socket) do
       if action == :export do
@@ -39,6 +50,7 @@ defmodule ChatWeb.MainLive.Index do
         |> LocalTimeHook.assign_time(Phoenix.LiveView.get_connect_params(socket)["tz_info"])
         |> allow_any500m_upload(:my_keys_file)
         |> Page.Login.check_stored()
+        |> maybe_set_cargo_room()
         |> ok()
       end
     else
@@ -283,6 +295,16 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("cargo:activate", _params, socket) do
+    CargoRoom.activate(socket.assigns.room.pub_key)
+    noreply(socket)
+  end
+
+  def handle_event("cargo:remove", _params, socket) do
+    CargoRoom.remove()
+    noreply(socket)
+  end
+
   @impl true
   def handle_info({:new_user, card}, socket) do
     socket
@@ -358,6 +380,54 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_info(:update_cargo_settings, socket) do
+    socket
+    |> assign_cargo_settings()
+    |> noreply()
+  end
+
+  def handle_info(:update_media_settings, socket) do
+    socket
+    |> assign_media_settings()
+    |> maybe_set_cargo_room()
+    |> noreply()
+  end
+
+  def handle_info({:create_new_room, %{name: name, type: type}}, socket) do
+    socket
+    |> Page.Lobby.new_room(name, type)
+    |> noreply()
+  end
+
+  def handle_info({:maybe_activate_cargo_room, true, %Room{} = room, room_identity}, socket) do
+    CargoRoom.activate(room.pub_key)
+
+    %CargoSettings{} = cargo_settings = socket.assigns.cargo_settings
+    %Identity{} = me = socket.assigns.me
+
+    cargo_settings.checkpoints
+    |> Enum.each(fn checkpoint_pub_key ->
+      dialog = Dialogs.find_or_open(me, checkpoint_pub_key |> User.by_id())
+
+      room_identity
+      |> Map.put(:name, room.name)
+      |> Messages.RoomInvite.new()
+      |> Dialogs.add_new_message(me, dialog)
+      |> RoomInviteIndex.add(dialog, me)
+    end)
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:maybe_activate_cargo_room, _cargo?, _room, _room_identity}, socket),
+    do: {:noreply, socket}
+
+  def handle_info({:update_cargo_room, cargo_room}, socket) do
+    socket
+    |> assign(:cargo_room, cargo_room)
+    |> noreply()
+  end
+
   def handle_progress(:my_keys_file, %{done?: true}, socket) do
     socket
     |> Page.ImportOwnKeyRing.read_file()
@@ -383,6 +453,16 @@ defmodule ChatWeb.MainLive.Index do
 
   def message_of(%{author_key: _}), do: "room"
   def message_of(_), do: "dialog"
+
+  defp assign_cargo_settings(socket) do
+    cargo_settings = AdminRoom.get_cargo_settings()
+    assign(socket, :cargo_settings, cargo_settings)
+  end
+
+  defp assign_media_settings(socket) do
+    media_settings = AdminRoom.get_media_settings()
+    assign(socket, :media_settings, media_settings)
+  end
 
   defp action_confirmation_popup(assigns) do
     ~H"""
@@ -463,5 +543,17 @@ defmodule ChatWeb.MainLive.Index do
       max_entries: Keyword.get(opts, :max_entries, 1),
       progress: &handle_progress/3
     )
+  end
+
+  defp maybe_set_cargo_room(socket) do
+    %MediaSettings{} = media_settings = socket.assigns.media_settings
+
+    if media_settings.functionality == :cargo do
+      PubSub.subscribe(Chat.PubSub, "chat::cargo_room")
+
+      assign(socket, :cargo_room, CargoRoom.get())
+    else
+      socket
+    end
   end
 end

@@ -11,7 +11,19 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+
+### Changed
+
+### Fixed
+
+## 2023-03-31_d8b27f7___2023-03-31_875d678
+
+### Added
 - Accept all invites in dialog
+- Cargo room type
+- Unique name constraint for Cargo rooms
+- Checkpoints preset
+- Cargo sync flow
 
 ### Changed
 - uploading in one thread

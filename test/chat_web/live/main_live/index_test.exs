@@ -1,12 +1,14 @@
 defmodule ChatWeb.MainLive.IndexTest do
-  use ChatWeb.ConnCase, async: true
+  use ChatWeb.ConnCase, async: false
 
   import ChatWeb.LiveTestHelpers
   import Phoenix.LiveViewTest
 
-  alias Chat.Dialogs
+  alias Chat.Admin.MediaSettings
+  alias Chat.{AdminDb, AdminRoom, Db, Dialogs, User}
   alias Chat.Dialogs.PrivateMessage
   alias Chat.Identity
+  alias Chat.Sync.CargoRoom
 
   describe "room sync between multiple tabs" do
     setup [:current_tab, :another_tab]
@@ -84,6 +86,311 @@ defmodule ChatWeb.MainLive.IndexTest do
 
       assert conn.status == 200
       assert conn.resp_body =~ "Created by Zstream"
+    end
+  end
+
+  describe "cargo room" do
+    setup do
+      AdminDb.db() |> CubDB.clear()
+      Db.db() |> CubDB.clear()
+    end
+
+    test "creation is enabled by media settings functionality option", %{conn: conn} do
+      AdminRoom.store_media_settings(%MediaSettings{})
+      %{view: view} = prepare_view(%{conn: conn})
+
+      view
+      |> element(".t-rooms", "Rooms")
+      |> render_click()
+
+      assert has_element?(view, "#room-create-form")
+      refute has_element?(view, ~S<input[name="room_input[type]"][value="cargo"]>)
+
+      view
+      |> element(".navbar button", "Admin")
+      |> render_click()
+
+      view
+      |> form("#media_settings", %{"media_settings" => %{"functionality" => "cargo"}})
+      |> render_submit()
+
+      view
+      |> element(".t-rooms", "Rooms")
+      |> render_click()
+
+      assert has_element?(view, ~S<input[name="room_input[type]"][value="cargo"]>)
+    end
+
+    test "when name is duplicate it shows an error", %{conn: conn} do
+      AdminRoom.store_media_settings(%MediaSettings{functionality: :cargo})
+      %{view: view} = prepare_view(%{conn: conn})
+
+      view
+      |> element(".t-rooms", "Rooms")
+      |> render_click()
+
+      view
+      |> form("#room-create-form", %{"room_input" => %{"name" => "Cargo Room", "type" => "cargo"}})
+      |> render_submit()
+
+      assert view
+             |> form("#room-create-form", %{
+               "room_input" => %{"name" => "Cargo Room", "type" => "cargo"}
+             })
+             |> render_submit() =~ "has already been taken"
+    end
+
+    test "sends invites to checkpoints in the preset after creation", %{conn: conn} do
+      checkpoint_1 = User.login("Checkpoint 1")
+      checkpoint_1 |> User.register()
+      checkpoint_1_key = checkpoint_1 |> Identity.pub_key()
+      encoded_checkpoint_1_pub_key = checkpoint_1_key |> Base.encode16(case: :lower)
+
+      checkpoint_2 = User.login("Checkpoint 2")
+      checkpoint_2 |> User.register()
+      checkpoint_2_key = checkpoint_2 |> Identity.pub_key()
+      encoded_checkpoint_2_pub_key = checkpoint_2_key |> Base.encode16(case: :lower)
+
+      checkpoint_3 = User.login("Checkpoint 3")
+      checkpoint_3 |> User.register()
+
+      AdminRoom.store_media_settings(%MediaSettings{functionality: :cargo})
+      %{view: view} = prepare_view(%{conn: conn})
+
+      view
+      |> element(".navbar button", "Admin")
+      |> render_click()
+
+      view
+      |> element("#users-rest")
+      |> render_hook("move_user", %{"type" => "rest", "pub_key" => encoded_checkpoint_1_pub_key})
+
+      view
+      |> element("#users-rest")
+      |> render_hook("move_user", %{"type" => "rest", "pub_key" => encoded_checkpoint_2_pub_key})
+
+      view
+      |> element(".t-rooms", "Rooms")
+      |> render_click()
+
+      view
+      |> form("#room-create-form", %{"room_input" => %{"name" => "Cargo Room", "type" => "cargo"}})
+      |> render_submit()
+
+      view
+      |> element(".t-chats", "Chats")
+      |> render_click()
+
+      view
+      |> element("#chatRoomBar ul li.hidden", "Checkpoint 1")
+      |> render_click()
+
+      assert view
+             |> element("#chatRoomBar ul li.hidden", "Checkpoint 1")
+             |> render_click() =~ "is invited by you into"
+
+      assert view
+             |> element("#chatRoomBar ul li.hidden", "Checkpoint 2")
+             |> render_click() =~ "is invited by you into"
+
+      refute view
+             |> element("#chatRoomBar ul li.hidden", "Checkpoint 3")
+             |> render_click() =~ "is invited by you into"
+    end
+  end
+
+  describe "cargo room sync" do
+    setup %{conn: conn} do
+      AdminDb.db() |> CubDB.clear()
+      Db.db() |> CubDB.clear()
+      :sys.replace_state(CargoRoom, fn _state -> nil end)
+      AdminRoom.store_media_settings(%MediaSettings{functionality: :cargo})
+      prepare_view(%{conn: conn})
+    end
+
+    test "starts the flow on room creation", %{view: view} do
+      view
+      |> element(".t-rooms", "Rooms")
+      |> render_click()
+
+      view
+      |> form("#room-create-form", %{
+        "room_input" => %{"name" => "Cargo Room", "type" => "cargo"}
+      })
+      |> render_submit()
+
+      Process.sleep(100)
+
+      refute has_element?(view, ".t-cargo-room")
+      refute has_element?(view, ".t-cargo-activate")
+      assert has_element?(view, ".t-cargo-remove")
+      html = render(view)
+      assert html =~ "Cargo sync activated"
+      assert html =~ "Insert empty USB drive"
+      assert String.contains?(html, "2:00") or String.contains?(html, "1:59")
+
+      Process.sleep(1000)
+      assert render(view) =~ ~r/1:5\d/
+
+      %{socket: socket} = reload_view(%{view: view})
+      CargoRoom.sync(socket.assigns.room.pub_key)
+      Process.sleep(100)
+
+      assert render(view) =~ "Syncing..."
+      refute has_element?(view, ".t-cargo-remove")
+
+      CargoRoom.mark_successful()
+      CargoRoom.complete()
+      Process.sleep(100)
+
+      assert render(view) =~ "Complete!"
+      assert has_element?(view, ".t-cargo-room")
+      assert has_element?(view, ".t-cargo-remove")
+
+      view
+      |> element(".t-cargo-remove")
+      |> render_click()
+
+      refute has_element?(view, ".t-cargo-room")
+      refute render(view) =~ "Cargo sync activated"
+    end
+
+    test "starts the flow in existing room", %{view: view} do
+      view
+      |> element(".t-rooms", "Rooms")
+      |> render_click()
+
+      view
+      |> form("#room-create-form", %{
+        "room_input" => %{"name" => "Regular Room", "type" => "public"}
+      })
+      |> render_submit()
+
+      refute has_element?(view, ".t-cargo-room")
+      assert has_element?(view, ".t-cargo-activate")
+
+      view
+      |> element(".t-cargo-activate")
+      |> render_click()
+
+      refute has_element?(view, ".t-cargo-room")
+      refute has_element?(view, ".t-cargo-activate")
+      assert has_element?(view, ".t-cargo-remove")
+      html = render(view)
+      assert html =~ "Cargo sync activated"
+      assert html =~ "Insert empty USB drive"
+      assert html =~ "2:00"
+    end
+
+    test "starts the flow from platform", %{view: view} do
+      view
+      |> element(".t-rooms", "Rooms")
+      |> render_click()
+
+      view
+      |> form("#room-create-form", %{
+        "room_input" => %{"name" => "Regular Room", "type" => "public"}
+      })
+      |> render_submit()
+
+      %{socket: socket} = reload_view(%{view: view})
+      room_key = socket.assigns.room.pub_key
+
+      view
+      |> form("#room-create-form", %{
+        "room_input" => %{"name" => "Another Regular Room", "type" => "public"}
+      })
+      |> render_submit()
+
+      refute has_element?(view, ".t-cargo-room")
+      assert has_element?(view, ".t-cargo-activate")
+
+      CargoRoom.sync(room_key)
+      Process.sleep(100)
+
+      refute has_element?(view, ".t-cargo-room")
+      refute has_element?(view, ".t-cargo-activate")
+      refute has_element?(view, ".t-cargo-remove")
+      refute render(view) =~ "Cargo sync activated"
+
+      CargoRoom.mark_successful()
+      CargoRoom.complete()
+      Process.sleep(100)
+
+      assert has_element?(view, ".t-cargo-room")
+      assert has_element?(view, ".t-cargo-activate")
+      refute has_element?(view, ".t-cargo-remove")
+      refute render(view) =~ "Cargo sync activated"
+
+      view
+      |> element(".t-cargo-room", "Cargo Room")
+      |> render_click()
+
+      refute has_element?(view, ".t-cargo-activate")
+      assert has_element?(view, ".t-cargo-remove")
+      html = render(view)
+      assert html =~ "Cargo sync activated"
+      assert html =~ "Complete!"
+    end
+
+    test "fails syncing", %{view: view} do
+      view
+      |> element(".t-rooms", "Rooms")
+      |> render_click()
+
+      view
+      |> form("#room-create-form", %{
+        "room_input" => %{"name" => "Cargo Room", "type" => "cargo"}
+      })
+      |> render_submit()
+
+      Process.sleep(100)
+
+      assert render(view) =~ "Cargo sync activated"
+
+      %{socket: socket} = reload_view(%{view: view})
+      CargoRoom.sync(socket.assigns.room.pub_key)
+      Process.sleep(100)
+
+      assert render(view) =~ "Syncing..."
+
+      CargoRoom.complete()
+      Process.sleep(100)
+
+      assert render(view) =~ "Failed!"
+      refute has_element?(view, ".t-cargo-room")
+      assert has_element?(view, ".t-cargo-remove")
+
+      view
+      |> element(".t-cargo-remove")
+      |> render_click()
+
+      refute has_element?(view, ".t-cargo-room")
+      refute render(view) =~ "Cargo sync activated"
+    end
+
+    test "stops the process early", %{view: view} do
+      view
+      |> element(".t-rooms", "Rooms")
+      |> render_click()
+
+      view
+      |> form("#room-create-form", %{
+        "room_input" => %{"name" => "Cargo Room", "type" => "cargo"}
+      })
+      |> render_submit()
+
+      Process.sleep(100)
+
+      assert render(view) =~ "Cargo sync activated"
+      assert has_element?(view, ".t-cargo-remove")
+
+      view
+      |> element(".t-cargo-remove")
+      |> render_click()
+
+      refute has_element?(view, ".t-cargo-room")
+      refute render(view) =~ "Cargo sync activated"
     end
   end
 

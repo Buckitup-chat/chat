@@ -4,13 +4,158 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
   import ChatWeb.LiveTestHelpers
   import Phoenix.LiveViewTest
 
-  alias Chat.Admin.MediaSettings
-  alias Chat.{AdminDb, AdminRoom}
+  alias Chat.Admin.{CargoSettings, MediaSettings}
+  alias Chat.{AdminDb, AdminRoom, Db, Identity, User}
+  alias Chat.Db.ChangeTracker
   alias Phoenix.PubSub
 
   setup do
-    AdminDb.db()
-    |> CubDB.clear()
+    CubDB.clear(AdminDb.db())
+    CubDB.clear(Db.db())
+  end
+
+  describe "cargo settings form" do
+    test "saves checkpoints preset to the admin DB", %{conn: conn} do
+      %{socket: socket, view: view} = prepare_view(%{conn: conn})
+
+      encoded_user_pub_key =
+        socket.assigns.me
+        |> Identity.pub_key()
+        |> Base.encode16(case: :lower)
+
+      encoded_checkpoint_1_pub_key =
+        "Checkpoint 1"
+        |> User.login()
+        |> tap(&User.register/1)
+        |> Identity.pub_key()
+        |> Base.encode16(case: :lower)
+
+      checkpoint_2_pub_key =
+        "Checkpoint 2"
+        |> User.login()
+        |> tap(&User.register/1)
+        |> Identity.pub_key()
+
+      ChangeTracker.await()
+
+      encoded_checkpoint_2_pub_key = Base.encode16(checkpoint_2_pub_key, case: :lower)
+
+      html =
+        view
+        |> element(".navbar button", "Admin")
+        |> render_click()
+
+      refute html =~ "Cargo checkpoints preset"
+
+      view
+      |> form("#media_settings", %{"media_settings" => %{"functionality" => "cargo"}})
+      |> render_submit()
+
+      html = render(view)
+
+      assert html =~ "Cargo checkpoints preset"
+      assert html =~ "Checkpoints are automatically invited to the Cargo rooms you create."
+
+      assert has_element?(view, ".users-title", "Checkpoints")
+      assert has_element?(view, ".users-title", "Other users")
+
+      refute_users(view, "checkpoints", ["Checkpoint 1", "Checkpoint 2"])
+      assert_users(view, "rest", ["Checkpoint 1", "Checkpoint 2"])
+
+      view
+      |> element(
+        ~s(li[phx-value-type="rest"][phx-value-pub-key="#{encoded_checkpoint_1_pub_key}"])
+      )
+      |> render_click()
+
+      view
+      |> element("button", "Add")
+      |> render_click()
+
+      assert_users(view, "checkpoints", ["Checkpoint 1"])
+      refute_users(view, "checkpoints", ["Checkpoint 2"])
+      assert_users(view, "rest", ["Checkpoint 2"])
+      refute_users(view, "rest", ["Checkpoint 1"])
+
+      assert has_element?(
+               view,
+               ~s(li.selected-user[phx-value-pub-key="#{encoded_checkpoint_2_pub_key}"])
+             )
+
+      view
+      |> element(
+        ~s(li[phx-value-type="checkpoints"][phx-value-pub-key="#{encoded_checkpoint_1_pub_key}"])
+      )
+      |> render_click()
+
+      view
+      |> element("button", "Remove")
+      |> render_click()
+
+      refute_users(view, "checkpoints", ["Checkpoint 1", "Checkpoint 2"])
+      assert_users(view, "rest", ["Checkpoint 1", "Checkpoint 2"])
+
+      refute has_element?(view, "li.selected-user")
+
+      view
+      |> element("#users-rest")
+      |> render_hook("move_user", %{"type" => "rest", "pub_key" => encoded_checkpoint_2_pub_key})
+
+      assert has_element?(
+               view,
+               ~s(li.selected-user[phx-value-pub-key="#{encoded_user_pub_key}"])
+             )
+
+      view
+      |> element("#users-rest")
+      |> render_hook("move_user", %{"type" => "rest", "pub_key" => encoded_checkpoint_1_pub_key})
+
+      assert has_element?(
+               view,
+               ~s(li.selected-user[phx-value-pub-key="#{encoded_user_pub_key}"])
+             )
+
+      view
+      |> element("#users-checkpoints")
+      |> render_hook("move_user", %{
+        "type" => "checkpoints",
+        "pub_key" => encoded_checkpoint_1_pub_key
+      })
+
+      assert_users(view, "checkpoints", ["Checkpoint 2"])
+      refute_users(view, "checkpoints", ["Checkpoint 1"])
+      assert_users(view, "rest", ["Checkpoint 1"])
+      refute_users(view, "rest", ["Checkpoint 2"])
+
+      assert has_element?(
+               view,
+               ~s(li.selected-user[phx-value-pub-key="#{encoded_checkpoint_2_pub_key}"])
+             )
+
+      assert %CargoSettings{} = cargo_settings = AdminRoom.get_cargo_settings()
+      assert cargo_settings.checkpoints == [checkpoint_2_pub_key]
+    end
+
+    defp assert_users(view, type, users) do
+      Enum.each(users, fn user ->
+        assert view
+               |> element(~s(.users-list li[phx-value-type="#{type}"] p), user)
+               |> has_element?(),
+               "Expected to have #{user} in #{humanized_type(type)}"
+      end)
+    end
+
+    defp refute_users(view, type, users) do
+      Enum.each(users, fn user ->
+        refute view
+               |> element(~s(.users-list li[phx-value-type="#{type}"] p), user)
+               |> has_element?(),
+               "Expected not to have #{user} in #{humanized_type(type)}"
+      end)
+    end
+
+    defp humanized_type("checkpoints"), do: "Checkpoints"
+    defp humanized_type("rest"), do: "Other users"
   end
 
   describe "media settings form" do

@@ -290,7 +290,9 @@
               id="sidebarRooms"
               class={
                 classes("w-6 h-6 hover:fill-purple", %{
-                  "fill-purple" => @lobby_mode == :rooms,
+                  "fill-purple" =>
+                    @lobby_mode == :rooms &&
+                      assigns[:cargo_room][:pub_key] != assigns[:room][:pub_key],
                   "fill-grayscale" => @lobby_mode != :rooms
                 })
               }
@@ -327,6 +329,19 @@
               <span class="text-xs">Admin</span>
             </button>
           <% end %>
+          <%= if assigns[:cargo_room][:status] == :complete do %>
+            <button
+              phx-click="room/switch"
+              phx-value-room={Room.hash(@cargo_room.pub_key)}
+              class="sidebarIcon"
+            >
+              <.icon
+                id="sidebarRooms"
+                class={"w-6 h-6 hover:fill-purple " <> if(@cargo_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}
+              />
+              <span class="text-xs">Cargo Room</span>
+            </button>
+          <% end %>
         </div>
         <div class="navbar">
           <div class="sm:flex flex-col items-center">
@@ -346,7 +361,9 @@
                 id="sidebarRooms"
                 class={
                   classes("w-6 h-6 hover:fill-purple", %{
-                    "fill-purple" => @lobby_mode == :rooms,
+                    "fill-purple" =>
+                      @lobby_mode == :rooms &&
+                        assigns[:cargo_room][:pub_key] != assigns[:room][:pub_key],
                     "fill-grayscale" => @lobby_mode != :rooms
                   })
                 }
@@ -385,6 +402,19 @@
                   }
                 />
                 <span class="text-xs">Admin</span>
+              </button>
+            <% end %>
+            <%= if assigns[:cargo_room][:status] == :complete do %>
+              <button
+                phx-click="room/switch"
+                phx-value-room={Room.hash(@cargo_room.pub_key)}
+                class="sidebarIcon mt-5 t-cargo-room"
+              >
+                <.icon
+                  id="sidebarRooms"
+                  class={"w-6 h-6 hover:fill-purple " <> if(@cargo_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}
+                />
+                <span class="text-xs">Cargo Room</span>
               </button>
             <% end %>
           </div>
@@ -548,103 +578,7 @@
           <div id="chatRoomBar" class="chatRoomBar">
             <.modal id="create-room-popup" class="">
               <h1 class="text-base font-bold text-grayscale">Create Room</h1>
-              <.form
-                :let={f}
-                for={:new_room}
-                id="room-create-form"
-                autocomplete="off"
-                phx-submit={hide_modal("create-room-popup") |> JS.push("room/create")}
-              >
-                <%= text_input(f, :name,
-                  placeholder: "Name your Room",
-                  class:
-                    "w-full h-11 mt-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-0"
-                ) %>
-
-                <p class="mt-3 text-black/50 text-sm">Room Type</p>
-                <div class="mt-3 flex flex-col">
-                  <a class="inline t-open-room">
-                    <input
-                      class="cursor-pointer text-orange-500"
-                      type="radio"
-                      id="typeChoice1"
-                      name="new_room[type]"
-                      value="public"
-                      checked
-                      phx-click={
-                        JS.dispatch("room:switch-type",
-                          to: "#typeChoice1",
-                          detail: %{
-                            description: "Public room is visible for everyone. Anyone can join.",
-                            id: "roomTypeDescription"
-                          }
-                        )
-                      }
-                    />
-                    <label class="cursor-pointer ml-1 text-black/50 text-sm" for="typeChoice1">
-                      Open
-                    </label>
-                  </a>
-                  <a class="inline">
-                    <input
-                      class="cursor-pointer text-orange-500 t-private-room"
-                      type="radio"
-                      id="typeChoice2"
-                      name="new_room[type]"
-                      value="request"
-                      phx-click={
-                        JS.dispatch("room:switch-type",
-                          to: "#typeChoice2",
-                          detail: %{
-                            description:
-                              "Private Room is visible for everyone. Anyone can send request and join if approved by a room member",
-                            id: "roomTypeDescription"
-                          }
-                        )
-                      }
-                    />
-                    <label class="cursor-pointer ml-1 text-black/50 text-sm" for="typeChoice2">
-                      Private
-                    </label>
-                  </a>
-                  <a class="inline">
-                    <input
-                      class="cursor-pointer text-orange-500 t-secret-room"
-                      type="radio"
-                      id="typeChoice3"
-                      name="new_room[type]"
-                      value="private"
-                      phx-click={
-                        JS.dispatch("room:switch-type",
-                          to: "#typeChoice3",
-                          detail: %{
-                            description:
-                              "Secret Room is not visible, only invited users can join",
-                            id: "roomTypeDescription"
-                          }
-                        )
-                      }
-                    />
-                    <label class="cursor-pointer ml-1 text-black/50 text-sm" for="typeChoice3">
-                      Secret
-                    </label>
-                  </a>
-                </div>
-                <div class="mt-5 py-1 w-full min-h-fit flex items-center justify-start border-0 rounded-lg bg-black/10">
-                  <.icon id="alert" class="basis-1/12 mr-2 w-4 h-4 fill-black/40" />
-                  <blockquote
-                    id="roomTypeDescription"
-                    class="basis-11/12 text-xs text-black/50 mr-3"
-                  >
-                    Public room is visible for everyone. Anyone can join.
-                  </blockquote>
-                </div>
-                <%= submit("Create",
-                  phx_disable_with: "Saving...",
-                  class:
-                    "w-full h-11 mt-2 text-white border-0 rounded-lg bg-grayscale flex items-center justify-center t-submit-create"
-                ) %>
-              </.form>
+              <.live_component id={:room_form} media_settings={@media_settings} module={RoomForm} />
             </.modal>
             <div class="px-7 mt-3 flex items-center justify-between">
               <h5 class="channel-block-text text-grayscale" style="font-size: 22px;">Rooms</h5>
@@ -754,44 +688,57 @@
                 data-has-more-messages={"#{@has_more_messages}"}
               >
                 <div
+                  class="w-full sticky top-0 right-0"
                   phx-click={JS.dispatch("phx:scroll-to-bottom")}
-                  class={
-                    classes(
-                      "w-full px-8 border-b border-white/10 backdrop-blur-md bg-black/20 z-10 flex flex-row items-center justify-between sticky top-0 right-0"
-                    )
-                  }
-                  style="min-height: 56px;"
                 >
-                  <div class="flex flex-row items-center">
-                    <button
-                      phx-click={JS.push("room/close") |> close_content()}
-                      class="sm:hidden pr-3"
-                    >
-                      <.icon id="arrowBack" class="w-6 h-6 fill-white" />
-                    </button>
-                    <%= if @room.type == :public do %>
-                      <.icon id="open" class="w-4 h-4 fill-white" />
-                    <% end %>
-                    <%= if @room.type == :private do %>
-                      <.icon id="secret" class="w-4 h-4 fill-white" />
-                    <% end %>
-                    <%= if @room.type == :request do %>
-                      <.icon id="private" class="w-5 h-5 stroke-white" />
-                    <% end %>
-                    <Layout.Card.hashed_name room={@room} style_spec={:chat_header} />
-                  </div>
-                  <div class="flex flex-row justify-between">
-                    <%= if @room.type == :request do %>
-                      <.room_request_button
-                        requests={@room_requests}
+                  <div
+                    class="w-full px-8 border-b border-white/10 backdrop-blur-md bg-black/20 z-10 flex flex-row items-center justify-between"
+                    style="min-height: 56px;"
+                  >
+                    <div class="flex flex-row items-center">
+                      <button
+                        phx-click={JS.push("room/close") |> close_content()}
+                        class="sm:hidden pr-3"
+                      >
+                        <.icon id="arrowBack" class="w-6 h-6 fill-white" />
+                      </button>
+                      <%= if @room.type == :public do %>
+                        <.icon id="open" class="w-4 h-4 fill-white" />
+                      <% end %>
+                      <%= if @room.type == :private do %>
+                        <.icon id="secret" class="w-4 h-4 fill-white" />
+                      <% end %>
+                      <%= if @room.type == :request do %>
+                        <.icon id="private" class="w-5 h-5 stroke-white" />
+                      <% end %>
+                      <Layout.Card.hashed_name room={@room} style_spec={:chat_header} />
+                    </div>
+
+                    <div class="flex flex-row justify-between">
+                      <Layout.CargoRoom.button
+                        cargo_room={assigns[:cargo_room]}
+                        media_settings={@media_settings}
+                        room={@room}
+                      />
+
+                      <%= if @room.type == :request do %>
+                        <.room_request_button
+                          requests={@room_requests}
+                          restricted={@db_status.writable == :no}
+                        />
+                      <% end %>
+                      <.room_invite_button
+                        users={Chat.User.list()}
                         restricted={@db_status.writable == :no}
                       />
-                    <% end %>
-                    <.room_invite_button
-                      users={Chat.User.list()}
-                      restricted={@db_status.writable == :no}
-                    />
+                    </div>
                   </div>
+
+                  <Layout.CargoRoom.bar
+                    cargo_room={assigns[:cargo_room]}
+                    media_settings={@media_settings}
+                    room={@room}
+                  />
                 </div>
 
                 <%= if @room.type == :request do %>
@@ -1001,7 +948,11 @@
                 </section>
               </Layout.Admin.block>
               <Layout.Admin.block title="Media settings">
-                <.live_component id={:media_settings_form} module={MediaSettingsForm} />
+                <.live_component
+                  id={:media_settings_form}
+                  media_settings={@media_settings}
+                  module={MediaSettingsForm}
+                />
               </Layout.Admin.block>
             </Layout.Admin.row>
             <Layout.Admin.row>
@@ -1081,6 +1032,17 @@
                 </section>
               </Layout.Admin.block>
             </Layout.Admin.row>
+            <%= if @media_settings.functionality == :cargo do %>
+              <Layout.Admin.row>
+                <Layout.Admin.block title="Cargo checkpoints preset">
+                  <.live_component
+                    id={:cargo_settings_form}
+                    cargo_settings={@cargo_settings}
+                    module={CargoSettingsForm}
+                  />
+                </Layout.Admin.block>
+              </Layout.Admin.row>
+            <% end %>
           </Layout.Admin.container>
         <% end %>
       </div>

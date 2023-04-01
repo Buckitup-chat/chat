@@ -14,6 +14,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   attr :pub_key, :string, required: true, doc: "peer or room pub key"
   attr :type, :atom, required: true, doc: ":dialog or :room"
   attr :uploads, :map, required: true, doc: "uploads metadata"
+  attr :uploads_order, :list, required: true, doc: "uploads order"
 
   def uploader(assigns) do
     ~H"""
@@ -26,7 +27,13 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       }
       id="file-uploader"
     >
-      <.entries config={@config} pub_key={@pub_key} type={@type} uploads={@uploads} />
+      <.entries
+        config={@config}
+        pub_key={@pub_key}
+        type={@type}
+        uploads={@uploads}
+        uploads_order={@uploads_order}
+      />
     </div>
     """
   end
@@ -36,6 +43,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   attr :pub_key, :string, required: true, doc: "peer or room pub key"
   attr :type, :string, required: true, doc: "dialog or room"
   attr :uploads, :map, required: true, doc: "uploads metadata"
+  attr :uploads_order, :list, required: true, doc: "uploads order"
 
   def mobile_uploader(assigns) do
     assigns =
@@ -61,6 +69,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
             pub_key={@pub_key}
             type={String.to_existing_atom(@type)}
             uploads={@uploads}
+            uploads_order={@uploads_order}
           />
         </div>
       </div>
@@ -147,6 +156,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   attr :pub_key, :string, required: true, doc: "peer or room pub key"
   attr :type, :atom, required: true, doc: ":dialog or :room"
   attr :uploads, :map, required: true, doc: "uploads metadata"
+  attr :uploads_order, :list, required: true, doc: "uploads order"
 
   defp entries(%{uploads: uploads} = assigns) when map_size(uploads) > 0 do
     ~H"""
@@ -156,10 +166,10 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       phx-mounted={JS.dispatch("phx:scroll-uploads-to-top")}
       phx-hook="SortableUploadEntries"
     >
-      <%= for %UploadEntry{valid?: true} = entry <- @config.entries do %>
+      <%= for uuid <- @uploads_order do %>
         <.entry
-          entry={entry}
-          metadata={@uploads[entry.uuid]}
+          entry={Enum.find(@config.entries, &(&1.uuid == uuid and &1.valid?))}
+          metadata={@uploads[uuid]}
           mobile?={@mobile?}
           pub_key={@pub_key}
           type={@type}
@@ -175,13 +185,14 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     """
   end
 
-  attr :entry, UploadEntry, required: true, doc: "upload entry"
+  attr :entry, UploadEntry, doc: "upload entry"
   attr :mobile?, :boolean, required: true
   attr :metadata, UploadMetadata, doc: "upload metadata"
   attr :pub_key, :string, required: true, doc: "peer or room pub key"
   attr :type, :atom, required: true, doc: ":dialog or :room"
 
-  defp entry(%{metadata: nil} = assigns) do
+  defp entry(%{entry: entry, metadata: metadata} = assigns)
+       when is_nil(entry) or is_nil(metadata) do
     ~H"""
 
     """

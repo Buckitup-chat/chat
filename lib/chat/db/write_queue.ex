@@ -99,23 +99,27 @@ defmodule Chat.Db.WriteQueue do
   defp produce(q_state(consumer: nil) = state), do: state
   defp produce(q_state(in_demand: false) = state), do: state
 
-  defp produce(q_state(buffer: buf, consumer: pid, mirrors: mirrors) = state) do
+  defp produce(q_state(consumer: pid) = state) do
     if Process.alive?(pid) do
-      case buffer_yield(buf) do
-        {:ignored, _} ->
-          state
-
-        {payload, new_buf} ->
-          GenServer.cast(pid, payload)
-
-          if mirrors do
-            Enum.each(mirrors, &GenServer.cast(&1, {:mirror, payload}))
-          end
-
-          state |> q_state(buffer: new_buf, in_demand: false)
-      end
+      state |> produce_to_consumer()
     else
       state |> q_state(consumer: nil)
+    end
+  end
+
+  defp produce_to_consumer(q_state(buffer: buf, consumer: pid, mirrors: mirrors) = state) do
+    case buffer_yield(buf) do
+      {:ignored, _} ->
+        state
+
+      {payload, new_buf} ->
+        GenServer.cast(pid, payload)
+
+        if mirrors do
+          Enum.each(mirrors, &GenServer.cast(&1, {:mirror, payload}))
+        end
+
+        state |> q_state(buffer: new_buf, in_demand: false)
     end
   end
 end

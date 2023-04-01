@@ -455,6 +455,7 @@
               pub_key={assigns[:peer][:pub_key]}
               type={:dialog}
               uploads={@uploads_metadata}
+              uploads_order={@file_uploads_order}
             />
           </div>
           <div
@@ -528,6 +529,7 @@
                     pub_key={@peer.pub_key}
                     type="dialog"
                     uploads={@uploads_metadata}
+                    uploads_order={@file_uploads_order}
                   />
                 </div>
               </div>
@@ -717,6 +719,7 @@
               pub_key={assigns[:room][:pub_key]}
               type={:room}
               uploads={@uploads_metadata}
+              uploads_order={@file_uploads_order}
             />
           </div>
           <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
@@ -876,6 +879,7 @@
                     pub_key={@room.pub_key}
                     type="room"
                     uploads={@uploads_metadata}
+                    uploads_order={@file_uploads_order}
                   />
                 </div>
               </div>

@@ -19,7 +19,7 @@ defmodule ChatWeb.ZipController do
   alias ChatWeb.MainLive.Layout.Message
 
   alias Phoenix.HTML.Safe
-  alias Phoenix.LiveView.HTMLEngine
+  alias Phoenix.LiveView.TagEngine
 
   def get(conn, params) do
     with %{"broker_key" => broker_key} <- params,
@@ -54,7 +54,7 @@ defmodule ChatWeb.ZipController do
       messages_stream =
         messages
         |> Stream.map(fn msg ->
-          HTMLEngine.component(
+          TagEngine.component(
             &Message.message_block/1,
             [
               chat_type: type,

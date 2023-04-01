@@ -13,6 +13,7 @@ straightforward as possible.
 ### Added
 
 ### Changed
+- dependencies update
 
 ### Fixed
 

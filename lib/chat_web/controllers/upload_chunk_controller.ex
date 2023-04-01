@@ -33,21 +33,8 @@ defmodule ChatWeb.UploadChunkController do
     end
   end
 
-  defp save_chunk_till({key, range, size, chunk} = data, till) do
-    if ChunkedFiles.save_upload_chunk(key, range, size, chunk) == :ok do
-      # Logger.debug("+")
-      :ok
-    else
-      # Logger.debug("_")
-      Process.sleep(100)
-      save_chunk_till(data, till)
-    end
-
-    # Slows down upload tremendeously
-    #
-    # time_mark() > till ->
-    #   # Logger.debug("-")
-    #   :failed
+  defp save_chunk_till({key, range, size, chunk} = data, _till) do
+    ChunkedFiles.save_upload_chunk(key, range, size, chunk)
   end
 
   defp time_mark, do: System.monotonic_time(:second)

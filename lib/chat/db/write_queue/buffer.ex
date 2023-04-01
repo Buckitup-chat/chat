@@ -12,7 +12,8 @@ defmodule Chat.Db.WriteQueue.Buffer do
     delete_keys: nil,
     log: nil,
     stream: nil,
-    chunk: nil
+    chunk: nil,
+    chunk_q: :queue.new()
   )
 
   def buffer_has_chunk?(buffer(chunk: chunk)), do: nil != chunk
@@ -20,6 +21,9 @@ defmodule Chat.Db.WriteQueue.Buffer do
 
   def buffer_chunk(buf, chunk), do: buffer(buf, chunk: chunk)
   def buffer_stream(buf, stream), do: buffer(buf, stream: stream)
+
+  def buffer_enqueue_chunk(buffer(chunk_q: q) = buf, pid, chunk),
+    do: buffer(chunk_q: :queue.in({pid, chunk}, q))
 
   def buffer_add_data(buffer(data: list) = buf, data), do: buffer(buf, data: append(list, data))
   def buffer_add_log(buffer(log: list) = buf, data), do: buffer(buf, log: append(list, data))
@@ -49,7 +53,7 @@ defmodule Chat.Db.WriteQueue.Buffer do
 
       chunk = buffer(buf, :chunk) ->
         "chunk" |> log()
-        {{:write, [chunk]}, buffer(buf, chunk: nil)}
+        handle_chunk(buf)
 
       true ->
         {:ignored, buf}
@@ -60,6 +64,16 @@ defmodule Chat.Db.WriteQueue.Buffer do
     {data, stream} = stream_yield(stream)
 
     {{:write, data}, buffer(buf, stream: stream)}
+  end
+
+  defp handle_chunk(bufffer(chunk: chunk, chunk_q: q) = buf) do
+    with {{:value, {pid, next_chunk}}, new_q} <- :queue.out(q) do
+      pid |> GenServer.reply(:ok)
+      {{:write, [chunk]}, buffer(buf, chunk: next_chunk, chunk_q: new_q)}
+    else
+      _ ->
+        {{:write, [chunk]}, buffer(buf, chunk: nil)}
+    end
   end
 
   defp stream_yield(stream) do

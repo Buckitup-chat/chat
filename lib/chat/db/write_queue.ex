@@ -19,7 +19,7 @@ defmodule Chat.Db.WriteQueue do
 
   def set_mirrors(sink, server), do: GenServer.cast(server, {:mirrors, sink})
 
-  def put_chunk(chunk, server), do: GenServer.call(server, {:put_chunk, chunk})
+  def put_chunk(chunk, server), do: GenServer.call(server, {:put_chunk, chunk}, :infinity)
   def put_stream(stream, server), do: GenServer.call(server, {:put_stream, stream})
 
   @doc "This will send data back to pid provided, with genserver cast as {:write, [data]} | {:delete, [:key]}"
@@ -57,9 +57,11 @@ defmodule Chat.Db.WriteQueue do
     end
   end
 
-  def handle_call({:put_chunk, chunk}, _, q_state(buffer: buf) = state) do
+  def handle_call({:put_chunk, chunk}, from_pid, q_state(buffer: buf) = state) do
     if buffer_has_chunk?(buf) do
-      state |> reply(:ignored)
+      state
+      |> q_state(buffer: buffer_enqueue_chunk(buf, from_pid, chunk)
+      |> noreply()
     else
       state
       |> q_state(buffer: buffer_chunk(buf, chunk))

@@ -13,6 +13,7 @@ straightforward as possible.
 ### Added
 
 ### Changed
+- dependencies update
 
 ### Fixed
 
@@ -27,7 +28,6 @@ straightforward as possible.
 
 ### Changed
 - uploading in one thread
-- dependencies update
 
 ### Fixed
 - UI: uploads scroll to top on uploader mount 

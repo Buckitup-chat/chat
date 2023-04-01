@@ -19,7 +19,6 @@ defmodule ChatWeb.ZipController do
   alias ChatWeb.MainLive.Layout.Message
 
   alias Phoenix.HTML.Safe
-  alias Phoenix.LiveView.HTMLEngine
 
   def get(conn, params) do
     with %{"broker_key" => broker_key} <- params,
@@ -54,20 +53,18 @@ defmodule ChatWeb.ZipController do
       messages_stream =
         messages
         |> Stream.map(fn msg ->
-          HTMLEngine.component(
-            &Message.message_block/1,
-            [
-              chat_type: type,
-              export?: true,
-              msg: msg,
-              me: me,
-              my_id: my_id,
-              peer: peer,
-              room: room,
-              timezone: timezone
-            ],
-            {__ENV__.module, __ENV__.function, __ENV__.file, __ENV__.line}
-          )
+          Message.message_block(%{
+            chat_type: type,
+            export?: true,
+            msg: msg,
+            me: me,
+            my_id: my_id,
+            peer: peer,
+            room: room,
+            timezone: timezone
+          })
+          |> IO.inspect()
+          # {__ENV__.module, __ENV__.function, __ENV__.file, __ENV__.line}
           |> Safe.to_iodata()
         end)
 

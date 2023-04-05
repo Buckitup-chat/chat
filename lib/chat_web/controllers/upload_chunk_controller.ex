@@ -33,7 +33,7 @@ defmodule ChatWeb.UploadChunkController do
     end
   end
 
-  defp save_chunk_till({key, range, size, chunk} = data, _till) do
+  defp save_chunk_till({key, range, size, chunk} = _data, _till) do
     ChunkedFiles.save_upload_chunk(key, range, size, chunk)
   end
 

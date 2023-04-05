@@ -60,7 +60,7 @@ defmodule Chat.Db.WriteQueue do
   def handle_call({:put_chunk, chunk}, from_pid, q_state(buffer: buf) = state) do
     if buffer_has_chunk?(buf) do
       state
-      |> q_state(buffer: buffer_enqueue_chunk(buf, from_pid, chunk)
+      |> q_state(buffer: buffer_enqueue_chunk(buf, from_pid, chunk))
       |> noreply()
     else
       state

@@ -715,11 +715,7 @@
                     </div>
 
                     <div class="flex flex-row justify-between">
-                      <Layout.CargoRoom.button
-                        cargo_room={assigns[:cargo_room]}
-                        media_settings={@media_settings}
-                        room={@room}
-                      />
+                      <Layout.CargoRoom.button cargo_sync={assigns[:cargo_sync]} />
 
                       <%= if @room.type == :request do %>
                         <.room_request_button

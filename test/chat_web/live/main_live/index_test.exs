@@ -282,6 +282,27 @@ defmodule ChatWeb.MainLive.IndexTest do
       assert html =~ "2:00"
     end
 
+    test "is disabled for rooms with non-unique names", %{view: view} do
+      view
+      |> element(".t-rooms", "Rooms")
+      |> render_click()
+
+      view
+      |> form("#room-create-form", %{
+        "room_input" => %{"name" => "Regular Room", "type" => "public"}
+      })
+      |> render_submit()
+
+      view
+      |> form("#room-create-form", %{
+        "room_input" => %{"name" => "Regular Room", "type" => "public"}
+      })
+      |> render_submit()
+
+      assert has_element?(view, ".t-cargo-activate")
+      refute render(view) =~ "phx-click=\"cargo:activate\""
+    end
+
     test "starts the flow from platform", %{view: view} do
       view
       |> element(".t-rooms", "Rooms")

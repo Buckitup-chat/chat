@@ -87,16 +87,25 @@ defmodule ChatWeb.MainLive.Layout.CargoRoom do
     """
   end
 
+  attr :cargo_sync, :atom, doc: "either one of: :disabled, :enabled, :duplicate_name"
+
+  def button(%{cargo_sync: :enabled} = assigns) do
+    ~H"""
+    <div class="mr-2 text-base text-white cursor-pointer t-cargo-activate" phx-click="cargo:activate">
+      Cargo sync
+    </div>
+    """
+  end
+
+  def button(%{cargo_sync: :duplicate_name} = assigns) do
+    ~H"""
+    <div class="mr-2 text-base text-white t-cargo-activate">Cargo sync</div>
+    """
+  end
+
   def button(assigns) do
     ~H"""
-    <%= if @media_settings.functionality == :cargo && (!@cargo_room || @cargo_room.pub_key != @room.pub_key && @cargo_room.status != :syncing) do %>
-      <div
-        class="mr-2 text-base text-white cursor-pointer t-cargo-activate"
-        phx-click="cargo:activate"
-      >
-        Cargo sync
-      </div>
-    <% end %>
+
     """
   end
 end

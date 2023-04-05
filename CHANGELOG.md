@@ -16,6 +16,7 @@ straightforward as possible.
 - dependencies update
 
 ### Fixed
+- Improved sync speed
 
 ## 2023-03-31_d8b27f7___2023-03-31_875d678
 

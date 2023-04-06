@@ -83,7 +83,7 @@ defmodule Chat.Log do
   defp build(later, earlier) do
     {{@db_key, earlier, ""}, {@db_key, later, :binary.copy(<<255>>, 100)}}
     |> Db.list()
-    |> Enum.map(fn {{@db_key, _index, who}, data} -> {who, data} end)
+    |> Enum.map(fn {{@db_key, _index, who}, data} -> {UUID.uuid4(), who, data} end)
     |> Enum.reverse()
   end
 

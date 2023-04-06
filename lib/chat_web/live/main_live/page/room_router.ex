@@ -4,6 +4,7 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
   import Phoenix.LiveView, only: [push_event: 3]
 
   alias ChatWeb.MainLive.Layout.Message
+  alias ChatWeb.MainLive.Modals
   alias ChatWeb.MainLive.Page
 
   #
@@ -39,6 +40,12 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
       {"download-messages", params} ->
         socket |> Page.Room.download_messages(params)
 
+      {"unlink-messages-modal", _} ->
+        socket |> Page.Room.unlink_messages_modal(Modals.UnlinkMessages)
+
+      {"unlink-messages", _} ->
+        socket |> Page.Room.unlink_messages(&Message.message_link/1)
+
       {"toggle-messages-select", params} ->
         socket |> Page.Room.toggle_messages_select(params)
 
@@ -70,8 +77,26 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
       "download" ->
         socket |> Page.Room.download_message(msg_id)
 
+      "link" ->
+        socket
+        |> Page.Room.link_message(msg_id, &Message.message_link/1)
+        |> Page.Room.share_message_link_modal(msg_id, Modals.ShareMessageLink)
+
+      "share-link-modal" ->
+        socket |> Page.Room.share_message_link_modal(msg_id, Modals.ShareMessageLink)
+
       "open-image-gallery" ->
         socket |> Page.Room.open_image_gallery(msg_id)
+    end
+  end
+
+  def route_live_action(socket) do
+    case socket.assigns do
+      %{live_action: :room_message_link, room_message_link_hash: hash} ->
+        socket |> Page.Room.init_with_linked_message(hash)
+
+      _ ->
+        socket
     end
   end
 

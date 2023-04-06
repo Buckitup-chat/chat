@@ -27,6 +27,7 @@ defmodule Chat.Application do
       Chat.KeyRingTokens,
       Chat.Broker,
       Chat.ChunkedFilesBroker,
+      Chat.RoomMessageLinksBroker,
       Chat.Sync.OnlinersSync,
       {DynamicSupervisor, name: Chat.Upload.UploadSupervisor},
       ChatWeb.Presence,

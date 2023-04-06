@@ -78,7 +78,7 @@ defmodule Chat.Rooms.Room do
             %RoomRequest{
               requester_key: user_public_key,
               pending?: false,
-              ciphered_room_identity: encrypt_identity(room_identity, user_public_key)
+              ciphered_room_identity: encrypt_identity_with_key(room_identity, user_public_key)
             }
 
           x ->
@@ -104,22 +104,30 @@ defmodule Chat.Rooms.Room do
     %{room | requests: new_requests}
   end
 
-  def decrypt_identity(ciphered, %Identity{} = me, room_public_key) do
-    secret = Enigma.compute_secret(me.private_key, room_public_key)
+  def encrypt_identity(%Identity{} = room_identity, secret) do
+    room_identity
+    |> Identity.to_strings()
+    |> Enum.at(1)
+    |> Enigma.cipher(secret)
+  end
 
-    ciphered
+  def decrypt_identity(encrypted, secret) do
+    encrypted
     |> Enigma.decipher(secret)
     |> then(&["", &1])
     |> Identity.from_strings()
   end
 
-  defp encrypt_identity(room_identity, user_public_key) do
+  def decrypt_identity_with_key(encrypted, %Identity{} = me, room_public_key) do
+    secret = Enigma.compute_secret(me.private_key, room_public_key)
+
+    decrypt_identity(encrypted, secret)
+  end
+
+  defp encrypt_identity_with_key(room_identity, user_public_key) do
     secret = Enigma.compute_secret(room_identity.private_key, user_public_key)
 
-    room_identity
-    |> Identity.to_strings()
-    |> Enum.at(1)
-    |> Enigma.cipher(secret)
+    encrypt_identity(room_identity, secret)
   end
 end
 

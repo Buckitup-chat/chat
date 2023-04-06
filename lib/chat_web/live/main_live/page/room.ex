@@ -4,10 +4,11 @@ defmodule ChatWeb.MainLive.Page.Room do
   use ChatWeb, :component
 
   import ChatWeb.MainLive.Page.Shared
+  import ChatWeb.LiveHelpers.LiveModal
   import Phoenix.Component, only: [assign: 3]
 
   import Phoenix.LiveView,
-    only: [consume_uploaded_entry: 3, push_event: 3, send_update: 2]
+    only: [consume_uploaded_entry: 3, push_event: 3, send_update: 2, push_patch: 2]
 
   require Logger
 
@@ -25,9 +26,11 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.Rooms.RoomRequest
   alias Chat.Upload.UploadMetadata
   alias Chat.User
+  alias Chat.Utils
   alias Chat.Utils.StorageId
 
   alias ChatWeb.MainLive.Layout
+  alias ChatWeb.MainLive.Page
 
   alias Phoenix.PubSub
 
@@ -59,11 +62,57 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:edit_content, nil)
     |> assign(:room, room)
     |> assign(:room_identity, room_identity)
+    |> assign(:is_room_linked?, Rooms.has_linked_messages?(room_identity))
     |> assign(:last_load_timestamp, nil)
     |> assign(:has_more_messages, true)
     |> assign(:message_update_mode, :replace)
     |> assign_messages()
     |> assign_requests()
+    |> push_event("chat:scroll-down", %{})
+  end
+
+  def init_with_linked_message(socket, link_hash) do
+    with {encrypted_identity, _, msg_index, msg_id} <- Rooms.get_message_link(link_hash),
+         identity <-
+           Rooms.decrypt_identity(encrypted_identity, link_hash |> Base.decode16!(case: :lower)),
+         room <- identity |> Identity.pub_key() |> Rooms.get() do
+      socket
+      |> store_new(identity)
+      |> init({identity, room})
+      |> load_messages_to({msg_index, msg_id})
+      |> push_patch(to: "/")
+    else
+      _ ->
+        socket
+        |> assign(:lobby_mode, :rooms)
+        |> init()
+        |> push_event("chat:toggle", %{to: "#chatRoomBar", class: "hidden"})
+        |> push_event("chat:toggle", %{to: "#navbarLeft", class: "navbar"})
+        |> push_event("chat:toggle", %{to: "#navbarLeft", class: "hidden"})
+        |> push_event("chat:toggle", %{to: "#navbarTop", class: "navbarTop"})
+        |> push_event("chat:toggle", %{to: "#navbarTop", class: "hidden"})
+        |> push_event("chat:toggle", %{to: "#navbarBottom", class: "navbarBottom"})
+        |> push_event("chat:toggle", %{to: "#navbarBottom", class: "hidden"})
+        |> push_event("chat:toggle", %{to: "#contentContainer", class: "hidden"})
+    end
+  end
+
+  def store_key_copy(%{assigns: %{me: me}} = socket, room_identity) do
+    my_notes = Dialogs.find_or_open(me)
+
+    room_identity
+    |> Messages.RoomInvite.new()
+    |> Dialogs.add_new_message(me, my_notes)
+    |> RoomInviteIndex.add(my_notes, me)
+
+    socket
+  end
+
+  def store_new(socket, new_room_identity) do
+    socket
+    |> store_key_copy(new_room_identity)
+    |> Page.Login.store_new_room(new_room_identity)
+    |> Page.Lobby.refresh_room_list()
   end
 
   def load_more_messages(%{assigns: %{page: page}} = socket) do
@@ -348,6 +397,48 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> maybe_redirect_to_file(socket)
   end
 
+  def link_message(
+        %{assigns: %{room: room, room_identity: room_identity}} = socket,
+        {index, id},
+        render_fun
+      ) do
+    :ok = Rooms.link_message(room, room_identity, {index, id})
+
+    socket
+    |> assign(:is_room_linked?, true)
+    |> push_event("chat:change", %{
+      to: "#room-message-#{id} .link-status",
+      content: render_to_html_string(%{linked: true, msg_id: id, msg_index: index}, render_fun)
+    })
+    |> forget_current_messages()
+  end
+
+  def unlink_messages_modal(socket, component) do
+    socket |> open_modal(component)
+  end
+
+  def unlink_messages(%{assigns: %{room_identity: room_identity}} = socket, render_fun) do
+    Rooms.cancel_room_links(room_identity)
+    |> Enum.reduce(socket, fn {_, _, index, id}, socket ->
+      content = render_to_html_string(%{linked: false, msg_id: id, msg_index: index}, render_fun)
+
+      socket
+      |> push_event("chat:change", %{to: "#room-message-#{id} .link-status", content: content})
+    end)
+    |> assign(:is_room_linked?, false)
+    |> close_modal()
+  end
+
+  def share_message_link_modal(%{assigns: %{}} = socket, msg_id, component) do
+    message_url = [ChatWeb.Endpoint.url(), "room", Rooms.message_link_hash(msg_id)] |> Path.join()
+
+    socket
+    |> open_modal(component, %{
+      url: message_url,
+      encoded_qr_code: Utils.qr_base64_from_url(message_url)
+    })
+  end
+
   defp maybe_redirect_to_file(%{type: type, content: json}, socket)
        when type in [:audio, :file, :image, :video] do
     {file_id, secret} = StorageId.from_json(json)
@@ -438,7 +529,34 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:room_requests, request_list)
   end
 
-  defp assign_requests(socket), do: socket
+  defp assign_requests(socket), do: socket |> assign(:room_requests, [])
+
+  defp load_messages_to(%{assigns: %{has_more_messages: false}} = socket, {_, msg_id}) do
+    socket
+    |> push_event("chat:scroll", %{to: "#message-block-#{msg_id}"})
+    |> push_event("chat:toggle", %{to: "#message-block-#{msg_id}", class: "bg-black/10"})
+  end
+
+  defp load_messages_to(
+         %{
+           assigns: %{
+             room: room,
+             room_identity: identity,
+             last_load_timestamp: index,
+             messages: messages
+           }
+         } = socket,
+         {msg_index, msg_id}
+       ) do
+    prev_messages = Rooms.read_to(room, identity, {index - 1, 0}, {msg_index, msg_id})
+    messages = prev_messages ++ messages
+
+    socket
+    |> assign(:messages, messages)
+    |> assign(:last_load_timestamp, set_messages_timestamp(messages))
+    |> push_event("chat:scroll", %{to: "#message-block-#{msg_id}"})
+    |> push_event("chat:toggle", %{to: "#message-block-#{msg_id}", class: "bg-black/10"})
+  end
 
   defp broadcast_message_updated(msg_id, pub_key, me, time) do
     {:updated_message, msg_id}

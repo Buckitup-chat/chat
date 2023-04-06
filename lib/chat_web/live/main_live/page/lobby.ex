@@ -46,9 +46,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     end)
 
     socket
-    |> Page.Dialog.store_room_key_copy(new_room_identity)
-    |> Page.Login.store_new_room(new_room_identity)
-    |> assign_room_list()
+    |> Page.Room.store_new(new_room_identity)
     |> Page.Shared.update_onliners_presence()
     |> Page.Room.init({new_room_identity, new_room})
   end
@@ -153,16 +151,14 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     if Map.has_key?(room_map, room_key) do
       socket
     else
-      new_room_identity = Rooms.decrypt_identity(encrypted_room_identity, me, room_key)
+      new_room_identity = Rooms.decrypt_identity_with_key(encrypted_room_identity, me, room_key)
 
       time = Chat.Time.monotonic_to_unix(time_offset)
       Rooms.clear_approved_request(new_room_identity, me)
       Log.got_room_key(me, time, new_room_identity |> Identity.pub_key())
 
       socket
-      |> Page.Dialog.store_room_key_copy(new_room_identity)
-      |> Page.Login.store_new_room(new_room_identity)
-      |> assign_room_list()
+      |> Page.Room.store_new(new_room_identity)
     end
   end
 

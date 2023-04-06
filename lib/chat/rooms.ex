@@ -7,6 +7,7 @@ defmodule Chat.Rooms do
   alias Chat.Rooms.Registry
   alias Chat.Rooms.Room
   alias Chat.Rooms.RoomMessages
+  alias Chat.Rooms.RoomMessageLinks
 
   @doc "Returns new room {Identity, Room}"
   def add(me, name, type \\ :public) do
@@ -83,13 +84,8 @@ defmodule Chat.Rooms do
   def read_message({_, _} = msg_id, %Identity{} = identity),
     do: RoomMessages.read(msg_id, identity)
 
-  defdelegate read(
-                room,
-                room_identity,
-                before \\ {nil, 0},
-                amount \\ 1000
-              ),
-              to: RoomMessages
+  defdelegate read(room, room_identity, before \\ {nil, 0}, amount \\ 1000), to: RoomMessages
+  defdelegate read_to(room, room_identity, from \\ {nil, 0}, to \\ {0, 0}), to: RoomMessages
 
   def update_message(content, msg_id, me, room),
     do: RoomMessages.update_message(content, msg_id, me, room)
@@ -158,7 +154,22 @@ defmodule Chat.Rooms do
   end
 
   defdelegate update(room), to: Registry
-  defdelegate decrypt_identity(encrypted_room_identity, person_identity, room_pub_key), to: Room
+
+  defdelegate link_message(room, room_identity, msg_id), to: RoomMessageLinks, as: :create
+  defdelegate message_link_hash(msg_id), to: RoomMessageLinks, as: :link_hash
+  defdelegate get_message_link(link_hash), to: RoomMessageLinks, as: :get
+
+  defdelegate has_linked_messages?(room_identity),
+    to: RoomMessageLinks,
+    as: :has_room_linked_messages?
+
+  defdelegate is_message_linked?(msg_id), to: RoomMessageLinks
+  defdelegate cancel_room_links(room_identity), to: RoomMessageLinks
+
+  defdelegate decrypt_identity(encrypted_room_identity, secret), to: Room
+
+  defdelegate decrypt_identity_with_key(encrypted_room_identity, person_identity, room_pub_key),
+    to: Room
 
   defp if_room_found(room_or_key, action, default \\ nil)
 

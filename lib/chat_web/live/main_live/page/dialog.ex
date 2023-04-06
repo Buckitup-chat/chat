@@ -19,7 +19,6 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.Log
   alias Chat.MemoIndex
   alias Chat.Messages
-  alias Chat.RoomInviteIndex
   alias Chat.Rooms
   alias Chat.Upload.UploadMetadata
   alias Chat.User
@@ -281,20 +280,18 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def accept_room_invite(%{assigns: %{me: me, dialog: dialog, rooms: rooms}} = socket, message_id) do
-    new_room_identitiy =
+    new_room_identity =
       Dialogs.read_message(dialog, message_id, me)
       |> then(fn %{type: :room_invite, content: json} -> json end)
       |> StorageId.from_json()
       |> RoomInvites.get()
       |> Identity.from_strings()
 
-    if rooms |> Enum.any?(&(&1.private_key == new_room_identitiy.private_key)) do
+    if rooms |> Enum.any?(&(&1.private_key == new_room_identity.private_key)) do
       socket
     else
       socket
-      |> store_room_key_copy(new_room_identitiy)
-      |> Page.Login.store_new_room(new_room_identitiy)
-      |> Page.Lobby.refresh_room_list()
+      |> Page.Room.store_new(new_room_identity)
     end
   rescue
     _ -> socket
@@ -315,25 +312,12 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       socket
     else
       socket
-      |> store_room_key_copy(new_room_identity)
-      |> Page.Login.store_new_room(new_room_identity)
-      |> Page.Lobby.refresh_room_list()
+      |> Page.Room.store_new(new_room_identity)
     end
     |> close()
     |> Page.Room.init({new_room_identity, new_room_identity |> Identity.pub_key() |> Rooms.get()})
   rescue
     _ -> socket
-  end
-
-  def store_room_key_copy(%{assigns: %{me: me}} = socket, room_identity) do
-    my_notes = Dialogs.find_or_open(me)
-
-    room_identity
-    |> Messages.RoomInvite.new()
-    |> Dialogs.add_new_message(me, my_notes)
-    |> RoomInviteIndex.add(my_notes, me)
-
-    socket
   end
 
   def toggle_messages_select(%{assigns: %{}} = socket, %{"action" => "on"}) do

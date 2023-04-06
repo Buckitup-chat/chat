@@ -3,6 +3,7 @@ defmodule ChatWeb.MainLive.Page.ImportKeyRing do
   import Phoenix.Component, only: [assign: 3]
 
   alias Chat.KeyRingTokens
+  alias Chat.Utils
   alias ChatWeb.MainLive.Page
   alias ChatWeb.Router.Helpers, as: Routes
 
@@ -10,12 +11,7 @@ defmodule ChatWeb.MainLive.Page.ImportKeyRing do
     {uuid, code} = KeyRingTokens.create()
 
     url = Routes.main_index_url(socket, :export, uuid)
-    qr_settings = %QRCode.SvgSettings{qrcode_color: "#ffffff", background_opacity: 0}
-
-    qr =
-      url
-      |> QRCode.create!()
-      |> QRCode.Svg.to_base64(qr_settings)
+    qr = Utils.qr_base64_from_url(url)
 
     socket
     |> assign(:mode, :import_key_ring)

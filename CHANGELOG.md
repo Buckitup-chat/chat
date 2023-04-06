@@ -18,6 +18,7 @@ straightforward as possible.
 ### Fixed
 - Improved sync speed
 - Fixed cargo room crashing when it's not set
+- Improved cargo styling
 
 ## 2023-03-31_d8b27f7___2023-03-31_875d678
 

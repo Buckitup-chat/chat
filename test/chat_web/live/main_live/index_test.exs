@@ -300,7 +300,9 @@ defmodule ChatWeb.MainLive.IndexTest do
       |> render_submit()
 
       assert has_element?(view, ".t-cargo-activate")
-      refute render(view) =~ "phx-click=\"cargo:activate\""
+      html = render(view)
+      refute html =~ "phx-click=\"cargo:activate\""
+      assert html =~ "Room does not have a unique name"
     end
 
     test "starts the flow from platform", %{view: view} do

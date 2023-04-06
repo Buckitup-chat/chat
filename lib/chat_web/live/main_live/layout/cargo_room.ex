@@ -9,8 +9,8 @@ defmodule ChatWeb.MainLive.Layout.CargoRoom do
     ~H"""
     <%= if @media_settings.functionality == :cargo && @cargo_room && @cargo_room.pub_key == @room.pub_key do %>
       <div class="w-full px-8 py-4 border-b border-white/10 backdrop-blur-md bg-grayscale/40 z-10 flex flex-row items-center justify-between text-md text-white">
-        <div class="text-base">
-          Cargo sync activated
+        <div class="flex flex-row items-center text-base">
+          Cargo sync activated <.remove_button status={@cargo_room.status} />
         </div>
 
         <.status cargo_room={@cargo_room} />
@@ -21,8 +21,6 @@ defmodule ChatWeb.MainLive.Layout.CargoRoom do
 
   defp status(%{cargo_room: %CargoRoom{status: :pending}} = assigns) do
     ~H"""
-    <.remove_button />
-
     <div class="flex text-red-400">
       <div>
         Insert empty USB drive
@@ -43,8 +41,6 @@ defmodule ChatWeb.MainLive.Layout.CargoRoom do
 
   defp status(%{cargo_room: %CargoRoom{status: :complete}} = assigns) do
     ~H"""
-    <.remove_button />
-
     <div class="flex text-green-500">
       Complete!
     </div>
@@ -53,8 +49,6 @@ defmodule ChatWeb.MainLive.Layout.CargoRoom do
 
   defp status(%{cargo_room: %CargoRoom{status: :failed}} = assigns) do
     ~H"""
-    <.remove_button />
-
     <div class="flex text-red-500">
       Failed!
     </div>
@@ -81,9 +75,17 @@ defmodule ChatWeb.MainLive.Layout.CargoRoom do
   defp formatted_seconds(seconds) when seconds < 10, do: "0#{seconds}"
   defp formatted_seconds(seconds), do: "#{seconds}"
 
+  defp remove_button(%{status: status} = assigns) when status in [:pending, :complete, :failed] do
+    ~H"""
+    <div class="cursor-pointer ml-1 rounded-full t-cargo-remove" phx-click="cargo:remove">
+      <.icon id="close" class="w-6 h-6 fill-red-500" />
+    </div>
+    """
+  end
+
   defp remove_button(assigns) do
     ~H"""
-    <div class="cursor-pointer ml-auto mr-2 t-cargo-remove" phx-click="cargo:remove">Close</div>
+
     """
   end
 
@@ -91,15 +93,26 @@ defmodule ChatWeb.MainLive.Layout.CargoRoom do
 
   def button(%{cargo_sync: :enabled} = assigns) do
     ~H"""
-    <div class="mr-2 text-base text-white cursor-pointer t-cargo-activate" phx-click="cargo:activate">
-      Cargo sync
+    <div
+      class="mr-2 flex items-center text-base text-white cursor-pointer t-cargo-activate"
+      phx-click="cargo:activate"
+    >
+      <.icon id="cargo" class="w-8 h-8 fill-white" />
+      <span>Sync</span>
     </div>
     """
   end
 
   def button(%{cargo_sync: :duplicate_name} = assigns) do
     ~H"""
-    <div class="mr-2 text-base text-white t-cargo-activate">Cargo sync</div>
+    <div class="group relative mr-2 flex items-center text-base text-gray-300 cursor-default t-cargo-activate">
+      <.icon id="cargo" class="w-8 h-8 fill-gray-300" />
+      <span>Sync</span>
+
+      <div class="absolute top-0 left-0 mt-10 -ml-16 -mr-16 px-4 py-4 w-50 invisible group-hover:visible rounded-lg bg-black text-white text-center text-xs">
+        Room does not have a unique name
+      </div>
+    </div>
     """
   end
 

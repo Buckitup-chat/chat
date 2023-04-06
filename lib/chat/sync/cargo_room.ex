@@ -123,6 +123,8 @@ defmodule Chat.Sync.CargoRoom do
     {:noreply, cargo_room}
   end
 
+  def handle_cast(:complete, nil), do: {:noreply, nil}
+
   def handle_cast(:complete, cargo_room) do
     status =
       case cargo_room do

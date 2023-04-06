@@ -25,7 +25,7 @@ defmodule Chat.Rooms.Room do
       pub_key: room |> Identity.pub_key(),
       requests: [],
       type: type,
-      hash: room |> Identity.pub_key() |> Base.encode16(case: :lower)
+      hash: room |> Identity.pub_key() |> hash()
     }
   end
 
@@ -103,6 +103,8 @@ defmodule Chat.Rooms.Room do
 
     %{room | requests: new_requests}
   end
+
+  def hash(pub_key), do: Base.encode16(pub_key, case: :lower)
 
   def encrypt_identity(%Identity{} = room_identity, secret) do
     room_identity

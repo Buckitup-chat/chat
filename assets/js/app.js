@@ -25,6 +25,7 @@ import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import AudioFile from "./hooks/audio-file"
+import DraggableCheckpoints from "./hooks/draggable-checkpoints"
 import MediaFileInput from "./hooks/media-file-input"
 import SortableUploadEntries from "./hooks/sortable-upload-entries"
 import UploadInProgress from "./hooks/upload-in-progress"
@@ -36,6 +37,7 @@ import * as Flash from "./hooks/flash"
 
 let Hooks = {
   AudioFile,
+  DraggableCheckpoints,
   MediaFileInput,
   SortableUploadEntries,
   UploadInProgress
@@ -135,11 +137,6 @@ const listeners = {
       );
     }, 900) 
   },
-  "room:switch-type": (e) => {
-    e.target.classList.add('checkedBackground');
-
-    document.getElementById(e.detail.id).textContent = e.detail.description
-  },
   "phx:chat:toggle": (e) => {
     if (e.detail && e.detail.class && e.detail.to) {
       document
@@ -154,11 +151,21 @@ const listeners = {
   },
   "phx:chat:focus": (e) => { const el = document.querySelector(e.detail.to); setTimeout(() => el.focus(), 100); },
   "phx:chat:change": (e) => { const el = document.querySelector(e.detail.to); el.innerHTML = e.detail.content; },
+  "phx:chat:bulk-change": (e) => {
+    const elements = document.querySelectorAll(e.detail.to);
+    elements.forEach((el) => { el.innerHTML = e.detail.content; });
+  },
   "phx:scroll-to-bottom": (e) => {
     setTimeout(() => {
       const chatContent = document.querySelector('.a-content-block');
       chatContent.scrollTo({ top: chatContent.scrollHeight })
     }, 0)
+  },
+  "phx:scroll-uploads-to-top": (e) => {
+      const uploader = document.querySelector('.a-uploader');
+      const mobileUploader = document.querySelector('.a-mobile-uploader');
+      uploader.scrollTop = -331.5;
+      mobileUploader.scrollTop = -331.5;
   },
   "phx:gallery:preload": (e) => {
     const img = new Image();
@@ -174,8 +181,11 @@ const listeners = {
   "phx:copy": (e) => {
     navigator.clipboard.writeText(e.target.value)
   },
-
-
+  "phx:js-exec": ({ detail }) => {
+    document.querySelectorAll(detail.to).forEach(el => {
+      liveSocket.execJS(el, el.getAttribute(detail.attr))
+    })
+  },
   ...uploadEventHandlers
 };
 for (key in listeners) {

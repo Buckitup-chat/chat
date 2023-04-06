@@ -16,9 +16,6 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
       {"message/" <> action, %{"id" => id, "index" => index}} ->
         socket |> route_message_event({action, {index |> String.to_integer(), id}})
 
-      {"create", %{"new_room" => %{"name" => name, "type" => type}}} ->
-        socket |> Page.Lobby.new_room(name, type |> String.to_existing_atom())
-
       {"invite-user", %{"hash" => hash}} ->
         socket |> Page.Room.invite_user(hash |> Base.decode16!(case: :lower))
 

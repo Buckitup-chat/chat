@@ -46,7 +46,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
              |> Enum.filter(fn {_uuid, %UploadMetadata{} = metadata} ->
                metadata.status == :active
              end)
-             |> length() == 2
+             |> length() == 1
 
       statuses =
         socket.assigns.uploads_metadata
@@ -56,7 +56,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
         end)
         |> Enum.frequencies()
 
-      assert %{active: 2, inactive: 1} = statuses
+      assert %{active: 1, inactive: 2} = statuses
     end
   end
 
@@ -73,6 +73,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       socket = Uploader.cancel_upload(socket, %{"ref" => entry.ref, "uuid" => entry.uuid})
 
+      assert Enum.empty?(socket.assigns.file_uploads_order)
       assert Enum.empty?(socket.assigns.uploads_metadata)
       assert Enum.empty?(socket.assigns.uploads.file.entries)
       assert catch_exit(UploadStatus.get(key))
@@ -102,10 +103,10 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       assert UploadStatus.get(key) == :inactive
 
-      assert %UploadMetadata{credentials: {key, _secret}, status: :active} =
+      assert %UploadMetadata{credentials: {key, _secret}, status: :pending} =
                Map.get(socket.assigns.uploads_metadata, entry_4.uuid)
 
-      assert UploadStatus.get(key) == :active
+      assert UploadStatus.get(key) == :inactive
 
       assert %UploadMetadata{credentials: {key, _secret}, status: :pending} =
                Map.get(socket.assigns.uploads_metadata, entry_5.uuid)
@@ -148,11 +149,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       socket = Uploader.move_upload(socket, %{"index" => 0, "uuid" => entry_2.uuid})
 
-      uuids =
-        socket.assigns.uploads.file.entries
-        |> Enum.map(& &1.uuid)
-
-      assert uuids == [
+      assert socket.assigns.file_uploads_order == [
                entry_2.uuid,
                entry_1.uuid,
                entry_3.uuid
@@ -166,11 +163,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       socket = Uploader.move_upload(socket, %{"index" => 2, "uuid" => entry_2.uuid})
 
-      uuids =
-        socket.assigns.uploads.file.entries
-        |> Enum.map(& &1.uuid)
-
-      assert uuids == [
+      assert socket.assigns.file_uploads_order == [
                entry_1.uuid,
                entry_3.uuid,
                entry_2.uuid
@@ -184,11 +177,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       socket = Uploader.move_upload(socket, %{"index" => 1, "uuid" => entry_2.uuid})
 
-      uuids =
-        socket.assigns.uploads.file.entries
-        |> Enum.map(& &1.uuid)
-
-      assert uuids == [
+      assert socket.assigns.file_uploads_order == [
                entry_1.uuid,
                entry_2.uuid,
                entry_3.uuid
@@ -634,7 +623,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
       assert %UploadMetadata{status: :paused} =
                Map.get(socket.assigns.uploads_metadata, entry_3.uuid)
 
-      assert %UploadMetadata{status: :active} =
+      assert %UploadMetadata{status: :pending} =
                Map.get(socket.assigns.uploads_metadata, entry_4.uuid)
     end
   end

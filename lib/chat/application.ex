@@ -28,6 +28,7 @@ defmodule Chat.Application do
       Chat.Broker,
       Chat.ChunkedFilesBroker,
       Chat.RoomMessageLinksBroker,
+      Chat.Sync.CargoRoom,
       Chat.Sync.OnlinersSync,
       {DynamicSupervisor, name: Chat.Upload.UploadSupervisor},
       ChatWeb.Presence,

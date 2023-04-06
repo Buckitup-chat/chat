@@ -1,7 +1,7 @@
 defmodule Chat.AdminRoom do
   @moduledoc "Admin Room functions"
 
-  alias Chat.Admin.MediaSettings
+  alias Chat.Admin.{CargoSettings, MediaSettings}
   alias Chat.AdminDb
   alias Chat.Card
   alias Chat.Identity
@@ -16,6 +16,7 @@ defmodule Chat.AdminRoom do
       raise "Admin room already created"
     end
 
+    AdminDb.put(:cargo_settings, %CargoSettings{})
     AdminDb.put(:media_settings, %MediaSettings{})
 
     "Admin room"
@@ -58,6 +59,19 @@ defmodule Chat.AdminRoom do
   rescue
     _ -> nil
   end
+
+  def get_cargo_settings do
+    cargo_settings = AdminDb.get(:cargo_settings)
+
+    if cargo_settings do
+      cargo_settings
+    else
+      %CargoSettings{}
+    end
+  end
+
+  def store_cargo_settings(%CargoSettings{} = cargo_settings),
+    do: AdminDb.put(:cargo_settings, cargo_settings)
 
   def get_media_settings do
     media_settings = AdminDb.get(:media_settings)

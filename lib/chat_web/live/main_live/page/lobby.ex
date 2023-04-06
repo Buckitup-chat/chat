@@ -35,9 +35,19 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   end
 
   def new_room(%{assigns: %{me: me, monotonic_offset: time_offset}} = socket, name, type)
-      when type in [:public, :request, :private] do
+      when type in [:public, :request, :private, :cargo] do
+    {cargo?, type} =
+      case type do
+        :cargo ->
+          {true, :public}
+
+        type ->
+          {false, type}
+      end
+
     {new_room_identity, new_room} = Rooms.add(me, name, type)
     new_room_card = Chat.Card.from_identity(new_room_identity)
+    send(self(), {:maybe_activate_cargo_room, cargo?, new_room, new_room_identity})
 
     me |> Log.create_room(Chat.Time.monotonic_to_unix(time_offset), new_room_identity, type)
 

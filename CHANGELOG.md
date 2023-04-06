@@ -13,9 +13,25 @@ straightforward as possible.
 ### Added
 
 ### Changed
+- dependencies update
 
 ### Fixed
 
+## 2023-03-31_d8b27f7___2023-03-31_875d678
+
+### Added
+- Accept all invites in dialog
+- Cargo room type
+- Unique name constraint for Cargo rooms
+- Checkpoints preset
+- Cargo sync flow
+
+### Changed
+- uploading in one thread
+
+### Fixed
+- UI: uploads scroll to top on uploader mount 
+- submitting of edited message by keyword
 
 ## 2023-03-22_4082136___2023-03-23_e2c9aa8
 
@@ -59,3 +75,4 @@ straightforward as possible.
 - UI: uploader covering chat/room list
 - lost feed names
 - admin room user actions
+

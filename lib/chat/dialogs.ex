@@ -43,6 +43,9 @@ defmodule Chat.Dialogs do
       ),
       do: DialogMessaging.read(dialog, reader, before, amount)
 
+  def list_room_invites(%Dialog{} = dialog, %Identity{} = reader),
+    do: DialogMessaging.list_room_invites(dialog, reader)
+
   def read_message(%Dialog{} = dialog, {index, %Message{} = message}, %Identity{} = me) do
     DialogMessaging.read({index, message}, me, dialog)
   end

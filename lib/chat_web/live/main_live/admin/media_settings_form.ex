@@ -42,6 +42,8 @@ defmodule ChatWeb.MainLive.Admin.MediaSettingsForm do
         changeset
         |> Ecto.Changeset.apply_changes()
         |> AdminRoom.store_media_settings()
+
+      send(self(), :update_media_settings)
     end
 
     {:noreply, assign(socket, :changeset, changeset)}

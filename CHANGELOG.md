@@ -14,7 +14,7 @@ straightforward as possible.
 
 ### Changed
 - dependencies update
-- rewrite feed on streams
+- updating feed rendering w/ new mechanics
 
 ### Fixed
 

@@ -147,23 +147,23 @@ defmodule ChatWeb.MainLive.Page.Feed do
     socket
     |> stream_batch_insert(:action_feed_list, list,
       at: -1,
-      dom_id: &"item-#{elem(&1, 0)}"
+      dom_id: &item_dom_id(&1)
     )
     |> assign_items_uuid(list)
   end
 
   defp assign_feed_stream(socket, list) do
     socket
-    |> stream(:action_feed_list, list, dom_id: &"item-#{elem(&1, 0)}")
+    |> stream(:action_feed_list, list, dom_id: &item_dom_id(&1))
     |> assign_items_uuid(list)
   end
 
   defp assign_items_uuid(%{assigns: %{items: nil}} = socket, list) do
-    socket |> assign(:items, Enum.map(list, &"item-#{elem(&1, 0)}"))
+    socket |> assign(:items, Enum.map(list, &item_dom_id(&1)))
   end
 
   defp assign_items_uuid(%{assigns: %{items: items}} = socket, list) do
-    socket |> assign(:items, Enum.map(list, &"item-#{elem(&1, 0)}") ++ items)
+    socket |> assign(:items, Enum.map(list, &item_dom_id(&1)) ++ items)
   end
 
   defp clean_feed_items(socket) do
@@ -172,4 +172,6 @@ defmodule ChatWeb.MainLive.Page.Feed do
       stream_delete_by_dom_id(socket, :action_feed_list, item)
     end)
   end
+
+  defp item_dom_id({uuid, _who, _data}), do: "feed-item-#{uuid}"
 end

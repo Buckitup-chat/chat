@@ -158,6 +158,8 @@ defmodule NaiveApi.RoomTest do
       me = User.login("Pedro") |> tap(&User.register/1)
       {room_identity, _room} = Rooms.add(me, "Escuela de amor")
 
+      ChangeTracker.await()
+
       {:ok, %{data: %{"uploadKey" => upload_key}}} =
         Absinthe.run(@upload_key_mutation, @schema,
           variables: %{

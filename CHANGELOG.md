@@ -11,6 +11,7 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+- queue uploaded file chunks (improves stability)
 
 ### Changed
 - dependencies update

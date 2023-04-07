@@ -73,7 +73,7 @@ defmodule Chat.LogTest do
     base = Ordering.last({:action_log})
     Log.sign_in(me, base + 1)
     await()
-    assert {_, {_, action}} = Log.list() |> elem(0) |> List.first()
+    assert {_, _, {_, action}} = Log.list() |> elem(0) |> List.first()
 
     assert "signs in" = Log.humanize_action(action)
     assert "unknown act" = Log.humanize_action(:some_strange_unlisted_action)

@@ -11,11 +11,14 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+- queue uploaded file chunks (improves stability)
 
 ### Changed
 - dependencies update
+- updating feed rendering w/ new mechanics
 
 ### Fixed
+- broken image render
 - Improved sync speed
 - Fixed cargo room crashing when it's not set
 - Improved cargo styling

@@ -24,7 +24,14 @@
             </p>
           </div>
           <div class="w-full mt-7">
-            <.form :let={f} for={:login} id="login-form" class="t-login-form" phx-submit="login">
+            <.form
+              :let={f}
+              for={%{}}
+              as={:login}
+              id="login-form"
+              class="t-login-form"
+              phx-submit="login"
+            >
               <%= text_input(f, :name,
                 placeholder: "Your name",
                 class:
@@ -907,7 +914,12 @@
             <Layout.Admin.row>
               <Layout.Admin.block title="WiFi settings">
                 <%= if @wifi_loaded do %>
-                  <.form for={:admin_wifi} id="admin-wifi-form" phx-submit="admin/wifi-submit">
+                  <.form
+                    for={%{}}
+                    as={:admin_wifi}
+                    id="admin-wifi-form"
+                    phx-submit="admin/wifi-submit"
+                  >
                     <section class="p-2 pb-0 text-right">
                       SSID:
                       <input
@@ -1198,7 +1210,8 @@
           <%= if @step == :initial do %>
             <div class="row">
               <.form
-                for={:my_keys_file}
+                for={%{}}
+                as={:my_keys_file}
                 id="my-keys-file-form"
                 class="column "
                 phx-change="login:my-keys-file-submit"
@@ -1253,7 +1266,8 @@
             </div>
             <.form
               :let={f}
-              for={:import_own_keyring_password}
+              for={%{}}
+              as={:import_own_keyring_password}
               id="logout-import-own-keyring-password-form"
               phx-submit="login:import-own-keyring-decrypt"
               class="mt-2.5"

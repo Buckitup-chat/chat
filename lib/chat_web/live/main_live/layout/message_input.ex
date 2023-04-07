@@ -29,7 +29,8 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
         <Layout.Uploader.button enabled={@writable} operating_system={@operating_system} type={@type} />
         <.form
           :let={di}
-          for={:dialog}
+          for={%{}}
+          as={:dialog}
           id="dialog-form"
           class="basis-[99%] flex items-center justify-between"
           phx-change={JS.dispatch("chat:set-input-size", to: "#dialog-input")}
@@ -71,7 +72,8 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
           </div>
           <.form
             :let={dei}
-            for={:dialog_edit}
+            for={%{}}
+            as={:dialog_edit}
             id="dialog-edit-form"
             class="flex items-center justify-start "
             phx-change={JS.dispatch("chat:set-input-size", to: "#dialog-edit-input")}
@@ -151,7 +153,8 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
         <Layout.Uploader.button enabled={@writable} operating_system={@operating_system} type={@type} />
         <.form
           :let={di}
-          for={:room}
+          for={%{}}
+          as={:room}
           id="room-form"
           class="basis-[99%] flex items-center justify-between"
           phx-change={JS.dispatch("chat:set-input-size", to: "#room-input")}
@@ -193,7 +196,8 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
           </div>
           <.form
             :let={dei}
-            for={:room_edit}
+            for={%{}}
+            as={:room_edit}
             id="rooom-edit-form"
             class="flex items-center justify-start "
             phx-change={JS.dispatch("chat:set-input-size", to: "#room-input")}

@@ -296,7 +296,8 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   defp file_form(assigns) do
     ~H"""
     <.form
-      for={:file}
+      for={%{}}
+      as={:file}
       id="uploader-file-form"
       class="flex flex-col m-2 column column-50 column-offset-50"
       phx-change={"#{@type}/import-files"}

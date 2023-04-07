@@ -30,10 +30,8 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
 
   def int(socket) do
     socket
-    |> assign(
-      need_login: true,
-      handshaked: false
-    )
+    |> assign(:need_login, true)
+    |> assign(:handshaked, false)
   end
 
   def request_wifi_settings(socket) do

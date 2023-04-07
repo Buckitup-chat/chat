@@ -16,8 +16,13 @@ straightforward as possible.
 ### Changed
 - dependencies update
 - updating feed rendering w/ new mechanics
+- Cargo room disappears after ejecting USB drive
 
 ### Fixed
+- Improved sync speed
+- Fixed cargo room crashing when it's not set
+- Improved cargo styling
+- Prevent backup/sync from corruption
 - admin panel w/o login returns to login form (when page gets reconnected in admin panel)
 - broken image render 
 - fix copying process

@@ -343,8 +343,8 @@
               class="sidebarIcon"
             >
               <.icon
-                id="sidebarRooms"
-                class={"w-6 h-6 hover:fill-purple " <> if(@cargo_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}
+                id="cargo"
+                class={"w-8 h-8 hover:fill-purple " <> if(@cargo_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}
               />
               <span class="text-xs">Cargo Room</span>
             </button>
@@ -418,8 +418,8 @@
                 class="sidebarIcon mt-5 t-cargo-room"
               >
                 <.icon
-                  id="sidebarRooms"
-                  class={"w-6 h-6 hover:fill-purple " <> if(@cargo_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}
+                  id="cargo"
+                  class={"w-8 h-8 hover:fill-purple " <> if(@cargo_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}
                 />
                 <span class="text-xs">Cargo Room</span>
               </button>
@@ -722,11 +722,7 @@
                     </div>
 
                     <div class="flex flex-row justify-between">
-                      <Layout.CargoRoom.button
-                        cargo_room={assigns[:cargo_room]}
-                        media_settings={@media_settings}
-                        room={@room}
-                      />
+                      <Layout.CargoRoom.button cargo_sync={assigns[:cargo_sync]} />
 
                       <%= if @room.type == :request do %>
                         <.room_request_button

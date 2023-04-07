@@ -70,6 +70,14 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
           />
         </div>
       <% end %>
+      <%= if @status.flags[:cargo] do %>
+        <div class="pb-1">
+          <.icon
+            id="cargo"
+            class={classes("w-9 h-9 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}
+          />
+        </div>
+      <% end %>
       <!-- <div class="pl-2">
               <.icon id="car" class={classes("w-6 h-6 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}/>
             </div>-->
@@ -143,6 +151,14 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
           <.icon
             id="replication"
             class={classes("w-6 h-6 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}
+          />
+        </div>
+      <% end %>
+      <%= if @status.flags[:cargo] do %>
+        <div class="pb-2 pr-1">
+          <.icon
+            id="cargo"
+            class={classes("w-8 h-8 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}
           />
         </div>
       <% end %>

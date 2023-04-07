@@ -41,8 +41,17 @@ defmodule ChatWeb.MainLive.Layout.CargoRoom do
 
   defp status(%{cargo_room: %CargoRoom{status: :complete}} = assigns) do
     ~H"""
-    <div class="flex text-green-500">
-      Complete!
+    <div class="relative flex text-green-500 items-center">
+      <.icon id="alert" class="peer mr-1 w-4 h-4 fill-white" />
+
+      <div class="absolute top-0 left-0 mt-6 -ml-64 px-4 py-4 w-96 invisible peer-hover:visible rounded-lg bg-black text-white text-center text-xs">
+        The sync is complete, unmount the cargo-drive now.<br />
+        Reinsert the drive to sync new messages.
+      </div>
+
+      <div>
+        Complete!
+      </div>
     </div>
     """
   end

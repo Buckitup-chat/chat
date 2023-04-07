@@ -16,6 +16,7 @@ straightforward as possible.
 ### Changed
 - dependencies update
 - updating feed rendering w/ new mechanics
+- Cargo room disappears after ejecting USB drive
 
 ### Fixed
 - broken image render

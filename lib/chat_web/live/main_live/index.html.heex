@@ -869,14 +869,10 @@
               <div
                 class="mt-16 mb-8 px-4 sm:px-8 w-full t-feed-list"
                 id="action-feed-list"
-                phx-update={@feed_update_mode}
+                phx-update="stream"
               >
-                <%= if @action_feed_list do %>
-                  <%= for item <- @action_feed_list do %>
-                    <div class="py-1 flex justify-start" id={"item-#{UUID.uuid4()}"}>
-                      <Page.Feed.item item={item} tz={@timezone} />
-                    </div>
-                  <% end %>
+                <%= if @streams.action_feed_list do %>
+                  <Page.Feed.render action_feed_list={@streams.action_feed_list} tz={@timezone} />
                 <% end %>
               </div>
               <%= if @action_feed_till > 1 do %>

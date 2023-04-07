@@ -15,6 +15,7 @@ straightforward as possible.
 
 ### Changed
 - dependencies update
+- updating feed rendering w/ new mechanics
 
 ### Fixed
 

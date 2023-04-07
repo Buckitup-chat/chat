@@ -19,6 +19,7 @@ straightforward as possible.
 
 ### Fixed
 - admin panel w/o login returns to login form (when page gets reconnected in admin panel)
+- broken image render 
 
 ## 2023-03-31_d8b27f7___2023-03-31_875d678
 

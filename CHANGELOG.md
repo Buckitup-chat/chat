@@ -19,11 +19,13 @@ straightforward as possible.
 - Cargo room disappears after ejecting USB drive
 
 ### Fixed
-- broken image render
 - Improved sync speed
 - Fixed cargo room crashing when it's not set
 - Improved cargo styling
 - Prevent backup/sync from corruption
+- admin panel w/o login returns to login form (when page gets reconnected in admin panel)
+- broken image render 
+- fix copying process
 
 ## 2023-03-31_d8b27f7___2023-03-31_875d678
 

@@ -19,6 +19,7 @@ defmodule ChatWeb.MainLive.Modals.UnlinkMessages do
           Cancel
         </button>
         <button
+          class="confirmButton"
           phx-click="room/unlink-messages"
           class="w-full mt-5 mr-1 h-12 bg-grayscale text-white rounded-lg"
         >

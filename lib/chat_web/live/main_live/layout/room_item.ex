@@ -52,7 +52,7 @@ defmodule ChatWeb.MainLive.Layout.RoomItem do
           <Layout.Card.hashed_name room={@room} />
         </div>
       </a>
-      <Layout.Room.room_icon type={@room.type} />
+      <Layout.Room.room_icon type={@room.type} style="stroke-black" />
     </li>
     """
   end

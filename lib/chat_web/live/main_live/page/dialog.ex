@@ -279,12 +279,12 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
     push_event(socket, "chat:redirect", %{url: url(~p"/get/zip/#{key}")})
   end
-  
+
   def accept_room_invite(
-    %{assigns: %{room_map: room_map}} = socket,
-    %{type: :room_invite, content: content} = msg,
-    render_fun
-    ) do
+        %{assigns: %{room_map: room_map}} = socket,
+        %{type: :room_invite, content: content} = msg,
+        render_fun
+      ) do
     new_room_identity =
       content
       |> StorageId.from_json()
@@ -301,7 +301,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   rescue
     _ -> socket
   end
-  
+
   def accept_room_invite(%{assigns: %{me: me, dialog: dialog}} = socket, message_id, render_fun) do
     socket
     |> accept_room_invite(Dialogs.read_message(dialog, message_id, me), render_fun)

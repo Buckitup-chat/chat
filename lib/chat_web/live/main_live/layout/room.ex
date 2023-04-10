@@ -59,7 +59,7 @@ defmodule ChatWeb.MainLive.Layout.Room do
       end)
 
     ~H"""
-    <.icon id={@id} class={"w-4 h-4 stroke-0 #{@style}"} />
+    <.icon id={@id} class={"w-4 h-4 stroke-0  #{@style}"} />
     """
   end
 
@@ -82,19 +82,21 @@ defmodule ChatWeb.MainLive.Layout.Room do
 
   def not_found_screen(assigns) do
     ~H"""
-    <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg" />
-    <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg" />
-    <div class="flex flex-col items-center justify-center h-screen">
-      <img class="grayscale w-48 mb-8 " src="/images/logo.png" />
-      <span class="text-white text-6xl block"><span>4  0  4</span></span>
-      <span class="text-white text-xl">Not found</span>
-      <.link
-        patch={~p"/"}
-        class="mt-5 flex flex-row items-center justify-center border rounded-lg border-white h-11 z-10"
-      >
-        <.icon id="arrowBack" class="pl-1 mr-1 w-4 h-4 flex fill-white" />
-        <span class="mr-1 pr-1 text-sm text-white">Go back to the root</span>
-      </.link>
+    <div id="notFoundScreen">
+      <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg" />
+      <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg" />
+      <div class="flex flex-col items-center justify-center h-screen">
+        <img class="grayscale w-48 mb-8 " src="/images/logo.png" />
+        <span class="text-white text-6xl block"><span>4  0  4</span></span>
+        <span class="text-white text-xl">Not found</span>
+        <.link
+          patch={~p"/"}
+          class="mt-5 flex flex-row items-center justify-center border rounded-lg border-white h-11 z-10"
+        >
+          <.icon id="arrowBack" class="pl-1 mr-1 w-4 h-4 flex fill-white" />
+          <span class="mr-1 pr-1 text-sm text-white">Go back to the root</span>
+        </.link>
+      </div>
     </div>
     """
   end
@@ -136,22 +138,23 @@ defmodule ChatWeb.MainLive.Layout.Room do
   end
 
   defp unlink_link(assigns) do
+    assigns =
+      assigns
+      |> assign_new(:link, fn %{restricted: restricted} ->
+        if restricted,
+          do: show_modal("restrict-write-actions"),
+          else: "room/unlink-messages-modal"
+      end)
+
     ~H"""
-    <span class="text-white">
-      Linked room!
-      <u>
-        <a
-          class="text-white"
-          phx-click={
-            if @restricted,
-              do: show_modal("restrict-write-actions"),
-              else: "room/unlink-messages-modal"
-          }
-        >
-          Unlink?
-        </a>
-      </u>
-    </span>
+    <div id="unlinkRoomLink">
+      <span class="text-white hidden sm:flex">
+        Linked room!<u><a class="text-white" phx-click={@link}> Unlink?</a></u>
+      </span>
+      <a class="block sm:hidden" phx-click={@link}>
+        <.icon id="link" class="w-4 h-4 fill-white stroke-white stroke-2" phx-click={@link} />
+      </a>
+    </div>
     """
   end
 end

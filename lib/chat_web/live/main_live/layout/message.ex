@@ -358,7 +358,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :file, :map, required: true, doc: "file map"
   attr :is_mine?, :boolean, required: true, doc: "is current user the author of the message?"
   attr :msg, :map, required: true, doc: "message struct"
-  attr :linkable?, :boolean, default: false, doc: "linkable? Only for public rooms"  
+  attr :linkable?, :boolean, default: false, doc: "linkable? Only for public rooms"
 
   defp header(assigns) do
     ~H"""
@@ -504,14 +504,14 @@ defmodule ChatWeb.MainLive.Layout.Message do
       <% end %>
       <%= if @linkable? do %>
         <a
-          class="dropdownItem"
+          class="dropdownItem t-link-action"
           phx-click={
             hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("room/message/link")
           }
           phx-value-id={@msg.id}
           phx-value-index={@msg.index}
         >
-          <.icon id="link" class="w-4 h-4 flex fill-black" />
+          <.icon id="link" class="w-4 h-4 flex fill-black stroke-black stroke-2" />
           <span>Link</span>
         </a>
       <% end %>
@@ -589,7 +589,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
           phx-value-id={@msg_id}
           phx-value-index={@msg_index}
         >
-          <.icon id="link" class="w-3 h-3 fill-black/50" />
+          <.icon id="link" class="w-3 h-3 fill-black/50 stroke-black stroke-2" />
         </a>
       <% end %>
     </div>

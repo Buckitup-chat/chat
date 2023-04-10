@@ -138,6 +138,8 @@ const listeners = {
     }, 900) 
   },
   "phx:chat:toggle": (e) => {
+    console.log(e)
+    console.log(document.querySelector(e.detail.to))
     if (e.detail && e.detail.class && e.detail.to) {
       document
         .querySelector(e.detail.to)
@@ -182,6 +184,8 @@ const listeners = {
     navigator.clipboard.writeText(e.target.value)
   },
   "phx:js-exec": ({ detail }) => {
+    console.log('phx:js-exec')
+    console.log(detail)
     document.querySelectorAll(detail.to).forEach(el => {
       liveSocket.execJS(el, el.getAttribute(detail.attr))
     })

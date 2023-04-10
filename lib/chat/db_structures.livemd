@@ -280,6 +280,18 @@ This approach has been proposed that involves the use of a new key and initializ
 
 <!-- livebook:{"break_markdown":true} -->
 
+#### Room message links
+
+Links for messages in public rooms
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:room_message_link, link_hash}, {encrypted_room_identity, room_hash, msg_index, msg_id}}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
 #### Room invites
 
 <!-- livebook:{"force_markdown":true} -->

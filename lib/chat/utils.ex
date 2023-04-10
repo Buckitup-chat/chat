@@ -34,9 +34,13 @@ defmodule Chat.Utils do
     |> Enum.reverse()
   end
 
-  def qr_base64_from_url(url) do
+  def qr_base64_from_url(url, opts \\ []) do
+    color = Keyword.get(opts, :color, "#000000")
+    background_opacity = Keyword.get(opts, :background_opacity)
+    settings = %QRCode.SvgSettings{qrcode_color: color, background_opacity: background_opacity}
+
     url
     |> QRCode.create!()
-    |> QRCode.Svg.to_base64(%QRCode.SvgSettings{qrcode_color: "#000000", background_opacity: nil})
+    |> QRCode.Svg.to_base64(settings)
   end
 end

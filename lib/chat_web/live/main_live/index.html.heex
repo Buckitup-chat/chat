@@ -457,7 +457,7 @@
           </div>
         </div>
         <%= if @lobby_mode == :chats do %>
-          <div id="chatRoomBar" class="chatRoomBar">
+          <div id="chatRoomBar" class="chatRoomBar sm:flex">
             <div class="px-7 mt-3 flex items-center justify-between">
               <h5 class="text-grayscale" style="font-size: 22px;">Chats</h5>
             </div>
@@ -600,7 +600,7 @@
           </div>
         <% end %>
         <%= if @lobby_mode == :rooms do %>
-          <div id="chatRoomBar" class="chatRoomBar">
+          <div id="chatRoomBar" class="chatRoomBar sm:flex">
             <.modal id="create-room-popup" class="">
               <h1 class="text-base font-bold text-grayscale">Create Room</h1>
               <.live_component id={:room_form} media_settings={@media_settings} module={RoomForm} />

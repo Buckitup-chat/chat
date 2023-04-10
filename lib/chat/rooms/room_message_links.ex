@@ -4,8 +4,8 @@ defmodule Chat.Rooms.RoomMessageLinks do
   """
   alias Chat.AdminDb
   alias Chat.Identity
-  alias Chat.Rooms.Room
   alias Chat.RoomMessageLinksBroker
+  alias Chat.Rooms.Room
 
   def link_hash({_, msg_id}), do: msg_id |> Enigma.hash() |> Base.encode16(case: :lower)
 

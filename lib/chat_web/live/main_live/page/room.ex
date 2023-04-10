@@ -5,6 +5,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   import ChatWeb.MainLive.Page.Shared
   import ChatWeb.LiveHelpers.LiveModal
+  import ChatWeb.LiveHelpers, only: [open_content: 0]
   import Phoenix.Component, only: [assign: 3]
 
   import Phoenix.LiveView,
@@ -71,15 +72,16 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> push_event("chat:scroll-down", %{})
   end
 
-  def init_with_linked_message(socket, link_hash) do
-    with {encrypted_identity, _, msg_index, msg_id} <- Rooms.get_message_link(link_hash),
+  def init_with_linked_message(socket, hash) do
+    with {encrypted_identity, _, msg_index, msg_id} <- Rooms.get_message_link(hash),
          identity <-
-           Rooms.decrypt_identity(encrypted_identity, link_hash |> Base.decode16!(case: :lower)),
+           Rooms.decrypt_identity(encrypted_identity, hash |> Base.decode16!(case: :lower)),
          room <- identity |> Identity.pub_key() |> Rooms.get() do
       socket
       |> store_new(identity)
       |> init({identity, room})
       |> load_messages_to({msg_index, msg_id})
+      |> send_js(open_content())
       |> push_patch(to: "/")
     else
       _ ->
@@ -97,13 +99,15 @@ defmodule ChatWeb.MainLive.Page.Room do
     end
   end
 
-  def store_key_copy(%{assigns: %{me: me}} = socket, room_identity) do
-    my_notes = Dialogs.find_or_open(me)
+  def store_key_copy(%{assigns: %{me: me, room_map: room_map}} = socket, room_identity) do
+    unless Map.has_key?(room_map, Identity.pub_key(room_identity)) do
+      my_notes = Dialogs.find_or_open(me)
 
-    room_identity
-    |> Messages.RoomInvite.new()
-    |> Dialogs.add_new_message(me, my_notes)
-    |> RoomInviteIndex.add(my_notes, me)
+      room_identity
+      |> Messages.RoomInvite.new()
+      |> Dialogs.add_new_message(me, my_notes)
+      |> RoomInviteIndex.add(my_notes, me)
+    end
 
     socket
   end

@@ -6,8 +6,8 @@ defmodule Chat.Rooms do
   alias Chat.Rooms.Message
   alias Chat.Rooms.Registry
   alias Chat.Rooms.Room
-  alias Chat.Rooms.RoomMessages
   alias Chat.Rooms.RoomMessageLinks
+  alias Chat.Rooms.RoomMessages
 
   @doc "Returns new room {Identity, Room}"
   def add(me, name, type \\ :public) do

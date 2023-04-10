@@ -11,7 +11,7 @@ defmodule ChatWeb.MainLive.Page.ImportKeyRing do
     {uuid, code} = KeyRingTokens.create()
 
     url = Routes.main_index_url(socket, :export, uuid)
-    qr = Utils.qr_base64_from_url(url)
+    qr = Utils.qr_base64_from_url(url, color: "#ffffff", background_opacity: 0)
 
     socket
     |> assign(:mode, :import_key_ring)

@@ -13,6 +13,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   require Logger
 
+  alias Chat.Admin.MediaSettings
   alias Chat.Broker
   alias Chat.ChunkedFiles
   alias Chat.Content.Memo
@@ -24,7 +25,8 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.Messages
   alias Chat.RoomInviteIndex
   alias Chat.Rooms
-  alias Chat.Rooms.RoomRequest
+  alias Chat.Rooms.{Registry, Room, RoomRequest}
+  alias Chat.Sync.CargoRoom
   alias Chat.Upload.UploadMetadata
   alias Chat.User
   alias Chat.Utils
@@ -69,6 +71,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:message_update_mode, :replace)
     |> assign_messages()
     |> assign_requests()
+    |> maybe_enable_cargo()
     |> push_event("chat:scroll-down", %{})
   end
 
@@ -598,5 +601,46 @@ defmodule ChatWeb.MainLive.Page.Room do
     socket
     |> assign(:messages, [])
     |> assign(:message_update_mode, :append)
+  end
+
+  def maybe_enable_cargo(socket) do
+    %MediaSettings{} = media_settings = socket.assigns.media_settings
+    room = socket.assigns[:room]
+
+    if media_settings.functionality == :cargo and not is_nil(room) do
+      enabled? =
+        case socket.assigns[:cargo_room] do
+          %CargoRoom{pub_key: pub_key, status: status}
+          when pub_key == room.pub_key or status == :syncing ->
+            false
+
+          _ ->
+            true
+        end
+
+      cargo_sync =
+        cond do
+          !enabled? ->
+            :disabled
+
+          !has_unique_name(room) ->
+            :duplicate_name
+
+          true ->
+            :enabled
+        end
+
+      assign(socket, :cargo_sync, cargo_sync)
+    else
+      socket
+    end
+  end
+
+  defp has_unique_name(%Room{} = room) do
+    Registry.all()
+    |> Enum.any?(fn {_room_pub_key, %Room{} = other_room} ->
+      other_room.name == room.name and other_room.pub_key != room.pub_key
+    end)
+    |> Kernel.not()
   end
 end

@@ -29,6 +29,16 @@ defmodule Chat.Db.ChangeTracker do
     |> GenServer.call({:await, key, expires(@timeout)}, 2 * @timeout)
   end
 
+  def await_many(keys, timeout) do
+    keys
+    |> Enum.map(fn key ->
+      Task.Supervisor.async(Chat.Db.ChangeTracker.Tasks, fn ->
+        GenServer.call(__MODULE__, {:await, key, expires(timeout)}, 2 * timeout)
+      end)
+    end)
+    |> Task.await_many(timeout)
+  end
+
   def on_saved(action) do
     key = {:change_tracking_marker, UUID.uuid4()}
 

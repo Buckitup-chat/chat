@@ -409,6 +409,7 @@ defmodule ChatWeb.MainLive.Index do
   def handle_info({:create_new_room, %{name: name, type: type}}, socket) do
     socket
     |> Page.Lobby.new_room(name, type)
+    |> Page.Room.maybe_enable_cargo()
     |> noreply()
   end
 
@@ -438,6 +439,7 @@ defmodule ChatWeb.MainLive.Index do
   def handle_info({:update_cargo_room, cargo_room}, socket) do
     socket
     |> assign(:cargo_room, cargo_room)
+    |> Page.Room.maybe_enable_cargo()
     |> noreply()
   end
 

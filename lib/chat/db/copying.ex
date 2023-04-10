@@ -6,15 +6,24 @@ defmodule Chat.Db.Copying do
 
   import Chat.Db.WriteQueue.ReadStream
 
+  alias Chat.Db.ChangeTracker
   alias Chat.Db.Common
   alias Chat.Db.WriteQueue
 
   def await_copied(from, to, keys \\ nil) do
     to_pipe = Common.names(to)
 
-    awaiter = Task.async(&wait_till_done/0)
+    stream = stream(from, to, nil, keys)
 
-    stream(from, to, awaiter.pid, keys)
+    awaiter =
+      Task.async(fn ->
+        stream
+        |> read_stream(:keys)
+        |> ChangeTracker.await_many(:timer.hours(1))
+      end)
+
+    stream
+    |> read_stream(awaiter: awaiter.pid)
     |> WriteQueue.put_stream(to_pipe.queue)
 
     Task.await(awaiter, :infinity)
@@ -105,18 +114,5 @@ defmodule Chat.Db.Copying do
     |> MapSet.new()
     |> MapSet.union(set)
     |> then(&{snap, &1})
-  end
-
-  defp wait_till_done do
-    receive do
-      :done ->
-        :ok
-
-      any ->
-        ["[copying] ", inspect(any)]
-        |> Logger.debug()
-
-        wait_till_done()
-    end
   end
 end

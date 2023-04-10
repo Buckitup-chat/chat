@@ -13,9 +13,28 @@ straightforward as possible.
 ### Added
 
 ### Changed
-- dependencies update
 
 ### Fixed
+
+
+## 2023-04-07_a41ea0d___2023-04-07_c06e36f
+
+### Added
+- queue uploaded file chunks (improves stability)
+
+### Changed
+- dependencies update
+- updating feed rendering w/ new mechanics
+- Cargo room disappears after ejecting USB drive
+
+### Fixed
+- Improved sync speed
+- Fixed cargo room crashing when it's not set
+- Improved cargo styling
+- Prevent backup/sync from corruption
+- admin panel w/o login returns to login form (when page gets reconnected in admin panel)
+- broken image render 
+- fix copying process
 
 ## 2023-03-31_d8b27f7___2023-03-31_875d678
 

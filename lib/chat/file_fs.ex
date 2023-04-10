@@ -31,13 +31,13 @@ defmodule Chat.FileFs do
       start == first
     end)
     |> then(fn filename ->
-      data = File.open!(filename, [:binary, :read], &IO.binread(&1, :eof))
-
       last =
         filename
         |> Path.split()
         |> List.last()
         |> String.to_integer()
+
+      data = File.open!(filename, [:binary, :read], &IO.binread(&1, last - first + 1))
 
       {data, last}
     end)

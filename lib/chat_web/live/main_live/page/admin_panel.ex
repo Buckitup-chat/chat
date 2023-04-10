@@ -28,6 +28,12 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     |> assign_room_list()
   end
 
+  def int(socket) do
+    socket
+    |> assign(:need_login, true)
+    |> assign(:handshaked, false)
+  end
+
   def request_wifi_settings(socket) do
     request_platform(:get_wifi_settings)
 

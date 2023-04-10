@@ -742,16 +742,10 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   defp image(assigns) do
-    # {JS.dispatch("chat:toggle", detail: %{class: "preview"})
-    #  |> JS.add_class("hidden", to: "#dialogInput")
-    #  |> JS.add_class("md:hidden", to: "#chatRoomBar")
-    #  |> JS.add_class("hidden", to: "#chatContent")
-    #  |> JS.remove_class("hidden", to: "#imageGallery")
-    #  |> JS.remove_class("overflow-scroll", to: "#chatContent")}
     ~H"""
     <img
       class="object-cover overflow-hidden"
-      src={@file.url}
+      src={@file[:url]}
       phx-click={open_gallery(@chat_type)}
       phx-value-id={@msg.id}
       phx-value-index={@msg.index}

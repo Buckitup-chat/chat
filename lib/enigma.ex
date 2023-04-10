@@ -29,4 +29,7 @@ defmodule Enigma do
   defdelegate hash(hashable), to: Enigma.Hash
 
   defdelegate short_hash(hashable), to: Enigma.Hash
+
+  defdelegate hide_secret_in_shares(secret, amount, threshold), to: Enigma.SecretSharing
+  defdelegate recover_secret_from_shares(shares), to: Enigma.SecretSharing
 end

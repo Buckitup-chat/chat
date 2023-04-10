@@ -4,7 +4,6 @@ defmodule ChatWeb.MainLive.Page.RoomTest do
   import ChatWeb.LiveTestHelpers
   import Phoenix.LiveViewTest
 
-  alias Chat.Rooms
   alias ChatWeb.MainLive.Modals.ShareMessageLink
   alias ChatWeb.MainLive.Modals.UnlinkMessages
 

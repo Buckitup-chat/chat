@@ -728,6 +728,9 @@
                   requests={@room_requests}
                   restrict_actions={@db_status.writable == :no}
                   linked?={@is_room_linked?}
+                  media_settings={@media_settings}
+                  cargo_room={assigns[:cargo_room]}
+                  cargo_sync={assigns[:cargo_sync]}
                 />
                 <%= if @room.type == :request do %>
                   <.modal id="room-request-list" class="z-30">

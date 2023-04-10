@@ -24,7 +24,7 @@ defmodule Chat.Rooms.RoomMessageLinks do
   def create(_, _, _), do: :error
 
   def sync do
-    AdminDb.list({{:room_message_link, 0}, {:"room_link\0", 0}})
+    AdminDb.list({{:room_message_link, 0}, {:"room_message_link\0", 0}})
     |> Enum.reduce(%{}, fn {{_, hash}, data}, map -> Map.put(map, hash, data) end)
   end
 

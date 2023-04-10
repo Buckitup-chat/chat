@@ -13,6 +13,9 @@ defmodule ChatWeb.MainLive.Layout.Room do
   attr :requests, :list, required: true, doc: "room requests list"
   attr :restrict_actions, :boolean, default: false, doc: "read-only mode indicator"
   attr :linked?, :boolean, default: false, doc: "whether has room the linked messages"
+  attr :cargo_room, Room, doc: "cargo room struct"
+  attr :cargo_sync, :atom, doc: "cargo sync status"
+  attr :media_settings, :map, doc: "admin room media settings"
 
   def header(assigns) do
     ~H"""
@@ -37,11 +40,13 @@ defmodule ChatWeb.MainLive.Layout.Room do
         <.unlink_link restricted={@restrict_actions} />
       <% end %>
       <div class="flex flex-row justify-between">
+        <Layout.CargoRoom.button cargo_sync={@cargo_sync} />
         <%= if @room.type == :request do %>
           <.request_button requests={@requests} restricted={@restrict_actions} />
         <% end %>
         <.invite_button users={Chat.User.list()} restricted={@restrict_actions} />
       </div>
+      <Layout.CargoRoom.bar cargo_room={@cargo_room} media_settings={@media_settings} room={@room} />
     </div>
     """
   end

@@ -42,7 +42,7 @@ defmodule Enigma.SecretSharingTest do
     assert_raise(
       ArgumentError,
       "secret should be a binary",
-      fn ->  Enigma.hide_secret_in_shares(5, 4, 3) end
+      fn -> Enigma.hide_secret_in_shares(5, 4, 3) end
     )
 
     assert_raise(

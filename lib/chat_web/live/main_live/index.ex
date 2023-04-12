@@ -7,7 +7,7 @@ defmodule ChatWeb.MainLive.Index do
   alias Chat.Admin.{CargoSettings, MediaSettings}
   alias Chat.{AdminRoom, Dialogs, Identity, Messages, RoomInviteIndex, User}
   alias Chat.Rooms.Room
-  alias Chat.Sync.CargoRoom
+  alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
   alias ChatWeb.Hooks.{LocalTimeHook, UploaderHook}
   alias ChatWeb.MainLive.Admin.{CargoSettingsForm, MediaSettingsForm}
   alias ChatWeb.MainLive.{Layout, Page}
@@ -51,6 +51,7 @@ defmodule ChatWeb.MainLive.Index do
         |> allow_any500m_upload(:my_keys_file)
         |> Page.Login.check_stored()
         |> maybe_set_cargo_room()
+        |> set_usb_drive_dump_room()
         |> ok()
       end
     else
@@ -296,12 +297,24 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   def handle_event("cargo:activate", _params, socket) do
+    UsbDriveDumpRoom.remove()
     CargoRoom.activate(socket.assigns.room.pub_key)
     noreply(socket)
   end
 
   def handle_event("cargo:remove", _params, socket) do
     CargoRoom.remove()
+    noreply(socket)
+  end
+
+  def handle_event("dump:activate", _params, socket) do
+    CargoRoom.remove()
+    UsbDriveDumpRoom.activate(socket.assigns.room.pub_key, socket.assigns.room_identity)
+    noreply(socket)
+  end
+
+  def handle_event("dump:remove", _params, socket) do
+    UsbDriveDumpRoom.remove()
     noreply(socket)
   end
 
@@ -397,10 +410,12 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> Page.Lobby.new_room(name, type)
     |> Page.Room.maybe_enable_cargo()
+    |> Page.Room.maybe_enable_usb_drive_dump()
     |> noreply()
   end
 
   def handle_info({:maybe_activate_cargo_room, true, %Room{} = room, room_identity}, socket) do
+    UsbDriveDumpRoom.remove()
     CargoRoom.activate(room.pub_key)
 
     %CargoSettings{} = cargo_settings = socket.assigns.cargo_settings
@@ -427,6 +442,15 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> assign(:cargo_room, cargo_room)
     |> Page.Room.maybe_enable_cargo()
+    |> Page.Room.maybe_enable_usb_drive_dump()
+    |> noreply()
+  end
+
+  def handle_info({:update_usb_drive_dump_room, dump_room}, socket) do
+    socket
+    |> assign(:usb_drive_dump_room, dump_room)
+    |> Page.Room.maybe_enable_cargo()
+    |> Page.Room.maybe_enable_usb_drive_dump()
     |> noreply()
   end
 
@@ -557,5 +581,11 @@ defmodule ChatWeb.MainLive.Index do
     else
       socket
     end
+  end
+
+  defp set_usb_drive_dump_room(socket) do
+    PubSub.subscribe(Chat.PubSub, "chat::usb_drive_dump_room")
+
+    assign(socket, :usb_drive_dump_room, UsbDriveDumpRoom.get())
   end
 end

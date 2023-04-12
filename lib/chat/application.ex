@@ -29,6 +29,7 @@ defmodule Chat.Application do
       Chat.ChunkedFilesBroker,
       Chat.Sync.CargoRoom,
       Chat.Sync.OnlinersSync,
+      Chat.Sync.UsbDriveDumpRoom,
       {DynamicSupervisor, name: Chat.Upload.UploadSupervisor},
       ChatWeb.Presence,
       # Start the Endpoint (http/https)

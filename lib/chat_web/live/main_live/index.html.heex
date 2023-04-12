@@ -349,6 +349,19 @@
               <span class="text-xs">Cargo Room</span>
             </button>
           <% end %>
+          <%= if assigns[:usb_drive_dump_room][:status] == :complete do %>
+            <button
+              phx-click="room/switch"
+              phx-value-room={Room.hash(@usb_drive_dump_room.pub_key)}
+              class="sidebarIcon"
+            >
+              <.icon
+                id="usbDrive"
+                class={"w-8 h-8 hover:fill-purple " <> if(@usb_drive_dump_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}
+              />
+              <span class="text-xs">Dump room</span>
+            </button>
+          <% end %>
         </div>
         <div class="navbar">
           <div class="sm:flex flex-col items-center">
@@ -422,6 +435,19 @@
                   class={"w-8 h-8 hover:fill-purple " <> if(@cargo_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}
                 />
                 <span class="text-xs">Cargo Room</span>
+              </button>
+            <% end %>
+            <%= if assigns[:usb_drive_dump_room][:status] == :complete do %>
+              <button
+                phx-click="room/switch"
+                phx-value-room={Room.hash(@usb_drive_dump_room.pub_key)}
+                class="sidebarIcon mt-5 t-dump-room"
+              >
+                <.icon
+                  id="usbDrive"
+                  class={"w-8 h-8 hover:fill-purple " <> if(@usb_drive_dump_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}
+                />
+                <span class="text-xs">Dump room</span>
               </button>
             <% end %>
           </div>
@@ -585,7 +611,13 @@
           <div id="chatRoomBar" class="chatRoomBar">
             <.modal id="create-room-popup" class="">
               <h1 class="text-base font-bold text-grayscale">Create Room</h1>
-              <.live_component id={:room_form} media_settings={@media_settings} module={RoomForm} />
+              <.live_component
+                cargo_room={assigns[:cargo_room]}
+                id={:room_form}
+                media_settings={@media_settings}
+                module={RoomForm}
+                usb_drive_dump_room={assigns[:usb_drive_dump_room]}
+              />
             </.modal>
             <div class="px-7 mt-3 flex items-center justify-between">
               <h5 class="channel-block-text text-grayscale" style="font-size: 22px;">Rooms</h5>
@@ -722,6 +754,7 @@
                     </div>
 
                     <div class="flex flex-row justify-between">
+                      <Layout.UsbDriveDumpRoom.button dump={assigns[:usb_drive_dump]} />
                       <Layout.CargoRoom.button cargo_sync={assigns[:cargo_sync]} />
 
                       <%= if @room.type == :request do %>
@@ -740,6 +773,10 @@
                   <Layout.CargoRoom.bar
                     cargo_room={assigns[:cargo_room]}
                     media_settings={@media_settings}
+                    room={@room}
+                  />
+                  <Layout.UsbDriveDumpRoom.bar
+                    dump_room={assigns[:usb_drive_dump_room]}
                     room={@room}
                   />
                 </div>

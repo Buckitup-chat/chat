@@ -39,25 +39,22 @@ defmodule Enigma.SecretSharingTest do
   test "failed sharing" do
     key = Enigma.hash("hello")
 
-    try do
+    assert_raise(
+      ArgumentError,
+      "secret should be a binary",
       Enigma.hide_secret_in_shares(5, 4, 3)
-    rescue
-      e in ArgumentError ->
-        assert e.message == "byte_size of secret (which should be binary string) should be 32"
-    end
+    )
 
-    try do
+    assert_raise(
+      ArgumentError,
+      "amount should be a number between 1 and 256, bounds not included",
       Enigma.hide_secret_in_shares(key, 257, 3)
-    rescue
-      e in ArgumentError ->
-        assert e.message == "amount should be a number between 1 and 256, bounds not included"
-    end
+    )
 
-    try do
+    assert_raise(
+      ArgumentError,
+      "amount of shares should be bigger than threshold",
       Enigma.hide_secret_in_shares(key, 3, 4)
-    rescue
-      e in ArgumentError ->
-        assert e.message == "threshold should be no more than amount"
-    end
+    )
   end
 end

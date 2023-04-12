@@ -299,6 +299,26 @@ graph TD;
 
 ## Shamir's Secret Sharing
 
+```mermaid
+graph TD;
+  scrt --> shrs;
+  amnt --> shrs;
+  thrsld --> shrs;
+  
+  subgraph KeyOwner
+    direction UD
+
+    scrt(Secret Key)
+    amnt(Amount)
+    thrsld(Threshold)
+  end
+  subgraph SecretSharesGenerator
+    shrs(Shares)
+  end
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
 If we need to protect our secret, we could use secret sharing.
 
 <ul>

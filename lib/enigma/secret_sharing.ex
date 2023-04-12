@@ -3,7 +3,7 @@ defmodule Enigma.SecretSharing do
   Shamir's Secret Sharing
   """
   defguard amount_constraint(amount) when amount > 1 and amount < 256
-  defguard secret_constraint(secret) when is_binary(secret) and byte_size(secret) == 32
+  defguard secret_constraint(secret) when is_binary(secret)
   defguard threshold_constraint(threshold, amount) when threshold <= amount
 
   defguard constraints(secret, amount, threshold)
@@ -27,7 +27,7 @@ defmodule Enigma.SecretSharing do
   def hide_secret_in_shares(secret, _amount, _threshold) when not secret_constraint(secret),
     do:
       raise(ArgumentError,
-        message: "byte_size of secret (which should be binary string) should be 32"
+        message: "secret should be a binary"
       )
 
   def hide_secret_in_shares(_secret, amount, _threshold) when not amount_constraint(amount),
@@ -38,7 +38,7 @@ defmodule Enigma.SecretSharing do
 
   def hide_secret_in_shares(_secret, amount, threshold)
       when not threshold_constraint(threshold, amount),
-      do: raise(ArgumentError, message: "threshold should be no more than amount")
+      do: raise(ArgumentError, message: "amount of shares should be bigger than threshold")
 
   def recover_secret_from_shares(shares), do: KeyX.recover_secret!(shares)
 end

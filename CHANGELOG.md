@@ -97,9 +97,9 @@ straightforward as possible.
 
 ## 2023-04-10_81a74ae___2023-04-11_d9dff35
 ### Added
-- Secret Sharing integration for the `Enigma` module
-- covered new `Enigma.SecretSharing` module with tests
+- Integration of Secret Sharing for the `Enigma` module
+
 
 ### Changed
-- `encription.livemd` now contains some info on secret sharing
+- Explained Secret Sharing in the updated documentation
 

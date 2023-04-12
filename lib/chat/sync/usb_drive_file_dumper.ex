@@ -94,8 +94,7 @@ defmodule Chat.Sync.UsbDriveFileDumper do
     ]
     |> Task.await_many(:infinity)
 
-    # FIXME: make sure file is dumped completely
-    # :timer.sleep(:timer.seconds(5))
+    ChangeTracker.await()
 
     topic =
       room_key

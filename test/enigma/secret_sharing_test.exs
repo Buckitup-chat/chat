@@ -42,19 +42,19 @@ defmodule Enigma.SecretSharingTest do
     assert_raise(
       ArgumentError,
       "secret should be a binary",
-      Enigma.hide_secret_in_shares(5, 4, 3)
+      fn ->  Enigma.hide_secret_in_shares(5, 4, 3) end
     )
 
     assert_raise(
       ArgumentError,
       "amount should be a number between 1 and 256, bounds not included",
-      Enigma.hide_secret_in_shares(key, 257, 3)
+      fn -> Enigma.hide_secret_in_shares(key, 257, 3) end
     )
 
     assert_raise(
       ArgumentError,
       "amount of shares should be bigger than threshold",
-      Enigma.hide_secret_in_shares(key, 3, 4)
+      fn -> Enigma.hide_secret_in_shares(key, 3, 4) end
     )
   end
 end

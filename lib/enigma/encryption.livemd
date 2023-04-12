@@ -300,20 +300,36 @@ graph TD;
 ## Shamir's Secret Sharing
 
 ```mermaid
-graph TD;
-  scrt --> shrs;
-  amnt --> shrs;
-  thrsld --> shrs;
+graph TD
+  direction LR
+  scrt --> shrs
+  amnt --> shrs
+  thrsld --> shrs
+  shrs -.share part 1.-> shrprt1
+  shrs -.share part 2.-> shrprt2
+  shrs -.share part 3.-> shrprt3
+  shrs -.share part 4.-> shrprt4
   
-  subgraph KeyOwner
-    direction UD
+  subgraph User Secret Owner
 
-    scrt(Secret Key)
-    amnt(Amount)
-    thrsld(Threshold)
+    scrt[Secret Key]
+    amnt[Amount : 4]
+    thrsld[Threshold : 3]
   end
   subgraph SecretSharesGenerator
-    shrs(Shares)
+    shrs{Generate Shares}
+  end
+  subgraph User 1
+    shrprt1[Share Part]
+  end
+  subgraph User 2
+    shrprt2[Share Part]
+  end
+  subgraph User 3
+    shrprt3[Share Part]
+  end
+  subgraph User 4
+    shrprt4[Share Part]
   end
 ```
 
@@ -321,24 +337,50 @@ graph TD;
 
 If we need to protect our secret, we could use secret sharing.
 
-<ul>
-  This is how it works: 
-  <li>
-    For starters, we take 3 parameters: our secret, a total amount of shares we need to generate, and a threshold, that indicates how many shares would be enough to recover our secret down the line;
-  </li>
-  <li>
-    Imagine that our secret is represented by a number. This number could be placed on the Oy axis. If we wanted to hide that point, we could represent it via a number of other points that would form a line, that intercepts Oy axis. The complexity of that line determines how easy it would be to calculate, which function represents that line, and by proxy, our secret. For instance, if our line was straight, 2 points would be enough to know where our secret lies on Oy axis;
-  </li>
-  <li>
-    Needless to say that the threshold shouldn't be bigger than a total amount of shares, you can't really recover your secret if you don't have enough points to form a needed line;
-  </li>
-  <li>
-    And that's basically it, the output of the share generation should be a list of shares, which we can handle out each to different users;
-  </li>
-  <li>
-    Once we need to recover our secret, we can ask these users what share they have, and after getting enough of them, our secret should be safely recovered.
-  </li>
-</ul>
+This is how it works.
+
+For starters, we take 3 parameters: our secret, a total amount of shares we need to generate
+and a threshold, that indicates how many shares would be enough to recover our secret down the line.
+
+Imagine that our secret is represented by a number. This number could be placed on the Oy axis. If we wanted to hide that point, we could represent it via a number of other points that would form a line, that intercepts Oy axis. The complexity of that line determines how easy it would be to calculate, which function represents that line, and by proxy, our secret. For instance, if our line was straight, 2 points would be enough to know where our secret lies on Oy axis.
+
+Needless to say that the threshold shouldn't be bigger than a total amount of shares, you can't really recover your secret if you don't have enough points to form a needed line.
+
+<!-- livebook:{"break_markdown":true} -->
+
+```mermaid
+  graph TD
+  shrprt1 --> r
+  shrprt2 --> r
+  shrprt3 --> r
+  r -. recovered secret .-> rec
+  subgraph Threshold
+    subgraph User 1
+      shrprt1(Share Part)
+    end
+    subgraph User 2
+      shrprt2(Share Part)
+    end
+    subgraph User 3
+      shrprt3(Share Part)
+    end
+  end
+  subgraph User 4
+      shrprt4(Share Part)
+    end
+  subgraph Key Recovery
+  r{Recover Secret}
+  end
+  subgraph User Key Owner
+    rec(Recovered Secret Key)
+  end
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+And that's basically it, the output of the share generation should be a list of shares, which we can handle out each to different users.
+
+Once we need to recover our secret, we can ask these users what share they have, and after getting enough of them, our secret should be safely recovered.
 
 ## Developer guidelines
 

@@ -432,13 +432,20 @@ html {
   bottom: 0;
 }
 
+.sidebar-container {
+  display: grid;
+  grid-template-rows: 1fr minmax(0, 1fr);
+  /* display: flex;
+  flex-direction: column; */
+}
+
 @media screen and (min-width: 640px) {
   .navbar { @apply h-screen w-[70px] flex flex-none flex-col justify-between bg-white }
 
   .navbarTop { @apply hidden }
   .navbarBottom { @apply hidden }
 
-  .chatRoomBar { @apply h-screen w-[320px] flex-none min-w-fit bg-white/90 overflow-y-scroll  }
+  .chatRoomBar { @apply h-screen w-[320px] flex-none min-w-fit bg-white/90 overflow-y-scroll }
 }
 
 @media screen and (max-width: 640px) {

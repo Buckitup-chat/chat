@@ -12,10 +12,11 @@ straightforward as possible.
 
 ### Added
 
+- Integration of Secret Sharing with encryption layer (#251)
+
 ### Changed
 
 ### Fixed
-
 
 ## 2023-04-07_a41ea0d___2023-04-07_c06e36f
 
@@ -95,8 +96,6 @@ straightforward as possible.
 - lost feed names
 - admin room user actions
 
-## [Unreleased] - 2023-04-11
-### Added
-- Integration of Secret Sharing with encryption layer
+
 
 

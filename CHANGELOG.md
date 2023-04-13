@@ -13,10 +13,12 @@ straightforward as possible.
 ### Added
 - USB drive dump
 
+- Integration of Secret Sharing with encryption layer (#251)
+
 ### Changed
 
 ### Fixed
-
+- better broken files handling
 
 ## 2023-04-07_a41ea0d___2023-04-07_c06e36f
 
@@ -95,4 +97,7 @@ straightforward as possible.
 - UI: uploader covering chat/room list
 - lost feed names
 - admin room user actions
+
+
+
 

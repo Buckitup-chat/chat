@@ -339,12 +339,12 @@ If we need to protect our secret, we could use secret sharing.
 
 This is how it works.
 
-For starters, we take 3 parameters: our secret, a total amount of shares we need to generate
+We take 3 parameters: our secret, a total amount of shares we need to generate
 and a threshold, that indicates how many shares would be enough to recover our secret down the line.
 
 Imagine that our secret is represented by a number. This number could be placed on the Oy axis. If we wanted to hide that point, we could represent it via a number of other points that would form a line, that intercepts Oy axis. The complexity of that line determines how easy it would be to calculate, which function represents that line, and by proxy, our secret. For instance, if our line was straight, 2 points would be enough to know where our secret lies on Oy axis.
 
-Needless to say that the threshold shouldn't be bigger than a total amount of shares, you can't really recover your secret if you don't have enough points to form a needed line.
+The threshold shouldn't be bigger than a total amount of shares, you can't really recover your secret if you don't have enough points to form a needed line.
 
 <!-- livebook:{"break_markdown":true} -->
 

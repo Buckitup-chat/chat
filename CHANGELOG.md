@@ -95,11 +95,8 @@ straightforward as possible.
 - lost feed names
 - admin room user actions
 
-## 2023-04-10_81a74ae___2023-04-11_d9dff35
+## [Unreleased] - 2023-04-11
 ### Added
-- Integration of Secret Sharing for the `Enigma` module
+- Integration of Secret Sharing with encryption layer
 
-
-### Changed
-- Explained Secret Sharing in the updated documentation
 

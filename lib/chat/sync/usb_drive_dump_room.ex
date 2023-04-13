@@ -17,8 +17,7 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
   @dump_timeout 60
   @start_timeout 5 * 60
 
-  @dump_topic "chat::usb_drive_dump_room"
-  @lobby_topic "chat::lobby"
+  @topic "chat::usb_drive_dump_room"
 
   defstruct [:identity, :pub_key, :successful?, status: :pending, timer: @start_timeout]
 
@@ -97,7 +96,7 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
           %__MODULE__{identity: room_identity, pub_key: room_key}
       end
 
-    :ok = PubSub.broadcast(Chat.PubSub, @dump_topic, {:update_usb_drive_dump_room, dump_room})
+    :ok = PubSub.broadcast(Chat.PubSub, @topic, {:update_usb_drive_dump_room, dump_room})
 
     {:noreply, dump_room}
   end
@@ -107,7 +106,7 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
 
     Process.send_after(self(), {:dump_timeout, dump_room.pub_key}, @dump_timeout * 1000)
 
-    :ok = PubSub.broadcast(Chat.PubSub, @dump_topic, {:update_usb_drive_dump_room, dump_room})
+    :ok = PubSub.broadcast(Chat.PubSub, @topic, {:update_usb_drive_dump_room, dump_room})
 
     {:noreply, dump_room}
   end
@@ -139,9 +138,7 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
 
     dump_room = %{dump_room | status: status}
 
-    :ok = PubSub.broadcast(Chat.PubSub, @dump_topic, {:update_usb_drive_dump_room, dump_room})
-    :ok = PubSub.broadcast(Chat.PubSub, @lobby_topic, {:new_room, dump_room.pub_key})
-    :ok = PubSub.broadcast(Chat.PubSub, @lobby_topic, {:new_user, nil})
+    :ok = PubSub.broadcast(Chat.PubSub, @topic, {:update_usb_drive_dump_room, dump_room})
 
     {:noreply, dump_room}
   end
@@ -156,7 +153,7 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
           dump_room
       end
 
-    :ok = PubSub.broadcast(Chat.PubSub, @dump_topic, {:update_usb_drive_dump_room, dump_room})
+    :ok = PubSub.broadcast(Chat.PubSub, @topic, {:update_usb_drive_dump_room, dump_room})
 
     {:noreply, dump_room}
   end
@@ -180,7 +177,7 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
           nil
       end
 
-    :ok = PubSub.broadcast(Chat.PubSub, @dump_topic, {:update_usb_drive_dump_room, dump_room})
+    :ok = PubSub.broadcast(Chat.PubSub, @topic, {:update_usb_drive_dump_room, dump_room})
 
     {:noreply, dump_room}
   end
@@ -195,7 +192,7 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
           dump_room
       end
 
-    :ok = PubSub.broadcast(Chat.PubSub, @dump_topic, {:update_usb_drive_dump_room, dump_room})
+    :ok = PubSub.broadcast(Chat.PubSub, @topic, {:update_usb_drive_dump_room, dump_room})
 
     {:noreply, dump_room}
   end

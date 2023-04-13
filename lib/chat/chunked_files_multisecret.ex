@@ -3,7 +3,8 @@ defmodule Chat.ChunkedFilesMultisecret do
 
   alias Chat.Db
 
-  @hundred_chunks_size 1000 * 1024 * 1024
+  @chunk_size Application.compile_env(:chat, :file_chunk_size)
+  @hundred_chunks_size 100 * @chunk_size
   @secret_size 32
 
   def generate(file_key, file_size, initial_secret) do

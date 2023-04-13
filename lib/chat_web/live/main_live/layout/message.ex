@@ -54,7 +54,8 @@ defmodule ChatWeb.MainLive.Layout.Message do
           (is_mine? && Card.from_identity(me)) || peer
 
         %{chat_type: :room, msg: msg, room: room} ->
-          User.by_id(msg.author_key) || Card.new(room.name, room.pub_key)
+          User.by_id(msg.author_key) ||
+            (msg.author_key == room.pub_key && Card.new(room.name, room.pub_key))
       end)
       |> assign_new(:dynamic_attrs, fn
         %{export?: true} ->

@@ -22,6 +22,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
   alias ChatWeb.Router.Helpers
   alias Phoenix.LiveView.{Socket, UploadEntry}
 
+  @client_chunk_size div(Application.compile_env(:chat, :file_chunk_size), 1024)
   @max_concurrent_uploads 2
 
   @type entry :: UploadEntry.t()
@@ -30,6 +31,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
           %{skip: true}
           | %{
               chunk_count: integer(),
+              chunk_size: integer(),
               entrypoint: String.t(),
               status: atom(),
               uploader: String.t(),
@@ -271,6 +273,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
 
     uploader_data = %{
       chunk_count: next_chunk,
+      chunk_size: @client_chunk_size,
       status: status
     }
 

@@ -259,6 +259,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       assert %{
                chunk_count: 0,
+               chunk_size: 10_240,
                entrypoint: entrypoint,
                status: :active,
                uploader: "UpChunkUploader",
@@ -302,6 +303,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       assert %{
                chunk_count: 0,
+               chunk_size: 10_240,
                entrypoint: entrypoint,
                status: :active,
                uploader: "UpChunkUploader",
@@ -361,6 +363,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       assert %{
                chunk_count: 0,
+               chunk_size: 10_240,
                entrypoint: entrypoint,
                status: :active,
                uploader: "UpChunkUploader",

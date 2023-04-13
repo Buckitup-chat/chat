@@ -10,7 +10,7 @@ defmodule Chat.Sync.UsbDriveFileDumper do
   alias Phoenix.LiveView.UploadEntry
   alias Phoenix.PubSub
 
-  @chunk_size 10_240_000
+  @chunk_size Application.compile_env(:chat, :file_chunk_size)
 
   def dump(%UsbDriveDumpFile{} = file, room_key, %Identity{} = room_identity) do
     type =

@@ -344,7 +344,12 @@
             >
               <.icon
                 id="cargo"
-                class={"w-8 h-8 hover:fill-purple " <> if(@cargo_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}
+                class={
+                  classes("w-8 h-8 hover:fill-purple", %{
+                    "fill-purple" => @cargo_room.pub_key == assigns[:room][:pub_key],
+                    "fill-grayscale" => @cargo_room.pub_key != assigns[:room][:pub_key]
+                  })
+                }
               />
               <span class="text-xs">Cargo Room</span>
             </button>
@@ -357,7 +362,12 @@
             >
               <.icon
                 id="usbDrive"
-                class={"w-8 h-8 hover:fill-purple " <> if(@usb_drive_dump_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}
+                class={
+                  classes("w-8 h-8 hover:fill-purple", %{
+                    "fill-purple" => @usb_drive_dump_room.pub_key == assigns[:room][:pub_key],
+                    "fill-grayscale" => @usb_drive_dump_room.pub_key != assigns[:room][:pub_key]
+                  })
+                }
               />
               <span class="text-xs">Dump room</span>
             </button>
@@ -432,7 +442,12 @@
               >
                 <.icon
                   id="cargo"
-                  class={"w-8 h-8 hover:fill-purple " <> if(@cargo_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}
+                  class={
+                    classes("w-8 h-8 hover:fill-purple", %{
+                      "fill-purple" => @cargo_room.pub_key == assigns[:room][:pub_key],
+                      "fill-grayscale" => @cargo_room.pub_key != assigns[:room][:pub_key]
+                    })
+                  }
                 />
                 <span class="text-xs">Cargo Room</span>
               </button>
@@ -445,7 +460,12 @@
               >
                 <.icon
                   id="usbDrive"
-                  class={"w-8 h-8 hover:fill-purple " <> if(@usb_drive_dump_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}
+                  class={
+                    classes("w-8 h-8 hover:fill-purple", %{
+                      "fill-purple" => @usb_drive_dump_room.pub_key == assigns[:room][:pub_key],
+                      "fill-grayscale" => @usb_drive_dump_room.pub_key != assigns[:room][:pub_key]
+                    })
+                  }
                 />
                 <span class="text-xs">Dump room</span>
               </button>

@@ -67,7 +67,8 @@ config :chat,
   mode: :internal,
   flags: [],
   writable: :yes,
-  env: config_env()
+  env: config_env(),
+  file_chunk_size: 10 * 1024 * 1024
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

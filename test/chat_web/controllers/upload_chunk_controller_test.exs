@@ -4,7 +4,7 @@ defmodule ChatWeb.UploadChunkControllerTest do
 
   alias Chat.ChunkedFiles
 
-  @chunk_size 10 * 1024 * 1024
+  @chunk_size Application.compile_env(:chat, :file_chunk_size)
   @upload_key "a79f0b663a01b53df466335d23096e61521ca4d1f1d6ef9919281b4e1b4dbdb9"
   @upload_fixture "test/support/fixtures/files/text.txt"
 

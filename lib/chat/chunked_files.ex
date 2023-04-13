@@ -90,7 +90,7 @@ defmodule Chat.ChunkedFiles do
     |> Enum.join("")
   end
 
-  @chunk_size 10 * 1024 * 1024
+  @chunk_size Application.compile_env(:chat, :file_chunk_size)
 
   def stream_chunks(key, initial_secret) do
     FileFs.stream_file_chunks(key)

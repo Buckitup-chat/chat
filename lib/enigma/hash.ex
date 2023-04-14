@@ -13,7 +13,7 @@ defmodule Enigma.Hash do
   def short_hash(hashable) do
     hashable
     |> hash()
-    |> then(fn <<code::binary-size(4)>> <> _ -> code end)
+    |> then(fn <<code::binary-size(3)>> <> _ -> code end)
     |> Base.encode16(case: :lower)
   end
 

@@ -15,6 +15,7 @@ straightforward as possible.
 - Integration of Secret Sharing with encryption layer (#251)
 
 ### Changed
+- short code to be first 6 hex digits (was 8)
 
 ### Fixed
 - better broken files handling

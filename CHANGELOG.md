@@ -11,9 +11,8 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
-- USB drive dump
-
 - Integration of Secret Sharing with encryption layer (#251)
+- USB drive dump
 
 ### Changed
 

@@ -5,7 +5,8 @@ defmodule ChatWeb.MainLive.IndexTest do
   import Phoenix.LiveViewTest
 
   alias Chat.Admin.MediaSettings
-  alias Chat.{AdminDb, AdminRoom, Db, Dialogs, User}
+  alias Chat.{AdminDb, AdminRoom, Db, Dialogs, Rooms, User}
+  alias Chat.{RoomsBroker, UsersBroker}
   alias Chat.Dialogs.PrivateMessage
   alias Chat.Identity
   alias Chat.Sync.CargoRoom
@@ -33,6 +34,42 @@ defmodule ChatWeb.MainLive.IndexTest do
 
       assert current_view_state.joined_rooms == another_view_state.joined_rooms
       assert current_view_state.room_count_to_backup == another_view_state.room_count_to_backup
+    end
+  end
+
+  describe "search box filtering" do
+    setup [:create_users, :prepare_view, :create_rooms]
+
+    test "ddssd", %{view: view} do
+      view |> form("#search-box", dialog: %{name: "pe"}) |> render_change()
+      %{socket: %{assigns: %{users: users}}} = reload_view(%{view: view})
+      assert [%{name: "Peter"}, %{name: "Pedro"}, %{name: "Perky"}] = users
+
+      view
+      |> element(
+        "button[phx-click='switch-lobby-mode'][phx-value-lobby-mode='rooms']:first-child"
+      )
+      |> render_click()
+
+      view |> form("#search-box", room: %{name: "Public"}) |> render_change()
+      %{socket: %{assigns: %{new_rooms: rooms}}} = reload_view(%{view: view})
+      assert [%{name: "Public1"}, %{name: "Public2"}, %{name: "Public3"}] = rooms
+    end
+
+    defp create_users(_) do
+      ["Peter", "Pedro", "Perky", "Olexandr", "Olexii"]
+      |> Enum.each(fn name ->
+        User.login(name)
+        |> tap(&User.register/1)
+        |> tap(&UsersBroker.put/1)
+      end)
+    end
+
+    defp create_rooms(%{socket: %{assigns: %{me: me}}}) do
+      ["Public1", "Public2", "Public3", "Secret1", "Secret2"]
+      |> Enum.each(fn name ->
+        Rooms.add(me, name) |> tap(fn {_, room} -> RoomsBroker.put(room) end)
+      end)
     end
   end
 

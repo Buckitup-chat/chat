@@ -11,8 +11,11 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+- Search box for users/rooms
+- Users/Rooms sync optimization for UI
 
 ### Changed
+
 
 ### Fixed
 

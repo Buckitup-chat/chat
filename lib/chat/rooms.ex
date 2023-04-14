@@ -18,6 +18,13 @@ defmodule Chat.Rooms do
     {room_identity, room}
   end
 
+  @doc "Returns all rooms list"
+  def list do
+    Registry.all()
+    |> Enum.map(&elem(&1, 1))
+    |> Enum.sort_by(& &1.name)
+  end
+
   @doc "Returns rooms {my_rooms, available_rooms}"
   def list(%{} = room_map) do
     Registry.all()

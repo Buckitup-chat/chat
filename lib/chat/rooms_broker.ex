@@ -1,5 +1,5 @@
 defmodule Chat.RoomsBroker do
-  @moduledoc "Keeps users"
+  @moduledoc "Keeps rooms"
   use GenServer
   import Tools.GenServerHelpers
 

@@ -264,7 +264,11 @@ defmodule ChatWeb.MainLive.IndexTest do
       html = render(view)
       assert html =~ "Cargo sync activated"
       assert html =~ "Insert empty USB drive"
-      assert String.contains?(html, "2:00") or String.contains?(html, "1:59")
+
+      assert(
+        String.contains?(html, "2:00") or String.contains?(html, "1:59"),
+        "not found in #{html}"
+      )
 
       Process.sleep(1000)
       assert render(view) =~ ~r/1:5\d/

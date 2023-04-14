@@ -311,7 +311,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
         msg={@msg}
       />
       <.timestamp msg={@msg} timezone={@timezone} />
-      <video src={@file.url} class="a-video" controls />
+      <video src={@file[:url]} class="a-video" controls />
       <.media_file_info file={@file} />
     </div>
     """
@@ -362,7 +362,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
   defp header_wrapper(%{export?: true, msg_type: type} = assigns) when type in [:audio, :video] do
     ~H"""
-    <.link class={@class} id={@id} href={@file.url}>
+    <.link class={@class} id={@id} href={@file[:url]}>
       <%= render_slot(@inner_block) %>
     </.link>
     """
@@ -562,7 +562,12 @@ defmodule ChatWeb.MainLive.Layout.Message do
         url: WebUtils.get_file_url(:file, id, secret)
       }
     else
-      _ -> nil
+      _ ->
+        %{
+          name: "Broken file",
+          size: "n/a",
+          url: nil
+        }
     end
     |> then(&assign(assigns, :file, &1))
   end

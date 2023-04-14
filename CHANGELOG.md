@@ -13,12 +13,14 @@ straightforward as possible.
 ### Added
 - Search box for users/rooms
 - Users/Rooms sync optimization for UI
+- Integration of Secret Sharing with encryption layer (#251)
+- added shortcode for FE
 
 ### Changed
 
 
 ### Fixed
-
+- better broken files handling
 
 ## 2023-04-07_a41ea0d___2023-04-07_c06e36f
 
@@ -97,4 +99,7 @@ straightforward as possible.
 - UI: uploader covering chat/room list
 - lost feed names
 - admin room user actions
+
+
+
 

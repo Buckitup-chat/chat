@@ -12,6 +12,7 @@ straightforward as possible.
 
 ### Added
 - Integration of Secret Sharing with encryption layer (#251)
+- added shortcode for FE
 - USB drive dump
 
 ### Changed

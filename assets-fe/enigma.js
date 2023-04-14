@@ -58,6 +58,15 @@ const Enigma = {
   },
   string_to_base64: function(string) {
     return Buffer.from(string).toString('base64');
+  },
+  shortcode_form_full_key: function(b64_full_key) {
+    const buffer = Buffer.from(b64_full_key, 'base64')
+    const public_key = Buffer.from(new Uint8Array(buffer.buffer, 32, 33)).toString('base64')
+    const public_hash = this.hash(public_key)
+    const hash_buffer = Buffer.from(public_hash, 'base64')
+    const code = Buffer.from(new Uint8Array(hash_buffer.buffer, 0, 3))
+
+    return code.toString('hex');
   }
 
 };

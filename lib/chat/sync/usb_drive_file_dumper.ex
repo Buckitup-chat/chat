@@ -3,8 +3,8 @@ defmodule Chat.Sync.UsbDriveFileDumper do
   Saves file as a message.
   """
 
-  alias Chat.{ChunkedFiles, ChunkedFilesMultisecret}
-  alias Chat.{FileIndex, Identity, Log, Messages, Rooms}
+  alias Chat.{ChunkedFiles, ChunkedFilesMultisecret, FileIndex, Identity, Log, Messages, Rooms}
+  alias Chat.Db.ChangeTracker
   alias Chat.Sync.UsbDriveDumpFile
   alias Chat.Upload.UploadKey
   alias Phoenix.PubSub
@@ -66,6 +66,7 @@ defmodule Chat.Sync.UsbDriveFileDumper do
 
     Rooms.on_saved(msg, room_key, fn ->
       FileIndex.save(file_key, room_key, message.id, file_secret)
+      ChangeTracker.await({:file_index, room_key, file_key, message.id})
 
       topic =
         room_key

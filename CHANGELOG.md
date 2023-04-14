@@ -11,8 +11,8 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
-
 - Integration of Secret Sharing with encryption layer (#251)
+- added shortcode for FE
 
 ### Changed
 

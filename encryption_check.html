@@ -27,8 +27,8 @@
 
 
     const hashCheckingB64 = {
-      "ysXSpU4FtIREs9IlbrSEcsdyHbpKpxYXc6jAXWHhTIU=" : "+KjHpjIVIbzG+wQltIR+jRU3lXnmLkUtH4UA8JNhmVg=", 
-      "MdFfqBGHdHvA6BYTC0TedglWfmzldjGczFRFvdAwBzQ=":"LksCBue9Isq8wVyYHow3XkxhLpI+mBKh8ysdYRIZLkI=",
+      "ysXSpU4FtIREs9IlbrSEcsdyHbpKpxYXc6jAXWHhTIU=": "+KjHpjIVIbzG+wQltIR+jRU3lXnmLkUtH4UA8JNhmVg=",
+      "MdFfqBGHdHvA6BYTC0TedglWfmzldjGczFRFvdAwBzQ=": "LksCBue9Isq8wVyYHow3XkxhLpI+mBKh8ysdYRIZLkI=",
     }
 
     for (let data_b64 in hashCheckingB64) {
@@ -38,10 +38,11 @@
       console.log(hash_b64 == hashed, hash_b64, hashed, data_b64)
     }
 
-    const local_storage_json = [["Enc Test","/Lww78qGiSHKkoc2gvwqY4UBK8hCh1RD54H9ZobkPKACfz90ZJoAWpiSLEpl/ZDF/nq9Q3U3ifHBxPoZ3jbQ6RI="],[],[]];
+    const local_storage_json = [["Enc Test", "/Lww78qGiSHKkoc2gvwqY4UBK8hCh1RD54H9ZobkPKACfz90ZJoAWpiSLEpl/ZDF/nq9Q3U3ifHBxPoZ3jbQ6RI="], [], []];
     const plain_b64 = "W1siRW5jIFRlc3QiLCIvTHd3NzhxR2lTSEtrb2MyZ3Z3cVk0VUJLOGhDaDFSRDU0SDlab2JrUEtBQ2Z6OTBaSm9BV3BpU0xFcGwvWkRGL25xOVEzVTNpZkhCeFBvWjNqYlE2Ukk9Il0sW10se31d"
     const enc_b64 = "Xh7/vgdkX7PfXAbY7p2ohyoaWU2QUo8TbShn7/971LC5fFxRVIuEskjTVUxVGKImnv5aJu/BUaIjhCnDPOrhNBKq/X+QvksVnbvz1Ek1hehC8pLuSyKp5ggC1phs7gVIg++IETTo7mdNJHAnXZ5+"
     const pass = "test12test12"
+    const short_code = "e0c5dc"
 
     const storage_b64 = Buffer.from(JSON.stringify(local_storage_json)).toString('base64')
 
@@ -54,15 +55,18 @@
     ])
 
     console.log([
-        enigma.hash(Buffer.from(pass).toString('base64')),
-        Buffer.from(
+      enigma.hash(Buffer.from(pass).toString('base64')),
+      Buffer.from(
         enigma.decipher(enc_b64,
           enigma.hash(Buffer.from(pass).toString('base64'))
         )
-        ).toString()
-        
-      
+      ).toString()
+
+
     ])
+
+    const computed_short_code = enigma.shortcode_form_full_key(local_storage_json[0][1])
+    console.log("Short code", computed_short_code == short_code, computed_short_code)
 
   </script>
 </head>

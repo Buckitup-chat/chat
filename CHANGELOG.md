@@ -17,6 +17,7 @@ straightforward as possible.
 - added shortcode for FE
 
 ### Changed
+- short code to be first 6 hex digits (was 8)
 
 
 ### Fixed

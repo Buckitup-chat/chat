@@ -508,7 +508,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
       assign(socket, :cargo_sync, cargo_sync)
     else
-      socket
+      assign(socket, :cargo_sync, nil)
     end
   end
 

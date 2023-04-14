@@ -6,8 +6,8 @@ defmodule Chat.Sync.UsbDriveFileDumper do
   alias Chat.{ChunkedFiles, ChunkedFilesMultisecret}
   alias Chat.Db.ChangeTracker
   alias Chat.{FileIndex, Identity, Log, Messages, Rooms, TaskSupervisor}
-  alias Chat.Upload.UploadKey
   alias Chat.Sync.UsbDriveDumpFile
+  alias Chat.Upload.UploadKey
   alias Phoenix.PubSub
 
   @chunk_size Application.compile_env(:chat, :file_chunk_size)

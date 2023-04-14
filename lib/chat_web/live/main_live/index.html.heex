@@ -443,7 +443,8 @@
             <div class="px-7 mt-3 flex items-center justify-between">
               <h5 class="text-grayscale" style="font-size: 22px;">Chats</h5>
             </div>
-            <div class="mt-10 w-full">
+            <Layout.SearchBox.render type={:dialog} />
+            <div class="mt-3 w-full">
               <ul class={
                 classes(
                   "",
@@ -602,6 +603,7 @@
                 <.icon id="add" class="w-3 h-3 flex fill-white" />
               </button>
             </div>
+            <Layout.SearchBox.render type={:room} />
             <div class={
               classes(
                 "w-full mt-6 flex flex-col items-start",
@@ -612,12 +614,12 @@
                 phx-click={
                   JS.toggle(to: "#confirmed-rooms", in: "fade-in-scale", out: "fade-out-scale")
                 }
-                class="px-7 mt-3 flex items-center"
+                class="px-7 mt-1 flex items-center"
               >
                 <.icon id="arrowDown" class="w-4 h-4 flex fill-black" />
                 <span class="ml-1 text-sm  font-bold cursor-pointer">Confirmed</span>
               </div>
-              <div class="mt-3 w-full ml-6 md:ml-10 t-confirmed-rooms" id="confirmed-rooms">
+              <div class="mt-3 w-full md:ml-5 t-confirmed-rooms" id="confirmed-rooms">
                 <ul class="t-confirmed-rooms-list">
                   <%= if @joined_rooms == [] do %>
                     <p class="text-base text-grayscale600 px-7">You have no rooms</p>

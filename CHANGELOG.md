@@ -11,10 +11,13 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+- Search box for users/rooms
+- Users/Rooms sync optimization for UI
 - Integration of Secret Sharing with encryption layer (#251)
 - added shortcode for FE
 
 ### Changed
+
 
 ### Fixed
 - better broken files handling

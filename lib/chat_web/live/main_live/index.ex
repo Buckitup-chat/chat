@@ -271,6 +271,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("lobby/search", params, socket) do
+    socket
+    |> Page.Lobby.filter_search_results(params)
+    |> noreply()
+  end
+
   def handle_event("dialog/" <> event, params, socket) do
     socket
     |> Page.DialogRouter.event({event, params})

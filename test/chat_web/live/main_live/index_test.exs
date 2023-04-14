@@ -5,7 +5,7 @@ defmodule ChatWeb.MainLive.IndexTest do
   import Phoenix.LiveViewTest
 
   alias Chat.Admin.MediaSettings
-  alias Chat.{AdminDb, AdminRoom, Db, Dialogs, User}
+  alias Chat.{AdminDb, AdminRoom, Db, Dialogs, Rooms, RoomsBroker, User, UsersBroker}
   alias Chat.Dialogs.PrivateMessage
   alias Chat.Identity
   alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
@@ -33,6 +33,42 @@ defmodule ChatWeb.MainLive.IndexTest do
 
       assert current_view_state.joined_rooms == another_view_state.joined_rooms
       assert current_view_state.room_count_to_backup == another_view_state.room_count_to_backup
+    end
+  end
+
+  describe "search box filtering" do
+    setup [:create_users, :prepare_view, :create_rooms]
+
+    test "search dialogs and rooms by name", %{view: view} do
+      view |> form("#search-box", dialog: %{name: "pe"}) |> render_change()
+      %{socket: %{assigns: %{users: users}}} = reload_view(%{view: view})
+      assert match?([%{name: "Pedro"}, %{name: "Perky"}, %{name: "Peter"}], users)
+
+      view
+      |> element(
+        "button[phx-click='switch-lobby-mode'][phx-value-lobby-mode='rooms']:first-child"
+      )
+      |> render_click()
+
+      view |> form("#search-box", room: %{name: "Public"}) |> render_change()
+      %{socket: %{assigns: %{new_rooms: rooms}}} = reload_view(%{view: view})
+      assert match?([%{name: "Public1"}, %{name: "Public2"}, %{name: "Public3"}], rooms)
+    end
+
+    defp create_users(_) do
+      ["Peter", "Pedro", "Perky", "Olexandr", "Olexii"]
+      |> Enum.each(fn name ->
+        User.login(name)
+        |> tap(&User.register/1)
+        |> tap(&UsersBroker.put/1)
+      end)
+    end
+
+    defp create_rooms(%{socket: %{assigns: %{me: me}}}) do
+      ["Public1", "Public2", "Public3", "Secret1", "Secret2"]
+      |> Enum.each(fn name ->
+        Rooms.add(me, name) |> tap(fn {_, room} -> RoomsBroker.put(room) end)
+      end)
     end
   end
 
@@ -146,17 +182,18 @@ defmodule ChatWeb.MainLive.IndexTest do
 
     test "sends invites to checkpoints in the preset after creation", %{conn: conn} do
       checkpoint_1 = User.login("Checkpoint 1")
-      checkpoint_1 |> User.register()
+      checkpoint_1 |> tap(&User.register/1) |> tap(&UsersBroker.put/1)
+
       checkpoint_1_key = checkpoint_1 |> Identity.pub_key()
       encoded_checkpoint_1_pub_key = checkpoint_1_key |> Base.encode16(case: :lower)
 
       checkpoint_2 = User.login("Checkpoint 2")
-      checkpoint_2 |> User.register()
+      checkpoint_2 |> tap(&User.register/1) |> tap(&UsersBroker.put/1)
       checkpoint_2_key = checkpoint_2 |> Identity.pub_key()
       encoded_checkpoint_2_pub_key = checkpoint_2_key |> Base.encode16(case: :lower)
 
       checkpoint_3 = User.login("Checkpoint 3")
-      checkpoint_3 |> User.register()
+      checkpoint_3 |> tap(&User.register/1) |> tap(&UsersBroker.put/1)
 
       AdminRoom.store_media_settings(%MediaSettings{functionality: :cargo})
       %{view: view} = prepare_view(%{conn: conn})

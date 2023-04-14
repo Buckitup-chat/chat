@@ -11,15 +11,17 @@ defmodule Chat.Upload.UploadKey do
           }
           | Phoenix.LiveView.UploadEntry.t()
 
-  @spec new(map(), String.t(), entry()) :: <<_::32>>
+  @spec new(map(), binary(), entry()) :: <<_::32>>
   def new(destination, client_id, entry) do
+    encoded_client_id = client_id |> Base.encode16(case: :lower)
+
     encoded_destination =
       destination
       |> Jason.encode!()
       |> Base.encode64()
 
     [
-      client_id,
+      encoded_client_id,
       encoded_destination,
       entry.client_relative_path,
       entry.client_name,

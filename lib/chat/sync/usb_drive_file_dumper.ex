@@ -6,13 +6,18 @@ defmodule Chat.Sync.UsbDriveFileDumper do
   alias Chat.{ChunkedFiles, ChunkedFilesMultisecret}
   alias Chat.Db.ChangeTracker
   alias Chat.{FileIndex, Identity, Log, Messages, Rooms, TaskSupervisor}
+  alias Chat.Upload.UploadKey
   alias Chat.Sync.UsbDriveDumpFile
-  alias Phoenix.LiveView.UploadEntry
   alias Phoenix.PubSub
 
   @chunk_size Application.compile_env(:chat, :file_chunk_size)
 
   def dump(%UsbDriveDumpFile{} = file, room_key, %Identity{} = room_identity) do
+    timestamp =
+      file.datetime
+      |> DateTime.from_naive!("Etc/UTC")
+      |> DateTime.to_unix()
+
     type =
       file
       |> Map.get(:name)
@@ -21,7 +26,20 @@ defmodule Chat.Sync.UsbDriveFileDumper do
       |> String.downcase()
       |> MIME.type()
 
-    file_key = UUID.uuid4()
+    destination = %{
+      pub_key: Base.encode16(room_key, case: :lower),
+      type: :room
+    }
+
+    entry = %{
+      client_last_modified: timestamp,
+      client_name: file.name,
+      client_relative_path: file.path,
+      client_size: file.size,
+      client_type: type
+    }
+
+    file_key = UploadKey.new(destination, room_key, entry)
 
     file_awaiter =
       Task.Supervisor.async(TaskSupervisor, fn ->
@@ -62,14 +80,9 @@ defmodule Chat.Sync.UsbDriveFileDumper do
         ChangeTracker.await({:chunk_key, last_chunk_key})
       end)
 
-    timestamp =
-      file.datetime
-      |> DateTime.from_naive!("Etc/UTC")
-      |> DateTime.to_unix()
-
     {index, message} =
       msg =
-      %UploadEntry{client_name: file.name, client_size: file.size, client_type: type}
+      entry
       |> Messages.File.new(file_key, file_secret, timestamp)
       |> Rooms.add_new_message(room_identity, room_key)
 

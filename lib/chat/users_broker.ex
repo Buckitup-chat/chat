@@ -47,9 +47,9 @@ defmodule Chat.UsersBroker do
   end
 
   def handle_cast({:put, user}, users) do
-    users
-    |> Enum.concat([user])
+    [user | users]
     |> Enum.uniq_by(& &1.pub_key)
+    |> Enum.sort_by(&"#{&1.name} #{&1.pub_key}")
     |> noreply()
   end
 

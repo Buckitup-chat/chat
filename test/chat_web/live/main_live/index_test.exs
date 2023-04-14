@@ -5,8 +5,7 @@ defmodule ChatWeb.MainLive.IndexTest do
   import Phoenix.LiveViewTest
 
   alias Chat.Admin.MediaSettings
-  alias Chat.{AdminDb, AdminRoom, Db, Dialogs, Rooms, User}
-  alias Chat.{RoomsBroker, UsersBroker}
+  alias Chat.{AdminDb, AdminRoom, Db, Dialogs, Rooms, RoomsBroker, User, UsersBroker}
   alias Chat.Dialogs.PrivateMessage
   alias Chat.Identity
   alias Chat.Sync.CargoRoom
@@ -40,10 +39,10 @@ defmodule ChatWeb.MainLive.IndexTest do
   describe "search box filtering" do
     setup [:create_users, :prepare_view, :create_rooms]
 
-    test "ddssd", %{view: view} do
+    test "search dialogs and rooms by name", %{view: view} do
       view |> form("#search-box", dialog: %{name: "pe"}) |> render_change()
       %{socket: %{assigns: %{users: users}}} = reload_view(%{view: view})
-      assert [%{name: "Peter"}, %{name: "Pedro"}, %{name: "Perky"}] = users
+      assert match?([%{name: "Pedro"}, %{name: "Perky"}, %{name: "Peter"}], users)
 
       view
       |> element(
@@ -53,7 +52,7 @@ defmodule ChatWeb.MainLive.IndexTest do
 
       view |> form("#search-box", room: %{name: "Public"}) |> render_change()
       %{socket: %{assigns: %{new_rooms: rooms}}} = reload_view(%{view: view})
-      assert [%{name: "Public1"}, %{name: "Public2"}, %{name: "Public3"}] = rooms
+      assert match?([%{name: "Public1"}, %{name: "Public2"}, %{name: "Public3"}], rooms)
     end
 
     defp create_users(_) do
@@ -179,17 +178,18 @@ defmodule ChatWeb.MainLive.IndexTest do
 
     test "sends invites to checkpoints in the preset after creation", %{conn: conn} do
       checkpoint_1 = User.login("Checkpoint 1")
-      checkpoint_1 |> User.register()
+      checkpoint_1 |> tap(&User.register/1) |> tap(&UsersBroker.put/1)
+
       checkpoint_1_key = checkpoint_1 |> Identity.pub_key()
       encoded_checkpoint_1_pub_key = checkpoint_1_key |> Base.encode16(case: :lower)
 
       checkpoint_2 = User.login("Checkpoint 2")
-      checkpoint_2 |> User.register()
+      checkpoint_2 |> tap(&User.register/1) |> tap(&UsersBroker.put/1)
       checkpoint_2_key = checkpoint_2 |> Identity.pub_key()
       encoded_checkpoint_2_pub_key = checkpoint_2_key |> Base.encode16(case: :lower)
 
       checkpoint_3 = User.login("Checkpoint 3")
-      checkpoint_3 |> User.register()
+      checkpoint_3 |> tap(&User.register/1) |> tap(&UsersBroker.put/1)
 
       AdminRoom.store_media_settings(%MediaSettings{functionality: :cargo})
       %{view: view} = prepare_view(%{conn: conn})

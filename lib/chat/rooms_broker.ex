@@ -59,9 +59,9 @@ defmodule Chat.RoomsBroker do
   end
 
   def handle_cast({:put, room}, rooms) do
-    rooms
-    |> Enum.concat([room])
+    [room | rooms]
     |> Enum.uniq_by(& &1.pub_key)
+    |> Enum.sort_by(& &1.name)
     |> noreply()
   end
 

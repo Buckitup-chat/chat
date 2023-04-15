@@ -70,6 +70,8 @@ config :chat,
   env: config_env(),
   file_chunk_size: 10 * 1024 * 1024
 
+config :chat, Chat.Db.ChangeTracker, expire_seconds: 31
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

@@ -13,7 +13,7 @@ defmodule Chat.Db.ChangeTracker do
   alias Chat.Db
   alias Chat.Db.ChangeTracker.Tracking
 
-  @timeout :timer.seconds(31)
+  @timeout :timer.seconds(Application.compile_env!(:chat, [__MODULE__, :expire_seconds]))
   @check_delay :timer.seconds(1)
 
   def await do

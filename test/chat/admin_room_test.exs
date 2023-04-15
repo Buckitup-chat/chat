@@ -19,6 +19,7 @@ defmodule Chat.AdminRoomTest do
 
   setup do
     AdminDb.db() |> CubDB.clear()
+    Process.sleep(1000)
     ChangeTracker.await()
   end
 

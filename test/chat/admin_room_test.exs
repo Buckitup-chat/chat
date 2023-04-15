@@ -1,8 +1,8 @@
 defmodule Chat.AdminRoomTest do
   use ExUnit.Case, async: false
 
-  alias Chat.Db.ChangeTracker
   alias Chat.Admin.MediaSettings
+  alias Chat.Db.ChangeTracker
 
   alias Chat.{
     AdminDb,

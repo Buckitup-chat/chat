@@ -28,8 +28,13 @@ defmodule Chat.Db.ChangeTracker do
   def await do
     key = {:change_tracking_marker, UUID.uuid4()}
 
-    Db.put(key, true)
-    await(key)
+    ensure(
+      action: fn ->
+        Db.put(key, true)
+      end,
+      writes_key: key
+    )
+
     Db.delete(key)
   end
 

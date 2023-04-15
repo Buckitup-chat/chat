@@ -21,7 +21,9 @@ defmodule Chat.AdminRoom do
 
     "Admin room"
     |> Identity.create()
-    |> tap(&AdminDb.put(:pub_key, Identity.pub_key(&1)))
+    |> tap(fn room_identity ->
+      AdminDb.put(:pub_key, Identity.pub_key(room_identity))
+    end)
   end
 
   def pub_key do

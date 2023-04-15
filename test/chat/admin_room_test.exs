@@ -18,12 +18,13 @@ defmodule Chat.AdminRoomTest do
   alias Chat.Messages
 
   setup do
-    AdminDb.db() |> CubDB.clear()
     Process.sleep(1000)
+    AdminDb.db() |> CubDB.clear()
+    AdminDb.db() |> CubDB.set_auto_compact(false)
     ChangeTracker.await()
   end
 
-  test "should be created on first user login or create", do: :todo_in_lobby_test?
+  # test "should be created on first user login or create", do: :todo_in_lobby_test?
 
   test "should not create more than one" do
     admin_with_room("Alice")

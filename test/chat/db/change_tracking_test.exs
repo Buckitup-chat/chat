@@ -28,6 +28,9 @@ defmodule Chat.Db.ChangeTrackingTest do
   test "should expire and respond" do
     pid = self()
 
+    # assert_raise ExUnit.AssertionError,
+    #              ~r/test should not rely on ChangeTracker expiration/,
+    #              fn ->
     Tracking.new()
     |> Tracking.add_promise(
       :to_be_found,
@@ -35,6 +38,8 @@ defmodule Chat.Db.ChangeTrackingTest do
       1
     )
     |> Tracking.extract_expired(50)
+
+    # end
 
     assert_receive :exp, 100
   end

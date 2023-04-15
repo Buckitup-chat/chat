@@ -15,13 +15,14 @@ straightforward as possible.
 - Users/Rooms sync optimization for UI
 - Integration of Secret Sharing with encryption layer (#251)
 - added shortcode for FE
+- USB drive dump
 
 ### Changed
 - short code to be first 6 hex digits (was 8)
 
-
 ### Fixed
 - better broken files handling
+- db changes tracking improvement
 
 ## 2023-04-07_a41ea0d___2023-04-07_c06e36f
 

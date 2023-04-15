@@ -6,6 +6,7 @@ defmodule ChatWeb.MainLive.Page.RoomForm do
   use ChatWeb, :live_component
 
   alias Chat.Rooms.RoomInput
+  alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
 
   @types_map %{
     public: "Public room is visible for everyone. Anyone can join.",
@@ -114,7 +115,7 @@ defmodule ChatWeb.MainLive.Page.RoomForm do
             name="Secret"
             value={:private}
           />
-          <%= if @media_settings.functionality == :cargo do %>
+          <%= if @media_settings.functionality == :cargo and !match?(%CargoRoom{status: :syncing}, @cargo_room) and !match?(%UsbDriveDumpRoom{status: :dumping}, @usb_drive_dump_room) do %>
             <.type_radio_button form={f} id="typeChoice4" name="Cargo" value={:cargo} />
           <% end %>
         </div>

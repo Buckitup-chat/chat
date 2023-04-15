@@ -16,6 +16,8 @@ defmodule ChatWeb.MainLive.Layout.Room do
   attr :cargo_room, Room, doc: "cargo room struct"
   attr :cargo_sync, :atom, doc: "cargo sync status"
   attr :media_settings, :map, doc: "admin room media settings"
+  attr :usb_drive_dump_room, Room, doc: "dump room"
+  attr :usb_drive_dump, :atom, doc: "dump status. :enabled or :disabled"
 
   def header(assigns) do
     ~H"""
@@ -40,6 +42,7 @@ defmodule ChatWeb.MainLive.Layout.Room do
         <.unlink_link restricted={@restrict_actions} />
       <% end %>
       <div class="flex flex-row justify-between">
+        <Layout.UsbDriveDumpRoom.button dump={@usb_drive_dump} />
         <Layout.CargoRoom.button cargo_sync={@cargo_sync} />
         <%= if @room.type == :request do %>
           <.request_button requests={@requests} restricted={@restrict_actions} />
@@ -47,6 +50,7 @@ defmodule ChatWeb.MainLive.Layout.Room do
         <.invite_button users={Chat.User.list()} restricted={@restrict_actions} />
       </div>
       <Layout.CargoRoom.bar cargo_room={@cargo_room} media_settings={@media_settings} room={@room} />
+      <Layout.UsbDriveDumpRoom.bar dump_room={@usb_drive_dump_room} room={@room} />
     </div>
     """
   end

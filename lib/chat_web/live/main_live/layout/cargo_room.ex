@@ -4,6 +4,7 @@ defmodule ChatWeb.MainLive.Layout.CargoRoom do
   use ChatWeb, :component
 
   alias Chat.Sync.CargoRoom
+  alias ChatWeb.MainLive.Layout.Timer
 
   def bar(assigns) do
     ~H"""
@@ -26,7 +27,7 @@ defmodule ChatWeb.MainLive.Layout.CargoRoom do
         Insert empty USB drive
       </div>
 
-      <.timer timer={@cargo_room.timer} />
+      <Timer.timer timer={@cargo_room.timer} />
     </div>
     """
   end
@@ -63,26 +64,6 @@ defmodule ChatWeb.MainLive.Layout.CargoRoom do
     </div>
     """
   end
-
-  defp timer(%{timer: timer} = assigns) do
-    minutes = "#{div(timer, 60)}"
-
-    seconds =
-      timer
-      |> rem(60)
-      |> formatted_seconds()
-
-    timer = minutes <> ":" <> seconds
-
-    assigns = assign(assigns, :timer, timer)
-
-    ~H"""
-    <div class="w-10 ml-1 text-white/90"><%= @timer %></div>
-    """
-  end
-
-  defp formatted_seconds(seconds) when seconds < 10, do: "0#{seconds}"
-  defp formatted_seconds(seconds), do: "#{seconds}"
 
   defp remove_button(%{status: status} = assigns) when status in [:pending, :complete, :failed] do
     ~H"""

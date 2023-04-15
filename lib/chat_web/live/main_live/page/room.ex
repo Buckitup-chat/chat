@@ -26,7 +26,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.RoomInviteIndex
   alias Chat.Rooms
   alias Chat.Rooms.{Registry, Room, RoomMessageLinks, RoomRequest}
-  alias Chat.Sync.CargoRoom
+  alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
   alias Chat.Upload.UploadMetadata
   alias Chat.User
   alias Chat.Utils
@@ -72,6 +72,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign_messages()
     |> assign_requests()
     |> maybe_enable_cargo()
+    |> maybe_enable_usb_drive_dump()
     |> push_event("chat:scroll-down", %{})
   end
 
@@ -609,19 +610,16 @@ defmodule ChatWeb.MainLive.Page.Room do
     room = socket.assigns[:room]
 
     if media_settings.functionality == :cargo and not is_nil(room) do
-      enabled? =
-        case socket.assigns[:cargo_room] do
-          %CargoRoom{pub_key: pub_key, status: status}
-          when pub_key == room.pub_key or status == :syncing ->
-            false
-
-          _ ->
-            true
-        end
-
       cargo_sync =
         cond do
-          !enabled? ->
+          match?(%UsbDriveDumpRoom{status: :dumping}, socket.assigns[:usb_drive_dump_room]) ->
+            :disabled
+
+          match?(
+            %CargoRoom{pub_key: pub_key, status: status}
+            when pub_key == room.pub_key or status == :syncing,
+            socket.assigns[:cargo_room]
+          ) ->
             :disabled
 
           !has_unique_name(room) ->
@@ -633,7 +631,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
       assign(socket, :cargo_sync, cargo_sync)
     else
-      socket
+      assign(socket, :cargo_sync, nil)
     end
   end
 
@@ -644,4 +642,26 @@ defmodule ChatWeb.MainLive.Page.Room do
     end)
     |> Kernel.not()
   end
+
+  def maybe_enable_usb_drive_dump(%{assigns: %{room: room}} = socket) when not is_nil(room) do
+    usb_drive_dump =
+      cond do
+        match?(%CargoRoom{status: :syncing}, socket.assigns[:cargo_room]) ->
+          :disabled
+
+        match?(
+          %UsbDriveDumpRoom{pub_key: pub_key, status: status}
+          when pub_key == room.pub_key or status == :dumping,
+          socket.assigns[:usb_drive_dump_room]
+        ) ->
+          :disabled
+
+        true ->
+          :enabled
+      end
+
+    assign(socket, :usb_drive_dump, usb_drive_dump)
+  end
+
+  def maybe_enable_usb_drive_dump(socket), do: socket
 end

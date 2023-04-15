@@ -369,9 +369,32 @@
             >
               <.icon
                 id="cargo"
-                class={"w-8 h-8 hover:fill-purple " <> if(@cargo_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}
+                class={
+                  classes("w-8 h-8 hover:fill-purple", %{
+                    "fill-purple" => @cargo_room.pub_key == assigns[:room][:pub_key],
+                    "fill-grayscale" => @cargo_room.pub_key != assigns[:room][:pub_key]
+                  })
+                }
               />
               <span class="text-xs">Cargo Room</span>
+            </button>
+          <% end %>
+          <%= if assigns[:usb_drive_dump_room][:status] == :complete do %>
+            <button
+              phx-click="room/switch"
+              phx-value-room={Room.hash(@usb_drive_dump_room.pub_key)}
+              class="sidebarIcon"
+            >
+              <.icon
+                id="usbDrive"
+                class={
+                  classes("w-8 h-8 hover:fill-purple", %{
+                    "fill-purple" => @usb_drive_dump_room.pub_key == assigns[:room][:pub_key],
+                    "fill-grayscale" => @usb_drive_dump_room.pub_key != assigns[:room][:pub_key]
+                  })
+                }
+              />
+              <span class="text-xs">Dump room</span>
             </button>
           <% end %>
         </div>
@@ -444,9 +467,32 @@
               >
                 <.icon
                   id="cargo"
-                  class={"w-8 h-8 hover:fill-purple " <> if(@cargo_room.pub_key == assigns[:room][:pub_key], do: "fill-purple", else: "fill-grayscale")}
+                  class={
+                    classes("w-8 h-8 hover:fill-purple", %{
+                      "fill-purple" => @cargo_room.pub_key == assigns[:room][:pub_key],
+                      "fill-grayscale" => @cargo_room.pub_key != assigns[:room][:pub_key]
+                    })
+                  }
                 />
                 <span class="text-xs">Cargo Room</span>
+              </button>
+            <% end %>
+            <%= if assigns[:usb_drive_dump_room][:status] == :complete do %>
+              <button
+                phx-click="room/switch"
+                phx-value-room={Room.hash(@usb_drive_dump_room.pub_key)}
+                class="sidebarIcon mt-5 t-dump-room"
+              >
+                <.icon
+                  id="usbDrive"
+                  class={
+                    classes("w-8 h-8 hover:fill-purple", %{
+                      "fill-purple" => @usb_drive_dump_room.pub_key == assigns[:room][:pub_key],
+                      "fill-grayscale" => @usb_drive_dump_room.pub_key != assigns[:room][:pub_key]
+                    })
+                  }
+                />
+                <span class="text-xs">Dump room</span>
               </button>
             <% end %>
           </div>
@@ -611,7 +657,13 @@
           <div id="chatRoomBar" class="chatRoomBar sm:flex">
             <.modal id="create-room-popup" class="">
               <h1 class="text-base font-bold text-grayscale">Create Room</h1>
-              <.live_component id={:room_form} media_settings={@media_settings} module={RoomForm} />
+              <.live_component
+                cargo_room={assigns[:cargo_room]}
+                id={:room_form}
+                media_settings={@media_settings}
+                module={RoomForm}
+                usb_drive_dump_room={assigns[:usb_drive_dump_room]}
+              />
             </.modal>
             <div class="px-7 mt-3 flex items-center justify-between">
               <h5 class="channel-block-text text-grayscale" style="font-size: 22px;">Rooms</h5>
@@ -733,6 +785,8 @@
                   media_settings={@media_settings}
                   cargo_room={assigns[:cargo_room]}
                   cargo_sync={assigns[:cargo_sync]}
+                  usb_drive_dump={assigns[:usb_drive_dump]}
+                  usb_drive_dump_room={assigns[:usb_drive_dump_room]}
                 />
                 <%= if @room.type == :request do %>
                   <.modal id="room-request-list" class="z-30">

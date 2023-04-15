@@ -2,6 +2,7 @@ defmodule Chat.Db.ChangeTracker.Tracking do
   @moduledoc """
   Tracking logic
   """
+  # use ExUnit.Case
   require Record
 
   Record.defrecordp(:tracker,
@@ -73,6 +74,17 @@ defmodule Chat.Db.ChangeTracker.Tracking do
       |> Enum.reduce({[], []}, fn {id, change}, {ids, changes} ->
         {[id | ids], [change | changes]}
       end)
+
+    # assert [] == changes,
+    #        "test should not rely on ChangeTracker expiration\nchanges: " <>
+    #          inspect(changes, pretty: true)
+
+    # <>
+    #    inspect(
+    #      Chat.Db.select({{:rooms, 0}, {:rooms1, 0}}, 100)
+    #      |> Enum.to_list(),
+    #      pretty: true
+    #    )
 
     new_keys =
       changes

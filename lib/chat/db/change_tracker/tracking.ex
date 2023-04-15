@@ -75,7 +75,14 @@ defmodule Chat.Db.ChangeTracker.Tracking do
         {[id | ids], [change | changes]}
       end)
 
-    assert [] == changes, "test should not rely on ChangeTracker expiration"
+    assert [] == changes,
+           "test should not rely on ChangeTracker expiration\nchanges: " <>
+             inspect(changes, pretty: true) <>
+             inspect(
+               Chat.Db.select({{:rooms, 0}, {:rooms1, 0}}, 100)
+               |> Enum.to_list(),
+               pretty: true
+             )
 
     new_keys =
       changes

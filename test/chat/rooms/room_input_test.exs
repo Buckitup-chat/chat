@@ -53,8 +53,12 @@ defmodule Chat.Rooms.RoomInputTest do
     end
 
     test "with duplicate room name for cargo type returns an error" do
-      Registry.update(%Room{name: Map.get(@valid_params, :name), pub_key: "1234"})
-      ChangeTracker.await({:rooms, "1234"})
+      ChangeTracker.ensure(
+        action: fn ->
+          Registry.update(%Room{name: Map.get(@valid_params, :name), pub_key: "1234"})
+        end,
+        writes_key: {:rooms, "1234"}
+      )
 
       media_settings = %MediaSettings{functionality: :cargo}
       params = @valid_params |> Map.put(:type, "cargo")

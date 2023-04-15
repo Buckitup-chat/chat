@@ -75,7 +75,6 @@ defmodule Chat.Db.ChangeTracker.Tracking do
         {[id | ids], [change | changes]}
       end)
 
-    changes |> IO.inspect()
     assert [] == changes, "test should not rely on ChangeTracker expiration"
 
     new_keys =

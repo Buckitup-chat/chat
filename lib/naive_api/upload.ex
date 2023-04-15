@@ -5,7 +5,11 @@ defmodule NaiveApi.Upload do
   alias Chat.Identity
   alias Chat.Upload.{Upload, UploadIndex, UploadKey}
 
-  def create_key(_, %{my_keypair: my_keypair, destination: destination, entry: entry}, _) do
+  def create_key(_, %{my_keypair: my_keypair, destination: destination, entry: entry} = params, _) do
+    params
+    |> inspect(pretty: true)
+    |> IO.puts()
+
     upload_key =
       destination
       |> serialize_destination()

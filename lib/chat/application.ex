@@ -27,6 +27,8 @@ defmodule Chat.Application do
       Chat.KeyRingTokens,
       Chat.Broker,
       Chat.ChunkedFilesBroker,
+      Chat.UsersBroker,
+      Chat.RoomsBroker,
       Chat.Sync.CargoRoom,
       Chat.Sync.OnlinersSync,
       Chat.Sync.UsbDriveDumpRoom,

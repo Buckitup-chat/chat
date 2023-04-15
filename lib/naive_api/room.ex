@@ -51,9 +51,13 @@ defmodule NaiveApi.Room do
 
   def send_file(
         _,
-        %{room_keypair: room_keypair, my_keypair: my_keypair, upload_key: upload_key},
+        %{room_keypair: room_keypair, my_keypair: my_keypair, upload_key: upload_key} = params,
         _
       ) do
+    params
+    |> inspect(pretty: true)
+    |> IO.puts()
+
     room_identity = Identity.from_keys(room_keypair)
     me = Identity.from_keys(my_keypair)
     room = room_identity |> Identity.pub_key() |> Rooms.get()

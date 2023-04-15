@@ -32,6 +32,10 @@ defmodule NaiveApi.Upload do
     ChunkedFilesMultisecret.generate(upload_key, entry.client_size, initial_secret)
 
     upload_key
+    |> inspect(pretty: true)
+    |> IO.puts()
+
+    upload_key
     |> ok()
   end
 

@@ -7,6 +7,6 @@ defmodule Enigma.HashTest do
   end
 
   test "short_hash should work" do
-    assert "8ca66ee6" = Enigma.short_hash("Hello")
+    assert "8ca66e" = Enigma.short_hash("Hello")
   end
 end

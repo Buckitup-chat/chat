@@ -10,7 +10,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Chat.Dialogs
   alias Chat.Messages
   alias Chat.Rooms
+  alias Chat.RoomsBroker
   alias Chat.User
+  alias Chat.UsersBroker
   alias ChatWeb.Router.Helpers, as: Routes
 
   @incoming_topic "platform->chat"
@@ -98,14 +100,18 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   end
 
   def remove_user(socket, hash) do
-    User.remove(hash)
+    hash
+    |> tap(&User.remove/1)
+    |> tap(&UsersBroker.forget/1)
 
     socket
     |> assign_user_lists()
   end
 
   def remove_room(socket, hash) do
-    Rooms.delete(hash)
+    hash
+    |> tap(&Rooms.delete/1)
+    |> tap(&RoomsBroker.forget/1)
 
     socket
     |> assign_room_list()

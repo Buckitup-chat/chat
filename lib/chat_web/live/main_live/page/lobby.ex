@@ -12,7 +12,8 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   alias Chat.Log
   alias Chat.Rooms
   alias Chat.Rooms.RoomRequest
-  alias Chat.User
+  alias Chat.RoomsBroker
+  alias Chat.UsersBroker
   alias ChatWeb.MainLive.Page
 
   @topic "chat::lobby"
@@ -27,6 +28,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign(:image_gallery, nil)
     |> assign(:version, get_version())
     |> assign(:db_status, StatusPoller.info())
+    |> assign(:search_filter, :off)
     |> assign_user_list()
     |> assign_room_list()
     |> assign_admin()
@@ -45,7 +47,9 @@ defmodule ChatWeb.MainLive.Page.Lobby do
           {false, type}
       end
 
-    {new_room_identity, new_room} = Rooms.add(me, name, type)
+    {new_room_identity, new_room} =
+      Rooms.add(me, name, type) |> tap(fn {_, room} -> RoomsBroker.put(room) end)
+
     new_room_card = Chat.Card.from_identity(new_room_identity)
     send(self(), {:maybe_activate_cargo_room, cargo?, new_room, new_room_identity})
 
@@ -73,10 +77,14 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     socket
   end
 
+  def show_new_user(%{assigns: %{search_filter: :on}} = socket, _), do: socket
+
   def show_new_user(socket, _user_card) do
     socket
     |> assign_user_list()
   end
+
+  def show_new_room(%{assigns: %{search_filter: :on}} = socket, _), do: socket
 
   def show_new_room(socket, _room_card) do
     socket
@@ -86,8 +94,33 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   def switch_lobby_mode(socket, mode) do
     socket
     |> close_current_mode()
+    |> assign(:search_filter, :off)
     |> assign(:lobby_mode, String.to_existing_atom(mode))
     |> init_new_mode()
+  end
+
+  def filter_search_results(socket, %{"_target" => ["reset"], "dialog" => _}) do
+    socket
+    |> assign(:search_filter, :off)
+    |> assign_user_list()
+  end
+
+  def filter_search_results(socket, %{"_target" => ["reset"], "room" => _}) do
+    socket
+    |> assign(:search_filter, :off)
+    |> assign_room_list()
+  end
+
+  def filter_search_results(socket, %{"dialog" => %{"name" => name}}) do
+    socket
+    |> assign(:search_filter, :on)
+    |> assign_user_list(String.trim(name))
+  end
+
+  def filter_search_results(socket, %{"room" => %{"name" => name}}) do
+    socket
+    |> assign(:search_filter, :on)
+    |> assign_room_list(String.trim(name))
   end
 
   def request_room(
@@ -208,14 +241,26 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     socket
   end
 
-  defp assign_user_list(socket) do
+  defp assign_user_list(socket, search_term \\ "")
+
+  defp assign_user_list(socket, search_term) when search_term == "" do
     socket
-    |> assign(:user_id, User.list() |> List.last())
-    |> assign(:users, User.list())
+    |> assign(:users, UsersBroker.list())
   end
 
-  defp assign_room_list(%{assigns: %{room_map: rooms, my_id: my_id}} = socket) do
-    {joined, new} = Rooms.list(rooms)
+  defp assign_user_list(%{assigns: %{my_id: id}} = socket, search_term) do
+    socket
+    |> assign(
+      :users,
+      UsersBroker.list(search_term) |> Enum.reject(fn user -> user.pub_key == id end)
+    )
+  end
+
+  defp assign_room_list(%{assigns: %{room_map: rooms, my_id: my_id}} = socket, search_term \\ "") do
+    {joined, new} =
+      if search_term == "",
+        do: RoomsBroker.list(rooms),
+        else: RoomsBroker.list(rooms, search_term)
 
     new =
       Enum.map(new, fn room ->
@@ -258,9 +303,14 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   defp close_current_mode(socket), do: socket
 
-  defp init_new_mode(%{assigns: %{lobby_mode: :chats}} = socket), do: socket |> Page.Dialog.init()
-  defp init_new_mode(%{assigns: %{lobby_mode: :rooms}} = socket), do: socket |> Page.Room.init()
-  defp init_new_mode(%{assigns: %{lobby_mode: :feeds}} = socket), do: socket |> Page.Feed.init()
+  defp init_new_mode(%{assigns: %{lobby_mode: :chats}} = socket),
+    do: socket |> Page.Dialog.init() |> assign_user_list()
+
+  defp init_new_mode(%{assigns: %{lobby_mode: :rooms}} = socket),
+    do: socket |> Page.Room.init() |> assign_room_list()
+
+  defp init_new_mode(%{assigns: %{lobby_mode: :feeds}} = socket),
+    do: socket |> Page.Feed.init()
 
   defp init_new_mode(%{assigns: %{lobby_mode: :admin}} = socket),
     do: socket |> Page.AdminPanel.init()

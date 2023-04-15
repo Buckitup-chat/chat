@@ -65,8 +65,12 @@ defmodule Chat.Sync.UsbDriveFileDumper do
       |> Rooms.add_new_message(room_identity, room_key)
 
     Rooms.on_saved(msg, room_key, fn ->
-      FileIndex.save(file_key, room_key, message.id, file_secret)
-      ChangeTracker.await({:file_index, room_key, file_key, message.id})
+      ChangeTracker.ensure(
+        action: fn ->
+          FileIndex.save(file_key, room_key, message.id, file_secret)
+        end,
+        writes_key: {:file_index, room_key, file_key, message.id}
+      )
 
       topic =
         room_key

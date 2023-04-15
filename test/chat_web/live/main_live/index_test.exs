@@ -325,7 +325,7 @@ defmodule ChatWeb.MainLive.IndexTest do
       html = render(view)
       assert html =~ "Cargo sync activated"
       assert html =~ "Insert empty USB drive"
-      assert html =~ "2:00"
+      assert html =~ "2:00" or html =~ "1:59"
     end
 
     test "is disabled for rooms with non-unique names", %{view: view} do

@@ -6,7 +6,6 @@ defmodule Chat.Rooms do
   alias Chat.Rooms.Message
   alias Chat.Rooms.Registry
   alias Chat.Rooms.Room
-  alias Chat.Rooms.RoomMessageLinks
   alias Chat.Rooms.RoomMessages
 
   @doc "Returns new room {Identity, Room}"
@@ -155,20 +154,9 @@ defmodule Chat.Rooms do
 
   defdelegate update(room), to: Registry
 
-  defdelegate link_message(room, room_identity, msg_id), to: RoomMessageLinks, as: :create
-  defdelegate message_link_hash(msg_id), to: RoomMessageLinks, as: :link_hash
-  defdelegate get_message_link(link_hash), to: RoomMessageLinks, as: :get
+  defdelegate decipher_identity(encrypted_room_identity, secret), to: Room
 
-  defdelegate has_linked_messages?(room_identity),
-    to: RoomMessageLinks,
-    as: :has_room_linked_messages?
-
-  defdelegate is_message_linked?(msg_id), to: RoomMessageLinks
-  defdelegate cancel_room_links(room_identity), to: RoomMessageLinks
-
-  defdelegate decrypt_identity(encrypted_room_identity, secret), to: Room
-
-  defdelegate decrypt_identity_with_key(encrypted_room_identity, person_identity, room_pub_key),
+  defdelegate decipher_identity_with_key(ciphered_room_identity, person_identity, room_pub_key),
     to: Room
 
   defp if_room_found(room_or_key, action, default \\ nil)

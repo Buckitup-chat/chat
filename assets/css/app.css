@@ -447,7 +447,7 @@ html {
   .navbarTop { @apply  w-screen h-12 flex items-center justify-between bg-white fixed top-0}
   .navbarBottom { @apply  w-screen h-14 flex items-center justify-between bg-white fixed bottom-0 }
 
-  .chatRoomBar { @apply  h-screen w-screen py-20  bg-white/90 overflow-y-scroll }
+  .chatRoomBar { @apply  h-screen w-screen py-20 bg-white/90 overflow-y-scroll }
   
 }
 

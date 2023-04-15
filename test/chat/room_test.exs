@@ -91,7 +91,7 @@ defmodule Chat.Rooms.RoomTest do
              }
            ] = room.requests
 
-    decrypted_identity = Rooms.decrypt_identity_with_key(encrypted_identity, bob, room.pub_key)
+    decrypted_identity = Rooms.decipher_identity_with_key(encrypted_identity, bob, room.pub_key)
 
     assert room_identity == %{decrypted_identity | name: room_identity.name}
 

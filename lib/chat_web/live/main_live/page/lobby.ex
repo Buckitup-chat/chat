@@ -153,7 +153,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   def join_approved_room(
         %{assigns: %{me: me, my_id: my_id, monotonic_offset: time_offset, room_map: room_map}} =
           socket,
-        encrypted_room_identity,
+        ciphered_room_identity,
         user_key,
         room_key
       )
@@ -161,7 +161,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     if Map.has_key?(room_map, room_key) do
       socket
     else
-      new_room_identity = Rooms.decrypt_identity_with_key(encrypted_room_identity, me, room_key)
+      new_room_identity = Rooms.decipher_identity_with_key(ciphered_room_identity, me, room_key)
 
       time = Chat.Time.monotonic_to_unix(time_offset)
       Rooms.clear_approved_request(new_room_identity, me)

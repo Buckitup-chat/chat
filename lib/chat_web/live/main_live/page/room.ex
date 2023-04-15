@@ -25,7 +25,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.Messages
   alias Chat.RoomInviteIndex
   alias Chat.Rooms
-  alias Chat.Rooms.{Registry, Room, RoomRequest}
+  alias Chat.Rooms.{Registry, Room, RoomMessageLinks, RoomRequest}
   alias Chat.Sync.CargoRoom
   alias Chat.Upload.UploadMetadata
   alias Chat.User
@@ -65,7 +65,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:edit_content, nil)
     |> assign(:room, room)
     |> assign(:room_identity, room_identity)
-    |> assign(:is_room_linked?, Rooms.has_linked_messages?(room_identity))
+    |> assign(:is_room_linked?, RoomMessageLinks.has_room_linked_messages?(room_identity))
     |> assign(:last_load_timestamp, nil)
     |> assign(:has_more_messages, true)
     |> assign(:message_update_mode, :replace)
@@ -76,9 +76,9 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def init_with_linked_message(socket, hash) do
-    with {encrypted_identity, _, msg_index, msg_id} <- Rooms.get_message_link(hash),
+    with {ciphered_identity, _, msg_index, msg_id} <- RoomMessageLinks.get(hash),
          identity <-
-           Rooms.decrypt_identity(encrypted_identity, hash |> Base.decode16!(case: :lower)),
+           Rooms.decipher_identity(ciphered_identity, hash |> Base.decode16!(case: :lower)),
          room <- identity |> Identity.pub_key() |> Rooms.get() do
       socket
       |> store_new(identity)
@@ -409,7 +409,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         {index, id},
         render_fun
       ) do
-    :ok = Rooms.link_message(room, room_identity, {index, id})
+    :ok = RoomMessageLinks.create(room, room_identity, {index, id})
 
     socket
     |> assign(:is_room_linked?, true)
@@ -425,7 +425,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def unlink_messages(%{assigns: %{room_identity: room_identity}} = socket, render_fun) do
-    Rooms.cancel_room_links(room_identity)
+    RoomMessageLinks.cancel_room_links(room_identity)
     |> Enum.reduce(socket, fn {_, _, index, id}, socket ->
       content = render_to_html_string(%{linked: false, msg_id: id, msg_index: index}, render_fun)
 
@@ -437,7 +437,8 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def share_message_link_modal(%{assigns: %{}} = socket, msg_id, component) do
-    message_url = [ChatWeb.Endpoint.url(), "room", Rooms.message_link_hash(msg_id)] |> Path.join()
+    message_url =
+      [ChatWeb.Endpoint.url(), "room", RoomMessageLinks.link_hash(msg_id)] |> Path.join()
 
     socket
     |> open_modal(component, %{

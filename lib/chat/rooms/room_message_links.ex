@@ -13,7 +13,7 @@ defmodule Chat.Rooms.RoomMessageLinks do
 
   def create(%Room{type: :public}, %Identity{} = room_identity, {msg_index, msg_id}) do
     secret = msg_id |> Enigma.hash()
-    encrypted_room_identity = Room.encrypt_identity(room_identity, secret)
+    encrypted_room_identity = Room.cipher_identity(room_identity, secret)
     link_data = {encrypted_room_identity, room_hash(room_identity), msg_index, msg_id}
     link_hash = secret |> Base.encode16(case: :lower)
 

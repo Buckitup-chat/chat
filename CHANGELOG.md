@@ -20,9 +20,9 @@ straightforward as possible.
 ### Changed
 - short code to be first 6 hex digits (was 8)
 
-
 ### Fixed
 - better broken files handling
+- db changes tracking improvement
 
 ## 2023-04-07_a41ea0d___2023-04-07_c06e36f
 

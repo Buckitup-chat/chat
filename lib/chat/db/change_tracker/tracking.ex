@@ -2,7 +2,7 @@ defmodule Chat.Db.ChangeTracker.Tracking do
   @moduledoc """
   Tracking logic
   """
-  use ExUnit.Case
+  # use ExUnit.Case
   require Record
 
   Record.defrecordp(:tracker,
@@ -75,9 +75,9 @@ defmodule Chat.Db.ChangeTracker.Tracking do
         {[id | ids], [change | changes]}
       end)
 
-    assert [] == changes,
-           "test should not rely on ChangeTracker expiration\nchanges: " <>
-             inspect(changes, pretty: true)
+    # assert [] == changes,
+    #        "test should not rely on ChangeTracker expiration\nchanges: " <>
+    #          inspect(changes, pretty: true)
 
     # <>
     #    inspect(

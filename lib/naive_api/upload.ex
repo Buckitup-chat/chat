@@ -1,6 +1,8 @@
 defmodule NaiveApi.Upload do
   @moduledoc "Upload resolvers"
   use NaiveApi, :resolver
+
+  alias Chat.Db.ChangeTracker
   alias Chat.{ChunkedFiles, ChunkedFilesMultisecret}
   alias Chat.Identity
   alias Chat.Upload.{Upload, UploadIndex, UploadKey}
@@ -26,6 +28,8 @@ defmodule NaiveApi.Upload do
 
     initial_secret = ChunkedFiles.get_file(upload_key)
     ChunkedFilesMultisecret.generate(upload_key, entry.client_size, initial_secret)
+
+    ChangeTracker.await()
 
     upload_key
     |> ok()

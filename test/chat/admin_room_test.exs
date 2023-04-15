@@ -2,6 +2,7 @@ defmodule Chat.AdminRoomTest do
   use ExUnit.Case, async: false
 
   alias Chat.Admin.MediaSettings
+  alias Chat.Db.ChangeTracker
 
   alias Chat.{
     AdminDb,
@@ -17,10 +18,13 @@ defmodule Chat.AdminRoomTest do
   alias Chat.Messages
 
   setup do
+    Process.sleep(1000)
     AdminDb.db() |> CubDB.clear()
+    AdminDb.db() |> CubDB.set_auto_compact(false)
+    ChangeTracker.await()
   end
 
-  test "should be created on first user login or create", do: :todo_in_lobby_test?
+  # test "should be created on first user login or create", do: :todo_in_lobby_test?
 
   test "should not create more than one" do
     admin_with_room("Alice")
@@ -90,7 +94,7 @@ defmodule Chat.AdminRoomTest do
 
   defp admin_with_room(name) do
     if AdminRoom.created?() do
-      raise "Admihn room is already created"
+      raise "Admin room is already created"
     end
 
     admin_room_identity = AdminRoom.create()
@@ -103,6 +107,7 @@ defmodule Chat.AdminRoomTest do
     identity = User.login(name)
     hash = User.register(identity)
     card = Card.from_identity(identity)
+    ChangeTracker.await()
 
     {identity, card, hash}
   end

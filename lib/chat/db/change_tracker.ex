@@ -13,14 +13,28 @@ defmodule Chat.Db.ChangeTracker do
   alias Chat.Db
   alias Chat.Db.ChangeTracker.Tracking
 
-  @timeout :timer.seconds(31)
+  @timeout :timer.seconds(Application.compile_env!(:chat, [__MODULE__, :expire_seconds]))
   @check_delay :timer.seconds(1)
+
+  def ensure(opts) do
+    key = Keyword.fetch!(opts, :writes_key)
+    action = Keyword.fetch!(opts, :action)
+
+    task = Task.async(fn -> await(key) end)
+    action.()
+    task |> Task.await(:infinity)
+  end
 
   def await do
     key = {:change_tracking_marker, UUID.uuid4()}
 
-    Db.put(key, true)
-    await(key)
+    ensure(
+      action: fn ->
+        Db.put(key, true)
+      end,
+      writes_key: key
+    )
+
     Db.delete(key)
   end
 

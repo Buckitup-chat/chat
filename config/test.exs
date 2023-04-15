@@ -23,3 +23,5 @@ config :chat,
   files_base_dir: "priv/test_db/files",
   write_budget: 100_000_000,
   writable: :yes
+
+config :chat, Chat.Db.ChangeTracker, expire_seconds: 3

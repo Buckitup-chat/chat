@@ -19,8 +19,6 @@ defmodule Chat.Rooms.RoomInputTest do
     }
 
     test "with valid params returns valid changeset" do
-      ChangeTracker.await({:rooms, "1234"})
-
       assert %Ecto.Changeset{} = changeset = RoomInput.changeset(%RoomInput{}, @valid_params)
       assert changeset.valid?
     end

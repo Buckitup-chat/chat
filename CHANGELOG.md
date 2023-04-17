@@ -11,11 +11,55 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+- Search box for users/rooms
+- Users/Rooms sync optimization for UI
+- Integration of Secret Sharing with encryption layer (#251)
+- added shortcode for FE
+- USB drive dump
 
 ### Changed
+- short code to be first 6 hex digits (was 8)
+
+### Fixed
+- better broken files handling
+- db changes tracking improvement
+- adaptive uploads with list of chats/rooms
+
+## 2023-04-07_a41ea0d___2023-04-07_c06e36f
+
+### Added
+- queue uploaded file chunks (improves stability)
+
+### Changed
+- dependencies update
+- updating feed rendering w/ new mechanics
+- Cargo room disappears after ejecting USB drive
+
+### Fixed
+- Improved sync speed
+- Fixed cargo room crashing when it's not set
+- Improved cargo styling
+- Prevent backup/sync from corruption
+- admin panel w/o login returns to login form (when page gets reconnected in admin panel)
+- broken image render 
+- fix copying process
+
+## 2023-03-31_d8b27f7___2023-03-31_875d678
+
+### Added
+- Accept all invites in dialog
+- Cargo room type
+- Unique name constraint for Cargo rooms
+- Checkpoints preset
+- Cargo sync flow
+
+### Changed
+- uploading in one thread
 
 ### Fixed
 - UI: uploads scroll to top on uploader mount 
+- submitting of edited message by keyword
+
 ## 2023-03-22_4082136___2023-03-23_e2c9aa8
 
 ### Added
@@ -58,4 +102,7 @@ straightforward as possible.
 - UI: uploader covering chat/room list
 - lost feed names
 - admin room user actions
+
+
+
 

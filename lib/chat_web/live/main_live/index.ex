@@ -191,12 +191,6 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("close-feeds", _, socket) do
-    socket
-    |> Page.Feed.close()
-    |> noreply()
-  end
-
   def handle_event("open-data-restore", _, socket) do
     socket
     |> assign(:mode, :restore_data)

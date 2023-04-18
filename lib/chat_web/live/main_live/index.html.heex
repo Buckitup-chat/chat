@@ -910,9 +910,7 @@
                 <a
                   class="sm:hidden mr-2"
                   phx-value-lobby-mode="chats"
-                  phx-click={
-                    JS.push("switch-lobby-mode") |> JS.push("close-feeds") |> close_content()
-                  }
+                  phx-click={JS.push("switch-lobby-mode") |> close_content()}
                 >
                   <.icon id="arrowBack" class="w-6 h-6 fill-white" />
                 </a>

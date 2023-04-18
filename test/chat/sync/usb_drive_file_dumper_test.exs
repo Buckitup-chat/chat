@@ -73,6 +73,43 @@ defmodule Chat.Sync.UsbDriveFileDumperTest do
 
       assert ChunkedFiles.chunk_with_byterange({file_key, file_secret}, {0, file.size - 1})
       assert ChunkedFiles.read({file_key, file_secret}) == String.duplicate("a", 10_000)
+
+      UsbDriveFileDumper.dump(file, room_key, room_identity)
+
+      assert_receive {:room,
+                      {:new_message,
+                       {new_message_index,
+                        %Message{
+                          id: new_message_id,
+                          timestamp: 1_681_156_800,
+                          author_key: ^room_key,
+                          type: :image
+                        }}}},
+                     10_000
+
+      assert [
+               %PlainMessage{
+                 content: content,
+                 id: ^id,
+                 index: ^index,
+                 timestamp: 1_681_156_800,
+                 author_key: ^room_key,
+                 type: :image
+               },
+               %PlainMessage{
+                 content: content,
+                 id: ^new_message_id,
+                 index: ^new_message_index,
+                 timestamp: 1_681_156_800,
+                 author_key: ^room_key,
+                 type: :image
+               }
+             ] = Rooms.read(room, room_identity)
+
+      assert [^file_key, _, _, _, _, _] =
+               content
+               |> StorageId.from_json()
+               |> Files.get()
     end
   end
 end

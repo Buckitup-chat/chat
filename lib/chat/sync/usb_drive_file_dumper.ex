@@ -40,6 +40,19 @@ defmodule Chat.Sync.UsbDriveFileDumper do
 
     file_key = UploadKey.new(destination, room_key, entry)
 
+    file_secret =
+      case FileIndex.get(room_key, file_key) do
+        nil ->
+          copy_file(file_key, file)
+
+        file_secret ->
+          file_secret
+      end
+
+    create_message(room_key, room_identity, file_key, file_secret, entry)
+  end
+
+  defp copy_file(file_key, file) do
     file_secret = ChunkedFiles.new_upload(file_key)
     ChunkedFilesMultisecret.generate(file_key, file.size, file_secret)
 
@@ -58,10 +71,14 @@ defmodule Chat.Sync.UsbDriveFileDumper do
       ChunkedFiles.save_upload_chunk(file_key, {chunk_start, chunk_end}, file.size, chunk)
     end)
 
+    file_secret
+  end
+
+  defp create_message(room_key, room_identity, file_key, file_secret, entry) do
     {_index, message} =
       msg =
       entry
-      |> Messages.File.new(file_key, file_secret, timestamp)
+      |> Messages.File.new(file_key, file_secret, entry.client_last_modified)
       |> Rooms.add_new_message(room_identity, room_key)
 
     Rooms.on_saved(msg, room_key, fn ->
@@ -79,7 +96,7 @@ defmodule Chat.Sync.UsbDriveFileDumper do
 
       PubSub.broadcast!(Chat.PubSub, topic, {:room, {:new_message, msg}})
 
-      Log.message_room(room_identity, timestamp, room_key)
+      Log.message_room(room_identity, entry.client_last_modified, room_key)
     end)
   end
 end

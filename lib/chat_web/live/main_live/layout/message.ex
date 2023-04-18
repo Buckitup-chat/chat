@@ -101,6 +101,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
       <%= unless @export? do %>
         <input
+          onclick="event.stopPropagation(); event.preventDefault();"
           type="checkbox"
           class="selectCheckbox w-6 h-6 ml-3 mt-3 rounded-full text-purple/90 bg-black/10 border-gray-300 focus:ring-2 t-selectCheckbox"
         />

@@ -181,8 +181,9 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> Messages.Text.new(time)
     |> Dialogs.update_message(msg_id, me, dialog)
     |> MemoIndex.add(dialog, me)
-
-    broadcast_message_updated(msg_id, dialog, me, time)
+    |> Dialogs.on_saved(dialog, fn ->
+      broadcast_message_updated(msg_id, dialog, me, time)
+    end)
 
     socket
     |> cancel_edit()

@@ -23,6 +23,7 @@ straightforward as possible.
 ### Fixed
 - better broken files handling
 - db changes tracking improvement
+- text message editing bugfix
 
 ## 2023-04-07_a41ea0d___2023-04-07_c06e36f
 

@@ -29,6 +29,7 @@ defmodule Chat.Application do
       Chat.ChunkedFilesBroker,
       Chat.UsersBroker,
       Chat.RoomsBroker,
+      Chat.RoomMessageLinksBroker,
       Chat.Sync.CargoRoom,
       Chat.Sync.OnlinersSync,
       Chat.Sync.UsbDriveDumpRoom,

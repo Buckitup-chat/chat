@@ -51,6 +51,7 @@ straightforward as possible.
 - Unique name constraint for Cargo rooms
 - Checkpoints preset
 - Cargo sync flow
+- Room post permanent link feature
 
 ### Changed
 - uploading in one thread

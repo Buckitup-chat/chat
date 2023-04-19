@@ -127,6 +127,8 @@ defmodule ChatWeb.LiveHelpers do
     """
   end
 
+  def open_content, do: %JS{} |> open_content()
+
   def open_content(%JS{} = js, time \\ 100) do
     js
     |> JS.hide(transition: "fade-out", to: "#navbarTop", time: 0)

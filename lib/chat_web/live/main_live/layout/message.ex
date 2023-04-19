@@ -38,6 +38,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :room, Room, default: nil, doc: "room access was requested to"
   attr :timezone, :string, required: true, doc: "needed to render the timestamp"
   attr :room_keys, :map, default: [], doc: "the list of room keys"
+  attr :linked, :boolean, default: false, doc: "link indicator"
 
   def message_block(assigns) do
     assigns =
@@ -71,6 +72,10 @@ defmodule ChatWeb.MainLive.Layout.Message do
             phx_value_type: chat_type
           ]
       end)
+      |> assign_new(:linkable?, fn
+        %{chat_type: :room, room: room} -> room.type == :public
+        _ -> false
+      end)
       |> assign_file()
 
     ~H"""
@@ -96,6 +101,8 @@ defmodule ChatWeb.MainLive.Layout.Message do
           room={@room}
           room_keys={@room_keys}
           timezone={@timezone}
+          linked={@linked}
+          linkable?={@linkable?}
         />
       </div>
 
@@ -149,6 +156,8 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :room, Room, default: nil, doc: "room access was requested to"
   attr :room_keys, :map, doc: "the list of room keys"
   attr :timezone, :string, required: true, doc: "needed to render the timestamp"
+  attr :linked, :boolean, default: false, doc: "link indicator"
+  attr :linkable?, :boolean, default: false, doc: "linkable? Only for public rooms"
 
   defp message(%{msg: %{type: :audio}} = assigns) do
     ~H"""
@@ -164,8 +173,12 @@ defmodule ChatWeb.MainLive.Layout.Message do
         file={@file}
         is_mine?={@is_mine?}
         msg={@msg}
+        linkable?={@linkable?}
       />
-      <.timestamp msg={@msg} timezone={@timezone} />
+      <div class="flex justify-end">
+        <.message_link msg_index={@msg.index} msg_id={@msg.id} linked={@linked} />
+        <.timestamp msg={@msg} timezone={@timezone} />
+      </div>
       <.audio export?={@export?} file={@file} msg={@msg} />
       <.media_file_info file={@file} />
     </div>
@@ -185,9 +198,13 @@ defmodule ChatWeb.MainLive.Layout.Message do
         file={@file}
         is_mine?={@is_mine?}
         msg={@msg}
+        linkable?={@linkable?}
       />
       <.file export?={@export?} file={@file} msg={@msg} />
-      <.timestamp msg={@msg} timezone={@timezone} />
+      <div class="flex justify-end">
+        <.message_link msg_index={@msg.index} msg_id={@msg.id} linked={@linked} />
+        <.timestamp msg={@msg} timezone={@timezone} />
+      </div>
     </div>
     """
   end
@@ -205,8 +222,12 @@ defmodule ChatWeb.MainLive.Layout.Message do
         file={@file}
         is_mine?={@is_mine?}
         msg={@msg}
+        linkable?={@linkable?}
       />
-      <.timestamp msg={@msg} timezone={@timezone} />
+      <div class="flex justify-end">
+        <.message_link msg_index={@msg.index} msg_id={@msg.id} linked={@linked} />
+        <.timestamp msg={@msg} timezone={@timezone} />
+      </div>
       <.image chat_type={@chat_type} msg={@msg} export?={@export?} file={@file} />
       <.media_file_info file={@file} />
     </div>
@@ -226,9 +247,13 @@ defmodule ChatWeb.MainLive.Layout.Message do
         file={@file}
         is_mine?={@is_mine?}
         msg={@msg}
+        linkable?={@linkable?}
       />
       <span class="x-content"><.text msg={@msg} /></span>
-      <.timestamp msg={@msg} timezone={@timezone} />
+      <div class="flex justify-end">
+        <.message_link msg_index={@msg.index} msg_id={@msg.id} linked={@linked} />
+        <.timestamp msg={@msg} timezone={@timezone} />
+      </div>
     </div>
     """
   end
@@ -310,7 +335,9 @@ defmodule ChatWeb.MainLive.Layout.Message do
         file={@file}
         is_mine?={@is_mine?}
         msg={@msg}
+        linkable?={@linkable?}
       />
+      <.message_link msg_index={@msg.index} msg_id={@msg.id} linked={@linked} />
       <.timestamp msg={@msg} timezone={@timezone} />
       <video src={@file[:url]} class="a-video" controls />
       <.media_file_info file={@file} />
@@ -332,6 +359,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :file, :map, required: true, doc: "file map"
   attr :is_mine?, :boolean, required: true, doc: "is current user the author of the message?"
   attr :msg, :map, required: true, doc: "message struct"
+  attr :linkable?, :boolean, default: false, doc: "linkable? Only for public rooms"
 
   defp header(assigns) do
     ~H"""
@@ -349,6 +377,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
         file={@file}
         is_mine?={@is_mine?}
         msg={@msg}
+        linkable?={@linkable?}
       />
     </.header_wrapper>
     """
@@ -474,6 +503,19 @@ defmodule ChatWeb.MainLive.Layout.Message do
           <span>Download</span>
         </a>
       <% end %>
+      <%= if @linkable? do %>
+        <a
+          class="dropdownItem t-link-action"
+          phx-click={
+            hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("room/message/link")
+          }
+          phx-value-id={@msg.id}
+          phx-value-index={@msg.index}
+        >
+          <.icon id="link" class="w-4 h-4 flex fill-black stroke-black stroke-2" />
+          <span>Link</span>
+        </a>
+      <% end %>
     </.dropdown>
     """
   end
@@ -535,6 +577,22 @@ defmodule ChatWeb.MainLive.Layout.Message do
     ~H"""
     <div class="px-2 text-grayscale600 flex justify-end mr-1" style="font-size: 10px;">
       <%= @time %>
+    </div>
+    """
+  end
+
+  def message_link(assigns) do
+    ~H"""
+    <div class="link-status">
+      <%= if @linked do %>
+        <a
+          phx-click="room/message/share-link-modal"
+          phx-value-id={@msg_id}
+          phx-value-index={@msg_index}
+        >
+          <.icon id="link" class="w-3 h-3 fill-black/50 stroke-black stroke-2" />
+        </a>
+      <% end %>
     </div>
     """
   end

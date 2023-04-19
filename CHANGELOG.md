@@ -21,6 +21,7 @@ straightforward as possible.
 - text message editing bugfix
 - Backup key password validation bugfix
 - Dumping duplicate files
+- Cargo sync failing after 1 minute mark
 
 
 ## 2023-04-15_c77d709___2023-04-15_64148f8

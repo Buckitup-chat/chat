@@ -4,7 +4,6 @@ defmodule ChatWeb.MainLive.Layout.CargoRoom do
   use ChatWeb, :component
 
   alias Chat.Sync.CargoRoom
-  alias ChatWeb.MainLive.Layout.Timer
 
   def bar(assigns) do
     ~H"""
@@ -26,8 +25,6 @@ defmodule ChatWeb.MainLive.Layout.CargoRoom do
       <div>
         Insert empty USB drive
       </div>
-
-      <Timer.timer timer={@cargo_room.timer} />
     </div>
     """
   end

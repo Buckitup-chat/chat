@@ -15,6 +15,7 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
+- text message editing bugfix
 - Backup key password validation bugfix
 
 

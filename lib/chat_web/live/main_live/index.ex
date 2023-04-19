@@ -8,13 +8,14 @@ defmodule ChatWeb.MainLive.Index do
   alias Chat.{AdminRoom, Dialogs, Identity, Messages, RoomInviteIndex, User}
   alias Chat.Rooms.Room
   alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
-  alias ChatWeb.Hooks.{LocalTimeHook, UploaderHook}
+  alias ChatWeb.Hooks.{LiveModalHook, LocalTimeHook, UploaderHook}
   alias ChatWeb.MainLive.Admin.{CargoSettingsForm, MediaSettingsForm}
   alias ChatWeb.MainLive.{Layout, Page}
   alias ChatWeb.MainLive.Page.RoomForm
   alias Phoenix.LiveView.JS
   alias Phoenix.PubSub
 
+  on_mount LiveModalHook
   on_mount LocalTimeHook
   on_mount UploaderHook
 
@@ -61,6 +62,15 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   @impl true
+  def handle_params(%{"hash" => hash}, _, %{assigns: %{live_action: :room_message_link}} = socket) do
+    socket
+    |> assign(:room_message_link_hash, hash)
+    |> noreply()
+  end
+
+  def handle_params(_, _, socket), do: socket |> noreply()
+
+  @impl true
   def handle_event("login", %{"login" => %{"name" => name}}, socket) do
     socket
     |> Page.Login.create_user(name)
@@ -68,6 +78,7 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Dialog.init()
     |> Page.Logout.init()
     |> Page.Shared.track_onliners_presence()
+    |> Page.RoomRouter.route_live_action()
     |> noreply()
   end
 
@@ -91,6 +102,7 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Dialog.init()
     |> Page.Logout.init()
     |> Page.Shared.track_onliners_presence()
+    |> Page.RoomRouter.route_live_action()
     |> noreply()
   end
 
@@ -188,12 +200,6 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("feed-more", _, socket) do
     socket
     |> Page.Feed.more()
-    |> noreply()
-  end
-
-  def handle_event("close-feeds", _, socket) do
-    socket
-    |> Page.Feed.close()
     |> noreply()
   end
 
@@ -371,6 +377,7 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Logout.init()
     |> Page.Dialog.init()
     |> Page.Shared.track_onliners_presence()
+    |> Page.RoomRouter.route_live_action()
     |> noreply()
   end
 
@@ -480,7 +487,6 @@ defmodule ChatWeb.MainLive.Index do
     ~H"""
     <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg" />
     <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg" />
-
     <div class="flex flex-col items-center justify-center w-screen h-screen">
       <div class="container unauthenticated z-10">
         <img src="/images/logo.png" />
@@ -516,59 +522,6 @@ defmodule ChatWeb.MainLive.Index do
         </button>
       </div>
     </.modal>
-    """
-  end
-
-  defp room_request_button(assigns) do
-    ~H"""
-    <button
-      class="mr-4 flex items-center"
-      phx-click={
-        cond do
-          @restricted -> show_modal("restrict-write-actions")
-          @requests == [] -> nil
-          true -> show_modal("room-request-list")
-        end
-      }
-    >
-      <.icon id="requestList" class="w-4 h-4 mr-1 z-20 stroke-white fill-white" />
-      <span class="text-base text-white">Requests</span>
-    </button>
-    """
-  end
-
-  defp room_invite_button(assigns) do
-    ~H"""
-    <button
-      class="flex items-center t-invite-btn"
-      phx-click={
-        cond do
-          @restricted -> show_modal("restrict-write-actions")
-          @users |> length == 1 -> nil
-          true -> show_modal("room-invite-list")
-        end
-      }
-    >
-      <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-white" />
-      <span class="text-base text-white"> Invite</span>
-    </button>
-    """
-  end
-
-  defp room_count_to_backup_message(%{count: 0} = assigns), do: ~H""
-
-  defp room_count_to_backup_message(assigns) do
-    assigns =
-      assigns
-      |> assign_new(:output, fn
-        %{count: 1} -> "1 room"
-        %{count: count} -> "#{count} rooms"
-      end)
-
-    ~H"""
-    <p class="mt-3 text-sm text-red-500">
-      You have <%= @output %> not backed up. Download the keys to make sure you have access to them after logging out.
-    </p>
     """
   end
 

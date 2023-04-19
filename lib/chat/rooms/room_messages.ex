@@ -90,6 +90,16 @@ defmodule Chat.Rooms.RoomMessages do
     |> then(&read({index, &1}, identity))
   end
 
+  def read_to(%Room{pub_key: room_key}, identity, {index, id} = _from, {to_index, to_id} = _to) do
+    {
+      key(room_key, to_index, to_id),
+      key(room_key, index, id)
+    }
+    |> Db.list()
+    |> Enum.map(fn {{_, _, index, _}, msg} -> read({index, msg}, identity) end)
+    |> Enum.reject(&is_nil/1)
+  end
+
   def get_next_message({index, id} = _msg_id, room_identity, predicate) do
     with room_key <- Identity.pub_key(room_identity),
          msg_key <- key(room_key, index, id),

@@ -11,6 +11,19 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+
+### Changed
+
+### Fixed
+- feeds close error on mobile bugfix
+- message select checkbox bugfix
+- text message editing bugfix
+- Backup key password validation bugfix
+
+
+## 2023-04-15_c77d709___2023-04-15_64148f8
+
+### Added
 - Search box for users/rooms
 - Users/Rooms sync optimization for UI
 - Integration of Secret Sharing with encryption layer (#251)
@@ -51,6 +64,7 @@ straightforward as possible.
 - Unique name constraint for Cargo rooms
 - Checkpoints preset
 - Cargo sync flow
+- Room post permanent link feature
 
 ### Changed
 - uploading in one thread

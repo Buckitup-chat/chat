@@ -74,12 +74,37 @@
       <.loading_screen />
     <% end %>
   <% else %>
+    <div id="modal" class="phx-modal fade-in" style="display: none;">
+      <div
+        id="modal-content"
+        class="phx-modal-content border-0 rounded-lg bg-white p-4 fade-in-scale flex flex-col t-modal"
+        phx-click-away="modal:close"
+        phx-window-keydown="modal:close"
+        phx-key="escape"
+        style="display: none;"
+      >
+        <a
+          href="#"
+          class="phx-modal-close w-full flex flex-row justify-end"
+          phx-click="modal:close"
+        >
+          <.icon id="close" class="w-4 h-4 flex fill-grayscale t-close-popup" />
+        </a>
+
+        <%= if @live_modal do %>
+          <%= live_component(
+            @live_modal.component,
+            @live_modal.params |> Map.merge(%{id: @live_modal.component})
+          ) %>
+        <% end %>
+      </div>
+    </div>
     <Layout.Popup.restrict_write_actions />
     <%= if @mode == :lobby do %>
       <.modal id="logout-backup-popup" hide_event="logout-close" class="">
         <%= if @logout_step == :initial do %>
           <h1 class="text-base font-bold text-grayscale">Log Out & Back Up</h1>
-          <.room_count_to_backup_message count={@room_count_to_backup} />
+          <Layout.Room.count_to_backup_message count={@room_count_to_backup} />
           <p class="mt-3 text-sm text-black/50">
             To get access again you will need the recovery keys:
           </p>
@@ -373,7 +398,7 @@
             </button>
           <% end %>
         </div>
-        <div class="navbar">
+        <div id="navbarLeft" class="navbar">
           <div class="sm:flex flex-col items-center">
             <div
               phx-click={JS.push("switch-lobby-mode")}
@@ -485,7 +510,7 @@
           </div>
         </div>
         <%= if @lobby_mode == :chats do %>
-          <div id="chatRoomBar" class="chatRoomBar">
+          <div id="chatRoomBar" class="chatRoomBar sm:flex">
             <div class="px-7 mt-3 flex items-center justify-between">
               <h5 class="text-grayscale" style="font-size: 22px;">Chats</h5>
             </div>
@@ -629,7 +654,7 @@
           </div>
         <% end %>
         <%= if @lobby_mode == :rooms do %>
-          <div id="chatRoomBar" class="chatRoomBar">
+          <div id="chatRoomBar" class="chatRoomBar sm:flex">
             <.modal id="create-room-popup" class="">
               <h1 class="text-base font-bold text-grayscale">Create Room</h1>
               <.live_component
@@ -719,20 +744,24 @@
           </div>
           <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
             <%= unless @room do %>
-              <div class="my-auto mx-auto flex flex-col items-center justify-center w-80 h-32 border-9 rounded-lg bg-white/20">
-                <span class="my-2 text-sm text-white">Select any Room or create your own</span>
-                <button
-                  phx-click={
-                    if @db_status.writable == :yes,
-                      do: show_modal("create-room-popup"),
-                      else: show_modal("restrict-write-actions")
-                  }
-                  class="my-2 flex flex-row items-center justify-center border rounded-lg border-white w-72 h-11 t-create-room"
-                >
-                  <span class="text-sm text-white">Create Room</span>
-                  <.icon id="add" class="w-4 h-4 flex fill-white" />
-                </button>
-              </div>
+              <%= if @live_action == :room_message_link do %>
+                <Layout.Room.not_found_screen />
+              <% else %>
+                <div class="my-auto mx-auto flex flex-col items-center justify-center w-80 h-32 border-9 rounded-lg bg-white/20">
+                  <span class="my-2 text-sm text-white">Select any Room or create your own</span>
+                  <button
+                    phx-click={
+                      if @db_status.writable == :yes,
+                        do: show_modal("create-room-popup"),
+                        else: show_modal("restrict-write-actions")
+                    }
+                    class="my-2 flex flex-row items-center justify-center border rounded-lg border-white w-72 h-11 t-create-room"
+                  >
+                    <span class="text-sm text-white">Create Room</span>
+                    <.icon id="add" class="w-4 h-4 flex fill-white" />
+                  </button>
+                </div>
+              <% end %>
             <% else %>
               <.live_component
                 module={Layout.ImageGallery}
@@ -748,61 +777,17 @@
                 data-page={@page}
                 data-has-more-messages={"#{@has_more_messages}"}
               >
-                <div
-                  class="w-full sticky top-0 right-0"
-                  phx-click={JS.dispatch("phx:scroll-to-bottom")}
-                >
-                  <div
-                    class="w-full px-8 border-b border-white/10 backdrop-blur-md bg-black/20 z-10 flex flex-row items-center justify-between"
-                    style="min-height: 56px;"
-                  >
-                    <div class="flex flex-row items-center">
-                      <button
-                        phx-click={JS.push("room/close") |> close_content()}
-                        class="sm:hidden pr-3"
-                      >
-                        <.icon id="arrowBack" class="w-6 h-6 fill-white" />
-                      </button>
-                      <%= if @room.type == :public do %>
-                        <.icon id="open" class="w-4 h-4 fill-white" />
-                      <% end %>
-                      <%= if @room.type == :private do %>
-                        <.icon id="secret" class="w-4 h-4 fill-white" />
-                      <% end %>
-                      <%= if @room.type == :request do %>
-                        <.icon id="private" class="w-5 h-5 stroke-white" />
-                      <% end %>
-                      <Layout.Card.hashed_name room={@room} style_spec={:chat_header} />
-                    </div>
-
-                    <div class="flex flex-row justify-between">
-                      <Layout.UsbDriveDumpRoom.button dump={assigns[:usb_drive_dump]} />
-                      <Layout.CargoRoom.button cargo_sync={assigns[:cargo_sync]} />
-
-                      <%= if @room.type == :request do %>
-                        <.room_request_button
-                          requests={@room_requests}
-                          restricted={@db_status.writable == :no}
-                        />
-                      <% end %>
-                      <.room_invite_button
-                        users={Chat.User.list()}
-                        restricted={@db_status.writable == :no}
-                      />
-                    </div>
-                  </div>
-
-                  <Layout.CargoRoom.bar
-                    cargo_room={assigns[:cargo_room]}
-                    media_settings={@media_settings}
-                    room={@room}
-                  />
-                  <Layout.UsbDriveDumpRoom.bar
-                    dump_room={assigns[:usb_drive_dump_room]}
-                    room={@room}
-                  />
-                </div>
-
+                <Layout.Room.header
+                  room={@room}
+                  requests={@room_requests}
+                  restrict_actions={@db_status.writable == :no}
+                  linked?={@is_room_linked?}
+                  media_settings={@media_settings}
+                  cargo_room={assigns[:cargo_room]}
+                  cargo_sync={assigns[:cargo_sync]}
+                  usb_drive_dump={assigns[:usb_drive_dump]}
+                  usb_drive_dump_room={assigns[:usb_drive_dump_room]}
+                />
                 <%= if @room.type == :request do %>
                   <.modal id="room-request-list" class="z-30">
                     <h1 class="text-base font-bold text-grayscale">Requests</h1>
@@ -872,6 +857,9 @@
                         my_id={@my_id}
                         room={@room}
                         timezone={@timezone}
+                        linked={
+                          Chat.Rooms.RoomMessageLinks.is_message_linked?({msg.index, msg.id})
+                        }
                       />
                     <% end %>
                   </div>
@@ -910,9 +898,7 @@
                 <a
                   class="sm:hidden mr-2"
                   phx-value-lobby-mode="chats"
-                  phx-click={
-                    JS.push("switch-lobby-mode") |> JS.push("close-feeds") |> close_content()
-                  }
+                  phx-click={JS.push("switch-lobby-mode") |> close_content()}
                 >
                   <.icon id="arrowBack" class="w-6 h-6 fill-white" />
                 </a>

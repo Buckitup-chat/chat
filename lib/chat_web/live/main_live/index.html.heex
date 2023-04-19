@@ -790,7 +790,10 @@
                   media_settings={@media_settings}
                   room={@room}
                 />
-                <Layout.UsbDriveDumpRoom.bar dump_room={assigns[:usb_drive_dump_room]} room={@room} />
+                <Layout.UsbDriveDumpRoom.bar
+                  dump_room={assigns[:usb_drive_dump_room]}
+                  room={@room}
+                />
 
                 <%= if @room.type == :request do %>
                   <.modal id="room-request-list" class="z-30">

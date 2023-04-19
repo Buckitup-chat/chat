@@ -15,6 +15,7 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
+- message select checkbox bugfix
 - text message editing bugfix
 - Backup key password validation bugfix
 

@@ -771,7 +771,7 @@
               />
               <div
                 id="chatContent"
-                class="basis-[93%] pb-1 md:pb-0 overflow-y-scroll flex flex-col justify-between relative a-content-block t-chat-content"
+                class="basis-[93%] pb-1 md:pb-0 overflow-y-scroll flex flex-col relative a-content-block t-chat-content"
                 id={"room-#{@room.hash}"}
                 phx-hook="Chat"
                 data-page={@page}
@@ -782,12 +782,16 @@
                   requests={@room_requests}
                   restrict_actions={@db_status.writable == :no}
                   linked?={@is_room_linked?}
-                  media_settings={@media_settings}
-                  cargo_room={assigns[:cargo_room]}
                   cargo_sync={assigns[:cargo_sync]}
                   usb_drive_dump={assigns[:usb_drive_dump]}
-                  usb_drive_dump_room={assigns[:usb_drive_dump_room]}
                 />
+                <Layout.CargoRoom.bar
+                  cargo_room={assigns[:cargo_room]}
+                  media_settings={@media_settings}
+                  room={@room}
+                />
+                <Layout.UsbDriveDumpRoom.bar dump_room={assigns[:usb_drive_dump_room]} room={@room} />
+
                 <%= if @room.type == :request do %>
                   <.modal id="room-request-list" class="z-30">
                     <h1 class="text-base font-bold text-grayscale">Requests</h1>

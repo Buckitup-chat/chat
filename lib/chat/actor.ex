@@ -20,7 +20,7 @@ defmodule Chat.Actor do
       }) do
     [
       identity |> Identity.to_strings(),
-      rooms |> Enum.map(&(&1 |> Identity.to_strings() |> Enum.at(1))),
+      rooms |> Enum.map(&(&1 |> Identity.priv_key_to_string())),
       contacts
     ]
     |> Jason.encode!()

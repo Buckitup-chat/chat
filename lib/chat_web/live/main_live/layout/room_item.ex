@@ -34,7 +34,7 @@ defmodule ChatWeb.MainLive.Layout.RoomItem do
           />
         </div>
       </a>
-      <.item_icon type={@room.type} />
+      <Layout.Room.room_icon type={@room.type} style="stroke-black" />
     </li>
     <!-- Mobile view -->
     <li
@@ -52,7 +52,7 @@ defmodule ChatWeb.MainLive.Layout.RoomItem do
           <Layout.Card.hashed_name room={@room} />
         </div>
       </a>
-      <.item_icon type={@room.type} />
+      <Layout.Room.room_icon type={@room.type} style="stroke-black" />
     </li>
     """
   end
@@ -79,24 +79,6 @@ defmodule ChatWeb.MainLive.Layout.RoomItem do
         </div>
       </li>
     <% end %>
-    """
-  end
-
-  defp item_icon(%{type: :request} = assigns) do
-    ~H"""
-    <.icon id="private" class="w-5 h-5 stroke-black" />
-    """
-  end
-
-  defp item_icon(%{type: :private} = assigns) do
-    ~H"""
-    <.icon id="secret" class="w-4 h-4" />
-    """
-  end
-
-  defp item_icon(%{type: :public} = assigns) do
-    ~H"""
-    <.icon id="open" class="w-4 h-4" />
     """
   end
 end

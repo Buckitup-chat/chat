@@ -13,7 +13,7 @@ defmodule Chat.Sync.CargoRoom do
   @type time :: integer()
 
   @start_timeout 2 * 60
-  @sync_timeout 60
+  @sync_timeout 60 * 60
 
   @cargo_topic "chat::cargo_room"
   @lobby_topic "chat::lobby"

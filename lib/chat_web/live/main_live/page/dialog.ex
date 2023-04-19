@@ -20,7 +20,6 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.Log
   alias Chat.MemoIndex
   alias Chat.Messages
-  alias Chat.RoomInviteIndex
   alias Chat.Rooms
   alias Chat.Upload.UploadMetadata
   alias Chat.User
@@ -297,9 +296,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       socket
     else
       socket
-      |> store_room_key_copy(new_room_identity)
-      |> Page.Login.store_new_room(new_room_identity)
-      |> Page.Lobby.refresh_room_list()
+      |> Page.Room.store_new(new_room_identity)
       |> update_invite_navigation(msg, new_room_identity, render_fun)
     end
   rescue
@@ -326,9 +323,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       socket
     else
       socket
-      |> store_room_key_copy(new_room_identity)
-      |> Page.Login.store_new_room(new_room_identity)
-      |> Page.Lobby.refresh_room_list()
+      |> Page.Room.store_new(new_room_identity)
     end
     |> close()
     |> Page.Room.init({new_room_identity, new_room_identity |> Identity.pub_key() |> Rooms.get()})
@@ -342,17 +337,6 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> Enum.each(fn invite ->
       send(self(), {:dialog, {:accept_room_invite, invite}})
     end)
-
-    socket
-  end
-
-  def store_room_key_copy(%{assigns: %{me: me}} = socket, room_identity) do
-    my_notes = Dialogs.find_or_open(me)
-
-    room_identity
-    |> Messages.RoomInvite.new()
-    |> Dialogs.add_new_message(me, my_notes)
-    |> RoomInviteIndex.add(my_notes, me)
 
     socket
   end

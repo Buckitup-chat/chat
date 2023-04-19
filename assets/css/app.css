@@ -438,7 +438,7 @@ html {
   .navbarTop { @apply hidden }
   .navbarBottom { @apply hidden }
 
-  .chatRoomBar { @apply h-screen w-[320px] flex-none min-w-fit bg-white/90 overflow-y-scroll  }
+  .chatRoomBar { @apply h-screen w-[320px] min-w-fit flex flex-none flex-col bg-white/90 overflow-y-scroll  }
 }
 
 @media screen and (max-width: 640px) {

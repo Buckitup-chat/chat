@@ -15,7 +15,7 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
-
+- feeds close error on mobile bugfix
 
 ## 2023-04-15_c77d709___2023-04-15_64148f8
 
@@ -32,7 +32,6 @@ straightforward as possible.
 ### Fixed
 - better broken files handling
 - db changes tracking improvement
-- feeds close error on mobile bugfix
 
 ## 2023-04-07_a41ea0d___2023-04-07_c06e36f
 

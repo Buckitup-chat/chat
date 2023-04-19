@@ -15,6 +15,7 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
+- Backup key password validation bugfix
 
 
 ## 2023-04-15_c77d709___2023-04-15_64148f8

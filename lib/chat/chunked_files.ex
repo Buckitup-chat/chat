@@ -30,7 +30,7 @@ defmodule Chat.ChunkedFiles do
 
   def save_upload_chunk(key, {chunk_start, chunk_end}, size, chunk) do
     with initial_secret <- ChunkedFilesBroker.get(key),
-         false <- is_nil(initial_secret),
+         {_, false} <- {:empty_initial_secret, is_nil(initial_secret)},
          secret <- ChunkedFilesMultisecret.get_secret(key, chunk_start, initial_secret),
          encoded <- Enigma.cipher(chunk, secret) do
       if chunk_end + 1 == size do

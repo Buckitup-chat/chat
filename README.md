@@ -25,6 +25,7 @@ Using IO data as arguments to the logging function will give a little performanc
 
   * [Encryption](./lib/enigma/encryption.livemd)
   * [DB structure](./lib/chat/db_structures.livemd)
+  * [AdminDB structure](./lib/chat/admin_db_structures.livemd)
   * [Room approval flow](./lib/chat/rooms/approve_flow.livemd)
   * [DB Prioritization](./lib/chat/db/prioritization.livemd)
   * [DB and Device Supervision](./lib/chat/db/supervision.livemd)

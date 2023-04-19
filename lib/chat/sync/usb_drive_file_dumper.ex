@@ -5,13 +5,13 @@ defmodule Chat.Sync.UsbDriveFileDumper do
 
   alias Chat.{ChunkedFiles, ChunkedFilesMultisecret, FileIndex, Identity, Log, Messages, Rooms}
   alias Chat.Db.ChangeTracker
-  alias Chat.Sync.UsbDriveDumpFile
+  alias Chat.Sync.{UsbDriveDumpFile, UsbDriveDumpRoom}
   alias Chat.Upload.UploadKey
   alias Phoenix.PubSub
 
   @chunk_size Application.compile_env(:chat, :file_chunk_size)
 
-  def dump(%UsbDriveDumpFile{} = file, room_key, %Identity{} = room_identity) do
+  def dump(%UsbDriveDumpFile{} = file, file_number, room_key, %Identity{} = room_identity) do
     timestamp =
       file.datetime
       |> DateTime.from_naive!("Etc/UTC")
@@ -43,16 +43,17 @@ defmodule Chat.Sync.UsbDriveFileDumper do
     file_secret =
       case FileIndex.get(room_key, file_key) do
         nil ->
-          copy_file(file_key, file)
+          copy_file(file_key, file, file_number)
 
         file_secret ->
+          UsbDriveDumpRoom.update_progress(file_number, file.name, file.size, true)
           file_secret
       end
 
     create_message(room_key, room_identity, file_key, file_secret, entry)
   end
 
-  defp copy_file(file_key, file) do
+  defp copy_file(file_key, file, file_number) do
     file_secret = ChunkedFiles.new_upload(file_key)
     ChunkedFilesMultisecret.generate(file_key, file.size, file_secret)
 
@@ -69,6 +70,13 @@ defmodule Chat.Sync.UsbDriveFileDumper do
         )
 
       ChunkedFiles.save_upload_chunk(file_key, {chunk_start, chunk_end}, file.size, chunk)
+
+      UsbDriveDumpRoom.update_progress(
+        file_number,
+        file.name,
+        chunk_end - chunk_start + 1,
+        chunk_end + 1 == file.size
+      )
     end)
 
     file_secret

@@ -3,6 +3,7 @@ defmodule ChatWeb.MainLive.Layout.UsbDriveDumpRoom do
 
   use ChatWeb, :component
 
+  alias Chat.Messages.File
   alias Chat.Sync.UsbDriveDumpRoom
   alias ChatWeb.MainLive.Layout.Timer
 
@@ -34,6 +35,8 @@ defmodule ChatWeb.MainLive.Layout.UsbDriveDumpRoom do
 
   defp status(%{dump_room: %UsbDriveDumpRoom{status: :dumping}} = assigns) do
     ~H"""
+    <.progress_bar progress={@dump_room.progress} />
+
     <div class="flex text-yellow-400">
       Dumping...
     </div>
@@ -60,6 +63,29 @@ defmodule ChatWeb.MainLive.Layout.UsbDriveDumpRoom do
     ~H"""
     <div class="flex text-red-500">
       Failed!
+    </div>
+    """
+  end
+
+  defp progress_bar(assigns) do
+    ~H"""
+    <div class="flex flex-col w-48 ml-auto mr-4">
+      <div class="z-20 flex relative w-full">
+        <div class="absolute -top-2 left-0 bg-gray-500 h-3" style={"width: #{@progress.percentage}%;"}>
+        </div>
+      </div>
+
+      <div class="z-30 flex flex-col w-full bg-purple50 text-xs text-black/50 p-2">
+        <div class="flex flex-row w-full justify-between">
+          <div>Total size: <%= File.format_size(@progress.total_size) %></div>
+          <div><%= @progress.percentage %>%</div>
+        </div>
+
+        <div class="flex flex-row w-full justify-between mt-1">
+          <div class="truncate">File: <%= @progress.current_filename %></div>
+          <div><%= @progress.current_file %> / <%= @progress.total_files %></div>
+        </div>
+      </div>
     </div>
     """
   end

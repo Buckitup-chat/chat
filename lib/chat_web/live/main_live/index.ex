@@ -452,6 +452,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_info({:update_usb_drive_dump_progress, dump_room}, socket) do
+    socket
+    |> assign(:usb_drive_dump_room, dump_room)
+    |> noreply()
+  end
+
   def handle_info({:update_usb_drive_dump_room, dump_room}, socket) do
     socket
     |> assign(:usb_drive_dump_room, dump_room)

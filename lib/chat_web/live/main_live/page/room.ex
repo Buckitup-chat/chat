@@ -34,6 +34,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Phoenix.PubSub
 
   @per_page 15
+  @usb_drive_dump_progress_topic "chat::usb_drive_dump_progress"
 
   def init(socket), do: socket |> assign(:room, nil)
 
@@ -64,6 +65,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:last_load_timestamp, nil)
     |> assign(:has_more_messages, true)
     |> assign(:message_update_mode, :replace)
+    |> assign(:usb_drive_dump_room, UsbDriveDumpRoom.get())
     |> assign_messages()
     |> assign_requests()
     |> maybe_enable_cargo()
@@ -331,6 +333,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def close(%{assigns: %{room: room}} = socket) do
     PubSub.unsubscribe(Chat.PubSub, room.pub_key |> room_topic())
+    PubSub.unsubscribe(Chat.PubSub, @usb_drive_dump_progress_topic)
 
     socket
     |> assign(:room, nil)
@@ -521,6 +524,8 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def maybe_enable_usb_drive_dump(%{assigns: %{room: room}} = socket) when not is_nil(room) do
+    PubSub.unsubscribe(Chat.PubSub, @usb_drive_dump_progress_topic)
+
     usb_drive_dump =
       cond do
         match?(%CargoRoom{status: :syncing}, socket.assigns[:cargo_room]) ->
@@ -531,6 +536,7 @@ defmodule ChatWeb.MainLive.Page.Room do
           when pub_key == room.pub_key or status == :dumping,
           socket.assigns[:usb_drive_dump_room]
         ) ->
+          PubSub.subscribe(Chat.PubSub, @usb_drive_dump_progress_topic)
           :disabled
 
         true ->

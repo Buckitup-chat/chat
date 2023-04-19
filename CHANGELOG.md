@@ -13,6 +13,7 @@ straightforward as possible.
 ### Added
 
 ### Changed
+- ChangeTracker expiry
 
 ### Fixed
 - feeds close error on mobile bugfix

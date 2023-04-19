@@ -14,6 +14,7 @@ straightforward as possible.
 - USB drive dump progress
 
 ### Changed
+- Hide Cargo sync timer and increase the timeout to 5 minutes
 
 ### Fixed
 - feeds close error on mobile bugfix

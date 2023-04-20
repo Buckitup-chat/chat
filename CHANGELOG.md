@@ -38,6 +38,7 @@ straightforward as possible.
 
 ### Changed
 - short code to be first 6 hex digits (was 8)
+- landing page code updated
 
 ### Fixed
 - better broken files handling

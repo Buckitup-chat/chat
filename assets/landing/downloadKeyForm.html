@@ -1,106 +1,109 @@
 <style>
     .downloadKeyBlock {
-      z-index:20;
-      background: white;
-      border: none;
-      padding: 10px;
-      width: 24vw;
-      display: flex;
-      justify-content: space-between;
-      flex-direction: column;
-      border-radius: 0.5rem;
-      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-    } 
-             
-    .formContainer {
-      visibility: hidden; 
-      z-index: 10;
-      width:100vw;
-      height: 100vh;
-      background: rgba(0,0,0,0.5);
-      position: absolute;
-      bottom: 0vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+        z-index: 20;
+        background: white;
+        border: none;
+        padding: 10px;
+        width: 24vw;
+        display: flex;
+        justify-content: space-between;
+        flex-direction: column;
+        border-radius: 0.5rem;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     }
-            
+
+    .formContainer {
+        visibility: hidden;
+        z-index: 10;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.5);
+        position: absolute;
+        bottom: 0vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
     .closeBtnForm {
-      width: 15px;
-      height: 15px;
-      margin-left: 24rem;
-      border: none;
-      background: none;
-      cursor: pointer;
+        width: 15px;
+        height: 15px;
+        margin-left: 24rem;
+        border: none;
+        background: none;
+        cursor: pointer;
     }
 
     .description {
-      color: rgb(0 0 0 / 0.5);
-      font-size: 0.875rem;
-      line-height: 1.25rem;
-      padding: 10px 0;
+        color: rgb(0 0 0 / 0.5);
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        padding: 10px 0;
     }
-    
+
     .warningContainer {
-      background-color: rgb(0 0 0 / 0.1);
-      border-radius: 0.5rem;
+        background-color: rgb(0 0 0 / 0.1);
+        border-radius: 0.5rem;
     }
-    
+
     .warning {
-      font-size: 0.75rem;
-      line-height: 1rem;
+        font-size: 0.75rem;
+        line-height: 1rem;
     }
-    
+
     .downloadKeyForm {
         display: flex;
         flex-direction: column;
         justify-content: space-around;
-        height:15rem;
+        height: 15rem;
     }
-    
+
     .input {
         height: 3rem;
         padding-left: 10px;
         border: 1px ridge;
         border-radius: 0.5rem;
     }
-    
-    .downloadBtn, .downloadWithoutPassword {
+
+    .downloadBtn,
+    .downloadWithoutPassword {
         height: 3rem;
         border: 1px ridge;
         border-radius: 0.5rem;
         background: white;
         cursor: pointer;
     }
-    
+
     .downloadBtn {
         background: black;
         color: white
     }
-    
-     @media screen and (max-width: 480px) {
+
+    @media screen and (max-width: 480px) {
         .downloadKeyBlock {
             width: 94vw;
         }
-    } 
+    }
 </style>
-          
-          
+
+
 <div id="formContainer" class="formContainer">
     <div id="downloadKeyBlock" class="downloadKeyBlock">
         <button id="closeBtn" class="closeBtnForm">X</button>
         <h4 class="title">Set Up Password</h4>
-        <p class="description">To store the backup copy of the key securely, enter the encryption password for the file</p>
-        <div class="warningContainer" >
-            <blockquote class="warning">This password is not stored and can NOT be recovered</blockquote>    
-        </div>  
+        <p class="description">To store the backup copy of the key securely, enter the encryption password for the file
+        </p>
+        <div class="warningContainer">
+            <blockquote class="warning">This password is not stored and can NOT be recovered</blockquote>
+        </div>
         <form class="downloadKeyForm" id="downloadKeyForm">
             <input class="input" id="password" type="password" name="input1" placeholder="Enter password">
             <input class="input" id="repeatPassword" type="password" name="input2" placeholder="Repeat password">
             <p class="description">At least 12 symbols</p>
             <button id="downloadBtn" class="downloadBtn" disabled>Dowload</button>
         </form>
-        <button class="downloadWithoutPassword" id="downloadWithoutPassword">Download without password <span style="color:red">insecure!</span></button>
+        <button class="downloadWithoutPassword" id="downloadWithoutPassword">Download without password <span
+                style="color:red">insecure!</span></button>
     </div>
 </div>
 
@@ -112,23 +115,23 @@
     const closeBtn = document.getElementById("closeBtn");
     const passwordInput = document.getElementById("password");
     const repeatPasswordInput = document.getElementById("repeatPassword");
-    
-    if(downloadBtn.disabled) {
+
+    if (downloadBtn.disabled) {
         downloadBtn.style.opacity = 0.5;
-    } 
+    }
 
     const validatePasswords = () => {
         const passwordValue = passwordInput.value;
         const repeatPasswordValue = repeatPasswordInput.value;
         const passwordsMatch = passwordValue.length >= 12 && passwordValue === repeatPasswordValue;
-    
+
         downloadBtn.disabled = !passwordsMatch;
         downloadBtn.style.opacity = passwordsMatch ? 1 : 0.5;
     };
 
     password.addEventListener("input", validatePasswords);
     repeatPassword.addEventListener("input", validatePasswords);
-    
+
     const downloadWithoutPassword = () => {
         const downloadData = localStorage.getItem('buckitUp-chat-auth');
         const userName = JSON.parse(downloadData)[0][0];
@@ -141,7 +144,7 @@
         localStorage.clear();
         window.location.reload();
     };
-    
+
     const downloadWithPassword = (e) => {
         e.preventDefault();
         const passwordValue = passwordInput.value;
@@ -154,7 +157,7 @@
             const contentB64 = Buffer.from(downloadData).toString('base64');
             const ciphered = enigma.cipher(contentB64, passwordHash);
             const userName = JSON.parse(downloadData)[0][0];
-            const file = new Blob([ciphered], {type: 'application/octet-stream'});
+            const file = new Blob([ciphered], { type: 'application/octet-stream' });
             const fileURL = URL.createObjectURL(file);
             const linkElement = document.createElement("a");
             linkElement.setAttribute('href', fileURL);
@@ -162,19 +165,16 @@
             linkElement.click();
             localStorage.clear();
             window.location.reload();
-        } 
+        }
     }
-    
+
     passwordInput.addEventListener("input", validatePasswords);
     repeatPasswordInput.addEventListener("input", validatePasswords);
     downloadWithoutPasswordBtn.addEventListener("click", downloadWithoutPassword);
     downloadBtn.addEventListener("click", downloadWithPassword);
-              
+
     closeBtn.addEventListener('click', () => {
         const downloadKeyForm = document.getElementById("formContainer");
         downloadKeyForm.style.visibility = "hidden";
     })
 </script>
-        
-         
-        

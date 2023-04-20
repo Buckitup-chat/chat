@@ -15,7 +15,7 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
   @type t :: %__MODULE__{}
   @type time :: integer()
 
-  @dump_timeout 60
+  @dump_timeout 60 * 60
   @start_timeout 5 * 60
 
   @progress_topic "chat::usb_drive_dump_progress"

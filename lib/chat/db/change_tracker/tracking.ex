@@ -8,6 +8,8 @@ defmodule Chat.Db.ChangeTracker.Tracking do
   require Logger
   require Record
 
+  @env Application.compile_env(:chat, :env)
+
   Record.defrecordp(:tracker,
     next_id: 1,
     keys: %{},
@@ -78,7 +80,7 @@ defmodule Chat.Db.ChangeTracker.Tracking do
         {[id | ids], [change | changes]}
       end)
 
-    expiry_callback(changes, Application.get_env(:chat, :env))
+    expiry_callback(changes)
 
     new_keys =
       changes
@@ -115,15 +117,19 @@ defmodule Chat.Db.ChangeTracker.Tracking do
     |> tracker(next_id: id + 1, keys: new_keys, items: items |> Map.put(id, item))
   end
 
-  defp expiry_callback(changes, :dev) when length(changes) > 0 do
+  defp expiry_callback(changes, env \\ @env)
+
+  defp expiry_callback([], _env), do: nil
+
+  defp expiry_callback(changes, :dev) do
     Logger.error("ChangeTracker expired. Changes: #{inspect(changes)}")
   end
 
-  defp expiry_callback(changes, :test) when length(changes) > 0 do
+  defp expiry_callback(changes, :test) do
     assert [] == changes,
            "test should not rely on ChangeTracker expiration\nchanges: " <>
              inspect(changes, pretty: true)
   end
 
-  defp expiry_callback(_changes, _env), do: nil
+  defp expiry_callback(_changes, :prod), do: nil
 end

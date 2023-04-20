@@ -15,6 +15,7 @@ straightforward as possible.
 
 ### Changed
 - Hide Cargo sync timer and increase the timeout to 5 minutes
+- ChangeTracker expiry
 
 ### Fixed
 - feeds close error on mobile bugfix

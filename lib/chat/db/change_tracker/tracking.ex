@@ -2,7 +2,10 @@ defmodule Chat.Db.ChangeTracker.Tracking do
   @moduledoc """
   Tracking logic
   """
-  # use ExUnit.Case
+
+  use ExUnit.Case
+
+  require Logger
   require Record
 
   Record.defrecordp(:tracker,
@@ -10,6 +13,26 @@ defmodule Chat.Db.ChangeTracker.Tracking do
     keys: %{},
     items: %{}
   )
+
+  defmacrop expiry_callback(changes) do
+    quote do
+      cond do
+        unquote(changes) == [] ->
+          nil
+
+        Mix.env() == :dev ->
+          Logger.error("ChangeTracker expired. Changes: #{inspect(unquote(changes))}")
+
+        Mix.env() == :test ->
+          assert [] == unquote(changes),
+                 "test should not rely on ChangeTracker expiration\nchanges: " <>
+                   inspect(unquote(changes), pretty: true)
+
+        true ->
+          nil
+      end
+    end
+  end
 
   def new do
     tracker()
@@ -75,16 +98,7 @@ defmodule Chat.Db.ChangeTracker.Tracking do
         {[id | ids], [change | changes]}
       end)
 
-    # assert [] == changes,
-    #        "test should not rely on ChangeTracker expiration\nchanges: " <>
-    #          inspect(changes, pretty: true)
-
-    # <>
-    #    inspect(
-    #      Chat.Db.select({{:rooms, 0}, {:rooms1, 0}}, 100)
-    #      |> Enum.to_list(),
-    #      pretty: true
-    #    )
+    expiry_callback(changes)
 
     new_keys =
       changes

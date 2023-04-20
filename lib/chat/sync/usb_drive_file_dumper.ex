@@ -5,13 +5,13 @@ defmodule Chat.Sync.UsbDriveFileDumper do
 
   alias Chat.{ChunkedFiles, ChunkedFilesMultisecret, FileIndex, Identity, Log, Messages, Rooms}
   alias Chat.Db.ChangeTracker
-  alias Chat.Sync.UsbDriveDumpFile
+  alias Chat.Sync.{UsbDriveDumpFile, UsbDriveDumpRoom}
   alias Chat.Upload.UploadKey
   alias Phoenix.PubSub
 
   @chunk_size Application.compile_env(:chat, :file_chunk_size)
 
-  def dump(%UsbDriveDumpFile{} = file, room_key, %Identity{} = room_identity) do
+  def dump(%UsbDriveDumpFile{} = file, file_number, room_key, %Identity{} = room_identity) do
     timestamp =
       file.datetime
       |> DateTime.from_naive!("Etc/UTC")
@@ -40,6 +40,20 @@ defmodule Chat.Sync.UsbDriveFileDumper do
 
     file_key = UploadKey.new(destination, room_key, entry)
 
+    file_secret =
+      case FileIndex.get(room_key, file_key) do
+        nil ->
+          copy_file(file_key, file, file_number)
+
+        file_secret ->
+          UsbDriveDumpRoom.update_progress(file_number, file.name, file.size, true)
+          file_secret
+      end
+
+    create_message(room_key, room_identity, file_key, file_secret, entry)
+  end
+
+  defp copy_file(file_key, file, file_number) do
     file_secret = ChunkedFiles.new_upload(file_key)
     ChunkedFilesMultisecret.generate(file_key, file.size, file_secret)
 
@@ -56,12 +70,23 @@ defmodule Chat.Sync.UsbDriveFileDumper do
         )
 
       ChunkedFiles.save_upload_chunk(file_key, {chunk_start, chunk_end}, file.size, chunk)
+
+      UsbDriveDumpRoom.update_progress(
+        file_number,
+        file.name,
+        chunk_end - chunk_start + 1,
+        chunk_end + 1 == file.size
+      )
     end)
 
+    file_secret
+  end
+
+  defp create_message(room_key, room_identity, file_key, file_secret, entry) do
     {_index, message} =
       msg =
       entry
-      |> Messages.File.new(file_key, file_secret, timestamp)
+      |> Messages.File.new(file_key, file_secret, entry.client_last_modified)
       |> Rooms.add_new_message(room_identity, room_key)
 
     Rooms.on_saved(msg, room_key, fn ->
@@ -79,7 +104,7 @@ defmodule Chat.Sync.UsbDriveFileDumper do
 
       PubSub.broadcast!(Chat.PubSub, topic, {:room, {:new_message, msg}})
 
-      Log.message_room(room_identity, timestamp, room_key)
+      Log.message_room(room_identity, entry.client_last_modified, room_key)
     end)
   end
 end

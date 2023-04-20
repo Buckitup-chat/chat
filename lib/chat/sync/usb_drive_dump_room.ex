@@ -7,6 +7,7 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
   use StructAccess
 
   alias Chat.Identity
+  alias Chat.Sync.UsbDriveDumpProgress
   alias Phoenix.PubSub
 
   @type room_key :: String.t()
@@ -17,9 +18,18 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
   @dump_timeout 60
   @start_timeout 5 * 60
 
-  @topic "chat::usb_drive_dump_room"
+  @progress_topic "chat::usb_drive_dump_progress"
+  @room_topic "chat::usb_drive_dump_room"
 
-  defstruct [:identity, :pub_key, :successful?, status: :pending, timer: @start_timeout]
+  defstruct [
+    :identity,
+    :pub_key,
+    :successful?,
+    :timer_ref,
+    progress: %UsbDriveDumpProgress{},
+    status: :pending,
+    timer: @start_timeout
+  ]
 
   @spec start_link(any) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(_args) do
@@ -49,6 +59,16 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
   @spec dump() :: :ok
   def dump do
     GenServer.cast(__MODULE__, :dump)
+  end
+
+  @spec set_total(integer(), integer()) :: :ok
+  def set_total(files, size) do
+    GenServer.cast(__MODULE__, {:set_total, files, size})
+  end
+
+  @spec update_progress(integer(), String.t(), integer(), boolean()) :: :ok
+  def update_progress(file_number, filename, size, last_chunk?) do
+    GenServer.cast(__MODULE__, {:update_progress, file_number, filename, size, last_chunk?})
   end
 
   @spec mark_successful() :: :ok
@@ -92,24 +112,70 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
           dump_room
 
         _ ->
-          Process.send_after(self(), :update_timer, 1000)
-          %__MODULE__{identity: room_identity, pub_key: room_key}
+          if dump_room[:timer_ref] do
+            Process.cancel_timer(dump_room.timer_ref)
+          end
+
+          timer_ref = Process.send_after(self(), :update_timer, 1000)
+          %__MODULE__{identity: room_identity, pub_key: room_key, timer_ref: timer_ref}
       end
 
-    :ok = PubSub.broadcast(Chat.PubSub, @topic, {:update_usb_drive_dump_room, dump_room})
+    :ok = PubSub.broadcast(Chat.PubSub, @room_topic, {:update_usb_drive_dump_room, dump_room})
 
     {:noreply, dump_room}
   end
 
   def handle_cast(:dump, dump_room) do
-    dump_room = %{dump_room | status: :dumping}
+    dump_room = %{dump_room | progress: %UsbDriveDumpProgress{}, status: :dumping}
 
     Process.send_after(self(), {:dump_timeout, dump_room.pub_key}, @dump_timeout * 1000)
 
-    :ok = PubSub.broadcast(Chat.PubSub, @topic, {:update_usb_drive_dump_room, dump_room})
+    :ok = PubSub.broadcast(Chat.PubSub, @room_topic, {:update_usb_drive_dump_room, dump_room})
 
     {:noreply, dump_room}
   end
+
+  def handle_cast({:set_total, files, size}, %__MODULE__{status: :dumping} = dump_room) do
+    progress = %{dump_room.progress | total_files: files, total_size: size}
+    {:noreply, %{dump_room | progress: progress}}
+  end
+
+  def handle_cast({:set_total, _files, _size}, dump_room),
+    do: {:noreply, dump_room}
+
+  def handle_cast(
+        {:update_progress, file_number, filename, size, last_chunk?},
+        %__MODULE__{progress: %UsbDriveDumpProgress{} = progress, status: :dumping} = dump_room
+      ) do
+    size = progress.completed_size + size
+
+    completed_size =
+      if last_chunk? do
+        size
+      else
+        progress.completed_size
+      end
+
+    percentage = round(size / progress.total_size * 100)
+
+    progress = %{
+      progress
+      | completed_size: completed_size,
+        current_file: file_number,
+        current_filename: filename,
+        percentage: percentage
+    }
+
+    dump_room = %{dump_room | progress: progress}
+
+    :ok =
+      PubSub.broadcast(Chat.PubSub, @progress_topic, {:update_usb_drive_dump_progress, dump_room})
+
+    {:noreply, dump_room}
+  end
+
+  def handle_cast({:update_progress, _file_number, _filename, _size, _last_chunk?}, dump_room),
+    do: {:noreply, dump_room}
 
   def handle_cast(:mark_successful, dump_room) do
     dump_room =
@@ -138,7 +204,7 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
 
     dump_room = %{dump_room | status: status}
 
-    :ok = PubSub.broadcast(Chat.PubSub, @topic, {:update_usb_drive_dump_room, dump_room})
+    :ok = PubSub.broadcast(Chat.PubSub, @room_topic, {:update_usb_drive_dump_room, dump_room})
 
     {:noreply, dump_room}
   end
@@ -153,7 +219,7 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
           dump_room
       end
 
-    :ok = PubSub.broadcast(Chat.PubSub, @topic, {:update_usb_drive_dump_room, dump_room})
+    :ok = PubSub.broadcast(Chat.PubSub, @room_topic, {:update_usb_drive_dump_room, dump_room})
 
     {:noreply, dump_room}
   end
@@ -169,15 +235,16 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
           dump_room
 
         dump_room.timer - 1 > 0 ->
-          Process.send_after(self(), :update_timer, 1000)
+          timer_ref = Process.send_after(self(), :update_timer, 1000)
           new_timer = dump_room.timer - 1
-          %{dump_room | timer: new_timer}
+          %{dump_room | timer: new_timer, timer_ref: timer_ref}
 
         true ->
           nil
       end
 
-    :ok = PubSub.broadcast(Chat.PubSub, @topic, {:update_usb_drive_dump_room, dump_room})
+    :ok =
+      PubSub.broadcast(Chat.PubSub, @progress_topic, {:update_usb_drive_dump_progress, dump_room})
 
     {:noreply, dump_room}
   end
@@ -192,7 +259,7 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
           dump_room
       end
 
-    :ok = PubSub.broadcast(Chat.PubSub, @topic, {:update_usb_drive_dump_room, dump_room})
+    :ok = PubSub.broadcast(Chat.PubSub, @room_topic, {:update_usb_drive_dump_room, dump_room})
 
     {:noreply, dump_room}
   end

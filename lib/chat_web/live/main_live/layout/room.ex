@@ -13,10 +13,7 @@ defmodule ChatWeb.MainLive.Layout.Room do
   attr :requests, :list, required: true, doc: "room requests list"
   attr :restrict_actions, :boolean, default: false, doc: "read-only mode indicator"
   attr :linked?, :boolean, default: false, doc: "whether has room the linked messages"
-  attr :cargo_room, Room, doc: "cargo room struct"
   attr :cargo_sync, :atom, doc: "cargo sync status"
-  attr :media_settings, :map, doc: "admin room media settings"
-  attr :usb_drive_dump_room, Room, doc: "dump room"
   attr :usb_drive_dump, :atom, doc: "dump status. :enabled or :disabled"
 
   def header(assigns) do
@@ -49,8 +46,6 @@ defmodule ChatWeb.MainLive.Layout.Room do
         <% end %>
         <.invite_button users={Chat.User.list()} restricted={@restrict_actions} />
       </div>
-      <Layout.CargoRoom.bar cargo_room={@cargo_room} media_settings={@media_settings} room={@room} />
-      <Layout.UsbDriveDumpRoom.bar dump_room={@usb_drive_dump_room} room={@room} />
     </div>
     """
   end

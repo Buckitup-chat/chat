@@ -11,8 +11,10 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+- USB drive dump progress
 
 ### Changed
+- Hide Cargo sync timer and increase the timeout to 5 minutes
 - ChangeTracker expiry
 
 ### Fixed
@@ -20,6 +22,8 @@ straightforward as possible.
 - message select checkbox bugfix
 - text message editing bugfix
 - Backup key password validation bugfix
+- Cargo sync failing after 1 minute mark
+- Dumping duplicate files
 
 
 ## 2023-04-15_c77d709___2023-04-15_64148f8

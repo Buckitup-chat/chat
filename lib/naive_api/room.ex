@@ -7,7 +7,7 @@ defmodule NaiveApi.Room do
   alias Chat.MemoIndex
   alias Chat.Messages
   alias Chat.Rooms
-  alias Chat.Upload.UploadIndex
+  alias Chat.Upload.{Upload, UploadIndex}
 
   @default_amount 20
 
@@ -62,12 +62,12 @@ defmodule NaiveApi.Room do
       nil ->
         ["Wrong upload key"] |> error()
 
-      upload ->
+      %Upload{} = upload ->
         {index, %{id: id}} =
           Messages.File.new(
             upload,
             upload_key,
-            ChunkedFiles.decrypt_secret(upload.secret, me),
+            ChunkedFiles.decrypt_secret(upload.encrypted_secret, me),
             now()
           )
           |> Rooms.add_new_message(me, room.pub_key)

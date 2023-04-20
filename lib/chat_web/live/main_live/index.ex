@@ -321,7 +321,13 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_event("dump:activate", _params, socket) do
     CargoRoom.remove()
-    UsbDriveDumpRoom.activate(socket.assigns.room.pub_key, socket.assigns.room_identity)
+
+    UsbDriveDumpRoom.activate(
+      socket.assigns.room.pub_key,
+      socket.assigns.room_identity,
+      socket.assigns.monotonic_offset
+    )
+
     noreply(socket)
   end
 

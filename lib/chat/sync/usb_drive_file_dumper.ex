@@ -52,7 +52,7 @@ defmodule Chat.Sync.UsbDriveFileDumper do
           maybe_resume_stopped_dump(file_key, file, file_number, room_identity, monotonic_offset)
 
         encrypted_secret ->
-          UsbDriveDumpRoom.update_progress(file_number, file.name, file.size, true)
+          UsbDriveDumpRoom.update_progress(file_number, file.name, file.size)
           secret = ChunkedFiles.decrypt_secret(encrypted_secret, room_identity)
           {secret, encrypted_secret}
       end
@@ -108,12 +108,7 @@ defmodule Chat.Sync.UsbDriveFileDumper do
         ChunkedFiles.save_upload_chunk(file_key, {chunk_start, chunk_end}, file.size, chunk)
       end
 
-      UsbDriveDumpRoom.update_progress(
-        file_number,
-        file.name,
-        chunk_end - chunk_start + 1,
-        chunk_end + 1 == file.size
-      )
+      UsbDriveDumpRoom.update_progress(file_number, file.name, chunk_end - chunk_start + 1)
     end)
   end
 

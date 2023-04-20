@@ -68,9 +68,9 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
     GenServer.cast(__MODULE__, {:set_total, files, size})
   end
 
-  @spec update_progress(integer(), String.t(), integer(), boolean()) :: :ok
-  def update_progress(file_number, filename, size, last_chunk?) do
-    GenServer.cast(__MODULE__, {:update_progress, file_number, filename, size, last_chunk?})
+  @spec update_progress(integer(), String.t(), integer()) :: :ok
+  def update_progress(file_number, filename, size) do
+    GenServer.cast(__MODULE__, {:update_progress, file_number, filename, size})
   end
 
   @spec mark_successful() :: :ok
@@ -152,19 +152,11 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
     do: {:noreply, dump_room}
 
   def handle_cast(
-        {:update_progress, file_number, filename, size, last_chunk?},
+        {:update_progress, file_number, filename, size},
         %__MODULE__{progress: %UsbDriveDumpProgress{} = progress, status: :dumping} = dump_room
       ) do
-    size = progress.completed_size + size
-
-    completed_size =
-      if last_chunk? do
-        size
-      else
-        progress.completed_size
-      end
-
-    percentage = round(size / progress.total_size * 100)
+    completed_size = progress.completed_size + size
+    percentage = round(completed_size / progress.total_size * 100)
 
     progress = %{
       progress

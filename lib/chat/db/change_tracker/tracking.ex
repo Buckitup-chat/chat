@@ -8,13 +8,31 @@ defmodule Chat.Db.ChangeTracker.Tracking do
   require Logger
   require Record
 
-  @env Application.compile_env(:chat, :env)
-
   Record.defrecordp(:tracker,
     next_id: 1,
     keys: %{},
     items: %{}
   )
+
+  defmacrop expiry_callback(changes) do
+    quote do
+      cond do
+        unquote(changes) == [] ->
+          nil
+
+        Mix.env() == :dev ->
+          Logger.error("ChangeTracker expired. Changes: #{inspect(unquote(changes))}")
+
+        Mix.env() == :test ->
+          assert [] == unquote(changes),
+                 "test should not rely on ChangeTracker expiration\nchanges: " <>
+                   inspect(unquote(changes), pretty: true)
+
+        true ->
+          nil
+      end
+    end
+  end
 
   def new do
     tracker()
@@ -116,20 +134,4 @@ defmodule Chat.Db.ChangeTracker.Tracking do
     state
     |> tracker(next_id: id + 1, keys: new_keys, items: items |> Map.put(id, item))
   end
-
-  defp expiry_callback(changes, env \\ @env)
-
-  defp expiry_callback([], _env), do: nil
-
-  defp expiry_callback(changes, :dev) do
-    Logger.error("ChangeTracker expired. Changes: #{inspect(changes)}")
-  end
-
-  defp expiry_callback(changes, :test) do
-    assert [] == changes,
-           "test should not rely on ChangeTracker expiration\nchanges: " <>
-             inspect(changes, pretty: true)
-  end
-
-  defp expiry_callback(_changes, :prod), do: nil
 end

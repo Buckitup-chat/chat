@@ -14,12 +14,14 @@ straightforward as possible.
 - USB drive dump progress
 
 ### Changed
+- Hide Cargo sync timer and increase the timeout to 5 minutes
 
 ### Fixed
 - feeds close error on mobile bugfix
 - message select checkbox bugfix
 - text message editing bugfix
 - Backup key password validation bugfix
+- Cargo sync failing after 1 minute mark
 - Dumping duplicate files
 - Drive dump failing after 1 minute mark
 

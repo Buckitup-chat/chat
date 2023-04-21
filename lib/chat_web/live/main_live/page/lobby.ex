@@ -7,7 +7,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   alias Phoenix.PubSub
 
   alias Chat.AdminRoom
-  alias Chat.Db.StatusPoller
+  alias Chat.Db.{StatusPoller, FreeSpaces}
   alias Chat.Identity
   alias Chat.Log
   alias Chat.Rooms
@@ -208,7 +208,10 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   def join_approved_room(socket, _, _, _), do: socket
 
   def set_db_status(socket, status) do
+    free_spaces = FreeSpaces.get_all()
+
     socket
+    |> assign(:free_spaces, free_spaces)
     |> assign(:db_status, status)
   end
 

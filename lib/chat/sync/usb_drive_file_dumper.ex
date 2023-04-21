@@ -6,12 +6,18 @@ defmodule Chat.Sync.UsbDriveFileDumper do
   alias Chat.{ChunkedFiles, ChunkedFilesMultisecret, FileIndex, Identity, Log, Messages, Rooms}
   alias Chat.Db.ChangeTracker
   alias Chat.Sync.{UsbDriveDumpFile, UsbDriveDumpRoom}
-  alias Chat.Upload.UploadKey
+  alias Chat.Upload.{Upload, UploadIndex, UploadKey}
   alias Phoenix.PubSub
 
   @chunk_size Application.compile_env(:chat, :file_chunk_size)
 
-  def dump(%UsbDriveDumpFile{} = file, file_number, room_key, %Identity{} = room_identity) do
+  def dump(
+        %UsbDriveDumpFile{} = file,
+        file_number,
+        room_key,
+        %Identity{} = room_identity,
+        monotonic_offset
+      ) do
     timestamp =
       file.datetime
       |> DateTime.from_naive!("Etc/UTC")
@@ -40,23 +46,52 @@ defmodule Chat.Sync.UsbDriveFileDumper do
 
     file_key = UploadKey.new(destination, room_key, entry)
 
-    file_secret =
+    {secret, encrypted_secret} =
       case FileIndex.get(room_key, file_key) do
         nil ->
-          copy_file(file_key, file, file_number)
+          maybe_resume_stopped_dump(file_key, file, file_number, room_identity, monotonic_offset)
 
-        file_secret ->
-          UsbDriveDumpRoom.update_progress(file_number, file.name, file.size, true)
-          file_secret
+        encrypted_secret ->
+          UsbDriveDumpRoom.update_progress(file_number, file.name, file.size)
+          secret = ChunkedFiles.decrypt_secret(encrypted_secret, room_identity)
+          {secret, encrypted_secret}
       end
 
-    create_message(room_key, room_identity, file_key, file_secret, entry)
+    create_message(room_key, room_identity, file_key, secret, encrypted_secret, entry)
   end
 
-  defp copy_file(file_key, file, file_number) do
-    file_secret = ChunkedFiles.new_upload(file_key)
-    ChunkedFilesMultisecret.generate(file_key, file.size, file_secret)
+  defp maybe_resume_stopped_dump(file_key, file, file_number, room_identity, monotonic_offset) do
+    {next_chunk, secret, encrypted_secret} =
+      case UploadIndex.get(file_key) do
+        nil ->
+          secret = ChunkedFiles.new_upload(file_key)
+          encrypted_secret = ChunkedFiles.encrypt_secret(secret, room_identity)
+          ChunkedFilesMultisecret.generate(file_key, file.size, secret)
+          add_dump_to_index(file_key, secret, room_identity, monotonic_offset)
+          {0, secret, encrypted_secret}
 
+        %Upload{} = upload ->
+          UploadIndex.delete(file_key)
+          secret = ChunkedFiles.decrypt_secret(upload.encrypted_secret, room_identity)
+          add_dump_to_index(file_key, secret, room_identity, monotonic_offset)
+          next_chunk = ChunkedFiles.next_chunk(file_key)
+          {next_chunk, secret, upload.encrypted_secret}
+      end
+
+    copy_file(file_key, file, file_number, next_chunk)
+    UploadIndex.delete(file_key)
+
+    {secret, encrypted_secret}
+  end
+
+  defp add_dump_to_index(key, secret, room_identity, monotonic_offset) do
+    encrypted_secret = ChunkedFiles.encrypt_secret(secret, room_identity)
+    timestamp = Chat.Time.monotonic_to_unix(monotonic_offset)
+    upload = %Upload{encrypted_secret: encrypted_secret, timestamp: timestamp}
+    UploadIndex.add(key, upload)
+  end
+
+  defp copy_file(file_key, file, file_number, next_chunk) do
     file.path
     |> File.stream!([], @chunk_size)
     |> Stream.with_index()
@@ -69,30 +104,25 @@ defmodule Chat.Sync.UsbDriveFileDumper do
           else: file.size - 1
         )
 
-      ChunkedFiles.save_upload_chunk(file_key, {chunk_start, chunk_end}, file.size, chunk)
+      if index >= next_chunk do
+        ChunkedFiles.save_upload_chunk(file_key, {chunk_start, chunk_end}, file.size, chunk)
+      end
 
-      UsbDriveDumpRoom.update_progress(
-        file_number,
-        file.name,
-        chunk_end - chunk_start + 1,
-        chunk_end + 1 == file.size
-      )
+      UsbDriveDumpRoom.update_progress(file_number, file.name, chunk_end - chunk_start + 1)
     end)
-
-    file_secret
   end
 
-  defp create_message(room_key, room_identity, file_key, file_secret, entry) do
+  defp create_message(room_key, room_identity, file_key, secret, encrypted_secret, entry) do
     {_index, message} =
       msg =
       entry
-      |> Messages.File.new(file_key, file_secret, entry.client_last_modified)
+      |> Messages.File.new(file_key, secret, entry.client_last_modified)
       |> Rooms.add_new_message(room_identity, room_key)
 
     Rooms.on_saved(msg, room_key, fn ->
       ChangeTracker.ensure(
         action: fn ->
-          FileIndex.save(file_key, room_key, message.id, file_secret)
+          FileIndex.save(file_key, room_key, message.id, encrypted_secret)
         end,
         writes_key: {:file_index, room_key, file_key, message.id}
       )

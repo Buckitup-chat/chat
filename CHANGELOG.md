@@ -17,6 +17,7 @@ straightforward as possible.
 ### Changed
 - Hide Cargo sync timer and increase the timeout to 5 minutes
 - ChangeTracker expiry
+- searchbar color changed
 
 ### Fixed
 - feeds close error on mobile bugfix

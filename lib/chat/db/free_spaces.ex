@@ -18,7 +18,7 @@ defmodule Chat.Db.FreeSpaces do
       value =
         case value do
           -1 -> "Not found"
-          value -> value |> bytes_to_MB()
+          value -> value |> bytes_to_mega_bytes()
         end
 
       {key, value}
@@ -35,7 +35,7 @@ defmodule Chat.Db.FreeSpaces do
     end
   end
 
-  defp bytes_to_MB(space) do
+  defp bytes_to_mega_bytes(space) do
     space
     |> Kernel./(1024 * 1024)
     |> round()

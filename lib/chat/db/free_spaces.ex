@@ -4,7 +4,7 @@ defmodule Chat.Db.FreeSpaces do
   alias Chat.Db.{InternalDb, MainDb, BackupDb, CargoDb}
   alias Chat.Db.Maintenance
 
-  def get_all() do
+  def get_all do
     spaces =
       [InternalDb, MainDb, BackupDb, CargoDb]
       |> Stream.map(&{&1 |> atomize_db_name(), &1 |> get_one()})
@@ -56,9 +56,10 @@ defmodule Chat.Db.FreeSpaces do
       |> Enum.map(&Map.get(spaces, &1))
       |> Enum.sum()
 
-    cond do
-      media_db_space >= -1 -> media_db_space + 1
-      true -> -1
+    if media_db_space >= -1 do
+      media_db_space + 1
+    else
+      -1
     end
   end
 end

@@ -14,12 +14,14 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Chat.User
   alias Chat.UsersBroker
   alias ChatWeb.Router.Helpers, as: Routes
+  alias Chat.Db.FreeSpacesPoller
 
   @incoming_topic "platform->chat"
   @outgoing_topic "chat->platform"
 
   def init(%{assigns: %{me: me}} = socket) do
     PubSub.subscribe(Chat.PubSub, @incoming_topic)
+    PubSub.subscribe(Chat.PubSub, FreeSpacesPoller.channel())
 
     me |> AdminRoom.visit()
 
@@ -28,6 +30,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     |> request_wifi_settings()
     |> assign_user_lists()
     |> assign_room_list()
+    |> assign(:free_spaces, FreeSpacesPoller.info())
   end
 
   def int(socket) do
@@ -138,8 +141,11 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     socket
   end
 
+  def set_free_spaces(socket, free_spaces), do: socket |> assign(:free_spaces, free_spaces)
+
   def close(socket) do
     PubSub.unsubscribe(Chat.PubSub, @incoming_topic)
+    PubSub.unsubscribe(Chat.PubSub, FreeSpacesPoller.channel())
 
     socket
     |> assign(:admin_list, nil)

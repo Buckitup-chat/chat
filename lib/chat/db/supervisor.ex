@@ -25,7 +25,9 @@ defmodule Chat.Db.Supervisor do
          ["[db] ", "Started database"] |> Logger.notice()
        end},
       # DB status broadcaster
-      Chat.Db.StatusPoller
+      Chat.Db.StatusPoller,
+      # Free spaces broadcaster
+      Chat.Db.FreeSpacesPoller
     ]
 
     Supervisor.init(children, strategy: :rest_for_one)

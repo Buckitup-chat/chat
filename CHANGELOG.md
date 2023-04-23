@@ -116,6 +116,7 @@ straightforward as possible.
  
 ### Added
 - extra front end encryption check 
+- free spaces widget on admin panel
  
 ### Changed
 - UI: audio button moved into paperclip menu

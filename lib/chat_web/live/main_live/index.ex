@@ -7,7 +7,6 @@ defmodule ChatWeb.MainLive.Index do
   alias Chat.Admin.{CargoSettings, MediaSettings}
   alias Chat.{AdminRoom, Dialogs, Identity, Messages, RoomInviteIndex, User}
   alias Chat.Rooms.Room
-  alias Chat.Db.FreeSpaces
   alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
   alias ChatWeb.Hooks.{LiveModalHook, LocalTimeHook, UploaderHook}
   alias ChatWeb.MainLive.Admin.{CargoSettingsForm, MediaSettingsForm}
@@ -33,7 +32,6 @@ defmodule ChatWeb.MainLive.Index do
       |> assign(:operating_system, operating_system)
       |> assign_cargo_settings()
       |> assign_media_settings()
-      |> assign_free_spaces()
 
     if connected?(socket) do
       if action == :export do
@@ -392,6 +390,9 @@ defmodule ChatWeb.MainLive.Index do
   def handle_info({:db_status, msg}, socket),
     do: socket |> Page.Lobby.set_db_status(msg) |> noreply()
 
+  def handle_info({:free_spaces, msg}, socket),
+    do: socket |> Page.AdminPanel.set_free_spaces(msg) |> noreply()
+
   def handle_info({:room, msg}, socket),
     do: socket |> Page.RoomRouter.info(msg) |> noreply()
 
@@ -423,7 +424,6 @@ defmodule ChatWeb.MainLive.Index do
   def handle_info(:update_media_settings, socket) do
     socket
     |> assign_media_settings()
-    |> assign_free_spaces()
     |> maybe_set_cargo_room()
     |> noreply()
   end
@@ -515,12 +515,6 @@ defmodule ChatWeb.MainLive.Index do
   defp assign_media_settings(socket) do
     media_settings = AdminRoom.get_media_settings()
     assign(socket, :media_settings, media_settings)
-  end
-
-  defp assign_free_spaces(socket) do
-    free_spaces = FreeSpaces.get_all()
-
-    assign(socket, :free_spaces, free_spaces)
   end
 
   defp action_confirmation_popup(assigns) do

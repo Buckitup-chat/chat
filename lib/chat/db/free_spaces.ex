@@ -10,13 +10,14 @@ defmodule Chat.Db.FreeSpaces do
       |> Stream.map(&{&1 |> atomize_db_name(), &1 |> get_one()})
       |> Enum.into(%{})
 
+    media_db_space = media_db_space(spaces)
+
     spaces
-    |> Map.put(:media_db, spaces.backup_db + spaces.cargo_db)
-    |> Map.drop([:backup_db, :cargo_db])
+    |> Map.put(:media_db, media_db_space)
     |> Enum.map(fn {key, value} ->
       value =
         case value do
-          0 -> "Not found"
+          -1 -> "Not found"
           value -> value |> bytes_to_MB()
         end
 
@@ -29,7 +30,7 @@ defmodule Chat.Db.FreeSpaces do
     pid = Process.whereis(db)
 
     case pid do
-      nil -> 0
+      nil -> -1
       _pid -> db |> Maintenance.db_free_space()
     end
   end
@@ -46,4 +47,18 @@ defmodule Chat.Db.FreeSpaces do
   defp atomize_db_name(MainDb), do: :main_db
   defp atomize_db_name(BackupDb), do: :backup_db
   defp atomize_db_name(CargoDb), do: :cargo_db
+
+  defp media_db_space(spaces) do
+    media_dbs = [:backup_db, :cargo_db]
+
+    media_db_space =
+      media_dbs
+      |> Enum.map(&Map.get(spaces, &1))
+      |> Enum.sum()
+
+    cond do
+      media_db_space >= -1 -> media_db_space + 1
+      true -> -1
+    end
+  end
 end

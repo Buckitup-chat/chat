@@ -7,6 +7,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Phoenix.PubSub
 
   alias Chat.AdminRoom
+  alias Chat.Db.FreeSpacesPoller
   alias Chat.Dialogs
   alias Chat.Messages
   alias Chat.Rooms
@@ -14,7 +15,6 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Chat.User
   alias Chat.UsersBroker
   alias ChatWeb.Router.Helpers, as: Routes
-  alias Chat.Db.FreeSpacesPoller
 
   @incoming_topic "platform->chat"
   @outgoing_topic "chat->platform"

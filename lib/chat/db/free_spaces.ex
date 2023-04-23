@@ -1,7 +1,7 @@
 defmodule Chat.Db.FreeSpaces do
   @moduledoc "Free space in MB of databases"
 
-  alias Chat.Db.{InternalDb, MainDb, BackupDb, CargoDb}
+  alias Chat.Db.{BackupDb, CargoDb, InternalDb, MainDb}
   alias Chat.Db.Maintenance
 
   def get_all do

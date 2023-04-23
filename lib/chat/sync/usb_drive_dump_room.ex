@@ -10,6 +10,7 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
   alias Chat.Sync.UsbDriveDumpProgress
   alias Phoenix.PubSub
 
+  @type monotonic_offset :: integer()
   @type room_key :: String.t()
   @type room_identity :: %Identity{}
   @type t :: %__MODULE__{}
@@ -23,6 +24,7 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
 
   defstruct [
     :identity,
+    :monotonic_offset,
     :pub_key,
     :successful?,
     :timer_ref,
@@ -51,9 +53,9 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
     GenServer.call(__MODULE__, :get_room_key)
   end
 
-  @spec activate(room_key(), room_identity()) :: :ok
-  def activate(room_key, room_identity) do
-    GenServer.cast(__MODULE__, {:activate, room_key, room_identity})
+  @spec activate(room_key(), room_identity(), monotonic_offset()) :: :ok
+  def activate(room_key, room_identity, monotonic_offset) do
+    GenServer.cast(__MODULE__, {:activate, room_key, room_identity, monotonic_offset})
   end
 
   @spec dump() :: :ok
@@ -66,9 +68,9 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
     GenServer.cast(__MODULE__, {:set_total, files, size})
   end
 
-  @spec update_progress(integer(), String.t(), integer(), boolean()) :: :ok
-  def update_progress(file_number, filename, size, last_chunk?) do
-    GenServer.cast(__MODULE__, {:update_progress, file_number, filename, size, last_chunk?})
+  @spec update_progress(integer(), String.t(), integer()) :: :ok
+  def update_progress(file_number, filename, size) do
+    GenServer.cast(__MODULE__, {:update_progress, file_number, filename, size})
   end
 
   @spec mark_successful() :: :ok
@@ -105,7 +107,7 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
   end
 
   @impl GenServer
-  def handle_cast({:activate, room_key, room_identity}, dump_room) do
+  def handle_cast({:activate, room_key, room_identity, monotonic_offset}, dump_room) do
     dump_room =
       case dump_room do
         %__MODULE__{status: :dumping} = dump_room ->
@@ -117,7 +119,13 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
           end
 
           timer_ref = Process.send_after(self(), :update_timer, 1000)
-          %__MODULE__{identity: room_identity, pub_key: room_key, timer_ref: timer_ref}
+
+          %__MODULE__{
+            identity: room_identity,
+            monotonic_offset: monotonic_offset,
+            pub_key: room_key,
+            timer_ref: timer_ref
+          }
       end
 
     :ok = PubSub.broadcast(Chat.PubSub, @room_topic, {:update_usb_drive_dump_room, dump_room})
@@ -144,19 +152,11 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
     do: {:noreply, dump_room}
 
   def handle_cast(
-        {:update_progress, file_number, filename, size, last_chunk?},
+        {:update_progress, file_number, filename, size},
         %__MODULE__{progress: %UsbDriveDumpProgress{} = progress, status: :dumping} = dump_room
       ) do
-    size = progress.completed_size + size
-
-    completed_size =
-      if last_chunk? do
-        size
-      else
-        progress.completed_size
-      end
-
-    percentage = round(size / progress.total_size * 100)
+    completed_size = progress.completed_size + size
+    percentage = round(completed_size / progress.total_size * 100)
 
     progress = %{
       progress

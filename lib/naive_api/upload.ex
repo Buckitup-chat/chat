@@ -13,13 +13,13 @@ defmodule NaiveApi.Upload do
       |> serialize_destination()
       |> UploadKey.new(my_keypair.public_key, entry)
 
-    secret =
+    encrypted_secret =
       upload_key
       |> ChunkedFiles.new_upload()
       |> ChunkedFiles.encrypt_secret(Identity.from_keys(my_keypair))
 
     UploadIndex.add(upload_key, %Upload{
-      secret: secret,
+      encrypted_secret: encrypted_secret,
       timestamp: DateTime.utc_now() |> DateTime.to_unix(),
       client_size: entry.client_size,
       client_type: entry.client_type,

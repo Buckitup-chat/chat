@@ -43,11 +43,16 @@ defmodule Chat.Sync.UsbDriveFileDumperTest do
 
       room_key = room.pub_key
 
-      UsbDriveDumpRoom.activate(room_key, room_identity)
+      monotonic_offset =
+        DateTime.utc_now()
+        |> DateTime.to_unix()
+        |> Chat.Time.monotonic_offset()
+
+      UsbDriveDumpRoom.activate(room_key, room_identity, monotonic_offset)
       UsbDriveDumpRoom.dump()
       UsbDriveDumpRoom.set_total(1, file.size)
 
-      UsbDriveFileDumper.dump(file, 1, room_key, room_identity)
+      UsbDriveFileDumper.dump(file, 1, room_key, room_identity, monotonic_offset)
 
       assert_receive {:update_usb_drive_dump_progress,
                       %UsbDriveDumpRoom{
@@ -97,11 +102,11 @@ defmodule Chat.Sync.UsbDriveFileDumperTest do
       assert ChunkedFiles.read({file_key, file_secret}) == String.duplicate("a", 10_000)
 
       UsbDriveDumpRoom.remove()
-      UsbDriveDumpRoom.activate(room_key, room_identity)
+      UsbDriveDumpRoom.activate(room_key, room_identity, monotonic_offset)
       UsbDriveDumpRoom.dump()
       UsbDriveDumpRoom.set_total(1, file.size)
 
-      UsbDriveFileDumper.dump(file, 1, room_key, room_identity)
+      UsbDriveFileDumper.dump(file, 1, room_key, room_identity, monotonic_offset)
 
       assert_receive {:update_usb_drive_dump_progress,
                       %UsbDriveDumpRoom{

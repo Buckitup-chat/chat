@@ -12,10 +12,12 @@ straightforward as possible.
 
 ### Added
 - USB drive dump progress
+- Ability to resume failed drive dump
 
 ### Changed
 - Hide Cargo sync timer and increase the timeout to 5 minutes
 - ChangeTracker expiry
+- searchbar color changed
 
 ### Fixed
 - feeds close error on mobile bugfix
@@ -25,6 +27,7 @@ straightforward as possible.
 - Cargo sync failing after 1 minute mark
 - Dumping duplicate files
 - Drive dump failing after 1 minute mark
+- Adaptive uploads and users/rooms list for desctop
 
 
 ## 2023-04-15_c77d709___2023-04-15_64148f8

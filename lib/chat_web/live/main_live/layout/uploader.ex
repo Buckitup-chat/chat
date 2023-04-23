@@ -21,7 +21,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     <div
       class={
         classes(
-          "flex flex-col-reverse bottom-[6%] w-full flex-col h-[27%] fixed md:bottom-[-10px] md:w-[18%] md:left-[78px] md:h-[49%] overflow-scroll a-uploader",
+          "flex flex-col-reverse w-full flex-col md:bottom-[-10px] md:w-[320px] md:left-[78px] overflow-scroll a-uploader",
           %{"hidden" => @uploads == %{}}
         )
       }

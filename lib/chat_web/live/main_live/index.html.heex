@@ -515,57 +515,59 @@
               <h5 class="text-grayscale" style="font-size: 22px;">Chats</h5>
             </div>
             <Layout.SearchBox.render type={:dialog} />
-            <div class="mt-3 w-full">
-              <ul class={
-                classes(
-                  "",
-                  %{"md:max-h-[415px] overflow-scroll" => @uploads_metadata !== %{}}
-                )
-              }>
-                <%= for user <- @users do %>
-                  <li
-                    phx-click="dialog/switch"
-                    phx-value-user-id={user.hash}
-                    class={
-                      classes(
-                        "hidden sm:flex w-full cursor-pointer h-9 flex items-center hover:bg-stone250",
-                        %{"from-green-400 to-blue-500" => user == @peer}
-                      )
-                    }
-                  >
-                    <a>
-                      <div class="flex flex-row px-7">
-                        <Layout.Card.hashed_name card={user} me={@me} />
-                      </div>
-                    </a>
-                  </li>
-                  <li
-                    phx-click={JS.push("dialog/switch") |> open_content()}
-                    phx-value-user-id={user.hash}
-                    class={
-                      classes(
-                        "sm:hidden w-full cursor-pointer h-9 flex items-center hover:bg-stone250",
-                        %{"bg-stone250" => user == @peer}
-                      )
-                    }
-                  >
-                    <a>
-                      <div class="flex flex-row px-7">
-                        <Layout.Card.hashed_name card={user} me={@me} />
-                      </div>
-                    </a>
-                  </li>
-                <% end %>
-              </ul>
-            </div>
+            <div class="sidebar-container h-[600px] md:h-[870px]">
+              <div class="mt-3 w-full overflow-scroll">
+                <ul class={
+                  classes(
+                    "",
+                    %{"overflow-scroll" => @uploads_metadata !== %{}}
+                  )
+                }>
+                  <%= for user <- @users do %>
+                    <li
+                      phx-click="dialog/switch"
+                      phx-value-user-id={user.hash}
+                      class={
+                        classes(
+                          "hidden sm:flex w-full cursor-pointer h-9 flex items-center hover:bg-stone250",
+                          %{"from-green-400 to-blue-500" => user == @peer}
+                        )
+                      }
+                    >
+                      <a>
+                        <div class="flex flex-row px-7">
+                          <Layout.Card.hashed_name card={user} me={@me} />
+                        </div>
+                      </a>
+                    </li>
+                    <li
+                      phx-click={JS.push("dialog/switch") |> open_content()}
+                      phx-value-user-id={user.hash}
+                      class={
+                        classes(
+                          "sm:hidden w-full cursor-pointer h-9 flex items-center hover:bg-stone250",
+                          %{"bg-stone250" => user == @peer}
+                        )
+                      }
+                    >
+                      <a>
+                        <div class="flex flex-row px-7">
+                          <Layout.Card.hashed_name card={user} me={@me} />
+                        </div>
+                      </a>
+                    </li>
+                  <% end %>
+                </ul>
+              </div>
 
-            <Layout.Uploader.uploader
-              config={@uploads.file}
-              pub_key={assigns[:peer][:pub_key]}
-              type={:dialog}
-              uploads={@uploads_metadata}
-              uploads_order={@file_uploads_order}
-            />
+              <Layout.Uploader.uploader
+                config={@uploads.file}
+                pub_key={assigns[:peer][:pub_key]}
+                type={:dialog}
+                uploads={@uploads_metadata}
+                uploads_order={@file_uploads_order}
+              />
+            </div>
           </div>
           <div
             id="contentContainer"
@@ -681,66 +683,72 @@
               </button>
             </div>
             <Layout.SearchBox.render type={:room} />
-            <div class={
-              classes(
-                "w-full mt-6 flex flex-col items-start",
-                %{"md:max-h-[415px] overflow-scroll" => @uploads_metadata !== %{}}
-              )
-            }>
-              <div
-                phx-click={
-                  JS.toggle(to: "#confirmed-rooms", in: "fade-in-scale", out: "fade-out-scale")
-                }
-                class="px-7 mt-1 flex items-center"
-              >
-                <.icon id="arrowDown" class="w-4 h-4 flex fill-black" />
-                <span class="ml-1 text-sm  font-bold cursor-pointer">Confirmed</span>
-              </div>
-              <div class="mt-3 w-full md:ml-5 t-confirmed-rooms" id="confirmed-rooms">
-                <ul class="t-confirmed-rooms-list">
-                  <%= if @joined_rooms == [] do %>
-                    <p class="text-base text-grayscale600 px-7">You have no rooms</p>
-                  <% else %>
-                    <%= for room <- @joined_rooms do %>
-                      <Layout.RoomItem.render
-                        room={room}
-                        confirmed?={true}
-                        selected_room={@room}
-                        click_event="room/switch"
-                      />
+            <div class="sidebar-container h-[600px] md:h-[870px]">
+              <div class={
+                classes(
+                  "w-full mt-6 flex flex-col items-start",
+                  %{"overflow-scroll" => @uploads_metadata !== %{}}
+                )
+              }>
+                <div
+                  phx-click={
+                    JS.toggle(to: "#confirmed-rooms", in: "fade-in-scale", out: "fade-out-scale")
+                  }
+                  class="px-7 mt-1 flex items-center"
+                >
+                  <.icon id="arrowDown" class="w-4 h-4 flex fill-black" />
+                  <span class="ml-1 text-sm  font-bold cursor-pointer">Confirmed</span>
+                </div>
+                <div class="mt-3 w-full md:ml-5 t-confirmed-rooms" id="confirmed-rooms">
+                  <ul class="t-confirmed-rooms-list">
+                    <%= if @joined_rooms == [] do %>
+                      <p class="text-base text-grayscale600 px-7">You have no rooms</p>
+                    <% else %>
+                      <%= for room <- @joined_rooms do %>
+                        <Layout.RoomItem.render
+                          room={room}
+                          confirmed?={true}
+                          selected_room={@room}
+                          click_event="room/switch"
+                        />
+                      <% end %>
                     <% end %>
-                  <% end %>
-                </ul>
-              </div>
-              <div
-                phx-click={
-                  JS.toggle(to: "#unconfirmed-rooms", in: "fade-in-scale", out: "fade-out-scale")
-                }
-                class="px-7 mt-3 flex items-center"
-              >
-                <.icon id="arrowDown" class="w-4 h-4 flex fill-black" />
-                <span class="ml-1 text-sm  font-bold cursor-pointer">Not Confirmed</span>
-              </div>
-              <div id="unconfirmed-rooms" class="mt-3 w-full t-unconfirmed-rooms">
-                <ul>
-                  <%= if @new_rooms == [] do %>
-                    <p class="text-base text-grayscale600 px-7">You have no rooms</p>
-                  <% else %>
-                    <%= for room <- @new_rooms do %>
-                      <Layout.RoomItem.render room={room} click_event="room/send-request" />
+                  </ul>
+                </div>
+                <div
+                  phx-click={
+                    JS.toggle(
+                      to: "#unconfirmed-rooms",
+                      in: "fade-in-scale",
+                      out: "fade-out-scale"
+                    )
+                  }
+                  class="px-7 mt-3 flex items-center"
+                >
+                  <.icon id="arrowDown" class="w-4 h-4 flex fill-black" />
+                  <span class="ml-1 text-sm  font-bold cursor-pointer">Not Confirmed</span>
+                </div>
+                <div id="unconfirmed-rooms" class="mt-3 w-full t-unconfirmed-rooms">
+                  <ul>
+                    <%= if @new_rooms == [] do %>
+                      <p class="text-base text-grayscale600 px-7">You have no rooms</p>
+                    <% else %>
+                      <%= for room <- @new_rooms do %>
+                        <Layout.RoomItem.render room={room} click_event="room/send-request" />
+                      <% end %>
                     <% end %>
-                  <% end %>
-                </ul>
+                  </ul>
+                </div>
               </div>
-            </div>
 
-            <Layout.Uploader.uploader
-              config={@uploads.file}
-              pub_key={assigns[:room][:pub_key]}
-              type={:room}
-              uploads={@uploads_metadata}
-              uploads_order={@file_uploads_order}
-            />
+              <Layout.Uploader.uploader
+                config={@uploads.file}
+                pub_key={assigns[:room][:pub_key]}
+                type={:room}
+                uploads={@uploads_metadata}
+                uploads_order={@file_uploads_order}
+              />
+            </div>
           </div>
           <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
             <%= unless @room do %>

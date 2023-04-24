@@ -126,6 +126,12 @@
             Log Out without the Keys
           </button>
           <button
+            class="mt-3 w-full h-12 border rounded-lg border-black/10 t-logout-without-key"
+            phx-click={hide_modal("logout-backup-popup") |> show_modal("secret-share-popup")}
+          >
+            Share a Secret
+          </button>
+          <button
             phx-click={hide_modal("logout-backup-popup")}
             class="mt-3 w-full h-12 border rounded-lg border-black/10 t-cancel-logout"
           >
@@ -296,6 +302,20 @@
             <span phx-click="logout-wipe" class="text-white mr-1 t-logout-btn">Logout</span>
           </button>
         </div>
+      </.modal>
+      <.modal id="secret-share-popup" class="t-logout-without-key-modal">
+        <h1 class="text-base font-bold text-grayscale">Share a Secret</h1>
+        <p class="mt-3 text-sm text-black/50">
+          Select users who you want to share your secrets with.
+        </p>
+        <.live_component module={ChatWeb.MainLive.Layout.SecretSharingForm} id="secret" me={@me} />
+
+        <button
+          phx-click={hide_modal("secret-share-popup")}
+          class="w-full mr-1 h-12 border rounded-lg border-black/10"
+        >
+          Cancel
+        </button>
       </.modal>
       <div class="w-screen h-screen flex flex-nowrap flex-row">
         <div id="navbarTop" class="navbarTop px-4">

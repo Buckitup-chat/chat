@@ -456,6 +456,7 @@ html {
   .sidebar-container {
     height: 85%;
     padding: 25px 0;
+    overflow: scroll;
   }
   
 }

@@ -1,7 +1,7 @@
 defmodule ChatWeb.MainLive.Page.RoomRouter do
   @moduledoc "Route room events"
 
-  import Phoenix.LiveView, only: [push_event: 3]
+  import Phoenix.LiveView, only: [push_event: 3, push_navigate: 2]
 
   alias ChatWeb.MainLive.Layout.Message
   alias ChatWeb.MainLive.Modals
@@ -10,6 +10,10 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
   #
   # LiveView events
   #
+
+  def event(%{assigns: %{need_login: true}} = socket, _event) do
+    socket |> push_navigate(to: "/")
+  end
 
   def event(socket, event) do
     case event do

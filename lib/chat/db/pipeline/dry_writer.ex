@@ -30,6 +30,10 @@ defmodule Chat.Db.Pipeline.DryWriter do
   end
 
   @impl true
+  def handle_cast({:mirror, {_operation, _list}}, state) do
+    state |> noreply()
+  end
+
   def handle_cast({operation, list}, state) do
     case operation do
       :write ->
@@ -45,8 +49,8 @@ defmodule Chat.Db.Pipeline.DryWriter do
   end
 
   @impl true
-  def handle_continue(:demand, {queue} = state) do
-    Queue.demand(queue)
-    state |> noreply()
+  def handle_continue(:demand, queue) do
+    queue |> Queue.demand()
+    queue |> noreply()
   end
 end

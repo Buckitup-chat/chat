@@ -11,22 +11,27 @@ defmodule ChatWeb.MainLive.Page.Login do
   alias Chat.Identity
   alias Chat.Log
   alias Chat.User
-  alias Chat.Utils
+  alias Chat.UsersBroker
   alias ChatWeb.MainLive.Page
 
-  @local_store_auth_key "buckitUp-chat-auth"
-  @local_store_room_count_key "buckitUp-room-count"
+  @local_store_auth_key "buckitUp-chat-auth-v2"
+  @local_store_room_count_key "buckitUp-room-count-v2"
 
   def handshaked(socket), do: socket |> assign(:handshaked, true)
 
   def create_user(socket, name) do
-    me = User.login(name |> String.trim())
-    id = User.register(me)
+    me =
+      name
+      |> String.trim()
+      |> User.login()
+      |> tap(&User.register/1)
+      |> tap(&UsersBroker.put/1)
+
     # todo: check setting time before creating
     Log.sign_in(me, socket.assigns.monotonic_offset |> Chat.Time.monotonic_to_unix())
 
     socket
-    |> assign_logged_user(me, id)
+    |> assign_logged_user(me)
     |> store()
     |> close()
     |> Page.Lobby.notify_new_user(me |> Chat.Card.from_identity())
@@ -47,16 +52,16 @@ defmodule ChatWeb.MainLive.Page.Login do
   end
 
   def load_user(socket, %Identity{} = me, rooms) do
-    id =
-      me
-      |> User.login()
-      |> User.register()
+    me
+    |> User.login()
+    |> tap(&User.register/1)
+    |> tap(&UsersBroker.put/1)
 
     PubSub.subscribe(Chat.PubSub, login_topic(me))
     Log.visit(me, socket.assigns.monotonic_offset |> Chat.Time.monotonic_to_unix())
 
     socket
-    |> assign_logged_user(me, id, rooms)
+    |> assign_logged_user(me, rooms)
     |> close()
     |> Page.Lobby.notify_new_user(me |> Chat.Card.from_identity())
   end
@@ -77,7 +82,10 @@ defmodule ChatWeb.MainLive.Page.Login do
   def store_new_room(%{assigns: %{rooms: rooms, room_map: room_map}} = socket, new_room_identity) do
     socket
     |> assign(:rooms, [new_room_identity | rooms])
-    |> assign(:room_map, Map.put(room_map, Utils.hash(new_room_identity), new_room_identity))
+    |> assign(
+      :room_map,
+      Map.put(room_map, new_room_identity |> Identity.pub_key(), new_room_identity)
+    )
     |> push_event("store-room", %{
       auth_key: @local_store_auth_key,
       room_count_key: @local_store_room_count_key,
@@ -125,7 +133,10 @@ defmodule ChatWeb.MainLive.Page.Login do
 
     socket
     |> assign(:rooms, [new_room_identity | rooms])
-    |> assign(:room_map, Map.put(room_map, Utils.hash(new_room_identity), new_room_identity))
+    |> assign(
+      :room_map,
+      Map.put(room_map, new_room_identity |> Identity.pub_key(), new_room_identity)
+    )
     |> assign(:room_count_to_backup, room_count)
   end
 
@@ -141,12 +152,13 @@ defmodule ChatWeb.MainLive.Page.Login do
     |> assign(:room_count_to_backup, 0)
   end
 
-  defp login_topic(person), do: "login:" <> Utils.hash(person)
+  defp login_topic(person),
+    do: "login:" <> (person |> Enigma.hash() |> Base.encode16(case: :lower))
 
-  defp assign_logged_user(socket, me, id, rooms \\ []) do
+  defp assign_logged_user(socket, me, rooms \\ []) do
     socket
     |> assign(:me, me)
-    |> assign(:my_id, id)
+    |> assign(:my_id, Identity.pub_key(me))
     |> assign_rooms(rooms)
     |> maybe_create_admin_room()
   end
@@ -161,7 +173,7 @@ defmodule ChatWeb.MainLive.Page.Login do
     |> assign(:rooms, rooms)
     |> assign(
       :room_map,
-      rooms |> Enum.map(fn room -> {room |> Utils.hash(), room} end) |> Map.new()
+      rooms |> Enum.map(fn room -> {room.public_key, room} end) |> Map.new()
     )
   end
 

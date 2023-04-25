@@ -26,6 +26,14 @@ defmodule Chat.Upload.UploadStatus do
     GenServer.start_link(__MODULE__, status, name: get_name(key))
   end
 
+  def started?(key) do
+    Process.whereis(get_name(key))
+    |> case do
+      nil -> false
+      _pid -> true
+    end
+  end
+
   @spec get(key()) :: status()
   def get(key) do
     GenServer.call(get_name(key), :get)
@@ -61,5 +69,5 @@ defmodule Chat.Upload.UploadStatus do
     {:stop, :normal, status}
   end
 
-  defp get_name(key), do: :"#{__MODULE__}_#{key}"
+  defp get_name(key), do: :"#{__MODULE__}_#{key |> Base.encode16(case: :lower)}"
 end

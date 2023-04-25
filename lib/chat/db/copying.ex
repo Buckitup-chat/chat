@@ -6,10 +6,32 @@ defmodule Chat.Db.Copying do
 
   import Chat.Db.WriteQueue.ReadStream
 
+  alias Chat.Db.ChangeTracker
   alias Chat.Db.Common
   alias Chat.Db.WriteQueue
 
-  def stream(from, to, awaiter \\ nil) do
+  def await_copied(from, to, keys \\ nil) do
+    to_pipe = Common.names(to)
+
+    stream = stream(from, to, nil, keys)
+
+    awaiter =
+      Task.async(fn ->
+        stream
+        |> read_stream(:keys)
+        |> ChangeTracker.await_many(:timer.hours(1))
+      end)
+
+    stream
+    |> read_stream(awaiter: awaiter.pid)
+    |> WriteQueue.put_stream(to_pipe.queue)
+
+    Task.await(awaiter, :infinity)
+  end
+
+  defp stream(from, to, awaiter, keys)
+
+  defp stream(from, to, awaiter, nil) do
     [from, to]
     |> Stream.map(fn db ->
       Task.async(fn -> get_data_keys_set(db) end)
@@ -26,18 +48,18 @@ defmodule Chat.Db.Copying do
     end)
   end
 
-  def await_copied(from, to) do
-    to_pipe = Common.names(to)
+  defp stream(from, to, awaiter, src) do
+    dst = get_data_keys_set(to)
 
-    awaiter = Task.async(&wait_till_done/0)
+    keys =
+      src
+      |> MapSet.difference(dst)
+      |> MapSet.to_list()
 
-    stream(from, to, awaiter.pid)
-    |> WriteQueue.put_stream(to_pipe.queue)
-
-    Task.await(awaiter, :infinity)
+    read_stream(keys: keys, db: from, awaiter: awaiter)
   end
 
-  def get_data_keys_set(db) do
+  defp get_data_keys_set(db) do
     CubDB.with_snapshot(db, fn snap ->
       {snap, MapSet.new()}
       |> before_change_tracking()
@@ -92,18 +114,5 @@ defmodule Chat.Db.Copying do
     |> MapSet.new()
     |> MapSet.union(set)
     |> then(&{snap, &1})
-  end
-
-  defp wait_till_done do
-    receive do
-      :done ->
-        :ok
-
-      any ->
-        ["[copying] ", inspect(any)]
-        |> Logger.debug()
-
-        wait_till_done()
-    end
   end
 end

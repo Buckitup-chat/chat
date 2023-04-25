@@ -20,7 +20,7 @@ Queue categorizes data into 4 buckets
 1. User data - everything but `action log`, `db change tracking` and `file chunks`. A list of them
 2. Logs and DB tracing - `action log` and `db change tracking`. A list of them
 3. Read stream - DB name and list of keys to be copied from another DB. Only one
-4. File chunk - Part of a file. Only one
+4. File chunk - Part of a file. First chunk and FIFO queue of next chunks
 
 Queue receives data from callers. 1st and 2nd buckets store multiple items. Queue does not accept data in 3rd or 4th bucket if there is some.
 
@@ -30,7 +30,8 @@ Upon receiving demand Queue sends whole bucket to Writer. If there is something 
 
 Read stream yields 100 items or till first `file_chunk`.
 
-Writer sends demand to Queue on start and as soom as it finished writing data received. This way we achieve sequentiasl writes and decopupling of UI and data writes.
+Writer sends demand to Queue on start and as soom as it finished writing data received.
+This way we achieve sequential writes and decoupling of UI and data writes.
 
 <!-- Learn more at https://mermaid-js.github.io/mermaid -->
 
@@ -83,7 +84,7 @@ graph TD;
 
 When Diff is written to MainDB, CurrentDB gets switched to MainDB. And mirroring gets switched from MainDB to InternalDB. This way InternalDB gets updates that happen while MainDB is currrent one.
 
-Every 5 minutes Diff of MainDB data that is absent in Internal DB formed and being written into Internal DB. After both DB are synchronized each next replication cares no data and finishes immidiatelly.
+Every 5 minutes Diff of MainDB data that is absent in Internal DB formed and being written into Internal DB. After both DBs are synchronized each next replication carries no data and finishes immediately.
 
 <!-- Learn more at https://mermaid-js.github.io/mermaid -->
 
@@ -110,7 +111,7 @@ graph TD;
 
 ### Backup
 
-Backup happens when 2nd USB drive pliugged. It goes in 2 stages.
+Backup happens when 2nd USB drive is plugged. It goes in 2 stages.
 
 Data from backup is copied to currentDB (MainDB). With the same Diff keys mechanics. 
 This gives us copy to internal DB as well.

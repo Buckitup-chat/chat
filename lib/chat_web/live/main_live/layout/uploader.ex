@@ -14,14 +14,26 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   attr :pub_key, :string, required: true, doc: "peer or room pub key"
   attr :type, :atom, required: true, doc: ":dialog or :room"
   attr :uploads, :map, required: true, doc: "uploads metadata"
+  attr :uploads_order, :list, required: true, doc: "uploads order"
 
   def uploader(assigns) do
     ~H"""
     <div
-      class="flex bottom-[6%] w-full left-30 flex-col fixed h-[27%] md:bottom-[-10px] md:w-[18%] md:h-[50%] overflow-scroll"
+      class={
+        classes(
+          "flex flex-col-reverse w-full flex-col md:bottom-[-10px] md:w-[320px] md:left-[78px] overflow-scroll a-uploader",
+          %{"hidden" => @uploads == %{}}
+        )
+      }
       id="file-uploader"
     >
-      <.entries config={@config} pub_key={@pub_key} type={@type} uploads={@uploads} />
+      <.entries
+        config={@config}
+        pub_key={@pub_key}
+        type={@type}
+        uploads={@uploads}
+        uploads_order={@uploads_order}
+      />
     </div>
     """
   end
@@ -31,6 +43,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   attr :pub_key, :string, required: true, doc: "peer or room pub key"
   attr :type, :string, required: true, doc: "dialog or room"
   attr :uploads, :map, required: true, doc: "uploads metadata"
+  attr :uploads_order, :list, required: true, doc: "uploads order"
 
   def mobile_uploader(assigns) do
     assigns =
@@ -41,7 +54,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       end)
 
     ~H"""
-    <div class="max-h-[280px] bottom-16 fixed w-full overflow-y-scroll flex flex-col-reverse">
+    <div class="max-h-[280px] bottom-16 fixed w-full overflow-y-scroll flex flex-col-reverse a-mobile-uploader">
       <div class="h-full">
         <div
           class="flex flex-col m-2 bg-purple50 rounded-lg h-fit overflow-scroll sm:hidden"
@@ -56,6 +69,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
             pub_key={@pub_key}
             type={String.to_existing_atom(@type)}
             uploads={@uploads}
+            uploads_order={@uploads_order}
           />
         </div>
       </div>
@@ -142,14 +156,20 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   attr :pub_key, :string, required: true, doc: "peer or room pub key"
   attr :type, :atom, required: true, doc: ":dialog or :room"
   attr :uploads, :map, required: true, doc: "uploads metadata"
+  attr :uploads_order, :list, required: true, doc: "uploads order"
 
   defp entries(%{uploads: uploads} = assigns) when map_size(uploads) > 0 do
     ~H"""
-    <div class="p-2" id={Utils.random_id()} phx-hook="SortableUploadEntries">
-      <%= for %UploadEntry{valid?: true} = entry <- @config.entries do %>
+    <div
+      class="p-2"
+      id={Utils.random_id()}
+      phx-mounted={JS.dispatch("phx:scroll-uploads-to-top")}
+      phx-hook="SortableUploadEntries"
+    >
+      <%= for uuid <- @uploads_order do %>
         <.entry
-          entry={entry}
-          metadata={@uploads[entry.uuid]}
+          entry={Enum.find(@config.entries, &(&1.uuid == uuid and &1.valid?))}
+          metadata={@uploads[uuid]}
           mobile?={@mobile?}
           pub_key={@pub_key}
           type={@type}
@@ -165,13 +185,14 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     """
   end
 
-  attr :entry, UploadEntry, required: true, doc: "upload entry"
+  attr :entry, UploadEntry, doc: "upload entry"
   attr :mobile?, :boolean, required: true
   attr :metadata, UploadMetadata, doc: "upload metadata"
   attr :pub_key, :string, required: true, doc: "peer or room pub key"
   attr :type, :atom, required: true, doc: ":dialog or :room"
 
-  defp entry(%{metadata: nil} = assigns) do
+  defp entry(%{entry: entry, metadata: metadata} = assigns)
+       when is_nil(entry) or is_nil(metadata) do
     ~H"""
 
     """
@@ -275,7 +296,8 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   defp file_form(assigns) do
     ~H"""
     <.form
-      for={:file}
+      for={%{}}
+      as={:file}
       id="uploader-file-form"
       class="flex flex-col m-2 column column-50 column-offset-50"
       phx-change={"#{@type}/import-files"}
@@ -300,18 +322,25 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       <%= if @operating_system == "Android" do %>
         <div class="flex flex-row justify-around">
           <a
-            class="flex justify-center items-center h-11 px-10 cursor-pointer rounded-md bg-white hover:bg-white/50"
+            class="flex justify-center items-center h-11 w-[30%] pr-2 cursor-pointer rounded-md bg-white hover:bg-white/50"
             phx-click={JS.dispatch("click", to: "#uploader-file-form .file-input")}
           >
             <.icon id="document" class="w-4 h-4 fill-grayscale" />
             <span class="ml-2">File</span>
           </a>
           <a
-            class="flex justify-center items-center h-11 px-10 cursor-pointer rounded-md bg-white hover:bg-white/50"
+            class="flex justify-center items-center h-11 w-[30%] pr-2 cursor-pointer rounded-md bg-white hover:bg-white/50"
             phx-click={JS.dispatch("click", to: "#uploader-file-form .image-input")}
           >
             <.icon id="image" class="w-4 h-4 fill-grayscale" />
             <span class="ml-2">Image</span>
+          </a>
+          <a
+            class="flex justify-center items-center h-11 w-[30%] pr-2 cursor-pointer rounded-md bg-white"
+            phx-click={JS.dispatch("click", to: "#uploader-file-form .audio-file-input")}
+          >
+            <.icon id="audio" class="w-4 h-4 fill-grayscale" />
+            <span class="ml-2">Audio</span>
           </a>
         </div>
 

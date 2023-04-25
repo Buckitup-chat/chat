@@ -11,14 +11,17 @@ defmodule Chat.MixProject do
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
-      test_coverage: [
-        summary: [threshold: 58]
-      ],
+      test_coverage: [tool: ExCoveralls],
       releases: [
         chat: [
           version: build_version(),
           applications: [chat: :permanent]
         ]
+      ],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.html": :test
       ]
     ]
   end
@@ -29,7 +32,7 @@ defmodule Chat.MixProject do
   def application do
     [
       mod: {Chat.Application, []},
-      extra_applications: [:logger, :runtime_tools]
+      extra_applications: [:logger, :runtime_tools, :curvy]
     ]
   end
 
@@ -43,6 +46,8 @@ defmodule Chat.MixProject do
   defp deps do
     [
       # {:flame_on, "~> 0.5.2"},
+      {:absinthe, "~> 1.7"},
+      {:absinthe_plug, "~> 1.5"},
       {:poison, "~> 5.0"},
       {:phoenix_ecto, "~> 4.0"},
       {:ecto, "~> 3.7"},
@@ -51,14 +56,15 @@ defmodule Chat.MixProject do
       {:tzdata, "~> 1.1"},
       {:qr_code, "~> 2.2.1"},
       {:cubdb, "~> 2.0"},
+      {:curvy, "~> 0.3.1"},
       {:struct_access, "~> 1.1"},
       {:uuid, "~> 1.1"},
       {:x509, "~> 0.8"},
-      {:phoenix, "~> 1.7.0-rc.2", override: true},
+      {:phoenix, "~> 1.7.2"},
       {:phoenix_html, "~> 3.0"},
       {:phoenix_view, "~> 2.0"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 0.18.3"},
+      {:phoenix_live_view, "~> 0.18.18"},
       {:floki, ">= 0.30.0", only: :test},
       {:phoenix_live_dashboard, "~> 0.7.2"},
       {:esbuild, "~> 0.3", runtime: Mix.env() == :dev && Mix.target() == :host},
@@ -70,10 +76,13 @@ defmodule Chat.MixProject do
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
       {:sobelow, "~> 0.8", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:mock, "~> 0.3.0", only: :test},
       {:tailwind, "~> 0.1", runtime: Mix.env() == :dev},
       {:timex, "~> 3.7"},
       {:zstream, "~> 0.6"},
-      {:ua_parser, github: "beam-community/ua_parser"}
+      {:ua_parser, github: "beam-community/ua_parser"},
+      {:excoveralls, "~> 0.14", only: [:test]},
+      {:keyx, "~> 0.4.1"}
     ]
   end
 

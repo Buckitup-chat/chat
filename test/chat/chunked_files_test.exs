@@ -9,18 +9,17 @@ defmodule Chat.ChunkedFilesTest do
     key = UUID.uuid4()
     secret = ChunkedFiles.new_upload(key)
 
-    assert 24 = byte_size(secret)
+    assert 32 = byte_size(secret)
 
     first = "some part of info "
     second = "another part"
     size = String.length(first) + String.length(second)
 
-    ChunkedFiles.save_upload_chunk(key, {0, 17}, first)
+    ChunkedFiles.save_upload_chunk(key, {0, 17}, 30, first)
     ChangeTracker.await({:file_chunk, key, 0, 17})
     assert false == ChunkedFiles.complete_upload?(key, size)
 
-    ChunkedFiles.save_upload_chunk(key, {18, 29}, second)
-    ChangeTracker.await({:file_chunk, key, 18, 29})
+    ChunkedFiles.save_upload_chunk(key, {18, 29}, 30, second)
     assert ChunkedFiles.complete_upload?(key, size)
 
     recovered = ChunkedFiles.read({key, secret})

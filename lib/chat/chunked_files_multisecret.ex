@@ -2,9 +2,9 @@ defmodule Chat.ChunkedFilesMultisecret do
   @moduledoc "Multisecret handler for chunks ciphering of large files (>~1GB)"
 
   alias Chat.Db
-  alias Chat.Utils
 
-  @hundred_chunks_size 1000 * 1024 * 1024
+  @chunk_size Application.compile_env(:chat, :file_chunk_size)
+  @hundred_chunks_size 100 * @chunk_size
   @secret_size 32
 
   def generate(file_key, file_size, initial_secret) do
@@ -21,7 +21,7 @@ defmodule Chat.ChunkedFilesMultisecret do
   end
 
   def get_secret(_file_key, offset, initial_secret)
-      when offset <= @hundred_chunks_size,
+      when offset < @hundred_chunks_size,
       do: initial_secret
 
   def get_secret(file_key, offset, initial_secret) do
@@ -35,15 +35,15 @@ defmodule Chat.ChunkedFilesMultisecret do
 
   defp encrypt_secret(additional_secret, initial_secret) do
     additional_secret
-    |> Utils.encrypt_blob(initial_secret)
+    |> Enigma.cipher(initial_secret)
   end
 
   defp decrypt_secret(encrypted, initial_secret) do
     encrypted
-    |> Utils.decrypt_blob(initial_secret)
+    |> Enigma.decipher(initial_secret)
   end
 
-  defp additional_secret, do: :crypto.strong_rand_bytes(@secret_size)
+  defp additional_secret, do: Enigma.generate_secret()
 
   defp slice_binary(bin, start, length), do: :binary.part(bin, {start, length})
 end

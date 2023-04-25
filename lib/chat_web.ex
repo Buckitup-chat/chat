@@ -127,6 +127,13 @@ defmodule ChatWeb do
       defp noreply(x), do: {:noreply, x}
 
       defp reply(x, p), do: {:reply, p, x}
+
+      defp stream_batch_insert(socket, key, items, opts \\ %{}) do
+        items
+        |> Enum.reduce(socket, fn item, socket ->
+          stream_insert(socket, key, item, opts)
+        end)
+      end
     end
   end
 

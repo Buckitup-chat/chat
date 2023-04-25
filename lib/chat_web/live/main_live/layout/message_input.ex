@@ -26,11 +26,11 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
       class="basis-[7%] w-full py-1.5 px-8 border border-white bg-white flex items-center fixed md:sticky bottom-0"
     >
       <%= if @input_mode == :plain do %>
-        <Layout.Uploader.push_to_talk_button config={@uploads.file} enabled={@writable} type={@type} />
         <Layout.Uploader.button enabled={@writable} operating_system={@operating_system} type={@type} />
         <.form
           :let={di}
-          for={:dialog}
+          for={%{}}
+          as={:dialog}
           id="dialog-form"
           class="basis-[99%] flex items-center justify-between"
           phx-change={JS.dispatch("chat:set-input-size", to: "#dialog-input")}
@@ -72,7 +72,8 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
           </div>
           <.form
             :let={dei}
-            for={:dialog_edit}
+            for={%{}}
+            as={:dialog_edit}
             id="dialog-edit-form"
             class="flex items-center justify-start "
             phx-change={JS.dispatch("chat:set-input-size", to: "#dialog-edit-input")}
@@ -82,7 +83,7 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
               |> JS.dispatch("chat:set-input-size", to: "#dialog-edit-input")
             }
             onkeydown="
-                      if (event.key == 'Enter' && event.shiftKey) {
+                      if (event.key == 'Enter' && !event.shiftKey) {
                         document.getElementById('dialog-edit-form-submit-button').click()
                       }
                       "
@@ -149,11 +150,11 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
     ~H"""
     <div class="basis-[7%] w-full py-1.5 px-8 border border-white bg-white flex items-center fixed md:sticky bottom-0">
       <%= if @input_mode == :plain do %>
-        <Layout.Uploader.push_to_talk_button config={@uploads.file} enabled={@writable} type={@type} />
         <Layout.Uploader.button enabled={@writable} operating_system={@operating_system} type={@type} />
         <.form
           :let={di}
-          for={:room}
+          for={%{}}
+          as={:room}
           id="room-form"
           class="basis-[99%] flex items-center justify-between"
           phx-change={JS.dispatch("chat:set-input-size", to: "#room-input")}
@@ -195,7 +196,8 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
           </div>
           <.form
             :let={dei}
-            for={:room_edit}
+            for={%{}}
+            as={:room_edit}
             id="rooom-edit-form"
             class="flex items-center justify-start "
             phx-change={JS.dispatch("chat:set-input-size", to: "#room-input")}
@@ -205,7 +207,7 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
               |> JS.dispatch("chat:set-input-size", to: "#room-input")
             }
             onkeydown="
-                      if (event.key == 'Enter' && event.shiftKey) {
+                      if (event.key == 'Enter' && !event.shiftKey) {
                         document.getElementById('room-edit-form-submit-button').click()
                       }
                       "

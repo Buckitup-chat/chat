@@ -4,40 +4,47 @@ defmodule ChatWeb.MainLive.Page.Room do
   use ChatWeb, :component
 
   import ChatWeb.MainLive.Page.Shared
+  import ChatWeb.LiveHelpers.LiveModal
+  import ChatWeb.LiveHelpers, only: [open_content: 0]
   import Phoenix.Component, only: [assign: 3]
 
   import Phoenix.LiveView,
-    only: [consume_uploaded_entry: 3, push_event: 3, send_update: 2]
+    only: [consume_uploaded_entry: 3, push_event: 3, send_update: 2, push_patch: 2]
 
   require Logger
 
+  alias Chat.Admin.MediaSettings
   alias Chat.Broker
   alias Chat.ChunkedFiles
+  alias Chat.Content.Memo
   alias Chat.Dialogs
   alias Chat.FileIndex
   alias Chat.Identity
   alias Chat.Log
-  alias Chat.Memo
   alias Chat.MemoIndex
   alias Chat.Messages
   alias Chat.RoomInviteIndex
   alias Chat.Rooms
+  alias Chat.Rooms.{Registry, Room, RoomMessageLinks, RoomRequest}
+  alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
   alias Chat.Upload.UploadMetadata
   alias Chat.User
   alias Chat.Utils
   alias Chat.Utils.StorageId
 
   alias ChatWeb.MainLive.Layout
+  alias ChatWeb.MainLive.Page
 
   alias Phoenix.PubSub
 
   @per_page 15
+  @usb_drive_dump_progress_topic "chat::usb_drive_dump_progress"
 
   def init(socket), do: socket |> assign(:room, nil)
 
-  def init(%{assigns: %{room_map: rooms}} = socket, room_hash) when is_binary(room_hash) do
-    room = Rooms.get(room_hash)
-    room_identity = rooms |> Map.get(room_hash)
+  def init(%{assigns: %{room_map: rooms}} = socket, room_key) when is_binary(room_key) do
+    room = Rooms.get(room_key)
+    room_identity = rooms |> Map.fetch!(room_key)
 
     socket
     |> init({room_identity, room})
@@ -59,11 +66,63 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:edit_content, nil)
     |> assign(:room, room)
     |> assign(:room_identity, room_identity)
+    |> assign(:is_room_linked?, RoomMessageLinks.has_room_linked_messages?(room_identity))
     |> assign(:last_load_timestamp, nil)
     |> assign(:has_more_messages, true)
     |> assign(:message_update_mode, :replace)
+    |> assign(:usb_drive_dump_room, UsbDriveDumpRoom.get())
     |> assign_messages()
     |> assign_requests()
+    |> maybe_enable_cargo()
+    |> maybe_enable_usb_drive_dump()
+    |> push_event("chat:scroll-down", %{})
+  end
+
+  def init_with_linked_message(socket, hash) do
+    with {ciphered_identity, _, msg_index, msg_id} <- RoomMessageLinks.get(hash),
+         identity <-
+           Rooms.decipher_identity(ciphered_identity, hash |> Base.decode16!(case: :lower)),
+         room <- identity |> Identity.pub_key() |> Rooms.get() do
+      socket
+      |> store_new(identity)
+      |> init({identity, room})
+      |> load_messages_to({msg_index, msg_id})
+      |> send_js(open_content())
+      |> push_patch(to: "/")
+    else
+      _ ->
+        socket
+        |> assign(:lobby_mode, :rooms)
+        |> init()
+        |> push_event("chat:toggle", %{to: "#chatRoomBar", class: "hidden"})
+        |> push_event("chat:toggle", %{to: "#navbarLeft", class: "navbar"})
+        |> push_event("chat:toggle", %{to: "#navbarLeft", class: "hidden"})
+        |> push_event("chat:toggle", %{to: "#navbarTop", class: "navbarTop"})
+        |> push_event("chat:toggle", %{to: "#navbarTop", class: "hidden"})
+        |> push_event("chat:toggle", %{to: "#navbarBottom", class: "navbarBottom"})
+        |> push_event("chat:toggle", %{to: "#navbarBottom", class: "hidden"})
+        |> push_event("chat:toggle", %{to: "#contentContainer", class: "hidden"})
+    end
+  end
+
+  def store_key_copy(%{assigns: %{me: me, room_map: room_map}} = socket, room_identity) do
+    unless Map.has_key?(room_map, Identity.pub_key(room_identity)) do
+      my_notes = Dialogs.find_or_open(me)
+
+      room_identity
+      |> Messages.RoomInvite.new()
+      |> Dialogs.add_new_message(me, my_notes)
+      |> RoomInviteIndex.add(my_notes, me)
+    end
+
+    socket
+  end
+
+  def store_new(socket, new_room_identity) do
+    socket
+    |> store_key_copy(new_room_identity)
+    |> Page.Login.store_new_room(new_room_identity)
+    |> Page.Lobby.refresh_room_list()
   end
 
   def load_more_messages(%{assigns: %{page: page}} = socket) do
@@ -96,7 +155,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         content
         |> Messages.Text.new(time)
         |> Rooms.add_new_message(me, room.pub_key)
-        |> MemoIndex.add(room, rooms[room.pub_key |> Utils.hash()])
+        |> MemoIndex.add(room, rooms[room.pub_key])
         |> broadcast_new_message(room.pub_key, me, time)
     end
 
@@ -106,10 +165,13 @@ defmodule ChatWeb.MainLive.Page.Room do
   def send_file(
         %{assigns: %{me: me, monotonic_offset: time_offset}} = socket,
         entry,
-        %UploadMetadata{credentials: {chunk_key, chunk_secret}, destination: %{pub_key: pub_key}} =
-          _metadata
+        %UploadMetadata{
+          credentials: {chunk_key, chunk_secret},
+          destination: %{pub_key: text_pub_key}
+        } = _metadata
       ) do
     time = Chat.Time.monotonic_to_unix(time_offset)
+    pub_key = text_pub_key |> Base.decode16!(case: :lower)
 
     message =
       consume_uploaded_entry(
@@ -129,7 +191,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
     {_index, msg} = message
 
-    FileIndex.save(chunk_key, pub_key |> Utils.hash(), msg.id, chunk_secret)
+    FileIndex.save(chunk_key, pub_key, msg.id, chunk_secret)
 
     Rooms.on_saved(message, pub_key, fn ->
       broadcast_new_message(message, pub_key, me, time)
@@ -139,13 +201,15 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def show_new(
-        %{assigns: %{room_identity: identity}} = socket,
-        {index, %{author_hash: hash, encrypted: {data, sign}} = new_message}
+        %{assigns: %{room_identity: %Identity{} = identity}} = socket,
+        {index, new_message}
       ) do
-    if Utils.is_signed_by?(sign, data, User.by_id(hash)) do
+    verified_message = Rooms.read_message({index, new_message}, identity)
+
+    if verified_message do
       socket
       |> assign(:page, 0)
-      |> assign(:messages, [{index, new_message} |> Rooms.read_message(identity)])
+      |> assign(:messages, [verified_message])
       |> assign(:message_update_mode, :append)
       |> push_event("chat:scroll-down", %{})
     else
@@ -166,7 +230,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         msg_id
       ) do
     content =
-      Rooms.read_message(msg_id, room_identity, &User.id_map_builder/1)
+      Rooms.read_message(msg_id, room_identity)
       |> then(fn
         %{type: :text, content: text} ->
           text
@@ -214,7 +278,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         render_fun
       ) do
     content =
-      Rooms.read_message(msg_id, room_identity, &User.id_map_builder/1)
+      Rooms.read_message(msg_id, room_identity)
       |> then(&%{msg: &1, my_id: my_id})
       |> render_to_html_string(render_fun)
 
@@ -244,26 +308,8 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:edit_message_id, nil)
   end
 
-  def delete_message(
-        %{
-          assigns: %{
-            me: me,
-            room_identity: room_identity,
-            room: room,
-            monotonic_offset: time_offset
-          }
-        } = socket,
-        {index, msg_id}
-      ) do
-    time = Chat.Time.monotonic_to_unix(time_offset)
-    Rooms.delete_message({index, msg_id}, room_identity, me)
-    broadcast_deleted_message(msg_id, room.pub_key, me, time)
-
-    socket
-  end
-
-  def approve_request(%{assigns: %{room_identity: room_identity}} = socket, user_hash) do
-    Rooms.approve_request(room_identity |> Utils.hash(), user_hash, room_identity)
+  def approve_request(%{assigns: %{room_identity: room_identity}} = socket, user_key) do
+    Rooms.approve_request(room_identity |> Identity.pub_key(), user_key, room_identity)
 
     socket
     |> push_event("put-flash", %{key: :info, message: "Request approved!"})
@@ -320,9 +366,9 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def invite_user(
         %{assigns: %{room: %{name: room_name}, room_identity: identity, me: me}} = socket,
-        user_hash
+        user_key
       ) do
-    dialog = Dialogs.find_or_open(me, user_hash |> User.by_id())
+    dialog = Dialogs.find_or_open(me, user_key |> User.by_id())
 
     identity
     |> Map.put(:name, room_name)
@@ -340,6 +386,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def close(%{assigns: %{room: room}} = socket) do
     PubSub.unsubscribe(Chat.PubSub, room.pub_key |> room_topic())
+    PubSub.unsubscribe(Chat.PubSub, @usb_drive_dump_progress_topic)
 
     socket
     |> assign(:room, nil)
@@ -357,13 +404,57 @@ defmodule ChatWeb.MainLive.Page.Room do
         msg_id
       ) do
     msg_id
-    |> Rooms.read_message(room_identity, &User.id_map_builder/1)
+    |> Rooms.read_message(room_identity)
     |> maybe_redirect_to_file(socket)
+  end
+
+  def link_message(
+        %{assigns: %{room: room, room_identity: room_identity}} = socket,
+        {index, id},
+        render_fun
+      ) do
+    :ok = RoomMessageLinks.create(room, room_identity, {index, id})
+
+    socket
+    |> assign(:is_room_linked?, true)
+    |> push_event("chat:change", %{
+      to: "#room-message-#{id} .link-status",
+      content: render_to_html_string(%{linked: true, msg_id: id, msg_index: index}, render_fun)
+    })
+    |> forget_current_messages()
+  end
+
+  def unlink_messages_modal(socket, component) do
+    socket |> open_modal(component)
+  end
+
+  def unlink_messages(%{assigns: %{room_identity: room_identity}} = socket, render_fun) do
+    RoomMessageLinks.cancel_room_links(room_identity)
+    |> Enum.reduce(socket, fn {_, _, index, id}, socket ->
+      content = render_to_html_string(%{linked: false, msg_id: id, msg_index: index}, render_fun)
+
+      socket
+      |> push_event("chat:change", %{to: "#room-message-#{id} .link-status", content: content})
+    end)
+    |> assign(:is_room_linked?, false)
+    |> close_modal()
+  end
+
+  def share_message_link_modal(%{assigns: %{}} = socket, msg_id, component) do
+    message_url =
+      [ChatWeb.Endpoint.url(), "room", RoomMessageLinks.link_hash(msg_id)] |> Path.join()
+
+    socket
+    |> open_modal(component, %{
+      url: message_url,
+      encoded_qr_code: Utils.qr_base64_from_url(message_url)
+    })
   end
 
   defp maybe_redirect_to_file(%{type: type, content: json}, socket)
        when type in [:audio, :file, :image, :video] do
     {file_id, secret} = StorageId.from_json(json)
+    file_id = Base.encode16(file_id, case: :lower)
     params = %{a: Base.url_encode64(secret)}
 
     url =
@@ -413,7 +504,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   defp room_topic(pub_key) do
     pub_key
-    |> Utils.hash()
+    |> Base.encode16(case: :lower)
     |> then(&"room:#{&1}")
   end
 
@@ -431,7 +522,7 @@ defmodule ChatWeb.MainLive.Page.Room do
          } = socket,
          per_page
        ) do
-    messages = Rooms.read(room, identity, &User.id_map_builder/1, {index, 0}, per_page + 1)
+    messages = Rooms.read(room, identity, {index, 0}, per_page + 1)
     page_messages = Enum.take(messages, -per_page)
 
     socket
@@ -443,15 +534,41 @@ defmodule ChatWeb.MainLive.Page.Room do
   defp assign_requests(%{assigns: %{room: %{type: :request} = room}} = socket) do
     request_list =
       room.pub_key
-      |> Utils.hash()
       |> Rooms.list_pending_requests()
-      |> Enum.map(fn {hash, _} -> User.by_id(hash) end)
+      |> Enum.map(fn %RoomRequest{requester_key: pub_key} -> User.by_id(pub_key) end)
 
     socket
     |> assign(:room_requests, request_list)
   end
 
-  defp assign_requests(socket), do: socket
+  defp assign_requests(socket), do: socket |> assign(:room_requests, [])
+
+  defp load_messages_to(%{assigns: %{has_more_messages: false}} = socket, {_, msg_id}) do
+    socket
+    |> push_event("chat:scroll", %{to: "#message-block-#{msg_id}"})
+    |> push_event("chat:toggle", %{to: "#message-block-#{msg_id}", class: "bg-black/10"})
+  end
+
+  defp load_messages_to(
+         %{
+           assigns: %{
+             room: room,
+             room_identity: identity,
+             last_load_timestamp: index,
+             messages: messages
+           }
+         } = socket,
+         {msg_index, msg_id}
+       ) do
+    prev_messages = Rooms.read_to(room, identity, {index - 1, 0}, {msg_index, msg_id})
+    messages = prev_messages ++ messages
+
+    socket
+    |> assign(:messages, messages)
+    |> assign(:last_load_timestamp, set_messages_timestamp(messages))
+    |> push_event("chat:scroll", %{to: "#message-block-#{msg_id}"})
+    |> push_event("chat:toggle", %{to: "#message-block-#{msg_id}", class: "bg-black/10"})
+  end
 
   defp broadcast_message_updated(msg_id, pub_key, me, time) do
     {:updated_message, msg_id}
@@ -490,4 +607,67 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:messages, [])
     |> assign(:message_update_mode, :append)
   end
+
+  def maybe_enable_cargo(socket) do
+    %MediaSettings{} = media_settings = socket.assigns.media_settings
+    room = socket.assigns[:room]
+
+    if media_settings.functionality == :cargo and not is_nil(room) do
+      cargo_sync =
+        cond do
+          match?(%UsbDriveDumpRoom{status: :dumping}, socket.assigns[:usb_drive_dump_room]) ->
+            :disabled
+
+          match?(
+            %CargoRoom{pub_key: pub_key, status: status}
+            when pub_key == room.pub_key or status == :syncing,
+            socket.assigns[:cargo_room]
+          ) ->
+            :disabled
+
+          !has_unique_name(room) ->
+            :duplicate_name
+
+          true ->
+            :enabled
+        end
+
+      assign(socket, :cargo_sync, cargo_sync)
+    else
+      assign(socket, :cargo_sync, nil)
+    end
+  end
+
+  defp has_unique_name(%Room{} = room) do
+    Registry.all()
+    |> Enum.any?(fn {_room_pub_key, %Room{} = other_room} ->
+      other_room.name == room.name and other_room.pub_key != room.pub_key
+    end)
+    |> Kernel.not()
+  end
+
+  def maybe_enable_usb_drive_dump(%{assigns: %{room: room}} = socket) when not is_nil(room) do
+    PubSub.unsubscribe(Chat.PubSub, @usb_drive_dump_progress_topic)
+
+    usb_drive_dump =
+      cond do
+        match?(%CargoRoom{status: :syncing}, socket.assigns[:cargo_room]) ->
+          :disabled
+
+        match?(
+          %UsbDriveDumpRoom{pub_key: pub_key, status: status}
+          when pub_key == room.pub_key or status == :dumping,
+          socket.assigns[:usb_drive_dump_room]
+        ) ->
+          PubSub.subscribe(Chat.PubSub, @usb_drive_dump_progress_topic)
+          :disabled
+
+        true ->
+          :enabled
+      end
+
+    assign(socket, :usb_drive_dump, usb_drive_dump)
+  end
+
+  def maybe_enable_usb_drive_dump(socket), do: socket
 end

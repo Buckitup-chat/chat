@@ -24,7 +24,14 @@
             </p>
           </div>
           <div class="w-full mt-7">
-            <.form :let={f} for={:login} id="login-form" class="t-login-form" phx-submit="login">
+            <.form
+              :let={f}
+              for={%{}}
+              as={:login}
+              id="login-form"
+              class="t-login-form"
+              phx-submit="login"
+            >
               <%= text_input(f, :name,
                 placeholder: "Your name",
                 class:
@@ -67,12 +74,37 @@
       <.loading_screen />
     <% end %>
   <% else %>
+    <div id="modal" class="phx-modal fade-in" style="display: none;">
+      <div
+        id="modal-content"
+        class="phx-modal-content border-0 rounded-lg bg-white p-4 fade-in-scale flex flex-col t-modal"
+        phx-click-away="modal:close"
+        phx-window-keydown="modal:close"
+        phx-key="escape"
+        style="display: none;"
+      >
+        <a
+          href="#"
+          class="phx-modal-close w-full flex flex-row justify-end"
+          phx-click="modal:close"
+        >
+          <.icon id="close" class="w-4 h-4 flex fill-grayscale t-close-popup" />
+        </a>
+
+        <%= if @live_modal do %>
+          <%= live_component(
+            @live_modal.component,
+            @live_modal.params |> Map.merge(%{id: @live_modal.component})
+          ) %>
+        <% end %>
+      </div>
+    </div>
     <Layout.Popup.restrict_write_actions />
     <%= if @mode == :lobby do %>
       <.modal id="logout-backup-popup" hide_event="logout-close" class="">
         <%= if @logout_step == :initial do %>
           <h1 class="text-base font-bold text-grayscale">Log Out & Back Up</h1>
-          <.room_count_to_backup_message count={@room_count_to_backup} />
+          <Layout.Room.count_to_backup_message count={@room_count_to_backup} />
           <p class="mt-3 text-sm text-black/50">
             To get access again you will need the recovery keys:
           </p>
@@ -290,7 +322,9 @@
               id="sidebarRooms"
               class={
                 classes("w-6 h-6 hover:fill-purple", %{
-                  "fill-purple" => @lobby_mode == :rooms,
+                  "fill-purple" =>
+                    @lobby_mode == :rooms &&
+                      assigns[:cargo_room][:pub_key] != assigns[:room][:pub_key],
                   "fill-grayscale" => @lobby_mode != :rooms
                 })
               }
@@ -327,8 +361,44 @@
               <span class="text-xs">Admin</span>
             </button>
           <% end %>
+          <%= if assigns[:cargo_room][:status] == :complete do %>
+            <button
+              phx-click="room/switch"
+              phx-value-room={Room.hash(@cargo_room.pub_key)}
+              class="sidebarIcon"
+            >
+              <.icon
+                id="cargo"
+                class={
+                  classes("w-8 h-8 hover:fill-purple", %{
+                    "fill-purple" => @cargo_room.pub_key == assigns[:room][:pub_key],
+                    "fill-grayscale" => @cargo_room.pub_key != assigns[:room][:pub_key]
+                  })
+                }
+              />
+              <span class="text-xs">Cargo Room</span>
+            </button>
+          <% end %>
+          <%= if assigns[:usb_drive_dump_room][:status] == :complete do %>
+            <button
+              phx-click="room/switch"
+              phx-value-room={Room.hash(@usb_drive_dump_room.pub_key)}
+              class="sidebarIcon"
+            >
+              <.icon
+                id="usbDrive"
+                class={
+                  classes("w-8 h-8 hover:fill-purple", %{
+                    "fill-purple" => @usb_drive_dump_room.pub_key == assigns[:room][:pub_key],
+                    "fill-grayscale" => @usb_drive_dump_room.pub_key != assigns[:room][:pub_key]
+                  })
+                }
+              />
+              <span class="text-xs">Dump room</span>
+            </button>
+          <% end %>
         </div>
-        <div class="navbar">
+        <div id="navbarLeft" class="navbar">
           <div class="sm:flex flex-col items-center">
             <div
               phx-click={JS.push("switch-lobby-mode")}
@@ -346,7 +416,9 @@
                 id="sidebarRooms"
                 class={
                   classes("w-6 h-6 hover:fill-purple", %{
-                    "fill-purple" => @lobby_mode == :rooms,
+                    "fill-purple" =>
+                      @lobby_mode == :rooms &&
+                        assigns[:cargo_room][:pub_key] != assigns[:room][:pub_key],
                     "fill-grayscale" => @lobby_mode != :rooms
                   })
                 }
@@ -387,6 +459,42 @@
                 <span class="text-xs">Admin</span>
               </button>
             <% end %>
+            <%= if assigns[:cargo_room][:status] == :complete do %>
+              <button
+                phx-click="room/switch"
+                phx-value-room={Room.hash(@cargo_room.pub_key)}
+                class="sidebarIcon mt-5 t-cargo-room"
+              >
+                <.icon
+                  id="cargo"
+                  class={
+                    classes("w-8 h-8 hover:fill-purple", %{
+                      "fill-purple" => @cargo_room.pub_key == assigns[:room][:pub_key],
+                      "fill-grayscale" => @cargo_room.pub_key != assigns[:room][:pub_key]
+                    })
+                  }
+                />
+                <span class="text-xs">Cargo Room</span>
+              </button>
+            <% end %>
+            <%= if assigns[:usb_drive_dump_room][:status] == :complete do %>
+              <button
+                phx-click="room/switch"
+                phx-value-room={Room.hash(@usb_drive_dump_room.pub_key)}
+                class="sidebarIcon mt-5 t-dump-room"
+              >
+                <.icon
+                  id="usbDrive"
+                  class={
+                    classes("w-8 h-8 hover:fill-purple", %{
+                      "fill-purple" => @usb_drive_dump_room.pub_key == assigns[:room][:pub_key],
+                      "fill-grayscale" => @usb_drive_dump_room.pub_key != assigns[:room][:pub_key]
+                    })
+                  }
+                />
+                <span class="text-xs">Dump room</span>
+              </button>
+            <% end %>
           </div>
           <div class="flex flex-col items-center">
             <div class="row mt-10">
@@ -402,62 +510,70 @@
           </div>
         </div>
         <%= if @lobby_mode == :chats do %>
-          <div id="chatRoomBar" class="chatRoomBar">
+          <div id="chatRoomBar" class="chatRoomBar sm:flex">
             <div class="px-7 mt-3 flex items-center justify-between">
               <h5 class="text-grayscale" style="font-size: 22px;">Chats</h5>
             </div>
-            <div class="mt-10 w-full">
-              <ul>
-                <%= for user <- @users do %>
-                  <li
-                    phx-click="dialog/switch"
-                    phx-value-user-id={user.hash}
-                    class={
-                      classes(
-                        "hidden sm:flex w-full cursor-pointer h-9 flex items-center hover:bg-stone250",
-                        %{"from-green-400 to-blue-500" => user == @peer}
-                      )
-                    }
-                  >
-                    <a>
-                      <div class="flex flex-row px-7">
-                        <Layout.Card.hashed_name card={user} me={@me} />
-                      </div>
-                    </a>
-                  </li>
-                  <li
-                    phx-click={JS.push("dialog/switch") |> open_content()}
-                    phx-value-user-id={user.hash}
-                    class={
-                      classes(
-                        "sm:hidden w-full cursor-pointer h-9 flex items-center hover:bg-stone250",
-                        %{"bg-stone250" => user == @peer}
-                      )
-                    }
-                  >
-                    <a>
-                      <div class="flex flex-row px-7">
-                        <Layout.Card.hashed_name card={user} me={@me} />
-                      </div>
-                    </a>
-                  </li>
-                <% end %>
-              </ul>
-            </div>
+            <Layout.SearchBox.render type={:dialog} />
+            <div class="sidebar-container h-[600px] md:h-[870px]">
+              <div class="mt-3 w-full overflow-scroll">
+                <ul class={
+                  classes(
+                    "",
+                    %{"overflow-scroll" => @uploads_metadata !== %{}}
+                  )
+                }>
+                  <%= for user <- @users do %>
+                    <li
+                      phx-click="dialog/switch"
+                      phx-value-user-id={user.hash}
+                      class={
+                        classes(
+                          "hidden sm:flex w-full cursor-pointer h-9 flex items-center hover:bg-stone250",
+                          %{"from-green-400 to-blue-500" => user == @peer}
+                        )
+                      }
+                    >
+                      <a>
+                        <div class="flex flex-row px-7">
+                          <Layout.Card.hashed_name card={user} me={@me} />
+                        </div>
+                      </a>
+                    </li>
+                    <li
+                      phx-click={JS.push("dialog/switch") |> open_content()}
+                      phx-value-user-id={user.hash}
+                      class={
+                        classes(
+                          "sm:hidden w-full cursor-pointer h-9 flex items-center hover:bg-stone250",
+                          %{"bg-stone250" => user == @peer}
+                        )
+                      }
+                    >
+                      <a>
+                        <div class="flex flex-row px-7">
+                          <Layout.Card.hashed_name card={user} me={@me} />
+                        </div>
+                      </a>
+                    </li>
+                  <% end %>
+                </ul>
+              </div>
 
-            <Layout.Uploader.uploader
-              config={@uploads.file}
-              pub_key={assigns[:peer][:pub_key]}
-              type={:dialog}
-              uploads={@uploads_metadata}
-            />
+              <Layout.Uploader.uploader
+                config={@uploads.file}
+                pub_key={assigns[:peer][:pub_key]}
+                type={:dialog}
+                uploads={@uploads_metadata}
+                uploads_order={@file_uploads_order}
+              />
+            </div>
           </div>
           <div
             id="contentContainer"
             class="from-green-400 to-blue-500 hidden sm:flex flex flex-col contentContainer"
           >
-            <%= unless @dialog do %>
-            <% else %>
+            <%= if @dialog do %>
               <.live_component
                 module={Layout.ImageGallery}
                 id="imageGallery"
@@ -524,6 +640,7 @@
                     pub_key={@peer.pub_key}
                     type="dialog"
                     uploads={@uploads_metadata}
+                    uploads_order={@file_uploads_order}
                   />
                 </div>
               </div>
@@ -539,106 +656,16 @@
           </div>
         <% end %>
         <%= if @lobby_mode == :rooms do %>
-          <div id="chatRoomBar" class="chatRoomBar">
+          <div id="chatRoomBar" class="chatRoomBar sm:flex">
             <.modal id="create-room-popup" class="">
               <h1 class="text-base font-bold text-grayscale">Create Room</h1>
-              <.form
-                :let={f}
-                for={:new_room}
-                id="room-create-form"
-                autocomplete="off"
-                phx-submit={hide_modal("create-room-popup") |> JS.push("room/create")}
-              >
-                <%= text_input(f, :name,
-                  placeholder: "Name your Room",
-                  class:
-                    "w-full h-11 mt-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-0"
-                ) %>
-
-                <p class="mt-3 text-black/50 text-sm">Room Type</p>
-                <div class="mt-3 flex flex-col">
-                  <a class="inline t-open-room">
-                    <input
-                      class="cursor-pointer text-orange-500"
-                      type="radio"
-                      id="typeChoice1"
-                      name="new_room[type]"
-                      value="public"
-                      checked
-                      phx-click={
-                        JS.dispatch("room:switch-type",
-                          to: "#typeChoice1",
-                          detail: %{
-                            description: "Public room is visible for everyone. Anyone can join.",
-                            id: "roomTypeDescription"
-                          }
-                        )
-                      }
-                    />
-                    <label class="cursor-pointer ml-1 text-black/50 text-sm" for="typeChoice1">
-                      Open
-                    </label>
-                  </a>
-                  <a class="inline">
-                    <input
-                      class="cursor-pointer text-orange-500 t-private-room"
-                      type="radio"
-                      id="typeChoice2"
-                      name="new_room[type]"
-                      value="request"
-                      phx-click={
-                        JS.dispatch("room:switch-type",
-                          to: "#typeChoice2",
-                          detail: %{
-                            description:
-                              "Private Room is visible for everyone. Anyone can send request and join if approved by a room member",
-                            id: "roomTypeDescription"
-                          }
-                        )
-                      }
-                    />
-                    <label class="cursor-pointer ml-1 text-black/50 text-sm" for="typeChoice2">
-                      Private
-                    </label>
-                  </a>
-                  <a class="inline">
-                    <input
-                      class="cursor-pointer text-orange-500 t-secret-room"
-                      type="radio"
-                      id="typeChoice3"
-                      name="new_room[type]"
-                      value="private"
-                      phx-click={
-                        JS.dispatch("room:switch-type",
-                          to: "#typeChoice3",
-                          detail: %{
-                            description:
-                              "Secret Room is not visible, only invited users can join",
-                            id: "roomTypeDescription"
-                          }
-                        )
-                      }
-                    />
-                    <label class="cursor-pointer ml-1 text-black/50 text-sm" for="typeChoice3">
-                      Secret
-                    </label>
-                  </a>
-                </div>
-                <div class="mt-5 py-1 w-full min-h-fit flex items-center justify-start border-0 rounded-lg bg-black/10">
-                  <.icon id="alert" class="basis-1/12 mr-2 w-4 h-4 fill-black/40" />
-                  <blockquote
-                    id="roomTypeDescription"
-                    class="basis-11/12 text-xs text-black/50 mr-3"
-                  >
-                    Public room is visible for everyone. Anyone can join.
-                  </blockquote>
-                </div>
-                <%= submit("Create",
-                  phx_disable_with: "Saving...",
-                  class:
-                    "w-full h-11 mt-2 text-white border-0 rounded-lg bg-grayscale flex items-center justify-center t-submit-create"
-                ) %>
-              </.form>
+              <.live_component
+                cargo_room={assigns[:cargo_room]}
+                id={:room_form}
+                media_settings={@media_settings}
+                module={RoomForm}
+                usb_drive_dump_room={assigns[:usb_drive_dump_room]}
+              />
             </.modal>
             <div class="px-7 mt-3 flex items-center justify-between">
               <h5 class="channel-block-text text-grayscale" style="font-size: 22px;">Rooms</h5>
@@ -655,77 +682,94 @@
                 <.icon id="add" class="w-3 h-3 flex fill-white" />
               </button>
             </div>
-            <div class="w-full mt-6 flex flex-col items-start">
-              <div
-                phx-click={
-                  JS.toggle(to: "#confirmed-rooms", in: "fade-in-scale", out: "fade-out-scale")
-                }
-                class="px-7 mt-3 flex items-center"
-              >
-                <.icon id="arrowDown" class="w-4 h-4 flex fill-black" />
-                <span class="ml-1 text-sm  font-bold cursor-pointer">Confirmed</span>
-              </div>
-              <div class="mt-3 w-full ml-6 md:ml-10 t-confirmed-rooms" id="confirmed-rooms">
-                <ul class="t-confirmed-rooms-list">
-                  <%= if @joined_rooms == [] do %>
-                    <p class="text-base text-grayscale600 px-7">You have no rooms</p>
-                  <% else %>
-                    <%= for room <- @joined_rooms do %>
-                      <Layout.RoomItem.render
-                        room={room}
-                        confirmed?={true}
-                        selected_room={@room}
-                        click_event="room/switch"
-                      />
+            <Layout.SearchBox.render type={:room} />
+            <div class="sidebar-container h-[600px] md:h-[870px]">
+              <div class={
+                classes(
+                  "w-full mt-6 flex flex-col items-start",
+                  %{"overflow-scroll" => @uploads_metadata !== %{}}
+                )
+              }>
+                <div
+                  phx-click={
+                    JS.toggle(to: "#confirmed-rooms", in: "fade-in-scale", out: "fade-out-scale")
+                  }
+                  class="px-7 mt-1 flex items-center"
+                >
+                  <.icon id="arrowDown" class="w-4 h-4 flex fill-black" />
+                  <span class="ml-1 text-sm  font-bold cursor-pointer">Confirmed</span>
+                </div>
+                <div class="mt-3 w-full md:ml-5 t-confirmed-rooms" id="confirmed-rooms">
+                  <ul class="t-confirmed-rooms-list">
+                    <%= if @joined_rooms == [] do %>
+                      <p class="text-base text-grayscale600 px-7">You have no rooms</p>
+                    <% else %>
+                      <%= for room <- @joined_rooms do %>
+                        <Layout.RoomItem.render
+                          room={room}
+                          confirmed?={true}
+                          selected_room={@room}
+                          click_event="room/switch"
+                        />
+                      <% end %>
                     <% end %>
-                  <% end %>
-                </ul>
-              </div>
-              <div
-                phx-click={
-                  JS.toggle(to: "#unconfirmed-rooms", in: "fade-in-scale", out: "fade-out-scale")
-                }
-                class="px-7 mt-3 flex items-center"
-              >
-                <.icon id="arrowDown" class="w-4 h-4 flex fill-black" />
-                <span class="ml-1 text-sm  font-bold cursor-pointer">Not Confirmed</span>
-              </div>
-              <div id="unconfirmed-rooms" class="mt-3 w-full t-unconfirmed-rooms">
-                <ul>
-                  <%= if @new_rooms == [] do %>
-                    <p class="text-base text-grayscale600 px-7">You have no rooms</p>
-                  <% else %>
-                    <%= for room <- @new_rooms do %>
-                      <Layout.RoomItem.render room={room} click_event="room/send-request" />
+                  </ul>
+                </div>
+                <div
+                  phx-click={
+                    JS.toggle(
+                      to: "#unconfirmed-rooms",
+                      in: "fade-in-scale",
+                      out: "fade-out-scale"
+                    )
+                  }
+                  class="px-7 mt-3 flex items-center"
+                >
+                  <.icon id="arrowDown" class="w-4 h-4 flex fill-black" />
+                  <span class="ml-1 text-sm  font-bold cursor-pointer">Not Confirmed</span>
+                </div>
+                <div id="unconfirmed-rooms" class="mt-3 w-full t-unconfirmed-rooms">
+                  <ul>
+                    <%= if @new_rooms == [] do %>
+                      <p class="text-base text-grayscale600 px-7">You have no rooms</p>
+                    <% else %>
+                      <%= for room <- @new_rooms do %>
+                        <Layout.RoomItem.render room={room} click_event="room/send-request" />
+                      <% end %>
                     <% end %>
-                  <% end %>
-                </ul>
+                  </ul>
+                </div>
               </div>
-            </div>
 
-            <Layout.Uploader.uploader
-              config={@uploads.file}
-              pub_key={assigns[:room][:pub_key]}
-              type={:room}
-              uploads={@uploads_metadata}
-            />
+              <Layout.Uploader.uploader
+                config={@uploads.file}
+                pub_key={assigns[:room][:pub_key]}
+                type={:room}
+                uploads={@uploads_metadata}
+                uploads_order={@file_uploads_order}
+              />
+            </div>
           </div>
           <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
             <%= unless @room do %>
-              <div class="my-auto mx-auto flex flex-col items-center justify-center w-80 h-32 border-9 rounded-lg bg-white/20">
-                <span class="my-2 text-sm text-white">Select any Room or create your own</span>
-                <button
-                  phx-click={
-                    if @db_status.writable == :yes,
-                      do: show_modal("create-room-popup"),
-                      else: show_modal("restrict-write-actions")
-                  }
-                  class="my-2 flex flex-row items-center justify-center border rounded-lg border-white w-72 h-11 t-create-room"
-                >
-                  <span class="text-sm text-white">Create Room</span>
-                  <.icon id="add" class="w-4 h-4 flex fill-white" />
-                </button>
-              </div>
+              <%= if @live_action == :room_message_link do %>
+                <Layout.Room.not_found_screen />
+              <% else %>
+                <div class="my-auto mx-auto flex flex-col items-center justify-center w-80 h-32 border-9 rounded-lg bg-white/20">
+                  <span class="my-2 text-sm text-white">Select any Room or create your own</span>
+                  <button
+                    phx-click={
+                      if @db_status.writable == :yes,
+                        do: show_modal("create-room-popup"),
+                        else: show_modal("restrict-write-actions")
+                    }
+                    class="my-2 flex flex-row items-center justify-center border rounded-lg border-white w-72 h-11 t-create-room"
+                  >
+                    <span class="text-sm text-white">Create Room</span>
+                    <.icon id="add" class="w-4 h-4 flex fill-white" />
+                  </button>
+                </div>
+              <% end %>
             <% else %>
               <.live_component
                 module={Layout.ImageGallery}
@@ -735,52 +779,29 @@
               />
               <div
                 id="chatContent"
-                class="basis-[93%] pb-1 md:pb-0 overflow-y-scroll flex flex-col justify-between relative a-content-block t-chat-content"
-                id={"room-#{@room.admin_hash}"}
+                class="basis-[93%] pb-1 md:pb-0 overflow-y-scroll flex flex-col relative a-content-block t-chat-content"
+                id={"room-#{@room.hash}"}
                 phx-hook="Chat"
                 data-page={@page}
                 data-has-more-messages={"#{@has_more_messages}"}
               >
-                <div
-                  phx-click={JS.dispatch("phx:scroll-to-bottom")}
-                  class={
-                    classes(
-                      "w-full px-8 border-b border-white/10 backdrop-blur-md bg-black/20 z-10 flex flex-row items-center justify-between sticky top-0 right-0"
-                    )
-                  }
-                  style="min-height: 56px;"
-                >
-                  <div class="flex flex-row items-center">
-                    <button
-                      phx-click={JS.push("room/close") |> close_content()}
-                      class="sm:hidden pr-3"
-                    >
-                      <.icon id="arrowBack" class="w-6 h-6 fill-white" />
-                    </button>
-                    <%= if @room.type == :public do %>
-                      <.icon id="open" class="w-4 h-4 fill-white" />
-                    <% end %>
-                    <%= if @room.type == :private do %>
-                      <.icon id="secret" class="w-4 h-4 fill-white" />
-                    <% end %>
-                    <%= if @room.type == :request do %>
-                      <.icon id="private" class="w-5 h-5 stroke-white" />
-                    <% end %>
-                    <Layout.Card.hashed_name room={@room} style_spec={:chat_header} />
-                  </div>
-                  <div class="flex flex-row justify-between">
-                    <%= if @room.type == :request do %>
-                      <.room_request_button
-                        requests={@room_requests}
-                        restricted={@db_status.writable == :no}
-                      />
-                    <% end %>
-                    <.room_invite_button
-                      users={Chat.User.list()}
-                      restricted={@db_status.writable == :no}
-                    />
-                  </div>
-                </div>
+                <Layout.Room.header
+                  room={@room}
+                  requests={@room_requests}
+                  restrict_actions={@db_status.writable == :no}
+                  linked?={@is_room_linked?}
+                  cargo_sync={assigns[:cargo_sync]}
+                  usb_drive_dump={assigns[:usb_drive_dump]}
+                />
+                <Layout.CargoRoom.bar
+                  cargo_room={assigns[:cargo_room]}
+                  media_settings={@media_settings}
+                  room={@room}
+                />
+                <Layout.UsbDriveDumpRoom.bar
+                  dump_room={assigns[:usb_drive_dump_room]}
+                  room={@room}
+                />
 
                 <%= if @room.type == :request do %>
                   <.modal id="room-request-list" class="z-30">
@@ -816,7 +837,7 @@
                   </h1>
                   <div id="#user-list" class="mt-3 w-full flex flex-col" phx-update="ignore">
                     <%= for user <- Chat.User.list() do %>
-                      <%= unless user.hash == @my_id do %>
+                      <%= unless user == Chat.Card.from_identity(@me) do %>
                         <div
                           id={"user-#{user.hash}"}
                           class="flex flex-row items-center justify-between t-invite"
@@ -851,6 +872,9 @@
                         my_id={@my_id}
                         room={@room}
                         timezone={@timezone}
+                        linked={
+                          Chat.Rooms.RoomMessageLinks.is_message_linked?({msg.index, msg.id})
+                        }
                       />
                     <% end %>
                   </div>
@@ -867,6 +891,7 @@
                     pub_key={@room.pub_key}
                     type="room"
                     uploads={@uploads_metadata}
+                    uploads_order={@file_uploads_order}
                   />
                 </div>
               </div>
@@ -888,9 +913,7 @@
                 <a
                   class="sm:hidden mr-2"
                   phx-value-lobby-mode="chats"
-                  phx-click={
-                    JS.push("switch-lobby-mode") |> JS.push("close-feeds") |> close_content()
-                  }
+                  phx-click={JS.push("switch-lobby-mode") |> close_content()}
                 >
                   <.icon id="arrowBack" class="w-6 h-6 fill-white" />
                 </a>
@@ -902,14 +925,10 @@
               <div
                 class="mt-16 mb-8 px-4 sm:px-8 w-full t-feed-list"
                 id="action-feed-list"
-                phx-update={@feed_update_mode}
+                phx-update="stream"
               >
-                <%= if @action_feed_list do %>
-                  <%= for item <- @action_feed_list do %>
-                    <div class="py-1 flex justify-start" id={"item-#{UUID.uuid4()}"}>
-                      <Page.Feed.item item={item} tz={@timezone} />
-                    </div>
-                  <% end %>
+                <%= if @streams.action_feed_list do %>
+                  <Page.Feed.render action_feed_list={@streams.action_feed_list} tz={@timezone} />
                 <% end %>
               </div>
               <%= if @action_feed_till > 1 do %>
@@ -947,7 +966,12 @@
             <Layout.Admin.row>
               <Layout.Admin.block title="WiFi settings">
                 <%= if @wifi_loaded do %>
-                  <.form for={:admin_wifi} id="admin-wifi-form" phx-submit="admin/wifi-submit">
+                  <.form
+                    for={%{}}
+                    as={:admin_wifi}
+                    id="admin-wifi-form"
+                    phx-submit="admin/wifi-submit"
+                  >
                     <section class="p-2 pb-0 text-right">
                       SSID:
                       <input
@@ -986,6 +1010,13 @@
                 <section class="p-2 text-grayscale600">
                   <a href="#" phx-click="admin/device-log">Device Log</a>
                 </section>
+              </Layout.Admin.block>
+              <Layout.Admin.block title="Media settings">
+                <.live_component
+                  id={:media_settings_form}
+                  media_settings={@media_settings}
+                  module={MediaSettingsForm}
+                />
               </Layout.Admin.block>
             </Layout.Admin.row>
             <Layout.Admin.row>
@@ -1065,6 +1096,17 @@
                 </section>
               </Layout.Admin.block>
             </Layout.Admin.row>
+            <%= if @media_settings.functionality == :cargo do %>
+              <Layout.Admin.row>
+                <Layout.Admin.block title="Cargo checkpoints preset">
+                  <.live_component
+                    id={:cargo_settings_form}
+                    cargo_settings={@cargo_settings}
+                    module={CargoSettingsForm}
+                  />
+                </Layout.Admin.block>
+              </Layout.Admin.row>
+            <% end %>
           </Layout.Admin.container>
         <% end %>
       </div>
@@ -1220,7 +1262,8 @@
           <%= if @step == :initial do %>
             <div class="row">
               <.form
-                for={:my_keys_file}
+                for={%{}}
+                as={:my_keys_file}
                 id="my-keys-file-form"
                 class="column "
                 phx-change="login:my-keys-file-submit"
@@ -1248,7 +1291,7 @@
           <% end %>
           <%= if @step == :decrypt do %>
             <div class="w-full h-14 mt-7 bg-transparent text-white py-2 px-2.5 border border-white/50 rounded-lg flex flex-row items-center justify-between">
-              <div class="w-44 flex flex-row items-stretch justify-start">
+              <div class="flex flex-row items-stretch justify-start">
                 <div
                   class="border-white/0 bg-white/50 w-7 h-7 flex items-center justify-center"
                   style="border-radius: 50%;"
@@ -1256,7 +1299,12 @@
                   <.icon id="check" class="w-4 h-4 stroke-white fill-white/0" />
                 </div>
                 <div class="ml-2" style="line-height: 12px;">
-                  <p style="font-size: 14px;"><%= @filename %></p>
+                  <p
+                    class="w-[200px] h-[14px] text-ellipsis overflow-hidden"
+                    style="font-size: 14px;"
+                  >
+                    <%= @filename %>
+                  </p>
                   <p class="text-xs text-white/50">uploaded</p>
                 </div>
               </div>
@@ -1270,7 +1318,8 @@
             </div>
             <.form
               :let={f}
-              for={:import_own_keyring_password}
+              for={%{}}
+              as={:import_own_keyring_password}
               id="logout-import-own-keyring-password-form"
               phx-submit="login:import-own-keyring-decrypt"
               class="mt-2.5"

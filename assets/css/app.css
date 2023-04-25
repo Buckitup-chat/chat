@@ -432,13 +432,17 @@ html {
   bottom: 0;
 }
 
+.sidebar-container {
+  display: grid;
+}
+
 @media screen and (min-width: 640px) {
   .navbar { @apply h-screen w-[70px] flex flex-none flex-col justify-between bg-white }
 
   .navbarTop { @apply hidden }
   .navbarBottom { @apply hidden }
 
-  .chatRoomBar { @apply h-screen w-[320px] flex-none min-w-fit bg-white/90 overflow-y-scroll  }
+  .chatRoomBar { @apply h-screen w-[320px] min-w-fit flex flex-none flex-col bg-white/90 overflow-y-scroll  }
 }
 
 @media screen and (max-width: 640px) {
@@ -543,7 +547,7 @@ html {
 .invalid-feedback {
   color: #a94442;
   display: block;
-  margin: -1rem 0 2rem;
+  /* margin: -1rem 0 2rem; */
 }
 
 /* LiveView specific classes for your customization */

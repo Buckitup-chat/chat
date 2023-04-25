@@ -4,7 +4,7 @@ defmodule Chat.AdminDb do
   """
   use GenServer
 
-  @db_location Application.compile_env(:chat, :admin_cub_db_file, "priv/admin_db")
+  @db_location Application.compile_env(:chat, :admin_cub_db_file, "priv/admin_db_v2")
 
   @doc false
   def start_link(opts) do
@@ -31,6 +31,11 @@ defmodule Chat.AdminDb do
   def get(key) do
     db()
     |> CubDB.get(key)
+  end
+
+  def list({min, max}) do
+    db()
+    |> CubDB.select(min_key: min, max_key: max)
   end
 
   def values(min, max) do

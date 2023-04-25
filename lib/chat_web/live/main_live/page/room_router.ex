@@ -4,6 +4,7 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
   import Phoenix.LiveView, only: [push_event: 3]
 
   alias ChatWeb.MainLive.Layout.Message
+  alias ChatWeb.MainLive.Modals
   alias ChatWeb.MainLive.Page
 
   #
@@ -15,17 +16,14 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
       {"message/" <> action, %{"id" => id, "index" => index}} ->
         socket |> route_message_event({action, {index |> String.to_integer(), id}})
 
-      {"create", %{"new_room" => %{"name" => name, "type" => type}}} ->
-        socket |> Page.Lobby.new_room(name, type |> String.to_existing_atom())
-
       {"invite-user", %{"hash" => hash}} ->
-        socket |> Page.Room.invite_user(hash)
+        socket |> Page.Room.invite_user(hash |> Base.decode16!(case: :lower))
 
       {"send-request", %{"room" => hash}} ->
-        socket |> Page.Lobby.request_room(hash)
+        socket |> Page.Lobby.request_room(hash |> Base.decode16!(case: :lower))
 
       {"approve-request", %{"hash" => hash}} ->
-        socket |> Page.Room.approve_request(hash)
+        socket |> Page.Room.approve_request(hash |> Base.decode16!(case: :lower))
 
       {"cancel-edit", _} ->
         socket |> Page.Room.cancel_edit()
@@ -38,6 +36,12 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
 
       {"download-messages", params} ->
         socket |> Page.Room.download_messages(params)
+
+      {"unlink-messages-modal", _} ->
+        socket |> Page.Room.unlink_messages_modal(Modals.UnlinkMessages)
+
+      {"unlink-messages", _} ->
+        socket |> Page.Room.unlink_messages(&Message.message_link/1)
 
       {"toggle-messages-select", params} ->
         socket |> Page.Room.toggle_messages_select(params)
@@ -55,7 +59,7 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
         socket |> Page.Room.send_text(text)
 
       {"switch", %{"room" => hash}} ->
-        socket |> Page.Room.close() |> Page.Room.init(hash)
+        socket |> Page.Room.close() |> Page.Room.init(hash |> Base.decode16!(case: :lower))
 
       {"sync-stored", data} ->
         socket |> Page.Login.sync_stored_room(data)
@@ -70,8 +74,26 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
       "download" ->
         socket |> Page.Room.download_message(msg_id)
 
+      "link" ->
+        socket
+        |> Page.Room.link_message(msg_id, &Message.message_link/1)
+        |> Page.Room.share_message_link_modal(msg_id, Modals.ShareMessageLink)
+
+      "share-link-modal" ->
+        socket |> Page.Room.share_message_link_modal(msg_id, Modals.ShareMessageLink)
+
       "open-image-gallery" ->
         socket |> Page.Room.open_image_gallery(msg_id)
+    end
+  end
+
+  def route_live_action(socket) do
+    case socket.assigns do
+      %{live_action: :room_message_link, room_message_link_hash: hash} ->
+        socket |> Page.Room.init_with_linked_message(hash)
+
+      _ ->
+        socket
     end
   end
 

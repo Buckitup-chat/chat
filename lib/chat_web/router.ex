@@ -12,13 +12,18 @@ defmodule ChatWeb.Router do
   end
 
   pipeline :api do
+    plug Plug.Parsers,
+      parsers: [:urlencoded, :multipart, :json],
+      pass: ["*/*"],
+      json_decoder: Phoenix.json_library()
+
     plug :accepts, ["json"]
   end
 
   scope "/", ChatWeb do
     pipe_through :browser
 
-    # get "/log", DeviceLogController, :log
+    get "/log", DeviceLogController, :log
     get "/reset", DeviceLogController, :reset
     get "/data_keys", DeviceLogController, :dump_data_keys
     get "/index", PageController, :index
@@ -31,10 +36,18 @@ defmodule ChatWeb.Router do
 
     live "/", MainLive.Index, :index
     live "/export-key-ring/:id", MainLive.Index, :export
+    live "/room/:hash", MainLive.Index, :room_message_link
   end
 
   scope "/", ChatWeb do
     put "/upload_chunk/:key", UploadChunkController, :put
+  end
+
+  scope "/" do
+    pipe_through :api
+
+    forward "/naive_api", Absinthe.Plug, schema: NaiveApi.Schema
+    forward "/naive_api_console", Absinthe.Plug.GraphiQL, schema: NaiveApi.Schema
   end
 
   # Other scopes may use custom stacks.

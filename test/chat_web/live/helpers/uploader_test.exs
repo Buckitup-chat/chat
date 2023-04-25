@@ -1,20 +1,21 @@
 defmodule ChatWeb.Helpers.UploaderTest do
-  use ChatWeb.ConnCase, async: true
+  use ChatWeb.ConnCase, async: false
 
   import ChatWeb.LiveTestHelpers
   import Phoenix.LiveViewTest
   import Support.{FakeData, RetryHelper}
 
   alias Chat.ChunkedFiles
+  alias Chat.Content.Files
+  alias Chat.Db.ChangeTracker
   alias Chat.Dialogs
   alias Chat.Dialogs.{Dialog, PrivateMessage}
-  alias Chat.Files
   alias Chat.Rooms
   alias Chat.Rooms.PlainMessage
   alias Chat.Upload.{Upload, UploadIndex, UploadMetadata, UploadStatus}
-  alias Chat.User
   alias Chat.Utils.StorageId
   alias ChatWeb.LiveHelpers.Uploader
+  alias ChatWeb.MainLive.Index
   alias Phoenix.LiveView.{Socket, UploadConfig, UploadEntry, Utils}
 
   describe "allow_file_upload/3" do
@@ -72,6 +73,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       socket = Uploader.cancel_upload(socket, %{"ref" => entry.ref, "uuid" => entry.uuid})
 
+      assert Enum.empty?(socket.assigns.file_uploads_order)
       assert Enum.empty?(socket.assigns.uploads_metadata)
       assert Enum.empty?(socket.assigns.uploads.file.entries)
       assert catch_exit(UploadStatus.get(key))
@@ -147,11 +149,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       socket = Uploader.move_upload(socket, %{"index" => 0, "uuid" => entry_2.uuid})
 
-      uuids =
-        socket.assigns.uploads.file.entries
-        |> Enum.map(& &1.uuid)
-
-      assert uuids == [
+      assert socket.assigns.file_uploads_order == [
                entry_2.uuid,
                entry_1.uuid,
                entry_3.uuid
@@ -165,11 +163,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       socket = Uploader.move_upload(socket, %{"index" => 2, "uuid" => entry_2.uuid})
 
-      uuids =
-        socket.assigns.uploads.file.entries
-        |> Enum.map(& &1.uuid)
-
-      assert uuids == [
+      assert socket.assigns.file_uploads_order == [
                entry_1.uuid,
                entry_3.uuid,
                entry_2.uuid
@@ -183,11 +177,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       socket = Uploader.move_upload(socket, %{"index" => 1, "uuid" => entry_2.uuid})
 
-      uuids =
-        socket.assigns.uploads.file.entries
-        |> Enum.map(& &1.uuid)
-
-      assert uuids == [
+      assert socket.assigns.file_uploads_order == [
                entry_1.uuid,
                entry_2.uuid,
                entry_3.uuid
@@ -269,18 +259,23 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       assert %{
                chunk_count: 0,
+               chunk_size: 10_240,
                entrypoint: entrypoint,
                status: :active,
                uploader: "UpChunkUploader",
                uuid: ^uuid
              } = uploader_data
 
-      upload_key =
+      text_key =
         entrypoint
         |> String.split("/")
         |> List.last()
 
-      assert entrypoint =~ ~p"/upload_chunk/#{upload_key}"
+      upload_key =
+        text_key
+        |> Base.decode16!(case: :lower)
+
+      assert entrypoint =~ ~p"/upload_chunk/#{text_key}"
 
       refute Map.has_key?(old_uploads_index, upload_key)
 
@@ -292,7 +287,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
       assert {^upload_key, _secret} = metadata.credentials
       assert %{dialog: %Dialog{}, pub_key: pub_key, type: :dialog} = metadata.destination
       assert metadata.status == :active
-      assert pub_key == socket.assigns.peer.pub_key
+      assert Base.decode16!(pub_key, case: :lower) == socket.assigns.peer.pub_key
     end
 
     test "returns data for a new room file upload", %{view: view} do
@@ -308,18 +303,21 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       assert %{
                chunk_count: 0,
+               chunk_size: 10_240,
                entrypoint: entrypoint,
                status: :active,
                uploader: "UpChunkUploader",
                uuid: ^uuid
              } = uploader_data
 
-      upload_key =
+      text_key =
         entrypoint
         |> String.split("/")
         |> List.last()
 
-      assert entrypoint =~ ~p"/upload_chunk/#{upload_key}"
+      upload_key = text_key |> Base.decode16!(case: :lower)
+
+      assert entrypoint =~ ~p"/upload_chunk/#{text_key}"
 
       refute Map.has_key?(old_uploads_index, upload_key)
 
@@ -331,7 +329,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
       assert {^upload_key, _secret} = metadata.credentials
       assert %{pub_key: pub_key, type: :room} = metadata.destination
       assert metadata.status == :active
-      assert pub_key == socket.assigns.room.pub_key
+      assert pub_key |> Base.decode16!(case: :lower) == socket.assigns.room.pub_key
     end
 
     test "when upload is already in progress commands uploader to skip", %{view: view} do
@@ -365,13 +363,14 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       assert %{
                chunk_count: 0,
+               chunk_size: 10_240,
                entrypoint: entrypoint,
                status: :active,
                uploader: "UpChunkUploader",
                uuid: ^uuid
              } = uploader_data
 
-      assert entrypoint =~ ~p"/upload_chunk/#{upload_key}"
+      assert entrypoint =~ ~p"/upload_chunk/#{upload_key |> Base.encode16(case: :lower)}"
 
       assert %UploadMetadata{} = metadata = Map.get(socket.assigns.uploads_metadata, uuid)
       assert {^upload_key, _secret} = metadata.credentials
@@ -400,16 +399,47 @@ defmodule ChatWeb.Helpers.UploaderTest do
       refute Map.get(socket.assigns.uploads_metadata, existing_entry.uuid)
       refute Map.get(socket.assigns.uploads_metadata, uuid)
 
-      retry_until(1_000, fn ->
-        assert [%PrivateMessage{} = message_1, %PrivateMessage{} = message_2] =
-                 Dialogs.read(socket.assigns.dialog, socket.assigns.me)
+      ChangeTracker.await()
 
-        assert message_1.type == :image
-        assert {id_1, secret_1} = StorageId.from_json(message_1.content)
-        assert message_2.type == :image
-        assert {id_2, secret_2} = StorageId.from_json(message_2.content)
-        assert Files.get(id_1, secret_1) == Files.get(id_2, secret_2)
-      end)
+      assert [%PrivateMessage{} = message_1, %PrivateMessage{} = message_2] =
+               Dialogs.read(socket.assigns.dialog, socket.assigns.me)
+
+      assert message_1.type == :image
+      assert credentials_1 = StorageId.from_json(message_1.content)
+      assert message_2.type == :image
+      assert credentials_2 = StorageId.from_json(message_2.content)
+      assert Files.get(credentials_1) == Files.get(credentials_2)
+
+      state = :sys.get_state(view.pid)
+      socket = state.socket
+
+      Index.handle_event(
+        "dialog/delete-messages",
+        %{
+          "messages" =>
+            Jason.encode!([%{id: message_1.id, index: Integer.to_string(message_1.index)}])
+        },
+        socket
+      )
+
+      ChangeTracker.await()
+
+      assert Files.get(credentials_1)
+      assert Files.get(credentials_2)
+
+      Index.handle_event(
+        "dialog/delete-messages",
+        %{
+          "messages" =>
+            Jason.encode!([%{id: message_2.id, index: Integer.to_string(message_2.index)}])
+        },
+        socket
+      )
+
+      ChangeTracker.await()
+
+      refute Files.get(credentials_1)
+      refute Files.get(credentials_2)
     end
 
     test "when file has already been uploaded to the room commands uploader to skip", %{
@@ -436,20 +466,50 @@ defmodule ChatWeb.Helpers.UploaderTest do
       refute Map.get(socket.assigns.uploads_metadata, existing_entry.uuid)
       refute Map.get(socket.assigns.uploads_metadata, uuid)
 
-      retry_until(1_000, fn ->
-        assert [%PlainMessage{} = message_1, %PlainMessage{} = message_2] =
-                 Rooms.read(
-                   socket.assigns.room,
-                   socket.assigns.room_identity,
-                   &User.id_map_builder/1
-                 )
+      ChangeTracker.await()
 
-        assert message_1.type == :image
-        assert {id_1, secret_1} = StorageId.from_json(message_1.content)
-        assert message_2.type == :image
-        assert {id_2, secret_2} = StorageId.from_json(message_2.content)
-        assert Files.get(id_1, secret_1) == Files.get(id_2, secret_2)
-      end)
+      assert [%PlainMessage{} = message_1, %PlainMessage{} = message_2] =
+               Rooms.read(
+                 socket.assigns.room,
+                 socket.assigns.room_identity
+               )
+
+      assert message_1.type == :image
+      assert credentials_1 = StorageId.from_json(message_1.content)
+      assert message_2.type == :image
+      assert credentials_2 = StorageId.from_json(message_2.content)
+      assert Files.get(credentials_1) == Files.get(credentials_2)
+
+      state = :sys.get_state(view.pid)
+      socket = state.socket
+
+      Index.handle_event(
+        "room/delete-messages",
+        %{
+          "messages" =>
+            Jason.encode!([%{id: message_1.id, index: Integer.to_string(message_1.index)}])
+        },
+        socket
+      )
+
+      ChangeTracker.await()
+
+      assert Files.get(credentials_1)
+      assert Files.get(credentials_2)
+
+      Index.handle_event(
+        "room/delete-messages",
+        %{
+          "messages" =>
+            Jason.encode!([%{id: message_2.id, index: Integer.to_string(message_2.index)}])
+        },
+        socket
+      )
+
+      ChangeTracker.await()
+
+      refute Files.get(credentials_1)
+      refute Files.get(credentials_2)
     end
   end
 
@@ -461,7 +521,7 @@ defmodule ChatWeb.Helpers.UploaderTest do
       assert {:noreply, ^socket} = Uploader.handle_progress(:file, entry, socket)
     end
 
-    test "when upload is finished adds the file to the dialog", %{view: view} do
+    test "when upload is finished adds the file to the dialog", %{conn: conn, view: view} do
       %{entry: entry, socket: socket} = start_upload(%{view: view})
 
       %UploadMetadata{} = metadata = Map.get(socket.assigns.uploads_metadata, entry.uuid)
@@ -471,27 +531,38 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       refute Map.get(socket.assigns.uploads_metadata, entry.uuid)
 
-      retry_until(1_000, fn ->
-        assert [%PrivateMessage{} = message] =
-                 Dialogs.read(socket.assigns.dialog, socket.assigns.me)
+      ChangeTracker.await()
 
-        assert message.type == :image
-        assert {id, secret} = StorageId.from_json(message.content)
+      assert [%PrivateMessage{} = message] =
+               Dialogs.read(socket.assigns.dialog, socket.assigns.me)
 
-        assert [chunk_key, encoded_chunk_secret, _, type, filename, size] = Files.get(id, secret)
+      assert message.type == :image
+      assert {id, secret} = StorageId.from_json(message.content)
 
-        assert {^chunk_key, encrypted_secret} = metadata.credentials
+      assert [chunk_key, encoded_chunk_secret, _, type, filename, size] = Files.get(id, secret)
 
-        assert Base.decode64!(encoded_chunk_secret) ==
-                 ChunkedFiles.decrypt_secret(encrypted_secret, socket.assigns.me)
+      assert {^chunk_key, encrypted_secret} = metadata.credentials
 
-        assert type == entry.client_type
-        assert filename == entry.client_name
-        assert size == "#{entry.client_size} b"
-      end)
+      assert Base.decode64!(encoded_chunk_secret) ==
+               ChunkedFiles.decrypt_secret(encrypted_secret, socket.assigns.me)
+
+      assert type == entry.client_type
+      assert filename == entry.client_name
+      assert size == "#{entry.client_size} b"
+
+      html = render(view)
+
+      assert %{"url" => file_url} =
+               Regex.named_captures(
+                 ~r|<img class="object-cover overflow-hidden" src="(?<url>[^"]+)"|,
+                 html
+               )
+
+      conn = get(conn, file_url)
+      assert conn.status == 200
     end
 
-    test "when upload is finished adds the file to the room", %{view: view} do
+    test "when upload is finished adds the file to the room", %{conn: conn, view: view} do
       create_and_open_room(%{view: view})
 
       %{entry: entry, socket: socket} = start_upload(%{view: view})
@@ -503,28 +574,38 @@ defmodule ChatWeb.Helpers.UploaderTest do
 
       refute Map.get(socket.assigns.uploads_metadata, entry.uuid)
 
-      retry_until(1_000, fn ->
-        assert [%PlainMessage{} = message] =
-                 Rooms.read(
-                   socket.assigns.room,
-                   socket.assigns.room_identity,
-                   &User.id_map_builder/1
-                 )
+      ChangeTracker.await()
 
-        assert message.type == :image
-        assert {id, secret} = StorageId.from_json(message.content)
+      assert [%PlainMessage{} = message] =
+               Rooms.read(
+                 socket.assigns.room,
+                 socket.assigns.room_identity
+               )
 
-        assert [chunk_key, encoded_chunk_secret, _, type, filename, size] = Files.get(id, secret)
+      assert message.type == :image
+      assert {id, secret} = StorageId.from_json(message.content)
 
-        assert {^chunk_key, encrypted_secret} = metadata.credentials
+      assert [chunk_key, encoded_chunk_secret, _, type, filename, size] = Files.get(id, secret)
 
-        assert Base.decode64!(encoded_chunk_secret) ==
-                 ChunkedFiles.decrypt_secret(encrypted_secret, socket.assigns.me)
+      assert {^chunk_key, encrypted_secret} = metadata.credentials
 
-        assert type == entry.client_type
-        assert filename == entry.client_name
-        assert size == "#{entry.client_size} b"
-      end)
+      assert Base.decode64!(encoded_chunk_secret) ==
+               ChunkedFiles.decrypt_secret(encrypted_secret, socket.assigns.me)
+
+      assert type == entry.client_type
+      assert filename == entry.client_name
+      assert size == "#{entry.client_size} b"
+
+      html = render(view)
+
+      assert %{"url" => file_url} =
+               Regex.named_captures(
+                 ~r|<img class="object-cover overflow-hidden" src="(?<url>[^"]+)"|,
+                 html
+               )
+
+      conn = get(conn, file_url)
+      assert conn.status == 200
     end
 
     test "when upload is finished starts the next upload", %{view: view} do

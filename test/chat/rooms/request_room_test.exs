@@ -5,7 +5,6 @@ defmodule Chat.Rooms.RequestRoomTest do
   alias Chat.Identity
   alias Chat.Rooms
   alias Chat.User
-  alias Chat.Utils
 
   test "should create as usual" do
     {_alice, _identity, room} = "Alice" |> user_and_request_room()
@@ -15,98 +14,106 @@ defmodule Chat.Rooms.RequestRoomTest do
 
   test "should be seen in list" do
     {_alice, identity, _room} = "Alice" |> user_and_request_room()
-    room_hash = identity |> Utils.hash()
+    room_key = identity |> Identity.pub_key()
 
-    {_, room_list} = Rooms.list([])
+    {_, room_list} = Rooms.list(%{})
 
-    assert nil != room_list |> Enum.find_value(&(&1.hash == room_hash))
+    assert nil != room_list |> Enum.find_value(&(&1.pub_key == room_key))
   end
 
   test "requesting should work as for public" do
     {_alice, identity, _room} = "Alice" |> user_and_request_room()
-    room_hash = identity |> Utils.hash()
+    room_key = identity |> Identity.pub_key()
     bob = "Bob" |> User.login()
     bob_pub_key = bob |> Identity.pub_key()
-    bob_hash = bob |> Utils.hash()
 
-    Rooms.add_request(room_hash, bob, 0)
+    Rooms.add_request(room_key, bob, 0)
     ChangeTracker.await()
-    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
 
-    Rooms.approve_request(room_hash, bob_hash, identity)
+    assert %Rooms.Room{requests: [%{requester_key: ^bob_pub_key, pending?: true}]} =
+             Rooms.get(room_key)
+
+    Rooms.approve_request(room_key, bob_pub_key, identity)
     ChangeTracker.await()
-    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, {_, _}}]} = Rooms.get(room_hash)
+
+    assert %Rooms.Room{requests: [%{requester_key: ^bob_pub_key, pending?: false}]} =
+             Rooms.get(room_key)
   end
 
   test "should be approved individually by any room key holder" do
     {_alice, identity, _room} = "Alice" |> user_and_request_room()
-    room_hash = identity |> Utils.hash()
+    room_key = identity |> Identity.pub_key()
     bob = "Bob" |> User.login()
     bob_pub_key = bob |> Identity.pub_key()
-    bob_hash = bob |> Utils.hash()
 
-    Rooms.add_request(room_hash, bob, 0)
-    ChangeTracker.await()
-    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
-
-    Rooms.approve_request(room_hash, bob_hash, identity)
+    Rooms.add_request(room_key, bob, 0)
     ChangeTracker.await()
 
-    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, _bob_room_key}]} =
-             Rooms.get(room_hash)
+    assert %Rooms.Room{requests: [%{requester_key: ^bob_pub_key, pending?: true}]} =
+             Rooms.get(room_key)
 
-    Rooms.approve_request(room_hash, bob_hash, identity)
+    Rooms.approve_request(room_key, bob_pub_key, identity)
     ChangeTracker.await()
 
-    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, _bob_room_key}]} =
-             Rooms.get(room_hash)
+    assert %Rooms.Room{requests: [%{requester_key: ^bob_pub_key, pending?: false}]} =
+             Rooms.get(room_key)
 
-    assert %Rooms.Room{requests: []} = Rooms.join_approved_request(identity, bob)
+    Rooms.approve_request(room_key, bob_pub_key, identity)
+    ChangeTracker.await()
+
+    assert %Rooms.Room{requests: [%{requester_key: ^bob_pub_key, pending?: false}]} =
+             Rooms.get(room_key)
+
+    assert %Rooms.Room{requests: []} = Rooms.clear_approved_request(identity, bob)
   end
 
   test "should NOT be approved individually when flag public_only is applied" do
     {_alice, identity, _room} = "Alice" |> user_and_request_room()
-    room_hash = identity |> Utils.hash()
+    room_key = identity |> Identity.pub_key()
     bob = "Bob" |> User.login()
     bob_pub_key = bob |> Identity.pub_key()
-    bob_hash = bob |> Utils.hash()
 
-    Rooms.add_request(room_hash, bob, 0)
+    Rooms.add_request(room_key, bob, 0)
     ChangeTracker.await()
-    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
 
-    Rooms.approve_request(room_hash, bob_hash, identity, public_only: true)
+    assert %Rooms.Room{requests: [%{requester_key: ^bob_pub_key, pending?: true}]} =
+             Rooms.get(room_key)
+
+    Rooms.approve_request(room_key, bob_pub_key, identity, public_only: true)
     ChangeTracker.await()
-    assert %Rooms.Room{requests: [{^bob_hash, ^bob_pub_key, :pending}]} = Rooms.get(room_hash)
+
+    assert %Rooms.Room{requests: [%{requester_key: ^bob_pub_key, pending?: true}]} =
+             Rooms.get(room_key)
   end
 
   test "should show a list of pending user requests" do
     {_alice, identity, _room} = "Alice" |> user_and_request_room()
-    room_hash = identity |> Utils.hash()
+    room_key = identity |> Identity.pub_key()
     bob = "Bob" |> User.login()
     bob_pub_key = bob |> Identity.pub_key()
-    bob_hash = bob |> Utils.hash()
 
-    Rooms.add_request(room_hash, bob, 0)
+    Rooms.add_request(room_key, bob, 0)
     ChangeTracker.await()
 
-    assert [{^bob_hash, ^bob_pub_key}] = Rooms.list_pending_requests(room_hash)
-    Rooms.approve_request(room_hash, bob_hash, identity)
+    assert [%{requester_key: ^bob_pub_key, pending?: true}] =
+             Rooms.list_pending_requests(room_key)
+
+    Rooms.approve_request(room_key, bob_pub_key, identity)
     ChangeTracker.await()
 
-    assert [] = Rooms.list_pending_requests(room_hash)
+    assert [] = Rooms.list_pending_requests(room_key)
   end
 
   test "reuest message should be added upon requesting" do
     {_alice, identity, room} = "Alice" |> user_and_request_room()
-    room_hash = identity |> Utils.hash()
+    room_key = identity |> Identity.pub_key()
     bob = "Bob" |> User.login()
     User.register(bob)
 
-    Rooms.add_request(room_hash, bob, 0)
+    Rooms.add_request(room_key, bob, 0)
     ChangeTracker.await()
 
-    messages = Rooms.read(room, identity, &User.id_map_builder/1)
+    messages = Rooms.read(room, identity)
 
     assert [%{type: :request}] = messages
   end
@@ -114,8 +121,8 @@ defmodule Chat.Rooms.RequestRoomTest do
   defp user_and_request_room(name) do
     alice = User.login(name)
     {room_identity, _room} = Rooms.add(alice, "#{name}'s Request room", :request)
-    Rooms.await_saved(room_identity)
-    room = Rooms.get(room_identity |> Utils.hash())
+    ChangeTracker.await()
+    room = Rooms.get(room_identity |> Identity.pub_key())
 
     {alice, room_identity, room}
   end

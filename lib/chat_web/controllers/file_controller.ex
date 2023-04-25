@@ -4,7 +4,7 @@ defmodule ChatWeb.FileController do
 
   alias Chat.Broker
   alias Chat.ChunkedFiles
-  alias Chat.Files
+  alias Chat.Content.Files
 
   # can do part downloads with https://elixirforum.com/t/question-regarding-send-download-send-file-from-binary-in-memory/32507/4
 
@@ -39,7 +39,7 @@ defmodule ChatWeb.FileController do
   defp render_file(conn, params, opts) do
     with %{"id" => id, "a" => secret} <- params,
          [chunk_key, chunk_secret_raw, _, type, name | _] <-
-           Files.get(id, secret |> Base.url_decode64!()),
+           Files.get(id |> Base.decode16!(case: :lower), secret |> Base.url_decode64!()),
          chunk_secret <- chunk_secret_raw |> Base.decode64!(),
          true <- type |> String.contains?("/") do
       size = ChunkedFiles.size(chunk_key)
@@ -73,26 +73,12 @@ defmodule ChatWeb.FileController do
         #          end)
 
         {_, []} ->
-          conn =
-            conn
-            |> set_disposition(name, opts[:disposition])
-            |> put_resp_header("content-length", "#{size}")
-            |> set_content_type(type, opts[:content_type])
-            |> send_chunked(200)
-
-          size
-          |> ChunkedFiles.file_chunk_ranges()
-          |> Enum.reduce_while(conn, fn range, conn ->
-            chunk = ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret}, range) |> elem(1)
-
-            case Plug.Conn.chunk(conn, chunk) do
-              {:ok, conn} ->
-                {:cont, conn}
-
-              {:error, :closed} ->
-                {:halt, conn}
-            end
-          end)
+          conn
+          |> set_disposition(name, opts[:disposition])
+          |> put_resp_header("content-length", "#{size}")
+          |> set_content_type(type, opts[:content_type])
+          |> send_chunked(200)
+          |> passthrou_whole_file(size, chunk_key, chunk_secret)
 
         {_, range} ->
           {{first, last}, data} =
@@ -124,6 +110,22 @@ defmodule ChatWeb.FileController do
     _ ->
       conn
       |> send_resp(404, "")
+  end
+
+  defp passthrou_whole_file(conn, size, chunk_key, chunk_secret) do
+    size
+    |> ChunkedFiles.file_chunk_ranges()
+    |> Enum.reduce_while(conn, fn range, conn ->
+      chunk = ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret}, range) |> elem(1)
+
+      case Plug.Conn.chunk(conn, chunk) do
+        {:ok, conn} ->
+          {:cont, conn}
+
+        {:error, :closed} ->
+          {:halt, conn}
+      end
+    end)
   end
 
   defp parse_range(["bytes=" <> range | _]) do

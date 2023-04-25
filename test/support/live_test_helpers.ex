@@ -22,12 +22,7 @@ defmodule ChatWeb.LiveTestHelpers do
     |> form("#login-form", login: %{name: "User"})
     |> render_submit()
 
-    render_hook(view, "local-time", %{
-      "locale" => "en-US",
-      "timestamp" => 1_675_181_845,
-      "timezone" => "Europe/Sarajevo",
-      "timezone_offset" => 1
-    })
+    set_local_time(%{view: view})
 
     state = :sys.get_state(view.pid)
     %{socket: state.socket, view: view}
@@ -39,11 +34,25 @@ defmodule ChatWeb.LiveTestHelpers do
     %{socket: state.socket, view: view}
   end
 
-  @spec login_by_key(%{conn: Plug.Conn.t()}) :: %{socket: Socket.t(), view: view()}
-  def login_by_key(%{conn: conn}) do
-    {:ok, view, _html} = live(conn, "/")
+  @spec set_local_time(%{view: view()}) :: %{socket: Socket.t(), view: view()}
+  def set_local_time(%{view: view}) do
+    render_hook(view, "local-time", %{
+      "locale" => "en-US",
+      "timestamp" => 1_675_181_845,
+      "timezone" => "Europe/Sarajevo",
+      "timezone_offset" => 1
+    })
+
+    state = :sys.get_state(view.pid)
+    %{socket: state.socket, view: view}
+  end
+
+  @spec login_by_key(%{conn: Plug.Conn.t()}, String.t()) :: %{socket: Socket.t(), view: view()}
+  def login_by_key(%{conn: conn}, path \\ "/") do
+    {:ok, view, _html} = live(conn, path)
 
     render_hook(view, "restoreAuth")
+    set_local_time(%{view: view})
 
     view
     |> element("#importKeyButton")
@@ -55,7 +64,7 @@ defmodule ChatWeb.LiveTestHelpers do
         last_modified: 1_594_171_879_000,
         name: "TestUser.data",
         content: File.read!("test/support/fixtures/import_keys/TestUser.data"),
-        size: 1611,
+        size: 113,
         type: "text/plain"
       }
     ])

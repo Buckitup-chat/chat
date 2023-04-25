@@ -7,7 +7,7 @@ defmodule ChatWeb.MainLive.Layout.CargoRoom do
 
   def bar(assigns) do
     ~H"""
-    <%= if @media_settings.functionality == :cargo && @cargo_room && @cargo_room.pub_key == @room.pub_key do %>
+    <%= if @cargo_room && @cargo_room.pub_key == @room.pub_key do %>
       <div class="w-full px-8 py-4 border-b border-white/10 backdrop-blur-md bg-grayscale/40 z-10 flex flex-row items-center justify-between text-md text-white">
         <div class="flex flex-row items-center text-base">
           Cargo sync activated <.remove_button status={@cargo_room.status} />

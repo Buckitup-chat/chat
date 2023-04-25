@@ -75,8 +75,8 @@ defmodule ChatWeb.LiveTestHelpers do
     %{socket: state.socket, view: view}
   end
 
-  @spec create_and_open_room(%{view: view()}) :: %{socket: Socket.t(), view: view()}
-  def create_and_open_room(%{view: view}) do
+  @spec create_and_open_room(%{view: view()}, String.t()) :: %{socket: Socket.t(), view: view()}
+  def create_and_open_room(%{view: view}, type \\ "public") do
     view
     |> element("button:first-child", "Rooms")
     |> render_click()
@@ -84,7 +84,7 @@ defmodule ChatWeb.LiveTestHelpers do
     name = Utils.random_id()
 
     view
-    |> form("#room-create-form", new_room: %{name: name, type: "public"})
+    |> form("#room-create-form", new_room: %{name: name, type: type})
     |> render_submit()
 
     state = :sys.get_state(view.pid)

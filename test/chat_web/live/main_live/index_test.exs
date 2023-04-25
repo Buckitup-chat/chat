@@ -30,5 +30,20 @@ defmodule ChatWeb.MainLive.IndexTest do
       assert current_view_state.joined_rooms == another_view_state.joined_rooms
       assert current_view_state.room_count_to_backup == another_view_state.room_count_to_backup
     end
+
+    test "on accepting the invitation", %{
+      current_tab: current_tab,
+      another_tab: another_tab,
+      conn: conn
+    } do
+      %{view: current_tab_view} = current_tab
+      %{view: another_tab_view} = another_tab
+      %{view: inviter_view} = prepare_view(%{conn: conn}) |> create_and_open_room("private")
+
+      inviter_view |> element("#roomInviteButton") |> IO.inspect() |> render_click()
+      # inviter_view |> element("#room-invite-list") |> IO.inspect
+
+      IO.inspect(inviter_view)
+    end
   end
 end

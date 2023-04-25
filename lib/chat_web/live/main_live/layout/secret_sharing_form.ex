@@ -7,10 +7,10 @@ defmodule ChatWeb.MainLive.Layout.SecretSharingForm do
 
   import Phoenix.Component
 
-  alias Chat.User.Registry
   alias Chat.Card
-  alias Chat.Dialogs.{DialogMessaging, Dialog}
+  alias Chat.Dialogs.{Dialog, DialogMessaging}
   alias Chat.Messages.Text
+  alias Chat.User.Registry
 
   @impl Phoenix.LiveComponent
   def mount(socket) do

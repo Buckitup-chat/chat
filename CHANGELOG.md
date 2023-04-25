@@ -11,6 +11,8 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+- Secret Sharing integrated into client via new form in logout
+- After clicking the button, secret shares will be sent to chosen users via text message
 
 ### Changed
 

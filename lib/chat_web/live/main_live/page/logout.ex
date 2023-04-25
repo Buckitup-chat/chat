@@ -9,6 +9,7 @@ defmodule ChatWeb.MainLive.Page.Logout do
   alias Chat.Actor
   alias Chat.Broker
   alias Chat.Log
+  alias Chat.{Dialogs, Messages}
 
   alias Ecto.Changeset
 
@@ -35,6 +36,17 @@ defmodule ChatWeb.MainLive.Page.Logout do
     |> assign(:is_password_confirmation_visible, false)
   end
 
+  def go_share(%{assigns: %{}} = socket) do
+    socket
+    |> assign(:logout_step, :share)
+    |> assign(
+      :changeset,
+      Changeset.change({%{}, schema()})
+      |> Changeset.validate_required(:users)
+      |> Changeset.validate_length(:users, min: 5)
+    )
+  end
+
   def toggle_password_visibility(%{assigns: %{is_password_visible: flag}} = socket) do
     socket
     |> assign(:is_password_visible, !flag)
@@ -56,6 +68,18 @@ defmodule ChatWeb.MainLive.Page.Logout do
         message: "Should consist of letters and numbers"
       )
       |> Changeset.validate_confirmation(:password)
+      |> Map.put(:action, :validate)
+
+    socket
+    |> assign(:changeset, changeset)
+  end
+
+  def check_share(socket, params) do
+    changeset =
+      {%{}, schema()}
+      |> Changeset.cast(params, schema() |> Map.keys())
+      |> Changeset.validate_required(:users)
+      |> Changeset.validate_length(:users, min: 5)
       |> Map.put(:action, :validate)
 
     socket
@@ -95,6 +119,34 @@ defmodule ChatWeb.MainLive.Page.Logout do
     |> push_event("chat:redirect", %{url: url(~p"/get/backup/#{broker_key}")})
   end
 
+  def generate_key_shares({me, rooms, users}) do
+    share_count = Enum.count(users)
+    base_key = Actor.new(me, rooms, %{}) |> Actor.to_encrypted_json("") |> Base.encode64()
+    len_part = ceil(String.length(base_key) / share_count)
+
+    for i <- 0..(share_count - 1), into: [] do
+      start_idx = i * len_part
+      end_idx = start_idx + len_part - 1
+
+      %{
+        user: Enum.at(users, i),
+        key: String.slice(base_key, start_idx..end_idx)
+      }
+    end
+  end
+
+  def send_shares(shares, {me, time_offset}) do
+    time = Chat.Time.monotonic_to_unix(time_offset)
+
+    shares
+    |> Enum.each(fn share ->
+      dialog = Dialogs.find_or_open(me, share.user)
+
+      %Messages.Text{text: share.key, timestamp: time}
+      |> Dialogs.add_new_message(me, dialog)
+    end)
+  end
+
   def go_final(%{assigns: %{}} = socket) do
     socket
     |> assign(:logout_step, :final)
@@ -118,6 +170,6 @@ defmodule ChatWeb.MainLive.Page.Logout do
   end
 
   defp schema do
-    %{password: :string, password_confirmation: :string}
+    %{password: :string, password_confirmation: :string, users: {:array, :string}}
   end
 end

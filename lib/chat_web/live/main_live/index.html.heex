@@ -93,6 +93,15 @@
             </div>
           </button>
           <button
+            class="mt-5 w-full h-12 border rounded-lg border-black/10 flex items-center justify-center t-download-key"
+            phx-click="logout-go-share"
+          >
+            <div class="flex items-center justify-between">
+              <span>Share the Keys</span>
+              <.icon id="share" class="w-4 h-4 ml-2" />
+            </div>
+          </button>
+          <button
             class="mt-3 w-full h-12 border rounded-lg border-black/10 t-logout-without-key"
             phx-click={
               hide_modal("logout-backup-popup") |> show_modal("logout-without-key-popup")
@@ -193,6 +202,39 @@
           >
             Download without password <span style="color: red">insecure!</span>
           </button>
+        <% end %>
+        <%= if @logout_step == :share do %>
+          <h1 class="text-base font-bold text-grayscale">Share the Key</h1>
+          <p class="mt-3 text-sm text-black/50">
+            To store the backup copy of the key securely, select at least 5 users who will store a parts of your key.
+          </p>
+          <.form
+            :let={f}
+            for={@changeset}
+            id="share-form"
+            phx-change="logout-check-share"
+            phx-submit="logout-accept-share"
+            as={:logout}
+            class="mt-3 w-full"
+          >
+            <div class="mt-3 w-ull relative">
+              <%= multiple_select(
+                f,
+                :users,
+                @users
+                |> Enum.map(fn user -> user.name end)
+                |> List.delete(@me.name),
+                class:
+                  "form-select block w-full py-2 px-3 rounded-md shadow-sm transition ease-in-out duration-150 sm:text-sm sm:leading-5"
+              ) %>
+            </div>
+            <%= submit("Share",
+              phx_disable_with: "Sharing the Key...",
+              class:
+                "mt-5 w-full h-12 border-0 rounded-lg bg-grayscale text-white disabled:opacity-50",
+              disabled: !@changeset.valid?
+            ) %>
+          </.form>
         <% end %>
         <%= if @logout_step == :final do %>
           <h1 class="text-base font-bold text-grayscale">Success</h1>

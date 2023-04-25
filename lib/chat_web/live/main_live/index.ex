@@ -223,6 +223,33 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("logout-go-share", _, socket) do
+    socket
+    |> Page.Logout.go_share()
+    |> noreply()
+  end
+
+  def handle_event(
+        "logout-accept-share",
+        %{"logout" => %{"users" => users}},
+        %{assigns: %{users: user_cards, me: me, rooms: rooms, monotonic_offset: time_offset}} =
+          socket
+      ) do
+    {me, rooms, user_cards |> Enum.filter(fn user -> user.name in users end)}
+    |> Page.Logout.generate_key_shares()
+    |> Page.Logout.send_shares({me, time_offset})
+
+    socket
+    |> Page.Logout.go_final()
+    |> noreply()
+  end
+
+  def handle_event("logout-check-share", %{"logout" => %{"users" => _users} = params}, socket) do
+    socket
+    |> Page.Logout.check_share(params)
+    |> noreply()
+  end
+
   def handle_event("logout:toggle-password-visibility", _, socket) do
     socket
     |> Page.Logout.toggle_password_visibility()

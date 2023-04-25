@@ -18,6 +18,7 @@ straightforward as possible.
 - Hide Cargo sync timer and increase the timeout to 5 minutes
 - ChangeTracker expiry
 - searchbar color changed
+- Separate main from backup DB
 
 ### Fixed
 - feeds close error on mobile bugfix

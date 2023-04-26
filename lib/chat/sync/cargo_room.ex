@@ -6,6 +6,7 @@ defmodule Chat.Sync.CargoRoom do
   use GenServer
   use StructAccess
 
+  alias Chat.{Rooms, RoomsBroker}
   alias Phoenix.PubSub
 
   @type room_key :: String.t()
@@ -138,6 +139,10 @@ defmodule Chat.Sync.CargoRoom do
         _ ->
           :failed
       end
+
+    cargo_room.pub_key
+    |> Rooms.get()
+    |> RoomsBroker.put()
 
     cargo_room = %{cargo_room | status: status}
 

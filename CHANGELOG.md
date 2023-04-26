@@ -30,6 +30,11 @@ straightforward as possible.
 - Dumping duplicate files
 - Drive dump failing after 1 minute mark
 - Adaptive uploads and users/rooms list for desctop
+- Show Cargo Room tab regardless of media settings
+- Error entering room on main drive fix
+- Markup for admin room fixed
+- Adaptive uploads and users/rooms list for mobile
+- handle lost messages when viewing gallery
 
 
 ## 2023-04-15_c77d709___2023-04-15_64148f8

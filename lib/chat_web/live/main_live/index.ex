@@ -4,7 +4,7 @@ defmodule ChatWeb.MainLive.Index do
 
   require Logger
 
-  alias Chat.Admin.{CargoSettings, MediaSettings}
+  alias Chat.Admin.CargoSettings
   alias Chat.{AdminRoom, Dialogs, Identity, Messages, RoomInviteIndex, User}
   alias Chat.Rooms.Room
   alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
@@ -52,7 +52,7 @@ defmodule ChatWeb.MainLive.Index do
         |> LocalTimeHook.assign_time(Phoenix.LiveView.get_connect_params(socket)["tz_info"])
         |> allow_any500m_upload(:my_keys_file)
         |> Page.Login.check_stored()
-        |> maybe_set_cargo_room()
+        |> set_cargo_room()
         |> set_usb_drive_dump_room()
         |> ok()
       end
@@ -428,7 +428,6 @@ defmodule ChatWeb.MainLive.Index do
   def handle_info(:update_media_settings, socket) do
     socket
     |> assign_media_settings()
-    |> maybe_set_cargo_room()
     |> noreply()
   end
 
@@ -554,16 +553,10 @@ defmodule ChatWeb.MainLive.Index do
     )
   end
 
-  defp maybe_set_cargo_room(socket) do
-    %MediaSettings{} = media_settings = socket.assigns.media_settings
+  defp set_cargo_room(socket) do
+    PubSub.subscribe(Chat.PubSub, "chat::cargo_room")
 
-    if media_settings.functionality == :cargo do
-      PubSub.subscribe(Chat.PubSub, "chat::cargo_room")
-
-      assign(socket, :cargo_room, CargoRoom.get())
-    else
-      socket
-    end
+    assign(socket, :cargo_room, CargoRoom.get())
   end
 
   defp set_usb_drive_dump_room(socket) do

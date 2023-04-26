@@ -41,6 +41,8 @@ defmodule Chat.Dialogs.DialogMessaging do
     |> ChangeTracker.await()
   end
 
+  def read({_index, nil}, _user_identity, _dialog), do: nil
+
   def read({index, %Message{} = msg}, %Identity{} = identity, %Dialog{a_key: a_key, b_key: b_key}) do
     {peer_key, is_mine?} =
       case {identity.public_key, a_key, b_key} do

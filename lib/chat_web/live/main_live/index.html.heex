@@ -361,7 +361,7 @@
               <span class="text-xs">Admin</span>
             </button>
           <% end %>
-          <%= if assigns[:cargo_room][:status] == :complete do %>
+          <%= if assigns[:cargo_room][:status] == :complete and Map.has_key?(@room_map, assigns[:cargo_room][:pub_key]) do %>
             <button
               phx-click="room/switch"
               phx-value-room={Room.hash(@cargo_room.pub_key)}
@@ -459,7 +459,7 @@
                 <span class="text-xs">Admin</span>
               </button>
             <% end %>
-            <%= if assigns[:cargo_room][:status] == :complete do %>
+            <%= if assigns[:cargo_room][:status] == :complete and Map.has_key?(@room_map, assigns[:cargo_room][:pub_key]) do %>
               <button
                 phx-click="room/switch"
                 phx-value-room={Room.hash(@cargo_room.pub_key)}
@@ -515,7 +515,7 @@
               <h5 class="text-grayscale" style="font-size: 22px;">Chats</h5>
             </div>
             <Layout.SearchBox.render type={:dialog} />
-            <div class="sidebar-container h-[600px] md:h-[870px]">
+            <div class="sidebar-container md:h-[870px]">
               <div class="mt-3 w-full overflow-scroll">
                 <ul class={
                   classes(
@@ -575,9 +575,9 @@
           >
             <%= if @dialog do %>
               <.live_component
-                module={Layout.ImageGallery}
+                module={Page.ImageGallery}
                 id="imageGallery"
-                type="dialog"
+                type={:dialog}
                 dialog={@dialog}
                 me={@me}
               />
@@ -683,7 +683,7 @@
               </button>
             </div>
             <Layout.SearchBox.render type={:room} />
-            <div class="sidebar-container h-[600px] md:h-[870px]">
+            <div class="sidebar-container md:h-[870px]">
               <div class={
                 classes(
                   "w-full mt-6 flex flex-col items-start",
@@ -772,9 +772,9 @@
               <% end %>
             <% else %>
               <.live_component
-                module={Layout.ImageGallery}
+                module={Page.ImageGallery}
                 id="imageGallery"
-                type="room"
+                type={:room}
                 room_identity={@room_identity}
               />
               <div
@@ -1052,7 +1052,7 @@
             </Layout.Admin.row>
             <Layout.Admin.row>
               <Layout.Admin.block title="Remove Room">
-                <section>
+                <section class="md:max-h-[400px] overflow-scroll">
                   <%= for room <- @room_list do %>
                     <div
                       class="cursor-pointer"
@@ -1074,7 +1074,7 @@
                 </section>
               </Layout.Admin.block>
               <Layout.Admin.block title="Remove User">
-                <section>
+                <section class="md:max-h-[400px] overflow-scroll">
                   <%= for user <- @full_user_list do %>
                     <div
                       class="cursor-pointer"

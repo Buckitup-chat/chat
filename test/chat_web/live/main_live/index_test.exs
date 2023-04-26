@@ -7,7 +7,7 @@ defmodule ChatWeb.MainLive.IndexTest do
   alias Chat.Admin.MediaSettings
   alias Chat.{AdminDb, AdminRoom, Db, Dialogs, Rooms, RoomsBroker, User, UsersBroker}
   alias Chat.Dialogs.PrivateMessage
-  alias Chat.Identity
+  alias Chat.{Identity, Messages, RoomInviteIndex}
   alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
 
   describe "room sync between multiple tabs" do
@@ -357,19 +357,19 @@ defmodule ChatWeb.MainLive.IndexTest do
       assert html =~ "Room does not have a unique name"
     end
 
-    test "starts the flow from platform", %{view: view} do
+    test "starts the flow from platform", %{conn: conn} do
+      AdminRoom.store_media_settings(%MediaSettings{functionality: :backup})
+
+      %{view: view} = prepare_view(%{conn: conn})
+
       view
       |> element(".t-rooms", "Rooms")
       |> render_click()
 
-      view
-      |> form("#room-create-form", %{
-        "room_input" => %{"name" => "Regular Room", "type" => "public"}
-      })
-      |> render_submit()
-
       %{socket: socket} = reload_view(%{view: view})
-      room_key = socket.assigns.room.pub_key
+      me = socket.assigns.me
+
+      {room_identity, room} = Rooms.add(me, "Regular Room", :public)
 
       view
       |> form("#room-create-form", %{
@@ -378,9 +378,9 @@ defmodule ChatWeb.MainLive.IndexTest do
       |> render_submit()
 
       refute has_element?(view, ".t-cargo-room")
-      assert has_element?(view, ".t-cargo-activate")
+      refute has_element?(view, ".t-cargo-activate")
 
-      CargoRoom.sync(room_key)
+      CargoRoom.sync(room.pub_key)
       Process.sleep(100)
 
       refute has_element?(view, ".t-cargo-room")
@@ -392,10 +392,30 @@ defmodule ChatWeb.MainLive.IndexTest do
       CargoRoom.complete()
       Process.sleep(100)
 
-      assert has_element?(view, ".t-cargo-room")
-      assert has_element?(view, ".t-cargo-activate")
+      refute has_element?(view, ".t-cargo-room")
+      refute has_element?(view, ".t-cargo-activate")
       refute has_element?(view, ".t-cargo-remove")
       refute render(view) =~ "Cargo sync activated"
+
+      dialog = Dialogs.find_or_open(me)
+
+      room_identity
+      |> Map.put(:name, room.name)
+      |> Messages.RoomInvite.new()
+      |> Dialogs.add_new_message(me, dialog)
+      |> RoomInviteIndex.add(dialog, me)
+
+      view
+      |> element(".t-chats", "Chats")
+      |> render_click()
+
+      open_dialog(%{view: view})
+
+      view
+      |> element("button:first-child", "Accept")
+      |> render_click()
+
+      assert has_element?(view, ".t-cargo-room")
 
       view
       |> element(".t-cargo-room", "Cargo Room")

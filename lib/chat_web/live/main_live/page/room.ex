@@ -32,7 +32,6 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.Utils
   alias Chat.Utils.StorageId
 
-  alias ChatWeb.MainLive.Layout
   alias ChatWeb.MainLive.Page
 
   alias Phoenix.PubSub
@@ -43,11 +42,13 @@ defmodule ChatWeb.MainLive.Page.Room do
   def init(socket), do: socket |> assign(:room, nil)
 
   def init(%{assigns: %{room_map: rooms}} = socket, room_key) when is_binary(room_key) do
-    room = Rooms.get(room_key)
-    room_identity = rooms |> Map.fetch!(room_key)
-
-    socket
-    |> init({room_identity, room})
+    with %Room{} = room <- Rooms.get(room_key),
+         %Identity{} = room_identity <- Map.get(rooms, room_key) do
+      init(socket, {room_identity, room})
+    else
+      _ ->
+        socket
+    end
   end
 
   def init(
@@ -486,18 +487,18 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def open_image_gallery(socket, msg_id) do
-    send_update(Layout.ImageGallery, id: "imageGallery", action: :open, incoming_msg_id: msg_id)
+    send_update(Page.ImageGallery, id: "imageGallery", action: :open, incoming_msg_id: msg_id)
     socket
   end
 
   def image_gallery_preload_next(socket) do
-    send_update(Layout.ImageGallery, id: "imageGallery", action: :preload_next)
+    send_update(Page.ImageGallery, id: "imageGallery", action: :preload_next)
 
     socket
   end
 
   def image_gallery_preload_prev(socket) do
-    send_update(Layout.ImageGallery, id: "imageGallery", action: :preload_prev)
+    send_update(Page.ImageGallery, id: "imageGallery", action: :preload_prev)
 
     socket
   end

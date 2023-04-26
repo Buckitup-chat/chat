@@ -11,6 +11,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
   setup do
     CubDB.clear(AdminDb.db())
     CubDB.clear(Db.db())
+    CubDB.set_auto_compact(AdminDb.db(), false)
   end
 
   describe "backup settings form" do

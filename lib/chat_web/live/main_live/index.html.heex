@@ -361,7 +361,7 @@
               <span class="text-xs">Admin</span>
             </button>
           <% end %>
-          <%= if assigns[:cargo_room][:status] == :complete do %>
+          <%= if assigns[:cargo_room][:status] == :complete and Map.has_key?(@room_map, assigns[:cargo_room][:pub_key]) do %>
             <button
               phx-click="room/switch"
               phx-value-room={Room.hash(@cargo_room.pub_key)}
@@ -459,7 +459,7 @@
                 <span class="text-xs">Admin</span>
               </button>
             <% end %>
-            <%= if assigns[:cargo_room][:status] == :complete do %>
+            <%= if assigns[:cargo_room][:status] == :complete and Map.has_key?(@room_map, assigns[:cargo_room][:pub_key]) do %>
               <button
                 phx-click="room/switch"
                 phx-value-room={Room.hash(@cargo_room.pub_key)}

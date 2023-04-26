@@ -1018,6 +1018,13 @@
                   module={MediaSettingsForm}
                 />
               </Layout.Admin.block>
+              <Layout.Admin.block title="Backup settings">
+                <.live_component
+                  id={:backup_settings_form}
+                  backup_settings={@backup_settings}
+                  module={BackupSettingsForm}
+                />
+              </Layout.Admin.block>
             </Layout.Admin.row>
             <Layout.Admin.row>
               <Layout.Admin.block title="Admin List">

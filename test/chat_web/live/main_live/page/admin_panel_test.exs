@@ -4,14 +4,73 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
   import ChatWeb.LiveTestHelpers
   import Phoenix.LiveViewTest
 
-  alias Chat.Admin.{CargoSettings, MediaSettings}
+  alias Chat.Admin.{BackupSettings, CargoSettings, MediaSettings}
   alias Chat.{AdminDb, AdminRoom, Db, Identity, User}
   alias Chat.Db.ChangeTracker
-  alias Phoenix.PubSub
 
   setup do
     CubDB.clear(AdminDb.db())
     CubDB.clear(Db.db())
+  end
+
+  describe "backup settings form" do
+    test "saves backup settings to the admin DB", %{conn: conn} do
+      %{view: view} = prepare_view(%{conn: conn})
+
+      html =
+        view
+        |> element(".navbar button", "Admin")
+        |> render_click()
+
+      assert html =~ "Backup settings"
+      assert html =~ "Should backup finish after copying data or continue syncing?"
+
+      assert html =~
+               ~S(<input checked="checked" id="backup_settings_type_regular" name="backup_settings[type]" type="radio" value="regular"/>)
+
+      assert html =~ ~r|<span class="ml-2 text-sm font-bold">\s+Regular\s+</span>|
+
+      assert html =~
+               ~S(<input id="backup_settings_type_continuous" name="backup_settings[type]" type="radio" value="continuous"/>)
+
+      assert html =~ ~r|<span class="ml-2 text-sm">\s+Continuous\s+</span>|
+
+      assert html =~ ~S(phx-disable-with="Updating..." type="submit">Update</button>)
+
+      html =
+        view
+        |> form("#backup_settings", %{"backup_settings" => %{"type" => "continuous"}})
+        |> render_change()
+
+      assert html =~
+               ~S(<input id="backup_settings_type_regular" name="backup_settings[type]" type="radio" value="regular"/>)
+
+      assert html =~ ~r|<span class="ml-2 text-sm">\s+Regular\s+</span>|
+
+      assert html =~
+               ~S(<input checked="checked" id="backup_settings_type_continuous" name="backup_settings[type]" type="radio" value="continuous"/>)
+
+      assert html =~ ~r|<span class="ml-2 text-sm font-bold">\s+Continuous\s+</span>|
+
+      assert html =~ ~S(phx-disable-with="Updating..." type="submit">Update</button>)
+
+      view
+      |> form("#backup_settings", %{"backup_settings" => %{"type" => "continuous"}})
+      |> render_submit()
+
+      assert html =~
+               ~S(<input id="backup_settings_type_regular" name="backup_settings[type]" type="radio" value="regular"/>)
+
+      assert html =~ ~r|<span class="ml-2 text-sm">\s+Regular\s+</span>|
+
+      assert html =~
+               ~S(<input checked="checked" id="backup_settings_type_continuous" name="backup_settings[type]" type="radio" value="continuous"/>)
+
+      assert html =~ ~r|<span class="ml-2 text-sm font-bold">\s+Continuous\s+</span>|
+
+      assert %BackupSettings{} = backup_settings = AdminRoom.get_backup_settings()
+      assert backup_settings.type == :continuous
+    end
   end
 
   describe "cargo settings form" do
@@ -161,7 +220,6 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
   describe "media settings form" do
     test "saves media settings to the admin DB", %{conn: conn} do
       %{view: view} = prepare_view(%{conn: conn})
-      PubSub.subscribe(Chat.PubSub, "chat->platform")
 
       html =
         view

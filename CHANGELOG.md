@@ -19,6 +19,7 @@ straightforward as possible.
 - ChangeTracker expiry
 - searchbar color changed
 - Separate main from backup DB
+- Configurable continuous backup
 
 ### Fixed
 - feeds close error on mobile bugfix

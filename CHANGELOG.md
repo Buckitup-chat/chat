@@ -17,6 +17,7 @@ straightforward as possible.
 ### Changed
 - Hide Cargo sync timer and increase the timeout to 5 minutes
 - ChangeTracker expiry
+- searchbar color changed
 
 ### Fixed
 - feeds close error on mobile bugfix
@@ -28,6 +29,7 @@ straightforward as possible.
 - Drive dump failing after 1 minute mark
 - Adaptive uploads and users/rooms list for desctop
 - Adaptive uploads and users/rooms list for mobile
+- handle lost messages when viewing gallery
 
 
 ## 2023-04-15_c77d709___2023-04-15_64148f8

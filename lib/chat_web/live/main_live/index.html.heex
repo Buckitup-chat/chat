@@ -575,9 +575,9 @@
           >
             <%= if @dialog do %>
               <.live_component
-                module={Layout.ImageGallery}
+                module={Page.ImageGallery}
                 id="imageGallery"
-                type="dialog"
+                type={:dialog}
                 dialog={@dialog}
                 me={@me}
               />
@@ -772,9 +772,9 @@
               <% end %>
             <% else %>
               <.live_component
-                module={Layout.ImageGallery}
+                module={Page.ImageGallery}
                 id="imageGallery"
-                type="room"
+                type={:room}
                 room_identity={@room_identity}
               />
               <div

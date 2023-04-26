@@ -32,7 +32,6 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.Utils
   alias Chat.Utils.StorageId
 
-  alias ChatWeb.MainLive.Layout
   alias ChatWeb.MainLive.Page
 
   alias Phoenix.PubSub
@@ -486,18 +485,18 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def open_image_gallery(socket, msg_id) do
-    send_update(Layout.ImageGallery, id: "imageGallery", action: :open, incoming_msg_id: msg_id)
+    send_update(Page.ImageGallery, id: "imageGallery", action: :open, incoming_msg_id: msg_id)
     socket
   end
 
   def image_gallery_preload_next(socket) do
-    send_update(Layout.ImageGallery, id: "imageGallery", action: :preload_next)
+    send_update(Page.ImageGallery, id: "imageGallery", action: :preload_next)
 
     socket
   end
 
   def image_gallery_preload_prev(socket) do
-    send_update(Layout.ImageGallery, id: "imageGallery", action: :preload_prev)
+    send_update(Page.ImageGallery, id: "imageGallery", action: :preload_prev)
 
     socket
   end

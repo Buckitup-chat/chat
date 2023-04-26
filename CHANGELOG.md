@@ -28,6 +28,7 @@ straightforward as possible.
 - Dumping duplicate files
 - Drive dump failing after 1 minute mark
 - Adaptive uploads and users/rooms list for desctop
+- Markup for admin room fixed
 - Adaptive uploads and users/rooms list for mobile
 - handle lost messages when viewing gallery
 

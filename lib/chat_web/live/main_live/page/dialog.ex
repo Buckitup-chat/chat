@@ -398,6 +398,15 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:image_gallery, nil)
   end
 
+  def broadcast_new_message(nil, _, _, _), do: nil
+
+  def broadcast_new_message(message, dialog, me, time) do
+    {:new_dialog_message, message}
+    |> dialog_broadcast(dialog)
+
+    Log.message_direct(me, time, Dialogs.peer(dialog, me))
+  end
+
   defp dialog_topic(%Dialogs.Dialog{} = dialog) do
     dialog
     |> Dialogs.key()
@@ -421,15 +430,6 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:messages, page_messages)
     |> assign(:has_more_messages, length(messages) > per_page)
     |> assign(:last_load_timestamp, set_messages_timestamp(page_messages))
-  end
-
-  defp broadcast_new_message(nil, _, _, _), do: nil
-
-  defp broadcast_new_message(message, dialog, me, time) do
-    {:new_dialog_message, message}
-    |> dialog_broadcast(dialog)
-
-    Log.message_direct(me, time, Dialogs.peer(dialog, me))
   end
 
   defp broadcast_message_updated(message_id, dialog, me, time) do

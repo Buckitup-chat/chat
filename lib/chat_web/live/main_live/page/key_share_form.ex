@@ -7,41 +7,54 @@ defmodule ChatWeb.MainLive.Page.KeyShareForm do
 
   alias Ecto.Changeset
 
+  alias ChatWeb.MainLive.Layout
+
+  def mount(socket) do
+    {:ok, socket |> assign(:share_users, [])}
+  end
+
   def assign_changeset(socket) do
     socket
     |> assign(
       :changeset,
       Changeset.change({%{}, schema()})
-      |> Changeset.validate_required(:users)
-      |> Changeset.validate_length(:users, min: 4)
+      |> Changeset.validate_required(:share_users)
+      |> Changeset.validate_length(:share_users, min: 4)
     )
   end
 
-  def check_share(socket, params) do
+  def check_share(%{assigns: %{share_users: _users} = params} = socket) do
     changeset =
       {%{}, schema()}
       |> Changeset.cast(params, schema() |> Map.keys())
-      |> Changeset.validate_required(:users)
-      |> Changeset.validate_length(:users, min: 4)
+      |> Changeset.validate_required(:share_users)
+      |> Changeset.validate_length(:share_users, min: 4)
       |> Map.put(:action, :validate)
 
     socket
     |> assign(:changeset, changeset)
   end
 
-  def handle_event("check-share", %{"form_data" => %{"users" => _users} = params}, socket) do
+  def handle_event("select-user", %{"user" => user} = _params, socket) do
     socket
-    |> check_share(params)
+    |> selected_user(user)
+    |> check_share()
     |> noreply()
   end
 
   def handle_event(
         "accept-share",
-        %{"form_data" => %{"users" => users}},
-        %{assigns: %{users: user_cards, me: me, rooms: rooms, monotonic_offset: time_offset}} =
-          socket
+        _params,
+        %{
+          assigns: %{
+            users: user_cards,
+            share_users: share_users,
+            me: me,
+            monotonic_offset: time_offset
+          }
+        } = socket
       ) do
-    {me, rooms, user_cards |> Enum.filter(fn user -> user.name in users end)}
+    {me, user_cards |> Enum.filter(fn user -> user.name in share_users end)}
     |> KeyShare.generate_key_shares()
     |> KeyShare.send_shares({me, time_offset})
 
@@ -59,7 +72,7 @@ defmodule ChatWeb.MainLive.Page.KeyShareForm do
         To store the backup copy of the key securely, select at least 4 users who will store a parts of your key.
       </p>
       <.form
-        :let={f}
+        :let={_f}
         for={@changeset}
         id="share-form"
         phx-change="check-share"
@@ -68,16 +81,34 @@ defmodule ChatWeb.MainLive.Page.KeyShareForm do
         as={:form_data}
         class="mt-3 w-full"
       >
-        <div class="mt-3 w-ull relative">
-          <%= multiple_select(
-            f,
-            :users,
-            @users
-            |> Enum.map(fn user -> user.name end)
-            |> List.delete(@me.name),
-            class:
-              "form-select block w-full py-2 px-3 rounded-md shadow-sm transition ease-in-out duration-150 sm:text-sm sm:leading-5"
-          ) %>
+        <div class="flex h-64 rounded-md">
+          <div class="mx-1 flex w-full h-full flex-col border border-gray-300 rounded-md bg-white">
+            <div class="text-lg bg-gray-100 rounded-t-md p-2 users-title">Users</div>
+            <ul
+              class="h-full overflow-y-scroll overflow-x-hidden users-list"
+              id="users-list"
+              phx-target={@myself}
+            >
+              <li
+                :for={user <- @users}
+                :if={user.name != @me.name}
+                class={"cursor-pointer" <> if(user.name in @share_users, do: " bg-gray-200 selected-user", else: "")}
+                phx-click="select-user"
+                phx-target={@myself}
+                phx-value-user={user.name}
+              >
+                <div class="content">
+                  <div class="flex-1 px-2 py-2 truncate whitespace-normal">
+                    <p class="text-sm font-bold">
+                      <div class="flex flex-row px-7">
+                        <Layout.Card.hashed_name card={user} />
+                      </div>
+                    </p>
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </div>
         </div>
         <%= submit("Share",
           phx_disable_with: "Sharing the Key...",
@@ -89,5 +120,12 @@ defmodule ChatWeb.MainLive.Page.KeyShareForm do
     """
   end
 
-  def schema, do: %{users: {:array, :string}}
+  defp selected_user(%{assigns: %{share_users: users}} = socket, user) do
+    case user in users do
+      true -> socket |> assign(:share_users, users -- [user])
+      false -> socket |> assign(:share_users, users ++ [user])
+    end
+  end
+
+  def schema, do: %{share_users: {:array, :string}}
 end

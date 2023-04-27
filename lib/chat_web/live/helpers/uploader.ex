@@ -134,12 +134,12 @@ defmodule ChatWeb.LiveHelpers.Uploader do
 
     {uploader_data, socket} =
       cond do
-        secret = FileIndex.get(reader_hash(socket.assigns), upload_key) ->
+        encrypted_secret = FileIndex.get(reader_hash(socket.assigns), upload_key) ->
           entry = Map.put(entry, :done?, true)
 
           metadata =
             %UploadMetadata{}
-            |> Map.put(:credentials, {upload_key, secret})
+            |> Map.put(:credentials, {upload_key, encrypted_secret})
             |> Map.put(:destination, file_upload_destination(socket.assigns))
 
           case metadata.destination.type do
@@ -153,13 +153,14 @@ defmodule ChatWeb.LiveHelpers.Uploader do
           {%{skip: true}, socket}
 
         true ->
-          {next_chunk, secret} = maybe_resume_existing_upload(upload_key, socket.assigns)
+          {next_chunk, encrypted_secret} =
+            maybe_resume_existing_upload(upload_key, socket.assigns)
 
           initial_secret = ChunkedFiles.get_file(upload_key)
           ChunkedFilesMultisecret.generate(upload_key, entry.client_size, initial_secret)
 
           {socket, uploader_data} =
-            start_chunked_upload(socket, entry, upload_key, secret, next_chunk)
+            start_chunked_upload(socket, entry, upload_key, encrypted_secret, next_chunk)
 
           link =
             Helpers.upload_chunk_url(Endpoint, :put, upload_key |> Base.encode16(case: :lower))
@@ -189,25 +190,25 @@ defmodule ChatWeb.LiveHelpers.Uploader do
   defp maybe_resume_existing_upload(upload_key, assigns) do
     case UploadIndex.get(upload_key) do
       nil ->
-        secret =
+        encrypted_secret =
           upload_key
           |> ChunkedFiles.new_upload()
           |> ChunkedFiles.encrypt_secret(assigns.me)
 
-        add_upload_to_index(assigns, upload_key, secret)
-        {0, secret}
+        add_upload_to_index(assigns, upload_key, encrypted_secret)
+        {0, encrypted_secret}
 
       %Upload{} = upload ->
         UploadIndex.delete(upload_key)
-        add_upload_to_index(assigns, upload_key, upload.secret)
+        add_upload_to_index(assigns, upload_key, upload.encrypted_secret)
         next_chunk = ChunkedFiles.next_chunk(upload_key)
-        {next_chunk, upload.secret}
+        {next_chunk, upload.encrypted_secret}
     end
   end
 
-  defp add_upload_to_index(assigns, key, secret) do
+  defp add_upload_to_index(assigns, key, encrypted_secret) do
     timestamp = Chat.Time.monotonic_to_unix(assigns.monotonic_offset)
-    upload = %Upload{secret: secret, timestamp: timestamp}
+    upload = %Upload{encrypted_secret: encrypted_secret, timestamp: timestamp}
     UploadIndex.add(key, upload)
   end
 

@@ -11,6 +11,42 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+
+### Changed
+
+### Fixed
+
+
+## 2023-04-26_e311fc1___2023-04-26_217f745
+
+### Added
+- USB drive dump progress
+- Ability to resume failed drive dump
+
+### Changed
+- Hide Cargo sync timer and increase the timeout to 5 minutes
+- ChangeTracker expiry
+- searchbar color changed
+
+### Fixed
+- feeds close error on mobile bugfix
+- message select checkbox bugfix
+- text message editing bugfix
+- Backup key password validation bugfix
+- Cargo sync failing after 1 minute mark
+- Dumping duplicate files
+- Drive dump failing after 1 minute mark
+- Adaptive uploads and users/rooms list for desctop
+- Show Cargo Room tab regardless of media settings
+- Error entering room on main drive fix
+- Markup for admin room fixed
+- Adaptive uploads and users/rooms list for mobile
+- handle lost messages when viewing gallery
+
+
+## 2023-04-15_c77d709___2023-04-15_64148f8
+
+### Added
 - Search box for users/rooms
 - Users/Rooms sync optimization for UI
 - Integration of Secret Sharing with encryption layer (#251)
@@ -19,6 +55,7 @@ straightforward as possible.
 
 ### Changed
 - short code to be first 6 hex digits (was 8)
+- landing page code updated
 
 ### Fixed
 - better broken files handling
@@ -51,6 +88,7 @@ straightforward as possible.
 - Unique name constraint for Cargo rooms
 - Checkpoints preset
 - Cargo sync flow
+- Room post permanent link feature
 
 ### Changed
 - uploading in one thread

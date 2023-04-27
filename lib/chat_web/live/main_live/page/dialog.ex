@@ -20,13 +20,11 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.Log
   alias Chat.MemoIndex
   alias Chat.Messages
-  alias Chat.RoomInviteIndex
   alias Chat.Rooms
   alias Chat.Upload.UploadMetadata
   alias Chat.User
   alias Chat.Utils.StorageId
 
-  alias ChatWeb.MainLive.Layout
   alias ChatWeb.MainLive.Page
 
   alias Phoenix.PubSub
@@ -181,8 +179,9 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> Messages.Text.new(time)
     |> Dialogs.update_message(msg_id, me, dialog)
     |> MemoIndex.add(dialog, me)
-
-    broadcast_message_updated(msg_id, dialog, me, time)
+    |> Dialogs.on_saved(dialog, fn ->
+      broadcast_message_updated(msg_id, dialog, me, time)
+    end)
 
     socket
     |> cancel_edit()
@@ -296,9 +295,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       socket
     else
       socket
-      |> store_room_key_copy(new_room_identity)
-      |> Page.Login.store_new_room(new_room_identity)
-      |> Page.Lobby.refresh_room_list()
+      |> Page.Room.store_new(new_room_identity)
       |> update_invite_navigation(msg, new_room_identity, render_fun)
     end
   rescue
@@ -325,9 +322,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       socket
     else
       socket
-      |> store_room_key_copy(new_room_identity)
-      |> Page.Login.store_new_room(new_room_identity)
-      |> Page.Lobby.refresh_room_list()
+      |> Page.Room.store_new(new_room_identity)
     end
     |> close()
     |> Page.Room.init({new_room_identity, new_room_identity |> Identity.pub_key() |> Rooms.get()})
@@ -341,17 +336,6 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> Enum.each(fn invite ->
       send(self(), {:dialog, {:accept_room_invite, invite}})
     end)
-
-    socket
-  end
-
-  def store_room_key_copy(%{assigns: %{me: me}} = socket, room_identity) do
-    my_notes = Dialogs.find_or_open(me)
-
-    room_identity
-    |> Messages.RoomInvite.new()
-    |> Dialogs.add_new_message(me, my_notes)
-    |> RoomInviteIndex.add(my_notes, me)
 
     socket
   end
@@ -370,18 +354,18 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def open_image_gallery(socket, msg_id) do
-    send_update(Layout.ImageGallery, id: "imageGallery", action: :open, incoming_msg_id: msg_id)
+    send_update(Page.ImageGallery, id: "imageGallery", action: :open, incoming_msg_id: msg_id)
     socket
   end
 
   def image_gallery_preload_next(socket) do
-    send_update(Layout.ImageGallery, id: "imageGallery", action: :preload_next)
+    send_update(Page.ImageGallery, id: "imageGallery", action: :preload_next)
 
     socket
   end
 
   def image_gallery_preload_prev(socket) do
-    send_update(Layout.ImageGallery, id: "imageGallery", action: :preload_prev)
+    send_update(Page.ImageGallery, id: "imageGallery", action: :preload_prev)
 
     socket
   end

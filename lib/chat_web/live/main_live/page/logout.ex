@@ -57,6 +57,7 @@ defmodule ChatWeb.MainLive.Page.Logout do
     changeset =
       {%{}, schema()}
       |> Changeset.cast(form, schema() |> Map.keys())
+      |> Changeset.validate_required([:password, :password_confirmation])
       |> Changeset.validate_length(:password, min: 12)
       |> Changeset.validate_format(:password, ~r/^[0-9A-Za-z]+$/,
         message: "Should consist of letters and numbers"

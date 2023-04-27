@@ -33,6 +33,11 @@ defmodule Chat.AdminDb do
     |> CubDB.get(key)
   end
 
+  def list({min, max}) do
+    db()
+    |> CubDB.select(min_key: min, max_key: max)
+  end
+
   def values(min, max) do
     db()
     |> CubDB.select(

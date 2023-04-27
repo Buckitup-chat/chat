@@ -6,19 +6,20 @@ defmodule Chat.Sync.CargoRoom do
   use GenServer
   use StructAccess
 
+  alias Chat.{Rooms, RoomsBroker}
   alias Phoenix.PubSub
 
   @type room_key :: String.t()
   @type t :: %__MODULE__{}
   @type time :: integer()
 
-  @start_timeout 2 * 60
-  @sync_timeout 60
+  @start_timeout 5 * 60
+  @sync_timeout 60 * 60
 
   @cargo_topic "chat::cargo_room"
   @lobby_topic "chat::lobby"
 
-  defstruct [:pub_key, :successful?, status: :pending, timer: @start_timeout]
+  defstruct [:pub_key, :successful?, :timer_ref, status: :pending, timer: @start_timeout]
 
   @spec start_link(any) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(_args) do
@@ -91,8 +92,12 @@ defmodule Chat.Sync.CargoRoom do
           cargo_room
 
         _ ->
-          Process.send_after(self(), :update_timer, 1000)
-          %__MODULE__{pub_key: room_key}
+          if cargo_room[:timer_ref] do
+            Process.cancel_timer(cargo_room.timer_ref)
+          end
+
+          timer_ref = Process.send_after(self(), :update_timer, 1000)
+          %__MODULE__{pub_key: room_key, timer_ref: timer_ref}
       end
 
     :ok = PubSub.broadcast(Chat.PubSub, @cargo_topic, {:update_cargo_room, cargo_room})
@@ -135,6 +140,10 @@ defmodule Chat.Sync.CargoRoom do
           :failed
       end
 
+    cargo_room.pub_key
+    |> Rooms.get()
+    |> RoomsBroker.put()
+
     cargo_room = %{cargo_room | status: status}
 
     :ok = PubSub.broadcast(Chat.PubSub, @cargo_topic, {:update_cargo_room, cargo_room})
@@ -175,10 +184,9 @@ defmodule Chat.Sync.CargoRoom do
           %{cargo_room | timer: new_timer}
 
         true ->
+          :ok = PubSub.broadcast(Chat.PubSub, @cargo_topic, {:update_cargo_room, nil})
           nil
       end
-
-    :ok = PubSub.broadcast(Chat.PubSub, @cargo_topic, {:update_cargo_room, cargo_room})
 
     {:noreply, cargo_room}
   end

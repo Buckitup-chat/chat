@@ -432,13 +432,17 @@ html {
   bottom: 0;
 }
 
+.sidebar-container {
+  display: grid;
+}
+
 @media screen and (min-width: 640px) {
   .navbar { @apply h-screen w-[70px] flex flex-none flex-col justify-between bg-white }
 
   .navbarTop { @apply hidden }
   .navbarBottom { @apply hidden }
 
-  .chatRoomBar { @apply h-screen w-[320px] flex-none min-w-fit bg-white/90 overflow-y-scroll  }
+  .chatRoomBar { @apply h-screen w-[320px] min-w-fit flex flex-none flex-col bg-white/90 overflow-y-scroll  }
 }
 
 @media screen and (max-width: 640px) {
@@ -447,7 +451,13 @@ html {
   .navbarTop { @apply  w-screen h-12 flex items-center justify-between bg-white fixed top-0}
   .navbarBottom { @apply  w-screen h-14 flex items-center justify-between bg-white fixed bottom-0 }
 
-  .chatRoomBar { @apply  h-screen w-screen py-20 bg-white/90 overflow-y-scroll }
+  .chatRoomBar { @apply w-screen py-11 bg-white/90 }
+
+  .sidebar-container {
+    height: 85%;
+    padding: 25px 0;
+    overflow: scroll;
+  }
   
 }
 

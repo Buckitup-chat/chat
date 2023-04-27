@@ -141,7 +141,7 @@ defmodule ChatWeb.MainLive.Admin.CargoSettingsForm do
   @impl Phoenix.LiveComponent
   def render(assigns) do
     ~H"""
-    <section class="flex flex-row mt-4">
+    <section class="flex flex-col md:flex-row mt-4">
       <.container
         myself={@myself}
         selected_pub_key={@selected_pub_key}
@@ -224,7 +224,7 @@ defmodule ChatWeb.MainLive.Admin.CargoSettingsForm do
 
   defp buttons(assigns) do
     ~H"""
-    <div class="flex flex-col self-center mx-8 my-auto">
+    <div class="flex flex-col self-center md:mx-8 mr-[5rem] my-5 md:my-auto">
       <p class="w-32 text-sm">Checkpoints are automatically invited to the Cargo rooms you create.</p>
 
       <.button disabled={@selected_type != "rest"} event="add_checkpoint" myself={@myself} text="Add" />

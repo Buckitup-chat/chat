@@ -1052,7 +1052,7 @@
             </Layout.Admin.row>
             <Layout.Admin.row>
               <Layout.Admin.block title="Remove Room">
-                <section class="md:max-h-[400px] overflow-scroll">
+                <section>
                   <%= for room <- @room_list do %>
                     <div
                       class="cursor-pointer"
@@ -1074,7 +1074,7 @@
                 </section>
               </Layout.Admin.block>
               <Layout.Admin.block title="Remove User">
-                <section class="md:max-h-[400px] overflow-scroll">
+                <section>
                   <%= for user <- @full_user_list do %>
                     <div
                       class="cursor-pointer"

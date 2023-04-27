@@ -4,7 +4,7 @@ defmodule ChatWeb.MainLive.Layout.Admin do
 
   def container(assigns) do
     ~H"""
-    <div class="flex flex-col overflow-scroll py-[40px] md:py-0 md:overflow-hidden">
+    <div class="flex flex-col overflow-scroll py-[40px] md:py-0 w-full">
       <%= render_slot(@inner_block) %>
     </div>
     """

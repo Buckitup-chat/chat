@@ -10,32 +10,33 @@ defmodule ChatWeb.MainLive.Layout.SecretSharingForm do
   alias Chat.Card
   alias Chat.Dialogs.{Dialog, DialogMessaging}
   alias Chat.Messages.Text
-  alias Chat.User.Registry
+
+  @threshold 4
 
   @impl Phoenix.LiveComponent
   def mount(socket) do
     users =
-      Registry.all()
-      |> Stream.map(fn {pub_key, %Card{} = user} -> {pub_key, user.name} end)
+      Chat.UsersBroker.list()
+      |> Stream.map(fn %Card{} = user -> {user.pub_key, user.name} end)
       |> Enum.to_list()
       |> Enum.sort_by(&elem(&1, 1))
 
-    {:ok,
-     socket
-     |> assign(:secret_holders, [])
-     |> assign(:user_options, users)
-     |> assign(:selected_pb_key, nil)
-     |> assign(:selected_kind, nil)
-     |> assign(:threshold, 3)}
+    socket
+    |> assign(:secret_holders, [])
+    |> assign(:user_options, users)
+    |> assign(:selected_pb_key, nil)
+    |> assign(:selected_kind, nil)
+    |> assign(:threshold, @threshold)
+    |> ok()
   end
 
   @impl Phoenix.LiveComponent
   def handle_event("select_user", %{"pub-key" => pub_key, "kind" => kind}, socket)
       when kind in ["share-holders", "rest"] do
-    {:noreply,
-     socket
-     |> assign(:selected_pb_key, decode_pub_key(pub_key))
-     |> assign(:selected_kind, kind)}
+    socket
+    |> assign(:selected_pb_key, decode_pub_key(pub_key))
+    |> assign(:selected_kind, kind)
+    |> noreply()
   end
 
   def handle_event("add_holder", _params, socket) do
@@ -46,11 +47,11 @@ defmodule ChatWeb.MainLive.Layout.SecretSharingForm do
         socket.assigns.selected_pb_key
       )
 
-    {:noreply,
-     socket
-     |> assign(:secret_holders, updated_holders)
-     |> assign(:user_options, updated_options)
-     |> assign(:selected_kind, "share-holders")}
+    socket
+    |> assign(:secret_holders, updated_holders)
+    |> assign(:user_options, updated_options)
+    |> assign(:selected_kind, "share-holders")
+    |> noreply()
   end
 
   def handle_event("remove_holder", _params, socket) do
@@ -61,11 +62,11 @@ defmodule ChatWeb.MainLive.Layout.SecretSharingForm do
         socket.assigns.selected_pb_key
       )
 
-    {:noreply,
-     socket
-     |> assign(:secret_holders, updated_holders)
-     |> assign(:user_options, updated_options)
-     |> assign(:selected_kind, "rest")}
+    socket
+    |> assign(:secret_holders, updated_holders)
+    |> assign(:user_options, updated_options)
+    |> assign(:selected_kind, "rest")
+    |> noreply()
   end
 
   def handle_event("secret_share", _params, socket) do
@@ -83,7 +84,7 @@ defmodule ChatWeb.MainLive.Layout.SecretSharingForm do
       |> DialogMessaging.add_new_message(secret_sharer, dialog)
     end
 
-    {:noreply, socket}
+    socket |> noreply()
   end
 
   defp from_one_to_another(list1, list2, pb_key) do
@@ -191,7 +192,7 @@ defmodule ChatWeb.MainLive.Layout.SecretSharingForm do
       />
 
       <.button
-        disabled={length(@shares) >= @threshold}
+        disabled={length(@shares) < @threshold}
         event="secret_share"
         myself={@myself}
         text="Send Shares"

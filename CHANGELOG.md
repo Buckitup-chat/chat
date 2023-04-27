@@ -12,7 +12,6 @@ straightforward as possible.
 
 ### Added
 - Secret Sharing integrated into client via new form in logout
-- After clicking the button, secret shares will be sent to chosen users via text message
 
 ### Changed
 

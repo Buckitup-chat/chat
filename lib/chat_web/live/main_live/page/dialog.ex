@@ -382,8 +382,6 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:image_gallery, nil)
   end
 
-
-
   defp dialog_topic(%Dialogs.Dialog{} = dialog) do
     dialog
     |> Dialogs.key()

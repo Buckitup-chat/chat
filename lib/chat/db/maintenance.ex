@@ -8,6 +8,8 @@ defmodule Chat.Db.Maintenance do
   end
 
   def path_free_space(path) do
+    File.exists?(path) or raise "Path #{inspect(path)} doesn't exist"
+
     System.cmd("df", ["-Pk", path])
     |> elem(0)
     |> String.split("\n", trim: true)
@@ -21,7 +23,8 @@ defmodule Chat.Db.Maintenance do
   end
 
   def path_to_device(path) do
-    with {data, 0} <- System.cmd("df", ["-P", path]),
+    with true <- File.exists?(path),
+         {data, 0} <- System.cmd("df", ["-P", path]),
          [_header, row] <- String.split(data, "\n", trim: true),
          [full_device | _] <- String.split(row, " ", trim: true) do
       full_device

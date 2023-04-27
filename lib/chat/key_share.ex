@@ -2,28 +2,25 @@ defmodule Chat.KeyShare do
   @moduledoc "Manipulate social sharing keys"
 
   alias Chat.Identity
-  alias Chat.{Actor, ChunkedFiles, ChunkedFilesMultisecret}
+  alias Chat.{ChunkedFiles, ChunkedFilesMultisecret}
   alias Chat.Upload.UploadKey
   alias Chat.{Dialogs, Dialogs.Dialog, Messages}
 
   alias Phoenix.PubSub
 
-  def generate_key_shares(
-        {%Identity{private_key: private_key, public_key: public_key} = me, users}
-      ) do
-    share_count = Enum.count(users)
-    base_key = Actor.new(me, [], %{}) |> Actor.to_encrypted_json("") |> Base.encode64()
-    len_part = ceil(String.length(base_key) / share_count)
+  @threshold 4
+
+  def generate_key_shares({%Identity{private_key: private_key} = _me, users}) do
+    shares =
+      private_key
+      |> Enigma.hide_secret_in_shares(users |> Enum.count(), @threshold)
+
+    share_count = Enum.count(shares)
 
     for i <- 0..(share_count - 1), into: [] do
-      start_idx = i * len_part
-      end_idx = start_idx + len_part - 1
-
       %{
         user: Enum.at(users, i),
-        key:
-          String.slice(base_key, start_idx..end_idx)
-          |> Enigma.encrypt(private_key, public_key)
+        key: Enum.at(shares, i) |> Base.encode64()
       }
     end
   end

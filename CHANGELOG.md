@@ -29,6 +29,7 @@ straightforward as possible.
 - Drive dump failing after 1 minute mark
 - Adaptive uploads and users/rooms list for desctop
 - Markup for admin room fixed
+-added scroll for admin room and mobile markup fixed
 
 
 ## 2023-04-15_c77d709___2023-04-15_64148f8

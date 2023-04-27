@@ -11,10 +11,12 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+- free spaces on admin panel
 - Store key using Social Sharing
 ### Changed
 
 ### Fixed
+-added scroll for admin room and mobile markup fixed
 
 
 ## 2023-04-26_e311fc1___2023-04-26_217f745
@@ -22,6 +24,7 @@ straightforward as possible.
 ### Added
 - USB drive dump progress
 - Ability to resume failed drive dump
+- AdminDb structure documentation
 
 ### Changed
 - Hide Cargo sync timer and increase the timeout to 5 minutes

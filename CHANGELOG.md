@@ -11,6 +11,7 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+- free spaces on admin panel
 
 ### Changed
 - Separate main from backup DB
@@ -24,6 +25,7 @@ straightforward as possible.
 ### Added
 - USB drive dump progress
 - Ability to resume failed drive dump
+- AdminDb structure documentation
 
 ### Changed
 - Hide Cargo sync timer and increase the timeout to 5 minutes

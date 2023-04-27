@@ -7,6 +7,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Phoenix.PubSub
 
   alias Chat.AdminRoom
+  alias Chat.Db.{FreeSpacesPoller, FreeSpacesSupervisor}
   alias Chat.Dialogs
   alias Chat.Messages
   alias Chat.Rooms
@@ -21,6 +22,10 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   def init(%{assigns: %{me: me}} = socket) do
     PubSub.subscribe(Chat.PubSub, @incoming_topic)
 
+    start_poller(me)
+
+    PubSub.subscribe(Chat.PubSub, FreeSpacesPoller.channel())
+
     me |> AdminRoom.visit()
 
     socket
@@ -28,6 +33,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     |> request_wifi_settings()
     |> assign_user_lists()
     |> assign_room_list()
+    |> assign(:free_spaces, FreeSpacesPoller.get_info())
   end
 
   def int(socket) do
@@ -138,8 +144,13 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     socket
   end
 
-  def close(socket) do
+  def set_free_spaces(socket, free_spaces), do: socket |> assign(:free_spaces, free_spaces)
+
+  def close(%{assigns: %{me: %{name: admin}}} = socket) do
     PubSub.unsubscribe(Chat.PubSub, @incoming_topic)
+    PubSub.unsubscribe(Chat.PubSub, FreeSpacesPoller.channel())
+
+    FreeSpacesPoller.leave(admin)
 
     socket
     |> assign(:admin_list, nil)
@@ -173,5 +184,23 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
 
     socket
     |> assign(:room_list, room_list)
+  end
+
+  defp start_poller(%{name: admin}) do
+    child_spec = FreeSpacesPoller.child_spec(name: FreeSpacesPoller, admin: admin)
+
+    start_result = DynamicSupervisor.start_child(FreeSpacesSupervisor, child_spec)
+
+    case start_result do
+      {:ok, _} -> :ok
+      _ -> FreeSpacesPoller.join(admin)
+    end
+  end
+
+  def stop_poller do
+    case FreeSpacesPoller |> Process.whereis() do
+      nil -> nil
+      pid -> DynamicSupervisor.terminate_child(FreeSpacesSupervisor, pid)
+    end
   end
 end

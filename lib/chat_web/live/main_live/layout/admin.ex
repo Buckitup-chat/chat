@@ -57,4 +57,23 @@ defmodule ChatWeb.MainLive.Layout.Admin do
     <% end %>
     """
   end
+
+  def free_spaces(assigns) do
+    ~H"""
+    <div class="flex flex-col space-y-5">
+      <div>
+        <label class="text-black/50"> Internal DB: </label>
+        <span><%= @free_spaces.internal_db %></span>
+      </div>
+      <div>
+        <label class="text-black/50"> Main DB: </label>
+        <span><%= @free_spaces.main_db %></span>
+      </div>
+      <div>
+        <label class="text-black/50"> Media DB: </label>
+        <span><%= @free_spaces.media_db %></span>
+      </div>
+    </div>
+    """
+  end
 end

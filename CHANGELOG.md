@@ -15,6 +15,7 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
+- Cargo sync and USB Drive dump bar scrolling away with the room content
 
 
 ## 2023-04-26_e311fc1___2023-04-26_217f745

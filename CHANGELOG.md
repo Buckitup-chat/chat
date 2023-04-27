@@ -22,6 +22,7 @@ straightforward as possible.
 ### Added
 - USB drive dump progress
 - Ability to resume failed drive dump
+- AdminDb structure documentation
 
 ### Changed
 - Hide Cargo sync timer and increase the timeout to 5 minutes

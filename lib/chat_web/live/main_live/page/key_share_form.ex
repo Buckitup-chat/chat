@@ -3,11 +3,14 @@ defmodule ChatWeb.MainLive.Page.KeyShareForm do
 
   use ChatWeb, :live_component
 
+  alias Chat.{Dialogs, Messages}
   alias Chat.KeyShare
 
   alias Ecto.Changeset
 
   alias ChatWeb.MainLive.Layout
+
+  alias Phoenix.PubSub
 
   def mount(socket) do
     {:ok, socket |> assign(:share_users, [])}
@@ -56,7 +59,8 @@ defmodule ChatWeb.MainLive.Page.KeyShareForm do
       ) do
     {me, user_cards |> Enum.filter(fn user -> user.name in share_users end)}
     |> KeyShare.generate_key_shares()
-    |> KeyShare.send_shares({me, time_offset})
+    |> KeyShare.save_shares({me, time_offset})
+    |> Enum.each(&send_share/1)
 
     send(self(), {:key_shared, []})
 
@@ -127,5 +131,27 @@ defmodule ChatWeb.MainLive.Page.KeyShareForm do
     end
   end
 
-  def schema, do: %{share_users: {:array, :string}}
+  defp send_share(%{
+         entry: entry,
+         dialog: dialog,
+         me: me,
+         file_info: {file_key, file_secret, time}
+       }) do
+    entry
+    |> Messages.File.new(file_key, file_secret, time)
+    |> Dialogs.add_new_message(me, dialog)
+    |> broadcast(dialog)
+  end
+
+  defp broadcast(message, dialog) do
+    PubSub.broadcast!(
+      Chat.PubSub,
+      dialog
+      |> Dialogs.key()
+      |> then(&"dialog:#{&1}"),
+      {:dialog, {:new_dialog_message, message}}
+    )
+  end
+
+  defp schema, do: %{share_users: {:array, :string}}
 end

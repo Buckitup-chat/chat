@@ -1,12 +1,9 @@
 defmodule Chat.KeyShare do
   @moduledoc "Manipulate social sharing keys"
 
-  alias Chat.Identity
+  alias Chat.{Dialogs, Dialogs.Dialog, Identity}
   alias Chat.{ChunkedFiles, ChunkedFilesMultisecret}
   alias Chat.Upload.UploadKey
-  alias Chat.{Dialogs, Dialogs.Dialog, Messages}
-
-  alias Phoenix.PubSub
 
   @threshold 4
 
@@ -25,9 +22,9 @@ defmodule Chat.KeyShare do
     end
   end
 
-  def send_shares(shares, {me, time_offset}) do
+  def save_shares(shares, {me, time_offset}) do
     shares
-    |> Enum.each(fn share ->
+    |> Enum.reduce([], fn share, acc ->
       with dialog <- Dialogs.find_or_open(me, share.user),
            file_info <- %{
              size: byte_size(share.key),
@@ -38,12 +35,19 @@ defmodule Chat.KeyShare do
            file_key <- UploadKey.new(destination, dialog.b_key, entry),
            file_secret <- ChunkedFiles.new_upload(file_key) do
         save({file_key, share.key}, {file_info.size, file_secret})
-        send(entry, dialog, me, {file_key, file_secret, file_info.time})
+
+        acc ++
+          [
+            %{
+              entry: entry,
+              dialog: dialog,
+              me: me,
+              file_info: {file_key, file_secret, file_info.time}
+            }
+          ]
       end
     end)
   end
-
-  def schema, do: %{users: {:array, :string}}
 
   defp destination(%Dialog{b_key: b_key} = dialog) do
     %{
@@ -69,22 +73,5 @@ defmodule Chat.KeyShare do
   defp save({file_key, share_key}, {file_size, file_secret}) do
     ChunkedFilesMultisecret.generate(file_key, file_size, file_secret)
     ChunkedFiles.save_upload_chunk(file_key, {0, file_size - 1}, file_size, share_key)
-  end
-
-  defp send(entry, dialog, me, {file_key, file_secret, time}) do
-    entry
-    |> Messages.File.new(file_key, file_secret, time)
-    |> Dialogs.add_new_message(me, dialog)
-    |> broadcast(dialog)
-  end
-
-  defp broadcast(message, dialog) do
-    PubSub.broadcast!(
-      Chat.PubSub,
-      dialog
-      |> Dialogs.key()
-      |> then(&"dialog:#{&1}"),
-      {:dialog, {:new_dialog_message, message}}
-    )
   end
 end

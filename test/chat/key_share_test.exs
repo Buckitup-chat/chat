@@ -22,9 +22,11 @@ defmodule Chat.KeyShareTest do
       assert Enum.all?(key_shares, &Map.has_key?(&1, :key))
     end
 
-    test "send_shares/2", %{me: me, shares: shares} do
+    test "save_shares/2", %{me: me, shares: shares} do
       time_offset = 3
-      assert shares |> KeyShare.send_shares({me, time_offset}) == :ok
+      saved_shares = shares |> KeyShare.save_shares({me, time_offset})
+      assert Enum.count(saved_shares) == Enum.count(shares)
+      assert Enum.all?(saved_shares, &Map.has_key?(&1, :entry))
     end
   end
 end

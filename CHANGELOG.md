@@ -14,9 +14,9 @@ straightforward as possible.
 - free spaces on admin panel
 
 ### Changed
-
+- styles for dark theme
 ### Fixed
--added scroll for admin room and mobile markup fixed
+- added scroll for admin room and mobile markup fixed
 
 
 ## 2023-04-26_e311fc1___2023-04-26_217f745

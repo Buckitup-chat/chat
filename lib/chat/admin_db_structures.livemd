@@ -50,7 +50,7 @@ Set cargo checkpoints. Checkpoints are automatically invited to the Cargo rooms.
 
 ### Media settings
 
-When new USB drive is plugged into the secondary port,the following functionality will be started.
+When new USB drive is plugged into the secondary port, the following functionality will be started.
 Functionalities:
 
 * backup - full backup of main drive;
@@ -65,7 +65,21 @@ Functionalities:
 
 <!-- livebook:{"break_markdown":true} -->
 
-###
+### Backup settings
+
+Configures whether the backup should be done after copying data, or if it should be syncing further changes.
+Types:
+
+* regular - finishes after copying;
+* continuous - copies data and then waits for new changes.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:backup_settings, %Chat.Admin.BackupSettings{type: type}}
+```
+
+<!-- livebook:{"break_markdown":true} -->
 
 ## Messaging
 

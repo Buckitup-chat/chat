@@ -14,6 +14,8 @@ straightforward as possible.
 - free spaces on admin panel
 
 ### Changed
+- Separate main from backup DB
+- Configurable continuous backup
 
 ### Fixed
 -added scroll for admin room and mobile markup fixed

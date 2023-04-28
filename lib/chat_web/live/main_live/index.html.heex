@@ -122,7 +122,7 @@
             phx-click="logout-go-share"
           >
             <div class="flex items-center justify-between">
-              <span>Share the Keys</span>
+              <span>Share the Key</span>
               <.icon id="share" class="w-4 h-4 ml-2" />
             </div>
           </button>
@@ -234,7 +234,6 @@
             id="key-share"
             users={@users}
             me={@me}
-            changeset={@changeset}
             monotonic_offset={@monotonic_offset}
           />
         <% end %>

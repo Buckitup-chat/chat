@@ -38,7 +38,6 @@ defmodule ChatWeb.MainLive.Page.Logout do
   def go_share(%{assigns: %{}} = socket) do
     socket
     |> assign(:logout_step, :share)
-    |> Page.KeyShareForm.assign_changeset()
   end
 
   def toggle_password_visibility(%{assigns: %{is_password_visible: flag}} = socket) do

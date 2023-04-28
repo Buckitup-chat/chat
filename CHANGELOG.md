@@ -17,9 +17,11 @@ straightforward as possible.
 ### Changed
 - Separate main from backup DB
 - Configurable continuous backup
+- styles for dark theme
 
 ### Fixed
--added scroll for admin room and mobile markup fixed
+- visit admin panel from room_invite message
+- added scroll for admin room and mobile markup fixed
 - Cargo sync and USB Drive dump bar scrolling away with the room content
 - Cargo sync and USB Drive dump not terminating when the drive is ejected
 

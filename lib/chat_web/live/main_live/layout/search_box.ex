@@ -23,7 +23,7 @@ defmodule ChatWeb.MainLive.Layout.SearchBox do
         <%= text_input(f, :name,
           placeholder: "Search",
           class:
-            "bg-gray-300 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+            "bg-gray-300 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 p-2.5"
         ) %>
         <button type="reset" name="reset" class="absolute inset-y-0 right-0 flex items-center pr-3">
           <.icon id="close" class="w-4 h-4 fill-gray-500 " />

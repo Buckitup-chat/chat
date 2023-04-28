@@ -12,6 +12,7 @@ straightforward as possible.
 
 ### Added
 - free spaces on admin panel
+- Ability to trigger Cargo sync again
 
 ### Changed
 - Separate main from backup DB

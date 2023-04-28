@@ -112,11 +112,15 @@ defmodule ChatWeb.MainLive.Page.KeyShareForm do
          me: me,
          file_info: {file_key, file_secret, time}
        }) do
-    entry
-    |> Messages.File.new(file_key, file_secret, time)
-    |> Dialogs.add_new_message(me, dialog)
-    |> Dialogs.await_saved(dialog)
-    |> broadcast(dialog)
+    message =
+      entry
+      |> Messages.File.new(file_key, file_secret, time)
+      |> Dialogs.add_new_message(me, dialog)
+
+    message
+    |> Dialogs.on_saved(dialog, fn ->
+      broadcast(message, dialog)
+    end)
   end
 
   defp broadcast(message, dialog) do

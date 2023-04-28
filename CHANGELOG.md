@@ -17,7 +17,9 @@ straightforward as possible.
 - Separate main from backup DB
 - Configurable continuous backup
 - styles for dark theme
+
 ### Fixed
+- visit admin panel from room_invite message
 - added scroll for admin room and mobile markup fixed
 
 

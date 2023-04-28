@@ -11,10 +11,12 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+- free spaces on admin panel
 
 ### Changed
 
 ### Fixed
+-added scroll for admin room and mobile markup fixed
 - Cargo sync and USB Drive dump bar scrolling away with the room content
 
 

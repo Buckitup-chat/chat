@@ -17,6 +17,7 @@ straightforward as possible.
 
 ### Fixed
 -added scroll for admin room and mobile markup fixed
+- visit admin panel from room_invite message
 
 
 ## 2023-04-26_e311fc1___2023-04-26_217f745

@@ -9,6 +9,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
   use ChatWeb, :component
 
+  alias Chat.AdminRoom
   alias Chat.Broker
   alias Chat.Card
   alias Chat.ChunkedFiles
@@ -318,14 +319,24 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       |> RoomInvites.get()
       |> Identity.from_strings()
 
-    if Map.has_key?(room_map, Identity.pub_key(new_room_identity)) do
+    socket =
+      if Map.has_key?(room_map, Identity.pub_key(new_room_identity)) do
+        socket
+      else
+        socket
+        |> Page.Room.store_new(new_room_identity)
+      end
+      |> close()
+
+    if new_room_identity.public_key == AdminRoom.pub_key() do
       socket
+      |> Page.Lobby.switch_lobby_mode("admin")
     else
       socket
-      |> Page.Room.store_new(new_room_identity)
+      |> Page.Room.init(
+        {new_room_identity, new_room_identity |> Identity.pub_key() |> Rooms.get()}
+      )
     end
-    |> close()
-    |> Page.Room.init({new_room_identity, new_room_identity |> Identity.pub_key() |> Rooms.get()})
   rescue
     _ -> socket
   end

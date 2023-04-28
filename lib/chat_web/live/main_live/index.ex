@@ -50,6 +50,7 @@ defmodule ChatWeb.MainLive.Index do
         )
         |> LocalTimeHook.assign_time(Phoenix.LiveView.get_connect_params(socket)["tz_info"])
         |> allow_any500m_upload(:my_keys_file)
+        |> allow_recover_upload()
         |> Page.Login.check_stored()
         |> set_cargo_room()
         |> set_usb_drive_dump_room()
@@ -123,6 +124,13 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> Page.Login.close()
     |> Page.ImportOwnKeyRing.init()
+    |> noreply()
+  end
+
+  def handle_event("login:recover-key-share", _, socket) do
+    socket
+    |> Page.Login.close()
+    |> assign(:mode, :recover_key_share)
     |> noreply()
   end
 
@@ -553,6 +561,16 @@ defmodule ChatWeb.MainLive.Index do
       accept: :any,
       max_entries: Keyword.get(opts, :max_entries, 1),
       progress: &handle_progress/3
+    )
+  end
+
+  defp allow_recover_upload(socket) do
+    socket
+    |> allow_upload(:recover_keys,
+      auto_upload: true,
+      progress: &Page.RecoverKeyShare.handle_progress/3,
+      accept: ~w(.social_part),
+      max_entries: 10
     )
   end
 

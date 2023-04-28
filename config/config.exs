@@ -72,6 +72,10 @@ config :chat,
 
 config :chat, Chat.Db.ChangeTracker, expire_seconds: 31
 
+config :mime, :types, %{
+  "text/plain" => ["social_part"]
+}
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

@@ -7,6 +7,8 @@ defmodule Chat.KeyShare do
 
   @threshold 4
 
+  def threshold, do: @threshold
+
   def generate_key_shares({%Identity{private_key: private_key} = _me, users}) do
     shares =
       private_key

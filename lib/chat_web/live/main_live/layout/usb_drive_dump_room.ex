@@ -10,7 +10,7 @@ defmodule ChatWeb.MainLive.Layout.UsbDriveDumpRoom do
   def bar(assigns) do
     ~H"""
     <%= if @dump_room && @dump_room.pub_key == @room.pub_key do %>
-      <div class="w-full px-8 py-4 border-b border-white/10 backdrop-blur-md bg-grayscale/40 z-10 flex flex-row items-center justify-between text-md text-white">
+      <div class="sticky top-[56px] w-full px-8 py-4 border-b border-white/10 backdrop-blur-md bg-grayscale/40 z-10 flex flex-row items-center justify-between text-md text-white">
         <div class="flex flex-row items-center text-base">
           USB drive dump activated <.remove_button status={@dump_room.status} />
         </div>

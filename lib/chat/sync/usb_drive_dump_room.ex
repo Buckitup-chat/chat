@@ -209,15 +209,8 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
     {:noreply, dump_room}
   end
 
-  def handle_cast(:remove, dump_room) do
-    dump_room =
-      case dump_room do
-        %__MODULE__{status: status} when status in [:pending, :complete, :failed] ->
-          nil
-
-        dump_room ->
-          dump_room
-      end
+  def handle_cast(:remove, _dump_room) do
+    dump_room = nil
 
     :ok = PubSub.broadcast(Chat.PubSub, @room_topic, {:update_usb_drive_dump_room, dump_room})
 

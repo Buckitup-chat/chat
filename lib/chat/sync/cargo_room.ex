@@ -153,15 +153,8 @@ defmodule Chat.Sync.CargoRoom do
     {:noreply, cargo_room}
   end
 
-  def handle_cast(:remove, cargo_room) do
-    cargo_room =
-      case cargo_room do
-        %__MODULE__{status: status} when status in [:pending, :complete, :failed] ->
-          nil
-
-        cargo_room ->
-          cargo_room
-      end
+  def handle_cast(:remove, _cargo_room) do
+    cargo_room = nil
 
     :ok = PubSub.broadcast(Chat.PubSub, @cargo_topic, {:update_cargo_room, cargo_room})
 

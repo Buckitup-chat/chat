@@ -20,6 +20,10 @@ defmodule ChatWeb.Hooks.LiveModalHook do
         "modal:close", _params, socket -> {:halt, LiveModal.close_modal(socket)}
         _event, _params, socket -> {:cont, socket}
       end)
+      |> attach_hook(:modal_hook, :handle_info, fn
+        :close_modal, socket -> {:halt, assign(socket, :live_modal, nil)}
+        _info, socket -> {:cont, socket}
+      end)
       |> assign(:live_modal, nil)
 
     {:cont, socket}

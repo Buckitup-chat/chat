@@ -44,7 +44,7 @@ defmodule ChatWeb.MainLive.Layout.Room do
         <%= if @room.type == :request do %>
           <.request_button requests={@requests} restricted={@restrict_actions} />
         <% end %>
-        <.invite_button users={Chat.User.list()} restricted={@restrict_actions} />
+        <.invite_button />
       </div>
     </div>
     """
@@ -126,14 +126,9 @@ defmodule ChatWeb.MainLive.Layout.Room do
   defp invite_button(assigns) do
     ~H"""
     <button
+      id="roomInviteButton"
       class="flex items-center t-invite-btn"
-      phx-click={
-        cond do
-          @restricted -> show_modal("restrict-write-actions")
-          @users |> length == 1 -> nil
-          true -> show_modal("room-invite-list")
-        end
-      }
+      phx-click="room/open-invite-list"
     >
       <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-white" />
       <span class="text-base text-white"> Invite</span>

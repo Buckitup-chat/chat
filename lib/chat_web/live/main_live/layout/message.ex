@@ -538,7 +538,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       </button>
     <% else %>
       <button
-        class="w-full sm:w-[30%] h-12 border-0 rounded-lg bg-grayscale text-white mb-2 sm:mb-0 sm:mr-2"
+        class="acceptInviteButton w-full sm:w-[30%] h-12 border-0 rounded-lg bg-grayscale text-white mb-2 sm:mb-0 sm:mr-2"
         phx-click="dialog/message/accept-room-invite"
         phx-value-id={@msg.id}
         phx-value-index={@msg.index}

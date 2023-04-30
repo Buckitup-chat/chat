@@ -93,7 +93,7 @@ defmodule ChatWeb.LiveTestHelpers do
     name = Utils.random_id()
 
     view
-    |> form("#room-create-form", new_room: %{name: name, type: type})
+    |> form("#room-create-form", room_input: %{name: name, type: type})
     |> render_submit()
 
     state = :sys.get_state(view.pid)

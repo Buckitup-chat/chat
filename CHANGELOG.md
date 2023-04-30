@@ -42,6 +42,7 @@ straightforward as possible.
 - Markup for admin room fixed
 - Adaptive uploads and users/rooms list for mobile
 - handle lost messages when viewing gallery
+- Invite list during room switch
 
 
 ## 2023-04-15_c77d709___2023-04-15_64148f8

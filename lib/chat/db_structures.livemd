@@ -412,3 +412,17 @@ classDiagram
   DB .. "n" ActionLog : index, user_key
   DB .. "n" ChangeTrackerMarker : uuid
 ```
+
+## DB Type
+
+We use DB type to mark the database for a specific use. Then we use the DB type to prevent directory from being renamed. Only `backup_db` directory is allowed to be renamed to `main_db` and vice versa. Take a look at `Platform.Storage.Bouncer` and `Platform.Storage.BouncerTest`.
+
+Types:
+
+- `:main_db` (used by `main_db` and `backup_db`)
+- `:cargo_db`
+- `:onliners_db`
+
+```elixir
+{:db_type, type}
+```

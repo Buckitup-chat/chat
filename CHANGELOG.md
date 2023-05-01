@@ -14,6 +14,7 @@ straightforward as possible.
 - free spaces on admin panel
 - Store key using Social Sharing
 - Ability to trigger Cargo sync again
+- Prevent DB directory from being renamed
 
 ### Changed
 - Separate main from backup DB

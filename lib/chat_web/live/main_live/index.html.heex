@@ -118,6 +118,15 @@
             </div>
           </button>
           <button
+            class="mt-5 w-full h-12 border rounded-lg border-black/10 flex items-center justify-center t-download-key"
+            phx-click="logout-go-share"
+          >
+            <div class="flex items-center justify-between">
+              <span>Share the Key</span>
+              <.icon id="share" class="w-4 h-4 ml-2" />
+            </div>
+          </button>
+          <button
             class="mt-3 w-full h-12 border rounded-lg border-black/10 t-logout-without-key"
             phx-click={
               hide_modal("logout-backup-popup") |> show_modal("logout-without-key-popup")
@@ -218,6 +227,15 @@
           >
             Download without password <span style="color: red">insecure!</span>
           </button>
+        <% end %>
+        <%= if @logout_step == :share do %>
+          <.live_component
+            module={ChatWeb.MainLive.Page.KeyShareForm}
+            id="key-share"
+            users={@users}
+            me={@me}
+            monotonic_offset={@monotonic_offset}
+          />
         <% end %>
         <%= if @logout_step == :final do %>
           <h1 class="text-base font-bold text-grayscale">Success</h1>
@@ -989,6 +1007,16 @@
                   module={MediaSettingsForm}
                 />
               </Layout.Admin.block>
+              <Layout.Admin.block title="Backup settings">
+                <.live_component
+                  id={:backup_settings_form}
+                  backup_settings={@backup_settings}
+                  module={BackupSettingsForm}
+                />
+              </Layout.Admin.block>
+              <Layout.Admin.block title="Free spaces">
+                <Layout.Admin.free_spaces free_spaces={@free_spaces} />
+              </Layout.Admin.block>
             </Layout.Admin.row>
             <Layout.Admin.row>
               <Layout.Admin.block title="Admin List">
@@ -1023,7 +1051,7 @@
             </Layout.Admin.row>
             <Layout.Admin.row>
               <Layout.Admin.block title="Remove Room">
-                <section class="md:max-h-[400px] overflow-scroll">
+                <section>
                   <%= for room <- @room_list do %>
                     <div
                       class="cursor-pointer"
@@ -1045,7 +1073,7 @@
                 </section>
               </Layout.Admin.block>
               <Layout.Admin.block title="Remove User">
-                <section class="md:max-h-[400px] overflow-scroll">
+                <section>
                   <%= for user <- @full_user_list do %>
                     <div
                       class="cursor-pointer"

@@ -161,8 +161,8 @@ defmodule ChatWeb.MainLive.IndexTest do
     setup do
       AdminDb.db() |> CubDB.clear()
       Db.db() |> CubDB.clear()
-      :sys.replace_state(CargoRoom, fn _state -> nil end)
-      :sys.replace_state(UsbDriveDumpRoom, fn _state -> nil end)
+      CargoRoom.remove()
+      UsbDriveDumpRoom.remove()
 
       :ok
     end
@@ -276,8 +276,8 @@ defmodule ChatWeb.MainLive.IndexTest do
     setup %{conn: conn} do
       AdminDb.db() |> CubDB.clear()
       Db.db() |> CubDB.clear()
-      :sys.replace_state(CargoRoom, fn _state -> nil end)
-      :sys.replace_state(UsbDriveDumpRoom, fn _state -> nil end)
+      CargoRoom.remove()
+      UsbDriveDumpRoom.remove()
       AdminRoom.store_media_settings(%MediaSettings{functionality: :cargo})
       prepare_view(%{conn: conn})
     end
@@ -503,6 +503,18 @@ defmodule ChatWeb.MainLive.IndexTest do
 
       refute has_element?(view, ".t-cargo-room")
       refute render(view) =~ "Cargo sync activated"
+
+      view
+      |> element(".t-cargo-activate")
+      |> render_click()
+
+      assert render(view) =~ "Cargo sync activated"
+
+      CargoRoom.remove()
+
+      Process.sleep(100)
+
+      refute render(view) =~ "Cargo sync activated"
     end
   end
 
@@ -534,8 +546,8 @@ defmodule ChatWeb.MainLive.IndexTest do
     setup %{conn: conn} do
       AdminDb.db() |> CubDB.clear()
       Db.db() |> CubDB.clear()
-      :sys.replace_state(CargoRoom, fn _state -> nil end)
-      :sys.replace_state(UsbDriveDumpRoom, fn _state -> nil end)
+      CargoRoom.remove()
+      UsbDriveDumpRoom.remove()
 
       %{conn: conn}
       |> prepare_view()
@@ -634,6 +646,18 @@ defmodule ChatWeb.MainLive.IndexTest do
       |> render_click()
 
       refute has_element?(view, ".t-dump-room")
+      refute render(view) =~ "USB drive dump activated"
+
+      view
+      |> element(".t-dump-activate")
+      |> render_click()
+
+      assert render(view) =~ "USB drive dump activated"
+
+      UsbDriveDumpRoom.remove()
+
+      Process.sleep(100)
+
       refute render(view) =~ "USB drive dump activated"
     end
   end

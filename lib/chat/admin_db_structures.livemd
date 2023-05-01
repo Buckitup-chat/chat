@@ -1,5 +1,86 @@
 # AdminDB structures
 
+## Admin room
+
+### Room
+
+Should be unique.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:pub_key, admin_room_pub_key}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Admin
+
+Admins are the users that visited admin room once at least. New potential admins can be invited from admin panel.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:new_admin, admin_pub_key}, admin_card}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Wifi password
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:wifi_password, hashed_password}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Cargo settings
+
+Set cargo checkpoints. Checkpoints are automatically invited to the Cargo rooms.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:cargo_settings, CargoSettings{checkpoints: [pub_key1, pub_key2, pub_key3]}}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Media settings
+
+When new USB drive is plugged into the secondary port, the following functionality will be started.
+Functionalities:
+
+* backup - full backup of main drive;
+* onliners - backup of data in scope of online (at this moment) users;
+* cargo - special cargo scenario.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:media_settings, %Chat.Admin.MediaSettings{functionality: functionality}}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Backup settings
+
+Configures whether the backup should be done after copying data, or if it should be syncing further changes.
+Types:
+
+* regular - finishes after copying;
+* continuous - copies data and then waits for new changes.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:backup_settings, %Chat.Admin.BackupSettings{type: type}}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
 ## Messaging
 
 #### Room message links

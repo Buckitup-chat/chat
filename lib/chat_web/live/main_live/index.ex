@@ -9,7 +9,7 @@ defmodule ChatWeb.MainLive.Index do
   alias Chat.Rooms.Room
   alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
   alias ChatWeb.Hooks.{LiveModalHook, LocalTimeHook, UploaderHook}
-  alias ChatWeb.MainLive.Admin.{CargoSettingsForm, MediaSettingsForm}
+  alias ChatWeb.MainLive.Admin.{BackupSettingsForm, CargoSettingsForm, MediaSettingsForm}
   alias ChatWeb.MainLive.{Layout, Page}
   alias ChatWeb.MainLive.Page.RoomForm
   alias Phoenix.LiveView.JS
@@ -30,6 +30,7 @@ defmodule ChatWeb.MainLive.Index do
     socket =
       socket
       |> assign(:operating_system, operating_system)
+      |> assign_backup_settings()
       |> assign_cargo_settings()
       |> assign_media_settings()
 
@@ -229,6 +230,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("logout-go-share", _, socket) do
+    socket
+    |> Page.Logout.go_share()
+    |> noreply()
+  end
+
   def handle_event("logout:toggle-password-visibility", _, socket) do
     socket
     |> Page.Logout.toggle_password_visibility()
@@ -336,6 +343,12 @@ defmodule ChatWeb.MainLive.Index do
     noreply(socket)
   end
 
+  def handle_info({:key_shared, _params}, socket) do
+    socket
+    |> Page.Logout.go_final()
+    |> noreply()
+  end
+
   @impl true
   def handle_info({:new_user, card}, socket) do
     socket
@@ -390,6 +403,9 @@ defmodule ChatWeb.MainLive.Index do
   def handle_info({:db_status, msg}, socket),
     do: socket |> Page.Lobby.set_db_status(msg) |> noreply()
 
+  def handle_info({:free_spaces, msg}, socket),
+    do: socket |> Page.AdminPanel.set_free_spaces(msg) |> noreply()
+
   def handle_info({:room, msg}, socket),
     do: socket |> Page.RoomRouter.info(msg) |> noreply()
 
@@ -409,6 +425,12 @@ defmodule ChatWeb.MainLive.Index do
 
     socket
     |> Page.Lobby.process(task)
+    |> noreply()
+  end
+
+  def handle_info(:update_backup_settings, socket) do
+    socket
+    |> assign_backup_settings()
     |> noreply()
   end
 
@@ -502,6 +524,11 @@ defmodule ChatWeb.MainLive.Index do
 
   def message_of(%{author_key: _}), do: "room"
   def message_of(_), do: "dialog"
+
+  defp assign_backup_settings(socket) do
+    backup_settings = AdminRoom.get_backup_settings()
+    assign(socket, :backup_settings, backup_settings)
+  end
 
   defp assign_cargo_settings(socket) do
     cargo_settings = AdminRoom.get_cargo_settings()

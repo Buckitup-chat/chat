@@ -230,6 +230,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("logout-go-share", _, socket) do
+    socket
+    |> Page.Logout.go_share()
+    |> noreply()
+  end
+
   def handle_event("logout:toggle-password-visibility", _, socket) do
     socket
     |> Page.Logout.toggle_password_visibility()
@@ -335,6 +341,12 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("dump:remove", _params, socket) do
     UsbDriveDumpRoom.remove()
     noreply(socket)
+  end
+
+  def handle_info({:key_shared, _params}, socket) do
+    socket
+    |> Page.Logout.go_final()
+    |> noreply()
   end
 
   @impl true

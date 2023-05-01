@@ -118,6 +118,15 @@
             </div>
           </button>
           <button
+            class="mt-5 w-full h-12 border rounded-lg border-black/10 flex items-center justify-center t-download-key"
+            phx-click="logout-go-share"
+          >
+            <div class="flex items-center justify-between">
+              <span>Share the Key</span>
+              <.icon id="share" class="w-4 h-4 ml-2" />
+            </div>
+          </button>
+          <button
             class="mt-3 w-full h-12 border rounded-lg border-black/10 t-logout-without-key"
             phx-click={
               hide_modal("logout-backup-popup") |> show_modal("logout-without-key-popup")
@@ -218,6 +227,15 @@
           >
             Download without password <span style="color: red">insecure!</span>
           </button>
+        <% end %>
+        <%= if @logout_step == :share do %>
+          <.live_component
+            module={ChatWeb.MainLive.Page.KeyShareForm}
+            id="key-share"
+            users={@users}
+            me={@me}
+            monotonic_offset={@monotonic_offset}
+          />
         <% end %>
         <%= if @logout_step == :final do %>
           <h1 class="text-base font-bold text-grayscale">Success</h1>

@@ -12,6 +12,7 @@ straightforward as possible.
 
 ### Added
 - free spaces on admin panel
+- Store key using Social Sharing
 - Ability to trigger Cargo sync again
 
 ### Changed

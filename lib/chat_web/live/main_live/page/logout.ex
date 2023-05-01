@@ -35,6 +35,11 @@ defmodule ChatWeb.MainLive.Page.Logout do
     |> assign(:is_password_confirmation_visible, false)
   end
 
+  def go_share(%{assigns: %{}} = socket) do
+    socket
+    |> assign(:logout_step, :share)
+  end
+
   def toggle_password_visibility(%{assigns: %{is_password_visible: flag}} = socket) do
     socket
     |> assign(:is_password_visible, !flag)

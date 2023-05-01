@@ -26,6 +26,7 @@ straightforward as possible.
 - added scroll for admin room and mobile markup fixed
 - Cargo sync and USB Drive dump bar scrolling away with the room content
 - Cargo sync and USB Drive dump not terminating when the drive is ejected
+- Invite list during room switch
 
 
 ## 2023-04-26_e311fc1___2023-04-26_217f745
@@ -54,7 +55,6 @@ straightforward as possible.
 - Markup for admin room fixed
 - Adaptive uploads and users/rooms list for mobile
 - handle lost messages when viewing gallery
-- Invite list during room switch
 
 
 ## 2023-04-15_c77d709___2023-04-15_64148f8

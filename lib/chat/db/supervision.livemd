@@ -102,6 +102,7 @@ graph TD;
   mm[[Mounter]]
   mdt[DirTask]
   mds(Chat MainDbSupervisor)
+  mb[[Bouncer]]
   ms[[Starter]]
   mc[[Copier]]
   mr[[Replicator]]
@@ -111,6 +112,7 @@ graph TD;
   pmds --> mm
   pmds --> mdt
   pmds --> mds
+  pmds --> mb
   pmds --> ms
   pmds --> mc
   pmds --> mr
@@ -124,6 +126,8 @@ graph TD;
 `DirTask` ensures that device filesystem has the folder to hold DB.
 
 `Chat MainDbSupervisor` is DB Supervisor from `Chat` application described above.
+
+`Bouncer` prevents DB directory from being renamed.
 
 `Starter` changes global DB status (in application config). And reverts it back when terminated.
 
@@ -161,18 +165,21 @@ graph TD;
 
   bdt[DirTask]
   bmds(Chat MediaDbSupervisor)
+  bb[[Bouncer]]
   bs[[Starter]]
   bc[[Copier]]
   bst[[Stopper]]
 
   pbds --> bdt
   pbds --> bmds
+  pbds --> bb
   pbds --> bs
   pbds --> bc
   pbds --> bst
 
   csdt[DirTask]
   csmds(Chat MediaDbSupervisor)
+  csb[[Bouncer]]
   css[[Starter]]
   cscds[[CargoDynamicSupervisor]]
   csl[[Logic]]
@@ -181,6 +188,7 @@ graph TD;
 
   pcss --> csdt
   pcss --> csmds
+  pcss --> csb
   pcss --> css
   pcss --> cscds
   pcss --> csl
@@ -190,6 +198,7 @@ graph TD;
 
   osdt[DirTask]
   osmds(Chat MediaDbSupervisor)
+  osb[[Bouncer]]
   oss[[Starter]]
   osods[[OnlinersDynamicSupervisor]]
   osl[[Logic]]
@@ -198,6 +207,7 @@ graph TD;
 
   poss --> osdt
   poss --> osmds
+  poss --> osb
   poss --> oss
   poss --> osods
   poss --> osl
@@ -221,6 +231,8 @@ while the unique aspects of the functionalities will be described in the below s
 `DirTask` ensures that device filesystem has the folder to hold DB.
 
 `Chat MediaDbSupervisor` is DB Supervisor from `Chat` application described above.
+
+`Bouncer` prevents DB directory from being renamed.
 
 `Starter` changes global DB status (in application config). And reverts it back when terminated.
 

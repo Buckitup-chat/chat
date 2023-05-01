@@ -13,6 +13,7 @@ straightforward as possible.
 ### Added
 - free spaces on admin panel
 - Ability to trigger Cargo sync again
+- Prevent DB directory from being renamed
 
 ### Changed
 - Separate main from backup DB

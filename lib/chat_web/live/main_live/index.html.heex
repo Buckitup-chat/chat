@@ -130,7 +130,7 @@
             phx-click="logout-go-share"
           >
             <div class="flex items-center justify-between">
-              <span>Share the Keys</span>
+              <span>Share the Key</span>
               <.icon id="share" class="w-4 h-4 ml-2" />
             </div>
           </button>
@@ -242,7 +242,6 @@
             id="key-share"
             users={@users}
             me={@me}
-            changeset={@changeset}
             monotonic_offset={@monotonic_offset}
           />
         <% end %>
@@ -1043,6 +1042,13 @@
                   id={:media_settings_form}
                   media_settings={@media_settings}
                   module={MediaSettingsForm}
+                />
+              </Layout.Admin.block>
+              <Layout.Admin.block title="Backup settings">
+                <.live_component
+                  id={:backup_settings_form}
+                  backup_settings={@backup_settings}
+                  module={BackupSettingsForm}
                 />
               </Layout.Admin.block>
               <Layout.Admin.block title="Free spaces">

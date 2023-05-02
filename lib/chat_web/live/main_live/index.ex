@@ -9,7 +9,7 @@ defmodule ChatWeb.MainLive.Index do
   alias Chat.Rooms.Room
   alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
   alias ChatWeb.Hooks.{LiveModalHook, LocalTimeHook, UploaderHook}
-  alias ChatWeb.MainLive.Admin.{CargoSettingsForm, MediaSettingsForm}
+  alias ChatWeb.MainLive.Admin.{BackupSettingsForm, CargoSettingsForm, MediaSettingsForm}
   alias ChatWeb.MainLive.{Layout, Page}
   alias ChatWeb.MainLive.Page.RoomForm
   alias Phoenix.LiveView.JS
@@ -30,6 +30,7 @@ defmodule ChatWeb.MainLive.Index do
     socket =
       socket
       |> assign(:operating_system, operating_system)
+      |> assign_backup_settings()
       |> assign_cargo_settings()
       |> assign_media_settings()
 
@@ -441,6 +442,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_info(:update_backup_settings, socket) do
+    socket
+    |> assign_backup_settings()
+    |> noreply()
+  end
+
   def handle_info(:update_cargo_settings, socket) do
     socket
     |> assign_cargo_settings()
@@ -531,6 +538,11 @@ defmodule ChatWeb.MainLive.Index do
 
   def message_of(%{author_key: _}), do: "room"
   def message_of(_), do: "dialog"
+
+  defp assign_backup_settings(socket) do
+    backup_settings = AdminRoom.get_backup_settings()
+    assign(socket, :backup_settings, backup_settings)
+  end
 
   defp assign_cargo_settings(socket) do
     cargo_settings = AdminRoom.get_cargo_settings()

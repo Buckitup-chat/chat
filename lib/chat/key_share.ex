@@ -10,23 +10,24 @@ defmodule Chat.KeyShare do
   def threshold, do: @threshold
 
   def generate_key_shares({%Identity{private_key: private_key} = _me, users}) do
-    shares =
-      private_key
-      |> Enigma.hide_secret_in_shares(users |> Enum.count(), @threshold)
+    amount = Enum.count(users)
 
-    share_count = Enum.count(shares)
-
-    for i <- 0..(share_count - 1), into: [] do
-      %{
-        user: Enum.at(users, i),
-        key: Enum.at(shares, i) |> Base.encode64()
-      }
-    end
+    private_key
+    |> Enigma.hide_secret_in_shares(amount, @threshold)
+    |> Enum.zip_reduce(users, [], fn key, user, acc ->
+      acc ++
+        [
+          %{
+            user: user,
+            key: key |> Base.encode64()
+          }
+        ]
+    end)
   end
 
   def save_shares(shares, {me, time_offset}) do
     shares
-    |> Enum.reduce([], fn share, acc ->
+    |> Enum.map(fn share ->
       with dialog <- Dialogs.find_or_open(me, share.user),
            file_info <- %{
              size: byte_size(share.key),
@@ -35,18 +36,16 @@ defmodule Chat.KeyShare do
            entry <- entry(file_info, me),
            destination <- destination(dialog),
            file_key <- UploadKey.new(destination, dialog.b_key, entry),
-           file_secret <- ChunkedFiles.new_upload(file_key) do
-        save({file_key, share.key}, {file_info.size, file_secret})
-
-        acc ++
-          [
-            %{
-              entry: entry,
-              dialog: dialog,
-              me: me,
-              file_info: {file_key, file_secret, file_info.time}
-            }
-          ]
+           file_secret <- ChunkedFiles.new_upload(file_key),
+           :ok <- save({file_key, share.key}, {file_info.size, file_secret}) do
+        %{
+          entry: entry,
+          dialog: dialog,
+          me: me,
+          file_info: {file_key, file_secret, file_info.time},
+          size: file_info.size,
+          key: share.key
+        }
       end
     end)
   end

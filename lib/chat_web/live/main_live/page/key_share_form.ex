@@ -6,42 +6,17 @@ defmodule ChatWeb.MainLive.Page.KeyShareForm do
   alias Chat.{Dialogs, Messages}
   alias Chat.KeyShare
 
-  alias Ecto.Changeset
-
   alias ChatWeb.MainLive.Layout
 
   alias Phoenix.PubSub
 
   def mount(socket) do
-    {:ok, socket |> assign(:share_users, [])}
-  end
-
-  def assign_changeset(socket) do
-    socket
-    |> assign(
-      :changeset,
-      Changeset.change({%{}, schema()})
-      |> Changeset.validate_required(:share_users)
-      |> Changeset.validate_length(:share_users, min: 4)
-    )
-  end
-
-  def check_share(%{assigns: %{share_users: _users} = params} = socket) do
-    changeset =
-      {%{}, schema()}
-      |> Changeset.cast(params, schema() |> Map.keys())
-      |> Changeset.validate_required(:share_users)
-      |> Changeset.validate_length(:share_users, min: 4)
-      |> Map.put(:action, :validate)
-
-    socket
-    |> assign(:changeset, changeset)
+    {:ok, socket |> assign(:share_users, MapSet.new())}
   end
 
   def handle_event("select-user", %{"user" => user} = _params, socket) do
     socket
     |> selected_user(user)
-    |> check_share()
     |> noreply()
   end
 
@@ -77,7 +52,7 @@ defmodule ChatWeb.MainLive.Page.KeyShareForm do
       </p>
       <.form
         :let={_f}
-        for={@changeset}
+        for={%{}}
         id="share-form"
         phx-change="check-share"
         phx-submit="accept-share"
@@ -117,7 +92,7 @@ defmodule ChatWeb.MainLive.Page.KeyShareForm do
         <%= submit("Share",
           phx_disable_with: "Sharing the Key...",
           class: "mt-5 w-full h-12 border-0 rounded-lg bg-grayscale text-white disabled:opacity-50",
-          disabled: !@changeset.valid?
+          disabled: Enum.count(@share_users) < KeyShare.threshold()
         ) %>
       </.form>
     </div>
@@ -126,8 +101,8 @@ defmodule ChatWeb.MainLive.Page.KeyShareForm do
 
   defp selected_user(%{assigns: %{share_users: users}} = socket, user) do
     case user in users do
-      true -> socket |> assign(:share_users, users -- [user])
-      false -> socket |> assign(:share_users, users ++ [user])
+      true -> socket |> assign(:share_users, MapSet.delete(users, user))
+      false -> socket |> assign(:share_users, MapSet.put(users, user))
     end
   end
 
@@ -137,10 +112,15 @@ defmodule ChatWeb.MainLive.Page.KeyShareForm do
          me: me,
          file_info: {file_key, file_secret, time}
        }) do
-    entry
-    |> Messages.File.new(file_key, file_secret, time)
-    |> Dialogs.add_new_message(me, dialog)
-    |> broadcast(dialog)
+    message =
+      entry
+      |> Messages.File.new(file_key, file_secret, time)
+      |> Dialogs.add_new_message(me, dialog)
+
+    message
+    |> Dialogs.on_saved(dialog, fn ->
+      broadcast(message, dialog)
+    end)
   end
 
   defp broadcast(message, dialog) do
@@ -152,6 +132,4 @@ defmodule ChatWeb.MainLive.Page.KeyShareForm do
       {:dialog, {:new_dialog_message, message}}
     )
   end
-
-  defp schema, do: %{share_users: {:array, :string}}
 end

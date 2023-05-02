@@ -174,6 +174,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("login:recovery-key-close", _, socket) do
+    socket
+    |> assign(:need_login, true)
+    |> noreply()
+  end
+
   def handle_event("login:export-code-close", _, socket) do
     socket
     |> push_event("chat:redirect", %{url: Routes.main_index_path(socket, :index)})
@@ -566,7 +572,7 @@ defmodule ChatWeb.MainLive.Index do
 
   defp allow_recover_upload(socket) do
     socket
-    |> allow_upload(:recover_keys,
+    |> allow_upload(:recovery_keys,
       auto_upload: true,
       progress: &Page.RecoverKeyShare.handle_progress/3,
       accept: ~w(.social_part),

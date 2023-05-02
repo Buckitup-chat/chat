@@ -48,6 +48,8 @@ defmodule Chat.Db do
     %{
       status: dry_relay_name,
       queue: queue_name,
+      read_supervisor: read_supervisor,
+      file_reader: file_reader_name,
       writer: writer_name,
       compactor: compactor,
       decider: decider,
@@ -57,6 +59,10 @@ defmodule Chat.Db do
     [
       # queue
       {Chat.Db.WriteQueue, name: queue_name},
+      # read supervisor
+      {Task.Supervisor, name: read_supervisor},
+      # file reader
+      {FileReader, name: file_reader_name, read_supervisor: read_supervisor},
       # db
       %{
         id: db_name,

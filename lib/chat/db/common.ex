@@ -8,6 +8,8 @@ defmodule Chat.Db.Common do
       queue: :"#{name}.Queue",
       status: :"#{name}.DryStatus",
       decider: :"#{name}.Decider",
+      read_supervisor: :"#{name}.ReadSupervisor",
+      file_reader: :"#{name}.FileReader",
       write_supervisor: :"#{name}.WriteSupervisor",
       compactor: :"#{name}.Compactor",
       writer: :"#{name}.Writer"

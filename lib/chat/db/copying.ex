@@ -27,6 +27,7 @@ defmodule Chat.Db.Copying do
     |> WriteQueue.put_stream(to_pipe.queue)
 
     Task.await(awaiter, :infinity)
+    |> tap(fn _ -> Logger.debug("awaiter done") end)
   end
 
   defp stream(from, to, awaiter, keys)
@@ -44,7 +45,7 @@ defmodule Chat.Db.Copying do
         |> MapSet.difference(dst)
         |> MapSet.to_list()
 
-      read_stream(keys: keys, db: from, awaiter: awaiter)
+      read_stream_new(from, keys, awaiter)
     end)
   end
 

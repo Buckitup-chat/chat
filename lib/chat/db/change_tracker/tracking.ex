@@ -30,7 +30,7 @@ defmodule Chat.Db.ChangeTracker.Tracking do
         do: Logger.error("ChangeTracker expired. Changes: #{inspect(changes)}")
 
     _ ->
-      def expiry_callback(x), do: nil
+      def expiry_callback(_), do: nil
   end
 
   def new do

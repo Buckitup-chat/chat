@@ -26,6 +26,7 @@ straightforward as possible.
 - added scroll for admin room and mobile markup fixed
 - Cargo sync and USB Drive dump bar scrolling away with the room content
 - Cargo sync and USB Drive dump not terminating when the drive is ejected
+- Invite list during room switch
 - Change Tracker expiry and nil values tracking
 
 

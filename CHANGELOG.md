@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 ### Added
-
+- Progress bar for dump
 ### Changed
 
 ### Fixed
@@ -22,7 +22,7 @@ straightforward as possible.
 - Store key using Social Sharing
 - Ability to trigger Cargo sync again
 - Prevent DB directory from being renamed
-- Progress bar for dump
+
 
 ### Changed
 - Separate main from backup DB

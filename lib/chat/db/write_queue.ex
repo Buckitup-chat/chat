@@ -6,12 +6,18 @@ defmodule Chat.Db.WriteQueue do
   import Tools.GenServerHelpers
   require Record
 
+  alias Chat.Db.ChangeTracker
+
   Record.defrecord(:q_state, buffer: buffer(), consumer: nil, in_demand: false, mirrors: [])
 
   use GenServer
 
+  def push({key, nil}, _server), do: ChangeTracker.set_written(key)
   def push(data, server), do: GenServer.cast(server, {:push, data})
+
+  def put({key, nil}, _server), do: ChangeTracker.set_written(key)
   def put(data, server), do: GenServer.cast(server, {:put, data})
+
   def mark_delete(key, server), do: GenServer.cast(server, {:mark_delete, key})
 
   def set_mirrors(sink, servers) when is_list(servers),
@@ -19,6 +25,7 @@ defmodule Chat.Db.WriteQueue do
 
   def set_mirrors(sink, server), do: GenServer.cast(server, {:mirrors, sink})
 
+  def put_chunk({key, nil}, _server), do: ChangeTracker.set_written(key)
   def put_chunk(chunk, server), do: GenServer.call(server, {:put_chunk, chunk}, :infinity)
   def put_stream(stream, server), do: GenServer.call(server, {:put_stream, stream})
 

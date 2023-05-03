@@ -15,7 +15,6 @@ defmodule Chat.Db.ChangeTracker.Tracking do
   case Mix.env() do
     :test ->
       use ExUnit.Case
-      def expiry_callback([]), do: nil
 
       def expiry_callback(changes) do
         assert [] == changes,

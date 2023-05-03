@@ -3,8 +3,6 @@ defmodule Chat.Db.ChangeTracker.Tracking do
   Tracking logic
   """
 
-  use ExUnit.Case
-
   require Logger
   require Record
 
@@ -14,24 +12,24 @@ defmodule Chat.Db.ChangeTracker.Tracking do
     items: %{}
   )
 
-  defmacrop expiry_callback(changes) do
-    quote do
-      cond do
-        unquote(changes) == [] ->
-          nil
+  case Mix.env() do
+    :test ->
+      use ExUnit.Case
 
-        Mix.env() == :dev ->
-          Logger.error("ChangeTracker expired. Changes: #{inspect(unquote(changes))}")
-
-        Mix.env() == :test ->
-          assert [] == unquote(changes),
-                 "test should not rely on ChangeTracker expiration\nchanges: " <>
-                   inspect(unquote(changes), pretty: true)
-
-        true ->
-          nil
+      def expiry_callback(changes) do
+        assert [] == changes,
+               "test should not rely on ChangeTracker expiration\nchanges: " <>
+                 inspect(changes, pretty: true)
       end
-    end
+
+    :dev ->
+      def expiry_callback([]), do: nil
+
+      def expiry_callback(changes),
+        do: Logger.error("ChangeTracker expired. Changes: #{inspect(changes)}")
+
+    _ ->
+      def expiry_callback(_), do: nil
   end
 
   def new do

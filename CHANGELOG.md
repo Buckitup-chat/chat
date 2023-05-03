@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
+### Added
+
+### Changed
+
+### Fixed
+
+## 2023-05-01_344a783___2023-05-03_059ad40
 
 ### Added
 - free spaces on admin panel
@@ -27,6 +34,8 @@ straightforward as possible.
 - added scroll for admin room and mobile markup fixed
 - Cargo sync and USB Drive dump bar scrolling away with the room content
 - Cargo sync and USB Drive dump not terminating when the drive is ejected
+- Invite list during room switch
+- Change Tracker expiry and nil values tracking
 
 
 ## 2023-04-26_e311fc1___2023-04-26_217f745

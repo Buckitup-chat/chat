@@ -85,7 +85,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
             class={classes("w-8 h-8 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}
           />
         </div>
-        <%!-- <div class="absolute inline-block bottom-16">
+        <div class="absolute inline-block bottom-16">
           <div class="overflow-hidden rounded-full w-10 h-10">
             <svg
               class="absolute top-0 left-0 w-full h-full text-gray-300 a-progress-bar"
@@ -110,7 +110,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
               </circle>
             </svg>
           </div>
-        </div> --%>
+        </div>
       <% end %>
       <!-- <div class="pl-2">
               <.icon id="car" class={classes("w-6 h-6 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}/>

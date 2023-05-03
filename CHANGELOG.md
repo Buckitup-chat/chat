@@ -15,6 +15,7 @@ straightforward as possible.
 - Store key using Social Sharing
 - Ability to trigger Cargo sync again
 - Prevent DB directory from being renamed
+- Progress bar for dump
 
 ### Changed
 - Separate main from backup DB

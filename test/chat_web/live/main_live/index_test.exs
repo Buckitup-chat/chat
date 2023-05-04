@@ -5,7 +5,7 @@ defmodule ChatWeb.MainLive.IndexTest do
   import Phoenix.LiveViewTest
 
   alias Chat.Admin.MediaSettings
-  alias Chat.{AdminDb, AdminRoom, Db, Dialogs, Rooms, RoomsBroker, User, UsersBroker}
+  alias Chat.{AdminDb, AdminRoom, Card, Db, Dialogs, Rooms, RoomsBroker, User, UsersBroker}
   alias Chat.Dialogs.PrivateMessage
   alias Chat.{Identity, Messages, RoomInviteIndex}
   alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
@@ -22,6 +22,38 @@ defmodule ChatWeb.MainLive.IndexTest do
 
       %{socket: %{assigns: %{room_identity: room_identity}}} =
         create_and_open_room(%{view: current_tab_view})
+
+      render_hook(current_tab_view, "room/sync-stored", %{
+        "key" => Identity.priv_key_to_string(room_identity),
+        "room_count" => 1
+      })
+
+      %{socket: %{assigns: current_view_state}} = reload_view(%{view: current_tab_view})
+      %{socket: %{assigns: another_view_state}} = reload_view(%{view: another_tab_view})
+
+      assert current_view_state.joined_rooms == another_view_state.joined_rooms
+      assert current_view_state.room_count_to_backup == another_view_state.room_count_to_backup
+    end
+
+    test "on accepting the invitation", %{
+      current_tab: current_tab,
+      another_tab: another_tab,
+      conn: conn
+    } do
+      %{view: current_tab_view, socket: %{assigns: %{me: me}}} = current_tab
+      %{view: another_tab_view} = another_tab
+
+      %{view: inviter_view, socket: %{assigns: %{room_identity: room_identity, me: inviter}}} =
+        prepare_view(%{conn: conn}) |> create_and_open_room("private")
+
+      my_hash = me |> Card.from_identity() |> then(& &1.hash)
+      inviter_view |> element("#roomInviteButton") |> render_click()
+      inviter_view |> element("#user-#{my_hash} a") |> render_click()
+
+      inviter_hash = inviter |> Card.from_identity() |> then(& &1.hash)
+      current_tab_view |> element("#dialog-list li#user-#{inviter_hash}") |> render_click()
+
+      current_tab_view |> element(".acceptInviteButton") |> render_click()
 
       render_hook(current_tab_view, "room/sync-stored", %{
         "key" => Identity.priv_key_to_string(room_identity),
@@ -129,8 +161,8 @@ defmodule ChatWeb.MainLive.IndexTest do
     setup do
       AdminDb.db() |> CubDB.clear()
       Db.db() |> CubDB.clear()
-      :sys.replace_state(CargoRoom, fn _state -> nil end)
-      :sys.replace_state(UsbDriveDumpRoom, fn _state -> nil end)
+      CargoRoom.remove()
+      UsbDriveDumpRoom.remove()
 
       :ok
     end
@@ -244,8 +276,8 @@ defmodule ChatWeb.MainLive.IndexTest do
     setup %{conn: conn} do
       AdminDb.db() |> CubDB.clear()
       Db.db() |> CubDB.clear()
-      :sys.replace_state(CargoRoom, fn _state -> nil end)
-      :sys.replace_state(UsbDriveDumpRoom, fn _state -> nil end)
+      CargoRoom.remove()
+      UsbDriveDumpRoom.remove()
       AdminRoom.store_media_settings(%MediaSettings{functionality: :cargo})
       prepare_view(%{conn: conn})
     end
@@ -471,6 +503,18 @@ defmodule ChatWeb.MainLive.IndexTest do
 
       refute has_element?(view, ".t-cargo-room")
       refute render(view) =~ "Cargo sync activated"
+
+      view
+      |> element(".t-cargo-activate")
+      |> render_click()
+
+      assert render(view) =~ "Cargo sync activated"
+
+      CargoRoom.remove()
+
+      Process.sleep(100)
+
+      refute render(view) =~ "Cargo sync activated"
     end
   end
 
@@ -502,8 +546,8 @@ defmodule ChatWeb.MainLive.IndexTest do
     setup %{conn: conn} do
       AdminDb.db() |> CubDB.clear()
       Db.db() |> CubDB.clear()
-      :sys.replace_state(CargoRoom, fn _state -> nil end)
-      :sys.replace_state(UsbDriveDumpRoom, fn _state -> nil end)
+      CargoRoom.remove()
+      UsbDriveDumpRoom.remove()
 
       %{conn: conn}
       |> prepare_view()
@@ -602,6 +646,18 @@ defmodule ChatWeb.MainLive.IndexTest do
       |> render_click()
 
       refute has_element?(view, ".t-dump-room")
+      refute render(view) =~ "USB drive dump activated"
+
+      view
+      |> element(".t-dump-activate")
+      |> render_click()
+
+      assert render(view) =~ "USB drive dump activated"
+
+      UsbDriveDumpRoom.remove()
+
+      Process.sleep(100)
+
       refute render(view) =~ "USB drive dump activated"
     end
   end

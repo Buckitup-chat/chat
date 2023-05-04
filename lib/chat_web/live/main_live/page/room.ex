@@ -4,8 +4,17 @@ defmodule ChatWeb.MainLive.Page.Room do
   use ChatWeb, :component
 
   import ChatWeb.MainLive.Page.Shared
-  import ChatWeb.LiveHelpers.LiveModal
-  import ChatWeb.LiveHelpers, only: [open_content: 0]
+
+  import ChatWeb.LiveHelpers,
+    only: [
+      open_content: 0,
+      show_modal: 1,
+      open_modal: 3,
+      open_modal: 2,
+      close_modal: 1,
+      send_js: 2
+    ]
+
   import Phoenix.Component, only: [assign: 3]
 
   import Phoenix.LiveView,
@@ -29,6 +38,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
   alias Chat.Upload.UploadMetadata
   alias Chat.User
+  alias Chat.UsersBroker
   alias Chat.Utils
   alias Chat.Utils.StorageId
 
@@ -363,6 +373,21 @@ defmodule ChatWeb.MainLive.Page.Room do
     socket
     |> forget_current_messages()
     |> push_event("chat:toggle", %{to: "#message-block-#{id}", class: "hidden"})
+  end
+
+  def open_invite_list(%{assigns: %{db_status: %{writable: :no}}} = socket, _) do
+    socket
+    |> send_js(show_modal("restrict-write-actions"))
+  end
+
+  def open_invite_list(%{assigns: %{my_id: id}} = socket, modal) do
+    users = UsersBroker.list() |> Enum.reject(fn user -> user.pub_key == id end)
+
+    if users |> length() > 0 do
+      socket |> open_modal(modal, %{users: users})
+    else
+      socket
+    end
   end
 
   def invite_user(

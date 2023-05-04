@@ -11,10 +11,35 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+- ChangeTracker. log long expiration keys
+- Progress bar for dump
 
 ### Changed
 
 ### Fixed
+- large filename in dump statistic
+
+## 2023-05-01_344a783___2023-05-03_059ad40
+
+### Added
+- free spaces on admin panel
+- Store key using Social Sharing
+- Ability to trigger Cargo sync again
+- Prevent DB directory from being renamed
+
+
+### Changed
+- Separate main from backup DB
+- Configurable continuous backup
+- styles for dark theme
+
+### Fixed
+- visit admin panel from room_invite message
+- added scroll for admin room and mobile markup fixed
+- Cargo sync and USB Drive dump bar scrolling away with the room content
+- Cargo sync and USB Drive dump not terminating when the drive is ejected
+- Invite list during room switch
+- Change Tracker expiry and nil values tracking
 
 
 ## 2023-04-26_e311fc1___2023-04-26_217f745
@@ -22,6 +47,7 @@ straightforward as possible.
 ### Added
 - USB drive dump progress
 - Ability to resume failed drive dump
+- AdminDb structure documentation
 
 ### Changed
 - Hide Cargo sync timer and increase the timeout to 5 minutes

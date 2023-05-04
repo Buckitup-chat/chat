@@ -2,7 +2,13 @@ defmodule ChatWeb.LiveHelpers do
   @moduledoc false
   import Phoenix.Component
 
+  alias ChatWeb.LiveHelpers.LiveModal
+  alias ChatWeb.LiveHelpers.Shared
   alias Phoenix.LiveView.JS
+
+  defdelegate open_modal(socket, component, params \\ %{}), to: LiveModal
+  defdelegate close_modal(socket), to: LiveModal
+  defdelegate send_js(socket, js), to: Shared
 
   @doc """
   Renders a live component inside a modal.

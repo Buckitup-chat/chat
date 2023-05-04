@@ -94,13 +94,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
               <circle
                 class="fill-transparent stroke-current"
                 stroke-dashoffset={
-                  126 -
-                    126 *
-                      (get_in(assigns, [
-                         Access.key!(:usb_drive_dump_room),
-                         Access.key!(:progress),
-                         Access.key!(:percentage)
-                       ]) || 0) / 100
+                  126 - 126 * (@usb_drive_dump_room[:progress][:percentage] || 0 ) / 100
                 }
                 stroke-width="4"
                 cx="22"
@@ -212,13 +206,7 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
               <circle
                 class="fill-transparent stroke-current"
                 stroke-dashoffset={
-                  126 -
-                    126 *
-                      (get_in(assigns, [
-                         Access.key!(:usb_drive_dump_room),
-                         Access.key!(:progress),
-                         Access.key!(:percentage)
-                       ]) || 0) / 100
+                  126 - 126 * (@usb_drive_dump_room[:progress][:percentage] || 0 ) / 100
                 }
                 stroke-width="4"
                 cx="22"

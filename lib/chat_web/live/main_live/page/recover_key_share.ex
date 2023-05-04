@@ -25,7 +25,6 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
   def handle_event("cancel", %{"ref" => ref}, socket) do
     socket
     |> remove_share(ref)
-    |> cancel_upload(:recovery_keys, ref)
     |> set_shares_index()
     |> mark_dublicates()
     |> check_shares()
@@ -67,13 +66,12 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
   def read_file(%{assigns: %{shares: _shares}} = socket) do
     case uploaded_entries(socket, :recovery_keys) do
       {[_ | _] = entries, []} ->
-        # IO.inspect(entries, label: "uploaded_entries")
         socket = socket |> set_recovery_hash(List.first(entries).client_name)
 
         uploaded_shares =
           for entry <- entries do
             consume_uploaded_entry(socket, entry, fn %{path: path} ->
-              {:postpone,
+              {:ok,
                %{
                  key: File.read!(path),
                  name: entry.client_name,

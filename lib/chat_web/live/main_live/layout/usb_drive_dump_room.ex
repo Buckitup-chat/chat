@@ -71,7 +71,7 @@ defmodule ChatWeb.MainLive.Layout.UsbDriveDumpRoom do
     ~H"""
     <div class="flex flex-col w-48 ml-auto mr-4">
       <div class="z-20 flex relative w-full">
-        <div class="absolute -top-2 left-0 bg-gray-500 h-3" style={"width: #{@progress.percentage}%;"}>
+        <div class="absolute -top-1 left-0 bg-gray-500 h-1" style={"width: #{@progress.percentage}%;"}>
         </div>
       </div>
 

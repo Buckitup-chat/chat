@@ -324,7 +324,7 @@
           >
             <.icon id="logo" class="w-6 h-6" />
           </div>
-          <Layout.DbStatus.mobile status={@db_status} />
+          <Layout.DbStatus.mobile status={@db_status} usb_drive_dump_room={@usb_drive_dump_room} />
           <button
             class="flex justify-between min-w-max"
             phx-click={JS.push("logout-open") |> show_modal("logout-backup-popup")}
@@ -516,7 +516,10 @@
           </div>
           <div class="flex flex-col items-center">
             <div class="row mt-10">
-              <Layout.DbStatus.desktop status={@db_status} />
+              <Layout.DbStatus.desktop
+                status={@db_status}
+                usb_drive_dump_room={@usb_drive_dump_room}
+              />
               <button
                 phx-click={JS.push("logout-open") |> show_modal("logout-backup-popup")}
                 class="sidebarIcon mb-1"

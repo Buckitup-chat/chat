@@ -640,3 +640,14 @@ html {
   100% { opacity: 0; }
 }
 
+.fill-transparent {
+  fill: transparent;
+  stroke-dasharray: 126;
+}
+.stroke-current {
+  stroke: currentColor;
+}
+.a-progress-bar {
+  transform: rotate(280deg);
+}
+

@@ -78,6 +78,12 @@ defmodule Chat.Db.ChangeTracker do
     |> GenServer.cast({:written, keys})
   end
 
+  def long_expiry_stats do
+    __MODULE__
+    |> GenServer.call(:info)
+    |> Tracking.long_expiry_stats()
+  end
+
   # Implementation
 
   def start_link(_) do
@@ -95,6 +101,10 @@ defmodule Chat.Db.ChangeTracker do
     state
     |> Tracking.add_await(key, from, expiration)
     |> noreply()
+  end
+
+  def handle_call(:info, _from, state) do
+    {:reply, state, state}
   end
 
   @impl true

@@ -16,6 +16,7 @@ defmodule Chat.Db.Supervisor do
       # DB changes tracking
       {Task.Supervisor, name: Chat.Db.ChangeTracker.Tasks},
       Chat.Db.ChangeTracker,
+      Chat.Db.ChangeTracker.Logger,
       # DB part
       Chat.Db.InternalDbSupervisor,
       {Task,

@@ -30,7 +30,7 @@ defmodule Chat.Db.ChangeTracker.Logger do
     if n > 0 do
       [
         "[ChangeTracker stats] ",
-        n,
+        inspect(n),
         " awaiting keys, for instance: ",
         inspect(top_keys, pretty: true)
       ]

@@ -14,6 +14,7 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
+- large filename in dump statistic
 
 ## 2023-05-01_344a783___2023-05-03_059ad40
 

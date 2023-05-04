@@ -120,6 +120,17 @@ defmodule Chat.Db.ChangeTracker.Tracking do
     |> tracker(keys: new_keys)
   end
 
+  def long_expiry_stats(tracker(items: items), long_seconds \\ 60) do
+    too_long = System.monotonic_time(:millisecond) + long_seconds * 1000
+
+    awaits =
+      items
+      |> Enum.filter(fn {_, {_, expiration, _}} -> expiration > too_long end)
+      |> Enum.map(fn {_, {key, _, _}} -> key end)
+
+    {awaits |> Enum.count(), awaits |> Enum.take(10)}
+  end
+
   defp add_action(
          tracker(next_id: id, keys: keys, items: items) = state,
          key,

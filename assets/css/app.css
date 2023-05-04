@@ -28,6 +28,10 @@ html {
 .a-outline {
   filter: drop-shadow(0px 0px 1px black);
 }
+
+.a-file-name {
+  max-width: 9.5rem;
+}
 @media screen and (min-width: 480px) {
   .a-video {
     height: 234px;

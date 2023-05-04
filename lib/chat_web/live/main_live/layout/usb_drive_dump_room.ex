@@ -82,7 +82,7 @@ defmodule ChatWeb.MainLive.Layout.UsbDriveDumpRoom do
         </div>
 
         <div class="flex flex-row w-full justify-between mt-1">
-          <div class="truncate">File: <%= @progress.current_filename %></div>
+          <div class="a-file-name truncate">File: <%= @progress.current_filename %></div>
           <div><%= @progress.current_file %> / <%= @progress.total_files %></div>
         </div>
       </div>

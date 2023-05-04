@@ -28,6 +28,10 @@ html {
 .a-outline {
   filter: drop-shadow(0px 0px 1px black);
 }
+
+.a-file-name {
+  max-width: 9.5rem;
+}
 @media screen and (min-width: 480px) {
   .a-video {
     height: 234px;
@@ -638,5 +642,16 @@ html {
 @keyframes fade-out-keys{
   0% { opacity: 1; }
   100% { opacity: 0; }
+}
+
+.fill-transparent {
+  fill: transparent;
+  stroke-dasharray: 126;
+}
+.stroke-current {
+  stroke: currentColor;
+}
+.a-progress-bar {
+  transform: rotate(280deg);
 }
 

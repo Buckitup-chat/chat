@@ -9,12 +9,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
+
 ### Added
 - ChangeTracker. Log long expiration keys
+- Progress bar for dump
 
 ### Changed
 
 ### Fixed
+- large filename in dump statistic
 
 ## 2023-05-01_344a783___2023-05-03_059ad40
 
@@ -23,6 +26,7 @@ straightforward as possible.
 - Store key using Social Sharing
 - Ability to trigger Cargo sync again
 - Prevent DB directory from being renamed
+
 
 ### Changed
 - Separate main from backup DB

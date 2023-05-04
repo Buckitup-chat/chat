@@ -2,6 +2,7 @@ defmodule Chat.Sync.UsbDriveDumpProgress do
   @moduledoc """
   Data structure used to show USB drive dump progress
   """
+  use StructAccess
 
   defstruct completed_size: 0,
             current_file: 0,

@@ -2,6 +2,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
   @moduledoc "Recover Key Share Page"
   use ChatWeb, :live_component
 
+  alias Chat.Actor
   alias Chat.KeyShare
 
   alias Ecto.Changeset
@@ -25,25 +26,37 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
     socket
     |> remove_share(ref)
     |> cancel_upload(:recovery_keys, ref)
+    |> set_shares_index()
+    |> mark_dublicates()
     |> check_shares()
+    |> set_share_bg()
     |> noreply()
   end
 
   def handle_event("accept", _, %{assigns: %{shares: shares}} = socket) do
-    key =
+    data =
       shares
       |> Enum.map(&Map.get(&1, :key))
       |> Enigma.recover_secret_from_shares()
 
-    # do login with key
-    socket |> noreply()
+    with {:ok, %{me: me, rooms: rooms}} <-
+           data
+           |> Actor.from_encrypted_json("")
+           |> then(&{:ok, &1}) do
+      Process.send(self(), {:key_recovered, [me, rooms]}, [])
+
+      socket |> noreply()
+    end
   end
 
   def handle_progress(:recovery_keys, %{done?: true} = _entry, socket) do
     socket
     |> read_file()
     |> read_result()
+    |> set_shares_index()
+    |> mark_dublicates()
     |> check_shares()
+    |> set_share_bg()
     |> noreply()
   end
 
@@ -54,6 +67,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
   def read_file(%{assigns: %{shares: _shares}} = socket) do
     case uploaded_entries(socket, :recovery_keys) do
       {[_ | _] = entries, []} ->
+        # IO.inspect(entries, label: "uploaded_entries")
         socket = socket |> set_recovery_hash(List.first(entries).client_name)
 
         uploaded_shares =
@@ -61,7 +75,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
             consume_uploaded_entry(socket, entry, fn %{path: path} ->
               {:postpone,
                %{
-                 key: File.read!(path) |> Base.decode64!(),
+                 key: File.read!(path),
                  name: entry.client_name,
                  ref: entry.ref,
                  valid: socket |> valid_entry?(entry.client_name)
@@ -81,24 +95,46 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
     <div>
       <div :if={!Enum.empty?(@shares)} class="max-w-sm w-full lg:max-w-full lg:flex">
         <div class="border-r border-b border-l border-gray-400 lg:border-l-0 lg:border-t lg:border-gray-400 bg-white rounded-b lg:rounded-b-none lg:rounded-r p-4 flex flex-col justify-between leading-normal">
-          <div class="mb-8">
+          <div class="mb-2">
             <div class="text-gray-900 items-center mb-2">
               <span
                 :for={share <- @shares}
-                class={"inline-flex rounded-md #{if share.valid do "bg-gray-50" else "bg-red-100" end} px-2 py-1 my-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10"}
+                class={"inline-flex rounded-md #{share.bg} px-2 py-1 my-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10"}
               >
                 <.share share={share} myself={@myself} />
               </span>
-              <%= error_tag(@form, :shares) %>
             </div>
           </div>
-          <div class="flex items-center"></div>
+          <div class="inline-flex px-2">
+            <div :if={Enum.any?(@shares, & &1.dublicate)} class="px-2">
+              <span class="dot-yellow w-full mx-1"></span>
+              <a class="text-xs font-small">Dublicates by key</a>
+            </div>
+            <div :if={Enum.any?(@shares, &(!&1.valid))} class="px-2">
+              <span class="dot-red w-full mx-1"></span>
+              <a class="text-xs font-small">Different user file</a>
+            </div>
+          </div>
+          <div
+            :if={Enum.any?(@shares, &(!&1.valid)) || Enum.any?(@shares, & &1.dublicate)}
+            class="border border-gray-400 rounded-md items-center justify-center bg-white max-w-sm w-full lg:max-w-full lg:flex mt-2 px-2 py-1 text-sm font-medium"
+          >
+            <span>
+              Please remove
+              <a :if={Enum.any?(@shares, & &1.dublicate)} class="text-red-400"> dublicates </a>
+              <a :if={Enum.any?(@shares, &(!&1.valid)) && Enum.any?(@shares, & &1.dublicate)}>
+                and
+              </a>
+              <a :if={Enum.any?(@shares, &(!&1.valid))} class="text-red-400"> different </a>
+              <a :if={Enum.any?(@shares, &(!&1.valid))}> user files </a>
+            </span>
+          </div>
         </div>
       </div>
       <input
         :if={!Enum.empty?(@shares)}
         style="background-color: white;"
-        class="w-full h-11 mt-7 bg-transparent text-black py-2 px-4 border border-gray/0 rounded-lg flex items-center justify-center disabled:opacity-50 cursor-pointer"
+        class="w-full h-11 mt-5 bg-transparent text-black py-2 px-4 border border-gray/0 rounded-lg flex items-center justify-center disabled:opacity-50 cursor-pointer"
         type="button"
         value="Accept"
         phx-click="accept"
@@ -221,7 +257,8 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
       |> Changeset.cast(params, schema() |> Map.keys())
       |> Changeset.validate_required(:shares)
       |> Changeset.validate_length(:shares, min: 4)
-      |> shares_validity()
+      |> validate_user_hash()
+      |> validate_unique()
       |> Map.put(:action, :validate)
 
     socket |> assign(:changeset, changeset)
@@ -229,9 +266,40 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
 
   defp schema, do: %{shares: {:array, :map}}
 
-  defp shares_validity(%Changeset{changes: %{shares: []}} = changeset), do: changeset
+  defp validate_unique(%Changeset{changes: %{shares: []}} = changeset), do: changeset
 
-  defp shares_validity(%Changeset{changes: %{shares: shares}} = changeset) do
+  defp validate_unique(%Changeset{changes: %{shares: shares}} = changeset) do
+    dublicates = shares |> look_for_dublicates()
+
+    case dublicates do
+      [] ->
+        changeset
+
+      _ ->
+        Changeset.add_error(
+          changeset,
+          :shares,
+          "dublicates are found: #{Enum.map(dublicates, & &1.index)}"
+        )
+    end
+  end
+
+  defp look_for_dublicates(shares) do
+    shares
+    |> Enum.filter(fn share -> Enum.count(shares, &(&1.key == share.key)) > 1 end)
+    |> Enum.group_by(& &1.key)
+    |> Enum.map(fn {key, maps} ->
+      %{
+        key: key,
+        exclude: maps |> Enum.min_by(& &1.index) |> Map.get(:index),
+        index: Enum.map(maps, & &1.index)
+      }
+    end)
+  end
+
+  defp validate_user_hash(%Changeset{changes: %{shares: []}} = changeset), do: changeset
+
+  defp validate_user_hash(%Changeset{changes: %{shares: shares}} = changeset) do
     case Enum.all?(shares, fn share -> share.valid end) do
       true ->
         changeset
@@ -240,10 +308,52 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
         Changeset.add_error(
           changeset,
           :shares,
-          "username-hash code is different from a first uploaded key share"
+          "user mismatch: different from a first uploaded key share"
         )
     end
   end
 
+  defp mark_dublicates(%{assigns: %{shares: shares}} = socket) do
+    dublicates_info = shares |> look_for_dublicates()
+
+    shares =
+      shares
+      |> Enum.map(fn share ->
+        case share.index not in (dublicates_info |> Enum.map(& &1.exclude)) do
+          true -> set_dublicate_mark(:f, share)
+          false -> set_dublicate_mark(:t, share)
+        end
+      end)
+
+    socket |> assign(:shares, shares)
+  end
+
+  defp set_shares_index(%{assigns: %{shares: shares}} = socket) do
+    socket
+    |> assign(
+      :shares,
+      Enum.with_index(shares, fn element, index -> Map.put(element, :index, index) end)
+    )
+  end
+
+  defp set_dublicate_mark(:t, share), do: Map.put(share, :dublicate, true)
+
+  defp set_dublicate_mark(:f, share), do: Map.put(share, :dublicate, false)
+
   defp read_result({_, result}), do: result
+
+  defp set_share_bg(%{assigns: %{shares: shares}} = socket) do
+    socket
+    |> assign(
+      :shares,
+      shares
+      |> Enum.map(fn share ->
+        case {share.valid, share.dublicate} do
+          {true, false} -> Map.put(share, :bg, "bg-gray-50")
+          {true, true} -> Map.put(share, :bg, "bg-yellow-50")
+          _ -> Map.put(share, :bg, "bg-red-50")
+        end
+      end)
+    )
+  end
 end

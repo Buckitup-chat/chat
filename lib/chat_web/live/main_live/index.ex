@@ -514,6 +514,20 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_info({:key_recovered, [me, rooms]}, socket) do
+    socket
+    |> assign(:step, nil)
+    |> assign(:mode, :lobby)
+    |> Page.Login.load_user(me, rooms)
+    |> Page.Login.store()
+    |> Page.Lobby.init()
+    |> Page.Dialog.init()
+    |> Page.Logout.init()
+    |> Page.Shared.track_onliners_presence()
+    |> Page.RoomRouter.route_live_action()
+    |> noreply()
+  end
+
   def handle_progress(:my_keys_file, %{done?: true}, socket) do
     socket
     |> Page.ImportOwnKeyRing.read_file()

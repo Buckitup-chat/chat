@@ -6,6 +6,7 @@ defmodule Chat.Db.WriteQueue.ReadStream do
   require Logger
   require Record
 
+  alias Chat.Db.Common
   alias Chat.Db.WriteQueue.FileReader
 
   Record.defrecord(:read_stream,
@@ -29,8 +30,10 @@ defmodule Chat.Db.WriteQueue.ReadStream do
   def read_stream_empty?(read_stream(file_ready: {_, _})), do: false
   def read_stream_empty?(_), do: true
 
-  def read_stream_yield(read_stream(file_ready: {_, _} = data, file_readers: readers) = stream) do
-    {next_file, next_readers} = FileReader.yield_file(readers)
+  def read_stream_yield(
+        read_stream(file_ready: {_, _} = data, file_readers: readers, db: db) = stream
+      ) do
+    {next_file, next_readers} = FileReader.yield_file(file_reader(db), readers)
 
     {[data],
      read_stream(stream,
@@ -48,7 +51,7 @@ defmodule Chat.Db.WriteQueue.ReadStream do
       send(awaiter, :done)
     end
 
-    {next_file, updated_readers} = FileReader.yield_file(new_readers)
+    {next_file, updated_readers} = FileReader.yield_file(file_reader(db), new_readers)
 
     {data,
      read_stream(stream,
@@ -61,8 +64,7 @@ defmodule Chat.Db.WriteQueue.ReadStream do
   defp read_list(db, readers, list) do
     {keys, new_list} = take_portion(list, [], 100)
     files_path = CubDB.data_dir(db) <> "_files"
-
-    "portion taken" |> Logger.debug()
+    file_reader = file_reader(db)
 
     {file_keys, db_keys} =
       Enum.split_with(keys, fn
@@ -70,27 +72,20 @@ defmodule Chat.Db.WriteQueue.ReadStream do
         _ -> false
       end)
 
-    "keys split" |> Logger.debug()
-
     new_readers =
-      file_keys
-      |> Enum.map(&FileReader.add_task(readers, &1, files_path))
-
-    "readers added" |> Logger.debug()
+      readers ++ Enum.map(file_keys, &FileReader.add_task(file_reader, &1, files_path))
 
     data =
       db_keys
       |> Enum.map(&{&1, CubDB.get(db, &1)})
-
-    "data loaded" |> Logger.debug()
 
     {data, new_readers, new_list}
   rescue
     # in case source DB is dead we finish with the stream
     e ->
       e |> inspect(pretty: true) |> Logger.warn()
-      Process.info(self(), :current_stacktrace) |> inspect(pretty: true) |> Logger.warn()
-      {db, list |> Enum.take(10), readers} |> inspect(pretty: true) |> Logger.warn()
+      # Process.info(self(), :current_stacktrace) |> inspect(pretty: true) |> Logger.warn()
+      # {db, list |> Enum.take(10), readers} |> inspect(pretty: true) |> Logger.warn()
       {[], [], []}
   end
 
@@ -102,4 +97,6 @@ defmodule Chat.Db.WriteQueue.ReadStream do
       {[key | rest], _} -> take_portion(rest, [key | keys], limit - 1)
     end
   end
+
+  defp file_reader(db), do: Common.names(db)[:file_reader]
 end

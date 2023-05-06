@@ -24,7 +24,7 @@ defmodule ChatWeb.MainLive.Page.RoomTest do
       assert %{component: UnlinkMessages, params: %{}} = state.live_modal
 
       view |> element("#modal button.confirmButton") |> render_click()
-      %{view: view, socket: %{assigns: %{is_room_linked?: false}}} = reload_view(%{view: view})
+      %{view: _view, socket: %{assigns: %{is_room_linked?: false}}} = reload_view(%{view: view})
     end
 
     test "go to room by active link", %{conn: conn, view: view, socket: %{assigns: assigns}} do
@@ -32,14 +32,14 @@ defmodule ChatWeb.MainLive.Page.RoomTest do
       %{params: %{url: url}} = assigns.live_modal
       link_hash = url |> String.split("/") |> List.last()
 
-      %{view: view} = close_sharelink_modal(%{view: view})
+      %{view: _view} = close_sharelink_modal(%{view: view})
 
       %{view: view, socket: %{assigns: new_assigns}} =
         login_by_key(%{conn: conn}, "/room/" <> link_hash)
 
       assert "/" = assert_patch(view)
-      assert room_pub_key = new_assigns.room.pub_key
-      assert [room] = new_assigns.joined_rooms
+      assert room_pub_key == new_assigns.room.pub_key
+      assert [_room] = new_assigns.joined_rooms
       assert true = new_assigns.is_room_linked?
 
       %{messages: [msg]} = new_assigns
@@ -52,7 +52,7 @@ defmodule ChatWeb.MainLive.Page.RoomTest do
       %{view: view, socket: %{assigns: assigns}} =
         login_by_key(%{conn: conn}, "/room/" <> link_hash)
 
-      assert link_hash = assigns.room_message_link_hash
+      assert link_hash == assigns.room_message_link_hash
       assert [] = assigns.joined_rooms
       view |> element("#notFoundScreen") |> render()
 

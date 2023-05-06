@@ -11,7 +11,7 @@ defmodule Chat.Db.Copying do
   alias Chat.Db.WriteQueue
 
   def await_copied(from, to, keys \\ nil) do
-    to_pipe = Common.names(to)
+    to_queue = Common.names(to, :queue)
 
     stream = stream(from, to, nil, keys)
 
@@ -24,7 +24,7 @@ defmodule Chat.Db.Copying do
 
     stream
     |> read_stream(awaiter: awaiter.pid)
-    |> WriteQueue.put_stream(to_pipe.queue)
+    |> WriteQueue.put_stream(to_queue)
 
     Task.await(awaiter, :infinity)
   end
@@ -44,7 +44,7 @@ defmodule Chat.Db.Copying do
         |> MapSet.difference(dst)
         |> MapSet.to_list()
 
-      read_stream(keys: keys, db: from, awaiter: awaiter)
+      read_stream_new(from, keys, awaiter)
     end)
   end
 

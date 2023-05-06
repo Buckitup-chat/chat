@@ -3,47 +3,100 @@ defmodule Chat.Db.WriteQueue.ReadStream do
   List of keys to be read from db and yielded into queue
   """
 
+  require Logger
   require Record
+
+  alias Chat.Db.Common
+  alias Chat.Db.WriteQueue.FileReader
 
   Record.defrecord(:read_stream,
     db: nil,
     keys: [],
+    file_readers: [],
+    file_ready: nil,
     awaiter: nil
   )
 
-  def read_stream_empty?(read_stream(keys: list)), do: [] == list
+  def read_stream_new(db, keys, awaiter \\ nil) do
+    read_stream(db: db, keys: keys, awaiter: awaiter)
+  end
 
-  def read_stream_yield(read_stream(db: db, keys: list, awaiter: awaiter) = stream) do
-    {data, new_list} = read_list(db, list)
+  def set_awaiter(read_stream(awaiter: nil) = stream, awaiter) do
+    read_stream(stream, awaiter: awaiter)
+  end
 
-    if new_list == [] and awaiter do
+  def read_stream_empty?(read_stream(keys: [_ | _])), do: false
+  def read_stream_empty?(read_stream(file_readers: [_ | _])), do: false
+  def read_stream_empty?(read_stream(file_ready: {_, _})), do: false
+  def read_stream_empty?(_), do: true
+
+  def read_stream_yield(
+        read_stream(file_ready: {_, _} = data, file_readers: readers, db: db) = stream
+      ) do
+    {next_file, next_readers} = FileReader.yield_file(file_reader(db), readers)
+
+    {[data],
+     read_stream(stream,
+       file_ready: next_file,
+       file_readers: next_readers
+     )}
+  end
+
+  def read_stream_yield(
+        read_stream(db: db, keys: list, awaiter: awaiter, file_readers: readers) = stream
+      ) do
+    {data, new_readers, new_list} = read_list(db, readers, list)
+
+    if new_list == [] and new_readers == [] and awaiter do
       send(awaiter, :done)
     end
 
-    {data, read_stream(stream, keys: new_list)}
+    {next_file, updated_readers} = FileReader.yield_file(file_reader(db), new_readers)
+
+    {data,
+     read_stream(stream,
+       keys: new_list,
+       file_readers: updated_readers,
+       file_ready: next_file
+     )}
   end
 
-  defp chunk_keys([], keys, _), do: {keys, []}
-  defp chunk_keys(rest, keys, 0), do: {keys, rest}
-
-  defp chunk_keys([{:file_chunk, _, _, _} = key | rest], keys, _), do: {[key | keys], rest}
-  defp chunk_keys([key | rest], keys, amount), do: chunk_keys(rest, [key | keys], amount - 1)
-
-  defp read_list(db, list) do
-    {keys, new_list} = chunk_keys(list, [], 100)
+  defp read_list(db, readers, list) do
+    {keys, new_list} = take_portion(list, [], 100)
     files_path = CubDB.data_dir(db) <> "_files"
+    file_reader = file_reader(db)
 
-    keys
-    |> Enum.map(fn
-      {:file_chunk, chunk_key, first, _} = key ->
-        {key, Chat.FileFs.read_file_chunk(first, chunk_key, files_path) |> elem(0)}
+    {file_keys, db_keys} =
+      Enum.split_with(keys, fn
+        {:file_chunk, _, _, _} -> true
+        _ -> false
+      end)
 
-      key ->
-        {key, CubDB.get(db, key)}
-    end)
-    |> then(&{&1, new_list})
+    new_readers =
+      readers ++ Enum.map(file_keys, &FileReader.add_task(file_reader, &1, files_path))
+
+    data =
+      db_keys
+      |> Enum.map(&{&1, CubDB.get(db, &1)})
+
+    {data, new_readers, new_list}
   rescue
     # in case source DB is dead we finish with the stream
-    _ -> {[], []}
+    e ->
+      e |> inspect(pretty: true) |> Logger.warn()
+      # Process.info(self(), :current_stacktrace) |> inspect(pretty: true) |> Logger.warn()
+      # {db, list |> Enum.take(10), readers} |> inspect(pretty: true) |> Logger.warn()
+      {[], [], []}
   end
+
+  defp take_portion(list, keys, limit) do
+    case {list, limit} do
+      {[], _} -> {keys, list}
+      {_, l} when l <= 0 -> {keys, list}
+      {[{:file_chunk, _, _, _} = key | rest], _} -> take_portion(rest, [key | keys], limit - 40)
+      {[key | rest], _} -> take_portion(rest, [key | keys], limit - 1)
+    end
+  end
+
+  defp file_reader(db), do: Common.names(db, :file_reader)
 end

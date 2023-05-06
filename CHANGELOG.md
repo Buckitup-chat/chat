@@ -15,6 +15,7 @@ straightforward as possible.
 - Progress bar for dump
 
 ### Changed
+- copying speed optimization 
 
 ### Fixed
 - large filename in dump statistic

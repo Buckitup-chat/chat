@@ -15,16 +15,17 @@ defmodule Chat.Db.Common do
       writer: names(name, :writer)
     }
 
-  def names(db_name, part), case(part) do
-    :queue -> :"#{db_name}.Queue"
-    :status -> :"#{db_name}.DryStatus"
-    :decider -> :"#{db_name}.Decider"
-    :read_supervisor -> :"#{db_name}.ReadSupervisor"
-    :file_reader -> :"#{db_name}.FileReader"
-    :write_supervisor -> :"#{db_name}.WriteSupervisor"
-    :compactor -> :"#{db_name}.Compactor"
-    :writer -> :"#{db_name}.Writer"
-    _ -> nil
+  def names(db_name, part) do
+    case part do
+      :queue -> :"#{db_name}.Queue"
+      :status -> :"#{db_name}.DryStatus"
+      :decider -> :"#{db_name}.Decider"
+      :read_supervisor -> :"#{db_name}.ReadSupervisor"
+      :file_reader -> :"#{db_name}.FileReader"
+      :write_supervisor -> :"#{db_name}.WriteSupervisor"
+      :compactor -> :"#{db_name}.Compactor"
+      :writer -> :"#{db_name}.Writer"
+    end
   end
 
   def db_state(name) do

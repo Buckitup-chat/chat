@@ -5,15 +5,27 @@ defmodule Chat.Db.Common do
 
   def names(name),
     do: %{
-      queue: :"#{name}.Queue",
-      status: :"#{name}.DryStatus",
-      decider: :"#{name}.Decider",
-      read_supervisor: :"#{name}.ReadSupervisor",
-      file_reader: :"#{name}.FileReader",
-      write_supervisor: :"#{name}.WriteSupervisor",
-      compactor: :"#{name}.Compactor",
-      writer: :"#{name}.Writer"
+      queue: names(name, :queue),
+      status: names(name, :status),
+      decider: names(name, :decider),
+      read_supervisor: names(name, :read_supervisor),
+      file_reader: names(name, :file_reader),
+      write_supervisor: names(name, :write_supervisor),
+      compactor: names(name, :compactor),
+      writer: names(name, :writer)
     }
+
+  def names(db_name, part), case(part) do
+    :queue -> :"#{db_name}.Queue"
+    :status -> :"#{db_name}.DryStatus"
+    :decider -> :"#{db_name}.Decider"
+    :read_supervisor -> :"#{db_name}.ReadSupervisor"
+    :file_reader -> :"#{db_name}.FileReader"
+    :write_supervisor -> :"#{db_name}.WriteSupervisor"
+    :compactor -> :"#{db_name}.Compactor"
+    :writer -> :"#{db_name}.Writer"
+    _ -> nil
+  end
 
   def db_state(name) do
     names(name)

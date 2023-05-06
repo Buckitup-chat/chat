@@ -98,5 +98,5 @@ defmodule Chat.Db.WriteQueue.ReadStream do
     end
   end
 
-  defp file_reader(db), do: Common.names(db)[:file_reader]
+  defp file_reader(db), do: Common.names(db, :file_reader)
 end

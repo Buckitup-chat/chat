@@ -4,7 +4,6 @@ defmodule Chat.KeyShareTest do
 
   alias Chat.Card
   alias Chat.KeyShare
-  alias Chat.Rooms
   alias Chat.User
 
   describe "key share" do

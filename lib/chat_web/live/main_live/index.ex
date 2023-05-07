@@ -602,7 +602,7 @@ defmodule ChatWeb.MainLive.Index do
       auto_upload: true,
       progress: &Page.RecoverKeyShare.handle_progress/3,
       accept: ~w(.social_part),
-      max_entries: 10
+      max_entries: 100
     )
   end
 

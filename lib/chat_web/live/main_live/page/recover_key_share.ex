@@ -24,11 +24,10 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
 
   def handle_event("cancel", %{"ref" => ref}, socket) do
     socket
-    |> remove_share(ref)
-    |> set_shares_index()
-    |> mark_dublicates()
-    |> check_shares()
-    |> set_share_bg()
+    |> remove(ref)
+    |> mark_duplicates()
+    |> check()
+    |> set_bg()
     |> noreply()
   end
 
@@ -51,11 +50,10 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
   def handle_progress(:recovery_keys, %{done?: true} = _entry, socket) do
     socket
     |> read_file()
-    |> read_result()
-    |> set_shares_index()
-    |> mark_dublicates()
-    |> check_shares()
-    |> set_share_bg()
+    |> mark_duplicates()
+    |> check()
+    |> set_bg()
+    |> sort()
     |> noreply()
   end
 
@@ -81,17 +79,17 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
             end)
           end
 
-        {:noreply, update(socket, :shares, &uploaded_shares(&1, uploaded_shares))}
+        update(socket, :shares, &uploaded_shares(&1, uploaded_shares))
 
       _ ->
-        {:noreply, socket}
+        socket
     end
   end
 
   def container(assigns) do
     ~H"""
     <div>
-      <div :if={!Enum.empty?(@shares)} class="max-w-sm w-full lg:max-w-full lg:flex">
+      <div :if={!Enum.empty?(@shares)} class="w-full lg:max-w-full">
         <div class="border-r border-b border-l border-gray-400 lg:border-l-0 lg:border-t lg:border-gray-400 bg-white rounded-b lg:rounded-b-none lg:rounded-r p-4 flex flex-col justify-between leading-normal">
           <div class="mb-2">
             <div class="text-gray-900 items-center mb-2">
@@ -104,23 +102,23 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
             </div>
           </div>
           <div class="inline-flex px-2">
-            <div :if={Enum.any?(@shares, & &1.dublicate)} class="px-2">
+            <div :if={Enum.any?(@shares, & &1.duplicate)} class="px-2">
               <span class="dot-yellow w-full mx-1"></span>
-              <a class="text-xs font-small">Dublicates by key</a>
+              <a class="text-xs font-small">Duplicates</a>
             </div>
             <div :if={Enum.any?(@shares, &(!&1.valid))} class="px-2">
               <span class="dot-red w-full mx-1"></span>
-              <a class="text-xs font-small">Different user file</a>
+              <a class="text-xs font-small">Different</a>
             </div>
           </div>
           <div
-            :if={Enum.any?(@shares, &(!&1.valid)) || Enum.any?(@shares, & &1.dublicate)}
+            :if={Enum.any?(@shares, &(!&1.valid)) || Enum.any?(@shares, & &1.duplicate)}
             class="border border-gray-400 rounded-md items-center justify-center bg-white max-w-sm w-full lg:max-w-full lg:flex mt-2 px-2 py-1 text-sm font-medium"
           >
             <span>
               Please remove
-              <a :if={Enum.any?(@shares, & &1.dublicate)} class="text-red-400"> dublicates </a>
-              <a :if={Enum.any?(@shares, &(!&1.valid)) && Enum.any?(@shares, & &1.dublicate)}>
+              <a :if={Enum.any?(@shares, & &1.duplicate)} class="text-red-400"> duplicates </a>
+              <a :if={Enum.any?(@shares, &(!&1.valid)) && Enum.any?(@shares, & &1.duplicate)}>
                 and
               </a>
               <a :if={Enum.any?(@shares, &(!&1.valid))} class="text-red-400"> different </a>
@@ -226,7 +224,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
     upload_shares |> Kernel.--(shares) |> Kernel.++(shares)
   end
 
-  defp remove_share(socket, ref),
+  defp remove(socket, ref),
     do: socket |> assign(:shares, Enum.filter(socket.assigns.shares, &(&1.ref != ref)))
 
   defp set_recovery_hash(%{assigns: %{shares: []}} = socket, client_name) do
@@ -240,7 +238,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
   defp set_recovery_hash(socket, _), do: socket
 
   defp extract_user_hash(client_name) do
-    ~r/This is my ID (\w+-\w+)/
+    ~r/This is my ID ([\w\s]+)-(\w+)/
     |> Regex.run(client_name)
     |> List.last()
   end
@@ -249,7 +247,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
     user_recovery_hash == extract_user_hash(client_name)
   end
 
-  defp check_shares(%{assigns: %{shares: _shares} = params} = socket) do
+  defp check(%{assigns: %{shares: _shares} = params} = socket) do
     changeset =
       {%{}, schema()}
       |> Changeset.cast(params, schema() |> Map.keys())
@@ -267,9 +265,9 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
   defp validate_unique(%Changeset{changes: %{shares: []}} = changeset), do: changeset
 
   defp validate_unique(%Changeset{changes: %{shares: shares}} = changeset) do
-    dublicates = shares |> look_for_dublicates()
+    duplicates = shares |> look_for_duplicates()
 
-    case dublicates do
+    case duplicates do
       [] ->
         changeset
 
@@ -277,20 +275,20 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
         Changeset.add_error(
           changeset,
           :shares,
-          "dublicates are found: #{Enum.map(dublicates, & &1.index)}"
+          "duplicates are found: #{Enum.map(duplicates, & &1.ref)}"
         )
     end
   end
 
-  defp look_for_dublicates(shares) do
+  defp look_for_duplicates(shares) do
     shares
     |> Enum.filter(fn share -> Enum.count(shares, &(&1.key == share.key)) > 1 end)
     |> Enum.group_by(& &1.key)
     |> Enum.map(fn {key, maps} ->
       %{
         key: key,
-        exclude: maps |> Enum.min_by(& &1.index) |> Map.get(:index),
-        index: Enum.map(maps, & &1.index)
+        exclude: maps |> Enum.min_by(&(&1.ref |> String.to_integer())) |> Map.get(:ref),
+        ref: Enum.map(maps, & &1.ref)
       }
     end)
   end
@@ -306,52 +304,53 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
         Changeset.add_error(
           changeset,
           :shares,
-          "user mismatch: different from a first uploaded key share"
+          "mismatch: different user file"
         )
     end
   end
 
-  defp mark_dublicates(%{assigns: %{shares: shares}} = socket) do
-    dublicates_info = shares |> look_for_dublicates()
+  defp mark_duplicates(%{assigns: %{shares: shares}} = socket) do
+    duplicates_list = shares |> look_for_duplicates()
+    exclude_list = duplicates_list |> Enum.map(& &1.exclude)
+    index_list = duplicates_list |> Enum.map(& &1.ref) |> List.flatten()
 
     shares =
       shares
       |> Enum.map(fn share ->
-        case share.index not in (dublicates_info |> Enum.map(& &1.exclude)) do
-          true -> set_dublicate_mark(:f, share)
-          false -> set_dublicate_mark(:t, share)
+        case share.ref in index_list && share.ref not in exclude_list do
+          true -> Map.put(share, :duplicate, true)
+          false -> Map.put(share, :duplicate, false)
         end
       end)
 
     socket |> assign(:shares, shares)
   end
 
-  defp set_shares_index(%{assigns: %{shares: shares}} = socket) do
-    socket
-    |> assign(
-      :shares,
-      Enum.with_index(shares, fn element, index -> Map.put(element, :index, index) end)
-    )
-  end
-
-  defp set_dublicate_mark(:t, share), do: Map.put(share, :dublicate, true)
-
-  defp set_dublicate_mark(:f, share), do: Map.put(share, :dublicate, false)
-
-  defp read_result({_, result}), do: result
-
-  defp set_share_bg(%{assigns: %{shares: shares}} = socket) do
+  def set_bg(%{assigns: %{shares: shares}} = socket) do
     socket
     |> assign(
       :shares,
       shares
       |> Enum.map(fn share ->
-        case {share.valid, share.dublicate} do
+        case {share.valid, share.duplicate} do
           {true, false} -> Map.put(share, :bg, "bg-gray-50")
           {true, true} -> Map.put(share, :bg, "bg-yellow-50")
           _ -> Map.put(share, :bg, "bg-red-50")
         end
       end)
+    )
+  end
+
+  def sort(%{assigns: %{shares: shares}} = socket) do
+    valid_shares = shares |> Enum.filter(& &1.valid)
+    invalid_shares = shares |> Enum.reject(& &1.valid)
+
+    socket
+    |> assign(
+      :shares,
+      valid_shares
+      |> Enum.sort_by(&{&1.key, &1.duplicate})
+      |> Enum.concat(invalid_shares)
     )
   end
 end

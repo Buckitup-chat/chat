@@ -50,7 +50,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShareTest do
 
       view = conn |> render_form() |> Map.get(:view)
 
-      social_part = me |> key_parts(:keys) |> List.first()
+      social_part = me |> key_parts() |> List.first()
 
       entry = [
         %{
@@ -87,18 +87,13 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShareTest do
     %{html: html, view: view}
   end
 
-  defp key_parts(user, option \\ :all) do
-    shares =
-      {user,
-       ["Kevin", "John", "Mike", "Liza"]
-       |> Enum.map(fn name ->
-         name |> User.login() |> Card.from_identity()
-       end)}
-      |> generate_key_shares()
-
-    case option do
-      :all -> shares
-      :keys -> shares |> Enum.map(& &1.key)
-    end
+  defp key_parts(user) do
+    {user,
+     ["Kevin", "John", "Mike", "Liza"]
+     |> Enum.map(fn name ->
+       name |> User.login() |> Card.from_identity()
+     end)}
+    |> generate_key_shares()
+    |> Enum.map(& &1.key)
   end
 end

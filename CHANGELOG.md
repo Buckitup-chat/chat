@@ -13,6 +13,7 @@ straightforward as possible.
 ### Added
 - ChangeTracker. Log long expiration keys
 - Progress bar for dump
+- AdminDb placeholders
 
 ### Changed
 

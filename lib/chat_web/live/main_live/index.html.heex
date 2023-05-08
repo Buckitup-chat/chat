@@ -332,7 +332,7 @@
           >
             <.icon id="logo" class="w-6 h-6" />
           </div>
-          <Layout.DbStatus.mobile status={@db_status} />
+          <Layout.DbStatus.mobile status={@db_status} usb_drive_dump_room={@usb_drive_dump_room} />
           <button
             class="flex justify-between min-w-max"
             phx-click={JS.push("logout-open") |> show_modal("logout-backup-popup")}
@@ -524,7 +524,10 @@
           </div>
           <div class="flex flex-col items-center">
             <div class="row mt-10">
-              <Layout.DbStatus.desktop status={@db_status} />
+              <Layout.DbStatus.desktop
+                status={@db_status}
+                usb_drive_dump_room={@usb_drive_dump_room}
+              />
               <button
                 phx-click={JS.push("logout-open") |> show_modal("logout-backup-popup")}
                 class="sidebarIcon mb-1"
@@ -542,7 +545,7 @@
             </div>
             <Layout.SearchBox.render type={:dialog} />
             <div class="sidebar-container md:h-[870px]">
-              <div class="mt-3 w-full overflow-scroll">
+              <div id="dialog-list" class="mt-3 w-full overflow-scroll">
                 <ul class={
                   classes(
                     "",
@@ -553,6 +556,7 @@
                     <li
                       phx-click="dialog/switch"
                       phx-value-user-id={user.hash}
+                      id={"user-#{user.hash}"}
                       class={
                         classes(
                           "hidden sm:flex w-full cursor-pointer h-9 flex items-center hover:bg-stone250",
@@ -857,37 +861,7 @@
                     </div>
                   </.modal>
                 <% end %>
-                <.modal id="room-invite-list" class="z-30">
-                  <h1 class="text-base font-bold text-grayscale t-invite-header">
-                    Invite to the Room
-                  </h1>
-                  <div id="#user-list" class="mt-3 w-full flex flex-col" phx-update="ignore">
-                    <%= for user <- Chat.User.list() do %>
-                      <%= unless user == Chat.Card.from_identity(@me) do %>
-                        <div
-                          id={"user-#{user.hash}"}
-                          class="flex flex-row items-center justify-between t-invite"
-                        >
-                          <Layout.Card.hashed_name card={user} />
-                          <a
-                            class="flex items-center justify-between"
-                            phx-click={
-                              JS.push("room/invite-user")
-                              |> JS.dispatch("chat:toggle",
-                                to: "#user-#{user.hash}",
-                                detail: %{class: "hidden"}
-                              )
-                            }
-                            phx-value-hash={user.hash}
-                          >
-                            <p class="text-purple font-semibold">Send invite</p>
-                            <.icon id="send" class="w-4 h-4 ml-2 z-20 fill-purple" />
-                          </a>
-                        </div>
-                      <% end %>
-                    <% end %>
-                  </div>
-                </.modal>
+
                 <div>
                   <Layout.Chat.loader />
                   <div id="chat-messages" phx-update={@message_update_mode}>

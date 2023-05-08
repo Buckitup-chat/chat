@@ -7,6 +7,7 @@ defmodule Chat.Db do
 
   alias Chat.Db.Queries
   alias Chat.Db.WriteQueue
+  alias Chat.Db.WriteQueue.FileReader
 
   @db_version "v.9"
   @db_location Application.compile_env(:chat, :cub_db_file, "priv/db")
@@ -48,6 +49,8 @@ defmodule Chat.Db do
     %{
       status: dry_relay_name,
       queue: queue_name,
+      read_supervisor: read_supervisor,
+      file_reader: file_reader_name,
       writer: writer_name,
       compactor: compactor,
       decider: decider,
@@ -55,6 +58,10 @@ defmodule Chat.Db do
     } = names(db_name)
 
     [
+      # read supervisor
+      {Task.Supervisor, name: read_supervisor},
+      # file reader
+      {FileReader, name: file_reader_name, read_supervisor: read_supervisor},
       # queue
       {Chat.Db.WriteQueue, name: queue_name},
       # db

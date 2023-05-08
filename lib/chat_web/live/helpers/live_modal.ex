@@ -2,8 +2,8 @@ defmodule ChatWeb.LiveHelpers.LiveModal do
   @moduledoc """
   Adds modal support for live pages.
   """
+  import ChatWeb.LiveHelpers.Shared, only: [send_js: 2]
   import Phoenix.Component, only: [assign: 3]
-  alias Phoenix.LiveView
   alias Phoenix.LiveView.JS
   alias Phoenix.LiveView.Socket
 
@@ -14,8 +14,6 @@ defmodule ChatWeb.LiveHelpers.LiveModal do
           params: %{String.t() => String.t()}
         }
 
-  @type js_t() :: %JS{ops: list()}
-
   @spec open_modal(Socket.t(), module(), map()) :: Socket.t()
   def open_modal(%Socket{} = socket, module, params \\ %{}) when is_atom(module) do
     socket
@@ -25,14 +23,10 @@ defmodule ChatWeb.LiveHelpers.LiveModal do
 
   @spec close_modal(Socket.t()) :: Socket.t()
   def close_modal(%Socket{} = socket) do
-    socket
-    |> assign(:live_modal, nil)
-    |> send_js(closing_transition())
-  end
+    Process.send_after(self(), :close_modal, 200)
 
-  @spec send_js(Socket.t(), js_t()) :: Socket.t()
-  def send_js(%Socket{} = socket, %JS{ops: ops}) do
-    LiveView.push_event(socket, "js-event", %{data: Jason.encode!(ops)})
+    socket
+    |> send_js(closing_transition())
   end
 
   defp opening_transition do
@@ -43,7 +37,7 @@ defmodule ChatWeb.LiveHelpers.LiveModal do
 
   defp closing_transition do
     %JS{}
-    |> JS.hide(to: "#modal", transition: "fade-out", time: 0)
-    |> JS.show(to: "#modal-content", transition: "fade-out-scale")
+    |> JS.hide(transition: "fade-out", to: "#modal")
+    |> JS.hide(transition: "fade-out-scale", to: "#modal-content")
   end
 end

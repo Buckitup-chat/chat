@@ -20,8 +20,8 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
       {"message/" <> action, %{"id" => id, "index" => index}} ->
         socket |> route_message_event({action, {index |> String.to_integer(), id}})
 
-      {"invite-user", %{"hash" => hash}} ->
-        socket |> Page.Room.invite_user(hash |> Base.decode16!(case: :lower))
+      {"open-invite-list", _} ->
+        socket |> Page.Room.open_invite_list(Modals.RoomInviteList)
 
       {"send-request", %{"room" => hash}} ->
         socket |> Page.Lobby.request_room(hash |> Base.decode16!(case: :lower))
@@ -107,6 +107,9 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
 
   def info(socket, message) do
     case message do
+      {:invite_user, hash} ->
+        socket |> Page.Room.invite_user(hash |> Base.decode16!(case: :lower))
+
       {:new_message, glimpse} ->
         socket |> Page.Room.show_new(glimpse)
 

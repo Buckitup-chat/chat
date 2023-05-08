@@ -70,7 +70,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShareTest do
 
       socket = view.pid |> :sys.get_state() |> Map.get(:socket)
 
-      assert {:noreply, socket} = RecoverKeyShare.handle_progress(:recovery_keys, entry, socket)
+      assert {:noreply, ^socket} = RecoverKeyShare.handle_progress(:recovery_keys, entry, socket)
     end
   end
 

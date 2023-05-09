@@ -40,8 +40,9 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShareTest do
         |> Map.get(:socket)
         |> RecoverKeyShare.mount()
 
-      assert socket.assigns.user_recovery_hash == nil
+      assert socket.assigns.hash_sign == nil
       assert socket.assigns.shares == []
+      assert socket.assigns.recovery_error == nil
     end
 
     test "handle upload", %{conn: conn, me: me} do

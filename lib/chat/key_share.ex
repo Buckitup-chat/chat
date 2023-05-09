@@ -1,7 +1,7 @@
 defmodule Chat.KeyShare do
   @moduledoc "Manipulate social sharing keys"
 
-  alias Chat.{Actor, Dialogs, Dialogs.Dialog, Identity}
+  alias Chat.{Dialogs, Dialogs.Dialog, Identity}
   alias Chat.{ChunkedFiles, ChunkedFilesMultisecret}
   alias Chat.Upload.UploadKey
 
@@ -9,18 +9,20 @@ defmodule Chat.KeyShare do
 
   def threshold, do: @threshold
 
-  def generate_key_shares({%Identity{private_key: _private_key} = me, users}) do
+  def generate_key_shares({%Identity{private_key: private_key} = me, users}) do
     amount = Enum.count(users)
+    hash = private_key |> Enigma.hash() |> Enigma.sign(private_key)
 
-    Actor.new(me, [], %{})
-    |> Actor.to_encrypted_json("")
+    me
+    |> Identity.to_strings()
+    |> Enum.at(1)
     |> Enigma.hide_secret_in_shares(amount, @threshold)
     |> Enum.zip_reduce(users, [], fn key, user, acc ->
       acc ++
         [
           %{
             user: user,
-            key: key
+            key: {key, hash} |> encode_content()
           }
         ]
     end)
@@ -76,4 +78,7 @@ defmodule Chat.KeyShare do
     ChunkedFilesMultisecret.generate(file_key, file_size, file_secret)
     ChunkedFiles.save_upload_chunk(file_key, {0, file_size - 1}, file_size, share_key)
   end
+
+  defp encode_content({key, hash}),
+    do: Base.encode16(key, case: :lower) <> "\n" <> Base.encode16(hash, case: :lower)
 end

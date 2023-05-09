@@ -2,8 +2,11 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
   @moduledoc "Recover Key Share Page"
   use ChatWeb, :live_component
 
-  alias Chat.Actor
   alias Chat.KeyShare
+
+  alias Chat.Identity
+
+  alias Chat.User.Registry
 
   alias Ecto.Changeset
 
@@ -11,7 +14,8 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
     {:ok,
      socket
      |> assign(:shares, [])
-     |> assign(:user_recovery_hash, nil)
+     |> assign(:hash_sign, nil)
+     |> assign(:recovery_error, nil)
      |> assign(
        :changeset,
        Changeset.change({%{}, schema()})
@@ -19,7 +23,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
   end
 
   def handle_event("save", _, socket) do
-    socket |> noreply()
+    socket |> clean_recovery_error() |> noreply()
   end
 
   def handle_event("cancel", %{"ref" => ref}, socket) do
@@ -28,28 +32,32 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
     |> mark_duplicates()
     |> check()
     |> set_bg()
+    |> clean_recovery_error()
     |> noreply()
   end
 
-  def handle_event("accept", _, %{assigns: %{shares: shares}} = socket) do
-    data =
+  def handle_event("accept", _, %{assigns: %{shares: shares, hash_sign: sign}} = socket) do
+    keystring =
       shares
       |> Enum.map(&Map.get(&1, :key))
       |> Enigma.recover_secret_from_shares()
 
-    with {:ok, %{me: me, rooms: rooms}} <-
-           data
-           |> Actor.from_encrypted_json("")
-           |> then(&{:ok, &1}) do
-      Process.send(self(), {:key_recovered, [me, rooms]}, [])
-
-      socket |> noreply()
+    with {:ok, user} <- user_in_share(keystring),
+         %Identity{} = me <- [user.name, keystring] |> Identity.from_strings(),
+         my_hash <- me.private_key |> Enigma.hash(),
+         is_valid_sign <- Enigma.is_valid_sign?(sign, my_hash, me.public_key) do
+      socket |> sign_based_response(me, is_valid_sign)
+    else
+      :user_keystring_broken ->
+        socket |> assign(:recovery_error, "Unable to detect user from social parts") |> noreply()
     end
   end
 
   def handle_progress(:recovery_keys, %{done?: true} = _entry, socket) do
     socket
     |> read_file()
+    |> set_hash_sign()
+    |> validate_hash()
     |> mark_duplicates()
     |> check()
     |> set_bg()
@@ -64,17 +72,17 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
   def read_file(%{assigns: %{shares: _shares}} = socket) do
     case uploaded_entries(socket, :recovery_keys) do
       {[_ | _] = entries, []} ->
-        socket = socket |> set_recovery_hash(List.first(entries).client_name)
-
         uploaded_shares =
           for entry <- entries do
             consume_uploaded_entry(socket, entry, fn %{path: path} ->
+              {key, hash_sign} = path |> read_content()
+
               {:ok,
                %{
-                 key: File.read!(path),
+                 key: key,
+                 hash_sign: hash_sign,
                  name: entry.client_name,
-                 ref: entry.ref,
-                 valid: socket |> valid_entry?(entry.client_name)
+                 ref: entry.ref
                }}
             end)
           end
@@ -101,28 +109,15 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
               </span>
             </div>
           </div>
-          <div class="inline-flex px-2">
-            <div :if={Enum.any?(@shares, & &1.duplicate)} class="px-2">
-              <span class="dot-yellow w-full mx-1"></span>
-              <a class="text-xs font-small">Duplicates</a>
-            </div>
-            <div :if={Enum.any?(@shares, &(!&1.valid))} class="px-2">
-              <span class="dot-red w-full mx-1"></span>
-              <a class="text-xs font-small">Different</a>
-            </div>
-          </div>
+
+          <.validation_box shares={@shares} />
           <div
-            :if={Enum.any?(@shares, &(!&1.valid)) || Enum.any?(@shares, & &1.duplicate)}
-            class="border border-gray-400 rounded-md items-center justify-center bg-white max-w-sm w-full lg:max-w-full lg:flex mt-2 px-2 py-1 text-sm font-medium"
+            :if={@recovery_error}
+            class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative text-center"
+            role="alert"
           >
-            <span>
-              Please remove
-              <a :if={Enum.any?(@shares, & &1.duplicate)} class="text-red-400"> duplicates </a>
-              <a :if={Enum.any?(@shares, &(!&1.valid)) && Enum.any?(@shares, & &1.duplicate)}>
-                and
-              </a>
-              <a :if={Enum.any?(@shares, &(!&1.valid))} class="text-red-400"> different </a>
-              <a :if={Enum.any?(@shares, &(!&1.valid))}> user files </a>
+            <span class="block sm:inline">
+              <%= @recovery_error %>
             </span>
           </div>
         </div>
@@ -137,6 +132,35 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
         phx-target={@myself}
         disabled={!@changeset.valid?}
       />
+    </div>
+    """
+  end
+
+  defp validation_box(assigns) do
+    ~H"""
+    <div class="inline-flex px-2">
+      <div :if={Enum.any?(@shares, & &1.duplicate)} class="px-2">
+        <span class="dot-yellow w-full mx-1"></span>
+        <a class="text-xs font-small">Duplicates</a>
+      </div>
+      <div :if={Enum.any?(@shares, &(!&1.valid))} class="px-2">
+        <span class="dot-red w-full mx-1"></span>
+        <a class="text-xs font-small">Different</a>
+      </div>
+    </div>
+    <div
+      :if={Enum.any?(@shares, &(!&1.valid)) || Enum.any?(@shares, & &1.duplicate)}
+      class="border border-gray-400 rounded-md items-center justify-center bg-white max-w-sm w-full lg:max-w-full lg:flex mt-2 px-2 py-1 text-sm font-medium"
+    >
+      <span>
+        Please remove
+        <a :if={Enum.any?(@shares, & &1.duplicate)} class="text-red-400"> duplicates </a>
+        <a :if={Enum.any?(@shares, &(!&1.valid)) && Enum.any?(@shares, & &1.duplicate)}>
+          and
+        </a>
+        <a :if={Enum.any?(@shares, &(!&1.valid))} class="text-red-400"> different </a>
+        <a :if={Enum.any?(@shares, &(!&1.valid))}> user files </a>
+      </span>
     </div>
     """
   end
@@ -210,7 +234,13 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
                   value="Upload Key Files"
                   onclick="event.target.parentNode.querySelector('input[type=file]').click()"
                 />
-                <.container changeset={@changeset} shares={@shares} form={f} myself={@myself} />
+                <.container
+                  changeset={@changeset}
+                  shares={@shares}
+                  form={f}
+                  myself={@myself}
+                  recovery_error={@recovery_error}
+                />
               </.form>
             </div>
           <% end %>
@@ -227,24 +257,29 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
   defp remove(socket, ref),
     do: socket |> assign(:shares, Enum.filter(socket.assigns.shares, &(&1.ref != ref)))
 
-  defp set_recovery_hash(%{assigns: %{shares: []}} = socket, client_name) do
+  defp set_hash_sign(%{assigns: %{shares: [], hash_sign: _hash_sign}} = socket),
+    do: socket |> assign(:hash_sign, nil)
+
+  defp set_hash_sign(%{assigns: %{shares: shares, hash_sign: nil}} = socket) do
     socket
     |> assign(
-      :user_recovery_hash,
-      extract_user_hash(client_name)
+      :hash_sign,
+      shares |> Enum.min_by(&(&1.ref |> String.to_integer())) |> Map.get(:hash_sign)
     )
   end
 
-  defp set_recovery_hash(socket, _), do: socket
+  defp set_hash_sign(%{assigns: %{shares: _shares, hash_sign: _hash_sign}} = socket),
+    do: socket
 
-  defp extract_user_hash(client_name) do
-    ~r/This is my ID ([\w\s]+)-(\w+)/
-    |> Regex.run(client_name)
-    |> List.last()
-  end
-
-  defp valid_entry?(%{assigns: %{user_recovery_hash: user_recovery_hash}}, client_name) do
-    user_recovery_hash == extract_user_hash(client_name)
+  defp validate_hash(%{assigns: %{shares: shares, hash_sign: hash_sign}} = socket) do
+    socket
+    |> assign(
+      :shares,
+      shares
+      |> Enum.map(fn share ->
+        Map.put(share, :valid, share.hash_sign == hash_sign)
+      end)
+    )
   end
 
   defp check(%{assigns: %{shares: _shares} = params} = socket) do
@@ -317,7 +352,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
     shares =
       shares
       |> Enum.map(fn share ->
-        case share.ref in index_list && share.ref not in exclude_list do
+        case share.ref in index_list && share.ref not in exclude_list && share.valid do
           true -> Map.put(share, :duplicate, true)
           false -> Map.put(share, :duplicate, false)
         end
@@ -353,4 +388,43 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
       |> Enum.concat(invalid_shares)
     )
   end
+
+  defp user_in_share(keystring) do
+    case keystring |> Base.decode64() do
+      {:ok, <<_private::binary-size(32), public::binary-size(33)>>} ->
+        {_, user} =
+          Registry.all()
+          |> Enum.find(fn {_, user} ->
+            user.pub_key == public
+          end)
+
+        {:ok, user}
+
+      :error ->
+        :user_keystring_broken
+    end
+  end
+
+  defp read_content(path) do
+    content =
+      path
+      |> File.stream!()
+      |> Stream.map(&String.trim_trailing/1)
+      |> Enum.to_list()
+      |> List.to_tuple()
+
+    {content |> elem(0) |> decode_content(), content |> elem(1) |> decode_content()}
+  end
+
+  defp decode_content(content), do: content |> Base.decode16(case: :lower) |> elem(1)
+
+  defp sign_based_response(socket, me, true) do
+    Process.send(self(), {:key_recovered, [me, []]}, [])
+    socket |> noreply()
+  end
+
+  defp sign_based_response(socket, _me, _not_valid),
+    do: socket |> assign(:recovery_error, "Invalid recovery signature") |> noreply()
+
+  defp clean_recovery_error(socket), do: socket |> assign(:recovery_error, nil)
 end

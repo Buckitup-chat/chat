@@ -361,7 +361,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
     socket |> assign(:shares, shares)
   end
 
-  def set_bg(%{assigns: %{shares: shares}} = socket) do
+  defp set_bg(%{assigns: %{shares: shares}} = socket) do
     socket
     |> assign(
       :shares,
@@ -376,7 +376,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
     )
   end
 
-  def sort(%{assigns: %{shares: shares}} = socket) do
+  defp sort(%{assigns: %{shares: shares}} = socket) do
     valid_shares = shares |> Enum.filter(& &1.valid)
     invalid_shares = shares |> Enum.reject(& &1.valid)
 

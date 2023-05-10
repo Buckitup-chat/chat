@@ -6,14 +6,12 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
 
   alias Chat.Identity
 
-  alias Chat.User.Registry
-
   alias Ecto.Changeset
 
   def mount(socket) do
     {:ok,
      socket
-     |> assign(:shares, [])
+     |> assign(:shares, MapSet.new())
      |> assign(:hash_sign, nil)
      |> assign(:recovery_error, nil)
      |> assign(
@@ -29,6 +27,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
   def handle_event("cancel", %{"ref" => ref}, socket) do
     socket
     |> remove(ref)
+    |> set_hash_sign()
     |> mark_duplicates()
     |> check()
     |> set_bg()
@@ -42,7 +41,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
       |> Enum.map(&Map.get(&1, :key))
       |> Enigma.recover_secret_from_shares()
 
-    with {:ok, user} <- user_in_share(keystring),
+    with {:ok, user} <- KeyShare.user_in_share(keystring),
          %Identity{} = me <- [user.name, keystring] |> Identity.from_strings(),
          my_hash <- me.private_key |> Enigma.hash(),
          is_valid_sign <- Enigma.is_valid_sign?(sign, my_hash, me.public_key) do
@@ -73,9 +72,9 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
     case uploaded_entries(socket, :recovery_keys) do
       {[_ | _] = entries, []} ->
         uploaded_shares =
-          for entry <- entries do
+          for entry <- entries, into: MapSet.new() do
             consume_uploaded_entry(socket, entry, fn %{path: path} ->
-              {key, hash_sign} = path |> read_content()
+              {key, hash_sign} = path |> KeyShare.read_content()
 
               {:ok,
                %{
@@ -87,7 +86,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
             end)
           end
 
-        update(socket, :shares, &uploaded_shares(&1, uploaded_shares))
+        update(socket, :shares, &KeyShare.compose(&1, uploaded_shares))
 
       _ ->
         socket
@@ -250,26 +249,22 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
     """
   end
 
-  defp uploaded_shares(shares, upload_shares) do
-    upload_shares |> Kernel.--(shares) |> Kernel.++(shares)
-  end
-
   defp remove(socket, ref),
     do: socket |> assign(:shares, Enum.filter(socket.assigns.shares, &(&1.ref != ref)))
 
-  defp set_hash_sign(%{assigns: %{shares: [], hash_sign: _hash_sign}} = socket),
-    do: socket |> assign(:hash_sign, nil)
+  defp set_hash_sign(%{assigns: %{shares: shares, hash_sign: _hash_sign}} = socket) do
+    case Enum.empty?(shares) do
+      true ->
+        socket |> assign(:hash_sign, nil)
 
-  defp set_hash_sign(%{assigns: %{shares: shares, hash_sign: nil}} = socket) do
-    socket
-    |> assign(
-      :hash_sign,
-      shares |> Enum.min_by(&(&1.ref |> String.to_integer())) |> Map.get(:hash_sign)
-    )
+      _ ->
+        socket
+        |> assign(
+          :hash_sign,
+          shares |> Enum.min_by(&(&1.ref |> String.to_integer())) |> Map.get(:hash_sign)
+        )
+    end
   end
-
-  defp set_hash_sign(%{assigns: %{shares: _shares, hash_sign: _hash_sign}} = socket),
-    do: socket
 
   defp validate_hash(%{assigns: %{shares: shares, hash_sign: hash_sign}} = socket) do
     socket
@@ -300,7 +295,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
   defp validate_unique(%Changeset{changes: %{shares: []}} = changeset), do: changeset
 
   defp validate_unique(%Changeset{changes: %{shares: shares}} = changeset) do
-    duplicates = shares |> look_for_duplicates()
+    duplicates = shares |> KeyShare.look_for_duplicates()
 
     case duplicates do
       [] ->
@@ -313,19 +308,6 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
           "duplicates are found: #{Enum.map(duplicates, & &1.ref)}"
         )
     end
-  end
-
-  defp look_for_duplicates(shares) do
-    shares
-    |> Enum.filter(fn share -> Enum.count(shares, &(&1.key == share.key)) > 1 end)
-    |> Enum.group_by(& &1.key)
-    |> Enum.map(fn {key, maps} ->
-      %{
-        key: key,
-        exclude: maps |> Enum.min_by(&(&1.ref |> String.to_integer())) |> Map.get(:ref),
-        ref: Enum.map(maps, & &1.ref)
-      }
-    end)
   end
 
   defp validate_user_hash(%Changeset{changes: %{shares: []}} = changeset), do: changeset
@@ -345,7 +327,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
   end
 
   defp mark_duplicates(%{assigns: %{shares: shares}} = socket) do
-    duplicates_list = shares |> look_for_duplicates()
+    duplicates_list = shares |> KeyShare.look_for_duplicates()
     exclude_list = duplicates_list |> Enum.map(& &1.exclude)
     index_list = duplicates_list |> Enum.map(& &1.ref) |> List.flatten()
 
@@ -388,35 +370,6 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
       |> Enum.concat(invalid_shares)
     )
   end
-
-  defp user_in_share(keystring) do
-    case keystring |> Base.decode64() do
-      {:ok, <<_private::binary-size(32), public::binary-size(33)>>} ->
-        {_, user} =
-          Registry.all()
-          |> Enum.find(fn {_, user} ->
-            user.pub_key == public
-          end)
-
-        {:ok, user}
-
-      :error ->
-        :user_keystring_broken
-    end
-  end
-
-  defp read_content(path) do
-    content =
-      path
-      |> File.stream!()
-      |> Stream.map(&String.trim_trailing/1)
-      |> Enum.to_list()
-      |> List.to_tuple()
-
-    {content |> elem(0) |> decode_content(), content |> elem(1) |> decode_content()}
-  end
-
-  defp decode_content(content), do: content |> Base.decode16(case: :lower) |> elem(1)
 
   defp sign_based_response(socket, me, true) do
     Process.send(self(), {:key_recovered, [me, []]}, [])

@@ -1,7 +1,7 @@
 defmodule Chat.KeyShare do
   @moduledoc "Manipulate social sharing keys"
 
-  alias Chat.{Dialogs, Dialogs.Dialog, Identity}
+  alias Chat.{Dialogs, Dialogs.Dialog, Identity, User.Registry}
   alias Chat.{ChunkedFiles, ChunkedFilesMultisecret}
   alias Chat.Upload.UploadKey
 
@@ -53,6 +53,54 @@ defmodule Chat.KeyShare do
     end)
   end
 
+  def compose([], upload_shares), do: MapSet.new(upload_shares)
+
+  def compose(shares, upload_shares) do
+    MapSet.union(MapSet.new(shares), MapSet.new(upload_shares))
+  end
+
+  def look_for_duplicates(shares) do
+    shares
+    |> Enum.filter(fn share -> Enum.count(shares, &(&1.key == share.key)) > 1 end)
+    |> Enum.group_by(& &1.key)
+    |> Enum.map(fn {key, maps} ->
+      %{
+        key: key,
+        exclude: maps |> Enum.min_by(&(&1.ref |> String.to_integer())) |> Map.get(:ref),
+        ref: Enum.map(maps, & &1.ref)
+      }
+    end)
+  end
+
+  def read_content(path) do
+    content =
+      path
+      |> File.stream!()
+      |> Stream.map(&String.trim_trailing/1)
+      |> Enum.to_list()
+      |> List.to_tuple()
+
+    {content |> elem(0) |> decode_content(), content |> elem(1) |> decode_content()}
+  end
+
+  def decode_content(content), do: content |> Base.decode64() |> elem(1)
+
+  def user_in_share(keystring) do
+    case keystring |> Base.decode64() do
+      {:ok, <<_private::binary-size(32), public::binary-size(33)>>} ->
+        {_, user} =
+          Registry.all()
+          |> Enum.find(fn {_, user} ->
+            user.pub_key == public
+          end)
+
+        {:ok, user}
+
+      :error ->
+        :user_keystring_broken
+    end
+  end
+
   defp destination(%Dialog{b_key: b_key} = dialog) do
     %{
       dialog: dialog,
@@ -80,5 +128,5 @@ defmodule Chat.KeyShare do
   end
 
   defp encode_content({key, hash}),
-    do: Base.encode16(key, case: :lower) <> "\n" <> Base.encode16(hash, case: :lower)
+    do: Base.encode64(key) <> "\n" <> Base.encode64(hash)
 end

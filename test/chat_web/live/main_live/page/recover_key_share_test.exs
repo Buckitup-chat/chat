@@ -41,7 +41,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShareTest do
         |> RecoverKeyShare.mount()
 
       assert socket.assigns.hash_sign == nil
-      assert socket.assigns.shares == []
+      assert socket.assigns.shares == MapSet.new([])
       assert socket.assigns.recovery_error == nil
     end
 

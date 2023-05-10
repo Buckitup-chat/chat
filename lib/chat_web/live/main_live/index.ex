@@ -76,11 +76,7 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("login", %{"login" => %{"name" => name}}, socket) do
     socket
     |> Page.Login.create_user(name)
-    |> Page.Lobby.init()
-    |> Page.Dialog.init()
-    |> Page.Logout.init()
-    |> Page.Shared.track_onliners_presence()
-    |> Page.RoomRouter.route_live_action()
+    |> login_init()
     |> noreply()
   end
 
@@ -100,11 +96,7 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> Page.Login.handshaked()
     |> Page.Login.load_user(data)
-    |> Page.Lobby.init()
-    |> Page.Dialog.init()
-    |> Page.Logout.init()
-    |> Page.Shared.track_onliners_presence()
-    |> Page.RoomRouter.route_live_action()
+    |> login_init()
     |> noreply()
   end
 
@@ -406,11 +398,7 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.ImportKeyRing.save_key_ring(keys)
     |> Page.Login.store()
     |> Page.ImportKeyRing.close()
-    |> Page.Lobby.init()
-    |> Page.Logout.init()
-    |> Page.Dialog.init()
-    |> Page.Shared.track_onliners_presence()
-    |> Page.RoomRouter.route_live_action()
+    |> login_init()
     |> noreply()
   end
 
@@ -520,11 +508,7 @@ defmodule ChatWeb.MainLive.Index do
     |> assign(:mode, :lobby)
     |> Page.Login.load_user(me, rooms)
     |> Page.Login.store()
-    |> Page.Lobby.init()
-    |> Page.Dialog.init()
-    |> Page.Logout.init()
-    |> Page.Shared.track_onliners_presence()
-    |> Page.RoomRouter.route_live_action()
+    |> login_init()
     |> noreply()
   end
 
@@ -616,5 +600,14 @@ defmodule ChatWeb.MainLive.Index do
     PubSub.subscribe(Chat.PubSub, "chat::usb_drive_dump_room")
 
     assign(socket, :usb_drive_dump_room, UsbDriveDumpRoom.get())
+  end
+
+  defp login_init(socket) do
+    socket
+    |> Page.Lobby.init()
+    |> Page.Dialog.init()
+    |> Page.Logout.init()
+    |> Page.Shared.track_onliners_presence()
+    |> Page.RoomRouter.route_live_action()
   end
 end

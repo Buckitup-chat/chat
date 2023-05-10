@@ -5,6 +5,8 @@ defmodule Chat.KeyShare do
   alias Chat.{ChunkedFiles, ChunkedFilesMultisecret}
   alias Chat.Upload.UploadKey
 
+  alias Ecto.Changeset
+
   @threshold 4
 
   def threshold, do: @threshold
@@ -61,8 +63,8 @@ defmodule Chat.KeyShare do
 
   def look_for_duplicates(shares) do
     shares
-    |> Enum.filter(fn share -> Enum.count(shares, &(&1.key == share.key)) > 1 end)
     |> Enum.group_by(& &1.key)
+    |> Enum.filter(fn {_key, shares} -> length(shares) > 1 end)
     |> Enum.map(fn {key, maps} ->
       %{
         key: key,
@@ -73,14 +75,11 @@ defmodule Chat.KeyShare do
   end
 
   def read_content(path) do
-    content =
-      path
-      |> File.stream!()
-      |> Stream.map(&String.trim_trailing/1)
-      |> Enum.to_list()
-      |> List.to_tuple()
-
-    {content |> elem(0) |> decode_content(), content |> elem(1) |> decode_content()}
+    path
+    |> File.stream!()
+    |> Stream.map(&String.trim_trailing/1)
+    |> Enum.to_list()
+    |> Enum.map(&decode_content/1)
   end
 
   def decode_content(content), do: content |> Base.decode64() |> elem(1)
@@ -98,6 +97,54 @@ defmodule Chat.KeyShare do
 
       :error ->
         :user_keystring_broken
+    end
+  end
+
+  def check(params) do
+    {%{}, schema()}
+    |> Changeset.cast(params, schema() |> Map.keys())
+    |> Changeset.validate_required(:shares)
+    |> Changeset.validate_length(:shares, min: 4)
+    |> validate_user_hash()
+    |> validate_unique()
+    |> Map.put(:action, :validate)
+  end
+
+  def changeset, do: Changeset.change({%{}, schema()})
+
+  def schema, do: %{shares: {:array, :map}}
+
+  def validate_unique(%Changeset{changes: %{shares: []}} = changeset), do: changeset
+
+  def validate_unique(%Changeset{changes: %{shares: shares}} = changeset) do
+    duplicates = shares |> look_for_duplicates()
+
+    case duplicates do
+      [] ->
+        changeset
+
+      _ ->
+        Changeset.add_error(
+          changeset,
+          :shares,
+          "duplicates are found: #{Enum.map(duplicates, & &1.ref)}"
+        )
+    end
+  end
+
+  def validate_user_hash(%Changeset{changes: %{shares: []}} = changeset), do: changeset
+
+  def validate_user_hash(%Changeset{changes: %{shares: shares}} = changeset) do
+    case Enum.all?(shares, fn share -> share.valid end) do
+      true ->
+        changeset
+
+      false ->
+        Changeset.add_error(
+          changeset,
+          :shares,
+          "mismatch: different user file"
+        )
     end
   end
 

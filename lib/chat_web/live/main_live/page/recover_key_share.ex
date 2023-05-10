@@ -6,8 +6,6 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
 
   alias Chat.Identity
 
-  alias Ecto.Changeset
-
   def mount(socket) do
     {:ok,
      socket
@@ -16,7 +14,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
      |> assign(:recovery_error, nil)
      |> assign(
        :changeset,
-       Changeset.change({%{}, schema()})
+       KeyShare.changeset()
      )}
   end
 
@@ -74,7 +72,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
         uploaded_shares =
           for entry <- entries, into: MapSet.new() do
             consume_uploaded_entry(socket, entry, fn %{path: path} ->
-              {key, hash_sign} = path |> KeyShare.read_content()
+              [key, hash_sign] = path |> KeyShare.read_content()
 
               {:ok,
                %{
@@ -278,52 +276,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
   end
 
   defp check(%{assigns: %{shares: _shares} = params} = socket) do
-    changeset =
-      {%{}, schema()}
-      |> Changeset.cast(params, schema() |> Map.keys())
-      |> Changeset.validate_required(:shares)
-      |> Changeset.validate_length(:shares, min: 4)
-      |> validate_user_hash()
-      |> validate_unique()
-      |> Map.put(:action, :validate)
-
-    socket |> assign(:changeset, changeset)
-  end
-
-  defp schema, do: %{shares: {:array, :map}}
-
-  defp validate_unique(%Changeset{changes: %{shares: []}} = changeset), do: changeset
-
-  defp validate_unique(%Changeset{changes: %{shares: shares}} = changeset) do
-    duplicates = shares |> KeyShare.look_for_duplicates()
-
-    case duplicates do
-      [] ->
-        changeset
-
-      _ ->
-        Changeset.add_error(
-          changeset,
-          :shares,
-          "duplicates are found: #{Enum.map(duplicates, & &1.ref)}"
-        )
-    end
-  end
-
-  defp validate_user_hash(%Changeset{changes: %{shares: []}} = changeset), do: changeset
-
-  defp validate_user_hash(%Changeset{changes: %{shares: shares}} = changeset) do
-    case Enum.all?(shares, fn share -> share.valid end) do
-      true ->
-        changeset
-
-      false ->
-        Changeset.add_error(
-          changeset,
-          :shares,
-          "mismatch: different user file"
-        )
-    end
+    socket |> assign(:changeset, params |> KeyShare.check())
   end
 
   defp mark_duplicates(%{assigns: %{shares: shares}} = socket) do

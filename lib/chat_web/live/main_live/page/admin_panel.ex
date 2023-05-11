@@ -54,8 +54,8 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     socket
   end
 
-  def set_wifi(socket, ssid, password) do
-    admin_room_identity = socket.room_map[AdminRoom.pub_key()]
+  def set_wifi(%{assigns: %{room_map: rooms}} = socket, ssid, password) do
+    admin_room_identity = rooms[AdminRoom.pub_key()]
 
     request_platform({:set_wifi, ssid, password})
     AdminRoom.store_wifi_password(password, admin_room_identity)

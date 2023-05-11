@@ -51,6 +51,7 @@ defmodule ChatWeb.MainLive.Index do
         )
         |> LocalTimeHook.assign_time(Phoenix.LiveView.get_connect_params(socket)["tz_info"])
         |> allow_any500m_upload(:my_keys_file)
+        |> allow_recover_upload()
         |> Page.Login.check_stored()
         |> set_cargo_room()
         |> set_usb_drive_dump_room()
@@ -75,11 +76,7 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("login", %{"login" => %{"name" => name}}, socket) do
     socket
     |> Page.Login.create_user(name)
-    |> Page.Lobby.init()
-    |> Page.Dialog.init()
-    |> Page.Logout.init()
-    |> Page.Shared.track_onliners_presence()
-    |> Page.RoomRouter.route_live_action()
+    |> login_init()
     |> noreply()
   end
 
@@ -99,11 +96,7 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> Page.Login.handshaked()
     |> Page.Login.load_user(data)
-    |> Page.Lobby.init()
-    |> Page.Dialog.init()
-    |> Page.Logout.init()
-    |> Page.Shared.track_onliners_presence()
-    |> Page.RoomRouter.route_live_action()
+    |> login_init()
     |> noreply()
   end
 
@@ -124,6 +117,13 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> Page.Login.close()
     |> Page.ImportOwnKeyRing.init()
+    |> noreply()
+  end
+
+  def handle_event("login:recover-key-share", _, socket) do
+    socket
+    |> Page.Login.close()
+    |> assign(:mode, :recover_key_share)
     |> noreply()
   end
 
@@ -163,6 +163,12 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("login:import-own-keyring-close", _, socket) do
     socket
     |> Page.ImportOwnKeyRing.close()
+    |> assign(:need_login, true)
+    |> noreply()
+  end
+
+  def handle_event("login:recovery-key-close", _, socket) do
+    socket
     |> assign(:need_login, true)
     |> noreply()
   end
@@ -392,11 +398,7 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.ImportKeyRing.save_key_ring(keys)
     |> Page.Login.store()
     |> Page.ImportKeyRing.close()
-    |> Page.Lobby.init()
-    |> Page.Logout.init()
-    |> Page.Dialog.init()
-    |> Page.Shared.track_onliners_presence()
-    |> Page.RoomRouter.route_live_action()
+    |> login_init()
     |> noreply()
   end
 
@@ -500,6 +502,16 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_info({:key_recovered, [me, rooms]}, socket) do
+    socket
+    |> assign(:step, nil)
+    |> assign(:mode, :lobby)
+    |> Page.Login.load_user(me, rooms)
+    |> Page.Login.store()
+    |> login_init()
+    |> noreply()
+  end
+
   def handle_progress(:my_keys_file, %{done?: true}, socket) do
     socket
     |> Page.ImportOwnKeyRing.read_file()
@@ -568,6 +580,16 @@ defmodule ChatWeb.MainLive.Index do
     )
   end
 
+  defp allow_recover_upload(socket) do
+    socket
+    |> allow_upload(:recovery_keys,
+      auto_upload: true,
+      progress: &Page.RecoverKeyShare.handle_progress/3,
+      accept: ~w(.social_part),
+      max_entries: 100
+    )
+  end
+
   defp set_cargo_room(socket) do
     PubSub.subscribe(Chat.PubSub, "chat::cargo_room")
 
@@ -578,5 +600,14 @@ defmodule ChatWeb.MainLive.Index do
     PubSub.subscribe(Chat.PubSub, "chat::usb_drive_dump_room")
 
     assign(socket, :usb_drive_dump_room, UsbDriveDumpRoom.get())
+  end
+
+  defp login_init(socket) do
+    socket
+    |> Page.Lobby.init()
+    |> Page.Dialog.init()
+    |> Page.Logout.init()
+    |> Page.Shared.track_onliners_presence()
+    |> Page.RoomRouter.route_live_action()
   end
 end

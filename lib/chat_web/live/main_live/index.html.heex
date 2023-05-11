@@ -68,6 +68,14 @@
             <span>Import the recovery keys</span>
             <.icon id="upload" class="w-4 h-4 ml-2 fill-white" />
           </button>
+          <button
+            id="recoverKeyButton"
+            phx-click="login:recover-key-share"
+            class="w-full h-11 mt-2.5 bg-transparent text-white py-2 px-4 border border-white/50 rounded-lg flex items-center justify-center"
+          >
+            <span>Recover key from Social Sharing</span>
+            <.icon id="secret" class="w-4 h-4 ml-2 fill-white" />
+          </button>
         </div>
       </div>
     <% else %>
@@ -1324,6 +1332,7 @@
               as={:import_own_keyring_password}
               id="logout-import-own-keyring-password-form"
               phx-submit="login:import-own-keyring-decrypt"
+              phx-drop-target={@uploads.my_keys_file.ref}
               class="mt-2.5"
             >
               <%= text_input(f, :password,
@@ -1359,6 +1368,14 @@
           <% end %>
         </div>
       </div>
+    <% end %>
+    <%= if @mode == :recover_key_share do %>
+      <.live_component
+        id="recover-share-key"
+        uploads={@uploads}
+        step={:initial}
+        module={ChatWeb.MainLive.Page.RecoverKeyShare}
+      />
     <% end %>
   <% end %>
 <% end %>

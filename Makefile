@@ -1,6 +1,7 @@
 .PHONY: check test ci-check
 
 check:
+	mix deps.clean mime --build
 	mix compile --warnings-as-errors
 	mix format --check-formatted
 	mix credo --strict
@@ -9,6 +10,7 @@ check:
 	mix dialyzer --ignore-exit-status
 
 ci-check: 
+	mix deps.clean mime --build
 	mix compile --warnings-as-errors
 	mix format --check-formatted
 	mix credo --strict

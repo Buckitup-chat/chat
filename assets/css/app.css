@@ -11,6 +11,24 @@ html {
   background: radial-gradient(100% 270.84% at 100% 100%, #C56139 0%, #722F58 48.96%, #502461 81.47%, #162755 100%);
 }
 
+.dot-yellow {
+  height: 18px;
+  width: 18px;
+  background-color: #fefce8;
+  border: 1px black solid;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-red {
+  height: 18px;
+  width: 18px;
+  background-color: #fef2f2;
+  border: 1px black solid;
+  border-radius: 50%;
+  display: inline-block;
+}
+
 .a-video {
   height: 112px;
 }

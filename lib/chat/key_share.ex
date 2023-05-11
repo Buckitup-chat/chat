@@ -64,10 +64,7 @@ defmodule Chat.KeyShare do
   def look_for_duplicates(shares) do
     shares
     |> Enum.group_by(& &1.key)
-    |> Enum.filter(fn
-      {_key, _shares = [_, _ | _]} -> true
-      {_key, _shares} -> false
-    end)
+    |> Enum.filter(&duplicated_share?/1)
     |> Enum.map(fn {key, maps} ->
       %{
         key: key,
@@ -106,7 +103,7 @@ defmodule Chat.KeyShare do
     {%{}, schema()}
     |> Changeset.cast(params, schema() |> Map.keys())
     |> Changeset.validate_required(:shares)
-    |> Changeset.validate_length(:shares, min: 4)
+    |> Changeset.validate_length(:shares, min: @threshold)
     |> validate_user_hash()
     |> validate_unique()
     |> Map.put(:action, :validate)
@@ -149,6 +146,8 @@ defmodule Chat.KeyShare do
         )
     end
   end
+
+  defp duplicated_share?({_key, shares}), do: match?([_, _ | _], shares)
 
   defp destination(%Dialog{b_key: b_key} = dialog) do
     %{

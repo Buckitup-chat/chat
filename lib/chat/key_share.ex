@@ -64,7 +64,10 @@ defmodule Chat.KeyShare do
   def look_for_duplicates(shares) do
     shares
     |> Enum.group_by(& &1.key)
-    |> Enum.filter(fn {_key, shares} -> length(shares) > 1 end)
+    |> Enum.filter(fn
+      {_key, _shares = [_, _ | _]} -> true
+      {_key, _shares} -> false
+    end)
     |> Enum.map(fn {key, maps} ->
       %{
         key: key,
@@ -78,7 +81,6 @@ defmodule Chat.KeyShare do
     path
     |> File.stream!()
     |> Stream.map(&String.trim_trailing/1)
-    |> Enum.to_list()
     |> Enum.map(&decode_content/1)
   end
 

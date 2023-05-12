@@ -1,4 +1,2 @@
-File.rm_rf!("priv/test_admin_db")
-File.rm_rf!("priv/test_backup_db")
-File.rm_rf!("priv/test_db")
+Path.wildcard("priv/*_db/") |> Enum.each(&File.rm_rf/1)
 ExUnit.start()

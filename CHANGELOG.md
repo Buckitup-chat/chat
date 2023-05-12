@@ -22,6 +22,7 @@ straightforward as possible.
 
 ### Fixed
 - large filename in dump statistic
+- Admin panel Wifi rename
 
 ## 2023-05-01_344a783___2023-05-03_059ad40
 

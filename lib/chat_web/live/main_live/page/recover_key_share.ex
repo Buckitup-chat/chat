@@ -79,26 +79,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
         uploaded_shares =
           for entry <- entries, into: MapSet.new() do
             consume_uploaded_entry(socket, entry, fn %{path: path} ->
-              case path |> KeyShare.read_content() do
-                :error ->
-                  {:ok,
-                   %{
-                     key: "",
-                     hash_sign: "",
-                     name: entry.client_name,
-                     ref: entry.ref,
-                     broken: true
-                   }}
-
-                [key, hash_sign] ->
-                  {:ok,
-                   %{
-                     key: key,
-                     hash_sign: hash_sign,
-                     name: entry.client_name,
-                     ref: entry.ref
-                   }}
-              end
+              share_from_upload(path, entry)
             end)
           end
 
@@ -107,6 +88,29 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
 
       _ ->
         socket
+    end
+  end
+
+  def share_from_upload(path, entry) do
+    case path |> KeyShare.read_content() do
+      :error ->
+        {:ok,
+         %{
+           key: "",
+           hash_sign: "",
+           name: entry.client_name,
+           ref: entry.ref,
+           broken: true
+         }}
+
+      [key, hash_sign] ->
+        {:ok,
+         %{
+           key: key,
+           hash_sign: hash_sign,
+           name: entry.client_name,
+           ref: entry.ref
+         }}
     end
   end
 

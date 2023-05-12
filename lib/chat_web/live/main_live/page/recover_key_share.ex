@@ -150,7 +150,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
         value="Accept"
         phx-click="accept"
         phx-target={@myself}
-        disabled={!@changeset.valid? || Enum.any?(@shares, &KeyShare.broken?(&1))}
+        disabled={!@changeset.valid? || Enum.any?(@shares, &KeyShare.broken?/1)}
       />
     </div>
     """
@@ -272,7 +272,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
 
   defp check_broken_content(socket, shares),
     do:
-      if(Enum.any?(shares, &KeyShare.broken?(&1)),
+      if(Enum.any?(shares, &KeyShare.broken?/1),
         do: socket |> assign(:recovery_error, "Unable to read file content"),
         else: socket
       )

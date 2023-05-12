@@ -46,7 +46,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
       socket |> sign_based_response(me, is_valid_sign)
     else
       :user_keystring_broken ->
-        shares = shares |> KeyShare.filter_broken()
+        shares = shares |> KeyShare.filter_out_broken()
 
         socket
         |> assign(:recovery_error, "Unable to detect user from social parts")

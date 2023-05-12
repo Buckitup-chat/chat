@@ -157,7 +157,7 @@ defmodule Chat.KeyShare do
     end
   end
 
-  def filter_broken(shares) when is_list(shares) and length(shares) > @threshold do
+  def filter_out_broken(shares) when is_list(shares) and length(shares) > @threshold do
     max_try = shares |> Enum.count() |> Kernel.-(@threshold)
 
     broken_shares = keystring_selection(shares, max_try)
@@ -168,7 +168,7 @@ defmodule Chat.KeyShare do
     end)
   end
 
-  def filter_broken(shares), do: shares
+  def filter_out_broken(shares), do: shares
 
   def broken?(share), do: Map.has_key?(share, :broken)
 
@@ -182,6 +182,9 @@ defmodule Chat.KeyShare do
       end
     end)
   end
+
+  def client_name(%Identity{name: name, public_key: pub_key} = _me),
+    do: "This is my ID #{name}-#{Enigma.short_hash(pub_key)}.social_part"
 
   defp run_selection(shares, try_number) do
     try_number
@@ -219,9 +222,6 @@ defmodule Chat.KeyShare do
       client_type: "text/plain"
     }
   end
-
-  defp client_name(%Identity{name: name, public_key: pub_key} = _me),
-    do: "This is my ID #{name}-#{Enigma.short_hash(pub_key)}.social_part"
 
   defp save({file_key, share_key}, {file_size, file_secret}) do
     ChunkedFilesMultisecret.generate(file_key, file_size, file_secret)

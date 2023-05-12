@@ -11,6 +11,15 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+
+### Changed
+
+### Fixed
+
+
+## 2023-05-12_7e5fcce___2023-05-12_b47aebb
+
+### Added
 - Social Sharing. key recover check
 - Recover key from Social Sharing
 - ChangeTracker. log long expiration keys

@@ -18,6 +18,7 @@ straightforward as possible.
 ### Fixed
 - Too long buttons on mobile
 - scroll uploads to top on uploader mount
+- uploads color changing depending on room/chat belonging
 
 ## 2023-05-12_7e5fcce___2023-05-12_b47aebb
 

@@ -46,7 +46,14 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
       socket |> sign_based_response(me, is_valid_sign)
     else
       :user_keystring_broken ->
-        socket |> assign(:recovery_error, "Unable to detect user from social parts") |> noreply()
+        shares = shares |> KeyShare.filter_out_broken()
+
+        socket
+        |> assign(:recovery_error, "Unable to detect user from social parts")
+        |> assign(:shares, shares)
+        |> set_bg()
+        |> sort()
+        |> noreply()
     end
   end
 
@@ -72,22 +79,38 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
         uploaded_shares =
           for entry <- entries, into: MapSet.new() do
             consume_uploaded_entry(socket, entry, fn %{path: path} ->
-              [key, hash_sign] = path |> KeyShare.read_content()
-
-              {:ok,
-               %{
-                 key: key,
-                 hash_sign: hash_sign,
-                 name: entry.client_name,
-                 ref: entry.ref
-               }}
+              share_from_upload(path, entry)
             end)
           end
 
+        socket = check_broken_content(socket, uploaded_shares)
         update(socket, :shares, &KeyShare.compose(&1, uploaded_shares))
 
       _ ->
         socket
+    end
+  end
+
+  def share_from_upload(path, entry) do
+    case path |> KeyShare.read_content() do
+      :error ->
+        {:ok,
+         %{
+           key: "",
+           hash_sign: "",
+           name: entry.client_name,
+           ref: entry.ref,
+           broken: true
+         }}
+
+      [key, hash_sign] ->
+        {:ok,
+         %{
+           key: key,
+           hash_sign: hash_sign,
+           name: entry.client_name,
+           ref: entry.ref
+         }}
     end
   end
 
@@ -127,7 +150,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
         value="Accept"
         phx-click="accept"
         phx-target={@myself}
-        disabled={!@changeset.valid?}
+        disabled={!@changeset.valid? || Enum.any?(@shares, &KeyShare.broken?/1)}
       />
     </div>
     """
@@ -247,6 +270,13 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
     """
   end
 
+  defp check_broken_content(socket, shares),
+    do:
+      if(Enum.any?(shares, &KeyShare.broken?/1),
+        do: socket |> assign(:recovery_error, "Unable to read file content"),
+        else: socket
+      )
+
   defp remove(socket, ref),
     do: socket |> assign(:shares, Enum.filter(socket.assigns.shares, &(&1.ref != ref)))
 
@@ -270,7 +300,11 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
       :shares,
       shares
       |> Enum.map(fn share ->
-        Map.put(share, :valid, share.hash_sign == hash_sign)
+        Map.put(
+          share,
+          :valid,
+          if(KeyShare.broken?(share), do: true, else: share.hash_sign == hash_sign)
+        )
       end)
     )
   end
@@ -302,9 +336,9 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
       :shares,
       shares
       |> Enum.map(fn share ->
-        case {share.valid, share.duplicate} do
-          {true, false} -> Map.put(share, :bg, "bg-gray-50")
-          {true, true} -> Map.put(share, :bg, "bg-yellow-50")
+        case {share.valid, share.duplicate, Map.has_key?(share, :broken)} do
+          {true, false, false} -> Map.put(share, :bg, "bg-gray-50")
+          {true, true, false} -> Map.put(share, :bg, "bg-yellow-50")
           _ -> Map.put(share, :bg, "bg-red-50")
         end
       end)
@@ -312,8 +346,8 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
   end
 
   defp sort(%{assigns: %{shares: shares}} = socket) do
-    valid_shares = shares |> Enum.filter(& &1.valid)
-    invalid_shares = shares |> Enum.reject(& &1.valid)
+    valid_shares = shares |> Enum.filter(&(&1.valid && !Map.has_key?(&1, :broken)))
+    invalid_shares = shares |> Enum.reject(&(&1.valid && !Map.has_key?(&1, :broken)))
 
     socket
     |> assign(

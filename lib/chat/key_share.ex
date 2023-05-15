@@ -7,6 +7,8 @@ defmodule Chat.KeyShare do
 
   alias Ecto.Changeset
 
+  alias Combinatorics
+
   @threshold 4
 
   def threshold, do: @threshold
@@ -79,9 +81,18 @@ defmodule Chat.KeyShare do
     |> File.stream!()
     |> Stream.map(&String.trim_trailing/1)
     |> Enum.map(&decode_content/1)
+    |> content_result()
   end
 
-  def decode_content(content), do: content |> Base.decode64() |> elem(1)
+  def content_result(result),
+    do: if(result |> Enum.any?(&(&1 == :error)), do: :error, else: result)
+
+  def decode_content(content) do
+    case content |> Base.decode64() do
+      {:ok, element} -> element
+      _ -> :error
+    end
+  end
 
   def user_in_share(keystring) do
     case keystring |> Base.decode64() do
@@ -147,6 +158,52 @@ defmodule Chat.KeyShare do
     end
   end
 
+  def filter_out_broken(shares) when is_list(shares) and length(shares) > @threshold do
+    max_try = shares |> Enum.count() |> Kernel.-(@threshold)
+
+    broken_shares = keystring_selection(shares, max_try)
+
+    shares
+    |> Enum.map(fn share ->
+      if share in broken_shares, do: Map.put_new(share, :broken, true), else: share
+    end)
+  end
+
+  def filter_out_broken(shares), do: shares
+
+  def broken?(share), do: Map.has_key?(share, :broken)
+
+  def keystring_selection(shares, 1 = _tries), do: run_selection(shares, 1)
+
+  def keystring_selection(shares, tries) do
+    Enum.reduce_while(1..tries, [], fn try_number, _acc ->
+      case run_selection(shares, try_number) do
+        [] -> {:cont, []}
+        [_ | _] = shares -> {:halt, shares}
+      end
+    end)
+  end
+
+  def client_name(%Identity{name: name, public_key: pub_key} = _me),
+    do: "This is my ID #{name}-#{Enigma.short_hash(pub_key)}.social_part"
+
+  defp run_selection(shares, try_number) do
+    try_number
+    |> Combinatorics.n_combinations(shares)
+    |> Enum.reduce_while([], fn share, acc ->
+      with keypair <- build_keypair_without({shares, share}),
+           user_from_share <- user_in_share(keypair) do
+        case user_from_share do
+          :user_keystring_broken ->
+            {:cont, []}
+
+          {:ok, _user} ->
+            {:halt, acc ++ share}
+        end
+      end
+    end)
+  end
+
   defp duplicated_share?({_key, shares}), do: match?([_, _ | _], shares)
 
   defp destination(%Dialog{b_key: b_key} = dialog) do
@@ -167,9 +224,6 @@ defmodule Chat.KeyShare do
     }
   end
 
-  defp client_name(%Identity{name: name, public_key: pub_key} = _me),
-    do: "This is my ID #{name}-#{Enigma.short_hash(pub_key)}.social_part"
-
   defp save({file_key, share_key}, {file_size, file_secret}) do
     ChunkedFilesMultisecret.generate(file_key, file_size, file_secret)
     ChunkedFiles.save_upload_chunk(file_key, {0, file_size - 1}, file_size, share_key)
@@ -177,4 +231,14 @@ defmodule Chat.KeyShare do
 
   defp encode_content({key, hash}),
     do: Base.encode64(key) <> "\n" <> Base.encode64(hash)
+
+  defp build_keypair_without({shares, exclude}) do
+    shares
+    |> Kernel.--(exclude_check_list(exclude))
+    |> Enum.map(&Map.get(&1, :key))
+    |> Enigma.recover_secret_from_shares()
+  end
+
+  defp exclude_check_list(exclude) when is_list(exclude), do: exclude
+  defp exclude_check_list(exclude), do: [exclude]
 end

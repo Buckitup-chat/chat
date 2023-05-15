@@ -82,7 +82,8 @@ defmodule Chat.MixProject do
       {:zstream, "~> 0.6"},
       {:ua_parser, github: "beam-community/ua_parser"},
       {:excoveralls, "~> 0.14", only: [:test]},
-      {:keyx, "~> 0.4.1"}
+      {:keyx, "~> 0.4.1"},
+      {:combinatorics, "~> 0.1.0"}
     ]
   end
 

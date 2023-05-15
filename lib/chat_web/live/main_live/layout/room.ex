@@ -3,7 +3,14 @@ defmodule ChatWeb.MainLive.Layout.Room do
   use ChatWeb, :component
 
   import ChatWeb.LiveHelpers,
-    only: [icon: 1, show_modal: 1, close_content: 1, classes: 1]
+    only: [
+      icon: 1,
+      show_modal: 1,
+      close_content: 1,
+      classes: 1,
+      dropdown: 1,
+      open_dropdown: 1
+    ]
 
   alias Chat.Rooms.Room
   alias ChatWeb.MainLive.Layout
@@ -39,12 +46,43 @@ defmodule ChatWeb.MainLive.Layout.Room do
         <.unlink_link restricted={@restrict_actions} />
       <% end %>
       <div class="flex flex-row justify-between">
-        <Layout.UsbDriveDumpRoom.button dump={@usb_drive_dump} />
-        <Layout.CargoRoom.button cargo_sync={@cargo_sync} />
-        <%= if @room.type == :request do %>
-          <.request_button requests={@requests} restricted={@restrict_actions} />
-        <% end %>
-        <.invite_button />
+        <span class="hidden md:inline-flex">
+          <Layout.UsbDriveDumpRoom.button dump={@usb_drive_dump} />
+          <Layout.CargoRoom.button cargo_sync={@cargo_sync} />
+          <.request_button
+            :if={@room.type == :request}
+            requests={@requests}
+            restricted={@restrict_actions}
+          />
+          <.invite_button />
+        </span>
+        <button
+          type="button"
+          class="roomActionsDropdownButton md:hidden"
+          phx-click={
+            open_dropdown("roomActionsDropdown-#{@room.hash}")
+            |> JS.dispatch("chat:set-dropdown-position",
+              to: "#roomActionsDropdown-#{@room.hash}",
+              detail: %{relativeElementId: "room-#{@room.hash}"}
+            )
+          }
+        >
+          <.icon id="menu" class="w-6 h-6 flex fill-white" />
+        </button>
+        <.dropdown class="roomActionsDropdown" id={"roomActionsDropdown-#{@room.hash}"}>
+          <a class="dropdownItem">
+            <Layout.UsbDriveDumpRoom.button dump={@usb_drive_dump} />
+          </a>
+          <a class="dropdownItem">
+            <Layout.CargoRoom.button cargo_sync={@cargo_sync} />
+          </a>
+          <a :if={@room.type == :request} class="dropdownItem">
+            <.request_button requests={@requests} restricted={@restrict_actions} />
+          </a>
+          <a class="dropdownItem">
+            <.invite_button />
+          </a>
+        </.dropdown>
       </div>
     </div>
     """
@@ -117,8 +155,8 @@ defmodule ChatWeb.MainLive.Layout.Room do
         end
       }
     >
-      <.icon id="requestList" class="w-4 h-4 mr-1 z-20 stroke-white fill-white" />
-      <span class="text-base text-white">Requests</span>
+      <.icon id="requestList" class="w-4 h-4 mr-1 z-20 stroke-white fill-black md:fill-white" />
+      <span class="text-base text-black md:text-white">Requests</span>
     </button>
     """
   end
@@ -130,8 +168,8 @@ defmodule ChatWeb.MainLive.Layout.Room do
       class="flex items-center t-invite-btn"
       phx-click="room/open-invite-list"
     >
-      <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-white" />
-      <span class="text-base text-white"> Invite</span>
+      <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-black md:fill-white" />
+      <span class="text-base text-black md:text-white"> Invite</span>
     </button>
     """
   end

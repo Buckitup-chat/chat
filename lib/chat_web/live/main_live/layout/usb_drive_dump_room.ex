@@ -109,11 +109,11 @@ defmodule ChatWeb.MainLive.Layout.UsbDriveDumpRoom do
   def button(%{dump: :enabled} = assigns) do
     ~H"""
     <div
-      class="mr-2 flex items-center text-base text-white cursor-pointer t-dump-activate"
+      class="mr-2 flex items-center text-base text-black md:text-white cursor-pointer t-dump-activate"
       phx-click="dump:activate"
     >
-      <.icon id="usbDrive" class="w-6 h-6 fill-white" />
-      <span class="hidden md:inline">Dump</span>
+      <.icon id="usbDrive" class="w-6 h-6 fill-black md:fill-white" />
+      <span>Dump</span>
     </div>
     """
   end

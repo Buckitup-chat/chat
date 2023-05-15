@@ -16,6 +16,7 @@ straightforward as possible.
 
 ### Fixed
 - Too long buttons on mobile
+- scroll uploads to top on uploader mount
 
 ## 2023-05-12_7e5fcce___2023-05-12_b47aebb
 

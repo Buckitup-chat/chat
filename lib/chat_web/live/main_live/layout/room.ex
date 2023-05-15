@@ -54,7 +54,7 @@ defmodule ChatWeb.MainLive.Layout.Room do
             requests={@requests}
             restricted={@restrict_actions}
           />
-          <.invite_button />
+          <.invite_button id="roomInviteButton" />
         </span>
         <button
           type="button"
@@ -62,8 +62,7 @@ defmodule ChatWeb.MainLive.Layout.Room do
           phx-click={
             open_dropdown("roomActionsDropdown-#{@room.hash}")
             |> JS.dispatch("chat:set-dropdown-position",
-              to: "#roomActionsDropdown-#{@room.hash}",
-              detail: %{relativeElementId: "room-#{@room.hash}"}
+              to: "#roomActionsDropdown-#{@room.hash}"
             )
           }
         >
@@ -80,7 +79,7 @@ defmodule ChatWeb.MainLive.Layout.Room do
             <.request_button requests={@requests} restricted={@restrict_actions} />
           </a>
           <a class="dropdownItem">
-            <.invite_button />
+            <.invite_button id="roomInviteButtonItem" />
           </a>
         </.dropdown>
       </div>
@@ -163,11 +162,7 @@ defmodule ChatWeb.MainLive.Layout.Room do
 
   defp invite_button(assigns) do
     ~H"""
-    <button
-      id="roomInviteButton"
-      class="flex items-center t-invite-btn"
-      phx-click="room/open-invite-list"
-    >
+    <button id={@id} class="flex items-center t-invite-btn" phx-click="room/open-invite-list">
       <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-black md:fill-white" />
       <span class="text-base text-black md:text-white"> Invite</span>
     </button>

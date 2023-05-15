@@ -296,7 +296,7 @@ defmodule ChatWeb.MainLive.IndexTest do
       Process.sleep(100)
 
       refute has_element?(view, ".t-cargo-room")
-      refute has_element?(view, ".t-cargo-activate")
+      refute has_element?(view, "span div.t-cargo-activate")
       assert has_element?(view, ".t-cargo-remove")
       html = render(view)
       assert html =~ "Cargo sync activated"
@@ -337,14 +337,14 @@ defmodule ChatWeb.MainLive.IndexTest do
       |> render_submit()
 
       refute has_element?(view, ".t-cargo-room")
-      assert has_element?(view, ".t-cargo-activate")
+      assert has_element?(view, "span div.t-cargo-activate")
 
       view
-      |> element(".t-cargo-activate")
+      |> element("span div.t-cargo-activate")
       |> render_click()
 
       refute has_element?(view, ".t-cargo-room")
-      refute has_element?(view, ".t-cargo-activate")
+      refute has_element?(view, "span div.t-cargo-activate")
       assert has_element?(view, ".t-cargo-remove")
       html = render(view)
       assert html =~ "Cargo sync activated"
@@ -368,7 +368,7 @@ defmodule ChatWeb.MainLive.IndexTest do
       })
       |> render_submit()
 
-      assert has_element?(view, ".t-cargo-activate")
+      assert has_element?(view, "span div.t-cargo-activate")
       html = render(view)
       refute html =~ "phx-click=\"cargo:activate\""
       assert html =~ "Room does not have a unique name"
@@ -395,13 +395,13 @@ defmodule ChatWeb.MainLive.IndexTest do
       |> render_submit()
 
       refute has_element?(view, ".t-cargo-room")
-      refute has_element?(view, ".t-cargo-activate")
+      refute has_element?(view, "span div.t-cargo-activate")
 
       CargoRoom.sync(room.pub_key)
       Process.sleep(100)
 
       refute has_element?(view, ".t-cargo-room")
-      refute has_element?(view, ".t-cargo-activate")
+      refute has_element?(view, "span div.t-cargo-activate")
       refute has_element?(view, ".t-cargo-remove")
       refute render(view) =~ "Cargo sync activated"
 
@@ -410,7 +410,7 @@ defmodule ChatWeb.MainLive.IndexTest do
       Process.sleep(100)
 
       refute has_element?(view, ".t-cargo-room")
-      refute has_element?(view, ".t-cargo-activate")
+      refute has_element?(view, "span div.t-cargo-activate")
       refute has_element?(view, ".t-cargo-remove")
       refute render(view) =~ "Cargo sync activated"
 
@@ -438,7 +438,7 @@ defmodule ChatWeb.MainLive.IndexTest do
       |> element(".t-cargo-room", "Cargo Room")
       |> render_click()
 
-      refute has_element?(view, ".t-cargo-activate")
+      refute has_element?(view, "span div.t-cargo-activate")
       assert has_element?(view, ".t-cargo-remove")
       html = render(view)
       assert html =~ "Cargo sync activated"
@@ -505,7 +505,7 @@ defmodule ChatWeb.MainLive.IndexTest do
       refute render(view) =~ "Cargo sync activated"
 
       view
-      |> element(".t-cargo-activate")
+      |> element("span div.t-cargo-activate")
       |> render_click()
 
       assert render(view) =~ "Cargo sync activated"
@@ -556,14 +556,14 @@ defmodule ChatWeb.MainLive.IndexTest do
 
     test "starts the flow in existing room", %{view: view} do
       refute has_element?(view, ".t-dump-room")
-      assert has_element?(view, ".t-dump-activate")
+      assert has_element?(view, "span div.t-dump-activate")
 
       view
-      |> element(".t-dump-activate")
+      |> element("span div.t-dump-activate")
       |> render_click()
 
       refute has_element?(view, ".t-dump-room")
-      refute has_element?(view, ".t-dump-activate")
+      refute has_element?(view, "span div.t-dump-activate")
       assert has_element?(view, ".t-dump-remove")
       html = render(view)
       assert html =~ "USB drive dump activated"
@@ -577,7 +577,7 @@ defmodule ChatWeb.MainLive.IndexTest do
       Process.sleep(100)
 
       refute has_element?(view, ".t-dump-room")
-      refute has_element?(view, ".t-dump-activate")
+      refute has_element?(view, "span div.t-dump-activate")
       refute has_element?(view, ".t-dump-remove")
       assert render(view) =~ "USB drive dump activated"
 
@@ -586,7 +586,7 @@ defmodule ChatWeb.MainLive.IndexTest do
       Process.sleep(100)
 
       assert has_element?(view, ".t-dump-room")
-      refute has_element?(view, ".t-dump-activate")
+      refute has_element?(view, "span div.t-dump-activate")
       assert has_element?(view, ".t-dump-remove")
       html = render(view)
       assert html =~ "USB drive dump activated"
@@ -596,7 +596,7 @@ defmodule ChatWeb.MainLive.IndexTest do
       |> element(".t-dump-room", "Dump room")
       |> render_click()
 
-      refute has_element?(view, ".t-dump-activate")
+      refute has_element?(view, "span div.t-dump-activate")
       assert has_element?(view, ".t-dump-remove")
       html = render(view)
       assert html =~ "USB drive dump activated"
@@ -605,10 +605,10 @@ defmodule ChatWeb.MainLive.IndexTest do
 
     test "fails dumping", %{view: view} do
       refute has_element?(view, ".t-dump-room")
-      assert has_element?(view, ".t-dump-activate")
+      assert has_element?(view, "span div.t-dump-activate")
 
       view
-      |> element(".t-dump-activate")
+      |> element("span div.t-dump-activate")
       |> render_click()
 
       assert render(view) =~ "USB drive dump activated"
@@ -635,7 +635,7 @@ defmodule ChatWeb.MainLive.IndexTest do
 
     test "stops the process early", %{view: view} do
       view
-      |> element(".t-dump-activate")
+      |> element("span div.t-dump-activate")
       |> render_click()
 
       assert render(view) =~ "USB drive dump activated"
@@ -649,7 +649,7 @@ defmodule ChatWeb.MainLive.IndexTest do
       refute render(view) =~ "USB drive dump activated"
 
       view
-      |> element(".t-dump-activate")
+      |> element("span div.t-dump-activate")
       |> render_click()
 
       assert render(view) =~ "USB drive dump activated"

@@ -164,8 +164,8 @@ const listeners = {
   "phx:scroll-uploads-to-top": (e) => {
       const uploader = document.querySelector('.a-uploader');
       const mobileUploader = document.querySelector('.a-mobile-uploader');
-      uploader.scrollTop = -331.5;
-      mobileUploader.scrollTop = -331.5;
+      uploader.scrollTop = -uploader.scrollHeight;
+      mobileUploader.scrollTop = -mobileUploader.scrollHeight;
   },
   "phx:gallery:preload": (e) => {
     const img = new Image();

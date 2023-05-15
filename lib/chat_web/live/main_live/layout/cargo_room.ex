@@ -81,10 +81,10 @@ defmodule ChatWeb.MainLive.Layout.CargoRoom do
   def button(%{cargo_sync: :enabled} = assigns) do
     ~H"""
     <div
-      class="mr-2 flex items-center text-base text-white cursor-pointer t-cargo-activate"
+      class="mr-2 flex items-center text-base text-black md:text-white cursor-pointer t-cargo-activate"
       phx-click="cargo:activate"
     >
-      <.icon id="cargo" class="w-8 h-8 fill-white" />
+      <.icon id="cargo" class="w-8 h-8 fill-black md:fill-white" />
       <span>Sync</span>
     </div>
     """

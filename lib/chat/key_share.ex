@@ -77,14 +77,15 @@ defmodule Chat.KeyShare do
   end
 
   def read_content(path) do
-    case path
-         |> File.stream!()
-         |> Stream.map(&String.trim_trailing/1)
-         |> Enum.map(&decode_content/1) do
-      [:error | _] -> :error
-      content -> content
-    end
+    path
+    |> File.stream!()
+    |> Stream.map(&String.trim_trailing/1)
+    |> Enum.map(&decode_content/1)
+    |> content_result()
   end
+
+  def content_result(result),
+    do: if(result |> Enum.any?(&(&1 == :error)), do: :error, else: result)
 
   def decode_content(content) do
     case content |> Base.decode64() do

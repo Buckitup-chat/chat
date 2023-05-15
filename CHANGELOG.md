@@ -15,7 +15,7 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
-
+- Too long buttons on mobile
 
 ## 2023-05-12_7e5fcce___2023-05-12_b47aebb
 

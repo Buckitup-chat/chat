@@ -113,7 +113,7 @@ defmodule ChatWeb.MainLive.Layout.UsbDriveDumpRoom do
       phx-click="dump:activate"
     >
       <.icon id="usbDrive" class="w-6 h-6 fill-white" />
-      <span>Dump</span>
+      <span class="hidden md:inline">Dump</span>
     </div>
     """
   end

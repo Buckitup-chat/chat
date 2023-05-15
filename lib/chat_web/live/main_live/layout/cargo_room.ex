@@ -85,7 +85,7 @@ defmodule ChatWeb.MainLive.Layout.CargoRoom do
       phx-click="cargo:activate"
     >
       <.icon id="cargo" class="w-8 h-8 fill-white" />
-      <span>Sync</span>
+      <span class="hidden md:inline">Sync</span>
     </div>
     """
   end

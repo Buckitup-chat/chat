@@ -69,6 +69,11 @@ defmodule Chat.Db.Queries do
     |> Enum.at(0)
   end
 
+  def has_key?(db, key) do
+    db
+    |> CubDB.has_key?(key)
+  end
+
   def put(db, key, value) do
     db
     |> CubDB.put(key, value)

@@ -70,16 +70,16 @@ defmodule ChatWeb.MainLive.Layout.Room do
         </button>
         <.dropdown class="roomActionsDropdown" id={"roomActionsDropdown-#{@room.hash}"}>
           <a class="dropdownItem">
-            <Layout.UsbDriveDumpRoom.button dump={@usb_drive_dump} />
-          </a>
-          <a class="dropdownItem">
-            <Layout.CargoRoom.button cargo_sync={@cargo_sync} />
+            <.invite_button id="roomInviteButtonItem" />
           </a>
           <a :if={@room.type == :request} class="dropdownItem">
             <.request_button requests={@requests} restricted={@restrict_actions} />
           </a>
           <a class="dropdownItem">
-            <.invite_button id="roomInviteButtonItem" />
+            <Layout.UsbDriveDumpRoom.button dump={@usb_drive_dump} />
+          </a>
+          <a class="dropdownItem">
+            <Layout.CargoRoom.button cargo_sync={@cargo_sync} />
           </a>
         </.dropdown>
       </div>

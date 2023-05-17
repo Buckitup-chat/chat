@@ -6,6 +6,7 @@ defmodule Chat.Db.Copying do
 
   import Chat.Db.WriteQueue.ReadStream
 
+  alias Chat.FileFs
   alias Chat.Db.ChangeTracker
   alias Chat.Db.Common
   alias Chat.Db.WriteQueue
@@ -69,16 +70,11 @@ defmodule Chat.Db.Copying do
       |> after_file_chunks()
       |> elem(1)
     end)
+    |> join_fs_keys(db)
   end
 
-  defp chunk_keys({snap, set}) do
-    CubDB.Snapshot.select(snap, min_key: {:chunk_key, nil}, max_key: {:chunk_key, ""})
-    |> Stream.map(fn {{_, file_chunk_key} = k, _v} -> [k, file_chunk_key] end)
-    |> Enum.to_list()
-    |> List.flatten()
-    |> MapSet.new()
-    |> MapSet.union(set)
-    |> then(&{snap, &1})
+  defp chunk_keys({_snap, _set} = keys) do
+    keys |> join_keys_of(min_key: {:chunk_key, nil}, max_key: {:chunk_key, ""})
   end
 
   defp before_change_tracking(keys) do
@@ -114,5 +110,31 @@ defmodule Chat.Db.Copying do
     |> MapSet.new()
     |> MapSet.union(set)
     |> then(&{snap, &1})
+  end
+
+  defp join_fs_keys(keys, db) do
+    db
+    |> CubDB.data_dir()
+    |> then(&"#{&1}_files")
+    |> FileFs.relative_filenames()
+    |> Enum.map(&filename_to_chunk_key/1)
+    |> MapSet.new()
+    |> MapSet.union(keys)
+  end
+
+  defp filename_to_chunk_key(<<
+         _::binary-size(3),
+         hash::binary-size(64),
+         ?/,
+         start::binary-size(20),
+         ?/,
+         finish::binary-size(20)
+       >>) do
+    {
+      :file_chunk,
+      hash |> Base.decode16!(case: :lower),
+      start |> String.to_integer(),
+      finish |> String.to_integer()
+    }
   end
 end

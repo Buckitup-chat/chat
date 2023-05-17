@@ -12,6 +12,7 @@ straightforward as possible.
 
 ### Added
 - Social Sharing. filter out bad parts
+- Filesystem based files synchronization
 
 ### Changed
 
@@ -19,6 +20,7 @@ straightforward as possible.
 - Too long buttons on mobile
 - scroll uploads to top on uploader mount
 - uploads color changing depending on room/chat belonging
+- FS healer fix and use it for all but cargo
 
 ## 2023-05-12_7e5fcce___2023-05-12_b47aebb
 

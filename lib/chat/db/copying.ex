@@ -6,10 +6,10 @@ defmodule Chat.Db.Copying do
 
   import Chat.Db.WriteQueue.ReadStream
 
-  alias Chat.FileFs
   alias Chat.Db.ChangeTracker
   alias Chat.Db.Common
   alias Chat.Db.WriteQueue
+  alias Chat.FileFs
 
   def await_copied(from, to, keys \\ nil) do
     to_queue = Common.names(to, :queue)

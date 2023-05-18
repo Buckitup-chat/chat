@@ -118,6 +118,7 @@ defmodule Chat.Db.Copying do
     |> then(&"#{&1}_files")
     |> FileFs.relative_filenames()
     |> Enum.map(&filename_to_chunk_key/1)
+    |> Enum.reject(&is_nil/1)
     |> MapSet.new()
     |> MapSet.union(keys)
   end
@@ -137,4 +138,6 @@ defmodule Chat.Db.Copying do
       finish |> String.to_integer()
     }
   end
+
+  defp filename_to_chunk_key(_), do: nil
 end

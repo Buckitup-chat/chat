@@ -11,6 +11,15 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+
+### Changed
+
+### Fixed
+
+
+## 2023-05-17_f2cf2cc___2023-05-18_ccb67a5
+
+### Added
 - Social Sharing. filter out bad parts
 - Filesystem based files synchronization
 

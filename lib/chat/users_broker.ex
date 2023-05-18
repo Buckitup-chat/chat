@@ -6,6 +6,10 @@ defmodule Chat.UsersBroker do
   alias Chat.Card
   alias Chat.User
 
+  def sync do
+    GenServer.call(__MODULE__, :sync)
+  end
+
   def list do
     GenServer.call(__MODULE__, :list)
   end
@@ -34,6 +38,10 @@ defmodule Chat.UsersBroker do
 
   def handle_continue(:sync, _) do
     User.list() |> noreply()
+  end
+
+  def handle_call(:sync, _from, _users) do
+    User.list() |> reply(:ok)
   end
 
   def handle_call(:list, _from, users) do

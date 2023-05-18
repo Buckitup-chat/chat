@@ -5,6 +5,10 @@ defmodule Chat.RoomsBroker do
 
   alias Chat.Rooms
 
+  def sync do
+    GenServer.call(__MODULE__, :sync)
+  end
+
   def list(room_map) do
     GenServer.call(__MODULE__, {:list, room_map})
   end
@@ -33,6 +37,10 @@ defmodule Chat.RoomsBroker do
 
   def handle_continue(:sync, _) do
     Rooms.list() |> noreply()
+  end
+
+  def handle_call(:sync, _from, _state) do
+    Rooms.list() |> reply(:ok)
   end
 
   def handle_call({:list, room_map}, _from, rooms) do

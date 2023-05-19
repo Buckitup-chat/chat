@@ -6,10 +6,10 @@ defmodule ChatWeb.MainLive.IndexTest do
 
   alias Chat.Admin.MediaSettings
   alias Chat.{AdminDb, AdminRoom, Card, Db, Dialogs, Rooms, User}
-  alias Chat.{Identity, Messages, RoomInviteIndex}
-  alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
-  alias Chat.Rooms.RoomsBroker
   alias Chat.Dialogs.PrivateMessage
+  alias Chat.{Identity, Messages, RoomInviteIndex}
+  alias Chat.Rooms.RoomsBroker
+  alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
   alias Chat.User.UsersBroker
 
   describe "room sync between multiple tabs" do

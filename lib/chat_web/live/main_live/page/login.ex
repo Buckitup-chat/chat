@@ -11,7 +11,7 @@ defmodule ChatWeb.MainLive.Page.Login do
   alias Chat.Identity
   alias Chat.Log
   alias Chat.User
-  alias Chat.UsersBroker
+  alias Chat.User.UsersBroker
   alias ChatWeb.MainLive.Page
 
   @local_store_auth_key "buckitUp-chat-auth-v2"

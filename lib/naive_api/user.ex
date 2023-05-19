@@ -2,7 +2,7 @@ defmodule NaiveApi.User do
   @moduledoc "User resolvers"
   use NaiveApi, :resolver
   alias Chat.User
-  alias Chat.UsersBroker
+  alias Chat.User.UsersBroker
 
   def signup(_, %{name: name}, _) do
     name

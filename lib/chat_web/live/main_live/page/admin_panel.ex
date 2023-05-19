@@ -11,15 +11,17 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Chat.Dialogs
   alias Chat.Messages
   alias Chat.Rooms
-  alias Chat.RoomsBroker
+  alias Chat.Rooms.RoomsBroker
   alias Chat.User
-  alias Chat.UsersBroker
+  alias Chat.User.UsersBroker
   alias ChatWeb.Router.Helpers, as: Routes
 
+  @admin_topic "chat::admin"
   @incoming_topic "platform->chat"
   @outgoing_topic "chat->platform"
 
   def init(%{assigns: %{me: me}} = socket) do
+    PubSub.subscribe(Chat.PubSub, @admin_topic)
     PubSub.subscribe(Chat.PubSub, @incoming_topic)
 
     start_poller(me)
@@ -146,7 +148,14 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
 
   def set_free_spaces(socket, free_spaces), do: socket |> assign(:free_spaces, free_spaces)
 
+  def refresh_rooms_and_users(socket) do
+    socket
+    |> assign_room_list()
+    |> assign_user_lists()
+  end
+
   def close(%{assigns: %{me: %{name: admin}}} = socket) do
+    PubSub.unsubscribe(Chat.PubSub, @admin_topic)
     PubSub.unsubscribe(Chat.PubSub, @incoming_topic)
     PubSub.unsubscribe(Chat.PubSub, FreeSpacesPoller.channel())
 
@@ -166,7 +175,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
       |> Enum.map(&{&1.hash, &1})
       |> Map.new()
 
-    full_user_list = User.list()
+    full_user_list = UsersBroker.list()
 
     user_list =
       full_user_list
@@ -179,7 +188,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   end
 
   defp assign_room_list(%{assigns: %{room_map: rooms}} = socket) do
-    {my, other} = Rooms.list(rooms)
+    {my, other} = RoomsBroker.list(rooms)
     room_list = my ++ other
 
     socket

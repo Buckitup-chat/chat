@@ -11,14 +11,27 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+
+### Changed
+
+### Fixed
+- fs listing (broken synchronization)
+- Update users/rooms cache on USB plugging/unplugging
+
+
+## 2023-05-17_f2cf2cc___2023-05-18_ccb67a5
+
+### Added
 - Social Sharing. filter out bad parts
+- Filesystem based files synchronization
 
 ### Changed
 
 ### Fixed
 - Too long buttons on mobile
 - scroll uploads to top on uploader mount
-- Update users/rooms cache on USB plugging/unplugging
+- uploads color changing depending on room/chat belonging
+- FS healer fix and use it for all but cargo
 
 ## 2023-05-12_7e5fcce___2023-05-12_b47aebb
 

@@ -1,4 +1,4 @@
-defmodule Chat.UsersBroker do
+defmodule Chat.User.UsersBroker do
   @moduledoc "Keeps users"
   use GenServer
   import Tools.GenServerHelpers

@@ -11,9 +11,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Chat.Dialogs
   alias Chat.Messages
   alias Chat.Rooms
-  alias Chat.RoomsBroker
+  alias Chat.Rooms.RoomsBroker
   alias Chat.User
-  alias Chat.UsersBroker
+  alias Chat.User.UsersBroker
   alias ChatWeb.Router.Helpers, as: Routes
 
   @admin_topic "chat::admin"

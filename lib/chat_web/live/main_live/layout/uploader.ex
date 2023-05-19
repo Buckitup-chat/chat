@@ -201,7 +201,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   defp entry(assigns) do
     ~H"""
     <div
-      class={"flex mb-2 border-purple relative w-full z-0 " <> if(@metadata.destination.type == @type and @metadata.destination.pub_key == @pub_key, do: "bg-white", else: "bg-pink-100")}
+      class={"flex mb-2 border-purple relative w-full z-0 " <> if(@metadata.destination.type == @type and @metadata.destination.pub_key == @pub_key |> Base.encode16(case: :lower), do: "bg-white", else: "bg-pink-100")}
       id={if(@mobile?, do: "mobile-", else: "") <> "upload-#{@entry.uuid}"}
       data-uuid={@entry.uuid}
     >

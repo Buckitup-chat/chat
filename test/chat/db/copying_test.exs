@@ -50,7 +50,7 @@ defmodule Chat.Db.CopyingTest do
         [key | keys]
       end)
 
-    key = UUID.uuid4()
+    key = UUID.uuid4() |> Enigma.hash()
     _secret = ChunkedFiles.new_upload(key)
 
     first = "some part of info "

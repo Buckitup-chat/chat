@@ -5,10 +5,12 @@ defmodule ChatWeb.MainLive.IndexTest do
   import Phoenix.LiveViewTest
 
   alias Chat.Admin.MediaSettings
-  alias Chat.{AdminDb, AdminRoom, Card, Db, Dialogs, Rooms, RoomsBroker, User, UsersBroker}
-  alias Chat.Dialogs.PrivateMessage
+  alias Chat.{AdminDb, AdminRoom, Card, Db, Dialogs, Rooms, User}
   alias Chat.{Identity, Messages, RoomInviteIndex}
   alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
+  alias Chat.Rooms.RoomsBroker
+  alias Chat.Dialogs.PrivateMessage
+  alias Chat.User.UsersBroker
 
   describe "room sync between multiple tabs" do
     setup [:current_tab, :another_tab]

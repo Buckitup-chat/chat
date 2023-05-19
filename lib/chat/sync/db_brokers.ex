@@ -1,7 +1,7 @@
 defmodule Chat.Sync.DbBrokers do
   @moduledoc "Db brokers handlers"
-  alias Chat.RoomsBroker
-  alias Chat.UsersBroker
+  alias Chat.Rooms.RoomsBroker
+  alias Chat.User.UsersBroker
 
   alias Phoenix.PubSub
 

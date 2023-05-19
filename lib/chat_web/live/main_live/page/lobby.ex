@@ -12,8 +12,8 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   alias Chat.Log
   alias Chat.Rooms
   alias Chat.Rooms.RoomRequest
-  alias Chat.RoomsBroker
-  alias Chat.UsersBroker
+  alias Chat.Rooms.RoomsBroker
+  alias Chat.User.UsersBroker
   alias ChatWeb.MainLive.Page
 
   @topic "chat::lobby"

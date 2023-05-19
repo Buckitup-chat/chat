@@ -83,6 +83,20 @@ defmodule Chat.FileFs do
     _ -> 0
   end
 
+  def relative_filenames(prefix) do
+    dir = build_path(prefix)
+
+    if File.dir?(dir) do
+      dir
+      |> list_files()
+      |> Enum.flat_map(&populate_level/1)
+      |> Enum.flat_map(&populate_level/1)
+      |> Enum.map(&String.slice(&1, (String.length(dir) + 1)..-1))
+    else
+      []
+    end
+  end
+
   ##
   ##   Implementations
   ##
@@ -91,6 +105,8 @@ defmodule Chat.FileFs do
     path
     |> File.ls!()
     |> Enum.map(&Path.join([path, &1]))
+  rescue
+    _ -> []
   end
 
   defp list_files(path) do

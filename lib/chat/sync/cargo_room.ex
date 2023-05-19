@@ -6,7 +6,8 @@ defmodule Chat.Sync.CargoRoom do
   use GenServer
   use StructAccess
 
-  alias Chat.{Rooms, RoomsBroker}
+  alias Chat.Rooms
+  alias Chat.Rooms.RoomsBroker
   alias Phoenix.PubSub
 
   @type room_key :: String.t()

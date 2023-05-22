@@ -15,7 +15,7 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
-- fs listing (broken synchronization)
+- fs listing (broken synchronization) + testing
 
 
 ## 2023-05-17_f2cf2cc___2023-05-18_ccb67a5

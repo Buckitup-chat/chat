@@ -53,6 +53,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
 
       {:unmounted_main, _} ->
         socket
+
+      :refresh_rooms_and_users ->
+        socket |> AdminPanel.refresh_rooms_and_users()
     end
   end
 

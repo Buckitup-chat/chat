@@ -414,6 +414,12 @@ defmodule ChatWeb.MainLive.Index do
   def handle_info({:platform_response, msg}, socket),
     do: socket |> Page.AdminPanelRouter.info(msg) |> noreply()
 
+  def handle_info({:lobby, :refresh_rooms_and_users}, socket),
+    do: socket |> Page.Lobby.refresh_rooms_and_users() |> noreply()
+
+  def handle_info({:admin, msg}, socket),
+    do: socket |> Page.AdminPanelRouter.info(msg) |> noreply()
+
   def handle_info({:dialog, msg}, socket), do: socket |> Page.DialogRouter.info(msg) |> noreply()
 
   def handle_info({ref, :ok}, socket) do

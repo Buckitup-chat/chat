@@ -16,6 +16,7 @@ straightforward as possible.
 
 ### Fixed
 - fs listing (broken synchronization) + testing
+- Update users/rooms cache on USB plugging/unplugging
 
 
 ## 2023-05-17_f2cf2cc___2023-05-18_ccb67a5

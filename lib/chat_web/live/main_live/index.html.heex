@@ -781,7 +781,7 @@
             </div>
           </div>
           <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
-            <%= unless @room and @room.pub_key do %>
+            <%= unless @room && @room.pub_key do %>
               <%= if @live_action == :room_message_link do %>
                 <Layout.Room.not_found_screen />
               <% else %>

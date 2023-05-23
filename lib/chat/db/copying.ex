@@ -60,7 +60,7 @@ defmodule Chat.Db.Copying do
     read_stream(keys: keys, db: from, awaiter: awaiter)
   end
 
-  defp get_data_keys_set(db) do
+  def get_data_keys_set(db) do
     CubDB.with_snapshot(db, fn snap ->
       {snap, MapSet.new()}
       |> before_change_tracking()

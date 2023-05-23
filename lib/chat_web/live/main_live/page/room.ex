@@ -38,7 +38,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
   alias Chat.Upload.UploadMetadata
   alias Chat.User
-  alias Chat.UsersBroker
+  alias Chat.User.UsersBroker
   alias Chat.Utils
   alias Chat.Utils.StorageId
 

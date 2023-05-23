@@ -9,10 +9,21 @@ defmodule Chat.Db.StatusPoller do
   @interval :timer.seconds(1)
 
   def info do
+    db = Chat.Db.db()
+
+    with pid when is_pid(pid) <- Process.whereis(db),
+         true <- Process.alive?(pid) do
+      :ok
+    else
+      _ -> Process.sleep(100)
+    end
+
+    compacting = db |> CubDB.compacting?()
+
     [:mode, :flags]
     |> Enum.map(&{&1, Common.get_chat_db_env(&1)})
     |> Enum.into(%{})
-    |> Map.put(:compacting, Chat.Db.db() |> CubDB.compacting?())
+    |> Map.put(:compacting, compacting)
     |> Map.put(:writable, if(Common.dry?(), do: :no, else: :yes))
   end
 

@@ -19,8 +19,8 @@ defmodule Chat.DB.SyncTest do
       assert_alive(dbs.main)
       assert_alive(dbs.backup)
 
-      assert_copied(dbs.internal, dbs.main)
-      assert_copied(dbs.main, dbs.backup)
+      assert_copied(dbs.internal_to_main_keys, dbs.main)
+      assert_copied(dbs.main_to_backup_keys, dbs.backup)
 
       internal_list = dbs.internal |> files_list()
       main_list = dbs.main |> files_list()
@@ -67,19 +67,16 @@ defmodule Chat.DB.SyncTest do
     end)
   end
 
-  defp assert_copied(src_db, dst_db) do
-    src =
-      src_db
-      |> Copying.get_data_keys_set()
-      |> MapSet.new()
-
+  defp assert_copied(src, dst_db) do
     dst =
       dst_db
       |> Copying.get_data_keys_set()
       |> MapSet.new()
 
-    diff = MapSet.difference(src, dst)
-    assert MapSet.size(diff) == 0, "#{inspect(diff)} not copied"
+    diff = MapSet.difference(src |> MapSet.new(), dst)
+
+    assert MapSet.size(diff) == 0,
+           "#{inspect(diff)} not copied "
   end
 
   defp files_list(db) do

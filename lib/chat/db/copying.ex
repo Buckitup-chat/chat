@@ -28,6 +28,7 @@ defmodule Chat.Db.Copying do
     |> WriteQueue.put_stream(to_queue)
 
     Task.await(awaiter, :infinity)
+    to |> CubDB.file_sync()
   end
 
   defp stream(from, to, awaiter, keys)

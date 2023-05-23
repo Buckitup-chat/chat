@@ -7,8 +7,8 @@ defmodule Support.Db.Sync do
   alias Chat.ChunkedFiles
   alias Chat.ChunkedFilesMultisecret
   alias Chat.Db
+  alias Chat.Db.Common
   alias Chat.Db.Copying
-  alias Chat.Db.Switching
   alias Chat.Dialogs
   alias Chat.Messages
   alias Chat.Upload.UploadKey
@@ -48,16 +48,8 @@ defmodule Support.Db.Sync do
   end
 
   def fill_interal(context) do
-    Switching.set_default(context.internal)
-
-    on_exit(fn ->
-      with db <- Chat.Db.Internal,
-           pid <- Process.whereis(db),
-           false <- is_nil(pid),
-           true <- Process.alive?(pid) do
-        Switching.set_default(Chat.Db.Internal)
-      end
-    end)
+    prev_settings = switch_on(context.internal)
+    on_exit(fn -> restore_settings(prev_settings) end)
 
     alice = User.login("alice")
     bob = User.login("bob")
@@ -71,7 +63,55 @@ defmodule Support.Db.Sync do
       generate_content(alice, bob, dialog, time_base)
     end
 
+    context.internal |> CubDB.file_sync()
+
     context
+  end
+
+  def copy_internal_to_main(context) do
+    keys = Copying.get_data_keys_set(context.internal)
+    Copying.await_copied(context.internal, context.main)
+
+    context
+    |> Map.put(:internal_to_main_keys, keys)
+  end
+
+  def copy_main_to_backup(context) do
+    keys = Copying.get_data_keys_set(context.main)
+    Copying.await_copied(context.main, context.backup)
+
+    context
+    |> Map.put(:main_to_backup_keys, keys)
+  end
+
+  defp switch_on(name) do
+    queue_name = Common.names(name, :queue)
+    status_relay_name = Common.names(name, :status)
+
+    prev_settings = %{
+      queue_name: Common.get_chat_db_env(:data_queue),
+      status_relay_name: Common.get_chat_db_env(:data_dry),
+      files_base_dir: Common.get_chat_db_env(:files_base_dir),
+      data_pid: Common.get_chat_db_env(:data_pid)
+    }
+
+    Common.put_chat_db_env(:data_queue, queue_name)
+    Common.put_chat_db_env(:data_pid, name)
+    Common.put_chat_db_env(:files_base_dir, CubDB.data_dir(name) <> "_files")
+    Common.put_chat_db_env(:data_dry, status_relay_name)
+
+    Chat.Ordering.reset()
+
+    prev_settings
+  end
+
+  defp restore_settings(prev_settings) do
+    Common.put_chat_db_env(:data_queue, prev_settings[:queue_name])
+    Common.put_chat_db_env(:data_pid, prev_settings[:data_pid])
+    Common.put_chat_db_env(:files_base_dir, prev_settings[:files_base_dir])
+    Common.put_chat_db_env(:data_dry, prev_settings[:status_relay_name])
+
+    Chat.Ordering.reset()
   end
 
   defp generate_content(alice, bob, dialog, time_base) do
@@ -84,18 +124,6 @@ defmodule Support.Db.Sync do
 
     file_message(from: alice, in: dialog, time: time_base + 3)
     file_message(from: bob, in: dialog, time: time_base + 4)
-  end
-
-  def copy_internal_to_main(context) do
-    Copying.await_copied(context.internal, context.main)
-
-    context
-  end
-
-  def copy_main_to_backup(context) do
-    Copying.await_copied(context.main, context.backup)
-
-    context
   end
 
   defp text_message(msg, opts) do

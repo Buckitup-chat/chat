@@ -11,12 +11,14 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+- control the impendance of GPIO24
 
 ### Changed
 
 ### Fixed
-- fs listing (broken synchronization)
-- fox room displaying w/o pub_key
+- fix room displaying w/o pub_key
+- fs listing (broken synchronization) + testing
+- Update users/rooms cache on USB plugging/unplugging
 
 
 ## 2023-05-17_f2cf2cc___2023-05-18_ccb67a5

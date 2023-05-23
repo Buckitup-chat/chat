@@ -28,6 +28,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
 
       {"unmount-main", _} ->
         socket |> AdminPanel.unmount_main()
+
+      {"toggle-gpio24-impendance", _} ->
+        socket |> AdminPanel.toggle_gpio24_impendance()
     end
   end
 
@@ -53,6 +56,12 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
 
       {:unmounted_main, _} ->
         socket
+
+      :refresh_rooms_and_users ->
+        socket |> AdminPanel.refresh_rooms_and_users()
+
+      {:gpio24_impedance_status, value} ->
+        socket |> AdminPanel.set_gpio24_impedance_status(value)
     end
   end
 

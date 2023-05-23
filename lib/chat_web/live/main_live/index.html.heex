@@ -1028,6 +1028,9 @@
               <Layout.Admin.block title="Free spaces">
                 <Layout.Admin.free_spaces free_spaces={@free_spaces} />
               </Layout.Admin.block>
+              <Layout.Admin.block title="GPIO 24 Impedance Control">
+                <Layout.Admin.gpio24_impedance_control status={assigns[:gpio24_impedance_status]} />
+              </Layout.Admin.block>
             </Layout.Admin.row>
             <Layout.Admin.row>
               <Layout.Admin.block title="Admin List">

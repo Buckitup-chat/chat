@@ -11,15 +11,17 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Chat.Dialogs
   alias Chat.Messages
   alias Chat.Rooms
-  alias Chat.RoomsBroker
+  alias Chat.Rooms.RoomsBroker
   alias Chat.User
-  alias Chat.UsersBroker
+  alias Chat.User.UsersBroker
   alias ChatWeb.Router.Helpers, as: Routes
 
+  @admin_topic "chat::admin"
   @incoming_topic "platform->chat"
   @outgoing_topic "chat->platform"
 
   def init(%{assigns: %{me: me}} = socket) do
+    PubSub.subscribe(Chat.PubSub, @admin_topic)
     PubSub.subscribe(Chat.PubSub, @incoming_topic)
 
     start_poller(me)
@@ -31,6 +33,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     socket
     |> assign(:wifi_loaded, false)
     |> request_wifi_settings()
+    |> request_gpio24_impedance_status()
     |> assign_user_lists()
     |> assign_room_list()
     |> assign(:free_spaces, FreeSpacesPoller.get_info())
@@ -44,6 +47,12 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
 
   def request_wifi_settings(socket) do
     request_platform(:get_wifi_settings)
+
+    socket
+  end
+
+  def request_gpio24_impedance_status(socket) do
+    request_platform(:get_gpio24_impedance_status)
 
     socket
   end
@@ -89,6 +98,22 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   def confirm_wifi_updated(socket) do
     socket
     |> assign(:wifi_loaded, true)
+  end
+
+  def toggle_gpio24_impendance(socket) do
+    request_platform(:toggle_gpio24_impendance)
+
+    socket
+  end
+
+  def set_gpio24_impedance_status(socket, 0) do
+    socket
+    |> assign(:gpio24_impedance_status, "Off")
+  end
+
+  def set_gpio24_impedance_status(socket, 1) do
+    socket
+    |> assign(:gpio24_impedance_status, "On")
   end
 
   def invite_user(%{assigns: %{me: me, room_map: rooms}} = socket, hash) do
@@ -146,7 +171,14 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
 
   def set_free_spaces(socket, free_spaces), do: socket |> assign(:free_spaces, free_spaces)
 
+  def refresh_rooms_and_users(socket) do
+    socket
+    |> assign_room_list()
+    |> assign_user_lists()
+  end
+
   def close(%{assigns: %{me: %{name: admin}}} = socket) do
+    PubSub.unsubscribe(Chat.PubSub, @admin_topic)
     PubSub.unsubscribe(Chat.PubSub, @incoming_topic)
     PubSub.unsubscribe(Chat.PubSub, FreeSpacesPoller.channel())
 
@@ -166,7 +198,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
       |> Enum.map(&{&1.hash, &1})
       |> Map.new()
 
-    full_user_list = User.list()
+    full_user_list = UsersBroker.list()
 
     user_list =
       full_user_list
@@ -179,7 +211,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   end
 
   defp assign_room_list(%{assigns: %{room_map: rooms}} = socket) do
-    {my, other} = Rooms.list(rooms)
+    {my, other} = RoomsBroker.list(rooms)
     room_list = my ++ other
 
     socket

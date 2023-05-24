@@ -16,6 +16,7 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
+- broken file message display
 - fix room displaying w/o pub_key
 - fs listing (broken synchronization) + testing
 - Update users/rooms cache on USB plugging/unplugging

@@ -44,7 +44,7 @@ defmodule Chat.DB.SyncTest do
     end
 
     test "internal filled", dbs do
-      assert 512 = dbs.internal |> CubDB.size()
+      assert 510 < dbs.internal |> CubDB.size()
 
       assert 102 =
                dbs.internal

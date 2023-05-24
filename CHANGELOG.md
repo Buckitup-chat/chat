@@ -11,6 +11,15 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+
+### Changed
+
+### Fixed
+
+
+## 2023-05-22_3fefe32___2023-05-24_98fba24
+
+### Added
 - control the impendance of GPIO24
 
 ### Changed

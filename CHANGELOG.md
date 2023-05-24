@@ -15,6 +15,7 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
+- uploader background breaking the page when leaving room 
 
 
 ## 2023-05-22_3fefe32___2023-05-24_98fba24

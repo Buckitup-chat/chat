@@ -16,10 +16,12 @@ defmodule Chat.Db.Copying do
 
     stream = stream(from, to, nil, keys)
 
+    stream_keys = read_stream(stream, :keys)
+    log_copying(from, to, stream_keys)
+
     awaiter =
       Task.async(fn ->
-        stream
-        |> read_stream(:keys)
+        stream_keys
         |> ChangeTracker.await_many(:timer.hours(1))
       end)
 
@@ -29,6 +31,22 @@ defmodule Chat.Db.Copying do
 
     Task.await(awaiter, :infinity)
     to |> CubDB.file_sync()
+  end
+
+  defp log_copying(from, to, keys) do
+    {chunks, data} = keys |> Enum.split_with(&match?({:file_chunk, _, _, _}, &1))
+
+    [
+      "[copying] ",
+      inspect(from),
+      " -> ",
+      inspect(to),
+      " file_chunks: ",
+      inspect(chunks |> Enum.count()),
+      " + data: ",
+      inspect(data |> Enum.count())
+    ]
+    |> Logger.info()
   end
 
   defp stream(from, to, awaiter, keys)

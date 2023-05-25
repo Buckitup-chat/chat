@@ -128,7 +128,7 @@ defmodule Chat.Db.ChangeTracker.Tracking do
       |> Enum.filter(fn {_, {_, expiration, _}} -> expiration > too_long end)
       |> Enum.map(fn {_, {key, _, _}} -> key end)
 
-    {awaits |> Enum.count(), awaits |> Enum.take(10)}
+    awaits |> Enum.count()
   end
 
   defp add_action(

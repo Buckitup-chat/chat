@@ -80,7 +80,7 @@ defmodule Chat.Db.ChangeTracker do
 
   def long_expiry_stats do
     __MODULE__
-    |> GenServer.call(:info)
+    |> GenServer.call(:info, :infinity)
     |> Tracking.long_expiry_stats()
   end
 

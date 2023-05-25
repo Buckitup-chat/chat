@@ -13,6 +13,7 @@ straightforward as possible.
 ### Added
 
 ### Changed
+- more copying and changetracker logging
 
 ### Fixed
 - uploader background breaking the page when leaving room 

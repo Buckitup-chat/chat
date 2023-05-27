@@ -21,7 +21,7 @@ defmodule Chat.Db.Copying do
     stream
     |> WriteQueue.put_stream(to_queue)
 
-    Task.await(awaiter, :timer.minutes(10))
+    Task.await(awaiter, :infinity)
 
     left_keys =
       exclude_written_keys(stream_keys |> MapSet.new(),

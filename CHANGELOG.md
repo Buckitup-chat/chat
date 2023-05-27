@@ -17,6 +17,7 @@ straightforward as possible.
 
 ### Fixed
 - uploader background breaking the page when leaving room 
+- copying stuck
 
 
 ## 2023-05-22_3fefe32___2023-05-24_98fba24

@@ -28,6 +28,12 @@ defmodule Chat.Db.WriteQueue.ReadStream do
   def read_stream_empty?(read_stream(keys: [_ | _])), do: false
   def read_stream_empty?(read_stream(file_readers: [_ | _])), do: false
   def read_stream_empty?(read_stream(file_ready: {_, _})), do: false
+
+  def read_stream_empty?(read_stream(awaiter: pid)) do
+    send(pid, :done)
+    true
+  end
+
   def read_stream_empty?(_), do: true
 
   def read_stream_yield(
@@ -78,6 +84,19 @@ defmodule Chat.Db.WriteQueue.ReadStream do
     data =
       db_keys
       |> Enum.map(&{&1, CubDB.get(db, &1)})
+
+    # {new_readers |> Enum.count(), new_list |> Enum.count()}
+    # |> IO.inspect()
+    # |> case do
+    #   {_x, 0} ->
+    #     new_readers
+    #     |> IO.inspect(label: "readers", pretty: true)
+    #     |> Enum.map(&Process.alive?(&1.pid))
+    #     |> IO.inspect()
+
+    #   _ ->
+    #     nil
+    # end
 
     {data, new_readers, new_list}
   rescue

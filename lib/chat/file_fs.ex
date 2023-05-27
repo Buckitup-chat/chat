@@ -97,6 +97,12 @@ defmodule Chat.FileFs do
     end
   end
 
+  def has_file?({_, _, _} = keys, prefix \\ nil) do
+    keys
+    |> file_path(build_path(prefix))
+    |> File.exists?()
+  end
+
   ##
   ##   Implementations
   ##

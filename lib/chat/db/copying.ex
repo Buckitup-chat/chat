@@ -6,31 +6,35 @@ defmodule Chat.Db.Copying do
 
   import Chat.Db.WriteQueue.ReadStream
 
-  alias Chat.Db.ChangeTracker
   alias Chat.Db.Common
   alias Chat.Db.WriteQueue
   alias Chat.FileFs
 
-  def await_copied(from, to, keys \\ nil) do
+  def await_copied(from, to, keys_set \\ nil) do
     to_queue = Common.names(to, :queue)
-
-    stream = stream(from, to, nil, keys)
+    awaiter = Task.async(&wait_till_done/0)
+    stream = stream(from, to, awaiter.pid, keys_set)
 
     stream_keys = read_stream(stream, :keys)
     log_copying(from, to, stream_keys)
 
-    awaiter =
-      Task.async(fn ->
-        stream_keys
-        |> ChangeTracker.await_many(:timer.hours(1))
-      end)
-
     stream
-    |> read_stream(awaiter: awaiter.pid)
     |> WriteQueue.put_stream(to_queue)
 
-    Task.await(awaiter, :infinity)
-    to |> CubDB.file_sync()
+    Task.await(awaiter, :timer.minutes(10))
+
+    left_keys =
+      exclude_written_keys(stream_keys |> MapSet.new(),
+        in_db: to,
+        wait_for_secs: 3,
+        no_change_tries: 2
+      )
+
+    if left_keys |> MapSet.size() > 0 do
+      await_copied(from, to, left_keys)
+    else
+      to |> CubDB.file_sync()
+    end
   end
 
   defp log_copying(from, to, keys) do
@@ -49,7 +53,7 @@ defmodule Chat.Db.Copying do
     |> Logger.info()
   end
 
-  defp stream(from, to, awaiter, keys)
+  defp stream(from, to, awaiter, keys_set)
 
   defp stream(from, to, awaiter, nil) do
     [from, to]
@@ -77,6 +81,72 @@ defmodule Chat.Db.Copying do
       |> MapSet.to_list()
 
     read_stream(keys: keys, db: from, awaiter: awaiter)
+  end
+
+  defp wait_till_done do
+    receive do
+      :done ->
+        # "[copying] queue done "
+        # |> IO.puts()
+
+        :ok
+
+      any ->
+        ["[copying] ", inspect(any)]
+        |> Logger.debug()
+
+        wait_till_done()
+    end
+  end
+
+  defp exclude_written_keys(keys, opts) do
+    db = Keyword.fetch!(opts, :in_db)
+    delay = Keyword.fetch!(opts, :wait_for_secs)
+
+    left_keys = check_unwritten_keys(keys, db)
+
+    key_count = keys |> MapSet.size()
+    left_count = left_keys |> MapSet.size()
+
+    # ["[copying] ", inspect(left_count), " keys left"] |> IO.puts()
+
+    cond do
+      left_count == 0 ->
+        # "0" |> IO.puts()
+        MapSet.new()
+
+      left_count != key_count ->
+        # "less" |> IO.puts()
+        Process.sleep(delay |> :timer.seconds())
+        exclude_written_keys(left_keys, opts)
+
+      Keyword.fetch!(opts, :no_change_tries) < 0 ->
+        # "no tries" |> IO.puts()
+        left_keys
+
+      true ->
+        # "more tries" |> IO.puts()
+        tries_left = Keyword.fetch!(opts, :no_change_tries)
+        Process.sleep(delay |> :timer.seconds())
+
+        exclude_written_keys(left_keys,
+          in_db: db,
+          wait_for_secs: delay,
+          no_change_tries: tries_left - 1
+        )
+    end
+  end
+
+  defp check_unwritten_keys(keys, db) do
+    keys
+    |> Enum.reject(fn
+      {:file_chunk, file_key, a, b} ->
+        Chat.FileFs.has_file?({file_key, a, b}, db |> CubDB.data_dir())
+
+      key ->
+        CubDB.has_key?(db, key)
+    end)
+    |> MapSet.new()
   end
 
   def get_data_keys_set(db) do

@@ -13,6 +13,6 @@ defmodule Chat.Db.MediaDbSupervisor do
   def init([db, path]) do
     db
     |> Chat.Db.supervise(path)
-    |> Supervisor.init(strategy: :rest_for_one)
+    |> Supervisor.init(strategy: :rest_for_one, max_restarts: 1, max_seconds: 5)
   end
 end

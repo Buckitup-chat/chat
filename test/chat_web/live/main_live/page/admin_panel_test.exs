@@ -279,4 +279,31 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
       assert media_settings.functionality == :onliners
     end
   end
+
+  describe "cargo camera urls settings form" do
+    test "saves camera urls to the admin DB", %{conn: conn} do
+      %{view: view} = prepare_view(%{conn: conn})
+
+      view
+      |> element(".navbar button", "Admin")
+      |> render_click()
+
+      view
+      |> form("#media_settings", %{"media_settings" => %{"functionality" => "cargo"}})
+      |> render_submit()
+
+      html = render(view)
+
+      assert html =~ "Cargo camera urls"
+      assert has_element?(view, "#camera-url-form")
+
+      view
+      |> form("#camera-url-form", %{
+        camera_url: %{url: "http://webcamsdemexico.net/cozumel1/live.jpg"}
+      })
+      |> render_submit
+
+      assert view |> has_element?(".t-camera-url")
+    end
+  end
 end

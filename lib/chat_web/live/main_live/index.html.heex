@@ -1118,6 +1118,13 @@
                     module={CargoSettingsForm}
                   />
                 </Layout.Admin.block>
+                <Layout.Admin.block title="Cargo camera urls">
+                  <.live_component
+                    id={:cargo_camera_settings_form}
+                    cargo_settings={@cargo_settings}
+                    module={CargoCameraSettingsForm}
+                  />
+                </Layout.Admin.block>
               </Layout.Admin.row>
             <% end %>
           </Layout.Admin.container>

@@ -62,7 +62,7 @@ defmodule Chat.Db.Copying.ProgressTest do
 
     delay =
       {:file_chunk, nil, nil, nil}
-      |> List.duplicate(20000)
+      |> List.duplicate(20_000)
       |> Progress.new(:db?)
       |> Progress.recheck_delay_in_ms()
 

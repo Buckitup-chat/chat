@@ -4,7 +4,7 @@ defmodule Chat.DB.SyncTest do
   import Support.Db.Sync
 
   alias Chat.Db.Common
-  alias Chat.Db.Copying
+  alias Chat.Db.Scope.Full, as: FullScope
 
   describe "sync" do
     setup [
@@ -70,7 +70,7 @@ defmodule Chat.DB.SyncTest do
   defp assert_copied(src, dst_db) do
     dst =
       dst_db
-      |> Copying.get_data_keys_set()
+      |> FullScope.keys()
       |> MapSet.new()
 
     diff = MapSet.difference(src |> MapSet.new(), dst)

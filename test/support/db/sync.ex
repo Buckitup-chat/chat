@@ -9,6 +9,7 @@ defmodule Support.Db.Sync do
   alias Chat.Db
   alias Chat.Db.Common
   alias Chat.Db.Copying
+  alias Chat.Db.Scope.Full, as: FullScope
   alias Chat.Dialogs
   alias Chat.Messages
   alias Chat.Upload.UploadKey
@@ -69,7 +70,9 @@ defmodule Support.Db.Sync do
   end
 
   def copy_internal_to_main(context) do
-    keys = Copying.get_data_keys_set(context.internal)
+    keys = FullScope.keys(context.internal)
+    # {time, _} = :timer.tc(fn -> Copying.await_copied(context.internal, context.main) end)
+    # time |> IO.inspect(label: "copy_internal_to_main")
     Copying.await_copied(context.internal, context.main)
 
     context
@@ -77,7 +80,9 @@ defmodule Support.Db.Sync do
   end
 
   def copy_main_to_backup(context) do
-    keys = Copying.get_data_keys_set(context.main)
+    keys = FullScope.keys(context.main)
+    # {time, _} = :timer.tc(fn -> Copying.await_copied(context.main, context.backup) end)
+    # time |> IO.inspect(label: "copy_main_to_backup")
     Copying.await_copied(context.main, context.backup)
 
     context

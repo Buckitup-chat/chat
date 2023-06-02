@@ -32,17 +32,24 @@ defmodule Chat.Admin.CargoSettingsTest do
 
     test "with empty urls returns error" do
       assert %Ecto.Changeset{} =
-               changeset = CargoSettings.camera_sensors_changeset(%CargoSettings{}, %{camera_sensors: ["", "", ""]})
+               changeset =
+               CargoSettings.camera_sensors_changeset(%CargoSettings{}, %{
+                 camera_sensors: ["", "", ""]
+               })
 
       assert !changeset.valid?
     end
 
     test "reset changeset is valid" do
       assert %Ecto.Changeset{} =
-               changeset = CargoSettings.camera_sensors_changeset(%CargoSettings{camera_sensors: @valid_params[:camera_sensors]})
+               changeset =
+               CargoSettings.camera_sensors_changeset(%CargoSettings{
+                 camera_sensors: @valid_params[:camera_sensors]
+               })
+
       assert %Ecto.Changeset{} = reset_changeset = CargoSettings.reset_camera_sensors(changeset)
-      
+
       assert reset_changeset.valid?
     end
-  end  
+  end
 end

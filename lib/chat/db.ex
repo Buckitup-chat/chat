@@ -77,7 +77,8 @@ defmodule Chat.Db do
         start: {Agent, :start_link, [fn -> false end, [name: dry_relay_name]]}
       },
       # write supervisor
-      {DynamicSupervisor, name: write_supervisor, strategy: :one_for_one},
+      {DynamicSupervisor,
+       name: write_supervisor, strategy: :one_for_one, max_restarts: 0, max_seconds: 1},
       # decider
       {Chat.Db.Pipeline.Decider,
        name: decider,

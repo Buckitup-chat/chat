@@ -129,7 +129,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
       |> render_click()
 
       view
-      |> element("button", "Add")
+      |> element(".t-buttons button", "Add")
       |> render_click()
 
       assert_users(view, "checkpoints", ["Checkpoint 1"])

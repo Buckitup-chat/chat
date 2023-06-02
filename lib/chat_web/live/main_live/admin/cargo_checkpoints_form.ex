@@ -224,7 +224,7 @@ defmodule ChatWeb.MainLive.Admin.CargoCheckpointsForm do
 
   defp buttons(assigns) do
     ~H"""
-    <div class="flex flex-col self-center md:mx-8 mr-[5rem] my-5 md:my-auto">
+    <div class="t-buttons flex flex-col self-center md:mx-8 mr-[5rem] my-5 md:my-auto">
       <p class="w-32 text-sm">Checkpoints are automatically invited to the Cargo rooms you create.</p>
 
       <.button disabled={@selected_type != "rest"} event="add_checkpoint" myself={@myself} text="Add" />

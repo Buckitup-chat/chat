@@ -29,7 +29,7 @@ defmodule Chat.Db.WriteQueue.ReadStream do
   def read_stream_empty?(read_stream(file_readers: [_ | _])), do: false
   def read_stream_empty?(read_stream(file_ready: {_, _})), do: false
 
-  def read_stream_empty?(read_stream(awaiter: pid)) do
+  def read_stream_empty?(read_stream(awaiter: pid)) when is_pid(pid) do
     send(pid, :done)
     true
   end

@@ -17,7 +17,7 @@ defmodule Chat.Db.MaintenanceTest do
       do:
         {"""
          Filesystem     1024-blocks      Used Available Capacity  Mounted on
-         /dev/disk1s5s1   244810132   8863632  18496604    33%    /
+         /dev/disk1s5s1   244810132   8863632  18496604    33%    /fake
          """, 0}
   end
 

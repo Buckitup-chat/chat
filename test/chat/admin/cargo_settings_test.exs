@@ -8,14 +8,14 @@ defmodule Chat.Admin.CargoSettingsTest do
 
     test "with valid params returns valid changeset" do
       assert %Ecto.Changeset{} =
-               changeset = CargoSettings.changeset(%CargoSettings{}, @valid_params)
+               changeset = CargoSettings.checkpoints_changeset(%CargoSettings{}, @valid_params)
 
       assert changeset.valid?
     end
 
     test "with missing checkpoints returns an error" do
       params = @valid_params |> Map.put(:checkpoints, nil)
-      changeset = CargoSettings.changeset(%CargoSettings{}, params)
+      changeset = CargoSettings.checkpoints_changeset(%CargoSettings{}, params)
       assert_has_error(changeset, :checkpoints, "can't be blank")
     end
   end

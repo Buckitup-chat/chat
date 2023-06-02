@@ -1,7 +1,7 @@
 defmodule ChatWeb.MainLive.Page.AdminPanel do
   @moduledoc "Admin functions page"
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [push_event: 3]
+  import Phoenix.LiveView, only: [push_event: 3, send_update: 2]
 
   alias Chat.RoomInviteIndex
   alias Phoenix.PubSub
@@ -14,6 +14,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Chat.Rooms.RoomsBroker
   alias Chat.User
   alias Chat.User.UsersBroker
+  alias ChatWeb.MainLive.Admin.CargoWeightSensorForm
   alias ChatWeb.Router.Helpers, as: Routes
 
   @admin_topic "chat::admin"
@@ -187,6 +188,23 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     socket
     |> assign(:admin_list, nil)
     |> assign(:user_list, nil)
+  end
+
+  def connect_to_weight_sensor(socket, name, opts) do
+    request_platform({:connect_to_weight_sensor, name, opts})
+
+    socket
+  end
+
+  def weight_sensor_connection_status(socket, status) do
+    status_str = if status == :ok, do: "Established", else: "Failed"
+
+    send_update(CargoWeightSensorForm,
+      id: :cargo_weight_sensor_form,
+      connection_status: status_str
+    )
+
+    socket
   end
 
   defp request_platform(message),

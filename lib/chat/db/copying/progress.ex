@@ -65,8 +65,11 @@ defmodule Chat.Db.Copying.Progress do
     total = initial_data_count + @file_weight * initial_file_count
     left = data_count + @file_weight * file_count
 
-    (100 - left * 100 / total)
-    |> trunc()
+    if total == 0 do
+      100
+    else
+      trunc(100 - left * 100 / total)
+    end
   end
 
   @spec left_keys(%__MODULE__{}) :: non_neg_integer()

@@ -4,8 +4,6 @@ defmodule Chat.Db.Scope.Full do
   """
 
   alias Chat.FileFs
-  def diff(src_db, dst_db) do
-  end
 
   @doc "Data keys in db and associated files"
   @spec keys(CubDB.t()) :: MapSet.t()
@@ -87,6 +85,4 @@ defmodule Chat.Db.Scope.Full do
       finish |> String.to_integer()
     }
   end
-
-  defp filename_to_chunk_key(_), do: nil
 end

@@ -27,17 +27,6 @@ defmodule ChatWeb.MainLive.Admin.CargoWeightSensorForm do
     |> ok()
   end
 
-  defp connection_status(assigns) do
-    ~H"""
-    <div class="flex flex-row">
-      Connection: 
-      <div class={classes("ml-1", %{"text-gray-400" => @status == "Absent", "text-red-400" => @status == "Failed", "text-green-400" => @status == "Established"})}>
-        <%= @status %>
-      </div>
-    </div>
-    """
-  end
-
   def render(assigns) do
     ~H"""
     <div class="mt-3">
@@ -123,5 +112,22 @@ defmodule ChatWeb.MainLive.Admin.CargoWeightSensorForm do
 
     socket
     |> noreply()
+  end
+
+  defp connection_status(assigns) do
+    ~H"""
+    <div class="flex flex-row">
+      Connection:
+      <div class={
+        classes("ml-1", %{
+          "text-gray-400" => @status == "Absent",
+          "text-red-400" => @status == "Failed",
+          "text-green-400" => @status == "Established"
+        })
+      }>
+        <%= @status %>
+      </div>
+    </div>
+    """
   end
 end

@@ -27,12 +27,21 @@ defmodule ChatWeb.MainLive.Admin.CargoWeightSensorForm do
     |> ok()
   end
 
+  defp connection_status(assigns) do
+    ~H"""
+    <div class="flex flex-row">
+      Connection: 
+      <div class={classes("ml-1", %{"text-gray-400" => @status == "Absent", "text-red-400" => @status == "Failed", "text-green-400" => @status == "Established"})}>
+        <%= @status %>
+      </div>
+    </div>
+    """
+  end
+
   def render(assigns) do
     ~H"""
     <div class="mt-3">
-      <div class="flex flex-row">
-        Connection: <%= @connection_status %>
-      </div>
+      <.connection_status status={@connection_status} />
       <.form
         :let={form}
         class="mt-3"

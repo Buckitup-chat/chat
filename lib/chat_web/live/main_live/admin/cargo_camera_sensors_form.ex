@@ -23,16 +23,23 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
   def render(assigns) do
     ~H"""
     <div class="mt-3">
-      <.form :let={form} for={@changeset} phx-change="validate" phx-submit="save" phx-target={@myself}>
+      <.form
+        :let={form}
+        for={@changeset}
+        phx-change="validate"
+        phx-submit="save"
+        phx-target={@myself}
+        class="camera-sensor-input-form"
+      >
         <fieldset class="flex flex-col space-y-2">
           <%= for {url, index} <- form_input_list(form) do %>
-            <div class="flex flex-row">
+            <div class="camera-sensor flex flex-row">
               <.camera_img url={url} />
               <input
                 id={"camera-sensor-input-#{index}"}
                 class={
                   classes(
-                    "w-full ml-1 bg-gray-300 border border-gray-300 text-gray-900 text-sm rounded-lg block focus:ring-transparent focus:border-transparent",
+                    "camera-sensor-input w-full ml-1 bg-gray-300 border border-gray-300 text-gray-900 text-sm rounded-lg block focus:ring-transparent focus:border-transparent",
                     %{
                       "focus:ring-red-500 ring-red-500 focus:border-red-500 border-red-500" =>
                         Enum.member?(@invalid_sensors, url)

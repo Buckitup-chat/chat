@@ -1,6 +1,6 @@
-defmodule ChatWeb.MainLive.Admin.CargoSettingsForm do
+defmodule ChatWeb.MainLive.Admin.CargoCheckpointsForm do
   @moduledoc """
-  Handles showing and updating cargo settings form data.
+  Handles showing and updating cargo checkpoints form data.
   """
 
   use ChatWeb, :live_component
@@ -115,7 +115,7 @@ defmodule ChatWeb.MainLive.Admin.CargoSettingsForm do
   defp update_checkpoints(socket, checkpoints, next_pub_key) do
     changeset =
       socket.assigns.cargo_settings
-      |> CargoSettings.changeset(%{checkpoints: checkpoints})
+      |> CargoSettings.checkpoints_changeset(%{checkpoints: checkpoints})
       |> Map.put(:action, :validate)
 
     if changeset.valid? do
@@ -224,7 +224,7 @@ defmodule ChatWeb.MainLive.Admin.CargoSettingsForm do
 
   defp buttons(assigns) do
     ~H"""
-    <div class="flex flex-col self-center md:mx-8 mr-[5rem] my-5 md:my-auto">
+    <div class="t-buttons flex flex-col self-center md:mx-8 mr-[5rem] my-5 md:my-auto">
       <p class="w-32 text-sm">Checkpoints are automatically invited to the Cargo rooms you create.</p>
 
       <.button disabled={@selected_type != "rest"} event="add_checkpoint" myself={@myself} text="Add" />

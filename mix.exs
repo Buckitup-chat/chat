@@ -84,7 +84,8 @@ defmodule Chat.MixProject do
       {:excoveralls, "~> 0.14", only: [:test]},
       {:rewire, "~> 0.9.0", only: [:test]},
       {:keyx, "~> 0.4.1"},
-      {:combinatorics, "~> 0.1.0"}
+      {:combinatorics, "~> 0.1.0"},
+      {:httpoison, "~> 2.0"}
     ]
   end
 

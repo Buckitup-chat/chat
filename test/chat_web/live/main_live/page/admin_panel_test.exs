@@ -3,6 +3,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
 
   import ChatWeb.LiveTestHelpers
   import Phoenix.LiveViewTest
+  import Mock
 
   alias Chat.Admin.{BackupSettings, CargoSettings, MediaSettings}
   alias Chat.{AdminDb, AdminRoom, Db, Identity, User}
@@ -74,7 +75,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
     end
   end
 
-  describe "cargo settings form" do
+  describe "cargo checkpoints form" do
     test "saves checkpoints preset to the admin DB", %{conn: conn} do
       %{socket: socket, view: view} = prepare_view(%{conn: conn})
 
@@ -129,7 +130,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
       |> render_click()
 
       view
-      |> element("button", "Add")
+      |> element(".t-buttons button", "Add")
       |> render_click()
 
       assert_users(view, "checkpoints", ["Checkpoint 1"])
@@ -216,6 +217,42 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
 
     defp humanized_type("checkpoints"), do: "Checkpoints"
     defp humanized_type("rest"), do: "Other users"
+  end
+
+  describe "cargo camera sensors form" do
+    test "validates camera urls", %{conn: conn} do
+      with_mock HTTPoison, get: fn _ -> {:ok, %{status_code: 200}} end do
+        %{view: view} = prepare_view(%{conn: conn})
+
+        view
+        |> element(".navbar button", "Admin")
+        |> render_click()
+
+        refute view |> render() =~ "Cargo camera sensors"
+
+        view
+        |> form("#media_settings", %{"media_settings" => %{"functionality" => "cargo"}})
+        |> render_submit()
+
+        assert view |> render() =~ "Cargo camera sensors"
+
+        view
+        |> element(".camera-sensor-input-form")
+        |> render_change(%{"_target" => ["0"], "0" => "hello"})
+
+        assert view |> render() =~ "Please remove invalid sensors."
+
+        view |> element(".camera-sensor-input-form .camera-sensor button") |> render_click()
+
+        refute view |> render() =~ "Please remove invalid sensors."
+
+        view
+        |> element(".camera-sensor-input-form")
+        |> render_change(%{"_target" => ["0"], "0" => "https://www.storage111.com/image/12345"})
+
+        refute view |> render() =~ "Please remove invalid sensors."
+      end
+    end
   end
 
   describe "media settings form" do

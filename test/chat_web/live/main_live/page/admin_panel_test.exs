@@ -234,6 +234,12 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
         |> form("#media_settings", %{"media_settings" => %{"functionality" => "cargo"}})
         |> render_submit()
 
+        refute view |> render() =~ "Cargo camera sensors"
+
+        view
+        |> form("#cargo_user_form", %{"user" => %{"name" => "CargoBot"}})
+        |> render_submit()
+
         assert view |> render() =~ "Cargo camera sensors"
 
         view

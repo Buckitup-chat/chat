@@ -13,6 +13,7 @@ straightforward as possible.
 ### Added
 - extend cargo settings (camera sensors && weight sensor)
 - concurrent copying tracking
+- Add cargo user to set cargo sensor settings
 
 ### Changed
 - more copying and changetracker logging

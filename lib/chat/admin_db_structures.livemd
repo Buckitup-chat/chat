@@ -48,6 +48,18 @@ Set cargo checkpoints. Checkpoints are automatically invited to the Cargo rooms.
 
 <!-- livebook:{"break_markdown":true} -->
 
+### Cargo user
+
+Add cargo user if you want to access the cargo settings.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:cargo_user, cargo_user_identity}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
 ### Media settings
 
 When new USB drive is plugged into the secondary port, the following functionality will be started.
@@ -80,6 +92,8 @@ Types:
 ```
 
 <!-- livebook:{"break_markdown":true} -->
+
+
 
 ## Messaging
 

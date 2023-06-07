@@ -38,6 +38,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     |> assign_user_lists()
     |> assign_room_list()
     |> assign(:free_spaces, FreeSpacesPoller.get_info())
+    |> assign(:cargo_user, AdminRoom.get_cargo_user())
   end
 
   def int(socket) do
@@ -205,6 +206,18 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     )
 
     socket
+  end
+
+  def create_cargo_user(socket, name) do
+    cargo_user =
+      name
+      |> User.login()
+      |> tap(&AdminRoom.store_cargo_user/1)
+      |> tap(&User.register/1)
+      |> tap(&UsersBroker.put/1)
+
+    socket
+    |> assign(:cargo_user, cargo_user)
   end
 
   defp request_platform(message),

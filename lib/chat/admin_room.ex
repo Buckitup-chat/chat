@@ -76,6 +76,10 @@ defmodule Chat.AdminRoom do
   def store_backup_settings(%BackupSettings{} = backup_settings),
     do: AdminDb.put(:backup_settings, backup_settings)
 
+  def get_cargo_user, do: AdminDb.get(:cargo_user)
+
+  def store_cargo_user(user_identity), do: AdminDb.put(:cargo_user, user_identity)
+
   def get_cargo_settings do
     cargo_settings = AdminDb.get(:cargo_settings)
 

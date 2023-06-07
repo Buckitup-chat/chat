@@ -68,6 +68,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
 
       {:weight_sensor_connection, status} ->
         socket |> AdminPanel.weight_sensor_connection_status(status)
+
+      {:create_cargo_user, name} ->
+        socket |> AdminPanel.create_cargo_user(name)
     end
   end
 

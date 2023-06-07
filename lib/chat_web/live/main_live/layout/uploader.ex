@@ -191,17 +191,23 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   attr :pub_key, :string, required: true, doc: "peer or room pub key"
   attr :type, :atom, required: true, doc: ":dialog or :room"
 
-  defp entry(%{entry: entry, metadata: metadata} = assigns)
-       when is_nil(entry) or is_nil(metadata) do
+  defp entry(%{entry: nil, metadata: nil} = assigns) do
     ~H"""
 
     """
   end
 
   defp entry(assigns) do
+    assigns = Map.put(assigns, :in_current_room, current_room?(assigns))
+
     ~H"""
     <div
-      class={"flex mb-2 border-purple relative w-full z-0 " <> if(@metadata.destination.type == @type and @metadata.destination.pub_key == @pub_key |> Base.encode16(case: :lower), do: "bg-white", else: "bg-pink-100")}
+      class={
+        classes("flex mb-2 border-purple relative w-full z-0", %{
+          "bg-white" => @in_current_room,
+          "bg-pink-100" => !@in_current_room
+        })
+      }
       id={if(@mobile?, do: "mobile-", else: "") <> "upload-#{@entry.uuid}"}
       data-uuid={@entry.uuid}
     >
@@ -248,6 +254,17 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     </div>
     """
   end
+
+  defp current_room?(%{pub_key: nil}), do: false
+
+  defp current_room?(%{
+         metadata: %{destination: %{type: dst_type, pub_key: pub_key}},
+         type: dst_type,
+         pub_key: bin_pub_key
+       }),
+       do: pub_key == bin_pub_key |> Base.encode16(case: :lower)
+
+  defp current_room?(_), do: false
 
   defp cancel_upload(uuid, ref) do
     %JS{}

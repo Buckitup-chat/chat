@@ -12,8 +12,8 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   alias Chat.Log
   alias Chat.Rooms
   alias Chat.Rooms.RoomRequest
-  alias Chat.RoomsBroker
-  alias Chat.UsersBroker
+  alias Chat.Rooms.RoomsBroker
+  alias Chat.User.UsersBroker
   alias ChatWeb.MainLive.Page
 
   @topic "chat::lobby"
@@ -34,6 +34,12 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign_admin()
     |> process(&approve_pending_requests/1)
     |> process(&join_approved_requests/1)
+  end
+
+  def refresh_rooms_and_users(socket) do
+    socket
+    |> assign_room_list()
+    |> assign_user_list()
   end
 
   def new_room(%{assigns: %{me: me, monotonic_offset: time_offset}} = socket, name, type)

@@ -615,7 +615,9 @@ defmodule ChatWeb.MainLive.Layout.Message do
   defp assign_file(%{msg: %{content: json, type: type}} = assigns) do
     with true <- type in [:audio, :image, :video, :file],
          {id, secret} <- StorageId.from_json(json),
-         [_, _, _, _, name, size] <- Files.get(id, secret) do
+         [_, _, _, _, name, size] <- Files.get(id, secret),
+         true <- String.valid?(name),
+         true <- String.valid?(size) do
       %{
         name: name,
         size: size,

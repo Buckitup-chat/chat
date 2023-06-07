@@ -781,7 +781,7 @@
             </div>
           </div>
           <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
-            <%= unless @room do %>
+            <%= unless @room && @room.pub_key do %>
               <%= if @live_action == :room_message_link do %>
                 <Layout.Room.not_found_screen />
               <% else %>
@@ -1028,6 +1028,9 @@
               <Layout.Admin.block title="Free spaces">
                 <Layout.Admin.free_spaces free_spaces={@free_spaces} />
               </Layout.Admin.block>
+              <Layout.Admin.block title="GPIO 24 Impedance Control">
+                <Layout.Admin.gpio24_impedance_control status={assigns[:gpio24_impedance_status]} />
+              </Layout.Admin.block>
             </Layout.Admin.row>
             <Layout.Admin.row>
               <Layout.Admin.block title="Admin List">
@@ -1110,11 +1113,34 @@
               <Layout.Admin.row>
                 <Layout.Admin.block title="Cargo checkpoints preset">
                   <.live_component
-                    id={:cargo_settings_form}
+                    id={:cargo_checkpoints_form}
                     cargo_settings={@cargo_settings}
-                    module={CargoSettingsForm}
+                    module={CargoCheckpointsForm}
                   />
                 </Layout.Admin.block>
+                <Layout.Admin.block title="Cargo user">
+                  <.live_component
+                    id={:cargo_user_data}
+                    cargo_user={assigns[:cargo_user]}
+                    module={CargoUserData}
+                  />
+                </Layout.Admin.block>
+                <%= if assigns[:cargo_user] do %>
+                  <Layout.Admin.block title="Cargo camera sensors">
+                    <.live_component
+                      id={:cargo_camera_sensors_form}
+                      cargo_settings={@cargo_settings}
+                      module={CargoCameraSensorsForm}
+                    />
+                  </Layout.Admin.block>
+                  <Layout.Admin.block title="Cargo weight sensor">
+                    <.live_component
+                      id={:cargo_weight_sensor_form}
+                      cargo_settings={@cargo_settings}
+                      module={CargoWeightSensorForm}
+                    />
+                  </Layout.Admin.block>
+                <% end %>
               </Layout.Admin.row>
             <% end %>
           </Layout.Admin.container>

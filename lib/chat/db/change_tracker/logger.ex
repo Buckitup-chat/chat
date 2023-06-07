@@ -25,14 +25,13 @@ defmodule Chat.Db.ChangeTracker.Logger do
 
   @impl true
   def handle_info(:check, _) do
-    {n, top_keys} = ChangeTracker.long_expiry_stats()
+    n = ChangeTracker.long_expiry_stats()
 
     if n > 0 do
       [
         "[ChangeTracker stats] ",
         inspect(n),
-        " awaiting keys, for instance: ",
-        inspect(top_keys, pretty: true)
+        " awaiting keys"
       ]
       |> Logger.warn()
     end

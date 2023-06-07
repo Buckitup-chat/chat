@@ -1,7 +1,7 @@
 defmodule ChatWeb.MainLive.Page.AdminPanel do
   @moduledoc "Admin functions page"
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [push_event: 3]
+  import Phoenix.LiveView, only: [push_event: 3, send_update: 2]
 
   alias Chat.RoomInviteIndex
   alias Phoenix.PubSub
@@ -11,15 +11,18 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Chat.Dialogs
   alias Chat.Messages
   alias Chat.Rooms
-  alias Chat.RoomsBroker
+  alias Chat.Rooms.RoomsBroker
   alias Chat.User
-  alias Chat.UsersBroker
+  alias Chat.User.UsersBroker
+  alias ChatWeb.MainLive.Admin.CargoWeightSensorForm
   alias ChatWeb.Router.Helpers, as: Routes
 
+  @admin_topic "chat::admin"
   @incoming_topic "platform->chat"
   @outgoing_topic "chat->platform"
 
   def init(%{assigns: %{me: me}} = socket) do
+    PubSub.subscribe(Chat.PubSub, @admin_topic)
     PubSub.subscribe(Chat.PubSub, @incoming_topic)
 
     start_poller(me)
@@ -31,9 +34,11 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     socket
     |> assign(:wifi_loaded, false)
     |> request_wifi_settings()
+    |> request_gpio24_impedance_status()
     |> assign_user_lists()
     |> assign_room_list()
     |> assign(:free_spaces, FreeSpacesPoller.get_info())
+    |> assign(:cargo_user, AdminRoom.get_cargo_user())
   end
 
   def int(socket) do
@@ -44,6 +49,12 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
 
   def request_wifi_settings(socket) do
     request_platform(:get_wifi_settings)
+
+    socket
+  end
+
+  def request_gpio24_impedance_status(socket) do
+    request_platform(:get_gpio24_impedance_status)
 
     socket
   end
@@ -89,6 +100,22 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   def confirm_wifi_updated(socket) do
     socket
     |> assign(:wifi_loaded, true)
+  end
+
+  def toggle_gpio24_impendance(socket) do
+    request_platform(:toggle_gpio24_impendance)
+
+    socket
+  end
+
+  def set_gpio24_impedance_status(socket, 0) do
+    socket
+    |> assign(:gpio24_impedance_status, "Off")
+  end
+
+  def set_gpio24_impedance_status(socket, 1) do
+    socket
+    |> assign(:gpio24_impedance_status, "On")
   end
 
   def invite_user(%{assigns: %{me: me, room_map: rooms}} = socket, hash) do
@@ -146,7 +173,14 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
 
   def set_free_spaces(socket, free_spaces), do: socket |> assign(:free_spaces, free_spaces)
 
+  def refresh_rooms_and_users(socket) do
+    socket
+    |> assign_room_list()
+    |> assign_user_lists()
+  end
+
   def close(%{assigns: %{me: %{name: admin}}} = socket) do
+    PubSub.unsubscribe(Chat.PubSub, @admin_topic)
     PubSub.unsubscribe(Chat.PubSub, @incoming_topic)
     PubSub.unsubscribe(Chat.PubSub, FreeSpacesPoller.channel())
 
@@ -155,6 +189,35 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     socket
     |> assign(:admin_list, nil)
     |> assign(:user_list, nil)
+  end
+
+  def connect_to_weight_sensor(socket, name, opts) do
+    request_platform({:connect_to_weight_sensor, name, opts})
+
+    socket
+  end
+
+  def weight_sensor_connection_status(socket, status) do
+    status_str = if status == :ok, do: "Established", else: "Failed"
+
+    send_update(CargoWeightSensorForm,
+      id: :cargo_weight_sensor_form,
+      connection_status: status_str
+    )
+
+    socket
+  end
+
+  def create_cargo_user(socket, name) do
+    cargo_user =
+      name
+      |> User.login()
+      |> tap(&AdminRoom.store_cargo_user/1)
+      |> tap(&User.register/1)
+      |> tap(&UsersBroker.put/1)
+
+    socket
+    |> assign(:cargo_user, cargo_user)
   end
 
   defp request_platform(message),
@@ -166,7 +229,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
       |> Enum.map(&{&1.hash, &1})
       |> Map.new()
 
-    full_user_list = User.list()
+    full_user_list = UsersBroker.list()
 
     user_list =
       full_user_list
@@ -179,7 +242,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   end
 
   defp assign_room_list(%{assigns: %{room_map: rooms}} = socket) do
-    {my, other} = Rooms.list(rooms)
+    {my, other} = RoomsBroker.list(rooms)
     room_list = my ++ other
 
     socket

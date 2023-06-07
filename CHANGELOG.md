@@ -11,6 +11,36 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+- extend cargo settings (camera sensors && weight sensor)
+- concurrent copying tracking
+- Add cargo user to set cargo sensor settings
+
+### Changed
+- more copying and changetracker logging
+
+### Fixed
+- uploader background breaking the page when leaving room 
+- copying stuck
+- backup stuck on ejecting drive while copying
+
+
+## 2023-05-22_3fefe32___2023-05-24_98fba24
+
+### Added
+- control the impendance of GPIO24
+
+### Changed
+
+### Fixed
+- broken file message display
+- fix room displaying w/o pub_key
+- fs listing (broken synchronization) + testing
+- Update users/rooms cache on USB plugging/unplugging
+
+
+## 2023-05-17_f2cf2cc___2023-05-18_ccb67a5
+
+### Added
 - Social Sharing. filter out bad parts
 - Filesystem based files synchronization
 

@@ -9,7 +9,16 @@ defmodule ChatWeb.MainLive.Index do
   alias Chat.Rooms.Room
   alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
   alias ChatWeb.Hooks.{LiveModalHook, LocalTimeHook, UploaderHook}
-  alias ChatWeb.MainLive.Admin.{BackupSettingsForm, CargoSettingsForm, MediaSettingsForm}
+
+  alias ChatWeb.MainLive.Admin.{
+    BackupSettingsForm,
+    CargoCameraSensorsForm,
+    CargoCheckpointsForm,
+    CargoUserData,
+    CargoWeightSensorForm,
+    MediaSettingsForm
+  }
+
   alias ChatWeb.MainLive.{Layout, Page}
   alias ChatWeb.MainLive.Page.RoomForm
   alias Phoenix.LiveView.JS
@@ -412,6 +421,12 @@ defmodule ChatWeb.MainLive.Index do
     do: socket |> Page.RoomRouter.info(msg) |> noreply()
 
   def handle_info({:platform_response, msg}, socket),
+    do: socket |> Page.AdminPanelRouter.info(msg) |> noreply()
+
+  def handle_info({:lobby, :refresh_rooms_and_users}, socket),
+    do: socket |> Page.Lobby.refresh_rooms_and_users() |> noreply()
+
+  def handle_info({:admin, msg}, socket),
     do: socket |> Page.AdminPanelRouter.info(msg) |> noreply()
 
   def handle_info({:dialog, msg}, socket), do: socket |> Page.DialogRouter.info(msg) |> noreply()

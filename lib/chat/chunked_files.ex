@@ -149,6 +149,7 @@ defmodule Chat.ChunkedFiles do
   defp await_on_fs_or_retry(:ok, chunk_full_key, encoded) do
     cond do
       check_file(chunk_full_key) -> :ok
+      wait_and_check_file(1, chunk_full_key) -> :ok
       wait_and_check_file(2, chunk_full_key) -> :ok
       wait_and_check_file(7, chunk_full_key) -> :ok
       wait_and_check_file(23, chunk_full_key) -> :ok

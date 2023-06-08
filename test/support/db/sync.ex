@@ -67,6 +67,7 @@ defmodule Support.Db.Sync do
       end,
       max_concurrency: 55
     )
+    |> Stream.run()
 
     context.internal |> CubDB.file_sync()
 

@@ -2,11 +2,10 @@ defmodule Chat.ChunkedFilesTest do
   use ExUnit.Case, async: false
 
   alias Chat.ChunkedFiles
-  alias Chat.Db.ChangeTracker
   alias Chat.FileFs
 
   test "should generate a key and a secret on upload start, save chunks by key and able to read full file decrypting with secret" do
-    key = UUID.uuid4()
+    key = UUID.uuid4() |> Enigma.hash()
     secret = ChunkedFiles.new_upload(key)
 
     assert 32 = byte_size(secret)
@@ -16,7 +15,6 @@ defmodule Chat.ChunkedFilesTest do
     size = String.length(first) + String.length(second)
 
     ChunkedFiles.save_upload_chunk(key, {0, 17}, 30, first)
-    ChangeTracker.await({:file_chunk, key, 0, 17})
     assert false == ChunkedFiles.complete_upload?(key, size)
 
     ChunkedFiles.save_upload_chunk(key, {18, 29}, 30, second)
@@ -30,7 +28,7 @@ defmodule Chat.ChunkedFilesTest do
   end
 
   test "should forget key" do
-    key = UUID.uuid4()
+    key = UUID.uuid4() |> Enigma.hash()
     _secret = ChunkedFiles.new_upload(key)
     assert nil != Chat.ChunkedFilesBroker.get(key)
 

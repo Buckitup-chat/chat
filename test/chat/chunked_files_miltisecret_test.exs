@@ -47,7 +47,7 @@ defmodule Chat.ChunkedFilesMultisecretTest do
   end
 
   def generate(file_size) do
-    file_key = UUID.uuid4()
+    file_key = UUID.uuid4() |> Enigma.hash()
     initial_secret = ChunkedFiles.new_upload(file_key)
     ChunkedFilesMultisecret.generate(file_key, file_size, initial_secret)
     ChangeTracker.await()

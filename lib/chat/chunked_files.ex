@@ -4,7 +4,6 @@ defmodule Chat.ChunkedFiles do
   alias Chat.ChunkedFilesBroker
   alias Chat.ChunkedFilesMultisecret
   alias Chat.Db
-  alias Chat.Db.ChangeTracker
   alias Chat.FileFs
   alias Chat.Identity
 
@@ -28,34 +27,18 @@ defmodule Chat.ChunkedFiles do
     |> Enum.count()
   end
 
-  def save_upload_chunk(key, {chunk_start, chunk_end}, size, chunk) do
+  def save_upload_chunk(key, {chunk_start, chunk_end}, _size, chunk) do
     with initial_secret <- ChunkedFilesBroker.get(key),
          {_, false} <- {:empty_initial_secret, is_nil(initial_secret)},
          secret <- ChunkedFilesMultisecret.get_secret(key, chunk_start, initial_secret),
-         encoded <- Enigma.cipher(chunk, secret) do
-      if chunk_end + 1 == size do
-        task =
-          Task.async(fn ->
-            ChangeTracker.await({:file_chunk, key, chunk_start, chunk_end})
-          end)
-
-        res = Db.put_chunk({{:file_chunk, key, chunk_start, chunk_end}, encoded})
-
-        if res == :ok do
-          Db.put({:chunk_key, {:file_chunk, key, chunk_start, chunk_end}}, true)
-        end
-
-        task |> Task.await(:infinity)
-        res
-      else
-        res = Db.put_chunk({{:file_chunk, key, chunk_start, chunk_end}, encoded})
-
-        if res == :ok do
-          Db.put({:chunk_key, {:file_chunk, key, chunk_start, chunk_end}}, true)
-        end
-
-        res
-      end
+         encoded <- Enigma.cipher(chunk, secret),
+         chunk_full_key <- {:file_chunk, key, chunk_start, chunk_end} do
+      Db.put_chunk({chunk_full_key, encoded})
+      |> await_on_fs_or_retry(chunk_full_key, encoded)
+      |> tap(fn
+        :ok -> Db.put({:chunk_key, chunk_full_key}, true)
+        x -> x
+      end)
     end
   end
 
@@ -161,5 +144,44 @@ defmodule Chat.ChunkedFiles do
 
   defp get_secret_from_multisecret(key, chunk_start, initial_secret) do
     ChunkedFilesMultisecret.get_secret(key, chunk_start, initial_secret)
+  end
+
+  defp await_on_fs_or_retry(:ok, chunk_full_key, encoded) do
+    cond do
+      check_file(chunk_full_key) -> :ok
+      wait_and_check_file(1, chunk_full_key) -> :ok
+      wait_and_check_file(2, chunk_full_key) -> :ok
+      wait_and_check_file(7, chunk_full_key) -> :ok
+      wait_and_check_file(23, chunk_full_key) -> :ok
+      wait_and_check_file(61, chunk_full_key) -> :ok
+      wait_and_check_file(117, chunk_full_key) -> :ok
+      true -> retry_save_file(chunk_full_key, encoded)
+    end
+  end
+
+  defp retry_save_file(chunk_full_key, encoded) do
+    res = Db.put_chunk({chunk_full_key, encoded})
+
+    cond do
+      res != :ok -> res
+      check_file(chunk_full_key) -> :ok
+      wait_and_check_file(2, chunk_full_key) -> :ok
+      wait_and_check_file(7, chunk_full_key) -> :ok
+      wait_and_check_file(23, chunk_full_key) -> :ok
+      wait_and_check_file(61, chunk_full_key) -> :ok
+      true -> :failed_to_check_file
+    end
+  end
+
+  defp wait_and_check_file(seconds, chunk_full_key) do
+    seconds
+    |> :timer.seconds()
+    |> Process.sleep()
+
+    check_file(chunk_full_key)
+  end
+
+  defp check_file({:file_chunk, file_key, chunk_start, chunk_end}) do
+    FileFs.has_file?({file_key, chunk_start, chunk_end})
   end
 end

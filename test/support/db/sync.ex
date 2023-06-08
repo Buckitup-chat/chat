@@ -60,9 +60,14 @@ defmodule Support.Db.Sync do
 
     dialog = Dialogs.find_or_open(alice, bob |> Card.from_identity())
 
-    for time_base <- 0..500//10 do
-      generate_content(alice, bob, dialog, time_base)
-    end
+    0..500//10
+    |> Task.async_stream(
+      fn time_base ->
+        generate_content(alice, bob, dialog, time_base)
+      end,
+      max_concurrency: 55
+    )
+    |> Stream.run()
 
     context.internal |> CubDB.file_sync()
 

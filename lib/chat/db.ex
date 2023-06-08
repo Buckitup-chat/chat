@@ -20,6 +20,7 @@ defmodule Chat.Db do
   def get(key), do: Queries.get(db(), key)
   def get_next(key, max_key, predicate), do: Queries.get_next(db(), key, max_key, predicate)
   def get_prev(key, min_key, predicate), do: Queries.get_prev(db(), key, min_key, predicate)
+  def has_key?(key), do: Queries.has_key?(db(), key)
 
   def put(key, value) do
     case key do

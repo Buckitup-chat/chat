@@ -17,6 +17,7 @@ straightforward as possible.
 
 ### Changed
 - more copying and changetracker logging
+- file chunk upload awaits a file on FS
 
 ### Fixed
 - uploader background breaking the page when leaving room 

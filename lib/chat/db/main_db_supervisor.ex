@@ -13,6 +13,6 @@ defmodule Chat.Db.MainDbSupervisor do
   def init(path) do
     Chat.Db.MainDb
     |> Chat.Db.supervise(path)
-    |> Supervisor.init(strategy: :rest_for_one)
+    |> Supervisor.init(strategy: :rest_for_one, max_restarts: 2, max_seconds: 5)
   end
 end

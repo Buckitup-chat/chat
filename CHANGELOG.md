@@ -14,6 +14,7 @@ straightforward as possible.
 - extend cargo settings (camera sensors && weight sensor)
 - concurrent copying tracking
 - Add cargo user to set cargo sensor settings
+- room invite lookup for cargo user
 
 ### Changed
 - more copying and changetracker logging

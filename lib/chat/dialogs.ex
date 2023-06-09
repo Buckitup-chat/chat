@@ -2,11 +2,14 @@ defmodule Chat.Dialogs do
   @moduledoc "Context for dialogs"
 
   alias Chat.Card
+  alias Chat.Content.RoomInvites
+  alias Chat.Db
   alias Chat.Dialogs.Dialog
   alias Chat.Dialogs.DialogMessaging
   alias Chat.Dialogs.Message
   alias Chat.Dialogs.Registry
   alias Chat.Identity
+  alias Chat.Utils.StorageId
 
   def find_or_open(%Identity{} = me) do
     find_or_open(me, Card.from_identity(me))
@@ -96,4 +99,22 @@ defmodule Chat.Dialogs do
   def peer(dialog, %Card{pub_key: key}), do: peer(dialog, key)
   def peer(%Dialog{a_key: my_key, b_key: peer_key}, my_key), do: peer_key
   def peer(%Dialog{a_key: peer_key, b_key: my_key}, my_key), do: peer_key
+
+  def room_invite_for_user_to_room(%Identity{} = user, %Identity{} = room) do
+    Db.select({{:dialogs, 0}, {:"dialogs\0", 0}}, 1000)
+    |> Stream.filter(fn {_key, %Dialog{a_key: a_key, b_key: b_key}} ->
+      user.public_key in [a_key, b_key]
+    end)
+    |> Stream.flat_map(fn {_, dialog} ->
+      list_room_invites(dialog, user)
+    end)
+    |> Stream.drop_while(fn invite ->
+      invite.content
+      |> StorageId.from_json()
+      |> RoomInvites.get()
+      |> Identity.from_strings()
+      |> then(& &1.public_key) != room.public_key
+    end)
+    |> Enum.at(0)
+  end
 end

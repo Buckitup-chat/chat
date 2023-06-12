@@ -7,6 +7,7 @@ defmodule Chat.Dialogs do
   alias Chat.Dialogs.Dialog
   alias Chat.Dialogs.DialogMessaging
   alias Chat.Dialogs.Message
+  alias Chat.Dialogs.PrivateMessage
   alias Chat.Dialogs.Registry
   alias Chat.Identity
   alias Chat.Utils.StorageId
@@ -100,7 +101,8 @@ defmodule Chat.Dialogs do
   def peer(%Dialog{a_key: my_key, b_key: peer_key}, my_key), do: peer_key
   def peer(%Dialog{a_key: peer_key, b_key: my_key}, my_key), do: peer_key
 
-  def room_invite_for_user_to_room(%Identity{} = user, %Identity{} = room) do
+  @spec room_invite_for_user_to_room(Identity.t(), String.t()) :: PrivateMessage.t() | nil
+  def room_invite_for_user_to_room(%Identity{} = user, room_pub_key) do
     Db.select({{:dialogs, 0}, {:"dialogs\0", 0}}, 1000)
     |> Stream.filter(fn {_key, %Dialog{a_key: a_key, b_key: b_key}} ->
       user.public_key in [a_key, b_key]
@@ -109,12 +111,18 @@ defmodule Chat.Dialogs do
       list_room_invites(dialog, user)
     end)
     |> Stream.drop_while(fn invite ->
-      invite.content
-      |> StorageId.from_json()
-      |> RoomInvites.get()
-      |> Identity.from_strings()
-      |> then(& &1.public_key) != room.public_key
+      invite
+      |> extract_invite_room_identity()
+      |> then(& &1.public_key) != room_pub_key
     end)
     |> Enum.at(0)
+  end
+
+  @spec extract_invite_room_identity(PrivateMessage.t()) :: Identity.t()
+  def extract_invite_room_identity(%PrivateMessage{type: :room_invite, content: content}) do
+    content
+    |> StorageId.from_json()
+    |> RoomInvites.get()
+    |> Identity.from_strings()
   end
 end

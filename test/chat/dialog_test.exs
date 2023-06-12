@@ -292,9 +292,9 @@ defmodule Chat.Dialogs.DialogTest do
       end)
       |> Enum.to_list()
 
-    invite1 = Chat.Dialogs.room_invite_for_user_to_room(bob, room_identity1)
-    invite2 = Chat.Dialogs.room_invite_for_user_to_room(bob, room_identity2)
-    invite3 = Chat.Dialogs.room_invite_for_user_to_room(bob, room_identity3)
+    invite1 = Chat.Dialogs.room_invite_for_user_to_room(bob, room_identity1.public_key)
+    invite2 = Chat.Dialogs.room_invite_for_user_to_room(bob, room_identity2.public_key)
+    invite3 = Chat.Dialogs.room_invite_for_user_to_room(bob, room_identity3.public_key)
 
     assert invite1.id == message1.id
     assert invite2.id == message2.id

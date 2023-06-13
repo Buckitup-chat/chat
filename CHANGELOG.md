@@ -22,6 +22,7 @@ straightforward as possible.
 - more copying and changetracker logging
 - file chunk upload awaits a file on FS
 - faster restart of supervision
+- support cargo camera url from chat
 
 ### Fixed
 

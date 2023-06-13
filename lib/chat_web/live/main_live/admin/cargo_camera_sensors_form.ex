@@ -180,7 +180,7 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
 
   defp validate_sensor(%{assigns: %{invalid_sensors: invalid_sensors}} = socket, url) do
     with %{scheme: scheme} when scheme in ["http", "https"] <- URI.parse(url),
-         {:ok, %{status_code: 200}} <- HTTPoison.get(url) do
+         {:ok, %{status_code: code}} when code in 200..299 <- HTTPoison.get(url) do
       socket
     else
       _ -> socket |> assign(:invalid_sensors, [url | invalid_sensors])

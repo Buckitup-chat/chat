@@ -84,7 +84,8 @@ defmodule Chat.AdminRoom do
     cargo_settings = AdminDb.get(:cargo_settings)
 
     if cargo_settings do
-      cargo_settings
+      %CargoSettings{}
+      |> Map.merge(cargo_settings)
     else
       %CargoSettings{}
     end

@@ -29,6 +29,7 @@ straightforward as possible.
 - copying stuck
 - backup stuck on ejecting drive while copying
 - set correct input of room invite lookup for cargo user
+- onliners and cargo fix on drive ejecting
 
 ## 2023-05-22_3fefe32___2023-05-24_98fba24
 

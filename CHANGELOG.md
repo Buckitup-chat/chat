@@ -16,6 +16,8 @@ straightforward as possible.
 - concurrent copying tracking
 - Add cargo user to set cargo sensor settings
 - room invite lookup for cargo user
+- write data from camera sensors into the cargo room
+
 
 ### Changed
 

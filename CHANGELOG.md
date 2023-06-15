@@ -25,6 +25,7 @@ straightforward as possible.
 - file chunk upload awaits a file on FS
 - faster restart of supervision
 - support cargo camera url from chat
+- minimise cargo scope
 
 ### Fixed
 

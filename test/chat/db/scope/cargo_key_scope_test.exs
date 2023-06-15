@@ -1,12 +1,13 @@
 defmodule Chat.Db.Scope.CargoKeyScopeTest do
   use ExUnit.Case, async: false
 
+  alias Chat.Db.Scope.KeyScope
   alias Chat.Dialogs
+  alias Chat.Identity
+  alias Chat.Messages
+  alias Chat.RoomInviteIndex
   alias Chat.Rooms
   alias Chat.User
-  alias Chat.Messages
-  alias Chat.Identity
-  alias Chat.RoomInviteIndex
 
   test "room and invitations in dialogs should be selected" do
     {bot_key, room_key} = generate_user_with_dialogs_content_and_invite_in_room()
@@ -20,7 +21,7 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     # |> Enum.frequencies_by(&elem(&1, 0))
     # |> IO.inspect(label: "db", pretty: true)
 
-    keys = Chat.Db.Scope.KeyScope.get_cargo_keys(Chat.Db.db(), room_key, [bot_key])
+    keys = KeyScope.get_cargo_keys(Chat.Db.db(), room_key, [bot_key])
 
     assert %{dialog_message: 1, dialogs: 1, room_invite: 1, room_invite_index: 1, rooms: 1} ==
              keys
@@ -29,7 +30,7 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
              |> Map.drop([:users])
   end
 
-  defp generate_user_with_dialogs_content_and_invite_in_room() do
+  defp generate_user_with_dialogs_content_and_invite_in_room do
     user = User.login("Alice")
     User.register(user)
 

@@ -6,8 +6,13 @@ defmodule Chat.Sync.CargoRoom do
   use GenServer
   use StructAccess
 
+  alias Chat.ChunkedFiles
+  alias Chat.ChunkedFilesMultisecret
+  alias Chat.Messages
   alias Chat.Rooms
   alias Chat.Rooms.RoomsBroker
+  alias Chat.Upload.UploadKey
+
   alias Phoenix.PubSub
 
   @type room_key :: String.t()
@@ -40,6 +45,11 @@ defmodule Chat.Sync.CargoRoom do
   @spec get_room_key() :: room_key() | nil
   def get_room_key do
     GenServer.call(__MODULE__, :get_room_key)
+  end
+
+  @spec write_file(Chat.Identity.t(), binary, map()) :: :ok | :ignore | :failed
+  def write_file(writer, content, metadata) do
+    GenServer.call(__MODULE__, {:write_file, writer, content, metadata})
   end
 
   @spec activate(room_key()) :: :ok
@@ -83,6 +93,39 @@ defmodule Chat.Sync.CargoRoom do
       end
 
     {:reply, room_key, state}
+  end
+
+  def handle_call({:write_file, writer, content, metadata}, _from, cargo_room) do
+    result =
+      case cargo_room do
+        nil ->
+          :ignore
+
+        %{pub_key: room_key} ->
+          destination = %{pub_key: Base.encode16(room_key, case: :lower), type: :room}
+
+          with file_info <- %{
+                 time: DateTime.utc_now() |> DateTime.to_unix(),
+                 size: Map.get(metadata, "Content-Length", "0") |> String.to_integer(),
+                 type: Map.get(metadata, "Content-Type", "application/octet-stream"),
+                 name_prefix: Map.get(metadata, "Name-Prefix", "")
+               },
+               entry <- file_entry(file_info),
+               file_key <- UploadKey.new(destination, room_key, entry),
+               file_secret <- ChunkedFiles.new_upload(file_key),
+               :ok <- save_file({file_key, content}, {file_info.size, file_secret}) do
+            message =
+              entry
+              |> Messages.File.new(file_key, file_secret, file_info.time)
+              |> Rooms.add_new_message(writer, room_key)
+
+            :ok = PubSub.broadcast!(Chat.PubSub, @cargo_topic, {:room, {:new_message, message}})
+          else
+            _ -> :failed
+          end
+      end
+
+    {:reply, result, cargo_room}
   end
 
   @impl GenServer
@@ -198,5 +241,23 @@ defmodule Chat.Sync.CargoRoom do
     :ok = PubSub.broadcast(Chat.PubSub, @cargo_topic, {:update_cargo_room, cargo_room})
 
     {:noreply, cargo_room}
+  end
+
+  defp file_entry(file_info) do
+    %{
+      client_last_modified: file_info.time,
+      client_name:
+        file_info.name_prefix <> "#{file_info.time}" <> "." <> mime_type_extension(file_info.type),
+      client_relative_path: nil,
+      client_size: file_info.size,
+      client_type: file_info.type
+    }
+  end
+
+  defp mime_type_extension(type), do: MIME.extensions(type) |> List.first() || "bin"
+
+  defp save_file({file_key, share_key}, {file_size, file_secret}) do
+    ChunkedFilesMultisecret.generate(file_key, file_size, file_secret)
+    ChunkedFiles.save_upload_chunk(file_key, {0, file_size - 1}, file_size, share_key)
   end
 end

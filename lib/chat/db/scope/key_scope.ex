@@ -4,6 +4,7 @@ defmodule Chat.Db.Scope.KeyScope do
   """
 
   alias Chat.Dialogs.Dialog
+  alias Chat.Dialogs.Message
 
   def get_keys(db, pub_keys_list) do
     pub_keys = MapSet.new(pub_keys_list)
@@ -14,6 +15,20 @@ defmodule Chat.Db.Scope.KeyScope do
       |> add_dialogs(snap, pub_keys)
       |> add_rooms(snap, pub_keys)
       |> add_content(snap, pub_keys)
+    end)
+  end
+
+  def get_cargo_keys(db, room_pub_key, invites_to_pub_keys) do
+    room_key = MapSet.new([room_pub_key])
+    invited_keys = MapSet.new(invites_to_pub_keys)
+
+    CubDB.with_snapshot(db, fn snap ->
+      MapSet.new()
+      |> add_full_users(snap)
+      |> add_rooms(snap, room_key)
+      |> add_content(snap, room_key)
+      |> add_invitation_dialogs(snap, invited_keys)
+      |> add_invitation_content(snap, invited_keys)
     end)
   end
 
@@ -123,6 +138,49 @@ defmodule Chat.Db.Scope.KeyScope do
     |> union_set(files)
     |> union_set(memo_index)
     |> union_set(memos)
+    |> union_set(room_invite_index)
+    |> union_set(room_invites)
+  end
+
+  defp add_invitation_dialogs(acc_set, snap, pub_keys) do
+    dialog_keys =
+      snap
+      |> db_stream({:dialogs, 0}, {:"dialogs\0", 0})
+      |> Stream.filter(fn {_full_dilaog_key, %Dialog{a_key: a_key, b_key: b_key}} ->
+        MapSet.member?(pub_keys, a_key) or MapSet.member?(pub_keys, b_key)
+      end)
+      |> Stream.map(&just_keys/1)
+      |> Enum.to_list()
+      |> MapSet.new()
+
+    dialog_binkeys =
+      dialog_keys
+      |> Enum.map(fn {:dialogs, dialog_key} -> dialog_key end)
+      |> MapSet.new()
+
+    snap
+    |> db_stream({:dialog_message, 0, 0, 0}, {:"dialog_message\0", 0, 0, 0})
+    |> Stream.filter(fn {{:dialog_message, key, _, _}, %Message{type: type}} ->
+      type == :room_invite and MapSet.member?(dialog_binkeys, key)
+    end)
+    |> Stream.map(&just_keys/1)
+    |> union_set(dialog_keys)
+    |> union_set(acc_set)
+  end
+
+  defp add_invitation_content(acc_set, snap, pub_keys) do
+    [room_invite_index, _room_invite_keys, room_invites] =
+      fetch_index_and_records(
+        snap,
+        pub_keys,
+        "room_invite",
+        min_key: {:room_invite_index, 0, 0},
+        max_key: {:"room_invite_index\0", 0, 0},
+        reader_hash_getter: fn {:room_invite_index, reader_key, _invite_key} -> reader_key end,
+        record_key_getter: fn {:room_invite_index, _reader_key, invite_key} -> invite_key end
+      )
+
+    acc_set
     |> union_set(room_invite_index)
     |> union_set(room_invites)
   end

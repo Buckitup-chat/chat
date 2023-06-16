@@ -8,6 +8,7 @@ defmodule Chat.Sync.CargoRoom do
 
   alias Chat.ChunkedFiles
   alias Chat.ChunkedFilesMultisecret
+  alias Chat.FileIndex
   alias Chat.Messages
   alias Chat.Rooms
   alias Chat.Rooms.RoomsBroker
@@ -118,6 +119,10 @@ defmodule Chat.Sync.CargoRoom do
               entry
               |> Messages.File.new(file_key, file_secret, file_info.time)
               |> Rooms.add_new_message(writer, room_key)
+
+            {_index, msg} = message
+
+            FileIndex.save(file_key, room_key, msg.id, file_secret)
 
             :ok = PubSub.broadcast!(Chat.PubSub, @cargo_topic, {:room, {:new_message, message}})
           else

@@ -43,7 +43,7 @@ defmodule Chat.FileFs do
         |> List.last()
         |> String.to_integer()
 
-      data = File.open!(filename, [:binary, :read], &IO.binread(&1, last - first + 1))
+      data = File.open!(filename, [:binary, :read], &IO.binread(&1, :all))
 
       {data, last}
     end)
@@ -54,7 +54,7 @@ defmodule Chat.FileFs do
     |> list_files()
     |> Enum.sort()
     |> Stream.map(fn file ->
-      File.open!(file, [:binary, :read], &IO.binread(&1, :eof))
+      File.open!(file, [:binary, :read], &IO.binread(&1, :all))
     end)
   end
 

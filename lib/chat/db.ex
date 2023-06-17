@@ -79,7 +79,7 @@ defmodule Chat.Db do
       },
       # write supervisor
       {DynamicSupervisor,
-       name: write_supervisor, strategy: :one_for_one, max_restarts: 1, max_seconds: 1},
+       name: write_supervisor, strategy: :one_for_one, max_restarts: 1, max_seconds: 10},
       # decider
       {Chat.Db.Pipeline.Decider,
        name: decider,

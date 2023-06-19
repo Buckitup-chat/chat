@@ -33,6 +33,7 @@ straightforward as possible.
 - copying stuck
 - backup stuck on ejecting drive while copying
 - set correct input of room invite lookup for cargo user
+- add FileIndex for file created in the cargo room
 - onliners and cargo fix on drive ejecting
 - cargo settings compatibility w/ previous version
 

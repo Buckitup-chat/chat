@@ -36,6 +36,7 @@ straightforward as possible.
 - add FileIndex for file created in the cargo room
 - onliners and cargo fix on drive ejecting
 - cargo settings compatibility w/ previous version
+- fix supervision restarts
 
 ## 2023-05-22_3fefe32___2023-05-24_98fba24
 

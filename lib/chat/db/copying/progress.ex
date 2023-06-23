@@ -10,7 +10,8 @@ defmodule Chat.Db.Copying.Progress do
             initial_file_count: -1,
             data_count: -1,
             file_count: -1,
-            complete?: false
+            complete?: false,
+            start_time: nil
 
   @file_weight 9
 
@@ -29,7 +30,8 @@ defmodule Chat.Db.Copying.Progress do
       initial_file_count: file_count,
       data_count: data_count,
       file_count: file_count,
-      complete?: data_count + file_count == 0
+      complete?: data_count + file_count == 0,
+      start_time: System.monotonic_time(:millisecond)
     }
   end
 
@@ -43,14 +45,16 @@ defmodule Chat.Db.Copying.Progress do
   end
 
   @spec recheck_delay_in_ms(%__MODULE__{}) :: non_neg_integer()
-  def recheck_delay_in_ms(%__MODULE__{data_count: data_count, file_count: file_count}) do
+  def recheck_delay_in_ms(%__MODULE__{data_count: data_count, file_count: file_count} = progress) do
     weight = data_count + file_count * @file_weight
+    percent = done_percent(progress)
 
     cond do
-      weight < 100 -> 100
-      weight < 1_000 -> 500
-      weight < 10_000 -> 1_000
-      weight < 100_000 -> 5_000
+      weight < 100 -> 300
+      weight < 1_000 -> 1_000
+      percent > 1 and percent < 98 -> estimate_percent_delay(progress, percent)
+      weight < 10_000 -> 5_000
+      weight < 100_000 -> 10_000
       true -> 29_000
     end
   end
@@ -84,6 +88,12 @@ defmodule Chat.Db.Copying.Progress do
   @spec get_unwritten_keys(%__MODULE__{}) :: list()
   def get_unwritten_keys(%__MODULE__{data_keys: data_keys, file_keys: file_keys}) do
     data_keys ++ file_keys
+  end
+
+  defp estimate_percent_delay(%__MODULE__{start_time: start_time}, percent) do
+    now = System.monotonic_time(:millisecond)
+
+    trunc((now - start_time) / percent)
   end
 
   defp eliminate_written_data(%__MODULE__{data_keys: []} = state), do: state

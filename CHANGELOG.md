@@ -26,6 +26,7 @@ straightforward as possible.
 - faster restart of supervision
 - support cargo camera url from chat
 - minimise cargo scope
+- include OS data page in the dashboard
 
 ### Fixed
 

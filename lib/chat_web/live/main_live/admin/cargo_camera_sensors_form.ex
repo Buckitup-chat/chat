@@ -2,13 +2,13 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
   @moduledoc """
   Handles showing and updating camera sensors settings form data.
   """
-
   use ChatWeb, :live_component
 
   import Phoenix.Component
 
   alias Chat.Admin.CargoSettings
   alias Chat.AdminRoom
+  alias Chat.Sync.Camera.Sensor
 
   def mount(socket) do
     cargo_settings = AdminRoom.get_cargo_settings()
@@ -16,7 +16,7 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
     socket
     |> assign(:cargo_settings, cargo_settings)
     |> assign(:changeset, cargo_settings |> CargoSettings.camera_sensors_changeset())
-    |> assign(:invalid_sensors, [])
+    |> assign(:invalid_sensors, %{})
     |> ok()
   end
 
@@ -42,7 +42,7 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
                     "camera-sensor-input w-full ml-1 bg-gray-300 border border-gray-300 text-gray-900 text-sm rounded-lg block focus:ring-transparent focus:border-transparent",
                     %{
                       "focus:ring-red-500 ring-red-500 focus:border-red-500 border-red-500" =>
-                        Enum.member?(@invalid_sensors, url)
+                        Map.has_key?(@invalid_sensors, index)
                     }
                   )
                 }
@@ -50,7 +50,7 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
                 placeholder="Paste the url here"
                 value={url}
                 name={index}
-                phx-debounce="2000"
+                phx-debounce="500"
               />
               <button
                 class="pl-2"
@@ -63,6 +63,11 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
                 <.icon id="close" class="w-4 h-4 fill-gray-500 " />
               </button>
             </div>
+            <%= if Map.has_key?(@invalid_sensors, index) do %>
+              <div class="flex-row text-xs text-red-500">
+                <%= Map.get(@invalid_sensors, index) %>
+              </div>
+            <% end %>
           <% end %>
           <button
             class="mx-auto mt-3 flex flex-row "
@@ -107,12 +112,11 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
 
   def handle_event(
         "delete",
-        %{"index" => index_str, "url" => url},
+        %{"index" => index_str, "url" => _url},
         %{
           assigns: %{
             cargo_settings: settings,
-            changeset: changeset,
-            invalid_sensors: invalid_sensors
+            changeset: changeset
           }
         } = socket
       ) do
@@ -132,7 +136,7 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
           })
         )
     end
-    |> assign(:invalid_sensors, invalid_sensors |> List.delete(url))
+    |> forget_invalid_sensor(index_str)
     |> noreply()
   end
 
@@ -151,7 +155,7 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
         camera_sensors: List.replace_at(sensors, index, url)
       })
     )
-    |> validate_sensor(url)
+    |> validate_sensor(url, index)
     |> noreply()
   end
 
@@ -170,20 +174,47 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
     |> Enum.with_index()
   end
 
-  defp camera_img(assigns) do
-    ~H"""
-    <%= if @url != "" do %>
-      <img class="w-12" src={@url} />
-    <% end %>
-    """
-  end
+  defp camera_img(%{url: url} = assigns) do
+    case Sensor.get_image(url) do
+      {:error, _} ->
+        ~H""
 
-  defp validate_sensor(%{assigns: %{invalid_sensors: invalid_sensors}} = socket, url) do
-    with %{scheme: scheme} when scheme in ["http", "https"] <- URI.parse(url),
-         {:ok, %{status_code: code}} when code in 200..299 <- HTTPoison.get(url) do
-      socket
-    else
-      _ -> socket |> assign(:invalid_sensors, [url | invalid_sensors])
+      {:ok, {type, content}} ->
+        assigns = assigns |> Map.put(:inline_url, "data:#{type};base64,#{Base.encode64(content)}")
+
+        ~H"""
+        <img class="w-12" src={@inline_url} />
+        """
     end
   end
+
+  defp validate_sensor(socket, url, index) do
+    case Sensor.get_image(url) do
+      {:ok, _} ->
+        socket |> forget_invalid_sensor(index)
+
+      {:error, error_message} ->
+        socket |> add_invalid_sensor(index, error_message)
+    end
+  end
+
+  defp add_invalid_sensor(
+         %{assigns: %{invalid_sensors: invalid_sensors}} = socket,
+         index,
+         message
+       )
+       when is_integer(index) do
+    assign(socket, :invalid_sensors, invalid_sensors |> Map.put(index, message))
+  end
+
+  defp add_invalid_sensor(socket, index_str, message),
+    do: add_invalid_sensor(socket, String.to_integer(index_str), message)
+
+  defp forget_invalid_sensor(%{assigns: %{invalid_sensors: invalid_sensors}} = socket, index)
+       when is_integer(index) do
+    assign(socket, :invalid_sensors, invalid_sensors |> Map.delete(index))
+  end
+
+  defp forget_invalid_sensor(socket, index_str),
+    do: forget_invalid_sensor(socket, String.to_integer(index_str))
 end

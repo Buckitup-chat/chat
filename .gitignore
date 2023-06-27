@@ -54,6 +54,7 @@ chat.iml
 .DS_Store
 .idea/
 .elixir-ls/
+.elixir-tools/
 .vscode/
 node_modules
 

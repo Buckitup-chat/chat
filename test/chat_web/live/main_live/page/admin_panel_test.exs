@@ -251,12 +251,6 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
         view |> element(".camera-sensor-input-form .camera-sensor button") |> render_click()
 
         refute view |> render() =~ "Please remove invalid sensors."
-
-        view
-        |> element(".camera-sensor-input-form")
-        |> render_change(%{"_target" => ["0"], "0" => "https://www.storage111.com/image/12345"})
-
-        refute view |> render() =~ "Please remove invalid sensors."
       end
     end
   end

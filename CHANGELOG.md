@@ -17,6 +17,7 @@ straightforward as possible.
 - Add cargo user to set cargo sensor settings
 - room invite lookup for cargo user
 - write data from camera sensors into the cargo room
+- ONVIF camera support
 
 
 ### Changed

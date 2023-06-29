@@ -12,6 +12,7 @@ defmodule Chat.Db.Copying do
   alias Chat.Db.WriteQueue
 
   def await_copied(from, to, keys_set \\ nil) do
+    "[copying] reading DBs" |> Logger.debug()
     to_queue = Common.names(to, :queue)
     stream = stream(from, to, nil, keys_set)
     stream_keys = read_stream(stream, :keys)

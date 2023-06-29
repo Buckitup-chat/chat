@@ -36,4 +36,4 @@ When the syncronization was succesful and all the data from camera sensors was s
 1. `Drive Reset`
 
 Indication: no red light, no green light.
-Something wrong with the syncing.
+Something wrong with the syncing. Scenario finished. Ready for the next flash drive.

@@ -32,7 +32,7 @@ defmodule Chat.MixProject do
   def application do
     [
       mod: {Chat.Application, []},
-      extra_applications: [:logger, :runtime_tools, :curvy]
+      extra_applications: [:logger, :runtime_tools, :curvy, :os_mon]
     ]
   end
 
@@ -52,14 +52,14 @@ defmodule Chat.MixProject do
       {:phoenix_ecto, "~> 4.0"},
       {:ecto, "~> 3.7"},
       {:temp, "~> 0.4.7"},
-      {:termit, "~> 2.0"},
+      # {:termit, "~> 2.0"},
       {:tzdata, "~> 1.1"},
       {:qr_code, "~> 2.2.1"},
       {:cubdb, "~> 2.0"},
       {:curvy, "~> 0.3.1"},
       {:struct_access, "~> 1.1"},
       {:uuid, "~> 1.1"},
-      {:x509, "~> 0.8"},
+      # {:x509, "~> 0.8"},
       {:phoenix, "~> 1.7.2"},
       {:phoenix_html, "~> 3.0"},
       {:phoenix_view, "~> 2.0"},
@@ -85,7 +85,9 @@ defmodule Chat.MixProject do
       {:rewire, "~> 0.9.0", only: [:test]},
       {:keyx, "~> 0.4.1"},
       {:combinatorics, "~> 0.1.0"},
-      {:httpoison, "~> 2.0"}
+      {:httpoison, "~> 2.0"},
+      {:onvif, github: "sergey-lukianov/onvif"},
+      {:tesla, "~> 1.7"}
     ]
   end
 

@@ -261,8 +261,9 @@ defmodule Chat.Sync.CargoRoom do
 
   defp mime_type_extension(type), do: MIME.extensions(type) |> List.first() || "bin"
 
-  defp save_file({file_key, share_key}, {file_size, file_secret}) do
-    ChunkedFilesMultisecret.generate(file_key, file_size, file_secret)
-    ChunkedFiles.save_upload_chunk(file_key, {0, file_size - 1}, file_size, share_key)
+  defp save_file({file_key, content}, {_file_size, file_secret}) do
+    size = byte_size(content)
+    ChunkedFilesMultisecret.generate(file_key, size, file_secret)
+    ChunkedFiles.save_upload_chunk(file_key, {0, max(size - 1, 0)}, size, content)
   end
 end

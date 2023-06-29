@@ -18,6 +18,8 @@ straightforward as possible.
 - room invite lookup for cargo user
 - write data from camera sensors into the cargo room
 - add Led indication for cargo scenario && docs
+- Add CPU temperature & utilization metrics to the dashboard
+- ONVIF camera support
 
 
 ### Changed
@@ -27,6 +29,7 @@ straightforward as possible.
 - faster restart of supervision
 - support cargo camera url from chat
 - minimise cargo scope
+- include OS data page in the dashboard
 
 ### Fixed
 

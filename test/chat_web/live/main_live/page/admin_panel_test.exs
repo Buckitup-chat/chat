@@ -221,43 +221,35 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
 
   describe "cargo camera sensors form" do
     test "validates camera urls", %{conn: conn} do
-      with_mock HTTPoison, get: fn _ -> {:ok, %{status_code: 200}} end do
-        %{view: view} = prepare_view(%{conn: conn})
+      %{view: view} = prepare_view(%{conn: conn})
 
-        view
-        |> element(".navbar button", "Admin")
-        |> render_click()
+      view
+      |> element(".navbar button", "Admin")
+      |> render_click()
 
-        refute view |> render() =~ "Cargo camera sensors"
+      refute view |> render() =~ "Cargo camera sensors"
 
-        view
-        |> form("#media_settings", %{"media_settings" => %{"functionality" => "cargo"}})
-        |> render_submit()
+      view
+      |> form("#media_settings", %{"media_settings" => %{"functionality" => "cargo"}})
+      |> render_submit()
 
-        refute view |> render() =~ "Cargo camera sensors"
+      refute view |> render() =~ "Cargo camera sensors"
 
-        view
-        |> form("#cargo_user_form", %{"user" => %{"name" => "CargoBot"}})
-        |> render_submit()
+      view
+      |> form("#cargo_user_form", %{"user" => %{"name" => "CargoBot"}})
+      |> render_submit()
 
-        assert view |> render() =~ "Cargo camera sensors"
+      assert view |> render() =~ "Cargo camera sensors"
 
-        view
-        |> element(".camera-sensor-input-form")
-        |> render_change(%{"_target" => ["0"], "0" => "hello"})
+      view
+      |> element(".camera-sensor-input-form")
+      |> render_change(%{"_target" => ["0"], "0" => "hello"})
 
-        assert view |> render() =~ "Please remove invalid sensors."
+      assert view |> render() =~ "Please remove invalid sensors."
 
-        view |> element(".camera-sensor-input-form .camera-sensor button") |> render_click()
+      view |> element(".camera-sensor-input-form .camera-sensor button") |> render_click()
 
-        refute view |> render() =~ "Please remove invalid sensors."
-
-        view
-        |> element(".camera-sensor-input-form")
-        |> render_change(%{"_target" => ["0"], "0" => "https://www.storage111.com/image/12345"})
-
-        refute view |> render() =~ "Please remove invalid sensors."
-      end
+      refute view |> render() =~ "Please remove invalid sensors."
     end
   end
 

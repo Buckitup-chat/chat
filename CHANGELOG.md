@@ -18,6 +18,7 @@ straightforward as possible.
 - room invite lookup for cargo user
 - write data from camera sensors into the cargo room
 - Add CPU temperature & utilization metrics to the dashboard
+- ONVIF camera support
 
 
 ### Changed

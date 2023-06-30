@@ -3,7 +3,6 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
 
   import ChatWeb.LiveTestHelpers
   import Phoenix.LiveViewTest
-  import Mock
 
   alias Chat.Admin.{BackupSettings, CargoSettings, MediaSettings}
   alias Chat.{AdminDb, AdminRoom, Db, Identity, User}

@@ -56,21 +56,6 @@ defmodule Chat.FileFs.Dir2 do
     _ -> {{:error, :no_dir}, :error}
   end
 
-  defp populate_level(path) do
-    path
-    |> File.ls!()
-    |> Enum.map(&Path.join([path, &1]))
-  rescue
-    _ -> []
-  end
-
-  defp list_files(path) do
-    path
-    |> populate_level()
-    |> Enum.map(&populate_level/1)
-    |> List.flatten()
-  end
-
   defp build_path(nil), do: Common.get_chat_db_env(:files_base_dir)
   defp build_path(str), do: str
 

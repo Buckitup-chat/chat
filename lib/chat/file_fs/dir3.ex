@@ -53,78 +53,9 @@ defmodule Chat.FileFs.Dir3 do
     _ -> {{:error, :no_file}, :error}
   end
 
-  def stream_file_chunks(key, prefix \\ nil) do
-    key_path(key, build_path(prefix))
-    |> list_files()
-    |> Enum.sort()
-    |> Stream.map(fn file ->
-      File.open!(file, [:binary, :read], &IO.binread(&1, :all))
-    end)
-  end
-
-  def delete_file(key, prefix \\ nil) do
-    key_path(key, build_path(prefix))
-    |> File.rm_rf!()
-  end
-
-  def count_size_stored(key, prefix \\ nil) do
-    key_path(key, build_path(prefix))
-    |> list_files()
-    |> Enum.map(fn filename ->
-      filename
-      |> Path.split()
-      |> Enum.take(-2)
-      |> Enum.map(&String.to_integer/1)
-      |> then(fn [first, last] -> max(last - first + 1, 0) end)
-    end)
-    |> Enum.sum()
-  end
-
-  def file_size(key, prefix \\ nil) do
-    key_path(key, build_path(prefix))
-    |> list_files()
-    |> Enum.sort(:desc)
-    |> List.first()
-    |> Path.split()
-    |> List.last()
-    |> String.to_integer()
-    |> Kernel.+(1)
-  rescue
-    _ -> 0
-  end
-
-  def relative_filenames(prefix) do
-    dir = build_path(prefix)
-
-    if File.dir?(dir) do
-      dir
-      |> list_files()
-      |> Enum.flat_map(&populate_level/1)
-      |> Enum.flat_map(&populate_level/1)
-      |> Enum.map(&String.slice(&1, (String.length(dir) + 1)..-1))
-    else
-      []
-    end
-  end
-
   ##
   ##   Implementations
   ##
-
-  defp populate_level(path) do
-    path
-    |> File.ls!()
-    |> Enum.map(&Path.join([path, &1]))
-  rescue
-    _ -> []
-  end
-
-  defp list_files(path) do
-    path
-    |> populate_level()
-    |> Enum.map(&populate_level/1)
-    |> List.flatten()
-  end
 
   defp build_path(nil), do: Common.get_chat_db_env(:files_base_dir)
   defp build_path(str), do: str

@@ -12,6 +12,18 @@ straightforward as possible.
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+
+## 2023-06-30_ad580b9___2023-06-29_6ab0603
+
+### Added
+
 - extend cargo settings (camera sensors && weight sensor)
 - concurrent copying tracking
 - Add cargo user to set cargo sensor settings
@@ -40,6 +52,7 @@ straightforward as possible.
 - onliners and cargo fix on drive ejecting
 - cargo settings compatibility w/ previous version
 - fix supervision restarts
+
 
 ## 2023-05-22_3fefe32___2023-05-24_98fba24
 

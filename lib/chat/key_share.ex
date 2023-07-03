@@ -7,8 +7,6 @@ defmodule Chat.KeyShare do
 
   alias Ecto.Changeset
 
-  alias Combinatorics
-
   @threshold 4
 
   def threshold, do: @threshold

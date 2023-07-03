@@ -5,19 +5,7 @@ defmodule Chat.FileFs.Dir3 do
   Uses following directory structure: prefix/file_key/start_offset/end_offset
   """
 
-  alias Chat.Db.Common
-
-  @int_padding 20
-
-  def write_file(data, {_, _, _} = keys, prefix \\ nil) do
-    keys
-    |> file_path(build_path(prefix))
-    |> tap(&create_dirs/1)
-    |> File.open([:write, :sync], fn file ->
-      :ok = IO.binwrite(file, data)
-      :file.datasync(file)
-    end)
-  end
+  import Chat.FileFs.Common
 
   def has_file?({_, _, _} = keys, prefix \\ nil) do
     keys
@@ -57,9 +45,6 @@ defmodule Chat.FileFs.Dir3 do
   ##   Implementations
   ##
 
-  defp build_path(nil), do: Common.get_chat_db_env(:files_base_dir)
-  defp build_path(str), do: str
-
   defp file_path({binary_key, first, last}, prefix) do
     key = binary_key |> Base.encode16(case: :lower)
 
@@ -68,25 +53,5 @@ defmodule Chat.FileFs.Dir3 do
       |> Enum.map(&offset_name/1)
 
     [prefix, hc(key), key, dir, file] |> Path.join()
-  end
-
-  defp key_path(binary_key, prefix) do
-    key = binary_key |> Base.encode16(case: :lower)
-
-    [prefix, hc(key), key] |> Path.join()
-  end
-
-  defp offset_name(int) do
-    int
-    |> to_string()
-    |> String.pad_leading(@int_padding, "0")
-  end
-
-  defp hc(str), do: String.slice(str, 0, 2)
-
-  defp create_dirs(path) do
-    path
-    |> Path.dirname()
-    |> File.mkdir_p!()
   end
 end

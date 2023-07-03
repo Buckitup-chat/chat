@@ -1,7 +1,8 @@
 defmodule Chat.FileFs do
   @moduledoc "Helpers for file storage"
 
-  alias Chat.Db.Common
+  import Chat.FileFs.Common
+
   alias Chat.FileFs.Dir2
   alias Chat.FileFs.Dir3
 
@@ -148,15 +149,4 @@ defmodule Chat.FileFs do
   rescue
     _ -> []
   end
-
-  defp build_path(nil), do: Common.get_chat_db_env(:files_base_dir)
-  defp build_path(str), do: str
-
-  defp key_path(binary_key, prefix) do
-    key = binary_key |> Base.encode16(case: :lower)
-
-    [prefix, hc(key), key] |> Path.join()
-  end
-
-  defp hc(str), do: String.slice(str, 0, 2)
 end

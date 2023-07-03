@@ -49,6 +49,7 @@ deploy:
 firmware:
 	rm -rf priv/db
 	rm -rf priv/admin_db
+	rm -rf priv/admin_db_v2
 	rm -rf priv/test_backup_db
 	rm -rf priv/test_admin_db
 	rm -rf priv/test_db

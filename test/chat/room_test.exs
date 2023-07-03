@@ -104,6 +104,9 @@ defmodule Chat.Rooms.RoomTest do
     assert [] = room.requests
   end
 
+  # todo: create test
+  test "room invite removal", do: :todo
+
   test "room list should return my created room" do
     alice = User.login("Alice")
     room_name = "Some my room"

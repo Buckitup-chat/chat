@@ -4,7 +4,7 @@ defmodule Chat.FileFs.Dir2 do
 
   Uses following directory structure: prefix/file_key/start_offset-end_offset
   """
-  alias Chat.Db.Common
+  import Chat.FileFs.Common
 
   @int_padding 20
 
@@ -56,9 +56,6 @@ defmodule Chat.FileFs.Dir2 do
     _ -> {{:error, :no_dir}, :error}
   end
 
-  defp build_path(nil), do: Common.get_chat_db_env(:files_base_dir)
-  defp build_path(str), do: str
-
   defp file_path({binary_key, first, last}, prefix) do
     key = binary_key |> Base.encode16(case: :lower)
 
@@ -68,20 +65,6 @@ defmodule Chat.FileFs.Dir2 do
 
     [prefix, hc(key), key, file] |> Path.join()
   end
-
-  defp key_path(binary_key, prefix) do
-    key = binary_key |> Base.encode16(case: :lower)
-
-    [prefix, hc(key), key] |> Path.join()
-  end
-
-  defp offset_name(int) do
-    int
-    |> to_string()
-    |> String.pad_leading(@int_padding, "0")
-  end
-
-  defp hc(str), do: String.slice(str, 0, 2)
 
   defp create_dirs(path) do
     path

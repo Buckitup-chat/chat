@@ -1,0 +1,39 @@
+# Cargo scenario
+
+## Led indication
+
+`GPIO23`(physical pin 16) -> plug the red led
+
+`GPIO25`(physical pin 22) -> plug the green led
+
+## Drivers flow scenario
+
+### Requirements
+
+The cargo bot with access to the cargo room on the flash drive.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Flow cases
+
+The driver drives to the point and presents the flash drive to the operator, the operator plugs the flash drive into the system. In this scenario:
+
+1. `Drive Accepted`
+
+Indication: solid red light, no green light.
+This indicates that the flash drive has been accepted and is being processed.
+
+1. `Drive Refused`
+
+Indication: blinking red light, no green light.
+This indicates that is something wrong with the cargo settings or with the keys
+
+1. `Drive Complete`
+
+Indication: no red light, solid green light.
+When the syncronization was succesful and all the data from camera sensors was stored into the system.
+
+1. `Drive Reset`
+
+Indication: no red light, no green light.
+Scenario finished. Ready for the next flash drive.

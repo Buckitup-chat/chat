@@ -29,6 +29,7 @@ straightforward as possible.
 - Add cargo user to set cargo sensor settings
 - room invite lookup for cargo user
 - write data from camera sensors into the cargo room
+- add Led indication for cargo scenario && docs
 - Add CPU temperature & utilization metrics to the dashboard
 - ONVIF camera support
 

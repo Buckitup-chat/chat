@@ -59,14 +59,14 @@ defmodule Chat.Db.WriteQueue.FileReader do
 
   @impl true
   def handle_call(
-        {:add_task, {:file_chunk, chunk_key, first, _} = key, files_path},
+        {:add_task, {:file_chunk, chunk_key, first, last} = key, files_path},
         _,
         %{read_supervisor: task_supervisor} = state
       ) do
     state
     |> reply(
       Task.Supervisor.async(task_supervisor, fn ->
-        {key, Chat.FileFs.read_file_chunk(first, chunk_key, files_path) |> elem(0)}
+        {key, Chat.FileFs.read_exact_file_chunk({first, last}, chunk_key, files_path) |> elem(0)}
       end)
     )
   end

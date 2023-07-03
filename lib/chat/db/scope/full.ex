@@ -63,26 +63,8 @@ defmodule Chat.Db.Scope.Full do
     db
     |> CubDB.data_dir()
     |> then(&"#{&1}_files")
-    |> FileFs.relative_filenames()
-    |> Enum.map(&filename_to_chunk_key/1)
-    |> Enum.reject(&is_nil/1)
+    |> FileFs.list_all_db_keys()
     |> MapSet.new()
     |> MapSet.union(keys)
-  end
-
-  defp filename_to_chunk_key(<<
-         _::binary-size(3),
-         hash::binary-size(64),
-         ?/,
-         start::binary-size(20),
-         ?/,
-         finish::binary-size(20)
-       >>) do
-    {
-      :file_chunk,
-      hash |> Base.decode16!(case: :lower),
-      start |> String.to_integer(),
-      finish |> String.to_integer()
-    }
   end
 end

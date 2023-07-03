@@ -83,7 +83,7 @@ defmodule Chat.DB.SyncTest do
     db
     |> CubDB.data_dir()
     |> then(&"#{&1}_files")
-    |> Chat.FileFs.relative_filenames()
+    |> Chat.FileFs.list_all_db_keys()
     |> Enum.sort()
   end
 end

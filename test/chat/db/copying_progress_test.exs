@@ -58,7 +58,7 @@ defmodule Chat.Db.Copying.ProgressTest do
       |> Progress.new(:db?)
       |> Progress.recheck_delay_in_ms()
 
-    assert delay == 5_000
+    assert delay == 10_000
 
     delay =
       {:file_chunk, nil, nil, nil}

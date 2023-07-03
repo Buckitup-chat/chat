@@ -99,9 +99,9 @@ defmodule Chat.Db.WriteQueue do
     |> noreply()
   end
 
-  def handle_cast({:mirrors, sink}, state) do
+  def handle_cast({:mirrors, _sink}, state) do
     state
-    |> q_state(mirrors: sink)
+    # |> q_state(mirrors: sink)
     |> noreply()
   end
 

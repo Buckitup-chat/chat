@@ -14,6 +14,7 @@ straightforward as possible.
 - Filesystem optimization
 
 ### Changed
+- mirroring disabled
 
 
 ### Fixed

@@ -11,6 +11,8 @@ defmodule Chat.Sync.CargoRoomTest do
 
   describe "write_file/3" do
     test "saves image as a room message" do
+      refute CargoRoom.get_room_key()
+
       operator = User.login("Operator")
       operator_key = User.register(operator)
       User.await_saved(operator_key)

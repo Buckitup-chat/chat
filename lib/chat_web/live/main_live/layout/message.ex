@@ -754,10 +754,13 @@ defmodule ChatWeb.MainLive.Layout.Message do
     ~H"""
     <img
       class="object-cover overflow-hidden"
+      id={"chat-image-#{@msg.id}"}
       src={@file[:url]}
+      loading="lazy"
       phx-click={open_gallery(@chat_type)}
       phx-value-id={@msg.id}
       phx-value-index={@msg.index}
+      phx-hook="ImageForceLoader"
     />
     """
   end

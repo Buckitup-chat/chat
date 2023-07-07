@@ -23,6 +23,7 @@ defmodule Chat.Application do
       Chat.Ordering.Counters,
       Chat.Db.Supervisor,
       Chat.AdminDb,
+      {Task, fn -> {:ok, _pid} = Chat.AdminDb.AdminLogger |> Logger.add_backend() end},
       # Application Services
       Chat.KeyRingTokens,
       Chat.Broker,

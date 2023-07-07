@@ -34,6 +34,7 @@ import * as LocalStateStore from "./hooks/local-storage"
 import * as LocalTime from "./hooks/local-time"
 import * as Chat from "./hooks/chat"
 import * as Flash from "./hooks/flash"
+import * as ImageForceLoader from "./hooks/image-force-loader"
 
 let Hooks = {
   AudioFile,
@@ -51,6 +52,7 @@ Hooks.LocalStateStore = LocalStateStore.hooks
 Hooks.LocalTime = LocalTime.hooks
 Hooks.Chat = Chat.hooks
 Hooks.Flash = Flash.hooks
+Hooks.ImageForceLoader = ImageForceLoader.hooks
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {

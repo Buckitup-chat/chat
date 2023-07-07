@@ -16,8 +16,8 @@ straightforward as possible.
 ### Changed
 - mirroring disabled
 
-
 ### Fixed
+- force image loading in chat
 
 
 

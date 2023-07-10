@@ -24,6 +24,9 @@ defmodule ChatWeb.Router do
     pipe_through :browser
 
     get "/log", DeviceLogController, :log
+    get "/db_log/prev/prev", DeviceLogController, :db_log_prev_prev
+    get "/db_log/prev", DeviceLogController, :db_log_prev
+    get "/db_log", DeviceLogController, :db_log
     get "/reset", DeviceLogController, :reset
     get "/data_keys", DeviceLogController, :dump_data_keys
     get "/index", PageController, :index

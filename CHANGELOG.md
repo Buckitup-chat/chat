@@ -12,9 +12,11 @@ straightforward as possible.
 
 ### Added
 - Filesystem optimization
+- Router support
 
 ### Changed
 - mirroring disabled
+- more logs on copying
 
 ### Fixed
 - force image loading in chat

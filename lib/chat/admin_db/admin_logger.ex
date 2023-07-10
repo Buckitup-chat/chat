@@ -77,7 +77,7 @@ defmodule Chat.AdminDb.AdminLogger do
     |> Enum.to_list()
   end
 
-  def get_next_generation() do
+  def get_next_generation do
     CubDB.select(Chat.AdminDb.db(), max_key: {:log, nil, nil}, reverse: true)
     |> Stream.take(1)
     |> Enum.to_list()
@@ -99,7 +99,7 @@ defmodule Chat.AdminDb.AdminLogger do
     |> then(&CubDB.delete_multi(Chat.AdminDb.db(), &1))
   end
 
-  defp sync_db() do
+  defp sync_db do
     CubDB.file_sync(Chat.AdminDb.db())
   end
 end

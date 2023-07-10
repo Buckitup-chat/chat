@@ -4,6 +4,8 @@ defmodule ChatWeb.DeviceLogController do
 
   alias Phoenix.PubSub
 
+  alias Chat.AdminDb.AdminLogger
+
   @incoming_topic "platform->chat"
   @outgoing_topic "chat->platform"
 
@@ -62,19 +64,19 @@ defmodule ChatWeb.DeviceLogController do
   end
 
   def db_log(conn, _) do
-    Chat.AdminDb.AdminLogger.get_log()
+    AdminLogger.get_log()
     |> format_db_log()
     |> send_text(conn)
   end
 
   def db_log_prev(conn, _) do
-    Chat.AdminDb.AdminLogger.get_log(:prev)
+    AdminLogger.get_log(:prev)
     |> format_db_log()
     |> send_text(conn)
   end
 
   def db_log_prev_prev(conn, _) do
-    Chat.AdminDb.AdminLogger.get_log(:prev_prev)
+    AdminLogger.get_log(:prev_prev)
     |> format_db_log()
     |> send_text(conn)
   end

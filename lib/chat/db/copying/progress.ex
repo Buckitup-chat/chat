@@ -138,9 +138,9 @@ defmodule Chat.Db.Copying.Progress do
       "s to check copied in ",
       progress.db |> to_string(),
       "  \t",
-      progress.file_count,
+      progress.file_count |> to_string(),
       " + ",
-      progress.data_count
+      progress.data_count |> to_string()
     ]
     |> Logger.debug()
   end

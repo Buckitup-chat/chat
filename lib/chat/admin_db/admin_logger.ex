@@ -13,7 +13,6 @@ defmodule Chat.AdminDb.AdminLogger do
 
   @impl :gen_event
   def init(_opts) do
-    Process.send_after(:clear_old_generations, self(), :timer.minutes(5))
     generation = get_next_generation()
     Application.put_env(:chat, __MODULE__, generation)
 
@@ -37,11 +36,6 @@ defmodule Chat.AdminDb.AdminLogger do
   end
 
   @impl :gen_event
-  def handle_info(:clear_old_generations, %{current_genearion: gen} = state) do
-    remove_old_generations(gen)
-    {:ok, state}
-  end
-
   def handle_info(_, state) do
     {:ok, state}
   end
@@ -87,16 +81,16 @@ defmodule Chat.AdminDb.AdminLogger do
     end
   end
 
-  defp write_message(key, value) do
-    Chat.AdminDb.put(key, value)
-  end
-
-  defp remove_old_generations(generation) do
+  def remove_old_generations(generation) do
     Chat.AdminDb.db()
     |> CubDB.select(min_key: {:log, 0, 0}, max_key: {:log, generation - 3, nil})
     |> Stream.map(fn {k, _} -> k end)
     |> Enum.to_list()
     |> then(&CubDB.delete_multi(Chat.AdminDb.db(), &1))
+  end
+
+  defp write_message(key, value) do
+    Chat.AdminDb.put(key, value)
   end
 
   defp sync_db do

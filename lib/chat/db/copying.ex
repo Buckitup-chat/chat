@@ -27,6 +27,7 @@ defmodule Chat.Db.Copying do
       :done -> :ok
       {:stuck, progress} -> await_copied(from, to, Progress.get_unwritten_keys(progress))
     end
+    |> tap(fn _ -> log_finished(from, to) end)
   end
 
   defp ensure_complete(prev_progress, started? \\ false, stuck_for_ms \\ 0) do
@@ -70,6 +71,17 @@ defmodule Chat.Db.Copying do
       inspect(data |> Enum.count())
     ]
     |> Logger.info()
+  end
+
+  defp log_finished(from, to) do
+    [
+      "[copying] ",
+      inspect(from),
+      " -> ",
+      inspect(to),
+      " is done"
+    ]
+    |> Logger.debug()
   end
 
   defp stream(from, to, awaiter, keys_set)

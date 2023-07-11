@@ -3,6 +3,8 @@ defmodule Chat.Db.Copying.Progress do
   Copy process progress state
   """
 
+  require Logger
+
   defstruct file_keys: [],
             data_keys: [],
             db: nil,
@@ -57,6 +59,7 @@ defmodule Chat.Db.Copying.Progress do
       weight < 100_000 -> 10_000
       true -> 29_000
     end
+    |> tap(&log_recheck_copyed_in(&1, progress.db))
   end
 
   @spec done_percent(%__MODULE__{}) :: non_neg_integer()
@@ -122,5 +125,17 @@ defmodule Chat.Db.Copying.Progress do
 
   defp update_counts(%__MODULE__{data_keys: data_keys, file_keys: file_keys} = state) do
     %{state | data_count: Enum.count(data_keys), file_count: Enum.count(file_keys)}
+  end
+
+  defp log_recheck_copyed_in(millis, db) do
+    seconds = millis / 1000
+
+    [
+      "[copying] ",
+      seconds |> to_string(),
+      "s to check copied in ",
+      db |> to_string()
+    ]
+    |> Logger.debug()
   end
 end

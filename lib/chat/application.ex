@@ -7,6 +7,8 @@ defmodule Chat.Application do
 
   require Logger
 
+  alias Chat.AdminDb.AdminLogger
+
   @env Application.compile_env(:chat, :env)
 
   @impl true
@@ -23,6 +25,14 @@ defmodule Chat.Application do
       Chat.Ordering.Counters,
       Chat.Db.Supervisor,
       Chat.AdminDb,
+      {Task,
+       fn ->
+         {:ok, _pid} = AdminLogger |> Logger.add_backend()
+         Process.sleep(:timer.minutes(5))
+
+         AdminLogger.get_current_generation()
+         |> AdminLogger.remove_old_generations()
+       end},
       # Application Services
       Chat.KeyRingTokens,
       Chat.Broker,

@@ -52,14 +52,16 @@ defmodule Chat.Db.Copying.Progress do
     percent = done_percent(progress)
 
     cond do
+      percent > 1 and percent < 98 -> estimate_percent_delay(progress, percent)
+      percent >= 98 -> trunc(estimate_percent_delay(progress, percent) * 0.6)
       weight < 100 -> 300
       weight < 1_000 -> 1_000
-      percent > 1 and percent < 98 -> estimate_percent_delay(progress, percent)
       weight < 10_000 -> 5_000
       weight < 100_000 -> 10_000
       true -> 29_000
     end
-    |> tap(&log_recheck_copyed_in(&1, progress.db))
+    |> max(300)
+    |> tap(&log_recheck_copyed_in(&1, progress))
   end
 
   @spec done_percent(%__MODULE__{}) :: non_neg_integer()
@@ -127,14 +129,18 @@ defmodule Chat.Db.Copying.Progress do
     %{state | data_count: Enum.count(data_keys), file_count: Enum.count(file_keys)}
   end
 
-  defp log_recheck_copyed_in(millis, db) do
+  defp log_recheck_copyed_in(millis, progress) do
     seconds = millis / 1000
 
     [
       "[copying] ",
       seconds |> to_string(),
       "s to check copied in ",
-      db |> to_string()
+      progress.db |> to_string(),
+      "  \t",
+      progress.file_count |> to_string(),
+      " + ",
+      progress.data_count |> to_string()
     ]
     |> Logger.debug()
   end

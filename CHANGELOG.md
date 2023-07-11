@@ -16,7 +16,7 @@ straightforward as possible.
 
 ### Changed
 - mirroring disabled
-- more logs on copying
+- more logs on copying w/ progress
 
 ### Fixed
 - force image loading in chat

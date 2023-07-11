@@ -41,17 +41,18 @@ defmodule Chat.Db.Copying do
       Progress.complete?(progress) ->
         :done
 
-      stuck_for_ms > 100_000 ->
+      stuck_for_ms > 40_000 ->
         {:stuck, progress}
 
       true ->
-        no_change = count == prev_count
+        no_change = count >= prev_count
+        changed? = not no_change
         delay = Progress.recheck_delay_in_ms(progress)
         Process.sleep(delay)
 
         ensure_complete(
           progress,
-          started? or !no_change,
+          started? or changed?,
           (started? && no_change && stuck_for_ms + delay) || 0
         )
     end

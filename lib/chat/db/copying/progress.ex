@@ -53,7 +53,7 @@ defmodule Chat.Db.Copying.Progress do
 
     cond do
       percent > 1 and percent < 98 -> estimate_percent_delay(progress, percent)
-      percent >= 98 -> estimate_percent_delay(progress, percent) * 0.6
+      percent >= 98 -> trunc(estimate_percent_delay(progress, percent) * 0.6)
       weight < 100 -> 300
       weight < 1_000 -> 1_000
       weight < 10_000 -> 5_000

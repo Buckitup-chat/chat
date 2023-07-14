@@ -50,7 +50,14 @@ defmodule Chat.Db.Copying do
         delay = Progress.recheck_delay_in_ms(progress)
         Process.sleep(delay)
 
-        Logger.debug(inspect({prev_count, count, stuck_for_ms}))
+        Logger.debug(inspect({prev_count, count, stuck_for_ms, delay, started?}))
+
+        if !changed? do
+          progress
+          |> Map.drop([:file_keys, :data_keys])
+          |> inspect(pretty: true)
+          |> Logger.warning()
+        end
 
         ensure_complete(
           progress,

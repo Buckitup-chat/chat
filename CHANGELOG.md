@@ -13,6 +13,7 @@ straightforward as possible.
 ### Added
 - Filesystem optimization
 - Router support
+- Upload by Drag&Drop to chats/rooms
 
 ### Changed
 - mirroring disabled

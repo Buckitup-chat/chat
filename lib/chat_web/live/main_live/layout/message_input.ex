@@ -24,6 +24,7 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
     <div
       id="dialogInput"
       class="basis-[7%] w-full py-1.5 px-8 border border-white bg-white flex items-center fixed md:sticky bottom-0"
+      phx-drop-target={@uploads.file.ref}
     >
       <%= if @input_mode == :plain do %>
         <Layout.Uploader.button enabled={@writable} operating_system={@operating_system} type={@type} />
@@ -148,7 +149,10 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
       |> assign_new(:writable, fn %{db_status: %{writable: writable}} -> writable == :yes end)
 
     ~H"""
-    <div class="basis-[7%] w-full py-1.5 px-8 border border-white bg-white flex items-center fixed md:sticky bottom-0">
+    <div
+      class="basis-[7%] w-full py-1.5 px-8 border border-white bg-white flex items-center fixed md:sticky bottom-0"
+      phx-drop-target={@uploads.file.ref}
+    >
       <%= if @input_mode == :plain do %>
         <Layout.Uploader.button enabled={@writable} operating_system={@operating_system} type={@type} />
         <.form

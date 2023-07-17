@@ -24,13 +24,17 @@ defmodule Chat.Db.Copying do
     Progress.new(stream_keys, to)
     |> ensure_complete()
     |> case do
-      :done -> :ok
-      {:stuck, progress} -> await_copied(from, to, Progress.get_unwritten_keys(progress))
+      :done ->
+        log_finished(from, to)
+        :ok
+
+      {:stuck, progress} ->
+        log_restart_on_stuck(from, to, progress)
+        await_copied(from, to, Progress.get_unwritten_keys(progress) |> Enum.shuffle())
     end
-    |> tap(fn _ -> log_finished(from, to) end)
   end
 
-  defp ensure_complete(prev_progress, started? \\ false, stuck_for_ms \\ 0) do
+  defp ensure_complete(prev_progress, stuck_for_ms \\ 0) do
     progress = Progress.eliminate_written(prev_progress)
     # {time, progress} = :timer.tc(fn -> Progress.eliminate_written(prev_progress) end)
     # time |> IO.inspect(label: "time")
@@ -50,19 +54,13 @@ defmodule Chat.Db.Copying do
         delay = Progress.recheck_delay_in_ms(progress)
         Process.sleep(delay)
 
-        Logger.debug(inspect({prev_count, count, stuck_for_ms, delay, started?}))
-
-        if !changed? do
-          progress
-          |> Map.drop([:file_keys, :data_keys])
-          |> inspect(pretty: true)
-          |> Logger.warning()
+        if !changed? and stuck_for_ms > 10_000 do
+          Logger.debug(inspect({prev_count, count, stuck_for_ms, delay}))
         end
 
         ensure_complete(
           progress,
-          started? or changed?,
-          (started? && !changed? && stuck_for_ms + delay) || 0
+          if(changed?, do: 0, else: stuck_for_ms + delay)
         )
     end
   end
@@ -90,6 +88,24 @@ defmodule Chat.Db.Copying do
       " -> ",
       inspect(to),
       " is done"
+    ]
+    |> Logger.debug()
+  end
+
+  defp log_restart_on_stuck(from, to, progress) do
+    progress_dump =
+      progress
+      |> Map.update(:data_keys, [], &Enum.take(&1, 10))
+      |> Map.update(:file_keys, [], &Enum.take(&1, 10))
+      |> inspect(pretty: true)
+
+    [
+      "[copying] ",
+      inspect(from),
+      " -> ",
+      inspect(to),
+      " stuck. restarting... ",
+      progress_dump
     ]
     |> Logger.debug()
   end

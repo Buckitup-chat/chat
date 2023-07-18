@@ -14,7 +14,7 @@ defmodule Chat.FileFs.Dir2 do
     |> tap(&create_dirs/1)
     |> File.open([:write, :sync], fn file ->
       :ok = IO.binwrite(file, data)
-      :file.datasync(file)
+      :ok = :file.datasync(file)
     end)
   end
 

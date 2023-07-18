@@ -43,36 +43,11 @@ defmodule ChatWeb.FileController do
          chunk_secret <- chunk_secret_raw |> Base.decode64!(),
          true <- type |> String.contains?("/") do
       size = ChunkedFiles.size(chunk_key)
-
       range = get_req_header(conn, "range")
       proto = get_http_protocol(conn)
 
-      case {proto, range} do
-        #        {:"HTTP/22", _} ->
-        #          "here" |> IO.inspect()
-        #
-        #          conn =
-        #            conn
-        #            |> set_disposition(name, opts[:disposition])
-        #            |> put_resp_header("content-length", "#{size}")
-        #            |> set_content_type(type, opts[:content_type])
-        #            |> send_chunked(200)
-        #
-        #          size
-        #          |> ChunkedFiles.file_chunk_ranges()
-        #          |> Enum.reduce_while(conn, fn range, conn ->
-        #            chunk = ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret}, range) |> elem(1)
-        #
-        #            case Plug.Conn.chunk(conn, chunk) do
-        #              {:ok, conn} ->
-        #                {:cont, conn}
-        #
-        #              {:error, :closed} ->
-        #                {:halt, conn}
-        #            end
-        #          end)
-
-        {_, []} ->
+      case {proto, range, type} do
+        {_, [], _} ->
           conn
           |> set_disposition(name, opts[:disposition])
           |> put_resp_header("content-length", "#{size}")
@@ -80,18 +55,28 @@ defmodule ChatWeb.FileController do
           |> send_chunked(200)
           |> passthrou_whole_file(size, chunk_key, chunk_secret)
 
-        {_, range} ->
-          {{first, last}, data} =
-            case parse_range(range) do
-              nil ->
-                ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret})
+        {_, ["bytes=0-" <> _] = range, "video/" <> _} ->
+          {first, last, data} = handle_chunking(range, size, chunk_key, chunk_secret)
 
-              {from, to} when is_integer(from) and is_integer(to) and from >= 0 and to >= from ->
-                ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret}, {from, to})
+          conn
+          |> set_disposition(name, opts[:disposition])
+          |> set_content_type(type, opts[:content_type])
+          |> put_resp_header("accept-ranges", "bytes")
+          |> put_resp_header("content-range", "bytes #{first}-#{last}/#{size}")
+          |> put_resp_header("content-length", "#{size}")
+          |> resp(:partial_content, data)
+          |> send_resp()
 
-              {from, nil} when is_integer(from) ->
-                ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret}, {from, nil})
-            end
+        {_, _range, "video/" <> _} ->
+          conn
+          |> set_disposition(name, opts[:disposition])
+          |> put_resp_header("content-length", "#{size}")
+          |> set_content_type(type, opts[:content_type])
+          |> send_chunked(200)
+          |> passthrou_whole_file(size, chunk_key, chunk_secret)
+
+        {_, range, type} ->
+          {first, last, data} = handle_chunking(range, size, chunk_key, chunk_secret)
 
           conn
           |> set_disposition(name, opts[:disposition])
@@ -110,6 +95,23 @@ defmodule ChatWeb.FileController do
     _ ->
       conn
       |> send_resp(404, "")
+  end
+
+  defp handle_chunking(range, size, chunk_key, chunk_secret) do
+    {first, last} =
+      case parse_range(range) do
+        nil ->
+          {0, size - 1}
+
+        {from, to} when is_integer(from) and is_integer(to) and from >= 0 and to >= from ->
+          {from, to}
+
+        {from, nil} when is_integer(from) ->
+          {from, size - 1}
+      end
+
+    data = ChunkedFiles.chunk_with_byterange({chunk_key, chunk_secret}, {first, last}) |> elem(1)
+    {first, last, data}
   end
 
   defp passthrou_whole_file(conn, size, chunk_key, chunk_secret) do

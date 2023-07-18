@@ -22,6 +22,7 @@ straightforward as possible.
 ### Fixed
 - force image loading in chat
 - set correct documentation link for cargo scenario
+- force video loading in chat
 
 
 

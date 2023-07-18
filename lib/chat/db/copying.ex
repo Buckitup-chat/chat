@@ -31,11 +31,9 @@ defmodule Chat.Db.Copying do
   end
 
   defp ensure_complete(prev_progress, started? \\ false, stuck_for_ms \\ 0) do
-    prev_count = Progress.left_keys(prev_progress)
     progress = Progress.eliminate_written(prev_progress)
     # {time, progress} = :timer.tc(fn -> Progress.eliminate_written(prev_progress) end)
     # time |> IO.inspect(label: "time")
-    count = Progress.left_keys(progress)
 
     cond do
       Progress.complete?(progress) ->
@@ -45,15 +43,19 @@ defmodule Chat.Db.Copying do
         {:stuck, progress}
 
       true ->
-        no_change = count >= prev_count
-        changed? = not no_change
+        prev_count = Progress.left_keys(prev_progress)
+        count = Progress.left_keys(progress)
+        changed? = prev_count > count
+
         delay = Progress.recheck_delay_in_ms(progress)
         Process.sleep(delay)
+
+        Logger.debug(inspect({prev_count, count, stuck_for_ms}))
 
         ensure_complete(
           progress,
           started? or changed?,
-          (started? && no_change && stuck_for_ms + delay) || 0
+          (started? && !changed? && stuck_for_ms + delay) || 0
         )
     end
   end

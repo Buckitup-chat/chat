@@ -15,6 +15,10 @@ defmodule Chat.ChunkedFiles do
     ChunkedFilesBroker.generate(key)
   end
 
+  def resume_upload(key, secret) do
+    ChunkedFilesBroker.put(key, secret)
+  end
+
   def get_file(key) do
     ChunkedFilesBroker.get(key)
   end

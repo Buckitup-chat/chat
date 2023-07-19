@@ -22,8 +22,7 @@ straightforward as possible.
 ### Fixed
 - force image loading in chat
 - set correct documentation link for cargo scenario
-
-
+- Half-uploaded files bug
 
 ## 2023-06-30_ad580b9___2023-06-29_6ab0603
 

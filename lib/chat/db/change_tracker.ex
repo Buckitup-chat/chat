@@ -7,6 +7,8 @@ defmodule Chat.Db.ChangeTracker do
   Keeps a list of keys to check and actions to perform on key found in DB or timed out (after @timeout)
   Runs callbacks for `promise` and responses to calls for `await`
   """
+  require Logger
+
   import Tools.GenServerHelpers
 
   use GenServer
@@ -74,6 +76,8 @@ defmodule Chat.Db.ChangeTracker do
   end
 
   def set_written(keys) do
+    Logger.debug(inspect(keys))
+
     __MODULE__
     |> GenServer.cast({:written, keys})
   end

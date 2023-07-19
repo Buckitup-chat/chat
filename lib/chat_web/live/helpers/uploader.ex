@@ -187,7 +187,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
   defp reader_hash(%{lobby_mode: :rooms, room: %{pub_key: room_pub_key}}),
     do: room_pub_key
 
-  defp maybe_resume_existing_upload(upload_key, assigns) do
+  defp maybe_resume_existing_upload(upload_key, %{me: me} = assigns) do
     case UploadIndex.get(upload_key) do
       nil ->
         encrypted_secret =
@@ -200,6 +200,9 @@ defmodule ChatWeb.LiveHelpers.Uploader do
 
       %Upload{} = upload ->
         UploadIndex.delete(upload_key)
+        secret = upload.encrypted_secret |> ChunkedFiles.decrypt_secret(me)
+        ChunkedFiles.resume_upload(upload_key, secret)
+        UploadStatus.put(upload_key, :active)
         add_upload_to_index(assigns, upload_key, upload.encrypted_secret)
         next_chunk = ChunkedFiles.next_chunk(upload_key)
         {next_chunk, upload.encrypted_secret}

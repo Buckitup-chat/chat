@@ -10,6 +10,10 @@ defmodule Chat.ChunkedFilesBroker do
     secret
   end
 
+  def put(key, secret) do
+    GenServer.call(__MODULE__, {:put, key, secret})
+  end
+
   def get(key) do
     __MODULE__
     |> GenServer.call({:get, key})

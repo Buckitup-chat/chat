@@ -12,9 +12,11 @@ defmodule Chat.Db.WriteQueue do
 
   use GenServer
 
+  def push({nil, nil}, _server), do: :ok
   def push({key, nil}, _server), do: ChangeTracker.set_written(key)
   def push(data, server), do: GenServer.cast(server, {:push, data})
 
+  def put({nil, nil}, _server), do: :ok
   def put({key, nil}, _server), do: ChangeTracker.set_written(key)
   def put(data, server), do: GenServer.cast(server, {:put, data})
 
@@ -25,6 +27,7 @@ defmodule Chat.Db.WriteQueue do
 
   def set_mirrors(sink, server), do: GenServer.cast(server, {:mirrors, sink})
 
+  def put_chunk({nil, nil}, _server), do: :ok
   def put_chunk({key, nil}, _server), do: ChangeTracker.set_written(key)
   def put_chunk(chunk, server), do: GenServer.call(server, {:put_chunk, chunk}, :infinity)
   def put_stream(stream, server), do: GenServer.call(server, {:put_stream, stream})

@@ -76,8 +76,6 @@ defmodule Chat.Db.ChangeTracker do
   end
 
   def set_written(keys) do
-    Logger.debug(inspect(keys))
-
     __MODULE__
     |> GenServer.cast({:written, keys})
   end

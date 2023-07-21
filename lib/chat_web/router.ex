@@ -40,6 +40,7 @@ defmodule ChatWeb.Router do
     live "/", MainLive.Index, :index
     live "/export-key-ring/:id", MainLive.Index, :export
     live "/room/:hash", MainLive.Index, :room_message_link
+    live "/chat/:hash", MainLive.Index, :chat_link
   end
 
   scope "/", ChatWeb do

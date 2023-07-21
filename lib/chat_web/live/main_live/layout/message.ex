@@ -415,7 +415,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
   defp header_content(assigns) do
     ~H"""
-    <Layout.Card.hashed_name card={@author} style_spec={:message_header} />
+    <Layout.Card.hashed_name card={@author} style_spec={:message_header} show_link?={true} />
     <button
       type="button"
       class="messageActionsDropdownButton hiddenUnderSelection t-message-dropdown"

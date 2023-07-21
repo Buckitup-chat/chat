@@ -4,6 +4,7 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
   import Phoenix.LiveView, only: [push_event: 3, push_navigate: 2]
 
   alias ChatWeb.MainLive.Layout.Message
+  alias ChatWeb.MainLive.Modals.ShowChatLink
   alias ChatWeb.MainLive.Page
 
   #
@@ -52,6 +53,9 @@ defmodule ChatWeb.MainLive.Page.DialogRouter do
 
       {"switch", %{"user-id" => user_id}} ->
         socket |> Page.Dialog.close() |> Page.Dialog.init(user_id)
+
+      {"show-link", %{"hash" => hash}} ->
+        socket |> Page.Dialog.show_link_modal(hash, ShowChatLink)
     end
   end
 

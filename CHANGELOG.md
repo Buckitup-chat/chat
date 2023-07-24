@@ -14,6 +14,7 @@ straightforward as possible.
 - Filesystem optimization
 - Router support
 - Upload by Drag&Drop to chats/rooms
+- chat links
 
 ### Changed
 - mirroring disabled

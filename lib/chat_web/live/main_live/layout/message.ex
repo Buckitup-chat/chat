@@ -266,9 +266,9 @@ defmodule ChatWeb.MainLive.Layout.Message do
       class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}
     >
       <div class="py-1 px-2">
-        <Layout.Card.hashed_name card={@author} style_spec={:room_request_message} />
+        <Layout.Card.hashed_name card={@author} style_spec={:room_request_message} show_link?={true} />
         <p class="inline-flex">requested access to room</p>
-        <Layout.Card.hashed_name room={@room} style_spec={:room_request_message} />
+        <Layout.Card.hashed_name room={@room} style_spec={:room_request_message} show_link?={true} />
       </div>
       <.timestamp msg={@msg} timezone={@timezone} />
     </div>
@@ -297,11 +297,11 @@ defmodule ChatWeb.MainLive.Layout.Message do
           <%= if @receiver == @author do %>
             <p class="inline-flex">You got the key copy of the room</p>
           <% else %>
-            <Layout.Card.hashed_name card={@receiver} style_spec={:room_invite} />
+            <Layout.Card.hashed_name card={@receiver} style_spec={:room_invite} show_link?={true} />
             <p class="inline-flex">is invited by you into</p>
           <% end %>
         <% else %>
-          <Layout.Card.hashed_name card={@author} style_spec={:room_invite} />
+          <Layout.Card.hashed_name card={@author} style_spec={:room_invite} show_link?={true} />
           <p class="inline-flex">wants you to join the room</p>
         <% end %>
         <Layout.Card.hashed_name room={@room_card} style_spec={:room_invite} />

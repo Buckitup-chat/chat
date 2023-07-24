@@ -7,7 +7,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   import Phoenix.Component, only: [assign: 3]
 
   import Phoenix.LiveView,
-    only: [consume_uploaded_entry: 3, push_event: 3, send_update: 2, push_navigate: 2]
+    only: [consume_uploaded_entry: 3, push_event: 3, send_update: 2, push_patch: 2]
 
   use ChatWeb, :component
 
@@ -59,8 +59,11 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:last_load_timestamp, nil)
     |> assign(:message_update_mode, :replace)
     |> assign_messages()
+    |> send_js(open_content())
+    |> push_patch(to: "/")
   rescue
-    _ -> socket |> push_navigate(to: "/")
+    _ ->
+      socket |> push_patch(to: "/")
   end
 
   def load_more_messages(%{assigns: %{page: page}} = socket) do

@@ -11,7 +11,6 @@ defmodule ChatWeb.MainLive.Page.DialogTest do
         login_by_key(%{conn: conn}, "/chat/#{Base.encode16(hash, case: :lower)}")
 
       assert Chat.Card.from_identity(me) == peer
-      assert Chat.Card.from_identity(me) == peer
       assert dialog != nil
 
       %{socket: %{assigns: %{peer: peer, dialog: dialog}}} =

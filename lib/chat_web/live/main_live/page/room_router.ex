@@ -91,16 +91,6 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
     end
   end
 
-  def route_live_action(socket) do
-    case socket.assigns do
-      %{live_action: :room_message_link, room_message_link_hash: hash} ->
-        socket |> Page.Room.init_with_linked_message(hash)
-
-      _ ->
-        socket
-    end
-  end
-
   #
   # Internal events
   #

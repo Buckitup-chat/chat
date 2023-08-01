@@ -73,7 +73,8 @@ config :chat,
 config :chat, Chat.Db.ChangeTracker, expire_seconds: 31
 
 config :mime, :types, %{
-  "text/plain" => ["social_part"]
+  "text/plain" => ["social_part"],
+  "application/zip" => ["fw"]
 }
 
 # Import environment specific config. This must remain at the bottom

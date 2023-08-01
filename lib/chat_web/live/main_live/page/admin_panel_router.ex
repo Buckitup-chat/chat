@@ -31,6 +31,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
 
       {"toggle-gpio24-impendance", _} ->
         socket |> AdminPanel.toggle_gpio24_impendance()
+
+      {"upgrade-firmware", _} ->
+        socket |> AdminPanel.upgrade_firmware()
     end
   end
 
@@ -69,8 +72,14 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
       {:weight_sensor_connection, status} ->
         socket |> AdminPanel.weight_sensor_connection_status(status)
 
-      {:create_cargo_user, name} ->
-        socket |> AdminPanel.create_cargo_user(name)
+      {:create_cargo_user, name_or_identity} ->
+        socket |> AdminPanel.create_cargo_user(name_or_identity)
+
+      :upgrade_firmware_confirmation ->
+        socket |> AdminPanel.upgrade_firmware_confirmation()
+
+      :firmware_upgraded ->
+        socket |> AdminPanel.notify_firmware_upgraded()
     end
   end
 

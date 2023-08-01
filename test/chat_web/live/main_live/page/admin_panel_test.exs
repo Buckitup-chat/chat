@@ -313,4 +313,87 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
       assert media_settings.functionality == :onliners
     end
   end
+
+  describe "firmware upgrade form" do
+    test "saves backup settings to the admin DB", %{conn: conn} do
+      %{view: view} = prepare_view(%{conn: conn})
+
+      html =
+        view
+        |> element(".navbar button", "Admin")
+        |> render_click()
+
+      assert html =~ "Firmware upgrade"
+      assert html =~ "Upload"
+      %{view: view, socket: socket} = reload_view(%{view: view})
+      IO.inspect view.pid, label: :view_pid
+      
+
+      content = File.read!("test/support/fixtures/files/platform.fw")
+
+      platform = file_input(view, "#firmware-upgrade-form", :config, [%{
+        last_modified: 1_594_171_879_000,
+        name: "platform.fw",
+        content: content,
+        size: byte_size(content),
+        type: "text/plain"
+      }])
+
+
+      
+      #assert html =~ "Upgrade"
+      render_upload(platform, "platform.fw", 0) |> IO.inspect()
+      
+
+
+
+
+
+      assert html =~
+               ~S(<input checked="checked" id="backup_settings_type_regular" name="backup_settings[type]" type="radio" value="regular"/>)
+
+      assert html =~ ~r|<span class="ml-2 text-sm font-bold">\s+Regular\s+</span>|
+
+      assert html =~
+               ~S(<input id="backup_settings_type_continuous" name="backup_settings[type]" type="radio" value="continuous"/>)
+
+      assert html =~ ~r|<span class="ml-2 text-sm">\s+Continuous\s+</span>|
+
+      assert html =~ ~S(phx-disable-with="Updating..." type="submit">Update</button>)
+
+      html =
+        view
+        |> form("#backup_settings", %{"backup_settings" => %{"type" => "continuous"}})
+        |> render_change()
+
+      assert html =~
+               ~S(<input id="backup_settings_type_regular" name="backup_settings[type]" type="radio" value="regular"/>)
+
+      assert html =~ ~r|<span class="ml-2 text-sm">\s+Regular\s+</span>|
+
+      assert html =~
+               ~S(<input checked="checked" id="backup_settings_type_continuous" name="backup_settings[type]" type="radio" value="continuous"/>)
+
+      assert html =~ ~r|<span class="ml-2 text-sm font-bold">\s+Continuous\s+</span>|
+
+      assert html =~ ~S(phx-disable-with="Updating..." type="submit">Update</button>)
+
+      view
+      |> form("#backup_settings", %{"backup_settings" => %{"type" => "continuous"}})
+      |> render_submit()
+
+      assert html =~
+               ~S(<input id="backup_settings_type_regular" name="backup_settings[type]" type="radio" value="regular"/>)
+
+      assert html =~ ~r|<span class="ml-2 text-sm">\s+Regular\s+</span>|
+
+      assert html =~
+               ~S(<input checked="checked" id="backup_settings_type_continuous" name="backup_settings[type]" type="radio" value="continuous"/>)
+
+      assert html =~ ~r|<span class="ml-2 text-sm font-bold">\s+Continuous\s+</span>|
+
+      assert %BackupSettings{} = backup_settings = AdminRoom.get_backup_settings()
+      assert backup_settings.type == :continuous
+    end
+  end
 end

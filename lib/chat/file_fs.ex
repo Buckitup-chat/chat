@@ -4,7 +4,7 @@ defmodule Chat.FileFs do
   import Chat.FileFs.Common
 
   alias Chat.FileFs.Dir2
-  # alias Chat.FileFs.Dir3
+  alias Chat.FileFs.Dir3
 
   @int_padding 20
   @dir2_chunkname_length @int_padding + 1 + @int_padding
@@ -14,37 +14,32 @@ defmodule Chat.FileFs do
   end
 
   def has_file?({_, _, _} = keys, prefix \\ nil) do
-    Dir2.has_file?(keys, prefix)
-    # ||
-    # Dir3.has_file?(keys, prefix)
+    Dir2.has_file?(keys, prefix) ||
+      Dir3.has_file?(keys, prefix)
   end
 
   def read_exact_file_chunk({_first, last} = offsets, key, prefix) do
-    {:ok, data} = Dir2.read_exact_file_chunk(offsets, key, prefix)
-    {data, last}
-    # case Dir2.read_exact_file_chunk(offsets, key, prefix) do
-    #   {:ok, data} ->
-    #     {data, last}
-    #
-    #   _ ->
-    #     {:ok, data} = Dir3.read_exact_file_chunk(offsets, key, prefix)
-    #     {data, last}
-    # end
+    case Dir2.read_exact_file_chunk(offsets, key, prefix) do
+      {:ok, data} ->
+        {data, last}
+
+      _ ->
+        {:ok, data} = Dir3.read_exact_file_chunk(offsets, key, prefix)
+        {data, last}
+    end
   end
 
   @spec read_file_chunk(offset :: non_neg_integer(), key :: String.t()) ::
           {binary(), non_neg_integer()}
   def read_file_chunk(first, key, prefix \\ nil) do
-    {{:ok, data}, last} = Dir2.read_file_chunk(first, key, prefix)
-    {data, last}
-    # case Dir2.read_file_chunk(first, key, prefix) do
-    #   {{:ok, data}, last} ->
-    #     {data, last}
-    #
-    #   _ ->
-    #     {{:ok, data}, last} = Dir3.read_file_chunk(first, key, prefix)
-    #     {data, last}
-    # end
+    case Dir2.read_file_chunk(first, key, prefix) do
+      {{:ok, data}, last} ->
+        {data, last}
+
+      _ ->
+        {{:ok, data}, last} = Dir3.read_file_chunk(first, key, prefix)
+        {data, last}
+    end
   end
 
   def stream_file_chunks(key, prefix \\ nil) do

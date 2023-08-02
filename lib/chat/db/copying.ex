@@ -30,7 +30,30 @@ defmodule Chat.Db.Copying do
 
       {:stuck, progress} ->
         log_restart_on_stuck(from, to, progress)
-        await_copied(from, to, Progress.get_unwritten_keys(progress) |> Enum.shuffle())
+        force_copied(from, to, Progress.get_unwritten_keys(progress) |> Enum.shuffle())
+    end
+  end
+
+  defp force_copied(from, to, keys_set) do
+    "[copying] reading DBs" |> Logger.debug()
+    to_queue = Common.names(to, :queue)
+    stream = stream(from, to, nil, keys_set)
+    stream_keys = read_stream(stream, :keys)
+
+    log_copying(from, to, stream_keys)
+
+    stream |> WriteQueue.force_stream(to_queue)
+
+    Progress.new(stream_keys, to)
+    |> ensure_complete()
+    |> case do
+      :done ->
+        log_finished(from, to)
+        :ok
+
+      {:stuck, progress} ->
+        log_restart_on_stuck(from, to, progress)
+        force_copied(from, to, Progress.get_unwritten_keys(progress) |> Enum.shuffle())
     end
   end
 

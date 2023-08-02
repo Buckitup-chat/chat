@@ -31,6 +31,7 @@ defmodule Chat.Db.WriteQueue do
   def put_chunk({key, nil}, _server), do: ChangeTracker.set_written(key)
   def put_chunk(chunk, server), do: GenServer.call(server, {:put_chunk, chunk}, :infinity)
   def put_stream(stream, server), do: GenServer.call(server, {:put_stream, stream})
+  def force_stream(stream, server), do: GenServer.call(server, {:force_stream, stream})
 
   @doc "This will send data back to pid provided, with genserver cast as {:write, [data]} | {:delete, [:key]}"
   def demand(server), do: GenServer.call(server, :demand)
@@ -65,6 +66,13 @@ defmodule Chat.Db.WriteQueue do
       |> produce()
       |> reply(:ok)
     end
+  end
+
+  def handle_call({:force_stream, stream}, _, q_state(buffer: buf) = state) do
+    state
+    |> q_state(buffer: buffer_stream(buf, stream))
+    |> produce()
+    |> reply(:ok)
   end
 
   def handle_call({:put_chunk, chunk}, from_pid, q_state(buffer: buf) = state) do

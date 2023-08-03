@@ -11,7 +11,7 @@ defmodule ChatWeb.MainLive.Admin.CargoUserData do
   @upload_options [
     accept: ~w(.data),
     max_entries: 1,
-    max_file_size: 1_024_000_000,
+    max_file_size: 12_000_000,
     auto_upload: true,
     progress: &__MODULE__.handle_progress/3
   ]

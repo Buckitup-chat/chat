@@ -79,6 +79,13 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  @impl true
+  def handle_params(%{"hash" => hash}, _, %{assigns: %{live_action: :chat_link}} = socket) do
+    socket
+    |> assign(:chat_link, hash)
+    |> noreply()
+  end
+
   def handle_params(_, _, socket), do: socket |> noreply()
 
   @impl true
@@ -623,6 +630,6 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Dialog.init()
     |> Page.Logout.init()
     |> Page.Shared.track_onliners_presence()
-    |> Page.RoomRouter.route_live_action()
+    |> Page.LiveRouter.action()
   end
 end

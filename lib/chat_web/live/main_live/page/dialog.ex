@@ -5,7 +5,9 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
   import ChatWeb.MainLive.Page.Shared
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [consume_uploaded_entry: 3, push_event: 3, send_update: 2]
+
+  import Phoenix.LiveView,
+    only: [consume_uploaded_entry: 3, push_event: 3, send_update: 2, push_patch: 2]
 
   use ChatWeb, :component
 
@@ -24,6 +26,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.Rooms
   alias Chat.Upload.UploadMetadata
   alias Chat.User
+  alias Chat.Utils
   alias Chat.Utils.StorageId
 
   alias ChatWeb.MainLive.Page
@@ -56,6 +59,11 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:last_load_timestamp, nil)
     |> assign(:message_update_mode, :replace)
     |> assign_messages()
+    |> send_js(open_content())
+    |> push_patch(to: "/")
+  rescue
+    _ ->
+      socket |> push_patch(to: "/")
   end
 
   def load_more_messages(%{assigns: %{page: page}} = socket) do
@@ -369,6 +377,13 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     send_update(Page.ImageGallery, id: "imageGallery", action: :preload_next)
 
     socket
+  end
+
+  def show_link_modal(%{assigns: %{}} = socket, hash, component) do
+    chat_url = [ChatWeb.Endpoint.url(), "chat", hash] |> Path.join()
+
+    socket
+    |> open_modal(component, %{url: chat_url, encoded_qr_code: Utils.qr_base64_from_url(chat_url)})
   end
 
   def image_gallery_preload_prev(socket) do

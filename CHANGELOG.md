@@ -26,6 +26,7 @@ straightforward as possible.
 - set correct documentation link for cargo scenario
 - Half-uploaded files bug
 - force video loading in chat
+- extra invites for checkpoints into cargo room
 
 ## 2023-06-30_ad580b9___2023-06-29_6ab0603
 

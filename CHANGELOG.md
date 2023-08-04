@@ -15,6 +15,7 @@ straightforward as possible.
 - Router support
 - Upload by Drag&Drop to chats/rooms
 - chat links
+- Import and backup cargo user keys
 
 ### Changed
 - mirroring disabled
@@ -25,6 +26,8 @@ straightforward as possible.
 - set correct documentation link for cargo scenario
 - Half-uploaded files bug
 - force video loading in chat
+- extra invites for checkpoints into cargo room
+- cargo camera sensor input stability
 
 ## 2023-06-30_ad580b9___2023-06-29_6ab0603
 

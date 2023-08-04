@@ -218,6 +218,91 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
     defp humanized_type("rest"), do: "Other users"
   end
 
+  describe "cargo user form" do
+    test "create a cargo user", %{conn: conn} do
+      %{view: view} = prepare_view(%{conn: conn})
+
+      view
+      |> element(".navbar button", "Admin")
+      |> render_click()
+
+      refute view |> render() =~ "Cargo user"
+
+      view
+      |> form("#media_settings", %{"media_settings" => %{"functionality" => "cargo"}})
+      |> render_submit()
+
+      assert view |> render() =~ "Cargo user"
+
+      view
+      |> form("#cargo_user_form", %{"user" => %{"name" => "CargoBot888"}})
+      |> render_submit()
+
+      assert view |> render() =~ "CargoBot888"
+      assert view |> render() =~ "Download the Keys"
+
+      view
+      |> element(".navbar button", "Chats")
+      |> render_click()
+
+      view
+      |> element("li.hidden", "CargoBot888")
+      |> render_click()
+
+      assert view |> render() =~
+               "The backup `CargoBot888.data` is not encrypted. Do not share it with anyone."
+
+      assert view |> render() =~ "CargoBot888.data"
+    end
+
+    test "upload a cargo user", %{conn: conn} do
+      %{view: view} = prepare_view(%{conn: conn})
+
+      view
+      |> element(".navbar button", "Admin")
+      |> render_click()
+
+      refute view |> render() =~ "Cargo user"
+
+      view
+      |> form("#media_settings", %{"media_settings" => %{"functionality" => "cargo"}})
+      |> render_submit()
+
+      assert view |> render() =~ "Cargo user"
+
+      content = File.read!("test/support/fixtures/import_keys/TestUser.data")
+
+      cargo_user =
+        file_input(view, "#upload-cargo-user", :config, [
+          %{
+            last_modified: 1_594_171_879_000,
+            name: "TestUser.data",
+            content: content,
+            size: byte_size(content),
+            type: "text/plain"
+          }
+        ])
+
+      render_upload(cargo_user, "TestUser.data", 100)
+
+      assert view |> render() =~ "Test User"
+      assert view |> render() =~ "Download the Keys"
+
+      view
+      |> element(".navbar button", "Chats")
+      |> render_click()
+
+      view
+      |> element("li.hidden", "Test User")
+      |> render_click()
+
+      assert view |> render() =~
+               "The backup `TestUser.data` is not encrypted. Do not share it with anyone."
+
+      assert view |> render() =~ "TestUser.data"
+    end
+  end
+
   describe "cargo camera sensors form" do
     test "validates camera urls", %{conn: conn} do
       %{view: view} = prepare_view(%{conn: conn})

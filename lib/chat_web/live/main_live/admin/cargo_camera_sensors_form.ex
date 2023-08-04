@@ -50,7 +50,7 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
                 placeholder="Paste the url here"
                 value={url}
                 name={index}
-                phx-debounce="500"
+                phx-debounce="1000"
               />
               <button
                 class="pl-2"

@@ -24,7 +24,7 @@ defmodule Chat.Sync.Camera.Sensor do
   defp parse_url(%__MODULE__{url: url} = context) do
     URI.parse(url)
     |> case do
-      %{host: nil} ->
+      %{host: host} when host in [nil, ""] ->
         %{context | error: "URL invalid (no hostname)"}
 
       %{scheme: s} when s not in ["http", "https"] ->
@@ -76,7 +76,7 @@ defmodule Chat.Sync.Camera.Sensor do
           {Tesla.Middleware.DigestAuth, %{username: login, password: password}}
         ]
     end
-    |> Tesla.client()
+    |> Tesla.client(Tesla.Adapter.Mint)
     |> Tesla.get(url)
     |> case do
       {:ok, %{status: 200, headers: headers, body: body}} ->

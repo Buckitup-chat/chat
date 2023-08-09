@@ -17,20 +17,27 @@ defmodule Chat.Db.Copying do
     stream = stream(from, to, nil, keys_set)
     stream_keys = read_stream(stream, :keys)
 
-    log_copying(from, to, stream_keys)
-
-    stream |> WriteQueue.put_stream(to_queue)
-
-    Progress.new(stream_keys, to)
-    |> ensure_complete()
+    stream
+    |> WriteQueue.put_stream(to_queue)
     |> case do
-      :done ->
-        log_finished(from, to)
-        :ok
+      :ok ->
+        log_copying(from, to, stream_keys)
 
-      {:stuck, progress} ->
-        log_restart_on_stuck(from, to, progress)
-        force_copied(from, to, Progress.get_unwritten_keys(progress) |> Enum.shuffle())
+        Progress.new(stream_keys, to)
+        |> ensure_complete()
+        |> case do
+          :done ->
+            log_finished(from, to)
+            :ok
+
+          {:stuck, progress} ->
+            log_restart_on_stuck(from, to, progress)
+            force_copied(from, to, Progress.get_unwritten_keys(progress) |> Enum.shuffle())
+        end
+
+      :ignored ->
+        log_copying_ignored(from, to)
+        :ignored
     end
   end
 
@@ -131,6 +138,17 @@ defmodule Chat.Db.Copying do
       progress_dump
     ]
     |> Logger.debug()
+  end
+
+  defp log_copying_ignored(from, to) do
+    [
+      "[copying] ",
+      inspect(from),
+      " -> ",
+      inspect(to),
+      " is ignored. Another copying is in progress"
+    ]
+    |> Logger.warn()
   end
 
   defp stream(from, to, awaiter, keys_set)

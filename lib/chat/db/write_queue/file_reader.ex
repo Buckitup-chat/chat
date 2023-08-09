@@ -15,8 +15,10 @@ defmodule Chat.Db.WriteQueue.FileReader do
   end
 
   def yield_file(server, readers) do
+    refs = Enum.map(readers, &Map.get(&1, :ref))
+
     server
-    |> GenServer.call(:yield)
+    |> GenServer.call({:yield, refs})
     |> first_file_and_updated_readers(readers)
   end
 
@@ -82,9 +84,9 @@ defmodule Chat.Db.WriteQueue.FileReader do
     |> reply(task)
   end
 
-  def handle_call(:yield, _from, %{harvest: harvest} = state) do
-    %{state | harvest: %{}}
-    |> reply(harvest)
+  def handle_call({:yield, refs}, _from, %{harvest: harvest} = state) do
+    %{state | harvest: Map.drop(harvest, refs)}
+    |> reply(harvest |> Map.take(refs))
   end
 
   @impl true

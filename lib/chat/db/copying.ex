@@ -7,6 +7,7 @@ defmodule Chat.Db.Copying do
   import Chat.Db.WriteQueue.ReadStream
 
   alias Chat.Db.Common
+  alias Chat.Db.Copying.Logging
   alias Chat.Db.Copying.Progress
   alias Chat.Db.Scope.Full, as: FullScope
   alias Chat.Db.WriteQueue
@@ -21,22 +22,22 @@ defmodule Chat.Db.Copying do
     |> WriteQueue.put_stream(to_queue)
     |> case do
       :ok ->
-        log_copying(from, to, stream_keys)
+        Logging.log_copying(from, to, stream_keys)
 
         Progress.new(stream_keys, to)
         |> ensure_complete()
         |> case do
           :done ->
-            log_finished(from, to)
+            Logging.log_finished(from, to)
             :ok
 
           {:stuck, progress} ->
-            log_restart_on_stuck(from, to, progress)
+            Logging.log_restart_on_stuck(from, to, progress)
             force_copied(from, to, Progress.get_unwritten_keys(progress) |> Enum.shuffle())
         end
 
       :ignored ->
-        log_copying_ignored(from, to)
+        Logging.log_copying_ignored(from, to)
         :ignored
     end
   end
@@ -47,7 +48,7 @@ defmodule Chat.Db.Copying do
     stream = stream(from, to, nil, keys_set)
     stream_keys = read_stream(stream, :keys)
 
-    log_copying(from, to, stream_keys)
+    Logging.log_copying(from, to, stream_keys)
 
     stream |> WriteQueue.force_stream(to_queue)
 
@@ -55,11 +56,11 @@ defmodule Chat.Db.Copying do
     |> ensure_complete()
     |> case do
       :done ->
-        log_finished(from, to)
+        Logging.log_finished(from, to)
         :ok
 
       {:stuck, progress} ->
-        log_restart_on_stuck(from, to, progress)
+        Logging.log_restart_on_stuck(from, to, progress)
         force_copied(from, to, Progress.get_unwritten_keys(progress) |> Enum.shuffle())
     end
   end
@@ -84,71 +85,11 @@ defmodule Chat.Db.Copying do
         delay = Progress.recheck_delay_in_ms(progress)
         Process.sleep(delay)
 
-        if !changed? and stuck_for_ms > 10_000 do
-          Logger.debug(inspect({prev_count, count, stuck_for_ms, delay}))
-        end
-
         ensure_complete(
           progress,
           if(changed?, do: 0, else: stuck_for_ms + delay)
         )
     end
-  end
-
-  defp log_copying(from, to, keys) do
-    {chunks, data} = keys |> Enum.split_with(&match?({:file_chunk, _, _, _}, &1))
-
-    [
-      "[copying] ",
-      inspect(from),
-      " -> ",
-      inspect(to),
-      " file_chunks: ",
-      inspect(chunks |> Enum.count()),
-      " + data: ",
-      inspect(data |> Enum.count())
-    ]
-    |> Logger.info()
-  end
-
-  defp log_finished(from, to) do
-    [
-      "[copying] ",
-      inspect(from),
-      " -> ",
-      inspect(to),
-      " is done"
-    ]
-    |> Logger.debug()
-  end
-
-  defp log_restart_on_stuck(from, to, progress) do
-    progress_dump =
-      progress
-      |> Map.update(:data_keys, [], &Enum.take(&1, 10))
-      |> Map.update(:file_keys, [], &Enum.take(&1, 10))
-      |> inspect(pretty: true)
-
-    [
-      "[copying] ",
-      inspect(from),
-      " -> ",
-      inspect(to),
-      " stuck. restarting... ",
-      progress_dump
-    ]
-    |> Logger.debug()
-  end
-
-  defp log_copying_ignored(from, to) do
-    [
-      "[copying] ",
-      inspect(from),
-      " -> ",
-      inspect(to),
-      " is ignored. Another copying is in progress"
-    ]
-    |> Logger.warn()
   end
 
   defp stream(from, to, awaiter, keys_set)

@@ -1,7 +1,6 @@
 defmodule Support.Db.Sync do
   @moduledoc "Functions for synchronization"
 
-  require Logger
   import ExUnit.Callbacks, only: [on_exit: 1, start_link_supervised!: 1]
 
   alias Chat.Card
@@ -111,8 +110,6 @@ defmodule Support.Db.Sync do
     Common.put_chat_db_env(:files_base_dir, CubDB.data_dir(name) <> "_files")
     Common.put_chat_db_env(:data_dry, status_relay_name)
 
-    log_db_switch(name)
-
     Chat.Ordering.reset()
 
     prev_settings
@@ -188,14 +185,5 @@ defmodule Support.Db.Sync do
   defp save({file_key, share_key}, {file_size, file_secret}) do
     ChunkedFilesMultisecret.generate(file_key, file_size, file_secret)
     ChunkedFiles.save_upload_chunk(file_key, {0, file_size - 1}, file_size, share_key)
-  end
-
-  defp log_db_switch(name) do
-    [
-      "[db] ",
-      "Switching current db to ",
-      inspect(name)
-    ]
-    |> Logger.info()
   end
 end

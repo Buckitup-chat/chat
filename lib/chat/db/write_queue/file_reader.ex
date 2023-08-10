@@ -15,7 +15,10 @@ defmodule Chat.Db.WriteQueue.FileReader do
   end
 
   def yield_file(server, readers) do
-    refs = Enum.map(readers, &Map.get(&1, :ref))
+    refs =
+      readers
+      |> Enum.filter(&is_map/1)
+      |> Enum.map(&Map.get(&1, :ref))
 
     server
     |> GenServer.call({:yield, refs})
@@ -26,13 +29,8 @@ defmodule Chat.Db.WriteQueue.FileReader do
     {files, tasks} = Enum.split_with(readers, &match?({{:file_chunk, _, _, _}, _}, &1))
 
     {more_files, still_tasks} =
-      Enum.split_with(tasks, fn
-        %{ref: ref} ->
-          Map.has_key?(harvest, ref)
-
-        x ->
-          inspect(x) |> Logger.warn()
-          x
+      Enum.split_with(tasks, fn %{ref: ref} ->
+        Map.has_key?(harvest, ref)
       end)
 
     harvested_files =

@@ -3,7 +3,6 @@ defmodule Chat.Db.Pipeline.Writer do
   Consumes the queue. Handles fsync and FS write for files
 
   """
-  require Logger
   require Record
 
   Record.defrecord(:w_state,
@@ -16,6 +15,7 @@ defmodule Chat.Db.Pipeline.Writer do
   )
 
   alias Chat.Db.ChangeTracker
+  alias Chat.Db.Copying.Logging
   alias Chat.Db.Pipeline.Compactor
   alias Chat.Db.WriteQueue, as: Queue
 
@@ -81,14 +81,14 @@ defmodule Chat.Db.Pipeline.Writer do
       end)
       |> then(fn {tx, keys} -> {:commit, tx, keys} end)
     end)
-    |> tap(&log_written_in(&1, db))
+    |> tap(&Logging.log_written_in(&1, db))
     |> ChangeTracker.set_written()
 
     chunks
     |> Enum.each(fn {{:file_chunk, chunk_key, min, max} = key, data} ->
       FileFs.write_file(data, {chunk_key, min, max}, path)
 
-      log_written_in([key], db)
+      Logging.log_written_in([key], db)
       ChangeTracker.set_written([key])
     end)
 
@@ -116,18 +116,5 @@ defmodule Chat.Db.Pipeline.Writer do
     CubDB.file_sync(db)
 
     state |> w_state(dirt_count: 0)
-  end
-
-  defp log_written_in(nil, _), do: :ok
-  defp log_written_in([], _), do: :ok
-
-  defp log_written_in(keys, db) do
-    [
-      "[copying] ",
-      " -> ",
-      inspect(db),
-      inspect(keys)
-    ]
-    |> Logger.debug()
   end
 end

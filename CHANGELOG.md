@@ -29,6 +29,7 @@ straightforward as possible.
 - extra invites for checkpoints into cargo room
 - cargo camera sensor input stability
 - pause uploads when uploader is busy
+- copying hangups
 
 ## 2023-06-30_ad580b9___2023-06-29_6ab0603
 

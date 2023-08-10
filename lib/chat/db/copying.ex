@@ -7,6 +7,7 @@ defmodule Chat.Db.Copying do
   import Chat.Db.WriteQueue.ReadStream
 
   alias Chat.Db.Common
+  alias Chat.Db.Copying.Logging
   alias Chat.Db.Copying.Progress
   alias Chat.Db.Scope.Full, as: FullScope
   alias Chat.Db.WriteQueue
@@ -17,20 +18,54 @@ defmodule Chat.Db.Copying do
     stream = stream(from, to, nil, keys_set)
     stream_keys = read_stream(stream, :keys)
 
-    log_copying(from, to, stream_keys)
+    stream
+    |> WriteQueue.put_stream(to_queue)
+    |> case do
+      :ok ->
+        Logging.log_copying(from, to, stream_keys)
 
-    stream |> WriteQueue.put_stream(to_queue)
+        Progress.new(stream_keys, to)
+        |> ensure_complete()
+        |> case do
+          :done ->
+            Logging.log_finished(from, to)
+            :ok
+
+          {:stuck, progress} ->
+            Logging.log_restart_on_stuck(from, to, progress)
+            force_copied(from, to, Progress.get_unwritten_keys(progress) |> Enum.shuffle())
+        end
+
+      :ignored ->
+        Logging.log_copying_ignored(from, to)
+        :ignored
+    end
+  end
+
+  defp force_copied(from, to, keys_set) do
+    "[copying] reading DBs" |> Logger.debug()
+    to_queue = Common.names(to, :queue)
+    stream = stream(from, to, nil, keys_set)
+    stream_keys = read_stream(stream, :keys)
+
+    Logging.log_copying(from, to, stream_keys)
+
+    stream |> WriteQueue.force_stream(to_queue)
 
     Progress.new(stream_keys, to)
     |> ensure_complete()
     |> case do
-      :done -> :ok
-      {:stuck, progress} -> await_copied(from, to, Progress.get_unwritten_keys(progress))
+      :done ->
+        Logging.log_finished(from, to)
+        :ok
+
+      {:stuck, progress} ->
+        Logging.log_restart_on_stuck(from, to, progress)
+        force_copied(from, to, Progress.get_unwritten_keys(progress) |> Enum.shuffle())
     end
-    |> tap(fn _ -> log_finished(from, to) end)
   end
 
-  defp ensure_complete(prev_progress, started? \\ false, stuck_for_ms \\ 0) do
+  defp ensure_complete(prev_progress, stuck_for_ms \\ 0) do
     progress = Progress.eliminate_written(prev_progress)
     # {time, progress} = :timer.tc(fn -> Progress.eliminate_written(prev_progress) end)
     # time |> IO.inspect(label: "time")
@@ -50,41 +85,11 @@ defmodule Chat.Db.Copying do
         delay = Progress.recheck_delay_in_ms(progress)
         Process.sleep(delay)
 
-        Logger.debug(inspect({prev_count, count, stuck_for_ms}))
-
         ensure_complete(
           progress,
-          started? or changed?,
-          (started? && !changed? && stuck_for_ms + delay) || 0
+          if(changed?, do: 0, else: stuck_for_ms + delay)
         )
     end
-  end
-
-  defp log_copying(from, to, keys) do
-    {chunks, data} = keys |> Enum.split_with(&match?({:file_chunk, _, _, _}, &1))
-
-    [
-      "[copying] ",
-      inspect(from),
-      " -> ",
-      inspect(to),
-      " file_chunks: ",
-      inspect(chunks |> Enum.count()),
-      " + data: ",
-      inspect(data |> Enum.count())
-    ]
-    |> Logger.info()
-  end
-
-  defp log_finished(from, to) do
-    [
-      "[copying] ",
-      inspect(from),
-      " -> ",
-      inspect(to),
-      " is done"
-    ]
-    |> Logger.debug()
   end
 
   defp stream(from, to, awaiter, keys_set)

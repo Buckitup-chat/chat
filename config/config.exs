@@ -72,6 +72,9 @@ config :chat,
 
 config :chat, Chat.Db.ChangeTracker, expire_seconds: 31
 
+# Uncomment the following line to enable db writing logging
+config :chat, :db_write_logging, true
+
 config :mime, :types, %{
   "text/plain" => ["social_part", "data"]
 }

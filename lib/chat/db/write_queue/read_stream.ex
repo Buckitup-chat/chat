@@ -85,19 +85,6 @@ defmodule Chat.Db.WriteQueue.ReadStream do
       db_keys
       |> Enum.map(&{&1, CubDB.get(db, &1)})
 
-    # {new_readers |> Enum.count(), new_list |> Enum.count()}
-    # |> IO.inspect()
-    # |> case do
-    #   {_x, 0} ->
-    #     new_readers
-    #     |> IO.inspect(label: "readers", pretty: true)
-    #     |> Enum.map(&Process.alive?(&1.pid))
-    #     |> IO.inspect()
-
-    #   _ ->
-    #     nil
-    # end
-
     {data, new_readers, new_list}
   rescue
     # in case source DB is dead we finish with the stream

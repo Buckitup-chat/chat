@@ -114,7 +114,8 @@ defmodule Chat.Sync.CargoRoom do
                entry <- file_entry(file_info),
                file_key <- UploadKey.new(destination, room_key, entry),
                file_secret <- ChunkedFiles.new_upload(file_key),
-               :ok <- save_file({file_key, content}, {file_info.size, file_secret}) do
+               size <- byte_size(content),
+               :ok <- save_file({file_key, content}, {size, file_secret}) do
             message =
               entry
               |> Messages.File.new(file_key, file_secret, file_info.time)
@@ -128,7 +129,7 @@ defmodule Chat.Sync.CargoRoom do
 
             {:ok,
              MapSet.new([
-               {:chunk_key, {:file_chunk, file_key, 0, max(file_info.size - 1, 0)}},
+               {:chunk_key, {:file_chunk, file_key, 0, max(size - 1, 0)}},
                {:file_key, file_key},
                {:file_index, room_key, file_key, msg.id},
                {:room_message, room_key, msg_index, msg.id |> Enigma.hash()}

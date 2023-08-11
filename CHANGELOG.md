@@ -96,6 +96,7 @@ straightforward as possible.
 - scroll uploads to top on uploader mount
 - uploads color changing depending on room/chat belonging
 - FS healer fix and use it for all but cargo
+- cargo copying after main data write
 
 ## 2023-05-12_7e5fcce___2023-05-12_b47aebb
 

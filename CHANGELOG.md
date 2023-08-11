@@ -18,7 +18,6 @@ straightforward as possible.
 - Import and backup cargo user keys
 
 ### Changed
-- mirroring disabled
 - more logs on copying w/ progress
 
 ### Fixed

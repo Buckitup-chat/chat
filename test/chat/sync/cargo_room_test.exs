@@ -38,7 +38,7 @@ defmodule Chat.Sync.CargoRoomTest do
       Rooms.await_saved(room_identity)
       CargoRoom.activate(room_identity.public_key)
 
-      assert :ok = CargoRoom.write_file(cargo_bot, content, metadata)
+      assert {:ok, _} = CargoRoom.write_file(cargo_bot, content, metadata)
       ChangeTracker.await()
 
       [%{type: :image, content: content}] = Rooms.read(room, room_identity)

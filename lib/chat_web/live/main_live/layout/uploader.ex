@@ -175,13 +175,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
           type={@type}
         />
       <% end %>
-      <div class="hidden">
-        <%= for entry <- @config.entries do %>
-          <%= for err <- upload_errors(@config, entry) do %>
-            <p phx-mounted={pause_upload(entry.uuid)} class="alert alert-danger"><%= err %></p>
-          <% end %>
-        <% end %>
-      </div>
+      <.entries_errors config={@config} />
     </div>
     """
   end
@@ -189,6 +183,22 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   defp entries(assigns) do
     ~H"""
 
+    """
+  end
+
+  attr :config, UploadConfig, required: true, doc: "upload config"
+
+  defp entries_errors(assigns) do
+    ~H"""
+    <div id={"uploadErrors-" <> Utils.random_id()} class="hidden" phx-update="replace">
+      <%= for entry <- @config.entries do %>
+        <%= for err <- upload_errors(@config, entry) do %>
+          <p id={"err-" <> Utils.random_id()} phx-mounted={pause_upload(entry.uuid)}>
+            <%= err %>
+          </p>
+        <% end %>
+      <% end %>
+    </div>
     """
   end
 

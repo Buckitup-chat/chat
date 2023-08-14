@@ -15,7 +15,7 @@ const uploadInitializer = (entry, onViewError) => {
       return
     }
 
-    let upload = UpChunk.createUpload({ chunkSize: entry.meta.chunk_size, endpoint: entrypoint, file })
+    let upload = UpChunk.createUpload({ attempts: 3, chunkSize: entry.meta.chunk_size, endpoint: entrypoint, file })
     upload.chunkCount = chunkCount
 
     if (status == "paused" || status == "pending") {
@@ -36,7 +36,7 @@ const uploadInitializer = (entry, onViewError) => {
     upload.on("progress", (e) => {
       const now = new Date().getTime()
 
-      if (!window.uploaderReorderInProgress && !upload.paused && e.detail < 100 && now - lastProgressUpdate > 1000) {
+      if (!window.uploaderReorderInProgress && upload.success && !upload.paused && e.detail < 100 && now - lastProgressUpdate > 1000) {
         entry.progress(e.detail)
         lastProgressUpdate = now
       }

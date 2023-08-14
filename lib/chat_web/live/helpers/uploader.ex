@@ -102,6 +102,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
         UploadStatus.put(key, :inactive)
 
         assign(socket, :uploads_metadata, Map.put(uploads, uuid, metadata))
+        |> maybe_delete_entries_errors()
 
       nil ->
         socket
@@ -126,6 +127,12 @@ defmodule ChatWeb.LiveHelpers.Uploader do
       nil ->
         socket
     end
+  end
+
+  defp maybe_delete_entries_errors(%Socket{} = socket) do
+    key_path = [:assigns, :uploads, :file, :errors] |> Enum.map(&Access.key!/1)
+
+    socket |> put_in(key_path, [])
   end
 
   @spec presign_url(entry(), socket()) :: {:ok, uploader_data(), socket()}

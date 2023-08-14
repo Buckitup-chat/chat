@@ -24,8 +24,8 @@ defmodule Chat.Db.Copying do
       :ok ->
         Logging.log_copying(from, to, stream_keys)
 
-        Progress.new(stream_keys, to)
-        |> ensure_complete()
+        stream_keys
+        |> await_written_into(to)
         |> case do
           :done ->
             Logging.log_finished(from, to)
@@ -40,6 +40,13 @@ defmodule Chat.Db.Copying do
         Logging.log_copying_ignored(from, to)
         :ignored
     end
+  end
+
+  @spec await_written_into(keys :: list(), target_db :: atom()) :: :done | {:stuck, Progress.t()}
+  def await_written_into(keys, target_db) do
+    keys
+    |> Progress.new(target_db)
+    |> ensure_complete()
   end
 
   defp force_copied(from, to, keys_set) do

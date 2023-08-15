@@ -15,6 +15,7 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
+- pause uploads when uploader is busy (IMPROVED)
 
 
 ## 2023-08-11_279815b___2023-08-11_24d6bac

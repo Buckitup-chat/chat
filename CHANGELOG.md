@@ -11,10 +11,13 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+- concurrent cargo sensors
+- firmware upgrade
 
 ### Changed
 
 ### Fixed
+- pause uploads when uploader is busy (IMPROVED)
 
 
 ## 2023-08-11_279815b___2023-08-11_24d6bac

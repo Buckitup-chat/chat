@@ -130,7 +130,8 @@ defmodule Chat.Sync.CargoRoom do
             {:ok,
              MapSet.new([
                {:chunk_key, {:file_chunk, file_key, 0, max(size - 1, 0)}},
-               {:file_key, file_key},
+               {:file_chunk, file_key, 0, max(size - 1, 0)},
+               {:file, file_key},
                {:file_index, room_key, file_key, msg.id},
                {:room_message, room_key, msg_index, msg.id |> Enigma.hash()}
              ])}

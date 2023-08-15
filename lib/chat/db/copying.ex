@@ -12,7 +12,10 @@ defmodule Chat.Db.Copying do
   alias Chat.Db.Scope.Full, as: FullScope
   alias Chat.Db.WriteQueue
 
-  def await_copied(from, to, keys_set \\ nil) do
+  def await_copied(from, to, keys_set \\ nil)
+  def await_copied(_from, _to, []), do: :ok
+
+  def await_copied(from, to, keys_set) do
     "[copying] reading DBs" |> Logger.debug()
     to_queue = Common.names(to, :queue)
     stream = stream(from, to, nil, keys_set)
@@ -24,8 +27,8 @@ defmodule Chat.Db.Copying do
       :ok ->
         Logging.log_copying(from, to, stream_keys)
 
-        Progress.new(stream_keys, to)
-        |> ensure_complete()
+        stream_keys
+        |> await_written_into(to)
         |> case do
           :done ->
             Logging.log_finished(from, to)
@@ -40,6 +43,15 @@ defmodule Chat.Db.Copying do
         Logging.log_copying_ignored(from, to)
         :ignored
     end
+  end
+
+  @spec await_written_into(keys :: list(), target_db :: atom()) :: :done | {:stuck, Progress.t()}
+  def await_written_into([], _target_db), do: :done
+
+  def await_written_into(keys, target_db) do
+    keys
+    |> Progress.new(target_db)
+    |> ensure_complete()
   end
 
   defp force_copied(from, to, keys_set) do

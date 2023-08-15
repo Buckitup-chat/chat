@@ -72,9 +72,6 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
       {:weight_sensor_connection, status} ->
         socket |> AdminPanel.weight_sensor_connection_status(status)
 
-      {:create_cargo_user, name_or_identity} ->
-        socket |> AdminPanel.create_cargo_user(name_or_identity)
-
       :upgrade_firmware_confirmation ->
         socket |> AdminPanel.upgrade_firmware_confirmation()
 

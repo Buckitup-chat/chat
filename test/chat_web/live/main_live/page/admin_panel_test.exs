@@ -7,6 +7,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
   alias Chat.Admin.{BackupSettings, CargoSettings, MediaSettings}
   alias Chat.{AdminDb, AdminRoom, Db, Identity, User}
   alias Chat.Db.ChangeTracker
+  alias ChatWeb.MainLive.Admin.FirmwareUpgradeForm
 
   setup do
     CubDB.clear(AdminDb.db())
@@ -218,6 +219,91 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
     defp humanized_type("rest"), do: "Other users"
   end
 
+  describe "cargo user form" do
+    test "create a cargo user", %{conn: conn} do
+      %{view: view} = prepare_view(%{conn: conn})
+
+      view
+      |> element(".navbar button", "Admin")
+      |> render_click()
+
+      refute view |> render() =~ "Cargo user"
+
+      view
+      |> form("#media_settings", %{"media_settings" => %{"functionality" => "cargo"}})
+      |> render_submit()
+
+      assert view |> render() =~ "Cargo user"
+
+      view
+      |> form("#cargo_user_form", %{"user" => %{"name" => "CargoBot888"}})
+      |> render_submit()
+
+      assert view |> render() =~ "CargoBot888"
+      assert view |> render() =~ "Download the Keys"
+
+      view
+      |> element(".navbar button", "Chats")
+      |> render_click()
+
+      view
+      |> element("li.hidden", "CargoBot888")
+      |> render_click()
+
+      assert view |> render() =~
+               "The backup `CargoBot888.data` is not encrypted. Do not share it with anyone."
+
+      assert view |> render() =~ "CargoBot888.data"
+    end
+
+    test "upload a cargo user", %{conn: conn} do
+      %{view: view} = prepare_view(%{conn: conn})
+
+      view
+      |> element(".navbar button", "Admin")
+      |> render_click()
+
+      refute view |> render() =~ "Cargo user"
+
+      view
+      |> form("#media_settings", %{"media_settings" => %{"functionality" => "cargo"}})
+      |> render_submit()
+
+      assert view |> render() =~ "Cargo user"
+
+      content = File.read!("test/support/fixtures/import_keys/TestUser.data")
+
+      cargo_user =
+        file_input(view, "#upload-cargo-user", :config, [
+          %{
+            last_modified: 1_594_171_879_000,
+            name: "TestUser.data",
+            content: content,
+            size: byte_size(content),
+            type: "text/plain"
+          }
+        ])
+
+      render_upload(cargo_user, "TestUser.data", 100)
+
+      assert view |> render() =~ "Test User"
+      assert view |> render() =~ "Download the Keys"
+
+      view
+      |> element(".navbar button", "Chats")
+      |> render_click()
+
+      view
+      |> element("li.hidden", "Test User")
+      |> render_click()
+
+      assert view |> render() =~
+               "The backup `TestUser.data` is not encrypted. Do not share it with anyone."
+
+      assert view |> render() =~ "TestUser.data"
+    end
+  end
+
   describe "cargo camera sensors form" do
     test "validates camera urls", %{conn: conn} do
       %{view: view} = prepare_view(%{conn: conn})
@@ -318,82 +404,30 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
     test "saves backup settings to the admin DB", %{conn: conn} do
       %{view: view} = prepare_view(%{conn: conn})
 
-      html =
-        view
-        |> element(".navbar button", "Admin")
-        |> render_click()
+      view |> element(".navbar button", "Admin") |> render_click()
+      assert view |> render() =~ "Firmware upgrade"
+      assert view |> render() =~ "Upload"
 
-      assert html =~ "Firmware upgrade"
-      assert html =~ "Upload"
-      %{view: view, socket: socket} = reload_view(%{view: view})
-      IO.inspect view.pid, label: :view_pid
-      
+      Phoenix.LiveView.send_update(view.pid, FirmwareUpgradeForm,
+        id: :firmware_upgrade_form,
+        substep: :done
+      )
 
-      content = File.read!("test/support/fixtures/files/platform.fw")
+      assert view |> render() =~ "Upgrade"
+      view |> element("button", "Upgrade") |> render_click()
+      assert view |> render() =~ "Upgrade firmware?"
 
-      platform = file_input(view, "#firmware-upgrade-form", :config, [%{
-        last_modified: 1_594_171_879_000,
-        name: "platform.fw",
-        content: content,
-        size: byte_size(content),
-        type: "text/plain"
-      }])
+      assert view |> render() =~
+               "Are you sure?. The reboot will be performed automatically after the upgrade."
 
+      view |> element(".confirmButton", "Ok") |> render_click()
 
-      
-      #assert html =~ "Upgrade"
-      render_upload(platform, "platform.fw", 0) |> IO.inspect()
-      
+      assert view |> render() =~ "Upgrading..."
+      assert view |> render() =~ "The reboot will be performed automatically."
 
+      send(view.pid, {:admin, :firmware_upgraded})
 
-
-
-
-      assert html =~
-               ~S(<input checked="checked" id="backup_settings_type_regular" name="backup_settings[type]" type="radio" value="regular"/>)
-
-      assert html =~ ~r|<span class="ml-2 text-sm font-bold">\s+Regular\s+</span>|
-
-      assert html =~
-               ~S(<input id="backup_settings_type_continuous" name="backup_settings[type]" type="radio" value="continuous"/>)
-
-      assert html =~ ~r|<span class="ml-2 text-sm">\s+Continuous\s+</span>|
-
-      assert html =~ ~S(phx-disable-with="Updating..." type="submit">Update</button>)
-
-      html =
-        view
-        |> form("#backup_settings", %{"backup_settings" => %{"type" => "continuous"}})
-        |> render_change()
-
-      assert html =~
-               ~S(<input id="backup_settings_type_regular" name="backup_settings[type]" type="radio" value="regular"/>)
-
-      assert html =~ ~r|<span class="ml-2 text-sm">\s+Regular\s+</span>|
-
-      assert html =~
-               ~S(<input checked="checked" id="backup_settings_type_continuous" name="backup_settings[type]" type="radio" value="continuous"/>)
-
-      assert html =~ ~r|<span class="ml-2 text-sm font-bold">\s+Continuous\s+</span>|
-
-      assert html =~ ~S(phx-disable-with="Updating..." type="submit">Update</button>)
-
-      view
-      |> form("#backup_settings", %{"backup_settings" => %{"type" => "continuous"}})
-      |> render_submit()
-
-      assert html =~
-               ~S(<input id="backup_settings_type_regular" name="backup_settings[type]" type="radio" value="regular"/>)
-
-      assert html =~ ~r|<span class="ml-2 text-sm">\s+Regular\s+</span>|
-
-      assert html =~
-               ~S(<input checked="checked" id="backup_settings_type_continuous" name="backup_settings[type]" type="radio" value="continuous"/>)
-
-      assert html =~ ~r|<span class="ml-2 text-sm font-bold">\s+Continuous\s+</span>|
-
-      assert %BackupSettings{} = backup_settings = AdminRoom.get_backup_settings()
-      assert backup_settings.type == :continuous
+      assert view |> render() =~ "Firmware upgraded"
     end
   end
 end

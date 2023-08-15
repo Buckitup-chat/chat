@@ -12,9 +12,11 @@ defmodule Chat.Db.WriteQueue do
 
   use GenServer
 
+  def push({nil, nil}, _server), do: :ok
   def push({key, nil}, _server), do: ChangeTracker.set_written(key)
   def push(data, server), do: GenServer.cast(server, {:push, data})
 
+  def put({nil, nil}, _server), do: :ok
   def put({key, nil}, _server), do: ChangeTracker.set_written(key)
   def put(data, server), do: GenServer.cast(server, {:put, data})
 
@@ -25,9 +27,11 @@ defmodule Chat.Db.WriteQueue do
 
   def set_mirrors(sink, server), do: GenServer.cast(server, {:mirrors, sink})
 
+  def put_chunk({nil, nil}, _server), do: :ok
   def put_chunk({key, nil}, _server), do: ChangeTracker.set_written(key)
   def put_chunk(chunk, server), do: GenServer.call(server, {:put_chunk, chunk}, :infinity)
   def put_stream(stream, server), do: GenServer.call(server, {:put_stream, stream})
+  def force_stream(stream, server), do: GenServer.call(server, {:force_stream, stream})
 
   @doc "This will send data back to pid provided, with genserver cast as {:write, [data]} | {:delete, [:key]}"
   def demand(server), do: GenServer.call(server, :demand)
@@ -62,6 +66,13 @@ defmodule Chat.Db.WriteQueue do
       |> produce()
       |> reply(:ok)
     end
+  end
+
+  def handle_call({:force_stream, stream}, _, q_state(buffer: buf) = state) do
+    state
+    |> q_state(buffer: buffer_stream(buf, stream))
+    |> produce()
+    |> reply(:ok)
   end
 
   def handle_call({:put_chunk, chunk}, from_pid, q_state(buffer: buf) = state) do
@@ -99,9 +110,9 @@ defmodule Chat.Db.WriteQueue do
     |> noreply()
   end
 
-  def handle_cast({:mirrors, _sink}, state) do
+  def handle_cast({:mirrors, sink}, state) do
     state
-    # |> q_state(mirrors: sink)
+    |> q_state(mirrors: sink)
     |> noreply()
   end
 

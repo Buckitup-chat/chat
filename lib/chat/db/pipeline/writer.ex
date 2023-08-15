@@ -15,6 +15,7 @@ defmodule Chat.Db.Pipeline.Writer do
   )
 
   alias Chat.Db.ChangeTracker
+  alias Chat.Db.Copying.Logging
   alias Chat.Db.Pipeline.Compactor
   alias Chat.Db.WriteQueue, as: Queue
 
@@ -80,12 +81,14 @@ defmodule Chat.Db.Pipeline.Writer do
       end)
       |> then(fn {tx, keys} -> {:commit, tx, keys} end)
     end)
+    |> tap(&Logging.log_written_in(&1, db))
     |> ChangeTracker.set_written()
 
     chunks
     |> Enum.each(fn {{:file_chunk, chunk_key, min, max} = key, data} ->
       FileFs.write_file(data, {chunk_key, min, max}, path)
 
+      Logging.log_written_in([key], db)
       ChangeTracker.set_written([key])
     end)
 

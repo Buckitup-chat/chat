@@ -11,12 +11,22 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+
+### Changed
+
+### Fixed
+
+
+## 2023-08-11_279815b___2023-08-11_24d6bac
+
+### Added
 - Filesystem optimization
 - Router support
 - Upload by Drag&Drop to chats/rooms
+- chat links
+- Import and backup cargo user keys
 
 ### Changed
-- mirroring disabled
 - more logs on copying w/ progress
 
 ### Fixed
@@ -24,6 +34,10 @@ straightforward as possible.
 - set correct documentation link for cargo scenario
 - Half-uploaded files bug
 - force video loading in chat
+- extra invites for checkpoints into cargo room
+- cargo camera sensor input stability
+- pause uploads when uploader is busy
+- copying hangups
 
 ## 2023-06-30_ad580b9___2023-06-29_6ab0603
 
@@ -90,6 +104,7 @@ straightforward as possible.
 - scroll uploads to top on uploader mount
 - uploads color changing depending on room/chat belonging
 - FS healer fix and use it for all but cargo
+- cargo copying after main data write
 
 ## 2023-05-12_7e5fcce___2023-05-12_b47aebb
 

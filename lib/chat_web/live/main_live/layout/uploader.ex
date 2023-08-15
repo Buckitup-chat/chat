@@ -175,6 +175,13 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
           type={@type}
         />
       <% end %>
+      <div class="hidden">
+        <%= for entry <- @config.entries do %>
+          <%= for err <- upload_errors(@config, entry) do %>
+            <p phx-mounted={pause_upload(entry.uuid)} class="alert alert-danger"><%= err %></p>
+          <% end %>
+        <% end %>
+      </div>
     </div>
     """
   end

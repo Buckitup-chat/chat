@@ -21,7 +21,12 @@ config :chat, ChatWeb.Endpoint,
   # Possibly not needed, but doesn't hurt
   http: [port: {:system, "PORT"}],
   url: [host: hostname, port: 443],
-  secret_key_base: Map.fetch!(System.get_env(), "SECRET_KEY_BASE"),
+  secret_key_base:
+    Map.get(
+      System.get_env(),
+      "SECRET_KEY_BASE",
+      "BKyA6n6KrL/mmKlyg5a+4/ZlWq0cN3dFqfvNj9zaw6Acvnp++u6bXN5rkns5xVpE"
+    ),
   check_origin: [
     "https://offline-chat.gigalixirapp.com",
     "https://buckitup.app"

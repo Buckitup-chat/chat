@@ -635,9 +635,17 @@
                     <h1 class="ml-1 mr-1 text-base font-bolt text-white">
                       My private notes
                     </h1>
-                    <Layout.Card.hashed_name card={@peer} style_spec={:chat_header} />
+                    <Layout.Card.hashed_name
+                      card={@peer}
+                      style_spec={:chat_header}
+                      show_link?={true}
+                    />
                   <% else %>
-                    <Layout.Card.hashed_name card={@peer} style_spec={:chat_header} />
+                    <Layout.Card.hashed_name
+                      card={@peer}
+                      style_spec={:chat_header}
+                      show_link?={true}
+                    />
                     <button>
                       <.icon id="edit" class="w-4 h-4 ml-1 flex fill-white/50" />
                     </button>
@@ -1032,7 +1040,7 @@
                 <Layout.Admin.gpio24_impedance_control status={assigns[:gpio24_impedance_status]} />
               </Layout.Admin.block>
               <Layout.Admin.block title="Firmware upgrade">
-                <.live_component id="firmware_upgrade_form" module={FirmwareUpgradeForm} />
+                <.live_component id={:firmware_upgrade_form} module={FirmwareUpgradeForm} />
               </Layout.Admin.block>
             </Layout.Admin.row>
             <Layout.Admin.row>

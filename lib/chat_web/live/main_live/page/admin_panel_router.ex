@@ -80,6 +80,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
 
       :firmware_upgraded ->
         socket |> AdminPanel.notify_firmware_upgraded()
+
+      {:create_cargo_user, data} ->
+        socket |> AdminPanel.create_cargo_user(data)
     end
   end
 

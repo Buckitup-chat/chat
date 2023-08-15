@@ -18,11 +18,16 @@ defmodule ChatWeb.MainLive.Admin.FirmwareUpgradeForm do
     |> assign(:step, :upload)
     |> assign(:substep, :pending)
     |> assign(assigns)
+    |> handle_upload()
     |> handle_upgrade()
-    |> allow_upload(:config, @upload_options)
-    |> IO.inspect()
     |> ok()
   end
+
+  defp handle_upload(%{assigns: %{step: :upload}} = socket) do
+    socket |> allow_upload(:config, @upload_options)
+  end
+
+  defp handle_upload(socket), do: socket
 
   defp handle_upgrade(%{assigns: %{step: :upgrade}} = socket) do
     consume_uploaded_entries(socket, :config, fn %{path: path}, _entry ->
@@ -37,7 +42,6 @@ defmodule ChatWeb.MainLive.Admin.FirmwareUpgradeForm do
   defp handle_upgrade(socket), do: socket
 
   def render(%{step: :upload} = assigns) do
-    IO.inspect self(), label: :me
     ~H"""
     <div>
       <.form

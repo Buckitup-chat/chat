@@ -6,6 +6,8 @@ defmodule ChatWeb.MainLive.Layout.Card do
   alias Chat.Card
   alias Chat.Rooms.Room
 
+  alias Phoenix.LiveView.JS
+
   @basic_text_style "text-sm"
   @grayscale_text_style "text-sm tracking-tighter text-grayscale600"
   @white_hash_text_style "text-base text-white/60"
@@ -29,6 +31,7 @@ defmodule ChatWeb.MainLive.Layout.Card do
   attr :room, Room, doc: "room sctruct"
   attr :selected_room, Room, doc: "selected room sctruct"
   attr :style_spec, :atom, default: :dialog_selection, doc: "style spec"
+  attr :show_link?, :boolean, default: false, doc: "to show the chat link?"
 
   def hashed_name(assigns) do
     assigns =
@@ -46,7 +49,14 @@ defmodule ChatWeb.MainLive.Layout.Card do
       |> assign_new(:name_style, &set_name_style/1)
 
     ~H"""
-    <div class="inline-flex">
+    <div
+      class="inline-flex"
+      phx-click={
+        if @show_link? do
+          JS.push("dialog/show-link", value: %{hash: @card.hash})
+        end
+      }
+    >
       <%= if @is_me? do %>
         <div class="text-sm t-my-notes">My notes</div>
       <% else %>

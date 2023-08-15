@@ -8,7 +8,7 @@ defmodule ChatWeb.MainLive.Modals.ConfirmFirmwareUpgrade do
       <h1 class="text-base font-bold text-grayscale">Upgrade firmware?</h1>
       <div class="mt-1 w-full h-7 flex items-center justify-between">
         <blockquote class="mt-2 ml-2 text-sm text-black/50 mr-3">
-          Are you sure?. The reb  oot will be performed automatically after the upgrade.
+          Are you sure?. The reboot will be performed automatically after the upgrade.
         </blockquote>
       </div>
       <div class="mt-1 flex items-center justify-between">

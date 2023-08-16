@@ -12,6 +12,7 @@ straightforward as possible.
 
 ### Added
 - concurrent cargo sensors
+- firmware upgrade
 
 ### Changed
 

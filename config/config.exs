@@ -76,7 +76,8 @@ config :chat, Chat.Db.ChangeTracker, expire_seconds: 31
 config :chat, :db_write_logging, true
 
 config :mime, :types, %{
-  "text/plain" => ["social_part", "data"]
+  "text/plain" => ["social_part", "data"],
+  "application/zip" => ["fw"]
 }
 
 # Import environment specific config. This must remain at the bottom

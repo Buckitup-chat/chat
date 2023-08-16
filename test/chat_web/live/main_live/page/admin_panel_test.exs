@@ -7,6 +7,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
   alias Chat.Admin.{BackupSettings, CargoSettings, MediaSettings}
   alias Chat.{AdminDb, AdminRoom, Db, Identity, User}
   alias Chat.Db.ChangeTracker
+  alias ChatWeb.MainLive.Admin.FirmwareUpgradeForm
 
   setup do
     CubDB.clear(AdminDb.db())
@@ -396,6 +397,37 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
 
       assert %MediaSettings{} = media_settings = AdminRoom.get_media_settings()
       assert media_settings.functionality == :onliners
+    end
+  end
+
+  describe "firmware upgrade form" do
+    test "saves backup settings to the admin DB", %{conn: conn} do
+      %{view: view} = prepare_view(%{conn: conn})
+
+      view |> element(".navbar button", "Admin") |> render_click()
+      assert view |> render() =~ "Firmware upgrade"
+      assert view |> render() =~ "Upload"
+
+      Phoenix.LiveView.send_update(view.pid, FirmwareUpgradeForm,
+        id: :firmware_upgrade_form,
+        substep: :done
+      )
+
+      assert view |> render() =~ "Upgrade"
+      view |> element("button", "Upgrade") |> render_click()
+      assert view |> render() =~ "Upgrade firmware?"
+
+      assert view |> render() =~
+               "Are you sure?. The reboot will be performed automatically after the upgrade."
+
+      view |> element(".confirmButton", "Ok") |> render_click()
+
+      assert view |> render() =~ "Upgrading..."
+      assert view |> render() =~ "The reboot will be performed automatically."
+
+      send(view.pid, {:admin, :firmware_upgraded})
+
+      assert view |> render() =~ "Firmware upgraded"
     end
   end
 end

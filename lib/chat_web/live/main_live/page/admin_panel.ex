@@ -1,7 +1,8 @@
 defmodule ChatWeb.MainLive.Page.AdminPanel do
   @moduledoc "Admin functions page"
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [push_event: 3, send_update: 2]
+  import Phoenix.LiveView, only: [push_event: 3, put_flash: 3, send_update: 2]
+  import ChatWeb.LiveHelpers, only: [open_modal: 2, close_modal: 1]
 
   alias Chat.RoomInviteIndex
   alias Phoenix.PubSub
@@ -20,6 +21,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Chat.User
   alias Chat.User.UsersBroker
   alias ChatWeb.MainLive.Admin.CargoWeightSensorForm
+  alias ChatWeb.MainLive.Admin.FirmwareUpgradeForm
   alias ChatWeb.Router.Helpers, as: Routes
 
   @admin_topic "chat::admin"
@@ -249,6 +251,25 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
 
     socket
     |> assign(:cargo_user, cargo_user)
+  end
+
+  def upgrade_firmware_confirmation(socket) do
+    socket
+    |> open_modal(ChatWeb.MainLive.Modals.ConfirmFirmwareUpgrade)
+  end
+
+  def upgrade_firmware(socket) do
+    send_update(FirmwareUpgradeForm, id: :firmware_upgrade_form, step: :upgrade)
+
+    socket
+    |> close_modal()
+  end
+
+  def notify_firmware_upgraded(socket) do
+    send_update(FirmwareUpgradeForm, id: :firmware_upgrade_form, substep: :done)
+
+    socket
+    |> put_flash(:info, "Firmware upgraded")
   end
 
   defp save_file({file_key, content}, {size, file_secret}) do

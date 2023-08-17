@@ -2,9 +2,10 @@ defmodule Chat.Admin.CargoSettingsTest do
   use ChatWeb.DataCase, async: true
 
   alias Chat.Admin.CargoSettings
+  alias Chat.Card
 
   describe "checkpoints_changeset/2" do
-    @valid_params %{checkpoints: ["1234"]}
+    @valid_params %{checkpoints: [%Card{}, %Card{}]}
 
     test "with valid params returns valid changeset" do
       assert %Ecto.Changeset{} =

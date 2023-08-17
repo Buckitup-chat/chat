@@ -7,6 +7,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
   alias Chat.Admin.{BackupSettings, CargoSettings, MediaSettings}
   alias Chat.{AdminDb, AdminRoom, Db, Identity, User}
   alias Chat.Db.ChangeTracker
+  alias Chat.User.UsersBroker
   alias ChatWeb.MainLive.Admin.FirmwareUpgradeForm
 
   setup do
@@ -84,18 +85,29 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
         |> Identity.pub_key()
         |> Base.encode16(case: :lower)
 
-      encoded_checkpoint_1_pub_key =
+      {encoded_checkpoint_1_pub_key, _card1} =
         "Checkpoint 1"
         |> User.login()
         |> tap(&User.register/1)
-        |> Identity.pub_key()
-        |> Base.encode16(case: :lower)
+        |> tap(&UsersBroker.put/1)
+        |> then(fn identity ->
+          {
+            identity |> Identity.pub_key() |> Base.encode16(case: :lower),
+            identity |> Chat.Card.from_identity()
+          }
+        end)
 
-      checkpoint_2_pub_key =
+      {checkpoint_2_pub_key, card2} =
         "Checkpoint 2"
         |> User.login()
         |> tap(&User.register/1)
-        |> Identity.pub_key()
+        |> tap(&UsersBroker.put/1)
+        |> then(fn identity ->
+          {
+            identity |> Identity.pub_key(),
+            identity |> Chat.Card.from_identity()
+          }
+        end)
 
       ChangeTracker.await()
 
@@ -194,13 +206,13 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
              )
 
       assert %CargoSettings{} = cargo_settings = AdminRoom.get_cargo_settings()
-      assert cargo_settings.checkpoints == [checkpoint_2_pub_key]
+      assert cargo_settings.checkpoints == [card2]
     end
 
     defp assert_users(view, type, users) do
       Enum.each(users, fn user ->
         assert view
-               |> element(~s(.users-list li[phx-value-type="#{type}"] p), user)
+               |> element(~s(.users-list li[phx-value-type="#{type}"] ), user)
                |> has_element?(),
                "Expected to have #{user} in #{humanized_type(type)}"
       end)
@@ -209,7 +221,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
     defp refute_users(view, type, users) do
       Enum.each(users, fn user ->
         refute view
-               |> element(~s(.users-list li[phx-value-type="#{type}"] p), user)
+               |> element(~s(.users-list li[phx-value-type="#{type}"]), user)
                |> has_element?(),
                "Expected not to have #{user} in #{humanized_type(type)}"
       end)

@@ -198,19 +198,22 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     |> assign(:user_list, nil)
   end
 
-  def connect_to_weight_sensor(socket, name, opts) do
-    request_platform({:connect_to_weight_sensor, name, opts})
+  def connect_to_weight_sensor(socket, device_params, opts) do
+    request_platform({:connect_to_weight_sensor, device_params, opts})
 
     socket
   end
 
   def weight_sensor_connection_status(socket, status) do
-    status_str = if status == :ok, do: "Established", else: "Failed"
+    case status do
+      {:ok, msg} ->
+        [connection_status: "Established", test_message: msg]
 
-    send_update(CargoWeightSensorForm,
-      id: :cargo_weight_sensor_form,
-      connection_status: status_str
-    )
+      _ ->
+        [connection_status: "Failed", test_message: ""]
+    end
+    |> Keyword.put(:id, :cargo_weight_sensor_form)
+    |> then(&send_update(CargoWeightSensorForm, &1))
 
     socket
   end

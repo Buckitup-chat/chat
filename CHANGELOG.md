@@ -15,6 +15,7 @@ straightforward as possible.
 - firmware upgrade
 
 ### Changed
+- extend cargo checkpoints
 
 ### Fixed
 - pause uploads when uploader is busy (IMPROVED)

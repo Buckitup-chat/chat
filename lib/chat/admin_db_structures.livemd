@@ -43,7 +43,7 @@ Set cargo checkpoints. Checkpoints are automatically invited to the Cargo rooms.
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-{:cargo_settings, CargoSettings{checkpoints: [pub_key1, pub_key2, pub_key3]}}
+{:cargo_settings, CargoSettings{checkpoints: [#Chat.Card<name: "Bob", ...>, #Chat.Card<name: "Alice", ...>]}}
 ```
 
 <!-- livebook:{"break_markdown":true} -->

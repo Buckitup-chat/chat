@@ -5,7 +5,7 @@ defmodule ChatWeb.MainLive.Index do
   require Logger
 
   alias Chat.Admin.CargoSettings
-  alias Chat.{AdminRoom, Dialogs, Identity, Messages, RoomInviteIndex, User}
+  alias Chat.{AdminRoom, Dialogs, Identity, Messages, RoomInviteIndex}
   alias Chat.Rooms.Room
   alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
   alias ChatWeb.Hooks.{LiveModalHook, LocalTimeHook, UploaderHook}
@@ -348,8 +348,8 @@ defmodule ChatWeb.MainLive.Index do
     %Room{} = room = socket.assigns.room
 
     cargo_settings.checkpoints
-    |> Enum.each(fn checkpoint_pub_key ->
-      dialog = Dialogs.open(me, checkpoint_pub_key |> User.by_id())
+    |> Enum.each(fn checkpoint ->
+      dialog = Dialogs.open(me, checkpoint)
 
       invites =
         Dialogs.read(dialog, me)
@@ -515,8 +515,8 @@ defmodule ChatWeb.MainLive.Index do
     %Identity{} = me = socket.assigns.me
 
     cargo_settings.checkpoints
-    |> Enum.each(fn checkpoint_pub_key ->
-      dialog = Dialogs.find_or_open(me, checkpoint_pub_key |> User.by_id())
+    |> Enum.each(fn checkpoint ->
+      dialog = Dialogs.find_or_open(me, checkpoint)
 
       room_identity
       |> Map.put(:name, room.name)

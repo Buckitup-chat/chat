@@ -10,7 +10,7 @@ defmodule Chat.Admin.CargoSettings do
   @camera_sensors_default [""]
   @primary_key false
   embedded_schema do
-    field(:checkpoints, {:array, :string}, default: [])
+    field(:checkpoints, {:array, :map}, default: [])
     field(:camera_sensors, {:array, :string}, default: @camera_sensors_default)
     field(:weight_sensor, :map, default: %{type: "NCI", parity: :none})
   end

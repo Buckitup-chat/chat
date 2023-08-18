@@ -20,7 +20,7 @@ defmodule ChatWeb.MainLive.Admin.CargoWeightSensorForm do
       name <- weight_sensor[:name],
       true <- is_binary(name) and byte_size(name) > 0,
       opts <- Map.drop(weight_sensor, [:name, :type]) |> Map.to_list() do
-        send(self(), {:admin, {:connect_to_weight_sensor, {type, name}, opts}})
+        test_weight_sensor_connection(type, name, opts)
     end
 
     socket
@@ -131,10 +131,28 @@ defmodule ChatWeb.MainLive.Admin.CargoWeightSensorForm do
     :ok = cargo_settings |> Map.put(:weight_sensor, params) |> AdminRoom.store_cargo_settings()
 
     send(self(), :update_cargo_settings)
-    send(self(), {:admin, {:connect_to_weight_sensor, {type, name}, opts}})
+    test_weight_sensor_connection(type, name, opts)
 
     socket
     |> noreply()
+  end
+
+  defp test_weight_sensor_connection(type, name, opts) do
+    require Logger
+    opts =
+      if is_binary(opts[:parity]) do
+        opts
+        |> Keyword.delete(:parity)
+        |> Keyword.put(:parity,  opts[:parity] |> String.to_existing_atom())
+      else
+        opts
+      end
+    send(self(), {:admin, {:connect_to_weight_sensor, {type, name}, opts}})
+
+    {:admin, {:connect_to_weight_sensor, {type, name}, opts}}
+    |> inspect()
+    |> Logger.warn()
+
   end
 
   defp connection_status(assigns) do

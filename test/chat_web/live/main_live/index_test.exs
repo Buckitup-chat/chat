@@ -165,6 +165,7 @@ defmodule ChatWeb.MainLive.IndexTest do
       Db.db() |> CubDB.clear()
       CargoRoom.remove()
       UsbDriveDumpRoom.remove()
+      UsersBroker.sync()
 
       :ok
     end

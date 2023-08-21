@@ -18,10 +18,14 @@ defmodule Chat.FileFs.Dir2 do
     end)
   end
 
-  def has_file?({_, _, _} = keys, prefix \\ nil) do
+  def has_file?({_, chunk_start, chunk_end} = keys, prefix \\ nil) do
     keys
     |> file_path(build_path(prefix))
-    |> File.exists?()
+    |> File.stat(time: :posix)
+    |> case do
+      {:ok, stat} -> chunk_start + stat.size == chunk_end + 1
+      _ -> false
+    end
   end
 
   def read_exact_file_chunk({first, last}, key, prefix \\ nil) do

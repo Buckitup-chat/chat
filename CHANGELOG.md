@@ -16,6 +16,7 @@ straightforward as possible.
 
 ### Changed
 - extend cargo checkpoints
+- await full file [#456]
 
 ### Fixed
 - pause uploads when uploader is busy (IMPROVED)

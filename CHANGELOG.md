@@ -20,6 +20,7 @@ straightforward as possible.
 
 ### Fixed
 - pause uploads when uploader is busy (IMPROVED)
+- cargo user invitation [#460]
 
 
 ## 2023-08-11_279815b___2023-08-11_24d6bac

@@ -13,6 +13,7 @@ straightforward as possible.
 ### Added
 - concurrent cargo sensors
 - firmware upgrade
+- weight cargo sensor into cargo room
 
 ### Changed
 - extend cargo checkpoints

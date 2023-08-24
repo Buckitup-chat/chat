@@ -2,7 +2,6 @@ defmodule ChatWeb.MainLive.Admin.CargoWeightSensorForm do
   @moduledoc """
   Handles showing and updating cargo weight sensor settings form data.
   """
-
   use ChatWeb, :live_component
 
   import Phoenix.Component
@@ -15,12 +14,12 @@ defmodule ChatWeb.MainLive.Admin.CargoWeightSensorForm do
     weight_sensor = cargo_settings.weight_sensor
 
     with true <- weight_sensor !== %{},
-      type <- weight_sensor[:type],
-      true <- is_binary(type) and byte_size(type) > 0,
-      name <- weight_sensor[:name],
-      true <- is_binary(name) and byte_size(name) > 0,
-      opts <- Map.drop(weight_sensor, [:name, :type]) |> Map.to_list() do
-        test_weight_sensor_connection(type, name, opts)
+         type <- weight_sensor[:type],
+         true <- is_binary(type) and byte_size(type) > 0,
+         name <- weight_sensor[:name],
+         true <- is_binary(name) and byte_size(name) > 0,
+         opts <- Map.drop(weight_sensor, [:name, :type]) |> Map.to_list() do
+      test_weight_sensor_connection(type, name, opts)
     end
 
     socket
@@ -126,7 +125,9 @@ defmodule ChatWeb.MainLive.Admin.CargoWeightSensorForm do
         %{assigns: %{changeset: changeset, cargo_settings: cargo_settings}} = socket
       ) do
     params = changeset |> Ecto.Changeset.apply_action!(:update)
-    {[name: name, type: type], opts} = params |> Enum.split_with(fn {k, _} -> k in [:name, :type] end)
+
+    {[name: name, type: type], opts} =
+      params |> Enum.split_with(fn {k, _} -> k in [:name, :type] end)
 
     :ok = cargo_settings |> Map.put(:weight_sensor, params) |> AdminRoom.store_cargo_settings()
 
@@ -139,20 +140,17 @@ defmodule ChatWeb.MainLive.Admin.CargoWeightSensorForm do
 
   defp test_weight_sensor_connection(type, name, opts) do
     require Logger
+
     opts =
       if is_binary(opts[:parity]) do
         opts
         |> Keyword.delete(:parity)
-        |> Keyword.put(:parity,  opts[:parity] |> String.to_existing_atom())
+        |> Keyword.put(:parity, opts[:parity] |> String.to_existing_atom())
       else
         opts
       end
+
     send(self(), {:admin, {:connect_to_weight_sensor, {type, name}, opts}})
-
-    {:admin, {:connect_to_weight_sensor, {type, name}, opts}}
-    |> inspect()
-    |> Logger.warn()
-
   end
 
   defp connection_status(assigns) do

@@ -3,11 +3,13 @@ defmodule Chat.Sync.Weigh.NCI do
   NCI weigh protocol helpers
   """
 
+  def parse_weight_response(""), do: {:error, :no_data}
+
   def parse_weight_response(binary) do
     Regex.named_captures(~r/\n *(?<weight>\S+)\r\n(?<status>.{2,3})\r\x03/m, binary)
     |> case do
       %{"weight" => weight, "status" => status} -> {:ok, {weight, status}}
-      x -> {:error, x}
+      x -> {:error, {:parsing, binary, x}}
     end
   end
 

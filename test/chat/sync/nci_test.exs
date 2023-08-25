@@ -31,4 +31,8 @@ defmodule NCITest do
   test "NCI should unwind status" do
     assert @correct_status_map == NCI.parse_status("0p0")
   end
+
+  test "empty should return error" do
+    assert {:error, :no_data} = NCI.parse_weight_response("")
+  end
 end

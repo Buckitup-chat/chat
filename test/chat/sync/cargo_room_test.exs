@@ -15,8 +15,7 @@ defmodule Chat.Sync.CargoRoomTest do
       refute CargoRoom.get_room_key()
 
       operator = User.login("Operator")
-      operator_key = User.register(operator)
-      User.await_saved(operator_key)
+      User.register(operator)
 
       cargo_bot = User.login("CargoBot")
       AdminRoom.store_cargo_user(cargo_bot)
@@ -48,6 +47,36 @@ defmodule Chat.Sync.CargoRoomTest do
       assert end_size == to_string(size)
       assert "cargo_shot_" <> _ = name
       assert ".jpg" = Path.extname(name)
+    end
+  end
+
+  describe "write_text" do
+    test "text should be written into cargo room" do
+      CargoRoom.remove()
+      refute CargoRoom.get_room_key()
+
+      operator = User.login("Operator")
+      User.register(operator)
+
+      cargo_bot = User.login("CargoBot2")
+      AdminRoom.store_cargo_user(cargo_bot)
+      cargo_bot_key = User.register(cargo_bot)
+      User.await_saved(cargo_bot_key)
+
+      content = "Cargo room message text"
+
+      assert :ignore = CargoRoom.write_text(cargo_bot, content)
+
+      {room_identity, room} = Rooms.add(operator, "TestCargoRoom2", :cargo)
+      Rooms.await_saved(room_identity)
+      CargoRoom.activate(room_identity.public_key)
+
+      assert {:ok, db_keys} = CargoRoom.write_text(cargo_bot, content)
+      Chat.Db.Copying.await_written_into(db_keys, Chat.Db.db())
+
+      [%{type: :text, content: read_content}] = Rooms.read(room, room_identity)
+
+      assert read_content == content
     end
   end
 end

@@ -53,6 +53,10 @@ defmodule Chat.Sync.CargoRoom do
     GenServer.call(__MODULE__, {:write_file, writer, content, metadata})
   end
 
+  def write_text(writer, content) do
+    GenServer.call(__MODULE__, {:write_text, writer, content})
+  end
+
   @spec activate(room_key()) :: :ok
   def activate(room_key) do
     GenServer.cast(__MODULE__, {:activate, room_key})
@@ -138,6 +142,31 @@ defmodule Chat.Sync.CargoRoom do
           else
             _ -> :failed
           end
+      end
+
+    {:reply, result, cargo_room}
+  end
+
+  def handle_call({:write_text, writer, content}, _from, cargo_room) do
+    result =
+      case cargo_room do
+        nil ->
+          :ignore
+
+        %{pub_key: room_key} ->
+          message =
+            content
+            |> Messages.Text.new(DateTime.utc_now() |> DateTime.to_unix())
+            |> Rooms.add_new_message(writer, room_key)
+
+          {msg_index, msg} = message
+
+          :ok = PubSub.broadcast!(Chat.PubSub, @cargo_topic, {:room, {:new_message, message}})
+
+          {:ok,
+           MapSet.new([
+             {:room_message, room_key, msg_index, msg.id |> Enigma.hash()}
+           ])}
       end
 
     {:reply, result, cargo_room}

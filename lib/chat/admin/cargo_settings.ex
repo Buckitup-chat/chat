@@ -12,7 +12,7 @@ defmodule Chat.Admin.CargoSettings do
   embedded_schema do
     field(:checkpoints, {:array, :map}, default: [])
     field(:camera_sensors, {:array, :string}, default: @camera_sensors_default)
-    field(:weight_sensor, :map, default: %{})
+    field(:weight_sensor, :map, default: %{type: "NCI", parity: :none})
   end
 
   def checkpoints_changeset(%__MODULE__{} = settings, attrs \\ %{}) do
@@ -48,9 +48,11 @@ defmodule Chat.Admin.CargoSettings do
   end
 
   @weight_sensor_schema %{
+    type: :string,
     name: :string,
     speed: :integer,
     data_bits: :integer,
+    parity: :string,
     stop_bits: :integer
   }
   def weight_sensor_changeset(attrs \\ %{}) do

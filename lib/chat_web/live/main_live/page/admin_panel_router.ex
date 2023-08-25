@@ -66,8 +66,8 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
       {:gpio24_impedance_status, value} ->
         socket |> AdminPanel.set_gpio24_impedance_status(value)
 
-      {:connect_to_weight_sensor, name, opts} ->
-        socket |> AdminPanel.connect_to_weight_sensor(name, opts)
+      {:connect_to_weight_sensor, device_params, opts} ->
+        socket |> AdminPanel.connect_to_weight_sensor(device_params, opts)
 
       {:weight_sensor_connection, status} ->
         socket |> AdminPanel.weight_sensor_connection_status(status)

@@ -1136,7 +1136,9 @@
                     module={CargoUserData}
                   />
                 </Layout.Admin.block>
-                <%= if assigns[:cargo_user] do %>
+              </Layout.Admin.row>
+              <%= if assigns[:cargo_user] do %>
+                <Layout.Admin.row>
                   <Layout.Admin.block title="Cargo camera sensors">
                     <.live_component
                       id={:cargo_camera_sensors_form}
@@ -1151,8 +1153,8 @@
                       module={CargoWeightSensorForm}
                     />
                   </Layout.Admin.block>
-                <% end %>
-              </Layout.Admin.row>
+                </Layout.Admin.row>
+              <% end %>
             <% end %>
           </Layout.Admin.container>
         <% end %>

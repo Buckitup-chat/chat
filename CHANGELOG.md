@@ -16,6 +16,7 @@ straightforward as possible.
 
 ### Changed
 - extend cargo checkpoints
+- update cargo indication docs
 
 ### Fixed
 - pause uploads when uploader is busy (IMPROVED)

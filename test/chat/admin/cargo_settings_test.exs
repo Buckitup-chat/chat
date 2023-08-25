@@ -55,7 +55,14 @@ defmodule Chat.Admin.CargoSettingsTest do
   end
 
   describe "weight_sensor_changeset/1" do
-    @valid_params %{name: "ttyAMA0", speed: 115_200, data_bits: 8, stop_bits: 1, parity: "none", type: "NCI"}
+    @valid_params %{
+      name: "ttyAMA0",
+      speed: 115_200,
+      data_bits: 8,
+      stop_bits: 1,
+      parity: "none",
+      type: "NCI"
+    }
 
     test "with valid params returns valid changeset" do
       assert %Ecto.Changeset{} = changeset = CargoSettings.weight_sensor_changeset(@valid_params)

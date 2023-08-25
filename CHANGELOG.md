@@ -17,9 +17,11 @@ straightforward as possible.
 ### Changed
 - extend cargo checkpoints
 - update cargo indication docs
+- await full file [#456]
 
 ### Fixed
 - pause uploads when uploader is busy (IMPROVED)
+- cargo user invitation [#460]
 
 
 ## 2023-08-11_279815b___2023-08-11_24d6bac

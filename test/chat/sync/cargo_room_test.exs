@@ -3,7 +3,9 @@ defmodule Chat.Sync.CargoRoomTest do
 
   alias Chat.AdminRoom
   alias Chat.Content.Files
+  alias Chat.Db
   alias Chat.Db.ChangeTracker
+  alias Chat.Db.Copying
   alias Chat.Rooms
   alias Chat.Sync.CargoRoom
   alias Chat.User
@@ -72,7 +74,7 @@ defmodule Chat.Sync.CargoRoomTest do
       CargoRoom.activate(room_identity.public_key)
 
       assert {:ok, db_keys} = CargoRoom.write_text(cargo_bot, content)
-      Chat.Db.Copying.await_written_into(db_keys, Chat.Db.db())
+      Copying.await_written_into(db_keys, Db.db())
 
       [%{type: :text, content: read_content}] = Rooms.read(room, room_identity)
 

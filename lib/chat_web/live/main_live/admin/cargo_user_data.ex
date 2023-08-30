@@ -90,7 +90,7 @@ defmodule ChatWeb.MainLive.Admin.CargoUserData do
             phx-drop-target={@uploads.config.ref}
             phx-target={@myself}
           >
-            <%= live_file_input(@uploads.config, style: "display: none") %>
+            <.live_file_input upload={@uploads.config} style="display: none" />
             <input
               style="background-color: rgb(36, 24, 36);"
               class="w-full h-11 mt-2 bg-transparent text-white py-2 px-4 border border-white/0 rounded-lg flex items-center justify-center"

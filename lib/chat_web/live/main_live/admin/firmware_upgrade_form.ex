@@ -53,7 +53,7 @@ defmodule ChatWeb.MainLive.Admin.FirmwareUpgradeForm do
         phx-drop-target={@uploads.config.ref}
         phx-target={@myself}
       >
-        <%= live_file_input(@uploads.config, style: "display: none") %>
+        <.live_file_input upload={@uploads.config} style="display: none" />
         <%= if @substep == :pending do %>
           <input
             style="background-color: rgb(36, 24, 36);"

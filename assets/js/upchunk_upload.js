@@ -36,7 +36,7 @@ const uploadInitializer = (entry, onViewError) => {
     upload.on("progress", (e) => {
       const now = new Date().getTime()
 
-      if (!window.uploaderReorderInProgress && upload.success && !upload.paused && e.detail < 100 && now - lastProgressUpdate > 1000) {
+      if (!window.uploaderReorderInProgress && !upload.paused && e.detail < 100 && now - lastProgressUpdate > 1000) {
         entry.progress(e.detail)
         lastProgressUpdate = now
       }

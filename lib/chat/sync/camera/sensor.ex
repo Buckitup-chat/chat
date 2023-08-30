@@ -2,7 +2,7 @@ defmodule Chat.Sync.Camera.Sensor do
   @moduledoc """
   Get image by url or ONVIF supported host
 
-  Url with no path is condiered to be ONVIF profile S compatible
+  Url with no path is considered to be ONVIF profile S compatible
   """
 
   alias Onvif.Media.Ver10.GetProfiles

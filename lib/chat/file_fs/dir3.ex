@@ -12,7 +12,7 @@ defmodule Chat.FileFs.Dir3 do
     |> file_path(build_path(prefix))
     |> File.stat(time: :posix)
     |> case do
-      {:ok, stat} -> chunk_start + stat.size == chunk_end + 1
+      {:ok, stat} -> chunk_start + stat.size >= chunk_end + 1
       _ -> false
     end
   end

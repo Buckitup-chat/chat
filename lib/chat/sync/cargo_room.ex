@@ -50,11 +50,11 @@ defmodule Chat.Sync.CargoRoom do
 
   @spec write_file(Chat.Identity.t(), binary, map()) :: {:ok, MapSet.t()} | :ignore | :failed
   def write_file(writer, content, metadata) do
-    GenServer.call(__MODULE__, {:write_file, writer, content, metadata})
+    GenServer.call(__MODULE__, {:write_file, writer, content, metadata}, 30_000)
   end
 
   def write_text(writer, content) do
-    GenServer.call(__MODULE__, {:write_text, writer, content})
+    GenServer.call(__MODULE__, {:write_text, writer, content}, 30_000)
   end
 
   @spec activate(room_key()) :: :ok

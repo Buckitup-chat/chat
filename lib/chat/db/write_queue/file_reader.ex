@@ -60,20 +60,17 @@ defmodule Chat.Db.WriteQueue.FileReader do
 
   @impl true
   def handle_call(
-        {:add_task, {:file_chunk, chunk_key, first, last} = key, files_path},
+        {:add_task, key, files_path},
         _,
         %__MODULE__{read_supervisor: task_supervisor, keys: keys} = state
       ) do
     task =
       %{ref: ref} =
       Task.Supervisor.async(task_supervisor, fn ->
-        try do
-          {content, _last} =
-            Chat.FileFs.read_exact_file_chunk({first, last}, chunk_key, files_path)
-
-          {key, content}
-        rescue
-          _ -> :error
+        read_or_fail_with(key, files_path, :retry)
+        |> case do
+          :retry -> read_or_fail_with(key, files_path, :error)
+          good -> good
         end
       end)
 
@@ -117,6 +114,18 @@ defmodule Chat.Db.WriteQueue.FileReader do
     state |> noreply()
   end
 
+  defp read_or_fail_with({:file_chunk, chunk_key, first, last} = key, path, fail_marker) do
+    try do
+      Chat.FileFs.read_exact_file_chunk({first, last}, chunk_key, path)
+      |> case do
+        {"", _} -> fail_marker
+        {content, _} -> {key, content}
+      end
+    rescue
+      _ -> fail_marker
+    end
+  end
+
   defp log_reader_ended(key, reason, name) do
     "#{name} Reading #{key} ended with reason: #{reason}" |> log(:error)
   end
@@ -126,7 +135,7 @@ defmodule Chat.Db.WriteQueue.FileReader do
   end
 
   defp log_error_reading(msg, name) do
-    "#{name} Error reading #{msg}" |> log(:warn)
+    "#{name} Error reading #{inspect(msg)}" |> log(:warn)
   end
 
   defp log(message, level) do

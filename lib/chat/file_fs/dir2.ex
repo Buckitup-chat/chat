@@ -8,11 +8,18 @@ defmodule Chat.FileFs.Dir2 do
 
   @int_padding 20
 
-  def write_file(data, {_, _, _} = keys, prefix \\ nil) do
-    keys
-    |> file_path(build_path(prefix))
-    |> tap(&create_dirs/1)
-    |> File.open([:write, :sync], fn file ->
+  def write_file(data, {_, first, last} = keys, prefix \\ nil) do
+    data_size = byte_size(data)
+    meta_size = last - first + 1
+
+    if data_size != meta_size do
+      log_ingress_chunk_integrity_error(keys, actual: data_size, declared: meta_size)
+    end
+
+    path = file_path(keys, build_path(prefix))
+    create_dirs(path)
+
+    File.open(path, [:write, :sync], fn file ->
       :ok = IO.binwrite(file, data)
       :ok = :file.datasync(file)
     end)
@@ -23,7 +30,7 @@ defmodule Chat.FileFs.Dir2 do
     |> file_path(build_path(prefix))
     |> File.stat(time: :posix)
     |> case do
-      {:ok, stat} -> chunk_start + stat.size >= chunk_end + 1
+      {:ok, stat} -> chunk_start + stat.size == chunk_end + 1
       _ -> false
     end
   end

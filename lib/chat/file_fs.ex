@@ -3,6 +3,8 @@ defmodule Chat.FileFs do
 
   import Chat.FileFs.Common
 
+  require Logger
+
   alias Chat.FileFs.Dir2
   alias Chat.FileFs.Dir3
 
@@ -92,9 +94,44 @@ defmodule Chat.FileFs do
       |> Stream.map(&String.slice(&1, (dir_length + 1)..-1))
       |> Stream.map(&filename_to_db_key/1)
       |> Enum.to_list()
+      |> tap(&check_integrity(&1, prefix))
     else
       []
     end
+  end
+
+  def list_file_errors(prefix) do
+    dir = build_path(prefix)
+    dir_length = String.length(dir)
+
+    if File.dir?(dir) do
+      dir
+      |> list_files()
+      |> Stream.flat_map(&chunks_in_file_dir/1)
+      |> Stream.reject(&is_nil/1)
+      |> Stream.map(&String.slice(&1, (dir_length + 1)..-1))
+      |> Stream.map(&filename_to_db_key/1)
+      |> Enum.to_list()
+    else
+      []
+    end
+    |> Enum.map(fn {_, a, b, c} = key ->
+      filename =
+        [key_path(a, build_path(prefix)), "#{b |> offset_name()}-#{c |> offset_name()}"]
+        |> Path.join()
+
+      case File.stat(filename) do
+        {:ok, stat} -> {filename, key, stat.size}
+        _ -> {filename, key, :no_file}
+      end
+    end)
+    |> Enum.reject(fn {_, {_, _, first, last}, size} ->
+      if is_integer(size) do
+        last - first + 1 == size
+      else
+        false
+      end
+    end)
   end
 
   ##
@@ -148,5 +185,30 @@ defmodule Chat.FileFs do
     end)
   rescue
     _ -> []
+  end
+
+  defp check_integrity(key_list, prefix) do
+    total = Enum.count(key_list)
+
+    broken =
+      Enum.reject(key_list, fn {_, a, b, c} ->
+        has_file?({a, b, c}, prefix)
+      end)
+
+    broken_count = Enum.count(broken)
+
+    if broken_count > 0 do
+      log_broken(Enum.take(broken, 10), broken_count, total, prefix)
+    end
+  end
+
+  defp log_broken(list, broken, total, prefix) do
+    [
+      "[chat] ",
+      "[file_fs] ",
+      "Integrity broken on #{prefix}",
+      "\nBroken #{broken} of #{total}, like: \n#{inspect(list, pretty: true)}"
+    ]
+    |> Logger.warning()
   end
 end

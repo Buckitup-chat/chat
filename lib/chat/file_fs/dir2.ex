@@ -6,6 +6,8 @@ defmodule Chat.FileFs.Dir2 do
   """
   import Chat.FileFs.Common
 
+  require Logger
+
   @int_padding 20
 
   def write_file(data, {_, first, last} = keys, prefix \\ nil) do
@@ -22,6 +24,21 @@ defmodule Chat.FileFs.Dir2 do
     File.open(path, [:write, :sync], fn file ->
       :ok = IO.binwrite(file, data)
       :ok = :file.datasync(file)
+    end)
+    |> tap(fn _ ->
+      case File.stat(path, time: :posix) do
+        {:ok, stat} ->
+          if stat.size != data_size do
+            log_written_chunk_integrity_error(
+              keys,
+              {data_size, meta_size},
+              {:wrong_size, stat.size}
+            )
+          end
+
+        _ ->
+          log_written_chunk_integrity_error(keys, {data_size, meta_size}, {:no_file, path})
+      end
     end)
   end
 
@@ -81,5 +98,40 @@ defmodule Chat.FileFs.Dir2 do
     path
     |> Path.dirname()
     |> File.mkdir_p!()
+  end
+
+  defp log_ingress_chunk_integrity_error(keys, opts) do
+    [
+      inspect(keys),
+      "\n    data size: ",
+      inspect(opts[:actual]),
+      "\n    declared size: ",
+      inspect(opts[:declared])
+    ]
+    |> log()
+  end
+
+  defp log_written_chunk_integrity_error(keys, {data, meta}, error) do
+    case error do
+      {:wrong_size, file_size} -> "Wrong size written: #{file_size} "
+      {:no_file, path} -> "File is not written #{path} "
+    end
+    |> then(
+      &[
+        &1,
+        "data: ",
+        inspect(data),
+        "meta: ",
+        inspect(meta),
+        "\n",
+        inspect(keys)
+      ]
+    )
+    |> log()
+  end
+
+  defp log(msg) do
+    ["[chat] ", "[file_fs] " | msg]
+    |> Logger.warning()
   end
 end

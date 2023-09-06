@@ -20,6 +20,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Chat.Upload.UploadKey
   alias Chat.User
   alias Chat.User.UsersBroker
+  alias ChatWeb.MainLive.Admin.CargoCheckpointsForm
   alias ChatWeb.MainLive.Admin.CargoWeightSensorForm
   alias ChatWeb.MainLive.Admin.FirmwareUpgradeForm
   alias ChatWeb.Router.Helpers, as: Routes
@@ -254,6 +255,10 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
 
     socket
     |> assign(:cargo_user, cargo_user)
+    |> assign_user_lists()
+    |> tap(fn _ ->
+      send_update(CargoCheckpointsForm, id: :cargo_checkpoints_form, action: :refresh)
+    end)
   end
 
   def upgrade_firmware_confirmation(socket) do

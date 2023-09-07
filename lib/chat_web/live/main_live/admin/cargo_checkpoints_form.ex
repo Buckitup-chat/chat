@@ -22,6 +22,7 @@ defmodule ChatWeb.MainLive.Admin.CargoCheckpointsForm do
     |> ok()
   end
 
+  @impl Phoenix.LiveComponent
   def update(assigns, socket) do
     socket
     |> assign(assigns)

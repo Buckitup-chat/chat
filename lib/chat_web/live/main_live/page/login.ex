@@ -13,7 +13,6 @@ defmodule ChatWeb.MainLive.Page.Login do
   alias Chat.Sync.DbBrokers
   alias Chat.User
   alias Chat.User.UsersBroker
-  alias ChatWeb.MainLive.Page
 
   @local_store_auth_key "buckitUp-chat-auth-v2"
   @local_store_room_count_key "buckitUp-room-count-v2"

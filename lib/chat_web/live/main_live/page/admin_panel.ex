@@ -23,8 +23,8 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Chat.User.UsersBroker
 
   alias ChatWeb.MainLive.Admin.CargoCheckpointsForm
-  alias ChatWeb.MainLive.Admin.CargoWeightSensorForm
   alias ChatWeb.MainLive.Admin.CargoUserData
+  alias ChatWeb.MainLive.Admin.CargoWeightSensorForm
   alias ChatWeb.MainLive.Admin.FirmwareUpgradeForm
   alias ChatWeb.Router.Helpers, as: Routes
 

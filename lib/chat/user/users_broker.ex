@@ -3,6 +3,8 @@ defmodule Chat.User.UsersBroker do
   use GenServer
   import Tools.GenServerHelpers
 
+  alias Phoenix.PubSub
+
   alias Chat.Card
   alias Chat.User
 

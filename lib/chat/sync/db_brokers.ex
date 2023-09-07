@@ -12,6 +12,10 @@ defmodule Chat.Sync.DbBrokers do
     :ok = RoomsBroker.sync()
     :ok = UsersBroker.sync()
 
+    broadcast_refresh()
+  end
+
+  def broadcast_refresh do
     :ok = PubSub.broadcast(Chat.PubSub, @lobby_topic, {:lobby, :refresh_rooms_and_users})
     :ok = PubSub.broadcast(Chat.PubSub, @admin_topic, {:admin, :refresh_rooms_and_users})
   end

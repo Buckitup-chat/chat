@@ -3,6 +3,7 @@ defmodule NaiveApi.User do
   use NaiveApi, :resolver
   alias Chat.User
   alias Chat.User.UsersBroker
+  alias Chat.Sync.DbBrokers
 
   def signup(_, %{name: name}, _) do
     name
@@ -10,6 +11,7 @@ defmodule NaiveApi.User do
     |> User.login()
     |> tap(&User.register/1)
     |> tap(&UsersBroker.put/1)
+    |> tap(fn _ -> DbBrokers.broadcast_refresh() end)
     |> ok()
   end
 

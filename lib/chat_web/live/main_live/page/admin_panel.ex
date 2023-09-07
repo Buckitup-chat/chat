@@ -17,11 +17,14 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Chat.Messages
   alias Chat.Rooms
   alias Chat.Rooms.RoomsBroker
+  alias Chat.Sync.DbBrokers
   alias Chat.Upload.UploadKey
   alias Chat.User
   alias Chat.User.UsersBroker
+
   alias ChatWeb.MainLive.Admin.CargoCheckpointsForm
   alias ChatWeb.MainLive.Admin.CargoWeightSensorForm
+  alias ChatWeb.MainLive.Admin.CargoUserData
   alias ChatWeb.MainLive.Admin.FirmwareUpgradeForm
   alias ChatWeb.Router.Helpers, as: Routes
 
@@ -144,18 +147,18 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     hash
     |> tap(&User.remove/1)
     |> tap(&UsersBroker.forget/1)
+    |> tap(fn _ -> DbBrokers.broadcast_refresh() end)
 
     socket
-    |> assign_user_lists()
   end
 
   def remove_room(socket, hash) do
     hash
     |> tap(&Rooms.delete/1)
     |> tap(&RoomsBroker.forget/1)
+    |> tap(fn _ -> DbBrokers.broadcast_refresh() end)
 
     socket
-    |> assign_room_list()
   end
 
   def render_device_log(socket, {nil, log}), do: render_device_log(socket, log)
@@ -185,6 +188,10 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     socket
     |> assign_room_list()
     |> assign_user_lists()
+    |> tap(fn _ ->
+      send_update(CargoCheckpointsForm, id: :cargo_checkpoints_form, action: :refresh)
+      send_update(CargoUserData, id: :cargo_user_data, cargo_user: AdminRoom.get_cargo_user())
+    end)
   end
 
   def close(%{assigns: %{me: %{name: admin}}} = socket) do
@@ -225,13 +232,10 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
       |> tap(&AdminRoom.store_cargo_user/1)
       |> tap(&User.register/1)
       |> tap(&UsersBroker.put/1)
+      |> tap(fn _ -> DbBrokers.broadcast_refresh() end)
 
     socket
     |> assign(:cargo_user, cargo_user)
-    |> assign_user_lists()
-    |> tap(fn _ ->
-      send_update(CargoCheckpointsForm, id: :cargo_checkpoints_form, action: :refresh)
-    end)
     |> process(fn _ ->
       AdminRoom.admin_list()
       |> Enum.each(fn admin_card ->

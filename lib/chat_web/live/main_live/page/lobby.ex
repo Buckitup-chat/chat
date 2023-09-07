@@ -1,5 +1,7 @@
 defmodule ChatWeb.MainLive.Page.Lobby do
   @moduledoc "Lobby part of chat. User list and room list"
+
+  import ChatWeb.LiveHelpers, only: [process: 2]
   import Phoenix.Component, only: [assign: 3]
   require Logger
 
@@ -227,22 +229,6 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   def close(socket) do
     PubSub.unsubscribe(Chat.PubSub, @topic)
     PubSub.unsubscribe(Chat.PubSub, StatusPoller.channel())
-
-    socket
-  end
-
-  def process(socket, task) do
-    Task.Supervisor.async_nolink(Chat.TaskSupervisor, fn ->
-      try do
-        socket |> task.()
-
-        :ok
-      rescue
-        reason ->
-          Logger.error([inspect(reason)])
-          {:error, task, reason}
-      end
-    end)
 
     socket
   end

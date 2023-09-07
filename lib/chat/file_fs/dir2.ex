@@ -42,16 +42,6 @@ defmodule Chat.FileFs.Dir2 do
     end)
   end
 
-  def has_file?({_, chunk_start, chunk_end} = keys, prefix \\ nil) do
-    keys
-    |> file_path(build_path(prefix))
-    |> File.stat(time: :posix)
-    |> case do
-      {:ok, stat} -> chunk_start + stat.size == chunk_end + 1
-      _ -> false
-    end
-  end
-
   def read_exact_file_chunk({first, last}, key, prefix \\ nil) do
     {key, first, last}
     |> file_path(build_path(prefix))
@@ -84,7 +74,7 @@ defmodule Chat.FileFs.Dir2 do
     _ -> {{:error, :no_dir}, :error}
   end
 
-  defp file_path({binary_key, first, last}, prefix) do
+  def file_path({binary_key, first, last}, prefix) do
     key = binary_key |> Base.encode16(case: :lower)
 
     file =

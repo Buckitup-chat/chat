@@ -115,15 +115,13 @@ defmodule Chat.Db.WriteQueue.FileReader do
   end
 
   defp read_or_fail_with({:file_chunk, chunk_key, first, last} = key, path, fail_marker) do
-    try do
-      Chat.FileFs.read_exact_file_chunk({first, last}, chunk_key, path)
-      |> case do
-        {"", _} -> fail_marker
-        {content, _} -> {key, content}
-      end
-    rescue
-      _ -> fail_marker
+    Chat.FileFs.read_exact_file_chunk({first, last}, chunk_key, path)
+    |> case do
+      {"", _} -> fail_marker
+      {content, _} -> {key, content}
     end
+  rescue
+    _ -> fail_marker
   end
 
   defp log_reader_ended(key, reason, name) do

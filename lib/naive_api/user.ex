@@ -1,6 +1,7 @@
 defmodule NaiveApi.User do
   @moduledoc "User resolvers"
   use NaiveApi, :resolver
+  alias Chat.Sync.DbBrokers
   alias Chat.User
   alias Chat.User.UsersBroker
 
@@ -10,6 +11,7 @@ defmodule NaiveApi.User do
     |> User.login()
     |> tap(&User.register/1)
     |> tap(&UsersBroker.put/1)
+    |> tap(fn _ -> DbBrokers.broadcast_refresh() end)
     |> ok()
   end
 

@@ -25,6 +25,7 @@ straightforward as possible.
 - cargo user invitation [#460]
 - upload progress
 - cargo indication [#465]
+- Admin panel improvments on user changes [#473]
 
 
 ## 2023-08-11_279815b___2023-08-11_24d6bac

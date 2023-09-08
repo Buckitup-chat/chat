@@ -1,5 +1,7 @@
 defmodule ChatWeb.MainLive.Page.Lobby do
   @moduledoc "Lobby part of chat. User list and room list"
+
+  import ChatWeb.LiveHelpers, only: [process: 2]
   import Phoenix.Component, only: [assign: 3]
   require Logger
 
@@ -36,6 +38,8 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> process(&join_approved_requests/1)
   end
 
+  def refresh_rooms_and_users(%{assigns: %{search_filter: :on}} = socket), do: socket
+
   def refresh_rooms_and_users(socket) do
     socket
     |> assign_room_list()
@@ -71,6 +75,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> Page.Room.init({new_room_identity, new_room})
   end
 
+  @deprecated "Use Chat.Sync.DbBrokers/0 instead"
   def notify_new_user(socket, user_card) do
     ChangeTracker.on_saved(fn ->
       PubSub.broadcast!(
@@ -227,22 +232,6 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   def close(socket) do
     PubSub.unsubscribe(Chat.PubSub, @topic)
     PubSub.unsubscribe(Chat.PubSub, StatusPoller.channel())
-
-    socket
-  end
-
-  def process(socket, task) do
-    Task.Supervisor.async_nolink(Chat.TaskSupervisor, fn ->
-      try do
-        socket |> task.()
-
-        :ok
-      rescue
-        reason ->
-          Logger.error([inspect(reason)])
-          {:error, task, reason}
-      end
-    end)
 
     socket
   end

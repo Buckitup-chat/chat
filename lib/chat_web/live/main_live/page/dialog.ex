@@ -24,6 +24,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.MemoIndex
   alias Chat.Messages
   alias Chat.Rooms
+  alias Chat.Sync.DbBrokers
   alias Chat.Upload.UploadMetadata
   alias Chat.User
   alias Chat.Utils
@@ -335,6 +336,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     if new_room_identity.public_key == AdminRoom.pub_key() do
       socket
       |> Page.Lobby.switch_lobby_mode("admin")
+      |> tap(fn _ -> DbBrokers.broadcast_refresh() end)
     else
       socket
       |> Page.Room.init(

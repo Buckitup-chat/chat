@@ -477,7 +477,7 @@ defmodule ChatWeb.MainLive.Index do
     Process.demonitor(ref, [:flush])
 
     socket
-    |> Page.Lobby.process(task)
+    |> process(task)
     |> noreply()
   end
 

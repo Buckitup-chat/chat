@@ -255,6 +255,8 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
       assert view |> render() =~ "CargoBot888"
       assert view |> render() =~ "Download the Keys"
 
+      :timer.sleep(1000)
+
       view
       |> element(".navbar button", "Chats")
       |> render_click()
@@ -301,6 +303,8 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
 
       assert view |> render() =~ "Test User"
       assert view |> render() =~ "Download the Keys"
+
+      :timer.sleep(1000)
 
       view
       |> element(".navbar button", "Chats")

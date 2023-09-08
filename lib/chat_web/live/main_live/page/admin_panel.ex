@@ -2,7 +2,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   @moduledoc "Admin functions page"
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [push_event: 3, put_flash: 3, send_update: 2]
-  import ChatWeb.LiveHelpers, only: [open_modal: 2, close_modal: 1]
+  import ChatWeb.LiveHelpers, only: [open_modal: 2, close_modal: 1, process: 2]
 
   alias Chat.RoomInviteIndex
   alias Phoenix.PubSub
@@ -17,9 +17,13 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias Chat.Messages
   alias Chat.Rooms
   alias Chat.Rooms.RoomsBroker
+  alias Chat.Sync.DbBrokers
   alias Chat.Upload.UploadKey
   alias Chat.User
   alias Chat.User.UsersBroker
+
+  alias ChatWeb.MainLive.Admin.CargoCheckpointsForm
+  alias ChatWeb.MainLive.Admin.CargoUserData
   alias ChatWeb.MainLive.Admin.CargoWeightSensorForm
   alias ChatWeb.MainLive.Admin.FirmwareUpgradeForm
   alias ChatWeb.Router.Helpers, as: Routes
@@ -143,18 +147,18 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     hash
     |> tap(&User.remove/1)
     |> tap(&UsersBroker.forget/1)
+    |> tap(fn _ -> DbBrokers.broadcast_refresh() end)
 
     socket
-    |> assign_user_lists()
   end
 
   def remove_room(socket, hash) do
     hash
     |> tap(&Rooms.delete/1)
     |> tap(&RoomsBroker.forget/1)
+    |> tap(fn _ -> DbBrokers.broadcast_refresh() end)
 
     socket
-    |> assign_room_list()
   end
 
   def render_device_log(socket, {nil, log}), do: render_device_log(socket, log)
@@ -184,6 +188,10 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     socket
     |> assign_room_list()
     |> assign_user_lists()
+    |> tap(fn _ ->
+      send_update(CargoCheckpointsForm, id: :cargo_checkpoints_form, action: :refresh)
+      send_update(CargoUserData, id: :cargo_user_data, cargo_user: AdminRoom.get_cargo_user())
+    end)
   end
 
   def close(%{assigns: %{me: %{name: admin}}} = socket) do
@@ -224,36 +232,44 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
       |> tap(&AdminRoom.store_cargo_user/1)
       |> tap(&User.register/1)
       |> tap(&UsersBroker.put/1)
-
-    AdminRoom.admin_list()
-    |> Enum.each(fn admin_card ->
-      dialog = %{b_key: b_key} = Dialogs.open(cargo_user, admin_card)
-      destination = %{dialog: dialog, pub_key: Base.encode16(b_key, case: :lower), type: :dialog}
-      file_key = UploadKey.new(destination, cargo_user.public_key, backup_entry)
-      file_secret = ChunkedFiles.new_upload(file_key)
-
-      :ok = save_file({file_key, backup_content}, {backup_entry.client_size, file_secret})
-
-      now = DateTime.utc_now() |> DateTime.to_unix()
-
-      text =
-        "The backup `#{backup_entry.client_name}` is not encrypted. Do not share it with anyone."
-
-      %Messages.Text{text: text, timestamp: now}
-      |> Dialogs.add_new_message(identity, dialog)
-      |> MemoIndex.add(dialog, identity)
-
-      {_index, msg} =
-        backup_entry
-        |> Messages.File.new(file_key, file_secret, now)
-        |> Dialogs.add_new_message(cargo_user, dialog)
-
-      FileIndex.save(file_key, dialog.a_key, msg.id, file_secret)
-      FileIndex.save(file_key, dialog.b_key, msg.id, file_secret)
-    end)
+      |> tap(fn _ -> DbBrokers.broadcast_refresh() end)
 
     socket
     |> assign(:cargo_user, cargo_user)
+    |> process(fn _ ->
+      AdminRoom.admin_list()
+      |> Enum.each(fn admin_card ->
+        dialog = %{b_key: b_key} = Dialogs.open(cargo_user, admin_card)
+
+        destination = %{
+          dialog: dialog,
+          pub_key: Base.encode16(b_key, case: :lower),
+          type: :dialog
+        }
+
+        file_key = UploadKey.new(destination, cargo_user.public_key, backup_entry)
+        file_secret = ChunkedFiles.new_upload(file_key)
+
+        :ok = save_file({file_key, backup_content}, {backup_entry.client_size, file_secret})
+
+        now = DateTime.utc_now() |> DateTime.to_unix()
+
+        text =
+          "The backup `#{backup_entry.client_name}` is not encrypted. Do not share it with anyone."
+
+        %Messages.Text{text: text, timestamp: now}
+        |> Dialogs.add_new_message(cargo_user, dialog)
+        |> MemoIndex.add(dialog, cargo_user)
+
+        {_index, msg} =
+          backup_entry
+          |> Messages.File.new(file_key, file_secret, now)
+          |> Dialogs.add_new_message(cargo_user, dialog)
+
+        FileIndex.save(file_key, dialog.a_key, msg.id, file_secret)
+        FileIndex.save(file_key, dialog.b_key, msg.id, file_secret)
+      end)
+    end)
   end
 
   def upgrade_firmware_confirmation(socket) do

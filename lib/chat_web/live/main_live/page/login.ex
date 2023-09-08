@@ -10,9 +10,9 @@ defmodule ChatWeb.MainLive.Page.Login do
   alias Chat.AdminRoom
   alias Chat.Identity
   alias Chat.Log
+  alias Chat.Sync.DbBrokers
   alias Chat.User
   alias Chat.User.UsersBroker
-  alias ChatWeb.MainLive.Page
 
   @local_store_auth_key "buckitUp-chat-auth-v2"
   @local_store_room_count_key "buckitUp-room-count-v2"
@@ -26,6 +26,7 @@ defmodule ChatWeb.MainLive.Page.Login do
       |> User.login()
       |> tap(&User.register/1)
       |> tap(&UsersBroker.put/1)
+      |> tap(fn _ -> DbBrokers.broadcast_refresh() end)
 
     # todo: check setting time before creating
     Log.sign_in(me, socket.assigns.monotonic_offset |> Chat.Time.monotonic_to_unix())
@@ -34,7 +35,6 @@ defmodule ChatWeb.MainLive.Page.Login do
     |> assign_logged_user(me)
     |> store()
     |> close()
-    |> Page.Lobby.notify_new_user(me |> Chat.Card.from_identity())
   end
 
   def load_user(socket, %{"auth" => data} = params) do
@@ -56,6 +56,7 @@ defmodule ChatWeb.MainLive.Page.Login do
     |> User.login()
     |> tap(&User.register/1)
     |> tap(&UsersBroker.put/1)
+    |> tap(fn _ -> DbBrokers.broadcast_refresh() end)
 
     PubSub.subscribe(Chat.PubSub, login_topic(me))
     Log.visit(me, socket.assigns.monotonic_offset |> Chat.Time.monotonic_to_unix())
@@ -63,7 +64,6 @@ defmodule ChatWeb.MainLive.Page.Login do
     socket
     |> assign_logged_user(me, rooms)
     |> close()
-    |> Page.Lobby.notify_new_user(me |> Chat.Card.from_identity())
   end
 
   def load_user(socket, x, y) do

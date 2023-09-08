@@ -8,7 +8,9 @@ defmodule ChatWeb.LiveHelpers do
 
   defdelegate open_modal(socket, component, params \\ %{}), to: LiveModal
   defdelegate close_modal(socket), to: LiveModal
+
   defdelegate send_js(socket, js), to: Shared
+  defdelegate process(socket, fun), to: Shared
 
   @doc """
   Renders a live component inside a modal.

@@ -3,8 +3,8 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
 
   require Logger
 
-  alias ChatWeb.MainLive.Page.AdminPanel
   alias ChatWeb.MainLive.Modals
+  alias ChatWeb.MainLive.Page.AdminPanel
 
   #
   # LiveView events

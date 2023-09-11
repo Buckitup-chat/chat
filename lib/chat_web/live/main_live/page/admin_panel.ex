@@ -2,7 +2,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   @moduledoc "Admin functions page"
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [push_event: 3, put_flash: 3, send_update: 2]
-  import ChatWeb.LiveHelpers, only: [open_modal: 2, close_modal: 1, process: 2]
+  import ChatWeb.LiveHelpers, only: [open_modal: 2, open_modal: 3, close_modal: 1, process: 2]
 
   alias Chat.RoomInviteIndex
   alias Phoenix.PubSub
@@ -129,7 +129,12 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     |> assign(:gpio24_impedance_status, "On")
   end
 
-  def invite_user(%{assigns: %{me: me, room_map: rooms}} = socket, hash) do
+  def show_user_invite_modal(%{assigns: %{user_list: users}} = socket, hash, modal) do
+    socket
+    |> open_modal(modal, %{user: users |> Enum.find(fn card -> card.pub_key == hash end)})
+  end
+
+  def confirm_user_invite(%{assigns: %{me: me, room_map: rooms}} = socket, hash) do
     if new_user = User.by_id(hash) do
       dialog = Dialogs.find_or_open(me, new_user)
 
@@ -141,6 +146,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     end
 
     socket
+    |> close_modal()
   end
 
   def remove_user(socket, hash) do

@@ -4,6 +4,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
   require Logger
 
   alias ChatWeb.MainLive.Page.AdminPanel
+  alias ChatWeb.MainLive.Modals
 
   #
   # LiveView events
@@ -14,8 +15,11 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
       {"wifi-submit", %{"ssid" => ssid, "password" => password}} ->
         socket |> AdminPanel.set_wifi(ssid |> String.trim(), password |> String.trim())
 
-      {"invite-new-user", %{"hash" => hash}} ->
-        socket |> AdminPanel.invite_user(hash |> decode)
+      {"show-user-invite-modal", %{"hash" => hash}} ->
+        socket |> AdminPanel.show_user_invite_modal(hash |> decode, Modals.ConfirmUserInvite)
+
+      {"confirm-user-invite", %{"hash" => hash}} ->
+        socket |> AdminPanel.confirm_user_invite(hash |> decode)
 
       {"remove-user", %{"hash" => hash}} ->
         socket |> AdminPanel.remove_user(hash |> decode)

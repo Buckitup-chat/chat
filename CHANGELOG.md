@@ -19,6 +19,7 @@ straightforward as possible.
 - extend cargo checkpoints
 - await full file [#456]
 - initial drive indication [#469]
+- add user name on invite confirmation to the admin room [#482]
 
 ### Fixed
 - pause uploads when uploader is busy (IMPROVED)

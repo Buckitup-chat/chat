@@ -19,6 +19,7 @@ straightforward as possible.
 - extend cargo checkpoints
 - await full file [#456]
 - initial drive indication [#469]
+- improved firmware upload status [#484]
 
 ### Fixed
 - pause uploads when uploader is busy (IMPROVED)

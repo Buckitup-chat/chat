@@ -77,8 +77,10 @@ const listeners = {
 
     if (relativeElementRect.bottom + 200 > window.innerHeight && relativeElementRect.top > 200) {
       e.target.style.bottom = 0;
+      e.target.style.top = '';
     } else {
       e.target.style.top = 28 + 'px';
+      e.target.style.bottom = '';
     }
 
     if (relativeElementRect.width < e.target.offsetWidth) { e.target.style.left = 0 }

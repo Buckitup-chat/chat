@@ -16,7 +16,8 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
         socket |> AdminPanel.set_wifi(ssid |> String.trim(), password |> String.trim())
 
       {"show-user-invite-modal", %{"hash" => hash}} ->
-        socket |> AdminPanel.show_user_invite_modal(hash |> decode, Modals.ConfirmUserInvite)
+        socket
+        |> AdminPanel.show_user_invite_modal(hash |> decode, Modals.ConfirmInviteToAdminRoom)
 
       {"confirm-user-invite", %{"hash" => hash}} ->
         socket |> AdminPanel.confirm_user_invite(hash |> decode)

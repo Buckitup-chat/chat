@@ -1,4 +1,4 @@
-defmodule ChatWeb.MainLive.Modals.ConfirmUserInvite do
+defmodule ChatWeb.MainLive.Modals.ConfirmInviteToAdminRoom do
   @moduledoc "Confirm user invitation to the room"
   use ChatWeb, :live_component
 

@@ -956,11 +956,6 @@
         <% end %>
         <%= if @lobby_mode == :admin  and @is_admin do %>
           <.action_confirmation_popup
-            id="invite-user-confirmation"
-            title="Invite new one"
-            description="Are you sure?"
-          />
-          <.action_confirmation_popup
             id="remove-room-confirmation"
             title="Remove Room"
             description="Are you sure?"
@@ -1056,17 +1051,8 @@
                   <%= for user <- @user_list do %>
                     <div
                       class="cursor-pointer"
-                      phx-click={
-                        show_modal("invite-user-confirmation")
-                        |> JS.set_attribute(
-                          {"phx-click",
-                           hide_modal("invite-user-confirmation")
-                           |> JS.push("admin/invite-new-user")
-                           |> stringify_commands()},
-                          to: ".confirmButton"
-                        )
-                        |> JS.set_attribute({"phx-value-hash", user.hash}, to: ".confirmButton")
-                      }
+                      phx-click="admin/show-user-invite-modal"
+                      phx-value-hash={user.hash}
                     >
                       <Layout.Card.hashed_name card={user} />
                     </div>

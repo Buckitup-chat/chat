@@ -52,7 +52,7 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
 
   def render(assigns) do
     ~H"""
-    <div id={@id} class="hidden bg-black w-full h-full left-[0%] md:top-[0%] absolute z-30">
+    <div id={@id} class="hidden bg-black w-full h-full left-[0%] md:top-[0%] fixed z-30">
       <%= if @is_open? do %>
         <div
           id="topPanel"
@@ -77,8 +77,8 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
             function handleArrows() {
               const prevBtn = document.getElementById('prev');
               const nextBtn = document.getElementById('next');
-              const image = document.getElementById('galleryImage');              
-              
+              const image = document.getElementById('galleryImage');
+
               setTimeout(() => {
                 if (image.naturalWidth > 0 && image.naturalHeight > 0 && image.complete) {
                   prevBtn.classList.remove('hidden');
@@ -88,8 +88,8 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
                 }
               }, '300');
             }
-            
-            handleArrows();            
+
+            handleArrows();
             "
             />
           <% else %>

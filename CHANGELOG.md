@@ -11,26 +11,34 @@ Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
+
 - concurrent cargo sensors
 - firmware upgrade
 - weight cargo sensor into cargo room
+- cargo room type changed to private (by request)
 
 ### Changed
+
 - extend cargo checkpoints
 - await full file [#456]
 - initial drive indication [#469]
+- add user name on invite confirmation to the admin room [#482]
+- improved firmware upload status [#484]
 
 ### Fixed
+
 - pause uploads when uploader is busy (IMPROVED)
 - cargo user invitation [#460]
 - upload progress
 - cargo indication [#465]
 - Admin panel improvments on user changes [#473]
-
+- Message context menu in vvideo message is not shown
+- gallery scroll 
 
 ## 2023-08-11_279815b___2023-08-11_24d6bac
 
 ### Added
+
 - Filesystem optimization
 - Router support
 - Upload by Drag&Drop to chats/rooms
@@ -38,9 +46,11 @@ straightforward as possible.
 - Import and backup cargo user keys
 
 ### Changed
+
 - more logs on copying w/ progress
 
 ### Fixed
+
 - force image loading in chat
 - set correct documentation link for cargo scenario
 - Half-uploaded files bug
@@ -63,7 +73,6 @@ straightforward as possible.
 - Add CPU temperature & utilization metrics to the dashboard
 - ONVIF camera support
 
-
 ### Changed
 
 - more copying and changetracker logging
@@ -83,7 +92,6 @@ straightforward as possible.
 - onliners and cargo fix on drive ejecting
 - cargo settings compatibility w/ previous version
 - fix supervision restarts
-
 
 ## 2023-05-22_3fefe32___2023-05-24_98fba24
 

@@ -51,7 +51,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     {cargo?, type} =
       case type do
         :cargo ->
-          {true, :public}
+          {true, :request}
 
         type ->
           {false, type}

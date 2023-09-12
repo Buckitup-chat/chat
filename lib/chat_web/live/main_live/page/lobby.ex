@@ -26,7 +26,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
     socket
     |> assign(:mode, :lobby)
-    |> assign(:lobby_mode, :chats)
+    |> assign(:lobby_mode, :rooms)
     |> assign(:image_gallery, nil)
     |> assign(:version, get_version())
     |> assign(:db_status, StatusPoller.info())
@@ -36,6 +36,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign_admin()
     |> process(&approve_pending_requests/1)
     |> process(&join_approved_requests/1)
+    |> Page.Room.init()
   end
 
   def refresh_rooms_and_users(%{assigns: %{search_filter: :on}} = socket), do: socket

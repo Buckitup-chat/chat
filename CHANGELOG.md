@@ -22,6 +22,7 @@ straightforward as possible.
 - extend cargo checkpoints
 - await full file [#456]
 - initial drive indication [#469]
+- add user name on invite confirmation to the admin room [#482]
 - improved firmware upload status [#484]
 
 ### Fixed

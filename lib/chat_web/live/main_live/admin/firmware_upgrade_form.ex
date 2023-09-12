@@ -64,6 +64,9 @@ defmodule ChatWeb.MainLive.Admin.FirmwareUpgradeForm do
           />
         <% end %>
       </.form>
+      <%= if @substep == :inprogress  do %>
+        <div class="mt-3">Uploading...</div>
+      <% end %>
       <%= if @substep in [:inprogress, :done]  do %>
         <%= for entry <- @uploads.config.entries do %>
           <div class="mt-4 w-full flex flex-row justify-between space-x-2">

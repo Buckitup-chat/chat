@@ -83,6 +83,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:message_update_mode, :replace)
     |> assign(:usb_drive_dump_room, UsbDriveDumpRoom.get())
     |> assign_messages()
+    |> assign_last_loaded_index()
     |> assign_requests()
     |> maybe_enable_cargo()
     |> maybe_enable_usb_drive_dump()
@@ -141,6 +142,35 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:page, page + 1)
     |> assign(:message_update_mode, :prepend)
     |> assign_messages()
+    |> case do
+      %{assigns: %{input_mode: :select}} = socket ->
+        socket
+        |> push_event("chat:toggle", %{to: "#chat-messages", class: "selectMode"})
+
+      socket ->
+        socket
+    end
+  end
+
+  def load_new_messages(
+        %{
+          assigns: %{
+            room: room,
+            room_identity: identity,
+            messages: messages,
+            last_loaded_index: index
+          }
+        } = socket
+      ) do
+    {_, new_messages} =
+      Rooms.read(room, identity, {nil, 0}, @per_page)
+      |> Enum.split_with(fn msg -> msg.index <= index end)
+
+    socket
+    |> assign(:message_update_mode, :append)
+    |> assign(:messages, new_messages)
+    |> assign_last_loaded_index()
+    |> push_event("chat:scroll-down", %{})
     |> case do
       %{assigns: %{input_mode: :select}} = socket ->
         socket
@@ -421,6 +451,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:room_identity, nil)
     |> assign(:messages, nil)
     |> assign(:message_update_mode, nil)
+    |> assign(:last_loaded_index, nil)
   end
 
   def close(socket), do: socket
@@ -555,6 +586,15 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> assign(:messages, page_messages)
     |> assign(:has_more_messages, length(messages) > per_page)
     |> assign(:last_load_timestamp, set_messages_timestamp(page_messages))
+  end
+
+  defp assign_last_loaded_index(%{assigns: %{messages: messages}} = socket) do
+    socket
+    |> assign(
+      :last_loaded_index,
+      List.last(messages)
+      |> then(&(get_in(&1, [Access.key!(:index)]) || socket.assigns[:last_loaded_index] || 0))
+    )
   end
 
   defp assign_requests(%{assigns: %{room: %{type: :request} = room}} = socket) do

@@ -157,7 +157,6 @@ defmodule ChatWeb.MainLive.Page.Room do
           assigns: %{
             room: room,
             room_identity: identity,
-            messages: messages,
             last_loaded_index: index
           }
         } = socket

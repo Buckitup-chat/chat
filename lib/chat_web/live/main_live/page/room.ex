@@ -161,13 +161,9 @@ defmodule ChatWeb.MainLive.Page.Room do
           }
         } = socket
       ) do
-    {_, new_messages} =
-      Rooms.read_to(room, identity, {nil, 0}, {index + 1, 0})
-      |> Enum.split_with(fn msg -> msg.index <= index end)
-
     socket
     |> assign(:message_update_mode, :append)
-    |> assign(:messages, new_messages)
+    |> assign(:messages, Rooms.read_to(room, identity, {nil, 0}, {index + 1, 0}))
     |> assign_last_loaded_index()
     |> push_event("chat:scroll-down", %{})
     |> case do

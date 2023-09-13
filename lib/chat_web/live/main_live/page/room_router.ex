@@ -114,6 +114,9 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
 
       {:preload_image_gallery, :prev} ->
         socket |> Page.Room.image_gallery_preload_prev()
+
+      :load_new_messages ->
+        socket |> Page.Room.load_new_messages()
     end
   end
 end

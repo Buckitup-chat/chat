@@ -162,7 +162,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         } = socket
       ) do
     {_, new_messages} =
-      Rooms.read(room, identity, {nil, 0}, @per_page)
+      Rooms.read_to(room, identity, {nil, 0}, {index + 1, 0})
       |> Enum.split_with(fn msg -> msg.index <= index end)
 
     socket

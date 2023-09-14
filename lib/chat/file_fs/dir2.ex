@@ -25,21 +25,7 @@ defmodule Chat.FileFs.Dir2 do
       :ok = IO.binwrite(file, data)
       :ok = :file.datasync(file)
     end)
-    |> tap(fn _ ->
-      case File.stat(path, time: :posix) do
-        {:ok, stat} ->
-          if stat.size != data_size do
-            log_written_chunk_integrity_error(
-              keys,
-              {data_size, meta_size},
-              {:wrong_size, stat.size}
-            )
-          end
-
-        _ ->
-          log_written_chunk_integrity_error(keys, {data_size, meta_size}, {:no_file, path})
-      end
-    end)
+    |> tap(fn _ -> check_file_written(keys, path, data_size, meta_size) end)
   end
 
   def read_exact_file_chunk({first, last}, key, prefix \\ nil) do
@@ -88,6 +74,22 @@ defmodule Chat.FileFs.Dir2 do
     path
     |> Path.dirname()
     |> File.mkdir_p!()
+  end
+
+  defp check_file_written(keys, path, data_size, meta_size) do
+    case File.stat(path, time: :posix) do
+      {:ok, stat} ->
+        if stat.size != data_size do
+          log_written_chunk_integrity_error(
+            keys,
+            {data_size, meta_size},
+            {:wrong_size, stat.size}
+          )
+        end
+
+      _ ->
+        log_written_chunk_integrity_error(keys, {data_size, meta_size}, {:no_file, path})
+    end
   end
 
   defp log_ingress_chunk_integrity_error(keys, opts) do

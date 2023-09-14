@@ -1,7 +1,7 @@
 defmodule Chat.Db.WriteQueue.FileSkipSet do
   @moduledoc "ETS table wrapper to keep list of skipped files"
 
-  def new(), do: :ets.new(nil, [:public])
+  def new, do: :ets.new(nil, [:public])
 
   def delete(ref) do
     :ets.delete(ref)

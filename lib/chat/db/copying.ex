@@ -11,6 +11,7 @@ defmodule Chat.Db.Copying do
   alias Chat.Db.Copying.Progress
   alias Chat.Db.Scope.Full, as: FullScope
   alias Chat.Db.WriteQueue
+  alias Chat.Db.WriteQueue.FileSkipSet
 
   def await_copied(from, to, keys_set \\ nil)
   def await_copied(_from, _to, []), do: :ok
@@ -57,15 +58,17 @@ defmodule Chat.Db.Copying do
   defp force_copied(from, to, keys_set) do
     "[copying] reading DBs" |> Logger.debug()
     to_queue = Common.names(to, :queue)
-    stream = stream(from, to, nil, keys_set)
+    skip_set = FileSkipSet.new()
+    stream = stream(from, to, nil, keys_set, skip_set)
     stream_keys = read_stream(stream, :keys)
 
     Logging.log_copying(from, to, stream_keys)
 
     stream |> WriteQueue.force_stream(to_queue)
 
-    Progress.new(stream_keys, to)
+    Progress.new(stream_keys, to, skip_set)
     |> ensure_complete()
+    |> tap(fn _ -> FileSkipSet.delete(skip_set) end)
     |> case do
       :done ->
         Logging.log_finished(from, to)
@@ -104,9 +107,9 @@ defmodule Chat.Db.Copying do
     end
   end
 
-  defp stream(from, to, awaiter, keys_set)
+  defp stream(from, to, awaiter, keys_set, skip_set \\ nil)
 
-  defp stream(from, to, awaiter, nil) do
+  defp stream(from, to, awaiter, nil, skip_set) do
     [from, to]
     |> Stream.map(fn db ->
       Task.async(fn -> FullScope.keys(db) end)
@@ -119,11 +122,11 @@ defmodule Chat.Db.Copying do
         |> MapSet.difference(dst)
         |> MapSet.to_list()
 
-      read_stream_new(from, keys, awaiter)
+      read_stream_new(from, keys, awaiter, skip_set)
     end)
   end
 
-  defp stream(from, to, awaiter, %MapSet{} = src) do
+  defp stream(from, to, awaiter, %MapSet{} = src, skip_set) do
     dst = FullScope.keys(to)
 
     keys =
@@ -131,10 +134,10 @@ defmodule Chat.Db.Copying do
       |> MapSet.difference(dst)
       |> MapSet.to_list()
 
-    read_stream(keys: keys, db: from, awaiter: awaiter)
+    read_stream(keys: keys, db: from, awaiter: awaiter, skip_set: skip_set)
   end
 
-  defp stream(from, to, awaiter, keys_list) when is_list(keys_list) do
-    stream(from, to, awaiter, MapSet.new(keys_list))
+  defp stream(from, to, awaiter, keys_list, skip_set) when is_list(keys_list) do
+    stream(from, to, awaiter, MapSet.new(keys_list), skip_set)
   end
 end

@@ -9,9 +9,9 @@ defmodule Chat.Db.WriteQueue.FileReader do
 
   defstruct name: nil, read_supervisor: nil, harvest: %{}, keys: %{}
 
-  def add_task(server, {:file_chunk, _, _, _} = key, files_path) do
+  def add_task(server, {:file_chunk, _, _, _} = key, files_path, skip_set \\ nil) do
     server
-    |> GenServer.call({:add_task, key, files_path})
+    |> GenServer.call({:add_task, key, files_path, skip_set})
   end
 
   def yield_file(server, readers) do
@@ -60,7 +60,7 @@ defmodule Chat.Db.WriteQueue.FileReader do
 
   @impl true
   def handle_call(
-        {:add_task, key, files_path},
+        {:add_task, key, files_path, skip_set},
         _,
         %__MODULE__{read_supervisor: task_supervisor, keys: keys} = state
       ) do
@@ -69,9 +69,13 @@ defmodule Chat.Db.WriteQueue.FileReader do
       Task.Supervisor.async(task_supervisor, fn ->
         read_or_fail_with(key, files_path, :retry)
         |> case do
-          :retry -> read_or_fail_with(key, files_path, :error)
+          {:retry, _} -> read_or_fail_with(key, files_path, :error)
           good -> good
         end
+        |> tap(fn
+          {:error, _} -> Chat.Db.WriteQueue.FileSkipSet.add_skipped_file(skip_set, key)
+          _ -> :ok
+        end)
       end)
 
     state
@@ -89,8 +93,8 @@ defmodule Chat.Db.WriteQueue.FileReader do
     Process.demonitor(ref, [:flush])
 
     case data do
-      :error ->
-        log_error_reading(keys[ref], name)
+      {:error, error} ->
+        log_error_reading(keys[ref], name, error)
         state
 
       {_key, _content} = data ->
@@ -117,23 +121,32 @@ defmodule Chat.Db.WriteQueue.FileReader do
   defp read_or_fail_with({:file_chunk, chunk_key, first, last} = key, path, fail_marker) do
     Chat.FileFs.read_exact_file_chunk({first, last}, chunk_key, path)
     |> case do
-      {"", _} -> fail_marker
-      {content, _} -> {key, content}
+      {"", _} ->
+        {fail_marker, :empty}
+
+      {content, _} ->
+        read_size = byte_size(content)
+
+        if read_size == last - first + 1 do
+          {key, content}
+        else
+          {fail_marker, {:size, read_size}}
+        end
     end
   rescue
-    _ -> fail_marker
+    error -> {fail_marker, error}
   end
 
   defp log_reader_ended(key, reason, name) do
-    "#{name} Reading #{key} ended with reason: #{reason}" |> log(:error)
+    "#{inspect(name)} Reading #{key} ended with reason: #{reason}" |> log(:error)
   end
 
   defp log_unhandled_msg(msg, name) do
-    ["#{name} Unhandled message ", inspect(msg)] |> log(:debug)
+    ["#{inspect(name)} Unhandled message ", inspect(msg)] |> log(:debug)
   end
 
-  defp log_error_reading(msg, name) do
-    "#{name} Error reading #{inspect(msg)}" |> log(:warn)
+  defp log_error_reading(msg, name, error) do
+    "#{inspect(name)} Error reading #{inspect(msg)}\n#{inspect(error)}" |> log(:warn)
   end
 
   defp log(message, level) do

@@ -14,11 +14,12 @@ defmodule Chat.Db.WriteQueue.ReadStream do
     keys: [],
     file_readers: [],
     file_ready: nil,
-    awaiter: nil
+    awaiter: nil,
+    skip_set: nil
   )
 
-  def read_stream_new(db, keys, awaiter \\ nil) do
-    read_stream(db: db, keys: keys, awaiter: awaiter)
+  def read_stream_new(db, keys, awaiter \\ nil, skip_set \\ nil) do
+    read_stream(db: db, keys: keys, awaiter: awaiter, skip_set: skip_set)
   end
 
   def set_awaiter(read_stream(awaiter: nil) = stream, awaiter) do
@@ -49,9 +50,15 @@ defmodule Chat.Db.WriteQueue.ReadStream do
   end
 
   def read_stream_yield(
-        read_stream(db: db, keys: list, awaiter: awaiter, file_readers: readers) = stream
+        read_stream(
+          db: db,
+          keys: list,
+          awaiter: awaiter,
+          file_readers: readers,
+          skip_set: skip_set
+        ) = stream
       ) do
-    {data, new_readers, new_list} = read_list(db, readers, list)
+    {data, new_readers, new_list} = read_list(db, readers, list, skip_set)
 
     if new_list == [] and new_readers == [] and awaiter do
       send(awaiter, :done)
@@ -67,7 +74,7 @@ defmodule Chat.Db.WriteQueue.ReadStream do
      )}
   end
 
-  defp read_list(db, readers, list) do
+  defp read_list(db, readers, list, skip_set) do
     {keys, new_list} = take_portion(list, [], 100)
     files_path = CubDB.data_dir(db) <> "_files"
     file_reader = file_reader(db)
@@ -79,7 +86,7 @@ defmodule Chat.Db.WriteQueue.ReadStream do
       end)
 
     new_readers =
-      readers ++ Enum.map(file_keys, &FileReader.add_task(file_reader, &1, files_path))
+      readers ++ Enum.map(file_keys, &FileReader.add_task(file_reader, &1, files_path, skip_set))
 
     data =
       db_keys

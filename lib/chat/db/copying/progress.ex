@@ -5,6 +5,8 @@ defmodule Chat.Db.Copying.Progress do
 
   require Logger
 
+  alias Chat.Db.WriteQueue.FileSkipSet
+
   defstruct file_keys: [],
             data_keys: [],
             db: nil,
@@ -13,12 +15,13 @@ defmodule Chat.Db.Copying.Progress do
             data_count: -1,
             file_count: -1,
             complete?: false,
-            start_time: nil
+            start_time: nil,
+            skip_set: nil
 
   @file_weight 9
 
   @spec new(list(), CubDB.t()) :: %__MODULE__{}
-  def new(keys, db) do
+  def new(keys, db, skip_set \\ nil) do
     {file_keys, data_keys} = Enum.split_with(keys, &match?({:file_chunk, _, _, _}, &1))
 
     file_count = Enum.count(file_keys)
@@ -33,7 +36,8 @@ defmodule Chat.Db.Copying.Progress do
       data_count: data_count,
       file_count: file_count,
       complete?: data_count + file_count == 0,
-      start_time: System.monotonic_time(:millisecond)
+      start_time: System.monotonic_time(:millisecond),
+      skip_set: skip_set
     }
   end
 
@@ -42,8 +46,9 @@ defmodule Chat.Db.Copying.Progress do
     state
     |> eliminate_written_data()
     |> eliminate_written_files()
+    |> eliminate_skipped_files()
     |> update_counts()
-    |> update_compete()
+    |> update_complete()
   end
 
   @spec recheck_delay_in_ms(%__MODULE__{}) :: non_neg_integer()
@@ -52,7 +57,8 @@ defmodule Chat.Db.Copying.Progress do
     percent = done_percent(progress)
 
     cond do
-      percent > 1 and percent < 98 -> estimate_percent_delay(progress, percent)
+      percent > 1 and percent < 90 -> estimate_percent_delay(progress, percent) * 10
+      percent > 1 and percent < 98 -> estimate_percent_delay(progress, percent) * 2
       percent >= 98 -> trunc(estimate_percent_delay(progress, percent) * 0.6)
       weight < 100 -> 300
       weight < 1_000 -> 1_000
@@ -121,7 +127,15 @@ defmodule Chat.Db.Copying.Progress do
     |> then(&%{state | file_keys: &1})
   end
 
-  defp update_compete(%__MODULE__{data_count: data_count, file_count: file_count} = state) do
+  defp eliminate_skipped_files(%__MODULE__{skip_set: nil} = state), do: state
+
+  defp eliminate_skipped_files(%__MODULE__{file_keys: file_keys, skip_set: skip_set} = state) do
+    file_keys
+    |> Enum.reject(&FileSkipSet.member?(skip_set, &1))
+    |> then(&%{state | file_keys: &1})
+  end
+
+  defp update_complete(%__MODULE__{data_count: data_count, file_count: file_count} = state) do
     %{state | complete?: data_count + file_count == 0}
   end
 

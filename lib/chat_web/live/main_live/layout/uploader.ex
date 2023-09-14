@@ -54,7 +54,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       end)
 
     ~H"""
-    <div class="max-h-[280px] bottom-16 fixed w-full overflow-y-scroll flex flex-col-reverse a-mobile-uploader">
+    <div class="max-h-[280px] bottom-16 fixed sm:relative sm:bottom-0 w-full overflow-y-scroll flex flex-col-reverse a-mobile-uploader">
       <div class="h-full">
         <div
           class="flex flex-col m-2 bg-purple50 rounded-lg h-fit overflow-scroll sm:hidden"

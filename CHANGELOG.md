@@ -35,6 +35,7 @@ straightforward as possible.
 - Message context menu in vvideo message is not shown
 - gallery scroll 
 - real-time message loading into the operator cargo room [#489]
+- tablet layout fixed
 
 ## 2023-08-11_279815b___2023-08-11_24d6bac
 

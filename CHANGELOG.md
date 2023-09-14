@@ -34,6 +34,7 @@ straightforward as possible.
 - Admin panel improvments on user changes [#473]
 - Message context menu in vvideo message is not shown
 - gallery scroll 
+- real-time message loading into the operator cargo room [#489]
 
 ## 2023-08-11_279815b___2023-08-11_24d6bac
 

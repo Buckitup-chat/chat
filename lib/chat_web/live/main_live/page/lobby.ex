@@ -71,6 +71,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     end)
 
     socket
+    |> Page.Room.close()
     |> Page.Room.store_new(new_room_identity)
     |> Page.Shared.update_onliners_presence()
     |> Page.Room.init({new_room_identity, new_room})

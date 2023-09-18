@@ -19,7 +19,8 @@ defmodule Chat.Db.Copying do
   def await_copied(from, to, keys_set) do
     "[copying] reading DBs" |> Logger.debug()
     to_queue = Common.names(to, :queue)
-    stream = stream(from, to, nil, keys_set)
+    skip_set = FileSkipSet.new()
+    stream = stream(from, to, nil, keys_set, skip_set)
     stream_keys = read_stream(stream, :keys)
 
     stream
@@ -29,7 +30,8 @@ defmodule Chat.Db.Copying do
         Logging.log_copying(from, to, stream_keys)
 
         stream_keys
-        |> await_written_into(to)
+        |> await_written_into(to, skip_set)
+        |> tap(fn _ -> FileSkipSet.delete(skip_set) end)
         |> case do
           :done ->
             Logging.log_finished(from, to)
@@ -47,11 +49,12 @@ defmodule Chat.Db.Copying do
   end
 
   @spec await_written_into(keys :: list(), target_db :: atom()) :: :done | {:stuck, Progress.t()}
-  def await_written_into([], _target_db), do: :done
+  def await_written_into(keys, target_db, skip_set \\ nil)
+  def await_written_into([], _, _), do: :done
 
-  def await_written_into(keys, target_db) do
+  def await_written_into(keys, target_db, skip_set) do
     keys
-    |> Progress.new(target_db)
+    |> Progress.new(target_db, skip_set)
     |> ensure_complete()
   end
 
@@ -106,8 +109,6 @@ defmodule Chat.Db.Copying do
         )
     end
   end
-
-  defp stream(from, to, awaiter, keys_set, skip_set \\ nil)
 
   defp stream(from, to, awaiter, nil, skip_set) do
     [from, to]

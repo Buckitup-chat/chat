@@ -644,7 +644,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     Log.update_room_message(me, time, pub_key)
   end
 
-  defp broadcast_new_message(message, pub_key, me, time) do
+  def broadcast_new_message(message, pub_key, me, time) do
     {:new_message, message}
     |> room_broadcast(pub_key)
 

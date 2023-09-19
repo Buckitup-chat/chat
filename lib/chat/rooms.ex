@@ -99,7 +99,7 @@ defmodule Chat.Rooms do
   def delete_message(msg_id, room, me),
     do: msg_id |> RoomMessages.delete_message(room, me)
 
-  def add_request(room_key, user_identity, time) do
+  def add_request(room_key, user_identity, time, message_added_fn \\ fn _ -> :ok end) do
     room_key
     |> get()
     |> Room.add_request(user_identity)
@@ -108,6 +108,7 @@ defmodule Chat.Rooms do
         time
         |> Messages.RoomRequest.new()
         |> add_new_message(user_identity, room.pub_key)
+        |> tap(message_added_fn)
       end
     end)
     |> update()

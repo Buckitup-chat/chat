@@ -140,7 +140,11 @@ defmodule ChatWeb.MainLive.Page.Lobby do
         room_key
       ) do
     time = Chat.Time.monotonic_to_unix(time_offset)
-    room = Rooms.add_request(room_key, me, time)
+
+    room =
+      Rooms.add_request(room_key, me, time, fn req_message ->
+        Page.Room.broadcast_new_message(req_message, room_key, me, time)
+      end)
 
     Log.request_room_key(me, time, room.pub_key)
 

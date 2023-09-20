@@ -357,7 +357,6 @@ defmodule ChatWeb.MainLive.Page.Room do
 
     case Rooms.get_request(room, user_key) do
       %RoomRequest{ciphered_room_identity: ciphered} when is_bitstring(ciphered) ->
-
         PubSub.broadcast!(
           Chat.PubSub,
           "chat::lobby",

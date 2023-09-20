@@ -844,7 +844,11 @@
                 <%= if @room.type == :request do %>
                   <.modal id="room-request-list" class="z-30">
                     <h1 class="text-base font-bold text-grayscale">Requests</h1>
-                    <div id="request-list" class="mt-3 w-full flex flex-col" phx-update={assigns[:room_requests_update_mode] || "replace"}>
+                    <div
+                      id="request-list"
+                      class="mt-3 w-full flex flex-col"
+                      phx-update={assigns[:room_requests_update_mode] || "replace"}
+                    >
                       <%= for user <- @room_requests do %>
                         <div
                           id={"user-#{user.hash}"}

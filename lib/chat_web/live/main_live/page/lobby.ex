@@ -26,7 +26,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
     socket
     |> assign(:mode, :lobby)
-    |> assign(:lobby_mode, :rooms)
+    |> assign(:lobby_mode, :chats)
     |> assign(:image_gallery, nil)
     |> assign(:version, get_version())
     |> assign(:db_status, StatusPoller.info())
@@ -36,7 +36,6 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign_admin()
     |> process(&approve_pending_requests/1)
     |> process(&join_approved_requests/1)
-    |> Page.Room.init()
   end
 
   def refresh_rooms_and_users(%{assigns: %{search_filter: :on}} = socket), do: socket
@@ -146,7 +145,8 @@ defmodule ChatWeb.MainLive.Page.Lobby do
       Rooms.add_request(room_key, me, time, fn req_message ->
         Page.Room.broadcast_new_message(req_message, room_key, me, time)
       end)
-      Rooms.RoomsBroker.put(room)
+
+    Rooms.RoomsBroker.put(room)
 
     Log.request_room_key(me, time, room.pub_key)
 
@@ -329,6 +329,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
         %RoomRequest{requester_key: user_key} <- Rooms.list_pending_requests(room_key),
         room = Rooms.approve_request(room_key, user_key, room_map[room_key], public_only: true) do
       Rooms.RoomsBroker.put(room)
+
       case Rooms.get_request(room, user_key) do
         %RoomRequest{ciphered_room_identity: ciphered} when is_bitstring(ciphered) ->
           time = Chat.Time.monotonic_to_unix(time_offset)

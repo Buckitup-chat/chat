@@ -353,6 +353,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def approve_request(%{assigns: %{room_identity: room_identity}} = socket, user_key) do
     room = Rooms.approve_request(room_identity |> Identity.pub_key(), user_key, room_identity)
+    Rooms.RoomsBroker.put(room)
 
     case Rooms.get_request(room, user_key) do
       %RoomRequest{ciphered_room_identity: ciphered} when is_bitstring(ciphered) ->

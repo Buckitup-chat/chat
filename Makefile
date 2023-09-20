@@ -38,7 +38,7 @@ server:
 	mix phx.server
 
 iex:
-	MIX_ENV=dev iex -S mix phx.server
+	MIX_ENV=dev iex --sname chat --cookie chat -S mix phx.server
 
 assets:
 	mix assets.deploy

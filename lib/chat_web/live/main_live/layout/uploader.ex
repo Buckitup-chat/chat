@@ -88,7 +88,10 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
         class="cursor-pointer mr-2"
         id="push-to-talk-button"
         phx-click={
-          if(@enabled, do: open_audio_file_upload_dialog(), else: show_modal("restrict-write-actions"))
+          if(@enabled,
+            do: open_audio_file_upload_dialog(),
+            else: show_modal("restrict-write-actions")
+          )
         }
       >
         <svg class="w-7 h-7 p-1 bg-purple rounded-full fill-white" viewbox="0 0 490.9 490.9">

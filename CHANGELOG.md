@@ -37,6 +37,7 @@ straightforward as possible.
 - real-time message loading into the operator cargo room [#489]
 - tablet layout fixed
 - cargo: new message read into room [#502]
+- request room approval flow [#507]
 
 ## 2023-08-11_279815b___2023-08-11_24d6bac
 

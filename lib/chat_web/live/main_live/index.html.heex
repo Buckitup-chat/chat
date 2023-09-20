@@ -844,7 +844,11 @@
                 <%= if @room.type == :request do %>
                   <.modal id="room-request-list" class="z-30">
                     <h1 class="text-base font-bold text-grayscale">Requests</h1>
-                    <div id="request-list" class="mt-3 w-full flex flex-col" phx-update="ignore">
+                    <div
+                      id="request-list"
+                      class="mt-3 w-full flex flex-col"
+                      phx-update={assigns[:room_requests_update_mode] || "replace"}
+                    >
                       <%= for user <- @room_requests do %>
                         <div
                           id={"user-#{user.hash}"}
@@ -852,7 +856,7 @@
                         >
                           <Layout.Card.hashed_name card={user} style_spec={:room_request_list} />
                           <a
-                            class="text-black/50"
+                            class="text-black/50 cursor-pointer"
                             phx-click={
                               JS.push("room/approve-request")
                               |> JS.dispatch("chat:toggle",

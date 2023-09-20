@@ -99,7 +99,7 @@ defmodule Chat.Rooms do
   def delete_message(msg_id, room, me),
     do: msg_id |> RoomMessages.delete_message(room, me)
 
-  def add_request(room_key, user_identity, time) do
+  def add_request(room_key, user_identity, time, message_added_fn \\ fn _ -> :ok end) do
     room_key
     |> get()
     |> Room.add_request(user_identity)
@@ -108,6 +108,7 @@ defmodule Chat.Rooms do
         time
         |> Messages.RoomRequest.new()
         |> add_new_message(user_identity, room.pub_key)
+        |> tap(message_added_fn)
       end
     end)
     |> update()
@@ -118,7 +119,7 @@ defmodule Chat.Rooms do
   @doc """
   Approves the room request for user.
   Opts:
-    * :public_only - Ignores aproval for a non-public room if `true`. Defaults to `false`.
+    * :public_only - Ignores approval for a non-public room if `true`. Defaults to `false`.
   """
   def approve_request(room_key, user_key, room_identity, opts \\ []) do
     if_room_found(room_key, fn room ->

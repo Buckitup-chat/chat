@@ -253,6 +253,7 @@ defmodule ChatWeb.MainLive.Page.Room do
       |> assign(:page, 0)
       |> assign(:messages, [verified_message])
       |> assign(:message_update_mode, :append)
+      |> maybe_update_requests(verified_message)
       |> push_event("chat:scroll-down", %{})
     else
       socket
@@ -351,9 +352,24 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def approve_request(%{assigns: %{room_identity: room_identity}} = socket, user_key) do
-    Rooms.approve_request(room_identity |> Identity.pub_key(), user_key, room_identity)
+    room = Rooms.approve_request(room_identity |> Identity.pub_key(), user_key, room_identity)
+    Rooms.RoomsBroker.put(room)
+
+    case Rooms.get_request(room, user_key) do
+      %RoomRequest{ciphered_room_identity: ciphered} when is_bitstring(ciphered) ->
+        PubSub.broadcast!(
+          Chat.PubSub,
+          "chat::lobby",
+          {:room_request_approved, ciphered, user_key, room.pub_key}
+        )
+
+      _ ->
+        :ok
+    end
 
     socket
+    |> assign_requests([user_key])
+    |> assign(:room_requests_update_mode, "ignore")
     |> push_event("put-flash", %{key: :info, message: "Request approved!"})
   end
 
@@ -448,6 +464,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     socket
     |> assign(:room, nil)
     |> assign(:room_requests, nil)
+    |> assign(:room_requests_update_mode, "replace")
     |> assign(:edit_room, nil)
     |> assign(:room_identity, nil)
     |> assign(:messages, nil)
@@ -530,6 +547,14 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   defp maybe_redirect_to_file(_message, socket), do: socket
 
+  defp maybe_update_requests(socket, message) do
+    message.type
+    |> case do
+      :request -> socket |> assign_requests()
+      _ -> socket
+    end
+  end
+
   def toggle_messages_select(%{assigns: %{}} = socket, %{"action" => "on"}) do
     socket
     |> forget_current_messages()
@@ -598,17 +623,21 @@ defmodule ChatWeb.MainLive.Page.Room do
     )
   end
 
-  defp assign_requests(%{assigns: %{room: %{type: :request} = room}} = socket) do
+  defp assign_requests(socket, to_ignore \\ [])
+
+  defp assign_requests(%{assigns: %{room: %{type: :request} = room}} = socket, to_ignore) do
     request_list =
       room.pub_key
       |> Rooms.list_pending_requests()
+      |> Enum.reject(fn %RoomRequest{requester_key: pub_key} -> pub_key in to_ignore end)
       |> Enum.map(fn %RoomRequest{requester_key: pub_key} -> User.by_id(pub_key) end)
 
     socket
     |> assign(:room_requests, request_list)
+    |> assign(:room_requests_update_mode, "replace")
   end
 
-  defp assign_requests(socket), do: socket |> assign(:room_requests, [])
+  defp assign_requests(socket, _), do: socket |> assign(:room_requests, [])
 
   defp load_messages_to(%{assigns: %{has_more_messages: false}} = socket, {_, msg_id}) do
     socket
@@ -644,7 +673,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     Log.update_room_message(me, time, pub_key)
   end
 
-  defp broadcast_new_message(message, pub_key, me, time) do
+  def broadcast_new_message(message, pub_key, me, time) do
     {:new_message, message}
     |> room_broadcast(pub_key)
 

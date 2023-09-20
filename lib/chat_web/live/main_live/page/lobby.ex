@@ -140,7 +140,13 @@ defmodule ChatWeb.MainLive.Page.Lobby do
         room_key
       ) do
     time = Chat.Time.monotonic_to_unix(time_offset)
-    room = Rooms.add_request(room_key, me, time)
+
+    room =
+      Rooms.add_request(room_key, me, time, fn req_message ->
+        Page.Room.broadcast_new_message(req_message, room_key, me, time)
+      end)
+
+    Rooms.RoomsBroker.put(room)
 
     Log.request_room_key(me, time, room.pub_key)
 
@@ -322,6 +328,8 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     for room_key <- Map.keys(room_map),
         %RoomRequest{requester_key: user_key} <- Rooms.list_pending_requests(room_key),
         room = Rooms.approve_request(room_key, user_key, room_map[room_key], public_only: true) do
+      Rooms.RoomsBroker.put(room)
+
       case Rooms.get_request(room, user_key) do
         %RoomRequest{ciphered_room_identity: ciphered} when is_bitstring(ciphered) ->
           time = Chat.Time.monotonic_to_unix(time_offset)

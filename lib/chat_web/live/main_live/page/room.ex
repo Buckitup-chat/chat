@@ -352,7 +352,20 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def approve_request(%{assigns: %{room_identity: room_identity}} = socket, user_key) do
-    Rooms.approve_request(room_identity |> Identity.pub_key(), user_key, room_identity)
+    room = Rooms.approve_request(room_identity |> Identity.pub_key(), user_key, room_identity)
+
+    case Rooms.get_request(room, user_key) do
+      %RoomRequest{ciphered_room_identity: ciphered} when is_bitstring(ciphered) ->
+
+        PubSub.broadcast!(
+          Chat.PubSub,
+          "chat::lobby",
+          {:room_request_approved, ciphered, user_key, room.pub_key}
+        )
+
+      _ ->
+        :ok
+    end
 
     socket
     |> assign_requests([user_key])
@@ -611,6 +624,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   defp assign_requests(socket, to_ignore \\ [])
+
   defp assign_requests(%{assigns: %{room: %{type: :request} = room}} = socket, to_ignore) do
     request_list =
       room.pub_key

@@ -45,16 +45,77 @@ defmodule Chat.Sync.CargoRoom do
 
   @spec get_room_key() :: room_key() | nil
   def get_room_key do
-    GenServer.call(__MODULE__, :get_room_key)
+    case get() do
+      %__MODULE__{pub_key: room_key} -> room_key
+      nil -> nil
+    end
   end
 
   @spec write_file(Chat.Identity.t(), binary, map()) :: {:ok, MapSet.t()} | :ignore | :failed
   def write_file(writer, content, metadata) do
-    GenServer.call(__MODULE__, {:write_file, writer, content, metadata})
+    case get() do
+      nil ->
+        :ignore
+
+      %__MODULE__{pub_key: room_key} ->
+        destination = %{pub_key: Base.encode16(room_key, case: :lower), type: :room}
+
+        with file_info <- %{
+               time: DateTime.utc_now() |> DateTime.to_unix(),
+               size: Map.get(metadata, "Content-Length", "0") |> String.to_integer(),
+               type: Map.get(metadata, "Content-Type", "application/octet-stream"),
+               name_prefix: Map.get(metadata, "Name-Prefix", "")
+             },
+             entry <- file_entry(file_info),
+             file_key <- UploadKey.new(destination, room_key, entry),
+             file_secret <- ChunkedFiles.new_upload(file_key),
+             size <- byte_size(content),
+             :ok <- save_file({file_key, content}, {size, file_secret}) do
+          message =
+            entry
+            |> Messages.File.new(file_key, file_secret, file_info.time)
+            |> Rooms.add_new_message(writer, room_key)
+
+          {msg_index, msg} = message
+
+          FileIndex.save(file_key, room_key, msg.id, file_secret)
+
+          :ok = PubSub.broadcast!(Chat.PubSub, @cargo_topic, {:room, {:new_message, message}})
+
+          {:ok,
+           MapSet.new([
+             {:chunk_key, {:file_chunk, file_key, 0, max(size - 1, 0)}},
+             {:file_chunk, file_key, 0, max(size - 1, 0)},
+             {:file, file_key},
+             {:file_index, room_key, file_key, msg.id},
+             {:room_message, room_key, msg_index, msg.id |> Enigma.hash()}
+           ])}
+        else
+          _ -> :failed
+        end
+    end
   end
 
   def write_text(writer, content) do
-    GenServer.call(__MODULE__, {:write_text, writer, content})
+    case get() do
+      nil ->
+        :ignore
+
+      %{pub_key: room_key} ->
+        message =
+          content
+          |> Messages.Text.new(DateTime.utc_now() |> DateTime.to_unix())
+          |> Rooms.add_new_message(writer, room_key)
+
+        {msg_index, msg} = message
+
+        :ok = PubSub.broadcast!(Chat.PubSub, @cargo_topic, {:room, {:new_message, message}})
+
+        {:ok,
+         MapSet.new([
+           {:room_message, room_key, msg_index, msg.id |> Enigma.hash()}
+         ])}
+    end
   end
 
   @spec activate(room_key()) :: :ok
@@ -85,91 +146,6 @@ defmodule Chat.Sync.CargoRoom do
   @impl GenServer
   def handle_call(:get, _from, cargo_room) do
     {:reply, cargo_room, cargo_room}
-  end
-
-  def handle_call(:get_room_key, _from, state) do
-    room_key =
-      case state do
-        %__MODULE__{} = cargo_room ->
-          cargo_room.pub_key
-
-        nil ->
-          nil
-      end
-
-    {:reply, room_key, state}
-  end
-
-  def handle_call({:write_file, writer, content, metadata}, _from, cargo_room) do
-    result =
-      case cargo_room do
-        nil ->
-          :ignore
-
-        %{pub_key: room_key} ->
-          destination = %{pub_key: Base.encode16(room_key, case: :lower), type: :room}
-
-          with file_info <- %{
-                 time: DateTime.utc_now() |> DateTime.to_unix(),
-                 size: Map.get(metadata, "Content-Length", "0") |> String.to_integer(),
-                 type: Map.get(metadata, "Content-Type", "application/octet-stream"),
-                 name_prefix: Map.get(metadata, "Name-Prefix", "")
-               },
-               entry <- file_entry(file_info),
-               file_key <- UploadKey.new(destination, room_key, entry),
-               file_secret <- ChunkedFiles.new_upload(file_key),
-               size <- byte_size(content),
-               :ok <- save_file({file_key, content}, {size, file_secret}) do
-            message =
-              entry
-              |> Messages.File.new(file_key, file_secret, file_info.time)
-              |> Rooms.add_new_message(writer, room_key)
-
-            {msg_index, msg} = message
-
-            FileIndex.save(file_key, room_key, msg.id, file_secret)
-
-            :ok = PubSub.broadcast!(Chat.PubSub, @cargo_topic, {:room, {:new_message, message}})
-
-            {:ok,
-             MapSet.new([
-               {:chunk_key, {:file_chunk, file_key, 0, max(size - 1, 0)}},
-               {:file_chunk, file_key, 0, max(size - 1, 0)},
-               {:file, file_key},
-               {:file_index, room_key, file_key, msg.id},
-               {:room_message, room_key, msg_index, msg.id |> Enigma.hash()}
-             ])}
-          else
-            _ -> :failed
-          end
-      end
-
-    {:reply, result, cargo_room}
-  end
-
-  def handle_call({:write_text, writer, content}, _from, cargo_room) do
-    result =
-      case cargo_room do
-        nil ->
-          :ignore
-
-        %{pub_key: room_key} ->
-          message =
-            content
-            |> Messages.Text.new(DateTime.utc_now() |> DateTime.to_unix())
-            |> Rooms.add_new_message(writer, room_key)
-
-          {msg_index, msg} = message
-
-          :ok = PubSub.broadcast!(Chat.PubSub, @cargo_topic, {:room, {:new_message, message}})
-
-          {:ok,
-           MapSet.new([
-             {:room_message, room_key, msg_index, msg.id |> Enigma.hash()}
-           ])}
-      end
-
-    {:reply, result, cargo_room}
   end
 
   @impl GenServer

@@ -17,30 +17,18 @@ defmodule Chat.Db.Copying do
   def await_copied(_from, _to, []), do: :ok
 
   def await_copied(from, to, keys_set) do
-    "[copying] reading DBs" |> Logger.debug()
-    to_queue = Common.names(to, :queue)
-    skip_set = FileSkipSet.new()
-    stream = stream(from, to, nil, keys_set, skip_set)
-    stream_keys = read_stream(stream, :keys)
+    ctx = prepare_copying(from, to, keys_set)
 
-    stream
-    |> WriteQueue.put_stream(to_queue)
+    ctx.stream
+    |> WriteQueue.put_stream(ctx.to_queue)
     |> case do
       :ok ->
-        Logging.log_copying(from, to, stream_keys)
+        Logging.log_copying(from, to, ctx.stream_keys)
 
-        stream_keys
-        |> await_written_into(to, skip_set)
-        |> tap(fn _ -> FileSkipSet.delete(skip_set) end)
-        |> case do
-          :done ->
-            Logging.log_finished(from, to)
-            :ok
-
-          {:stuck, progress} ->
-            Logging.log_restart_on_stuck(from, to, progress)
-            force_copied(from, to, Progress.get_unwritten_keys(progress) |> Enum.shuffle())
-        end
+        ctx.stream_keys
+        |> await_written_into(to, ctx.skip_set)
+        |> tap(fn _ -> FileSkipSet.delete(ctx.skip_set) end)
+        |> maybe_restart(ctx)
 
       :ignored ->
         Logging.log_copying_ignored(from, to)
@@ -58,29 +46,43 @@ defmodule Chat.Db.Copying do
     |> ensure_complete()
   end
 
-  defp force_copied(from, to, keys_set) do
+  defp prepare_copying(from, to, keys_set) do
     "[copying] reading DBs" |> Logger.debug()
     to_queue = Common.names(to, :queue)
     skip_set = FileSkipSet.new()
     stream = stream(from, to, nil, keys_set, skip_set)
     stream_keys = read_stream(stream, :keys)
 
-    Logging.log_copying(from, to, stream_keys)
+    %{
+      from: from,
+      to: to,
+      to_queue: to_queue,
+      skip_set: skip_set,
+      stream: stream,
+      stream_keys: stream_keys
+    }
+  end
 
-    stream |> WriteQueue.force_stream(to_queue)
+  defp maybe_restart(:done, %{} = ctx) do
+    Logging.log_finished(ctx.from, ctx.to)
+    :ok
+  end
 
-    Progress.new(stream_keys, to, skip_set)
-    |> ensure_complete()
-    |> tap(fn _ -> FileSkipSet.delete(skip_set) end)
-    |> case do
-      :done ->
-        Logging.log_finished(from, to)
-        :ok
+  defp maybe_restart({:stuck, progress}, %{} = ctx) do
+    Logging.log_restart_on_stuck(ctx.from, ctx.to, progress)
+    force_copied(ctx.from, ctx.to, Progress.get_unwritten_keys(progress) |> Enum.shuffle())
+  end
 
-      {:stuck, progress} ->
-        Logging.log_restart_on_stuck(from, to, progress)
-        force_copied(from, to, Progress.get_unwritten_keys(progress) |> Enum.shuffle())
-    end
+  defp force_copied(from, to, keys_set) do
+    ctx = prepare_copying(from, to, keys_set)
+    Logging.log_copying(from, to, ctx.stream_keys)
+
+    ctx.stream |> WriteQueue.force_stream(ctx.to_queue)
+
+    ctx.stream_keys
+    |> await_written_into(to, ctx.skip_set)
+    |> tap(fn _ -> FileSkipSet.delete(ctx.skip_set) end)
+    |> maybe_restart(ctx)
   end
 
   defp ensure_complete(prev_progress, stuck_for_ms \\ 0) do

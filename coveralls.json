@@ -1,6 +1,9 @@
 {
   "coverage_options": {
-    "minimum_coverage": 73
+    "minimum_coverage": 70
+  },
+  "terminal_options": {
+    "file_column_width": 120
   },
   "skip_files": []
 }

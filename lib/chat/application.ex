@@ -25,14 +25,6 @@ defmodule Chat.Application do
       Chat.Ordering.Counters,
       Chat.Db.Supervisor,
       Chat.AdminDb,
-      {Task,
-       fn ->
-         {:ok, _pid} = AdminLogger |> Logger.add_backend()
-         Process.sleep(:timer.minutes(5))
-
-         AdminLogger.get_current_generation()
-         |> AdminLogger.remove_old_generations()
-       end},
       # Application Services
       Chat.KeyRingTokens,
       Chat.Broker,
@@ -49,7 +41,23 @@ defmodule Chat.Application do
       # Start the Endpoint (http/https)
       ChatWeb.Endpoint,
       # Supervised tasks caller
-      {Task.Supervisor, name: Chat.TaskSupervisor}
+      {Task.Supervisor, name: Chat.TaskSupervisor},
+      {Task,
+       fn ->
+         {:ok, _pid} = AdminLogger |> Logger.add_backend()
+
+         Task.Supervisor.start_child(
+           Chat.TaskSupervisor,
+           fn ->
+             log_version()
+             Process.sleep(:timer.minutes(5))
+
+             AdminLogger.get_current_generation()
+             |> AdminLogger.remove_old_generations()
+           end,
+           shutdown: :brutal_kill
+         )
+       end}
       # Start a worker by calling: Chat.Worker.start_link(arg)
       # {Chat.Worker, arg}
     ]

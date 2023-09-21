@@ -16,6 +16,8 @@ straightforward as possible.
 - firmware upgrade
 - weight cargo sensor into cargo room
 - cargo room type changed to private (by request)
+- version in db_log [#511]
+- favicon added [#493]
 
 ### Changed
 
@@ -51,7 +53,6 @@ straightforward as possible.
 - Upload by Drag&Drop to chats/rooms
 - chat links
 - Import and backup cargo user keys
-- version in db_log
 
 ### Changed
 

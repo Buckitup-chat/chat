@@ -4,6 +4,7 @@ defmodule Chat.Db.WriteQueue.FileReader do
   """
   require Logger
   import Tools.GenServerHelpers
+  alias Chat.Db.WriteQueue.FileSkipSet
 
   use GenServer
 
@@ -73,7 +74,7 @@ defmodule Chat.Db.WriteQueue.FileReader do
           good -> good
         end
         |> tap(fn
-          {:error, _} -> Chat.Db.WriteQueue.FileSkipSet.add_skipped_file(skip_set, key)
+          {:error, _} -> FileSkipSet.add_skipped_file(skip_set, key)
           _ -> :ok
         end)
       end)

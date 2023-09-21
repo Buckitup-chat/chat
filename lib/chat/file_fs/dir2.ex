@@ -10,7 +10,7 @@ defmodule Chat.FileFs.Dir2 do
 
   @int_padding 20
 
-  def write_file(data, {_, first, last} = keys, prefix \\ nil) do
+  def write_file(data, {_, _first, _last} = keys, prefix \\ nil) do
     #    data_size = byte_size(data)
     #    meta_size = last - first + 1
 

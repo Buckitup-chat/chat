@@ -57,7 +57,14 @@ defmodule Chat.Db.WriteQueue.ReadStream do
       send(awaiter, :done)
     end
 
-    {next_file, updated_readers} = FileReader.yield_file(file_reader(db), new_readers)
+    db_pid = Process.whereis(db)
+
+    {next_file, updated_readers} =
+      if is_pid(db_pid) and Process.alive?(db_pid) do
+        FileReader.yield_file(file_reader(db), new_readers)
+      else
+        {nil, new_readers}
+      end
 
     {data,
      read_stream(stream,
@@ -69,6 +76,8 @@ defmodule Chat.Db.WriteQueue.ReadStream do
 
   defp read_list(db, readers, list) do
     {keys, new_list} = take_portion(list, [], 100)
+    db_pid = Process.whereis(db)
+    true = is_pid(db_pid) and Process.alive?(db_pid)
     files_path = CubDB.data_dir(db) <> "_files"
     file_reader = file_reader(db)
 

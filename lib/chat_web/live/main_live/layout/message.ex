@@ -321,6 +321,8 @@ defmodule ChatWeb.MainLive.Layout.Message do
       <.timestamp msg={@msg} timezone={@timezone} />
     </div>
     """
+  rescue
+    _ -> ~H""
   end
 
   defp message(%{msg: %{type: :video}} = assigns) do

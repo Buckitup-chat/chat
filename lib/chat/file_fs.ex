@@ -3,6 +3,8 @@ defmodule Chat.FileFs do
 
   import Chat.FileFs.Common
 
+  #  require Logger
+
   alias Chat.FileFs.Dir2
   alias Chat.FileFs.Dir3
 
@@ -13,9 +15,23 @@ defmodule Chat.FileFs do
     Dir2.write_file(data, keys, prefix)
   end
 
-  def has_file?({_, _, _} = keys, prefix \\ nil) do
-    Dir2.has_file?(keys, prefix) ||
-      Dir3.has_file?(keys, prefix)
+  def has_file?({_, first, last} = keys, prefix \\ nil) do
+    case file_stats(keys, prefix) do
+      {:ok, stat} -> first + stat.size == last + 1
+      _ -> false
+    end
+  end
+
+  def file_stats({_, _, _} = keys, prefix \\ nil) do
+    dir_path = build_path(prefix)
+
+    keys
+    |> Dir2.file_path(dir_path)
+    |> File.stat(time: :posix)
+    |> case do
+      {:ok, _} = good -> good
+      _ -> keys |> Dir3.file_path(dir_path) |> File.stat(time: :posix)
+    end
   end
 
   def read_exact_file_chunk({_first, last} = offsets, key, prefix) do
@@ -92,6 +108,26 @@ defmodule Chat.FileFs do
       |> Stream.map(&String.slice(&1, (dir_length + 1)..-1))
       |> Stream.map(&filename_to_db_key/1)
       |> Enum.to_list()
+
+      #      |> tap(&check_integrity(&1, prefix))
+    else
+      []
+    end
+  end
+
+  def list_file_errors(prefix) do
+    dir = build_path(prefix)
+    dir_length = String.length(dir)
+
+    if File.dir?(dir) do
+      dir
+      |> list_files()
+      |> Stream.flat_map(&chunks_in_file_dir/1)
+      |> Stream.reject(&is_nil/1)
+      |> Stream.map(&String.slice(&1, (dir_length + 1)..-1))
+      |> Stream.map(&filename_to_db_key/1)
+      |> Enum.to_list()
+      |> check_integrity(prefix)
     else
       []
     end
@@ -149,4 +185,53 @@ defmodule Chat.FileFs do
   rescue
     _ -> []
   end
+
+  defp check_integrity(key_list, prefix) do
+    #    total = Enum.count(key_list)
+
+    #    broken =
+    key_list
+    |> Enum.map(fn {_, file_key, first, last} ->
+      key = {file_key, first, last}
+      meta_size = last - first + 1
+      result = file_stats(key, prefix)
+
+      cond do
+        result |> not_found?() ->
+          {:no_file, file_key |> Base.encode16(case: :lower), file_key, first, last}
+
+        result |> correct_size?(meta_size) ->
+          :ok
+
+        true ->
+          [
+            file_size: result |> elem(1) |> Map.get(:size),
+            meta_size: last - first + 1,
+            meta: {file_key |> Base.encode16(case: :lower), key}
+          ]
+      end
+    end)
+    |> Enum.reject(&match?(:ok, &1))
+
+    #    broken_count = Enum.count(broken)
+
+    #    if broken_count > 0 do
+    #      log_broken(Enum.take(broken, 10), broken_count, total, prefix)
+    #    end
+
+    #    broken
+  end
+
+  defp not_found?(stat_result), do: not match?({:ok, _}, stat_result)
+  defp correct_size?({:ok, %{size: size}}, correct), do: size == correct
+
+  #  defp log_broken(list, broken, total, prefix) do
+  #    [
+  #      "[chat] ",
+  #      "[file_fs] ",
+  #      "Integrity broken on #{prefix}",
+  #      "\nBroken #{broken} of #{total}, like: \n#{inspect(list, pretty: true)}"
+  #    ]
+  #    |> Logger.warning()
+  #  end
 end

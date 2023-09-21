@@ -11,9 +11,14 @@ defmodule Chat.Db.WriteQueue.FileReaderTest do
   alias Chat.Db.WriteQueue.FileReader
 
   defmodule FileFsMock do
-    def read_exact_file_chunk(_, _, _) do
+    def read_exact_file_chunk({first, last}, _, _) do
       Process.sleep(:rand.uniform(450) + 50)
-      {:content, 0}
+      size = last - first + 1
+
+      {
+        " " |> String.duplicate(size),
+        size
+      }
     end
   end
 
@@ -97,7 +102,7 @@ defmodule Chat.Db.WriteQueue.FileReaderTest do
 
     [file | more_files]
     |> Enum.reject(&is_nil/1)
-    |> Enum.map(fn {key, :content} -> key end)
+    |> Enum.map(fn {key, _content} -> key end)
     |> MapSet.new()
     |> then(&{&1, still_tasks})
   end

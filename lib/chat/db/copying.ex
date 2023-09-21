@@ -11,33 +11,24 @@ defmodule Chat.Db.Copying do
   alias Chat.Db.Copying.Progress
   alias Chat.Db.Scope.Full, as: FullScope
   alias Chat.Db.WriteQueue
+  alias Chat.Db.WriteQueue.FileSkipSet
 
   def await_copied(from, to, keys_set \\ nil)
   def await_copied(_from, _to, []), do: :ok
 
   def await_copied(from, to, keys_set) do
-    "[copying] reading DBs" |> Logger.debug()
-    to_queue = Common.names(to, :queue)
-    stream = stream(from, to, nil, keys_set)
-    stream_keys = read_stream(stream, :keys)
+    ctx = prepare_copying(from, to, keys_set)
 
-    stream
-    |> WriteQueue.put_stream(to_queue)
+    ctx.stream
+    |> WriteQueue.put_stream(ctx.to_queue)
     |> case do
       :ok ->
-        Logging.log_copying(from, to, stream_keys)
+        Logging.log_copying(from, to, ctx.stream_keys)
 
-        stream_keys
-        |> await_written_into(to)
-        |> case do
-          :done ->
-            Logging.log_finished(from, to)
-            :ok
-
-          {:stuck, progress} ->
-            Logging.log_restart_on_stuck(from, to, progress)
-            force_copied(from, to, Progress.get_unwritten_keys(progress) |> Enum.shuffle())
-        end
+        ctx.stream_keys
+        |> await_written_into(to, ctx.skip_set)
+        |> tap(fn _ -> FileSkipSet.delete(ctx.skip_set) end)
+        |> maybe_restart(ctx)
 
       :ignored ->
         Logging.log_copying_ignored(from, to)
@@ -46,35 +37,52 @@ defmodule Chat.Db.Copying do
   end
 
   @spec await_written_into(keys :: list(), target_db :: atom()) :: :done | {:stuck, Progress.t()}
-  def await_written_into([], _target_db), do: :done
+  def await_written_into(keys, target_db, skip_set \\ nil)
+  def await_written_into([], _, _), do: :done
 
-  def await_written_into(keys, target_db) do
+  def await_written_into(keys, target_db, skip_set) do
     keys
-    |> Progress.new(target_db)
+    |> Progress.new(target_db, skip_set)
     |> ensure_complete()
   end
 
-  defp force_copied(from, to, keys_set) do
+  defp prepare_copying(from, to, keys_set) do
     "[copying] reading DBs" |> Logger.debug()
     to_queue = Common.names(to, :queue)
-    stream = stream(from, to, nil, keys_set)
+    skip_set = FileSkipSet.new()
+    stream = stream(from, to, nil, keys_set, skip_set)
     stream_keys = read_stream(stream, :keys)
 
-    Logging.log_copying(from, to, stream_keys)
+    %{
+      from: from,
+      to: to,
+      to_queue: to_queue,
+      skip_set: skip_set,
+      stream: stream,
+      stream_keys: stream_keys
+    }
+  end
 
-    stream |> WriteQueue.force_stream(to_queue)
+  defp maybe_restart(:done, %{} = ctx) do
+    Logging.log_finished(ctx.from, ctx.to)
+    :ok
+  end
 
-    Progress.new(stream_keys, to)
-    |> ensure_complete()
-    |> case do
-      :done ->
-        Logging.log_finished(from, to)
-        :ok
+  defp maybe_restart({:stuck, progress}, %{} = ctx) do
+    Logging.log_restart_on_stuck(ctx.from, ctx.to, progress)
+    force_copied(ctx.from, ctx.to, Progress.get_unwritten_keys(progress) |> Enum.shuffle())
+  end
 
-      {:stuck, progress} ->
-        Logging.log_restart_on_stuck(from, to, progress)
-        force_copied(from, to, Progress.get_unwritten_keys(progress) |> Enum.shuffle())
-    end
+  defp force_copied(from, to, keys_set) do
+    ctx = prepare_copying(from, to, keys_set)
+    Logging.log_copying(from, to, ctx.stream_keys)
+
+    ctx.stream |> WriteQueue.force_stream(ctx.to_queue)
+
+    ctx.stream_keys
+    |> await_written_into(to, ctx.skip_set)
+    |> tap(fn _ -> FileSkipSet.delete(ctx.skip_set) end)
+    |> maybe_restart(ctx)
   end
 
   defp ensure_complete(prev_progress, stuck_for_ms \\ 0) do
@@ -104,9 +112,7 @@ defmodule Chat.Db.Copying do
     end
   end
 
-  defp stream(from, to, awaiter, keys_set)
-
-  defp stream(from, to, awaiter, nil) do
+  defp stream(from, to, awaiter, nil, skip_set) do
     [from, to]
     |> Stream.map(fn db ->
       Task.async(fn -> FullScope.keys(db) end)
@@ -119,11 +125,11 @@ defmodule Chat.Db.Copying do
         |> MapSet.difference(dst)
         |> MapSet.to_list()
 
-      read_stream_new(from, keys, awaiter)
+      read_stream_new(from, keys, awaiter, skip_set)
     end)
   end
 
-  defp stream(from, to, awaiter, %MapSet{} = src) do
+  defp stream(from, to, awaiter, %MapSet{} = src, skip_set) do
     dst = FullScope.keys(to)
 
     keys =
@@ -131,10 +137,10 @@ defmodule Chat.Db.Copying do
       |> MapSet.difference(dst)
       |> MapSet.to_list()
 
-    read_stream(keys: keys, db: from, awaiter: awaiter)
+    read_stream(keys: keys, db: from, awaiter: awaiter, skip_set: skip_set)
   end
 
-  defp stream(from, to, awaiter, keys_list) when is_list(keys_list) do
-    stream(from, to, awaiter, MapSet.new(keys_list))
+  defp stream(from, to, awaiter, keys_list, skip_set) when is_list(keys_list) do
+    stream(from, to, awaiter, MapSet.new(keys_list), skip_set)
   end
 end

@@ -104,7 +104,7 @@ defmodule Chat.Rooms.RequestRoomTest do
     assert [] = Rooms.list_pending_requests(room_key)
   end
 
-  test "reuest message should be added upon requesting" do
+  test "request message should be added upon requesting" do
     {_alice, identity, room} = "Alice" |> user_and_request_room()
     room_key = identity |> Identity.pub_key()
     bob = "Bob" |> User.login()

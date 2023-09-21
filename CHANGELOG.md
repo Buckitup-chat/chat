@@ -24,6 +24,7 @@ straightforward as possible.
 - initial drive indication [#469]
 - add user name on invite confirmation to the admin room [#482]
 - improved firmware upload status [#484]
+- file reader skip bad files [#468]
 
 ### Fixed
 
@@ -31,8 +32,8 @@ straightforward as possible.
 - cargo user invitation [#460]
 - upload progress
 - cargo indication [#465]
-- Admin panel improvments on user changes [#473]
-- Message context menu in vvideo message is not shown
+- Admin panel improvements on user changes [#473]
+- Message context menu in video message is not shown
 - gallery scroll
 - real-time message loading into the operator cargo room [#489]
 - tablet layout fixed

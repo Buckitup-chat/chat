@@ -16,15 +16,13 @@ defmodule ChatWeb.LiveHelpers.Shared do
 
   @spec process(Socket.t(), fun()) :: Socket.t()
   def process(socket, task) do
-    Task.Supervisor.async_nolink(Chat.TaskSupervisor, fn ->
+    Task.Supervisor.start_child(Chat.TaskSupervisor, fn ->
       try do
         socket |> task.()
 
         :ok
       rescue
-        reason ->
-          Logger.error([inspect(reason)])
-          {:error, task, reason}
+        reason -> Logger.error([inspect(reason)])
       end
     end)
 

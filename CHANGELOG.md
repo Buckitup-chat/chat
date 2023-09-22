@@ -44,6 +44,7 @@ straightforward as possible.
 - request room approval flow [#507]
 - cargo room unblock [#504]
 - handle FileReader on stopped db [#505]
+- correct Chat.TaskSupervisor usage [#512]
 
 ## 2023-08-11_279815b___2023-08-11_24d6bac
 

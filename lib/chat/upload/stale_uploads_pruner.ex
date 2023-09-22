@@ -44,8 +44,9 @@ defmodule Chat.Upload.StaleUploadsPruner do
     one_day_ago = timestamp + (System.monotonic_time(:second) - monotonic_time) - 24 * 60 * 60
 
     UploadIndex.list()
-    |> Stream.filter(fn {_key, %Upload{} = upload} ->
-      upload.timestamp < one_day_ago
+    |> Stream.filter(fn
+      {_key, %Upload{} = upload} -> upload.timestamp < one_day_ago
+      _ -> false
     end)
     |> Enum.each(fn {key, %Upload{}} ->
       ChunkedFiles.delete(key)

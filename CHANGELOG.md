@@ -27,6 +27,7 @@ straightforward as possible.
 - add user name on invite confirmation to the admin room [#482]
 - improved firmware upload status [#484]
 - file reader skip bad files [#468]
+- cargo room complete indication when scenario is finished [#495]
 
 ### Fixed
 

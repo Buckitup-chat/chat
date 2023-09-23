@@ -34,8 +34,8 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign_user_list()
     |> assign_room_list()
     |> assign_admin()
-    |> process(&approve_pending_requests/1)
-    |> process(&join_approved_requests/1)
+#    |> process(&approve_pending_requests/1)
+#    |> process(&join_approved_requests/1)
   end
 
   def refresh_rooms_and_users(%{assigns: %{search_filter: :on}} = socket), do: socket

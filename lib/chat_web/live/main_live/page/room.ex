@@ -160,7 +160,8 @@ defmodule ChatWeb.MainLive.Page.Room do
             last_loaded_index: index
           }
         } = socket
-      ) do
+      )
+      when not is_nil(room) and not is_nil(identity) do
     socket
     |> assign(:message_update_mode, :append)
     |> assign(

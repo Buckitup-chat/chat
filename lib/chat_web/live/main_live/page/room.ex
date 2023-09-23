@@ -182,6 +182,8 @@ defmodule ChatWeb.MainLive.Page.Room do
     end
   end
 
+  def load_new_messages(socket), do: socket
+
   def send_text(
         %{assigns: %{room: room, me: me, room_map: rooms, monotonic_offset: time_offset}} =
           socket,

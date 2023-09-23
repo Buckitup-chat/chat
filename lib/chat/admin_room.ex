@@ -91,6 +91,29 @@ defmodule Chat.AdminRoom do
     end
   end
 
+  def parse_weight_setting(weight_sensor) do
+    with true <- weight_sensor !== %{},
+         type <- weight_sensor[:type],
+         true <- is_binary(type) and byte_size(type) > 0,
+         name <- weight_sensor[:name],
+         true <- is_binary(name) and byte_size(name) > 0,
+         opts <- Map.drop(weight_sensor, [:name, :type]) |> Map.to_list() |> fix_parity() do
+      {:ok, {name, type, opts}}
+    else
+      :error
+    end
+  end
+
+  defp fix_parity(opts) do
+    if is_binary(opts[:parity]) do
+      opts
+      |> Keyword.delete(:parity)
+      |> Keyword.put(:parity, opts[:parity] |> String.to_existing_atom())
+    else
+      opts
+    end
+  end
+
   def store_cargo_settings(%CargoSettings{} = cargo_settings),
     do: AdminDb.put(:cargo_settings, cargo_settings)
 

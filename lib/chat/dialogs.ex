@@ -123,6 +123,9 @@ defmodule Chat.Dialogs do
     content
     |> StorageId.from_json()
     |> RoomInvites.get()
-    |> Identity.from_strings()
+    |> case do
+      nil -> nil
+      x -> x |> Identity.from_strings()
+    end
   end
 end

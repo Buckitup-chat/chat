@@ -34,8 +34,8 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign_user_list()
     |> assign_room_list()
     |> assign_admin()
-#    |> process(&approve_pending_requests/1)
-#    |> process(&join_approved_requests/1)
+    |> process(&approve_pending_requests/1)
+    |> process(&join_approved_requests/1)
   end
 
   def refresh_rooms_and_users(%{assigns: %{search_filter: :on}} = socket), do: socket
@@ -322,9 +322,9 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   defp init_new_mode(%{assigns: %{lobby_mode: :admin}} = socket),
     do: socket |> Page.AdminPanel.init()
 
-  defp approve_pending_requests(%{
-         assigns: %{room_map: room_map, me: me, monotonic_offset: time_offset}
-       }) do
+  defp approve_pending_requests(socket) do
+    %{room_map: room_map, me: me, monotonic_offset: time_offset} = socket.assigns
+
     for room_key <- Map.keys(room_map),
         %RoomRequest{requester_key: user_key} <- Rooms.list_pending_requests(room_key),
         room = Rooms.approve_request(room_key, user_key, room_map[room_key], public_only: true) do
@@ -345,15 +345,22 @@ defmodule ChatWeb.MainLive.Page.Lobby do
           :ok
       end
     end
+  rescue
+    _ -> :skip
   end
 
-  defp join_approved_requests(%{assigns: %{new_rooms: rooms, my_id: my_id}, root_pid: root_pid}) do
+  defp join_approved_requests(socket) do
+    %{new_rooms: rooms, my_id: my_id} = socket.assigns
+    root_pid = socket.root_pid
+
     for %Rooms.Room{} = room <- rooms,
         request <- Rooms.list_approved_requests_for(room, my_id),
         ciphered = request.ciphered_room_identity,
         true == is_bitstring(ciphered) do
       send(root_pid, {:room_request_approved, ciphered, my_id, room.pub_key})
     end
+  rescue
+    _ -> :skip
   end
 
   defp get_version do

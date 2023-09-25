@@ -1119,32 +1119,34 @@
                     module={CargoCheckpointsForm}
                   />
                 </Layout.Admin.block>
-                <Layout.Admin.block title="Cargo user">
+              </Layout.Admin.row>
+            <% end %>
+            <Layout.Admin.row>
+              <Layout.Admin.block title="Cargo user">
+                <.live_component
+                  id={:cargo_user_data}
+                  cargo_user={assigns[:cargo_user]}
+                  module={CargoUserData}
+                />
+              </Layout.Admin.block>
+            </Layout.Admin.row>
+            <%= if assigns[:cargo_user] do %>
+              <Layout.Admin.row>
+                <Layout.Admin.block title="Cargo camera sensors">
                   <.live_component
-                    id={:cargo_user_data}
-                    cargo_user={assigns[:cargo_user]}
-                    module={CargoUserData}
+                    id={:cargo_camera_sensors_form}
+                    cargo_settings={@cargo_settings}
+                    module={CargoCameraSensorsForm}
+                  />
+                </Layout.Admin.block>
+                <Layout.Admin.block title="Cargo weight sensor">
+                  <.live_component
+                    id={:cargo_weight_sensor_form}
+                    cargo_settings={@cargo_settings}
+                    module={CargoWeightSensorForm}
                   />
                 </Layout.Admin.block>
               </Layout.Admin.row>
-              <%= if assigns[:cargo_user] do %>
-                <Layout.Admin.row>
-                  <Layout.Admin.block title="Cargo camera sensors">
-                    <.live_component
-                      id={:cargo_camera_sensors_form}
-                      cargo_settings={@cargo_settings}
-                      module={CargoCameraSensorsForm}
-                    />
-                  </Layout.Admin.block>
-                  <Layout.Admin.block title="Cargo weight sensor">
-                    <.live_component
-                      id={:cargo_weight_sensor_form}
-                      cargo_settings={@cargo_settings}
-                      module={CargoWeightSensorForm}
-                    />
-                  </Layout.Admin.block>
-                </Layout.Admin.row>
-              <% end %>
             <% end %>
           </Layout.Admin.container>
         <% end %>

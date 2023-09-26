@@ -46,6 +46,8 @@ straightforward as possible.
 - handle FileReader on stopped db [#505]
 - correct Chat.TaskSupervisor usage [#512]
 - upload pruner error [#517]
+- offline approval
+- invalid invite handling
 
 ## 2023-08-11_279815b___2023-08-11_24d6bac
 

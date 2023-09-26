@@ -160,7 +160,8 @@ defmodule ChatWeb.MainLive.Page.Room do
             last_loaded_index: index
           }
         } = socket
-      ) do
+      )
+      when not is_nil(room) and not is_nil(identity) do
     socket
     |> assign(:message_update_mode, :append)
     |> assign(
@@ -181,6 +182,8 @@ defmodule ChatWeb.MainLive.Page.Room do
         socket
     end
   end
+
+  def load_new_messages(socket), do: socket
 
   def send_text(
         %{assigns: %{room: room, me: me, room_map: rooms, monotonic_offset: time_offset}} =

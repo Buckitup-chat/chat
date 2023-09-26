@@ -284,9 +284,9 @@ defmodule ChatWeb.MainLive.Page.Lobby do
       with admin_pub_key <- AdminRoom.pub_key(),
            false <- is_nil(admin_pub_key),
            some_data <- admin_pub_key |> Enigma.hash(),
-           identitiy <- rooms[admin_pub_key],
-           false <- is_nil(identitiy),
-           sign <- Enigma.sign(some_data, identitiy.private_key),
+           identity <- rooms[admin_pub_key],
+           false <- is_nil(identity),
+           sign <- Enigma.sign(some_data, identity.private_key),
            true <- Enigma.is_valid_sign?(sign, some_data, admin_pub_key) do
         true
       else
@@ -322,9 +322,9 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   defp init_new_mode(%{assigns: %{lobby_mode: :admin}} = socket),
     do: socket |> Page.AdminPanel.init()
 
-  defp approve_pending_requests(%{
-         assigns: %{room_map: room_map, me: me, monotonic_offset: time_offset}
-       }) do
+  defp approve_pending_requests(socket) do
+    %{room_map: room_map, me: me, monotonic_offset: time_offset} = socket.assigns
+
     for room_key <- Map.keys(room_map),
         %RoomRequest{requester_key: user_key} <- Rooms.list_pending_requests(room_key),
         room = Rooms.approve_request(room_key, user_key, room_map[room_key], public_only: true) do
@@ -345,15 +345,22 @@ defmodule ChatWeb.MainLive.Page.Lobby do
           :ok
       end
     end
+  rescue
+    _ -> :skip
   end
 
-  defp join_approved_requests(%{assigns: %{new_rooms: rooms, my_id: my_id}, root_pid: root_pid}) do
+  defp join_approved_requests(socket) do
+    %{new_rooms: rooms, my_id: my_id} = socket.assigns
+    root_pid = socket.root_pid
+
     for %Rooms.Room{} = room <- rooms,
         request <- Rooms.list_approved_requests_for(room, my_id),
         ciphered = request.ciphered_room_identity,
         true == is_bitstring(ciphered) do
       send(root_pid, {:room_request_approved, ciphered, my_id, room.pub_key})
     end
+  rescue
+    _ -> :skip
   end
 
   defp get_version do

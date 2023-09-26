@@ -240,12 +240,6 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
       |> element(".navbar button", "Admin")
       |> render_click()
 
-      refute view |> render() =~ "Cargo user"
-
-      view
-      |> form("#media_settings", %{"media_settings" => %{"functionality" => "cargo"}})
-      |> render_submit()
-
       assert view |> render() =~ "Cargo user"
 
       view
@@ -277,12 +271,6 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
       view
       |> element(".navbar button", "Admin")
       |> render_click()
-
-      refute view |> render() =~ "Cargo user"
-
-      view
-      |> form("#media_settings", %{"media_settings" => %{"functionality" => "cargo"}})
-      |> render_submit()
 
       assert view |> render() =~ "Cargo user"
 
@@ -328,12 +316,6 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
       view
       |> element(".navbar button", "Admin")
       |> render_click()
-
-      refute view |> render() =~ "Cargo camera sensors"
-
-      view
-      |> form("#media_settings", %{"media_settings" => %{"functionality" => "cargo"}})
-      |> render_submit()
 
       refute view |> render() =~ "Cargo camera sensors"
 

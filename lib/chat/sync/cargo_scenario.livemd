@@ -1,5 +1,12 @@
 # Cargo scenario
 
+```elixir
+Mix.install([
+  {:kino_vega_lite, "~> 0.1.4"},
+  {:kino_maplibre, "~> 0.1.3"}
+])
+```
+
 ## Led indication
 
 `GPIO23`(physical pin 16) -> plug the red led
@@ -42,3 +49,29 @@ When the syncronization was succesful and all the data from camera sensors was s
 
 Indication: no red light, no green light.
 Scenario finished. Ready for the next flash drive.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### For operators
+
+<!-- livebook:{"break_markdown":true} -->
+
+|                               | Drive accepted :red_circle: | Drive complete :white_check_mark: | Drive refused :sos: | Drive reset :black_circle: |
+| ----------------------------- | --------------------------- | --------------------------------- | ------------------- | -------------------------- |
+| Cargo user present            | Initial state               | Next state                        |                     | Final state                |
+| Cargo user absent             | Initial state               | Next state                        |                     | Final state                |
+| Cargo user is a checkpoint    | Initial state               | Next state                        |                     | Final state                |
+| Cargo user isn't a checkpoint | Initial state               |                                   | Next state          | Final state                |
+| Cargo room present            | Initial state               | Next state                        |                     | Final state                |
+| Cargo room absent             | Initial state               |                                   | Next state          | Final state                |
+
+<!-- livebook:{"break_markdown":true} -->
+
+### For drivers
+
+<!-- livebook:{"break_markdown":true} -->
+
+|         | Drive accepted :red_circle: | Drive complete :white_check_mark: | Drive refused :sos: | Drive reset :black_circle: |
+| ------- | --------------------------- | --------------------------------- | ------------------- | -------------------------- |
+| Success | Initial state               | Next state                        |                     | Final state                |
+| Fail    | Initial state               |                                   | Next state          | Final state                |

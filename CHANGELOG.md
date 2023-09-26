@@ -22,6 +22,7 @@ straightforward as possible.
 ### Changed
 
 - extend cargo checkpoints
+- update cargo indication docs
 - await full file [#456]
 - initial drive indication [#469]
 - add user name on invite confirmation to the admin room [#482]

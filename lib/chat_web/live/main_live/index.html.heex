@@ -388,10 +388,28 @@
             </button>
           <% end %>
           <%= if assigns[:cargo_room][:status] == :complete and Map.has_key?(@room_map, assigns[:cargo_room][:pub_key]) do %>
+            <!-- desktop -->
             <button
               phx-click="room/switch"
               phx-value-room={Room.hash(@cargo_room.pub_key)}
-              class="sidebarIcon"
+              class="hidden md:flex flex-col items-center justify-center"
+            >
+              <.icon
+                id="cargo"
+                class={
+                  classes("w-8 h-8 hover:fill-purple", %{
+                    "fill-purple" => @cargo_room.pub_key == assigns[:room][:pub_key],
+                    "fill-grayscale" => @cargo_room.pub_key != assigns[:room][:pub_key]
+                  })
+                }
+              />
+              <span class="text-xs">Cargo Room</span>
+            </button>
+            <!-- mobile -->
+            <button
+              phx-click={JS.push("room/switch") |> open_content()}
+              phx-value-room={Room.hash(@cargo_room.pub_key)}
+              class="flex flex-col items-center justify-center md:hidden"
             >
               <.icon
                 id="cargo"

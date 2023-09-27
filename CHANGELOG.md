@@ -48,6 +48,7 @@ straightforward as possible.
 - upload pruner error [#517]
 - offline approval
 - invalid invite handling
+- cargo room gets opened on mobile [#492]
 
 ## 2023-08-11_279815b___2023-08-11_24d6bac
 

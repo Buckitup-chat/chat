@@ -426,7 +426,6 @@
           <%= if assigns[:usb_drive_dump_room][:status] == :complete do %>
             <button
               phx-click="room/switch"
-
               phx-value-room={Room.hash(@usb_drive_dump_room.pub_key)}
               class="sidebarIcon"
             >

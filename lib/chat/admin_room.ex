@@ -100,7 +100,7 @@ defmodule Chat.AdminRoom do
          opts <- Map.drop(weight_sensor, [:name, :type]) |> Map.to_list() |> fix_parity() do
       {:ok, {name, type, opts}}
     else
-      :error
+      _ -> :error
     end
   end
 

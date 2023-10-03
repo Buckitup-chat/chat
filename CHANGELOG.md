@@ -18,6 +18,7 @@ straightforward as possible.
 - cargo room type changed to private (by request)
 - version in db_log [#511]
 - favicon added [#493]
+- shortcode reverse for chat list [#528]
 
 ### Changed
 

@@ -62,7 +62,7 @@ defmodule ChatWeb.MainLive.Layout.Card do
         <div class={@name_style}><%= @card.name %></div>
         <tt class={"ml-1 #{@hash_style}"}>[<%= Enigma.short_hash(@card) %>]</tt>
       <% else %>
-        <tt class={"#{@hash_style}"}>[<%= Enigma.short_hash(@card) %>]</tt>
+        <tt class={@hash_style}>[<%= Enigma.short_hash(@card) %>]</tt>
         <div class={"ml-1 #{@name_style}"}><%= @card.name %></div>
       <% end %>
       <%= if @is_me? do %>

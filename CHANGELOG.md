@@ -19,6 +19,7 @@ straightforward as possible.
 - version in db_log [#511]
 - favicon added [#493]
 - shortcode reverse for chat list [#528]
+- distinct usb drives scenario [#527]
 
 ### Changed
 

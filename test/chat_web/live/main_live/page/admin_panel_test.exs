@@ -349,7 +349,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
       assert html =~ "Media settings"
 
       assert html =~
-               ~r|When new USB drive is plugged into the secondary port,<br/>\s+the following functionality will be started:|
+               ~r|When new USB drive is plugged,<br/>\s+the following functionality will be started:|
 
       assert html =~
                ~S(<input checked="checked" id="media_settings_functionality_backup" name="media_settings[functionality]" type="radio" value="backup"/>)

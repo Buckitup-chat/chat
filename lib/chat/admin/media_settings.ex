@@ -13,11 +13,12 @@ defmodule Chat.Admin.MediaSettings do
       default: :backup,
       values: [backup: "Backup", cargo: "Cargo", onliners: "Onliners sync"]
     )
+    field(:main, :boolean, default: true)
   end
 
   def changeset(%__MODULE__{} = media_settings, attrs) do
     media_settings
-    |> cast(attrs, [:functionality])
+    |> cast(attrs, [:functionality, :main])
     |> validate_required([:functionality])
   end
 end

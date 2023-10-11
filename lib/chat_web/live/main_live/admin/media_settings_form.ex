@@ -62,8 +62,7 @@ defmodule ChatWeb.MainLive.Admin.MediaSettingsForm do
         phx-target={@myself}
       >
         <div>
-          When new USB drive is plugged,<br />
-          the following functionality will be started:
+          When new USB drive is plugged,<br /> the following functionality will be started:
         </div>
         <.main_checkbox form={f} field={:main} />
         <%= for {value, label} <- Ecto.Enum.mappings(MediaSettings, :functionality) do %>

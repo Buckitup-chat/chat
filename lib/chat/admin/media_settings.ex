@@ -13,6 +13,7 @@ defmodule Chat.Admin.MediaSettings do
       default: :backup,
       values: [backup: "Backup", cargo: "Cargo", onliners: "Onliners sync"]
     )
+
     field(:main, :boolean, default: true)
   end
 

@@ -20,6 +20,7 @@ straightforward as possible.
 - favicon added [#493]
 - shortcode reverse for chat list [#528]
 - distinct usb drives scenario [#527]
+- FS benchmark scenario [#526]
 
 ### Changed
 

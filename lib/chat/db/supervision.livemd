@@ -61,14 +61,16 @@ graph LR;
   pa(Application)
   ds(DeviceSupervisor)
   cb[ChatBridge]
+  di[DriveIndication]
   uw[UsbWatcher]
   dmds{{DynamicMainDbSupervisor}}
   dms{{DynamicMediaSupervisor}}
   pmds(Platform MainDbSupervisor)
   pms(Platform MediaSupervisor)
 
-  pa --> ds
   pa --> cb
+  pa --> di
+  pa --> ds
 
   ds --> dmds --> pmds
   ds --> dms --> pms

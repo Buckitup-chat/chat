@@ -100,10 +100,10 @@
         </a>
 
         <%= if @live_modal do %>
-          <%= live_component(
-            @live_modal.component,
-            @live_modal.params |> Map.merge(%{id: @live_modal.component})
-          ) %>
+          <.live_component
+            component={@live_modal.component}
+            {@live_modal.params |> Map.merge(%{id: @live_modal.component})}
+          />
         <% end %>
       </div>
     </div>

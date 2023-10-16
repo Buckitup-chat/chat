@@ -10,7 +10,7 @@ defmodule Chat.FileFs.Dir3 do
   def read_exact_file_chunk({first, last}, key, prefix \\ nil) do
     {key, first, last}
     |> file_path(build_path(prefix))
-    |> File.open([:binary, :read], &IO.binread(&1, :all))
+    |> File.open([:binary, :read], &binread/1)
   end
 
   def read_file_chunk(first, key, prefix \\ nil) do
@@ -28,7 +28,7 @@ defmodule Chat.FileFs.Dir3 do
 
         [file_dir_path, first_offset_name, last_offset_name]
         |> Path.join()
-        |> File.open([:binary, :read], &IO.binread(&1, :all))
+        |> File.open([:binary, :read], &binread/1)
         |> then(&{&1, last})
     end
   rescue

@@ -14,6 +14,8 @@ straightforward as possible.
 
 ### Changed
 
+- Nerves + Elixir + Phoenix update [#501]
+
 ### Fixed
 
 ## 2023-10-11_c9df216___2023-10-11_8198274

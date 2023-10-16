@@ -105,7 +105,7 @@ defmodule Chat.Db.WriteQueue.ReadStream do
   rescue
     # in case source DB is dead we finish with the stream
     e ->
-      e |> inspect(pretty: true) |> Logger.warn()
+      e |> inspect(pretty: true) |> Logger.warning()
       # Process.info(self(), :current_stacktrace) |> inspect(pretty: true) |> Logger.warn()
       # {db, list |> Enum.take(10), readers} |> inspect(pretty: true) |> Logger.warn()
       {[], [], []}

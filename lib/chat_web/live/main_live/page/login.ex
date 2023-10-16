@@ -46,7 +46,7 @@ defmodule ChatWeb.MainLive.Page.Login do
   end
 
   def load_user(socket, x) do
-    x |> inspect() |> Logger.warn()
+    x |> inspect() |> Logger.warning()
 
     socket
   end
@@ -67,7 +67,7 @@ defmodule ChatWeb.MainLive.Page.Login do
   end
 
   def load_user(socket, x, y) do
-    {x, y} |> inspect() |> Logger.warn()
+    {x, y} |> inspect() |> Logger.warning()
 
     socket
   end

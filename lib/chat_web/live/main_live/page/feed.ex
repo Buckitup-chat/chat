@@ -13,7 +13,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
     socket
     |> assign(:action_feed_till, till)
     |> assign(:items, nil)
-    |> stream_configure(:action_feed_till,  dom_id: &item_dom_id(&1))
+    |> stream_configure(:action_feed_till, dom_id: &item_dom_id(&1))
     |> assign_feed_stream(list)
     |> assign(:feed_update_mode, :ignore)
   end
@@ -149,7 +149,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
     |> Enum.map(fn {uuid, who, data} ->
       %{id: uuid, who: who, data: data}
     end)
-    |> then(& {&1, till})
+    |> then(&{&1, till})
   end
 
   defp assign_feed_stream(%{assigns: %{streams: %{action_feed_list: _feed}}} = socket, list) do
@@ -162,12 +162,10 @@ defmodule ChatWeb.MainLive.Page.Feed do
   end
 
   defp assign_feed_stream(socket, list) do
-
     socket
     |> stream(:action_feed_list, list)
     |> assign_items_uuid(list)
   end
-
 
   defp assign_items_uuid(%{assigns: %{items: nil}} = socket, list) do
     socket |> assign(:items, Enum.map(list, &item_dom_id(&1)))

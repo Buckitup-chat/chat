@@ -147,7 +147,7 @@ defmodule Chat.Db.WriteQueue.FileReader do
   end
 
   defp log_error_reading(msg, name, error) do
-    "#{inspect(name)} Error reading #{inspect(msg)}\n#{inspect(error)}" |> log(:warn)
+    "#{inspect(name)} Error reading #{inspect(msg)}\n#{inspect(error)}" |> log(:warning)
   end
 
   defp log(message, level) do

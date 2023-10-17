@@ -33,7 +33,7 @@ defmodule Chat.Db.ChangeTracker.Logger do
         inspect(n),
         " awaiting keys"
       ]
-      |> Logger.warn()
+      |> Logger.warning()
     end
 
     schedule_timer(@check_delay)

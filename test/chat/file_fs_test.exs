@@ -1,6 +1,8 @@
 defmodule Chat.FileFsTest do
   use ExUnit.Case
 
+  import Chat.FileFs.Common, only: [binread: 1]
+
   describe "old FS operations" do
     setup do
       path =
@@ -49,6 +51,54 @@ defmodule Chat.FileFsTest do
     test "stream file", %{path: path, db_key: {_, key, _, _}, content: content} do
       assert ^content =
                Chat.FileFs.stream_file_chunks(key, path) |> Enum.to_list() |> List.first()
+    end
+  end
+
+  describe "file operations" do
+    test "binread" do
+      dir = make_temp_dir("binread")
+      file1 = make_file(dir, 4096)
+      file2 = make_file(dir, 4095)
+      file3 = make_file(dir, 4097)
+      file4 = make_file(dir, 0)
+
+      assert 4095 = file2 |> read_file() |> byte_size()
+      assert 4096 = file1 |> read_file() |> byte_size()
+      assert 4097 = file3 |> read_file() |> byte_size()
+      assert 0 = file4 |> read_file() |> byte_size()
+
+      clear_temp_dir(dir)
+    end
+
+    defp read_file(filename) do
+      filename
+      |> File.open([:binary, :read], &binread/1)
+      |> case do
+        {:ok, data} -> data
+        other -> {:error, other}
+      end
+    end
+
+    defp make_file(dir, length) do
+      dir
+      |> Path.join(UUID.uuid4())
+      |> tap(fn filename ->
+        data = :crypto.strong_rand_bytes(length)
+
+        File.open(filename, [:write, :sync], fn file ->
+          :ok = IO.binwrite(file, data)
+        end)
+      end)
+    end
+
+    defp make_temp_dir(suffix) do
+      System.tmp_dir!()
+      |> Path.join(suffix)
+      |> tap(&File.mkdir_p!/1)
+    end
+
+    defp clear_temp_dir(dir) do
+      File.rm_rf(dir)
     end
   end
 end

@@ -5,14 +5,15 @@ defmodule ChatWeb.MainLive.Page.Feed do
   alias Chat.Log
   alias Chat.User
 
-  @items_treshold 100
+  @items_threshold 100
 
   def init(socket) do
-    {list, till} = load_actions(@items_treshold)
+    {list, till} = load_actions(@items_threshold)
 
     socket
     |> assign(:action_feed_till, till)
     |> assign(:items, nil)
+    |> stream_configure(:action_feed_till, dom_id: &item_dom_id(&1))
     |> assign_feed_stream(list)
     |> assign(:feed_update_mode, :ignore)
   end
@@ -26,7 +27,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
   end
 
   def more(%{assigns: %{action_feed_till: since}} = socket) do
-    {list, till} = load_more(@items_treshold, [], since - 1)
+    {list, till} = load_more(@items_threshold, [], since - 1)
 
     socket
     |> assign(:action_feed_till, till)
@@ -43,7 +44,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
 
   def item(
         %{
-          item: {dom_id, {_uuid, who, data}},
+          item: {dom_id, %{who: who, data: data}},
           tz: timezone
         } = assigns
       ) do
@@ -121,7 +122,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
   end
 
   defp load_actions(count) do
-    {list, till} = Log.list()
+    {list, till} = Log.list() |> to_maps()
     list_count = list |> Enum.count()
 
     if count <= list_count or till < 1 do
@@ -132,7 +133,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
   end
 
   defp load_more(count, small_list, since) do
-    {list, till} = Log.list(since)
+    {list, till} = Log.list(since) |> to_maps()
     list_count = list |> Enum.count()
     rest_count = count - list_count
 
@@ -141,6 +142,14 @@ defmodule ChatWeb.MainLive.Page.Feed do
     else
       load_more(rest_count, small_list ++ list, till - 1)
     end
+  end
+
+  defp to_maps({list, till}) do
+    list
+    |> Enum.map(fn {uuid, who, data} ->
+      %{id: uuid, who: who, data: data}
+    end)
+    |> then(&{&1, till})
   end
 
   defp assign_feed_stream(%{assigns: %{streams: %{action_feed_list: _feed}}} = socket, list) do
@@ -154,7 +163,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
 
   defp assign_feed_stream(socket, list) do
     socket
-    |> stream(:action_feed_list, list, dom_id: &item_dom_id(&1))
+    |> stream(:action_feed_list, list)
     |> assign_items_uuid(list)
   end
 
@@ -173,5 +182,5 @@ defmodule ChatWeb.MainLive.Page.Feed do
     end)
   end
 
-  defp item_dom_id({uuid, _who, _data}), do: "feed-item-#{uuid}"
+  defp item_dom_id(%{id: uuid}), do: "action_feed_list-#{uuid}"
 end

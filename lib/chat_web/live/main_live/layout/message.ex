@@ -349,7 +349,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   defp message(assigns) do
-    ["[message] ", "error rendering ", inspect(assigns[:msg], pretty: true)] |> Logger.warn()
+    ["[message] ", "error rendering ", inspect(assigns[:msg], pretty: true)] |> Logger.warning()
 
     ~H"""
     <!-- error rendering message -->

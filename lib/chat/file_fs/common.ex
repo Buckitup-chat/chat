@@ -22,4 +22,13 @@ defmodule Chat.FileFs.Common do
   end
 
   def hc(str), do: String.slice(str, 0, 2)
+
+  def binread(path) do
+    path
+    |> IO.binread(:eof)
+    |> case do
+      :eof -> ""
+      str -> str
+    end
+  end
 end

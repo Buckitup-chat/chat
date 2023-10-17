@@ -63,7 +63,7 @@ defmodule Chat.FileFs do
     |> chunks_in_file_dir()
     |> Enum.sort()
     |> Stream.map(fn file ->
-      File.open!(file, [:binary, :read], &IO.binread(&1, :all))
+      File.open!(file, [:binary, :read], &binread/1)
     end)
   end
 

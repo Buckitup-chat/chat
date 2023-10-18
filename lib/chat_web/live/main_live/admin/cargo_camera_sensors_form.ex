@@ -10,6 +10,8 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
   alias Chat.AdminRoom
   alias Chat.Sync.Camera.Sensor
 
+  alias ChatWeb.MainLive.Admin.CameraPreview
+
   def mount(socket) do
     cargo_settings = AdminRoom.get_cargo_settings()
 
@@ -34,7 +36,7 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
         <fieldset class="flex flex-col space-y-2">
           <%= for {url, index} <- form_input_list(form) do %>
             <div class="camera-sensor flex flex-row">
-              <.camera_img url={url} />
+              <.live_component module={CameraPreview} id={"camera-sensor-preview-#{index}"} url={url} />
               <input
                 id={"camera-sensor-input-#{index}"}
                 class={
@@ -50,7 +52,7 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
                 placeholder="Paste the url here"
                 value={url}
                 name={index}
-                phx-debounce="1000"
+                phx-debounce="500"
               />
               <button
                 class="pl-2"
@@ -172,20 +174,6 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
     changeset
     |> CargoSettings.camera_sensors_field()
     |> Enum.with_index()
-  end
-
-  defp camera_img(%{url: url} = assigns) do
-    case Sensor.get_image(url) do
-      {:error, _} ->
-        ~H""
-
-      {:ok, {type, content}} ->
-        assigns = assigns |> Map.put(:inline_url, "data:#{type};base64,#{Base.encode64(content)}")
-
-        ~H"""
-        <img class="w-12" src={@inline_url} />
-        """
-    end
   end
 
   defp validate_sensor(socket, url, index) do

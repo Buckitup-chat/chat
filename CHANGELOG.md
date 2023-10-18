@@ -12,6 +12,8 @@ straightforward as possible.
 
 ### Added
 
+- async load of camera sensor images for admin [#532]
+
 ### Changed
 
 - Nerves + Elixir + Phoenix update [#501]

@@ -53,7 +53,7 @@ defmodule ChatWeb.MainLive.Admin.CameraPreview do
 
   defp assign_camera_task(%{root_pid: pid, assigns: %{myself: cid, url: url}} = socket) do
     with false <- url == "",
-         {:ok, task_pid} =
+         {:ok, task_pid} <-
            Task.Supervisor.start_child(Chat.TaskSupervisor, generate_camera_task(url, pid, cid)) do
       socket
       |> assign(:task, task_pid)

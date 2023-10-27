@@ -41,7 +41,7 @@ This approach used in all DB Supervisors. Each handles its own DB, otherwise the
 
 Device managing happens in `Platform` project. (It incorporates `Chat` as dependency)
 
-Here is a bit simplified supervision tree.
+Here is a simplified supervision tree.
 
 <!-- livebook:{"break_markdown":true} -->
 
@@ -61,29 +61,74 @@ graph LR;
   pa(Application)
   ds(DeviceSupervisor)
   cb[ChatBridge]
-  uw[UsbWatcher]
-  dmds{{DynamicMainDbSupervisor}}
-  dms{{DynamicMediaSupervisor}}
-  pmds(Platform MainDbSupervisor)
-  pms(Platform MediaSupervisor)
+  di[DriveIndication]
+  drive_sup{{Drives}}
+  dr[Drives.Registry]
+  udd[UsbDrives.Detector]
 
-  pa --> ds
   pa --> cb
+  pa --> di
+  pa --> ds
 
-  ds --> dmds --> pmds
-  ds --> dms --> pms
-  ds --> uw
+  ds --> drive_sup
+  ds --> dr
+  ds --> udd
 
-  pmds -..- mds
-  pms -..- meds
+  drive_sup -..-> mds
+  drive_sup -..-> meds
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+`DriveIndication` handles extra LED indication hardware
+
+`ChatBridge` lets Chat to talk to Platform. Wifi setting and drives interaction are possible here.
+
+`UsbDrives.Detector` polls filesystem for USB devices plug/unplug.
+
+`Drives.Registry` registers processes used in drive dedicated subtrees.
+
+`Drives`  - supervises detected drives. We need Dynamic Supervisors to start or shutdown supervision subtrees, since devices are not always present. Each drive gets its own subtree.
+
+Drive subtree consists of 2 parts.
+
+* Booting - heals filesystem, mounts it and decideces which scenario to run
+* Scenario - supervises given scenario behavior
+
+Depending on scenario, subtree will include `MainDbSupervisor` or `MediaSupervisor` to supervise DB.
+
+<!-- livebook:{"break_markdown":true} -->
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph TD;
+  ds{{Drives}}
+  bs(Boot)
+  dis[DriveIndicationStarter]
+  h[[Healer]]
+  healed{{Healed}}
+  m[[Mounter]]
+  mounted{{Mounted}}
+  sc{{Scenario}}
+  d[Decider]
+
+  ds -.-> bs
+  bs --> dis
+  bs --> healed
+  bs --> h
+
+  healed --> m
+  healed --> mounted
+
+  mounted --> sc
+  mounted --> d
 
 ```
 
 <!-- livebook:{"break_markdown":true} -->
 
-`UsbWatcher` subscribes to system events to detect USB devices plug/unplug.
-
-We need Dynamic Supervisors to start or shutdown supervision subtrees, since devices are not always present.
+...
 
 `Platform MainDbSupervisor` and `Platform MediaSupervisor` do `rest for one` strategy that will restart all later started peers in case of failing.
 

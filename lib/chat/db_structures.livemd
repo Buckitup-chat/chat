@@ -63,8 +63,8 @@ Since room has many users, it has its own private key. It allows holder of a key
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-{{:room_message, room_pub_key_binhash, index, message
- %Message{timestamp, author_hash, encrypted_and_signed_message, message_type, id, version}}
+{{:room_message, room_pub_key_binhash, index, message_id}
+ %Message{timestamp, author_hash, encrypted_and_signed_message, message_type, id, version}
 ```
 
 <!-- livebook:{"break_markdown":true} -->

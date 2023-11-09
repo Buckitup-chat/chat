@@ -45,21 +45,19 @@ defmodule Chat.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
-      # {:flame_on, "~> 0.5.2"},
       {:absinthe, "~> 1.7"},
       {:absinthe_plug, "~> 1.5"},
+                       {:neuron, "~> 5.1"},
       {:poison, "~> 5.0"},
       {:phoenix_ecto, "~> 4.0"},
       {:ecto, "~> 3.7"},
       {:temp, "~> 0.4.7"},
-      # {:termit, "~> 2.0"},
       {:tzdata, "~> 1.1"},
       {:qr_code, "~> 2.2.1"},
       {:cubdb, "~> 2.0"},
       {:curvy, "~> 0.3.1"},
       {:struct_access, "~> 1.1"},
       {:uuid, "~> 1.1"},
-      # {:x509, "~> 0.8"},
       {:phoenix, "~> 1.7.2"},
       {:phoenix_html, "~> 3.0"},
       {:phoenix_view, "~> 2.0"},

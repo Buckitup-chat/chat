@@ -1,5 +1,5 @@
 defmodule NaiveApi.Data do
-  @moduledoc false
+  @moduledoc "Data transferring functions for API"
   use NaiveApi, :resolver
 
   def all_keys(_, _) do
@@ -14,24 +14,10 @@ defmodule NaiveApi.Data do
   def get_value(%{key: key}, _) do
     key
     |> deserialize_key()
-    |> case do
-      # todo: rework
-      {:file_chunk, file_key, first, last} ->
-        Chat.FileFs.read_exact_file_chunk(
-          {first, last},
-          file_key,
-          CubDB.data_dir(Chat.Db.db()) <> "_files"
-        )
-        |> elem(0)
-
-      _ ->
-        Chat.Db.get(key)
-    end
+    |> Chat.db_get()
     |> :erlang.term_to_binary([:compressed])
     |> bits_encode()
     |> ok()
-  rescue
-    _ -> error("Parsing key")
   end
 
   def deserialize_value(string) do
@@ -51,7 +37,6 @@ defmodule NaiveApi.Data do
       <<_::64, ?-, _::32, ?-, _::32, ?-, _::32, ?-, _::96>> = uuid -> uuid
       b when is_bitstring(b) -> b |> bits_encode()
       t when is_tuple(t) -> t |> serialize_key()
-      s -> s
     end)
   end
 
@@ -82,9 +67,11 @@ defmodule NaiveApi.Data do
       ["file_index", reader, key, uuid] ->
         {:file_index, reader |> bits_decode(), key |> bits_decode(), uuid}
 
+      # coveralls-ignore-next-line
       ["upload_index", key] ->
         {:upload_index, key |> bits_decode()}
 
+      # coveralls-ignore-next-line
       ["file_secrets", key] ->
         {:file_secrets, key |> bits_decode()}
 

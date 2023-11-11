@@ -2,9 +2,12 @@ defmodule NaiveApi.Data do
   @moduledoc "Data transferring functions for API"
   use NaiveApi, :resolver
 
+  alias Chat.Db
+  alias Chat.Db.Scope.Full, as: FullScope
+
   def all_keys(_, _) do
-    Chat.Db.db()
-    |> Chat.Db.Scope.Full.keys()
+    Db.db()
+    |> FullScope.keys()
     |> MapSet.to_list()
     |> Enum.map(&serialize_key/1)
     |> Enum.reject(&is_nil/1)

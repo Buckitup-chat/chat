@@ -13,10 +13,6 @@ defmodule NaiveApi.Schema do
   import_types(NaiveApi.Schema.Types)
 
   query do
-    field :hello, :string do
-      resolve(fn _, _, _ -> {:ok, "Hello Wold"} end)
-    end
-
     @desc "List all users excluding requesting one"
     field :user_list, list_of(non_null(:card)) do
       arg(:my_public_key, :public_key |> non_null)

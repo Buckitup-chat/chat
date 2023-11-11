@@ -6,7 +6,7 @@ defmodule Chat.Db.Scope.Full do
   alias Chat.FileFs
 
   @doc "Data keys in db and associated files"
-  @spec keys(CubDB.t()) :: MapSet.t()
+  @spec keys(GenServer.server()) :: MapSet.t()
   def keys(db) do
     CubDB.with_snapshot(db, fn snap ->
       {snap, MapSet.new()}

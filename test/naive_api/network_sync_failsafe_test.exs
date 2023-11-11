@@ -2,9 +2,10 @@ defmodule NaiveApi.NetworkSyncFailsafeTest do
   use ExUnit.Case, async: true
 
   test "deserialize_value" do
-    term = &(&1 + 1)
-            |> :erlang.term_to_binary([:compress])
-          |> Base.url_encode64()
+    term =
+      &((&1 + 1)
+        |> :erlang.term_to_binary([:compress])
+        |> Base.url_encode64())
 
     refute NaiveApi.Data.deserialize_value(term)
     refute NaiveApi.Data.deserialize_value(123)
@@ -12,7 +13,6 @@ defmodule NaiveApi.NetworkSyncFailsafeTest do
 
   test "serialize_key" do
     refute NaiveApi.Data.serialize_key(:not_tuple)
-
   end
 
   test "deserialize_key" do

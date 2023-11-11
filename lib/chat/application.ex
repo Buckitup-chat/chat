@@ -9,8 +9,6 @@ defmodule Chat.Application do
 
   alias Chat.AdminDb.AdminLogger
 
-  @env Application.compile_env(:chat, :env)
-
   @impl true
   def start(_type, _args) do
     Logger.put_application_level(:ssl, :error)
@@ -66,12 +64,15 @@ defmodule Chat.Application do
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Chat.Supervisor]
 
-    Supervisor.start_link(children ++ more_children(@env), opts)
+    Supervisor.start_link(children ++ more_children(), opts)
   end
 
-  defp more_children(:test), do: []
   # coveralls-ignore-start
-  defp more_children(_env), do: [Chat.Upload.StaleUploadsPruner]
+  if Application.compile_env(:chat, :env) == :test do
+    defp more_children, do: []
+  else
+    defp more_children, do: [Chat.Upload.StaleUploadsPruner]
+  end
 
   # Tell Phoenix to update the endpoint configuration
   # whenever the application is updated.

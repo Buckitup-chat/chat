@@ -4,6 +4,7 @@ defmodule Chat.Sync.Camera.Sensor do
 
   Url with no path is considered to be ONVIF profile S compatible
   """
+  @dialyzer {:no_match, [get_onvif_endpoint: 1]}
 
   alias Onvif.Media.Ver10.GetProfiles
   alias Onvif.Media.Ver10.GetSnapshotUri

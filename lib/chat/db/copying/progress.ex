@@ -18,9 +18,11 @@ defmodule Chat.Db.Copying.Progress do
             start_time: nil,
             skip_set: nil
 
+  @type t :: %__MODULE__{}
+
   @file_weight 9
 
-  @spec new(list(), CubDB.t()) :: %__MODULE__{}
+  @spec new(list(), GenServer.server()) :: %__MODULE__{}
   def new(keys, db, skip_set \\ nil) do
     {file_keys, data_keys} = Enum.split_with(keys, &match?({:file_chunk, _, _, _}, &1))
 

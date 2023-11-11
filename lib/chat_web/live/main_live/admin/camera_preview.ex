@@ -1,5 +1,7 @@
 defmodule ChatWeb.MainLive.Admin.CameraPreview do
   @moduledoc "Async camera preview"
+  @dialyzer :no_match
+
   use ChatWeb, :live_component
 
   alias Phoenix.LiveView.AsyncResult

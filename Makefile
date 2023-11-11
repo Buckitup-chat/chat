@@ -1,4 +1,8 @@
-.PHONY: check test ci-check
+.PHONY: check test ci-check empty_db help
+
+help:
+	@clear
+	@grep -E '^[a-zA-Z_-]+:' Makefile | cut -f1 -d: | sort
 
 check:
 	mix deps.clean mime --build
@@ -47,13 +51,15 @@ assets:
 deploy:
 	git push gigalixir 
 
-firmware:
+empty_db:
 	rm -rf priv/db
 	rm -rf priv/admin_db
 	rm -rf priv/admin_db_v2
 	rm -rf priv/test_backup_db
 	rm -rf priv/test_admin_db
 	rm -rf priv/test_db
+
+firmware: empty_db
 	MIX_TARGET=host mix do compile, assets.deploy
 
 clean:

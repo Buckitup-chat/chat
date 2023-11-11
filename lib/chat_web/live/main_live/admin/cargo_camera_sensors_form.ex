@@ -195,9 +195,6 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
     assign(socket, :invalid_sensors, invalid_sensors |> Map.put(index, message))
   end
 
-  defp add_invalid_sensor(socket, index_str, message),
-    do: add_invalid_sensor(socket, String.to_integer(index_str), message)
-
   defp forget_invalid_sensor(%{assigns: %{invalid_sensors: invalid_sensors}} = socket, index)
        when is_integer(index) do
     {keep_index, to_reindex} = Enum.split_with(invalid_sensors, fn {key, _} -> key <= index end)

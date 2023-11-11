@@ -1,6 +1,8 @@
 defmodule Chat.Messages.RoomInvite do
   @moduledoc "Room invite message"
 
+  @type t :: %__MODULE__{}
+
   defstruct room_identity: nil, timestamp: 0
 
   def new(identity) do
@@ -27,6 +29,6 @@ defimpl Chat.DryStorable, for: Chat.Messages.RoomInvite do
 
   def timestamp(%RoomInvite{} = msg), do: msg.timestamp
 
-  @spec type(Chat.Messages.RoomInvite) :: atom()
+  @spec type(Chat.Messages.RoomInvite.t()) :: atom()
   def type(%RoomInvite{} = _), do: :room_invite
 end

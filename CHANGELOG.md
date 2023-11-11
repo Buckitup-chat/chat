@@ -13,6 +13,7 @@ straightforward as possible.
 ### Added
 
 - async load of camera sensor images for admin [#532]
+- endpoints for network sync [#548]
 
 ### Changed
 

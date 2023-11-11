@@ -128,13 +128,13 @@ graph TD;
 
 <!-- livebook:{"break_markdown":true} -->
 
-...
+`DriveIndicationStarter` starts indication on custom hardware and ands it when drive ejected (i.e. this process terminated)
 
-`Platform MainDbSupervisor` and `Platform MediaSupervisor` do `rest for one` strategy that will restart all later started peers in case of failing.
+`Healer` detects FS used on drive and checks FS w/ coresponding tool (FAT, exFAT or F2FS)
 
-All the processes marked as mounter traps its exit. I.e. handle its termination. Combining this with `rest_for_one` strategy of supervisor makes it `Plug`-like behaviour in supervisor.
+`Mounter` mounts device into device dedicated folder
 
-`Chat MainDbSupervisor` and `Chat MediaDbSupervisor` are DB Supervisors from `Chat` application described above.
+`Decider` checks device content and starts according scenario under `Scenario` supervisor.
 
 ## Main drive supervision
 

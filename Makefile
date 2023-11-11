@@ -6,8 +6,8 @@ check:
 	mix format --check-formatted
 	mix credo --strict
 	mix deps.unlock --check-unused
-	mix sobelow --verbose
-	mix dialyzer --ignore-exit-status
+	mix sobelow
+	MIX_ENV=test mix dialyzer
 
 ci-check: 
 	mix deps.clean mime --build
@@ -15,6 +15,7 @@ ci-check:
 	mix format --check-formatted
 	mix credo --strict
 	mix deps.unlock --check-unused
+	mix dialyzer
 
 ci-test:
 	npm install --prefix ./assets

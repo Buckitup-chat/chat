@@ -3,7 +3,7 @@ defmodule Chat.User.Registry do
 
   alias Chat.Card
   alias Chat.Db
-  alias Chat.Db.ChangeTracker
+  alias Chat.Db.Copying
   alias Chat.Identity
 
   def enlist(%Identity{} = user) do
@@ -23,7 +23,13 @@ defmodule Chat.User.Registry do
     Db.delete({:users, pub_key})
   end
 
+  def await_saved(pub_key_list) when is_list(pub_key_list) do
+    pub_key_list
+    |> Enum.map(&{:users, &1})
+    |> Copying.await_written_into(Db.db())
+  end
+
   def await_saved(pub_key) do
-    ChangeTracker.await({:users, pub_key})
+    Copying.await_written_into([{:users, pub_key}], Db.db())
   end
 end

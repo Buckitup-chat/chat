@@ -7,7 +7,7 @@ check:
 	mix credo --strict
 	mix deps.unlock --check-unused
 	mix sobelow
-	mix dialyzer
+	MIX_ENV=test mix dialyzer
 
 ci-check: 
 	mix deps.clean mime --build

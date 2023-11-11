@@ -12,6 +12,7 @@ defmodule Chat.MixProject do
       aliases: aliases(),
       deps: deps(),
       test_coverage: [tool: ExCoveralls],
+      dialyzer: [plt_add_apps: [:ex_unit]],
       releases: [
         chat: [
           version: build_version(),

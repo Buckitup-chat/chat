@@ -1,0 +1,223 @@
+          <div id="chatRoomBar" class="chatRoomBar sm:flex">
+            <.modal id="create-room-popup" class="">
+              <h1 class="text-base font-bold text-grayscale">Create Room</h1>
+              <.live_component
+                cargo_room={assigns[:cargo_room]}
+                id={:room_form}
+                media_settings={@media_settings}
+                module={RoomForm}
+                usb_drive_dump_room={assigns[:usb_drive_dump_room]}
+              />
+            </.modal>
+            <div class="px-7 mt-3 flex items-center justify-between">
+              <h5 class="channel-block-text text-grayscale" style="font-size: 22px;">Rooms</h5>
+              <button
+                id="room-create-toggle"
+                class="w-5 h-5 border rounded-full flex items-center justify-center t-sidebar-create-room"
+                style="background: linear-gradient(135deg, #611E87 0%, #A75B63 100%);"
+                phx-click={
+                  if @db_status.writable == :yes,
+                    do: show_modal("create-room-popup"),
+                    else: show_modal("restrict-write-actions")
+                }
+              >
+                <.icon id="add" class="w-3 h-3 flex fill-white" />
+              </button>
+            </div>
+            <Layout.SearchBox.render type={:room} />
+            <div class="sidebar-container md:h-[870px]">
+              <div class={
+                classes(
+                  "w-full mt-6 flex flex-col items-start",
+                  %{"overflow-scroll" => @uploads_metadata !== %{}}
+                )
+              }>
+                <div
+                  phx-click={
+                    JS.toggle(to: "#confirmed-rooms", in: "fade-in-scale", out: "fade-out-scale")
+                  }
+                  class="px-7 mt-1 flex items-center"
+                >
+                  <.icon id="arrowDown" class="w-4 h-4 flex fill-black" />
+                  <span class="ml-1 text-sm  font-bold cursor-pointer">Confirmed</span>
+                </div>
+                <div class="mt-3 w-full md:ml-5 t-confirmed-rooms" id="confirmed-rooms">
+                  <ul class="t-confirmed-rooms-list">
+                    <%= if @joined_rooms == [] do %>
+                      <p class="text-base text-grayscale600 px-7">You have no rooms</p>
+                    <% else %>
+                      <%= for room <- @joined_rooms do %>
+                        <Layout.RoomItem.render
+                          room={room}
+                          confirmed?={true}
+                          selected_room={@room}
+                          click_event="room/switch"
+                        />
+                      <% end %>
+                    <% end %>
+                  </ul>
+                </div>
+                <div
+                  phx-click={
+                    JS.toggle(
+                      to: "#unconfirmed-rooms",
+                      in: "fade-in-scale",
+                      out: "fade-out-scale"
+                    )
+                  }
+                  class="px-7 mt-3 flex items-center"
+                >
+                  <.icon id="arrowDown" class="w-4 h-4 flex fill-black" />
+                  <span class="ml-1 text-sm  font-bold cursor-pointer">Not Confirmed</span>
+                </div>
+                <div id="unconfirmed-rooms" class="mt-3 w-full t-unconfirmed-rooms">
+                  <ul>
+                    <%= if @new_rooms == [] do %>
+                      <p class="text-base text-grayscale600 px-7">You have no rooms</p>
+                    <% else %>
+                      <%= for room <- @new_rooms do %>
+                        <Layout.RoomItem.render room={room} click_event="room/send-request" />
+                      <% end %>
+                    <% end %>
+                  </ul>
+                </div>
+              </div>
+
+              <Layout.Uploader.uploader
+                config={@uploads.file}
+                pub_key={assigns[:room][:pub_key]}
+                type={:room}
+                uploads={@uploads_metadata}
+                uploads_order={@file_uploads_order}
+              />
+            </div>
+          </div>
+          <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
+            <%= unless @room && @room.pub_key do %>
+              <%= if @live_action == :room_message_link do %>
+                <Layout.Room.not_found_screen />
+              <% else %>
+                <div class="my-auto mx-auto flex flex-col items-center justify-center w-80 h-32 border-9 rounded-lg bg-white/20">
+                  <span class="my-2 text-sm text-white">Select any Room or create your own</span>
+                  <button
+                    phx-click={
+                      if @db_status.writable == :yes,
+                        do: show_modal("create-room-popup"),
+                        else: show_modal("restrict-write-actions")
+                    }
+                    class="my-2 flex flex-row items-center justify-center border rounded-lg border-white w-72 h-11 t-create-room"
+                  >
+                    <span class="text-sm text-white">Create Room</span>
+                    <.icon id="add" class="w-4 h-4 flex fill-white" />
+                  </button>
+                </div>
+              <% end %>
+            <% else %>
+              <.live_component
+                module={Page.ImageGallery}
+                id="imageGallery"
+                type={:room}
+                room_identity={@room_identity}
+              />
+              <div
+                id="chatContent"
+                class="basis-[93%] pb-1 md:pb-0 overflow-y-scroll flex flex-col relative a-content-block t-chat-content"
+                id={"room-#{@room.hash}"}
+                phx-hook="Chat"
+                data-page={@page}
+                data-has-more-messages={"#{@has_more_messages}"}
+              >
+                <Layout.Room.header
+                  room={@room}
+                  requests={@room_requests}
+                  restrict_actions={@db_status.writable == :no}
+                  linked?={@is_room_linked?}
+                  cargo_sync={assigns[:cargo_sync]}
+                  usb_drive_dump={assigns[:usb_drive_dump]}
+                />
+                <Layout.CargoRoom.bar
+                  cargo_room={assigns[:cargo_room]}
+                  media_settings={@media_settings}
+                  room={@room}
+                />
+                <Layout.UsbDriveDumpRoom.bar
+                  dump_room={assigns[:usb_drive_dump_room]}
+                  room={@room}
+                />
+
+                <%= if @room.type == :request do %>
+                  <.modal id="room-request-list" class="z-30">
+                    <h1 class="text-base font-bold text-grayscale">Requests</h1>
+                    <div
+                      id="request-list"
+                      class="mt-3 w-full flex flex-col"
+                      phx-update={assigns[:room_requests_update_mode] || "replace"}
+                    >
+                      <%= for user <- @room_requests do %>
+                        <div
+                          id={"user-#{user.hash}"}
+                          class="flex flex-row items-center justify-between"
+                        >
+                          <Layout.Card.hashed_name card={user} style_spec={:room_request_list} />
+                          <a
+                            class="text-black/50 cursor-pointer"
+                            phx-click={
+                              JS.push("room/approve-request")
+                              |> JS.dispatch("chat:toggle",
+                                to: "#user-#{user.hash}",
+                                detail: %{class: "hidden"}
+                              )
+                            }
+                            phx-value-hash={user.hash}
+                          >
+                            Approve
+                          </a>
+                        </div>
+                      <% end %>
+                    </div>
+                  </.modal>
+                <% end %>
+
+                <div>
+                  <Layout.Chat.loader />
+                  <div id="chat-messages" phx-update={@message_update_mode}>
+                    <%= for msg <- @messages do %>
+                      <Layout.Message.message_block
+                        chat_type={:room}
+                        msg={msg}
+                        my_id={@my_id}
+                        room={@room}
+                        timezone={@timezone}
+                        linked={
+                          Chat.Rooms.RoomMessageLinks.is_message_linked?({msg.index, msg.id})
+                        }
+                      />
+                    <% end %>
+                  </div>
+
+                  <Layout.Uploader.in_progress?
+                    pub_key={@room.pub_key}
+                    type={:room}
+                    uploads={@uploads_metadata}
+                  />
+
+                  <Layout.Uploader.mobile_uploader
+                    config={@uploads.file}
+                    operating_system={@operating_system}
+                    pub_key={@room.pub_key}
+                    type="room"
+                    uploads={@uploads_metadata}
+                    uploads_order={@file_uploads_order}
+                  />
+                </div>
+              </div>
+              <Layout.MessageInput.render
+                db_status={@db_status}
+                edit_content={@edit_content}
+                input_mode={@input_mode}
+                operating_system={@operating_system}
+                type="room"
+                uploads={@uploads}
+              />
+            <% end %>
+          </div>

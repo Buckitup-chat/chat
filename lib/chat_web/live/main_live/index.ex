@@ -29,6 +29,8 @@ defmodule ChatWeb.MainLive.Index do
   on_mount LocalTimeHook
   on_mount UploaderHook
 
+  embed_templates "*"
+
   @impl true
   def mount(
         params,
@@ -71,6 +73,12 @@ defmodule ChatWeb.MainLive.Index do
       socket
       |> ok()
     end
+  end
+
+  def render(assigns) do
+    ~H"""
+    <.index {assigns} />
+    """
   end
 
   @impl true

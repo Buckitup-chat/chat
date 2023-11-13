@@ -1,0 +1,73 @@
+      <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg" />
+      <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg" />
+      <div class="flex flex-col items-center justify-center w-screen h-screen">
+        <div class="container unauthenticated z-10">
+          <div class="flex justify-center">
+            <.icon id="logo" class="w-14 h-14 fill-white" />
+          </div>
+          <div class="left-0 mt-10">
+            <h1
+              style="font-size: 28px; line-height: 34px;"
+              class="font-inter font-bold text-white"
+            >
+              Log In
+            </h1>
+            <p class="mt-2.5 font-inter text-sm text-white/70">
+              Please, enter your name. That’s how other users will see you
+            </p>
+          </div>
+          <div class="w-full mt-7">
+            <.form
+              :let={f}
+              for={%{}}
+              as={:login}
+              id="login-form"
+              class="t-login-form"
+              phx-submit="login"
+            >
+              <%= text_input(f, :name,
+                placeholder: "Your name",
+                class:
+                  "w-full h-11 bg-transparent border border-white/50 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-0 focus:border-white"
+              ) %>
+              <%= error_tag(f, :name) %>
+
+              <div class="mt-2.5">
+                <%= submit("Log In",
+                  phx_disable_with: "Saving...",
+                  class: "w-full h-11 focus:outline-none text-white px-4 rounded-lg",
+                  style: "background-color: rgb(36, 24, 36);"
+                ) %>
+              </div>
+            </.form>
+          </div>
+          <div class="mt-7 flex flex-row items-center justify-between">
+            <hr class="basis-[44%] border-1 border-white/10" />
+            <p class="text-white/50">or</p>
+            <hr class="basis-[44%] border-1 border-white/10" />
+          </div>
+          <button
+            phx-click="login:request-key-ring"
+            class="w-full h-11 mt-7 bg-transparent text-white py-2 px-4 border border-white/50 rounded-lg flex items-center justify-center"
+          >
+            <span>Login with QR code</span>
+            <.icon id="qrcode" class="w-4 h-4 ml-2 fill-white" />
+          </button>
+          <button
+            id="importKeyButton"
+            phx-click="login:import-own-key-ring"
+            class="w-full h-11 mt-2.5 bg-transparent text-white py-2 px-4 border border-white/50 rounded-lg flex items-center justify-center"
+          >
+            <span>Import the recovery keys</span>
+            <.icon id="upload" class="w-4 h-4 ml-2 fill-white" />
+          </button>
+          <button
+            id="recoverKeyButton"
+            phx-click="login:recover-key-share"
+            class="w-full h-11 mt-2.5 bg-transparent text-white py-2 px-4 border border-white/50 rounded-lg flex items-center justify-center"
+          >
+            <span>Recover key from Social Sharing</span>
+            <.icon id="secret" class="w-4 h-4 ml-2 fill-white" />
+          </button>
+        </div>
+      </div>

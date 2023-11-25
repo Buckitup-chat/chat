@@ -1,4 +1,4 @@
-defmodule Chat.NetworkSynchronization.UpdatingStatus do
+defmodule Chat.NetworkSynchronization.Status.UpdatingStatus do
   @moduledoc "Updating status"
 
   import Chat.NetworkSynchronization, only: [monotonic_ms: 0]

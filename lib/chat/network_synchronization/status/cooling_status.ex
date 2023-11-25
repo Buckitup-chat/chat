@@ -1,4 +1,4 @@
-defmodule Chat.NetworkSynchronization.CoolingStatus do
+defmodule Chat.NetworkSynchronization.Status.CoolingStatus do
   @moduledoc "Cooling down status"
 
   import Chat.NetworkSynchronization, only: [monotonic_ms: 0]

@@ -1,13 +1,13 @@
 defmodule Chat.NetworkSynchronization.Flow do
   @moduledoc "Synchronization worker flow"
 
-  alias Chat.NetworkSynchronization.CoolingStatus
-  alias Chat.NetworkSynchronization.ErrorStatus
-  alias Chat.NetworkSynchronization.SynchronizingStatus
-  alias Chat.NetworkSynchronization.UpdatingStatus
+  alias Chat.NetworkSynchronization.Status.CoolingStatus
+  alias Chat.NetworkSynchronization.Status.ErrorStatus
+  alias Chat.NetworkSynchronization.Status.SynchronizingStatus
+  alias Chat.NetworkSynchronization.Status.UpdatingStatus
 
-  alias Chat.NetworkSynchronization.Ets
   alias Chat.NetworkSynchronization.Retrieval
+  alias Chat.NetworkSynchronization.Store
 
   def start_half_cooled(source) do
     source
@@ -58,10 +58,10 @@ defmodule Chat.NetworkSynchronization.Flow do
   defp count_one_done(status), do: UpdatingStatus.count_one_done(status)
 
   defp get_remote_keys(_status, api_url), do: Retrieval.remote_keys(api_url)
-  defp make_diff(remote_keys), do: Retrieval.reject_know(remote_keys)
+  defp make_diff(remote_keys), do: Retrieval.reject_known(remote_keys)
   defp get_and_save(api_url, remote_key), do: Retrieval.retrieve_key(api_url, remote_key)
   defp finalize_update(status), do: tap(status, fn _ -> Retrieval.finalize() end)
 
   defp update_mem_status(status, source_id),
-    do: tap(status, &Ets.update_source_status(source_id, &1))
+    do: tap(status, &Store.update_source_status(source_id, &1))
 end

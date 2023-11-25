@@ -17,6 +17,13 @@ defmodule Chat do
     end
   end
 
+  def db_has?(key) do
+    case key do
+      {:file_chunk, key, first, last} -> Chat.FileFs.has_file?({key, first, last})
+      key -> Chat.Db.has_key?(key)
+    end
+  end
+
   defp read_chunk(range, key) do
     {data, _last} =
       Chat.FileFs.read_exact_file_chunk(range, key, path())

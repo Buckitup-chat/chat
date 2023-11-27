@@ -5,7 +5,7 @@ import Config
 config :chat, ChatWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "ABUZKxav/bWgALTw9KJRhIKc03955IEvFKODEKAl8MdscEm5iNfRO0VyM88gxe7w",
-  server: false
+  server: true
 
 # In test we don't send emails.
 config :chat, Chat.Mailer, adapter: Swoosh.Adapters.Test

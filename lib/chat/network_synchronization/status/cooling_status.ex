@@ -14,6 +14,6 @@ defmodule Chat.NetworkSynchronization.Status.CoolingStatus do
   end
 
   def new_half(%Source{} = source) do
-    %__MODULE__{till: source.cooldown_hours * @hour_ms / 2 + monotonic_ms()}
+    %__MODULE__{till: trunc(source.cooldown_hours * @hour_ms / 2) + monotonic_ms()}
   end
 end

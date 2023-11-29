@@ -4,9 +4,9 @@ defmodule Chat.NetworkSynchronization.Worker do
   use GenServer
 
   import Chat.NetworkSynchronization, only: [monotonic_ms: 0]
-  import Chat.NetworkSynchronization.Flow
   import Tools.GenServerHelpers
 
+  alias Chat.NetworkSynchronization.Flow
 
   @doc """
   ```elixir
@@ -43,15 +43,15 @@ defmodule Chat.NetworkSynchronization.Worker do
 
   def handle_continue(:start_deferred, source) do
     source
-    |> start_half_cooled()
+    |> Flow.start_half_cooled()
     |> schedule_cooling_completed()
     |> state(source, [])
     |> noreply()
   end
 
   @impl true
-  def handle_info(:synchronise, {source, _}) do
-    start_synchronization(source,
+  def handle_info(:synchronise, {source, _, _}) do
+    Flow.start_synchronization(source,
       ok: fn status, keys ->
         status
         |> schedule_update()
@@ -69,15 +69,15 @@ defmodule Chat.NetworkSynchronization.Worker do
 
   def handle_info(:update, {source, _, []}) do
     source
-    |> start_cooling()
+    |> Flow.start_cooling()
     |> schedule_cooling_completed()
     |> state(source, [])
     |> noreply()
   end
 
-  def handle_info(:update, {source, status, [remote_key, rest]}) do
+  def handle_info(:update, {source, status, [remote_key | rest]}) do
     status
-    |> start_key_retrieval(source, remote_key)
+    |> Flow.start_key_retrieval(source, remote_key)
     |> schedule_update()
     |> state(source, rest)
     |> noreply()

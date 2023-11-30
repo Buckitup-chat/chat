@@ -18,6 +18,7 @@ defmodule Chat.NetworkSynchronization.Store.BasicStatusTest do
   end
 
   defp add_sources(context, num) do
+    Store.init()
     for _ <- 1..num do
       Store.add_source()
     end

@@ -26,6 +26,7 @@ defmodule Chat.NetworkSynchronization.Store.DbLoadTest do
   end
 
   defp assert_lists_same_sources_sorted_by_id(context) do
+    Store.init()
     Store.list_sources_with_status()
     |> Enum.map(fn {%{id: id}, _} -> id end)
     |> tap(fn listed_ids ->

@@ -46,6 +46,7 @@ defmodule Chat.NetworkSynchronization.FlowTest do
   end
 
   defp make_empty_source(context) do
+    Store.init()
     source = NetworkSynchronization.add_source()
 
     context

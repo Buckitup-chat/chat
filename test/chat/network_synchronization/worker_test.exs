@@ -15,6 +15,7 @@ defmodule Chat.NetworkSynchronization.WorkerTest do
     %{name: __MODULE__.Worker}
     |> make_failing_source
     |> start_worker
+    |> assert_worker_started
     |> assert_error_status
     |> retry
     |> assert_error_status
@@ -70,6 +71,12 @@ defmodule Chat.NetworkSynchronization.WorkerTest do
 
   defp finish_cooling(context) do
     send(context.pid, :synchronise)
+    context
+  end
+
+  defp assert_worker_started(context) do
+    assert context.name |> Process.whereis() |> is_pid()
+    assert context.name |> Process.whereis() |> Process.alive?()
     context
   end
 

@@ -8,7 +8,6 @@ defmodule Chat.NetworkSynchronization.Store do
   @status_table :buckitup_network_source_statuses
 
   def list_sources_with_status do
-    init()
     statuses = list(@status_table) |> Map.new()
 
     list(@source_table)
@@ -19,8 +18,6 @@ defmodule Chat.NetworkSynchronization.Store do
 
 
   def add_source() do
-    init()
-
     ets_size(@source_table)
     |> case do
       :undefined -> 1
@@ -31,8 +28,6 @@ defmodule Chat.NetworkSynchronization.Store do
   end
 
   def update_source(source) do
-    init()
-
     put(@source_table, source.id, source)
     db_put(@source_db_prefix, source.id, source)
 
@@ -40,8 +35,6 @@ defmodule Chat.NetworkSynchronization.Store do
   end
 
   def delete_source(source) do
-    init()
-
     delete(@source_table, source.id)
     db_delete(@source_db_prefix, source.id)
   end
@@ -54,8 +47,12 @@ defmodule Chat.NetworkSynchronization.Store do
     delete(@status_table, id)
   end
 
-  defp init do
+  def init do
+    if ets_size(@status_table) == :undefined do
+      create_table(@status_table)
+    end
     if ets_size(@source_table) == :undefined do
+      create_table(@source_table)
       load_from_db(@source_db_prefix)
       |> Enum.each(fn {{_, id}, value} ->
         put(@source_table, id, value)
@@ -99,10 +96,6 @@ defmodule Chat.NetworkSynchronization.Store do
 
   defp put(table, id, item) do
     :ets.insert(table, {id, item})
-  rescue
-    _ ->
-      create_table(table)
-      put(table, id, item)
   end
 
   defp create_table(name) do

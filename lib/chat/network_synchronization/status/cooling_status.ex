@@ -7,7 +7,7 @@ defmodule Chat.NetworkSynchronization.Status.CoolingStatus do
 
   defstruct till: 0
 
-  @hour_ms 3600_000
+  @hour_ms :timer.hours(1)
 
   def new(%Source{} = source) do
     %__MODULE__{till: source.cooldown_hours * @hour_ms + monotonic_ms()}

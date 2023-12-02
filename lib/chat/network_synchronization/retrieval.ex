@@ -1,8 +1,8 @@
 defmodule Chat.NetworkSynchronization.Retrieval do
   @moduledoc "Data retrieval"
 
-  alias NaiveApi.Data
   alias Chat.Sync.DbBrokers
+  alias NaiveApi.Data
 
   def all_from(api_url) do
     get_keys(api_url)

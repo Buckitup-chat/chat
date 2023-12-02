@@ -2,8 +2,8 @@ defmodule Chat.NetworkSynchronization.Store.DbLoadTest do
   use ExUnit.Case, async: true
   import Rewire
 
-  alias Chat.NetworkSynchronization.Store
   alias Chat.NetworkSynchronization.Source
+  alias Chat.NetworkSynchronization.Store
 
   rewire(Store, source_db_prefix: S1, source_table: S1, status_table: T1)
 
@@ -27,6 +27,7 @@ defmodule Chat.NetworkSynchronization.Store.DbLoadTest do
 
   defp assert_lists_same_sources_sorted_by_id(context) do
     Store.init()
+
     Store.list_sources_with_status()
     |> Enum.map(fn {%{id: id}, _} -> id end)
     |> tap(fn listed_ids ->

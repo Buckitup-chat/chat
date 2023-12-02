@@ -12,7 +12,7 @@ defmodule Chat.NetworkSynchronization.FlowTest do
     def remote_keys(_url), do: {:ok, [1, 2, 3, 4, 5]}
     def reject_known(keys), do: keys
     def retrieve_key(_url, _key), do: :skip
-    def finalize(), do: :ok
+    def finalize, do: :ok
   end
 
   rewire(Store, source_db_prefix: S4, source_table: S4, status_table: T4)
@@ -129,6 +129,9 @@ defmodule Chat.NetworkSynchronization.FlowTest do
     |> Enum.drop(context.amount_updated)
     |> Enum.reduce(status, fn key, status ->
       Flow.start_key_retrieval(status, source, key)
+    end)
+    |> tap(fn status ->
+      assert status.done == status.total
     end)
 
     context

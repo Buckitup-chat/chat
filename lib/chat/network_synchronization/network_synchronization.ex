@@ -1,8 +1,8 @@
 defmodule Chat.NetworkSynchronization do
   @moduledoc "Network synchronisation"
 
-  alias Chat.NetworkSynchronization.Store
   alias Chat.NetworkSynchronization.Source
+  alias Chat.NetworkSynchronization.Store
   alias Chat.NetworkSynchronization.Worker
 
   alias Phoenix.PubSub

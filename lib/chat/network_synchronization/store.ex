@@ -16,7 +16,7 @@ defmodule Chat.NetworkSynchronization.Store do
     end)
   end
 
-  def add_source() do
+  def add_source do
     ets_size(@source_table)
     |> case do
       # coveralls-ignore-next-line

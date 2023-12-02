@@ -17,7 +17,8 @@ defmodule ChatWeb.MainLive.Index do
     CargoUserData,
     CargoWeightSensorForm,
     FirmwareUpgradeForm,
-    MediaSettingsForm
+    MediaSettingsForm,
+    NetworkSourceList
   }
 
   alias ChatWeb.MainLive.{Layout, Page}
@@ -75,9 +76,10 @@ defmodule ChatWeb.MainLive.Index do
     end
   end
 
+  @impl true
   def render(assigns) do
     ~H"""
-    <.index {assigns} />
+    <.main {assigns} />
     """
   end
 

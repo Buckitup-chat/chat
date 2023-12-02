@@ -6,8 +6,8 @@ defmodule Chat.NetworkSynchronization.Flow do
   alias Chat.NetworkSynchronization.Status.SynchronizingStatus
   alias Chat.NetworkSynchronization.Status.UpdatingStatus
 
-  alias Chat.NetworkSynchronization.Retrieval
   alias Chat.NetworkSynchronization
+  alias Chat.NetworkSynchronization.Retrieval
 
   def start_half_cooled(source) do
     source

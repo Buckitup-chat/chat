@@ -2,8 +2,8 @@ defmodule Chat.NetworkSynchronization.Store.BasicStatusTest do
   use ExUnit.Case, async: true
   import Rewire
 
-  alias Chat.NetworkSynchronization.Store
   alias Chat.NetworkSynchronization.Status.CoolingStatus
+  alias Chat.NetworkSynchronization.Store
 
   rewire(Store, source_db_prefix: S3, source_table: S3, status_table: T3)
 
@@ -19,6 +19,7 @@ defmodule Chat.NetworkSynchronization.Store.BasicStatusTest do
 
   defp add_sources(context, num) do
     Store.init()
+
     for _ <- 1..num do
       Store.add_source()
     end
@@ -29,7 +30,7 @@ defmodule Chat.NetworkSynchronization.Store.BasicStatusTest do
 
   defp set_them_cooling(context) do
     Store.list_sources_with_status()
-    |> Enum.map(fn {source, nil} ->
+    |> Enum.each(fn {source, nil} ->
       status = source |> CoolingStatus.new()
       Store.update_source_status(source.id, status)
     end)

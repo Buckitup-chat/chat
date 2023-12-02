@@ -5,7 +5,7 @@ defmodule Chat.NetworkSynchronization.Status.SynchronizingStatus do
 
   defstruct since: 0
 
-  def new() do
+  def new do
     %__MODULE__{since: monotonic_ms()}
   end
 end

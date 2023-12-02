@@ -2,13 +2,14 @@ defmodule Chat.NetworkSynchronization.RetrievalTest do
   use ExUnit.Case, async: true
   import Rewire
 
+  alias Chat.Db.Copying
   alias Chat.NetworkSynchronization.Retrieval
 
   defmodule DbBrokersMock do
     def refresh, do: :called
   end
 
-  rewire Retrieval, [{Chat.Sync.DbBrokers, DbBrokersMock}]
+  rewire(Retrieval, [{Chat.Sync.DbBrokers, DbBrokersMock}])
 
   setup_all [:create_user]
 
@@ -55,7 +56,7 @@ defmodule Chat.NetworkSynchronization.RetrievalTest do
 
   defp create_user(_) do
     user = Chat.User.login("Test user") |> Chat.User.register()
-    Chat.Db.Copying.await_written_into([{:users, user}], Chat.Db.db())
+    Copying.await_written_into([{:users, user}], Chat.Db.db())
 
     %{user: user}
   end

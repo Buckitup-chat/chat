@@ -1,38 +1,38 @@
-          <div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
-            <div class="overflow-y-auto flex flex-col justify-between t-feedsBlock">
-              <div class="h-14 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start fixed">
-                <a
-                  class="sm:hidden mr-2"
-                  phx-value-lobby-mode="chats"
-                  phx-click={JS.push("switch-lobby-mode") |> close_content()}
-                >
-                  <.icon id="arrowBack" class="w-6 h-6 fill-white" />
-                </a>
-                <h1 class="ml-1 text-base font-bolt text-white">Feeds</h1>
-                <div class="ml-3 text-white/50">
-                  [ <%= @version %> ]
-                </div>
-              </div>
-              <div
-                class="mt-16 mb-8 px-4 sm:px-8 w-full t-feed-list"
-                id="action-feed-list"
-                phx-update="stream"
-              >
-                <%= if @streams.action_feed_list do %>
-                  <Page.Feed.render action_feed_list={@streams.action_feed_list} tz={@timezone} />
-                <% end %>
-              </div>
-              <%= if @action_feed_till > 1 do %>
-                <div class="mb-10 px-4 flex flex-row items-center justify-between">
-                  <hr class="basis-[35%] sm:basis-[45%] border-1 border-white/10" />
-                  <a
-                    class="basis-[30%] sm:basis-[20%] text-center cursor-pointer text-white/50 t-load-more"
-                    phx-click="feed-more"
-                  >
-                    load more
-                  </a>
-                  <hr class="basis-[35%] sm:basis-[45%] border-1 border-white/10" />
-                </div>
-              <% end %>
-            </div>
-          </div>
+<div id="contentContainer" class="hidden sm:flex flex flex-col contentContainer">
+  <div class="overflow-y-auto flex flex-col justify-between t-feedsBlock">
+    <div class="h-14 w-full px-8 border-b border-white/10 backdrop-blur-md bg-white/10 z-10 flex flex-row items-center justify-start fixed">
+      <a
+        class="sm:hidden mr-2"
+        phx-value-lobby-mode="chats"
+        phx-click={JS.push("switch-lobby-mode") |> close_content()}
+      >
+        <.icon id="arrowBack" class="w-6 h-6 fill-white" />
+      </a>
+      <h1 class="ml-1 text-base font-bolt text-white">Feeds</h1>
+      <div class="ml-3 text-white/50">
+        [ <%= @version %> ]
+      </div>
+    </div>
+    <div
+      class="mt-16 mb-8 px-4 sm:px-8 w-full t-feed-list"
+      id="action-feed-list"
+      phx-update="stream"
+    >
+      <%= if @streams.action_feed_list do %>
+        <Page.Feed.render action_feed_list={@streams.action_feed_list} tz={@timezone} />
+      <% end %>
+    </div>
+    <%= if @action_feed_till > 1 do %>
+      <div class="mb-10 px-4 flex flex-row items-center justify-between">
+        <hr class="basis-[35%] sm:basis-[45%] border-1 border-white/10" />
+        <a
+          class="basis-[30%] sm:basis-[20%] text-center cursor-pointer text-white/50 t-load-more"
+          phx-click="feed-more"
+        >
+          load more
+        </a>
+        <hr class="basis-[35%] sm:basis-[45%] border-1 border-white/10" />
+      </div>
+    <% end %>
+  </div>
+</div>

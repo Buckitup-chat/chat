@@ -18,8 +18,13 @@ defmodule Chat.NetworkSynchronization.FlowTest do
   rewire(Store, source_db_prefix: S4, source_table: S4, status_table: T4)
 
   rewire(Store, source_db_prefix: S4, source_table: S4, status_table: T4, as: StoreMock)
-  rewire(Flow, [{Chat.NetworkSynchronization.Retrieval, RetrievalMock}, {Store, StoreMock}])
   rewire(NetworkSynchronization, Store: StoreMock)
+  rewire(NetworkSynchronization, Store: StoreMock, as: NetworkSynchronizationMock)
+
+  rewire(Flow, [
+    {Chat.NetworkSynchronization.Retrieval, RetrievalMock},
+    {NetworkSynchronization, NetworkSynchronizationMock}
+  ])
 
   test "full cycle" do
     %{}

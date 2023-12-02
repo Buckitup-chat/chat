@@ -16,10 +16,10 @@ defmodule Chat.NetworkSynchronization.Store do
     end)
   end
 
-
   def add_source() do
     ets_size(@source_table)
     |> case do
+      # coveralls-ignore-next-line
       :undefined -> 1
       n -> n + 1
     end
@@ -51,8 +51,10 @@ defmodule Chat.NetworkSynchronization.Store do
     if ets_size(@status_table) == :undefined do
       create_table(@status_table)
     end
+
     if ets_size(@source_table) == :undefined do
       create_table(@source_table)
+
       load_from_db(@source_db_prefix)
       |> Enum.each(fn {{_, id}, value} ->
         put(@source_table, id, value)
@@ -80,6 +82,7 @@ defmodule Chat.NetworkSynchronization.Store do
   defp list(table) do
     :ets.tab2list(table)
   rescue
+    # coveralls-ignore-next-line
     _ -> []
   end
 

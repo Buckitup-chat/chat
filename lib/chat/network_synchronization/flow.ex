@@ -7,7 +7,7 @@ defmodule Chat.NetworkSynchronization.Flow do
   alias Chat.NetworkSynchronization.Status.UpdatingStatus
 
   alias Chat.NetworkSynchronization.Retrieval
-  alias Chat.NetworkSynchronization.Store
+  alias Chat.NetworkSynchronization
 
   def start_half_cooled(source) do
     source
@@ -63,5 +63,5 @@ defmodule Chat.NetworkSynchronization.Flow do
   defp finalize_update(status), do: tap(status, fn _ -> Retrieval.finalize() end)
 
   defp update_mem_status(status, source_id),
-    do: tap(status, &Store.update_source_status(source_id, &1))
+    do: tap(status, &NetworkSynchronization.update_status(source_id, &1))
 end

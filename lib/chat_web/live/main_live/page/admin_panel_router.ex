@@ -85,6 +85,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
 
       {:create_cargo_user, data} ->
         socket |> AdminPanel.create_cargo_user(data)
+
+      {:network_source_status, source_id, status} ->
+        socket |> AdminPanel.send_network_source_list_update(source_id, status)
     end
   end
 

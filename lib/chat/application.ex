@@ -38,6 +38,7 @@ defmodule Chat.Application do
       ChatWeb.Presence,
       # Start the Endpoint (http/https)
       ChatWeb.Endpoint,
+      Chat.NetworkSynchronization.Supervisor,
       # Supervised tasks caller
       {Task.Supervisor, name: Chat.TaskSupervisor},
       {Task,
@@ -52,6 +53,14 @@ defmodule Chat.Application do
 
              AdminLogger.get_current_generation()
              |> AdminLogger.remove_old_generations()
+           end,
+           shutdown: :brutal_kill
+         )
+
+         Task.Supervisor.start_child(
+           Chat.TaskSupervisor,
+           fn ->
+             Chat.NetworkSynchronization.init_workers()
            end,
            shutdown: :brutal_kill
          )

@@ -18,6 +18,7 @@ defmodule Chat.NetworkSynchronization.Store.SourceOperationsTest do
 
   defp enlist_sources(context, num) do
     Store.init()
+
     for _ <- 1..num do
       Store.add_source()
     end

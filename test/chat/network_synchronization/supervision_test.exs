@@ -7,6 +7,7 @@ defmodule ChatTest.NetworkSynchronization.SupervisionTest do
 
   rewire(Store, source_db_prefix: S5, source_table: S5, status_table: T5)
   rewire(Store, source_db_prefix: S5, source_table: S5, status_table: T5, as: StoreMock)
+
   rewire(NetworkSynchronization,
     Store: StoreMock,
     Worker: WorkerMock,
@@ -14,7 +15,11 @@ defmodule ChatTest.NetworkSynchronization.SupervisionTest do
     dynamic_supervisor: D5,
     as: NetworkSynchronizationMock
   )
-  rewire(Chat.NetworkSynchronization.Flow, NetworkSynchronization: NetworkSynchronizationMock, as: FlowMock)
+
+  rewire(Chat.NetworkSynchronization.Flow,
+    NetworkSynchronization: NetworkSynchronizationMock,
+    as: FlowMock
+  )
 
   rewire(Chat.NetworkSynchronization.Worker, [
     {Chat.NetworkSynchronization.Flow, FlowMock},

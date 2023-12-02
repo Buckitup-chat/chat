@@ -35,6 +35,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   def init(%{assigns: %{me: me}} = socket) do
     PubSub.subscribe(Chat.PubSub, @admin_topic)
     PubSub.subscribe(Chat.PubSub, @incoming_topic)
+    PubSub.subscribe(Chat.PubSub, Chat.NetworkSynchronization.notification_topic())
 
     start_poller(me)
 
@@ -200,9 +201,19 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     end)
   end
 
+  def send_network_source_list_update(socket, source_id, status) do
+    send_update(ChatWeb.MainLive.Admin.NetworkSourceList,
+      id: :network_sources,
+      status_update: {source_id, status}
+    )
+
+    socket
+  end
+
   def close(%{assigns: %{me: %{name: admin}}} = socket) do
     PubSub.unsubscribe(Chat.PubSub, @admin_topic)
     PubSub.unsubscribe(Chat.PubSub, @incoming_topic)
+    PubSub.unsubscribe(Chat.PubSub, Chat.NetworkSynchronization.notification_topic())
     PubSub.unsubscribe(Chat.PubSub, FreeSpacesPoller.channel())
 
     FreeSpacesPoller.leave(admin)

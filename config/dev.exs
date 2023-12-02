@@ -11,7 +11,7 @@ config :chat, :handle_all_traffic, true
 config :chat, ChatWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  http: [ip: {0, 0, 0, 0}, port: 4000],
+  http: [ip: {0, 0, 0, 0}, port: 4444],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,

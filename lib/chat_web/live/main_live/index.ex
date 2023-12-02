@@ -17,7 +17,8 @@ defmodule ChatWeb.MainLive.Index do
     CargoUserData,
     CargoWeightSensorForm,
     FirmwareUpgradeForm,
-    MediaSettingsForm
+    MediaSettingsForm,
+    NetworkSourceList
   }
 
   alias ChatWeb.MainLive.{Layout, Page}
@@ -28,6 +29,8 @@ defmodule ChatWeb.MainLive.Index do
   on_mount LiveModalHook
   on_mount LocalTimeHook
   on_mount UploaderHook
+
+  embed_templates "*"
 
   @impl true
   def mount(
@@ -71,6 +74,13 @@ defmodule ChatWeb.MainLive.Index do
       socket
       |> ok()
     end
+  end
+
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <.main {assigns} />
+    """
   end
 
   @impl true

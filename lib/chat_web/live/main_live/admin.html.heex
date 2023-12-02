@@ -1,0 +1,185 @@
+<.action_confirmation_popup
+  id="remove-room-confirmation"
+  title="Remove Room"
+  description="Are you sure?"
+/>
+<.action_confirmation_popup
+  id="remove-user-confirmation"
+  title="Remove User"
+  description="Are you sure?"
+/>
+<Layout.Admin.container>
+  <Layout.Admin.row>
+    <Layout.Admin.block title="WiFi settings">
+      <%= if @wifi_loaded do %>
+        <.form for={%{}} as={:admin_wifi} id="admin-wifi-form" phx-submit="admin/wifi-submit">
+          <section class="p-2 pb-0 text-right">
+            SSID:
+            <input name="ssid" class="p-1.5 rounded bg-white/50" type="text" value={@wifi_ssid} />
+          </section>
+          <section class="p-2 pb-1 text-right">
+            Password:
+            <input
+              name="password"
+              class="p-1.5 rounded bg-white/50"
+              type="text"
+              value={@wifi_password}
+            />
+          </section>
+          <section class="text-center">
+            <button type="submit" class="bg-red-500 px-4 py-2 mt-1 text-white rounded">
+              Update
+            </button>
+          </section>
+        </.form>
+      <% else %>
+        <section class="text-center">
+          loading ...
+        </section>
+      <% end %>
+    </Layout.Admin.block>
+    <Layout.Admin.block title="Maintenance">
+      <section>
+        <Layout.Admin.db_status status={@db_status} />
+        <Layout.Admin.unmount_main_button mode={@db_status.mode} />
+      </section>
+      <section class="p-2 text-grayscale600">
+        <a href="#" phx-click="admin/device-log">Device Log</a>
+      </section>
+    </Layout.Admin.block>
+    <Layout.Admin.block title="Media settings">
+      <.live_component
+        id={:media_settings_form}
+        media_settings={@media_settings}
+        module={MediaSettingsForm}
+      />
+    </Layout.Admin.block>
+    <Layout.Admin.block title="Backup settings">
+      <.live_component
+        id={:backup_settings_form}
+        backup_settings={@backup_settings}
+        module={BackupSettingsForm}
+      />
+    </Layout.Admin.block>
+    <Layout.Admin.block title="Free spaces">
+      <Layout.Admin.free_spaces free_spaces={@free_spaces} />
+    </Layout.Admin.block>
+    <Layout.Admin.block title="GPIO 24 Impedance Control">
+      <Layout.Admin.gpio24_impedance_control status={assigns[:gpio24_impedance_status]} />
+    </Layout.Admin.block>
+    <Layout.Admin.block title="Firmware upgrade">
+      <.live_component id={:firmware_upgrade_form} module={FirmwareUpgradeForm} />
+    </Layout.Admin.block>
+  </Layout.Admin.row>
+  <Layout.Admin.row>
+    <Layout.Admin.block title="Remote Sources">
+      <.live_component id={:network_sources} module={NetworkSourceList} />
+    </Layout.Admin.block>
+  </Layout.Admin.row>
+  <Layout.Admin.row>
+    <Layout.Admin.block title="Admin List">
+      <section>
+        <%= for admin <- @admin_list do %>
+          <Layout.Card.hashed_name card={admin} />
+        <% end %>
+      </section>
+    </Layout.Admin.block>
+    <Layout.Admin.block title="Invite new one">
+      <section>
+        <%= for user <- @user_list do %>
+          <div
+            class="cursor-pointer"
+            phx-click="admin/show-user-invite-modal"
+            phx-value-hash={user.hash}
+          >
+            <Layout.Card.hashed_name card={user} />
+          </div>
+        <% end %>
+      </section>
+    </Layout.Admin.block>
+  </Layout.Admin.row>
+  <Layout.Admin.row>
+    <Layout.Admin.block title="Remove Room">
+      <section>
+        <%= for room <- @room_list do %>
+          <div
+            class="cursor-pointer"
+            phx-click={
+              show_modal("remove-room-confirmation")
+              |> JS.set_attribute(
+                {"phx-click",
+                 hide_modal("remove-room-confirmation")
+                 |> JS.push("admin/remove-room")
+                 |> stringify_commands()},
+                to: ".confirmButton"
+              )
+              |> JS.set_attribute({"phx-value-hash", room.hash}, to: ".confirmButton")
+            }
+          >
+            <Layout.Card.hashed_name card={room} />
+          </div>
+        <% end %>
+      </section>
+    </Layout.Admin.block>
+    <Layout.Admin.block title="Remove User">
+      <section>
+        <%= for user <- @full_user_list do %>
+          <div
+            class="cursor-pointer"
+            phx-click={
+              show_modal("remove-user-confirmation")
+              |> JS.set_attribute(
+                {"phx-click",
+                 hide_modal("remove-user-confirmation")
+                 |> JS.push("admin/remove-user")
+                 |> stringify_commands()},
+                to: ".confirmButton"
+              )
+              |> JS.set_attribute({"phx-value-hash", user.hash}, to: ".confirmButton")
+            }
+          >
+            <Layout.Card.hashed_name card={user} />
+          </div>
+        <% end %>
+      </section>
+    </Layout.Admin.block>
+  </Layout.Admin.row>
+  <%= if @media_settings.functionality == :cargo do %>
+    <Layout.Admin.row>
+      <Layout.Admin.block title="Cargo checkpoints preset">
+        <.live_component
+          id={:cargo_checkpoints_form}
+          cargo_settings={@cargo_settings}
+          module={CargoCheckpointsForm}
+        />
+      </Layout.Admin.block>
+    </Layout.Admin.row>
+  <% end %>
+  <Layout.Admin.row>
+    <Layout.Admin.block title="Cargo user">
+      <.live_component
+        id={:cargo_user_data}
+        cargo_user={assigns[:cargo_user]}
+        module={CargoUserData}
+      />
+    </Layout.Admin.block>
+  </Layout.Admin.row>
+  <%= if assigns[:cargo_user] do %>
+    <Layout.Admin.row>
+      <Layout.Admin.block title="Cargo camera sensors">
+        <.live_component
+          id={:cargo_camera_sensors_form}
+          cargo_settings={@cargo_settings}
+          module={CargoCameraSensorsForm}
+        />
+      </Layout.Admin.block>
+      <Layout.Admin.block title="Cargo weight sensor">
+        <.live_component
+          id={:cargo_weight_sensor_form}
+          cargo_settings={@cargo_settings}
+          module={CargoWeightSensorForm}
+        />
+      </Layout.Admin.block>
+    </Layout.Admin.row>
+  <% end %>
+</Layout.Admin.container>

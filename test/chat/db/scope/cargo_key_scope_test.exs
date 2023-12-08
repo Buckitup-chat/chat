@@ -1,43 +1,46 @@
 defmodule Chat.Db.Scope.CargoKeyScopeTest do
   use ExUnit.Case, async: false
 
-  alias Chat.AdminRoom
-  alias Chat.Db.Scope.KeyScope
-  alias Chat.Dialogs
-  alias Chat.Identity
-  alias Chat.Messages
-  alias Chat.RoomInviteIndex
-  alias Chat.Rooms
-  alias Chat.User
+  alias Chat.{
+    AdminRoom,
+    Db.Scope.KeyScope,
+    Dialogs,
+    Identity,
+    Messages,
+    RoomInviteIndex,
+    Rooms,
+    User
+  }
 
-  test "room and invitations in dialogs should be selected" do
+  setup do
     {bot_key, room_key} = generate_user_with_dialogs_content_and_invite_in_room()
+    {:ok, %{bot_key: bot_key, room_key: room_key}}
+  end
+
+  test "room and invitations in dialogs should be selected", %{
+    bot_key: bot_key,
+    room_key: room_key
+  } do
     assert_keys_for_cargo_keys(room_key, [bot_key], 1)
   end
 
   test "room invitation should be found in dialog of operator and user by only checkpoints key" do
-    # Operator create checkpoints and save them to admin db
-    # Then invite them to Cargo room
-    # Operator create user C and invite him to Cargo room
-    # Check that cargo keys scope contain invites to checkpoints and user C by only checkpoints key
-
-    {admin, john, operator} =
-      {User.login("admin"), User.login("John"),
-       "Operator" |> User.login() |> register_and_put_user()}
-
-    [checkpoint1_key, checkpoint2_key] =
-      generate_checkpoints([admin, john])
+    {admin, john, operator} = setup_test_data()
+    [checkpoint1_key, checkpoint2_key] = generate_checkpoints([admin, john])
 
     room_identity = generate_cargo_room(operator)
     room_key = Identity.pub_key(room_identity)
-    _dialogs = generate_dialogs_and_cargo_room_invite([admin, john], operator, room_identity)
 
-    user_c = User.login("UserC")
-    register_and_put_user(user_c)
-
+    generate_dialogs_and_cargo_room_invite([admin, john], operator, room_identity)
+    user_c = User.login("UserC") |> register_and_put_user()
     generate_dialogs_and_cargo_room_invite([user_c], operator, room_identity)
 
     assert_keys_for_cargo_keys(room_key, [checkpoint1_key, checkpoint2_key], 3)
+  end
+
+  defp setup_test_data do
+    {User.login("admin"), User.login("John"),
+     "Operator" |> User.login() |> register_and_put_user()}
   end
 
   defp assert_keys_for_cargo_keys(room_key, checkpoint_keys, expected_count) do

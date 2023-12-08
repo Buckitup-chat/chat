@@ -16,7 +16,8 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
   end
 
   test "room invitation should be found in dialog of checkpoint and cargo user by only checkpoints key" do
-    {admin, john, user} = {User.login("admin"), User.login("John"), "User" |> User.login() |> register_and_put_user()}
+    {admin, john, user} =
+      {User.login("admin"), User.login("John"), "User" |> User.login() |> register_and_put_user()}
 
     [checkpoint1_key, _checkpoint2_key] =
       generate_checkpoints([admin, john])

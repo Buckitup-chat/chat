@@ -18,7 +18,8 @@ defmodule ChatWeb.MainLive.Index do
     CargoWeightSensorForm,
     FirmwareUpgradeForm,
     MediaSettingsForm,
-    NetworkSourceList
+    NetworkSourceList,
+    LanSettings
   }
 
   alias ChatWeb.MainLive.{Layout, Page}

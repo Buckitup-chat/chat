@@ -77,43 +77,6 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     """
   end
 
-  attr :config, UploadConfig, required: true, doc: "upload config"
-  attr :enabled, :boolean, default: true, doc: "to allow or to restrict upload"
-  attr :type, :string, required: true, doc: "dialog or room"
-
-  def push_to_talk_button(assigns) do
-    ~H"""
-    <div class="flex flex-row items-center">
-      <button
-        class="cursor-pointer mr-2"
-        id="push-to-talk-button"
-        phx-click={
-          if(@enabled,
-            do: open_audio_file_upload_dialog(),
-            else: show_modal("restrict-write-actions")
-          )
-        }
-      >
-        <svg class="w-7 h-7 p-1 bg-purple rounded-full fill-white" viewbox="0 0 490.9 490.9">
-          <g class="start">
-            <path d="M245.5,322.9c53,0,96.2-43.2,96.2-96.2V96.2c0-53-43.2-96.2-96.2-96.2s-96.2,43.2-96.2,96.2v130.5
-            C149.3,279.8,192.5,322.9,245.5,322.9z M173.8,96.2c0-39.5,32.2-71.7,71.7-71.7s71.7,32.2,71.7,71.7v130.5
-            c0,39.5-32.2,71.7-71.7,71.7s-71.7-32.2-71.7-71.7V96.2z" />
-            <path d="M94.4,214.5c-6.8,0-12.3,5.5-12.3,12.3c0,85.9,66.7,156.6,151.1,162.8v76.7h-63.9c-6.8,0-12.3,5.5-12.3,12.3
-            s5.5,12.3,12.3,12.3h152.3c6.8,0,12.3-5.5,12.3-12.3s-5.5-12.3-12.3-12.3h-63.9v-76.7c84.4-6.3,151.1-76.9,151.1-162.8
-            c0-6.8-5.5-12.3-12.3-12.3s-12.3,5.5-12.3,12.3c0,76.6-62.3,138.9-138.9,138.9s-138.9-62.3-138.9-138.9
-            C106.6,220,101.2,214.5,94.4,214.5z" />
-          </g>
-
-          <g class="stop hidden">
-            <rect width="300.9" height="300.9" rx="25" x="100" y="100" />
-          </g>
-        </svg>
-      </button>
-    </div>
-    """
-  end
-
   attr :enabled, :boolean, default: true, doc: "to allow or to restrict upload"
   attr :operating_system, :string, doc: "client's operating system"
   attr :type, :string, required: true, doc: "dialog or room"
@@ -184,9 +147,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   end
 
   defp entries(assigns) do
-    ~H"""
-
-    """
+    ~H""
   end
 
   attr :config, UploadConfig, required: true, doc: "upload config"
@@ -212,9 +173,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   attr :type, :atom, required: true, doc: ":dialog or :room"
 
   defp entry(%{entry: nil, metadata: nil} = assigns) do
-    ~H"""
-
-    """
+    ~H""
   end
 
   defp entry(assigns) do
@@ -314,10 +273,6 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
     """
   end
 
-  defp open_audio_file_upload_dialog do
-    JS.dispatch("click", to: "#uploader-file-form .audio-file-input")
-  end
-
   defp open_file_upload_dialog do
     JS.dispatch("click", to: "#uploader-file-form .file-input")
   end
@@ -345,55 +300,40 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
         upload={@config}
       />
 
-      <input
-        accept="audio/*"
-        class="audio-file-input hidden"
-        data-ref={@config.ref}
-        id={"#{@config.ref}-push-to-talk"}
-        name="audio_file"
-        phx-hook="MediaFileInput"
-        type="file"
-        multiple={if(@config.max_entries > 1, do: true)}
-      />
-
       <%= if @operating_system == "Android" do %>
         <div class="flex flex-row justify-around">
           <a
             class="flex justify-center items-center h-11 w-[30%] pr-2 cursor-pointer rounded-md bg-white hover:bg-white/50"
-            phx-click={JS.dispatch("click", to: "#uploader-file-form .file-input")}
+            phx-click={open_file_selector("*/*", "#uploader-file-form .file-input")}
           >
             <.icon id="document" class="w-4 h-4 fill-grayscale" />
             <span class="ml-2">File</span>
           </a>
           <a
             class="flex justify-center items-center h-11 w-[30%] pr-2 cursor-pointer rounded-md bg-white hover:bg-white/50"
-            phx-click={JS.dispatch("click", to: "#uploader-file-form .image-input")}
+            phx-click={open_file_selector("image/*, video/*", "#uploader-file-form .file-input")}
           >
             <.icon id="image" class="w-4 h-4 fill-grayscale" />
             <span class="ml-2">Image</span>
           </a>
           <a
             class="flex justify-center items-center h-11 w-[30%] pr-2 cursor-pointer rounded-md bg-white"
-            phx-click={JS.dispatch("click", to: "#uploader-file-form .audio-file-input")}
+            phx-click={open_file_selector("audio/*", "#uploader-file-form .file-input")}
           >
             <.icon id="audio" class="w-4 h-4 fill-grayscale" />
             <span class="ml-2">Audio</span>
           </a>
         </div>
 
-        <input
-          accept="image/*, video/*"
-          class="image-input hidden p-1 flex flex-col items-center text-sm text-black/50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple file:text-purple50 file:cursor-pointer"
-          data-ref={@config.ref}
-          id={"#{@config.ref}-android"}
-          name="media_file"
-          phx-hook="MediaFileInput"
-          type="file"
-          multiple={if(@config.max_entries > 1, do: true)}
-        />
       <% end %>
     </.form>
     """
+  end
+
+  defp open_file_selector(media_type, dom_selector) do
+    %JS{}
+    |> JS.set_attribute({"accept", media_type}, to: dom_selector)
+    |> JS.dispatch("click", to: dom_selector)
   end
 
   attr :pub_key, :string, required: true, doc: "peer or room pub key"

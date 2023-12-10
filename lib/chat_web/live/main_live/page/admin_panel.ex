@@ -119,7 +119,6 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     send_update(LanSettings, changes |> Keyword.merge(id: :lan_settings))
   end
 
-
   def toggle_gpio24_impendance(socket) do
     request_platform(:toggle_gpio24_impendance)
 
@@ -315,7 +314,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   end
 
   def request_platform(message),
-      do: PubSub.broadcast(Chat.PubSub, @outgoing_topic, message)
+    do: PubSub.broadcast(Chat.PubSub, @outgoing_topic, message)
 
   defp save_file({file_key, content}, {size, file_secret}) do
     ChunkedFilesMultisecret.generate(file_key, size, file_secret)

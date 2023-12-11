@@ -30,7 +30,7 @@ defmodule ChatWeb.MainLive.Admin.LanSettings do
     request_platform_profile()
 
     socket
-    |> assign(:porfile, :requested)
+    |> assign(:profile, :requested)
     |> noreply()
   end
 

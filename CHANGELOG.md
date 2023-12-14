@@ -21,6 +21,7 @@ straightforward as possible.
 - Nerves + Elixir + Phoenix update [#501]
 
 ### Fixed
+- mobile upload on Android
 
 ## 2023-10-11_c9df216___2023-10-11_8198274
 

@@ -324,7 +324,6 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
             <span class="ml-2">Audio</span>
           </a>
         </div>
-
       <% end %>
     </.form>
     """

@@ -31,8 +31,9 @@ defmodule ChatWebTest.MainLive.Admin.LanSettingsTest do
     |> assert_ip_rendered_and_mode_loading()
     |> send_known_profiles_update()
     |> assert_profiles_rendered_and_first_selected()
+    |> flush_received_messages()
     |> change_profile_in_the_settings()
-    |> assert_profile_change_and_profile_request_received()
+    |> assert_profile_change_and_profile_request_and_ip_request_received()
     |> assert_ip_rendered_and_mode_loading()
     |> send_profile_update_to_second()
     |> assert_profile_rendered_and_second_selected()
@@ -48,35 +49,23 @@ defmodule ChatWebTest.MainLive.Admin.LanSettingsTest do
   end
 
   defp send_ip_update(context) do
-    ip = "123.45.67.89"
-
     context
-    |> send_component_update(:ip, ip)
-    |> Map.put(:assigned_ip, ip)
+    |> send_component_update(:ip, "123.45.67.89")
   end
 
   defp send_profile_update(context) do
-    profile = :no_internet
-
     context
-    |> send_component_update(:profile, profile)
-    |> Map.put(:assigned_profile, profile)
+    |> send_component_update(:profile, :no_internet)
   end
 
   defp send_known_profiles_update(context) do
-    profiles = [:no_internet, :internet]
-
     context
-    |> send_component_update(:known_profiles, profiles)
-    |> Map.put(:assigned_profiles, profiles)
+    |> send_component_update(:known_profiles, [:no_internet, :internet])
   end
 
   defp send_profile_update_to_second(context) do
-    profile = :internet
-
     context
-    |> send_component_update(:profile, profile)
-    |> Map.put(:assigned_profile, profile)
+    |> send_component_update(:profile, :internet)
   end
 
   defp send_component_update(context, key, value) do
@@ -111,9 +100,10 @@ defmodule ChatWebTest.MainLive.Admin.LanSettingsTest do
     context
   end
 
-  defp assert_profile_change_and_profile_request_received(context) do
+  defp assert_profile_change_and_profile_request_and_ip_request_received(context) do
     assert_receive {:lan_set_profile, :internet}
     assert_receive :lan_profile
+    assert_receive :lan_ip
     context
   end
 
@@ -147,6 +137,14 @@ defmodule ChatWebTest.MainLive.Admin.LanSettingsTest do
   defp unsubscribe_from_outgoing_pubsub(context) do
     Phoenix.PubSub.unsubscribe(@pubsub_name, @outgoing_topic)
     context
+  end
+
+  defp flush_received_messages(context) do
+    receive do
+      _ -> flush_received_messages(context)
+    after
+      0 -> context
+    end
   end
 
   defp start_test_pubsub(context) do

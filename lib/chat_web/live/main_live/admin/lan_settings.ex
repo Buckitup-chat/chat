@@ -28,6 +28,7 @@ defmodule ChatWeb.MainLive.Admin.LanSettings do
   def handle_event("change-profile", %{"mode" => profile}, socket) do
     set_platform_profile(profile |> String.to_existing_atom())
     request_platform_profile()
+    request_platform_ip()
 
     socket
     |> assign(:profile, :requested)

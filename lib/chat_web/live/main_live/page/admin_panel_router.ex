@@ -71,6 +71,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
         AdminPanel.update_lan_settings(known_profiles: list)
         socket
 
+      {:updated_lan_profile, :ok} ->
+        socket
+
       {:device_log, log} ->
         socket |> AdminPanel.render_device_log(log)
 

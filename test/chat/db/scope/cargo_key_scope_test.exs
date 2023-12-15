@@ -35,7 +35,10 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     user_c = User.login("UserC") |> register_and_put_user()
     generate_dialogs_and_cargo_room_invite([user_c], operator, room_identity)
 
-    assert_keys_for_cargo_keys(room_key, [checkpoint1_key, checkpoint2_key], 3)
+    user_d = User.login("UserD") |> register_and_put_user()
+    generate_dialogs_and_cargo_room_invite([user_d], user_c, room_identity)
+
+    assert_keys_for_cargo_keys(room_key, [checkpoint1_key, checkpoint2_key], 4)
   end
 
   defp setup_test_data do

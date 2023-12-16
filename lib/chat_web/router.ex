@@ -9,6 +9,7 @@ defmodule ChatWeb.Router do
     plug :protect_from_forgery
     plug :put_secure_browser_headers
     plug ChatWeb.Plugs.OperatingSystemDetector
+    plug ChatWeb.Plugs.PreferSSL
   end
 
   pipeline :api do
@@ -18,6 +19,10 @@ defmodule ChatWeb.Router do
       json_decoder: Phoenix.json_library()
 
     plug :accepts, ["json"]
+  end
+
+  pipeline :upload do
+    plug ChatWeb.Plugs.PreferSSL
   end
 
   scope "/", ChatWeb do
@@ -43,6 +48,8 @@ defmodule ChatWeb.Router do
   end
 
   scope "/", ChatWeb do
+    pipe_through :upload
+
     put "/upload_chunk/:key", UploadChunkController, :put
   end
 

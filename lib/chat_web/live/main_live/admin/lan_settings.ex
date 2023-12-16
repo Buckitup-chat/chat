@@ -29,6 +29,7 @@ defmodule ChatWeb.MainLive.Admin.LanSettings do
     set_platform_profile(profile |> String.to_existing_atom())
     request_platform_profile()
     request_platform_ip()
+    double_request_platform_ip()
 
     socket
     |> assign(:profile, :requested)
@@ -90,5 +91,15 @@ defmodule ChatWeb.MainLive.Admin.LanSettings do
   defp make_labeled_list(list) do
     list
     |> Enum.map(&{&1, &1 |> Phoenix.Naming.humanize()})
+  end
+
+  defp double_request_platform_ip do
+    [3, 7, 19]
+    |> Enum.each(fn seconds ->
+      Task.Supervisor.async_nolink(Chat.TaskSupervisor, fn ->
+        Process.sleep(seconds |> :timer.seconds())
+        request_platform_ip()
+      end)
+    end)
   end
 end

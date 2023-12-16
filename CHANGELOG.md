@@ -15,6 +15,8 @@ straightforward as possible.
 - async load of camera sensor images for admin [#532]
 - endpoints for network sync [#548]
 - network synchronization [#549]
+- internet access and setting [#556]
+- internet proxy [#557]
 
 ### Changed
 

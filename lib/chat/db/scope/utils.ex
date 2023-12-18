@@ -81,7 +81,7 @@ defmodule Chat.Db.Scope.Utils do
   def get_dialog_binkeys(dialog_keys),
     do: dialog_keys |> Enum.map(fn {:dialogs, dialog_key} -> dialog_key end) |> MapSet.new()
 
-  def get_dialog_invitation_messages(snap, dialog_binkeys) do
+  def get_dialog_invitation_messages(dialog_binkeys, snap) do
     snap
     |> db_stream({:dialog_message, 0, 0, 0}, {:"dialog_message\0", 0, 0, 0})
     |> Stream.filter(fn {{:dialog_message, key, _, _}, %Message{type: type}} ->

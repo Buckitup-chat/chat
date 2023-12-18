@@ -145,46 +145,37 @@ defmodule Chat.Db.Scope.KeyScope do
   defp add_invitation_dialogs(acc_set, snap, pub_keys) do
     dialogs = Utils.get_dialogs(snap)
 
-    checkpoints_dialog_keys = Utils.get_type_dialog_keys(:checkpoints, dialogs, [pub_keys, nil])
-    checkpoints_dialog_binkeys = Utils.get_dialog_binkeys(checkpoints_dialog_keys)
-
-    checkpoints_invitation_messages =
-      Utils.get_dialog_invitation_messages(snap, checkpoints_dialog_binkeys)
+    {checkpoints_dialog_keys, checkpoints_invitation_messages} =
+      extract_dialogs_with_invitations(:checkpoints, snap, dialogs, [pub_keys, nil])
 
     operator_key =
       Utils.get_invitation_sender_key(:sender, dialogs, checkpoints_invitation_messages)
 
-    operator_dialog_keys =
-      Utils.get_type_dialog_keys(:user, dialogs, [operator_key, checkpoints_dialog_keys])
-
-    operator_dialog_binkeys = Utils.get_dialog_binkeys(operator_dialog_keys)
-
-    operator_invitation_messages =
-      Utils.get_dialog_invitation_messages(snap, operator_dialog_binkeys)
+    {operator_dialog_keys, operator_invitation_messages} =
+      extract_dialogs_with_invitations(:user, snap, dialogs, [
+        operator_key,
+        checkpoints_dialog_keys
+      ])
 
     nested_user_key =
       Utils.get_invitation_sender_key(:recipient, dialogs, operator_invitation_messages)
       |> MapSet.difference(pub_keys)
 
-    nested_dialog_keys =
-      Utils.get_type_dialog_keys(:user, dialogs, [nested_user_key, operator_dialog_keys])
-
-    nested_dialog_binkeys = Utils.get_dialog_binkeys(nested_dialog_keys)
-
-    nested_invitation_messages =
-      Utils.get_dialog_invitation_messages(snap, nested_dialog_binkeys)
+    {nested_dialog_keys, nested_invitation_messages} =
+      extract_dialogs_with_invitations(:user, snap, dialogs, [
+        nested_user_key,
+        operator_dialog_keys
+      ])
 
     {
       [checkpoints_invitation_messages, operator_invitation_messages, nested_invitation_messages]
       |> Stream.concat()
       |> Stream.map(&Utils.just_keys/1)
-      |> Utils.union_set(
-        Utils.dialog_keys_union([
-          checkpoints_dialog_keys,
-          operator_dialog_keys,
-          nested_dialog_keys
-        ])
-      )
+      |> union_set_dialog_keys([
+        checkpoints_dialog_keys,
+        operator_dialog_keys,
+        nested_dialog_keys
+      ])
       |> Utils.union_set(acc_set),
       MapSet.union(pub_keys, nested_user_key)
     }
@@ -235,4 +226,19 @@ defmodule Chat.Db.Scope.KeyScope do
 
     [index, keys, records]
   end
+
+  defp extract_dialogs_with_invitations(type, snap, dialogs, [keys, dialog_keys])
+       when type in [:checkpoints, :user] do
+    dialog_keys = Utils.get_type_dialog_keys(type, dialogs, [keys, dialog_keys])
+
+    messages =
+      dialog_keys |> Utils.get_dialog_binkeys() |> Utils.get_dialog_invitation_messages(snap)
+
+    {dialog_keys, messages}
+  end
+
+  defp union_set_dialog_keys(acc_keys, dialog_keys),
+    do:
+      acc_keys
+      |> Utils.union_set(Utils.dialog_keys_union(dialog_keys))
 end

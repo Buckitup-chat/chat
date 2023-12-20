@@ -32,10 +32,10 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     room_key = Identity.pub_key(room_identity)
 
     generate_dialogs_and_cargo_room_invite([admin, john], operator, room_identity)
-    user_c = User.login("UserC") |> register_and_put_user()
+    user_c = User.login("UserC") |> create_user_from_identity()
     generate_dialogs_and_cargo_room_invite([user_c], operator, room_identity)
 
-    user_d = User.login("UserD") |> register_and_put_user()
+    user_d = User.login("UserD") |> create_user_from_identity()
     generate_dialogs_and_cargo_room_invite([user_d], user_c, room_identity)
 
     assert_keys_for_cargo_keys(room_key, [checkpoint1_key, checkpoint2_key], 4)
@@ -43,7 +43,7 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
 
   defp setup_test_data do
     {User.login("admin"), User.login("John"),
-     "Operator" |> User.login() |> register_and_put_user()}
+     "Operator" |> User.login() |> create_user_from_identity()}
   end
 
   defp assert_keys_for_cargo_keys(room_key, checkpoint_keys, expected_count) do
@@ -71,7 +71,7 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
   defp generate_checkpoints(identities) do
     data =
       Enum.reduce(identities, %{keys: [], cards: []}, fn identity, acc ->
-        register_and_put_user(identity)
+        create_user_from_identity(identity)
         card = Chat.Card.from_identity(identity)
 
         %{
@@ -93,7 +93,7 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
       })
   end
 
-  defp register_and_put_user(identity) do
+  defp create_user_from_identity(identity) do
     identity |> tap(&User.register/1) |> tap(&User.UsersBroker.put/1)
   end
 
@@ -103,15 +103,15 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
   end
 
   defp generate_dialogs_and_cargo_room_invite(checkpoints, user, room_identity) do
-    dialogs =
-      for checkpoint <- checkpoints,
-          into: [],
-          do: Dialogs.find_or_open(user, checkpoint |> Chat.Card.from_identity())
-
-    Enum.each(dialogs, fn dialog -> create_and_add_room_invite(room_identity, dialog, user) end)
+    for checkpoint <- checkpoints,
+        into: [],
+        do:
+          user
+          |> Dialogs.find_or_open(checkpoint |> Chat.Card.from_identity())
+          |> create_and_add_room_invite(room_identity, user)
   end
 
-  defp create_and_add_room_invite(room_identity, dialog, user) do
+  defp create_and_add_room_invite(dialog, room_identity, user) do
     room_identity
     |> Messages.RoomInvite.new()
     |> Dialogs.add_new_message(user, dialog)
@@ -120,10 +120,10 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
 
   defp generate_user_with_dialogs_content_and_invite_in_room do
     user = User.login("Alice")
-    register_and_put_user(user)
+    create_user_from_identity(user)
 
     bot = User.login("Bob")
-    register_and_put_user(bot)
+    create_user_from_identity(bot)
     bot_key = Identity.pub_key(bot)
 
     {room_identity, _room} = Rooms.add(user, "Room")
@@ -135,7 +135,7 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     |> Messages.Text.new(DateTime.utc_now())
     |> Dialogs.add_new_message(user, dialog)
 
-    create_and_add_room_invite(room_identity, dialog, user)
+    create_and_add_room_invite(dialog, room_identity, user)
 
     {bot_key, room_key}
   end

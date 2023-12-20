@@ -88,4 +88,18 @@ defmodule Chat.Db.Scope.Utils do
       type == :room_invite and MapSet.member?(dialog_binkeys, key)
     end)
   end
+
+  # TODO: correct this function to work in next commit
+
+  # def get_dialog_invitation_messages(dialog_binkeys, snap) do
+  #   dialog_binkeys
+  #   |> Stream.map(fn dialog_key ->
+  #     {{:dialog_message, dialog_key, 0, 0}, {:dialog_message, dialog_key, nil, nil}}
+  #   end)
+  #   |> Stream.map(fn {min, max} = _range ->
+  #     snap
+  #     |> db_stream(min, max)
+  #     |> Stream.filter(&match?({_, %Message{type: :room_invite}}, &1))
+  #   end)
+  # end
 end

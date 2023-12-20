@@ -3,7 +3,7 @@ defmodule Chat.Db.Scope.KeyScope do
   Builds db keys accessible by keys_list
   """
 
-  alias Chat.Db.Scope.Utils
+  import Chat.Db.Scope.Utils
   alias Chat.Dialogs.Dialog
 
   def get_keys(db, pub_keys_list) do
@@ -34,14 +34,14 @@ defmodule Chat.Db.Scope.KeyScope do
 
   defp add_full_users(acc_set, snap) do
     snap
-    |> Utils.db_keys_stream({:users, 0}, {:"users\0", 0})
-    |> Utils.union_set(acc_set)
+    |> db_keys_stream({:users, 0}, {:"users\0", 0})
+    |> union_set(acc_set)
   end
 
   defp add_dialogs(acc_set, snap, pub_keys) do
     dialog_keys =
       snap
-      |> Utils.db_stream({:dialogs, 0}, {:"dialogs\0", 0})
+      |> db_stream({:dialogs, 0}, {:"dialogs\0", 0})
       |> Stream.filter(fn {_full_dilaog_key, %Dialog{a_key: a_key, b_key: b_key}} ->
         MapSet.member?(pub_keys, a_key) or MapSet.member?(pub_keys, b_key)
       end)
@@ -54,29 +54,29 @@ defmodule Chat.Db.Scope.KeyScope do
       |> MapSet.new()
 
     snap
-    |> Utils.db_keys_stream({:dialog_message, 0, 0, 0}, {:"dialog_message\0", 0, 0, 0})
+    |> db_keys_stream({:dialog_message, 0, 0, 0}, {:"dialog_message\0", 0, 0, 0})
     |> Stream.filter(fn {:dialog_message, key, _, _} ->
       MapSet.member?(dialog_binkeys, key)
     end)
-    |> Utils.union_set(dialog_keys)
-    |> Utils.union_set(acc_set)
+    |> union_set(dialog_keys)
+    |> union_set(acc_set)
   end
 
   defp add_rooms(acc_set, snap, pub_keys) do
     with_rooms =
       snap
-      |> Utils.db_keys_stream({:rooms, 0}, {:"rooms\0", 0})
+      |> db_keys_stream({:rooms, 0}, {:"rooms\0", 0})
       |> Stream.filter(fn {:rooms, key} ->
         MapSet.member?(pub_keys, key)
       end)
-      |> Utils.union_set(acc_set)
+      |> union_set(acc_set)
 
     snap
-    |> Utils.db_keys_stream({:room_message, 0, 0, 0}, {:"room_message\0", 0, 0, 0})
+    |> db_keys_stream({:room_message, 0, 0, 0}, {:"room_message\0", 0, 0, 0})
     |> Stream.filter(fn {:room_message, room_key, _, _} ->
       MapSet.member?(pub_keys, room_key)
     end)
-    |> Utils.union_set(with_rooms)
+    |> union_set(with_rooms)
   end
 
   defp add_content(acc_set, snap, pub_keys) do
@@ -95,7 +95,7 @@ defmodule Chat.Db.Scope.KeyScope do
 
     chunk_keys =
       snap
-      |> Utils.db_keys_stream(
+      |> db_keys_stream(
         {:chunk_key, {:file_chunk, 0, 0, 0}},
         {:chunk_key, {:"file_chunk\0", 0, 0, 0}}
       )
@@ -132,51 +132,59 @@ defmodule Chat.Db.Scope.KeyScope do
       )
 
     acc_set
-    |> Utils.union_set(chunk_keys)
-    |> Utils.union_set(file_index)
-    |> Utils.union_set(file_chunks)
-    |> Utils.union_set(files)
-    |> Utils.union_set(memo_index)
-    |> Utils.union_set(memos)
-    |> Utils.union_set(room_invite_index)
-    |> Utils.union_set(room_invites)
+    |> union_set(chunk_keys)
+    |> union_set(file_index)
+    |> union_set(file_chunks)
+    |> union_set(files)
+    |> union_set(memo_index)
+    |> union_set(memos)
+    |> union_set(room_invite_index)
+    |> union_set(room_invites)
   end
 
   defp add_invitation_dialogs(acc_set, snap, pub_keys) do
-    dialogs = Utils.get_dialogs(snap)
-
+    # get all dialogs
+    dialogs = get_dialogs(snap)
+    # select dialog keys and invitation messages to checkpoints
     {checkpoints_dialog_keys, checkpoints_invitation_messages} =
       extract_dialogs_with_invitations(:checkpoints, snap, dialogs, [pub_keys, nil])
 
+    # get operator key as first sender of invitations to checkpoints
     operator_key =
-      Utils.get_invitation_sender_key(:sender, dialogs, checkpoints_invitation_messages)
+      get_invitation_sender_key(:sender, dialogs, checkpoints_invitation_messages)
 
+    # select operator dialog keys and invitation messages with non checkpoints
     {operator_dialog_keys, operator_invitation_messages} =
       extract_dialogs_with_invitations(:user, snap, dialogs, [
         operator_key,
         checkpoints_dialog_keys
       ])
 
+    # get key of users who recieved invitations from operator exclude checkpoints
     nested_user_key =
-      Utils.get_invitation_sender_key(:recipient, dialogs, operator_invitation_messages)
+      get_invitation_sender_key(:recipient, dialogs, operator_invitation_messages)
       |> MapSet.difference(pub_keys)
 
+    # select dialog keys and invitation messages from users who recieved invitations from operator
     {nested_dialog_keys, nested_invitation_messages} =
       extract_dialogs_with_invitations(:user, snap, dialogs, [
         nested_user_key,
         operator_dialog_keys
       ])
 
+    # combine all invitation messages
     {
       [checkpoints_invitation_messages, operator_invitation_messages, nested_invitation_messages]
       |> Stream.concat()
-      |> Stream.map(&Utils.just_keys/1)
+      |> Stream.map(&just_keys/1)
+      # merge dialog keys into acc_set
       |> union_set_dialog_keys([
         checkpoints_dialog_keys,
         operator_dialog_keys,
         nested_dialog_keys
       ])
-      |> Utils.union_set(acc_set),
+      |> union_set(acc_set),
+      # combine keys of checkpoints and nested users to get complete list of invite content
       MapSet.union(pub_keys, nested_user_key)
     }
   end
@@ -194,8 +202,8 @@ defmodule Chat.Db.Scope.KeyScope do
       )
 
     acc_set
-    |> Utils.union_set(room_invite_index)
-    |> Utils.union_set(room_invites)
+    |> union_set(room_invite_index)
+    |> union_set(room_invites)
   end
 
   defp fetch_index_and_records(snap, pub_keys, record_name, opts) do
@@ -204,7 +212,7 @@ defmodule Chat.Db.Scope.KeyScope do
 
     index =
       snap
-      |> Utils.db_keys_stream(opts[:min_key], opts[:max_key])
+      |> db_keys_stream(opts[:min_key], opts[:max_key])
       |> Stream.filter(fn key ->
         reader_hash = reader_hash_getter.(key)
         MapSet.member?(pub_keys, reader_hash)
@@ -218,7 +226,7 @@ defmodule Chat.Db.Scope.KeyScope do
 
     records =
       snap
-      |> Utils.db_keys_stream({:"#{record_name}", 0}, {:"#{record_name}\0", 0})
+      |> db_keys_stream({:"#{record_name}", 0}, {:"#{record_name}\0", 0})
       |> Stream.filter(fn {_record_name, record_key} ->
         MapSet.member?(keys, record_key)
       end)
@@ -229,10 +237,10 @@ defmodule Chat.Db.Scope.KeyScope do
 
   defp extract_dialogs_with_invitations(type, snap, dialogs, [keys, dialog_keys])
        when type in [:checkpoints, :user] do
-    dialog_keys = Utils.get_type_dialog_keys(type, dialogs, [keys, dialog_keys])
+    dialog_keys = get_type_dialog_keys(type, dialogs, [keys, dialog_keys])
 
     messages =
-      dialog_keys |> Utils.get_dialog_binkeys() |> Utils.get_dialog_invitation_messages(snap)
+      dialog_keys |> get_dialog_binkeys() |> get_dialog_invitation_messages(snap)
 
     {dialog_keys, messages}
   end
@@ -240,5 +248,5 @@ defmodule Chat.Db.Scope.KeyScope do
   defp union_set_dialog_keys(acc_keys, dialog_keys),
     do:
       acc_keys
-      |> Utils.union_set(Utils.dialog_keys_union(dialog_keys))
+      |> union_set(dialog_keys_union(dialog_keys))
 end

@@ -22,6 +22,8 @@ straightforward as possible.
 
 ### Fixed
 
+- user access to cargo room
+
 ## 2023-10-11_c9df216___2023-10-11_8198274
 
 ### Added

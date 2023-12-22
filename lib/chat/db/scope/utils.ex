@@ -43,7 +43,7 @@ defmodule Chat.Db.Scope.Utils do
     |> Stream.filter(fn {{:dialogs, dialog_key}, %Dialog{a_key: a_key, b_key: b_key}} ->
       (MapSet.member?(keys, a_key) or MapSet.member?(keys, b_key)) and
         case type do
-          :user -> dialog_key not in exclude_dialog_keys
+          :users -> dialog_key not in exclude_dialog_keys
           :checkpoints -> true
         end
     end)
@@ -53,21 +53,13 @@ defmodule Chat.Db.Scope.Utils do
   def dialog_keys_union(list_of_keys),
     do: Enum.reduce(list_of_keys, MapSet.new(), &MapSet.union(&1, &2))
 
-  def get_invitation_sender_key(type, dialogs, invitation_messages) do
+  def get_invitations_sender_keys(type, snap, invitation_messages) do
     invitation_messages
     |> Stream.map(fn {{:dialog_message, dialog_key, _, _},
                       %Message{is_a_to_b?: is_a_to_b} = _message} ->
-      dialogs
-      |> Enum.find(fn {{_, key}, _} ->
-        key == dialog_key
-      end)
-      |> elem(1)
-      |> then(
-        &case type do
-          :sender -> sender_invitation_condition(&1, is_a_to_b)
-          :recipient -> recipient_invitation_condition(&1, is_a_to_b)
-        end
-      )
+      {snap, dialog_key}
+      |> fetch_dialog_by_key()
+      |> get_invitation_participant(type, is_a_to_b)
     end)
     |> MapSet.new()
   end
@@ -82,24 +74,30 @@ defmodule Chat.Db.Scope.Utils do
     do: dialog_keys |> Enum.map(fn {:dialogs, dialog_key} -> dialog_key end) |> MapSet.new()
 
   def get_dialog_invitation_messages(dialog_binkeys, snap) do
-    snap
-    |> db_stream({:dialog_message, 0, 0, 0}, {:"dialog_message\0", 0, 0, 0})
-    |> Stream.filter(fn {{:dialog_message, key, _, _}, %Message{type: type}} ->
-      type == :room_invite and MapSet.member?(dialog_binkeys, key)
+    dialog_binkeys
+    |> Stream.map(fn dialog_key ->
+      {{:dialog_message, dialog_key, 0, 0}, {:dialog_message, dialog_key, nil, nil}}
     end)
+    |> Enum.map(fn {min, max} = _range ->
+      snap
+      |> db_stream(min, max)
+      |> Stream.filter(&match?({_, %Message{type: :room_invite}}, &1))
+    end)
+    |> Stream.concat()
   end
 
-  # TODO: correct this function to work in next commit
+  defp get_invitation_participant(dialog, type, is_a_to_b) when type in [:sender, :recipient] do
+    case type do
+      :sender -> if(is_a_to_b, do: dialog.a_key, else: dialog.b_key)
+      :recipient -> if(is_a_to_b, do: dialog.b_key, else: dialog.a_key)
+    end
+  end
 
-  # def get_dialog_invitation_messages(dialog_binkeys, snap) do
-  #   dialog_binkeys
-  #   |> Stream.map(fn dialog_key ->
-  #     {{:dialog_message, dialog_key, 0, 0}, {:dialog_message, dialog_key, nil, nil}}
-  #   end)
-  #   |> Stream.map(fn {min, max} = _range ->
-  #     snap
-  #     |> db_stream(min, max)
-  #     |> Stream.filter(&match?({_, %Message{type: :room_invite}}, &1))
-  #   end)
-  # end
+  defp fetch_dialog_by_key({snap, dialog_key}),
+    do:
+      snap
+      |> db_stream({:dialogs, dialog_key}, {:"dialogs\0", dialog_key})
+      |> Enum.to_list()
+      |> List.first()
+      |> then(fn {_, dialog} -> dialog end)
 end

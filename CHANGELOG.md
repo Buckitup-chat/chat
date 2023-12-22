@@ -22,7 +22,7 @@ straightforward as possible.
 
 ### Fixed
 
-- user access to cargo room
+- copy invited user invitation with cargo room [#574]
 
 ## 2023-10-11_c9df216___2023-10-11_8198274
 

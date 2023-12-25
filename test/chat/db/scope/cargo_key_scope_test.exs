@@ -25,25 +25,86 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
   end
 
   test "room invitation should be found in dialog of operator and user by only checkpoints key" do
-    {admin, john, operator} = setup_test_data()
-    [checkpoint1_key, checkpoint2_key] = generate_checkpoints([admin, john])
+    {[checkpoints, checkpoint_keys], operators, users} =
+      setup_test_data(2, 1, 2)
 
+    assert Enum.count(checkpoints) == 2
+
+    operator = List.first(operators)
     room_identity = generate_cargo_room(operator)
     room_key = Identity.pub_key(room_identity)
 
-    generate_dialogs_and_cargo_room_invite([admin, john], operator, room_identity)
-    user_c = User.login("UserC") |> create_user_from_identity()
+    generate_dialogs_and_cargo_room_invite(checkpoints, operator, room_identity)
+    user_c = List.first(users)
     generate_dialogs_and_cargo_room_invite([user_c], operator, room_identity)
 
-    user_d = User.login("UserD") |> create_user_from_identity()
+    user_d = List.last(users)
     generate_dialogs_and_cargo_room_invite([user_d], user_c, room_identity)
 
-    assert_keys_for_cargo_keys(room_key, [checkpoint1_key, checkpoint2_key], 4)
+    assert_keys_for_cargo_keys(room_key, checkpoint_keys, 4)
   end
 
-  defp setup_test_data do
-    {User.login("admin"), User.login("John"),
-     "Operator" |> User.login() |> create_user_from_identity()}
+  test "room invitations found up to 1 handshake" do
+    {[checkpoints, checkpoint_keys], operators, users} =
+      setup_test_data(3, 2, 4)
+
+    assert Enum.count(checkpoints) == 3
+
+    operator_1 = Enum.at(operators, 0)
+    operator_2 = Enum.at(operators, 1)
+
+    room_identity = generate_cargo_room(operator_1)
+    room_key = Identity.pub_key(room_identity)
+
+    # o1 creates the room with checkpoints c1 and c2
+    generate_dialogs_and_cargo_room_invite(
+      [Enum.at(checkpoints, 0), Enum.at(checkpoints, 1)],
+      operator_1,
+      room_identity
+    )
+
+    # o2 adds a manual invite for c3 into the room
+    generate_dialogs_and_cargo_room_invite([Enum.at(checkpoints, 2)], operator_2, room_identity)
+
+    # o1 invites u1
+    generate_dialogs_and_cargo_room_invite([Enum.at(users, 0)], operator_1, room_identity)
+
+    # u1 invites u2 and u4
+    generate_dialogs_and_cargo_room_invite(
+      [Enum.at(users, 1), Enum.at(users, 3)],
+      Enum.at(users, 0),
+      room_identity
+    )
+
+    # u2 invites u3
+    generate_dialogs_and_cargo_room_invite([Enum.at(users, 2)], Enum.at(users, 1), room_identity)
+
+    # u3 invites u4 and u1
+    generate_dialogs_and_cargo_room_invite(
+      [Enum.at(users, 3), Enum.at(users, 0)],
+      Enum.at(users, 2),
+      room_identity
+    )
+
+    # Assert that u3's invite should not get into scope
+    assert_keys_for_cargo_keys(room_key, checkpoint_keys, 7)
+  end
+
+  defp setup_test_data(checkpoints_count, operators_count, users_count) do
+    checkpoints = Enum.map(1..checkpoints_count, fn n -> "checkpoint#{n}" |> User.login() end)
+    checkpoints_keys = generate_checkpoints(checkpoints)
+
+    operators =
+      Enum.map(1..operators_count, fn n ->
+        "operator#{n}" |> User.login() |> IO.inspect() |> create_user_from_identity()
+      end)
+
+    users =
+      Enum.map(1..users_count, fn n ->
+        "user#{n}" |> User.login() |> create_user_from_identity()
+      end)
+
+    {[checkpoints, checkpoints_keys], operators, users}
   end
 
   defp assert_keys_for_cargo_keys(room_key, checkpoint_keys, expected_count) do

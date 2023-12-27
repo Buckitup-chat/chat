@@ -146,11 +146,11 @@ defmodule Chat.Db.Scope.KeyScope do
     context =
       snap
       |> put_invitation_dialogs()
-      |> extract_dialogs_with_invitations(:checkpoints, snap, [pub_keys, nil])
-      |> put_invitations_sender_keys(:sender, snap)
-      |> extract_dialogs_with_invitations(:users, snap)
-      |> then(&put_invitations_sender_keys(&1, :recipient, snap, [1, pub_keys]))
-      |> extract_dialogs_with_invitations(:users, snap)
+      |> put_checkpoints_keys([snap, pub_keys])
+      |> put_operators_keys(snap)
+      |> put_users_invitations_dialogs_keys(snap)
+      |> put_nested_users_keys([snap, pub_keys])
+      |> put_users_invitations_dialogs_keys(snap)
       |> put_invitations_info()
 
     context_info = context["invitations_info"]
@@ -211,4 +211,15 @@ defmodule Chat.Db.Scope.KeyScope do
 
     [index, keys, records]
   end
+
+  defp put_checkpoints_keys(context, [snap, pub_keys]),
+    do: context |> extract_dialogs_with_invitations(:checkpoints, snap, [pub_keys, nil])
+
+  defp put_users_invitations_dialogs_keys(context, snap),
+    do: extract_dialogs_with_invitations(context, :users, snap)
+
+  defp put_operators_keys(context, snap), do: put_invitations_sender_keys(context, :sender, snap)
+
+  defp put_nested_users_keys(context, [snap, pub_keys]),
+    do: put_invitations_sender_keys(context, :recipient, snap, [1, pub_keys])
 end

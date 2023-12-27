@@ -94,12 +94,7 @@ defmodule Chat.Db.Scope.Utils do
   end
 
   def fetch_dialog_by_key({snap, dialog_key}),
-    do:
-      snap
-      |> db_stream({:dialogs, dialog_key}, {:"dialogs\0", dialog_key})
-      |> Enum.to_list()
-      |> List.first()
-      |> then(fn {_, dialog} -> dialog end)
+    do: CubDB.Snapshot.get(snap, {:dialogs, dialog_key}, {:dialogs, dialog_key})
 
   def get_messages_keys(messages),
     do:
@@ -178,7 +173,6 @@ defmodule Chat.Db.Scope.Utils do
             get_type_dialog_keys(type, context["dialogs"], [context["operators_keys"], keys])
 
           _ ->
-            # Adjust the error atom as needed
             {:error, :not_found}
         end
 
@@ -188,7 +182,6 @@ defmodule Chat.Db.Scope.Utils do
             get_type_dialog_keys(type, context["dialogs"], [context["nested_users_keys"], keys])
 
           _ ->
-            # Adjust the error atom as needed
             {:error, :not_found}
         end
     end

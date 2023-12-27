@@ -86,18 +86,129 @@ defmodule Chat.Db.Scope.Utils do
     |> Stream.concat()
   end
 
-  defp get_invitation_participant(dialog, type, is_a_to_b) when type in [:sender, :recipient] do
+  def get_invitation_participant(dialog, type, is_a_to_b) when type in [:sender, :recipient] do
     case type do
       :sender -> if(is_a_to_b, do: dialog.a_key, else: dialog.b_key)
       :recipient -> if(is_a_to_b, do: dialog.b_key, else: dialog.a_key)
     end
   end
 
-  defp fetch_dialog_by_key({snap, dialog_key}),
+  def fetch_dialog_by_key({snap, dialog_key}),
     do:
       snap
       |> db_stream({:dialogs, dialog_key}, {:"dialogs\0", dialog_key})
       |> Enum.to_list()
       |> List.first()
       |> then(fn {_, dialog} -> dialog end)
+
+  def get_messages_keys(messages),
+    do:
+      messages
+      |> Stream.concat()
+      |> Stream.map(&just_keys/1)
+
+  def extract_dialogs_with_invitations(context, type, snap, [keys, dialog_keys] \\ [[], []])
+      when type in [:checkpoints, :users] do
+    dialog_keys = define_dialogs_keys(context, type, [keys, dialog_keys])
+    invitation_category = define_invitation_category(context)
+    context = Map.put(context, "#{invitation_category}_dialog_keys", dialog_keys)
+
+    messages =
+      dialog_keys |> get_dialog_binkeys() |> get_dialog_invitation_messages(snap)
+
+    Map.put(context, "#{invitation_category}_dialogs", {dialog_keys, messages})
+  end
+
+  def union_set_dialog_keys(acc_keys, dialog_keys),
+    do:
+      acc_keys
+      |> union_set(dialog_keys_union(dialog_keys))
+
+  def put_invitation_dialogs(snap, context \\ %{}),
+    do: Map.put(context, "dialogs", get_dialogs(snap))
+
+  def put_invitations_sender_keys(context, type, snap, [step, keys] \\ [0, []]) do
+    sender_keys =
+      get_invitations_sender_keys(type, snap, context_invitations_messages(context, step))
+
+    keys = if Enum.empty?(keys), do: sender_keys, else: sender_keys |> MapSet.difference(keys)
+
+    Map.put(
+      context,
+      case step do
+        0 -> "operators_keys"
+        1 -> "nested_users_keys"
+      end,
+      keys
+    )
+  end
+
+  def context_invitations_messages(context, step) do
+    {_dialogs, messages} =
+      if step == 0, do: context["checkpoints_dialogs"], else: context["operators_dialogs"]
+
+    messages
+  end
+
+  def merge_dialogs_keys(messages_keys, acc_set, dialogs_keys) do
+    messages_keys
+    |> union_set_dialog_keys(dialogs_keys)
+    |> union_set(acc_set)
+  end
+
+  def define_invitation_category(context) do
+    case [
+      Map.has_key?(context, "checkpoints_dialogs"),
+      Map.has_key?(context, "operators_dialogs")
+    ] do
+      [false, false] -> :checkpoints
+      [true, false] -> :operators
+      _ -> :nested_users
+    end
+  end
+
+  def define_dialogs_keys(context, type, [keys, dialog_keys]) do
+    case define_invitation_category(context) do
+      :checkpoints ->
+        get_type_dialog_keys(type, context["dialogs"], [keys, dialog_keys])
+
+      :operators ->
+        case Map.fetch(context, "checkpoints_dialogs") do
+          {:ok, {keys, _messages}} ->
+            get_type_dialog_keys(type, context["dialogs"], [context["operators_keys"], keys])
+
+          _ ->
+            # Adjust the error atom as needed
+            {:error, :not_found}
+        end
+
+      :nested_users ->
+        case Map.fetch(context, "operators_dialogs") do
+          {:ok, {keys, _messages}} ->
+            get_type_dialog_keys(type, context["dialogs"], [context["nested_users_keys"], keys])
+
+          _ ->
+            # Adjust the error atom as needed
+            {:error, :not_found}
+        end
+    end
+  end
+
+  def put_invitations_info(context) do
+    [
+      context["checkpoints_dialogs"],
+      context["operators_dialogs"],
+      context["nested_users_dialogs"]
+    ]
+    |> Enum.reduce(%{dialogs_keys: [], messages: []}, fn {keys, messages}, acc ->
+      %{
+        acc
+        | dialogs_keys: acc.dialogs_keys ++ [keys],
+          messages: acc.messages ++ [messages]
+      }
+    end)
+    |> then(&Map.put(context, "invitations_info", &1))
+  end
+
+  def full_hadshake_keys(pub_keys, users_keys), do: pub_keys |> MapSet.union(users_keys)
 end

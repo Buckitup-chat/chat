@@ -146,7 +146,7 @@ defmodule Chat.Db.Scope.KeyScope do
     context =
       snap
       |> put_invitation_dialogs()
-      |> put_checkpoints_keys([snap, pub_keys])
+      |> put_checkpoints_dialogs_keys([snap, pub_keys])
       |> put_operators_keys(snap)
       |> put_users_invitations_dialogs_keys(snap)
       |> put_nested_users_keys([snap, pub_keys])
@@ -212,7 +212,7 @@ defmodule Chat.Db.Scope.KeyScope do
     [index, keys, records]
   end
 
-  defp put_checkpoints_keys(context, [snap, pub_keys]),
+  defp put_checkpoints_dialogs_keys(context, [snap, pub_keys]),
     do: context |> extract_dialogs_with_invitations(:checkpoints, snap, [pub_keys, nil])
 
   defp put_users_invitations_dialogs_keys(context, snap),

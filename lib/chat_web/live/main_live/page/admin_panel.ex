@@ -30,8 +30,8 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias ChatWeb.Router.Helpers, as: Routes
 
   @admin_topic "chat::admin"
-  @incoming_topic "platform->chat"
-  @outgoing_topic "chat->platform"
+  @incoming_topic Application.compile_env!(:chat, :topic_from_platform)
+  @outgoing_topic Application.compile_env!(:chat, :topic_to_platform)
 
   def init(%{assigns: %{me: me}} = socket) do
     PubSub.subscribe(Chat.PubSub, @admin_topic)

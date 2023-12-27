@@ -8,7 +8,7 @@ defmodule ChatWebTest.MainLive.Admin.LanSettingsTest do
   alias ChatWeb.MainLive.Admin.LanSettings
   alias ChatWebTest.MainLive.Admin.LanSettingsTest, as: Test
 
-  @outgoing_topic "chat->platform"
+  @outgoing_topic Application.compile_env!(:chat, :topic_to_platform)
   @pubsub_name Test.PubSub
 
   defmodule AdminPanelMock do

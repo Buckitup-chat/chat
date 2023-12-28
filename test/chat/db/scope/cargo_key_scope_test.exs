@@ -9,7 +9,8 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     Messages,
     RoomInviteIndex,
     Rooms,
-    User
+    User,
+    Utils
   }
 
   @timeout 100
@@ -69,15 +70,39 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
       room_identity
     )
 
-    generate_dialogs_and_cargo_room_invite([Enum.at(users, 2)], Enum.at(users, 1), room_identity)
+    first_handshake_indexed_messages =
+      generate_dialogs_and_cargo_room_invite(
+        [Enum.at(users, 2)],
+        Enum.at(users, 1),
+        room_identity
+      )
 
-    generate_dialogs_and_cargo_room_invite(
-      [Enum.at(users, 3), Enum.at(users, 0)],
-      Enum.at(users, 2),
-      room_identity
-    )
+    second_handshake_indexed_messages =
+      generate_dialogs_and_cargo_room_invite(
+        [Enum.at(users, 3), Enum.at(users, 0)],
+        Enum.at(users, 2),
+        room_identity
+      )
 
-    assert_keys_for_cargo_keys(room_key, checkpoint_keys, 7)
+    cargo_keys =
+      KeyScope.get_cargo_keys(Chat.Db.db(), room_key, checkpoint_keys)
+      |> Enum.map(fn entry ->
+        case entry do
+          {:room_invite_index, _reader_hash, invite_key} ->
+            invite_key
+
+          _ ->
+            nil
+        end
+      end)
+      |> Enum.reject(&is_nil/1)
+      |> MapSet.new()
+
+    assert first_handshake_indexed_messages
+           |> Enum.any?(&MapSet.member?(cargo_keys, &1))
+
+    refute second_handshake_indexed_messages
+           |> Enum.any?(&MapSet.member?(cargo_keys, &1))
   end
 
   defp setup_test_data(checkpoints_count, operators_count, users_count) do
@@ -98,7 +123,9 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
 
   defp assert_keys_for_cargo_keys(room_key, checkpoint_keys, expected_count) do
     Process.sleep(@timeout)
-    keys = KeyScope.get_cargo_keys(Chat.Db.db(), room_key, checkpoint_keys)
+
+    keys =
+      KeyScope.get_cargo_keys(Chat.Db.db(), room_key, checkpoint_keys)
 
     expected_keys = %{
       dialog_message: expected_count,
@@ -157,10 +184,15 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
   end
 
   defp create_and_add_room_invite(dialog, room_identity, user) do
-    room_identity
-    |> Messages.RoomInvite.new()
-    |> Dialogs.add_new_message(user, dialog)
-    |> RoomInviteIndex.add(dialog, user)
+    room_invitation_message =
+      room_identity
+      |> Messages.RoomInvite.new()
+      |> Dialogs.add_new_message(user, dialog)
+      |> RoomInviteIndex.add(dialog, user)
+
+    Dialogs.read_message(dialog, room_invitation_message, user)
+    |> Map.fetch!(:content)
+    |> Utils.StorageId.from_json_to_key()
   end
 
   defp generate_user_with_dialogs_content_and_invite_in_room do

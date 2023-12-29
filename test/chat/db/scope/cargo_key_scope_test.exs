@@ -28,80 +28,53 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
   end
 
   test "room invitation should be found in dialog of operator and user by only checkpoints key" do
-    {[checkpoints, checkpoint_keys], operators, users} = setup_test_data(2, 1, 2)
+    {[checkpoints, checkpoint_keys], [operator], [user_c, user_d] = _users} =
+      setup_test_data(2, 1, 2)
+
     assert Enum.count(checkpoints) == 2
 
-    operator = List.first(operators)
     room_identity = generate_cargo_room(operator)
     room_key = Identity.pub_key(room_identity)
 
     generate_dialogs_and_cargo_room_invite(checkpoints, operator, room_identity)
-    user_c = List.first(users)
     generate_dialogs_and_cargo_room_invite([user_c], operator, room_identity)
-
-    user_d = List.last(users)
     generate_dialogs_and_cargo_room_invite([user_d], user_c, room_identity)
 
     assert_keys_for_cargo_keys(room_key, checkpoint_keys, 4)
   end
 
   test "room invitations found up to 1 handshake" do
-    {[checkpoints, checkpoint_keys], operators, users} = setup_test_data(3, 2, 4)
+    {
+      [checkpoints, checkpoints_keys],
+      [operator_1, operator_2],
+      [user_1, user_2, user_3, user_4]
+    } = setup_test_data(3, 2, 4)
+
+    invitations_board = %{}
+
     assert Enum.count(checkpoints) == 3
 
-    operator_1 = Enum.at(operators, 0)
-    operator_2 = Enum.at(operators, 1)
-    room_identity = generate_cargo_room(operator_1)
-    room_key = Identity.pub_key(room_identity)
-
-    generate_dialogs_and_cargo_room_invite(
-      [Enum.at(checkpoints, 0), Enum.at(checkpoints, 1)],
-      operator_1,
-      room_identity
-    )
-
-    generate_dialogs_and_cargo_room_invite([Enum.at(checkpoints, 2)], operator_2, room_identity)
-
-    generate_dialogs_and_cargo_room_invite([Enum.at(users, 0)], operator_1, room_identity)
-
-    generate_dialogs_and_cargo_room_invite(
-      [Enum.at(users, 1), Enum.at(users, 3)],
-      Enum.at(users, 0),
-      room_identity
-    )
-
-    first_handshake_indexed_messages =
-      generate_dialogs_and_cargo_room_invite(
-        [Enum.at(users, 2)],
-        Enum.at(users, 1),
-        room_identity
-      )
-
-    second_handshake_indexed_messages =
-      generate_dialogs_and_cargo_room_invite(
-        [Enum.at(users, 3), Enum.at(users, 0)],
-        Enum.at(users, 2),
-        room_identity
-      )
+    invitations_board
+    |> generate_cargo_room(operator_1)
+    |> put_dialogs_with_invites([checkpoints, operator_1], :index_1)
+    |> put_dialogs_with_invites([[Enum.at(checkpoints, 2)], operator_2], :index_2)
+    |> put_dialogs_with_invites([[user_1], operator_1], :index_3)
+    |> put_dialogs_with_invites([[user_2, user_4], user_1], :index_4)
+    |> put_dialogs_with_invites([[user_3], user_2], :index_5)
+    |> put_dialogs_with_invites([[user_4, user_1], user_3], :index_6)
 
     cargo_keys =
-      KeyScope.get_cargo_keys(Chat.Db.db(), room_key, checkpoint_keys)
-      |> Enum.map(fn entry ->
-        case entry do
-          {:room_invite_index, _reader_hash, invite_key} ->
-            invite_key
+      Chat.Db.db()
+      |> KeyScope.get_cargo_keys(Map.get(invitations_board, :room_key), checkpoints_keys)
+      |> fetch_checked_keys()
 
-          _ ->
-            nil
-        end
-      end)
-      |> Enum.reject(&is_nil/1)
-      |> MapSet.new()
+    board_keys =
+      Map.filter(invitations_board, fn {_k, v} -> is_list(v) end)
 
-    assert first_handshake_indexed_messages
+    assert Map.get(invitations_board, :index_5)
            |> Enum.any?(&MapSet.member?(cargo_keys, &1))
 
-    refute second_handshake_indexed_messages
+    refute Map.get(invitations_board, :index_6)
            |> Enum.any?(&MapSet.member?(cargo_keys, &1))
   end
 
@@ -169,30 +142,32 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     identity |> tap(&User.register/1) |> tap(&User.UsersBroker.put/1)
   end
 
-  defp generate_cargo_room(user) do
-    {room_identity, _room} = Rooms.add(user, "Cargo room", :cargo)
-    room_identity
-  end
-
-  defp generate_dialogs_and_cargo_room_invite(checkpoints, user, room_identity) do
-    for checkpoint <- checkpoints,
+  defp generate_dialogs_and_cargo_room_invite(context, [recipients, sender]) do
+    for recipient <- recipients,
         into: [],
         do:
-          user
-          |> Dialogs.find_or_open(checkpoint |> Chat.Card.from_identity())
-          |> create_and_add_room_invite(room_identity, user)
+          sender
+          |> Dialogs.find_or_open(recipient |> Chat.Card.from_identity())
+          |> create_and_add_room_invite(Map.get(context, :room_identity), sender)
   end
 
   defp create_and_add_room_invite(dialog, room_identity, user) do
-    room_invitation_message =
-      room_identity
-      |> Messages.RoomInvite.new()
-      |> Dialogs.add_new_message(user, dialog)
-      |> RoomInviteIndex.add(dialog, user)
+    room_identity
+    |> Messages.RoomInvite.new()
+    |> Dialogs.add_new_message(user, dialog)
+    |> RoomInviteIndex.add(dialog, user)
+    |> then(&read_room_invitatition(dialog, &1, user))
+  end
 
+  defp read_room_invitatition(dialog, room_invitation_message, user) do
     Dialogs.read_message(dialog, room_invitation_message, user)
     |> Map.fetch!(:content)
     |> Utils.StorageId.from_json_to_key()
+  end
+
+  defp generate_cargo_room(context, user) do
+    {room_identity, _room} = Rooms.add(user, "Cargo room", :cargo)
+    Map.put(context, :room_identity, room_identity)
   end
 
   defp generate_user_with_dialogs_content_and_invite_in_room do
@@ -215,5 +190,30 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     create_and_add_room_invite(dialog, room_identity, user)
 
     {bot_key, room_key}
+  end
+
+  defp fetch_checked_keys(keys) do
+    keys
+    |> Enum.map(fn entry ->
+      case entry do
+        {:room_invite_index, _reader_hash, invite_key} ->
+          invite_key
+
+        _ ->
+          nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> MapSet.new()
+  end
+
+  defp put_dialogs_with_invites(
+         context,
+         [recipients, sender],
+         step_mark
+       ) do
+    context
+    |> generate_dialogs_and_cargo_room_invite([recipients, sender])
+    |> then(&Map.put(context, step_mark, &1))
   end
 end

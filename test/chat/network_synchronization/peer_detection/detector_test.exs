@@ -31,15 +31,15 @@ defmodule ChatTest.NetworkSynchronization.PeerDetection.DetectorTest do
   test "detector should work" do
     %{name: __MODULE__.Detector}
     |> start_detector
-    |> assert__detector_started
-    |> assert__restart_timer_set
+    |> assert_detector_started
+    |> assert_restart_timer_set
     |> send_update
-    |> assert__pubsub_sent
+    |> assert_pubsub_sent
     |> send_range
-    |> assert__lan_detection_ran
-    |> assert__restart_timer_updated
+    |> assert_lan_detection_ran
+    |> assert_restart_timer_updated
     |> send_restart
-    |> assert__restart_timer_updated
+    |> assert_restart_timer_updated
     |> stop_detector
   end
 
@@ -68,20 +68,24 @@ defmodule ChatTest.NetworkSynchronization.PeerDetection.DetectorTest do
     context
   end
 
-  defp assert__detector_started(context) do
+  defp assert_detector_started(context) do
     assert Process.alive?(context.pid)
     context
   end
 
-  defp assert__restart_timer_set(context) do
+  defp assert_restart_timer_set(context) do
     timer_ref = :sys.get_state(context.pid)
     time_left = Process.cancel_timer(timer_ref, async: false, info: true)
     assert time_left > :timer.minutes(70) - 50
     context |> Map.put(:timer_ref, timer_ref)
   end
 
-  defp assert__pubsub_sent(context) do
-    await_till(fn -> Agent.get(DetectorTestAgent, &Map.get(&1, :broadcasted)) end,
+  defp assert_pubsub_sent(context) do
+    await_till(
+      fn ->
+        Agent.get(DetectorTestAgent, &Map.get(&1, :broadcasted)) ==
+          {:range, {"10.10.10.10", "255.255.255.0"}}
+      end,
       step: 10,
       time: 500
     )
@@ -90,7 +94,7 @@ defmodule ChatTest.NetworkSynchronization.PeerDetection.DetectorTest do
     context
   end
 
-  defp assert__lan_detection_ran(context) do
+  defp assert_lan_detection_ran(context) do
     await_till(fn -> Agent.get(DetectorTestAgent, &Map.get(&1, :lan_detection_ran)) end,
       step: 10,
       time: 500
@@ -100,7 +104,7 @@ defmodule ChatTest.NetworkSynchronization.PeerDetection.DetectorTest do
     context
   end
 
-  defp assert__restart_timer_updated(context) do
+  defp assert_restart_timer_updated(context) do
     timer_ref = :sys.get_state(context.pid)
     time_left = Process.cancel_timer(timer_ref, async: false, info: true)
     assert time_left > :timer.minutes(70) - 50

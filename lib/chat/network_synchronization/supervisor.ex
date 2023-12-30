@@ -4,6 +4,7 @@ defmodule Chat.NetworkSynchronization.Supervisor do
   use Supervisor
 
   alias Chat.NetworkSynchronization.Store
+  alias Chat.NetworkSynchronization.PeerDetection.LanDetector
 
   def start_link(arg) do
     name = Keyword.get(arg, :name, __MODULE__)
@@ -23,7 +24,8 @@ defmodule Chat.NetworkSynchronization.Supervisor do
 
     children = [
       {DynamicSupervisor, name: dynamic_name, strategy: :one_for_one},
-      {Registry, name: registry_name, keys: :unique}
+      {Registry, name: registry_name, keys: :unique},
+      LanDetector
     ]
 
     Store.init()

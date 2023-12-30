@@ -1,4 +1,5 @@
 defmodule ChatSupport.Mocks.NetworkSynchronization.NeuronMockForLanDetection do
+  @moduledoc "Mocking Neuron for LAN detection"
   def new_peers_list, do: ["10.10.10.111", "10.10.10.20", "10.10.10.253"]
 
   def query(_, _, url: url, connection_opts: _) do

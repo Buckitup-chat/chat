@@ -1,4 +1,5 @@
 defmodule ChatSupport.Mocks.NetworkSynchronization.SynchronizationMockForLanDetection do
+  @moduledoc "Mocking Synchronization for LAN detection"
   alias Chat.NetworkSynchronization.Source
 
   def set_known(peers), do: peers |> Enum.map(&host_to_source/1) |> set_sources

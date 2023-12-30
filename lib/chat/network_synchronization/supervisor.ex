@@ -3,8 +3,8 @@ defmodule Chat.NetworkSynchronization.Supervisor do
 
   use Supervisor
 
-  alias Chat.NetworkSynchronization.Store
   alias Chat.NetworkSynchronization.PeerDetection.LanDetector
+  alias Chat.NetworkSynchronization.Store
 
   def start_link(arg) do
     name = Keyword.get(arg, :name, __MODULE__)

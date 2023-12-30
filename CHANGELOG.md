@@ -17,6 +17,7 @@ straightforward as possible.
 - network synchronization [#549]
 - internet access and setting [#556]
 - internet proxy [#557]
+- LAN peers detection [#572]
 
 ### Changed
 

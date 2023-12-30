@@ -48,6 +48,7 @@ defmodule Chat.MixProject do
     [
       {:absinthe, "~> 1.7"},
       {:absinthe_plug, "~> 1.5"},
+      {:ip, "~> 2.0"},
       {:neuron, "~> 5.1"},
       {:poison, "~> 5.0"},
       {:phoenix_ecto, "~> 4.0"},

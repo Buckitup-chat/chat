@@ -4,8 +4,8 @@ defmodule ChatWeb.DeviceLogController do
 
   alias Chat.AdminDb.AdminLogger
 
-  @incoming_topic "platform->chat"
-  @outgoing_topic "chat->platform"
+  @incoming_topic Application.compile_env!(:chat, :topic_from_platform)
+  @outgoing_topic Application.compile_env!(:chat, :topic_to_platform)
 
   def log(conn, _) do
     Phoenix.PubSub.subscribe(Chat.PubSub, @incoming_topic)

@@ -69,9 +69,6 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
       |> KeyScope.get_cargo_keys(Map.get(invitations_board, :room_key), checkpoints_keys)
       |> fetch_checked_keys()
 
-    board_keys =
-      Map.filter(invitations_board, fn {_k, v} -> is_list(v) end)
-
     assert Enum.any?(
              Map.get(invitations_board, :index_5),
              &MapSet.member?(cargo_keys, &1)

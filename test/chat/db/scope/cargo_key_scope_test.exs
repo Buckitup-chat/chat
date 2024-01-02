@@ -33,12 +33,14 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
 
     assert Enum.count(checkpoints) == 2
 
-    room_identity = generate_cargo_room(operator)
-    room_key = Identity.pub_key(room_identity)
+    context =
+      %{}
+      |> generate_cargo_room(operator)
+      |> put_dialogs_with_invites([checkpoints, operator], :index_1)
+      |> put_dialogs_with_invites([[user_c], operator], :index_2)
+      |> put_dialogs_with_invites([[user_d], user_c], :index_3)
 
-    generate_dialogs_and_cargo_room_invite(checkpoints, operator, room_identity)
-    generate_dialogs_and_cargo_room_invite([user_c], operator, room_identity)
-    generate_dialogs_and_cargo_room_invite([user_d], user_c, room_identity)
+    room_key = context |> Map.get(:room_identity) |> Identity.pub_key()
 
     assert_keys_for_cargo_keys(room_key, checkpoint_keys, 4)
   end
@@ -50,18 +52,17 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
       [user_1, user_2, user_3, user_4]
     } = setup_test_data(3, 2, 4)
 
-    invitations_board = %{}
-
     assert Enum.count(checkpoints) == 3
 
-    invitations_board
-    |> generate_cargo_room(operator_1)
-    |> put_dialogs_with_invites([checkpoints, operator_1], :index_1)
-    |> put_dialogs_with_invites([[Enum.at(checkpoints, 2)], operator_2], :index_2)
-    |> put_dialogs_with_invites([[user_1], operator_1], :index_3)
-    |> put_dialogs_with_invites([[user_2, user_4], user_1], :index_4)
-    |> put_dialogs_with_invites([[user_3], user_2], :index_5)
-    |> put_dialogs_with_invites([[user_4, user_1], user_3], :index_6)
+    invitations_board =
+      %{}
+      |> generate_cargo_room(operator_1)
+      |> put_dialogs_with_invites([checkpoints, operator_1], :index_1)
+      |> put_dialogs_with_invites([[Enum.at(checkpoints, 2)], operator_2], :index_2)
+      |> put_dialogs_with_invites([[user_1], operator_1], :index_3)
+      |> put_dialogs_with_invites([[user_2, user_4], user_1], :index_4)
+      |> put_dialogs_with_invites([[user_3], user_2], :index_5)
+      |> put_dialogs_with_invites([[user_4, user_1], user_3], :index_6)
 
     cargo_keys =
       Chat.Db.db()
@@ -71,11 +72,15 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     board_keys =
       Map.filter(invitations_board, fn {_k, v} -> is_list(v) end)
 
-    assert Map.get(invitations_board, :index_5)
-           |> Enum.any?(&MapSet.member?(cargo_keys, &1))
+    assert Enum.any?(
+             Map.get(invitations_board, :index_5),
+             &MapSet.member?(cargo_keys, &1)
+           )
 
-    refute Map.get(invitations_board, :index_6)
-           |> Enum.any?(&MapSet.member?(cargo_keys, &1))
+    refute Enum.any?(
+             Map.get(invitations_board, :index_6),
+             &MapSet.member?(cargo_keys, &1)
+           )
   end
 
   defp setup_test_data(checkpoints_count, operators_count, users_count) do

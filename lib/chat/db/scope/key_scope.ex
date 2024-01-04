@@ -151,6 +151,8 @@ defmodule Chat.Db.Scope.KeyScope do
       |> put_users_invitations_dialogs_keys(snap)
       |> put_nested_users_keys([snap, pub_keys])
       |> put_users_invitations_dialogs_keys(snap)
+      |> put_subset_users_keys([snap, pub_keys])
+      |> put_users_invitations_dialogs_keys(snap)
       |> put_invitations_info()
 
     context_info = context["invitations_info"]
@@ -162,7 +164,7 @@ defmodule Chat.Db.Scope.KeyScope do
         acc_set,
         context_info.dialogs_keys
       ),
-      full_hadshake_keys(pub_keys, context["nested_users_keys"])
+      full_handshake_keys([pub_keys, context["nested_users_keys"], context["subset_users_keys"]])
     }
   end
 
@@ -219,6 +221,15 @@ defmodule Chat.Db.Scope.KeyScope do
     do: extract_dialogs_with_invitations(context, :users, snap)
 
   defp put_operators_keys(context, snap), do: put_invitations_sender_keys(context, :sender, snap)
+
+  defp put_subset_users_keys(context, [snap, pub_keys]),
+    do:
+      put_invitations_sender_keys(context, :recipient, snap, [
+        2,
+        pub_keys
+        |> MapSet.union(context["operators_keys"])
+        |> MapSet.union(context["nested_users_keys"])
+      ])
 
   defp put_nested_users_keys(context, [snap, pub_keys]),
     do: put_invitations_sender_keys(context, :recipient, snap, [1, pub_keys])

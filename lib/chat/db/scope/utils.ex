@@ -104,12 +104,18 @@ defmodule Chat.Db.Scope.Utils do
 
   def extract_dialogs_with_invitations(context, type, snap, [keys, dialog_keys] \\ [[], []])
       when type in [:checkpoints, :users] do
-    dialog_keys = define_dialogs_keys(context, type, [keys, dialog_keys])
-    invitation_category = define_invitation_category(context)
+    dialog_keys =
+      define_dialogs_keys(context, type, [keys, dialog_keys])
+
+    invitation_category =
+      define_invitation_category(context)
+
     context = Map.put(context, "#{invitation_category}_dialog_keys", dialog_keys)
 
     messages =
-      dialog_keys |> get_dialog_binkeys() |> get_dialog_invitation_messages(snap)
+      dialog_keys
+      |> get_dialog_binkeys()
+      |> get_dialog_invitation_messages(snap)
 
     Map.put(context, "#{invitation_category}_dialogs", {dialog_keys, messages})
   end
@@ -122,17 +128,18 @@ defmodule Chat.Db.Scope.Utils do
   def put_invitation_dialogs(snap, context \\ %{}),
     do: Map.put(context, "dialogs", get_dialogs(snap))
 
-  def put_invitations_sender_keys(context, type, snap, [step, keys] \\ [0, []]) do
-    sender_keys =
-      get_invitations_sender_keys(type, snap, context_invitations_messages(context, step))
-
-    keys = if Enum.empty?(keys), do: sender_keys, else: sender_keys |> MapSet.difference(keys)
+  def put_invitations_sender_keys(context, type, snap, [step, keys] \\ [0, MapSet.new()]) do
+    keys =
+      type
+      |> get_invitations_sender_keys(snap, context_invitations_messages(context, step))
+      |> MapSet.difference(keys)
 
     Map.put(
       context,
       case step do
         0 -> "operators_keys"
         1 -> "nested_users_keys"
+        2 -> "subset_users_keys"
       end,
       keys
     )
@@ -140,7 +147,11 @@ defmodule Chat.Db.Scope.Utils do
 
   def context_invitations_messages(context, step) do
     {_dialogs, messages} =
-      if step == 0, do: context["checkpoints_dialogs"], else: context["operators_dialogs"]
+      case step do
+        0 -> context["checkpoints_dialogs"]
+        1 -> context["operators_dialogs"]
+        2 -> context["nested_users_dialogs"]
+      end
 
     messages
   end
@@ -154,11 +165,13 @@ defmodule Chat.Db.Scope.Utils do
   def define_invitation_category(context) do
     case [
       Map.has_key?(context, "checkpoints_dialogs"),
-      Map.has_key?(context, "operators_dialogs")
+      Map.has_key?(context, "operators_dialogs"),
+      Map.has_key?(context, "nested_users_dialogs")
     ] do
-      [false, false] -> :checkpoints
-      [true, false] -> :operators
-      _ -> :nested_users
+      [false, false, false] -> :checkpoints
+      [true, false, false] -> :operators
+      [true, true, false] -> :nested_users
+      [true, true, true] -> :subset_users
     end
   end
 
@@ -184,6 +197,15 @@ defmodule Chat.Db.Scope.Utils do
           _ ->
             {:error, :not_found}
         end
+
+      :subset_users ->
+        case Map.fetch(context, "nested_users_dialogs") do
+          {:ok, {keys, _messages}} ->
+            get_type_dialog_keys(type, context["dialogs"], [context["subset_users_keys"], keys])
+
+          _ ->
+            {:error, :not_found}
+        end
     end
   end
 
@@ -191,7 +213,8 @@ defmodule Chat.Db.Scope.Utils do
     [
       context["checkpoints_dialogs"],
       context["operators_dialogs"],
-      context["nested_users_dialogs"]
+      context["nested_users_dialogs"],
+      context["subset_users_dialogs"]
     ]
     |> Enum.reduce(%{dialogs_keys: [], messages: []}, fn {keys, messages}, acc ->
       %{
@@ -203,5 +226,7 @@ defmodule Chat.Db.Scope.Utils do
     |> then(&Map.put(context, "invitations_info", &1))
   end
 
-  def full_hadshake_keys(pub_keys, users_keys), do: pub_keys |> MapSet.union(users_keys)
+  def full_handshake_keys(keys) when is_list(keys) do
+    keys |> Enum.reject(&is_nil/1) |> Enum.reduce(MapSet.new(), &union_set/2)
+  end
 end

@@ -2,16 +2,14 @@ defmodule ChatWeb.DeviceLogController do
   @moduledoc "Backup functionality that should be moved into system secret room"
   use ChatWeb, :controller
 
-  alias Phoenix.PubSub
-
   alias Chat.AdminDb.AdminLogger
 
   @incoming_topic "platform->chat"
   @outgoing_topic "chat->platform"
 
   def log(conn, _) do
-    PubSub.subscribe(Chat.PubSub, @incoming_topic)
-    PubSub.broadcast(Chat.PubSub, @outgoing_topic, :get_device_log)
+    Phoenix.PubSub.subscribe(Chat.PubSub, @incoming_topic)
+    Phoenix.PubSub.broadcast(Chat.PubSub, @outgoing_topic, :get_device_log)
 
     receive do
       {:platform_response, {:device_log, {ram_log, log}}} ->
@@ -23,9 +21,17 @@ defmodule ChatWeb.DeviceLogController do
           end
 
         second =
-          Enum.map_join(log, "\n", fn {level, {_module, msg, extended_erl_date, _extra}} ->
-            date = convert_extended_erl_date(extended_erl_date)
-            "#{date} [#{level}] #{msg}"
+          Enum.map_join(log, "\n", fn
+            {level, {_module, msg, extended_erl_date, _extra}} ->
+              date = convert_extended_erl_date(extended_erl_date)
+              "#{date} [#{level}] #{msg}"
+
+            %{message: msg, level: level, timestamp: extended_erl_date} ->
+              date = convert_extended_erl_date(extended_erl_date)
+              "#{date} [#{level}] #{msg}"
+
+            x ->
+              "!!!!!!!! #{inspect(x)}"
           end)
 
         first <> second

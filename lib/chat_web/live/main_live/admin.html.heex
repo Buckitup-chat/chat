@@ -38,6 +38,9 @@
         </section>
       <% end %>
     </Layout.Admin.block>
+    <Layout.Admin.block title="LAN settings">
+      <.live_component id={:lan_settings} module={LanSettings} />
+    </Layout.Admin.block>
     <Layout.Admin.block title="Maintenance">
       <section>
         <Layout.Admin.db_status status={@db_status} />

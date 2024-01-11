@@ -59,6 +59,21 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
       {:updated_wifi_settings, _} ->
         socket |> AdminPanel.confirm_wifi_updated()
 
+      {:lan_ip, ip} ->
+        AdminPanel.update_lan_settings(ip: ip)
+        socket
+
+      {:lan_profile, profile} ->
+        AdminPanel.update_lan_settings(profile: profile)
+        socket
+
+      {:lan_known_profiles, list} ->
+        AdminPanel.update_lan_settings(known_profiles: list)
+        socket
+
+      {:updated_lan_profile, :ok} ->
+        socket
+
       {:device_log, log} ->
         socket |> AdminPanel.render_device_log(log)
 

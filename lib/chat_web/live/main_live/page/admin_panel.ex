@@ -26,6 +26,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias ChatWeb.MainLive.Admin.CargoUserData
   alias ChatWeb.MainLive.Admin.CargoWeightSensorForm
   alias ChatWeb.MainLive.Admin.FirmwareUpgradeForm
+  alias ChatWeb.MainLive.Admin.LanSettings
   alias ChatWeb.Router.Helpers, as: Routes
 
   @admin_topic "chat::admin"
@@ -112,6 +113,10 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   def confirm_wifi_updated(socket) do
     socket
     |> assign(:wifi_loaded, true)
+  end
+
+  def update_lan_settings(changes) do
+    send_update(LanSettings, changes |> Keyword.merge(id: :lan_settings))
   end
 
   def toggle_gpio24_impendance(socket) do
@@ -308,13 +313,13 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     |> put_flash(:info, "Firmware upgraded")
   end
 
+  def request_platform(message),
+    do: PubSub.broadcast(Chat.PubSub, @outgoing_topic, message)
+
   defp save_file({file_key, content}, {size, file_secret}) do
     ChunkedFilesMultisecret.generate(file_key, size, file_secret)
     ChunkedFiles.save_upload_chunk(file_key, {0, max(size - 1, 0)}, size, content)
   end
-
-  defp request_platform(message),
-    do: PubSub.broadcast(Chat.PubSub, @outgoing_topic, message)
 
   defp assign_user_lists(socket) do
     admin_map =

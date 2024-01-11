@@ -3,7 +3,7 @@ defmodule Chat.Db.Scope.KeyScope do
   Builds db keys accessible by keys_list
   """
 
-  import Chat.Db.Scope.Utils
+  import Chat.Db.Scope.{Utils, InvitationsHandshaker}
   alias Chat.Dialogs.Dialog
 
   def get_keys(db, pub_keys_list) do
@@ -28,8 +28,9 @@ defmodule Chat.Db.Scope.KeyScope do
       |> add_rooms(snap, room_key)
       |> add_content(snap, room_key)
       |> add_invitation_dialogs(snap, invited_keys)
-      |> add_invitation_content(snap, invited_keys)
     end)
+
+    # |> IO.inspect(label: "cargo keys")
   end
 
   defp add_full_users(acc_set, snap) do
@@ -144,93 +145,12 @@ defmodule Chat.Db.Scope.KeyScope do
 
   defp add_invitation_dialogs(acc_set, snap, pub_keys) do
     context =
-      snap
-      |> put_invitation_dialogs()
-      |> put_checkpoints_dialogs_keys([snap, pub_keys])
-      |> put_operators_keys(snap)
-      |> put_users_invitations_dialogs_keys(snap)
-      |> put_nested_users_keys([snap, pub_keys])
-      |> put_users_invitations_dialogs_keys(snap)
-      |> put_subset_users_keys([snap, pub_keys])
-      |> put_users_invitations_dialogs_keys(snap)
-      |> put_invitations_info()
+      build_initial_context(snap)
+      |> handshake_dialogs_cycle(pub_keys)
 
-    context_info = context["invitations_info"]
+    consumed_keys =
+      process_invitation_groups(context.invitations_queue)
 
-    {
-      context_info.messages
-      |> get_messages_keys()
-      |> merge_dialogs_keys(
-        acc_set,
-        context_info.dialogs_keys
-      ),
-      full_handshake_keys([pub_keys, context["nested_users_keys"], context["subset_users_keys"]])
-    }
+    update_acc_set(acc_set, consumed_keys)
   end
-
-  defp add_invitation_content({acc_set, full_keys}, snap, _pub_keys) do
-    [room_invite_index, _room_invite_keys, room_invites] =
-      fetch_index_and_records(
-        snap,
-        full_keys,
-        "room_invite",
-        min_key: {:room_invite_index, 0, 0},
-        max_key: {:"room_invite_index\0", 0, 0},
-        reader_hash_getter: fn {:room_invite_index, reader_key, _invite_key} -> reader_key end,
-        record_key_getter: fn {:room_invite_index, _reader_key, invite_key} -> invite_key end
-      )
-
-    acc_set
-    |> union_set(room_invite_index)
-    |> union_set(room_invites)
-  end
-
-  defp fetch_index_and_records(snap, pub_keys, record_name, opts) do
-    reader_hash_getter = opts[:reader_hash_getter]
-    record_key_getter = opts[:record_key_getter]
-
-    index =
-      snap
-      |> db_keys_stream(opts[:min_key], opts[:max_key])
-      |> Stream.filter(fn key ->
-        reader_hash = reader_hash_getter.(key)
-        MapSet.member?(pub_keys, reader_hash)
-      end)
-      |> MapSet.new()
-
-    keys =
-      index
-      |> Enum.map(&record_key_getter.(&1))
-      |> MapSet.new()
-
-    records =
-      snap
-      |> db_keys_stream({:"#{record_name}", 0}, {:"#{record_name}\0", 0})
-      |> Stream.filter(fn {_record_name, record_key} ->
-        MapSet.member?(keys, record_key)
-      end)
-      |> MapSet.new()
-
-    [index, keys, records]
-  end
-
-  defp put_checkpoints_dialogs_keys(context, [snap, pub_keys]),
-    do: context |> extract_dialogs_with_invitations(:checkpoints, snap, [pub_keys, nil])
-
-  defp put_users_invitations_dialogs_keys(context, snap),
-    do: extract_dialogs_with_invitations(context, :users, snap)
-
-  defp put_operators_keys(context, snap), do: put_invitations_sender_keys(context, :sender, snap)
-
-  defp put_subset_users_keys(context, [snap, pub_keys]),
-    do:
-      put_invitations_sender_keys(context, :recipient, snap, [
-        2,
-        pub_keys
-        |> MapSet.union(context["operators_keys"])
-        |> MapSet.union(context["nested_users_keys"])
-      ])
-
-  defp put_nested_users_keys(context, [snap, pub_keys]),
-    do: put_invitations_sender_keys(context, :recipient, snap, [1, pub_keys])
 end

@@ -75,7 +75,9 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
 
   defp setup_test_data(checkpoints_count, operators_count, users_count) do
     checkpoints = Enum.map(1..checkpoints_count, &("checkpoint#{&1}" |> User.login()))
-    checkpoint_keys = generate_checkpoints(checkpoints)
+
+    checkpoint_keys =
+      generate_checkpoints(checkpoints)
 
     operators =
       Enum.map(

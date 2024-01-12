@@ -7,6 +7,8 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
   alias Chat.Dialogs.Dialog
   alias Chat.Dialogs.Message
 
+  @handshake_depth 4
+
   def build_initial_context(snap) do
     %{}
     |> put_room_invitations_content(snap, nil)
@@ -16,11 +18,9 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
   end
 
   def handshake_dialogs_cycle(context, pub_keys) do
-    move = 0
-
     context
     |> start_invitations_queue(pub_keys)
-    |> execute_handshake_cycle(move)
+    |> execute_handshake_cycle()
   end
 
   def process_invitation_groups(%{invitations_queue: invitations_queue} = _context) do
@@ -69,14 +69,15 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
   end
 
   defp execute_handshake_cycle(
-         %{invitations_messages: messages, invitations_queue: queue} = context,
-         move
+         %{invitations_messages: messages, invitations_queue: queue} = context
        ) do
+    current_cycle = length(queue)
+
     context =
-      if not Enum.empty?(messages) && move <= 2 do
+      if not Enum.empty?(messages) && current_cycle <= @handshake_depth do
         queue
         |> List.first()
-        |> get_messages_sender_keys(move)
+        |> get_messages_sender_keys(current_cycle)
         |> fetch_cycle_invites(context)
         |> put_invitations_queue(context)
         |> remove_queued_invitations_messages()
@@ -84,8 +85,7 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
         context
       end
 
-    move = move + 1
-    if move == 3, do: context, else: execute_handshake_cycle(context, move)
+    if is_last_handshake_cycle?(context), do: context, else: execute_handshake_cycle(context)
   end
 
   defp put_room_invitations_content(context, snap, keys) do
@@ -146,12 +146,12 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
     end)
   end
 
-  defp get_messages_sender_keys(messages, move) do
+  defp get_messages_sender_keys(messages, current_cycle) do
     messages
     |> Enum.map(fn {_, _dialog_key, is_a_to_b, _, %{a_key: a_key, b_key: b_key}} ->
-      case {is_a_to_b, move} do
-        {true, 0} -> a_key
-        {false, 0} -> b_key
+      case {is_a_to_b, current_cycle} do
+        {true, 1} -> a_key
+        {false, 1} -> b_key
         {true, _} -> b_key
         {false, _} -> a_key
       end
@@ -261,4 +261,7 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
       MapSet.member?(keys, record_key)
     end)
   end
+
+  defp is_last_handshake_cycle?(%{invitations_queue: queue} = _context),
+    do: length(queue) == @handshake_depth
 end

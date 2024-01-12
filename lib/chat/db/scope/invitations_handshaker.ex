@@ -200,9 +200,10 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
   defp clear_context_preparation(%{room_invites: _, room_invite_indexes: _} = context),
     do: Map.drop(context, [:room_invites, :room_invite_indexes, :invitations_keymap])
 
-  defp put_invitations_messages(context, snap) do
-    context.invitations_keymap
-    |> Enum.map(fn {invite_key, [user2_key, user1_key]} ->
+  defp put_invitations_messages(%{invitations_keymap: invitations_keymap} = context, snap) do
+    invitations_keymap
+    |> Enum.map(fn {invite_key, user_keys} when length(user_keys) == 2 ->
+      [user2_key, user1_key] = user_keys
       dialog_key = %Dialog{a_key: user1_key, b_key: user2_key} |> Enigma.hash()
 
       invitation_message =
@@ -254,8 +255,6 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
       MapSet.member?(keys, reader_hash)
     end)
   end
-
-  defp filter_invitations_records(invitations, nil), do: invitations
 
   defp filter_invitations_records(invitations, keys) do
     Stream.filter(invitations, fn {_record_name, record_key} ->

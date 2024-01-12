@@ -69,23 +69,20 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
   end
 
   defp execute_handshake_cycle(
-         %{invitations_messages: messages, invitations_queue: queue} = context
+         %{invitations_messages: _messages, invitations_queue: queue} = context
        ) do
     current_cycle = length(queue)
 
-    context =
-      if not Enum.empty?(messages) && current_cycle <= @handshake_depth do
-        queue
-        |> List.first()
-        |> get_messages_sender_keys(current_cycle)
-        |> fetch_cycle_invites(context)
-        |> put_invitations_queue(context)
-        |> remove_queued_invitations_messages()
-      else
-        context
-      end
-
-    if is_last_handshake_cycle?(context), do: context, else: execute_handshake_cycle(context)
+    if not is_last_handshake_cycle?(context, current_cycle) do
+      queue
+      |> get_current_queue_senders(current_cycle)
+      |> fetch_cycle_invites(context)
+      |> put_invitations_queue(context)
+      |> remove_queued_invitations_messages()
+      |> execute_handshake_cycle()
+    else
+      context
+    end
   end
 
   defp put_room_invitations_content(context, snap, keys) do
@@ -262,6 +259,38 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
     end)
   end
 
-  defp is_last_handshake_cycle?(%{invitations_queue: queue} = _context),
-    do: length(queue) == @handshake_depth
+  defp is_last_handshake_cycle?(
+         %{invitations_queue: queue, invitations_messages: messages} = context,
+         current_cycle
+       ),
+       do:
+         Enum.empty?(messages) or not is_related_invitations_exists?(context, current_cycle) or
+           length(queue) == @handshake_depth
+
+  defp is_related_invitations_exists?(
+         %{invitations_messages: messages, invitations_queue: queue} = _context,
+         current_cycle
+       ) do
+    queue
+    |> get_current_queue_senders(current_cycle)
+    |> is_recipient_exists?(messages)
+  end
+
+  defp get_current_queue_senders(queue, current_cycle) do
+    queue
+    |> List.first()
+    |> get_messages_sender_keys(current_cycle)
+  end
+
+  defp is_recipient_exists?(sender_keys, messages) do
+    sender_keys
+    |> Enum.any?(fn sender_key ->
+      messages
+      |> Enum.map(fn {_, _, is_a_to_b, _, %{a_key: a_key, b_key: b_key}} ->
+        if is_a_to_b, do: a_key, else: b_key
+      end)
+      |> MapSet.new()
+      |> MapSet.member?(sender_key)
+    end)
+  end
 end

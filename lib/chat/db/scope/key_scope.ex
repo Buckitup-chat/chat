@@ -3,7 +3,8 @@ defmodule Chat.Db.Scope.KeyScope do
   Builds db keys accessible by keys_list
   """
 
-  import Chat.Db.Scope.{Utils, InvitationsHandshaker}
+  import Chat.Db.Scope.Utils
+  import Chat.Db.Scope.InvitationsHandshaker
   alias Chat.Dialogs.Dialog
 
   def get_keys(db, pub_keys_list) do
@@ -29,8 +30,6 @@ defmodule Chat.Db.Scope.KeyScope do
       |> add_content(snap, room_key)
       |> add_invitation_dialogs(snap, invited_keys)
     end)
-
-    # |> IO.inspect(label: "cargo keys")
   end
 
   defp add_full_users(acc_set, snap) do
@@ -144,13 +143,10 @@ defmodule Chat.Db.Scope.KeyScope do
   end
 
   defp add_invitation_dialogs(acc_set, snap, pub_keys) do
-    context =
-      build_initial_context(snap)
-      |> handshake_dialogs_cycle(pub_keys)
-
-    consumed_keys =
-      process_invitation_groups(context.invitations_queue)
-
-    update_acc_set(acc_set, consumed_keys)
+    snap
+    |> build_initial_context()
+    |> handshake_dialogs_cycle(pub_keys)
+    |> process_invitation_groups()
+    |> update_acc_set(acc_set)
   end
 end

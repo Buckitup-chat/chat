@@ -7,7 +7,7 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
   alias Chat.Dialogs.Dialog
   alias Chat.Dialogs.Message
 
-  @handshake_depth 4
+  @invitations_depth 4
 
   def build_initial_context(snap) do
     %{}
@@ -73,15 +73,15 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
        ) do
     current_cycle = length(queue)
 
-    if not is_last_handshake_cycle?(context, current_cycle) do
+    if is_last_handshake_cycle?(context, current_cycle) do
+      context
+    else
       queue
       |> get_current_queue_senders(current_cycle)
       |> fetch_cycle_invites(context)
       |> put_invitations_queue(context)
       |> remove_queued_invitations_messages()
       |> execute_handshake_cycle()
-    else
-      context
     end
   end
 
@@ -146,12 +146,7 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
   defp get_messages_sender_keys(messages, current_cycle) do
     messages
     |> Enum.map(fn {_, _dialog_key, is_a_to_b, _, %{a_key: a_key, b_key: b_key}} ->
-      case {is_a_to_b, current_cycle} do
-        {true, 1} -> a_key
-        {false, 1} -> b_key
-        {true, _} -> b_key
-        {false, _} -> a_key
-      end
+      define_sender_key(is_a_to_b, current_cycle, {a_key, b_key})
     end)
     |> MapSet.new()
   end
@@ -182,14 +177,18 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
     do: context |> Map.put(:invitations_queue, [invitations])
 
   defp remove_queued_invitations_messages(
-         %{invitations_queue: invitations_queue, invitations_messages: invitations_messages} =
-           context
+         %{invitations_queue: _queue, invitations_messages: []} = context
+       ),
+       do: context
+
+  defp remove_queued_invitations_messages(
+         %{invitations_queue: queue, invitations_messages: messages} = context
        ) do
     %{
       context
       | invitations_messages:
-          Enum.reject(invitations_messages, fn value ->
-            value in List.flatten(invitations_queue)
+          Enum.reject(messages, fn value ->
+            value in List.flatten(queue)
           end)
     }
   end
@@ -199,23 +198,29 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
 
   defp put_invitations_messages(%{invitations_keymap: invitations_keymap} = context, snap) do
     invitations_keymap
-    |> Enum.map(fn {invite_key, user_keys} when length(user_keys) == 2 ->
-      [user2_key, user1_key] = user_keys
-      dialog_key = %Dialog{a_key: user1_key, b_key: user2_key} |> Enigma.hash()
+    |> Enum.map(fn {invite_key, user_keys} ->
+      case user_keys do
+        [user2_key, user1_key] ->
+          dialog_key = %Dialog{a_key: user1_key, b_key: user2_key} |> Enigma.hash()
 
-      invitation_message =
-        snap
-        |> db_stream(
-          {:dialog_message, dialog_key, 0, 0},
-          {:dialog_message, dialog_key, nil, nil}
-        )
-        |> Stream.filter(&match?({_, %Message{type: :room_invite}}, &1))
-        |> Enum.at(0)
+          invitation_message =
+            snap
+            |> db_stream(
+              {:dialog_message, dialog_key, 0, 0},
+              {:dialog_message, dialog_key, nil, nil}
+            )
+            |> Stream.filter(&match?({_, %Message{type: :room_invite}}, &1))
+            |> Enum.at(0)
 
-      {_, %Message{is_a_to_b?: is_a_to_b, id: message_id}} = invitation_message
+          {_, %Message{is_a_to_b?: is_a_to_b, id: message_id}} = invitation_message
 
-      {invite_key, dialog_key, is_a_to_b, message_id, %{a_key: user1_key, b_key: user2_key}}
+          {invite_key, dialog_key, is_a_to_b, message_id, %{a_key: user1_key, b_key: user2_key}}
+
+        _ ->
+          nil
+      end
     end)
+    |> Enum.reject(&is_nil/1)
     |> then(&Map.put(context, :invitations_messages, &1))
   end
 
@@ -265,7 +270,7 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
        ),
        do:
          Enum.empty?(messages) or not is_related_invitations_exists?(context, current_cycle) or
-           length(queue) == @handshake_depth
+           length(queue) == @invitations_depth
 
   defp is_related_invitations_exists?(
          %{invitations_messages: messages, invitations_queue: queue} = _context,
@@ -283,14 +288,21 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
   end
 
   defp is_recipient_exists?(sender_keys, messages) do
-    sender_keys
-    |> Enum.any?(fn sender_key ->
-      messages
-      |> Enum.map(fn {_, _, is_a_to_b, _, %{a_key: a_key, b_key: b_key}} ->
-        if is_a_to_b, do: a_key, else: b_key
-      end)
-      |> MapSet.new()
-      |> MapSet.member?(sender_key)
+    messages
+    |> Enum.any?(fn {_, _, is_a_to_b, _, %{a_key: a_key, b_key: b_key}} ->
+      case is_a_to_b do
+        true -> MapSet.member?(sender_keys, a_key)
+        false -> MapSet.member?(sender_keys, b_key)
+      end
     end)
+  end
+
+  defp define_sender_key(is_a_to_b, current_cycle, {a_key, b_key}) do
+    case {is_a_to_b, current_cycle} do
+      {true, 1} -> a_key
+      {false, 1} -> b_key
+      {true, _} -> b_key
+      {false, _} -> a_key
+    end
   end
 end

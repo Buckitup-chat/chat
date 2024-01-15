@@ -28,17 +28,15 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
   end
 
   test "room invitation should be found in dialog of operator and user by only checkpoints key" do
-    {[checkpoints, checkpoint_keys], [operator], [user_c, user_d] = _users} =
+    {[[checkpoint_1, checkpoint_2], checkpoint_keys], [operator], [user_c, user_d] = _users} =
       setup_test_data(2, 1, 2)
-
-    assert Enum.count(checkpoints) == 2
 
     context =
       %{}
       |> generate_cargo_room(operator)
-      |> put_dialogs_with_invites([checkpoints, operator], :index_1)
-      |> put_dialogs_with_invites([[user_c], operator], :index_2)
-      |> put_dialogs_with_invites([[user_d], user_c], :index_3)
+      |> send_invite(from: operator, to: [checkpoint_1, checkpoint_2], mark_as: :index_1)
+      |> send_invite(from: operator, to: user_c, mark_as: :index_2)
+      |> send_invite(from: user_c, to: user_d, mark_as: :index_3)
 
     room_key = context |> Map.get(:room_identity) |> Identity.pub_key()
 
@@ -47,22 +45,20 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
 
   test "room invitations found up to 1 handshake" do
     {
-      [checkpoints, checkpoints_keys],
+      [[checkpoint_1, checkpoint_2, checkpoint_3], checkpoints_keys],
       [operator_1, operator_2],
       [user_1, user_2, user_3, user_4]
     } = setup_test_data(3, 2, 4)
 
-    assert Enum.count(checkpoints) == 3
-
     invitations_board =
       %{}
       |> generate_cargo_room(operator_1)
-      |> put_dialogs_with_invites([Enum.slice(checkpoints, 0..1), operator_1], :index_1)
-      |> put_dialogs_with_invites([[Enum.at(checkpoints, 2)], operator_2], :index_2)
-      |> put_dialogs_with_invites([[user_1], operator_1], :index_3)
-      |> put_dialogs_with_invites([[user_2, user_4], user_1], :index_4)
-      |> put_dialogs_with_invites([[user_3], user_2], :index_5)
-      |> put_dialogs_with_invites([[user_4, user_1], user_3], :index_6)
+      |> send_invite(from: operator_1, to: [checkpoint_1, checkpoint_2], mark_as: :index_1)
+      |> send_invite(from: operator_2, to: checkpoint_3, mark_as: :index_2)
+      |> send_invite(from: operator_1, to: user_1, mark_as: :index_3)
+      |> send_invite(from: user_1, to: [user_2, user_4], mark_as: :index_4)
+      |> send_invite(from: user_2, to: user_3, mark_as: :index_5)
+      |> send_invite(from: user_3, to: [user_4, user_1], mark_as: :index_6)
 
     cargo_keys =
       Chat.Db.db()
@@ -139,7 +135,9 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     identity |> tap(&User.register/1) |> tap(&User.UsersBroker.put/1)
   end
 
-  defp generate_dialogs_and_cargo_room_invite(context, [recipients, sender]) do
+  defp generate_dialogs_and_cargo_room_invite(context, [sender, recipients]) do
+    recipients = if is_list(recipients), do: recipients, else: [recipients]
+
     for recipient <- recipients,
         into: [],
         do:
@@ -204,13 +202,9 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     |> MapSet.new()
   end
 
-  defp put_dialogs_with_invites(
-         context,
-         [recipients, sender],
-         step_mark
-       ) do
+  defp send_invite(context, opts) do
     context
-    |> generate_dialogs_and_cargo_room_invite([recipients, sender])
-    |> then(&Map.put(context, step_mark, &1))
+    |> generate_dialogs_and_cargo_room_invite([opts[:from], opts[:to]])
+    |> then(&Map.put(context, opts[:mark_as], &1))
   end
 end

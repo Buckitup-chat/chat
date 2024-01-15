@@ -1,6 +1,6 @@
-defmodule Chat.Db.Scope.InvitationsHandshaker do
+defmodule Chat.Db.Scope.InvitationLevel do
   @moduledoc """
-  Process cargo room invitations by handshaker
+  Process cargo room invitations
   """
 
   import Chat.Db.Scope.Utils
@@ -20,6 +20,7 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
   def handshake_dialogs_cycle(context, pub_keys) do
     context
     |> start_invitations_queue(pub_keys)
+    |> put_operators_keys()
     |> execute_handshake_cycle()
   end
 
@@ -68,16 +69,12 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
     [index, keys, records]
   end
 
-  defp execute_handshake_cycle(
-         %{invitations_messages: _messages, invitations_queue: queue} = context
-       ) do
-    current_cycle = length(queue)
-
-    if is_last_handshake_cycle?(context, current_cycle) do
+  defp execute_handshake_cycle(context) do
+    if is_last_handshake_cycle?(context) do
       context
     else
-      queue
-      |> get_current_queue_senders(current_cycle)
+      context
+      |> get_current_queue_senders()
       |> fetch_cycle_invites(context)
       |> put_invitations_queue(context)
       |> remove_queued_invitations_messages()
@@ -143,10 +140,10 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
     end)
   end
 
-  defp get_messages_sender_keys(messages, current_cycle) do
+  defp get_messages_sender_keys(messages, type) do
     messages
     |> Enum.map(fn {_, _dialog_key, is_a_to_b, _, %{a_key: a_key, b_key: b_key}} ->
-      define_sender_key(is_a_to_b, current_cycle, {a_key, b_key})
+      define_sender_key(is_a_to_b, type, {a_key, b_key})
     end)
     |> MapSet.new()
   end
@@ -241,6 +238,9 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
     Map.put(context, :invitations_keymap, keymap)
   end
 
+  defp put_operators_keys(%{invitations_queue: _queue} = context),
+    do: Map.put(context, :operators_keys, get_current_queue_senders(context))
+
   defp union_set_acc(set_acc, group_data, key_extractor) do
     group_data
     |> Enum.map(&key_extractor.(&1))
@@ -265,26 +265,38 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
   end
 
   defp is_last_handshake_cycle?(
-         %{invitations_queue: queue, invitations_messages: messages} = context,
-         current_cycle
+         %{invitations_queue: queue, invitations_messages: messages} = context
        ),
        do:
-         Enum.empty?(messages) or not is_related_invitations_exists?(context, current_cycle) or
+         Enum.empty?(messages) or not is_related_invitations_exists?(context) or
            length(queue) == @invitations_depth
 
   defp is_related_invitations_exists?(
-         %{invitations_messages: messages, invitations_queue: queue} = _context,
-         current_cycle
+         %{invitations_messages: messages, invitations_queue: _queue} = context
        ) do
-    queue
-    |> get_current_queue_senders(current_cycle)
+    context
+    |> get_current_queue_senders()
     |> is_recipient_exists?(messages)
   end
 
-  defp get_current_queue_senders(queue, current_cycle) do
+  defp get_current_queue_senders(
+         %{invitations_queue: queue, operators_keys: operators} = _context
+       ) do
+    case length(queue) do
+      1 ->
+        operators
+
+      _ ->
+        queue
+        |> List.first()
+        |> get_messages_sender_keys(:users)
+    end
+  end
+
+  defp get_current_queue_senders(%{invitations_queue: queue}) do
     queue
     |> List.first()
-    |> get_messages_sender_keys(current_cycle)
+    |> get_messages_sender_keys(:operators)
   end
 
   defp is_recipient_exists?(sender_keys, messages) do
@@ -297,12 +309,17 @@ defmodule Chat.Db.Scope.InvitationsHandshaker do
     end)
   end
 
-  defp define_sender_key(is_a_to_b, current_cycle, {a_key, b_key}) do
-    case {is_a_to_b, current_cycle} do
-      {true, 1} -> a_key
-      {false, 1} -> b_key
-      {true, _} -> b_key
-      {false, _} -> a_key
+  defp define_sender_key(is_a_to_b, :operators, {a_key, b_key}) do
+    case is_a_to_b do
+      true -> a_key
+      false -> b_key
+    end
+  end
+
+  defp define_sender_key(is_a_to_b, :users, {a_key, b_key}) do
+    case is_a_to_b do
+      true -> b_key
+      false -> a_key
     end
   end
 end

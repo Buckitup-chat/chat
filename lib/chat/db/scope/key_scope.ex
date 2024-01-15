@@ -4,7 +4,7 @@ defmodule Chat.Db.Scope.KeyScope do
   """
 
   import Chat.Db.Scope.Utils
-  import Chat.Db.Scope.InvitationsHandshaker
+  import Chat.Db.Scope.InvitationLevel
   alias Chat.Dialogs.Dialog
 
   def get_keys(db, pub_keys_list) do

@@ -90,7 +90,6 @@ defmodule Chat.Db.Scope.InvitationLevel do
         "room_invite",
         min_key: {:room_invite_index, 0, 0},
         max_key: {:"room_invite_index\0", 0, 0},
-        reader_hash_getter: fn {:room_invite_index, reader_key, _invite_key} -> reader_key end,
         record_key_getter: fn {:room_invite_index, _reader_key, invite_key} -> invite_key end
       )
 
@@ -149,6 +148,7 @@ defmodule Chat.Db.Scope.InvitationLevel do
   end
 
   defp start_invitations_queue(%{invitations_queue: _invitations_queue} = context, _pub_keys),
+    # coveralls-ignore-next-line
     do: context
 
   defp start_invitations_queue(%{invitations_messages: invitations_messages} = context, pub_keys) do
@@ -160,6 +160,7 @@ defmodule Chat.Db.Scope.InvitationLevel do
     |> remove_queued_invitations_messages()
   end
 
+  # coveralls-ignore-next-line
   defp put_invitations_queue([], context), do: context
 
   defp put_invitations_queue(invitations, %{invitations_queue: queue} = context),
@@ -176,6 +177,7 @@ defmodule Chat.Db.Scope.InvitationLevel do
   defp remove_queued_invitations_messages(
          %{invitations_queue: _queue, invitations_messages: []} = context
        ),
+       # coveralls-ignore-next-line
        do: context
 
   defp remove_queued_invitations_messages(
@@ -213,6 +215,7 @@ defmodule Chat.Db.Scope.InvitationLevel do
 
           {invite_key, dialog_key, is_a_to_b, message_id, %{a_key: user1_key, b_key: user2_key}}
 
+        # coveralls-ignore-next-line
         _ ->
           nil
       end

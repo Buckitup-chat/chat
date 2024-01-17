@@ -119,29 +119,17 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
     end
   end
 
-  defp open(%{assigns: %{incoming_msg_id: msg_id, dialog: dialog, me: me}} = socket) do
-    socket
-    |> assign_current(msg_id, Dialogs.read_message(dialog, msg_id, me))
-  end
-
   defp open(%{assigns: %{incoming_msg_id: msg_id, room_identity: room_identity}} = socket) do
     socket
     |> assign_current(msg_id, Rooms.read_message(msg_id, room_identity))
   end
 
-  defp preload_prev(%{assigns: %{list: []}} = socket), do: socket
-
-  defp preload_prev(%{assigns: %{dialog: dialog, list: list, me: me}} = socket) do
-    first = List.first(list)
-
+  defp open(%{assigns: %{incoming_msg_id: msg_id, dialog: dialog, me: me}} = socket) do
     socket
-    |> assign_prev(
-      Dialogs.read_prev_message(dialog, {first.index, first.id}, me, fn
-        {_, %{type: :image}} -> true
-        _ -> false
-      end)
-    )
+    |> assign_current(msg_id, Dialogs.read_message(dialog, msg_id, me))
   end
+
+  defp preload_prev(%{assigns: %{list: []}} = socket), do: socket
 
   defp preload_prev(%{assigns: %{room_identity: identity, list: list}} = socket) do
     first = List.first(list)
@@ -155,19 +143,19 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
     )
   end
 
-  defp preload_next(%{assigns: %{list: []}} = socket), do: socket
-
-  defp preload_next(%{assigns: %{dialog: dialog, list: list, me: me}} = socket) do
-    last = List.last(list)
+  defp preload_prev(%{assigns: %{dialog: dialog, list: list, me: me}} = socket) do
+    first = List.first(list)
 
     socket
-    |> assign_next(
-      Dialogs.read_next_message(dialog, {last.index, last.id}, me, fn
+    |> assign_prev(
+      Dialogs.read_prev_message(dialog, {first.index, first.id}, me, fn
         {_, %{type: :image}} -> true
         _ -> false
       end)
     )
   end
+
+  defp preload_next(%{assigns: %{list: []}} = socket), do: socket
 
   defp preload_next(%{assigns: %{room_identity: identity, list: list}} = socket) do
     last = List.last(list)
@@ -175,6 +163,18 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
     socket
     |> assign_next(
       Rooms.read_next_message({last.index, last.id}, identity, fn
+        {_, %{type: :image}} -> true
+        _ -> false
+      end)
+    )
+  end
+
+  defp preload_next(%{assigns: %{dialog: dialog, list: list, me: me}} = socket) do
+    last = List.last(list)
+
+    socket
+    |> assign_next(
+      Dialogs.read_next_message(dialog, {last.index, last.id}, me, fn
         {_, %{type: :image}} -> true
         _ -> false
       end)

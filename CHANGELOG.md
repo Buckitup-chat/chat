@@ -16,6 +16,7 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
+- displaying the gallery after go to invited room [#562]
 
 ## 2023-12-30_167d8d9___2023-12-30_80fe885
 

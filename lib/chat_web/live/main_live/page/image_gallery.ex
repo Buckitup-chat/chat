@@ -136,8 +136,6 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
   end
 
   defp open(%{assigns: %{incoming_msg_id: msg_id, dialog: dialog, me: me}} = socket) do
-    IO.inspect(socket.assigns, label: "open")
-
     socket
     |> assign_current(msg_id, Dialogs.read_message(dialog, msg_id, me))
   end

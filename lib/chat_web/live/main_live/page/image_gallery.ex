@@ -119,19 +119,32 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
     end
   end
 
-  defp open(%{assigns: %{incoming_msg_id: msg_id, room_identity: room_identity}} = socket) do
+  defp open(
+         %{
+           assigns: %{
+             incoming_msg_id: msg_id,
+             type: :room,
+             room_identity: room_identity
+           }
+         } =
+           socket
+       ) do
+    IO.inspect(socket.assigns, label: "open")
+
     socket
     |> assign_current(msg_id, Rooms.read_message(msg_id, room_identity))
   end
 
   defp open(%{assigns: %{incoming_msg_id: msg_id, dialog: dialog, me: me}} = socket) do
+    IO.inspect(socket.assigns, label: "open")
+
     socket
     |> assign_current(msg_id, Dialogs.read_message(dialog, msg_id, me))
   end
 
   defp preload_prev(%{assigns: %{list: []}} = socket), do: socket
 
-  defp preload_prev(%{assigns: %{room_identity: identity, list: list}} = socket) do
+  defp preload_prev(%{assigns: %{room_identity: identity, type: :room, list: list}} = socket) do
     first = List.first(list)
 
     socket
@@ -157,7 +170,7 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
 
   defp preload_next(%{assigns: %{list: []}} = socket), do: socket
 
-  defp preload_next(%{assigns: %{room_identity: identity, list: list}} = socket) do
+  defp preload_next(%{assigns: %{room_identity: identity, type: :room, list: list}} = socket) do
     last = List.last(list)
 
     socket

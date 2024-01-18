@@ -262,10 +262,15 @@ defmodule ChatWeb.MainLive.Admin.ZerotierSettings do
 
       receive do
         # coveralls-ignore-start
-        {^command, {:ok, response}} -> ok.(response)
-        {^command, {:error, response}} -> error.(response)
-        _ -> :ignore
-        # coveralls-ignore-stop
+        {^command, {:ok, response}} ->
+          ok.(response)
+
+        {^command, {:error, response}} ->
+          error.(response)
+
+        _ ->
+          :ignore
+          # coveralls-ignore-stop
       after
         # coveralls-ignore-next-line
         5000 -> :timeout

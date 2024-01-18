@@ -150,7 +150,7 @@ defmodule ChatWebTest.MainLive.Admin.ZerotierSettingsTest do
 
   ### Fixture
 
-  def info_json() do
+  def info_json do
     """
       {
        "address": "56bcbb9d9c",

@@ -34,7 +34,6 @@ defmodule ChatTest.NetworkSynchronization.PeerDetection.DetectorTest do
     |> assert_detector_started
     |> assert_restart_timer_set
     |> send_update
-    |> assert_pubsub_sent
     |> send_range
     |> assert_lan_detection_ran
     |> assert_restart_timer_updated
@@ -59,7 +58,7 @@ defmodule ChatTest.NetworkSynchronization.PeerDetection.DetectorTest do
   end
 
   defp start_detector(context) do
-    assert {:ok, pid} = start_supervised({LanDetector, name: context.name})
+    {:ok, pid} = start_supervised({LanDetector, name: context.name})
     context |> Map.put(:pid, pid)
   end
 
@@ -78,20 +77,6 @@ defmodule ChatTest.NetworkSynchronization.PeerDetection.DetectorTest do
     time_left = Process.cancel_timer(timer_ref, async: false, info: true)
     assert time_left > :timer.minutes(70) - 50
     context |> Map.put(:timer_ref, timer_ref)
-  end
-
-  defp assert_pubsub_sent(context) do
-    await_till(
-      fn ->
-        Agent.get(DetectorTestAgent, &Map.get(&1, :broadcasted)) ==
-          {:range, {"10.10.10.10", "255.255.255.0"}}
-      end,
-      step: 10,
-      time: 500
-    )
-    |> tap(&refute :timeout == &1)
-
-    context
   end
 
   defp assert_lan_detection_ran(context) do

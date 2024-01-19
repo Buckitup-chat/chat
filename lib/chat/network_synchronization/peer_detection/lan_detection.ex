@@ -63,8 +63,8 @@ defmodule Chat.NetworkSynchronization.PeerDetection.LanDetection do
           _ -> nil
         end
       end,
-      max_concurrency: 100,
-      timeout: 600_000
+      max_concurrency: 1000,
+      timeout: 60_000
     )
     |> Enum.reject(fn
       {:ok, nil} -> true

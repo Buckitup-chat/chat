@@ -12,6 +12,7 @@ straightforward as possible.
 
 
 ### Added
+- ZeroTier support [#425]
 
 ### Changed
 

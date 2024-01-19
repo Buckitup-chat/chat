@@ -11,7 +11,7 @@ defmodule ChatWeb.MainLive.Admin.FirmwareUpgradeForm do
     auto_upload: true,
     progress: &__MODULE__.handle_progress/3
   ]
-  @outgoing_topic "chat->platform"
+  @outgoing_topic Application.compile_env!(:chat, :topic_to_platform)
 
   def update(assigns, socket) do
     socket

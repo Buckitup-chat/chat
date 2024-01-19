@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
+
+### Added
+
+### Changed
+
+### Fixed
+- copy invited user invitation with cargo room [#574]
+
+## 2023-12-30_167d8d9___2023-12-30_80fe885
+
 ### Added
 
 - async load of camera sensor images for admin [#532]
@@ -17,6 +27,7 @@ straightforward as possible.
 - network synchronization [#549]
 - internet access and setting [#556]
 - internet proxy [#557]
+- LAN peers detection [#572]
 
 ### Changed
 
@@ -25,7 +36,6 @@ straightforward as possible.
 ### Fixed
 - mobile upload on Android
 - device log. new format support [#565]
-- copy invited user invitation with cargo room [#574]
 
 ## 2023-10-11_c9df216___2023-10-11_8198274
 

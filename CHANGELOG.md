@@ -37,7 +37,6 @@ straightforward as possible.
 - mobile upload on Android
 - device log. new format support [#565]
 
-
 ## 2023-10-11_c9df216___2023-10-11_8198274
 
 ### Added

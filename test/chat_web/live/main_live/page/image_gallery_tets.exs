@@ -7,23 +7,22 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
   alias ChatWeb.MainLive.Page.ImageGallery
 
   describe "image gallery" do
-    setup [:create_initial_state]
-    test "open gallery after transition from intive to room", %{conn: conn, state: state} do
-      %{}
-      |> create_users(2)
+    setup [:first_person, :second_person]
+
+    test "open gallery after transition from intive to room", %{
+      first_person: first_person,
+      second_person: second_person,
+      conn: conn
+    } do
+      IO.inspect(conn)
+
+      %{view: fist_person_view} = first_person
+      %{view: second_person_view} = second_person
+
+      {fist_person_view, second_person_view} |> IO.inspect(label: "views")
     end
 
-    defp create_users(conn, number) do
-      Enum.reduce(1..number, %{conn: conn, users: []}, fn _, acc ->
-        {conn, user} = IndexTest.create_user(acc.conn)
-        Map.put(acc, :users, [user | acc.users])
-      end)
-    end
-  
-    defp create_initial_state(_) do
-      # Set up the initial state by creating users
-      {conn, users_state} = create_users(2)
-      %{conn: conn, state: users_state}
-    end
+    defp first_person(%{conn: _} = conn), do: [first_person: login_by_key(conn)]
+    defp second_person(%{conn: _} = conn), do: [second_person: login_by_key(conn)]
   end
 end

@@ -19,7 +19,8 @@ defmodule ChatWeb.MainLive.Index do
     FirmwareUpgradeForm,
     LanSettings,
     MediaSettingsForm,
-    NetworkSourceList
+    NetworkSourceList,
+    ZerotierSettings
   }
 
   alias ChatWeb.MainLive.{Layout, Page}

@@ -12,11 +12,16 @@ straightforward as possible.
 
 
 ### Added
+- ZeroTier support [#425]
 
 ### Changed
 
 ### Fixed
 - feeds page ui issue [#583]
+- Mobile view. Sync mode cover chat options [#579]
+- Log in by key uploading UI issue [#583]
+- Chats page UI issue [#583]
+- copy invited user invitation with cargo room [#574]
 
 ## 2023-12-30_167d8d9___2023-12-30_80fe885
 
@@ -36,8 +41,6 @@ straightforward as possible.
 ### Fixed
 - mobile upload on Android
 - device log. new format support [#565]
-- Log in by key uploading UI issue
-
 
 
 ## 2023-10-11_c9df216___2023-10-11_8198274

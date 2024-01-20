@@ -3,8 +3,9 @@ defmodule Chat.Db.Scope.KeyScope do
   Builds db keys accessible by keys_list
   """
 
+  import Chat.Db.Scope.Utils
+  import Chat.Db.Scope.InvitationLevel
   alias Chat.Dialogs.Dialog
-  alias Chat.Dialogs.Message
 
   def get_keys(db, pub_keys_list) do
     pub_keys = MapSet.new(pub_keys_list)
@@ -28,7 +29,6 @@ defmodule Chat.Db.Scope.KeyScope do
       |> add_rooms(snap, room_key)
       |> add_content(snap, room_key)
       |> add_invitation_dialogs(snap, invited_keys)
-      |> add_invitation_content(snap, invited_keys)
     end)
   end
 
@@ -143,92 +143,10 @@ defmodule Chat.Db.Scope.KeyScope do
   end
 
   defp add_invitation_dialogs(acc_set, snap, pub_keys) do
-    dialog_keys =
-      snap
-      |> db_stream({:dialogs, 0}, {:"dialogs\0", 0})
-      |> Stream.filter(fn {_full_dilaog_key, %Dialog{a_key: a_key, b_key: b_key}} ->
-        MapSet.member?(pub_keys, a_key) or MapSet.member?(pub_keys, b_key)
-      end)
-      |> Stream.map(&just_keys/1)
-      |> Enum.to_list()
-      |> MapSet.new()
-
-    dialog_binkeys =
-      dialog_keys
-      |> Enum.map(fn {:dialogs, dialog_key} -> dialog_key end)
-      |> MapSet.new()
-
     snap
-    |> db_stream({:dialog_message, 0, 0, 0}, {:"dialog_message\0", 0, 0, 0})
-    |> Stream.filter(fn {{:dialog_message, key, _, _}, %Message{type: type}} ->
-      type == :room_invite and MapSet.member?(dialog_binkeys, key)
-    end)
-    |> Stream.map(&just_keys/1)
-    |> union_set(dialog_keys)
-    |> union_set(acc_set)
-  end
-
-  defp add_invitation_content(acc_set, snap, pub_keys) do
-    [room_invite_index, _room_invite_keys, room_invites] =
-      fetch_index_and_records(
-        snap,
-        pub_keys,
-        "room_invite",
-        min_key: {:room_invite_index, 0, 0},
-        max_key: {:"room_invite_index\0", 0, 0},
-        reader_hash_getter: fn {:room_invite_index, reader_key, _invite_key} -> reader_key end,
-        record_key_getter: fn {:room_invite_index, _reader_key, invite_key} -> invite_key end
-      )
-
-    acc_set
-    |> union_set(room_invite_index)
-    |> union_set(room_invites)
-  end
-
-  defp db_keys_stream(snap, min, max) do
-    snap
-    |> db_stream(min, max)
-    |> Stream.map(&just_keys/1)
-  end
-
-  defp db_stream(snap, min, max) do
-    CubDB.Snapshot.select(snap, min_key: min, max_key: max)
-  end
-
-  defp union_set(list, set) do
-    list
-    |> MapSet.new()
-    |> MapSet.union(set)
-  end
-
-  defp just_keys({k, _v}), do: k
-
-  defp fetch_index_and_records(snap, pub_keys, record_name, opts) do
-    reader_hash_getter = opts[:reader_hash_getter]
-    record_key_getter = opts[:record_key_getter]
-
-    index =
-      snap
-      |> db_keys_stream(opts[:min_key], opts[:max_key])
-      |> Stream.filter(fn key ->
-        reader_hash = reader_hash_getter.(key)
-        MapSet.member?(pub_keys, reader_hash)
-      end)
-      |> MapSet.new()
-
-    keys =
-      index
-      |> Enum.map(&record_key_getter.(&1))
-      |> MapSet.new()
-
-    records =
-      snap
-      |> db_keys_stream({:"#{record_name}", 0}, {:"#{record_name}\0", 0})
-      |> Stream.filter(fn {_record_name, record_key} ->
-        MapSet.member?(keys, record_key)
-      end)
-      |> MapSet.new()
-
-    [index, keys, records]
+    |> build_initial_context()
+    |> handshake_dialogs_cycle(pub_keys)
+    |> process_invitation_groups()
+    |> update_acc_set(acc_set)
   end
 end

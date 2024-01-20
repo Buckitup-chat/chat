@@ -12,11 +12,15 @@ straightforward as possible.
 
 
 ### Added
+- ZeroTier support [#425]
 
 ### Changed
 
 ### Fixed
 - Mobile view. Sync mode cover chat options [#579]
+- Log in by key uploading UI issue [#583]
+- Chats page UI issue [#583]
+- copy invited user invitation with cargo room [#574]
 
 ## 2023-12-30_167d8d9___2023-12-30_80fe885
 

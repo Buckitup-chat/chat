@@ -17,6 +17,7 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
+- feeds page ui issue [#583]
 - Mobile view. Sync mode cover chat options [#579]
 - Log in by key uploading UI issue [#583]
 - Chats page UI issue [#583]

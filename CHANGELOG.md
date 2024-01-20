@@ -17,6 +17,7 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
+- Mobile view. Sync mode cover chat options [#579]
 - Log in by key uploading UI issue [#583]
 - Chats page UI issue [#583]
 - copy invited user invitation with cargo room [#574]
@@ -39,7 +40,6 @@ straightforward as possible.
 ### Fixed
 - mobile upload on Android
 - device log. new format support [#565]
-
 
 
 ## 2023-10-11_c9df216___2023-10-11_8198274

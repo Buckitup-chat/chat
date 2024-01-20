@@ -74,7 +74,8 @@ config :chat, Chat.Db.ChangeTracker, expire_seconds: 31
 
 config :chat,
   topic_to_platform: "chat->platform",
-  topic_from_platform: "platform->chat"
+  topic_from_platform: "platform->chat",
+  topic_to_zerotier: "-> zerotier"
 
 # Uncomment the following line to enable db writing logging
 # config :chat, :db_write_logging, true

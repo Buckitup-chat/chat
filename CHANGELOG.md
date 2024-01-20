@@ -17,6 +17,7 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
+- Log in by key uploading UI issue [#583]
 - Chats page UI issue [#583]
 - copy invited user invitation with cargo room [#574]
 

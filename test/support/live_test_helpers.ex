@@ -13,13 +13,13 @@ defmodule ChatWeb.LiveTestHelpers do
   @type view :: %Phoenix.LiveViewTest.View{}
 
   @spec prepare_view(%{conn: Plug.Conn.t()}) :: %{socket: Socket.t(), view: view()}
-  def prepare_view(%{conn: conn}) do
+  def prepare_view(%{conn: conn}, name \\ "User") do
     {:ok, view, _html} = live(conn, "/")
 
     render_hook(view, "restoreAuth")
 
     view
-    |> form("#login-form", login: %{name: "User"})
+    |> form("#login-form", login: %{name: name})
     |> render_submit()
 
     set_local_time(%{view: view})

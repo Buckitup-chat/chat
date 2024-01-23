@@ -25,8 +25,7 @@ defmodule ChatWeb.MainLive.Page.Shared do
   end
 
   def track_onliners_presence(%Socket{} = socket) do
-    {:ok, _} =
-      OnlinersPresence.track(socket.root_pid, presence_key(socket), get_user_keys(socket))
+    OnlinersPresence.track(socket.root_pid, presence_key(socket), get_user_keys(socket))
 
     socket
   end

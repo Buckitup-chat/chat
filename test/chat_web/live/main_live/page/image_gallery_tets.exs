@@ -17,21 +17,38 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
     } do
       persons = [first_person, second_person]
 
+      [_socket1, socket2] = persons |> extract_sockets()
+
       %{}
       |> init_views(persons)
       |> create_room()
-      |> upload_image()
+      |> upload_image("room")
       |> send_room_invite()
-      |> add_dialog_gallery()
+      |> add_dialog_gallery(socket2.assigns.me)
+      |> accept_room_invitation("Bonnie")
     end
 
-    defp add_dialog_gallery(%{views: [view | _] = _views} = context) do
-      # TODO: upload image to dialog with Clyde
+    defp extract_sockets(persons),
+      do: Enum.map(persons, fn %{socket: socket} = _person -> socket end)
 
-      context
+    defp accept_room_invitation(%{views: [_ | view] = _views} = context, name) do
+      %{view: view}
+      |> open_dialog(name)
+      |> update_context_view(context)
+    end
+
+    defp add_dialog_gallery(%{views: [view | _] = _views} = context, user) do
+      IO.inspect(context, label: "adding dialog gallery: context")
+
+      %{view: view}
+      |> open_dialog(user)
+      |> upload_image("dialog")
+      |> update_context_view(context)
     end
 
     defp send_room_invite(%{views: [view | _] = _views} = context) do
+      IO.inspect(context, label: "sending room invite: context")
+
       view
       |> element("#roomInviteButton")
       |> render_click()
@@ -40,14 +57,18 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
       |> element("a", "Send invite")
       |> render_click()
 
+      view
+      |> element("#modal .phx-modal-content")
+      |> render_keydown()
+
       context
     end
 
-    defp upload_image(%{views: [view_1 | _] = _views} = context) do
+    defp upload_image(%{views: [view_1 | _] = _views} = context, source) do
       with %{entry: entry, socket: _socket_1} <- start_upload(%{view: view_1}),
            entry <- %{entry | done?: true, progress: 100},
            :ok <- ChangeTracker.await() do
-        Map.put(context, :room_upload_entry, entry)
+        Map.put(context, "#{source}_image", entry)
       else
         _ -> context
       end

@@ -16,12 +16,17 @@ export const hooks = {
   },
 
   restore(obj) {
-    var authData = localStorage.getItem(obj.auth_key)
-    var roomCount = localStorage.getItem(obj.room_count_key)
-    var responseData = authData ? {auth: authData, room_count: Number(roomCount)} : {}
+    const responseData = this.fullState(obj)
     this.pushEvent(obj.event, responseData)
-    if (authData) { this.setupAuthEvents(obj.auth_key) }
+    if (responseData?.auth) { this.setupAuthEvents(obj.auth_key) }
   },
+
+  fullState(obj) {
+    const authData = localStorage.getItem(obj.auth_key);
+    const roomCount = localStorage.getItem(obj.room_count_key);
+    return authData ? {auth: authData, room_count: Number(roomCount)} : {}
+  },
+
 
   clear(obj) {
     localStorage.removeItem(obj.auth_key);

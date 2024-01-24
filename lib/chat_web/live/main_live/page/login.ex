@@ -14,6 +14,8 @@ defmodule ChatWeb.MainLive.Page.Login do
   alias Chat.User
   alias Chat.User.UsersBroker
 
+  alias ChatWeb.MainLive.Index
+
   @local_store_auth_key "buckitUp-chat-auth-v2"
   @local_store_room_count_key "buckitUp-room-count-v2"
 
@@ -116,6 +118,30 @@ defmodule ChatWeb.MainLive.Page.Login do
   end
 
   def check_stored(socket) do
+    cond do
+      already_loaded_client_storage?(socket) -> socket
+      params = client_storage_in_params(socket) -> emulate_restore_auth(socket, params)
+      true -> request_restore(socket)
+    end
+  end
+
+  defp already_loaded_client_storage?(socket) do
+    match?(%{assigns: %{me: _}}, socket)
+  end
+
+  defp client_storage_in_params(socket) do
+    %{"storage" => storage} = Phoenix.LiveView.get_connect_params(socket)
+    storage
+  rescue
+    _ -> nil
+  end
+
+  defp emulate_restore_auth(socket, params) do
+    {:noreply, socket} = Index.handle_event("restoreAuth", params, socket)
+    socket |> request_restore()
+  end
+
+  defp request_restore(socket) do
     socket
     |> push_event("restore", %{
       auth_key: @local_store_auth_key,

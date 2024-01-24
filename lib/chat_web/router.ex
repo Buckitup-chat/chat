@@ -41,10 +41,12 @@ defmodule ChatWeb.Router do
     get "/get/device_log/:key", TempSyncController, :device_log
     get "/get/zip/:broker_key", ZipController, :get
 
-    live "/", MainLive.Index, :index
-    live "/export-key-ring/:id", MainLive.Index, :export
-    live "/room/:hash", MainLive.Index, :room_message_link
-    live "/chat/:hash", MainLive.Index, :chat_link
+    live_session :default do
+      live "/", MainLive.Index, :index
+      live "/export-key-ring/:id", MainLive.Index, :export
+      live "/room/:hash", MainLive.Index, :room_message_link
+      live "/chat/:hash", MainLive.Index, :chat_link
+    end
   end
 
   scope "/", ChatWeb do

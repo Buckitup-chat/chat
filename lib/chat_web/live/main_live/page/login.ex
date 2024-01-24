@@ -14,6 +14,8 @@ defmodule ChatWeb.MainLive.Page.Login do
   alias Chat.User
   alias Chat.User.UsersBroker
 
+  alias ChatWeb.MainLive.Index
+
   @local_store_auth_key "buckitUp-chat-auth-v2"
   @local_store_room_count_key "buckitUp-room-count-v2"
 
@@ -134,7 +136,7 @@ defmodule ChatWeb.MainLive.Page.Login do
   end
 
   defp emulate_restore_auth(socket, params) do
-    {:noreply, socket} = ChatWeb.MainLive.Index.handle_event("restoreAuth", params, socket)
+    {:noreply, socket} = Index.handle_event("restoreAuth", params, socket)
     socket |> request_restore()
   end
 

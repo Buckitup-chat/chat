@@ -132,6 +132,8 @@ defmodule ChatWeb.MainLive.Page.Login do
   defp client_storage_in_params(socket) do
     with %{"storage" => storage} <- Phoenix.LiveView.get_connect_params(socket) do
       storage
+    else
+      _ -> nil
     end
   end
 

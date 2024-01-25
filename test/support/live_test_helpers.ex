@@ -75,19 +75,19 @@ defmodule ChatWeb.LiveTestHelpers do
   end
 
   @spec open_dialog(%{view: view()}) :: %{socket: Socket.t(), view: view()}
-  def open_dialog(%{view: view}, user \\ "My notes") do
-    controls =
+  def open_dialog(%{view: view}, user \\ nil) do
+    user_item =
       case user do
-        "My notes" ->
+        nil ->
           "#chatRoomBar ul li.hidden"
 
         _ ->
           user = user |> Chat.Card.from_identity()
-          "#user-#{user.hash}"
+          "#chatRoomBar #user-#{user.hash}"
       end
 
     view
-    |> element(controls)
+    |> element(user_item)
     |> render_click()
 
     state = :sys.get_state(view.pid)

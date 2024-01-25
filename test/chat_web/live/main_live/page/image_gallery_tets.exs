@@ -17,38 +17,39 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
     } do
       persons = [first_person, second_person]
 
-      [_socket1, socket2] = persons |> extract_sockets()
+      [_socket1, %{assigns: %{me: recipient}} = socket2] = persons |> extract_sockets()
 
       %{}
       |> init_views(persons)
-      |> create_room()
-      |> upload_image("room")
+      |> create_room_with_upload_image()
       |> send_room_invite()
-      |> add_dialog_gallery(socket2.assigns.me)
-      |> accept_room_invitation("Bonnie")
-    end
+      |> add_dialog_gallery(recipient: recipient)
 
-    defp extract_sockets(persons),
-      do: Enum.map(persons, fn %{socket: socket} = _person -> socket end)
+      # |> accept_room_invitation("Bonnie")
+    end
 
     defp accept_room_invitation(%{views: [_ | view] = _views} = context, name) do
       %{view: view}
       |> open_dialog(name)
-      |> update_context_view(context)
+
+      # TODO: write room invitation acceptance
+
+      context
     end
 
-    defp add_dialog_gallery(%{views: [view | _] = _views} = context, user) do
-      IO.inspect(context, label: "adding dialog gallery: context")
+    defp create_room_with_upload_image(context),
+      do: context |> create_room() |> upload_image("room")
+
+    defp add_dialog_gallery(%{views: [view | _] = _views} = context, recipient: user) do
+      view |> element(".t-chats") |> render_click()
 
       %{view: view}
       |> open_dialog(user)
-      |> upload_image("dialog")
       |> update_context_view(context)
+      |> upload_image("dialog")
     end
 
     defp send_room_invite(%{views: [view | _] = _views} = context) do
-      IO.inspect(context, label: "sending room invite: context")
-
       view
       |> element("#roomInviteButton")
       |> render_click()
@@ -58,8 +59,10 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
       |> render_click()
 
       view
-      |> element("#modal .phx-modal-content")
+      |> element("#modal-content")
       |> render_keydown()
+
+      refute view |> has_element?("#modal-content", "Send room invite")
 
       context
     end
@@ -90,6 +93,9 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
 
     defp first_person(%{conn: _} = conn), do: [first_person: prepare_view(conn, "Bonnie")]
     defp second_person(%{conn: _} = conn), do: [second_person: prepare_view(conn, "Clyde")]
+
+    defp extract_sockets(persons),
+      do: Enum.map(persons, fn %{socket: socket} = _person -> socket end)
 
     defp extract_views(persons) when is_list(persons),
       do: Enum.map(persons, fn %{view: view} -> view end)

@@ -16,31 +16,30 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
       second_person: second_person
     } do
       persons = [first_person, second_person]
-
-      [_socket1, %{assigns: %{me: recipient}} = socket2] = persons |> extract_sockets()
+      {_sender, recipient} = extract_participants(persons)
 
       %{}
       |> init_views(persons)
-      |> create_room_with_upload_image()
-      |> send_room_invite()
-      |> add_dialog_gallery(recipient: recipient)
+      |> create_room_and_upload_image()
+      |> send_room_invitation()
+      |> open_dialog_and_upload_image(recipient: recipient)
 
-      # |> accept_room_invitation("Bonnie")
+      # |> accept_room_invitation(from: sender)
     end
 
-    defp accept_room_invitation(%{views: [_ | view] = _views} = context, name) do
+    defp accept_room_invitation(%{views: [_ | view] = _views} = context, from: user) do
       %{view: view}
-      |> open_dialog(name)
+      |> open_dialog(user)
 
       # TODO: write room invitation acceptance
 
       context
     end
 
-    defp create_room_with_upload_image(context),
+    defp create_room_and_upload_image(context),
       do: context |> create_room() |> upload_image("room")
 
-    defp add_dialog_gallery(%{views: [view | _] = _views} = context, recipient: user) do
+    defp open_dialog_and_upload_image(%{views: [view | _] = _views} = context, recipient: user) do
       view |> element(".t-chats") |> render_click()
 
       %{view: view}
@@ -49,7 +48,7 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
       |> upload_image("dialog")
     end
 
-    defp send_room_invite(%{views: [view | _] = _views} = context) do
+    defp send_room_invitation(%{views: [view | _] = _views} = context) do
       view
       |> element("#roomInviteButton")
       |> render_click()
@@ -93,6 +92,14 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
 
     defp first_person(%{conn: _} = conn), do: [first_person: prepare_view(conn, "Bonnie")]
     defp second_person(%{conn: _} = conn), do: [second_person: prepare_view(conn, "Clyde")]
+
+    defp extract_participants(persons) do
+      persons
+      |> extract_sockets()
+      |> then(fn [%{assigns: %{me: sender}}, %{assigns: %{me: recipient}}] ->
+        {sender, recipient}
+      end)
+    end
 
     defp extract_sockets(persons),
       do: Enum.map(persons, fn %{socket: socket} = _person -> socket end)

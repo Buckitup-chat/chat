@@ -135,7 +135,9 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
     |> assign_current(msg_id, Rooms.read_message(msg_id, room_identity))
   end
 
-  defp open(%{assigns: %{incoming_msg_id: msg_id, dialog: dialog, me: me}} = socket) do
+  defp open(
+         %{assigns: %{incoming_msg_id: msg_id, dialog: dialog, type: :dialog, me: me}} = socket
+       ) do
     socket
     |> assign_current(msg_id, Dialogs.read_message(dialog, msg_id, me))
   end
@@ -154,7 +156,7 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
     )
   end
 
-  defp preload_prev(%{assigns: %{dialog: dialog, list: list, me: me}} = socket) do
+  defp preload_prev(%{assigns: %{dialog: dialog, type: :dialog, list: list, me: me}} = socket) do
     first = List.first(list)
 
     socket
@@ -180,7 +182,7 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
     )
   end
 
-  defp preload_next(%{assigns: %{dialog: dialog, list: list, me: me}} = socket) do
+  defp preload_next(%{assigns: %{dialog: dialog, type: :dialog, list: list, me: me}} = socket) do
     last = List.last(list)
 
     socket

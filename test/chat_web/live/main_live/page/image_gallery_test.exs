@@ -16,22 +16,36 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
       second_person: second_person
     } do
       persons = [first_person, second_person]
-      {sender, recipient} = extract_participants(persons)
 
       %{}
+      |> set_participants(persons)
       |> init_views(persons)
       |> create_room_and_upload_image()
       |> send_room_invitation()
-      |> open_dialog_and_upload_image(recipient: recipient)
-      |> accept_room_invitation(from: sender)
+      |> open_dialog_and_upload_image()
+      |> accept_room_invitation()
+      |> open_room_image_gallery()
     end
 
-    defp accept_room_invitation(%{views: [_, view] = _views} = context, from: sender) do
+    defp open_room_image_gallery(%{views: [_, view] = _views, room_image: _uuid} = context) do
+      view
+      |> element("div #chat-messages")
+      |> render()
+
+      # TODO: open image gallery
+      context
+    end
+
+    defp accept_room_invitation(
+           %{views: [_, view] = _views, participants: %{sender: sender}} = context
+         ) do
       %{view: view}
       |> open_dialog(sender)
       |> update_context_view(context)
       |> select_room_invitation()
       |> render_click()
+
+      assert view |> has_element?("#roomHeader")
 
       context
     end
@@ -39,11 +53,13 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
     defp create_room_and_upload_image(context),
       do: context |> create_room() |> upload_image("room")
 
-    defp open_dialog_and_upload_image(%{views: [view | _] = _views} = context, recipient: user) do
+    defp open_dialog_and_upload_image(
+           %{views: [view | _] = _views, participants: %{recipient: recipient}} = context
+         ) do
       view |> element(".t-chats") |> render_click()
 
       %{view: view}
-      |> open_dialog(user)
+      |> open_dialog(recipient)
       |> update_context_view(context)
       |> upload_image("dialog")
     end
@@ -53,24 +69,24 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
       |> element("#roomInviteButton")
       |> render_click()
 
+      assert view |> has_element?("#room-invite-list")
+
       view
       |> element("a", "Send invite")
       |> render_click()
 
       view
-      |> element("#modal-content")
-      |> render_keydown()
-
-      refute view |> has_element?("#modal-content", "Send room invite")
+      |> element("#modal-content .phx-modal-close")
+      |> render_click()
 
       context
     end
 
     defp upload_image(%{views: [view_1 | _] = _views} = context, source) do
       with %{entry: entry, socket: _socket} <- start_upload(%{view: view_1}),
-           _entry <- %{entry | done?: true, progress: 100},
+           entry <- %{entry | done?: true, progress: 100},
            :ok <- ChangeTracker.await() do
-        Map.put(context, "#{source}_image" |> String.to_atom(), true)
+        Map.put(context, "#{source}_image" |> String.to_atom(), entry.uuid)
       else
         _ -> context
       end
@@ -98,12 +114,13 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
 
     defp which_view_update?(context), do: if(Map.has_key?(context, :dialog_image), do: 1, else: 0)
 
-    defp extract_participants(persons) do
+    defp set_participants(context, persons) do
       persons
       |> extract_sockets()
       |> then(fn [%{assigns: %{me: sender}}, %{assigns: %{me: recipient}}] ->
-        {sender, recipient}
+        %{sender: sender, recipient: recipient}
       end)
+      |> put_context_value({:participants, context})
     end
 
     defp extract_sockets(persons),

@@ -87,7 +87,7 @@ defmodule ChatWeb.LiveTestHelpers do
       end
 
     view
-    |> element(user_item)
+    |> element(user_item, if(user, do: "", else: "My notes"))
     |> render_click()
 
     state = :sys.get_state(view.pid)

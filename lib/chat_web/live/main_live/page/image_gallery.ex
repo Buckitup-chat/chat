@@ -129,8 +129,6 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
          } =
            socket
        ) do
-    IO.inspect(socket.assigns, label: "open")
-
     socket
     |> assign_current(msg_id, Rooms.read_message(msg_id, room_identity))
   end

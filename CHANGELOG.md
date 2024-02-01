@@ -23,6 +23,7 @@ straightforward as possible.
 - Chats page UI issue [#583]
 - copy invited user invitation with cargo room [#574]
 - relogin from socket state [#538]
+- fix sidebar hiding [#563, #591]
 
 ## 2023-12-30_167d8d9___2023-12-30_80fe885
 

@@ -27,6 +27,23 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     assert_keys_for_cargo_keys(room_key, [bot_key], 1)
   end
 
+  test "user and checkpoint got room invites" do
+    {[[checkpoint_1], checkpoint_key], [operator], [user]} = setup_test_data(1, 1, 1)
+
+    context =
+      %{}
+      |> generate_cargo_room(operator)
+      |> send_invite(from: operator, to: [checkpoint_1, user], mark_as: :index_1)
+
+    cargo_keys =
+      Chat.Db.db()
+      |> KeyScope.get_cargo_keys(Map.get(context, :room_key), [checkpoint_key])
+      |> fetch_checked_keys()
+
+    assert Enum.any?(Map.get(context, :index_1), &MapSet.member?(cargo_keys, &1))
+    assert_keys_for_cargo_keys(Map.get(context, :room_key), [checkpoint_key], 2)
+  end
+
   test "room invitation should be found in dialog of operator and user by only checkpoints key" do
     {[[checkpoint_1, checkpoint_2], checkpoint_keys], [operator], [user_c, user_d] = _users} =
       setup_test_data(2, 1, 2)

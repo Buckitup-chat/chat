@@ -15,6 +15,7 @@ straightforward as possible.
 - ZeroTier support [#425]
 
 ### Changed
+- improved encryption testing
 
 ### Fixed
 - feeds page ui issue [#583]

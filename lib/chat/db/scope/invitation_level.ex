@@ -129,8 +129,10 @@ defmodule Chat.Db.Scope.InvitationLevel do
 
   defp fetch_cycle_invites(sender_keys, %{snap: snap, invitations_keymap: keymap} = _context) do
     keymap
-    |> Enum.filter(fn {_invite_key, [user1_key, user2_key]} ->
-      MapSet.member?(sender_keys, user1_key) or MapSet.member?(sender_keys, user2_key)
+    |> Enum.filter(fn 
+      {_invite_key, [user1_key, user2_key]} ->
+        MapSet.member?(sender_keys, user1_key) or MapSet.member?(sender_keys, user2_key)
+      _ -> false
     end)
     |> compose_invitations_messages(sender_keys, snap)
   end
@@ -222,12 +224,16 @@ defmodule Chat.Db.Scope.InvitationLevel do
 
   defp put_operators_keys(%{invitations_keymap: keymap} = context, pub_keys) do
     keymap
-    |> Enum.map(fn {_key, [user_1, user_2]} ->
-      case {user_1 in pub_keys, user_2 in pub_keys} do
-        {true, false} -> user_2
-        {false, true} -> user_1
-        _ -> nil
-      end
+    |> Enum.map(fn
+      {_key, [user_1, user_2]} ->
+        cond do
+          user_1 in pub_keys and user_2 not in pub_keys -> user_2
+          user_2 in pub_keys and user_1 not in pub_keys -> user_1
+          true -> nil
+        end
+
+      _ ->
+        nil
     end)
     |> Enum.reject(&is_nil/1)
     |> then(&Map.put(context, :operators_keys, &1))
@@ -287,8 +293,12 @@ defmodule Chat.Db.Scope.InvitationLevel do
 
   defp is_recipient_exists?(sender_keys, messages) do
     messages
-    |> Enum.any?(fn {_invite_key, [user_1, user_2]} ->
-      MapSet.member?(sender_keys, user_1) or MapSet.member?(sender_keys, user_2)
+    |> Enum.any?(fn
+      {_invite_key, [user_1, user_2]} ->
+        MapSet.member?(sender_keys, user_1) or MapSet.member?(sender_keys, user_2)
+
+      _ ->
+        false
     end)
   end
 
@@ -320,8 +330,9 @@ defmodule Chat.Db.Scope.InvitationLevel do
 
   defp filter_root_keymap(keymap, pub_keys) do
     keymap
-    |> Enum.filter(fn {_invite_key, [a_key, b_key]} ->
-      is_root_key?([a_key, b_key], pub_keys)
+    |> Enum.filter(fn
+      {_invite_key, [a_key, b_key]} -> is_root_key?([a_key, b_key], pub_keys)
+      _ -> false
     end)
   end
 

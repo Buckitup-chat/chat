@@ -129,10 +129,12 @@ defmodule Chat.Db.Scope.InvitationLevel do
 
   defp fetch_cycle_invites(sender_keys, %{snap: snap, invitations_keymap: keymap} = _context) do
     keymap
-    |> Enum.filter(fn 
+    |> Enum.filter(fn
       {_invite_key, [user1_key, user2_key]} ->
         MapSet.member?(sender_keys, user1_key) or MapSet.member?(sender_keys, user2_key)
-      _ -> false
+
+      _ ->
+        false
     end)
     |> compose_invitations_messages(sender_keys, snap)
   end

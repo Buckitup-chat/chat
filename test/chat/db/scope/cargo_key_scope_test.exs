@@ -35,13 +35,15 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
       |> generate_cargo_room(operator)
       |> send_invite(from: operator, to: [checkpoint_1, user], mark_as: :index_1)
 
+    room_key = context |> Map.get(:room_identity) |> Identity.pub_key()
+
     cargo_keys =
       Chat.Db.db()
-      |> KeyScope.get_cargo_keys(Map.get(context, :room_key), checkpoint_key)
+      |> KeyScope.get_cargo_keys(room_key, checkpoint_key)
       |> fetch_checked_keys()
 
     assert Enum.any?(Map.get(context, :index_1), &MapSet.member?(cargo_keys, &1))
-    assert_keys_for_cargo_keys(Map.get(context, :room_key), checkpoint_key, 2)
+    assert_keys_for_cargo_keys(room_key, checkpoint_key, 2)
   end
 
   test "room invitation should be found in dialog of operator and user by only checkpoints key" do

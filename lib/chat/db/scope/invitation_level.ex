@@ -10,11 +10,11 @@ defmodule Chat.Db.Scope.InvitationLevel do
   @invitations_depth 4
 
   def build_initial_context(snap, pub_keys) do
-    %{}
-    |> put_room_invitations_content(snap, nil)
+    %{snap: snap}
+    |> put_room_invitations_content(nil)
     |> put_invitations_keymap()
     |> put_operators_keys(pub_keys)
-    |> put_initial_invites_queue(snap, pub_keys)
+    |> put_initial_invites_queue(pub_keys)
     |> remove_queued_invitations_keymap()
     |> clear_context_preparation()
   end
@@ -65,7 +65,7 @@ defmodule Chat.Db.Scope.InvitationLevel do
   end
 
   def execute_handshake_cycle(
-        %{invitations_keymap: keymap, invitations_queue: queue, operators_keys: operators} =
+        %{invitations_keymap: _keymap, invitations_queue: _queue, operators_keys: _operators} =
           context
       ) do
     if is_last_handshake_cycle?(context) do
@@ -80,7 +80,7 @@ defmodule Chat.Db.Scope.InvitationLevel do
     end
   end
 
-  defp put_room_invitations_content(context, snap, keys) do
+  defp put_room_invitations_content(%{snap: snap} = context, keys) do
     [room_invite_index, _room_invite_keys, room_invites] =
       snap
       |> fetch_index_and_records(
@@ -127,15 +127,44 @@ defmodule Chat.Db.Scope.InvitationLevel do
     }
   end
 
-  defp fetch_cycle_invites(sender_keys, %{invitations_keymap: keymap} = _context) do
+  defp fetch_cycle_invites(sender_keys, %{snap: snap, invitations_keymap: keymap} = _context) do
     keymap
     |> Enum.filter(fn {_invite_key, [user1_key, user2_key]} ->
       MapSet.member?(sender_keys, user1_key) or MapSet.member?(sender_keys, user2_key)
     end)
+    |> compose_invitations_messages(sender_keys, snap)
+  end
 
-    # TODO compose current cycle invitations messages
+  defp compose_invitations_messages(messages, sender_keys, snap) do
+    messages
+    |> Enum.map(&compose_invite_message(&1, snap))
+    |> reject_non_sender_messages(sender_keys)
+  end
 
-    # |> compose_invitations_messages()
+  defp compose_invite_message({invite_key, [first_key, second_key]} = invite, snap) do
+    with dialog_key <- build_dialog_key({first_key, second_key}),
+         {_, %Message{is_a_to_b?: is_a_to_b, id: message_id}} <-
+           dialog_key
+           |> get_invite_messages_by_dialog_key(snap)
+           |> Enum.at(0),
+         %Dialog{a_key: a_key, b_key: b_key} <- Chat.Db.get({:dialogs, dialog_key}) do
+      {
+        invite_key,
+        dialog_key,
+        is_a_to_b,
+        message_id,
+        %{a_key: a_key, b_key: b_key}
+      }
+    else
+      _ -> {:error, invite}
+    end
+  end
+
+  defp reject_non_sender_messages(messages, sender_keys) do
+    messages
+    |> Enum.reject(fn {_key, _dialog_key, is_a_to_b, _message_id, %{a_key: a_key, b_key: b_key}} ->
+      (a_key not in sender_keys and is_a_to_b) || (b_key not in sender_keys and not is_a_to_b)
+    end)
   end
 
   defp get_messages_sender_keys(messages, type) do
@@ -156,9 +185,6 @@ defmodule Chat.Db.Scope.InvitationLevel do
         :invitations_queue,
         [invitations | queue]
       )
-
-  defp put_invitations_queue(invitations, context),
-    do: context |> Map.put(:invitations_queue, [invitations])
 
   defp remove_queued_invitations_keymap(
          %{invitations_queue: queue, invitations_keymap: keymap} = context
@@ -261,16 +287,9 @@ defmodule Chat.Db.Scope.InvitationLevel do
 
   defp is_recipient_exists?(sender_keys, messages) do
     messages
-    |> Enum.any?(fn {invite_key, [user_1, user_2]} ->
+    |> Enum.any?(fn {_invite_key, [user_1, user_2]} ->
       MapSet.member?(sender_keys, user_1) or MapSet.member?(sender_keys, user_2)
     end)
-  end
-
-  defp define_sender_key(is_a_to_b, :operators, {a_key, b_key}) do
-    case is_a_to_b do
-      true -> a_key
-      false -> b_key
-    end
   end
 
   defp define_sender_key(is_a_to_b, :users, {a_key, b_key}) do
@@ -281,31 +300,12 @@ defmodule Chat.Db.Scope.InvitationLevel do
   end
 
   defp put_initial_invites_queue(
-         %{invitations_keymap: keymap, operators_keys: operators} = context,
-         snap,
+         %{snap: snap, invitations_keymap: keymap, operators_keys: operators} = context,
          pub_keys
        ) do
     keymap
     |> filter_root_keymap(pub_keys)
-    |> Enum.map(fn {invite_key, [first_key, second_key]} ->
-      dialog_key = build_dialog_key({first_key, second_key})
-
-      {_, %Message{is_a_to_b?: is_a_to_b, id: message_id}} =
-        dialog_key
-        |> get_invite_messages_by_dialog_key(snap)
-        |> Enum.at(0)
-
-      %Dialog{a_key: a_key, b_key: b_key} =
-        CubDB.Snapshot.get(snap, {:dialogs, dialog_key})
-
-      {
-        invite_key,
-        dialog_key,
-        is_a_to_b,
-        message_id,
-        %{a_key: a_key, b_key: b_key}
-      }
-    end)
+    |> compose_invitations_messages(operators, snap)
     |> then(&Map.put_new(context, :invitations_queue, [&1]))
   end
 

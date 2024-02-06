@@ -19,7 +19,8 @@ defmodule ChatWeb.MainLive.Index do
     FirmwareUpgradeForm,
     LanSettings,
     MediaSettingsForm,
-    NetworkSourceList
+    NetworkSourceList,
+    ZerotierSettings
   }
 
   alias ChatWeb.MainLive.{Layout, Page}
@@ -66,9 +67,9 @@ defmodule ChatWeb.MainLive.Index do
         |> LocalTimeHook.assign_time(Phoenix.LiveView.get_connect_params(socket)["tz_info"])
         |> allow_any500m_upload(:my_keys_file)
         |> allow_recover_upload()
-        |> Page.Login.check_stored()
         |> set_cargo_room()
         |> set_usb_drive_dump_room()
+        |> Page.Login.check_stored()
         |> ok()
       end
     else
@@ -665,6 +666,11 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   defp login_init(socket) do
+    socket
+    |> on_login()
+  end
+
+  def on_login(socket) do
     socket
     |> Page.Lobby.init()
     |> Page.Dialog.init()

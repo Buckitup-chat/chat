@@ -4,10 +4,6 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
   import ChatWeb.LiveTestHelpers
   import Phoenix.LiveViewTest
 
-  alias ChatWeb.MainLive.Page.ImageGallery
-
-  alias Chat.Db.ChangeTracker
-
   describe "image gallery" do
     setup [:first_person, :second_person]
 
@@ -27,13 +23,21 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
       |> open_room_image_gallery()
     end
 
-    defp open_room_image_gallery(%{views: [_, view] = _views, room_image: _uuid} = context) do
-      view
-      |> element("div #chat-messages")
-      |> render()
+    defp open_room_image_gallery(%{views: [_, view_2] = _views, room_image: _uuid} = context) do
+      with %{socket: %{assigns: %{messages: messages}} = _socket, view: view} <-
+             reload_view(%{view: view_2}),
+           %{id: message_id} = _message <-
+             Enum.find(messages, fn %{type: type} = _message -> type == :image end) do
+        view
+        |> element("#chat-image-#{message_id}")
+        |> render_click()
 
-      # TODO: open image gallery
-      context
+        assert view |> has_element?("#galleryImage")
+
+        # TODO: check gallery image state
+
+        context
+      end
     end
 
     defp accept_room_invitation(
@@ -83,10 +87,10 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
     end
 
     defp upload_image(%{views: [view_1 | _] = _views} = context, source) do
-      with %{entry: entry, socket: _socket} <- start_upload(%{view: view_1}),
+      with %{entry: entry, file: file, filename: filename} <- start_upload(%{view: view_1}),
            entry <- %{entry | done?: true, progress: 100},
-           :ok <- ChangeTracker.await() do
-        Map.put(context, "#{source}_image" |> String.to_atom(), entry.uuid)
+           render_upload(file, filename, 100) do
+        Map.put(context, "#{source}_image" |> String.to_atom(), entry)
       else
         _ -> context
       end

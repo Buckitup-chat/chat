@@ -7,7 +7,7 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
   describe "image gallery" do
     setup [:first_person, :second_person]
 
-    test "open gallery after transition from intive to room", %{
+    test "watch gallery images after transition from invite to room", %{
       first_person: first_person,
       second_person: second_person
     } do
@@ -16,27 +16,58 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
       %{}
       |> set_participants(persons)
       |> init_views(persons)
-      |> create_room_and_upload_image()
+      |> create_room_and_upload_images()
       |> send_room_invitation()
       |> open_dialog_and_upload_image()
       |> accept_room_invitation()
       |> open_room_image_gallery()
+      |> check_room_gallery_open_image()
+      |> check_room_gallery_images_switch()
     end
 
-    defp open_room_image_gallery(%{views: [_, view_2] = _views, room_image: _uuid} = context) do
-      with %{socket: %{assigns: %{messages: messages}} = _socket, view: view} <-
+    defp check_room_gallery_images_switch(
+           %{
+             views: [_, view],
+             room_messages: [_first, %{id: second_id} | _] = _messages,
+             opened: id
+           } =
+             context
+         ) do
+      assert view |> has_element?("div #imageGallery .button-container #next")
+      assert view |> has_element?("div #imageGallery .button-container #prev")
+      assert view |> has_element?("div #topPanel .text-white")
+
+      view
+      |> element("#imageGallery #next")
+      |> render_click()
+
+      assert view |> has_element?("div #topPanel .text-white", "#{second_id}")
+
+      view
+      |> element("#imageGallery #prev")
+      |> render_click()
+
+      assert view |> has_element?("div #topPanel .text-white", "#{id}")
+
+      context
+    end
+
+    defp check_room_gallery_open_image(%{views: [_, view] = _views} = context) do
+      refute view |> has_element?("span", "The message is lost")
+      assert view |> has_element?("#galleryImage")
+
+      context
+    end
+
+    defp open_room_image_gallery(%{views: [_, view_2] = _views, room_images: _images} = context) do
+      with %{socket: %{assigns: %{messages: messages}}, view: view} <-
              reload_view(%{view: view_2}),
-           %{id: message_id} = _message <-
-             Enum.find(messages, fn %{type: type} = _message -> type == :image end) do
+           %{id: message_id} <- Enum.find(messages, &(&1.type == :image)) do
         view
         |> element("#chat-image-#{message_id}")
         |> render_click()
 
-        assert view |> has_element?("#galleryImage")
-
-        # TODO: check gallery image state
-
-        context
+        context |> Map.put(:room_messages, messages) |> Map.put(:opened, message_id)
       end
     end
 
@@ -54,8 +85,8 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
       context
     end
 
-    defp create_room_and_upload_image(context),
-      do: context |> create_room() |> upload_image("room")
+    defp create_room_and_upload_images(context),
+      do: context |> create_room() |> upload_images("room", 3)
 
     defp open_dialog_and_upload_image(
            %{views: [view | _] = _views, participants: %{recipient: recipient}} = context
@@ -86,11 +117,18 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
       context
     end
 
+    defp upload_images(context, _source, 0), do: context
+
+    defp upload_images(context, source, count),
+      do: context |> upload_image(source) |> upload_images(source, count - 1)
+
     defp upload_image(%{views: [view_1 | _] = _views} = context, source) do
       with %{entry: entry, file: file, filename: filename} <- start_upload(%{view: view_1}),
            entry <- %{entry | done?: true, progress: 100},
            render_upload(file, filename, 100) do
-        Map.put(context, "#{source}_image" |> String.to_atom(), entry)
+        Map.update(context, atom_image_key(source), [entry], fn prev_entries ->
+          [entry | prev_entries]
+        end)
       else
         _ -> context
       end
@@ -135,5 +173,7 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
 
     defp select_room_invitation(%{views: [_, view]} = _context),
       do: element(view, "button", "Accept and Open")
+
+    defp atom_image_key(source), do: "#{source}_images" |> String.to_atom()
   end
 end

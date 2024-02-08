@@ -23,6 +23,13 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
       |> open_room_image_gallery()
       |> check_room_gallery_open_image()
       |> check_room_gallery_images_switch()
+      |> close_room_image_gallery()
+    end
+
+    defp close_room_image_gallery(%{views: [_, view] = _views, opened: id} = context) do
+      view |> element("#backBtn button", "Back") |> render_click()
+      refute view |> has_element?("div #topPanel .text-white", "#{id}")
+      context
     end
 
     defp check_room_gallery_images_switch(
@@ -96,7 +103,7 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
       %{view: view}
       |> open_dialog(recipient)
       |> update_context_view(context)
-      |> upload_image("dialog")
+      |> upload_images("dialog", 2)
     end
 
     defp send_room_invitation(%{views: [view | _] = _views} = context) do

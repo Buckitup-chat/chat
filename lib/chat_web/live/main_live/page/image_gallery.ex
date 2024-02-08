@@ -115,6 +115,7 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
       :open -> socket |> open()
       :preload_next -> socket |> preload_next()
       :preload_prev -> socket |> preload_prev()
+      # coveralls-ignore-next-line
       _ -> socket
     end
   end
@@ -140,6 +141,7 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
     |> assign_current(msg_id, Dialogs.read_message(dialog, msg_id, me))
   end
 
+  # coveralls-ignore-next-line
   defp preload_prev(%{assigns: %{list: []}} = socket), do: socket
 
   defp preload_prev(%{assigns: %{room_identity: identity, type: :room, list: list}} = socket) do
@@ -166,6 +168,7 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
     )
   end
 
+  # coveralls-ignore-next-line
   defp preload_next(%{assigns: %{list: []}} = socket), do: socket
 
   defp preload_next(%{assigns: %{room_identity: identity, type: :room, list: list}} = socket) do

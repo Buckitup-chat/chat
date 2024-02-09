@@ -17,6 +17,7 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
+- cargo sync broken [#594]
 - feeds page ui issue [#583]
 - Mobile view. Sync mode cover chat options [#579]
 - Log in by key uploading UI issue [#583]

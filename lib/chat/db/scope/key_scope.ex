@@ -144,8 +144,8 @@ defmodule Chat.Db.Scope.KeyScope do
 
   defp add_invitation_dialogs(acc_set, snap, pub_keys) do
     snap
-    |> build_initial_context()
-    |> handshake_dialogs_cycle(pub_keys)
+    |> build_initial_context(pub_keys)
+    |> execute_handshake_cycle()
     |> process_invitation_groups()
     |> update_acc_set(acc_set)
   end

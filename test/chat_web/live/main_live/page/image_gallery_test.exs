@@ -5,15 +5,22 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
   import Phoenix.LiveViewTest
 
   describe "image gallery" do
-    setup [:first_person, :second_person]
+    setup [:setup_persons]
 
-    test "watch gallery images after transition from invite to room", %{
-      first_person: first_person,
-      second_person: second_person
-    } do
-      persons = [first_person, second_person]
+    test "watch gallery images after transition from invite to room",
+         %{first_person: first_person, second_person: second_person} = context do
+      context
+      |> init_gallery_workflow([first_person, second_person])
+      |> test_image_gallery_flow()
+    end
 
-      %{}
+    defp setup_persons(%{conn: _} = conn) do
+      {:ok,
+       first_person: prepare_view(conn, "Bonnie"), second_person: prepare_view(conn, "Clyde")}
+    end
+
+    defp init_gallery_workflow(context, persons) do
+      context
       |> set_participants(persons)
       |> init_views(persons)
       |> create_room_and_upload_images()
@@ -21,6 +28,10 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
       |> open_dialog_with_invite()
       |> upload_dialog_images()
       |> open_dialog_image_gallery()
+    end
+
+    defp test_image_gallery_flow(context) do
+      context
       |> check_gallery_image_switch(:dialog)
       |> close_image_gallery()
       |> accept_room_invitation()
@@ -30,53 +41,58 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
       |> close_image_gallery()
     end
 
-    defp close_image_gallery(%{views: [_, view] = _views, opened: id} = context) do
-      view |> element("#backBtn button", "Back") |> render_click()
-      refute view |> has_element?("div #topPanel .text-white", "#{id}")
+    defp close_image_gallery(%{views: [_, view], opened: id} = context) do
+      view |> click_element("#backBtn button", "Back")
+      view |> assert_no_element("div #topPanel .text-white", id)
+
       context
     end
 
     defp check_gallery_image_switch(%{views: [_, view]} = context, type) do
-      messages = context[atom_image_key(type)]
-      {id, second_id} = {Enum.at(messages, 0).id, Enum.at(messages, 1).id}
+      {id, second_id} = context |> fetch_image_ids(type)
 
       context
-      |> assert_move_btn(view, :next)
-      |> assert_move_btn(view, :prev)
-      |> render_click_move(view, :next)
-      |> assert_image_element_id(view, second_id)
-      |> render_click_move(view, :prev)
-      |> assert_image_element_id(view, id)
+      |> assert_navigation_buttons(view)
+      |> navigate_and_assert_image(view, :next, second_id)
+      |> navigate_and_assert_image(view, :prev, id)
     end
 
-    defp assert_image_element_id(context, view, value) do
-      assert view |> has_element?("div #topPanel .text-white", "#{value}")
+    defp assert_navigation_buttons(context, view) do
+      Enum.each([:next, :prev], fn type ->
+        assert view |> has_element?("div #imageGallery .button-container #{button_id(type)}")
+      end)
+
       context
     end
 
-    defp render_click_move(context, view, type) do
+    defp navigate_and_assert_image(context, view, direction, expected_id) do
       view
-      |> element(
-        "#imageGallery #{case type do
-          :next -> "#next"
-          :prev -> "#prev"
-        end}"
-      )
-      |> render_click()
+      |> click_element("#imageGallery #{button_id(direction)}")
+
+      view
+      |> assert_element("div #topPanel .text-white", expected_id)
 
       context
     end
 
-    defp assert_move_btn(context, view, type) do
-      assert view
-             |> has_element?(
-               "div #imageGallery .button-container #{case type do
-                 :next -> "#next"
-                 :prev -> "#prev"
-               end}"
-             )
+    defp button_id(:next), do: "#next"
+    defp button_id(:prev), do: "#prev"
 
-      context
+    defp fetch_image_ids(context, type) do
+      messages = context |> Map.fetch!(atom_image_key(type))
+      {Enum.at(messages, 0).id, Enum.at(messages, 1).id}
+    end
+
+    defp click_element(view, selector, action \\ nil) do
+      view |> element(selector, action) |> render_click()
+    end
+
+    defp assert_element(view, selector, expected_value) do
+      assert view |> has_element?(selector, "#{expected_value}")
+    end
+
+    defp assert_no_element(view, selector, unexpected_value) do
+      refute view |> has_element?(selector, "#{unexpected_value}")
     end
 
     defp check_room_gallery_open_image(%{views: [_, view] = _views} = context) do
@@ -88,15 +104,15 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
 
     defp open_dialog_image_gallery(
            %{
-             views: [_view_1, view_2] = _views,
+             views: [_, view] = _views,
              dialog_image_messages: [%{id: message_id}, _] = _messages
            } = context
          ) do
-      view_2
+      view
       |> element("#chat-image-#{message_id}")
       |> render_click()
 
-      assert view_2 |> has_element?("#galleryImage")
+      assert view |> has_element?("#galleryImage")
 
       context |> Map.put(:opened, message_id)
     end
@@ -200,9 +216,6 @@ defmodule ChatWeb.MainLive.Page.ImageGalleryTest do
   end
 
   defp put_context_value(value, {key, context}), do: Map.put(context, key, value)
-
-  defp first_person(%{conn: _} = conn), do: [first_person: prepare_view(conn, "Bonnie")]
-  defp second_person(%{conn: _} = conn), do: [second_person: prepare_view(conn, "Clyde")]
 
   defp which_view_update?(actor), do: if(actor == :sender, do: 0, else: 1)
 

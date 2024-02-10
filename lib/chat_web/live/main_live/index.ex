@@ -20,6 +20,7 @@ defmodule ChatWeb.MainLive.Index do
     LanSettings,
     MediaSettingsForm,
     NetworkSourceList,
+    NervesKeySettings,
     ZerotierSettings
   }
 

@@ -69,6 +69,22 @@ defmodule ChatWeb.MainLive.Admin.NervesKeySettings do
     """
   end
 
+  def status_provisioned(assigns) do
+    ~H"""
+    <div class="text-center my-2">
+      Chip found. Provisioned
+    </div>
+    <div>
+      <label class="text-black/50"> Board: </label>
+      <%= @board_name %>
+    </div>
+    <div>
+      <label class="text-black/50"> SN: </label>
+      <%= @manufacturer_sn %>
+    </div>
+    """
+  end
+
   def provision_form(assigns) do
     ~H"""
     <section>
@@ -102,12 +118,6 @@ defmodule ChatWeb.MainLive.Admin.NervesKeySettings do
   def request_status(my_pid) do
     @topic
     |> pubsub_async_command(:status, fn ->
-      # assigns = %{board_name: "NervesKey", manufacturer_sn: "AER5WYW6655PL3Q"}
-      #
-      # %{status: status_not_provisioned(assigns), show_provision_form: true}
-      # |> update_component(my_pid)
-
-      # %{status: status_no_chip(%{})} |> update_component(my_pid)
       receive do
         {:status, :no_chip} ->
           %{status: status_no_chip(%{})} |> update_component(my_pid)
@@ -118,21 +128,23 @@ defmodule ChatWeb.MainLive.Admin.NervesKeySettings do
           |> update_component(my_pid)
 
           :ok
+
+        {:status, {:provisioned, assigns}} ->
+          %{status: status_provisioned(assigns), show_provision_form: false}
+          |> update_component(my_pid)
       after
-        # :timeout
-        1500 ->
-          %{status: status_no_chip(%{})} |> update_component(my_pid)
+        1500 -> :timeout
       end
     end)
   end
 
-  def request_provisioning(component_pid, actor, _device_name, cert_years) do
+  def request_provisioning(component_pid, actor, device_name, cert_years) do
     pubsub_async_command(@topic, {:generate_cert, cert_years}, fn ->
       with {:ok, cert_and_key} <- receive_cert_and_key(5 |> :timer.seconds()),
-           _ <- save_cert_to_my_notes(actor, cert_and_key) do
-        # hash <- calc_keys_hash(cert_and_key),
-        # :ok <- send_provision_ready(@topic, hash, device_name),
-        # :ok <- receive_provisioned(15 |> :timer.seconds()) do
+           :ok <- save_cert_to_my_notes(actor, cert_and_key),
+           hash <- calc_keys_hash(cert_and_key),
+           :ok <- send_provision_ready(@topic, hash, device_name),
+           :ok <- receive_provisioned(15 |> :timer.seconds()) do
         request_status(component_pid)
       else
         _ -> request_status(component_pid)
@@ -149,38 +161,43 @@ defmodule ChatWeb.MainLive.Admin.NervesKeySettings do
   end
 
   defp save_cert_to_my_notes(actor, cert_and_key) do
-    require Logger
-    actor |> inspect(pretty: true) |> Logger.critical()
-    cert_and_key |> inspect(pretty: true) |> Logger.critical()
+    {raw_cert, raw_private_key} = cert_and_key
 
-    :todo
+    raw_private_key
+    |> X509.PrivateKey.to_pem()
+    |> Chat.file_message_from_text_to_my_notes("device_signer.key", "text/plain", actor)
+
+    raw_cert
+    |> X509.Certificate.to_pem()
+    |> Chat.file_message_from_text_to_my_notes("device_signer.cert", "text/plain", actor)
+
+    :ok
   end
 
-  # defp calc_keys_hash(cert_and_key) do
-  #   :todo
-  # end
-  #
-  # defp send_provision_ready(topic, hash, device_name) do
-  #   broadcast_command(topic, {{:provision, hash, device_name}, self()})
-  #
-  #   :ok
-  # end
-  #
-  # defp receive_provisioned(timeout) do
-  #   receive do
-  #     {:provisioned, data} ->
-  #       data |> dbg()
-  #       :ok
-  #   after
-  #     timeout ->
-  #       :timeout
-  #   end
-  # end
+  defp calc_keys_hash({cert, key}) do
+    pem_cert = X509.Certificate.to_pem(cert)
+    pem_key = X509.PrivateKey.to_pem(key)
 
-  # generate_keys
-  # send_keys_to_my_notes
-  # calc_keys_hash
-  # finish_provisoning
+    Enigma.hash(pem_cert <> pem_key)
+  end
+
+  defp send_provision_ready(topic, hash, device_name) do
+    broadcast_command(topic, {{:provision, hash, device_name}, self()})
+
+    :ok
+  end
+
+  defp receive_provisioned(timeout) do
+    receive do
+      {:provisioned, data} ->
+        require Logger
+        data |> inspect() |> Logger.error()
+        :ok
+    after
+      timeout ->
+        :timeout
+    end
+  end
 
   defp update_component(updates_map, pid) do
     updates_map

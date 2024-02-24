@@ -41,10 +41,16 @@ defmodule Chat.Db.Copying do
   def await_written_into([], _, _), do: :done
 
   def await_written_into(keys, target_db, skip_set) do
-    keys
-    |> Progress.new(target_db, skip_set)
-    |> ensure_complete()
+    if dry_db?(target_db) do
+      :done
+    else
+      keys
+      |> Progress.new(target_db, skip_set)
+      |> ensure_complete()
+    end
   end
+
+  defp dry_db?(db), do: Common.names(db, :status) |> Common.dry?()
 
   defp prepare_copying(from, to, keys_set) do
     "[copying] reading DBs" |> Logger.debug()

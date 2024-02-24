@@ -59,7 +59,7 @@ defmodule Chat.Db.Scope.Full do
     |> MapSet.new()
     |> MapSet.union(set)
     |> then(&{snap, &1})
-    rescue
+  rescue
     _ -> {snap, set}
   end
 
@@ -70,7 +70,7 @@ defmodule Chat.Db.Scope.Full do
     |> FileFs.list_all_db_keys()
     |> MapSet.new()
     |> MapSet.union(keys)
-    rescue
+  rescue
     _ -> keys
   end
 end

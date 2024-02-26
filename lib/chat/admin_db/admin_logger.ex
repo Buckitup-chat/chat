@@ -28,6 +28,8 @@ defmodule Chat.AdminDb.AdminLogger do
     |> write_message({ts, level, msg})
 
     {:ok, %{state | next_index: index + 1}}
+  rescue
+    _ -> {:ok, state}
   end
 
   def handle_event(:flush, state) do

@@ -35,6 +35,8 @@ defmodule Chat.AdminRoom do
     admin_card = admin |> Card.from_identity()
 
     AdminDb.put({:new_admin, admin_pub_key}, admin_card)
+  rescue
+    _ -> :untracked
   end
 
   def admin_list do

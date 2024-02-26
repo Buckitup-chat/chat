@@ -3,6 +3,8 @@ defmodule Chat do
   High level functions
   """
 
+  alias Chat.Db.Copying
+
   def db_get(key) do
     case key do
       {:file_chunk, file_key, first, last} -> read_chunk({first, last}, file_key)
@@ -12,7 +14,7 @@ defmodule Chat do
 
   def db_put(key, value) do
     Chat.Db.put(key, value)
-    Chat.Db.Copying.await_written_into([key], Chat.Db.db())
+    Copying.await_written_into([key], Chat.Db.db())
   end
 
   def db_has?(key) do

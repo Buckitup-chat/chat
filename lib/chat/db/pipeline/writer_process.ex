@@ -39,11 +39,12 @@ defmodule Chat.Db.Pipeline.WriterProcess do
   end
 
   @impl true
-
   def handle_continue(:demand, state) do
     state
     |> demand_queue()
     |> noreply()
+  rescue
+    _ -> noreply(state)
   end
 
   @impl true

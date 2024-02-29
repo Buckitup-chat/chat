@@ -27,20 +27,26 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     assert_keys_for_cargo_keys(room_key, [bot_key], 1)
   end
 
+  test "user and checkpoint got room invites" do
+    {[[checkpoint_1], checkpoint_key], [operator], [user]} = setup_test_data(1, 1, 1)
+
+    %{}
+    |> generate_cargo_room(operator)
+    |> send_invite(from: operator, to: [checkpoint_1, user], mark_as: :index_1)
+    |> assert_index_exists(:index_1, checkpoint_key)
+    |> assert_cargo_keys(checkpoint_key, 2)
+  end
+
   test "room invitation should be found in dialog of operator and user by only checkpoints key" do
     {[[checkpoint_1, checkpoint_2], checkpoint_keys], [operator], [user_c, user_d] = _users} =
       setup_test_data(2, 1, 2)
 
-    context =
-      %{}
-      |> generate_cargo_room(operator)
-      |> send_invite(from: operator, to: [checkpoint_1, checkpoint_2], mark_as: :index_1)
-      |> send_invite(from: operator, to: user_c, mark_as: :index_2)
-      |> send_invite(from: user_c, to: user_d, mark_as: :index_3)
-
-    room_key = context |> Map.get(:room_identity) |> Identity.pub_key()
-
-    assert_keys_for_cargo_keys(room_key, checkpoint_keys, 4)
+    %{}
+    |> generate_cargo_room(operator)
+    |> send_invite(from: operator, to: [checkpoint_1, checkpoint_2], mark_as: :index_1)
+    |> send_invite(from: operator, to: user_c, mark_as: :index_2)
+    |> send_invite(from: user_c, to: user_d, mark_as: :index_3)
+    |> assert_cargo_keys(checkpoint_keys, 4)
   end
 
   test "room invitations found up to 1 handshake" do
@@ -50,23 +56,16 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
       [user_1, user_2, user_3, user_4]
     } = setup_test_data(3, 2, 4)
 
-    invitations_board =
-      %{}
-      |> generate_cargo_room(operator_1)
-      |> send_invite(from: operator_1, to: [checkpoint_1, checkpoint_2], mark_as: :index_1)
-      |> send_invite(from: operator_2, to: checkpoint_3, mark_as: :index_2)
-      |> send_invite(from: operator_1, to: user_1, mark_as: :index_3)
-      |> send_invite(from: user_1, to: [user_2, user_4], mark_as: :index_4)
-      |> send_invite(from: user_2, to: user_3, mark_as: :index_5)
-      |> send_invite(from: user_3, to: [user_4, user_1], mark_as: :index_6)
-
-    cargo_keys =
-      Chat.Db.db()
-      |> KeyScope.get_cargo_keys(Map.get(invitations_board, :room_key), checkpoints_keys)
-      |> fetch_checked_keys()
-
-    assert Enum.any?(Map.get(invitations_board, :index_5), &MapSet.member?(cargo_keys, &1))
-    refute Enum.any?(Map.get(invitations_board, :index_6), &MapSet.member?(cargo_keys, &1))
+    %{}
+    |> generate_cargo_room(operator_1)
+    |> send_invite(from: operator_1, to: [checkpoint_1, checkpoint_2], mark_as: :index_1)
+    |> send_invite(from: operator_2, to: checkpoint_3, mark_as: :index_2)
+    |> send_invite(from: operator_1, to: user_1, mark_as: :index_3)
+    |> send_invite(from: user_1, to: [user_2, user_4], mark_as: :index_4)
+    |> send_invite(from: user_2, to: user_3, mark_as: :index_5)
+    |> send_invite(from: user_3, to: [user_4, user_1], mark_as: :index_6)
+    |> assert_index_exists(:index_5, checkpoints_keys)
+    |> refute_index_exists(:index_6, checkpoints_keys)
   end
 
   defp setup_test_data(checkpoints_count, operators_count, users_count) do
@@ -85,6 +84,31 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
       Enum.map(1..users_count, &("user#{&1}" |> User.login() |> create_user_from_identity()))
 
     {[checkpoints, checkpoint_keys], operators, users}
+  end
+
+  defp assert_index_exists(%{room_identity: room_key} = context, index, checkpoint_key) do
+    cargo_keys =
+      Chat.Db.db()
+      |> KeyScope.get_cargo_keys(room_key |> Identity.pub_key(), checkpoint_key)
+      |> fetch_checked_keys()
+
+    assert Enum.any?(Map.get(context, index), &MapSet.member?(cargo_keys, &1))
+    context
+  end
+
+  defp refute_index_exists(%{room_identity: room_key} = context, index, checkpoint_key) do
+    cargo_keys =
+      Chat.Db.db()
+      |> KeyScope.get_cargo_keys(room_key |> Identity.pub_key(), checkpoint_key)
+      |> fetch_checked_keys()
+
+    refute Enum.any?(Map.get(context, index), &MapSet.member?(cargo_keys, &1))
+    context
+  end
+
+  defp assert_cargo_keys(%{room_identity: room_key} = context, checkpoint_key, amount_of_entities) do
+    assert_keys_for_cargo_keys(room_key |> Identity.pub_key(), checkpoint_key, amount_of_entities)
+    context
   end
 
   defp assert_keys_for_cargo_keys(room_key, checkpoint_keys, expected_count) do

@@ -17,6 +17,8 @@ straightforward as possible.
 ### Changed
 
 ### Fixed
+- displaying the gallery after go to invited room [#562]
+- cargo sync broken [#594]
 - feeds page ui issue [#583]
 - Mobile view. Sync mode cover chat options [#579]
 - Log in by key uploading UI issue [#583]
@@ -24,6 +26,9 @@ straightforward as possible.
 - copy invited user invitation with cargo room [#574]
 - relogin from socket state [#538]
 - fix sidebar hiding [#563, #591]
+- reading from full db, switching in RO mode [#581]
+- skip demand when takes too long [#590]
+- fix message selection [#578]
 
 ## 2023-12-30_167d8d9___2023-12-30_80fe885
 

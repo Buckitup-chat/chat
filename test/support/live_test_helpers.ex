@@ -13,13 +13,13 @@ defmodule ChatWeb.LiveTestHelpers do
   @type view :: %Phoenix.LiveViewTest.View{}
 
   @spec prepare_view(%{conn: Plug.Conn.t()}) :: %{socket: Socket.t(), view: view()}
-  def prepare_view(%{conn: conn}) do
+  def prepare_view(%{conn: conn}, name \\ "User") do
     {:ok, view, _html} = live(conn, "/")
 
     render_hook(view, "restoreAuth")
 
     view
-    |> form("#login-form", login: %{name: "User"})
+    |> form("#login-form", login: %{name: name})
     |> render_submit()
 
     set_local_time(%{view: view})
@@ -75,9 +75,19 @@ defmodule ChatWeb.LiveTestHelpers do
   end
 
   @spec open_dialog(%{view: view()}) :: %{socket: Socket.t(), view: view()}
-  def open_dialog(%{view: view}) do
+  def open_dialog(%{view: view}, user \\ nil) do
+    user_item =
+      case user do
+        nil ->
+          "#chatRoomBar ul li.hidden"
+
+        _ ->
+          user = user |> Chat.Card.from_identity()
+          "#chatRoomBar #user-#{user.hash}"
+      end
+
     view
-    |> element("#chatRoomBar ul li.hidden", "My notes")
+    |> element(user_item, if(user, do: "", else: "My notes"))
     |> render_click()
 
     state = :sys.get_state(view.pid)

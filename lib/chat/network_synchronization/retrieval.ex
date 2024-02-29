@@ -57,6 +57,7 @@ defmodule Chat.NetworkSynchronization.Retrieval do
          #  _ <- {serialized, value} |> dbg(),
          false <- is_nil(value) do
       Chat.db_put(key, value)
+      :ok
     end
   end
 

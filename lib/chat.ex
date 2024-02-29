@@ -3,6 +3,8 @@ defmodule Chat do
   High level functions
   """
 
+  alias Chat.Db.Copying
+
   def db_get(key) do
     case key do
       {:file_chunk, file_key, first, last} -> read_chunk({first, last}, file_key)
@@ -11,10 +13,8 @@ defmodule Chat do
   end
 
   def db_put(key, value) do
-    case key do
-      {:file_chunk, file_key, first, last} -> write_chunk(value, {file_key, first, last})
-      _ -> Chat.Db.put(key, value)
-    end
+    Chat.Db.put(key, value)
+    Copying.await_written_into([key], Chat.Db.db())
   end
 
   def db_has?(key) do
@@ -29,10 +29,6 @@ defmodule Chat do
       Chat.FileFs.read_exact_file_chunk(range, key, path())
 
     data
-  end
-
-  defp write_chunk(value, chunk_params) do
-    Chat.FileFs.write_file(value, chunk_params, path())
   end
 
   defp path, do: CubDB.data_dir(Chat.Db.db()) <> "_files"

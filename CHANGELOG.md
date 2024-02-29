@@ -27,6 +27,7 @@ straightforward as possible.
 - relogin from socket state [#538]
 - reading from full db, switching in RO mode [#581]
 - skip demand when takes too long [#590]
+- fix message selection [#578]
 
 ## 2023-12-30_167d8d9___2023-12-30_80fe885
 

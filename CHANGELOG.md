@@ -15,6 +15,7 @@ straightforward as possible.
 - ZeroTier support [#425]
 
 ### Changed
+- improved encryption testing
 
 ### Fixed
 - displaying the gallery after go to invited room [#562]

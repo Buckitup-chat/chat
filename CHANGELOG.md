@@ -25,6 +25,7 @@ straightforward as possible.
 - Chats page UI issue [#583]
 - copy invited user invitation with cargo room [#574]
 - relogin from socket state [#538]
+- fix sidebar hiding [#563, #591]
 - reading from full db, switching in RO mode [#581]
 - skip demand when takes too long [#590]
 - fix message selection [#578]

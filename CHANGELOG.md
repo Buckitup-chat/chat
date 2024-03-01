@@ -16,6 +16,7 @@ straightforward as possible.
 
 ### Changed
 - improved encryption testing
+- no indication unless cargo [#603]
 
 ### Fixed
 - displaying the gallery after go to invited room [#562]

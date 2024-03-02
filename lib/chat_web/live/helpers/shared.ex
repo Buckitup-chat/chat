@@ -18,8 +18,8 @@ defmodule ChatWeb.LiveHelpers.Shared do
   def process(socket, task) do
     pid = Process.whereis(Chat.TaskSupervisor)
 
-    if pid and Process.alive?(pid) do
-      Task.Supervisor.start_child(Chat.TaskSupervisor, fn ->
+    if is_pid(pid) and Process.alive?(pid) do
+      Task.Supervisor.start_child(pid, fn ->
         try do
           socket |> task.()
 
@@ -29,7 +29,7 @@ defmodule ChatWeb.LiveHelpers.Shared do
         end
       end)
     else
-      Logger.warning("[chat] Chat.TaskSupervisor is not running")
+      Logger.warning("[chat] [UI] Chat.TaskSupervisor is not running")
     end
 
     socket

@@ -16,15 +16,21 @@ defmodule ChatWeb.LiveHelpers.Shared do
 
   @spec process(Socket.t(), fun()) :: Socket.t()
   def process(socket, task) do
-    Task.Supervisor.start_child(Chat.TaskSupervisor, fn ->
-      try do
-        socket |> task.()
+    pid = Process.whereis(Chat.TaskSupervisor)
 
-        :ok
-      rescue
-        reason -> Logger.error([inspect(reason)])
-      end
-    end)
+    if is_pid(pid) and Process.alive?(pid) do
+      Task.Supervisor.start_child(pid, fn ->
+        try do
+          socket |> task.()
+
+          :ok
+        rescue
+          reason -> Logger.error([inspect(reason)])
+        end
+      end)
+    else
+      Logger.warning("[chat] [UI] Chat.TaskSupervisor is not running")
+    end
 
     socket
   end

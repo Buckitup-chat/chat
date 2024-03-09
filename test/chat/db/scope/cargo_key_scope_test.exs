@@ -15,16 +15,10 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
 
   @timeout 100
 
-  setup do
-    {bot_key, room_key} = generate_user_with_dialogs_content_and_invite_in_room()
-    {:ok, %{bot_key: bot_key, room_key: room_key}}
-  end
-
-  test "room and invitations in dialogs should be selected", %{
-    bot_key: bot_key,
-    room_key: room_key
-  } do
-    assert_keys_for_cargo_keys(room_key, [bot_key], 1)
+  test "room and invitations in dialogs should be selected" do
+    {bot, room_key} = generate_user_with_dialogs_content_and_invite_in_room()
+    assert_keys_for_cargo_keys(room_key, [bot.public_key], 1)
+    assert_invite_received(bot, room: room_key)
   end
 
   test "user and checkpoint got room invites" do
@@ -35,6 +29,7 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     |> send_invite(from: operator, to: [checkpoint_1, user], mark_as: :index_1)
     |> assert_index_exists(:index_1, checkpoint_key)
     |> assert_cargo_keys(checkpoint_key, 2)
+    |> assert_invites_received_by([checkpoint_1, user])
   end
 
   test "room invitation should be found in dialog of operator and user by only checkpoints key" do
@@ -47,14 +42,15 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     |> send_invite(from: operator, to: user_c, mark_as: :index_2)
     |> send_invite(from: user_c, to: user_d, mark_as: :index_3)
     |> assert_cargo_keys(checkpoint_keys, 4)
+    |> assert_invites_received_by([checkpoint_1, checkpoint_2, user_c, user_d])
   end
 
   test "room invitations found up to 1 handshake" do
     {
       [[checkpoint_1, checkpoint_2, checkpoint_3], checkpoints_keys],
       [operator_1, operator_2],
-      [user_1, user_2, user_3, user_4]
-    } = setup_test_data(3, 2, 4)
+      [user_1, user_2, user_3, user_4, user_5]
+    } = setup_test_data(3, 2, 5)
 
     %{}
     |> generate_cargo_room(operator_1)
@@ -66,6 +62,10 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     |> send_invite(from: user_3, to: [user_4, user_1], mark_as: :index_6)
     |> assert_index_exists(:index_5, checkpoints_keys)
     |> refute_index_exists(:index_6, checkpoints_keys)
+    |> IO.inspect()
+    |> assert_invites_received_by([checkpoint_1, checkpoint_2, checkpoint_3])
+    |> assert_invites_received_by([user_1, user_2, user_4])
+    |> refute_invites_received_by([user_5])
   end
 
   defp setup_test_data(checkpoints_count, operators_count, users_count) do
@@ -195,7 +195,6 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
 
     bot = User.login("Bob")
     create_user_from_identity(bot)
-    bot_key = Identity.pub_key(bot)
 
     {room_identity, _room} = Rooms.add(user, "Room")
     room_key = Identity.pub_key(room_identity)
@@ -208,7 +207,7 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
 
     create_and_add_room_invite(dialog, room_identity, user)
 
-    {bot_key, room_key}
+    {bot, room_key}
   end
 
   defp fetch_checked_keys(keys) do
@@ -230,5 +229,33 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     context
     |> generate_dialogs_and_cargo_room_invite([opts[:from], opts[:to]])
     |> then(&Map.put(context, opts[:mark_as], &1))
+  end
+
+  defp assert_invite_received(%Chat.Identity{} = user_identity, room: room_key) do
+    invite = Dialogs.room_invite_for_user_to_room(user_identity, room_key)
+    assert invite
+    room_identity = Dialogs.extract_invite_room_identity(invite)
+    assert room_identity
+    room_identity
+  end
+
+  defp assert_invites_received_by(context, user_identities) do
+    tap(context, fn %{room_identity: cargo_room_identity} ->
+      user_identities
+      |> Enum.map(&assert_invite_received(&1, room: cargo_room_identity.public_key))
+      |> Enum.each(fn received_identity ->
+        assert received_identity == cargo_room_identity
+      end)
+    end)
+  end
+
+  defp refute_invites_received_by(context, user_identities) do
+    tap(context, fn %{room_identity: cargo_room_identity} ->
+      user_identities
+      |> Enum.each(fn user ->
+        invite = Dialogs.room_invite_for_user_to_room(user, cargo_room_identity.public_key)
+        refute invite, "Got invite into [#{cargo_room_identity.name}] for #{user.name}"
+      end)
+    end)
   end
 end

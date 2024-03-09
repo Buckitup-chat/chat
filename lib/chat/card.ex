@@ -21,8 +21,6 @@ defmodule Chat.Card do
       hash: pub_key |> Base.encode16(case: :lower)
     }
   end
-
-  def pub_key(%__MODULE__{pub_key: pub_key}), do: pub_key
 end
 
 defimpl Enigma.Hash.Protocol, for: Chat.Card do

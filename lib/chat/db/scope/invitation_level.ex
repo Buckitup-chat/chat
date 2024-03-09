@@ -2,8 +2,8 @@ defmodule Chat.Db.Scope.InvitationLevel do
   @moduledoc """
   Process cargo room invitations
   """
-
   import Chat.Db.Scope.Utils
+
   alias Chat.Dialogs.Dialog
   alias Chat.Dialogs.Message
 
@@ -112,7 +112,8 @@ defmodule Chat.Db.Scope.InvitationLevel do
   end
 
   defp map_invitation_data(
-         {invite_key, dialog_key, is_a_to_b, message_id, %{a_key: a_key, b_key: b_key} = _message}
+         {invite_key, dialog_key, is_a_to_b, message_index, message_id,
+          %{a_key: a_key, b_key: b_key} = _message}
        ) do
     %{
       dialog_key: {:dialogs, dialog_key},
@@ -123,7 +124,7 @@ defmodule Chat.Db.Scope.InvitationLevel do
            false -> a_key
          end, invite_key},
       invite_key: {:room_invite, invite_key},
-      dialog_message: {:dialog_message, dialog_key, nil, message_id}
+      dialog_message: {:dialog_message, dialog_key, message_index, message_id}
     }
   end
 
@@ -147,7 +148,7 @@ defmodule Chat.Db.Scope.InvitationLevel do
 
   defp compose_invite_message({invite_key, [first_key, second_key]} = invite, snap) do
     with dialog_key <- build_dialog_key({first_key, second_key}),
-         {_, %Message{is_a_to_b?: is_a_to_b, id: message_id}} <-
+         {{:dialog_message, _key, msg_index, msg_id}, %Message{is_a_to_b?: is_a_to_b}} <-
            dialog_key
            |> get_invite_messages_by_dialog_key(snap)
            |> Enum.at(0),
@@ -156,7 +157,8 @@ defmodule Chat.Db.Scope.InvitationLevel do
         invite_key,
         dialog_key,
         is_a_to_b,
-        message_id,
+        msg_index,
+        msg_id,
         %{a_key: a_key, b_key: b_key}
       }
     else
@@ -166,14 +168,18 @@ defmodule Chat.Db.Scope.InvitationLevel do
 
   defp reject_non_sender_messages(messages, sender_keys) do
     messages
-    |> Enum.reject(fn {_key, _dialog_key, is_a_to_b, _message_id, %{a_key: a_key, b_key: b_key}} ->
-      (a_key not in sender_keys and is_a_to_b) || (b_key not in sender_keys and not is_a_to_b)
+    |> Enum.reject(fn
+      {_key, _dialog_key, true, _message_index, _message_id, %{a_key: a_key}} ->
+        a_key not in sender_keys
+
+      {_key, _dialog_key, _, _message_index, _message_id, %{b_key: b_key}} ->
+        b_key not in sender_keys
     end)
   end
 
   defp get_messages_sender_keys(messages, type) do
     messages
-    |> Enum.map(fn {_, _dialog_key, is_a_to_b, _, %{a_key: a_key, b_key: b_key}} ->
+    |> Enum.map(fn {_, _dialog_key, is_a_to_b, _, _, %{a_key: a_key, b_key: b_key}} ->
       define_sender_key(is_a_to_b, type, {a_key, b_key})
     end)
     |> MapSet.new()
@@ -344,5 +350,5 @@ defmodule Chat.Db.Scope.InvitationLevel do
   defp build_dialog_key({a_key, b_key}), do: %Dialog{a_key: a_key, b_key: b_key} |> Enigma.hash()
 
   defp get_queued_invites_keys(queue),
-    do: queue |> List.flatten() |> Enum.map(fn {invite_key, _, _, _, _} -> invite_key end)
+    do: queue |> List.flatten() |> Enum.map(fn {invite_key, _, _, _, _, _} -> invite_key end)
 end

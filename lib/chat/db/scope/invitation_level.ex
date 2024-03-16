@@ -142,17 +142,19 @@ defmodule Chat.Db.Scope.InvitationLevel do
 
   defp compose_invitations_messages(messages, sender_keys, snap) do
     messages
-    |> Enum.map(&compose_invite_message(&1, snap))
+    |> Enum.flat_map(&compose_invite_message(&1, snap))
     |> reject_non_sender_messages(sender_keys)
   end
 
   defp compose_invite_message({invite_key, [first_key, second_key]} = invite, snap) do
-    with dialog_key <- build_dialog_key({first_key, second_key}),
-         {{:dialog_message, _key, msg_index, msg_id}, %Message{is_a_to_b?: is_a_to_b}} <-
-           dialog_key
-           |> get_invite_messages_by_dialog_key(snap)
-           |> Enum.at(0),
-         %Dialog{a_key: a_key, b_key: b_key} <- Chat.Db.get({:dialogs, dialog_key}) do
+    dialog_key = build_dialog_key({first_key, second_key})
+
+    dialog_key
+    |> get_invite_messages_by_dialog_key(snap)
+    |> Enum.map(fn {{:dialog_message, ^dialog_key, msg_index, msg_id},
+                    %Message{is_a_to_b?: is_a_to_b}} ->
+      %Dialog{a_key: a_key, b_key: b_key} = Chat.Db.get({:dialogs, dialog_key})
+
       {
         invite_key,
         dialog_key,
@@ -161,9 +163,9 @@ defmodule Chat.Db.Scope.InvitationLevel do
         msg_id,
         %{a_key: a_key, b_key: b_key}
       }
-    else
-      _ -> {:error, invite}
-    end
+    end)
+  rescue
+    _ -> [{:error, invite}]
   end
 
   defp reject_non_sender_messages(messages, sender_keys) do

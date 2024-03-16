@@ -1,5 +1,16 @@
 defmodule ChatTest.IsolatedDataCase do
-  @moduledoc "Test case that isolates data between tests"
+  @moduledoc """
+  Test case that isolates data between tests
+
+  Use like
+    use ChatTest.IsolatedDataCase, dbs: [:db1, db2]
+
+  `:isolated_dbs` key should be passed from test context for all functions to work.
+
+  `use_db(context, target_db)` to switch current db
+  `db_name(context, db)` to get db registered name
+
+  """
   use ExUnit.CaseTemplate, async: false
 
   alias Chat.Db

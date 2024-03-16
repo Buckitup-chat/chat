@@ -148,5 +148,6 @@ defmodule Chat.Db.Scope.KeyScope do
     |> execute_handshake_cycle()
     |> process_invitation_groups()
     |> update_acc_set(acc_set)
+#    |> dbg()
   end
 end

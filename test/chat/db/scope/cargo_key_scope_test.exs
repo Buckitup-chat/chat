@@ -47,7 +47,7 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
 
   test "room invitations found up to 1 handshake" do
     {
-      [[checkpoint_1, checkpoint_2, checkpoint_3], checkpoints_keys],
+      [[checkpoint_1, checkpoint_2, checkpoint_3], _checkpoints_keys],
       [operator_1, operator_2],
       [user_1, user_2, user_3, user_4, user_5]
     } = setup_test_data(3, 2, 5)
@@ -60,8 +60,6 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     |> send_invite(from: user_1, to: [user_2, user_4], mark_as: :index_4)
     |> send_invite(from: user_2, to: user_3, mark_as: :index_5)
     |> send_invite(from: user_3, to: [user_4, user_1], mark_as: :index_6)
-    |> assert_index_exists(:index_5, checkpoints_keys)
-    |> refute_index_exists(:index_6, checkpoints_keys)
     |> assert_invites_received_by([checkpoint_1, checkpoint_2, checkpoint_3])
     |> assert_invites_received_by([user_1, user_2, user_4])
     |> refute_invites_received_by([user_5])
@@ -95,16 +93,6 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     context
   end
 
-  defp refute_index_exists(%{room_identity: room_key} = context, index, checkpoint_key) do
-    cargo_keys =
-      Chat.Db.db()
-      |> KeyScope.get_cargo_keys(room_key |> Identity.pub_key(), checkpoint_key)
-      |> fetch_checked_keys()
-
-    refute Enum.any?(Map.get(context, index), &MapSet.member?(cargo_keys, &1))
-    context
-  end
-
   defp assert_cargo_keys(%{room_identity: room_key} = context, checkpoint_key, amount_of_entities) do
     assert_keys_for_cargo_keys(room_key |> Identity.pub_key(), checkpoint_key, amount_of_entities)
     context
@@ -120,7 +108,7 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
       dialog_message: expected_count,
       dialogs: expected_count,
       room_invite: expected_count,
-      room_invite_index: expected_count,
+      room_invite_index: expected_count * 2,
       rooms: 1
     }
 

@@ -28,7 +28,7 @@ defmodule Chat.Db.Scope.KeyScope do
       |> add_full_users(snap)
       |> add_rooms(snap, room_key)
       |> add_content(snap, room_key)
-      |> add_invitation_dialogs(snap, invited_keys)
+      |> add_cargo_invites(snap, invited_keys)
     end)
   end
 
@@ -142,11 +142,112 @@ defmodule Chat.Db.Scope.KeyScope do
     |> union_set(room_invites)
   end
 
-  defp add_invitation_dialogs(acc_set, snap, pub_keys) do
+  defp add_cargo_invites(acc_set, snap, pub_keys) do
+    build_user_invite_indexes(snap, pub_keys)
+    |> MapSet.union(acc_set)
+  end
+
+  defp build_user_invite_indexes(snap, start_users) do
+    full_invite_index =
+      snap
+      |> db_keys_stream({:room_invite_index, 0, 0}, {:"room_invite_index\0", 0, 0})
+      |> Enum.reduce(Map.new(), fn {:room_invite_index, user_key, invite_key}, acc ->
+        Map.put(acc, invite_key, [user_key | Map.get(acc, invite_key, [])])
+      end)
+      |> Enum.reduce(Map.new(), fn {invite_key, [a, b]}, acc ->
+        acc
+        |> add_in_user_invite_index(a, b, invite_key)
+        |> add_in_user_invite_index(b, a, invite_key)
+      end)
+
+    {_full_invite_index, traversed_keys, _source_users, _traversed_users} =
+      {full_invite_index, MapSet.new(), start_users, MapSet.new()}
+      |> traverse(snap, backward_messages?: true)
+      |> traverse(snap)
+      |> traverse(snap)
+
+    traversed_keys
+  end
+
+  defp traverse(
+         {full_invite_index, traversed_keys, source_users, traversed_users},
+         snap,
+         [backward_messages?: backward?] \\ [backward_messages?: false]
+       ) do
+    invite_pairs =
+      full_invite_index
+      |> Map.take(source_users |> MapSet.to_list())
+      |> Enum.flat_map(fn {source_user, map} ->
+        map |> Enum.map(fn {user, invite_keys} -> {source_user, user, invite_keys} end)
+      end)
+
+    destination_users =
+      invite_pairs
+      |> Enum.map(fn {_source_user, user, _invite_key} -> user end)
+      |> MapSet.new()
+
+    keys =
+      invite_pairs
+      |> Enum.flat_map(fn {source_user, user, invite_keys} ->
+        dialog_keys = generate_message_and_dialog_keys(source_user, user, backward?, snap)
+
+        if match?([_], dialog_keys),
+          do: [],
+          else: [
+            dialog_keys,
+            generate_invite_keys(source_user, user, invite_keys)
+          ]
+      end)
+      |> List.flatten()
+      |> MapSet.new()
+
+    updated_keys = MapSet.union(traversed_keys, keys)
+    new_traversed_users = MapSet.union(traversed_users, source_users)
+    new_destination_users = MapSet.difference(destination_users, new_traversed_users)
+
+    {full_invite_index, updated_keys, new_destination_users, new_traversed_users}
+  end
+
+  defp generate_invite_keys(source_user, user, invite_keys) do
+    invite_keys
+    |> Enum.uniq()
+    |> Enum.flat_map(fn invite_key ->
+      [
+        {:room_invite, invite_key},
+        {:room_invite_index, source_user, invite_key},
+        {:room_invite_index, user, invite_key}
+      ]
+    end)
+  end
+
+  defp generate_message_and_dialog_keys(source_user, user, backward?, snap) do
+    dialog_key = dialog_key(source_user, user)
+    dialog = CubDB.Snapshot.get(snap, {:dialogs, dialog_key})
+
     snap
-    |> build_initial_context(pub_keys)
-    |> execute_handshake_cycle()
-    |> process_invitation_groups()
-    |> update_acc_set(acc_set)
+    |> db_stream({:dialog_message, dialog_key, 0, 0}, {:dialog_message, dialog_key, nil, 0})
+    |> Stream.filter(fn {{:dialog_message, _, _, _}, msg} ->
+      correct_direction? =
+        (source_user == dialog.a_key and msg.is_a_to_b? and not backward?) or
+          (source_user == dialog.a_key and not msg.is_a_to_b? and backward?) or
+          (source_user == dialog.b_key and not msg.is_a_to_b? and not backward?) or
+          (source_user == dialog.b_key and msg.is_a_to_b? and backward?)
+
+      msg.type == :room_invite and
+        correct_direction?
+    end)
+    |> Enum.map(fn {key, _} -> key end)
+    |> then(&[{:dialogs, dialog_key} | &1])
+  end
+
+  defp dialog_key(user_a, user_b) do
+    %Chat.Dialogs.Dialog{a_key: user_a, b_key: user_b} |> Enigma.hash()
+  end
+
+  defp add_in_user_invite_index(map, a, b, invite_key) do
+    user_edges = Map.get(map, a, Map.new())
+    invites_list = get_in(map, [a, b]) || []
+    updated_user_edges = Map.put(user_edges, b, [invite_key | invites_list])
+    Map.put(map, a, updated_user_edges)
   end
 end

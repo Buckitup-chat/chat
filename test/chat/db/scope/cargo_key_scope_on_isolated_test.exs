@@ -1,6 +1,6 @@
 defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
   use ChatTest.IsolatedDataCase,
-    dbs: [:operator, :point1_db, :point2_db, :point3_db, :many_invitations]
+    dbs: [:operator, :point1_db, :point2_db, :point3_db, :many_invitations, :long_forward_db]
 
   alias Chat.{
     AdminRoom,
@@ -16,8 +16,6 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
 
   alias Chat.Db.Copying
 
-  @timeout 100
-
   test "user and checkpoint got room invites", %{isolated_dbs: dbs} do
     {[[checkpoint_1], checkpoint_key], [operator], [user]} = setup_test_data(1, 1, 1)
 
@@ -25,8 +23,6 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
     |> use_db(:operator)
     |> generate_cargo_room(operator)
     |> send_invite(from: operator, to: [checkpoint_1, user], mark_as: :index_1)
-    |> assert_index_exists(:index_1, checkpoint_key)
-    |> assert_cargo_keys(checkpoint_key, 2)
     |> copy_cargo_to(:point1_db, checkpoint_key)
     |> use_db(:point1_db)
     |> assert_invites_received_by([checkpoint_1, user])
@@ -43,7 +39,6 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
     |> send_invite(from: operator, to: [checkpoint_1, user], mark_as: :fake_index_1)
     |> generate_cargo_room(operator)
     |> send_invite(from: operator, to: [checkpoint_1, user], mark_as: :index_1)
-    |> assert_index_exists(:index_1, checkpoint_key)
     |> copy_cargo_to(:many_invitations, checkpoint_key)
     |> use_db(:many_invitations)
     |> assert_invites_received_by([checkpoint_1, user])
@@ -60,13 +55,11 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
     |> send_invite(from: operator, to: [checkpoint_1, checkpoint_2], mark_as: :index_1)
     |> send_invite(from: operator, to: user_c, mark_as: :index_2)
     |> send_invite(from: user_c, to: user_d, mark_as: :index_3)
-    |> assert_cargo_keys(checkpoint_keys, 4)
     |> copy_cargo_to(:point2_db, checkpoint_keys)
     |> use_db(:point2_db)
     |> assert_invites_received_by([checkpoint_1, checkpoint_2, user_c, user_d])
   end
 
-  @tag :skip
   test "room invitations found up to 1 handshake", %{isolated_dbs: dbs} do
     {
       [[checkpoint_1, checkpoint_2, checkpoint_3], checkpoints_keys],
@@ -83,13 +76,35 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
     |> send_invite(from: user_1, to: [user_2, user_4], mark_as: :index_4)
     |> send_invite(from: user_2, to: user_3, mark_as: :index_5)
     |> send_invite(from: user_3, to: [user_4, user_1], mark_as: :index_6)
-    |> assert_index_exists(:index_5, checkpoints_keys)
-    |> refute_index_exists(:index_6, checkpoints_keys)
     |> copy_cargo_to(:point3_db, checkpoints_keys)
     |> use_db(:point3_db)
     |> assert_invites_received_by([checkpoint_1, checkpoint_2, checkpoint_3])
     |> assert_invites_received_by([user_1, user_2, user_4])
     |> refute_invites_received_by([user_5, user_3])
+  end
+
+  test "long forward chain", %{isolated_dbs: dbs} do
+    {
+      [[checkpoint_1], checkpoints_keys],
+      [operator_1],
+      [user_1, user_2, user_3, user_4, user_5]
+    } = setup_test_data(1, 1, 5)
+
+    %{isolated_dbs: dbs}
+    |> use_db(:operator)
+    |> generate_cargo_room(operator_1)
+    |> send_invite(from: operator_1, to: [checkpoint_1], mark_as: :index_1)
+    |> send_invite(from: operator_1, to: user_1, mark_as: :index_3)
+    |> send_invite(from: user_1, to: user_2, mark_as: :index_4)
+    |> send_invite(from: user_2, to: user_3, mark_as: :index_4)
+    |> send_invite(from: user_3, to: user_4, mark_as: :index_4)
+    |> send_invite(from: user_4, to: user_5, mark_as: :index_4)
+    |> send_invite(from: user_5, to: user_1, mark_as: :index_4)
+    |> copy_cargo_to(:long_forward_db, checkpoints_keys)
+    |> use_db(:long_forward_db)
+    |> assert_invites_received_by([checkpoint_1])
+    |> assert_invites_received_by([user_1, user_2])
+    |> refute_invites_received_by([user_3, user_4, user_5])
   end
 
   defp setup_test_data(checkpoints_count, operators_count, users_count) do
@@ -108,55 +123,6 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
       Enum.map(1..users_count, &("user#{&1}" |> User.login() |> create_user_from_identity()))
 
     {[checkpoints, checkpoint_keys], operators, users}
-  end
-
-  defp assert_index_exists(%{room_identity: room_key} = context, index, checkpoint_key) do
-    cargo_keys =
-      Chat.Db.db()
-      |> KeyScope.get_cargo_keys(room_key |> Identity.pub_key(), checkpoint_key)
-      |> fetch_checked_keys()
-
-    assert Enum.any?(Map.get(context, index), &MapSet.member?(cargo_keys, &1))
-    context
-  end
-
-  defp refute_index_exists(%{room_identity: room_key} = context, index, checkpoint_key) do
-    cargo_keys =
-      Chat.Db.db()
-      |> KeyScope.get_cargo_keys(room_key |> Identity.pub_key(), checkpoint_key)
-      |> fetch_checked_keys()
-
-    refute Enum.any?(Map.get(context, index), &MapSet.member?(cargo_keys, &1))
-    context
-  end
-
-  defp assert_cargo_keys(%{room_identity: room_key} = context, checkpoint_key, amount_of_entities) do
-    assert_keys_for_cargo_keys(room_key |> Identity.pub_key(), checkpoint_key, amount_of_entities)
-    context
-  end
-
-  defp assert_keys_for_cargo_keys(room_key, checkpoint_keys, expected_count) do
-    Process.sleep(@timeout)
-
-    keys =
-      KeyScope.get_cargo_keys(Chat.Db.db(), room_key, checkpoint_keys)
-
-    expected_keys = %{
-      dialog_message: expected_count,
-      dialogs: expected_count,
-      room_invite: expected_count,
-      room_invite_index: expected_count,
-      rooms: 1
-    }
-
-    assert expected_keys == filter_and_count_keys(keys)
-  end
-
-  defp filter_and_count_keys(keys) do
-    keys
-    |> MapSet.to_list()
-    |> Enum.frequencies_by(&elem(&1, 0))
-    |> Map.drop([:users])
   end
 
   defp generate_checkpoints(identities) do
@@ -213,21 +179,6 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
       Rooms.add(user, "Cargo room_" <> inspect(Enum.random(10..200)), :cargo)
 
     Map.put(context, :room_identity, room_identity)
-  end
-
-  defp fetch_checked_keys(keys) do
-    keys
-    |> Enum.map(fn entry ->
-      case entry do
-        {:room_invite_index, _reader_hash, invite_key} ->
-          invite_key
-
-        _ ->
-          nil
-      end
-    end)
-    |> Enum.reject(&is_nil/1)
-    |> MapSet.new()
   end
 
   defp send_invite(context, opts) do

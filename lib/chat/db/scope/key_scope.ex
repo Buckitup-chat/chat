@@ -155,14 +155,17 @@ defmodule Chat.Db.Scope.KeyScope do
         {:room_invite_index, user_key, invite_key}, acc ->
           Map.put(acc, invite_key, [user_key | Map.get(acc, invite_key, [])])
 
-        x, acc ->
-          x |> dbg()
+        _, acc ->
           acc
       end)
-      |> Enum.reduce(Map.new(), fn {invite_key, [a, b]}, acc ->
-        acc
-        |> add_in_user_invite_index(a, b, invite_key)
-        |> add_in_user_invite_index(b, a, invite_key)
+      |> Enum.reduce(Map.new(), fn
+        {invite_key, [a, b]}, acc ->
+          acc
+          |> add_in_user_invite_index(a, b, invite_key)
+          |> add_in_user_invite_index(b, a, invite_key)
+
+        _, acc ->
+          acc
       end)
 
     {_full_invite_index, traversed_keys, _source_users, _traversed_users} =

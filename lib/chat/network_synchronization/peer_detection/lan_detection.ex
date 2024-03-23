@@ -5,7 +5,7 @@ defmodule Chat.NetworkSynchronization.PeerDetection.LanDetection do
 
   def on_lan(ip, mask) do
     ip_range(ip, mask)
-    |> reject_known_peers
+    |> reject_known_peers(ip)
     |> generate_urls
     |> reject_offline_urls
     |> add_urls
@@ -19,7 +19,7 @@ defmodule Chat.NetworkSynchronization.PeerDetection.LanDetection do
     first..last
   end
 
-  defp reject_known_peers(range) do
+  defp reject_known_peers(range, own_ip) do
     known =
       NetworkSynchronization.synchronisation()
       |> Enum.map(fn {%{url: url}, _} ->
@@ -35,6 +35,7 @@ defmodule Chat.NetworkSynchronization.PeerDetection.LanDetection do
       end)
       |> Enum.reject(&is_nil/1)
       |> MapSet.new()
+      |> MapSet.put(own_ip |> IP.Address.from_string!() |> IP.Address.to_integer())
 
     range
     |> Enum.reject(fn ip -> MapSet.member?(known, ip) end)

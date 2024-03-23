@@ -35,6 +35,7 @@ straightforward as possible.
 - cargo invite fix [#611]
 - onliners syncs room/chat list [#580]
 - drive indication on cargo only [#620]
+- do not detect self [#615]
 
 ## 2023-12-30_167d8d9___2023-12-30_80fe885
 

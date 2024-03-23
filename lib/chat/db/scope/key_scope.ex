@@ -151,8 +151,13 @@ defmodule Chat.Db.Scope.KeyScope do
     full_invite_index =
       snap
       |> db_keys_stream({:room_invite_index, 0, 0}, {:"room_invite_index\0", 0, 0})
-      |> Enum.reduce(Map.new(), fn {:room_invite_index, user_key, invite_key}, acc ->
-        Map.put(acc, invite_key, [user_key | Map.get(acc, invite_key, [])])
+      |> Enum.reduce(Map.new(), fn
+        {:room_invite_index, user_key, invite_key}, acc ->
+          Map.put(acc, invite_key, [user_key | Map.get(acc, invite_key, [])])
+
+        x, acc ->
+          x |> dbg()
+          acc
       end)
       |> Enum.reduce(Map.new(), fn {invite_key, [a, b]}, acc ->
         acc
@@ -222,7 +227,9 @@ defmodule Chat.Db.Scope.KeyScope do
 
   defp generate_message_and_dialog_keys(source_user, user, backward?, snap) do
     dialog_key = dialog_key(source_user, user)
-    dialog = CubDB.Snapshot.get(snap, {:dialogs, dialog_key})
+
+    [{_, dialog}] =
+      snap |> db_stream({:dialogs, dialog_key}, {:dialogs, dialog_key}) |> Enum.to_list()
 
     snap
     |> db_stream({:dialog_message, dialog_key, 0, 0}, {:dialog_message, dialog_key, nil, 0})

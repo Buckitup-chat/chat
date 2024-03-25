@@ -64,6 +64,12 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
 
         <div class="h-screen flex justify-center items-center lg:h-[99vh]">
           <%= if @current[:url] do %>
+            <div
+              id="galleryImagePreloader"
+              class="w-full h-full flex justify-center items-center hidden text-white/50 text-5xl bg-black"
+            >
+              loading ...
+            </div>
             <img
               id="galleryImage"
               class="w-auto z-10 max-h-full lg:px-14"
@@ -78,11 +84,14 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
               const prevBtn = document.getElementById('prev');
               const nextBtn = document.getElementById('next');
               const image = document.getElementById('galleryImage');
+              const preloader = document.getElementById('galleryImagePreloader');
 
               setTimeout(() => {
                 if (image.naturalWidth > 0 && image.naturalHeight > 0 && image.complete) {
+                  preloader.classList.add('hidden');
                   prevBtn.classList.remove('hidden');
                   nextBtn.classList.remove('hidden');
+                  image.classList.remove('hidden');
                 } else {
                   handleArrows();
                 }
@@ -357,6 +366,8 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
         JS.push("switch-prev")
         |> JS.add_class("hidden", to: "#prev")
         |> JS.add_class("hidden", to: "#next")
+        |> JS.add_class("hidden", to: "#galleryImage")
+        |> JS.remove_class("hidden", to: "#galleryImagePreloader")
       }
     >
       <svg
@@ -382,6 +393,8 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
         JS.push("switch-next")
         |> JS.add_class("hidden", to: "#next")
         |> JS.add_class("hidden", to: "#prev")
+        |> JS.add_class("hidden", to: "#galleryImage")
+        |> JS.remove_class("hidden", to: "#galleryImagePreloader")
       }
       phx-target={@target}
     >

@@ -25,10 +25,9 @@ defmodule Chat.Db.Scope.KeyScope do
 
     CubDB.with_snapshot(db, fn snap ->
       MapSet.new()
-      |> add_full_users(snap)
       |> add_rooms(snap, room_key)
       |> add_content(snap, room_key)
-      |> add_cargo_invites(snap, invited_keys)
+      |> add_cargo_invites(snap, invited_keys, room_pub_key)
     end)
   end
 
@@ -142,17 +141,29 @@ defmodule Chat.Db.Scope.KeyScope do
     |> union_set(room_invites)
   end
 
-  defp add_cargo_invites(acc_set, snap, pub_keys) do
-    build_user_invite_indexes(snap, pub_keys)
+  defp add_cargo_invites(acc_set, snap, pub_keys, room_key) do
+    build_user_invite_indexes(snap, pub_keys, room_key)
     |> MapSet.union(acc_set)
   end
 
-  defp build_user_invite_indexes(snap, start_users) do
+  defp build_user_invite_indexes(snap, start_users, room_key) do
+    room_key_hash = room_key |> Enigma.hash()
+
     full_invite_index =
       snap
-      |> db_keys_stream({:room_invite_index, 0, 0}, {:"room_invite_index\0", 0, 0})
+      |> db_stream({:room_invite_index, 0, 0}, {:"room_invite_index\0", 0, 0})
+      |> Stream.filter(fn
+        {_key, {bit_length, bitstring}} ->
+          match?(
+            <<^bitstring::bitstring-size(bit_length), _::bitstring-size(32 * 8 - bit_length)>>,
+            room_key_hash
+          )
+
+        _ ->
+          true
+      end)
       |> Enum.reduce(Map.new(), fn
-        {:room_invite_index, user_key, invite_key}, acc ->
+        {{:room_invite_index, user_key, invite_key}, _}, acc ->
           Map.put(acc, invite_key, [user_key | Map.get(acc, invite_key, [])])
 
         _, acc ->

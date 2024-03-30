@@ -124,7 +124,7 @@ defmodule ChatWeb.MainLive.Page.Room do
       room_identity
       |> Messages.RoomInvite.new()
       |> Dialogs.add_new_message(me, my_notes)
-      |> RoomInviteIndex.add(my_notes, me)
+      |> RoomInviteIndex.add(my_notes, me, room_identity |> Identity.pub_key())
     end
 
     socket
@@ -441,7 +441,13 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def invite_user(
-        %{assigns: %{room: %{name: room_name}, room_identity: identity, me: me}} = socket,
+        %{
+          assigns: %{
+            room: %{name: room_name, pub_key: room_pub_key},
+            room_identity: identity,
+            me: me
+          }
+        } = socket,
         user_key
       ) do
     dialog = Dialogs.find_or_open(me, user_key |> User.by_id())
@@ -450,7 +456,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> Map.put(:name, room_name)
     |> Messages.RoomInvite.new()
     |> Dialogs.add_new_message(me, dialog)
-    |> RoomInviteIndex.add(dialog, me)
+    |> RoomInviteIndex.add(dialog, me, room_pub_key)
 
     socket
     |> push_event("put-flash", %{key: :info, message: "Invitation Sent!"})

@@ -289,13 +289,13 @@ This approach has been proposed that involves the use of a new key and initializ
  enc_room_key}
 ```
 
-Room invite index tracks who can reed it.
+Room invite index tracks who can read it. It contains first bits of room public key hash. More rooms the system has - more detailed bitstring gets
 
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
 {{:room_invite_index, reader_hash, invite_key},
- true}
+ {length, bitstring}}
 ```
 
 <!-- livebook:{"break_markdown":true} -->
@@ -308,6 +308,10 @@ classDiagram
 
   class RoomInvite {
     encrypted room identity
+  }
+  class RoomInviteIndex {
+    bit_length
+    bitsting
   }
   RoomInvite -- RoomInviteIndex
 
@@ -419,9 +423,9 @@ We use DB type to mark the database for a specific use. Then we use the DB type 
 
 Types:
 
-- `:main_db` (used by `main_db` and `backup_db`)
-- `:cargo_db`
-- `:onliners_db`
+* `:main_db` (used by `main_db` and `backup_db`)
+* `:cargo_db`
+* `:onliners_db`
 
 ```elixir
 {:db_type, type}

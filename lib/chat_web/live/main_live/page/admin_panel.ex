@@ -148,7 +148,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
       |> then(&Map.get(rooms, &1))
       |> Messages.RoomInvite.new()
       |> Dialogs.add_new_message(me, dialog)
-      |> RoomInviteIndex.add(dialog, me)
+      |> RoomInviteIndex.add(dialog, me, AdminRoom.pub_key())
     end
 
     socket

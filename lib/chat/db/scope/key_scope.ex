@@ -152,16 +152,7 @@ defmodule Chat.Db.Scope.KeyScope do
     full_invite_index =
       snap
       |> db_stream({:room_invite_index, 0, 0}, {:"room_invite_index\0", 0, 0})
-      |> Stream.filter(fn
-        {_key, {bit_length, bitstring}} ->
-          match?(
-            <<^bitstring::bitstring-size(bit_length), _::bitstring-size(32 * 8 - bit_length)>>,
-            room_key_hash
-          )
-
-        _ ->
-          true
-      end)
+      |> Stream.filter(&invite_like_in_room_hash?(&1, room_key_hash))
       |> Enum.reduce(Map.new(), fn
         {{:room_invite_index, user_key, invite_key}, _}, acc ->
           Map.put(acc, invite_key, [user_key | Map.get(acc, invite_key, [])])
@@ -226,6 +217,18 @@ defmodule Chat.Db.Scope.KeyScope do
 
     {full_invite_index, updated_keys, new_destination_users, new_traversed_users}
   end
+
+  defp invite_like_in_room_hash?(invite_keypair, room_key_hash)
+
+  defp invite_like_in_room_hash?({_, {bit_length, bitstring}}, room_key_hash) do
+    match?(
+      <<^bitstring::bitstring-size(bit_length), _::bitstring>>,
+      room_key_hash
+    )
+  end
+
+  defp invite_like_in_room_hash?({_, true}, _), do: true
+  defp invite_like_in_room_hash?(_, _), do: false
 
   defp generate_invite_keys(source_user, user, invite_keys) do
     invite_keys

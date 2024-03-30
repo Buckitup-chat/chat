@@ -18,6 +18,7 @@ straightforward as possible.
 - improved encryption testing
 - no indication unless cargo [#603]
 - extra logging absence of chat task supervisor
+- cargo scope: invites optimisation [#619]
 
 ### Fixed
 - displaying the gallery after go to invited room [#562]

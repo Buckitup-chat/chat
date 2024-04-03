@@ -279,7 +279,8 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
         {key, _} -> key
         key -> key
       end)
-      |> IO.inspect(label: db_name)
+      |> inspect(label: db_name)
+      |> IO.puts()
     end)
   end
 end

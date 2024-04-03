@@ -218,17 +218,21 @@ defmodule Chat.Db.Scope.KeyScope do
     {full_invite_index, updated_keys, new_destination_users, new_traversed_users}
   end
 
-  defp invite_like_in_room_hash?(invite_keypair, room_key_hash)
+  def invite_like_in_room_hash?(invite_keypair, room_key_hash) do
+    case invite_keypair do
+      {{:room_invite_index, _, _}, {bit_length, bits}} ->
+        match?(
+          <<^bits::bitstring-size(bit_length), _::bitstring>>,
+          room_key_hash
+        )
 
-  defp invite_like_in_room_hash?({_, {bit_length, bitstring}}, room_key_hash) do
-    match?(
-      <<^bitstring::bitstring-size(bit_length), _::bitstring>>,
-      room_key_hash
-    )
+      {{:room_invite_index, _, _}, true} ->
+        true
+
+      _ ->
+        false
+    end
   end
-
-  defp invite_like_in_room_hash?({_, true}, _), do: true
-  defp invite_like_in_room_hash?(_, _), do: false
 
   defp generate_invite_keys(source_user, user, invite_keys) do
     invite_keys

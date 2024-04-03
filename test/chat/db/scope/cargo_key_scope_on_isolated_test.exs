@@ -1,6 +1,14 @@
 defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
   use ChatTest.IsolatedDataCase,
-    dbs: [:operator, :point1_db, :point2_db, :point3_db, :many_invitations, :long_forward_db]
+    dbs: [
+      :operator,
+      :point1_db,
+      :point2_db,
+      :point3_db,
+      :many_invitations,
+      :long_forward_db,
+      :more_invites
+    ]
 
   alias Chat.{
     AdminRoom,
@@ -105,6 +113,36 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
     |> assert_invites_received_by([checkpoint_1])
     |> assert_invites_received_by([user_1, user_2])
     |> refute_invites_received_by([user_3, user_4, user_5])
+  end
+
+  test "even more invites to check room tracing", %{isolated_dbs: dbs} do
+    {
+      [[checkpoint_1], checkpoints_keys],
+      [operator_1],
+      [user_1, user_2, user_3]
+    } =
+      setup_test_data(1, 1, 3)
+
+    %{isolated_dbs: dbs}
+    |> use_db(:operator)
+    |> then(fn context ->
+      1..40
+      |> Enum.reduce(context, fn _, context ->
+        context
+        |> generate_cargo_room(operator_1)
+        |> send_invite(from: operator_1, to: [checkpoint_1], mark_as: :index_1)
+        |> send_invite(from: operator_1, to: user_1, mark_as: :index_3)
+        |> send_invite(from: user_1, to: user_2, mark_as: :index_4)
+        |> send_invite(from: user_2, to: user_3, mark_as: :index_4)
+      end)
+    end)
+    |> copy_cargo_to(:more_invites, checkpoints_keys)
+    |> use_db(:more_invites)
+    |> assert_invites_received_by([checkpoint_1])
+    |> assert_invites_received_by([user_1, user_2])
+    |> refute_invites_received_by([user_3])
+    |> show_db_stats(:operator)
+    |> show_db_stats(:more_invites)
   end
 
   defp setup_test_data(checkpoints_count, operators_count, users_count) do
@@ -226,6 +264,22 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
         invite = Dialogs.room_invite_for_user_to_room(user, cargo_room_identity.public_key)
         refute invite, "Got invite into [#{cargo_room_identity.name}] for #{user.name}"
       end)
+    end)
+  end
+
+  defp show_db_stats(context, db_name) do
+    tap(context, fn context ->
+      context
+      |> db_name(db_name)
+      |> CubDB.select()
+      |> Enum.frequencies_by(fn
+        {{key, _, _, _}, _} -> key
+        {{key, _, _}, _} -> key
+        {{key, _}, _} -> key
+        {key, _} -> key
+        key -> key
+      end)
+      |> IO.inspect(label: db_name)
     end)
   end
 end

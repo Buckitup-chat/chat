@@ -43,7 +43,7 @@ defmodule Chat.RoomInviteIndex do
     {bit_length, room_hash_bits, msg_hash}
   end
 
-  defp room_count() do
+  defp room_count do
     Chat.Rooms.list() |> Enum.count()
   end
 end

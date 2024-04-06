@@ -154,17 +154,18 @@ defmodule Chat.Db.Scope.KeyScope do
       |> db_stream({:room_invite_index, 0, 0}, {:"room_invite_index\0", 0, 0})
       |> Stream.filter(&invite_like_in_room_hash?(&1, room_key_hash))
       |> Enum.reduce(Map.new(), fn
-        {{:room_invite_index, user_key, invite_key}, _}, acc ->
-          Map.put(acc, invite_key, [user_key | Map.get(acc, invite_key, [])])
+        {{:room_invite_index, user_key, invite_key}, value}, acc ->
+          {list, trace} = Map.get(acc, invite_key, {[], value})
+          Map.put(acc, invite_key, {[user_key | list], trace})
 
         _, acc ->
           acc
       end)
       |> Enum.reduce(Map.new(), fn
-        {invite_key, [a, b]}, acc ->
+        {invite_key, {[a, b], trace}}, acc ->
           acc
-          |> add_in_user_invite_index(a, b, invite_key)
-          |> add_in_user_invite_index(b, a, invite_key)
+          |> add_in_user_invite_index(a, b, {invite_key, trace})
+          |> add_in_user_invite_index(b, a, {invite_key, trace})
 
         _, acc ->
           acc
@@ -199,7 +200,11 @@ defmodule Chat.Db.Scope.KeyScope do
     keys =
       invite_pairs
       |> Enum.flat_map(fn {source_user, user, invite_keys} ->
-        dialog_keys = generate_message_and_dialog_keys(source_user, user, backward?, snap)
+        traces =
+          invite_keys
+          |> MapSet.new(&elem(&1, 1))
+
+        dialog_keys = generate_message_and_dialog_keys(source_user, user, backward?, traces, snap)
 
         if match?([_], dialog_keys),
           do: [],
@@ -220,6 +225,12 @@ defmodule Chat.Db.Scope.KeyScope do
 
   def invite_like_in_room_hash?(invite_keypair, room_key_hash) do
     case invite_keypair do
+      {{:room_invite_index, _, _}, {bit_length, bits, _}} ->
+        match?(
+          <<^bits::bitstring-size(bit_length), _::bitstring>>,
+          room_key_hash
+        )
+
       {{:room_invite_index, _, _}, {bit_length, bits}} ->
         match?(
           <<^bits::bitstring-size(bit_length), _::bitstring>>,
@@ -234,8 +245,19 @@ defmodule Chat.Db.Scope.KeyScope do
     end
   end
 
+  defp invite_like_in_message_id_hash?(traces, message_id_hash) do
+    traces
+    |> Enum.any?(fn
+      {_, _, hash} -> hash == message_id_hash
+      {_, _} -> true
+      true -> true
+      _ -> false
+    end)
+  end
+
   defp generate_invite_keys(source_user, user, invite_keys) do
     invite_keys
+    |> Enum.map(&elem(&1, 0))
     |> Enum.uniq()
     |> Enum.flat_map(fn invite_key ->
       [
@@ -246,7 +268,7 @@ defmodule Chat.Db.Scope.KeyScope do
     end)
   end
 
-  defp generate_message_and_dialog_keys(source_user, user, backward?, snap) do
+  defp generate_message_and_dialog_keys(source_user, user, backward?, traces, snap) do
     dialog_key = dialog_key(source_user, user)
 
     [{_, dialog}] =
@@ -262,7 +284,7 @@ defmodule Chat.Db.Scope.KeyScope do
           (source_user == dialog.b_key and msg.is_a_to_b? and backward?)
 
       msg.type == :room_invite and
-        correct_direction?
+        correct_direction? and invite_like_in_message_id_hash?(traces, msg.id |> Enigma.hash())
     end)
     |> Enum.map(fn {key, _} -> key end)
     |> then(&[{:dialogs, dialog_key} | &1])

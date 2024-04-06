@@ -14,7 +14,13 @@ defmodule Chat.RoomInviteIndex do
       |> Map.fetch!(:content)
       |> StorageId.from_json_to_key()
 
-    room_trace = room_bit_trace(room_pub_key, Chat.Rooms.list() |> Enum.count())
+    msg_id =
+      case indexed_message do
+        {_, %{id: msg_id}} -> msg_id
+        {_, msg_id} -> msg_id
+      end
+
+    room_trace = room_bit_trace(room_pub_key, msg_id, room_count())
 
     Db.put({:room_invite_index, dialog.a_key, key}, room_trace)
     Db.put({:room_invite_index, dialog.b_key, key}, room_trace)
@@ -26,13 +32,18 @@ defmodule Chat.RoomInviteIndex do
     Db.delete({:room_invite_index, reader_hash, key})
   end
 
-  defp room_bit_trace(room_pub_key, room_count) do
+  defp room_bit_trace(room_pub_key, msg_id, room_count) do
     bit_length =
       trunc(:math.log2(room_count) - 4)
       |> max(1)
       |> min(32)
 
     <<room_hash_bits::bits-size(bit_length), _::bitstring>> = room_pub_key |> Enigma.hash()
-    {bit_length, room_hash_bits}
+    msg_hash = msg_id |> Enigma.hash()
+    {bit_length, room_hash_bits, msg_hash}
+  end
+
+  defp room_count() do
+    Chat.Rooms.list() |> Enum.count()
   end
 end

@@ -115,6 +115,7 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
     |> refute_invites_received_by([user_3, user_4, user_5])
   end
 
+  @tag timeout: :infinity
   test "even more invites to check room tracing", %{isolated_dbs: dbs} do
     {
       [[checkpoint_1], checkpoints_keys],
@@ -126,7 +127,7 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
     %{isolated_dbs: dbs}
     |> use_db(:operator)
     |> then(fn context ->
-      1..40
+      1..600
       |> Enum.reduce(context, fn _, context ->
         context
         |> generate_cargo_room(operator_1)
@@ -136,11 +137,13 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
         |> send_invite(from: user_2, to: user_3, mark_as: :index_4)
       end)
     end)
+    |> mark_time()
     |> copy_cargo_to(:more_invites, checkpoints_keys)
     |> use_db(:more_invites)
     |> assert_invites_received_by([checkpoint_1])
     |> assert_invites_received_by([user_1, user_2])
     |> refute_invites_received_by([user_3])
+    |> yeild_time()
     |> show_db_stats(:operator)
     |> show_db_stats(:more_invites)
   end
@@ -281,6 +284,19 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
       end)
       |> inspect(label: db_name)
       |> IO.puts()
+    end)
+  end
+
+  defp mark_time(context) do
+    context
+    |> Map.put(:start_time, System.monotonic_time(:millisecond))
+  end
+
+  defp yeild_time(context) do
+    tap(context, fn context ->
+      span = System.monotonic_time(:millisecond) - context.start_time
+
+      IO.puts("Took #{span / 1000} s")
     end)
   end
 end

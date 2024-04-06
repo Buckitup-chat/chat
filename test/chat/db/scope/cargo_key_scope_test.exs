@@ -161,7 +161,7 @@ defmodule Chat.Db.Scope.CargoKeyScopeTest do
     room_identity
     |> Messages.RoomInvite.new()
     |> Dialogs.add_new_message(user, dialog)
-    |> RoomInviteIndex.add(dialog, user)
+    |> RoomInviteIndex.add(dialog, user, room_identity |> Identity.pub_key())
     |> then(&read_room_invitatition(dialog, &1, user))
   end
 

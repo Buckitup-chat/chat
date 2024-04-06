@@ -88,7 +88,7 @@ defmodule Chat.Db.Scope.KeyScopeTest do
         room_identity
         |> Messages.RoomInvite.new()
         |> Dialogs.add_new_message(alice, alice_bob_dialog)
-        |> RoomInviteIndex.add(alice_bob_dialog, alice)
+        |> RoomInviteIndex.add(alice_bob_dialog, alice, first_room_key)
 
       room_invite_key =
         Dialogs.read_message(alice_bob_dialog, room_invite, alice)

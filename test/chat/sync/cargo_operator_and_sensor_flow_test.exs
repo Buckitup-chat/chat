@@ -48,7 +48,7 @@ defmodule ChatTest.Sync.CargoOperatorAndSensorFlowTest do
     |> Map.put(:name, room.name)
     |> RoomInvite.new()
     |> Chat.Dialogs.add_new_message(context.operator_user, dialog)
-    |> Chat.RoomInviteIndex.add(dialog, context.operator_user)
+    |> Chat.RoomInviteIndex.add(dialog, context.operator_user, room.pub_key)
     |> tap(fn {index, message} ->
       Copying.await_written_into(
         [{:dialog_message, dialog |> Enigma.hash(), index, message.id |> Enigma.hash()}],
@@ -85,7 +85,7 @@ defmodule ChatTest.Sync.CargoOperatorAndSensorFlowTest do
       assert context.cargo_scope |> MapSet.size() > 3
 
       should_have =
-        ~w(users dialogs dialog_message rooms room_invite room_invite_index)a
+        ~w(dialogs dialog_message rooms room_invite room_invite_index)a
         |> MapSet.new()
 
       scope_key_types =

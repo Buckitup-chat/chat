@@ -377,7 +377,7 @@ defmodule ChatWeb.MainLive.Index do
         |> Map.put(:name, room.name)
         |> Messages.RoomInvite.new()
         |> Dialogs.add_new_message(me, dialog)
-        |> RoomInviteIndex.add(dialog, me)
+        |> RoomInviteIndex.add(dialog, me, room.pub_key)
       end
     end)
 
@@ -534,7 +534,7 @@ defmodule ChatWeb.MainLive.Index do
       |> Map.put(:name, room.name)
       |> Messages.RoomInvite.new()
       |> Dialogs.add_new_message(me, dialog)
-      |> RoomInviteIndex.add(dialog, me)
+      |> RoomInviteIndex.add(dialog, me, room.pub_key)
     end)
 
     {:noreply, socket}

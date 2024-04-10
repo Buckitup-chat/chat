@@ -39,6 +39,7 @@ straightforward as possible.
 - do not detect self [#615]
 - gallery: image loading indication [#621]
 - cargo: handle no or many dialogs for invite [#631]
+- Log out. Increase clickable area, all button area should be clickable [#632]
 
 ## 2023-12-30_167d8d9___2023-12-30_80fe885
 

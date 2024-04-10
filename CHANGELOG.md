@@ -38,7 +38,7 @@ straightforward as possible.
 - drive indication on cargo only [#620]
 - do not detect self [#615]
 - gallery: image loading indication [#621]
-
+- Admin panel. On mobile version user unable to scroll Check point list [#637]
 ## 2023-12-30_167d8d9___2023-12-30_80fe885
 
 ### Added

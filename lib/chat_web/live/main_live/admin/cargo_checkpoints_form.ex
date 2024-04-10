@@ -194,7 +194,6 @@ defmodule ChatWeb.MainLive.Admin.CargoCheckpointsForm do
     <ul
       class="h-full overflow-y-scroll overflow-x-hidden users-list"
       id={"users-" <> @type}
-      phx-hook="DraggableCheckpoints"
       phx-target={@myself}
     >
       <%= for user <- @users do %>

@@ -38,7 +38,7 @@ straightforward as possible.
 - drive indication on cargo only [#620]
 - do not detect self [#615]
 - gallery: image loading indication [#621]
-- Log out. Increase clickable area, all button area should be clickable
+- Log out. Increase clickable area, all button area should be clickable [#632]
 
 ## 2023-12-30_167d8d9___2023-12-30_80fe885
 

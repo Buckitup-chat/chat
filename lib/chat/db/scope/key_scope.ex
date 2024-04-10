@@ -231,15 +231,6 @@ defmodule Chat.Db.Scope.KeyScope do
           room_key_hash
         )
 
-      {{:room_invite_index, _, _}, {bit_length, bits}} ->
-        match?(
-          <<^bits::bitstring-size(bit_length), _::bitstring>>,
-          room_key_hash
-        )
-
-      {{:room_invite_index, _, _}, true} ->
-        true
-
       _ ->
         false
     end
@@ -249,8 +240,6 @@ defmodule Chat.Db.Scope.KeyScope do
     traces
     |> Enum.any?(fn
       {_, _, hash} -> hash == message_id_hash
-      {_, _} -> true
-      true -> true
       _ -> false
     end)
   end
@@ -271,8 +260,14 @@ defmodule Chat.Db.Scope.KeyScope do
   defp generate_message_and_dialog_keys(source_user, user, backward?, traces, snap) do
     dialog_key = dialog_key(source_user, user)
 
-    [{_, dialog}] =
-      snap |> db_stream({:dialogs, dialog_key}, {:dialogs, dialog_key}) |> Enum.to_list()
+    dialog =
+      snap
+      |> db_stream({:dialogs, dialog_key}, {:dialogs, dialog_key})
+      |> Enum.to_list()
+      |> case do
+        [{_, dialog}] -> dialog
+        [{_, dialog} | _] -> dialog
+      end
 
     snap
     |> db_stream({:dialog_message, dialog_key, 0, 0}, {:dialog_message, dialog_key, nil, 0})
@@ -288,6 +283,8 @@ defmodule Chat.Db.Scope.KeyScope do
     end)
     |> Enum.map(fn {key, _} -> key end)
     |> then(&[{:dialogs, dialog_key} | &1])
+  catch
+    _, _ -> []
   end
 
   defp dialog_key(user_a, user_b) do

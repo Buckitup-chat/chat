@@ -231,15 +231,6 @@ defmodule Chat.Db.Scope.KeyScope do
           room_key_hash
         )
 
-      {{:room_invite_index, _, _}, {bit_length, bits}} ->
-        match?(
-          <<^bits::bitstring-size(bit_length), _::bitstring>>,
-          room_key_hash
-        )
-
-      {{:room_invite_index, _, _}, true} ->
-        true
-
       _ ->
         false
     end
@@ -249,8 +240,6 @@ defmodule Chat.Db.Scope.KeyScope do
     traces
     |> Enum.any?(fn
       {_, _, hash} -> hash == message_id_hash
-      {_, _} -> true
-      true -> true
       _ -> false
     end)
   end

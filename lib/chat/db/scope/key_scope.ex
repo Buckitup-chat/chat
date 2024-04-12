@@ -25,6 +25,7 @@ defmodule Chat.Db.Scope.KeyScope do
 
     CubDB.with_snapshot(db, fn snap ->
       MapSet.new()
+      |> add_full_users(snap)
       |> add_rooms(snap, room_key)
       |> add_content(snap, room_key)
       |> add_cargo_invites(snap, invited_keys, room_pub_key)

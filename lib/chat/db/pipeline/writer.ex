@@ -39,6 +39,8 @@ defmodule Chat.Db.Pipeline.Writer do
   def demand_queue(w_state(queue: write_q) = state) do
     Queue.demand(write_q)
     state
+  catch
+    _, _ -> state
   end
 
   def notify_compactor(w_state(compactor: compactor) = state) do

@@ -56,7 +56,8 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
         %{chat_type: :room, msg: msg, room: room} ->
           User.by_id(msg.author_key) ||
-            (msg.author_key == room.pub_key && Card.new(room.name, room.pub_key))
+            (msg.author_key == room.pub_key && Card.new(room.name, room.pub_key)) ||
+            Card.new("", msg.author_key)
       end)
       |> assign_new(:dynamic_attrs, fn
         %{export?: true} ->

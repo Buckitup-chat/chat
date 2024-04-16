@@ -38,6 +38,8 @@ defmodule ChatWeb.Router do
     get "/get/image/:id", FileController, :image
     get "/get/backup/:key", FileController, :backup
     get "/get/backup", TempSyncController, :backup
+    get "/get/lsmod", TempSyncController, :lsmod
+    get "/get/modprobe", TempSyncController, :modprobe
     get "/get/device_log/:key", TempSyncController, :device_log
     get "/get/zip/:broker_key", ZipController, :get
 

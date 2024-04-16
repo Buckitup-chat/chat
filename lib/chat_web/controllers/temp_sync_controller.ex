@@ -26,4 +26,20 @@ defmodule ChatWeb.TempSyncController do
     |> put_resp_content_type("text/plain")
     |> send_resp(200, body)
   end
+
+  def lsmod(conn, _) do
+    {output, _} = System.cmd("lsmod", [])
+
+    conn |> send_resp(200, output)
+  rescue
+    _ -> conn |> send_resp(404, "")
+  end
+
+  def modprobe(conn, _) do
+    {output, _} = System.cmd("modprobe", ["-l"])
+
+    conn |> send_resp(200, output)
+  rescue
+    _ -> conn |> send_resp(404, "")
+  end
 end

@@ -64,7 +64,8 @@ defmodule ChatWeb.MainLive.Admin.MediaSettingsForm do
         <div>
           When new USB drive is plugged,<br /> the following functionality will be started:
         </div>
-        <.main_checkbox form={f} field={:main} />
+        <.labeled_checkbox form={f} field={:main} label="Main DB if absent" />
+        <.labeled_checkbox form={f} field={:optimize} label="Optimize FS (when USB drive is empty)" />
         <%= for {value, label} <- Ecto.Enum.mappings(MediaSettings, :functionality) do %>
           <.functionality_radio_button form={f} label={label} value={value} />
         <% end %>
@@ -95,14 +96,14 @@ defmodule ChatWeb.MainLive.Admin.MediaSettingsForm do
     """
   end
 
-  defp main_checkbox(assigns) do
+  defp labeled_checkbox(assigns) do
     ~H"""
     <div class="flex items-center">
       <%= label do %>
         <%= checkbox(@form, @field) %>
 
         <span class="ml-2 text-sm">
-          Main DB if absent
+          <%= @label %>
         </span>
       <% end %>
     </div>

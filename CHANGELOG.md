@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
+### Added
+
+### Changed
+
+### Fixed
+
+
+## 2024-04-08_ef99bc7___2024-04-16_79e8ce2
 
 ### Added
 - ZeroTier support [#425]

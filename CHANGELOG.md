@@ -49,6 +49,7 @@ straightforward as possible.
 - Admin panel. On mobile version user unable to scroll Check point list [#637]
 - cargo: handle no or many dialogs for invite [#631]
 - Log out. Increase clickable area, all button area should be clickable [#632]
+- Double scroll on Chat page [#640]
 
 ## 2023-12-30_167d8d9___2023-12-30_80fe885
 

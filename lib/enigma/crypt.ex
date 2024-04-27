@@ -35,6 +35,14 @@ defmodule Enigma.Crypt do
     }
   end
 
+  def encrypt_and_bisign(data, src_private, dst_private) do
+    dst_public = Curvy.Key.to_pubkey(Curvy.Key.from_privkey(dst_private))
+    {encrypted_data, data_sign} = encrypt_and_sign(data, src_private, dst_public)
+    encrypted_data_sign = Curvy.sign(encrypted_data, dst_private, compact: true)
+
+    {encrypted_data, data_sign, encrypted_data_sign}
+  end
+
   def decrypt(encrypted_data, private, public) do
     secret = compute_secret(private, public)
 
@@ -45,11 +53,17 @@ defmodule Enigma.Crypt do
   def decrypt_signed({encrypted_data, sign}, private, public, author_public) do
     decrypted = encrypted_data |> decrypt(private, public)
 
-    if Curvy.verify(sign, decrypted, author_public) do
-      {:ok, decrypted}
-    else
-      :error
-    end
+    if Curvy.verify(sign, decrypted, author_public),
+      do: {:ok, decrypted},
+      else: :error
+  end
+
+  def decrypt_bisigned({encrypted_data, data_sign, encrypted_data_sign}, private, author_public) do
+    public = Curvy.Key.to_pubkey(Curvy.Key.from_privkey(private))
+
+    if Curvy.verify(encrypted_data_sign, encrypted_data, public),
+      do: decrypt_signed({encrypted_data, data_sign}, private, author_public, author_public),
+      else: :error_out_sign
   end
 
   def sign(data, private) do

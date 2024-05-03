@@ -34,9 +34,12 @@ defmodule Chat.RoomInviteIndex do
 
   defp room_bit_trace(room_pub_key, msg_id, room_count) do
     bit_length =
-      trunc(:math.log2(room_count) - 4)
-      |> max(1)
-      |> min(32)
+      if room_count == 0,
+        do: 0,
+        else:
+          trunc(:math.log2(room_count) - 4)
+          |> max(1)
+          |> min(32)
 
     <<room_hash_bits::bits-size(bit_length), _::bitstring>> = room_pub_key |> Enigma.hash()
     msg_hash = msg_id |> Enigma.hash()

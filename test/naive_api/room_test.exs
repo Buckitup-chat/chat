@@ -42,10 +42,10 @@ defmodule NaiveApi.RoomTest do
       {room_identity, _room} = Rooms.add(me, @room_name)
 
       %Messages.Text{text: @text, timestamp: now()}
-      |> Rooms.add_new_message(me, room_identity.public_key)
+      |> Rooms.add_new_message(me, room_identity)
 
       FakeData.image(@image_name)
-      |> Rooms.add_new_message(me, room_identity.public_key)
+      |> Rooms.add_new_message(me, room_identity)
 
       [me: me, room_identity: room_identity]
     end

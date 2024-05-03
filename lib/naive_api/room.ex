@@ -41,7 +41,7 @@ defmodule NaiveApi.Room do
         {index, %{id: id}} =
           content
           |> Messages.Text.new(timestamp)
-          |> Rooms.add_new_message(me, room.pub_key)
+          |> Rooms.add_new_message(me, room_identity)
           |> MemoIndex.add(room, room.pub_key)
 
         %{id: id, index: index}
@@ -56,7 +56,6 @@ defmodule NaiveApi.Room do
       ) do
     room_identity = Identity.from_keys(room_keypair)
     me = Identity.from_keys(my_keypair)
-    room = room_identity |> Identity.pub_key() |> Rooms.get()
 
     case UploadIndex.get(upload_key) do
       nil ->
@@ -70,7 +69,7 @@ defmodule NaiveApi.Room do
             ChunkedFiles.decrypt_secret(upload.encrypted_secret, me),
             now()
           )
-          |> Rooms.add_new_message(me, room.pub_key)
+          |> Rooms.add_new_message(me, room_identity)
 
         %{id: id, index: index}
         |> ok()

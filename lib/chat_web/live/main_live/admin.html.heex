@@ -119,7 +119,7 @@
                  |> stringify_commands()},
                 to: ".confirmButton"
               )
-              |> JS.set_attribute({"phx-value-hash", room.hash}, to: ".confirmButton")
+              |> JS.set_attribute({"phx-value-hash", room |> Room.hash()}, to: ".confirmButton")
             }
           >
             <Layout.Card.hashed_name card={room} />

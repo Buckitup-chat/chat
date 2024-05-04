@@ -51,8 +51,9 @@ defmodule Chat.Sync.CargoRoom do
     end
   end
 
-  @spec write_file(Chat.Identity.t(), binary, map()) :: {:ok, MapSet.t()} | :ignore | :failed
-  def write_file(writer, content, metadata) do
+  @spec write_file(Chat.Identity.t(), binary, map(), function()) ::
+          {:ok, MapSet.t()} | :ignore | :failed
+  def write_file(writer, content, metadata, get_room_identity_fn) do
     case get() do
       nil ->
         :ignore
@@ -66,6 +67,7 @@ defmodule Chat.Sync.CargoRoom do
                type: Map.get(metadata, "Content-Type", "application/octet-stream"),
                name_prefix: Map.get(metadata, "Name-Prefix", "")
              },
+             room_identity <- get_room_identity_fn.(room_key),
              entry <- file_entry(file_info),
              file_key <- UploadKey.new(destination, room_key, entry),
              file_secret <- ChunkedFiles.new_upload(file_key),
@@ -74,7 +76,7 @@ defmodule Chat.Sync.CargoRoom do
           message =
             entry
             |> Messages.File.new(file_key, file_secret, file_info.time)
-            |> Rooms.add_new_message(writer, room_key)
+            |> Rooms.add_new_message(writer, room_identity)
 
           {msg_index, msg} = message
 
@@ -88,7 +90,7 @@ defmodule Chat.Sync.CargoRoom do
              {:file_chunk, file_key, 0, max(size - 1, 0)},
              {:file, file_key},
              {:file_index, room_key, file_key, msg.id},
-             {:room_message, room_key, msg_index, msg.id |> Enigma.hash()}
+             Chat.DbKeys.room_message(msg, index: msg_index, room: room_key)
            ])}
         else
           _ -> :failed
@@ -96,25 +98,29 @@ defmodule Chat.Sync.CargoRoom do
     end
   end
 
-  def write_text(writer, content) do
+  def write_text(writer, content, get_room_identity_fn) do
     case get() do
       nil ->
         :ignore
 
       %{pub_key: room_key} ->
-        message =
-          content
-          |> Messages.Text.new(DateTime.utc_now() |> DateTime.to_unix())
-          |> Rooms.add_new_message(writer, room_key)
+        if room_identiny = get_room_identity_fn.(room_key) do
+          message =
+            content
+            |> Messages.Text.new(DateTime.utc_now() |> DateTime.to_unix())
+            |> Rooms.add_new_message(writer, room_identiny)
 
-        {msg_index, msg} = message
+          {msg_index, msg} = message
 
-        :ok = PubSub.broadcast!(Chat.PubSub, @cargo_topic, {:room, {:new_message, message}})
+          :ok = PubSub.broadcast!(Chat.PubSub, @cargo_topic, {:room, {:new_message, message}})
 
-        {:ok,
-         MapSet.new([
-           {:room_message, room_key, msg_index, msg.id |> Enigma.hash()}
-         ])}
+          {:ok,
+           MapSet.new([
+             Chat.DbKeys.room_message(msg, index: msg_index, room: room_key)
+           ])}
+        else
+          :failed
+        end
     end
   end
 

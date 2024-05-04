@@ -9,7 +9,7 @@ defmodule Chat.Db do
   alias Chat.Db.WriteQueue
   alias Chat.Db.WriteQueue.FileReader
 
-  @db_version "v.9"
+  @db_version "v.10"
   @db_location Application.compile_env(:chat, :cub_db_file, "priv/db")
 
   def list(range, transform), do: Queries.list(db(), range, transform)

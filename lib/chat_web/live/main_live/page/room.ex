@@ -199,7 +199,7 @@ defmodule ChatWeb.MainLive.Page.Room do
       content ->
         content
         |> Messages.Text.new(time)
-        |> Rooms.add_new_message(me, room.pub_key)
+        |> Rooms.add_new_message(me, rooms[room.pub_key])
         |> MemoIndex.add(room, rooms[room.pub_key])
         |> broadcast_new_message(room.pub_key, me, time)
     end
@@ -208,7 +208,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def send_file(
-        %{assigns: %{me: me, monotonic_offset: time_offset}} = socket,
+        %{assigns: %{me: me, monotonic_offset: time_offset, room_map: rooms}} = socket,
         entry,
         %UploadMetadata{
           credentials: {chunk_key, chunk_secret},
@@ -229,7 +229,7 @@ defmodule ChatWeb.MainLive.Page.Room do
             ChunkedFiles.decrypt_secret(chunk_secret, me),
             time
           )
-          |> Rooms.add_new_message(me, pub_key)
+          |> Rooms.add_new_message(me, rooms[pub_key])
           |> then(&{:ok, &1})
         end
       )

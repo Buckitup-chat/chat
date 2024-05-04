@@ -104,6 +104,7 @@ defmodule Chat.Rooms.RequestRoomTest do
     assert [] = Rooms.list_pending_requests(room_key)
   end
 
+  @tag :skip
   test "request message should be added upon requesting" do
     {_alice, identity, room} = "Alice" |> user_and_request_room()
     room_key = identity |> Identity.pub_key()

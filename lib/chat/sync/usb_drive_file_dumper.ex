@@ -117,7 +117,7 @@ defmodule Chat.Sync.UsbDriveFileDumper do
       msg =
       entry
       |> Messages.File.new(file_key, secret, entry.client_last_modified)
-      |> Rooms.add_new_message(room_identity, room_key)
+      |> Rooms.add_new_message(room_identity, room_identity)
 
     Rooms.on_saved(msg, room_key, fn ->
       ChangeTracker.ensure(

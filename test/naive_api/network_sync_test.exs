@@ -142,7 +142,7 @@ defmodule NailveApi.NetworkSyncTest do
       "-"
       |> String.duplicate(151)
       |> Messages.Text.new(1)
-      |> Chat.Rooms.add_new_message(sender, room_key)
+      |> Chat.Rooms.add_new_message(sender, room_identity)
       |> Chat.MemoIndex.add(room, room_identity)
 
     memo_key =

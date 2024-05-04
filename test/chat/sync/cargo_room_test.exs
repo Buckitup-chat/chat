@@ -33,13 +33,17 @@ defmodule Chat.Sync.CargoRoomTest do
         "Name-Prefix" => "cargo_shot_"
       }
 
-      assert :ignore = CargoRoom.write_file(cargo_bot, content, metadata)
+      assert :ignore = CargoRoom.write_file(cargo_bot, content, metadata, fn _ -> nil end)
 
       {room_identity, room} = Rooms.add(operator, "TestCargoRoom", :cargo)
       Rooms.await_saved(room_identity)
       CargoRoom.activate(room_identity.public_key)
 
-      assert {:ok, _} = CargoRoom.write_file(cargo_bot, content, metadata)
+      assert {:ok, _} =
+               CargoRoom.write_file(cargo_bot, content, metadata, fn key ->
+                 if key === room_identity.public_key, do: room_identity
+               end)
+
       ChangeTracker.await()
 
       [%{type: :image, content: content}] = Rooms.read(room, room_identity)
@@ -67,13 +71,17 @@ defmodule Chat.Sync.CargoRoomTest do
 
       content = "Cargo room message text"
 
-      assert :ignore = CargoRoom.write_text(cargo_bot, content)
+      assert :ignore = CargoRoom.write_text(cargo_bot, content, fn _ -> nil end)
 
       {room_identity, room} = Rooms.add(operator, "TestCargoRoom2", :cargo)
       Rooms.await_saved(room_identity)
       CargoRoom.activate(room_identity.public_key)
 
-      assert {:ok, db_keys} = CargoRoom.write_text(cargo_bot, content)
+      assert {:ok, db_keys} =
+               CargoRoom.write_text(cargo_bot, content, fn key ->
+                 if key === room_identity.public_key, do: room_identity
+               end)
+
       Copying.await_written_into(db_keys, Db.db())
 
       [%{type: :text, content: read_content}] = Rooms.read(room, room_identity)

@@ -87,7 +87,7 @@ defmodule ChatWeb.MainLive.IndexTest do
       view |> form("#search-box", room: %{name: "Public"}) |> render_change()
       %{socket: %{assigns: %{new_rooms: rooms}}} = reload_view(%{view: view})
       names_set = rooms |> Enum.map(& &1.name) |> MapSet.new()
-      assert names_set |> MapSet.contains?(["Public1", "Public2", "Public3"])
+      assert ["Public1", "Public2", "Public3"] |> MapSet.new() |> MapSet.subset?(names_set)
     end
 
     defp create_users(_) do

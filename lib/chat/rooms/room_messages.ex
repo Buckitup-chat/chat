@@ -6,6 +6,7 @@ defmodule Chat.Rooms.RoomMessages do
   alias Chat.Db.ChangeTracker
   alias Chat.DryStorable
   alias Chat.Identity
+  alias Chat.Proto.Identify
   alias Chat.Rooms.Message
   alias Chat.Rooms.PlainMessage
   alias Chat.Rooms.Room
@@ -148,7 +149,7 @@ defmodule Chat.Rooms.RoomMessages do
         %Identity{} = room_identity,
         %Identity{} = author
       ) do
-    with room_key <- room_identity |> Identity.pub_key(),
+    with room_key <- room_identity |> Identify.pub_key(),
          msg_key <- room_key |> key(index, id),
          msg <- Db.get(msg_key),
          true <- msg.author_key == author.public_key do
@@ -171,7 +172,7 @@ defmodule Chat.Rooms.RoomMessages do
   end
 
   defp add_message(content, room_identity, author, opts) do
-    room_pub_key = room_identity |> Chat.Proto.Identify.pub_key()
+    room_pub_key = room_identity |> Identify.pub_key()
 
     content
     |> Enigma.encrypt_and_bisign(author.private_key, room_identity.private_key)

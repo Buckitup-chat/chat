@@ -1,9 +1,11 @@
 defmodule ChatTest.Rooms.SpamRoomTest do
   use ExUnit.Case, async: true
 
-  alias Chat.User
-  alias Chat.Rooms
   alias Chat.Db
+  alias Chat.Messages.Text
+  alias Chat.Proto.Identify
+  alias Chat.Rooms
+  alias Chat.User
 
   test "room should not store spam messages" do
     %{}
@@ -18,8 +20,8 @@ defmodule ChatTest.Rooms.SpamRoomTest do
     alice = User.login("User Alice")
     sally = User.login("Spammer Sally")
     {room_identity, _room} = Rooms.add(alice, "Alice Private room", :private)
-    await_key_written({:rooms, room_identity |> Chat.Proto.Identify.pub_key()})
-    room = Rooms.get(room_identity |> Chat.Proto.Identify.pub_key())
+    await_key_written({:rooms, room_identity |> Identify.pub_key()})
+    room = Rooms.get(room_identity |> Identify.pub_key())
 
     context
     |> Map.merge(%{
@@ -34,7 +36,7 @@ defmodule ChatTest.Rooms.SpamRoomTest do
     1..4
     |> Enum.map(fn i ->
       "hello #{i}"
-      |> Chat.Messages.Text.new(i)
+      |> Text.new(i)
       |> Rooms.add_new_message(context.user, context.room_identity)
     end)
     |> Enum.map(fn {index, room_msg} ->
@@ -53,7 +55,7 @@ defmodule ChatTest.Rooms.SpamRoomTest do
         |> Enum.frequencies_by(& &1.author_key)
 
       expected_messages = %{
-        (context.user |> Chat.Proto.Identify.pub_key()) => context.user_messages
+        (context.user |> Identify.pub_key()) => context.user_messages
       }
 
       assert expected_messages == messages
@@ -68,7 +70,7 @@ defmodule ChatTest.Rooms.SpamRoomTest do
     5..8
     |> Enum.map(fn i ->
       "spam #{i}"
-      |> Chat.Messages.Text.new(i)
+      |> Text.new(i)
       |> Rooms.add_new_message(context.spammer, fake_room_identity)
     end)
     |> Enum.reject(&is_nil/1)
@@ -87,7 +89,7 @@ defmodule ChatTest.Rooms.SpamRoomTest do
         Chat.Rooms.read(context.room, context.room_identity)
         |> Enum.frequencies_by(& &1.author_key)
 
-      user_key = context.user |> Chat.Proto.Identify.pub_key()
+      user_key = context.user |> Identify.pub_key()
 
       expected_messages = %{
         user_key => context.user_messages

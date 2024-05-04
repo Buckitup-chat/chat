@@ -21,8 +21,8 @@ defmodule Chat.Rooms.Room do
   defstruct [:admin, :name, :pub_key, :requests, :signature, type: :public]
 
   def create(%Identity{} = admin, %Identity{name: name} = room, type \\ :public) do
-    admin_pub_key = admin |> Chat.Proto.Identify.pub_key()
-    room_pub_key = room |> Chat.Proto.Identify.pub_key()
+    admin_pub_key = admin |> Identify.pub_key()
+    room_pub_key = room |> Identify.pub_key()
 
     signature =
       digest(admin_pub_key, room_pub_key, type)

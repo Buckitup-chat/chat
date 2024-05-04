@@ -4,6 +4,7 @@ defmodule Chat.Rooms.Room do
   use StructAccess
 
   alias Chat.Identity
+  alias Chat.Proto.Identify
   alias Chat.Rooms.RoomRequest
 
   @type room_type() :: :public | :request | :private
@@ -12,20 +13,28 @@ defmodule Chat.Rooms.Room do
           name: String.t(),
           pub_key: String.t(),
           requests: list(),
-          type: room_type()
+          type: room_type(),
+          signature: String.t()
         }
 
   @derive {Inspect, only: [:name, :type]}
-  defstruct [:admin, :name, :pub_key, :hash, :requests, type: :public]
+  defstruct [:admin, :name, :pub_key, :requests, :signature, type: :public]
 
   def create(%Identity{} = admin, %Identity{name: name} = room, type \\ :public) do
+    admin_pub_key = admin |> Chat.Proto.Identify.pub_key()
+    room_pub_key = room |> Chat.Proto.Identify.pub_key()
+
+    signature =
+      digest(admin_pub_key, room_pub_key, type)
+      |> Enigma.sign(room.private_key)
+
     %__MODULE__{
-      admin: admin |> Identity.pub_key(),
+      admin: admin_pub_key,
       name: name,
-      pub_key: room |> Identity.pub_key(),
+      pub_key: room_pub_key,
       requests: [],
       type: type,
-      hash: room |> Identity.pub_key() |> hash()
+      signature: signature
     }
   end
 
@@ -66,26 +75,24 @@ defmodule Chat.Rooms.Room do
         opts
       )
       when type in [:public, :request] do
-    public_only? = Keyword.get(opts, :public_only, false)
+    with public_only? <- Keyword.get(opts, :public_only, false),
+         false <- public_only? and type != :public,
+         true <- room |> valid?(),
+         new_requests <-
+           Enum.map(requests, fn
+             %RoomRequest{requester_key: ^user_public_key, pending?: true} ->
+               %RoomRequest{
+                 requester_key: user_public_key,
+                 pending?: false,
+                 ciphered_room_identity: cipher_identity_with_key(room_identity, user_public_key)
+               }
 
-    if public_only? and type != :public do
-      room
-    else
-      new_requests =
-        requests
-        |> Enum.map(fn
-          %RoomRequest{requester_key: ^user_public_key, pending?: true} ->
-            %RoomRequest{
-              requester_key: user_public_key,
-              pending?: false,
-              ciphered_room_identity: cipher_identity_with_key(room_identity, user_public_key)
-            }
-
-          x ->
-            x
-        end)
-
+             x ->
+               x
+           end) do
       %{room | requests: new_requests}
+    else
+      _ -> room
     end
   end
 
@@ -104,7 +111,20 @@ defmodule Chat.Rooms.Room do
     %{room | requests: new_requests}
   end
 
-  def hash(pub_key), do: Base.encode16(pub_key, case: :lower)
+  def hash(identity),
+    do: identity |> Identify.pub_key() |> Base.encode16(case: :lower)
+
+  def digest(%__MODULE__{} = room) do
+    digest(room.admin, room.pub_key, room.type)
+  end
+
+  def digest(admin, pub_key, type) do
+    admin <> pub_key <> Atom.to_string(type)
+  end
+
+  def valid?(%__MODULE__{} = room) do
+    Enigma.is_valid_sign?(room.signature, room |> digest(), room.pub_key)
+  end
 
   def cipher_identity(%Identity{} = room_identity, secret) do
     room_identity

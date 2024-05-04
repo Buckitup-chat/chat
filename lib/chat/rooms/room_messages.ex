@@ -24,14 +24,12 @@ defmodule Chat.Rooms.RoomMessages do
     |> add_message(room_identity, author, opts |> Keyword.merge(type: type, now: now))
   end
 
-  @deprecated "Use add_new_message/4 instead"
   def on_saved({index, msg}, room_hash, ok_fn) do
     room_hash
     |> key(index, msg.id)
     |> ChangeTracker.promise(ok_fn)
   end
 
-  @deprecated "No change tracker"
   def await_saved({index, msg}, room_hash) do
     room_hash
     |> key(index, msg.id)

@@ -23,10 +23,9 @@ defmodule Chat.Rooms.Room do
   def create(%Identity{} = admin, %Identity{name: name} = room, type \\ :public) do
     admin_pub_key = admin |> Identify.pub_key()
     room_pub_key = room |> Identify.pub_key()
+    digest = digest(admin_pub_key, room_pub_key, type)
 
-    signature =
-      digest(admin_pub_key, room_pub_key, type)
-      |> Enigma.sign(room.private_key)
+    signature = {digest |> Enigma.sign(room.private_key), digest |> Enigma.sign(admin_pub_key)}
 
     %__MODULE__{
       admin: admin_pub_key,
@@ -123,7 +122,11 @@ defmodule Chat.Rooms.Room do
   end
 
   def valid?(%__MODULE__{} = room) do
-    Enigma.is_valid_sign?(room.signature, room |> digest(), room.pub_key)
+    digest = room |> digest()
+    {room_sign, admin_sign} = room.signature
+
+    Enigma.is_valid_sign?(room_sign, digest, room.pub_key) and
+      Enigma.is_valid_sign?(admin_sign, digest, room.admin)
   end
 
   def cipher_identity(%Identity{} = room_identity, secret) do

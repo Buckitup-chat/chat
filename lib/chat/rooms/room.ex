@@ -25,7 +25,8 @@ defmodule Chat.Rooms.Room do
     room_pub_key = room |> Identify.pub_key()
     digest = digest(admin_pub_key, room_pub_key, type)
 
-    signature = {digest |> Enigma.sign(room.private_key), digest |> Enigma.sign(admin_pub_key)}
+    signature =
+      {digest |> Enigma.sign(room.private_key), digest |> Enigma.sign(admin.private_key)}
 
     %__MODULE__{
       admin: admin_pub_key,

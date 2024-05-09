@@ -1,0 +1,46 @@
+<<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>WebAuthN PoC</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script>
+      const createCreds = async () => {
+        const randomStringFromServer="hjewdbjwhedbjhwbedjh bjbqjhebjqdb";
+        const publicKeyCredentialCreationOptions = {
+            challenge: Uint8Array.from(
+                randomStringFromServer, c => c.charCodeAt(0)),
+            rp: {
+                name: "Duo Security",
+                id: "duosecurity.com",
+            },
+            user: {
+                id: Uint8Array.from(
+                    "UZSL85T9AFC", c => c.charCodeAt(0)),
+                name: "lee@webauthn.guide",
+                displayName: "Lee",
+            },
+            pubKeyCredParams: [{alg: -7, type: "public-key"}],
+            authenticatorSelection: {
+                authenticatorAttachment: "cross-platform",
+            },
+            timeout: 60000,
+            attestation: "direct"
+        };
+
+        const credential = await navigator.credentials.create({
+            publicKey: publicKeyCredentialCreationOptions
+        });
+
+        console.log("hi")
+      };
+
+      createCreds();
+    </script>
+  </head>
+  <body>
+    <button type="button" onclick="createCreds()">
+      create
+    </button>
+  </body>
+</html>

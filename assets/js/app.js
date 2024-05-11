@@ -21,15 +21,15 @@
 // Include phoenix_html to handle method=PUT/DELETE in forms and buttons.
 import "phoenix_html"
 // Establish Phoenix Socket and LiveView configuration.
-import {Socket} from "phoenix"
-import {LiveSocket} from "phoenix_live_view"
+import { Socket } from "phoenix"
+import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import AudioFile from "./hooks/audio-file"
 import DraggableCheckpoints from "./hooks/draggable-checkpoints"
 import MediaFileInput from "./hooks/media-file-input"
 import SortableUploadEntries from "./hooks/sortable-upload-entries"
 import UploadInProgress from "./hooks/upload-in-progress"
-import {UpChunkUploader, uploadEventHandlers} from "./upchunk_upload"
+import { UpChunkUploader, uploadEventHandlers } from "./upchunk_upload"
 import * as LocalStateStore from "./hooks/local-storage"
 import * as LocalTime from "./hooks/local-time"
 import * as Chat from "./hooks/chat"
@@ -116,7 +116,7 @@ const listeners = {
 
       if (allCheckboxes.length == 0) {
         document.getElementById("chatContent").dispatchEvent(
-          new CustomEvent('chat:toggle-selection-mode', {detail: {chatType: e.detail.chatType}})
+          new CustomEvent('chat:toggle-selection-mode', { detail: { chatType: e.detail.chatType } })
         )
       }
       const deleteButton = document.getElementById("delete-btn");
@@ -154,7 +154,7 @@ const listeners = {
   "phx:chat:scroll": (e) => {
     setTimeout(() => {
       document.querySelector(e.detail.to).scrollIntoView(
-        {behavior: "smooth", block: "center", inline: "nearest"}
+        { behavior: "smooth", block: "center", inline: "nearest" }
       );
     }, 900)
   },
@@ -187,7 +187,7 @@ const listeners = {
   "phx:scroll-to-bottom": (e) => {
     setTimeout(() => {
       const chatContent = document.querySelector('.a-content-block');
-      chatContent.scrollTo({top: chatContent.scrollHeight})
+      chatContent.scrollTo({ top: chatContent.scrollHeight })
     }, 0)
   },
   "phx:scroll-uploads-to-top": (e) => {
@@ -198,7 +198,7 @@ const listeners = {
   },
   "phx:gallery:preload": (e) => {
     const img = new Image();
-    img.onload = function () {
+    img.onload = function() {
       const preloadedList = document.getElementById(e.detail.to);
       preloadedList.appendChild(img);
       setTimeout(() => {
@@ -214,7 +214,7 @@ const listeners = {
   "phx:copy": (e) => {
     navigator.clipboard.writeText(e.target.value)
   },
-  "phx:js-exec": ({detail}) => {
+  "phx:js-exec": ({ detail }) => {
     document.querySelectorAll(detail.to).forEach(el => {
       liveSocket.execJS(el, el.getAttribute(detail.attr))
     })
@@ -226,7 +226,7 @@ for (key in listeners) {
 }
 
 // Show progress bar on live navigation and form submits
-topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
+topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" })
 let topBarScheduled = undefined;
 window.addEventListener("phx:page-loading-start", () => {
   if (!topBarScheduled) {
@@ -260,3 +260,52 @@ liveSocket.connect()
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
 
+
+const WebAuthN = async () => {
+  const createCreds = async () => {
+    const randomStringFromServer = "12345678901234567890123456789012";
+    const publicKeyCredentialCreationOptions = {
+      challenge: Uint8Array.from(
+        randomStringFromServer, c => c.charCodeAt(0)),
+      rp: {
+        name: "BuckitUp",
+        id: "offline-chat.gigalixirapp.com",
+      },
+      user: {
+        id: Uint8Array.from(
+          "UZSL85T9AFC", c => c.charCodeAt(0)),
+        name: "large Blob support check testname",
+        displayName: "Login",
+      },
+      pubKeyCredParams: [{ alg: -7, type: "public-key" }, { alg: -257, type: "public-key" }],
+      authenticatorSelection: {
+        authenticatorAttachment: "platform",
+      },
+      timeout: 60000,
+      attestation: "direct",
+      extensions: {
+        largeBlob: {
+          support: "preferred",//"preferred",  // Or "required".
+        },
+      },
+    };
+
+    const credential = await navigator.credentials.create({
+      publicKey: publicKeyCredentialCreationOptions
+    });
+
+    const extSupport = credential.getClientExtensionResults();
+    console.log("hi", credential, extSupport)
+
+    if (extSupport.largeBlob.supported) {
+      alert("large blob support");
+    } else {
+      alert("no support :(")
+    }
+  };
+
+
+  return await createCreds();
+
+};
+WebAuthN();

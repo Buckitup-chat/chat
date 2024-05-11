@@ -9,7 +9,6 @@ defmodule Chat.Rooms.Room do
 
   @type room_type() :: :public | :request | :private
   @type t() :: %__MODULE__{
-          admin: String.t(),
           name: String.t(),
           pub_key: String.t(),
           requests: list(),
@@ -18,18 +17,16 @@ defmodule Chat.Rooms.Room do
         }
 
   @derive {Inspect, only: [:name, :type]}
-  defstruct [:admin, :name, :pub_key, :requests, :signature, type: :public]
+  defstruct [:name, :pub_key, :requests, :signature, type: :public]
 
-  def create(%Identity{} = admin, %Identity{name: name} = room, type \\ :public) do
-    admin_pub_key = admin |> Identify.pub_key()
+  def create(%Identity{} = _admin, %Identity{name: name} = room, type \\ :public) do
     room_pub_key = room |> Identify.pub_key()
 
     signature =
-      digest(admin_pub_key, room_pub_key, type)
+      digest(room_pub_key, type)
       |> Enigma.sign(room.private_key)
 
     %__MODULE__{
-      admin: admin_pub_key,
       name: name,
       pub_key: room_pub_key,
       requests: [],
@@ -115,11 +112,11 @@ defmodule Chat.Rooms.Room do
     do: identity |> Identify.pub_key() |> Base.encode16(case: :lower)
 
   def digest(%__MODULE__{} = room) do
-    digest(room.admin, room.pub_key, room.type)
+    digest(room.pub_key, room.type)
   end
 
-  def digest(admin, pub_key, type) do
-    admin <> pub_key <> Atom.to_string(type)
+  def digest(pub_key, type) do
+    pub_key <> Atom.to_string(type)
   end
 
   def valid?(%__MODULE__{} = room) do

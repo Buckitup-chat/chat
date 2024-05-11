@@ -106,7 +106,7 @@ flowchart LR
 
 ### Rooms
 
-Each room has its own keypair. It is given to every member of a room. This way many users can write to room (using theirs keys) and read messages of other users (using room keys).
+Each room has its own keypair. It is given to every member of a room. This way many users can write to room (using their key and room key) and read messages of other users (using room key).
 
 Room private keys stored on user devices only. DB stores public key and room name. Also, room keeps a list of request in it.
 Room messages store ciphered message, its signature, author's timestamp, message index and author's public key.

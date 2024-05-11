@@ -49,13 +49,13 @@ Dialog key combines hashes of peer pub_keys
 
 ## Room
 
-Since room has many users, it has its own private key. It allows holder of a key to read and write into room. Having a rooml key provides an access to it.
+Since room has many users, it has its own private key. It allows holder of a key to read and write into room. Having a room key provides an access to it.
 
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
 {{:rooms, room_pub_key_hash}
- %Room{name, pub_key, room_type, requests, creator_pub_key_hash}}
+ %Room{name, pub_key, room_type, requests, signature}}
 ```
 
 #### Messages
@@ -64,7 +64,7 @@ Since room has many users, it has its own private key. It allows holder of a key
 
 ```elixir
 {{:room_message, room_pub_key_binhash, index, message_id}
- %Message{timestamp, author_hash, encrypted_and_signed_message, message_type, id, version}
+ %Message{timestamp, author_hash, encrypted_and_bisigned_message, message_type, id, version}
 ```
 
 <!-- livebook:{"break_markdown":true} -->
@@ -109,12 +109,12 @@ classDiagram
     public_key
     type
     requests: []
-    creator_public_key
+    signature
   }
   class RoomMessage {
     timestamp
     author_public_key
-    message: SafeMessage
+    message: SafeRoomMessage
     type: MessageType
     message_id
     version
@@ -123,11 +123,17 @@ classDiagram
 
   class SafeMessage {
     encrypted: text or secretId
-    sign
+    message_author_sign
+  }
+
+  class SafeRoomMessage {
+    encrypted: text or secretId
+    message_author_sign
+    encrypted_room_sign
   }
   
   DialogMessage o-- SafeMessage 
-  RoomMessage o-- SafeMessage 
+  RoomMessage o-- SafeRoomMessage 
 
 
   DB .. "n" Card : public_key

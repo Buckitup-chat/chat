@@ -269,7 +269,7 @@ const WebAuthN = async () => {
         randomStringFromServer, c => c.charCodeAt(0)),
       rp: {
         name: "BuckitUp",
-        id: "offline-chat.gigalixirapp.com",
+        id: "localhost",
       },
       user: {
         id: Uint8Array.from(
@@ -287,6 +287,9 @@ const WebAuthN = async () => {
         largeBlob: {
           support: "preferred",//"preferred",  // Or "required".
         },
+        prf: {
+          support: "preferred"
+        }
       },
     };
 

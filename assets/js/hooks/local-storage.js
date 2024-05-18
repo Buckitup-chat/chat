@@ -7,6 +7,7 @@ export const hooks = {
     this.handleEvent("restore", (obj) => this.restore(obj))
     this.handleEvent("store-room", (obj) => this.storeRoom(obj))
     this.handleEvent("reset-rooms-to-backup", (obj) => this.resetRoomsToBackup(obj))
+    this.handleEvent("set-legal-notice-accepted", (obj) => this.setLegalNoticeAccepted(obj))
   },
 
   store(obj) {
@@ -24,7 +25,19 @@ export const hooks = {
   fullState(obj) {
     const authData = localStorage.getItem(obj.auth_key);
     const roomCount = localStorage.getItem(obj.room_count_key);
-    return authData ? {auth: authData, room_count: Number(roomCount)} : {}
+    const legalNoticeAccepted = !!localStorage.getItem(obj.legal_notice_key)
+
+    return authData
+      ? {
+        auth: authData,
+        room_count: Number(roomCount),
+        legal_notice_accepted: legalNoticeAccepted
+      }
+      : {}
+  },
+
+  setLegalNoticeAccepted(obj) {
+    localStorage.setItem(obj.legal_notice_key, true)
   },
 
 

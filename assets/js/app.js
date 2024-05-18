@@ -61,7 +61,8 @@ let liveSocket = new LiveSocket("/live", Socket, {
     tz_info: Hooks.LocalTime.info(),
     storage: Hooks.LocalStateStore.fullState({
       auth_key: "buckitUp-chat-auth-v2",
-      room_count_key: "buckitUp-room-count-v2"
+      room_count_key: "buckitUp-room-count-v2",
+      legal_notice_key: "agreementAccepted"
     })
   },
   hooks: Hooks,

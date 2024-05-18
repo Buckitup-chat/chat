@@ -45,6 +45,7 @@ defmodule ChatWeb.MainLive.Page.Login do
     socket
     |> load_user(me, rooms)
     |> assign(:room_count_to_backup, Map.get(params, "room_count", 0))
+    |> assign(:legal_notice_accepted, Map.get(params, "legal_notice_accepted", false))
   end
 
   def load_user(socket, x) do

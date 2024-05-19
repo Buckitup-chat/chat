@@ -25,7 +25,7 @@ export const hooks = {
   fullState(obj) {
     const authData = localStorage.getItem(obj.auth_key);
     const roomCount = localStorage.getItem(obj.room_count_key);
-    const legalNoticeAccepted = !!localStorage.getItem(obj.legal_notice_key)
+    const legalNoticeAccepted = localStorage.getItem(obj.legal_notice_key)
 
     return authData
       ? {
@@ -37,7 +37,7 @@ export const hooks = {
   },
 
   setLegalNoticeAccepted(obj) {
-    localStorage.setItem(obj.legal_notice_key, true)
+    localStorage.setItem(obj.legal_notice_key, "true")
   },
 
 

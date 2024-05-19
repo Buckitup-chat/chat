@@ -39,7 +39,7 @@ defmodule ChatWeb.MainLive.Modals.LegalNotice do
               <input class="scale-150 mr-1" type="checkbox" id="note" name="note" value="note" />
               <label class="text-sm text-black" for="note">
                 By using you agree to accept the custom
-                <a class="text-blue-700" href="">privacy policy</a>
+                <a class="text-blue-700" href="/privacy-policy.html" target="_blank">privacy policy & terms</a>
               </label>
             </form>
             <br />

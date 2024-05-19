@@ -17,7 +17,7 @@ defmodule ChatWeb do
   and import those modules here.
   """
   def static_paths do
-    ~w(assets fonts images favicon.ico robots.txt)
+    ~w(assets fonts images favicon.ico robots.txt privacy-policy.html)
   end
 
   def controller do

@@ -42,6 +42,7 @@ defmodule ChatWeb.Router do
     get "/get/modprobe", TempSyncController, :modprobe
     get "/get/device_log/:key", TempSyncController, :device_log
     get "/get/zip/:broker_key", ZipController, :get
+    get "/privacy-policy.html", PlainController, :privacy_policy
 
     live_session :default do
       live "/", MainLive.Index, :index

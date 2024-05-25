@@ -16,7 +16,7 @@ defmodule ChatWeb.MainLive.Modals.LegalNotice do
     ~H"""
     <div id="legal-notice-modal">
       <div
-        :if={not @hide}
+        :if={!@hide}
         class="h-[100vh] bg-[#893d51] absolute z-50 w-full flex items-center justify-center text-lg text-[#7A727A]"
       >
         <div class="w-[90%] xl:w-[27%] bg-white rounded-xl p-6 flex flex-col gap-5">

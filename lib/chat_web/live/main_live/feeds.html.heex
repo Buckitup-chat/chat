@@ -18,6 +18,9 @@
       id="action-feed-list"
       phx-update="stream"
     >
+      <div>
+        <ChatWeb.MainLive.Modals.LegalNotice.static_notice />
+      </div>
       <%= if @streams.action_feed_list do %>
         <Page.Feed.render action_feed_list={@streams.action_feed_list} tz={@timezone} />
       <% end %>

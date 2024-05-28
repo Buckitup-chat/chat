@@ -102,14 +102,6 @@ defmodule Chat.Rooms do
     room_key
     |> get()
     |> Room.add_request(user_identity)
-    # |> tap(fn %{type: type} = room ->
-    #   if type == :request do
-    #     time
-    #     |> Messages.RoomRequest.new()
-    #     |> add_new_message(user_identity, room.pub_key)
-    #     |> tap(message_added_fn)
-    #   end
-    # end)
     |> update()
   end
 

@@ -28,27 +28,36 @@ defmodule ChatWeb.Router do
   scope "/", ChatWeb do
     pipe_through :browser
 
+    # pretty used
+    get "/get/file/:id", FileController, :file
+    get "/get/image/:id", FileController, :image
+    get "/get/zip/:broker_key", ZipController, :get
+    get "/privacy-policy.html", PlainController, :privacy_policy
+
+    # prod debug
+    # coveralls-ignore-start
     get "/log", DeviceLogController, :log
     get "/db_log/prev/prev", DeviceLogController, :db_log_prev_prev
     get "/db_log/prev", DeviceLogController, :db_log_prev
     get "/db_log", DeviceLogController, :db_log
-    get "/reset", DeviceLogController, :reset
     get "/data_keys", DeviceLogController, :dump_data_keys
-    get "/get/file/:id", FileController, :file
-    get "/get/image/:id", FileController, :image
-    get "/get/backup/:key", FileController, :backup
-    get "/get/backup", TempSyncController, :backup
     get "/get/lsmod", TempSyncController, :lsmod
     get "/get/modprobe", TempSyncController, :modprobe
+    get "/reset", DeviceLogController, :reset
+    # coveralls-ignore-stop
+
+    # outdated ?
+    # coveralls-ignore-start
+    get "/get/backup/:key", FileController, :backup
+    get "/get/backup", TempSyncController, :backup
     get "/get/device_log/:key", TempSyncController, :device_log
-    get "/get/zip/:broker_key", ZipController, :get
-    get "/privacy-policy.html", PlainController, :privacy_policy
+    # coveralls-ignore-stop
 
     live_session :default do
       live "/", MainLive.Index, :index
-      live "/export-key-ring/:id", MainLive.Index, :export
       live "/room/:hash", MainLive.Index, :room_message_link
       live "/chat/:hash", MainLive.Index, :chat_link
+      live "/export-key-ring/:id", MainLive.Index, :export
     end
   end
 
@@ -62,6 +71,7 @@ defmodule ChatWeb.Router do
     pipe_through :api
 
     forward "/naive_api", Absinthe.Plug, schema: NaiveApi.Schema
+    # coveralls-ignore-next-line
     forward "/naive_api_console", Absinthe.Plug.GraphiQL, schema: NaiveApi.Schema
   end
 
@@ -83,6 +93,7 @@ defmodule ChatWeb.Router do
   scope "/" do
     pipe_through :browser
 
+    # coveralls-ignore-next-line
     live_dashboard "/dashboard",
       metrics: ChatWeb.Telemetry,
       additional_pages: [

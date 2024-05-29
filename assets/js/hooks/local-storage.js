@@ -1,6 +1,6 @@
 // JS Hook for storing some state in sessionStorage in the browser.
 // The server requests stored data and clears it when requested.
-export const hooks = {
+export default {
   mounted() {
     this.handleEvent("store", (obj) => this.store(obj))
     this.handleEvent("clear", (obj) => this.clear(obj))
@@ -50,15 +50,15 @@ export const hooks = {
     var authData = localStorage.getItem(obj.auth_key);
     var dataJson = JSON.parse(authData);
     var roomKeys = dataJson.at(1);
-    
-    if (!roomKeys.includes(obj.room_key)) { 
+
+    if (!roomKeys.includes(obj.room_key)) {
       var roomCount = localStorage.getItem(obj.room_count_key);
       var newRoomCount = Number(roomCount) + 1;
 
-      roomKeys.push(obj.room_key)      
+      roomKeys.push(obj.room_key)
       localStorage.setItem(obj.auth_key, JSON.stringify(dataJson));
       localStorage.setItem(obj.room_count_key, newRoomCount);
-      this.pushEvent(obj.reply, {room_count: newRoomCount, key: obj.room_key})
+      this.pushEvent(obj.reply, { room_count: newRoomCount, key: obj.room_key })
     }
   },
 
@@ -66,9 +66,9 @@ export const hooks = {
 
   setupAuthEvents(key) {
     window.addEventListener('storage', event => {
-      if (event.key === key && event.newValue === null) { 
-        location.reload() 
+      if (event.key === key && event.newValue === null) {
+        location.reload()
       }
-   })
+    })
   }
 }

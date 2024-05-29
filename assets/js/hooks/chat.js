@@ -1,4 +1,4 @@
-export const hooks = {
+export default {
   mounted() {
     this.loader = document.getElementById('chat-loader')
     this.pending = this.page();

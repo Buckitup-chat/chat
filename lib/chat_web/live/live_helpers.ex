@@ -146,7 +146,7 @@ defmodule ChatWeb.LiveHelpers do
       to: "#contentContainer",
       time: time
     )
-    |> JS.add_class("hidden", to: "#chatRoomBar", transition: "fade-out", time: 0)
+    |> JS.add_class("hidden", to: "#chatRoomBar")
   end
 
   def close_content(%JS{} = js, time \\ 100) do
@@ -154,6 +154,6 @@ defmodule ChatWeb.LiveHelpers do
     |> JS.show(transition: "fade-in", to: "#navbarTop", display: "flex", time: time)
     |> JS.show(transition: "fade-in", to: "#navbarBottom", display: "flex", time: time)
     |> JS.add_class("hidden sm:flex", transition: "fade-out", to: "#contentContainer", time: 0)
-    |> JS.remove_class("hidden", to: "#chatRoomBar", transition: "fade-in", time: time)
+    |> JS.remove_class("hidden", to: "#chatRoomBar")
   end
 end

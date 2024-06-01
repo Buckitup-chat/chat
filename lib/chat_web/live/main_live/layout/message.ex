@@ -56,21 +56,22 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
         %{chat_type: :room, msg: msg, room: room} ->
           User.by_id(msg.author_key) ||
-            (msg.author_key == room.pub_key && Card.new(room.name, room.pub_key))
+            (msg.author_key == room.pub_key && Card.new(room.name, room.pub_key)) ||
+            Card.new("", msg.author_key)
       end)
       |> assign_new(:dynamic_attrs, fn
         %{export?: true} ->
           []
 
         %{chat_type: chat_type, export?: false, is_mine?: is_mine?, msg: msg} ->
-          [
-            phx_click:
+          %{
+            "phx-click" =>
               JS.dispatch("chat:select-message", detail: %{chatType: Atom.to_string(chat_type)}),
-            phx_value_id: msg.id,
-            phx_value_index: msg.index,
-            phx_value_is_mine: Atom.to_string(is_mine?),
-            phx_value_type: chat_type
-          ]
+            "phx-value-id" => msg.id,
+            "phx-value-index" => msg.index,
+            "phx-value-is-mine" => Atom.to_string(is_mine?),
+            "phx-value-type" => chat_type
+          }
       end)
       |> assign_new(:linkable?, fn
         %{chat_type: :room, room: room} -> room.type == :public

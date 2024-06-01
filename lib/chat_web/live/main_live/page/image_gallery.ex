@@ -64,6 +64,12 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
 
         <div class="h-screen flex justify-center items-center lg:h-[99vh]">
           <%= if @current[:url] do %>
+            <div
+              id="galleryImagePreloader"
+              class="w-full h-full flex justify-center items-center hidden text-white/50 text-5xl bg-black"
+            >
+              loading ...
+            </div>
             <img
               id="galleryImage"
               class="w-auto z-10 max-h-full lg:px-14"
@@ -78,11 +84,14 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
               const prevBtn = document.getElementById('prev');
               const nextBtn = document.getElementById('next');
               const image = document.getElementById('galleryImage');
+              const preloader = document.getElementById('galleryImagePreloader');
 
               setTimeout(() => {
                 if (image.naturalWidth > 0 && image.naturalHeight > 0 && image.complete) {
+                  preloader.classList.add('hidden');
                   prevBtn.classList.remove('hidden');
                   nextBtn.classList.remove('hidden');
+                  image.classList.remove('hidden');
                 } else {
                   handleArrows();
                 }
@@ -115,35 +124,36 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
       :open -> socket |> open()
       :preload_next -> socket |> preload_next()
       :preload_prev -> socket |> preload_prev()
+      # coveralls-ignore-next-line
       _ -> socket
     end
   end
 
-  defp open(%{assigns: %{incoming_msg_id: msg_id, dialog: dialog, me: me}} = socket) do
-    socket
-    |> assign_current(msg_id, Dialogs.read_message(dialog, msg_id, me))
-  end
-
-  defp open(%{assigns: %{incoming_msg_id: msg_id, room_identity: room_identity}} = socket) do
+  defp open(
+         %{
+           assigns: %{
+             incoming_msg_id: msg_id,
+             type: :room,
+             room_identity: room_identity
+           }
+         } =
+           socket
+       ) do
     socket
     |> assign_current(msg_id, Rooms.read_message(msg_id, room_identity))
   end
 
-  defp preload_prev(%{assigns: %{list: []}} = socket), do: socket
-
-  defp preload_prev(%{assigns: %{dialog: dialog, list: list, me: me}} = socket) do
-    first = List.first(list)
-
+  defp open(
+         %{assigns: %{incoming_msg_id: msg_id, dialog: dialog, type: :dialog, me: me}} = socket
+       ) do
     socket
-    |> assign_prev(
-      Dialogs.read_prev_message(dialog, {first.index, first.id}, me, fn
-        {_, %{type: :image}} -> true
-        _ -> false
-      end)
-    )
+    |> assign_current(msg_id, Dialogs.read_message(dialog, msg_id, me))
   end
 
-  defp preload_prev(%{assigns: %{room_identity: identity, list: list}} = socket) do
+  # coveralls-ignore-next-line
+  defp preload_prev(%{assigns: %{list: []}} = socket), do: socket
+
+  defp preload_prev(%{assigns: %{room_identity: identity, type: :room, list: list}} = socket) do
     first = List.first(list)
 
     socket
@@ -155,26 +165,39 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
     )
   end
 
-  defp preload_next(%{assigns: %{list: []}} = socket), do: socket
-
-  defp preload_next(%{assigns: %{dialog: dialog, list: list, me: me}} = socket) do
-    last = List.last(list)
+  defp preload_prev(%{assigns: %{dialog: dialog, type: :dialog, list: list, me: me}} = socket) do
+    first = List.first(list)
 
     socket
-    |> assign_next(
-      Dialogs.read_next_message(dialog, {last.index, last.id}, me, fn
+    |> assign_prev(
+      Dialogs.read_prev_message(dialog, {first.index, first.id}, me, fn
         {_, %{type: :image}} -> true
         _ -> false
       end)
     )
   end
 
-  defp preload_next(%{assigns: %{room_identity: identity, list: list}} = socket) do
+  # coveralls-ignore-next-line
+  defp preload_next(%{assigns: %{list: []}} = socket), do: socket
+
+  defp preload_next(%{assigns: %{room_identity: identity, type: :room, list: list}} = socket) do
     last = List.last(list)
 
     socket
     |> assign_next(
       Rooms.read_next_message({last.index, last.id}, identity, fn
+        {_, %{type: :image}} -> true
+        _ -> false
+      end)
+    )
+  end
+
+  defp preload_next(%{assigns: %{dialog: dialog, type: :dialog, list: list, me: me}} = socket) do
+    last = List.last(list)
+
+    socket
+    |> assign_next(
+      Dialogs.read_next_message(dialog, {last.index, last.id}, me, fn
         {_, %{type: :image}} -> true
         _ -> false
       end)
@@ -343,6 +366,8 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
         JS.push("switch-prev")
         |> JS.add_class("hidden", to: "#prev")
         |> JS.add_class("hidden", to: "#next")
+        |> JS.add_class("hidden", to: "#galleryImage")
+        |> JS.remove_class("hidden", to: "#galleryImagePreloader")
       }
     >
       <svg
@@ -368,6 +393,8 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
         JS.push("switch-next")
         |> JS.add_class("hidden", to: "#next")
         |> JS.add_class("hidden", to: "#prev")
+        |> JS.add_class("hidden", to: "#galleryImage")
+        |> JS.remove_class("hidden", to: "#galleryImagePreloader")
       }
       phx-target={@target}
     >

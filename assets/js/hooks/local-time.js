@@ -1,6 +1,7 @@
-export const hooks = {
+export default {
   mounted() {
     this.pushEvent("local-time", this.info());
+
   },
   info() {
     return {

@@ -9,7 +9,7 @@ defmodule Chat.Db do
   alias Chat.Db.WriteQueue
   alias Chat.Db.WriteQueue.FileReader
 
-  @db_version "v.9"
+  @db_version "v.10.1"
   @db_location Application.compile_env(:chat, :cub_db_file, "priv/db")
 
   def list(range, transform), do: Queries.list(db(), range, transform)
@@ -22,13 +22,7 @@ defmodule Chat.Db do
   def get_prev(key, min_key, predicate), do: Queries.get_prev(db(), key, min_key, predicate)
   def has_key?(key), do: Queries.has_key?(db(), key)
 
-  def put(key, value) do
-    case key do
-      {:action_log, _, _} -> WriteQueue.put({key, value}, queue())
-      {:change_tracking_marker, _} -> WriteQueue.put({key, value}, queue())
-      _ -> WriteQueue.push({key, value}, queue())
-    end
-  end
+  def put(key, value), do: WriteQueue.put({key, value}, queue())
 
   def delete(key),
     do: WriteQueue.mark_delete(key, queue())
@@ -72,14 +66,17 @@ defmodule Chat.Db do
           {CubDB, :start_link,
            [path, [auto_file_sync: false, auto_compact: false, name: db_name]]}
       },
-      # dry status realy
+      # dry status relay
       %{
         id: dry_relay_name,
         start: {Agent, :start_link, [fn -> false end, [name: dry_relay_name]]}
       },
       # write supervisor
       {DynamicSupervisor,
-       name: write_supervisor, strategy: :one_for_one, max_restarts: 1, max_seconds: 10},
+       name: write_supervisor,
+       strategy: :one_for_one,
+       max_restarts: 1,
+       max_seconds: :timer.minutes(30)},
       # decider
       {Chat.Db.Pipeline.Decider,
        name: decider,

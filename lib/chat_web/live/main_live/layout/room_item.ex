@@ -17,7 +17,7 @@ defmodule ChatWeb.MainLive.Layout.RoomItem do
     <!-- Desktop view -->
     <li
       phx-click={@click_event}
-      phx-value-room={@room.hash}
+      phx-value-room={@room |> Room.hash()}
       class={
         classes(
           "hidden sm:flex w-full h-9 flex items-center cursor-pointer hover:bg-stone250",
@@ -39,7 +39,7 @@ defmodule ChatWeb.MainLive.Layout.RoomItem do
     <!-- Mobile view -->
     <li
       phx-click={JS.push(@click_event) |> open_content()}
-      phx-value-room={@room.hash}
+      phx-value-room={@room |> Room.hash()}
       class={
         classes(
           "sm:hidden w-full h-9 flex items-center cursor-pointer hover:bg-stone250",
@@ -72,7 +72,7 @@ defmodule ChatWeb.MainLive.Layout.RoomItem do
       <li
         class="w-full h-9 cursor-pointer flex items-center hover:bg-stone250"
         phx-click={@click_event}
-        phx-value-room={@room.hash}
+        phx-value-room={@room |> Room.hash()}
       >
         <div class="flex flex-row px-7 w-full">
           <Layout.Card.hashed_name room={@room} />

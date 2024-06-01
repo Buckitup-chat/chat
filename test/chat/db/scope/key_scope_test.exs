@@ -88,7 +88,7 @@ defmodule Chat.Db.Scope.KeyScopeTest do
         room_identity
         |> Messages.RoomInvite.new()
         |> Dialogs.add_new_message(alice, alice_bob_dialog)
-        |> RoomInviteIndex.add(alice_bob_dialog, alice)
+        |> RoomInviteIndex.add(alice_bob_dialog, alice, first_room_key)
 
       room_invite_key =
         Dialogs.read_message(alice_bob_dialog, room_invite, alice)
@@ -103,17 +103,17 @@ defmodule Chat.Db.Scope.KeyScopeTest do
       {_index, alice_first_room_message} =
         "Hello first room from Alice"
         |> Messages.Text.new(1)
-        |> Rooms.add_new_message(alice, first_room.pub_key)
+        |> Rooms.add_new_message(alice, room_identity)
 
       {_index, bob_first_room_message} =
         "Hello first room from Bob"
         |> Messages.Text.new(1)
-        |> Rooms.add_new_message(bob, first_room.pub_key)
+        |> Rooms.add_new_message(bob, room_identity)
 
       {_index, charlie_first_room_message} =
         "Hello first room from Charlie"
         |> Messages.Text.new(1)
-        |> Rooms.add_new_message(charlie, first_room.pub_key)
+        |> Rooms.add_new_message(charlie, room_identity)
 
       %Messages.File{data: image_data} = image = FakeData.image("1.pp")
       [first_file_key, encoded_chunk_secret, _, _, _, _] = image_data
@@ -122,7 +122,7 @@ defmodule Chat.Db.Scope.KeyScopeTest do
       {_index, first_image_message} =
         image
         |> Map.put(:timestamp, 4)
-        |> Rooms.add_new_message(charlie, first_room.pub_key)
+        |> Rooms.add_new_message(charlie, room_identity)
 
       FileIndex.save(
         first_file_key,
@@ -145,12 +145,12 @@ defmodule Chat.Db.Scope.KeyScopeTest do
       {_index, bob_second_room_message} =
         "Hello second room from Bob"
         |> Messages.Text.new(1)
-        |> Rooms.add_new_message(bob, second_room.pub_key)
+        |> Rooms.add_new_message(bob, room_identity)
 
       {_index, charlie_second_room_message} =
         "Hello second room from Charlie"
         |> Messages.Text.new(1)
-        |> Rooms.add_new_message(charlie, second_room.pub_key)
+        |> Rooms.add_new_message(charlie, room_identity)
 
       %Messages.File{data: image_data} = image = FakeData.image("2.pp")
       [second_file_key, encoded_chunk_secret, _, _, _, _] = image_data
@@ -159,7 +159,7 @@ defmodule Chat.Db.Scope.KeyScopeTest do
       {_index, second_image_message} =
         image
         |> Map.put(:timestamp, 4)
-        |> Rooms.add_new_message(charlie, second_room.pub_key)
+        |> Rooms.add_new_message(charlie, room_identity)
 
       FileIndex.save(
         second_file_key,
@@ -313,7 +313,7 @@ defmodule Chat.Db.Scope.KeyScopeTest do
 
       assert Enum.count(keys, fn key ->
                match?({:room_message, _room_key, _index, _message_hash}, key)
-             end) == 5
+             end) == 4
 
       assert Enum.member?(keys, {:users, alice_key})
       assert Enum.member?(keys, {:users, bob_key})

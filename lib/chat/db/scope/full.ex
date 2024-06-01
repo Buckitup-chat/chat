@@ -18,6 +18,8 @@ defmodule Chat.Db.Scope.Full do
       |> elem(1)
     end)
     |> join_fs_keys(db)
+  rescue
+    _ -> MapSet.new()
   end
 
   defp chunk_keys({_snap, _set} = keys) do
@@ -57,6 +59,8 @@ defmodule Chat.Db.Scope.Full do
     |> MapSet.new()
     |> MapSet.union(set)
     |> then(&{snap, &1})
+  rescue
+    _ -> {snap, set}
   end
 
   defp join_fs_keys(keys, db) do
@@ -66,5 +70,7 @@ defmodule Chat.Db.Scope.Full do
     |> FileFs.list_all_db_keys()
     |> MapSet.new()
     |> MapSet.union(keys)
+  rescue
+    _ -> keys
   end
 end

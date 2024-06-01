@@ -34,21 +34,21 @@ defmodule Chat.Rooms.RoomTest do
 
     message
     |> Messages.Text.new(1)
-    |> Rooms.add_new_message(alice, room.pub_key)
+    |> Rooms.add_new_message(alice, room_identity)
 
     message
     |> String.pad_trailing(200, "-")
     |> Messages.Text.new(2)
-    |> Rooms.add_new_message(alice, room.pub_key)
+    |> Rooms.add_new_message(alice, room_identity)
 
     FakeData.file()
     |> Map.put(:timestamp, 3)
-    |> Rooms.add_new_message(alice, room.pub_key)
+    |> Rooms.add_new_message(alice, room_identity)
 
     image_msg =
       FakeData.image("2.pp")
       |> Map.put(:timestamp, 4)
-      |> Rooms.add_new_message(alice, room.pub_key)
+      |> Rooms.add_new_message(alice, room_identity)
 
     image_msg
     |> Rooms.await_saved(room.pub_key)
@@ -156,7 +156,7 @@ defmodule Chat.Rooms.RoomTest do
       Messages.Text.new("1", 2),
       Messages.Text.new("2", 3)
     ]
-    |> Enum.map(&Rooms.add_new_message(&1, alice, room.pub_key))
+    |> Enum.map(&Rooms.add_new_message(&1, alice, room_identity))
     |> List.last()
     |> Rooms.await_saved(room.pub_key)
 
@@ -191,7 +191,7 @@ defmodule Chat.Rooms.RoomTest do
       Messages.Text.new("1", 2),
       Messages.Text.new("2", 3)
     ]
-    |> Enum.map(&Rooms.add_new_message(&1, alice, room.pub_key))
+    |> Enum.map(&Rooms.add_new_message(&1, alice, room_identity))
     |> List.last()
     |> Rooms.await_saved(room.pub_key)
 
@@ -228,7 +228,7 @@ defmodule Chat.Rooms.RoomTest do
       Messages.Text.new("1", 2),
       Messages.Text.new("2", 3)
     ]
-    |> Enum.map(&Rooms.add_new_message(&1, alice, room.pub_key))
+    |> Enum.map(&Rooms.add_new_message(&1, alice, room_identity))
     |> List.last()
     |> Rooms.await_saved(room.pub_key)
 

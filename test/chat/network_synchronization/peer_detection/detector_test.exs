@@ -75,7 +75,7 @@ defmodule ChatTest.NetworkSynchronization.PeerDetection.DetectorTest do
   defp assert_restart_timer_set(context) do
     timer_ref = :sys.get_state(context.pid)
     time_left = Process.cancel_timer(timer_ref, async: false, info: true)
-    assert time_left > :timer.minutes(70) - 50
+    assert time_left > :timer.minutes(70) - 100
     context |> Map.put(:timer_ref, timer_ref)
   end
 

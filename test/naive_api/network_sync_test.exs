@@ -130,7 +130,7 @@ defmodule NailveApi.NetworkSyncTest do
       room_identity
       |> Messages.RoomInvite.new()
       |> Dialogs.add_new_message(sender, dialog)
-      |> Chat.RoomInviteIndex.add(dialog, sender)
+      |> Chat.RoomInviteIndex.add(dialog, sender, room_key)
 
     room_invite_key =
       Dialogs.read_message(dialog, room_invite, sender)
@@ -142,7 +142,7 @@ defmodule NailveApi.NetworkSyncTest do
       "-"
       |> String.duplicate(151)
       |> Messages.Text.new(1)
-      |> Chat.Rooms.add_new_message(sender, room_key)
+      |> Chat.Rooms.add_new_message(sender, room_identity)
       |> Chat.MemoIndex.add(room, room_identity)
 
     memo_key =

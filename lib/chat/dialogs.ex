@@ -113,12 +113,15 @@ defmodule Chat.Dialogs do
     |> Stream.drop_while(fn invite ->
       invite
       |> extract_invite_room_identity()
-      |> then(& &1.public_key) != room_pub_key
+      |> case do
+        %Chat.Identity{} = x -> x.public_key != room_pub_key
+        _ -> true
+      end
     end)
     |> Enum.at(0)
   end
 
-  @spec extract_invite_room_identity(PrivateMessage.t()) :: Identity.t()
+  @spec extract_invite_room_identity(PrivateMessage.t()) :: Identity.t() | nil
   def extract_invite_room_identity(%PrivateMessage{type: :room_invite, content: content}) do
     content
     |> StorageId.from_json()

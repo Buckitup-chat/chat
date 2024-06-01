@@ -1,5 +1,6 @@
 defmodule Support.Db.Sync do
   @moduledoc "Functions for synchronization"
+  @deprecated "Use ChatTest.IsolatedDataCase"
 
   import ExUnit.Callbacks, only: [on_exit: 1, start_link_supervised!: 1]
 

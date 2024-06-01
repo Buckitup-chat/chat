@@ -10,19 +10,47 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
+### Added
+ - Spam-less rooms [#600]
+
+### Changed
+
+### Fixed
+
+
+## 2024-04-08_ef99bc7___2024-04-16_79e8ce2
 
 ### Added
 - ZeroTier support [#425]
 
 ### Changed
+- improved encryption testing
+- no indication unless cargo [#603]
+- extra logging absence of chat task supervisor
+- cargo scope: invites optimisation [#619]
 
 ### Fixed
+- displaying the gallery after go to invited room [#562]
+- cargo sync broken [#594]
 - feeds page ui issue [#583]
 - Mobile view. Sync mode cover chat options [#579]
 - Log in by key uploading UI issue [#583]
 - Chats page UI issue [#583]
 - copy invited user invitation with cargo room [#574]
 - relogin from socket state [#538]
+- fix sidebar hiding [#563, #591]
+- reading from full db, switching in RO mode [#581]
+- skip demand when takes too long [#590]
+- fix message selection [#578]
+- cargo invite fix [#611]
+- onliners syncs room/chat list [#580]
+- drive indication on cargo only [#620]
+- do not detect self [#615]
+- gallery: image loading indication [#621]
+- Admin panel. On mobile version user unable to scroll Check point list [#637]
+- cargo: handle no or many dialogs for invite [#631]
+- Log out. Increase clickable area, all button area should be clickable [#632]
+- Double scroll on Chat page [#640]
 
 ## 2023-12-30_167d8d9___2023-12-30_80fe885
 

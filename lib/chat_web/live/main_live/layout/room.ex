@@ -60,15 +60,15 @@ defmodule ChatWeb.MainLive.Layout.Room do
           type="button"
           class="roomActionsDropdownButton md:hidden"
           phx-click={
-            open_dropdown("roomActionsDropdown-#{@room.hash}")
+            open_dropdown("roomActionsDropdown-#{@room |> Room.hash()}")
             |> JS.dispatch("chat:set-dropdown-position",
-              to: "#roomActionsDropdown-#{@room.hash}"
+              to: "#roomActionsDropdown-#{@room |> Room.hash()}"
             )
           }
         >
           <.icon id="menu" class="w-6 h-6 flex fill-white" />
         </button>
-        <.dropdown class="roomActionsDropdown" id={"roomActionsDropdown-#{@room.hash}"}>
+        <.dropdown class="roomActionsDropdown" id={"roomActionsDropdown-#{@room |> Room.hash}"}>
           <a class="dropdownItem">
             <.invite_button id="roomInviteButtonItem" />
           </a>

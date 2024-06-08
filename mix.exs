@@ -88,7 +88,8 @@ defmodule Chat.MixProject do
       {:combinatorics, "~> 0.1.0"},
       {:httpoison, "~> 2.0"},
       {:onvif, github: "sergey-lukianov/onvif"},
-      {:tesla, "~> 1.7"}
+      {:tesla, "~> 1.7"},
+      {:x509, "~> 0.8.8"}
     ]
   end
 

@@ -23,6 +23,8 @@ defmodule Chat.Application do
       Chat.Ordering.Counters,
       Chat.Db.Supervisor,
       Chat.AdminDb,
+      {Task, fn -> Bucket.Identity.bootstrap() end}
+      |> Supervisor.child_spec(id: :identity_bootstrap),
       # Application Services
       Chat.KeyRingTokens,
       Chat.Broker,
@@ -65,6 +67,7 @@ defmodule Chat.Application do
            shutdown: :brutal_kill
          )
        end}
+
       # Start a worker by calling: Chat.Worker.start_link(arg)
       # {Chat.Worker, arg}
     ]

@@ -4,8 +4,10 @@ defmodule Enigma.P256 do
   """
 
   @curve :secp256r1
+  # @asn1_curve {:namedCurves, {1, 2, 840, 10045, 3, 1, 7}}
+  @asn1_curve {:namedCurve, :pubkey_cert_records.namedCurves(@curve)}
 
-  def generate_key() do
+  def generate_key do
     X509.PrivateKey.new_ec(@curve)
   end
 
@@ -18,7 +20,8 @@ defmodule Enigma.P256 do
   end
 
   def valid_sign?(data, sign, public) do
-    :public_key.verify(data, :sha256, sign, public)
+    full_public_key = {public |> parse_public_key(), @asn1_curve}
+    :public_key.verify(data, :sha256, sign, full_public_key)
   end
 
   def ecdh(private, public) do
@@ -37,6 +40,7 @@ defmodule Enigma.P256 do
   defp parse_public_key(key) do
     case key do
       {point = {:ECPoint, _public}, _curve} -> point
+      str when is_binary(str) -> {:ECPoint, str}
     end
   end
 end

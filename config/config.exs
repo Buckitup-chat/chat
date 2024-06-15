@@ -24,6 +24,11 @@ config :chat, ChatWeb.Endpoint,
 # at the `config/runtime.exs`.
 config :chat, Chat.Mailer, adapter: Swoosh.Adapters.Local
 
+# Bucket part
+# Using :chat app till :bucket app created
+config :chat,
+  identity_backends: [Bucket.Identity.DbIdentity]
+
 # Swoosh API client is needed for adapters other than SMTP.
 # config :swoosh, :api_client, false
 

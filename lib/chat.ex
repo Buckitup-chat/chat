@@ -2,11 +2,11 @@ defmodule Chat do
   @moduledoc """
   High level functions
   """
-  alias Chat.FileIndex
-  alias Chat.Dialogs
-  alias Chat.Messages
-  alias Chat.Identity
   alias Chat.ChunkedFiles
+  alias Chat.Dialogs
+  alias Chat.FileIndex
+  alias Chat.Identity
+  alias Chat.Messages
 
   def file_message_from_text_to_my_notes(content, name, mime_type, %Identity{} = me) do
     file_key = UUID.uuid4() |> Enigma.hash()

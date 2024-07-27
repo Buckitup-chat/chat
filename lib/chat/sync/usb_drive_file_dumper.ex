@@ -27,7 +27,7 @@ defmodule Chat.Sync.UsbDriveFileDumper do
       file
       |> Map.get(:name)
       |> Path.extname()
-      |> String.slice(1..-1)
+      |> String.slice(1..-1//1)
       |> String.downcase()
       |> MIME.type()
 

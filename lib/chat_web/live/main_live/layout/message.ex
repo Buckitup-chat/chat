@@ -23,7 +23,6 @@ defmodule ChatWeb.MainLive.Layout.Message do
   alias Chat.Utils.StorageId
   alias ChatWeb.MainLive.Layout
   alias ChatWeb.Utils, as: WebUtils
-  alias Phoenix.HTML.Tag
   alias Phoenix.LiveView.JS
 
   attr :author, Card, doc: "message author card"
@@ -775,5 +774,5 @@ defmodule ChatWeb.MainLive.Layout.Message do
     |> JS.remove_class("hidden", to: "#imageGallery")
   end
 
-  defp nl2br(str), do: Utils.trim_text(str) |> Enum.intersperse(Tag.tag(:br))
+  defp nl2br(str), do: Utils.trim_text(str) |> Enum.intersperse(tag(:br))
 end

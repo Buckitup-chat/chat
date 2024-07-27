@@ -41,7 +41,7 @@ defmodule Chat.NetworkSynchronization.Store.BasicStatusTest do
 
   defp delete_status_for_last(context, amount) do
     Store.list_sources_with_status()
-    |> Enum.slice(-amount..-1)
+    |> Enum.slice(-amount..-1//1)
     |> Enum.each(fn {source, _status} ->
       Store.delete_source_status(source.id)
     end)

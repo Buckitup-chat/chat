@@ -105,7 +105,7 @@ defmodule Chat.FileFs do
       |> list_files()
       |> Stream.flat_map(&chunks_in_file_dir/1)
       |> Stream.reject(&is_nil/1)
-      |> Stream.map(&String.slice(&1, (dir_length + 1)..-1))
+      |> Stream.map(&String.slice(&1, (dir_length + 1)..-1//1))
       |> Stream.map(&filename_to_db_key/1)
       |> Enum.to_list()
 
@@ -124,7 +124,7 @@ defmodule Chat.FileFs do
       |> list_files()
       |> Stream.flat_map(&chunks_in_file_dir/1)
       |> Stream.reject(&is_nil/1)
-      |> Stream.map(&String.slice(&1, (dir_length + 1)..-1))
+      |> Stream.map(&String.slice(&1, (dir_length + 1)..-1//1))
       |> Stream.map(&filename_to_db_key/1)
       |> Enum.to_list()
       |> check_integrity(prefix)

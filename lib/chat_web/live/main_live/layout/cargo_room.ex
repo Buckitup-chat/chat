@@ -72,7 +72,6 @@ defmodule ChatWeb.MainLive.Layout.CargoRoom do
 
   defp remove_button(assigns) do
     ~H"""
-
     """
   end
 
@@ -105,7 +104,6 @@ defmodule ChatWeb.MainLive.Layout.CargoRoom do
 
   def button(assigns) do
     ~H"""
-
     """
   end
 end

@@ -18,7 +18,7 @@ defmodule NaiveApi.Data do
     key
     |> deserialize_key()
     |> Chat.db_get()
-    |> :erlang.term_to_binary([:compressed])
+    |> Proxy.Serialize.serialize()
     |> bits_encode()
     |> ok()
   end
@@ -26,7 +26,7 @@ defmodule NaiveApi.Data do
   def deserialize_value(string) do
     string
     |> bits_decode()
-    |> :erlang.binary_to_term([:safe])
+    |> Proxy.Serialize.deserialize()
   rescue
     _ -> nil
   end

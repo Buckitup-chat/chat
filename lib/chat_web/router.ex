@@ -58,6 +58,8 @@ defmodule ChatWeb.Router do
       live "/room/:hash", MainLive.Index, :room_message_link
       live "/chat/:hash", MainLive.Index, :chat_link
       live "/export-key-ring/:id", MainLive.Index, :export
+
+      live "/proxy/:address/", ProxyLive.Index, :proxy
     end
   end
 
@@ -65,6 +67,11 @@ defmodule ChatWeb.Router do
     pipe_through :upload
 
     put "/upload_chunk/:key", UploadChunkController, :put
+  end
+
+  scope "/proxy-api/", ChatWeb do
+    get "/select", ProxyApiController, :select
+    post "/update", ProxyApiController, :update
   end
 
   scope "/" do

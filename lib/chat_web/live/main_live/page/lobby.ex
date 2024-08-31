@@ -79,11 +79,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   @deprecated "Use Chat.Sync.DbBrokers/0 instead"
   def notify_new_user(socket, user_card) do
     ChangeTracker.on_saved(fn ->
-      PubSub.broadcast!(
-        Chat.PubSub,
-        @topic,
-        {:new_user, user_card}
-      )
+      Chat.Broadcast.new_user(user_card)
     end)
 
     socket

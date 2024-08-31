@@ -68,8 +68,7 @@ defmodule Proxy.Api do
   end
 
   defp broadcast_new_user(card) do
-    Chat.User.UsersBroker.put(card)
-    Phoenix.PubSub.broadcast(Chat.PubSub, "chat::lobby", {:new_user, card})
+    Chat.Broadcast.new_user(card)
   end
 
   defp choose_getter(slug) do

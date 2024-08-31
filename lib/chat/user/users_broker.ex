@@ -18,7 +18,11 @@ defmodule Chat.User.UsersBroker do
     GenServer.call(__MODULE__, {:list, search_term})
   end
 
-  def put(identity) do
+  def put(%Card{} = card) do
+    GenServer.cast(__MODULE__, {:put, card})
+  end
+
+  def put(%Chat.Identity{} = identity) do
     GenServer.cast(__MODULE__, {:put, Card.from_identity(identity)})
   end
 

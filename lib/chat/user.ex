@@ -15,7 +15,7 @@ defmodule Chat.User do
     |> Identity.create()
   end
 
-  def register(%Identity{} = identity), do: Registry.enlist(identity)
+  def register(card_or_identity), do: Registry.enlist(card_or_identity)
   def await_saved(hash), do: Registry.await_saved(hash)
 
   def list,

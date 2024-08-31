@@ -16,8 +16,6 @@ defmodule ChatWeb.ProxyLive.Components.UserList do
       _ -> :noop
     end
 
-    new_assigns |> dbg()
-
     socket
     |> assign(new_assigns)
     |> ok()

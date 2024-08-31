@@ -7,8 +7,10 @@ defmodule Chat.User.Registry do
   alias Chat.Identity
 
   def enlist(%Identity{} = user) do
-    card = user |> Card.from_identity()
+    user |> Card.from_identity() |> enlist()
+  end
 
+  def enlist(%Card{} = card) do
     Db.put({:users, card.pub_key}, card)
 
     card.pub_key

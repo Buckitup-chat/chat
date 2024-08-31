@@ -2,6 +2,7 @@ defmodule ChatWeb.ProxyLive.Components.UserList do
   use ChatWeb, :live_component
 
   alias ChatWeb.MainLive.Layout
+  alias ChatWeb.ProxyLive.ChannelClients
 
   def mount(socket) do
     socket
@@ -12,12 +13,16 @@ defmodule ChatWeb.ProxyLive.Components.UserList do
 
   def update(new_assigns, socket) do
     case new_assigns do
-      %{server: server, me: me, id: id} -> request_user_list(server, me, id)
-      _ -> :noop
-    end
+      %{server: server, me: me, id: id} ->
+        request_user_list(server, me, id)
+        socket |> assign(new_assigns)
 
-    socket
-    |> assign(new_assigns)
+      %{new_user: card} ->
+        assign(socket, :users, [card | socket.assigns.users] |> Enum.uniq())
+
+      _ ->
+        socket |> assign(new_assigns)
+    end
     |> ok()
   end
 
@@ -49,5 +54,12 @@ defmodule ChatWeb.ProxyLive.Components.UserList do
         end
       end)
     end)
+
+    ChannelClients.Users.start_link(
+      uri: "ws://#{server}/proxy-socket/websocket",
+      on_new_user: fn card ->
+        send_update(component_pid, __MODULE__, id: id, new_user: card)
+      end
+    )
   end
 end

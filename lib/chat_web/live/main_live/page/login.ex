@@ -28,7 +28,11 @@ defmodule ChatWeb.MainLive.Page.Login do
       |> String.trim()
       |> User.login()
       |> tap(&User.register/1)
-      |> tap(&UsersBroker.put/1)
+      |> tap(fn identity ->
+        identity
+        |> Chat.Card.from_identity()
+        |> Chat.Broadcast.new_user()
+      end)
       |> tap(fn _ -> DbBrokers.broadcast_refresh() end)
 
     # todo: check setting time before creating

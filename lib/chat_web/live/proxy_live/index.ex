@@ -2,6 +2,7 @@ defmodule ChatWeb.ProxyLive.Index do
   use ChatWeb, :live_view
 
   alias ChatWeb.ProxyLive.Init
+  alias ChatWeb.ProxyLive.Components.Dialog
   alias ChatWeb.ProxyLive.Components.UserList
 
   embed_templates "*"
@@ -25,7 +26,22 @@ defmodule ChatWeb.ProxyLive.Index do
       module={UserList}
       server={@server}
       me={@actor.me}
+      on_click={:proxy_user_list_selects_peer}
+    />
+    <.live_component
+      :if={assigns[:actor] && assigns[:server] && assigns[:dialog_to]}
+      id="dialog"
+      module={Dialog}
+      server={@server}
+      actor={@actor}
+      to={@dialog_to}
     />
     """
+  end
+
+  def handle_info({:proxy_user_list_selects_peer, card}, socket) do
+    socket
+    |> assign(dialog_to: card)
+    |> noreply()
   end
 end

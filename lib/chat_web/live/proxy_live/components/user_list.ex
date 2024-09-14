@@ -6,24 +6,41 @@ defmodule ChatWeb.ProxyLive.Components.UserList do
 
   def mount(socket) do
     socket
-    |> assign(:users, [])
+    |> assign(:users, %{})
     |> assign(:loading, true)
     |> ok()
   end
 
   def update(new_assigns, socket) do
-    case new_assigns do
+    new_assigns
+    |> case do
       %{server: server, me: me, id: id} ->
         request_user_list(server, me, id)
-        socket |> assign(new_assigns)
+        new_assigns
+
+      %{users: users} when is_list(users) ->
+        new_assigns
+        |> Map.drop([:users])
+        |> Map.put(:users, Map.new(users, fn card -> {hash_card(card), card} end))
 
       %{new_user: card} ->
-        assign(socket, :users, [card | socket.assigns.users] |> Enum.uniq())
+        new_assigns
+        |> Map.drop([:new_user])
+        |> Map.put(:users, Map.put(socket.assigns.users, hash_card(card), card))
 
-      _ ->
-        socket |> assign(new_assigns)
+      x ->
+        x
     end
+    |> then(&assign(socket, &1))
     |> ok()
+  end
+
+  def hash_card(card), do: Enigma.short_hash(card)
+
+  def handle_event("user_click", %{"hash" => user_hash}, socket) do
+    send_user_clicked(socket.assigns, user_hash)
+
+    noreply(socket)
   end
 
   def render(assigns) do
@@ -33,8 +50,15 @@ defmodule ChatWeb.ProxyLive.Components.UserList do
         <h1>Loading users ...</h1>
       </div>
       <div :if={!@loading}>
-        <div :for={user <- @users} class="flex flex-row items-center justify-between">
-          <Layout.Card.hashed_name card={user} />
+        <div :for={{hash, user} <- @users} class="flex flex-row items-center justify-between">
+          <div
+            class="cursor-pointer"
+            phx-target={@myself}
+            phx-click="user_click"
+            phx-value-hash={hash}
+          >
+            <Layout.Card.hashed_name card={user} me={@me} />
+          </div>
         </div>
       </div>
     </div>
@@ -61,5 +85,14 @@ defmodule ChatWeb.ProxyLive.Components.UserList do
         send_update(component_pid, __MODULE__, id: id, new_user: card)
       end
     )
+  end
+
+  defp send_user_clicked(assigs, user_hash) do
+    card = Map.get(assigs.users, user_hash)
+    prefix = assigs[:on_click]
+
+    if card && prefix do
+      send(self(), {prefix, card})
+    end
   end
 end

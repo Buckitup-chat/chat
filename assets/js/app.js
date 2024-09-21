@@ -27,6 +27,7 @@ import { UpChunkUploader, uploadEventHandlers } from "./upchunk_upload"
 import topbar from "../vendor/topbar"
 import Hooks from "./hooks"
 import CustomEvents from "./custom-events"
+import { initWebComponents } from "./web-components"
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
@@ -84,6 +85,7 @@ liveSocket.connect()
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
 
+initWebComponents();
 
 const WebAuthN = async () => {
   const createCreds = async () => {

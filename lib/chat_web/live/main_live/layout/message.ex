@@ -35,7 +35,6 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :my_id, :string, doc: "current user's ID - used only for :room chat type"
   attr :peer, Card, doc: "the other user - used only for :dialog chat type"
   attr :room, Room, default: nil, doc: "room access was requested to"
-  attr :timezone, :string, required: true, doc: "needed to render the timestamp"
   attr :room_keys, :map, default: [], doc: "the list of room keys"
   attr :linked, :boolean, default: false, doc: "link indicator"
 
@@ -100,7 +99,6 @@ defmodule ChatWeb.MainLive.Layout.Message do
           receiver={assigns[:peer]}
           room={@room}
           room_keys={@room_keys}
-          timezone={@timezone}
           linked={@linked}
           linkable?={@linkable?}
         />
@@ -156,7 +154,6 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :receiver, Card, doc: "peer in dialog"
   attr :room, Room, default: nil, doc: "room access was requested to"
   attr :room_keys, :map, doc: "the list of room keys"
-  attr :timezone, :string, required: true, doc: "needed to render the timestamp"
   attr :linked, :boolean, default: false, doc: "link indicator"
   attr :linkable?, :boolean, default: false, doc: "linkable? Only for public rooms"
 
@@ -178,7 +175,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       />
       <div class="flex justify-end">
         <.message_link msg_index={@msg.index} msg_id={@msg.id} linked={@linked} />
-        <.timestamp msg={@msg} timezone={@timezone} />
+        <.timestamp msg={@msg} />
       </div>
       <.audio export?={@export?} file={@file} msg={@msg} />
       <.media_file_info file={@file} />
@@ -204,7 +201,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       <.file export?={@export?} file={@file} msg={@msg} />
       <div class="flex justify-end">
         <.message_link msg_index={@msg.index} msg_id={@msg.id} linked={@linked} />
-        <.timestamp msg={@msg} timezone={@timezone} />
+        <.timestamp msg={@msg} />
       </div>
     </div>
     """
@@ -227,7 +224,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       />
       <div class="flex justify-end">
         <.message_link msg_index={@msg.index} msg_id={@msg.id} linked={@linked} />
-        <.timestamp msg={@msg} timezone={@timezone} />
+        <.timestamp msg={@msg} />
       </div>
       <.image chat_type={@chat_type} msg={@msg} export?={@export?} file={@file} />
       <.media_file_info file={@file} />
@@ -253,7 +250,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
       <span class="x-content"><.text msg={@msg} /></span>
       <div class="flex justify-end">
         <.message_link msg_index={@msg.index} msg_id={@msg.id} linked={@linked} />
-        <.timestamp msg={@msg} timezone={@timezone} />
+        <.timestamp msg={@msg} />
       </div>
     </div>
     """
@@ -270,7 +267,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
         <p class="inline-flex">requested access to room</p>
         <Layout.Card.hashed_name room={@room} style_spec={:room_request_message} show_link?={true} />
       </div>
-      <.timestamp msg={@msg} timezone={@timezone} />
+      <.timestamp msg={@msg} />
     </div>
     """
   end
@@ -318,7 +315,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
         <% end %>
       <% end %>
 
-      <.timestamp msg={@msg} timezone={@timezone} />
+      <.timestamp msg={@msg} />
     </div>
     """
   rescue
@@ -341,7 +338,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
         linkable?={@linkable?}
       />
       <.message_link msg_index={@msg.index} msg_id={@msg.id} linked={@linked} />
-      <.timestamp msg={@msg} timezone={@timezone} />
+      <.timestamp msg={@msg} />
       <video src={@file[:url]} class="a-video" controls />
       <.media_file_info file={@file} />
     </div>
@@ -566,20 +563,11 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   attr :msg, :map, required: true, doc: "message struct"
-  attr :timezone, :string, required: true, doc: "user's timezone"
 
   defp timestamp(assigns) do
-    assigns =
-      assign_new(assigns, :time, fn %{msg: %{timestamp: timestamp}, timezone: timezone} ->
-        timestamp
-        |> DateTime.from_unix!()
-        |> DateTime.shift_zone!(timezone)
-        |> Timex.format!("{h12}:{0m} {AM}, {D}.{M}.{YYYY}")
-      end)
-
     ~H"""
     <div class="px-2 text-grayscale600 flex justify-end mr-1" style="font-size: 10px;">
-      <%= @time %>
+      <time-stamp><%= @msg.timestamp %></time-stamp>
     </div>
     """
   end

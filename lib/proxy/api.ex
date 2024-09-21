@@ -2,7 +2,8 @@ defmodule Proxy.Api do
   @moduledoc "Proxy API. For server controller"
 
   @known_atoms %{
-    users: :"users\0"
+    users: :"users\0",
+    dialog_message: true
   }
   def known_atoms(), do: @known_atoms
 
@@ -39,6 +40,29 @@ defmodule Proxy.Api do
     end
     |> Proxy.Serialize.serialize()
   catch
+    _, _ -> :wrong_args |> Proxy.Serialize.serialize()
+  end
+
+  def create_dialog(args) do
+    args
+    |> case do
+      binary when is_binary(binary) -> Proxy.Serialize.deserialize(binary)
+      x -> x
+    end
+    |> Map.new()
+    |> case do
+      %{me: me, peer: peer, digest: digest, token_key: token_key} ->
+        if correct_digest?(token_key, Chat.Proto.Identify.pub_key(me), digest) do
+          Chat.Dialogs.find_or_open(me, peer)
+        end
+
+      _ ->
+        :wrong_args
+    end
+    |> Proxy.Serialize.serialize()
+  catch
+    # a, b ->
+    #   [a, b, __STACKTRACE__] |> dbg()
     _, _ -> :wrong_args |> Proxy.Serialize.serialize()
   end
 

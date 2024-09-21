@@ -1,6 +1,7 @@
 defmodule Proxy do
   @moduledoc "Proxy. Client side"
 
+  # Users
   def register_me(server, me) do
     %{token_key: token_key, token: token} =
       api_confirmation_token(server)
@@ -24,9 +25,40 @@ defmodule Proxy do
     api_select(server, min: {:users, 0}, max: {:"users\0", 0}, amount: 10000)
   end
 
+  # Dialogs
+  def find_or_create_dialog(server, me, peer) do
+    %{token_key: token_key, token: token} =
+      api_confirmation_token(server)
+
+    digest = Enigma.sign(token, me.private_key)
+
+    api_create_dialog(server, %{
+      token_key: token_key,
+      me: me |> Chat.Card.from_identity(),
+      peer: peer,
+      digest: digest
+    })
+  end
+
+  def get_dialog_messages(server, dialog) do
+    dialog_key = Chat.Dialogs.key(dialog)
+
+    api_select(server,
+      min: {:dialog_message, dialog_key, 0, 0},
+      max: {:dialog_message, dialog_key, nil, nil},
+      amount: 10
+    )
+  end
+
+  # Terminology
+  ####################################
   defp api_confirmation_token(server), do: api_get(server, "confirmation-token", [])
   defp api_select(server, args), do: api_get(server, "select", args)
   defp api_register_user(server, args), do: api_post(server, "register-user", args)
+  defp api_create_dialog(server, args), do: api_post(server, "create-dialog", args)
+
+  # Utilities
+  ####################################
 
   defp api_get(server, action, args) do
     server

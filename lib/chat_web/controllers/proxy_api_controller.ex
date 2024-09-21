@@ -38,4 +38,16 @@ defmodule ChatWeb.ProxyApiController do
     _, _ ->
       conn |> send_resp(404, "Not found")
   end
+
+  def create_dialog(conn, _params) do
+    {:ok, body, _conn} = conn |> read_body()
+    data = Proxy.Api.create_dialog(body)
+
+    conn
+    |> put_resp_content_type("application/octet-stream")
+    |> send_resp(200, data)
+  catch
+    _, _ ->
+      conn |> send_resp(404, "Not found")
+  end
 end

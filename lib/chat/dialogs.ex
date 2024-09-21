@@ -16,7 +16,7 @@ defmodule Chat.Dialogs do
     find_or_open(me, Card.from_identity(me))
   end
 
-  def find_or_open(%Identity{} = src, %Card{} = dst) do
+  def find_or_open(src, dst) do
     case Registry.find(src, dst) do
       nil ->
         open(src, dst)

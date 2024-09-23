@@ -19,7 +19,6 @@ defmodule ChatWeb.ProxyLive.Index do
 
   def render(assigns) do
     ~H"""
-    <!-- <pre class="bg-white/50"> <%= assigns |> Map.take([:server, :actor]) |> inspect(pretty: true) %></pre> -->
     <.live_component
       :if={assigns[:actor] && assigns[:server]}
       id="users"

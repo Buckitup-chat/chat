@@ -46,7 +46,7 @@ defmodule Chat.OrderingTest do
     alice = User.login("Alice")
     alice |> User.register()
 
-    {_room_identity, room} = alice |> Rooms.add("some room")
+    {room_identity, room} = alice |> Rooms.add("some room")
 
     message = "hello, room  "
 
@@ -54,7 +54,7 @@ defmodule Chat.OrderingTest do
       message
       |> Kernel.<>(to_string(num))
       |> Messages.Text.new(num)
-      |> Rooms.add_new_message(alice, room.pub_key)
+      |> Rooms.add_new_message(alice, room_identity)
     end
 
     ChangeTracker.await()

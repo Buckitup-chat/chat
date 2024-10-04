@@ -6,16 +6,15 @@ defmodule Chat.Rooms.RoomMessages do
   alias Chat.Db.ChangeTracker
   alias Chat.DryStorable
   alias Chat.Identity
+  alias Chat.Proto.Identify
   alias Chat.Rooms.Message
   alias Chat.Rooms.PlainMessage
   alias Chat.Rooms.Room
 
-  @db_key :room_message
-
   def add_new_message(
         message,
         %Identity{} = author,
-        room_key,
+        %Identity{} = room_identity,
         opts \\ []
       ) do
     type = message |> DryStorable.type()
@@ -23,7 +22,7 @@ defmodule Chat.Rooms.RoomMessages do
 
     message
     |> DryStorable.content()
-    |> add_message(room_key, author, opts |> Keyword.merge(type: type, now: now))
+    |> add_message(room_identity, author, opts |> Keyword.merge(type: type, now: now))
   end
 
   def on_saved({index, msg}, room_hash, ok_fn) do
@@ -60,13 +59,7 @@ defmodule Chat.Rooms.RoomMessages do
          }},
         identity
       ) do
-    with {:ok, content} <-
-           Enigma.decrypt_signed(
-             encrypted,
-             identity.private_key,
-             author_key,
-             author_key
-           ),
+    with {:ok, content} <- Enigma.decrypt_bisigned(encrypted, identity.private_key, author_key),
          message <-
            %PlainMessage{
              timestamp: timestamp,
@@ -88,6 +81,16 @@ defmodule Chat.Rooms.RoomMessages do
     |> key(index, id)
     |> Db.get()
     |> then(&read({index, &1}, identity))
+  end
+
+  def read_to(%Room{pub_key: room_key}, identity, {index, id} = _from, {to_index, to_id} = _to) do
+    {
+      key(room_key, to_index, to_id),
+      key(room_key, index, id)
+    }
+    |> Db.list()
+    |> Enum.map(fn {{_, _, index, _}, msg} -> read({index, msg}, identity) end)
+    |> Enum.reject(&is_nil/1)
   end
 
   def get_next_message({index, id} = _msg_id, room_identity, predicate) do
@@ -132,7 +135,12 @@ defmodule Chat.Rooms.RoomMessages do
 
       new_message
       |> DryStorable.content()
-      |> add_message(room_key, author, type: type, now: msg.timestamp, id: msg.id, index: index)
+      |> add_message(room_identity, author,
+        type: type,
+        now: msg.timestamp,
+        id: msg.id,
+        index: index
+      )
     end
   end
 
@@ -141,7 +149,7 @@ defmodule Chat.Rooms.RoomMessages do
         %Identity{} = room_identity,
         %Identity{} = author
       ) do
-    with room_key <- room_identity |> Identity.pub_key(),
+    with room_key <- room_identity |> Identify.pub_key(),
          msg_key <- room_key |> key(index, id),
          msg <- Db.get(msg_key),
          true <- msg.author_key == author.public_key do
@@ -153,29 +161,38 @@ defmodule Chat.Rooms.RoomMessages do
     end
   end
 
-  def key(room_key, time, 0),
-    do: {@db_key, room_key, time, 0}
-
-  def key(room_key, time, id),
-    do: {@db_key, room_key, time, id |> Enigma.hash()}
+  def key(room_key, index, id), do: Chat.DbKeys.room_message(id, index: index, room: room_key)
 
   def delete_by_room(room_key) do
     {
-      {@db_key, room_key, -1, 0},
-      {@db_key, room_key, nil, 0}
+      key(room_key, -1, 0),
+      key(room_key, nil, 0)
     }
     |> Db.bulk_delete()
   end
 
-  defp add_message(content, room_key, author, opts) do
+  defp add_message(content, room_identity, author, opts) do
+    room_pub_key = room_identity |> Identify.pub_key()
+
     content
-    |> Enigma.encrypt_and_sign(author.private_key, room_key)
+    |> Enigma.encrypt_and_bisign(author.private_key, room_identity.private_key)
     |> Message.new(author.public_key, opts)
-    |> db_save(room_key, opts[:index])
+    |> if_eligable_for_room(
+      room_pub_key,
+      &db_save(&1, room_pub_key, opts[:index])
+    )
+  end
+
+  defp if_eligable_for_room(message, room_key, ok_fn) do
+    {encrypted, _, encrypted_and_signed} = message.encrypted
+
+    if Enigma.is_valid_sign?(encrypted_and_signed, encrypted, room_key),
+      do: ok_fn.(message),
+      else: nil
   end
 
   defp db_save(message, room_key, index) do
-    next = index || Chat.Ordering.next({@db_key, room_key})
+    next = index || Chat.Ordering.next(Chat.DbKeys.room_message_prefix(room_key))
 
     room_key
     |> key(next, message.id)

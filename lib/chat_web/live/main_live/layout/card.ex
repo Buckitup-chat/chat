@@ -6,6 +6,8 @@ defmodule ChatWeb.MainLive.Layout.Card do
   alias Chat.Card
   alias Chat.Rooms.Room
 
+  alias Phoenix.LiveView.JS
+
   @basic_text_style "text-sm"
   @grayscale_text_style "text-sm tracking-tighter text-grayscale600"
   @white_hash_text_style "text-base text-white/60"
@@ -26,9 +28,11 @@ defmodule ChatWeb.MainLive.Layout.Card do
   attr :card, Card, doc: "room/user card"
   attr :me, Identity, doc: "current user"
   attr :is_me?, :boolean, doc: "is this the current user's card?"
-  attr :room, Room, doc: "room sctruct"
-  attr :selected_room, Room, doc: "selected room sctruct"
+  attr :room, Room, doc: "room struct"
+  attr :selected_room, Room, doc: "selected room struct"
   attr :style_spec, :atom, default: :dialog_selection, doc: "style spec"
+  attr :show_link?, :boolean, default: false, doc: "to show the chat link?"
+  attr :reverse?, :boolean, default: false, doc: "reverse order for chats"
 
   def hashed_name(assigns) do
     assigns =
@@ -46,12 +50,23 @@ defmodule ChatWeb.MainLive.Layout.Card do
       |> assign_new(:name_style, &set_name_style/1)
 
     ~H"""
-    <div class="inline-flex">
-      <%= if @is_me? do %>
-        <div class="text-sm t-my-notes">My notes</div>
+    <div
+      class="inline-flex"
+      phx-click={
+        if @show_link? do
+          JS.push("dialog/show-link", value: %{hash: @card.hash})
+        end
+      }
+    >
+      <%= if @reverse? do %>
+        <div class={@name_style}><%= @card.name %></div>
+        <tt class={"ml-1 #{@hash_style}"}>[<%= Enigma.short_hash(@card) %>]</tt>
       <% else %>
-        <tt class={"#{@hash_style}"}>[<%= Enigma.short_hash(@card) %>]</tt>
+        <tt class={@hash_style}>[<%= Enigma.short_hash(@card) %>]</tt>
         <div class={"ml-1 #{@name_style}"}><%= @card.name %></div>
+      <% end %>
+      <%= if @is_me? do %>
+        <div class="text-sm t-my-notes ml-1 font-medium">(My notes)</div>
       <% end %>
     </div>
     """

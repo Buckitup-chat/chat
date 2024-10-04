@@ -7,6 +7,7 @@ defmodule Chat.Dialogs.DialogTest do
   alias Chat.Db.ChangeTracker
   alias Chat.Dialogs
   alias Chat.Messages
+  alias Chat.Rooms
   alias Chat.User
   alias Chat.Utils.StorageId
   alias Support.FakeData
@@ -261,6 +262,43 @@ defmodule Chat.Dialogs.DialogTest do
     same_msg = Dialogs.read_message(dialog, {msg.index, msg.id}, alice)
 
     assert same_msg == msg
+  end
+
+  test "gets invite for users to the room" do
+    alice = User.login("Alice")
+    alice_key = User.register(alice)
+    User.await_saved(alice_key)
+
+    bob = User.login("Bob")
+    bob_key = User.register(bob)
+    User.await_saved(bob_key)
+    bob_card = User.by_id(bob_key)
+    dialog = Dialogs.find_or_open(alice, bob_card)
+
+    {room_identity1, _room} = Rooms.add(alice, "Private room 1", :private)
+    Rooms.await_saved(room_identity1)
+    {room_identity2, _room} = Rooms.add(alice, "Private room 2", :private)
+    Rooms.await_saved(room_identity2)
+    {room_identity3, _room} = Rooms.add(alice, "Private room 3", :private)
+    Rooms.await_saved(room_identity3)
+
+    [message1, message2, message3] =
+      Stream.map([room_identity1, room_identity2, room_identity3], fn room_identity ->
+        room_identity
+        |> Messages.RoomInvite.new()
+        |> Dialogs.add_new_message(alice, dialog)
+        |> tap(&Dialogs.await_saved(&1, dialog))
+        |> then(fn {_, msg} -> msg end)
+      end)
+      |> Enum.to_list()
+
+    invite1 = Chat.Dialogs.room_invite_for_user_to_room(bob, room_identity1.public_key)
+    invite2 = Chat.Dialogs.room_invite_for_user_to_room(bob, room_identity2.public_key)
+    invite3 = Chat.Dialogs.room_invite_for_user_to_room(bob, room_identity3.public_key)
+
+    assert invite1.id == message1.id
+    assert invite2.id == message2.id
+    assert invite3.id == message3.id
   end
 
   defp fake_file do

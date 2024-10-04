@@ -103,7 +103,11 @@ defmodule ChatWeb do
   defp view_helpers do
     quote do
       # Use all HTML functionality (forms, tags, etc)
-      use Phoenix.HTML
+      # use Phoenix.HTML
+      import Phoenix.HTML.Form
+      import Phoenix.HTML
+
+      use PhoenixHTMLHelpers
 
       # Import LiveView and .heex helpers (live_render, live_patch, <.form>, etc)
       import Phoenix.Component
@@ -127,6 +131,13 @@ defmodule ChatWeb do
       defp noreply(x), do: {:noreply, x}
 
       defp reply(x, p), do: {:reply, p, x}
+
+      defp stream_batch_insert(socket, key, items, opts \\ %{}) do
+        items
+        |> Enum.reduce(socket, fn item, socket ->
+          stream_insert(socket, key, item, opts)
+        end)
+      end
     end
   end
 

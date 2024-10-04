@@ -2,7 +2,6 @@ defmodule Chat.Rooms do
   @moduledoc "Rooms context"
 
   alias Chat.Identity
-  alias Chat.Messages
   alias Chat.Rooms.Message
   alias Chat.Rooms.Registry
   alias Chat.Rooms.Room
@@ -16,6 +15,13 @@ defmodule Chat.Rooms do
     room |> Registry.update()
 
     {room_identity, room}
+  end
+
+  @doc "Returns all rooms list"
+  def list do
+    Registry.all()
+    |> Enum.map(&elem(&1, 1))
+    |> Enum.sort_by(& &1.name)
   end
 
   @doc "Returns rooms {my_rooms, available_rooms}"
@@ -83,13 +89,8 @@ defmodule Chat.Rooms do
   def read_message({_, _} = msg_id, %Identity{} = identity),
     do: RoomMessages.read(msg_id, identity)
 
-  defdelegate read(
-                room,
-                room_identity,
-                before \\ {nil, 0},
-                amount \\ 1000
-              ),
-              to: RoomMessages
+  defdelegate read(room, room_identity, before \\ {nil, 0}, amount \\ 1000), to: RoomMessages
+  defdelegate read_to(room, room_identity, from \\ {nil, 0}, to \\ {0, 0}), to: RoomMessages
 
   def update_message(content, msg_id, me, room),
     do: RoomMessages.update_message(content, msg_id, me, room)
@@ -97,17 +98,10 @@ defmodule Chat.Rooms do
   def delete_message(msg_id, room, me),
     do: msg_id |> RoomMessages.delete_message(room, me)
 
-  def add_request(room_key, user_identity, time) do
+  def add_request(room_key, user_identity, _time, _message_added_fn \\ fn _ -> :ok end) do
     room_key
     |> get()
     |> Room.add_request(user_identity)
-    |> tap(fn %{type: type} = room ->
-      if type == :request do
-        time
-        |> Messages.RoomRequest.new()
-        |> add_new_message(user_identity, room.pub_key)
-      end
-    end)
     |> update()
   end
 
@@ -116,7 +110,7 @@ defmodule Chat.Rooms do
   @doc """
   Approves the room request for user.
   Opts:
-    * :public_only - Ignores aproval for a non-public room if `true`. Defaults to `false`.
+    * :public_only - Ignores approval for a non-public room if `true`. Defaults to `false`.
   """
   def approve_request(room_key, user_key, room_identity, opts \\ []) do
     if_room_found(room_key, fn room ->
@@ -158,7 +152,11 @@ defmodule Chat.Rooms do
   end
 
   defdelegate update(room), to: Registry
-  defdelegate decrypt_identity(encrypted_room_identity, person_identity, room_pub_key), to: Room
+
+  defdelegate decipher_identity(encrypted_room_identity, secret), to: Room
+
+  defdelegate decipher_identity_with_key(ciphered_room_identity, person_identity, room_pub_key),
+    to: Room
 
   defp if_room_found(room_or_key, action, default \\ nil)
 

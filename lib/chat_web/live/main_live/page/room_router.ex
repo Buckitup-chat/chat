@@ -1,25 +1,27 @@
 defmodule ChatWeb.MainLive.Page.RoomRouter do
   @moduledoc "Route room events"
 
-  import Phoenix.LiveView, only: [push_event: 3]
+  import Phoenix.LiveView, only: [push_event: 3, push_navigate: 2]
 
   alias ChatWeb.MainLive.Layout.Message
+  alias ChatWeb.MainLive.Modals
   alias ChatWeb.MainLive.Page
 
   #
   # LiveView events
   #
 
+  def event(%{assigns: %{need_login: true}} = socket, _event) do
+    socket |> push_navigate(to: "/")
+  end
+
   def event(socket, event) do
     case event do
       {"message/" <> action, %{"id" => id, "index" => index}} ->
         socket |> route_message_event({action, {index |> String.to_integer(), id}})
 
-      {"create", %{"new_room" => %{"name" => name, "type" => type}}} ->
-        socket |> Page.Lobby.new_room(name, type |> String.to_existing_atom())
-
-      {"invite-user", %{"hash" => hash}} ->
-        socket |> Page.Room.invite_user(hash |> Base.decode16!(case: :lower))
+      {"open-invite-list", _} ->
+        socket |> Page.Room.open_invite_list(Modals.RoomInviteList)
 
       {"send-request", %{"room" => hash}} ->
         socket |> Page.Lobby.request_room(hash |> Base.decode16!(case: :lower))
@@ -38,6 +40,12 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
 
       {"download-messages", params} ->
         socket |> Page.Room.download_messages(params)
+
+      {"unlink-messages-modal", _} ->
+        socket |> Page.Room.unlink_messages_modal(Modals.UnlinkMessages)
+
+      {"unlink-messages", _} ->
+        socket |> Page.Room.unlink_messages(&Message.message_link/1)
 
       {"toggle-messages-select", params} ->
         socket |> Page.Room.toggle_messages_select(params)
@@ -70,6 +78,14 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
       "download" ->
         socket |> Page.Room.download_message(msg_id)
 
+      "link" ->
+        socket
+        |> Page.Room.link_message(msg_id, &Message.message_link/1)
+        |> Page.Room.share_message_link_modal(msg_id, Modals.ShareMessageLink)
+
+      "share-link-modal" ->
+        socket |> Page.Room.share_message_link_modal(msg_id, Modals.ShareMessageLink)
+
       "open-image-gallery" ->
         socket |> Page.Room.open_image_gallery(msg_id)
     end
@@ -81,6 +97,9 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
 
   def info(socket, message) do
     case message do
+      {:invite_user, hash} ->
+        socket |> Page.Room.invite_user(hash |> Base.decode16!(case: :lower))
+
       {:new_message, glimpse} ->
         socket |> Page.Room.show_new(glimpse)
 
@@ -95,6 +114,9 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
 
       {:preload_image_gallery, :prev} ->
         socket |> Page.Room.image_gallery_preload_prev()
+
+      :load_new_messages ->
+        socket |> Page.Room.load_new_messages()
     end
   end
 end

@@ -6,19 +6,32 @@ defmodule Chat.Db.WriteQueue do
   import Tools.GenServerHelpers
   require Record
 
-  # require Logger
+  alias Chat.Db.ChangeTracker
 
-  Record.defrecord(:q_state, buffer: buffer(), consumer: nil, in_demand: false, mirror: nil)
+  Record.defrecord(:q_state, buffer: buffer(), consumer: nil, in_demand: false, mirrors: [])
 
   use GenServer
 
+  def push({nil, nil}, _server), do: :ok
+  def push({key, nil}, _server), do: ChangeTracker.set_written(key)
   def push(data, server), do: GenServer.cast(server, {:push, data})
-  def put(data, server), do: GenServer.cast(server, {:put, data})
-  def mark_delete(key, server), do: GenServer.cast(server, {:mark_delete, key})
-  def set_mirror(sink, server), do: GenServer.cast(server, {:mirror, sink})
 
-  def put_chunk(chunk, server), do: GenServer.call(server, {:put_chunk, chunk})
+  def put({nil, nil}, _server), do: :ok
+  def put({key, nil}, _server), do: ChangeTracker.set_written(key)
+  def put(data, server), do: GenServer.cast(server, {:put, data})
+
+  def mark_delete(key, server), do: GenServer.cast(server, {:mark_delete, key})
+
+  def set_mirrors(sink, servers) when is_list(servers),
+    do: Enum.each(servers, &set_mirrors(sink, &1))
+
+  def set_mirrors(sink, server), do: GenServer.cast(server, {:mirrors, sink})
+
+  def put_chunk({nil, nil}, _server), do: :ok
+  def put_chunk({key, nil}, _server), do: ChangeTracker.set_written(key)
+  def put_chunk(chunk, server), do: GenServer.call(server, {:put_chunk, chunk}, :infinity)
   def put_stream(stream, server), do: GenServer.call(server, {:put_stream, stream})
+  def force_stream(stream, server), do: GenServer.call(server, {:force_stream, stream})
 
   @doc "This will send data back to pid provided, with genserver cast as {:write, [data]} | {:delete, [:key]}"
   def demand(server), do: GenServer.call(server, :demand)
@@ -37,18 +50,11 @@ defmodule Chat.Db.WriteQueue do
   end
 
   @impl true
-  def handle_call(:demand, {to_pid, _}, q_state(mirror: mirror) = state) do
-    # "demand in #{inspect(self())} from #{inspect(to_pid)} with mirror: #{inspect(mirror)}"
-    # |> Logger.debug()
-
-    if mirror_pid?(to_pid, mirror) do
-      state |> reply(:ok)
-    else
-      state
-      |> q_state(consumer: to_pid, in_demand: true)
-      |> produce()
-      |> reply(:ok)
-    end
+  def handle_call(:demand, {to_pid, _}, state) do
+    state
+    |> q_state(consumer: to_pid, in_demand: true)
+    |> produce()
+    |> reply(:ok)
   end
 
   def handle_call({:put_stream, stream}, _, q_state(buffer: buf) = state) do
@@ -62,9 +68,18 @@ defmodule Chat.Db.WriteQueue do
     end
   end
 
-  def handle_call({:put_chunk, chunk}, _, q_state(buffer: buf) = state) do
+  def handle_call({:force_stream, stream}, _, q_state(buffer: buf) = state) do
+    state
+    |> q_state(buffer: buffer_stream(buf, stream))
+    |> produce()
+    |> reply(:ok)
+  end
+
+  def handle_call({:put_chunk, chunk}, from_pid, q_state(buffer: buf) = state) do
     if buffer_has_chunk?(buf) do
-      state |> reply(:ignored)
+      state
+      |> q_state(buffer: buffer_enqueue_chunk(buf, from_pid, chunk))
+      |> noreply()
     else
       state
       |> q_state(buffer: buffer_chunk(buf, chunk))
@@ -95,38 +110,36 @@ defmodule Chat.Db.WriteQueue do
     |> noreply()
   end
 
-  def handle_cast({:mirror, sink}, state) do
+  def handle_cast({:mirrors, sink}, state) do
     state
-    |> q_state(mirror: sink)
+    |> q_state(mirrors: sink)
     |> noreply()
   end
 
   defp produce(q_state(consumer: nil) = state), do: state
   defp produce(q_state(in_demand: false) = state), do: state
 
-  defp produce(q_state(buffer: buf, consumer: pid, mirror: sink) = state) do
+  defp produce(q_state(consumer: pid) = state) do
     if Process.alive?(pid) do
-      case buffer_yield(buf) do
-        {:ignored, _} ->
-          state
-
-        {payload, new_buf} ->
-          GenServer.cast(pid, payload)
-          GenServer.cast(sink, payload)
-
-          state |> q_state(buffer: new_buf, in_demand: false)
-      end
+      state |> produce_to_consumer()
     else
       state |> q_state(consumer: nil)
     end
   end
 
-  defp mirror_pid?(pid, mirror) do
-    cond do
-      is_nil(mirror) -> false
-      pid == mirror -> true
-      is_atom(mirror) and Process.whereis(mirror) == pid -> true
-      true -> false
+  defp produce_to_consumer(q_state(buffer: buf, consumer: pid, mirrors: mirrors) = state) do
+    case buffer_yield(buf) do
+      {:ignored, _} ->
+        state
+
+      {payload, new_buf} ->
+        GenServer.cast(pid, payload)
+
+        if mirrors do
+          Enum.each(mirrors, &GenServer.cast(&1, {:mirror, payload}))
+        end
+
+        state |> q_state(buffer: new_buf, in_demand: false)
     end
   end
 end

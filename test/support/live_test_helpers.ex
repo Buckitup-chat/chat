@@ -13,21 +13,16 @@ defmodule ChatWeb.LiveTestHelpers do
   @type view :: %Phoenix.LiveViewTest.View{}
 
   @spec prepare_view(%{conn: Plug.Conn.t()}) :: %{socket: Socket.t(), view: view()}
-  def prepare_view(%{conn: conn}) do
+  def prepare_view(%{conn: conn}, name \\ "User") do
     {:ok, view, _html} = live(conn, "/")
 
     render_hook(view, "restoreAuth")
 
     view
-    |> form("#login-form", login: %{name: "User"})
+    |> form("#login-form", login: %{name: name})
     |> render_submit()
 
-    render_hook(view, "local-time", %{
-      "locale" => "en-US",
-      "timestamp" => 1_675_181_845,
-      "timezone" => "Europe/Sarajevo",
-      "timezone_offset" => 1
-    })
+    set_local_time(%{view: view})
 
     state = :sys.get_state(view.pid)
     %{socket: state.socket, view: view}
@@ -39,11 +34,25 @@ defmodule ChatWeb.LiveTestHelpers do
     %{socket: state.socket, view: view}
   end
 
-  @spec login_by_key(%{conn: Plug.Conn.t()}) :: %{socket: Socket.t(), view: view()}
-  def login_by_key(%{conn: conn}) do
-    {:ok, view, _html} = live(conn, "/")
+  @spec set_local_time(%{view: view()}) :: %{socket: Socket.t(), view: view()}
+  def set_local_time(%{view: view}) do
+    render_hook(view, "local-time", %{
+      "locale" => "en-US",
+      "timestamp" => 1_675_181_845,
+      "timezone" => "Europe/Sarajevo",
+      "timezone_offset" => 1
+    })
+
+    state = :sys.get_state(view.pid)
+    %{socket: state.socket, view: view}
+  end
+
+  @spec login_by_key(%{conn: Plug.Conn.t()}, String.t()) :: %{socket: Socket.t(), view: view()}
+  def login_by_key(%{conn: conn}, path \\ "/") do
+    {:ok, view, _html} = live(conn, path)
 
     render_hook(view, "restoreAuth")
+    set_local_time(%{view: view})
 
     view
     |> element("#importKeyButton")
@@ -66,17 +75,27 @@ defmodule ChatWeb.LiveTestHelpers do
   end
 
   @spec open_dialog(%{view: view()}) :: %{socket: Socket.t(), view: view()}
-  def open_dialog(%{view: view}) do
+  def open_dialog(%{view: view}, user \\ nil) do
+    user_item =
+      case user do
+        nil ->
+          "#chatRoomBar ul li.hidden"
+
+        _ ->
+          user = user |> Chat.Card.from_identity()
+          "#chatRoomBar #user-#{user.hash}"
+      end
+
     view
-    |> element("#chatRoomBar ul li.hidden", "My notes")
+    |> element(user_item, if(user, do: "", else: "My notes"))
     |> render_click()
 
     state = :sys.get_state(view.pid)
     %{socket: state.socket, view: view}
   end
 
-  @spec create_and_open_room(%{view: view()}) :: %{socket: Socket.t(), view: view()}
-  def create_and_open_room(%{view: view}) do
+  @spec create_and_open_room(%{view: view()}, String.t()) :: %{socket: Socket.t(), view: view()}
+  def create_and_open_room(%{view: view}, type \\ "public") do
     view
     |> element("button:first-child", "Rooms")
     |> render_click()
@@ -84,7 +103,7 @@ defmodule ChatWeb.LiveTestHelpers do
     name = Utils.random_id()
 
     view
-    |> form("#room-create-form", new_room: %{name: name, type: "public"})
+    |> form("#room-create-form", room_input: %{name: name, type: type})
     |> render_submit()
 
     state = :sys.get_state(view.pid)

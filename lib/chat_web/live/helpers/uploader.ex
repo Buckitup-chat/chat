@@ -7,12 +7,22 @@ defmodule ChatWeb.LiveHelpers.Uploader do
   import Phoenix.Component
 
   alias Chat.{ChunkedFiles, ChunkedFilesMultisecret, FileIndex}
-  alias Chat.Upload.{Upload, UploadIndex, UploadMetadata, UploadStatus, UploadSupervisor}
+
+  alias Chat.Upload.{
+    Upload,
+    UploadIndex,
+    UploadKey,
+    UploadMetadata,
+    UploadStatus,
+    UploadSupervisor
+  }
+
   alias ChatWeb.Endpoint
   alias ChatWeb.MainLive.Page
   alias ChatWeb.Router.Helpers
   alias Phoenix.LiveView.{Socket, UploadEntry}
 
+  @client_chunk_size div(Application.compile_env(:chat, :file_chunk_size), 1024)
   @max_concurrent_uploads 2
 
   @type entry :: UploadEntry.t()
@@ -21,6 +31,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
           %{skip: true}
           | %{
               chunk_count: integer(),
+              chunk_size: integer(),
               entrypoint: String.t(),
               status: atom(),
               uploader: String.t(),
@@ -39,6 +50,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
       max_file_size: 102_400_000_000,
       progress: &__MODULE__.handle_progress/3
     )
+    |> assign(:file_uploads_order, [])
     |> assign(:uploads_metadata, %{})
   end
 
@@ -50,8 +62,10 @@ defmodule ChatWeb.LiveHelpers.Uploader do
       %UploadMetadata{} = metadata ->
         {key, _secret} = metadata.credentials
         UploadStatus.stop(key)
+        file_uploads_order = List.delete(socket.assigns.file_uploads_order, uuid)
 
         socket
+        |> assign(:file_uploads_order, file_uploads_order)
         |> assign(:uploads_metadata, Map.delete(uploads, uuid))
         |> cancel_upload(:file, ref)
         |> maybe_resume_next_upload()
@@ -63,18 +77,16 @@ defmodule ChatWeb.LiveHelpers.Uploader do
 
   @spec move_upload(socket(), params()) :: socket()
   def move_upload(%Socket{} = socket, %{"index" => new_index, "uuid" => uuid}) do
-    uploads = socket.assigns.uploads
-    entries = Map.get(uploads.file, :entries, [])
+    file_uploads_order = socket.assigns.file_uploads_order
 
-    case Enum.find_index(entries, &(&1.uuid == uuid)) do
+    case Enum.find_index(file_uploads_order, &(&1 == uuid)) do
       nil ->
         socket
 
       old_index ->
-        {entry, entries} = List.pop_at(entries, old_index)
-        entries = List.insert_at(entries, new_index, entry)
-        uploads = update_in(uploads.file.entries, fn _old_entries -> entries end)
-        assign(socket, :uploads, uploads)
+        {^uuid, file_uploads_order} = List.pop_at(file_uploads_order, old_index)
+        file_uploads_order = List.insert_at(file_uploads_order, new_index, uuid)
+        assign(socket, :file_uploads_order, file_uploads_order)
     end
   end
 
@@ -90,6 +102,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
         UploadStatus.put(key, :inactive)
 
         assign(socket, :uploads_metadata, Map.put(uploads, uuid, metadata))
+        |> maybe_delete_entries_errors()
 
       nil ->
         socket
@@ -116,18 +129,24 @@ defmodule ChatWeb.LiveHelpers.Uploader do
     end
   end
 
+  defp maybe_delete_entries_errors(%Socket{} = socket) do
+    key_path = [:assigns, :uploads, :file, :errors] |> Enum.map(&Access.key!/1)
+
+    socket |> put_in(key_path, [])
+  end
+
   @spec presign_url(entry(), socket()) :: {:ok, uploader_data(), socket()}
   def presign_url(entry, socket) do
     upload_key = get_upload_key(entry, socket.assigns)
 
     {uploader_data, socket} =
       cond do
-        secret = FileIndex.get(reader_hash(socket.assigns), upload_key) ->
+        encrypted_secret = FileIndex.get(reader_hash(socket.assigns), upload_key) ->
           entry = Map.put(entry, :done?, true)
 
           metadata =
             %UploadMetadata{}
-            |> Map.put(:credentials, {upload_key, secret})
+            |> Map.put(:credentials, {upload_key, encrypted_secret})
             |> Map.put(:destination, file_upload_destination(socket.assigns))
 
           case metadata.destination.type do
@@ -141,13 +160,14 @@ defmodule ChatWeb.LiveHelpers.Uploader do
           {%{skip: true}, socket}
 
         true ->
-          {next_chunk, secret} = maybe_resume_existing_upload(upload_key, socket.assigns)
+          {next_chunk, encrypted_secret} =
+            maybe_resume_existing_upload(upload_key, socket.assigns)
 
           initial_secret = ChunkedFiles.get_file(upload_key)
           ChunkedFilesMultisecret.generate(upload_key, entry.client_size, initial_secret)
 
           {socket, uploader_data} =
-            start_chunked_upload(socket, entry, upload_key, secret, next_chunk)
+            start_chunked_upload(socket, entry, upload_key, encrypted_secret, next_chunk)
 
           link =
             Helpers.upload_chunk_url(Endpoint, :put, upload_key |> Base.encode16(case: :lower))
@@ -163,23 +183,9 @@ defmodule ChatWeb.LiveHelpers.Uploader do
   end
 
   defp get_upload_key(%UploadEntry{} = entry, %{my_id: id} = assigns) do
-    destination =
-      assigns
-      |> file_upload_destination()
-      |> Jason.encode!()
-      |> Base.encode64()
-
-    [
-      id,
-      destination,
-      entry.client_relative_path,
-      entry.client_name,
-      entry.client_type,
-      entry.client_size,
-      entry.client_last_modified
-    ]
-    |> Enum.join(":")
-    |> Enigma.hash()
+    assigns
+    |> file_upload_destination()
+    |> UploadKey.new(id, entry)
   end
 
   defp reader_hash(%{lobby_mode: :chats, peer: %{pub_key: peer_pub_key}}),
@@ -188,28 +194,31 @@ defmodule ChatWeb.LiveHelpers.Uploader do
   defp reader_hash(%{lobby_mode: :rooms, room: %{pub_key: room_pub_key}}),
     do: room_pub_key
 
-  defp maybe_resume_existing_upload(upload_key, assigns) do
+  defp maybe_resume_existing_upload(upload_key, %{me: me} = assigns) do
     case UploadIndex.get(upload_key) do
       nil ->
-        secret =
+        encrypted_secret =
           upload_key
           |> ChunkedFiles.new_upload()
           |> ChunkedFiles.encrypt_secret(assigns.me)
 
-        add_upload_to_index(assigns, upload_key, secret)
-        {0, secret}
+        add_upload_to_index(assigns, upload_key, encrypted_secret)
+        {0, encrypted_secret}
 
       %Upload{} = upload ->
         UploadIndex.delete(upload_key)
-        add_upload_to_index(assigns, upload_key, upload.secret)
+        secret = upload.encrypted_secret |> ChunkedFiles.decrypt_secret(me)
+        ChunkedFiles.resume_upload(upload_key, secret)
+        UploadStatus.put(upload_key, :active)
+        add_upload_to_index(assigns, upload_key, upload.encrypted_secret)
         next_chunk = ChunkedFiles.next_chunk(upload_key)
-        {next_chunk, upload.secret}
+        {next_chunk, upload.encrypted_secret}
     end
   end
 
-  defp add_upload_to_index(assigns, key, secret) do
+  defp add_upload_to_index(assigns, key, encrypted_secret) do
     timestamp = Chat.Time.monotonic_to_unix(assigns.monotonic_offset)
-    upload = %Upload{secret: secret, timestamp: timestamp}
+    upload = %Upload{encrypted_secret: encrypted_secret, timestamp: timestamp}
     UploadIndex.add(key, upload)
   end
 
@@ -238,8 +247,11 @@ defmodule ChatWeb.LiveHelpers.Uploader do
       :room -> Page.Room.send_file(socket, entry, metadata)
     end
 
+    file_uploads_order = List.delete(socket.assigns.file_uploads_order, uuid)
+
     {:noreply,
      socket
+     |> assign(:file_uploads_order, file_uploads_order)
      |> assign(:uploads_metadata, Map.delete(uploads, uuid))
      |> maybe_resume_next_upload()}
   end
@@ -267,8 +279,12 @@ defmodule ChatWeb.LiveHelpers.Uploader do
       |> Map.put(:destination, file_upload_destination(socket.assigns))
       |> Map.put(:status, status)
 
+    file_uploads_order = socket.assigns.file_uploads_order ++ [entry.uuid]
+    uploads_metadata = Map.put(uploads, entry.uuid, metadata)
+
     uploader_data = %{
       chunk_count: next_chunk,
+      chunk_size: @client_chunk_size,
       status: status
     }
 
@@ -280,7 +296,9 @@ defmodule ChatWeb.LiveHelpers.Uploader do
 
     DynamicSupervisor.start_child(UploadSupervisor, child_spec)
 
-    {assign(socket, :uploads_metadata, Map.put(uploads, entry.uuid, metadata)), uploader_data}
+    {socket
+     |> assign(:file_uploads_order, file_uploads_order)
+     |> assign(:uploads_metadata, uploads_metadata), uploader_data}
   end
 
   defp file_upload_destination(%{
@@ -299,13 +317,14 @@ defmodule ChatWeb.LiveHelpers.Uploader do
       |> Enum.filter(fn {_uuid, metadata} -> metadata.status == :active end)
       |> length()
 
-    next_entry =
-      Enum.find(socket.assigns.uploads.file.entries, fn %UploadEntry{} = entry ->
-        case Map.get(uploads, entry.uuid) do
+    next_uuid =
+      Enum.find(socket.assigns.file_uploads_order, fn uuid ->
+        case Map.get(uploads, uuid) do
           nil ->
             false
 
           %UploadMetadata{} = metadata ->
+            entry = Enum.find(socket.assigns.uploads.file.entries, &(&1.uuid == uuid))
             entry.valid? and metadata.status == :pending
         end
       end)
@@ -314,11 +333,11 @@ defmodule ChatWeb.LiveHelpers.Uploader do
       active_uploads >= @max_concurrent_uploads ->
         socket
 
-      is_nil(next_entry) ->
+      is_nil(next_uuid) ->
         socket
 
       true ->
-        resume_upload(socket, %{"uuid" => next_entry.uuid})
+        resume_upload(socket, %{"uuid" => next_uuid})
     end
   end
 end

@@ -11,15 +11,18 @@ defmodule Chat.MixProject do
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
-      test_coverage: [
-        ignore_modules: [ChatWeb.ChannelCase, ChatWeb.Gettext, ChatWeb.Router],
-        summary: [threshold: 62]
-      ],
+      test_coverage: [tool: ExCoveralls],
+      dialyzer: [plt_add_apps: [:ex_unit]],
       releases: [
         chat: [
           version: build_version(),
           applications: [chat: :permanent]
         ]
+      ],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.html": :test
       ]
     ]
   end
@@ -30,7 +33,7 @@ defmodule Chat.MixProject do
   def application do
     [
       mod: {Chat.Application, []},
-      extra_applications: [:logger, :runtime_tools, :curvy]
+      extra_applications: [:logger, :runtime_tools, :curvy, :os_mon]
     ]
   end
 
@@ -43,39 +46,57 @@ defmodule Chat.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
-      # {:flame_on, "~> 0.5.2"},
-      {:poison, "~> 5.0"},
-      {:phoenix_ecto, "~> 4.0"},
-      {:ecto, "~> 3.7"},
-      {:temp, "~> 0.4.7"},
-      {:termit, "~> 2.0"},
-      {:tzdata, "~> 1.1"},
+      # Chat deps
       {:qr_code, "~> 2.2.1"},
       {:cubdb, "~> 2.0"},
       {:curvy, "~> 0.3.1"},
       {:struct_access, "~> 1.1"},
       {:uuid, "~> 1.1"},
-      {:x509, "~> 0.8"},
-      {:phoenix, "~> 1.7.0-rc.2", override: true},
-      {:phoenix_html, "~> 3.0"},
+      {:ip, "~> 2.0"},
+      {:slipstream, "~> 1.1"},
+      {:onvif, github: "sergey-lukianov/onvif"},
+      {:keyx, "~> 0.4.1"},
+      {:combinatorics, "~> 0.1.0"},
+      {:timex, "~> 3.7"},
+      {:tzdata, "~> 1.1"},
+
+      # Phoenix
+      {:phoenix, "~> 1.7.2"},
+      {:phoenix_html, "~> 4.0"},
+      {:phoenix_html_helpers, "~> 1.0"},
       {:phoenix_view, "~> 2.0"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 0.18.3"},
-      {:floki, ">= 0.30.0", only: :test},
-      {:phoenix_live_dashboard, "~> 0.7.2"},
-      {:esbuild, "~> 0.3", runtime: Mix.env() == :dev && Mix.target() == :host},
-      {:telemetry_metrics, "~> 0.6"},
-      {:telemetry_poller, "~> 1.0"},
+      {:phoenix_live_view, "~> 0.18"},
+      {:phoenix_ecto, "~> 4.0"},
+      {:ecto, "~> 3.7"},
+      {:plug_cowboy, "~> 2.5"},
+      {:phoenix_live_dashboard, "~> 0.7"},
       {:gettext, "~> 0.18"},
       {:jason, "~> 1.2"},
-      {:plug_cowboy, "~> 2.5"},
+
+      # Build tooling
+      {:esbuild, "~> 0.3", runtime: Mix.env() == :dev && Mix.target() == :host},
+      {:tailwind, "~> 0.1", runtime: Mix.env() == :dev},
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
       {:sobelow, "~> 0.8", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
-      {:tailwind, "~> 0.1", runtime: Mix.env() == :dev},
-      {:timex, "~> 3.7"},
+      {:excoveralls, "~> 0.14", only: [:test]},
+      {:rewire, "~> 0.9", only: [:test]},
+      {:live_isolated_component, "~> 0.8.0", only: [:dev, :test]},
+
+      # other
+      {:absinthe, "~> 1.7"},
+      {:absinthe_plug, "~> 1.5"},
+      {:neuron, "~> 5.1"},
+      {:temp, "~> 0.4.7"},
+      {:floki, ">= 0.30.0", only: :test},
+      {:telemetry_metrics, "~> 1.0"},
+      {:telemetry_poller, "~> 1.0"},
+      {:mock, "~> 0.3.0", only: :test},
       {:zstream, "~> 0.6"},
-      {:ua_parser, github: "beam-community/ua_parser"}
+      {:ua_parser, github: "beam-community/ua_parser"},
+      {:httpoison, "~> 2.0"},
+      {:tesla, "~> 1.7"}
     ]
   end
 

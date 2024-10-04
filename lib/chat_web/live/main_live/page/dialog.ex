@@ -5,11 +5,15 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
   import ChatWeb.MainLive.Page.Shared
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [consume_uploaded_entry: 3, push_event: 3, send_update: 2]
+
+  import Phoenix.LiveView,
+    only: [consume_uploaded_entry: 3, push_event: 3, send_update: 2, push_patch: 2]
 
   use ChatWeb, :component
 
+  alias Chat.AdminRoom
   alias Chat.Broker
+  alias Chat.Card
   alias Chat.ChunkedFiles
   alias Chat.Content.Memo
   alias Chat.Content.RoomInvites
@@ -19,13 +23,13 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.Log
   alias Chat.MemoIndex
   alias Chat.Messages
-  alias Chat.RoomInviteIndex
   alias Chat.Rooms
+  alias Chat.Sync.DbBrokers
   alias Chat.Upload.UploadMetadata
   alias Chat.User
+  alias Chat.Utils
   alias Chat.Utils.StorageId
 
-  alias ChatWeb.MainLive.Layout
   alias ChatWeb.MainLive.Page
 
   alias Phoenix.PubSub
@@ -39,16 +43,12 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def init(%{assigns: %{me: me, monotonic_offset: time_offset}} = socket, user_id) do
-    ["[dialog] ", "init"] |> Logger.debug()
-
     time = Chat.Time.monotonic_to_unix(time_offset)
     peer = User.by_id(user_id |> Base.decode16!(case: :lower))
     dialog = Dialogs.find_or_open(me, peer)
 
-    ["[dialog] ", "before subscribe"] |> Logger.debug()
     PubSub.subscribe(Chat.PubSub, dialog |> dialog_topic())
     Log.open_direct(me, time, peer)
-    ["[dialog] ", "before assigns"] |> Logger.debug()
 
     socket
     |> assign(:page, 0)
@@ -60,6 +60,11 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:last_load_timestamp, nil)
     |> assign(:message_update_mode, :replace)
     |> assign_messages()
+    |> send_js(open_content())
+    |> push_patch(to: "/")
+  rescue
+    _ ->
+      socket |> push_patch(to: "/")
   end
 
   def load_more_messages(%{assigns: %{page: page}} = socket) do
@@ -180,8 +185,9 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> Messages.Text.new(time)
     |> Dialogs.update_message(msg_id, me, dialog)
     |> MemoIndex.add(dialog, me)
-
-    broadcast_message_updated(msg_id, dialog, me, time)
+    |> Dialogs.on_saved(dialog, fn ->
+      broadcast_message_updated(msg_id, dialog, me, time)
+    end)
 
     socket
     |> cancel_edit()
@@ -246,6 +252,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   defp maybe_redirect_to_file(%{type: type, content: json}, socket)
        when type in [:audio, :file, :image, :video] do
     {file_id, secret} = StorageId.from_json(json)
+    file_id = Base.encode16(file_id, case: :lower)
     params = %{a: Base.url_encode64(secret)}
 
     url =
@@ -279,28 +286,35 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     push_event(socket, "chat:redirect", %{url: url(~p"/get/zip/#{key}")})
   end
 
-  def accept_room_invite(%{assigns: %{me: me, dialog: dialog, rooms: rooms}} = socket, message_id) do
-    new_room_identitiy =
-      Dialogs.read_message(dialog, message_id, me)
-      |> then(fn %{type: :room_invite, content: json} -> json end)
+  def accept_room_invite(
+        %{assigns: %{room_map: room_map}} = socket,
+        %{type: :room_invite, content: content} = msg,
+        render_fun
+      ) do
+    new_room_identity =
+      content
       |> StorageId.from_json()
       |> RoomInvites.get()
       |> Identity.from_strings()
 
-    if rooms |> Enum.any?(&(&1.private_key == new_room_identitiy.private_key)) do
+    if Map.has_key?(room_map, Identity.pub_key(new_room_identity)) do
       socket
     else
       socket
-      |> store_room_key_copy(new_room_identitiy)
-      |> Page.Login.store_new_room(new_room_identitiy)
-      |> Page.Lobby.refresh_room_list()
+      |> Page.Room.store_new(new_room_identity)
+      |> update_invite_navigation(msg, new_room_identity, render_fun)
     end
   rescue
     _ -> socket
   end
 
+  def accept_room_invite(%{assigns: %{me: me, dialog: dialog}} = socket, message_id, render_fun) do
+    socket
+    |> accept_room_invite(Dialogs.read_message(dialog, message_id, me), render_fun)
+  end
+
   def accept_room_invite_and_open_room(
-        %{assigns: %{me: me, dialog: dialog, room_map: rooms}} = socket,
+        %{assigns: %{me: me, dialog: dialog, room_map: room_map}} = socket,
         message_id
       ) do
     new_room_identity =
@@ -310,27 +324,35 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       |> RoomInvites.get()
       |> Identity.from_strings()
 
-    if rooms[new_room_identity.public_key].private_key == new_room_identity.private_key do
+    socket =
+      if Map.has_key?(room_map, Identity.pub_key(new_room_identity)) do
+        socket
+      else
+        socket
+        |> Page.Room.store_new(new_room_identity)
+      end
+      |> close()
+
+    if new_room_identity.public_key == AdminRoom.pub_key() do
       socket
+      |> Page.Lobby.switch_lobby_mode("admin")
+      |> tap(fn _ -> DbBrokers.broadcast_refresh() end)
     else
       socket
-      |> store_room_key_copy(new_room_identity)
-      |> Page.Login.store_new_room(new_room_identity)
-      |> Page.Lobby.refresh_room_list()
+      |> Page.Room.init(
+        {new_room_identity, new_room_identity |> Identity.pub_key() |> Rooms.get()}
+      )
     end
-    |> close()
-    |> Page.Room.init({new_room_identity, new_room_identity |> Identity.pub_key() |> Rooms.get()})
   rescue
     _ -> socket
   end
 
-  def store_room_key_copy(%{assigns: %{me: me}} = socket, room_identity) do
-    my_notes = Dialogs.find_or_open(me)
-
-    room_identity
-    |> Messages.RoomInvite.new()
-    |> Dialogs.add_new_message(me, my_notes)
-    |> RoomInviteIndex.add(my_notes, me)
+  def accept_all_room_invites(%{assigns: %{dialog: dialog, me: me}} = socket) do
+    Dialogs.list_room_invites(dialog, me)
+    |> Enum.reverse()
+    |> Enum.each(fn invite ->
+      send(self(), {:dialog, {:accept_room_invite, invite}})
+    end)
 
     socket
   end
@@ -349,18 +371,25 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def open_image_gallery(socket, msg_id) do
-    send_update(Layout.ImageGallery, id: "imageGallery", action: :open, incoming_msg_id: msg_id)
+    send_update(Page.ImageGallery, id: "imageGallery", action: :open, incoming_msg_id: msg_id)
     socket
   end
 
   def image_gallery_preload_next(socket) do
-    send_update(Layout.ImageGallery, id: "imageGallery", action: :preload_next)
+    send_update(Page.ImageGallery, id: "imageGallery", action: :preload_next)
 
     socket
   end
 
+  def show_link_modal(%{assigns: %{}} = socket, hash, component) do
+    chat_url = [ChatWeb.Endpoint.url(), "chat", hash] |> Path.join()
+
+    socket
+    |> open_modal(component, %{url: chat_url, encoded_qr_code: Utils.qr_base64_from_url(chat_url)})
+  end
+
   def image_gallery_preload_prev(socket) do
-    send_update(Layout.ImageGallery, id: "imageGallery", action: :preload_prev)
+    send_update(Page.ImageGallery, id: "imageGallery", action: :preload_prev)
 
     socket
   end
@@ -391,10 +420,8 @@ defmodule ChatWeb.MainLive.Page.Dialog do
          %{assigns: %{dialog: dialog, me: me, last_load_timestamp: timestamp}} = socket,
          per_page
        ) do
-    ["[dialog] ", "before msg read"] |> Logger.debug()
     messages = Dialogs.read(dialog, me, {timestamp, 0}, per_page + 1)
     page_messages = Enum.take(messages, -per_page)
-    ["[dialog] ", "after msg read"] |> Logger.debug()
 
     socket
     |> assign(:messages, page_messages)
@@ -440,5 +467,25 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     socket
     |> assign(:messages, [])
     |> assign(:message_update_mode, :append)
+  end
+
+  defp update_invite_navigation(
+         %{assigns: %{room_map: room_map}} = socket,
+         msg,
+         room_identity,
+         render_fun
+       ) do
+    room_hash = room_identity |> Card.from_identity() |> Enigma.short_hash()
+    room_key = room_identity |> Identity.pub_key()
+
+    socket
+    |> push_event("chat:bulk-change", %{
+      to: ".x-invite-navigation[data-room='#{room_hash}']",
+      content:
+        render_to_html_string(
+          %{msg: msg, room_key: room_key, room_keys: Map.keys(room_map)},
+          render_fun
+        )
+    })
   end
 end

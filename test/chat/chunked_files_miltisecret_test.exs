@@ -6,7 +6,8 @@ defmodule Chat.ChunkedFilesMultisecretTest do
   alias Chat.Db
   alias Chat.Db.ChangeTracker
 
-  @hundred_chunks_size 1000 * 1024 * 1024
+  @chunk_size Application.compile_env(:chat, :file_chunk_size)
+  @hundred_chunks_size 100 * @chunk_size
 
   describe "multi-secret for files up to 1GB" do
     setup do
@@ -46,7 +47,7 @@ defmodule Chat.ChunkedFilesMultisecretTest do
   end
 
   def generate(file_size) do
-    file_key = UUID.uuid4()
+    file_key = UUID.uuid4() |> Enigma.hash()
     initial_secret = ChunkedFiles.new_upload(file_key)
     ChunkedFilesMultisecret.generate(file_key, file_size, initial_secret)
     ChangeTracker.await()

@@ -19,9 +19,10 @@ defmodule ChatWeb.MainLive.Layout.Message do
   alias Chat.Messages.ExportHelper
   alias Chat.Rooms.Room
   alias Chat.User
+  alias Chat.Utils
   alias Chat.Utils.StorageId
   alias ChatWeb.MainLive.Layout
-  alias Phoenix.HTML.Tag
+  alias ChatWeb.Utils, as: WebUtils
   alias Phoenix.LiveView.JS
 
   attr :author, Card, doc: "message author card"
@@ -34,8 +35,8 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :my_id, :string, doc: "current user's ID - used only for :room chat type"
   attr :peer, Card, doc: "the other user - used only for :dialog chat type"
   attr :room, Room, default: nil, doc: "room access was requested to"
-  attr :timezone, :string, required: true, doc: "needed to render the timestamp"
   attr :room_keys, :map, default: [], doc: "the list of room keys"
+  attr :linked, :boolean, default: false, doc: "link indicator"
 
   def message_block(assigns) do
     assigns =
@@ -51,22 +52,28 @@ defmodule ChatWeb.MainLive.Layout.Message do
         %{chat_type: :dialog, is_mine?: is_mine?, me: me, peer: peer} ->
           (is_mine? && Card.from_identity(me)) || peer
 
-        %{chat_type: :room, msg: msg} ->
-          User.by_id(msg.author_key)
+        %{chat_type: :room, msg: msg, room: room} ->
+          User.by_id(msg.author_key) ||
+            (msg.author_key == room.pub_key && Card.new(room.name, room.pub_key)) ||
+            Card.new("", msg.author_key)
       end)
       |> assign_new(:dynamic_attrs, fn
         %{export?: true} ->
           []
 
         %{chat_type: chat_type, export?: false, is_mine?: is_mine?, msg: msg} ->
-          [
-            phx_click:
+          %{
+            "phx-click" =>
               JS.dispatch("chat:select-message", detail: %{chatType: Atom.to_string(chat_type)}),
-            phx_value_id: msg.id,
-            phx_value_index: msg.index,
-            phx_value_is_mine: Atom.to_string(is_mine?),
-            phx_value_type: chat_type
-          ]
+            "phx-value-id" => msg.id,
+            "phx-value-index" => msg.index,
+            "phx-value-is-mine" => Atom.to_string(is_mine?),
+            "phx-value-type" => chat_type
+          }
+      end)
+      |> assign_new(:linkable?, fn
+        %{chat_type: :room, room: room} -> room.type == :public
+        _ -> false
       end)
       |> assign_file()
 
@@ -92,12 +99,14 @@ defmodule ChatWeb.MainLive.Layout.Message do
           receiver={assigns[:peer]}
           room={@room}
           room_keys={@room_keys}
-          timezone={@timezone}
+          linked={@linked}
+          linkable?={@linkable?}
         />
       </div>
 
       <%= unless @export? do %>
         <input
+          onclick="event.stopPropagation(); event.preventDefault();"
           type="checkbox"
           class="selectCheckbox w-6 h-6 ml-3 mt-3 rounded-full text-purple/90 bg-black/10 border-gray-300 focus:ring-2 t-selectCheckbox"
         />
@@ -145,7 +154,8 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :receiver, Card, doc: "peer in dialog"
   attr :room, Room, default: nil, doc: "room access was requested to"
   attr :room_keys, :map, doc: "the list of room keys"
-  attr :timezone, :string, required: true, doc: "needed to render the timestamp"
+  attr :linked, :boolean, default: false, doc: "link indicator"
+  attr :linkable?, :boolean, default: false, doc: "linkable? Only for public rooms"
 
   defp message(%{msg: %{type: :audio}} = assigns) do
     ~H"""
@@ -161,8 +171,12 @@ defmodule ChatWeb.MainLive.Layout.Message do
         file={@file}
         is_mine?={@is_mine?}
         msg={@msg}
+        linkable?={@linkable?}
       />
-      <.timestamp msg={@msg} timezone={@timezone} />
+      <div class="flex justify-end">
+        <.message_link msg_index={@msg.index} msg_id={@msg.id} linked={@linked} />
+        <.timestamp msg={@msg} />
+      </div>
       <.audio export?={@export?} file={@file} msg={@msg} />
       <.media_file_info file={@file} />
     </div>
@@ -182,9 +196,13 @@ defmodule ChatWeb.MainLive.Layout.Message do
         file={@file}
         is_mine?={@is_mine?}
         msg={@msg}
+        linkable?={@linkable?}
       />
       <.file export?={@export?} file={@file} msg={@msg} />
-      <.timestamp msg={@msg} timezone={@timezone} />
+      <div class="flex justify-end">
+        <.message_link msg_index={@msg.index} msg_id={@msg.id} linked={@linked} />
+        <.timestamp msg={@msg} />
+      </div>
     </div>
     """
   end
@@ -202,8 +220,12 @@ defmodule ChatWeb.MainLive.Layout.Message do
         file={@file}
         is_mine?={@is_mine?}
         msg={@msg}
+        linkable?={@linkable?}
       />
-      <.timestamp msg={@msg} timezone={@timezone} />
+      <div class="flex justify-end">
+        <.message_link msg_index={@msg.index} msg_id={@msg.id} linked={@linked} />
+        <.timestamp msg={@msg} />
+      </div>
       <.image chat_type={@chat_type} msg={@msg} export?={@export?} file={@file} />
       <.media_file_info file={@file} />
     </div>
@@ -223,9 +245,13 @@ defmodule ChatWeb.MainLive.Layout.Message do
         file={@file}
         is_mine?={@is_mine?}
         msg={@msg}
+        linkable?={@linkable?}
       />
       <span class="x-content"><.text msg={@msg} /></span>
-      <.timestamp msg={@msg} timezone={@timezone} />
+      <div class="flex justify-end">
+        <.message_link msg_index={@msg.index} msg_id={@msg.id} linked={@linked} />
+        <.timestamp msg={@msg} />
+      </div>
     </div>
     """
   end
@@ -237,11 +263,11 @@ defmodule ChatWeb.MainLive.Layout.Message do
       class={"#{@color} max-w-xxs sm:max-w-md min-w-[180px] rounded-lg shadow-lg"}
     >
       <div class="py-1 px-2">
-        <Layout.Card.hashed_name card={@author} style_spec={:room_request_message} />
+        <Layout.Card.hashed_name card={@author} style_spec={:room_request_message} show_link?={true} />
         <p class="inline-flex">requested access to room</p>
-        <Layout.Card.hashed_name room={@room} style_spec={:room_request_message} />
+        <Layout.Card.hashed_name room={@room} style_spec={:room_request_message} show_link?={true} />
       </div>
-      <.timestamp msg={@msg} timezone={@timezone} />
+      <.timestamp msg={@msg} />
     </div>
     """
   end
@@ -268,11 +294,11 @@ defmodule ChatWeb.MainLive.Layout.Message do
           <%= if @receiver == @author do %>
             <p class="inline-flex">You got the key copy of the room</p>
           <% else %>
-            <Layout.Card.hashed_name card={@receiver} style_spec={:room_invite} />
+            <Layout.Card.hashed_name card={@receiver} style_spec={:room_invite} show_link?={true} />
             <p class="inline-flex">is invited by you into</p>
           <% end %>
         <% else %>
-          <Layout.Card.hashed_name card={@author} style_spec={:room_invite} />
+          <Layout.Card.hashed_name card={@author} style_spec={:room_invite} show_link?={true} />
           <p class="inline-flex">wants you to join the room</p>
         <% end %>
         <Layout.Card.hashed_name room={@room_card} style_spec={:room_invite} />
@@ -280,41 +306,20 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
       <%= unless @export? do %>
         <%= if (@is_mine? and @author == @receiver) or not @is_mine? do %>
-          <div class="px-2 my-1 flex items-center justify-between">
-            <%= if @room_card.pub_key in @room_keys do %>
-              <button
-                class="w-full h-12 border-0 rounded-lg bg-grayscale text-white"
-                phx-click="dialog/message/accept-room-invite-and-open-room"
-                phx-value-id={@msg.id}
-                phx-value-index={@msg.index}
-              >
-                Go to Room
-              </button>
-            <% else %>
-              <button
-                class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
-                phx-click="dialog/message/accept-room-invite"
-                phx-value-id={@msg.id}
-                phx-value-index={@msg.index}
-              >
-                Accept
-              </button>
-              <button
-                class="w-[49%] h-12 border-0 rounded-lg bg-grayscale text-white"
-                phx-click="dialog/message/accept-room-invite-and-open-room"
-                phx-value-id={@msg.id}
-                phx-value-index={@msg.index}
-              >
-                Accept and Open
-              </button>
-            <% end %>
+          <div
+            data-room={Enigma.short_hash(@room_card)}
+            class="x-invite-navigation flex flex-col sm:flex-row sm:items-center sm:justify-between px-2 my-1"
+          >
+            <.room_invite_navigation room_key={@room_card.pub_key} room_keys={@room_keys} msg={@msg} />
           </div>
         <% end %>
       <% end %>
 
-      <.timestamp msg={@msg} timezone={@timezone} />
+      <.timestamp msg={@msg} />
     </div>
     """
+  rescue
+    _ -> ~H""
   end
 
   defp message(%{msg: %{type: :video}} = assigns) do
@@ -330,16 +335,18 @@ defmodule ChatWeb.MainLive.Layout.Message do
         file={@file}
         is_mine?={@is_mine?}
         msg={@msg}
+        linkable?={@linkable?}
       />
-      <.timestamp msg={@msg} timezone={@timezone} />
-      <video src={@file.url} class="a-video" controls />
+      <.message_link msg_index={@msg.index} msg_id={@msg.id} linked={@linked} />
+      <.timestamp msg={@msg} />
+      <video src={@file[:url]} class="a-video" controls />
       <.media_file_info file={@file} />
     </div>
     """
   end
 
   defp message(assigns) do
-    ["[message] ", "error rendering ", inspect(assigns[:msg], pretty: true)] |> Logger.warn()
+    ["[message] ", "error rendering ", inspect(assigns[:msg], pretty: true)] |> Logger.warning()
 
     ~H"""
     <!-- error rendering message -->
@@ -352,6 +359,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :file, :map, required: true, doc: "file map"
   attr :is_mine?, :boolean, required: true, doc: "is current user the author of the message?"
   attr :msg, :map, required: true, doc: "message struct"
+  attr :linkable?, :boolean, default: false, doc: "linkable? Only for public rooms"
 
   defp header(assigns) do
     ~H"""
@@ -369,6 +377,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
         file={@file}
         is_mine?={@is_mine?}
         msg={@msg}
+        linkable?={@linkable?}
       />
     </.header_wrapper>
     """
@@ -383,7 +392,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
   defp header_wrapper(%{export?: true, msg_type: type} = assigns) when type in [:audio, :video] do
     ~H"""
-    <.link class={@class} id={@id} href={@file.url}>
+    <.link class={@class} id={@id} href={@file[:url]}>
       <%= render_slot(@inner_block) %>
     </.link>
     """
@@ -405,7 +414,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
   defp header_content(assigns) do
     ~H"""
-    <Layout.Card.hashed_name card={@author} style_spec={:message_header} />
+    <Layout.Card.hashed_name card={@author} style_spec={:message_header} show_link?={true} />
     <button
       type="button"
       class="messageActionsDropdownButton hiddenUnderSelection t-message-dropdown"
@@ -494,25 +503,87 @@ defmodule ChatWeb.MainLive.Layout.Message do
           <span>Download</span>
         </a>
       <% end %>
+      <%= if @linkable? do %>
+        <a
+          class="dropdownItem t-link-action"
+          phx-click={
+            hide_dropdown("messageActionsDropdown-#{@msg.id}") |> JS.push("room/message/link")
+          }
+          phx-value-id={@msg.id}
+          phx-value-index={@msg.index}
+        >
+          <.icon id="link" class="w-4 h-4 flex fill-black stroke-black stroke-2" />
+          <span>Link</span>
+        </a>
+      <% end %>
     </.dropdown>
     """
   end
 
+  attr :room_key, :string, required: true, doc: "room public key"
+  attr :room_keys, :list, required: true, doc: "room_map keys"
   attr :msg, :map, required: true, doc: "message struct"
-  attr :timezone, :string, required: true, doc: "user's timezone"
+
+  def room_invite_navigation(assigns) do
+    ~H"""
+    <%= if @room_key in @room_keys do %>
+      <button
+        class="w-full h-12 border-0 rounded-lg bg-grayscale text-white"
+        phx-click="dialog/message/accept-room-invite-and-open-room"
+        phx-value-id={@msg.id}
+        phx-value-index={@msg.index}
+      >
+        Go to Room
+      </button>
+    <% else %>
+      <button
+        class="acceptInviteButton w-full sm:w-[30%] h-12 border-0 rounded-lg bg-grayscale text-white mb-2 sm:mb-0 sm:mr-2"
+        phx-click="dialog/message/accept-room-invite"
+        phx-value-id={@msg.id}
+        phx-value-index={@msg.index}
+      >
+        Accept
+      </button>
+      <button
+        class="w-full sm:w-[40%] h-12 border-0 rounded-lg bg-grayscale text-white mb-2 sm:mb-0 sm:mr-2"
+        phx-click="dialog/message/accept-room-invite-and-open-room"
+        phx-value-id={@msg.id}
+        phx-value-index={@msg.index}
+      >
+        Accept and Open
+      </button>
+      <button
+        class="w-full sm:w-[30%] h-12 border-0 rounded-lg bg-grayscale text-white mb-2 sm:mb-0 sm:mr-2"
+        phx-click="dialog/message/accept-all-room-invites"
+      >
+        Accept all
+      </button>
+    <% end %>
+    """
+  end
+
+  attr :msg, :map, required: true, doc: "message struct"
 
   defp timestamp(assigns) do
-    assigns =
-      assign_new(assigns, :time, fn %{msg: %{timestamp: timestamp}, timezone: timezone} ->
-        timestamp
-        |> DateTime.from_unix!()
-        |> DateTime.shift_zone!(timezone)
-        |> Timex.format!("{h12}:{0m} {AM}, {D}.{M}.{YYYY}")
-      end)
-
     ~H"""
     <div class="px-2 text-grayscale600 flex justify-end mr-1" style="font-size: 10px;">
-      <%= @time %>
+      <time-stamp><%= @msg.timestamp %></time-stamp>
+    </div>
+    """
+  end
+
+  def message_link(assigns) do
+    ~H"""
+    <div class="link-status">
+      <%= if @linked do %>
+        <a
+          phx-click="room/message/share-link-modal"
+          phx-value-id={@msg_id}
+          phx-value-index={@msg_index}
+        >
+          <.icon id="link" class="w-3 h-3 fill-black/50 stroke-black stroke-2" />
+        </a>
+      <% end %>
     </div>
     """
   end
@@ -531,22 +602,26 @@ defmodule ChatWeb.MainLive.Layout.Message do
     })
   end
 
-  defp assign_file(%{msg: %{content: json, type: type}} = assigns)
-       when type in [:audio, :file, :image, :video] do
-    {id, secret} = StorageId.from_json(json)
-    [_, _, _, _, name, size] = Files.get(id, secret)
-
-    assign(assigns, :file, %{
-      name: name,
-      size: size,
-      url: get_file_url(id, secret)
-    })
-  end
-
-  defp assign_file(assigns), do: assign(assigns, :file, nil)
-
-  defp get_file_url(id, secret) do
-    ~p"/get/file/#{Base.encode16(id, case: :lower)}?a=#{Base.url_encode64(secret)}"
+  defp assign_file(%{msg: %{content: json, type: type}} = assigns) do
+    with true <- type in [:audio, :image, :video, :file],
+         {id, secret} <- StorageId.from_json(json),
+         [_, _, _, _, name, size] <- Files.get(id, secret),
+         true <- String.valid?(name),
+         true <- String.valid?(size) do
+      %{
+        name: name,
+        size: size,
+        url: WebUtils.get_file_url(:file, id, secret)
+      }
+    else
+      _ ->
+        %{
+          name: "Broken file",
+          size: "n/a",
+          url: nil
+        }
+    end
+    |> then(&assign(assigns, :file, &1))
   end
 
   attr :export?, :boolean, required: true, doc: "embed file icon SVG?"
@@ -554,23 +629,24 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :msg, :map, required: true, doc: "message struct"
 
   defp file(assigns) do
-    ~H"""
-    <.link class="flex items-center justify-between" href={@file.url}>
-      <.file_icon export?={@export?} />
+    if assigns.file do
+      ~H"""
+      <.link class="flex items-center justify-between" href={@file.url}>
+        <.file_icon export?={@export?} />
 
-      <div class="w-36 flex flex-col pr-3">
-        <span class="truncate text-xs x-file" href={@file.url}><%= @file.name %></span>
-        <span class="text-xs text-black/50 whitespace-pre-line"><%= @file.size %></span>
-      </div>
-    </.link>
-    """
-  rescue
-    _ ->
+        <div class="w-36 flex flex-col pr-3">
+          <span class="truncate text-xs x-file" href={@file.url}><%= @file.name %></span>
+          <span class="text-xs text-black/50 whitespace-pre-line"><%= @file.size %></span>
+        </div>
+      </.link>
+      """
+    else
       ~H"""
       <div class="flex items-center justify-between">
         Error getting file
       </div>
       """
+    end
   end
 
   attr :export?, :boolean, required: true, doc: "embed SVG?"
@@ -665,19 +741,16 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   defp image(assigns) do
-    # {JS.dispatch("chat:toggle", detail: %{class: "preview"})
-    #  |> JS.add_class("hidden", to: "#dialogInput")
-    #  |> JS.add_class("md:hidden", to: "#chatRoomBar")
-    #  |> JS.add_class("hidden", to: "#chatContent")
-    #  |> JS.remove_class("hidden", to: "#imageGallery")
-    #  |> JS.remove_class("overflow-scroll", to: "#chatContent")}
     ~H"""
     <img
       class="object-cover overflow-hidden"
-      src={@file.url}
+      src={@file[:url]}
+      id={"chat-image-#{@msg.id}"}
+      loading="lazy"
       phx-click={open_gallery(@chat_type)}
       phx-value-id={@msg.id}
       phx-value-index={@msg.index}
+      phx-hook="ImageForceLoader"
     />
     """
   end
@@ -689,19 +762,5 @@ defmodule ChatWeb.MainLive.Layout.Message do
     |> JS.remove_class("hidden", to: "#imageGallery")
   end
 
-  defp nl2br(str) do
-    str
-    |> String.trim()
-    |> String.split("\n", trim: false)
-    |> Enum.reduce({[], :none}, fn part, {good, count} ->
-      case {part, count} do
-        {"", :enough} -> {good, :enough}
-        {"", :none} -> {[part | good], :enough}
-        _ -> {[part | good], :none}
-      end
-    end)
-    |> elem(0)
-    |> Enum.reverse()
-    |> Enum.intersperse(Tag.tag(:br))
-  end
+  defp nl2br(str), do: Utils.trim_text(str) |> Enum.intersperse(tag(:br))
 end

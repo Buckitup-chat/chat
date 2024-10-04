@@ -3,7 +3,6 @@ defmodule Chat.Db.CopyingTest do
 
   alias Chat.ChunkedFiles
   alias Chat.Db
-  alias Chat.Db.ChangeTracker
   alias Chat.Db.Copying
   alias Chat.Db.InternalDb
   alias Chat.Db.MainDb
@@ -50,14 +49,13 @@ defmodule Chat.Db.CopyingTest do
         [key | keys]
       end)
 
-    key = UUID.uuid4()
+    key = UUID.uuid4() |> Enigma.hash()
     _secret = ChunkedFiles.new_upload(key)
 
     first = "some part of info "
     second = "another part"
 
     ChunkedFiles.save_upload_chunk(key, {0, 17}, 30, first)
-    ChangeTracker.await()
     ChunkedFiles.save_upload_chunk(key, {18, 29}, 30, second)
 
     keys

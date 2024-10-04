@@ -2,41 +2,49 @@ defmodule ChatWeb.DeviceLogController do
   @moduledoc "Backup functionality that should be moved into system secret room"
   use ChatWeb, :controller
 
-  alias Phoenix.PubSub
+  alias Chat.AdminDb.AdminLogger
 
-  @incoming_topic "platform->chat"
-  @outgoing_topic "chat->platform"
+  @incoming_topic Application.compile_env!(:chat, :topic_from_platform)
+  @outgoing_topic Application.compile_env!(:chat, :topic_to_platform)
 
   def log(conn, _) do
-    PubSub.subscribe(Chat.PubSub, @incoming_topic)
-    PubSub.broadcast(Chat.PubSub, @outgoing_topic, :get_device_log)
+    Phoenix.PubSub.subscribe(Chat.PubSub, @incoming_topic)
+    Phoenix.PubSub.broadcast(Chat.PubSub, @outgoing_topic, :get_device_log)
 
-    body =
-      receive do
-        {:platform_response, {:device_log, {ram_log, log}}} ->
-          first =
-            if ram_log do
-              ram_log <> "\n-----------------------------\n\n"
-            else
-              ""
-            end
+    receive do
+      {:platform_response, {:device_log, {ram_log, log}}} ->
+        first =
+          if ram_log do
+            ram_log <> "\n-----------------------------\n\n"
+          else
+            ""
+          end
 
-          second =
-            Enum.map_join(log, "\n", fn {level, {_module, msg, {{a, b, c}, {d, e, f, g}}, _extra}} ->
-              date = NaiveDateTime.new!(a, b, c, d, e, f, g * 1000)
+        second =
+          Enum.map_join(log, "\n", fn
+            {level, {_module, msg, extended_erl_date, _extra}} ->
+              date = convert_extended_erl_date(extended_erl_date)
               "#{date} [#{level}] #{msg}"
-            end)
 
-          first <> second
-      after
-        :timer.seconds(10) ->
-          "Timeout"
-      end
+            %{message: msg, level: level, timestamp: extended_erl_date} ->
+              date = convert_extended_erl_date(extended_erl_date)
+              "#{date} [#{level}] #{msg}"
 
-    conn
-    # |> put_resp_header("content-disposition", "attachment; filename=\"device_log.txt\"")
-    |> put_resp_content_type("text/plain")
-    |> send_resp(200, body)
+            x ->
+              "!!!!!!!! #{inspect(x)}"
+          end)
+
+        first <> second
+    after
+      :timer.seconds(10) ->
+        "Timeout"
+    end
+    |> send_text(conn)
+
+    # conn
+    # # |> put_resp_header("content-disposition", "attachment; filename=\"device_log.txt\"")
+    # |> put_resp_content_type("text/plain")
+    # |> send_resp(200, body)
   end
 
   def reset(conn, _) do
@@ -54,12 +62,47 @@ defmodule ChatWeb.DeviceLogController do
   end
 
   def dump_data_keys(conn, _) do
-    body =
-      Chat.Db.db()
-      |> CubDB.select()
-      |> Stream.map(fn {key, _} -> inspect(key) end)
-      |> Enum.join("\n")
+    Chat.Db.db()
+    |> CubDB.select()
+    |> Stream.map(fn {key, _} -> inspect(key) end)
+    |> Enum.join("\n")
+    |> send_text(conn)
+  end
 
+  def db_log(conn, _) do
+    AdminLogger.get_log()
+    |> format_db_log()
+    |> send_text(conn)
+  end
+
+  def db_log_prev(conn, _) do
+    AdminLogger.get_log(:prev)
+    |> format_db_log()
+    |> send_text(conn)
+  end
+
+  def db_log_prev_prev(conn, _) do
+    AdminLogger.get_log(:prev_prev)
+    |> format_db_log()
+    |> send_text(conn)
+  end
+
+  defp format_db_log(log) do
+    log
+    |> Enum.map_join("\n", fn {_, {extended_erl_date, level, io_list}} ->
+      extended_erl_date
+      |> convert_extended_erl_date()
+      |> NaiveDateTime.to_string()
+      |> then(&[&1, " [", level |> to_string(), "] ", io_list])
+      |> IO.iodata_to_binary()
+    end)
+  end
+
+  defp convert_extended_erl_date({{a, b, c}, {d, e, f, g}}) do
+    NaiveDateTime.new!(a, b, c, d, e, f, g * 1000)
+  end
+
+  defp send_text(body, conn) do
     conn
     |> put_resp_content_type("text/plain")
     |> send_resp(200, body)

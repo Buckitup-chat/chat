@@ -2,8 +2,9 @@ defmodule ChatWeb.ErrorHelpers do
   @moduledoc """
   Conveniences for translating and building error messages.
   """
+  use PhoenixHTMLHelpers
 
-  use Phoenix.HTML
+  import Phoenix.HTML.Form
 
   @doc """
   Generates tag for inlined form input errors.

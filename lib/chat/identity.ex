@@ -1,7 +1,10 @@
 defmodule Chat.Identity do
   @moduledoc "Identity to be stored on user device. Can be used for User as well as for Room"
 
+  @type t :: %__MODULE__{}
+
   @derive {Inspect, only: [:name]}
+
   defstruct [:name, :private_key, :public_key]
 
   def create(name) do
@@ -36,6 +39,14 @@ defmodule Chat.Identity do
         public_key: public
       }
     end)
+  end
+
+  def from_keys(%{private_key: private, public_key: public}) do
+    %__MODULE__{
+      name: "",
+      private_key: private,
+      public_key: public
+    }
   end
 end
 

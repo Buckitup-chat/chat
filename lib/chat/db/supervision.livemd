@@ -35,13 +35,13 @@ This approach used in all DB Supervisors. Each handles its own DB, otherwise the
 
 * `Chat.Db.InternalDbSupervisor`
 * `Chat.Db.MainDbSupervisor`
-* `Chat.Db.BackupDbSupervisor`
+* `Chat.Db.MediaDbSupervisor`
 
 ## Device Supervision
 
 Device managing happens in `Platform` project. (It incorporates `Chat` as dependency)
 
-Here is a bit simplified supervision tree.
+Here is a simplified supervision tree.
 
 <!-- livebook:{"break_markdown":true} -->
 
@@ -52,7 +52,7 @@ graph LR;
   subgraph Chat
     ids(InternalDbSupervisor)
     mds(MainDbSupervisor)
-    bds(BackupDbSupervisor)
+    meds(MediaDbSupervisor)
     ca(Application)
 
     ca -.-> ids
@@ -61,40 +61,80 @@ graph LR;
   pa(Application)
   ds(DeviceSupervisor)
   cb[ChatBridge]
-  uw[UsbWatcher]
-  dmds{{DynamicMainDbSupervisor}}
-  dms{{DynamicMediaSupervisor}}
-  pmds(Platform MainDbSupervisor)
-  pms(Platform MediaSupervisor)
-  mmds(Chat MainDbSupervisor)
-  bbds(Chat BackupDbSupervisor)
+  di[DriveIndication]
+  drive_sup{{Drives}}
+  dr[Drives.Registry]
+  udd[UsbDrives.Detector]
 
-  pa --> ds
   pa --> cb
+  pa --> di
+  pa --> ds
 
-  ds --> dmds --> pmds
-  ds --> dms --> pms
-  ds --> uw
+  ds --> drive_sup
+  ds --> dr
+  ds --> udd
 
-  pmds ---> mmds
-  pms -..- bbds
+  drive_sup -..-> mds
+  drive_sup -..-> meds
+```
 
-  mmds -..- mds
-  bbds -..- bds
+<!-- livebook:{"break_markdown":true} -->
+
+`DriveIndication` handles extra LED indication hardware
+
+`ChatBridge` lets Chat to talk to Platform. Wifi setting and drives interaction are possible here.
+
+`UsbDrives.Detector` polls filesystem for USB devices plug/unplug.
+
+`Drives.Registry` registers processes used in drive dedicated subtrees.
+
+`Drives`  - supervises detected drives. We need Dynamic Supervisors to start or shutdown supervision subtrees, since devices are not always present. Each drive gets its own subtree.
+
+Drive subtree consists of 2 parts.
+
+* Booting - heals filesystem, mounts it and decideces which scenario to run
+* Scenario - supervises given scenario behavior
+
+Depending on scenario, subtree will include `MainDbSupervisor` or `MediaSupervisor` to supervise DB.
+
+<!-- livebook:{"break_markdown":true} -->
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph TD;
+  ds{{Drives}}
+  bs(Boot)
+  dis[DriveIndicationStarter]
+  h[[Healer]]
+  healed{{Healed}}
+  m[[Mounter]]
+  mounted{{Mounted}}
+  sc{{Scenario}}
+  d[Decider]
+
+  ds -.-> bs
+  bs --> dis
+  bs --> healed
+  bs --> h
+
+  healed --> m
+  healed --> mounted
+
+  mounted --> sc
+  mounted --> d
 
 ```
 
 <!-- livebook:{"break_markdown":true} -->
 
-`UsbWatcher` subscribes to system events to detect USB devices plug/unplug.
+`DriveIndicationStarter` starts indication on custom hardware and ands it when drive ejected (i.e. this process terminated)
 
-We need Dynamic Supervisors to start or shutdown supervision subtrees, since devices are not always present.
+`Healer` detects FS used on drive and checks FS w/ coresponding tool (FAT, exFAT or F2FS)
 
-`Platform MainDbSupervisor` and `Platform MediaSupervisor` do `rest for one` strategy that will restart all later started peers in case of failing.
+`Mounter` mounts device into device dedicated folder
 
-All the processes marked as mounter traps its exit. I.e. handle its termination. Combining this with `rest_for_one` strategy of supervisor makes it `Plug`-like behaviour in supervisor.
-
-`Chat MainDbSupervisor` and `Chat BackupDbSupervisor` are DB Supervisors from `Chat` application described above.
+`Decider` checks device content and starts according scenario under `Scenario` supervisor.
 
 ## Main drive supervision
 
@@ -106,17 +146,18 @@ graph TD;
   mts(Task.Supervisor)
   mm[[Mounter]]
   mdt[DirTask]
-  mmds(Chat MainDbSupervisor)
+  mds(Chat MainDbSupervisor)
+  mb[[Bouncer]]
   ms[[Starter]]
   mc[[Copier]]
   mr[[Replicator]]
   msw[[Switcher]]
-  mmds(Chat MainDbSupervisor)
 
   pmds --> mts
   pmds --> mm
   pmds --> mdt
-  pmds --> mmds
+  pmds --> mds
+  pmds --> mb
   pmds --> ms
   pmds --> mc
   pmds --> mr
@@ -130,6 +171,8 @@ graph TD;
 `DirTask` ensures that device filesystem has the folder to hold DB.
 
 `Chat MainDbSupervisor` is DB Supervisor from `Chat` application described above.
+
+`Bouncer` prevents DB directory from being renamed.
 
 `Starter` changes global DB status (in application config). And reverts it back when terminated.
 
@@ -158,25 +201,49 @@ graph TD;
   pms --> d
 
   pbds(Platform BackupDbSupervisor)
+  pcss(Platform CargoSyncSupervisor)
   poss(Platform OnlinersSyncSupervisor)
 
   fds ---> pbds
+  fds ---> pcss
   fds ---> poss
 
   bdt[DirTask]
-  bbds(Chat BackupDbSupervisor)
+  bmds(Chat MediaDbSupervisor)
+  bb[[Bouncer]]
   bs[[Starter]]
   bc[[Copier]]
   bst[[Stopper]]
 
   pbds --> bdt
-  pbds --> bbds
+  pbds --> bmds
+  pbds --> bb
   pbds --> bs
   pbds --> bc
   pbds --> bst
 
+  csdt[DirTask]
+  csmds(Chat MediaDbSupervisor)
+  csb[[Bouncer]]
+  css[[Starter]]
+  cscds[[CargoDynamicSupervisor]]
+  csl[[Logic]]
+  csc[[Copier]]
+  csst[[Stopper]]
+
+  pcss --> csdt
+  pcss --> csmds
+  pcss --> csb
+  pcss --> css
+  pcss --> cscds
+  pcss --> csl
+
+  cscds --> csc
+  cscds --> csst
+
   osdt[DirTask]
-  osbds(Chat BackupDbSupervisor)
+  osmds(Chat MediaDbSupervisor)
+  osb[[Bouncer]]
   oss[[Starter]]
   osods[[OnlinersDynamicSupervisor]]
   osl[[Logic]]
@@ -184,7 +251,8 @@ graph TD;
   osst[[Stopper]]
 
   poss --> osdt
-  poss --> osbds
+  poss --> osmds
+  poss --> osb
   poss --> oss
   poss --> osods
   poss --> osl
@@ -198,7 +266,7 @@ graph TD;
 `Mounter` mounts device into folder specified. And unmounts when terminated.
 
 `Decider` figures out which functionality to start under `FunctionalityDynamicSupervisor`.
-It does it by checking whether device contains appropriate directory (`bdb` for backup or `onliners_db` for onliners sync).
+It does it by checking whether device contains appropriate directory (`backup_db` for backup, `cargo_db` for cargo, or `onliners_db` for onliners sync).
 If not, it checks the media settings in the Chat Admin room.
 If it's not set yet, the default functionality is used (backup).
 
@@ -207,7 +275,9 @@ while the unique aspects of the functionalities will be described in the below s
 
 `DirTask` ensures that device filesystem has the folder to hold DB.
 
-`Chat BackupDbSupervisor` is DB Supervisor from `Chat` application described above.
+`Chat MediaDbSupervisor` is DB Supervisor from `Chat` application described above.
+
+`Bouncer` prevents DB directory from being renamed.
 
 `Starter` changes global DB status (in application config). And reverts it back when terminated.
 
@@ -219,6 +289,15 @@ while the unique aspects of the functionalities will be described in the below s
 
 Synchronizes MainDb and BackupDb by copying the data that's available on the
 device, but not in the MainDb and vice versa.
+
+### Platform CargoDbSupervisor
+
+Copies data from the Cargo room. If there's some data on the device, it copies it to the main drive.
+Otherwise, it copies data from the only room on main drive. If the room doesn't exist yet, or if there
+are multiple rooms, it skips copying data.
+
+`Logic` is responsible for deciding which room is for Cargo, then starts `Copier` and `Stopper` under
+`CargoDynamicSupervisor`.
 
 ### Platform OnlinersSyncSupervisor
 

@@ -3,6 +3,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
 
   require Logger
 
+  alias ChatWeb.MainLive.Modals
   alias ChatWeb.MainLive.Page.AdminPanel
 
   #
@@ -14,8 +15,12 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
       {"wifi-submit", %{"ssid" => ssid, "password" => password}} ->
         socket |> AdminPanel.set_wifi(ssid |> String.trim(), password |> String.trim())
 
-      {"invite-new-user", %{"hash" => hash}} ->
-        socket |> AdminPanel.invite_user(hash |> decode)
+      {"show-user-invite-modal", %{"hash" => hash}} ->
+        socket
+        |> AdminPanel.show_user_invite_modal(hash |> decode, Modals.ConfirmInviteToAdminRoom)
+
+      {"confirm-user-invite", %{"hash" => hash}} ->
+        socket |> AdminPanel.confirm_user_invite(hash |> decode)
 
       {"remove-user", %{"hash" => hash}} ->
         socket |> AdminPanel.remove_user(hash |> decode)
@@ -28,6 +33,12 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
 
       {"unmount-main", _} ->
         socket |> AdminPanel.unmount_main()
+
+      {"toggle-gpio24-impendance", _} ->
+        socket |> AdminPanel.toggle_gpio24_impendance()
+
+      {"upgrade-firmware", _} ->
+        socket |> AdminPanel.upgrade_firmware()
     end
   end
 
@@ -48,11 +59,50 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
       {:updated_wifi_settings, _} ->
         socket |> AdminPanel.confirm_wifi_updated()
 
+      {:lan_ip, ip} ->
+        AdminPanel.update_lan_settings(ip: ip)
+        socket
+
+      {:lan_profile, profile} ->
+        AdminPanel.update_lan_settings(profile: profile)
+        socket
+
+      {:lan_known_profiles, list} ->
+        AdminPanel.update_lan_settings(known_profiles: list)
+        socket
+
+      {:updated_lan_profile, :ok} ->
+        socket
+
       {:device_log, log} ->
         socket |> AdminPanel.render_device_log(log)
 
       {:unmounted_main, _} ->
         socket
+
+      :refresh_rooms_and_users ->
+        socket |> AdminPanel.refresh_rooms_and_users()
+
+      {:gpio24_impedance_status, value} ->
+        socket |> AdminPanel.set_gpio24_impedance_status(value)
+
+      {:connect_to_weight_sensor, device_params, opts} ->
+        socket |> AdminPanel.connect_to_weight_sensor(device_params, opts)
+
+      {:weight_sensor_connection, status} ->
+        socket |> AdminPanel.weight_sensor_connection_status(status)
+
+      :upgrade_firmware_confirmation ->
+        socket |> AdminPanel.upgrade_firmware_confirmation()
+
+      :firmware_upgraded ->
+        socket |> AdminPanel.notify_firmware_upgraded()
+
+      {:create_cargo_user, data} ->
+        socket |> AdminPanel.create_cargo_user(data)
+
+      {:network_source_status, source_id, status} ->
+        socket |> AdminPanel.send_network_source_list_update(source_id, status)
     end
   end
 

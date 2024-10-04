@@ -4,7 +4,7 @@ defmodule Support.FakeData do
   alias Phoenix.LiveView.{UploadEntry, Utils}
 
   def file do
-    key = UUID.uuid4()
+    key = UUID.uuid4() |> Enigma.hash()
     secret = Enigma.generate_secret()
 
     %{client_size: 123, client_type: "audio/mp3", client_name: "Some file.ext"}
@@ -12,7 +12,7 @@ defmodule Support.FakeData do
   end
 
   def image(name) do
-    key = UUID.uuid4()
+    key = UUID.uuid4() |> Enigma.hash()
     secret = Enigma.generate_secret()
 
     %{client_size: 123, client_type: "image/jpeg", client_name: name}

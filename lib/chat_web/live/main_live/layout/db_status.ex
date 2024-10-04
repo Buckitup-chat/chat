@@ -70,6 +70,42 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
           />
         </div>
       <% end %>
+      <%= if @status.flags[:cargo] do %>
+        <div class="pb-1">
+          <.icon
+            id="cargo"
+            class={classes("w-9 h-9 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}
+          />
+        </div>
+      <% end %>
+      <%= if @status.flags[:usb_drive_dump] do %>
+        <div class="pb-1">
+          <.icon
+            id="usbDrive"
+            class={classes("w-8 h-8 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}
+          />
+        </div>
+        <div class="absolute inline-block bottom-16">
+          <div class="overflow-hidden rounded-full w-10 h-10">
+            <svg
+              class="absolute top-0 left-0 w-full h-full text-gray-300 a-progress-bar"
+              viewBox="0 0 44 44"
+            >
+              <circle
+                class="fill-transparent stroke-current"
+                stroke-dashoffset={
+                  126 - 126 * (@usb_drive_dump_room[:progress][:percentage] || 0) / 100
+                }
+                stroke-width="4"
+                cx="22"
+                cy="22"
+                r="20"
+              >
+              </circle>
+            </svg>
+          </div>
+        </div>
+      <% end %>
       <!-- <div class="pl-2">
               <.icon id="car" class={classes("w-6 h-6 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}/>
             </div>-->
@@ -144,6 +180,42 @@ defmodule ChatWeb.MainLive.Layout.DbStatus do
             id="replication"
             class={classes("w-6 h-6 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}
           />
+        </div>
+      <% end %>
+      <%= if @status.flags[:cargo] do %>
+        <div class="pb-2 pr-1">
+          <.icon
+            id="cargo"
+            class={classes("w-8 h-8 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}
+          />
+        </div>
+      <% end %>
+      <%= if @status.flags[:usb_drive_dump] do %>
+        <div class="pb-2 pr-1">
+          <.icon
+            id="usbDrive"
+            class={classes("w-6 h-6 fill-gray-200", %{"fill-red-600" => @status.writable == :no})}
+          />
+        </div>
+        <div class="absolute inline-block bottom-2">
+          <div class="overflow-hidden rounded-full w-8 h-8">
+            <svg
+              class="absolute top-0 left-0 w-full h-full text-gray-300 a-progress-bar"
+              viewBox="0 0 44 44"
+            >
+              <circle
+                class="fill-transparent stroke-current"
+                stroke-dashoffset={
+                  126 - 126 * (@usb_drive_dump_room[:progress][:percentage] || 0) / 100
+                }
+                stroke-width="4"
+                cx="22"
+                cy="22"
+                r="20"
+              >
+              </circle>
+            </svg>
+          </div>
         </div>
       <% end %>
       <!-- <div class="h-[27px]">

@@ -42,6 +42,8 @@ defmodule ChatWeb.MainLive.Admin.MediaSettingsForm do
         changeset
         |> Ecto.Changeset.apply_changes()
         |> AdminRoom.store_media_settings()
+
+      send(self(), :update_media_settings)
     end
 
     {:noreply, assign(socket, :changeset, changeset)}
@@ -60,9 +62,10 @@ defmodule ChatWeb.MainLive.Admin.MediaSettingsForm do
         phx-target={@myself}
       >
         <div>
-          When new USB drive is plugged into the secondary port,<br />
-          the following functionality will be started:
+          When new USB drive is plugged,<br /> the following functionality will be started:
         </div>
+        <.labeled_checkbox form={f} field={:main} label="Main DB if absent" />
+        <.labeled_checkbox form={f} field={:optimize} label="Optimize FS (when USB drive is empty)" />
         <%= for {value, label} <- Ecto.Enum.mappings(MediaSettings, :functionality) do %>
           <.functionality_radio_button form={f} label={label} value={value} />
         <% end %>
@@ -86,6 +89,20 @@ defmodule ChatWeb.MainLive.Admin.MediaSettingsForm do
         <%= radio_button(@form, :functionality, @value) %>
 
         <span class={"ml-2 text-sm" <> if(selected_functionality?(@form, @value), do: " font-bold", else: "")}>
+          <%= @label %>
+        </span>
+      <% end %>
+    </div>
+    """
+  end
+
+  defp labeled_checkbox(assigns) do
+    ~H"""
+    <div class="flex items-center">
+      <%= label do %>
+        <%= checkbox(@form, @field) %>
+
+        <span class="ml-2 text-sm">
           <%= @label %>
         </span>
       <% end %>

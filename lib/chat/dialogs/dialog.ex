@@ -1,18 +1,18 @@
 defmodule Chat.Dialogs.Dialog do
   @moduledoc "Module to hold a conversation between A and B"
 
-  alias Chat.Card
-  alias Chat.Identity
+  alias Chat.Proto.Identify
 
   @derive {Inspect, only: []}
   defstruct [:a_key, :b_key]
 
-  def start(%Identity{} = identity, %Card{pub_key: card_key}) do
-    identity_key = Identity.pub_key(identity)
+  def start(some_peer, other_peer) do
+    some_key = some_peer |> Identify.pub_key()
+    other_key = other_peer |> Identify.pub_key()
 
     %__MODULE__{
-      a_key: max(identity_key, card_key),
-      b_key: min(identity_key, card_key)
+      a_key: max(some_key, other_key),
+      b_key: min(some_key, other_key)
     }
   end
 end

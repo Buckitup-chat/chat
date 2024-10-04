@@ -34,21 +34,21 @@ defmodule Chat.Rooms.RoomTest do
 
     message
     |> Messages.Text.new(1)
-    |> Rooms.add_new_message(alice, room.pub_key)
+    |> Rooms.add_new_message(alice, room_identity)
 
     message
     |> String.pad_trailing(200, "-")
     |> Messages.Text.new(2)
-    |> Rooms.add_new_message(alice, room.pub_key)
+    |> Rooms.add_new_message(alice, room_identity)
 
     FakeData.file()
     |> Map.put(:timestamp, 3)
-    |> Rooms.add_new_message(alice, room.pub_key)
+    |> Rooms.add_new_message(alice, room_identity)
 
     image_msg =
       FakeData.image("2.pp")
       |> Map.put(:timestamp, 4)
-      |> Rooms.add_new_message(alice, room.pub_key)
+      |> Rooms.add_new_message(alice, room_identity)
 
     image_msg
     |> Rooms.await_saved(room.pub_key)
@@ -91,7 +91,7 @@ defmodule Chat.Rooms.RoomTest do
              }
            ] = room.requests
 
-    decrypted_identity = Rooms.decrypt_identity(encrypted_identity, bob, room.pub_key)
+    decrypted_identity = Rooms.decipher_identity_with_key(encrypted_identity, bob, room.pub_key)
 
     assert room_identity == %{decrypted_identity | name: room_identity.name}
 
@@ -103,6 +103,9 @@ defmodule Chat.Rooms.RoomTest do
 
     assert [] = room.requests
   end
+
+  # todo: create test
+  test "room invite removal", do: :todo
 
   test "room list should return my created room" do
     alice = User.login("Alice")
@@ -153,7 +156,7 @@ defmodule Chat.Rooms.RoomTest do
       Messages.Text.new("1", 2),
       Messages.Text.new("2", 3)
     ]
-    |> Enum.map(&Rooms.add_new_message(&1, alice, room.pub_key))
+    |> Enum.map(&Rooms.add_new_message(&1, alice, room_identity))
     |> List.last()
     |> Rooms.await_saved(room.pub_key)
 
@@ -188,7 +191,7 @@ defmodule Chat.Rooms.RoomTest do
       Messages.Text.new("1", 2),
       Messages.Text.new("2", 3)
     ]
-    |> Enum.map(&Rooms.add_new_message(&1, alice, room.pub_key))
+    |> Enum.map(&Rooms.add_new_message(&1, alice, room_identity))
     |> List.last()
     |> Rooms.await_saved(room.pub_key)
 
@@ -225,7 +228,7 @@ defmodule Chat.Rooms.RoomTest do
       Messages.Text.new("1", 2),
       Messages.Text.new("2", 3)
     ]
-    |> Enum.map(&Rooms.add_new_message(&1, alice, room.pub_key))
+    |> Enum.map(&Rooms.add_new_message(&1, alice, room_identity))
     |> List.last()
     |> Rooms.await_saved(room.pub_key)
 

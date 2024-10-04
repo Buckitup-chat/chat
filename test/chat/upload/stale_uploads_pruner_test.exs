@@ -1,5 +1,5 @@
 defmodule Chat.Upload.StaleUploadsPrunerTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Chat.{ChunkedFiles, ChunkedFilesBroker}
   alias Chat.Db.ChangeTracker
@@ -17,12 +17,12 @@ defmodule Chat.Upload.StaleUploadsPrunerTest do
     test "prunes old uploads" do
       timestamp = DateTime.to_unix(DateTime.utc_now()) - @day_in_seconds - 1
       old_key = UUID.uuid4()
-      old_upload = %Upload{secret: "1234", timestamp: timestamp}
+      old_upload = %Upload{encrypted_secret: "1234", timestamp: timestamp}
       UploadIndex.add(old_key, old_upload)
 
       timestamp = DateTime.to_unix(DateTime.utc_now()) - @day_in_seconds + 1
       new_key = UUID.uuid4()
-      new_upload = %Upload{secret: "1234", timestamp: timestamp}
+      new_upload = %Upload{encrypted_secret: "1234", timestamp: timestamp}
       UploadIndex.add(new_key, new_upload)
 
       ChangeTracker.await()
@@ -51,7 +51,7 @@ defmodule Chat.Upload.StaleUploadsPrunerTest do
 
       timestamp = DateTime.to_unix(DateTime.utc_now()) - @day_in_seconds - 1
       key = UUID.uuid4()
-      upload = %Upload{secret: "1234", timestamp: timestamp}
+      upload = %Upload{encrypted_secret: "1234", timestamp: timestamp}
       UploadIndex.add(key, upload)
 
       timestamp = DateTime.to_unix(DateTime.utc_now())
@@ -67,7 +67,7 @@ defmodule Chat.Upload.StaleUploadsPrunerTest do
       ChunkedFiles.new_upload(key)
       ChunkedFiles.save_upload_chunk(key, {0, 17}, 18, "some part of info ")
       timestamp = DateTime.to_unix(DateTime.utc_now()) - @day_in_seconds - 1
-      upload = %Upload{secret: "1234", timestamp: timestamp}
+      upload = %Upload{encrypted_secret: "1234", timestamp: timestamp}
       UploadIndex.add(key, upload)
       ChangeTracker.await()
 
@@ -82,7 +82,7 @@ defmodule Chat.Upload.StaleUploadsPrunerTest do
     test "stops old upload status servers" do
       key = UUID.uuid4()
       timestamp = DateTime.to_unix(DateTime.utc_now()) - @day_in_seconds - 1
-      upload = %Upload{secret: "1234", timestamp: timestamp}
+      upload = %Upload{encrypted_secret: "1234", timestamp: timestamp}
       UploadIndex.add(key, upload)
       ChangeTracker.await()
 

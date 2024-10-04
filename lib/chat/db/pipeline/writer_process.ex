@@ -26,7 +26,37 @@ defmodule Chat.Db.Pipeline.WriterProcess do
   end
 
   @impl true
-  def handle_cast({operation, list}, state) do
+  def handle_cast({:mirror, {_operation, _list} = payload}, state) do
+    state
+    |> handle_operation(payload)
+    |> noreply()
+  end
+
+  def handle_cast({_operation, _list} = payload, state) do
+    state
+    |> handle_operation(payload)
+    |> noreply_continue(:demand)
+  end
+
+  @impl true
+  def handle_continue(:demand, state) do
+    state
+    |> demand_queue()
+    |> noreply()
+  rescue
+    _ -> noreply(state)
+  end
+
+  @impl true
+  def handle_info(:fsync, state) do
+    state
+    |> cancel_fsync_timer()
+    |> notify_compactor()
+    |> fsync()
+    |> noreply()
+  end
+
+  defp handle_operation(state, {operation, list}) do
     state
     |> notify_compactor()
     |> then(fn st ->
@@ -37,24 +67,6 @@ defmodule Chat.Db.Pipeline.WriterProcess do
     end)
     |> start_fsync_timer()
     |> may_fsync()
-    |> noreply_continue(:demand)
-  end
-
-  @impl true
-
-  def handle_continue(:demand, state) do
-    state
-    |> demand_queue()
-    |> noreply()
-  end
-
-  @impl true
-  def handle_info(:fsync, state) do
-    state
-    |> cancel_fsync_timer()
-    |> notify_compactor()
-    |> fsync()
-    |> noreply()
   end
 
   defp may_fsync(state) do

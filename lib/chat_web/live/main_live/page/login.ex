@@ -10,25 +10,38 @@ defmodule ChatWeb.MainLive.Page.Login do
   alias Chat.AdminRoom
   alias Chat.Identity
   alias Chat.Log
+  alias Chat.Sync.DbBrokers
   alias Chat.User
-  alias ChatWeb.MainLive.Page
+  alias Chat.User.UsersBroker
+
+  alias ChatWeb.MainLive.Index
 
   @local_store_auth_key "buckitUp-chat-auth-v2"
   @local_store_room_count_key "buckitUp-room-count-v2"
+  @legal_notice_accepted_key "agreementAccepted"
 
   def handshaked(socket), do: socket |> assign(:handshaked, true)
 
   def create_user(socket, name) do
-    me = User.login(name |> String.trim())
-    id = User.register(me)
+    me =
+      name
+      |> String.trim()
+      |> User.login()
+      |> tap(&User.register/1)
+      |> tap(fn identity ->
+        identity
+        |> Chat.Card.from_identity()
+        |> Chat.Broadcast.new_user()
+      end)
+      |> tap(fn _ -> DbBrokers.broadcast_refresh() end)
+
     # todo: check setting time before creating
     Log.sign_in(me, socket.assigns.monotonic_offset |> Chat.Time.monotonic_to_unix())
 
     socket
-    |> assign_logged_user(me, id)
+    |> assign_logged_user(me)
     |> store()
     |> close()
-    |> Page.Lobby.notify_new_user(me |> Chat.Card.from_identity())
   end
 
   def load_user(socket, %{"auth" => data} = params) do
@@ -37,31 +50,37 @@ defmodule ChatWeb.MainLive.Page.Login do
     socket
     |> load_user(me, rooms)
     |> assign(:room_count_to_backup, Map.get(params, "room_count", 0))
+    |> assign(:legal_notice_accepted, Map.get(params, "legal_notice_accepted", "") == "true")
   end
 
   def load_user(socket, x) do
-    x |> inspect() |> Logger.warn()
+    x |> inspect() |> Logger.warning()
 
     socket
   end
 
   def load_user(socket, %Identity{} = me, rooms) do
-    id =
-      me
-      |> User.login()
-      |> User.register()
+    me
+    |> User.login()
+    |> tap(&User.register/1)
+    |> tap(&UsersBroker.put/1)
+    |> tap(fn identity ->
+      identity
+      |> Chat.Card.from_identity()
+      |> Chat.Broadcast.new_user()
+    end)
+    |> tap(fn _ -> DbBrokers.broadcast_refresh() end)
 
     PubSub.subscribe(Chat.PubSub, login_topic(me))
     Log.visit(me, socket.assigns.monotonic_offset |> Chat.Time.monotonic_to_unix())
 
     socket
-    |> assign_logged_user(me, id, rooms)
+    |> assign_logged_user(me, rooms)
     |> close()
-    |> Page.Lobby.notify_new_user(me |> Chat.Card.from_identity())
   end
 
   def load_user(socket, x, y) do
-    {x, y} |> inspect() |> Logger.warn()
+    {x, y} |> inspect() |> Logger.warning()
 
     socket
   end
@@ -110,10 +129,35 @@ defmodule ChatWeb.MainLive.Page.Login do
   end
 
   def check_stored(socket) do
+    cond do
+      already_loaded_client_storage?(socket) -> socket
+      params = client_storage_in_params(socket) -> emulate_restore_auth(socket, params)
+      true -> request_restore(socket)
+    end
+  end
+
+  defp already_loaded_client_storage?(socket) do
+    match?(%{assigns: %{me: _}}, socket)
+  end
+
+  defp client_storage_in_params(socket) do
+    %{"storage" => storage} = Phoenix.LiveView.get_connect_params(socket)
+    storage
+  rescue
+    _ -> nil
+  end
+
+  defp emulate_restore_auth(socket, params) do
+    {:noreply, socket} = Index.handle_event("restoreAuth", params, socket)
+    socket |> request_restore()
+  end
+
+  defp request_restore(socket) do
     socket
     |> push_event("restore", %{
       auth_key: @local_store_auth_key,
       room_count_key: @local_store_room_count_key,
+      legal_notice_key: @legal_notice_accepted_key,
       event: "restoreAuth"
     })
   end
@@ -149,10 +193,10 @@ defmodule ChatWeb.MainLive.Page.Login do
   defp login_topic(person),
     do: "login:" <> (person |> Enigma.hash() |> Base.encode16(case: :lower))
 
-  defp assign_logged_user(socket, me, id, rooms \\ []) do
+  defp assign_logged_user(socket, me, rooms \\ []) do
     socket
     |> assign(:me, me)
-    |> assign(:my_id, id)
+    |> assign(:my_id, Identity.pub_key(me))
     |> assign_rooms(rooms)
     |> maybe_create_admin_room()
   end

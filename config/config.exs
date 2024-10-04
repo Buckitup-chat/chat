@@ -67,7 +67,23 @@ config :chat,
   mode: :internal,
   flags: [],
   writable: :yes,
-  env: config_env()
+  env: config_env(),
+  file_chunk_size: 10 * 1024 * 1024
+
+config :chat, Chat.Db.ChangeTracker, expire_seconds: 31
+
+config :chat,
+  topic_to_platform: "chat->platform",
+  topic_from_platform: "platform->chat",
+  topic_to_zerotier: "-> zerotier"
+
+# Uncomment the following line to enable db writing logging
+# config :chat, :db_write_logging, true
+
+config :mime, :types, %{
+  "text/plain" => ["social_part", "data"],
+  "application/zip" => ["fw"]
+}
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

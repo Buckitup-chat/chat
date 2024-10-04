@@ -41,6 +41,8 @@ defmodule Chat.Dialogs.DialogMessaging do
     |> ChangeTracker.await()
   end
 
+  def read({_index, nil}, _user_identity, _dialog), do: nil
+
   def read({index, %Message{} = msg}, %Identity{} = identity, %Dialog{a_key: a_key, b_key: b_key}) do
     {peer_key, is_mine?} =
       case {identity.public_key, a_key, b_key} do
@@ -93,6 +95,14 @@ defmodule Chat.Dialogs.DialogMessaging do
     end)
     |> Enum.reject(&is_nil/1)
     |> Enum.reverse()
+  end
+
+  def list_room_invites(%Dialog{} = dialog, %Identity{} = me) do
+    dialog
+    |> get_room_invites()
+    |> Enum.filter(fn {_, message} -> message.type == :room_invite end)
+    |> Enum.map(fn {{_, _, index, _}, message} -> read({index, message}, me, dialog) end)
+    |> Enum.reject(&is_nil/1)
   end
 
   def get_message(%Dialog{} = dialog, {index, id}) do
@@ -201,5 +211,13 @@ defmodule Chat.Dialogs.DialogMessaging do
       msg_key(dialog, max_index, id)
     }
     |> Db.select(amount)
+  end
+
+  defp get_room_invites(dialog) do
+    {
+      msg_key(dialog, 0, 0),
+      msg_key(dialog, nil, 0)
+    }
+    |> Db.list()
   end
 end

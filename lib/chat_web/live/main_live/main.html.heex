@@ -1,0 +1,527 @@
+<div style="display: none;" id="session-link" phx-hook="LocalStateStore"></div>
+<div style="display: none;" id="time-link" phx-hook="LocalTime"></div>
+<%= unless connected?(@socket) do %>
+  <.loading_screen />
+<% else %>
+  <%= if @need_login do %>
+    <%= if @handshaked do %>
+      <.login />
+    <% else %>
+      <.loading_screen />
+    <% end %>
+  <% else %>
+    <div id="modal" class="phx-modal fade-in" style="display: none;">
+      <div
+        id="modal-content"
+        class="phx-modal-content border-0 rounded-lg bg-white p-4 fade-in-scale flex flex-col t-modal"
+        phx-click-away="modal:close"
+        phx-window-keydown="modal:close"
+        phx-key="escape"
+        style="display: none;"
+      >
+        <a
+          href="#"
+          class="phx-modal-close w-full flex flex-row justify-end"
+          phx-click="modal:close"
+        >
+          <.icon id="close" class="w-4 h-4 flex fill-grayscale t-close-popup" />
+        </a>
+
+        <%= if @live_modal do %>
+          <.live_component
+            module={@live_modal.component}
+            {@live_modal.params |> Map.merge(%{id: @live_modal.component})}
+          />
+        <% end %>
+      </div>
+    </div>
+    <Layout.Popup.restrict_write_actions />
+    <%= if @mode == :lobby do %>
+      <.modal id="logout-backup-popup" hide_event="logout-close" class="">
+        <%= if @logout_step == :initial do %>
+          <h1 class="text-base font-bold text-grayscale">Log Out & Back Up</h1>
+          <Layout.Room.count_to_backup_message count={@room_count_to_backup} />
+          <p class="mt-3 text-sm text-black/50">
+            To get access again you will need the recovery keys:
+          </p>
+          <button
+            class="mt-5 w-full h-12 border-0 rounded-lg bg-grayscale flex items-center justify-center"
+            phx-click="logout-go-middle"
+          >
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-white t-download-key">Download the Keys</span>
+              <.icon id="upload" class="w-4 h-4 ml-2 fill-white" />
+            </div>
+          </button>
+          <button
+            class="mt-5 w-full h-12 border rounded-lg border-black/10 flex items-center justify-center t-download-key"
+            phx-click="logout-go-share"
+          >
+            <div class="flex items-center justify-between">
+              <span>Share the Key</span>
+              <.icon id="share" class="w-4 h-4 ml-2" />
+            </div>
+          </button>
+          <button
+            class="mt-3 w-full h-12 border rounded-lg border-black/10 t-logout-without-key"
+            phx-click={
+              hide_modal("logout-backup-popup") |> show_modal("logout-without-key-popup")
+            }
+          >
+            Log Out without the Keys
+          </button>
+          <button
+            phx-click={hide_modal("logout-backup-popup")}
+            class="mt-3 w-full h-12 border rounded-lg border-black/10 t-cancel-logout"
+          >
+            Cancel
+          </button>
+        <% end %>
+        <%= if @logout_step == :middle do %>
+          <h1 class="text-base font-bold text-grayscale">Set Up Password</h1>
+          <p class="mt-3 text-sm text-black/50">
+            To store the backup copy of the key securely, enter the encryption password for the file
+          </p>
+          <div class="mt-5 w-full h-7 flex items-center justify-between border-0 rounded-lg bg-black/10">
+            <.icon id="alert" class="ml-1 w-4 h-4 fill-black/40" />
+            <blockquote class="text-xs text-black/50 mr-3">
+              This password in not stored and can NOT be recovered
+            </blockquote>
+          </div>
+          <.form
+            :let={f}
+            for={@changeset}
+            id="logout-form"
+            phx-change="logout-check-password"
+            phx-submit="logout-download-with-password"
+            as={:logout}
+            class="mt-3 w-full"
+          >
+            <div class="w-ull relative">
+              <%= if @is_password_visible do %>
+                <%= text_input(f, :password,
+                  type: "text",
+                  placeholder: "Enter Password",
+                  phx_debounce: 700,
+                  class:
+                    "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50"
+                ) %>
+                <a phx-click="logout:toggle-password-visibility">
+                  <.icon id="visibility" class="w-4 h-4 absolute top-4 right-3 ml-2" />
+                </a>
+              <% else %>
+                <%= text_input(f, :password,
+                  type: "password",
+                  placeholder: "Enter Password",
+                  phx_debounce: 700,
+                  class:
+                    "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50"
+                ) %>
+                <a phx-click="logout:toggle-password-visibility">
+                  <.icon id="visibilityOff" class="w-4 h-4 absolute top-4 right-3 ml-2" />
+                </a>
+              <% end %>
+            </div>
+            <!--<%= error_tag f, :password %> -->
+            <div class="mt-3 w-ull relative">
+              <%= if @is_password_confirmation_visible do %>
+                <%= text_input(f, :password_confirmation,
+                  type: "text",
+                  placeholder: "Repeat Password",
+                  phx_debounce: 700,
+                  class:
+                    "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50"
+                ) %>
+                <a phx-click="logout:toggle-password-confirmation-visibility">
+                  <.icon id="visibility" class="w-4 h-4 absolute top-4 right-3 ml-2" />
+                </a>
+              <% else %>
+                <%= text_input(f, :password_confirmation,
+                  type: "password",
+                  placeholder: "Repeat Password",
+                  phx_debounce: 700,
+                  class:
+                    "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50"
+                ) %>
+                <a phx-click="logout:toggle-password-confirmation-visibility">
+                  <.icon id="visibilityOff" class="w-4 h-4 absolute top-4 right-3 ml-2" />
+                </a>
+              <% end %>
+            </div>
+            <!-- <%= error_tag f, :password_confirmation %> -->
+            <p class="mt-3 text-sm text-black/50">At least 12 symbols</p>
+            <%= submit("Download",
+              phx_disable_with: "Downloading...",
+              class:
+                "mt-5 w-full h-12 border-0 rounded-lg bg-grayscale text-white disabled:opacity-50",
+              disabled: !@changeset.valid?
+            ) %>
+          </.form>
+          <button
+            class="mt-3 w-full h-12 border rounded-lg border-black/10"
+            phx-click="logout-download-insecure"
+          >
+            Download without password <span style="color: red">insecure!</span>
+          </button>
+        <% end %>
+        <%= if @logout_step == :share do %>
+          <.live_component
+            module={ChatWeb.MainLive.Page.KeyShareForm}
+            id="key-share"
+            users={@users}
+            me={@me}
+            monotonic_offset={@monotonic_offset}
+          />
+        <% end %>
+        <%= if @logout_step == :final do %>
+          <h1 class="text-base font-bold text-grayscale">Success</h1>
+          <p class="mt-3 text-sm text-black/50">
+            If you downloaded the the recovery key, you can log out now, it will erase all the browser data about BuckitUp.
+          </p>
+          <button
+            class="mt-3 w-full h-12 border-0 rounded-lg bg-grayscale text-white t-exit"
+            phx-click="logout-wipe"
+          >
+            Exit
+          </button>
+          <button
+            phx-click={hide_modal("logout-backup-popup")}
+            class="mt-3 w-full h-12 border rounded-lg border-black/10"
+          >
+            Cancel
+          </button>
+        <% end %>
+      </.modal>
+      <.modal id="delete-message-popup" class="t-delete-message-popup">
+        <h1 class="text-base font-bold text-grayscale">Delete Message</h1>
+        <p class="mt-3 text-sm text-black/50">Are you sure you want to do this?</p>
+        <div class="mt-5 flex items-center justify-between">
+          <button
+            phx-click={hide_modal("delete-message-popup")}
+            class="w-full mr-1 h-12 border rounded-lg border-black/10 t-delete-cancel"
+          >
+            Cancel
+          </button>
+          <button class="deleteMessageButton w-full ml-1 h-12 border-0 rounded-lg bg-red-500 flex items-center justify-center t-delete-message-btn">
+            <span class="text-white mr-1">Delete</span>
+            <.icon id="delete" class="w-4 h-4 fill-white" />
+          </button>
+        </div>
+      </.modal>
+      <.modal id="delete-messages-popup" class="">
+        <h1 class="text-base font-bold text-grayscale">Delete Messages</h1>
+        <p class="mt-3 text-sm text-black/50">
+          You can only delete your own messages. Are you sure you want to delete this message?
+        </p>
+        <div class="mt-5 flex items-center justify-between">
+          <button
+            phx-click={hide_modal("delete-messages-popup")}
+            class="w-full mr-1 h-12 border rounded-lg border-black/10 t-cancel-delete-msg-popup-btn"
+          >
+            Cancel
+          </button>
+          <button class="deleteMessageButton w-full ml-1 h-12 border-0 rounded-lg bg-red-500 flex items-center justify-center t-delete-message-popup-btn">
+            <span class="text-white mr-1">Delete</span>
+            <.icon id="delete" class="w-4 h-4 fill-white" />
+          </button>
+        </div>
+      </.modal>
+      <.modal id="logout-without-key-popup" class="t-logout-without-key-modal">
+        <h1 class="text-base font-bold text-grayscale">Log Out without the Key</h1>
+        <p class="mt-3 text-sm text-black/50">
+          You are deleting your keys to the BuckitUp, everything will become permanently inaccessible from this browser without the <a
+            phx-click={
+              hide_modal("logout-without-key-popup")
+              |> show_modal("logout-backup-popup")
+              |> JS.push("logout-go-middle")
+            }
+            class="cursor-pointer text-blue-600 after:content-['_↗'] ..."
+          >keyring backup</a>.
+        </p>
+        <p class="text-sm text-black/50">Are you sure?</p>
+        <div class="mt-5 flex items-center justify-between">
+          <button
+            phx-click={hide_modal("logout-without-key-popup")}
+            class="w-full mr-1 h-12 border rounded-lg border-black/10"
+          >
+            Cancel
+          </button>
+          <button
+            phx-click="logout-wipe"
+            class="w-full ml-1 h-12 border-0 rounded-lg bg-grayscale  flex items-center justify-center"
+          >
+            <span class="text-white mr-1 t-logout-btn">Logout</span>
+          </button>
+        </div>
+      </.modal>
+      <.live_component
+        id="legal-notice-component"
+        module={ChatWeb.MainLive.Modals.LegalNotice}
+        hide={assigns[:legal_notice_accepted]}
+      />
+      <div class="w-screen h-[100svh] flex flex-nowrap flex-row">
+        <div id="navbarTop" class="navbarTop px-4">
+          <div
+            phx-click={JS.push("switch-lobby-mode") |> open_content()}
+            phx-value-lobby-mode="feeds"
+            class="sidebarIcon"
+          >
+            <.icon id="logo" class="w-6 h-6" />
+          </div>
+          <Layout.DbStatus.mobile status={@db_status} usb_drive_dump_room={@usb_drive_dump_room} />
+          <button
+            class="flex justify-between min-w-max"
+            phx-click={JS.push("logout-open") |> show_modal("logout-backup-popup")}
+            class="sidebarIcon mb-1"
+          >
+            <.icon id="logout" class="w-4 h-4 hover:fill-purple" />
+            <span class="text-xs">Log out & Back Up</span>
+          </button>
+        </div>
+        <div id="navbarBottom" class="navbarBottom px-20 z-20">
+          <button phx-click="switch-lobby-mode" phx-value-lobby-mode="rooms" class="sidebarIcon">
+            <.icon
+              id="sidebarRooms"
+              class={
+                classes("w-6 h-6 hover:fill-purple", %{
+                  "fill-purple" =>
+                    @lobby_mode == :rooms &&
+                      assigns[:cargo_room][:pub_key] != assigns[:room][:pub_key],
+                  "fill-grayscale" => @lobby_mode != :rooms
+                })
+              }
+            />
+            <span class="text-xs">Rooms</span>
+          </button>
+          <button phx-click="switch-lobby-mode" phx-value-lobby-mode="chats" class="sidebarIcon">
+            <.icon
+              id="sidebarChats"
+              class={
+                classes("w-6 h-6 hover:fill-purple", %{
+                  "fill-purple" => @lobby_mode == :chats,
+                  "fill-grayscale" => @lobby_mode != :chats
+                })
+              }
+            />
+            <span class="text-xs">Chats</span>
+          </button>
+          <%= if @is_admin do %>
+            <button
+              phx-click="switch-lobby-mode"
+              phx-value-lobby-mode="admin"
+              class="sidebarIcon "
+            >
+              <.icon
+                id="admin"
+                class={
+                  classes("w-5 h-5 hover:fill-purple", %{
+                    "fill-purple" => @lobby_mode == :admin,
+                    "fill-grayscale" => @lobby_mode != :admin
+                  })
+                }
+              />
+              <span class="text-xs">Admin</span>
+            </button>
+          <% end %>
+          <%= if assigns[:cargo_room][:status] == :complete and Map.has_key?(@room_map, assigns[:cargo_room][:pub_key]) do %>
+            <!-- desktop -->
+            <button
+              phx-click="room/switch"
+              phx-value-room={Room.hash(@cargo_room.pub_key)}
+              class="hidden md:flex flex-col items-center justify-center"
+            >
+              <.icon
+                id="cargo"
+                class={
+                  classes("w-8 h-8 hover:fill-purple", %{
+                    "fill-purple" => @cargo_room.pub_key == assigns[:room][:pub_key],
+                    "fill-grayscale" => @cargo_room.pub_key != assigns[:room][:pub_key]
+                  })
+                }
+              />
+              <span class="text-xs">Cargo Room</span>
+            </button>
+            <!-- mobile -->
+            <button
+              phx-click={JS.push("room/switch") |> open_content()}
+              phx-value-room={Room.hash(@cargo_room.pub_key)}
+              class="flex flex-col items-center justify-center md:hidden"
+            >
+              <.icon
+                id="cargo"
+                class={
+                  classes("w-8 h-8 hover:fill-purple", %{
+                    "fill-purple" => @cargo_room.pub_key == assigns[:room][:pub_key],
+                    "fill-grayscale" => @cargo_room.pub_key != assigns[:room][:pub_key]
+                  })
+                }
+              />
+              <span class="text-xs">Cargo Room</span>
+            </button>
+          <% end %>
+          <%= if assigns[:usb_drive_dump_room][:status] == :complete do %>
+            <button
+              phx-click="room/switch"
+              phx-value-room={Room.hash(@usb_drive_dump_room.pub_key)}
+              class="sidebarIcon"
+            >
+              <.icon
+                id="usbDrive"
+                class={
+                  classes("w-8 h-8 hover:fill-purple", %{
+                    "fill-purple" => @usb_drive_dump_room.pub_key == assigns[:room][:pub_key],
+                    "fill-grayscale" => @usb_drive_dump_room.pub_key != assigns[:room][:pub_key]
+                  })
+                }
+              />
+              <span class="text-xs">Dump room</span>
+            </button>
+          <% end %>
+        </div>
+        <div id="navbarLeft" class="navbar">
+          <div class="sm:flex flex-col items-center">
+            <div
+              phx-click={JS.push("switch-lobby-mode")}
+              phx-value-lobby-mode="feeds"
+              class="sidebarIcon cursor-pointer mt-3 t-feeds"
+            >
+              <.icon id="logo" class="w-9 h-9" />
+            </div>
+            <button
+              phx-click="switch-lobby-mode"
+              phx-value-lobby-mode="rooms"
+              class="sidebarIcon mt-9 t-rooms"
+            >
+              <.icon
+                id="sidebarRooms"
+                class={
+                  classes("w-6 h-6 hover:fill-purple", %{
+                    "fill-purple" =>
+                      @lobby_mode == :rooms &&
+                        assigns[:cargo_room][:pub_key] != assigns[:room][:pub_key],
+                    "fill-grayscale" => @lobby_mode != :rooms
+                  })
+                }
+              />
+              <span class="text-xs">Rooms</span>
+            </button>
+            <button
+              phx-click="switch-lobby-mode"
+              phx-value-lobby-mode="chats"
+              class="sidebarIcon mt-5 t-chats"
+            >
+              <.icon
+                id="sidebarChats"
+                class={
+                  classes("w-6 h-6 hover:fill-purple", %{
+                    "fill-purple" => @lobby_mode == :chats,
+                    "fill-grayscale" => @lobby_mode != :chats
+                  })
+                }
+              />
+              <span class="text-xs">Chats</span>
+            </button>
+            <%= if @is_admin do %>
+              <button
+                phx-click="switch-lobby-mode"
+                phx-value-lobby-mode="admin"
+                class="sidebarIcon mt-5"
+              >
+                <.icon
+                  id="admin"
+                  class={
+                    classes("w-5 h-5 hover:fill-purple", %{
+                      "fill-purple" => @lobby_mode == :admin,
+                      "fill-grayscale" => @lobby_mode != :admin
+                    })
+                  }
+                />
+                <span class="text-xs">Admin</span>
+              </button>
+            <% end %>
+            <%= if assigns[:cargo_room][:status] == :complete and Map.has_key?(@room_map, assigns[:cargo_room][:pub_key]) do %>
+              <button
+                phx-click="room/switch"
+                phx-value-room={Room.hash(@cargo_room.pub_key)}
+                class="sidebarIcon mt-5 t-cargo-room"
+              >
+                <.icon
+                  id="cargo"
+                  class={
+                    classes("w-8 h-8 hover:fill-purple", %{
+                      "fill-purple" => @cargo_room.pub_key == assigns[:room][:pub_key],
+                      "fill-grayscale" => @cargo_room.pub_key != assigns[:room][:pub_key]
+                    })
+                  }
+                />
+                <span class="text-xs">Cargo Room</span>
+              </button>
+            <% end %>
+            <%= if assigns[:usb_drive_dump_room][:status] == :complete do %>
+              <button
+                phx-click="room/switch"
+                phx-value-room={Room.hash(@usb_drive_dump_room.pub_key)}
+                class="sidebarIcon mt-5 t-dump-room"
+              >
+                <.icon
+                  id="usbDrive"
+                  class={
+                    classes("w-8 h-8 hover:fill-purple", %{
+                      "fill-purple" => @usb_drive_dump_room.pub_key == assigns[:room][:pub_key],
+                      "fill-grayscale" => @usb_drive_dump_room.pub_key != assigns[:room][:pub_key]
+                    })
+                  }
+                />
+                <span class="text-xs">Dump room</span>
+              </button>
+            <% end %>
+          </div>
+          <div class="flex flex-col items-center">
+            <div class="row mt-10">
+              <Layout.DbStatus.desktop
+                status={@db_status}
+                usb_drive_dump_room={@usb_drive_dump_room}
+              />
+              <button
+                phx-click={JS.push("logout-open") |> show_modal("logout-backup-popup")}
+                class="sidebarIcon mb-1"
+              >
+                <.icon id="logout" class="w-6 h-6 hover:fill-purple" />
+                <span class="text-xs t-logout">Log out & Back Up</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <%= if @lobby_mode == :chats do %>
+          <.chats {assigns} />
+        <% end %>
+        <%= if @lobby_mode == :rooms do %>
+          <.rooms {assigns} />
+        <% end %>
+        <%= if @lobby_mode == :feeds do %>
+          <.feeds {assigns} />
+        <% end %>
+        <%= if @lobby_mode == :admin  and @is_admin do %>
+          <.admin {assigns} />
+        <% end %>
+      </div>
+    <% end %>
+    <%= if @mode == :import_key_ring do %>
+      <.request_access_sharing code={@code} encoded_qr_code={@encoded_qr_code} url={@url} />
+    <% end %>
+    <%= if @mode == :export_key_ring do %>
+      <.share_my_access {assigns} />
+    <% end %>
+    <%= if @mode == :import_own_key_ring do %>
+      <.login_with_file {assigns} />
+    <% end %>
+    <%= if @mode == :recover_key_share do %>
+      <.live_component
+        id="recover-share-key"
+        uploads={@uploads}
+        step={:initial}
+        module={ChatWeb.MainLive.Page.RecoverKeyShare}
+      />
+    <% end %>
+  <% end %>
+<% end %>

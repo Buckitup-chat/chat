@@ -15,7 +15,7 @@ const uploadInitializer = (entry, onViewError) => {
       return
     }
 
-    let upload = UpChunk.createUpload({ chunkSize: 10240, endpoint: entrypoint, file })
+    let upload = UpChunk.createUpload({ attempts: 3, chunkSize: entry.meta.chunk_size, endpoint: entrypoint, file })
     upload.chunkCount = chunkCount
 
     if (status == "paused" || status == "pending") {

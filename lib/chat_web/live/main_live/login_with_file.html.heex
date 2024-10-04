@@ -1,0 +1,121 @@
+<img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg" />
+<img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg" />
+<div class="flex flex-col items-center justify-center w-screen h-screen">
+  <div class="container unauthenticated z-10">
+    <div class="flex justify-center">
+      <.icon id="logo" class="w-14 h-14 fill-white" />
+    </div>
+    <div class="left-0 mt-10">
+      <a
+        phx-click="login:import-own-keyring-close"
+        class="x-back-target flex items-center justify-start"
+      >
+        <.icon id="arrowLeft" class="w-4 h-4 fill-white/70" />
+        <p class="ml-2 text-sm text-white/70">Back to Log In</p>
+      </a>
+      <h1 style="font-size: 28px; line-height: 34px;" class="mt-5 font-inter font-bold text-white">
+        Import the recovery keys
+      </h1>
+      <p class="mt-2.5 font-inter text-sm text-white/70">
+        Please, upload the key file and enter the password for decryption
+      </p>
+    </div>
+    <%= if @step == :initial do %>
+      <div class="row">
+        <.form
+          for={%{}}
+          as={:my_keys_file}
+          id="my-keys-file-form"
+          class="column "
+          phx-change="login:my-keys-file-submit"
+          phx-submit="login:my-keys-file-submit"
+          phx-drop-target={@uploads.my_keys_file.ref}
+        >
+          <.live_file_input upload={@uploads.my_keys_file} style="display: none" />
+          <input
+            style="background-color: rgb(36, 24, 36);"
+            class="w-full h-11 mt-7 bg-transparent text-white py-2 px-4 border border-white/0 rounded-lg flex items-center justify-center"
+            type="button"
+            value="Upload Key File"
+            onclick="event.target.parentNode.querySelector('input[type=file]').click()"
+          />
+          <%= for entry <- @uploads.my_keys_file.entries do %>
+            <%= if entry.progress > 0 and entry.progress <= 100 do %>
+              <progress value={entry.progress} max="100"><%= entry.progress %>%</progress>
+            <% end %>
+            <%= for err <- upload_errors(@uploads.my_keys_file, entry) do %>
+              <p class="alert alert-danger"><%= err %></p>
+            <% end %>
+          <% end %>
+        </.form>
+      </div>
+    <% end %>
+    <%= if @step == :decrypt do %>
+      <div class="w-full h-14 mt-7 bg-transparent text-white py-2 px-2.5 border border-white/50 rounded-lg flex flex-row items-center justify-between">
+        <div class="flex flex-row items-stretch justify-start">
+          <div
+            class="border-white/0 bg-white/50 w-7 h-7 flex items-center justify-center"
+            style="border-radius: 50%;"
+          >
+            <.icon id="check" class="w-4 h-4 stroke-white fill-white/0" />
+          </div>
+          <div class="ml-2" style="line-height: 12px;">
+            <p
+              class="w-[130px] md:w-[200px] h-[14px] text-ellipsis overflow-hidden"
+              style="font-size: 14px;"
+            >
+              <%= @filename %>
+            </p>
+            <p class="text-xs text-white/50">uploaded</p>
+          </div>
+        </div>
+        <button
+          class="w-20 h-9 p-1.5 flex items-center justify-between border rounded-lg bg-white/20 border-white/0 "
+          phx-click="login:import-own-keyring-reupload"
+        >
+          <p style="font-size: 14px;">Delete</p>
+          <.icon id="delete" class="w-4 h-4 fill-white" />
+        </button>
+      </div>
+      <.form
+        :let={f}
+        for={%{}}
+        as={:import_own_keyring_password}
+        id="logout-import-own-keyring-password-form"
+        phx-submit="login:import-own-keyring-decrypt"
+        phx-drop-target={@uploads.my_keys_file.ref}
+        class="mt-2.5"
+      >
+        <%= text_input(f, :password,
+          type: "password",
+          placeholder: "Enter Password",
+          phx_debounce: 700,
+          class:
+            "w-full  h-11 py-2.5 appearance-none block bg-transparent border border-white/50 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-0 focus:border-white"
+        ) %>
+        <%= if @show_invalid do %>
+          <div
+            class="mt-2.5 p-2.5 w-full h-11 bg-transparent border border-white/0 rounded-lg text-white flex flex-row items-strech justify-between"
+            style="background: #F45649;"
+          >
+            <div class="w-44 flex flex-row items-stretch justify-start">
+              <.icon id="delete" class="w-4 h-4 mt-1 fill-white" />
+              <p class="ml-1" style="font-size: 14px;">Password Incorrect</p>
+            </div>
+            <button type="button" phx-click="login:import-own-keyring:drop-password-error">
+              <.icon id="close" class="w-4 h-4 fill-white" />
+            </button>
+          </div>
+        <% end %>
+        <div>
+          <%= submit("Log In",
+            phx_disable_with: "Checking...",
+            class:
+              "w-full h-11 mt-7 bg-transparent text-white py-2 px-4 border border-white/0 rounded-lg flex items-center justify-center",
+            style: "background-color: rgb(36, 24, 36);"
+          ) %>
+        </div>
+      </.form>
+    <% end %>
+  </div>
+</div>

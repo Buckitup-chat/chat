@@ -13,20 +13,44 @@ defmodule Chat.Db.ChangeTracker do
   alias Chat.Db
   alias Chat.Db.ChangeTracker.Tracking
 
-  @timeout :timer.seconds(31)
+  @timeout :timer.seconds(Application.compile_env!(:chat, [__MODULE__, :expire_seconds]))
   @check_delay :timer.seconds(1)
+
+  def ensure(opts) do
+    key = Keyword.fetch!(opts, :writes_key)
+    action = Keyword.fetch!(opts, :action)
+
+    task = Task.async(fn -> await(key) end)
+    action.()
+    task |> Task.await(:infinity)
+  end
 
   def await do
     key = {:change_tracking_marker, UUID.uuid4()}
 
-    Db.put(key, true)
-    await(key)
+    ensure(
+      action: fn ->
+        Db.put(key, true)
+      end,
+      writes_key: key
+    )
+
     Db.delete(key)
   end
 
   def await(key) do
     __MODULE__
     |> GenServer.call({:await, key, expires(@timeout)}, 2 * @timeout)
+  end
+
+  def await_many(keys, timeout) do
+    keys
+    |> Enum.map(fn key ->
+      Task.Supervisor.async(Chat.Db.ChangeTracker.Tasks, fn ->
+        GenServer.call(__MODULE__, {:await, key, expires(timeout)}, 2 * timeout)
+      end)
+    end)
+    |> Task.await_many(timeout)
   end
 
   def on_saved(action) do
@@ -54,6 +78,12 @@ defmodule Chat.Db.ChangeTracker do
     |> GenServer.cast({:written, keys})
   end
 
+  def long_expiry_stats do
+    __MODULE__
+    |> GenServer.call(:info, :infinity)
+    |> Tracking.long_expiry_stats()
+  end
+
   # Implementation
 
   def start_link(_) do
@@ -71,6 +101,10 @@ defmodule Chat.Db.ChangeTracker do
     state
     |> Tracking.add_await(key, from, expiration)
     |> noreply()
+  end
+
+  def handle_call(:info, _from, state) do
+    {:reply, state, state}
   end
 
   @impl true

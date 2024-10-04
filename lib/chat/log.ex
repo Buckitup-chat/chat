@@ -83,7 +83,9 @@ defmodule Chat.Log do
   defp build(later, earlier) do
     {{@db_key, earlier, ""}, {@db_key, later, :binary.copy(<<255>>, 100)}}
     |> Db.list()
-    |> Enum.map(fn {{@db_key, _index, who}, data} -> {who, data} end)
+    |> Enum.map(fn {{@db_key, index, who}, data} ->
+      {generate_uuid({@db_key, index, who}), who, data}
+    end)
     |> Enum.reverse()
   end
 
@@ -96,6 +98,9 @@ defmodule Chat.Log do
     {@db_key, Ordering.next({@db_key}), pub_key(me)}
     |> Db.put({time, action, opts})
   end
+
+  defp generate_uuid({db_key, index, who}),
+    do: Enigma.hash("#{db_key}:#{index}:#{who}") |> Base.encode16(case: :lower)
 
   defp pub_key(%Identity{public_key: key}), do: key
   defp pub_key(%Card{pub_key: key}), do: key

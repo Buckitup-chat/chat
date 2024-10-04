@@ -1,9 +1,35 @@
 defmodule Chat do
   @moduledoc """
-  Chat keeps the contexts that define your domain
-  and business logic.
-
-  Contexts are also responsible for managing your data, regardless
-  if it comes from the database, an external API or others.
+  High level functions
   """
+
+  alias Chat.Db.Copying
+
+  def db_get(key) do
+    case key do
+      {:file_chunk, file_key, first, last} -> read_chunk({first, last}, file_key)
+      _ -> Chat.Db.get(key)
+    end
+  end
+
+  def db_put(key, value) do
+    Chat.Db.put(key, value)
+    Copying.await_written_into([key], Chat.Db.db())
+  end
+
+  def db_has?(key) do
+    case key do
+      {:file_chunk, key, first, last} -> Chat.FileFs.has_file?({key, first, last})
+      key -> Chat.Db.has_key?(key)
+    end
+  end
+
+  defp read_chunk(range, key) do
+    {data, _last} =
+      Chat.FileFs.read_exact_file_chunk(range, key, path())
+
+    data
+  end
+
+  defp path, do: CubDB.data_dir(Chat.Db.db()) <> "_files"
 end

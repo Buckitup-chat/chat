@@ -1,9 +1,9 @@
-export const hooks = {
+export default {
   mounted() {
     this.loader = document.getElementById('chat-loader')
     this.pending = this.page();
     this.setScrollTop();
-    this.loadMorePages(2);
+    this.loadMorePages(1);
 
     this.el.addEventListener("scroll", e => {
       if (this.pending === this.page() && this.el.scrollTop === 0 && this.hasMoreMessagesToLoad()) {

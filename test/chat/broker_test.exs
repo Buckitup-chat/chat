@@ -4,7 +4,7 @@ defmodule Chat.BrokerTest do
   alias Chat.Broker
 
   test "broker should store any value, and give it once" do
-    value = {"some value", :of, 'any type', 45}
+    value = {"some value", :of, ~c"any type", 45}
 
     key = Broker.store(value)
     assert is_binary(key)

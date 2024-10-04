@@ -7,7 +7,7 @@ defmodule Chat.Application do
 
   require Logger
 
-  @env Application.compile_env(:chat, :env)
+  alias Chat.AdminDb.AdminLogger
 
   @impl true
   def start(_type, _args) do
@@ -27,11 +27,44 @@ defmodule Chat.Application do
       Chat.KeyRingTokens,
       Chat.Broker,
       Chat.ChunkedFilesBroker,
+      Chat.User.UsersBroker,
+      Chat.Rooms.RoomsBroker,
+      Chat.RoomMessageLinksBroker,
+      Chat.Sync.CargoRoom,
+      Chat.Sync.OnlinersSync,
+      Chat.Sync.UsbDriveDumpRoom,
       {DynamicSupervisor, name: Chat.Upload.UploadSupervisor},
+      {DynamicSupervisor, name: Chat.Db.FreeSpacesSupervisor},
+      ChatWeb.Presence,
       # Start the Endpoint (http/https)
       ChatWeb.Endpoint,
+      Chat.NetworkSynchronization.Supervisor,
       # Supervised tasks caller
-      {Task.Supervisor, name: Chat.TaskSupervisor}
+      {Task.Supervisor, name: Chat.TaskSupervisor},
+      {Task,
+       fn ->
+         {:ok, _pid} = AdminLogger |> Logger.add_backend()
+
+         Task.Supervisor.start_child(
+           Chat.TaskSupervisor,
+           fn ->
+             log_version()
+             Process.sleep(:timer.minutes(5))
+
+             AdminLogger.get_current_generation()
+             |> AdminLogger.remove_old_generations()
+           end,
+           shutdown: :brutal_kill
+         )
+
+         Task.Supervisor.start_child(
+           Chat.TaskSupervisor,
+           fn ->
+             Chat.NetworkSynchronization.init_workers()
+           end,
+           shutdown: :brutal_kill
+         )
+       end}
       # Start a worker by calling: Chat.Worker.start_link(arg)
       # {Chat.Worker, arg}
     ]
@@ -40,11 +73,15 @@ defmodule Chat.Application do
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Chat.Supervisor]
 
-    Supervisor.start_link(children ++ more_children(@env), opts)
+    Supervisor.start_link(children ++ more_children(), opts)
   end
 
-  defp more_children(:test), do: []
-  defp more_children(_env), do: [Chat.Upload.StaleUploadsPruner]
+  # coveralls-ignore-start
+  if Application.compile_env(:chat, :env) == :test do
+    defp more_children, do: []
+  else
+    defp more_children, do: [Chat.Upload.StaleUploadsPruner]
+  end
 
   # Tell Phoenix to update the endpoint configuration
   # whenever the application is updated.
@@ -53,6 +90,8 @@ defmodule Chat.Application do
     ChatWeb.Endpoint.config_change(changed, removed)
     :ok
   end
+
+  # coveralls-ignore-end
 
   defp log_version do
     ver = System.get_env("RELEASE_SYS_CONFIG")

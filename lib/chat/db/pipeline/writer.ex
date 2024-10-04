@@ -3,7 +3,6 @@ defmodule Chat.Db.Pipeline.Writer do
   Consumes the queue. Handles fsync and FS write for files
 
   """
-  require Logger
   require Record
 
   Record.defrecord(:w_state,
@@ -16,6 +15,7 @@ defmodule Chat.Db.Pipeline.Writer do
   )
 
   alias Chat.Db.ChangeTracker
+  alias Chat.Db.Copying.Logging
   alias Chat.Db.Pipeline.Compactor
   alias Chat.Db.WriteQueue, as: Queue
 
@@ -39,6 +39,8 @@ defmodule Chat.Db.Pipeline.Writer do
   def demand_queue(w_state(queue: write_q) = state) do
     Queue.demand(write_q)
     state
+  catch
+    _, _ -> state
   end
 
   def notify_compactor(w_state(compactor: compactor) = state) do
@@ -81,12 +83,14 @@ defmodule Chat.Db.Pipeline.Writer do
       end)
       |> then(fn {tx, keys} -> {:commit, tx, keys} end)
     end)
+    |> tap(&Logging.log_written_in(&1, db))
     |> ChangeTracker.set_written()
 
     chunks
     |> Enum.each(fn {{:file_chunk, chunk_key, min, max} = key, data} ->
       FileFs.write_file(data, {chunk_key, min, max}, path)
 
+      Logging.log_written_in([key], db)
       ChangeTracker.set_written([key])
     end)
 
@@ -111,7 +115,6 @@ defmodule Chat.Db.Pipeline.Writer do
   def fsync_needed?(w_state(dirt_count: count)), do: count > @fsync_trigger_count
 
   def fsync(w_state(db: db) = state) do
-    ["[db writer] ", "fsyncing ", inspect(db)] |> Logger.warn()
     CubDB.file_sync(db)
 
     state |> w_state(dirt_count: 0)

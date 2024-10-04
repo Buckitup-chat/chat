@@ -35,6 +35,11 @@ defmodule ChatWeb.MainLive.Page.Logout do
     |> assign(:is_password_confirmation_visible, false)
   end
 
+  def go_share(%{assigns: %{}} = socket) do
+    socket
+    |> assign(:logout_step, :share)
+  end
+
   def toggle_password_visibility(%{assigns: %{is_password_visible: flag}} = socket) do
     socket
     |> assign(:is_password_visible, !flag)
@@ -51,6 +56,7 @@ defmodule ChatWeb.MainLive.Page.Logout do
     changeset =
       {%{}, schema()}
       |> Changeset.cast(form, schema() |> Map.keys())
+      |> Changeset.validate_required([:password, :password_confirmation])
       |> Changeset.validate_length(:password, min: 12)
       |> Changeset.validate_format(:password, ~r/^[0-9A-Za-z]+$/,
         message: "Should consist of letters and numbers"

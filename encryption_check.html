@@ -1,84 +1,121 @@
 <html>
+  <head>
+    <script src="assets-fe/index.js"></script>
+    <script type="module">
+      var correctLocalStorage = [
+        [
+          "enigma tester",
+          "MIIEpQIBAAKCAQEAwrpDEPExp5OBh0x4I/x4TBxF8uC73kO0ckHPLvPBUv6yzrdq2VUsIuuRvY9HzF3Se7QxStLpKVXgOmrvEyHVs9Z54Eeays1/Au/Vj5ltGZngvISUORQlk200ZcqNdh39VEjxT+MTN7s1hjfHHJ+PN3xO6eyEVZ/WskruvhCgA8zgVtrnCwHzfVS65XDmvGM4xzNzxhhplM9BvrqSe412VuhVA3+RxbuXCfaAlHaeea4uxSk4yvC9trNzOloYzuxuKnDkRjOPRH1KyevE3iQXE+h3Z7Bk63vheMaLBKjqXNRQKpc/vm2n0XOm8mRuzdPNvse/7bP5iOOd7cp2nXYmfwIDAQABAoIBAQCDlpkBluwGIQDT7FH3h4HHdQez1DhAP6Jt35jhUqleq20rkfjresoDowrufSd4rCIzpBX3SUV0wGpxL5f1ZtTh3Vqou9qXl3xwAKBhlL2MIlcjLbh4RewKjy5sZw9nNWbekRg48usmqyTFWWX9Krn+Ncuh+kmHDydnfomM+PEY/ykMXTsfHBkU28T0Zb7D5kpCOhnNgDo/gmJQe7IlgGPH8HC6/sih1kfl0r6Vp9WbtauPawJRljmDau4wDPugr7aY+73iyMXwRWPejGQNdg/DiPVY3GKFa22eaoMrBZHaLmO8VIvI4bQJk/hycwTJFGBFp+WBUOn3I9sDZRZbA0jJAoGBAN9xSBGH+/Wk/JHveYYfs8gJzYW+BEzHQQTfLRvkk73anuGkfkn8yVa4UvmjZRZHk8vBjh+SYWu2LYLEEvPTQ7jQU+K5dyCHtDXNPENIDhwkbheS8eIvTuW07OdAmkmwawL5gqxUteL1bFuNCSauF+rGjrJFfixq32NRT4sLGzF7AoGBAN8Z36vNvxHecZJyoTxb5EF1VLQtU+nAVP6nKH9ux9zF/4+MZWf9fE1Y9Xx0HYH0l2ZMAMdUzNRt1Feaap2GdrGu40hwQHjKGJR/u7eE3AAvvERFUJNKnlgb67Y+McGeLDDYi4IsUJaCjueEtoT5d1tk5RXP5YDEtYzL7/KJXmXNAoGAT02JYo984WY5LiJsYyoFSM4R35HdPNLLRMtg2zF5LjzVfwg+uku5ucmZyXgwfIPS9NIxewsdAHmcFXk5sMgelQ17eFCS8zy2vRGmfcqpF1vmpv9EUh6wRd685iaLm/O9R0T/F+LI21B3sNaRlOTdIDpwkt0PNvyHZFyLerHqaNkCgYEAipodbjO9T5Gdhzj12HTSQqRtAh7i8eaOJ0KcE0c0nYDYu0qiuU8uyTLKGA5fQpw87s2q8itJsXOmJuKE9+ZQmSSoiRlLxH7xdFhCu8mrj+YYFWXmoAsMgnqeHrNW4A2vMI1nZnC3hDoKI+U8KzJ8p2fwNnPZBf2vOJB+OnSDE8UCgYEAoedVctrv+Ws4IARCN/0Tfem5Gy0lvxQe/cFPri3wpmoH+Ac7P42xQQyGruqfgX/vPFvQl1dofln0X9EYLPdHt2/DRVmp3kYkzcgyU/oqfmLpu+fE9GZZX3jVL/QmZH2VdRBf9o85BhckgafSlF1PYbSuji/rsOIwIZ+p+tsU4as=",
+        ],
+        [
+          "MIIEogIBAAKCAQEAwR3ZNA/olnsOUSyfFn4YoZSseTin8a521seJFnRFRpN5hKK7UeRVMKBF6isv6SEKsqIom1O0ktQPbFOVQyO4xsesP3sYITYEX8dR1Odg5W1slXX0ZoTXOx+Z4tBKfQuoquhrqlk5NxBXQYAFHhNROTUKtkyyfpojhh9JA7nqxVBfAa3VrlU36TSa4BX0MlyHYIPSJY0a0tk2aUMBpYLtN+4kUL+DWSVPIQ+dejWhNdpsehgyVpqcXW4A+Vy1o99/rWJQPUHbDehNB+0G+c0D3YVmWBDSnc2EoLmJXVtkimERpvd/9aYqLi7aoPu7QwSCrZInd7sbt7xhVLlYtmd1OwIDAQABAoIBAHmtYeaww17VSC8TS2Wzq7dbYtS6Qu8/evdXH+Q6/E88qotMsXQmxxptUb/62CQuwnvNOoKr2hHNda5Od7Sm9EyjEL+qwohibZ0fjEr2QpIsQQdnG8fgmXBSN/a2QMjLKMoOyY+6yhcMv72weQj7KOk/p3E3oBuu6QUf/zRO10Lcid5ULxQBAV+HJ/uLH6okZhBpMOT8K4iyHVvWMCgC1+mb1NlVC9dAcCjNzixUcM5O1B2IDQ3fJCLWqVlVGLwKC7sznOLPN4d3ljdEOVuHTeRtqw3HKpbKnEFOifZu8b5GdtILKz62f6Dse+31sE7bb+DW0sr4RsGcDhFPHCErq6ECgYEA3zIoXFbv87Yn36/o0WI49H9mSMQzmVvFUD2PdEzDLf0/LPldUE4aCZb4G1R9txUJxEyg8hWX5KByVfA/w+weorTik20YgKZQhUMOsm5IJD1uUcC8Z5t5ArBZF3oTr2tusIiBqFdipVKRuywCvYQLY0WdKkiRsuafBt4DrdHpY9ECgYEA3X/xaaSRUYNJsE215dg0SV2ezXT7vWKVg4XjxcyJ9bIzbh5RIxPLz1x2h57pGfDoJpqQuLTXust0Rh/xg/8X8B0P49sHXvz1hsRjbPEjhMWbTW62/tt9ByGzt1ko61EARabQeO63r1dR4ReonJt4OOc/vWXZFTwNfZg2Dvokh0sCgYBgHTtgOFfwfVrCawA5WrDoKQyk/UizG9/mY/wouv26CjpwZZoXgOqZgpepPUM92iNwkwcj+MSGQcm61FDBUCcJLhf8IJjSncxC9tOXZwJOCN4++l6nxz3fOI3FHF7pxbvO7ZnYInlqdBopnhQ4BGra/xllIgcMIWAOFwFCkwiMYQKBgEVuOH8z7bVOYQfZpB3zApjItuGSPOLlhxZeHsK+1bPlcweeizJiny1Vv3XNkyXlhO+s3ZZ4YXMVGVJt6ufES32hrnxvCMV2p4PiBYR9pfOVeZPxE32Z0XwtzUa4tQHmNx6eJpTxxzQ4O9tB7kGA3lN/8VPuG/jzBQuMbc2ODWs3AoGALqg8axpibKkdSjGy2FCz3KkzRuYVvYqd6yWPyJnJ1jkBAHKNdRgN42oYDyLU3/vPuoL1DUmoe5HKPM7ypacTUkg85bGWSI5YCSpViIQU6QfE7JcIS+Bs28BSBsZYt0lGOoFrlFYmICl3+/YPfh06pbt9MsrxNpH/UeQXaaYAOpg=",
+        ],
+        {},
+      ];
+      var password = "testpasswordtest";
+      var cipheredContentB64 =
+        "4mVVll/Udm/6XMvRerlL4McjRzdxRnK1gFkrSjBYwUQdxyT9SDdUDoMw9S0pM1c25FvYyrBMC8g4MKWdWOrJlwexEjiMiGOkUVV4pkxG2YZ9neiS3j1P1wVvVXS7zYrWQOQJFpB8XsRuGpGMjSR/MxBDFYJ1jXBBKIbiZBEf86u/cvNNNrGbtkFS1l3RSAbDGVg9PdJQ3+3WgPYnyq2IY65hWm7+RTQUrMw2TvZ7AZLvFAhCi/3QxXOX4pJOQ0bQr3klmQfhesDco5ZwXeXF5ZtA25PcTG/9MymoMHuFJ0G07w6mcl5KunZgjIqAJyPKWQq5Mo/ScH45fvD74QG6qwb9paO/6qdFiejCPNHVhd1KVbYqY4DmPKTcTKixyq5iQo+Q9cRoqzEHbRhaak2wON6ScFPJ5PxiUwXTZ+hnxJ7hDKFEt/XtisjHDjoeSJbUt7dh0jULcHvAi19iEc+SA1IrR/e8hUJjMz7DmXboXJP4QjD2T976M9mtJ6QDZN0yMJg3d6LKMutWrBYKVfJzFJvhYwY+OjiX4WPiAll2WYPMC+P17tajg0XpkKCG4WP0Tp0JKhHHC52nyeOUD5Y6GMX3SvnnK4qh3y1hBSwUmboCvJ1SKGJDufDQwJWyWGjot0AY+8Si9quLzQJ4PX3GkZA4SKqL8TRKrSklfKRvAz3YS2D+OQizCfHTez8PHXJcxzABN6w1/ExiH563lBsad3mbKyfqHVGEGrjh5HtKF9HUi+xFchSrZDGda7JnNgZ+zYmHM+N5ZK2Fhpa1c9TNivFDiFuLajXhhlEY/ZNAswTSu3DkKB7ieZaR1biGFj+z+Qj6jY4GEauFA7p+IbzHVsm8bHNr1g/OrbZChTEuv7Ze6pPrN5JQpP+OzrZnkrG6aemTWWDc95SoBtjsXh3N8IP25WJUgC+NDuoeH+PHnMJfVyrONYlTPV6N/m41R+K3RF6SuwGm53IdTSHTre5hfXMnB1al52dqEAPNB6NspEWXf0YbtRnNC+8SYX09cALzb1QN2VKEiTRVW1zg7lvoWvsdh+K0jo5I57q/bfX0t1I7wlZf94B5pRxz3R2ZDFBkkjRov2JjcLbIWkEkrcT4RQl2f2PCacIsygan9jq9LVGaHhqr5ksPzegMz0cb8RxqcosjV7+4c0zqM11Hc5VS0d8o7O2LQC0QlOrVPmq2DDVy+fQYueTZjeEA51vd/8KxXP2clr1MZ/J373JfP6EF0Z0p7M8uPhpSJ47HAYX3dcqNaYFIqH29HP1U4llXkxtP7upAvdyTAHFckoU8ySbYumrqxBd0qwfSo3VFsfp85I9dMOn2GErafoY0aMYHN4XRX4pWoYHdfrpC27cfnCFu6Ngdvp0w/EdO/9HSm7s2kPGgmgX7Shlc1+pTQHzld2DFczoQ0W2pFPKzRN95fGjaTTUH2+br3u7APIXl4+4yY9wKV7k150Y5cRoBfxC9oHzZqXzHmGtskOt7NJXfkJAl/tii4F9UREhBNE2AZI/D9tzkLKFZO0IyZFcHKDW5CZQTHwY5E60RHaQJJqqBLXwrwvvyigR4ofMspvYcyO6/o+vM5TJrYEPheXusFt4CzSOgrkpJEj296nLkfav38JgUUXKmcxymSehSS0bnx+cUAQ0+oPe+HigR5ccYFw78nFJ8TRAcrDzIAntXLv4g6qH0cGhrIwg6/P2HXMuXOpCORlGp/IeoiipeplTS8B4dryLZLmpzpkUO/BxZrnjkxknNKEi/LPiqoTE4QAUvrxKZLsANEoeun2eLshZ3drlBO2tJsclL69Fon65vrLkttvJSKb7vsBK5ZiYKpyriBULD/RNmCnRLUtIX/cCKl4SM610YwfxkMehpw4gd8D7KTa5Uz72Cq2puUiYb8V2Wkf/YKrV6lZJbCYoWBahRXCiW/IvQlA2DDentXnaogAy4Jbau5qj+5Gzhh9rX+iKA4Q7akaqRPvKQZozTW2pW/CYDkq2ejGxvWQIW6VI7lHHEZWMHOoAGqvW7kFqZ0vPSvL/brtNkyXBV9jGcT2dRaKzreu5d0zFCjziH3hOg26RS3jWGvQiH8RrF7hAIBeIAweAG8GlcWD251g6Mjik7oV0vIddvBULRypzQ00fvYBMJUUkQX3VvzGoTuFC6wPgV2KadhlyCLmdugoOZAdQrHLvVlHbbRitX2crbMyLIQQ8xYycwH14XsVAcMg34xtGPpsE7VR49rIFdRrF5ZYyHuxcxoQwT0V8bVO2u9IILPfZ+fWY0lqlcQYVPoVS8PPSy7ywVaTTIxdusBmVl5+ljapF1VsSGxLJXSwNI/wOzFG+4kNnosojWiN3MmTmTc2A1/5l7XHpNIBJKHi9NNQ0hLP4I0B3eFpQt0DYmto/t5ouvo/fFinAtAb1E4DO8AVbw+jLYXFhA4RfU4pqemZwl8Wk0PMIBgtpNiFPJzzmehRV97qACrYDpV1fbXq+vTyOS5ZX8CY6RNFgUmAZmNsUGtw+YU6uq9aPx6eeY7xAa8ypTJNYLFBYS2w056VKZCklb9ZTfnXGyW2WQkui2M12ToXVfsi+xlHsWHi3qg/udmqbnFQU+OtfykyB3VpZRynsoD38xVS0uca+Jk02JOo/LSkftzaHfJDYJwwMXyQEaHtVRnVn4v5IKC/wSr6DeDJWAqFWTfcOadIudnSt9V3+/D2KnoXqbpNeOJB4J1EtSavWd66Lm04BhLBAoI7EoZx4ipsO8YfOVUU+/erpg8eNDYtQ4hse0zMmFRWN04aqdn42EVBj93VrNl/J5CyJwXe/xTaUXnbxmsD9f/b5FThvvdvR6lvbp+XihdPs9dc8B5m2gouPAIvrNaz3Jr8INkFCs43QCtXjJejqKrnR5hO3s0DQ/rOsoWPhiQ5xzASJxm8MMQbdYIJYfPAwNdeQDy+DDGYNYOJQxXbQUXkc5s8sg8lQrtzTv+ZZvJmlXDeKsPZSk0AGEwqUA8j9uh4Eo4MYG/S0aJHp1EUf/J9Z3gYqwjFqQr5gkAX/P3pGMGzpcbF0Oyc9dFC4h4MuAZeE8adg/wewMDAjGfIwN2VcO8fWMOj6qqeaJtwiTKBMGZbyx9dWPvAk+NwZFhtQIvlfG8qBHYL3/nuAhUjO/Coh35NH6THAsoS2NQTK2+94SYiTIoOyXDu3dMxlmr6oaSquERk/V+O+ePhCDLzLBO+Pmj0bGEfBYum7FyrMfzVjbj2T6EAdmT912Fg+5D7S8sLsFUnuFDx7W0jtEVxE+oJJvdamKl/C3p9/Y/Npkvj9tSOIBWvmYzILgMY5x2dBTKtIBI9JfKdp6gQsFHnCUAfxDhEJuxuCtzJVWC3HQFPk6fVXbGzsP2ag7+PGhkltZSA8SjUV+w0kgSS6rfENj70tSC0k5G1Gf74wkJX2TaAjPkajNJaHSNQXEaMhGhMrubUbhcrXr7/OBGVuwBPHrCq6/VukRD3KCWT9FFMytmuFb3Jk9bI85EyupAkgJE8FKAhS02rTIXRiZA1sKzuh35Xt7/nesFCCksGMVe1PbGFK5FhhtDCuqYkk6ujBZ3nDFpX9GMLo6dMo6fECgYwhb6d5WRmot6KRkG6f5xvK1U1NBWy9RLna3cVSYw3gMSs/jgYTbgaH4m53QHxvhn3RQ7HhxsZUTa+bl5PaF0kbNAj9yuNFHAKRpS5ppY/togcHu6mhyp90tQJJfZv7gqd397pFVIvouv92VjDfZs847InJyrGlHpOX2HuVdF6gM33i1sy/Biv7rzE+56COYanPsdj5xgt2uZPuW6SGj7DZZpexywAos0fvicaxepqffoW5Yzh7owjZOxdqJFH0SVmVdPFu5kMNcgCtNu33b2x4JUfsUKKNLc9KYLRWlINoZMhGJlbes6vwpsOR1pOP8YNeDvl/K+r6qhybLM9oe1ZUgqaaG83kVNHEIkLovQo1p4pqzcLL6PUGhZeIrsSYbtO2Mk3F1Lbb2FCxQCe6WEWHy7qooF2UJ3HWySfSRMwWcrtLOhXQ7VuWv/ufnHKhsguqKqEfiark8vbZf4Io87LFt5jcE14ohyJTtC2fEz8NCRC7kgR9VxddyM6BG6R/ZIL+o9zA9NUI9SzJLlFD4hLupAqXUFdH1JXo2Dslah/MkaMTFNLaGfEji1AnV39IGA4DUMa6tSL/db9GfGcS4LbPmwFpKp5vQ/4lOvHdae0NPPD2hZGVs4lse/sATWk3I7xYLIT94BI+yn8hHQmBwo3ZrQzhrAX7CL5PtC4+QciLPbIAGNFcdnVBcNMsmFTMpM2zQ7WDkgO8w";
 
-<head>
-  <script src="assets-fe/index.js"></script>
-  <script type="module">
-    var correctLocalStorage = [["enigma tester", "MIIEpQIBAAKCAQEAwrpDEPExp5OBh0x4I/x4TBxF8uC73kO0ckHPLvPBUv6yzrdq2VUsIuuRvY9HzF3Se7QxStLpKVXgOmrvEyHVs9Z54Eeays1/Au/Vj5ltGZngvISUORQlk200ZcqNdh39VEjxT+MTN7s1hjfHHJ+PN3xO6eyEVZ/WskruvhCgA8zgVtrnCwHzfVS65XDmvGM4xzNzxhhplM9BvrqSe412VuhVA3+RxbuXCfaAlHaeea4uxSk4yvC9trNzOloYzuxuKnDkRjOPRH1KyevE3iQXE+h3Z7Bk63vheMaLBKjqXNRQKpc/vm2n0XOm8mRuzdPNvse/7bP5iOOd7cp2nXYmfwIDAQABAoIBAQCDlpkBluwGIQDT7FH3h4HHdQez1DhAP6Jt35jhUqleq20rkfjresoDowrufSd4rCIzpBX3SUV0wGpxL5f1ZtTh3Vqou9qXl3xwAKBhlL2MIlcjLbh4RewKjy5sZw9nNWbekRg48usmqyTFWWX9Krn+Ncuh+kmHDydnfomM+PEY/ykMXTsfHBkU28T0Zb7D5kpCOhnNgDo/gmJQe7IlgGPH8HC6/sih1kfl0r6Vp9WbtauPawJRljmDau4wDPugr7aY+73iyMXwRWPejGQNdg/DiPVY3GKFa22eaoMrBZHaLmO8VIvI4bQJk/hycwTJFGBFp+WBUOn3I9sDZRZbA0jJAoGBAN9xSBGH+/Wk/JHveYYfs8gJzYW+BEzHQQTfLRvkk73anuGkfkn8yVa4UvmjZRZHk8vBjh+SYWu2LYLEEvPTQ7jQU+K5dyCHtDXNPENIDhwkbheS8eIvTuW07OdAmkmwawL5gqxUteL1bFuNCSauF+rGjrJFfixq32NRT4sLGzF7AoGBAN8Z36vNvxHecZJyoTxb5EF1VLQtU+nAVP6nKH9ux9zF/4+MZWf9fE1Y9Xx0HYH0l2ZMAMdUzNRt1Feaap2GdrGu40hwQHjKGJR/u7eE3AAvvERFUJNKnlgb67Y+McGeLDDYi4IsUJaCjueEtoT5d1tk5RXP5YDEtYzL7/KJXmXNAoGAT02JYo984WY5LiJsYyoFSM4R35HdPNLLRMtg2zF5LjzVfwg+uku5ucmZyXgwfIPS9NIxewsdAHmcFXk5sMgelQ17eFCS8zy2vRGmfcqpF1vmpv9EUh6wRd685iaLm/O9R0T/F+LI21B3sNaRlOTdIDpwkt0PNvyHZFyLerHqaNkCgYEAipodbjO9T5Gdhzj12HTSQqRtAh7i8eaOJ0KcE0c0nYDYu0qiuU8uyTLKGA5fQpw87s2q8itJsXOmJuKE9+ZQmSSoiRlLxH7xdFhCu8mrj+YYFWXmoAsMgnqeHrNW4A2vMI1nZnC3hDoKI+U8KzJ8p2fwNnPZBf2vOJB+OnSDE8UCgYEAoedVctrv+Ws4IARCN/0Tfem5Gy0lvxQe/cFPri3wpmoH+Ac7P42xQQyGruqfgX/vPFvQl1dofln0X9EYLPdHt2/DRVmp3kYkzcgyU/oqfmLpu+fE9GZZX3jVL/QmZH2VdRBf9o85BhckgafSlF1PYbSuji/rsOIwIZ+p+tsU4as="], ["MIIEogIBAAKCAQEAwR3ZNA/olnsOUSyfFn4YoZSseTin8a521seJFnRFRpN5hKK7UeRVMKBF6isv6SEKsqIom1O0ktQPbFOVQyO4xsesP3sYITYEX8dR1Odg5W1slXX0ZoTXOx+Z4tBKfQuoquhrqlk5NxBXQYAFHhNROTUKtkyyfpojhh9JA7nqxVBfAa3VrlU36TSa4BX0MlyHYIPSJY0a0tk2aUMBpYLtN+4kUL+DWSVPIQ+dejWhNdpsehgyVpqcXW4A+Vy1o99/rWJQPUHbDehNB+0G+c0D3YVmWBDSnc2EoLmJXVtkimERpvd/9aYqLi7aoPu7QwSCrZInd7sbt7xhVLlYtmd1OwIDAQABAoIBAHmtYeaww17VSC8TS2Wzq7dbYtS6Qu8/evdXH+Q6/E88qotMsXQmxxptUb/62CQuwnvNOoKr2hHNda5Od7Sm9EyjEL+qwohibZ0fjEr2QpIsQQdnG8fgmXBSN/a2QMjLKMoOyY+6yhcMv72weQj7KOk/p3E3oBuu6QUf/zRO10Lcid5ULxQBAV+HJ/uLH6okZhBpMOT8K4iyHVvWMCgC1+mb1NlVC9dAcCjNzixUcM5O1B2IDQ3fJCLWqVlVGLwKC7sznOLPN4d3ljdEOVuHTeRtqw3HKpbKnEFOifZu8b5GdtILKz62f6Dse+31sE7bb+DW0sr4RsGcDhFPHCErq6ECgYEA3zIoXFbv87Yn36/o0WI49H9mSMQzmVvFUD2PdEzDLf0/LPldUE4aCZb4G1R9txUJxEyg8hWX5KByVfA/w+weorTik20YgKZQhUMOsm5IJD1uUcC8Z5t5ArBZF3oTr2tusIiBqFdipVKRuywCvYQLY0WdKkiRsuafBt4DrdHpY9ECgYEA3X/xaaSRUYNJsE215dg0SV2ezXT7vWKVg4XjxcyJ9bIzbh5RIxPLz1x2h57pGfDoJpqQuLTXust0Rh/xg/8X8B0P49sHXvz1hsRjbPEjhMWbTW62/tt9ByGzt1ko61EARabQeO63r1dR4ReonJt4OOc/vWXZFTwNfZg2Dvokh0sCgYBgHTtgOFfwfVrCawA5WrDoKQyk/UizG9/mY/wouv26CjpwZZoXgOqZgpepPUM92iNwkwcj+MSGQcm61FDBUCcJLhf8IJjSncxC9tOXZwJOCN4++l6nxz3fOI3FHF7pxbvO7ZnYInlqdBopnhQ4BGra/xllIgcMIWAOFwFCkwiMYQKBgEVuOH8z7bVOYQfZpB3zApjItuGSPOLlhxZeHsK+1bPlcweeizJiny1Vv3XNkyXlhO+s3ZZ4YXMVGVJt6ufES32hrnxvCMV2p4PiBYR9pfOVeZPxE32Z0XwtzUa4tQHmNx6eJpTxxzQ4O9tB7kGA3lN/8VPuG/jzBQuMbc2ODWs3AoGALqg8axpibKkdSjGy2FCz3KkzRuYVvYqd6yWPyJnJ1jkBAHKNdRgN42oYDyLU3/vPuoL1DUmoe5HKPM7ypacTUkg85bGWSI5YCSpViIQU6QfE7JcIS+Bs28BSBsZYt0lGOoFrlFYmICl3+/YPfh06pbt9MsrxNpH/UeQXaaYAOpg="], {}]
-    var password = "testpasswordtest";
-    var cipheredContentB64 = "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"
+      var passwordHash = enigma.hash(Buffer.from(password).toString("base64"));
+      const correctB64PasswordHash =
+        "9SXzCP6VM1+5fMjLLoPoi8cBN4unROj6xzJ5Xc9em5A=";
 
+      console.log("Hashing check ", correctB64PasswordHash == passwordHash);
 
-    var passwordHash = enigma.hash(Buffer.from(password).toString('base64'))
-    const correctB64PasswordHash = "9SXzCP6VM1+5fMjLLoPoi8cBN4unROj6xzJ5Xc9em5A="
+      const cipheredContent = Buffer.from(cipheredContentB64, "base64");
+      const deciphered = enigma.decipher(cipheredContentB64, passwordHash);
 
-    console.log("Hashing check ", correctB64PasswordHash == passwordHash)
+      console.log(
+        "Decipher check ",
+        deciphered.toString() == JSON.stringify(correctLocalStorage),
+      );
 
+      const contentB64 = Buffer.from(
+        JSON.stringify(correctLocalStorage),
+      ).toString("base64");
+      const ciphered = enigma.cipher(contentB64, passwordHash);
 
-    const cipheredContent = Buffer.from(cipheredContentB64, 'base64')
-    const deciphered = enigma.decipher(cipheredContentB64, passwordHash)
+      console.log(
+        "Cipher check ",
+        ciphered.toString("base64") == cipheredContentB64,
+      );
 
-    console.log("Decipher check ", deciphered.toString() == JSON.stringify(correctLocalStorage))
+      const hashCheckingB64 = {
+        "ysXSpU4FtIREs9IlbrSEcsdyHbpKpxYXc6jAXWHhTIU=":
+          "+KjHpjIVIbzG+wQltIR+jRU3lXnmLkUtH4UA8JNhmVg=",
+        "MdFfqBGHdHvA6BYTC0TedglWfmzldjGczFRFvdAwBzQ=":
+          "LksCBue9Isq8wVyYHow3XkxhLpI+mBKh8ysdYRIZLkI=",
+      };
 
+      for (let data_b64 in hashCheckingB64) {
+        const hash_b64 = hashCheckingB64[data_b64];
+        const hashed = enigma.hash(data_b64);
 
-    const contentB64 = Buffer.from(JSON.stringify(correctLocalStorage)).toString('base64')
-    const ciphered = enigma.cipher(contentB64, passwordHash)
+        console.log(hash_b64 == hashed, hash_b64, hashed, data_b64);
+      }
 
-    console.log("Cipher check ", ciphered.toString('base64') == cipheredContentB64)
+      const local_storage_json = [
+        [
+          "Enc Test",
+          "/Lww78qGiSHKkoc2gvwqY4UBK8hCh1RD54H9ZobkPKACfz90ZJoAWpiSLEpl/ZDF/nq9Q3U3ifHBxPoZ3jbQ6RI=",
+        ],
+        [],
+        [],
+      ];
+      const plain_b64 =
+        "W1siRW5jIFRlc3QiLCIvTHd3NzhxR2lTSEtrb2MyZ3Z3cVk0VUJLOGhDaDFSRDU0SDlab2JrUEtBQ2Z6OTBaSm9BV3BpU0xFcGwvWkRGL25xOVEzVTNpZkhCeFBvWjNqYlE2Ukk9Il0sW10se31d";
+      const enc_b64 =
+        "Xh7/vgdkX7PfXAbY7p2ohyoaWU2QUo8TbShn7/971LC5fFxRVIuEskjTVUxVGKImnv5aJu/BUaIjhCnDPOrhNBKq/X+QvksVnbvz1Ek1hehC8pLuSyKp5ggC1phs7gVIg++IETTo7mdNJHAnXZ5+";
+      const pass = "test12test12";
+      const short_code = "e0c5dc";
 
+      const storage_b64 = Buffer.from(
+        JSON.stringify(local_storage_json),
+      ).toString("base64");
 
-    const hashCheckingB64 = {
-      "ysXSpU4FtIREs9IlbrSEcsdyHbpKpxYXc6jAXWHhTIU=": "+KjHpjIVIbzG+wQltIR+jRU3lXnmLkUtH4UA8JNhmVg=",
-      "MdFfqBGHdHvA6BYTC0TedglWfmzldjGczFRFvdAwBzQ=": "LksCBue9Isq8wVyYHow3XkxhLpI+mBKh8ysdYRIZLkI=",
-    }
+      console.log([plain_b64 == storage_b64, plain_b64, storage_b64]);
 
-    for (let data_b64 in hashCheckingB64) {
-      const hash_b64 = hashCheckingB64[data_b64]
-      const hashed = enigma.hash(data_b64)
+      console.log([
+        JSON.stringify(local_storage_json),
+        Buffer.from(plain_b64, "base64").toString(),
+      ]);
 
-      console.log(hash_b64 == hashed, hash_b64, hashed, data_b64)
-    }
+      console.log([
+        enigma.hash(Buffer.from(pass).toString("base64")),
+        Buffer.from(
+          enigma.decipher(
+            enc_b64,
+            enigma.hash(Buffer.from(pass).toString("base64")),
+          ),
+        ).toString(),
+      ]);
 
-    const local_storage_json = [["Enc Test", "/Lww78qGiSHKkoc2gvwqY4UBK8hCh1RD54H9ZobkPKACfz90ZJoAWpiSLEpl/ZDF/nq9Q3U3ifHBxPoZ3jbQ6RI="], [], []];
-    const plain_b64 = "W1siRW5jIFRlc3QiLCIvTHd3NzhxR2lTSEtrb2MyZ3Z3cVk0VUJLOGhDaDFSRDU0SDlab2JrUEtBQ2Z6OTBaSm9BV3BpU0xFcGwvWkRGL25xOVEzVTNpZkhCeFBvWjNqYlE2Ukk9Il0sW10se31d"
-    const enc_b64 = "Xh7/vgdkX7PfXAbY7p2ohyoaWU2QUo8TbShn7/971LC5fFxRVIuEskjTVUxVGKImnv5aJu/BUaIjhCnDPOrhNBKq/X+QvksVnbvz1Ek1hehC8pLuSyKp5ggC1phs7gVIg++IETTo7mdNJHAnXZ5+"
-    const pass = "test12test12"
+      let passwordHash_2 = enigma.hash(Buffer.from(pass).toString("base64"));
+      const downloadData = local_storage_json;
+      // const downloadData = localStorage.getItem('buckitUp-chat-auth');
+      console.log("downloadData", [downloadData, JSON.stringify(downloadData)]);
+      const contentB64_2 = Buffer.from(JSON.stringify(downloadData)).toString(
+        "base64",
+      );
+      const ciphered_2 = enigma.cipher(contentB64_2, passwordHash_2);
+      const userName = downloadData[0][0];
+      const file = new Blob([ciphered_2], { type: "application/octet-stream" });
+      const fileURL = URL.createObjectURL(file);
+      const linkElement = document.createElement("a");
+      linkElement.setAttribute("href", fileURL);
+      linkElement.setAttribute("download", `${userName}.data`);
+      linkElement.click();
+      //localStorage.clear()
+      //window.location.reload();
 
-    const storage_b64 = Buffer.from(JSON.stringify(local_storage_json)).toString('base64')
-
-    console.log([plain_b64 == storage_b64, plain_b64, storage_b64])
-
-    console.log([
-      JSON.stringify(local_storage_json),
-      Buffer.from(plain_b64, 'base64').toString()
-
-    ])
-
-    console.log([
-      enigma.hash(Buffer.from(pass).toString('base64')),
-      Buffer.from(
-        enigma.decipher(
-          enc_b64,
-          enigma.hash(Buffer.from(pass).toString('base64'))
-        )
-      ).toString()
-    ])
-
-    let passwordHash_2 = enigma.hash(Buffer.from(pass).toString('base64'))
-    const downloadData = local_storage_json
-    // const downloadData = localStorage.getItem('buckitUp-chat-auth');
-    console.log('downloadData', [downloadData, JSON.stringify(downloadData)])
-    const contentB64_2 = Buffer.from(JSON.stringify(downloadData)).toString('base64');
-    const ciphered_2 = enigma.cipher(contentB64_2, passwordHash_2);
-    const userName = downloadData[0][0];
-    const file = new Blob([ciphered_2], {type: 'application/octet-stream'});
-    const fileURL = URL.createObjectURL(file);
-    const linkElement = document.createElement("a");
-    linkElement.setAttribute('href', fileURL);
-    linkElement.setAttribute('download', `${userName}.data`);
-    linkElement.click();
-    //localStorage.clear()
-    //window.location.reload();
-  </script>
-</head>
-
+      const computed_short_code = enigma.shortcode_form_full_key(
+        local_storage_json[0][1],
+      );
+      console.log(
+        "Short code",
+        computed_short_code == short_code,
+        computed_short_code,
+      );
+    </script>
+  </head>
 </html>

@@ -45,6 +45,7 @@ npm-debug.log
 # Database
 /priv/db
 /priv/admin_db*
+/priv/test_backup_db
 /priv/test_db
 /priv/test_admin_db
 
@@ -53,6 +54,7 @@ chat.iml
 .DS_Store
 .idea/
 .elixir-ls/
+.elixir-tools/
 .vscode/
 node_modules
 

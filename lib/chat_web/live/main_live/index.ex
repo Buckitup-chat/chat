@@ -4,14 +4,36 @@ defmodule ChatWeb.MainLive.Index do
 
   require Logger
 
-  alias Phoenix.LiveView.JS
-  alias ChatWeb.Hooks.{LocalTimeHook, OnlinersSyncHook, UploaderHook}
-  alias ChatWeb.MainLive.Admin.MediaSettingsForm
-  alias ChatWeb.MainLive.{Layout, Page}
+  alias Chat.Admin.CargoSettings
+  alias Chat.{AdminRoom, Dialogs, Identity, Messages, RoomInviteIndex}
+  alias Chat.Rooms.Room
+  alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
+  alias ChatWeb.Hooks.{LiveModalHook, LocalTimeHook, UploaderHook}
 
+  alias ChatWeb.MainLive.Admin.{
+    BackupSettingsForm,
+    CargoCameraSensorsForm,
+    CargoCheckpointsForm,
+    CargoUserData,
+    CargoWeightSensorForm,
+    FirmwareUpgradeForm,
+    LanSettings,
+    MediaSettingsForm,
+    NetworkSourceList,
+    PrivacyPolicy,
+    ZerotierSettings
+  }
+
+  alias ChatWeb.MainLive.{Layout, Page}
+  alias ChatWeb.MainLive.Page.RoomForm
+  alias Phoenix.LiveView.JS
+  alias Phoenix.PubSub
+
+  on_mount LiveModalHook
   on_mount LocalTimeHook
   on_mount UploaderHook
-  on_mount OnlinersSyncHook
+
+  embed_templates "*"
 
   @impl true
   def mount(
@@ -20,7 +42,13 @@ defmodule ChatWeb.MainLive.Index do
         %{assigns: %{live_action: action}} = socket
       ) do
     Process.flag(:sensitive, true)
-    socket = assign(socket, :operating_system, operating_system)
+
+    socket =
+      socket
+      |> assign(:operating_system, operating_system)
+      |> assign_backup_settings()
+      |> assign_cargo_settings()
+      |> assign_media_settings()
 
     if connected?(socket) do
       if action == :export do
@@ -39,6 +67,9 @@ defmodule ChatWeb.MainLive.Index do
         )
         |> LocalTimeHook.assign_time(Phoenix.LiveView.get_connect_params(socket)["tz_info"])
         |> allow_any500m_upload(:my_keys_file)
+        |> allow_recover_upload()
+        |> set_cargo_room()
+        |> set_usb_drive_dump_room()
         |> Page.Login.check_stored()
         |> ok()
       end
@@ -49,12 +80,33 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   @impl true
+  def render(assigns) do
+    ~H"""
+    <.main {assigns} />
+    """
+  end
+
+  @impl true
+  def handle_params(%{"hash" => hash}, _, %{assigns: %{live_action: :room_message_link}} = socket) do
+    socket
+    |> assign(:room_message_link_hash, hash)
+    |> noreply()
+  end
+
+  @impl true
+  def handle_params(%{"hash" => hash}, _, %{assigns: %{live_action: :chat_link}} = socket) do
+    socket
+    |> assign(:chat_link, hash)
+    |> noreply()
+  end
+
+  def handle_params(_, _, socket), do: socket |> noreply()
+
+  @impl true
   def handle_event("login", %{"login" => %{"name" => name}}, socket) do
     socket
     |> Page.Login.create_user(name)
-    |> Page.Lobby.init()
-    |> Page.Dialog.init()
-    |> Page.Logout.init()
+    |> login_init()
     |> noreply()
   end
 
@@ -74,9 +126,7 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> Page.Login.handshaked()
     |> Page.Login.load_user(data)
-    |> Page.Lobby.init()
-    |> Page.Dialog.init()
-    |> Page.Logout.init()
+    |> login_init()
     |> noreply()
   end
 
@@ -97,6 +147,13 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> Page.Login.close()
     |> Page.ImportOwnKeyRing.init()
+    |> noreply()
+  end
+
+  def handle_event("login:recover-key-share", _, socket) do
+    socket
+    |> Page.Login.close()
+    |> assign(:mode, :recover_key_share)
     |> noreply()
   end
 
@@ -140,6 +197,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_event("login:recovery-key-close", _, socket) do
+    socket
+    |> assign(:need_login, true)
+    |> noreply()
+  end
+
   def handle_event("login:export-code-close", _, socket) do
     socket
     |> push_event("chat:redirect", %{url: Routes.main_index_path(socket, :index)})
@@ -177,12 +240,6 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
-  def handle_event("close-feeds", _, socket) do
-    socket
-    |> Page.Feed.close()
-    |> noreply()
-  end
-
   def handle_event("open-data-restore", _, socket) do
     socket
     |> assign(:mode, :restore_data)
@@ -206,6 +263,12 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("logout-go-middle", _, socket) do
     socket
     |> Page.Logout.go_middle()
+    |> noreply()
+  end
+
+  def handle_event("logout-go-share", _, socket) do
+    socket
+    |> Page.Logout.go_share()
     |> noreply()
   end
 
@@ -246,6 +309,7 @@ defmodule ChatWeb.MainLive.Index do
 
   def handle_event("logout-wipe", _, socket) do
     socket
+    |> Page.Shared.untrack_onliners_presence()
     |> Page.Login.clear()
     |> Page.Logout.wipe()
     |> noreply()
@@ -254,6 +318,12 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("logout-close", _, socket) do
     socket
     |> Page.Logout.close()
+    |> noreply()
+  end
+
+  def handle_event("lobby/search", params, socket) do
+    socket
+    |> Page.Lobby.filter_search_results(params)
     |> noreply()
   end
 
@@ -278,6 +348,68 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("put-flash", %{"key" => key, "message" => message}, socket) do
     socket
     |> put_flash(key, message)
+    |> noreply()
+  end
+
+  def handle_event("cargo:activate", _params, socket) do
+    UsbDriveDumpRoom.remove()
+    CargoRoom.activate(socket.assigns.room.pub_key)
+
+    %CargoSettings{} = cargo_settings = socket.assigns.cargo_settings
+    %Identity{} = me = socket.assigns.me
+    %Identity{} = room_identity = socket.assigns.room_identity
+    %Room{} = room = socket.assigns.room
+
+    cargo_settings.checkpoints
+    |> Enum.each(fn checkpoint ->
+      dialog = Dialogs.open(me, checkpoint)
+
+      invites =
+        Dialogs.read(dialog, me)
+        |> Stream.filter(fn %{type: type} -> type == :room_invite end)
+        |> Stream.filter(fn message ->
+          identity = Dialogs.extract_invite_room_identity(message)
+          identity.public_key == room_identity.public_key
+        end)
+        |> Enum.to_list()
+
+      if invites == [] do
+        room_identity
+        |> Map.put(:name, room.name)
+        |> Messages.RoomInvite.new()
+        |> Dialogs.add_new_message(me, dialog)
+        |> RoomInviteIndex.add(dialog, me, room.pub_key)
+      end
+    end)
+
+    noreply(socket)
+  end
+
+  def handle_event("cargo:remove", _params, socket) do
+    CargoRoom.remove()
+    noreply(socket)
+  end
+
+  def handle_event("dump:activate", _params, socket) do
+    CargoRoom.remove()
+
+    UsbDriveDumpRoom.activate(
+      socket.assigns.room.pub_key,
+      socket.assigns.room_identity,
+      socket.assigns.monotonic_offset
+    )
+
+    noreply(socket)
+  end
+
+  def handle_event("dump:remove", _params, socket) do
+    UsbDriveDumpRoom.remove()
+    noreply(socket)
+  end
+
+  def handle_info({:key_shared, _params}, socket) do
+    socket
+    |> Page.Logout.go_final()
     |> noreply()
   end
 
@@ -324,19 +456,26 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.ImportKeyRing.save_key_ring(keys)
     |> Page.Login.store()
     |> Page.ImportKeyRing.close()
-    |> Page.Lobby.init()
-    |> Page.Logout.init()
-    |> Page.Dialog.init()
+    |> login_init()
     |> noreply()
   end
 
   def handle_info({:db_status, msg}, socket),
     do: socket |> Page.Lobby.set_db_status(msg) |> noreply()
 
+  def handle_info({:free_spaces, msg}, socket),
+    do: socket |> Page.AdminPanel.set_free_spaces(msg) |> noreply()
+
   def handle_info({:room, msg}, socket),
     do: socket |> Page.RoomRouter.info(msg) |> noreply()
 
   def handle_info({:platform_response, msg}, socket),
+    do: socket |> Page.AdminPanelRouter.info(msg) |> noreply()
+
+  def handle_info({:lobby, :refresh_rooms_and_users}, socket),
+    do: socket |> Page.Lobby.refresh_rooms_and_users() |> noreply()
+
+  def handle_info({:admin, msg}, socket),
     do: socket |> Page.AdminPanelRouter.info(msg) |> noreply()
 
   def handle_info({:dialog, msg}, socket), do: socket |> Page.DialogRouter.info(msg) |> noreply()
@@ -351,7 +490,89 @@ defmodule ChatWeb.MainLive.Index do
     Process.demonitor(ref, [:flush])
 
     socket
-    |> Page.Lobby.process(task)
+    |> process(task)
+    |> noreply()
+  end
+
+  def handle_info(:update_backup_settings, socket) do
+    socket
+    |> assign_backup_settings()
+    |> noreply()
+  end
+
+  def handle_info(:update_cargo_settings, socket) do
+    socket
+    |> assign_cargo_settings()
+    |> noreply()
+  end
+
+  def handle_info(:update_media_settings, socket) do
+    socket
+    |> assign_media_settings()
+    |> noreply()
+  end
+
+  def handle_info({:create_new_room, %{name: name, type: type}}, socket) do
+    socket
+    |> Page.Lobby.new_room(name, type)
+    |> Page.Room.maybe_enable_cargo()
+    |> Page.Room.maybe_enable_usb_drive_dump()
+    |> noreply()
+  end
+
+  def handle_info({:maybe_activate_cargo_room, true, %Room{} = room, room_identity}, socket) do
+    UsbDriveDumpRoom.remove()
+    CargoRoom.activate(room.pub_key)
+
+    %CargoSettings{} = cargo_settings = socket.assigns.cargo_settings
+    %Identity{} = me = socket.assigns.me
+
+    cargo_settings.checkpoints
+    |> Enum.each(fn checkpoint ->
+      dialog = Dialogs.find_or_open(me, checkpoint)
+
+      room_identity
+      |> Map.put(:name, room.name)
+      |> Messages.RoomInvite.new()
+      |> Dialogs.add_new_message(me, dialog)
+      |> RoomInviteIndex.add(dialog, me, room.pub_key)
+    end)
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:maybe_activate_cargo_room, _cargo?, _room, _room_identity}, socket),
+    do: {:noreply, socket}
+
+  def handle_info({:update_cargo_room, cargo_room}, socket) do
+    socket
+    |> assign(:cargo_room, cargo_room)
+    |> Page.Room.maybe_enable_cargo()
+    |> Page.Room.maybe_enable_usb_drive_dump()
+    |> noreply()
+  end
+
+  def handle_info({:update_usb_drive_dump_progress, dump_room}, socket) do
+    socket
+    |> assign(:usb_drive_dump_room, dump_room)
+    |> noreply()
+  end
+
+  def handle_info({:update_usb_drive_dump_room, dump_room}, socket) do
+    socket
+    |> assign(:usb_drive_dump_room, dump_room)
+    |> Page.Room.maybe_enable_cargo()
+    |> Page.Room.maybe_enable_usb_drive_dump()
+    |> noreply()
+  end
+
+  def handle_info({:key_recovered, [me, rooms]}, socket) do
+    socket
+    |> assign(:step, nil)
+    |> assign(:mode, :lobby)
+    |> Page.Login.load_user(me, rooms)
+    |> Page.Login.store()
+    |> login_init()
     |> noreply()
   end
 
@@ -369,7 +590,6 @@ defmodule ChatWeb.MainLive.Index do
     ~H"""
     <img class="vectorGroup bottomVectorGroup" src="/images/bottom_vector_group.svg" />
     <img class="vectorGroup topVectorGroup" src="/images/top_vector_group.svg" />
-
     <div class="flex flex-col items-center justify-center w-screen h-screen">
       <div class="container unauthenticated z-10">
         <img src="/images/logo.png" />
@@ -380,6 +600,21 @@ defmodule ChatWeb.MainLive.Index do
 
   def message_of(%{author_key: _}), do: "room"
   def message_of(_), do: "dialog"
+
+  defp assign_backup_settings(socket) do
+    backup_settings = AdminRoom.get_backup_settings()
+    assign(socket, :backup_settings, backup_settings)
+  end
+
+  defp assign_cargo_settings(socket) do
+    cargo_settings = AdminRoom.get_cargo_settings()
+    assign(socket, :cargo_settings, cargo_settings)
+  end
+
+  defp assign_media_settings(socket) do
+    media_settings = AdminRoom.get_media_settings()
+    assign(socket, :media_settings, media_settings)
+  end
 
   defp action_confirmation_popup(assigns) do
     ~H"""
@@ -398,59 +633,6 @@ defmodule ChatWeb.MainLive.Index do
     """
   end
 
-  defp room_request_button(assigns) do
-    ~H"""
-    <button
-      class="mr-4 flex items-center"
-      phx-click={
-        cond do
-          @restricted -> show_modal("restrict-write-actions")
-          @requests == [] -> nil
-          true -> show_modal("room-request-list")
-        end
-      }
-    >
-      <.icon id="requestList" class="w-4 h-4 mr-1 z-20 stroke-white fill-white" />
-      <span class="text-base text-white">Requests</span>
-    </button>
-    """
-  end
-
-  defp room_invite_button(assigns) do
-    ~H"""
-    <button
-      class="flex items-center t-invite-btn"
-      phx-click={
-        cond do
-          @restricted -> show_modal("restrict-write-actions")
-          @users |> length == 1 -> nil
-          true -> show_modal("room-invite-list")
-        end
-      }
-    >
-      <.icon id="share" class="w-4 h-4 mr-1 z-20 fill-white" />
-      <span class="text-base text-white"> Invite</span>
-    </button>
-    """
-  end
-
-  defp room_count_to_backup_message(%{count: 0} = assigns), do: ~H""
-
-  defp room_count_to_backup_message(assigns) do
-    assigns =
-      assigns
-      |> assign_new(:output, fn
-        %{count: 1} -> "1 room"
-        %{count: count} -> "#{count} rooms"
-      end)
-
-    ~H"""
-    <p class="mt-3 text-sm text-red-500">
-      You have <%= @output %> not backed up. Download the keys to make sure you have access to them after logging out.
-    </p>
-    """
-  end
-
   defp allow_any500m_upload(socket, type, opts \\ []) do
     socket
     |> allow_upload(type,
@@ -460,5 +642,41 @@ defmodule ChatWeb.MainLive.Index do
       max_entries: Keyword.get(opts, :max_entries, 1),
       progress: &handle_progress/3
     )
+  end
+
+  defp allow_recover_upload(socket) do
+    socket
+    |> allow_upload(:recovery_keys,
+      auto_upload: true,
+      progress: &Page.RecoverKeyShare.handle_progress/3,
+      accept: ~w(.social_part),
+      max_entries: 100
+    )
+  end
+
+  defp set_cargo_room(socket) do
+    PubSub.subscribe(Chat.PubSub, "chat::cargo_room")
+
+    assign(socket, :cargo_room, CargoRoom.get())
+  end
+
+  defp set_usb_drive_dump_room(socket) do
+    PubSub.subscribe(Chat.PubSub, "chat::usb_drive_dump_room")
+
+    assign(socket, :usb_drive_dump_room, UsbDriveDumpRoom.get())
+  end
+
+  defp login_init(socket) do
+    socket
+    |> on_login()
+  end
+
+  def on_login(socket) do
+    socket
+    |> Page.Lobby.init()
+    |> Page.Dialog.init()
+    |> Page.Logout.init()
+    |> Page.Shared.track_onliners_presence()
+    |> Page.LiveRouter.action()
   end
 end

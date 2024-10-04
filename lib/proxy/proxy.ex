@@ -40,20 +40,26 @@ defmodule Proxy do
     })
   end
 
-  def get_dialog_messages(server, dialog) do
+  def get_dialog_messages(server, dialog, index, amount) do
     dialog_key = Chat.Dialogs.key(dialog)
 
     api_select(server,
       min: {:dialog_message, dialog_key, 0, 0},
-      max: {:dialog_message, dialog_key, nil, nil},
-      amount: 10
+      max: {:dialog_message, dialog_key, index, nil},
+      amount: amount
     )
+  end
+
+  # Content
+  def get_file_info(server, file_key) do
+    api_key_value(server, {:file, file_key})
   end
 
   # Terminology
   ####################################
   defp api_confirmation_token(server), do: api_get(server, "confirmation-token", [])
   defp api_select(server, args), do: api_get(server, "select", args)
+  defp api_key_value(server, args), do: api_get(server, "key-value", args)
   defp api_register_user(server, args), do: api_post(server, "register-user", args)
   defp api_create_dialog(server, args), do: api_post(server, "create-dialog", args)
 
@@ -88,7 +94,7 @@ defmodule Proxy do
 
   defp unwrap(x) do
     case(x) do
-      str when is_binary(str) -> Proxy.Serialize.deserialize(str)
+      str when is_binary(str) -> Proxy.Serialize.deserialize_with_atoms(str)
       x -> x
     end
   end

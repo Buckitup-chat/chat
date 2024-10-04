@@ -91,6 +91,18 @@ defmodule Proxy.Api do
     _, _ -> :wrong_args |> Proxy.Serialize.serialize()
   end
 
+  def key_value_data(args) do
+    args
+    |> case do
+      binary when is_binary(binary) -> Proxy.Serialize.deserialize(binary)
+      x -> x
+    end
+    |> Chat.db_get()
+    |> Proxy.Serialize.serialize()
+  catch
+    _, _ -> :wrong_args |> Proxy.Serialize.serialize()
+  end
+
   defp broadcast_new_user(card) do
     Chat.Broadcast.new_user(card)
   end

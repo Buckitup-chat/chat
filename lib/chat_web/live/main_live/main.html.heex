@@ -1,7 +1,7 @@
 <div style="display: none;" id="session-link" phx-hook="LocalStateStore"></div>
 <div style="display: none;" id="time-link" phx-hook="LocalTime"></div>
 <%= unless connected?(@socket) do %>
-  <.loading_screen />
+  <Layout.Basic.loading_screen />
 <% else %>
   <%= if @need_login do %>
     <%= if @handshaked do %>

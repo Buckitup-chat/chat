@@ -602,6 +602,29 @@ defmodule ChatWeb.MainLive.Layout.Message do
     })
   end
 
+  defp assign_file(
+         %{msg: %{content: json, type: type, file_info: [_, _, _, _, name, size]}} = assigns
+       ) do
+    with true <- type in [:audio, :image, :video, :file],
+         {id, secret} <- StorageId.from_json(json),
+         true <- String.valid?(name),
+         true <- String.valid?(size) do
+      %{
+        name: name,
+        size: size,
+        url: WebUtils.get_file_url(:file, id, secret)
+      }
+    else
+      _ ->
+        %{
+          name: "Broken file",
+          size: "n/a",
+          url: nil
+        }
+    end
+    |> then(&assign(assigns, :file, &1))
+  end
+
   defp assign_file(%{msg: %{content: json, type: type}} = assigns) do
     with true <- type in [:audio, :image, :video, :file],
          {id, secret} <- StorageId.from_json(json),

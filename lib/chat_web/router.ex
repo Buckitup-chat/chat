@@ -71,6 +71,7 @@ defmodule ChatWeb.Router do
 
   scope "/proxy-api/", ChatWeb do
     get "/select", ProxyApiController, :select
+    get "/key-value", ProxyApiController, :key_value
     get "/confirmation-token", ProxyApiController, :confirmation_token
     post "/register-user", ProxyApiController, :register_user
     post "/create-dialog", ProxyApiController, :create_dialog

@@ -54,6 +54,7 @@ defmodule ChatWeb do
 
       unquote(view_helpers())
       unquote(live_helpers())
+      unquote(socket_private_helpers())
     end
   end
 
@@ -63,6 +64,7 @@ defmodule ChatWeb do
 
       unquote(view_helpers())
       unquote(live_helpers())
+      unquote(socket_private_helpers())
     end
   end
 
@@ -138,6 +140,12 @@ defmodule ChatWeb do
           stream_insert(socket, key, item, opts)
         end)
       end
+    end
+  end
+
+  defp socket_private_helpers do
+    quote do
+      import ChatWeb.LiveHelpers.SocketPrivate
     end
   end
 

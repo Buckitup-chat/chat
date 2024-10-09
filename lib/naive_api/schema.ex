@@ -66,13 +66,14 @@ defmodule NaiveApi.Schema do
 
   mutation do
     @desc """
-    Registers new user in the system. Providing unique keypair.
+    Registers new user in the system. Generating unique keypair if none provided.
 
     There is no uniqueness restriction on the name.
     The system references users by their public_key 
     """
     field :user_sign_up, non_null(:identity) do
       arg(:name, non_null(:string))
+      arg(:keypair, :input_key_pair)
       resolve(&User.signup/3)
     end
 

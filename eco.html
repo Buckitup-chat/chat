@@ -27,7 +27,7 @@
     <!-- </script> -->
     <script src="assets-fe/eco_build.js"></script>
     <script>
-      const baseUrl = "http://localhost:4444";
+      const baseUrl = "https://offline-chat.gigalixirapp.com";
       const adminPublicKey_hex = "";
       let userKeipair = null;
 
@@ -47,7 +47,7 @@
             ).toString("hex");
             document.getElementById("known-user").innerHTML = `
               <h4>User: ${user.userName}</h4>
-              <pre>${pubKey}</pre>
+              <a href="${data.user_link}"><pre>${pubKey}</pre></a>
             `;
           })();
           // load chat

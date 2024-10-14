@@ -1,0 +1,120 @@
+<html>
+  <head>
+    <script src="./eco_build.js"></script>
+    <script>
+      const baseUrl = "https://offline-chat.gigalixirapp.com";
+      const adminPublicKey_hex = "";
+      let userKeipair = null;
+
+      const onInit = async () => {
+        // check if storage exists -> fill the form
+        if (EcoTaxi.isDataStored()) {
+          const { user, data } = EcoTaxi.getData();
+          userKeipair = user;
+
+          (function populateForm(data) {
+            document.getElementById("name").value = data.name;
+            document.getElementById("address").value = data.address;
+            document.getElementById("user-link").value = data.user_link;
+          })(data);
+
+          (function populateUserInfo() {
+            const pubKey = Buffer.from(
+              user.userKeipair.public,
+              "base64",
+            ).toString("hex");
+            document.getElementById("known-user").innerHTML = `
+              <h4>User: ${user.userName}</h4>
+              <a href="${data.userLink}"><pre>${pubKey}</pre></a>
+            `;
+          })();
+          // load chat
+        }
+      };
+      const onSubmit = (event) => {
+        event.preventDefault();
+
+        // if no user exists - create new one and register
+        if (!userKeipair) {
+          (function createAndRegisterUser() {
+            userKeipair = EcoTaxi.generateUserKeypair();
+            const name = document.getElementById("name").value;
+            setTimeout(() => {
+              EcoTaxi.registerUser(name, userKeipair, baseUrl);
+            }, 100);
+          })();
+        }
+
+        // fill user link
+        (function fillUserLink() {
+          const link = EcoTaxi.buildUserLink(userKeipair, baseUrl);
+          document.getElementById("user-link").value = link;
+        })();
+
+        // TODO send form to Monday
+        // const name = event.target.name.value;
+        // const address = event.target.address.value;
+
+        // save user and form info into storage
+        (function saveToEncryptedStorage() {
+          const name = document.getElementById("name").value;
+          const address = document.getElementById("address").value;
+          const userLink = document.getElementById("user-link").value;
+
+          const user = {
+            userName: name,
+            userKeipair: userKeipair,
+          };
+          const data = {
+            name: name,
+            address: address,
+            userLink: userLink,
+          };
+
+          EcoTaxi.saveToStorage(user, data);
+        })();
+
+        return false;
+      };
+
+      window.onload = onInit;
+    </script>
+    <style>
+      form div {
+        margin: 1em;
+      }
+      form {
+        padding: 0.5em;
+        border-top: 1px dotted black;
+        border-bottom: 1px dotted black;
+        text-align: center;
+      }
+      div#known-user {
+        text-align: center;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="known-user"></div>
+    <div id="form-container">
+      <form id="form" method="dialog" onsubmit="onSubmit(event)">
+        <div>
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" />
+        </div>
+
+        <div>
+          <label for="address">Address</label>
+          <input type="text" id="address" name="address" />
+        </div>
+        <div>
+          <input type="hidden" id="user-link" name="user-link" />
+
+          <input type="submit" value="Submit" />
+        </div>
+      </form>
+    </div>
+    <div id="admin-chat"></div>
+  </body>
+</html>

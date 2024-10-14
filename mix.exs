@@ -73,6 +73,7 @@ defmodule Chat.MixProject do
       {:phoenix_live_dashboard, "~> 0.7"},
       {:gettext, "~> 0.18"},
       {:jason, "~> 1.2"},
+      {:cors_plug, "~> 3.0"},
 
       # Build tooling
       {:esbuild, "~> 0.3", runtime: Mix.env() == :dev && Mix.target() == :host},

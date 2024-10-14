@@ -1,3 +1,6 @@
+// https://www.npmjs.com/package/@noble/secp256k1
+const secp = require('@noble/secp256k1');
+
 const jsSHA3 = require("jssha/dist/sha3");
 const blf = require('blowfish-js');
 var Buffer = require('buffer/').Buffer  // note: the trailing slash is important!
@@ -41,8 +44,47 @@ const Enigma = {
 
     return deciphered
   },
-  encrypt: "todo",
+  generate_keypair: function() {
+    const privKey = secp.utils.randomPrivateKey();
+    const pubKey = secp.getPublicKey(privKey, true);
+
+    return {
+      public: this.array_to_base64(pubKey),
+      private: this.array_to_base64(privKey)
+    }
+  },
+  compute_secret: function(b64_private_key, b64_public_key) {
+    const secret = secp.getSharedSecret(
+      this.base64_to_array(b64_private_key),
+      this.base64_to_array(b64_public_key),
+      true
+    )
+
+    console.log(secret)
+
+    return this.array_to_base64(secret)
+  },
+
+
+  encrypt: function(b64_plain_data, b64_private_key, b64_public_key) {
+    secret = this.compute_secret(b64_private_key, b64_public_key)
+
+    return this.cipher(b64_plain_data, secret)
+  },
+  encrypt_and_sign: "todo",
   decrypt: "todo",
+  decrypt_signed: "todo",
+
+  sign: "todo",
+  is_valid_sign: "todo",
+
+  keypair: {
+    generate: this.generate_keypair,
+    to_b64_string: "todo",
+    from_b64_string: "todo"
+  },
+
+
 
   base64_to_string: function(b64_data) {
     return Buffer.from(b64_data, 'base64').toString();
@@ -73,4 +115,4 @@ const Enigma = {
 
 window.enigma = Enigma;
 window.Buffer = Buffer;
-window.blf = blf;
+window.secp = secp;

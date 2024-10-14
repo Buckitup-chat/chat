@@ -5,13 +5,21 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "browserify enigma.js -o index.js"
+    "build": "browserify enigma.js -o index.js",
+    "build_eco": "browserify enigma.js eco-taxi.js --bundle -o eco_build.js"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@lo-fi/local-vault": "^0.16.1",
+    "@noble/secp256k1": "^1.7.1",
     "blowfish-js": "^1.0.0",
     "buffer": "^6.0.3",
     "jssha": "^3.3.0"
+  },
+  "devDependencies": {
+    "browserify": "^17.0.1",
+    "esbuild": "0.24.0",
+    "esmify": "^2.1.1"
   }
 }

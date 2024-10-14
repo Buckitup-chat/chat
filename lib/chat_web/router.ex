@@ -13,6 +13,8 @@ defmodule ChatWeb.Router do
   end
 
   pipeline :api do
+    plug CORSPlug, origin: "*"
+
     plug Plug.Parsers,
       parsers: [:urlencoded, :multipart, :json],
       pass: ["*/*"],

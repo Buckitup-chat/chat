@@ -5,9 +5,14 @@ defmodule NaiveApi.User do
   alias Chat.User
   alias Chat.User.UsersBroker
 
-  def signup(_, %{name: name}, _) do
-    name
-    |> String.trim()
+  def signup(_, params, _) do
+    case params do
+      %{keypair: keys, name: name} ->
+        Chat.Identity.from_keys(keys) |> Map.put(:name, name)
+
+      %{name: name} ->
+        name |> String.trim()
+    end
     |> User.login()
     |> tap(&User.register/1)
     |> tap(&UsersBroker.put/1)

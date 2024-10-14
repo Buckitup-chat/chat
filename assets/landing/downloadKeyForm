@@ -1,0 +1,157 @@
+<style>
+    .downloadKeyBlock {
+        z-index:20;
+        background: white;
+        border: none;
+        padding: 10px;
+        width: 24vw;
+        display: flex;
+        justify-content: space-between;
+        flex-direction: column;
+        border-radius: 0.5rem;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    } 
+             
+    .formContainer {
+        visibility: hidden; 
+        z-index: 10;
+        width:100vw;
+        height: 100vh;
+        background: rgba(0,0,0,0.5);
+        position: absolute;
+        bottom: 0vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+            
+    .closeBtn {
+        width: 15px;
+        height: 15px;
+        margin-left: 22.5rem;
+        border: none;
+        background: none;
+        cursor: pointer;
+    }
+
+    .description {
+        color: rgb(0 0 0 / 0.5);
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        padding: 10px 0;
+    }
+    
+    .warningContainer {
+        background-color: rgb(0 0 0 / 0.1);
+        border-radius: 0.5rem;
+    }
+    
+    .warning {
+        font-size: 0.75rem;
+        line-height: 1rem;
+    }
+    
+    .downloadKeyForm {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-around;
+        height:15rem;
+    }
+    
+    .input {
+        height: 3rem;
+        padding-left: 10px;
+        border: 1px ridge;
+        border-radius: 0.5rem;
+    }
+    
+    .downloadBtn, .downloadWithoutPassword {
+        height: 3rem;
+        border: 1px ridge;
+        border-radius: 0.5rem;
+        background: white;
+        cursor: pointer;
+    }
+    
+    .downloadBtn {
+        background: black;
+        color: white
+    }
+    
+    @media screen and (max-width: 480px) {
+        .downloadKeyBlock {
+            width: 94vw;
+        }
+    } 
+</style>
+          
+          
+<div id="formContainer" class="formContainer">
+    <div id="downloadKeyBlock" class="downloadKeyBlock">
+        <button id="closeBtn" class="closeBtn">X</button>
+        <h4 class="title">Set Up Password</h4>
+        <p class="description">To store the backup copy of the key securely, enter the encryption password for the file</p>
+        <div class="warningContainer" >
+            <blockquote class="warning">This password is not stored and can NOT be recovered</blockquote>    
+        </div>  
+        <form class="downloadKeyForm" id="downloadKeyForm">
+            <input class="input" type="password" name="input" placeholder="Enter password">
+            <input class="input" type="password" name="input" placeholder="Repeat password">
+            <p class="description">At least 12 symbols</p>
+            <button class="downloadBtn">Dowload</button>
+        </form>
+        <button class="downloadWithoutPassword" id="downloadWithoutPassword">Download without password</button>
+    </div>
+</div>
+          
+          
+<script>
+    const downloadWithoutPassword = document.getElementById("downloadWithoutPassword");
+              
+    downloadWithoutPassword.addEventListener("click", () => {
+        const downloadData = localStorage.getItem('buckitUp-chat-auth');
+        const userName = JSON.parse(downloadData)[0][0];
+        const file = new Blob([downloadData], { type: 'application/json' });
+        const fileURL = URL.createObjectURL(file);
+        const linkElement = document.createElement("a");
+        linkElement.setAttribute('href', fileURL);
+        linkElement.setAttribute('download', `${userName}.data`);
+        linkElement.click();
+        localStorage.clear()
+        window.location.reload();
+    })
+                
+    downloadBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        let password = document.getElementById("password").value;
+        let repeatPassword = document.getElementById("repeatPassword").value;
+        let isValidPassword = password.length >= 12 && password === repeatPassword;
+        //const password = 'qazxswedcvfr'
+        // const base64KeyFromSite = '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'
+  
+        if(isValidPassword) {
+            let passwordHash = enigma.hash(Buffer.from(password).toString('base64'))
+            const downloadData = localStorage.getItem('buckitUp-chat-auth');
+            console.log('downloadData', downloadData)
+            const contentB64 = Buffer.from(downloadData).toString('base64');
+            const ciphered = enigma.cipher(contentB64, passwordHash);
+            const userName = JSON.parse(downloadData)[0][0];
+            const file = new Blob([ciphered], {type: 'application/octet-stream'});
+            const fileURL = URL.createObjectURL(file);
+            const linkElement = document.createElement("a");
+            linkElement.setAttribute('href', fileURL);
+            linkElement.setAttribute('download', `${userName}.data`);
+            linkElement.click();
+            localStorage.clear()
+            window.location.reload();
+        }
+    });
+              
+    closeBtn.addEventListener('click', () => {
+        const downloadKeyForm = document.getElementById("formContainer");
+        downloadKeyForm.style.visibility = "hidden"
+    })
+</script>
+        
+         
+        

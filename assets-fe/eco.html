@@ -1,45 +1,23 @@
 <html>
   <head>
-    <!-- <script type="importmap"> -->
-    <!--   { -->
-    <!--     "imports": { -->
-    <!--       "local-vault": "/assets-fe/lv/lv.js", -->
-    <!--       "local-vault/adapter/idb": "/assets-fe/lv/adapter.idb.js", -->
-    <!--       "local-vault/adapter/local-storage": "/assets-fe/lv/adapter.local-storage.js", -->
-    <!--       "local-vault/adapter/session-storage": "/assets-fe/lv/adapter.session-storage.js", -->
-    <!--       "local-vault/adapter/cookie": "/assets-fe/lv/adapter.cookie.js", -->
-    <!--       "local-vault/adapter/opfs": "/assets-fe/lv/adapter.opfs.js", -->
-    <!--       "local-vault/adapter/opfs-worker": "/assets-fe/lv/adapter.opfs-worker.js", -->
-    <!---->
-    <!--       "@byojs/storage/idb": "/assets-fe/lv/external/@byojs/storage/adapter.idb.mjs", -->
-    <!--       "@byojs/storage/local-storage": "/assets-fe/lv/external/@byojs/storage/adapter.local-storage.mjs", -->
-    <!--       "@byojs/storage/session-storage": "/assets-fe/lv/external/@byojs/storage/adapter.session-storage.mjs", -->
-    <!--       "@byojs/storage/cookie": "/assets-fe/lv/external/@byojs/storage/adapter.cookie.mjs", -->
-    <!--       "@byojs/storage/opfs": "/assets-fe/lv/external/@byojs/storage/adapter.opfs.mjs", -->
-    <!--       "@byojs/storage/opfs-worker": "/assets-fe/lv/external/@byojs/storage/adapter.opfs-worker.mjs", -->
-    <!---->
-    <!--       "@lo-fi/local-data-lock": "/assets-fe/lv/external/@lo-fi/local-data-lock/ldl.js", -->
-    <!--       "@lo-fi/webauthn-local-client": "/assets-fe/lv/external/@lo-fi/local-data-lock/external/@lo-fi/webauthn-local-client/walc.js", -->
-    <!---->
-    <!--       "idb-keyval": "/assets-fe/lv/external/@byojs/storage/external/idb-keyval.js" -->
-    <!--     } -->
-    <!--   } -->
-    <!-- </script> -->
-    <script src="assets-fe/eco_build.js"></script>
+    <script src="./eco_build.js"></script>
     <script>
       const baseUrl = "https://offline-chat.gigalixirapp.com";
       const adminPublicKey_hex = "";
       let userKeipair = null;
 
       const onInit = async () => {
+        // check if storage exists -> fill the form
         if (EcoTaxi.isDataStored()) {
           const { user, data } = EcoTaxi.getData();
           userKeipair = user;
+
           (function populateForm(data) {
             document.getElementById("name").value = data.name;
             document.getElementById("address").value = data.address;
             document.getElementById("user-link").value = data.user_link;
           })(data);
+
           (function populateUserInfo() {
             const pubKey = Buffer.from(
               user.userKeipair.public,
@@ -47,13 +25,11 @@
             ).toString("hex");
             document.getElementById("known-user").innerHTML = `
               <h4>User: ${user.userName}</h4>
-              <a href="${data.user_link}"><pre>${pubKey}</pre></a>
+              <a href="${data.userLink}"><pre>${pubKey}</pre></a>
             `;
           })();
           // load chat
         }
-        // check if storage exists -> fill the form
-        // and load chat
       };
       const onSubmit = (event) => {
         event.preventDefault();

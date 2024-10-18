@@ -484,6 +484,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
             msg
             |> Map.from_struct()
             |> Map.put(:file_info, file_info)
+            |> Map.put(:file_url, ChatWeb.Utils.get_proxied_file_url(server, id, secret))
 
           simple_message ->
             simple_message

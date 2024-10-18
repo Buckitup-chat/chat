@@ -20,12 +20,19 @@ defmodule Chat.ChunkedFilesMultisecret do
       else: Db.put({:file_secrets, file_key}, secrets_needed |> Enum.join(""))
   end
 
-  def get_secret(_file_key, offset, initial_secret)
+  def get_secret(
+        _file_key,
+        offset,
+        initial_secret,
+        data_getter \\ fn file_key -> Db.get({:file_secrets, file_key}) end
+      )
+
+  def get_secret(_file_key, offset, initial_secret, _data_getter)
       when offset < @hundred_chunks_size,
       do: initial_secret
 
-  def get_secret(file_key, offset, initial_secret) do
-    secrets = Db.get({:file_secrets, file_key})
+  def get_secret(file_key, offset, initial_secret, data_getter) do
+    secrets = data_getter.(file_key)
     secret_offset_start = (trunc(offset / @hundred_chunks_size) - 1) * @secret_size
 
     secrets

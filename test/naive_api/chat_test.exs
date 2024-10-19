@@ -96,7 +96,47 @@ defmodule NaiveApi.ChatTest do
                room_invite["content"]
              )
     end
-
-    defp now, do: DateTime.utc_now() |> DateTime.to_unix()
   end
+
+  describe "mutation: chatSendText" do
+    @text "¡Hola!"
+    @send_text_mutation """
+      mutation ChatSendText($peerPublicKey: PublicKey!, $myKeypair: InputKeyPair!, $text: String!, $timestamp: Int!) { 
+        chatSendText(peerPublicKey: $peerPublicKey, myKeypair: $myKeypair, text: $text, timestamp: $timestamp) {
+          id
+          index
+        }
+      }
+    """
+    setup do
+      me = User.login("Pedro") |> tap(&User.register/1)
+      peer = User.login("Diego") |> tap(&User.register/1)
+      dialog = Dialogs.find_or_open(me, Card.from_identity(peer))
+      [me: me, peer: peer, dialog: dialog]
+    end
+
+    test "sends text", %{me: me, peer: peer, dialog: dialog} do
+      {:ok, %{data: %{"chatSendText" => message_reference}}} =
+        Absinthe.run(@send_text_mutation, @schema,
+          variables: %{
+            "peerPublicKey" => Bitstring.serialize_33(peer.public_key),
+            "myKeypair" => %{
+              "public_key" => Bitstring.serialize_33(me.public_key),
+              "private_key" => Bitstring.serialize_32(me.private_key)
+            },
+            "text" => @text,
+            "timestamp" => now()
+          }
+        )
+
+      assert 1 == message_reference["index"]
+
+      assert match?(
+               {:ok, [uuid: _, binary: _, type: _, version: _, variant: _]},
+               UUID.info(message_reference["id"])
+             )
+    end
+  end
+
+  defp now, do: DateTime.utc_now() |> DateTime.to_unix()
 end

@@ -106,5 +106,19 @@ defmodule NaiveApi.Schema do
       arg(:upload_key, non_null(:file_key))
       resolve(&Room.send_file/3)
     end
+
+    @desc """
+    Sends text message in the chat(dialog).
+
+    There is no limit on `text` length.
+    `timestamp` is unixtime in seconds. Will use system time if `timestamp` omitted.  
+    """
+    field :chat_send_text, non_null(:message_reference) do
+      arg(:peer_public_key, non_null(:public_key))
+      arg(:my_keypair, non_null(:input_key_pair))
+      arg(:text, non_null(:string))
+      arg(:timestamp, :integer)
+      resolve(&Chat.send_text/3)
+    end
   end
 end

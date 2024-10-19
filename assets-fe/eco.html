@@ -2,15 +2,58 @@
   <head>
     <script src="./eco_build.js"></script>
     <script>
-      const baseUrl = "https://offline-chat.gigalixirapp.com";
-      const adminPublicKey_hex = "";
+      // const baseUrl = "https://offline-chat.gigalixirapp.com";
+      const baseUrl = "http://localhost:4444";
+      const adminPublicKey_hex =
+        "028f6245d765045c4a8cfe3b44d5e3b4d3dc1d969e4d4d19220b56ac3f77ce19bf";
       let userKeipair = null;
+      let lastLoadedIndex = null;
+
+      const loadMessages = async () => {
+        // get messages
+        const messages = await EcoTaxi.getMessages(
+          baseUrl,
+          userKeipair,
+          adminPublicKey_hex,
+          21,
+          lastLoadedIndex,
+        );
+
+        // deal with paging
+        if (messages.length > 20) {
+          // enable next page loading
+          document.getElementById("load-more").style.display = "block";
+          messages.shift();
+        } else {
+          // disable next page loading
+          document.getElementById("load-more").style.display = "none";
+        }
+
+        // render new messages
+        messages
+          .filter((m) => m.content.__typename === "TextContent")
+          .reverse()
+          .forEach((m) => {
+            const date = new Date(m.timestamp * 1000);
+            const div = document.createElement("div");
+            div.innerHTML = `<p>
+              <span style="font-size: 80%;">${date.toLocaleString()}</span>
+              <i>${m.author.name}</i> : &nbsp;
+              ${m.content.text}
+            </p>`;
+            document.getElementById("admin-chat").prepend(div);
+          });
+
+        if (messages.length > 0) {
+          lastLoadedIndex = messages[0].index;
+        }
+      };
 
       const onInit = async () => {
         // check if storage exists -> fill the form
         if (EcoTaxi.isDataStored()) {
           const { user, data } = EcoTaxi.getData();
-          userKeipair = user;
+          userKeipair = user.userKeipair;
 
           (function populateForm(data) {
             document.getElementById("name").value = data.name;
@@ -28,7 +71,15 @@
               <a href="${data.userLink}"><pre>${pubKey}</pre></a>
             `;
           })();
+
+          (function ensureRegistered(keypair, name) {
+            setTimeout(() => {
+              EcoTaxi.registerUser(name, keypair, baseUrl);
+            }, 100);
+          })(user.userKeipair, user.userName);
+
           // load chat
+          loadMessages();
         }
       };
       const onSubmit = (event) => {
@@ -52,6 +103,33 @@
         })();
 
         // TODO send form to Monday
+
+        // send Form to chat
+        (async function sendForm(data) {
+          const text = [
+            data?.email,
+            data?.phone,
+            data?.area,
+            data?.address,
+            data?.quantity,
+            data?.tariff,
+            data?.saturday ? "Saturday ready" : "",
+            data?.promoCode,
+            data?.comment,
+          ]
+            .filter((x) => x)
+            .join("\n");
+
+          const resp = await EcoTaxi.sendMessage(
+            baseUrl,
+            userKeipair,
+            adminPublicKey_hex,
+            text,
+          );
+          console.log("sendMessage", resp);
+        })({
+          address: document.getElementById("address").value,
+        });
 
         // save user and form info into storage
         (function saveToEncryptedStorage() {
@@ -113,6 +191,11 @@
         </div>
       </form>
     </div>
-    <div id="admin-chat"></div>
+    <div id="admin-chat-container">
+      <div id="load-more">
+        <button onclick="loadMessages()" type="button">Load More</button>
+      </div>
+      <div id="admin-chat"></div>
+    </div>
   </body>
 </html>

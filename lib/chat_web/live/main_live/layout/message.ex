@@ -610,7 +610,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
          true <- String.valid?(name),
          true <- String.valid?(size) do
       %{
-        name: "---- " <> name,
+        name: name,
         size: size,
         url: url
       }

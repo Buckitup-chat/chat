@@ -59,8 +59,8 @@ defmodule Proxy do
     api_key_value(server, {:file_secrets, file_key})
   end
 
-  def read_file_chunk(server, file_key, start, end) do
-    api_key_value(server, {:file_chunk, file_key, start, end})
+  def read_file_chunk(server, file_key, start) do
+    api_key_value(server, {:file_chunk, file_key, start})
   end
 
   # Terminology

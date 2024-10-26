@@ -1,23 +1,65 @@
 defmodule ChatWeb.ProxyLive.Index do
   use ChatWeb, :live_view
 
+  alias Phoenix.LiveView.JS
+
   alias ChatWeb.ProxyLive.Init
+
+  alias ChatWeb.Hooks.LiveModalHook
+  alias ChatWeb.Hooks.UploaderHook
+  alias ChatWeb.MainLive.Layout
+  alias ChatWeb.MainLive.Page
+
+  alias ChatWeb.ProxyLive.Page.Lobby, as: ProxyLobby
+  alias ChatWeb.ProxyLive.Page.Dialog, as: ProxyDialog
+
   alias ChatWeb.ProxyLive.Components.Dialog
   alias ChatWeb.ProxyLive.Components.UserList
 
-  embed_templates "*"
+  on_mount LiveModalHook
+  on_mount UploaderHook
 
-  def mount(params, _, socket) do
+  embed_templates "*"
+  embed_templates "../main_live/chats*"
+  embed_templates "../main_live/rooms*"
+
+  def mount(params, session, socket) do
     [
       &Init.check_connected(&1),
       &Init.extract_actor(&1),
-      &Init.extract_address(&1, params)
+      &Init.extract_address(&1, params),
+      &Init.mimic_main_page_mount(&1, session)
     ]
-    |> Enum.reduce_while(socket, fn step, socket -> step.(socket) end)
+    |> Init.run_steps(socket)
     |> ok()
   end
 
+  def handle_event(msg, params, socket) do
+    case msg do
+      "lobby/" <> _ -> ProxyLobby.handle_event(msg, params, socket)
+      "switch-lobby-mode" -> socket |> ProxyLobby.switch_lobby_mode(params)
+      "dialog/" <> _ -> ProxyDialog.handle_event(msg, params, socket)
+      "chat:" <> _ -> ProxyDialog.handle_event(msg, params, socket)
+      "local-time" -> socket
+    end
+    |> noreply()
+  end
+
+  def handle_info(msg, socket) do
+    case msg do
+      {:lobby, sub_msg} -> ProxyLobby.handle_info(sub_msg, socket)
+      {:dialog, sub_msg} -> ProxyDialog.handle_info(sub_msg, socket)
+    end
+    |> noreply()
+  end
+
   def render(assigns) do
+    ~H"""
+    <.proxy {assigns} />
+    """
+  end
+
+  def render_poc(assigns) do
     ~H"""
     <.live_component
       :if={assigns[:actor] && assigns[:server]}
@@ -38,7 +80,7 @@ defmodule ChatWeb.ProxyLive.Index do
     """
   end
 
-  def handle_info({:proxy_user_list_selects_peer, card}, socket) do
+  def handle_info_poc({:proxy_user_list_selects_peer, card}, socket) do
     socket
     |> assign(dialog_to: card)
     |> noreply()

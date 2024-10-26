@@ -567,7 +567,9 @@ defmodule ChatWeb.MainLive.Layout.Message do
   defp timestamp(assigns) do
     ~H"""
     <div class="px-2 text-grayscale600 flex justify-end mr-1" style="font-size: 10px;">
-      <time-stamp><%= @msg.timestamp %></time-stamp>
+      <time-stamp id="timestamp-#{@msg.id}" phx-update="ignore">
+        <%= @msg.timestamp %>
+      </time-stamp>
     </div>
     """
   end
@@ -600,6 +602,29 @@ defmodule ChatWeb.MainLive.Layout.Message do
       size: size,
       url: "files/" <> filename
     })
+  end
+
+  defp assign_file(
+         %{msg: %{content: json, type: type, file_info: [_, _, _, _, name, size], file_url: url}} =
+           assigns
+       ) do
+    with true <- type in [:audio, :image, :video, :file],
+         true <- String.valid?(name),
+         true <- String.valid?(size) do
+      %{
+        name: name,
+        size: size,
+        url: url
+      }
+    else
+      _ ->
+        %{
+          name: "Broken file",
+          size: "n/a",
+          url: nil
+        }
+    end
+    |> then(&assign(assigns, :file, &1))
   end
 
   defp assign_file(%{msg: %{content: json, type: type}} = assigns) do

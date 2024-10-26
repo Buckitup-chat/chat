@@ -31,6 +31,9 @@ defmodule ChatWeb.Router do
     pipe_through :browser
 
     # pretty used
+    get "/get/file/proxy/:server/:id", ProxiedFileController, :file
+    get "/get/image/proxy/:server/:id", ProxiedFileController, :image
+
     get "/get/file/:id", FileController, :file
     get "/get/image/:id", FileController, :image
     get "/get/zip/:broker_key", ZipController, :get
@@ -73,6 +76,7 @@ defmodule ChatWeb.Router do
 
   scope "/proxy-api/", ChatWeb do
     get "/select", ProxyApiController, :select
+    get "/key-value", ProxyApiController, :key_value
     get "/confirmation-token", ProxyApiController, :confirmation_token
     post "/register-user", ProxyApiController, :register_user
     post "/create-dialog", ProxyApiController, :create_dialog

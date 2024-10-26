@@ -8,6 +8,7 @@ defmodule Chat do
   def db_get(key) do
     case key do
       {:file_chunk, file_key, first, last} -> read_chunk({first, last}, file_key)
+      {:file_chunk, file_key, first} -> read_chunk(first, file_key)
       _ -> Chat.Db.get(key)
     end
   end
@@ -24,11 +25,15 @@ defmodule Chat do
     end
   end
 
-  defp read_chunk(range, key) do
+  defp read_chunk(range, key) when is_tuple(range) do
     {data, _last} =
       Chat.FileFs.read_exact_file_chunk(range, key, path())
 
     data
+  end
+
+  defp read_chunk(first, key) do
+    Chat.FileFs.read_file_chunk(first, key, path())
   end
 
   defp path, do: CubDB.data_dir(Chat.Db.db()) <> "_files"

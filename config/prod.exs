@@ -29,7 +29,8 @@ config :chat, ChatWeb.Endpoint,
     ),
   check_origin: [
     "https://offline-chat.gigalixirapp.com",
-    "https://buckitup.app"
+    "https://buckitup.app",
+    "//128.140.47.184"
   ],
   allow_reset_data: false
 

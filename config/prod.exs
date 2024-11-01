@@ -32,7 +32,8 @@ config :chat, ChatWeb.Endpoint,
     "https://buckitup.app",
     "//128.140.47.184"
   ],
-  allow_reset_data: false
+  allow_reset_data: false,
+  server: true
 
 # url: [host: "buckitup.app", port: 443],
 # secret_key_base: Map.fetch!(System.get_env(), "SECRET_KEY_BASE"),

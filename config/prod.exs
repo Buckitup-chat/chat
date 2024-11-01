@@ -19,7 +19,7 @@ hostname =
 config :chat, ChatWeb.Endpoint,
   cache_static_manifest: "priv/static/cache_manifest.json",
   # Possibly not needed, but doesn't hurt
-  http: [port: {:system, "PORT"}],
+  http: [port: System.get_env("PORT")],
   url: [host: hostname, port: 443],
   secret_key_base:
     Map.get(

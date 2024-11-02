@@ -30,28 +30,10 @@ cert_present? =
   [ssl_cacertfile, ssl_certfile, ssl_keyfile]
   |> Enum.all?(&File.exists?/1)
 
-config :chat, ChatWeb.Endpoint,
-  cache_static_manifest: "priv/static/cache_manifest.json",
-  # Possibly not needed, but doesn't hurt
-  http: [port: System.get_env("PORT")],
-  url: [host: hostname, port: 443],
-  secret_key_base:
-    Map.get(
-      System.get_env(),
-      "SECRET_KEY_BASE",
-      "BKyA6n6KrL/mmKlyg5a+4/ZlWq0cN3dFqfvNj9zaw6Acvnp++u6bXN5rkns5xVpE"
-    ),
-  check_origin: [
-    "https://offline-chat.gigalixirapp.com",
-    "https://buckitup.app",
-    "//128.140.47.184",
-    "//#{hostname}"
-  ],
-  allow_reset_data: false,
-  server: true
-
 if cert_present? do
   config :chat, ChatWeb.Endpoint,
+    url: [host: hostname],
+    http: [ip: {0, 0, 0, 0}, port: 80],
     https: [
       port: 443,
       cipher_suite: :strong,
@@ -59,7 +41,35 @@ if cert_present? do
       certfile: ssl_certfile,
       keyfile: ssl_keyfile
     ],
-    force_ssl: [hsts: true]
+    secret_key_base:
+      Map.get(
+        System.get_env(),
+        "SECRET_KEY_BASE",
+        "BKyA6n6KrL/mmKlyg5a+4/ZlWq0cN3dFqfvNj9zaw6Acvnp++u6bXN5rkns5xVpE"
+      ),
+    force_ssl: [hsts: true],
+    check_origin: ["//#{hostname}"],
+    allow_reset_data: false,
+    server: true
+else
+  config :chat, ChatWeb.Endpoint,
+    cache_static_manifest: "priv/static/cache_manifest.json",
+    # Possibly not needed, but doesn't hurt
+    http: [port: System.get_env("PORT")],
+    url: [host: hostname, port: 443],
+    secret_key_base:
+      Map.get(
+        System.get_env(),
+        "SECRET_KEY_BASE",
+        "BKyA6n6KrL/mmKlyg5a+4/ZlWq0cN3dFqfvNj9zaw6Acvnp++u6bXN5rkns5xVpE"
+      ),
+    check_origin: [
+      "https://offline-chat.gigalixirapp.com",
+      "https://buckitup.app",
+      "//#{hostname}"
+    ],
+    allow_reset_data: false,
+    server: true
 end
 
 # url: [host: "buckitup.app", port: 443],

@@ -16,7 +16,11 @@ if [ `hostname` = 'eco' ]; then
   mix phx.gen.release
   MIX_ENV=prod mix release --overwrite
   sudo systemctl restart eco.service
+
   sudo systemctl status eco.service
+  sleep 3
+  sudo systemctl status eco.service
+
 
 
 

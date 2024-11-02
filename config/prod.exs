@@ -12,9 +12,22 @@ import Config
 
 hostname =
   cond do
+    domain = System.get_env("DOMAIN") -> domain
     app_name = System.get_env("APP_NAME") -> "#{app_name}.gigalixirapp.com"
-    true -> "buckitup.app"
+    true -> "demo.buckitup.org"
   end
+
+domain_to_file_prefix = fn domain ->
+  String.replace(domain, ".", "_")
+end
+
+ssl_cacertfile = "../cert/#{hostname}/#{domain_to_file_prefix.(hostname)}.ca-bundle"
+ssl_certfile = "../cert/#{hostname}/#{domain_to_file_prefix.(hostname)}.crt"
+ssl_keyfile = "../cert/#{hostname}/priv.key"
+
+cert_present? =
+  [ssl_cacertfile, ssl_certfile, ssl_keyfile]
+  |> Enum.all?(&File.exists?/1)
 
 config :chat, ChatWeb.Endpoint,
   cache_static_manifest: "priv/static/cache_manifest.json",
@@ -34,6 +47,19 @@ config :chat, ChatWeb.Endpoint,
   ],
   allow_reset_data: false,
   server: true
+
+if cert_present? do
+  config :chat, ChatWeb.Endpoint,
+    https: [
+      port: 443,
+      cipher_suite: :strong,
+      cacertfile: ssl_cacertfile,
+      certfile: ssl_certfile,
+      keyfile: ssl_keyfile
+    ],
+    force_ssl: [hsts: true],
+    check_origin: ["//#{hostname}"]
+end
 
 # url: [host: "buckitup.app", port: 443],
 # secret_key_base: Map.fetch!(System.get_env(), "SECRET_KEY_BASE"),

@@ -8,9 +8,9 @@ import Config
 # The block below contains prod specific runtime configuration.
 
 # Start the phoenix server if environment is set and running in a release
-if System.get_env("PHX_SERVER") && System.get_env("RELEASE_NAME") do
-  config :chat, ChatWeb.Endpoint, server: true
-end
+# if System.get_env("PHX_SERVER") && System.get_env("RELEASE_NAME") do
+#   config :chat, ChatWeb.Endpoint, server: true
+# end
 
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.

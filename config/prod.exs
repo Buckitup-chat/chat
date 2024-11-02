@@ -21,9 +21,10 @@ domain_to_file_prefix = fn domain ->
   String.replace(domain, ".", "_")
 end
 
-ssl_cacertfile = "../cert/#{hostname}/#{domain_to_file_prefix.(hostname)}.ca-bundle"
-ssl_certfile = "../cert/#{hostname}/#{domain_to_file_prefix.(hostname)}.crt"
-ssl_keyfile = "../cert/#{hostname}/priv.key"
+cert_dir = Path.expand("../cert", __DIR__)
+ssl_cacertfile = "#{cert_dir}/#{hostname}/#{domain_to_file_prefix.(hostname)}.ca-bundle"
+ssl_certfile = "#{cert_dir}/#{hostname}/#{domain_to_file_prefix.(hostname)}.crt"
+ssl_keyfile = "#{cert_dir}/#{hostname}/priv.key"
 
 cert_present? =
   [ssl_cacertfile, ssl_certfile, ssl_keyfile]

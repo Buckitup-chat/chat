@@ -44,7 +44,8 @@ config :chat, ChatWeb.Endpoint,
   check_origin: [
     "https://offline-chat.gigalixirapp.com",
     "https://buckitup.app",
-    "//128.140.47.184"
+    "//128.140.47.184",
+    "//#{hostname}"
   ],
   allow_reset_data: false,
   server: true
@@ -58,8 +59,7 @@ if cert_present? do
       certfile: ssl_certfile,
       keyfile: ssl_keyfile
     ],
-    force_ssl: [hsts: true],
-    check_origin: ["//#{hostname}"]
+    force_ssl: [hsts: true]
 end
 
 # url: [host: "buckitup.app", port: 443],

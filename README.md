@@ -4,7 +4,7 @@
 2. Run `asdf install` in project dir
 3. Run `mix deps.get`
 4. In `assets/js` run `npm install`
-5. Run `make iex` in project dir to start server on [`localhost:4000`](http://localhost:4000) and shell. You can exit shell with double `Ctrl-C` and stop the server.
+5. Run `make iex` in project dir to start server on [`localhost:4444`](http://localhost:4444) and shell. You can exit shell with double `Ctrl-C` and stop the server.
 
 
 # CSS class naming conventions

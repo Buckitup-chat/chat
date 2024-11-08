@@ -45,6 +45,11 @@ server:
 iex:
 	MIX_ENV=dev iex --sname chat --cookie chat -S mix phx.server
 
+iex_like_prod:
+	MIX_ENV=prod \
+					SECRET_KEY_BASE=IGuZPUcM7Vuq1iPemg6pc7EMwLLmMiVA4stbfDstZPshJ8QDqxBBcVqNnQI6clxi \
+					iex -S mix phx.server
+
 assets:
 	mix assets.deploy
 
@@ -60,6 +65,7 @@ empty_db:
 	rm -rf priv/test_db
 
 firmware: empty_db
+	rm -rf _build/prod
 	MIX_TARGET=host mix do compile, assets.deploy
 
 clean:

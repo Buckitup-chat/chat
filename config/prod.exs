@@ -21,31 +21,42 @@ domain_to_file_prefix = fn domain ->
   String.replace(domain, ".", "_")
 end
 
-cert_dir = Path.expand("../../cert", __DIR__)
-ssl_cacertfile = "#{cert_dir}/#{hostname}/#{domain_to_file_prefix.(hostname)}.ca-bundle"
-ssl_certfile = "#{cert_dir}/#{hostname}/#{domain_to_file_prefix.(hostname)}.crt"
-ssl_keyfile = "#{cert_dir}/#{hostname}/priv.key"
+cert_src_dir = "../cert/#{hostname}"
+cert_deploy_dir = "../chat/priv/certs"
+File.rm_rf!(cert_deploy_dir)
+
+ssl_cacertfile = "#{domain_to_file_prefix.(hostname)}.ca-bundle"
+ssl_certfile = "#{domain_to_file_prefix.(hostname)}.crt"
+ssl_keyfile = "priv.key"
 
 cert_present? =
   [ssl_cacertfile, ssl_certfile, ssl_keyfile]
+  |> Enum.map(&Path.join([cert_src_dir, &1]))
   |> Enum.all?(&File.exists?/1)
 
 if cert_present? do
+  File.mkdir_p!(cert_deploy_dir)
+
+  [ssl_cacertfile, ssl_certfile, ssl_keyfile]
+  |> Enum.map(fn filename ->
+    File.cp!(Path.join([cert_src_dir, filename]), Path.join([cert_deploy_dir, filename]))
+  end)
+
   config :chat, ChatWeb.Endpoint,
     url: [host: hostname],
     http: [ip: {0, 0, 0, 0}, port: 80],
     https: [
       port: 443,
       cipher_suite: :strong,
-      cacertfile: ssl_cacertfile,
-      certfile: ssl_certfile,
-      keyfile: ssl_keyfile
+      cacertfile: [cert_deploy_dir, ssl_cacertfile] |> Path.join(),
+      certfile: [cert_deploy_dir, ssl_certfile] |> Path.join(),
+      keyfile: [cert_deploy_dir, ssl_keyfile] |> Path.join()
     ],
     secret_key_base:
       Map.get(
         System.get_env(),
         "SECRET_KEY_BASE",
-        "BKyA6n6KrL/mmKlyg5a+4/ZlWq0cN3dFqfvNj9zaw6Acvnp++u6bXN5rkns5xVpE"
+        "IGuZPUcM7Vuq1iPemg6pc7EMwLLmMiVA4stbfDstZPshJ8QDqxBBcVqNnQI6clxi"
       ),
     force_ssl: [hsts: true],
     check_origin: ["//#{hostname}"],

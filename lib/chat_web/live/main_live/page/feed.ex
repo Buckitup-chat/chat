@@ -42,24 +42,15 @@ defmodule ChatWeb.MainLive.Page.Feed do
     |> assign(:items, nil)
   end
 
-  def item(
-        %{
-          item: {dom_id, %{who: who, data: data}},
-          tz: timezone
-        } = assigns
-      ) do
-    datetime =
-      data
-      |> elem(0)
-      |> DateTime.from_unix!()
-      |> DateTime.shift_zone!(timezone)
-      |> Timex.format!("{h12}:{0m} {AM}, {D}.{M}.{YYYY}")
+  def item(%{item: {dom_id, %{who: who, data: data}}} = assigns) do
+    unixtime = data |> elem(0)
+    action = data |> Tuple.delete_at(0)
 
     assigns =
       assign(assigns,
         user: User.by_id(who),
-        action: data |> Tuple.delete_at(0),
-        datetime: datetime,
+        action: action,
+        timestamp: unixtime,
         dom_id: dom_id
       )
 
@@ -67,7 +58,10 @@ defmodule ChatWeb.MainLive.Page.Feed do
     <div class="py-1 flex justify-start" id={@dom_id}>
       <div class="border-0 rounded-md bg-white/20 p-2 flex flex-col justify-start">
         <span class="text-white"><%= @user && @user.name %> <.action action={@action} /></span>
-        <div class="text-white/70" style="font-size: 10px;"><%= @datetime %></div>
+        <div class="text-white/70" style="font-size: 10px;">
+          <time-stamp id="timestamp-#{@dom_id}" data-unixtime={@timestamp} phx-update="ignore">
+          </time-stamp>
+        </div>
       </div>
     </div>
     """

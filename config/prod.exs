@@ -21,9 +21,10 @@ domain_to_file_prefix = fn domain ->
   String.replace(domain, ".", "_")
 end
 
-cert_src_dir = "../cert/#{hostname}"
-cert_deploy_dir = "../chat/priv/certs"
-File.rm_rf!(cert_deploy_dir)
+cert_deploy_dir = cert_src_dir = Path.expand("../../cert/#{hostname}", __DIR__)
+# cert_src_dir = "../cert/#{hostname}"
+# cert_deploy_dir = "../chat/priv/certs"
+# File.rm_rf!(cert_deploy_dir)
 
 ssl_cacertfile = "#{domain_to_file_prefix.(hostname)}.ca-bundle"
 ssl_certfile = "#{domain_to_file_prefix.(hostname)}.crt"
@@ -37,10 +38,10 @@ cert_present? =
 if cert_present? do
   File.mkdir_p!(cert_deploy_dir)
 
-  [ssl_cacertfile, ssl_certfile, ssl_keyfile]
-  |> Enum.map(fn filename ->
-    File.cp!(Path.join([cert_src_dir, filename]), Path.join([cert_deploy_dir, filename]))
-  end)
+  # [ssl_cacertfile, ssl_certfile, ssl_keyfile]
+  # |> Enum.map(fn filename ->
+  #   File.cp!(Path.join([cert_src_dir, filename]), Path.join([cert_deploy_dir, filename]))
+  # end)
 
   config :chat, ChatWeb.Endpoint,
     url: [host: hostname],

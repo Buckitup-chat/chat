@@ -5,7 +5,7 @@
 <% else %>
   <%= if @need_login do %>
     <%= if @handshaked do %>
-      <.login />
+      <.login skip_user_creation={assigns[:skip_user_creation]} />
     <% else %>
       <.loading_screen />
     <% end %>

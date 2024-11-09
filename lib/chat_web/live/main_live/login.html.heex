@@ -9,11 +9,14 @@
       <h1 style="font-size: 28px; line-height: 34px;" class="font-inter font-bold text-white">
         Log In
       </h1>
-      <p class="mt-2.5 font-inter text-sm text-white/70">
+      <p
+        :if={is_nil(assigns[:skip_user_creation])}
+        class="mt-2.5 font-inter text-sm text-white/70"
+      >
         Please, enter your name. That’s how other users will see you
       </p>
     </div>
-    <div class="w-full mt-7">
+    <div :if={is_nil(assigns[:skip_user_creation])} class="w-full mt-7">
       <.form
         :let={f}
         for={%{}}
@@ -38,7 +41,10 @@
         </div>
       </.form>
     </div>
-    <div class="mt-7 flex flex-row items-center justify-between">
+    <div
+      :if={is_nil(assigns[:skip_user_creation])}
+      class="mt-7 flex flex-row items-center justify-between"
+    >
       <hr class="basis-[44%] border-1 border-white/10" />
       <p class="text-white/50">or</p>
       <hr class="basis-[44%] border-1 border-white/10" />

@@ -21,6 +21,7 @@ defmodule ChatWeb.MainLive.Index do
     MediaSettingsForm,
     NetworkSourceList,
     PrivacyPolicy,
+    UserSettings,
     ZerotierSettings
   }
 
@@ -62,6 +63,7 @@ defmodule ChatWeb.MainLive.Index do
         |> assign(
           need_login: true,
           handshaked: false,
+          skip_user_creation: Chat.AdminDb.get(:skip_user_creation),
           mode: :user_list,
           monotonic_offset: 0
         )

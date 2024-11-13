@@ -397,14 +397,12 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
     pid = self()
 
     Task.start(fn ->
-      server
-      |> tap(&Proxy.register_me(&1, me))
-      |> Proxy.get_users()
-      |> then(fn users ->
-        if is_list(users) do
-          send(pid, {:lobby, {:user_list, users}})
-        end
-      end)
+      Proxy.register_me(server, me)
+      users = Proxy.get_users(server)
+
+      if is_list(users) do
+        send(pid, {:lobby, {:user_list, users}})
+      end
     end)
   end
 

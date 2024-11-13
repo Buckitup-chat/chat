@@ -22,13 +22,17 @@ defmodule Enigma.SecretSharing do
         raise(ArgumentError, message: "amount of shares should be bigger than threshold")
 
       true ->
-        KeyX.generate_shares!(threshold, 255, secret)
-        |> Enum.shuffle()
-        |> Enum.reduce_while([], fn share, acc ->
-          if length(acc) < amount, do: {:cont, [share | acc]}, else: {:halt, acc}
-        end)
+        generate_shares(secret, amount, threshold)
     end
   end
 
   def recover_secret_from_shares(shares), do: KeyX.recover_secret!(shares)
+
+  defp generate_shares(secret, amount, threshold) do
+    KeyX.generate_shares!(threshold, 255, secret)
+    |> Enum.shuffle()
+    |> Enum.reduce_while([], fn share, acc ->
+      if length(acc) < amount, do: {:cont, [share | acc]}, else: {:halt, acc}
+    end)
+  end
 end

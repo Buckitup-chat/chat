@@ -22,7 +22,7 @@ defmodule Proxy do
   end
 
   def get_users(server) do
-    api_select(server, min: {:users, 0}, max: {:"users\0", 0}, amount: 10000)
+    api_select(server, min: {:users, 0}, max: {:"users\0", 0}, amount: 10_000)
   end
 
   # Dialogs

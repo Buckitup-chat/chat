@@ -3,6 +3,8 @@ defmodule ChatWeb.ProxyLive.Index do
 
   alias Phoenix.LiveView.JS
 
+  alias Chat.Rooms.Room
+
   alias ChatWeb.ProxyLive.Init
 
   alias ChatWeb.Hooks.LiveModalHook
@@ -13,8 +15,8 @@ defmodule ChatWeb.ProxyLive.Index do
   alias ChatWeb.ProxyLive.Page.Lobby, as: ProxyLobby
   alias ChatWeb.ProxyLive.Page.Dialog, as: ProxyDialog
 
-  alias ChatWeb.ProxyLive.Components.Dialog
-  alias ChatWeb.ProxyLive.Components.UserList
+  # alias ChatWeb.ProxyLive.Components.Dialog
+  # alias ChatWeb.ProxyLive.Components.UserList
 
   on_mount LiveModalHook
   on_mount UploaderHook
@@ -59,26 +61,26 @@ defmodule ChatWeb.ProxyLive.Index do
     """
   end
 
-  def render_poc(assigns) do
-    ~H"""
-    <.live_component
-      :if={assigns[:actor] && assigns[:server]}
-      id="users"
-      module={UserList}
-      server={@server}
-      me={@actor.me}
-      on_click={:proxy_user_list_selects_peer}
-    />
-    <.live_component
-      :if={assigns[:actor] && assigns[:server] && assigns[:dialog_to]}
-      id="dialog"
-      module={Dialog}
-      server={@server}
-      actor={@actor}
-      to={@dialog_to}
-    />
-    """
-  end
+  # def render_poc(assigns) do
+  #   ~H"""
+  #   <.live_component
+  #     :if={assigns[:actor] && assigns[:server]}
+  #     id="users"
+  #     module={UserList}
+  #     server={@server}
+  #     me={@actor.me}
+  #     on_click={:proxy_user_list_selects_peer}
+  #   />
+  #   <.live_component
+  #     :if={assigns[:actor] && assigns[:server] && assigns[:dialog_to]}
+  #     id="dialog"
+  #     module={Dialog}
+  #     server={@server}
+  #     actor={@actor}
+  #     to={@dialog_to}
+  #   />
+  #   """
+  # end
 
   def handle_info_poc({:proxy_user_list_selects_peer, card}, socket) do
     socket

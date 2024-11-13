@@ -77,21 +77,19 @@ defmodule Proxy do
   defp api_get(server, action, args) do
     server
     |> build_url(action, args)
-    |> HTTPoison.get()
-    |> case do
-      {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
-        body |> unwrap()
-
-      _ ->
-        {:error, :no_server_responce}
-    end
+    |> HTTPoison.get([], follow_redirect: true)
+    |> handle_respoonse()
   end
 
   defp api_post(server, action, args) do
     server
     |> build_url(action, %{})
-    |> HTTPoison.post(args |> Proxy.Serialize.serialize())
-    |> case do
+    |> HTTPoison.post(args |> Proxy.Serialize.serialize(), [], follow_redirect: true)
+    |> handle_respoonse()
+  end
+
+  defp handle_respoonse(response) do
+    case response do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
         body |> unwrap()
 

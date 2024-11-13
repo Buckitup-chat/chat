@@ -13,7 +13,7 @@ defmodule NaiveApi.Chat do
   def read(_, %{peer_public_key: peer_public_key, my_keypair: my_keypair} = params, _) do
     peer = User.by_id(peer_public_key)
     my_card = User.by_id(my_keypair.public_key)
-    me = Identity.from_keys(my_keypair) |> Map.put(:name, my_card.name)
+    me = Identity.from_keys(my_keypair) |> Map.put(:name, my_card[:name] || "")
     dialog = Dialogs.find_or_open(me, peer)
 
     before_timestamp = params[:before]

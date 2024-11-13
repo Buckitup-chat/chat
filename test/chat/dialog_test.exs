@@ -1,6 +1,7 @@
 defmodule Chat.Dialogs.DialogTest do
   use ExUnit.Case, async: true
 
+  alias Chat.Identity
   alias Chat.Card
   alias Chat.Content.Files
   alias Chat.Content.Memo
@@ -98,7 +99,7 @@ defmodule Chat.Dialogs.DialogTest do
              |> Memo.get()
   end
 
-  test "dialog with fle should work" do
+  test "dialog with file should work" do
     alice = User.login("Alice")
     bob = User.login("Bob")
     bob_card = bob |> Card.from_identity()
@@ -299,6 +300,28 @@ defmodule Chat.Dialogs.DialogTest do
     assert invite1.id == message1.id
     assert invite2.id == message2.id
     assert invite3.id == message3.id
+  end
+
+  test "message from unregistred user works" do
+    alice = User.login("Alice")
+    alice_card = alice |> Card.from_identity()
+
+    bob = Identity.create("Bob")
+    bob_card = bob |> Card.from_identity()
+    content = "hi"
+
+    initial = Dialogs.find_or_open(alice, bob_card)
+    dialog = Dialogs.find_or_open(bob, alice_card)
+
+    assert initial == dialog
+
+    %Messages.Text{text: content}
+    |> Dialogs.add_new_message(alice, dialog)
+    |> Dialogs.await_saved(dialog)
+
+    [bob_version] = Dialogs.read(dialog, bob)
+
+    assert bob_version.content == content
   end
 
   defp fake_file do

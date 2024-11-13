@@ -120,7 +120,7 @@ defmodule Chat.Rooms.Room do
   end
 
   def valid?(%__MODULE__{} = room) do
-    Enigma.is_valid_sign?(room.signature, room |> digest(), room.pub_key)
+    Enigma.valid_sign?(room.signature, room |> digest(), room.pub_key)
   end
 
   def cipher_identity(%Identity{} = room_identity, secret) do

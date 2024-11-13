@@ -42,7 +42,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
     with {:ok, user} <- KeyShare.user_in_share(keystring),
          %Identity{} = me <- [user.name, keystring] |> Identity.from_strings(),
          my_hash <- me.private_key |> Enigma.hash(),
-         is_valid_sign <- Enigma.is_valid_sign?(sign, my_hash, me.public_key) do
+         is_valid_sign <- Enigma.valid_sign?(sign, my_hash, me.public_key) do
       socket |> sign_based_response(me, is_valid_sign)
     else
       :user_keystring_broken ->

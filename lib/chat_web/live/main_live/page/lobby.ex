@@ -283,7 +283,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
            identity <- rooms[admin_pub_key],
            false <- is_nil(identity),
            sign <- Enigma.sign(some_data, identity.private_key),
-           true <- Enigma.is_valid_sign?(sign, some_data, admin_pub_key) do
+           true <- Enigma.valid_sign?(sign, some_data, admin_pub_key) do
         true
       else
         _ -> false

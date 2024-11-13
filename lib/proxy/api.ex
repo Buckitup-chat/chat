@@ -1,6 +1,8 @@
 defmodule Proxy.Api do
   @moduledoc "Proxy API. For server controller"
 
+  alias Chat.Proto.Identify
+
   @known_atoms %{
     users: :"users\0",
     dialog_message: true
@@ -17,7 +19,7 @@ defmodule Proxy.Api do
 
   def correct_digest?(token_key, public_key, digest) do
     token = Chat.Broker.get(token_key)
-    Enigma.is_valid_sign?(digest, token, public_key)
+    Enigma.valid_sign?(digest, token, public_key)
   end
 
   def register_user(args) do
@@ -52,7 +54,7 @@ defmodule Proxy.Api do
     |> Map.new()
     |> case do
       %{me: me, peer: peer, digest: digest, token_key: token_key} ->
-        if correct_digest?(token_key, Chat.Proto.Identify.pub_key(me), digest) do
+        if correct_digest?(token_key, Identify.pub_key(me), digest) do
           Chat.Dialogs.find_or_open(me, peer)
         end
 

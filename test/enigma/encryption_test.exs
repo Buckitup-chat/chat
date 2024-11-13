@@ -163,7 +163,7 @@ defmodule Enigma.EncryptionTest do
   defp assert_eve_can_verify_bisigned_message_is_for_the_room(context) do
     tap(context, fn context ->
       {encrypted_data, _data_sign, encrypted_data_sign} = context.encrypted_and_bisigned
-      assert Enigma.is_valid_sign?(encrypted_data_sign, encrypted_data, context.room.pub_key)
+      assert Enigma.valid_sign?(encrypted_data_sign, encrypted_data, context.room.pub_key)
     end)
   end
 

@@ -26,7 +26,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   alias Chat.Rooms
   alias Chat.Sync.DbBrokers
   alias Chat.Upload.UploadMetadata
-  alias Chat.User
+  # alias Chat.User
   alias Chat.Utils
   alias Chat.Utils.StorageId
 
@@ -536,8 +536,8 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
     )
   end
 
-  defp set_messages_timestamp([]), do: nil
-  defp set_messages_timestamp([message | _]), do: message.index
+  # defp set_messages_timestamp([]), do: nil
+  # defp set_messages_timestamp([message | _]), do: message.index
 
   defp forget_current_messages(socket) do
     socket

@@ -186,7 +186,7 @@ defmodule Chat.Rooms.RoomMessages do
   defp if_eligable_for_room(message, room_key, ok_fn) do
     {encrypted, _, encrypted_and_signed} = message.encrypted
 
-    if Enigma.is_valid_sign?(encrypted_and_signed, encrypted, room_key),
+    if Enigma.valid_sign?(encrypted_and_signed, encrypted, room_key),
       do: ok_fn.(message),
       else: nil
   end

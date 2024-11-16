@@ -68,6 +68,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
     |> assign_messages()
     |> send_js(open_content())
 
+    # may be to support chat redirects
     # |> push_patch(to: "/")
   rescue
     _ ->
@@ -77,6 +78,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   def handle_event(msg, params, socket) do
     case msg do
       "dialog/switch" -> socket |> switch_dialog(params)
+      "chat:load-more" -> socket |> load_more_messages()
       _ -> socket |> tap(fn _ -> dbg([msg, params]) end)
     end
   end
@@ -88,7 +90,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
       {:loaded_messages, messages, amount, dialog} ->
         socket |> add_loaded_messages(messages, amount, dialog)
 
-      {:anying, _} ->
+      {_anything, _} ->
         socket
     end
   end
@@ -101,9 +103,12 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
 
   defp add_loaded_messages(socket, messages, amount, dialog) do
     if dialog == socket.assigns.dialog do
+      new_messages = Enum.take(messages, -amount)
+
       socket
-      |> assign(:messages, messages)
+      |> assign(:messages, new_messages)
       |> assign(:has_more_messages, Enum.count(messages) > amount)
+      |> assign(:last_load_timestamp, new_messages |> List.first() |> Map.get(:index))
     else
       socket
     end
@@ -123,6 +128,10 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
         socket
     end
   end
+
+  #
+  # Copy paste from main_live
+  #
 
   def send_text(
         %{assigns: %{dialog: dialog, me: me, monotonic_offset: time_offset}} = socket,

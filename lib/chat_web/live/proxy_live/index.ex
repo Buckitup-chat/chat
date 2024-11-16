@@ -41,10 +41,17 @@ defmodule ChatWeb.ProxyLive.Index do
       "lobby/" <> _ -> ProxyLobby.handle_event(msg, params, socket)
       "switch-lobby-mode" -> socket |> ProxyLobby.switch_lobby_mode(params)
       "dialog/" <> _ -> ProxyDialog.handle_event(msg, params, socket)
+      "chat:load-more" -> handle_general_event(msg, params, socket)
       "chat:" <> _ -> ProxyDialog.handle_event(msg, params, socket)
       "local-time" -> socket
     end
     |> noreply()
+  end
+
+  def handle_general_event(msg, params, socket) do
+    case {msg, socket.assigns} do
+      {"chat:load-more", %{dialog: _}} -> ProxyDialog.handle_event(msg, params, socket)
+    end
   end
 
   def handle_info(msg, socket) do

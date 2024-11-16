@@ -18,6 +18,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   alias Chat.Content.Memo
   alias Chat.Content.RoomInvites
   alias Chat.Dialogs
+  alias Chat.Dialogs.DialogMessaging
   alias Chat.FileIndex
   alias Chat.Identity
   alias Chat.Log
@@ -469,13 +470,13 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
       messages =
         Proxy.get_dialog_messages(server, dialog, max_index, per_page + 1)
         |> Enum.map(fn {{:dialog_message, _, index, _}, msg} ->
-          {index, msg} |> Chat.Dialogs.DialogMessaging.read(actor.me, dialog)
+          {index, msg} |> DialogMessaging.read(actor.me, dialog)
         end)
         |> Enum.filter(& &1)
         |> Enum.reverse()
         |> Enum.map(fn
           %{type: type, content: json} = msg when type in [:image, :audio, :file, :video] ->
-            {id, secret} = json |> StorageId.from_json() |> dbg()
+            {id, secret} = json |> StorageId.from_json()
 
             file_info =
               Proxy.get_file_info(server, id)

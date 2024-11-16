@@ -109,8 +109,8 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
         </div>
 
         <div class="button-container flex justify-between absolute bottom-[45%] w-full p-5">
-          <.prev_button enabled={is_prev_before?(@list, @current)} target={@myself} />
-          <.next_button enabled={is_next_after?(@list, @current)} target={@myself} />
+          <.prev_button enabled={prev_before?(@list, @current)} target={@myself} />
+          <.next_button enabled={next_after?(@list, @current)} target={@myself} />
         </div>
 
         <div id="preloadedList" phx-update="ignore"></div>
@@ -315,8 +315,8 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
     socket
   end
 
-  defp is_next_after?(list, current), do: List.last(list) !== current
-  defp is_prev_before?([first | _], current), do: first !== current
+  defp next_after?(list, current), do: List.last(list) !== current
+  defp prev_before?([first | _], current), do: first !== current
 
   defp image_url(id, secret) do
     key = id |> Base.encode16(case: :lower)

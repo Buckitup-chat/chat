@@ -3,8 +3,10 @@ defmodule Chat.Broadcast do
   Manage broadcasting to channels and pubsub
   """
 
+  alias Chat.User.UsersBroker
+
   def new_user(card) do
-    Chat.User.UsersBroker.put(card)
+    UsersBroker.put(card)
     Phoenix.PubSub.broadcast(Chat.PubSub, "chat::lobby", {:new_user, card})
     ChatWeb.Endpoint.broadcast("users:lobby", "new_user", card |> as_binary())
   end

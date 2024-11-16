@@ -1,11 +1,13 @@
 defmodule ChatWeb.ProxyLive.Init do
-  use ChatWeb, :live_view
-
   @moduledoc """
   Initial steps
 
   Steps are run using `run_steps/2`. It uses `Enum.reduce_while/3`, so stops on the first failed step.
   """
+
+  use ChatWeb, :live_view
+
+  alias Chat.Proto
   alias ChatWeb.ProxyLive.Page
 
   def run_steps(step_list, socket) do
@@ -45,10 +47,10 @@ defmodule ChatWeb.ProxyLive.Init do
 
     socket
     |> assign(:me, actor.me)
-    |> assign(:my_id, actor.me |> Chat.Proto.Identify.pub_key() |> Base.encode16(case: :lower))
+    |> assign(:my_id, actor.me |> Proto.Identify.pub_key() |> Base.encode16(case: :lower))
     |> assign(
       :room_map,
-      actor.rooms |> Map.new(fn room -> {Chat.Proto.Identify.pub_key(room), room} end)
+      actor.rooms |> Map.new(fn room -> {Proto.Identify.pub_key(room), room} end)
     )
     |> assign(:operating_system, os_name)
     |> assign(:db_status, %{

@@ -28,7 +28,7 @@ defmodule Chat.Rooms.RoomMessageLinks do
     |> Enum.reduce(%{}, fn {{_, hash}, data}, map -> Map.put(map, hash, data) end)
   end
 
-  def is_message_linked?({index, msg_id}) do
+  def message_linked?({index, msg_id}) do
     {index, msg_id}
     |> link_hash()
     |> get()

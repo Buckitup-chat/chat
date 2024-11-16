@@ -12,8 +12,8 @@ defmodule ChatWeb.ProxyLive.Index do
   alias ChatWeb.MainLive.Layout
   alias ChatWeb.MainLive.Page
 
-  alias ChatWeb.ProxyLive.Page.Lobby, as: ProxyLobby
   alias ChatWeb.ProxyLive.Page.Dialog, as: ProxyDialog
+  alias ChatWeb.ProxyLive.Page.Lobby, as: ProxyLobby
 
   # alias ChatWeb.ProxyLive.Components.Dialog
   # alias ChatWeb.ProxyLive.Components.UserList

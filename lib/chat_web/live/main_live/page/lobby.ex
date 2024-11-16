@@ -267,7 +267,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
     new =
       Enum.map(new, fn room ->
-        Map.put(room, :is_requested?, Rooms.is_requested_by?(room.pub_key, my_id))
+        Map.put(room, :is_requested?, Rooms.requested_by?(room.pub_key, my_id))
       end)
 
     socket

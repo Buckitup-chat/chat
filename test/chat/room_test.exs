@@ -79,7 +79,7 @@ defmodule Chat.Rooms.RoomTest do
 
     assert [%{requester_key: ^bob_key, pending?: true}] = room.requests
 
-    assert room |> Rooms.Room.is_requested_by?(bob_key)
+    assert room |> Rooms.Room.requested_by?(bob_key)
 
     room = room |> Rooms.Room.approve_request(bob_key, room_identity, [])
 
@@ -138,7 +138,7 @@ defmodule Chat.Rooms.RoomTest do
     assert %Rooms.Room{requests: [%{requester_key: ^bob_pub_key, pending?: true}]} =
              Rooms.get(room_key)
 
-    assert Rooms.is_requested_by?(room_key, bob_pub_key)
+    assert Rooms.requested_by?(room_key, bob_pub_key)
 
     Rooms.approve_request(room_key, bob_pub_key, room_identity)
     ChangeTracker.await()

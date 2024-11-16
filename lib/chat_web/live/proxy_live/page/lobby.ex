@@ -3,6 +3,8 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
 
   require Logger
 
+  alias Chat.Proto
+
   # import ChatWeb.LiveHelpers, only: [process: 2]
   import Phoenix.Component, only: [assign: 3]
   import ChatWeb.LiveHelpers.SocketPrivate
@@ -260,7 +262,7 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
   defp assign_user_list(socket, search_term \\ "") do
     cache = socket |> get_private(:users_cache, [])
     actor = socket |> get_private(:actor)
-    my_pubkey = actor.me |> Chat.Proto.Identify.pub_key()
+    my_pubkey = actor.me |> Proto.Identify.pub_key()
 
     user_list =
       case search_term do

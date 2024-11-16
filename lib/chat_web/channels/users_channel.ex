@@ -1,4 +1,7 @@
 defmodule ChatWeb.UsersChannel do
+  @moduledoc """
+  Channel for proxy?
+  """
   use ChatWeb, :channel
 
   @impl true

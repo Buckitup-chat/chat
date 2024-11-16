@@ -45,12 +45,12 @@ defmodule Chat.Rooms.Room do
     Enum.find(requests, &match?(%RoomRequest{requester_key: ^user_public_key}, &1))
   end
 
-  def is_requested_by?(%__MODULE__{requests: requests}, user_public_key) do
+  def requested_by?(%__MODULE__{requests: requests}, user_public_key) do
     requests
     |> Enum.any?(&match?(%RoomRequest{requester_key: ^user_public_key}, &1))
   end
 
-  def is_requested_by?(_, _), do: false
+  def requested_by?(_, _), do: false
 
   def list_pending_requests(%__MODULE__{requests: requests, type: type})
       when type in [:public, :request] do

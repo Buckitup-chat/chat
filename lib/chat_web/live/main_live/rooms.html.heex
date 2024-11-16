@@ -179,7 +179,7 @@
               msg={msg}
               my_id={@my_id}
               room={@room}
-              linked={Chat.Rooms.RoomMessageLinks.is_message_linked?({msg.index, msg.id})}
+              linked={Chat.Rooms.RoomMessageLinks.message_linked?({msg.index, msg.id})}
             />
           <% end %>
         </div>

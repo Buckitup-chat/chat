@@ -38,7 +38,7 @@ defmodule Chat.Rooms.RoomInput do
       type != :cargo ->
         changeset
 
-      is_unique?(name) ->
+      unique?(name) ->
         changeset
 
       true ->
@@ -46,7 +46,7 @@ defmodule Chat.Rooms.RoomInput do
     end
   end
 
-  defp is_unique?(name) do
+  defp unique?(name) do
     Registry.all()
     |> Enum.any?(fn {_room_pub_key, %Room{} = room} ->
       room.name == name

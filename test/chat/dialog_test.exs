@@ -1,12 +1,13 @@
 defmodule Chat.Dialogs.DialogTest do
   use ExUnit.Case, async: true
 
-  alias Chat.Identity
   alias Chat.Card
   alias Chat.Content.Files
   alias Chat.Content.Memo
   alias Chat.Db.ChangeTracker
   alias Chat.Dialogs
+  alias Chat.Dialogs.Dialog
+  alias Chat.Identity
   alias Chat.Messages
   alias Chat.Rooms
   alias Chat.User

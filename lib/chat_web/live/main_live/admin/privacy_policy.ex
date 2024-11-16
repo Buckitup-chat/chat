@@ -3,9 +3,8 @@ defmodule ChatWeb.MainLive.Admin.PrivacyPolicy do
   Privacy policy editor
   """
   use ChatWeb, :live_component
-
-  alias Phoenix.LiveView.JS
   alias Chat.AdminRoom
+  alias Phoenix.LiveView.JS
 
   def mount(socket) do
     socket

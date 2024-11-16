@@ -128,10 +128,10 @@ defmodule Chat.Rooms do
     |> update()
   end
 
-  def is_requested_by?(room_pub_key, person_public_key) do
+  def requested_by?(room_pub_key, person_public_key) do
     room_pub_key
     |> get()
-    |> Room.is_requested_by?(person_public_key)
+    |> Room.requested_by?(person_public_key)
   end
 
   def list_pending_requests(room_key) do

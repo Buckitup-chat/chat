@@ -55,7 +55,9 @@ defmodule ChatWeb.MainLive.IndexTest do
       inviter_hash = inviter |> Card.from_identity() |> then(& &1.hash)
       current_tab_view |> element("#dialog-list li#user-#{inviter_hash}") |> render_click()
 
-      current_tab_view |> element(".acceptInviteButton") |> render_click()
+      Support.RetryHelper.retry_until(1000, fn ->
+        current_tab_view |> element(".acceptInviteButton") |> render_click()
+      end)
 
       render_hook(current_tab_view, "room/sync-stored", %{
         "key" => Identity.priv_key_to_string(room_identity),

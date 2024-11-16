@@ -7,7 +7,7 @@ defmodule Proxy.Api do
     users: :"users\0",
     dialog_message: true
   }
-  def known_atoms(), do: @known_atoms
+  def known_atoms, do: @known_atoms
 
   def confirmation_token do
     token = :crypto.strong_rand_bytes(80)

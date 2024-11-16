@@ -115,7 +115,7 @@ defmodule NaiveApi.ChatTest do
       [me: me, peer: peer, dialog: dialog]
     end
 
-    test "sends text", %{me: me, peer: peer, dialog: dialog} do
+    test "sends text", %{me: me, peer: peer} do
       {:ok, %{data: %{"chatSendText" => message_reference}}} =
         Absinthe.run(@send_text_mutation, @schema,
           variables: %{

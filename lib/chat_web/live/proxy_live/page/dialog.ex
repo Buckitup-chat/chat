@@ -79,6 +79,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
     case msg do
       "dialog/switch" -> socket |> switch_dialog(params)
       "chat:load-more" -> socket |> load_more_messages()
+      "dialog/message/open-image-gallery" -> socket |> open_image_gallery(params)
       _ -> socket |> tap(fn _ -> dbg([msg, params]) end)
     end
   end

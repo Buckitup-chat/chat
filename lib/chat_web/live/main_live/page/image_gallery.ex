@@ -21,32 +21,25 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
     |> ok()
   end
 
-  def update(%{action: action} = assigns, socket) do
-    socket
-    |> assign(Map.drop(assigns, [:action]))
-    |> handle_action(action)
-    |> ok()
+  def update(new_assigns, socket) do
+    case new_assigns do
+      %{action: action} ->
+        socket
+        |> assign(Map.drop(new_assigns, [:action]))
+        |> handle_action(action)
+        |> ok()
+
+      _ ->
+        socket |> assign(new_assigns) |> ok()
+    end
   end
 
-  def update(assigns, socket) do
-    socket |> assign(assigns) |> ok()
-  end
-
-  def handle_event("switch-next", _, socket) do
-    socket
-    |> switch_next()
-    |> noreply()
-  end
-
-  def handle_event("switch-prev", _, socket) do
-    socket
-    |> switch_prev()
-    |> noreply()
-  end
-
-  def handle_event("close", _, socket) do
-    socket
-    |> close()
+  def handle_event(event, _, socket) do
+    case event do
+      "switch-next" -> socket |> switch_next()
+      "switch-prev" -> socket |> switch_prev()
+      "close" -> socket |> close()
+    end
     |> noreply()
   end
 
@@ -119,6 +112,92 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
     """
   end
 
+  def back_button(assigns) do
+    ~H"""
+    <div id="backBtn" class="items-center">
+      <button
+        class="text-white flex z-20"
+        phx-target={@target}
+        phx-click={
+          JS.push("close")
+          |> JS.remove_class("hidden", to: "#chatContent")
+          |> JS.add_class("hidden", to: "#imageGallery")
+        }
+      >
+        <div class="flex pl-2">
+          <svg
+            class="relative top-1"
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            fill="white"
+            viewBox="0 0 24 24"
+          >
+            <path d="M16.67 0l2.83 2.829-9.339 9.175 9.339 9.167-2.83 2.829-12.17-11.996z" />
+          </svg>
+          <p>&nbsp;Back</p>
+        </div>
+      </button>
+    </div>
+    """
+  end
+
+  def prev_button(assigns) do
+    ~H"""
+    <button
+      id="prev"
+      class={(@enabled && "z-10") || "invisible"}
+      phx-target={@target}
+      phx-click={
+        JS.push("switch-prev")
+        |> JS.add_class("hidden", to: "#prev")
+        |> JS.add_class("hidden", to: "#next")
+        |> JS.add_class("hidden", to: "#galleryImage")
+        |> JS.remove_class("hidden", to: "#galleryImagePreloader")
+      }
+    >
+      <svg
+        class="a-outline"
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        fill="white"
+        viewBox="0 0 24 24"
+      >
+        <path d="M16.67 0l2.83 2.829-9.339 9.175 9.339 9.167-2.83 2.829-12.17-11.996z" />
+      </svg>
+    </button>
+    """
+  end
+
+  def next_button(assigns) do
+    ~H"""
+    <button
+      id="next"
+      class={(@enabled && "z-10") || "invisible"}
+      phx-click={
+        JS.push("switch-next")
+        |> JS.add_class("hidden", to: "#next")
+        |> JS.add_class("hidden", to: "#prev")
+        |> JS.add_class("hidden", to: "#galleryImage")
+        |> JS.remove_class("hidden", to: "#galleryImagePreloader")
+      }
+      phx-target={@target}
+    >
+      <svg
+        class="a-outline"
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        fill="white"
+        viewBox="0 0 24 24"
+      >
+        <path d="M5 3l3.057-3 11.943 12-11.943 12-3.057-3 9-9z" />
+      </svg>
+    </button>
+    """
+  end
+
   defp handle_action(socket, action) do
     case action do
       :open -> socket |> open()
@@ -129,79 +208,58 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
     end
   end
 
-  defp open(
-         %{
-           assigns: %{
-             incoming_msg_id: msg_id,
-             type: :room,
-             room_identity: room_identity
-           }
-         } =
-           socket
-       ) do
-    socket
-    |> assign_current(msg_id, Rooms.read_message(msg_id, room_identity))
+  defp open(socket) do
+    case socket.assigns do
+      %{type: :room, incoming_msg_id: msg_id, room_identity: room_identity} ->
+        socket |> assign_current(msg_id, Rooms.read_message(msg_id, room_identity))
+
+      %{type: :dialog, incoming_msg_id: msg_id, dialog: dialog, me: me} ->
+        socket
+        |> assign_current(msg_id, Dialogs.read_message(dialog, msg_id, me))
+
+        # %{type: :proxy_dialog, incoming_msg_id: msg_id, dialog: dialog, me: me, server: server} ->
+        #   socket
+    end
   end
 
-  defp open(
-         %{assigns: %{incoming_msg_id: msg_id, dialog: dialog, type: :dialog, me: me}} = socket
-       ) do
-    socket
-    |> assign_current(msg_id, Dialogs.read_message(dialog, msg_id, me))
+  defp preload_prev(socket) do
+    case socket.assigns do
+      %{list: []} ->
+        socket
+
+      %{type: :room, room_identity: identity, list: [first | _]} ->
+        socket
+        |> assign_prev(
+          Rooms.read_prev_message({first.index, first.id}, identity, &match?({_, %{type: :image}}, &1))
+        )
+
+      %{type: :dialog, dialog: dialog, list: [first | _], me: me} ->
+        socket
+        |> assign_prev(
+          Dialogs.read_prev_message(dialog, {first.index, first.id}, me, &match?({_, %{type: :image}}, &1))
+        )
+    end
   end
 
-  # coveralls-ignore-next-line
-  defp preload_prev(%{assigns: %{list: []}} = socket), do: socket
+  defp preload_next(socket) do
+    case socket.assigns do
+      %{list: []} ->
+        socket
 
-  defp preload_prev(%{assigns: %{room_identity: identity, type: :room, list: list}} = socket) do
-    first = List.first(list)
+      %{type: :room, room_identity: identity, list: list} ->
+        last = List.last(list)
+        socket
+        |> assign_next(
+          Rooms.read_next_message({last.index, last.id}, identity, &match?({_, %{type: :image}}, &1))
+        )
 
-    socket
-    |> assign_prev(
-      Rooms.read_prev_message({first.index, first.id}, identity, fn
-        {_, %{type: :image}} -> true
-        _ -> false
-      end)
-    )
-  end
-
-  defp preload_prev(%{assigns: %{dialog: dialog, type: :dialog, list: list, me: me}} = socket) do
-    first = List.first(list)
-
-    socket
-    |> assign_prev(
-      Dialogs.read_prev_message(dialog, {first.index, first.id}, me, fn
-        {_, %{type: :image}} -> true
-        _ -> false
-      end)
-    )
-  end
-
-  # coveralls-ignore-next-line
-  defp preload_next(%{assigns: %{list: []}} = socket), do: socket
-
-  defp preload_next(%{assigns: %{room_identity: identity, type: :room, list: list}} = socket) do
-    last = List.last(list)
-
-    socket
-    |> assign_next(
-      Rooms.read_next_message({last.index, last.id}, identity, fn
-        {_, %{type: :image}} -> true
-        _ -> false
-      end)
-    )
-  end
-
-  defp preload_next(%{assigns: %{dialog: dialog, type: :dialog, list: list, me: me}} = socket) do
-    last = List.last(list)
-
-    socket
-    |> assign_next(
-      Dialogs.read_next_message(dialog, {last.index, last.id}, me, fn
-        {_, %{type: :image}} -> true
-        _ -> false
-      end)
-    )
+      %{type: :dialog, dialog: dialog, list: list, me: me} ->
+        last = List.last(list)
+        socket
+        |> assign_next(
+          Dialogs.read_next_message(dialog, {last.index, last.id}, me, &match?({_, %{type: :image}}, &1))
+        )
+    end
   end
 
   defp switch_prev(%{assigns: %{list: list, prev: prev, current: current}} = socket) do
@@ -324,91 +382,5 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
 
     ~p"/get/image/#{key}?a=#{code}"
     |> url()
-  end
-
-  def back_button(assigns) do
-    ~H"""
-    <div id="backBtn" class="items-center">
-      <button
-        class="text-white flex z-20"
-        phx-target={@target}
-        phx-click={
-          JS.push("close")
-          |> JS.remove_class("hidden", to: "#chatContent")
-          |> JS.add_class("hidden", to: "#imageGallery")
-        }
-      >
-        <div class="flex pl-2">
-          <svg
-            class="relative top-1"
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            fill="white"
-            viewBox="0 0 24 24"
-          >
-            <path d="M16.67 0l2.83 2.829-9.339 9.175 9.339 9.167-2.83 2.829-12.17-11.996z" />
-          </svg>
-          <p>&nbsp;Back</p>
-        </div>
-      </button>
-    </div>
-    """
-  end
-
-  def prev_button(assigns) do
-    ~H"""
-    <button
-      id="prev"
-      class={(@enabled && "z-10") || "invisible"}
-      phx-target={@target}
-      phx-click={
-        JS.push("switch-prev")
-        |> JS.add_class("hidden", to: "#prev")
-        |> JS.add_class("hidden", to: "#next")
-        |> JS.add_class("hidden", to: "#galleryImage")
-        |> JS.remove_class("hidden", to: "#galleryImagePreloader")
-      }
-    >
-      <svg
-        class="a-outline"
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="24"
-        fill="white"
-        viewBox="0 0 24 24"
-      >
-        <path d="M16.67 0l2.83 2.829-9.339 9.175 9.339 9.167-2.83 2.829-12.17-11.996z" />
-      </svg>
-    </button>
-    """
-  end
-
-  def next_button(assigns) do
-    ~H"""
-    <button
-      id="next"
-      class={(@enabled && "z-10") || "invisible"}
-      phx-click={
-        JS.push("switch-next")
-        |> JS.add_class("hidden", to: "#next")
-        |> JS.add_class("hidden", to: "#prev")
-        |> JS.add_class("hidden", to: "#galleryImage")
-        |> JS.remove_class("hidden", to: "#galleryImagePreloader")
-      }
-      phx-target={@target}
-    >
-      <svg
-        class="a-outline"
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="24"
-        fill="white"
-        viewBox="0 0 24 24"
-      >
-        <path d="M5 3l3.057-3 11.943 12-11.943 12-3.057-3 9-9z" />
-      </svg>
-    </button>
-    """
   end
 end

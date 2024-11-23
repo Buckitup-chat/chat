@@ -3,20 +3,12 @@ defmodule Proxy do
 
   # Users
   def register_me(server, me) do
-    %{token_key: token_key, token: token} =
-      api_confirmation_token(server)
-
-    digest = Enigma.sign(token, me.private_key)
-
-    api_register_user(
-      server,
-      %{
-        token_key: token_key,
-        public_key: me.public_key,
-        name: me.name,
-        digest: digest
-      }
-    )
+    %{
+      public_key: me.public_key,
+      name: me.name
+    }
+    |> add_signed_token(server, me.private_key)
+    |> api_register_user(server)
   catch
     _, _ -> :failed
   end
@@ -27,17 +19,12 @@ defmodule Proxy do
 
   # Dialogs
   def find_or_create_dialog(server, me, peer) do
-    %{token_key: token_key, token: token} =
-      api_confirmation_token(server)
-
-    digest = Enigma.sign(token, me.private_key)
-
-    api_create_dialog(server, %{
-      token_key: token_key,
+    %{
       me: me |> Chat.Card.from_identity(),
-      peer: peer,
-      digest: digest
-    })
+      peer: peer
+    }
+    |> add_signed_token(server, me.private_key)
+    |> api_create_dialog(server)
   end
 
   def get_dialog_messages(server, dialog, index, amount) do
@@ -69,15 +56,25 @@ defmodule Proxy do
     api_key_value(server, {:file_chunk, file_key, start})
   end
 
+  defp add_signed_token(params, server, private_key) do
+    %{token_key: token_key, token: token} = api_confirmation_token(server)
+
+    %{
+      token_key: token_key,
+      digest: Enigma.sign(token, private_key)
+    }
+    |> Map.merge(params)
+  end
+
   # Terminology
   ####################################
   defp api_confirmation_token(server), do: api_get(server, "confirmation-token", [])
   defp api_select(server, args), do: api_get(server, "select", args)
   defp api_key_value(server, args), do: api_get(server, "key-value", args)
-  defp api_register_user(server, args), do: api_post(server, "register-user", args)
-  defp api_create_dialog(server, args), do: api_post(server, "create-dialog", args)
+  defp api_register_user(args, server), do: api_post(server, "register-user", args)
+  defp api_create_dialog(args, server), do: api_post(server, "create-dialog", args)
 
-  # Utilities
+  #  Request utilities
   ####################################
 
   defp api_get(server, action, args) do

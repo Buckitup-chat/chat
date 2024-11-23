@@ -7,103 +7,88 @@ defmodule Proxy.Api do
     users: :"users\0",
     dialog_message: true
   }
+  @doc "Ensure atoms are loaded for deserialization"
   def known_atoms, do: @known_atoms
 
   def confirmation_token do
     token = :crypto.strong_rand_bytes(80)
     key = Chat.Broker.store(token)
 
-    %{token_key: key, token: token}
-    |> Proxy.Serialize.serialize()
-  end
-
-  def correct_digest?(token_key, public_key, digest) do
-    token = Chat.Broker.get(token_key)
-    Enigma.valid_sign?(digest, token, public_key)
+    %{token_key: key, token: token} |> wrap()
   end
 
   def register_user(args) do
-    args
-    |> case do
-      binary when is_binary(binary) -> Proxy.Serialize.deserialize(binary)
-      x -> x
-    end
-    |> Map.new()
-    |> case do
-      %{name: name, public_key: public_key, digest: digest, token_key: token_key} ->
-        if correct_digest?(token_key, public_key, digest) do
-          card = Chat.Card.new(name, public_key)
-          Chat.User.register(card)
-          broadcast_new_user(card)
-        end
+    %{
+      name: name,
+      public_key: public_key
+    } = args |> unwrap_map_by(fn %{public_key: key} -> key end)
 
-      _ ->
-        :wrong_args
-    end
-    |> Proxy.Serialize.serialize()
+    card = Chat.Card.new(name, public_key)
+    Chat.User.register(card)
+    broadcast_new_user(card)
+
+    card |> wrap()
   catch
-    _, _ -> :wrong_args |> Proxy.Serialize.serialize()
+    _, _ -> :wrong_args |> wrap()
   end
 
   def create_dialog(args) do
-    args
-    |> case do
-      binary when is_binary(binary) -> Proxy.Serialize.deserialize(binary)
-      x -> x
-    end
-    |> Map.new()
-    |> case do
-      %{me: me, peer: peer, digest: digest, token_key: token_key} ->
-        if correct_digest?(token_key, Identify.pub_key(me), digest) do
-          Chat.Dialogs.find_or_open(me, peer)
-        end
+    %{
+      me: me,
+      peer: peer
+    } = args |> unwrap_map_by(fn %{me: me} -> Identify.pub_key(me) end)
 
-      _ ->
-        :wrong_args
-    end
-    |> Proxy.Serialize.serialize()
+    Chat.Dialogs.find_or_open(me, peer) |> wrap()
   catch
-    # a, b ->
-    #   [a, b, __STACKTRACE__] |> dbg()
-    _, _ -> :wrong_args |> Proxy.Serialize.serialize()
+    _, _ -> :wrong_args |> wrap()
   end
 
   def select_data(args) do
-    args
-    |> case do
-      binary when is_binary(binary) -> Proxy.Serialize.deserialize(binary)
-      x -> x
-    end
-    |> Map.new()
-    |> case do
-      %{min: min, max: max, amount: amount} ->
-        getter =
-          min
-          |> elem(0)
-          |> choose_getter()
+    %{min: min, max: max, amount: amount} = args |> unwrap_map()
 
-        getter.({min, max}, amount)
-        |> Enum.to_list()
+    getter =
+      min
+      |> elem(0)
+      |> choose_getter()
 
-      _ ->
-        :wrong_args
-    end
-    |> Proxy.Serialize.serialize()
+    getter.({min, max}, amount)
+    |> Enum.to_list()
+    |> wrap()
   catch
-    _, _ -> :wrong_args |> Proxy.Serialize.serialize()
+    _, _ -> :wrong_args |> wrap()
   end
 
   def key_value_data(args) do
     args
-    |> case do
-      binary when is_binary(binary) -> Proxy.Serialize.deserialize(binary)
-      x -> x
-    end
+    |> unwrap()
     |> Chat.db_get()
-    |> Proxy.Serialize.serialize()
+    |> wrap()
   catch
-    _, _ -> :wrong_args |> Proxy.Serialize.serialize()
+    _, _ -> :wrong_args |> wrap()
   end
+
+  ############
+  # Utilities
+  defp correct_digest?(token_key, public_key, digest) do
+    token = Chat.Broker.get(token_key)
+    Enigma.valid_sign?(digest, token, public_key)
+  end
+
+  defp unwrap(x) do
+    if is_binary(x),
+      do: Proxy.Serialize.deserialize(x),
+      else: x
+  end
+
+  defp unwrap_map(x), do: x |> unwrap() |> Map.new()
+
+  defp unwrap_map_by(args, owner_pub_key_getter) do
+    map = %{digest: digest, token_key: token_key} = unwrap_map(args)
+    true = correct_digest?(token_key, owner_pub_key_getter.(map), digest)
+    map
+  end
+
+  defp wrap(x), do: Proxy.Serialize.serialize(x)
 
   defp broadcast_new_user(card) do
     Chat.Broadcast.new_user(card)

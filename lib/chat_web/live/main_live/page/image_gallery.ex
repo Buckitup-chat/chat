@@ -22,16 +22,12 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
   end
 
   def update(new_assigns, socket) do
-    case new_assigns do
-      %{action: action} ->
-        socket
-        |> assign(Map.drop(new_assigns, [:action]))
-        |> handle_action(action)
-        |> ok()
+    {action, new_assigns} = Map.pop(new_assigns, :action)
 
-      _ ->
-        socket |> assign(new_assigns) |> ok()
-    end
+    socket
+    |> assign(new_assigns)
+    |> handle_action(action)
+    |> ok()
   end
 
   def handle_event(event, _, socket) do
@@ -200,9 +196,11 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
 
   defp handle_action(socket, action) do
     case action do
+      nil -> socket
       :open -> socket |> open()
       :preload_next -> socket |> preload_next()
       :preload_prev -> socket |> preload_prev()
+      :current_delivered -> socket |> current_slide_delivered()
       # coveralls-ignore-next-line
       _ -> socket
     end
@@ -217,10 +215,67 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
         socket
         |> assign_current(msg_id, Dialogs.read_message(dialog, msg_id, me))
 
-        # %{type: :proxy_dialog, incoming_msg_id: msg_id, dialog: dialog, me: me, server: server} ->
-        #   socket
+      %{type: :proxy_dialog, incoming_msg_id: msg_id, dialog: dialog, me: me, server: server} ->
+        index = msg_id["index"] |> String.to_integer()
+
+        action = fn page_pid ->
+          message =
+            Proxy.get_dialog_message(
+              server,
+              dialog,
+              index,
+              msg_id["id"]
+            )
+            |> decypher_file_message({me, dialog, index, server})
+
+          current_slide = %{url: message.file_url, id: msg_id["id"], index: index}
+
+          Phoenix.LiveView.send_update(page_pid, __MODULE__,
+            id: "imageGallery",
+            action: :current_delivered,
+            current: current_slide,
+            list: [current_slide],
+            is_open?: true
+          )
+        end
+
+        spawn_task(action)
+
+        socket
     end
   end
+
+  def decypher_file_message(message, {me, dialog, index, server}) do
+    [message]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(fn msg ->
+      {index, msg} |> Chat.Dialogs.DialogMessaging.read(me, dialog)
+    end)
+    |> Enum.filter(& &1)
+    |> Enum.reverse()
+    |> Enum.map(fn
+      %{type: type, content: json} = msg when type in [:image, :audio, :file, :video] ->
+        {id, secret} = json |> StorageId.from_json()
+
+        file_info =
+          Proxy.get_file_info(server, id)
+          |> Enum.map(&Enigma.decipher(&1, secret))
+
+        msg
+        |> Map.from_struct()
+        |> Map.put(:file_info, file_info)
+        |> Map.put(:file_url, ChatWeb.Utils.get_proxied_file_url(server, id, secret))
+    end)
+    |> List.first()
+  end
+
+  defp spawn_task(action) do
+    pid = self()
+
+    Task.start(fn -> action.(pid) end)
+  end
+
+  defp image_message?(message), do: match?({_, %{type: :image}}, message)
 
   defp preload_prev(socket) do
     case socket.assigns do
@@ -230,13 +285,22 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
       %{type: :room, room_identity: identity, list: [first | _]} ->
         socket
         |> assign_prev(
-          Rooms.read_prev_message({first.index, first.id}, identity, &match?({_, %{type: :image}}, &1))
+          Rooms.read_prev_message(
+            {first.index, first.id},
+            identity,
+            &image_message?/1
+          )
         )
 
       %{type: :dialog, dialog: dialog, list: [first | _], me: me} ->
         socket
         |> assign_prev(
-          Dialogs.read_prev_message(dialog, {first.index, first.id}, me, &match?({_, %{type: :image}}, &1))
+          Dialogs.read_prev_message(
+            dialog,
+            {first.index, first.id},
+            me,
+            &image_message?/1
+          )
         )
     end
   end
@@ -248,16 +312,27 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
 
       %{type: :room, room_identity: identity, list: list} ->
         last = List.last(list)
+
         socket
         |> assign_next(
-          Rooms.read_next_message({last.index, last.id}, identity, &match?({_, %{type: :image}}, &1))
+          Rooms.read_next_message(
+            {last.index, last.id},
+            identity,
+            &image_message?/1
+          )
         )
 
       %{type: :dialog, dialog: dialog, list: list, me: me} ->
         last = List.last(list)
+
         socket
         |> assign_next(
-          Dialogs.read_next_message(dialog, {last.index, last.id}, me, &match?({_, %{type: :image}}, &1))
+          Dialogs.read_next_message(
+            dialog,
+            {last.index, last.id},
+            me,
+            &image_message?/1
+          )
         )
     end
   end
@@ -317,6 +392,13 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
     |> invoke_preload_prev()
   end
 
+  defp current_slide_delivered(socket) do
+    socket
+    |> push_event("gallery:preload", %{to: "preloadedList", url: socket.assigns.current.url})
+    |> invoke_preload_next()
+    |> invoke_preload_prev()
+  end
+
   defp assign_prev(%{assigns: %{prev: prev, list: list}} = socket, %{
          content: json,
          id: id,
@@ -352,6 +434,7 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
   defp invoke_preload_prev(%{assigns: %{type: type}} = socket, range \\ @preloading_range) do
     command =
       case type do
+        :proxy_dialog -> {:dialog, {:preload_image_gallery, :prev}}
         :dialog -> {:dialog, {:preload_image_gallery, :prev}}
         :room -> {:room, {:preload_image_gallery, :prev}}
       end
@@ -364,6 +447,7 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
   defp invoke_preload_next(%{assigns: %{type: type}} = socket, range \\ @preloading_range) do
     command =
       case type do
+        :proxy_dialog -> {:dialog, {:preload_image_gallery, :next}}
         :dialog -> {:dialog, {:preload_image_gallery, :next}}
         :room -> {:room, {:preload_image_gallery, :next}}
       end

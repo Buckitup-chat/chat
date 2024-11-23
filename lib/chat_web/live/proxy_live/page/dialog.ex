@@ -85,8 +85,6 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   end
 
   def handle_info(msg, socket) do
-    msg |> dbg()
-
     case msg do
       {:loaded_messages, messages, amount, dialog} ->
         socket |> add_loaded_messages(messages, amount, dialog)
@@ -128,6 +126,23 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
       socket ->
         socket
     end
+  end
+
+  def open_image_gallery(socket, msg_id) do
+    server = socket |> get_private(:server)
+    %{dialog: dialog, me: me} = socket.assigns
+
+    send_update(Page.ImageGallery,
+      id: "imageGallery",
+      action: :open,
+      incoming_msg_id: msg_id,
+      type: :proxy_dialog,
+      server: server,
+      dialog: dialog,
+      me: me
+    )
+
+    socket
   end
 
   #
@@ -420,11 +435,6 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
     socket
     |> forget_current_messages()
     |> assign(:input_mode, :plain)
-  end
-
-  def open_image_gallery(socket, msg_id) do
-    send_update(Page.ImageGallery, id: "imageGallery", action: :open, incoming_msg_id: msg_id)
-    socket
   end
 
   def image_gallery_preload_next(socket) do

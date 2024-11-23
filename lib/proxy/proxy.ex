@@ -50,6 +50,12 @@ defmodule Proxy do
     )
   end
 
+  def get_dialog_message(server, dialog, index, id) do
+    dialog_key = Chat.Dialogs.key(dialog)
+
+    api_key_value(server, {:dialog_message, dialog_key, index, id |> Enigma.hash()})
+  end
+
   # Content
   def get_file_info(server, file_key) do
     api_key_value(server, {:file, file_key})

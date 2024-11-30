@@ -5,7 +5,7 @@ defmodule ChatWeb.UsersChannel do
   use ChatWeb, :channel
 
   @impl true
-  def join("users:lobby", _payload, socket) do
+  def join("proxy:clients", _payload, socket) do
     {:ok, socket}
     # if authorized?(payload) do
     #   {:ok, socket}

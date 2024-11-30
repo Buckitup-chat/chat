@@ -19,7 +19,7 @@ defmodule ChatWeb.ProxySocket do
   # See the [`Channels guide`](https://hexdocs.pm/phoenix/channels.html)
   # for further details.
 
-  channel "users:lobby", ChatWeb.UsersChannel
+  channel "proxy:clients", ChatWeb.UsersChannel
 
   # Socket params are passed from the client and can
   # be used to verify and authenticate a user. After

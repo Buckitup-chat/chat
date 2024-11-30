@@ -428,6 +428,9 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
       uri: "ws://#{server}/proxy-socket/websocket",
       on_new_user: fn card ->
         send(pid, {:lobby, {:new_user, card}})
+      end,
+      on_new_dialog_message: fn {dialog_key, indexed_message} ->
+        send(pid, {:dialog, {:new_dialog_message, {dialog_key, indexed_message}}})
       end
     )
   end

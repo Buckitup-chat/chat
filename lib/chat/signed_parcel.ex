@@ -81,13 +81,28 @@ defmodule Chat.SignedParcel do
         {{:memo, _}, _} = m,
         {{:memo_index, _, _}, true} = i1,
         {{:memo_index, _, _}, true} = i2,
-        {{:dialog_message, dkey, :next, msg_id}, %{type: :memo}} = msg
+        {{:dialog_message, dkey, :next, msg_id}, %{type: :memo} = msg}
       ] ->
         next = Chat.Ordering.next({:dialog_message, dkey})
         %{parcel | data: [m, i1, i2, {{:dialog_message, dkey, next, msg_id}, msg}]}
 
       x ->
         x
+    end
+  end
+
+  def indexed_message(%__MODULE__{data: items}) do
+    case items do
+      [{{:dialog_message, _, index, _}, %Chat.Dialogs.Message{type: :text} = msg}] ->
+        {index, msg}
+
+      [
+        {{:memo, _}, _},
+        {{:memo_index, _, _}, true},
+        {{:memo_index, _, _}, true},
+        {{:dialog_message, _, index, _}, %Chat.Dialogs.Message{type: :memo} = msg}
+      ] ->
+        {index, msg}
     end
   end
 

@@ -10,15 +10,20 @@ defmodule ChatWeb.ProxyLive.ChannelClients.Users do
 
   require Logger
 
-  @topic "users:lobby"
+  @topic "proxy:clients"
 
   def start_link(args) do
     Slipstream.start_link(__MODULE__, args)
   end
 
   @impl Slipstream
-  def init(uri: uri, on_new_user: new_user_fn) do
-    {:ok, connect!(uri: uri) |> assign(:on_new_user, new_user_fn)}
+  def init(uri: uri, on_new_user: new_user_fn, on_new_dialog_message: new_dialog_message_fn) do
+    {:ok,
+     connect!(uri: uri)
+     |> assign(
+       on_new_user: new_user_fn,
+       on_new_dialog_message: new_dialog_message_fn
+     )}
   end
 
   @impl Slipstream
@@ -40,10 +45,15 @@ defmodule ChatWeb.ProxyLive.ChannelClients.Users do
   end
 
   @impl Slipstream
-  def handle_message(@topic, "new_user", {:binary, data}, socket) do
-    data
-    |> Proxy.Serialize.deserialize_with_atoms()
-    |> socket.assigns.on_new_user.()
+  def handle_message(@topic, type, {:binary, data}, socket) do
+    args =
+      data
+      |> Proxy.Serialize.deserialize_with_atoms()
+
+    case type do
+      "new_user" -> socket.assigns.on_new_user.(args)
+      "new_dialog_message" -> socket.assigns.on_new_dialog_message.(args)
+    end
 
     {:ok, socket}
   end

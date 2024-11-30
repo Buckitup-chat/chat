@@ -90,6 +90,13 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
       {:loaded_messages, messages, amount, dialog} ->
         socket |> add_loaded_messages(messages, amount, dialog)
 
+      {:new_dialog_message, {dialog_key, indexed_message}} ->
+        current_dialog = socket.assigns.dialog
+
+        if current_dialog && Chat.Dialogs.key(current_dialog) == dialog_key,
+          do: socket |> show_new(indexed_message),
+          else: socket
+
       {_anything, _} ->
         socket
     end
@@ -105,10 +112,16 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
     if dialog == socket.assigns.dialog do
       new_messages = Enum.take(messages, -amount)
 
+      last_index =
+        case new_messages do
+          [first | _] when is_map(first) -> Map.get(first, :index)
+          _ -> nil
+        end
+
       socket
       |> assign(:messages, new_messages)
       |> assign(:has_more_messages, Enum.count(messages) > amount)
-      |> assign(:last_load_timestamp, new_messages |> List.first() |> Map.get(:index))
+      |> assign(:last_load_timestamp, last_index)
     else
       socket
     end
@@ -159,10 +172,19 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
         %Messages.Text{text: text, timestamp: time}
         |> Chat.SignedParcel.wrap_dialog_message(dialog, me)
         |> Proxy.save_parcel(server, me)
+        |> Chat.Broadcast.new_dialog_message(dialog |> Chat.Dialogs.key())
       end)
     end
 
     socket
+  end
+
+  def show_new(%{assigns: %{me: me, dialog: dialog}} = socket, new_message) do
+    socket
+    |> assign(:messages, [DialogMessaging.read(new_message, me, dialog)])
+    |> assign(:message_update_mode, :append)
+    |> assign(:page, 0)
+    |> push_event("chat:scroll-down", %{})
   end
 
   #
@@ -226,14 +248,6 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
     end)
 
     socket
-  end
-
-  def show_new(%{assigns: %{me: me, dialog: dialog}} = socket, new_message) do
-    socket
-    |> assign(:messages, [Dialogs.read_message(dialog, new_message, me)])
-    |> assign(:message_update_mode, :append)
-    |> assign(:page, 0)
-    |> push_event("chat:scroll-down", %{})
   end
 
   def edit_message(%{assigns: %{me: me, dialog: dialog}} = socket, msg_id) do

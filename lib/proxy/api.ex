@@ -52,16 +52,15 @@ defmodule Proxy.Api do
     true = Chat.SignedParcel.sign_valid?(parcel, Identify.pub_key(me))
     true = Chat.SignedParcel.scope_valid?(parcel, Identify.pub_key(me))
 
-    data_items =
-      parcel
-      |> Chat.SignedParcel.inject_next_index()
-      |> Chat.SignedParcel.data_items()
+    indexed_parcel = Chat.SignedParcel.inject_next_index(parcel)
+    data_items = Chat.SignedParcel.data_items(indexed_parcel)
 
     Enum.each(data_items, fn {key, value} -> Chat.Db.put(key, value) end)
 
     data_keys = data_items |> Enum.map(fn {key, _} -> key end)
     Chat.Db.Copying.await_written_into(data_keys, Chat.Db.db())
-    :ok |> wrap()
+
+    indexed_parcel |> Chat.SignedParcel.indexed_message() |> wrap()
   catch
     # x, y -> {:wrong_args, x, y, __STACKTRACE__} |> wrap()
     _, _ -> :wrong_args |> wrap()

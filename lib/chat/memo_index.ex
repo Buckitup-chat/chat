@@ -13,14 +13,28 @@ defmodule Chat.MemoIndex do
   alias Chat.Rooms.Room
   alias Chat.Utils
 
+  def pack(room_or_dialog, storage_key) do
+    case {room_or_dialog, storage_key} do
+      {_, nil} ->
+        []
+
+      {%Dialog{a_key: a_key, b_key: b_key}, memo_key} ->
+        [{{:memo_index, a_key, memo_key}, true}, {{:memo_index, b_key, memo_key}, true}]
+
+      {%Room{pub_key: pub_key}, memo_key} ->
+        [{{:memo_index, pub_key, memo_key}, true}]
+    end
+  end
+
   def add({_, %Message{type: :memo}} = indexed_message, %Dialog{} = dialog, me) do
     key =
       Dialogs.read_message(dialog, indexed_message, me)
       |> Map.fetch!(:content)
       |> Utils.StorageId.from_json_to_key()
 
-    Db.put({:memo_index, dialog.a_key, key}, true)
-    Db.put({:memo_index, dialog.b_key, key}, true)
+    dialog
+    |> pack(key)
+    |> Enum.each(fn {key, value} -> Db.put(key, value) end)
 
     indexed_message
   end
@@ -35,7 +49,9 @@ defmodule Chat.MemoIndex do
       |> Map.fetch!(:content)
       |> Utils.StorageId.from_json_to_key()
 
-    Db.put({:memo_index, room.pub_key, key}, true)
+    room
+    |> pack(key)
+    |> Enum.each(fn {key, value} -> Db.put(key, value) end)
 
     indexed_message
   end

@@ -153,6 +153,25 @@ defmodule Chat.Dialogs.DialogMessaging do
     |> change_my_message(author, dialog, msg_id)
   end
 
+  def content_to_message(content, %Identity{} = author, %Dialog{} = dialog, opts) do
+    case {dialog.a_key, dialog.b_key, author.public_key} do
+      {dst, dst, dst} ->
+        content
+        |> Enigma.encrypt_and_sign(author.private_key, dst)
+        |> Message.a_to_b(opts)
+
+      {dst, src, src} ->
+        content
+        |> Enigma.encrypt_and_sign(author.private_key, dst)
+        |> Message.b_to_a(opts)
+
+      {src, dst, src} ->
+        content
+        |> Enigma.encrypt_and_sign(author.private_key, dst)
+        |> Message.a_to_b(opts)
+    end
+  end
+
   def msg_key(%Dialog{} = dialog, index, 0),
     do: {@db_prefix, dialog |> Enigma.hash(), index, 0}
 
@@ -170,28 +189,9 @@ defmodule Chat.Dialogs.DialogMessaging do
     end
   end
 
-  defp add_message(
-         content,
-         %Dialog{a_key: a_key, b_key: b_key} = dialog,
-         %Identity{private_key: private_key, public_key: s_key},
-         opts
-       ) do
-    case {a_key, b_key, s_key} do
-      {dst, dst, dst} ->
-        content
-        |> Enigma.encrypt_and_sign(private_key, dst)
-        |> Message.a_to_b(opts)
-
-      {dst, src, src} ->
-        content
-        |> Enigma.encrypt_and_sign(private_key, dst)
-        |> Message.b_to_a(opts)
-
-      {src, dst, src} ->
-        content
-        |> Enigma.encrypt_and_sign(private_key, dst)
-        |> Message.a_to_b(opts)
-    end
+  defp add_message(content, %Dialog{} = dialog, %Identity{} = author, opts) do
+    content
+    |> content_to_message(author, dialog, opts)
     |> store_message(dialog, opts[:index])
   end
 

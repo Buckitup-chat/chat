@@ -22,6 +22,21 @@ defimpl Chat.DryStorable, for: Chat.Messages.Text do
     end
   end
 
+  def to_parcel(text) do
+    case type(text) do
+      :memo ->
+        {key, {secret, data}} = Memo.pack(text.text)
+
+        {
+          StorageId.to_json({key, secret}),
+          [data]
+        }
+
+      :text ->
+        {text.text, []}
+    end
+  end
+
   def timestamp(text), do: text.timestamp
 
   @spec type(Chat.Messages.Text) :: atom()

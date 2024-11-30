@@ -7,4 +7,7 @@ defprotocol Chat.DryStorable do
 
   @spec type(t) :: any()
   def type(storable)
+
+  @spec to_parcel(t) :: {any(), list()}
+  def to_parcel(storable)
 end

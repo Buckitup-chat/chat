@@ -31,4 +31,14 @@ defmodule Chat.Content.Storage do
     secret = Enigma.generate_secret()
     cipher_and_store(db_key, data, secret)
   end
+
+  def cipher_and_pack(db_key, data) do
+    secret = Enigma.generate_secret()
+    cipher_and_pack(db_key, data, secret)
+  end
+
+  def cipher_and_pack(db_key, data, secret) do
+    blob = Enigma.cipher(data, secret)
+    {secret, {db_key, blob}}
+  end
 end

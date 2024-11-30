@@ -16,5 +16,11 @@ defmodule Chat.Content.Memo do
     {key, Storage.cipher_and_store(db_key(key), data)}
   end
 
+  def pack(data) do
+    key = UUID.uuid4()
+
+    {key, Storage.cipher_and_pack(db_key(key), data)}
+  end
+
   defp db_key(key), do: {:memo, key}
 end

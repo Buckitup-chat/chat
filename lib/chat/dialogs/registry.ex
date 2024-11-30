@@ -9,6 +9,12 @@ defmodule Chat.Dialogs.Registry do
   end
 
   def find(me, peer) do
-    Db.get({:dialogs, Dialog.start(me, peer) |> Enigma.hash()})
+    Dialog.start(me, peer)
+    |> Enigma.hash()
+    |> find()
+  end
+
+  def find(hash) do
+    Db.get({:dialogs, hash})
   end
 end

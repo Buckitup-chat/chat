@@ -2,49 +2,39 @@ defmodule ChatWeb.ProxyApiController do
   use ChatWeb, :controller
 
   def select(conn, params) do
-    fn ->
-      Proxy.Api.select_data(params |> decode_args())
-    end
-    |> run_and_respond(conn)
+    run_and_respond(conn, params, fn args ->
+      Proxy.Api.select_data(args)
+    end)
   end
 
   def key_value(conn, params) do
-    fn ->
-      Proxy.Api.key_value_data(params |> decode_args())
-    end
-    |> run_and_respond(conn)
+    run_and_respond(conn, params, fn args ->
+      Proxy.Api.key_value_data(args)
+    end)
   end
 
-  def confirmation_token(conn, _params) do
-    data = Proxy.Api.confirmation_token()
-
-    conn
-    |> put_resp_content_type("application/octet-stream")
-    |> send_resp(200, data)
+  def confirmation_token(conn, params) do
+    run_and_respond(conn, params, fn _ ->
+      Proxy.Api.confirmation_token()
+    end)
   end
 
-  def register_user(conn, _params) do
-    {:ok, body, _conn} = conn |> read_body()
-    data = Proxy.Api.register_user(body)
-
-    conn
-    |> put_resp_content_type("application/octet-stream")
-    |> send_resp(200, data)
-  catch
-    _, _ ->
-      conn |> send_resp(404, "Not found")
+  def register_user(conn, params) do
+    run_and_respond(conn, params, fn body ->
+      Proxy.Api.register_user(body)
+    end)
   end
 
-  def create_dialog(conn, _params) do
-    {:ok, body, _conn} = conn |> read_body()
-    data = Proxy.Api.create_dialog(body)
+  def create_dialog(conn, params) do
+    run_and_respond(conn, params, fn body ->
+      Proxy.Api.create_dialog(body)
+    end)
+  end
 
-    conn
-    |> put_resp_content_type("application/octet-stream")
-    |> send_resp(200, data)
-  catch
-    _, _ ->
-      conn |> send_resp(404, "Not found")
+  def save_parcel(conn, params) do
+    run_and_respond(conn, params, fn body ->
+      Proxy.Api.save_parcel(body)
+    end)
   end
 
   # Helpers
@@ -54,8 +44,17 @@ defmodule ChatWeb.ProxyApiController do
     Base.url_decode64!(encoded_args, padding: false)
   end
 
-  defp run_and_respond(action, conn) do
-    data = action.()
+  defp run_and_respond(conn, params, action) do
+    data =
+      case conn.method do
+        "POST" ->
+          {:ok, body, _conn} = conn |> read_body()
+          body
+
+        _ ->
+          params |> decode_args()
+      end
+      |> then(action)
 
     conn
     |> put_resp_content_type("application/octet-stream")

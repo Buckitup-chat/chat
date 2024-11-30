@@ -43,6 +43,15 @@ defmodule Proxy do
     api_key_value(server, {:dialog_message, dialog_key, index, id |> Enigma.hash()})
   end
 
+  def save_parcel(parcel, server, me) do
+    %{
+      parcel: parcel,
+      author: me.public_key
+    }
+    |> add_signed_token(server, me.private_key)
+    |> api_save_parcel(server)
+  end
+
   # Content
   def get_file_info(server, file_key) do
     api_key_value(server, {:file, file_key})
@@ -73,6 +82,7 @@ defmodule Proxy do
   defp api_key_value(server, args), do: api_get(server, "key-value", args)
   defp api_register_user(args, server), do: api_post(server, "register-user", args)
   defp api_create_dialog(args, server), do: api_post(server, "create-dialog", args)
+  defp api_save_parcel(args, server), do: api_post(server, "save-parcel", args)
 
   #  Request utilities
   ####################################

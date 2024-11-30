@@ -80,6 +80,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
       "dialog/switch" -> socket |> switch_dialog(params)
       "chat:load-more" -> socket |> load_more_messages()
       "dialog/message/open-image-gallery" -> socket |> open_image_gallery(params)
+      "dialog/text-message" -> socket |> send_text_message(params)
       _ -> socket |> tap(fn _ -> dbg([msg, params]) end)
     end
   end
@@ -141,6 +142,25 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
       dialog: dialog,
       me: me
     )
+
+    socket
+  end
+
+  def send_text_message(socket, params) do
+    server = socket |> get_private(:server)
+    %{dialog: dialog, me: me} = socket.assigns
+    %{"dialog" => %{"text" => text}} = params
+    trimmed_text = String.trim(text)
+
+    if trimmed_text != "" do
+      time = DateTime.utc_now() |> DateTime.to_unix(:second)
+
+      Task.start(fn ->
+        %Messages.Text{text: text, timestamp: time}
+        |> Chat.SignedParcel.wrap_dialog_message(dialog, me)
+        |> Proxy.save_parcel(server, me)
+      end)
+    end
 
     socket
   end

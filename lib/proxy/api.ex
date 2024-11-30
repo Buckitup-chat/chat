@@ -43,6 +43,30 @@ defmodule Proxy.Api do
     _, _ -> :wrong_args |> wrap()
   end
 
+  def save_parcel(args) do
+    %{
+      author: me,
+      parcel: parcel
+    } = args |> unwrap_map_by(fn %{author: me} -> Identify.pub_key(me) end)
+
+    true = Chat.SignedParcel.sign_valid?(parcel, Identify.pub_key(me))
+    true = Chat.SignedParcel.scope_valid?(parcel, Identify.pub_key(me))
+
+    data_items =
+      parcel
+      |> Chat.SignedParcel.inject_next_index()
+      |> Chat.SignedParcel.data_items()
+
+    Enum.each(data_items, fn {key, value} -> Chat.Db.put(key, value) end)
+
+    data_keys = data_items |> Enum.map(fn {key, _} -> key end)
+    Chat.Db.Copying.await_written_into(data_keys, Chat.Db.db())
+    :ok |> wrap()
+  catch
+    # x, y -> {:wrong_args, x, y, __STACKTRACE__} |> wrap()
+    _, _ -> :wrong_args |> wrap()
+  end
+
   def select_data(args) do
     %{min: min, max: max, amount: amount} = args |> unwrap_map()
 

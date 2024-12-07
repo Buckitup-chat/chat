@@ -60,6 +60,7 @@ defmodule Chat.Application do
          Task.Supervisor.start_child(
            Chat.TaskSupervisor,
            fn ->
+             Chat.NetworkSynchronization.Retrieval.load_all_chat_modules()
              Chat.NetworkSynchronization.init_workers()
            end,
            shutdown: :brutal_kill

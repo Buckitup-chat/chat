@@ -27,7 +27,7 @@ defmodule Chat.Dialogs do
     end
   end
 
-  def open(%Identity{} = src, %Card{} = dst) do
+  def open(src, dst) do
     Dialog.start(src, dst)
   end
 

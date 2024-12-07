@@ -76,7 +76,7 @@ defmodule Chat.Db.Queries do
 
   def put(db, key, value) do
     db
-    |> CubDB.put(key, value)
+    |> CubDB.put_new(key, value)
   end
 
   def delete(db, key) do

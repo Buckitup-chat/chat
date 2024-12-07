@@ -43,7 +43,10 @@ server:
 	mix phx.server
 
 iex:
-	MIX_ENV=dev iex --sname chat --cookie chat -S mix phx.server
+	MIX_ENV=dev iex --sname chat --cookie chat -S mix phx.server --  --no-validate-compile-env
+
+2nd_iex:
+	DATA_DIR=priv/2nd/db PORT=4445 MIX_ENV=dev iex --sname chat2 --cookie chat -S mix phx.server --  --no-validate-compile-env
 
 iex_like_prod:
 	MIX_ENV=prod \
@@ -58,6 +61,7 @@ deploy:
 
 empty_db:
 	rm -rf priv/db
+	rm -rf priv/2nd/*
 	rm -rf priv/admin_db
 	rm -rf priv/admin_db_v2
 	rm -rf priv/test_backup_db

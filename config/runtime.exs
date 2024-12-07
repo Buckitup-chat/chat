@@ -12,6 +12,20 @@ import Config
 #   config :chat, ChatWeb.Endpoint, server: true
 # end
 
+if config_env() == :dev do
+  data_dir = System.get_env("DATA_DIR") || "priv/db"
+
+  config :chat,
+    cub_db_file: data_dir,
+    admin_cub_db_file: "#{data_dir}/../admin_db_v2",
+    files_base_dir: "#{data_dir}/files"
+
+  config :chat, ChatWeb.Endpoint,
+    # Binding to loopback ipv4 address prevents access from other machines.
+    # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
+    http: [ip: {0, 0, 0, 0}, port: System.get_env("PORT") || 4444]
+end
+
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you

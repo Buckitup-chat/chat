@@ -38,6 +38,18 @@ defmodule Chat.NetworkSynchronization.Retrieval do
     |> Enum.reject(&Chat.db_has?/1)
   end
 
+  def load_all_chat_modules do
+    {:ok, modules} = :application.get_key(:chat, :modules)
+
+    modules
+    |> Enum.filter(&match?(["Chat" | _], Module.split(&1)))
+    |> Enum.reject(&(&1 == __MODULE__))
+    |> Enum.each(fn module ->
+      module
+      |> Code.ensure_loaded?()
+    end)
+  end
+
   defp get_keys(base_url) do
     {:ok, %{body: %{"data" => %{"dataKeys" => keys}}}} =
       Neuron.query("query {dataKeys}", %{}, url: base_url)
@@ -64,17 +76,5 @@ defmodule Chat.NetworkSynchronization.Retrieval do
   defp get_values(keys, base_url) do
     keys
     |> Enum.each(&get_value(&1, base_url))
-  end
-
-  defp load_all_chat_modules do
-    {:ok, modules} = :application.get_key(:chat, :modules)
-
-    modules
-    |> Enum.filter(&match?(["Chat" | _], Module.split(&1)))
-    |> Enum.reject(&(&1 == __MODULE__))
-    |> Enum.each(fn module ->
-      module
-      |> Code.ensure_loaded?()
-    end)
   end
 end

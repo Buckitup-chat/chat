@@ -91,18 +91,18 @@ defmodule Chat.SignedParcel do
     end
   end
 
-  def indexed_message(%__MODULE__{data: items}) do
+  def prepare_for_broadcast(%__MODULE__{data: items}) do
     case items do
-      [{{:dialog_message, _, index, _}, %Chat.Dialogs.Message{type: :text} = msg}] ->
-        {index, msg}
+      [{{:dialog_message, key, index, _}, %Chat.Dialogs.Message{type: :text} = msg}] ->
+        {:new_dialog_message, key, {index, msg}}
 
       [
         {{:memo, _}, _},
         {{:memo_index, _, _}, true},
         {{:memo_index, _, _}, true},
-        {{:dialog_message, _, index, _}, %Chat.Dialogs.Message{type: :memo} = msg}
+        {{:dialog_message, key, index, _}, %Chat.Dialogs.Message{type: :memo} = msg}
       ] ->
-        {index, msg}
+        {:new_dialog_message, key, {index, msg}}
     end
   end
 
@@ -122,7 +122,8 @@ defmodule Chat.SignedParcel do
   end
 
   defp dialog_peer_keys(dialog_key) do
-    dialog = Chat.Dialogs.Registry.find(dialog_key)
+    dialog =
+      Chat.Dialogs.Registry.find(dialog_key)
 
     [dialog.a_key, dialog.b_key]
   end

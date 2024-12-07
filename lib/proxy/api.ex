@@ -25,7 +25,7 @@ defmodule Proxy.Api do
 
     card = Chat.Card.new(name, public_key)
     Chat.User.register(card)
-    broadcast_new_user(card)
+    {:new_user, card} |> broadcast()
 
     card |> wrap()
   catch
@@ -40,6 +40,7 @@ defmodule Proxy.Api do
 
     Chat.Dialogs.find_or_open(me, peer) |> wrap()
   catch
+    # x, y -> {:wrong_args, x, y, __STACKTRACE__} |> dbg()
     _, _ -> :wrong_args |> wrap()
   end
 
@@ -60,9 +61,13 @@ defmodule Proxy.Api do
     data_keys = data_items |> Enum.map(fn {key, _} -> key end)
     Chat.Db.Copying.await_written_into(data_keys, Chat.Db.db())
 
-    indexed_parcel |> Chat.SignedParcel.indexed_message() |> wrap()
+    indexed_parcel
+    |> Chat.SignedParcel.prepare_for_broadcast()
+    |> broadcast()
+
+    :ok |> wrap()
   catch
-    # x, y -> {:wrong_args, x, y, __STACKTRACE__} |> wrap()
+    # x, y -> {:wrong_args, x, y, __STACKTRACE__} |> dbg() |> wrap()
     _, _ -> :wrong_args |> wrap()
   end
 
@@ -90,6 +95,19 @@ defmodule Proxy.Api do
     _, _ -> :wrong_args |> wrap()
   end
 
+  def broadcast(msg) do
+    case msg do
+      {:new_dialog_message, key, indexed_message} ->
+        Chat.Broadcast.new_dialog_message(indexed_message, key)
+
+      {:new_user, card} ->
+        Chat.Broadcast.new_user(card)
+
+      _ ->
+        :skip
+    end
+  end
+
   ############
   # Utilities
   defp correct_digest?(token_key, public_key, digest) do
@@ -112,10 +130,6 @@ defmodule Proxy.Api do
   end
 
   defp wrap(x), do: Proxy.Serialize.serialize(x)
-
-  defp broadcast_new_user(card) do
-    Chat.Broadcast.new_user(card)
-  end
 
   defp choose_getter(slug) do
     case slug do

@@ -39,8 +39,8 @@ defmodule ChatWeb.ProxyLive.ChannelClients.Users do
   end
 
   @impl Slipstream
-  def handle_info(x, socket) do
-    x |> dbg()
+  def handle_info(_x, socket) do
+    # x |> inspect() |> Logger.error()
     {:noreply, socket}
   end
 
@@ -49,6 +49,8 @@ defmodule ChatWeb.ProxyLive.ChannelClients.Users do
     args =
       data
       |> Proxy.Serialize.deserialize_with_atoms()
+
+    # [type, args] |> inspect() |> Logger.error()
 
     case type do
       "new_user" -> socket.assigns.on_new_user.(args)

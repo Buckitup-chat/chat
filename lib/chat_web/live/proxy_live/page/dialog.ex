@@ -172,7 +172,6 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
         %Messages.Text{text: text, timestamp: time}
         |> Chat.SignedParcel.wrap_dialog_message(dialog, me)
         |> Proxy.save_parcel(server, me)
-        |> Chat.Broadcast.new_dialog_message(dialog |> Chat.Dialogs.key())
       end)
     end
 
@@ -521,6 +520,9 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
     pid = self()
 
     Task.start(fn ->
+      peer = Dialogs.peer(dialog, actor.me)
+      Proxy.find_or_create_dialog(server, actor.me, peer)
+
       messages =
         Proxy.get_dialog_messages(server, dialog, max_index, per_page + 1)
         |> Enum.map(fn {{:dialog_message, _, index, _}, msg} ->

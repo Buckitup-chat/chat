@@ -88,6 +88,8 @@ defmodule Proxy do
   ####################################
 
   defp api_get(server, action, args) do
+    # ["=== proxy GET", action, args] |> dbg()
+
     server
     |> build_url(action, args)
     |> HTTPoison.get([], follow_redirect: true)
@@ -95,6 +97,8 @@ defmodule Proxy do
   end
 
   defp api_post(server, action, args) do
+    # ["=== proxy POST", action, args] |> dbg()
+
     server
     |> build_url(action, %{})
     |> HTTPoison.post(args |> Proxy.Serialize.serialize(), [], follow_redirect: true)

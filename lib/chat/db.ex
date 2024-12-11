@@ -91,7 +91,8 @@ defmodule Chat.Db do
   end
 
   def file_path do
-    "#{@db_location}/#{@db_version}"
+    data_dir = Application.get_env(:chat, :cub_db_file, "priv/data")
+    "#{data_dir}/#{@db_version}"
   end
 
   def version_path, do: @db_version

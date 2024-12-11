@@ -65,6 +65,6 @@ defmodule Chat.AdminDb do
   end
 
   def file_path do
-    @db_location
+    Application.get_env(:chat, :admin_cub_db_file, @db_location)
   end
 end

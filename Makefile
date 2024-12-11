@@ -50,8 +50,10 @@ iex:
 
 iex_like_prod:
 	MIX_ENV=prod \
-					SECRET_KEY_BASE=IGuZPUcM7Vuq1iPemg6pc7EMwLLmMiVA4stbfDstZPshJ8QDqxBBcVqNnQI6clxi \
-					iex -S mix phx.server
+	PORT=4443 \
+	DOMAIN=buckitup.app \
+	SECRET_KEY_BASE=IGuZPUcM7Vuq1iPemg6pc7EMwLLmMiVA4stbfDstZPshJ8QDqxBBcVqNnQI6clxi \
+	iex -S mix phx.server --  --no-validate-compile-env
 
 assets:
 	mix assets.deploy

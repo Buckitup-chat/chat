@@ -10,7 +10,6 @@ defmodule Chat.Db do
   alias Chat.Db.WriteQueue.FileReader
 
   @db_version "v.10.1"
-  @db_location Application.compile_env(:chat, :cub_db_file, "priv/db")
 
   def list(range, transform), do: Queries.list(db(), range, transform)
   def list({_min, _max} = range), do: Queries.list(db(), range)

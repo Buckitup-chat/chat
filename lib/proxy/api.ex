@@ -3,13 +3,6 @@ defmodule Proxy.Api do
 
   alias Chat.Proto.Identify
 
-  @known_atoms %{
-    users: :"users\0",
-    dialog_message: true
-  }
-  @doc "Ensure atoms are loaded for deserialization"
-  def known_atoms, do: @known_atoms
-
   def confirmation_token do
     token = :crypto.strong_rand_bytes(80)
     key = Chat.Broker.store(token)
@@ -81,6 +74,15 @@ defmodule Proxy.Api do
 
     getter.({min, max}, amount)
     |> Enum.to_list()
+    |> wrap()
+  catch
+    _, _ -> :wrong_args |> wrap()
+  end
+
+  def bulk_get_data(args) do
+    args
+    |> unwrap()
+    |> Map.new(fn key -> {key, Chat.Db.get(key)} end)
     |> wrap()
   catch
     _, _ -> :wrong_args |> wrap()

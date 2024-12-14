@@ -432,8 +432,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   defp broadcast_new_message(nil, _, _, _), do: nil
 
   defp broadcast_new_message(message, dialog, me, time) do
-    {:new_dialog_message, message}
-    |> dialog_broadcast(dialog)
+    Chat.Broadcast.new_dialog_message(message, dialog |> Dialogs.key())
 
     Log.message_direct(me, time, Dialogs.peer(dialog, me))
   end

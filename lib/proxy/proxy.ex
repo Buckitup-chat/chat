@@ -65,6 +65,10 @@ defmodule Proxy do
     api_key_value(server, {:file_chunk, file_key, start})
   end
 
+  def get_data_by_keys(server, keys) do
+    api_bulk_get(server, keys |> Enum.uniq())
+  end
+
   defp add_signed_token(params, server, private_key) do
     %{token_key: token_key, token: token} = api_confirmation_token(server)
 
@@ -80,6 +84,7 @@ defmodule Proxy do
   defp api_confirmation_token(server), do: api_get(server, "confirmation-token", [])
   defp api_select(server, args), do: api_get(server, "select", args)
   defp api_key_value(server, args), do: api_get(server, "key-value", args)
+  defp api_bulk_get(server, args), do: api_post(server, "bulk-get", args)
   defp api_register_user(args, server), do: api_post(server, "register-user", args)
   defp api_create_dialog(args, server), do: api_post(server, "create-dialog", args)
   defp api_save_parcel(args, server), do: api_post(server, "save-parcel", args)

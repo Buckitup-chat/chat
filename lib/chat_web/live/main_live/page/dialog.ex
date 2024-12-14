@@ -421,7 +421,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
          per_page
        ) do
     messages = Dialogs.read(dialog, me, {timestamp, 0}, per_page + 1)
-    page_messages = Enum.take(messages, -per_page)
+    page_messages = Enum.take(messages, -per_page) |> Chat.Messaging.preload_content()
 
     socket
     |> assign(:messages, page_messages)

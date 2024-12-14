@@ -13,7 +13,6 @@ defmodule ChatWeb.MainLive.Layout.Message do
 
   alias Chat.Card
   alias Chat.Content.Files
-  alias Chat.Content.Memo
   alias Chat.Content.RoomInvites
   alias Chat.Identity
   alias Chat.Messages.ExportHelper
@@ -22,7 +21,6 @@ defmodule ChatWeb.MainLive.Layout.Message do
   alias Chat.Utils
   alias Chat.Utils.StorageId
   alias ChatWeb.MainLive.Layout
-  alias ChatWeb.Utils, as: WebUtils
   alias Phoenix.LiveView.JS
 
   attr :author, Card, doc: "message author card"
@@ -118,17 +116,10 @@ defmodule ChatWeb.MainLive.Layout.Message do
   attr :msg, :map, required: true, doc: "message struct"
 
   def text(%{msg: %{type: :memo}} = assigns) do
-    assigns =
-      assign_new(assigns, :memo, fn %{msg: %{content: json}} ->
-        json
-        |> StorageId.from_json()
-        |> Memo.get()
-      end)
-
     ~H"""
     <div class="px-4 w-full">
       <span class="flex-initial break-words">
-        <%= nl2br(@memo) %>
+        <%= nl2br(@msg.memo) %>
       </span>
     </div>
     """
@@ -273,6 +264,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   end
 
   defp message(%{msg: %{type: :room_invite}} = assigns) do
+    # TODO: put in Chat.Messaging
     assigns =
       assigns
       |> assign_new(:room_card, fn
@@ -603,39 +595,15 @@ defmodule ChatWeb.MainLive.Layout.Message do
     })
   end
 
-  defp assign_file(
-         %{msg: %{type: type, file_info: [_, _, _, _, name, size], file_url: url}} =
-           assigns
-       ) do
-    with true <- type in [:audio, :image, :video, :file],
+  defp assign_file(%{msg: msg} = assigns) do
+    with %{type: type, file_info: [_, _, _, _, name, size], file_url: url} <- msg,
+         true <- type in [:audio, :image, :video, :file],
          true <- String.valid?(name),
          true <- String.valid?(size) do
       %{
         name: name,
         size: size,
         url: url
-      }
-    else
-      _ ->
-        %{
-          name: "Broken file",
-          size: "n/a",
-          url: nil
-        }
-    end
-    |> then(&assign(assigns, :file, &1))
-  end
-
-  defp assign_file(%{msg: %{content: json, type: type}} = assigns) do
-    with true <- type in [:audio, :image, :video, :file],
-         {id, secret} <- StorageId.from_json(json),
-         [_, _, _, _, name, size] <- Files.get(id, secret),
-         true <- String.valid?(name),
-         true <- String.valid?(size) do
-      %{
-        name: name,
-        size: size,
-        url: WebUtils.get_file_url(:file, id, secret)
       }
     else
       _ ->

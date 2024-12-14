@@ -37,6 +37,12 @@ defmodule ChatWeb.ProxyApiController do
     end)
   end
 
+  def bulk_get(conn, params) do
+    run_and_respond(conn, params, fn body ->
+      Proxy.Api.bulk_get_data(body)
+    end)
+  end
+
   # Helpers
   ##################
   defp decode_args(params) do

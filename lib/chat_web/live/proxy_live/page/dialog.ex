@@ -530,17 +530,12 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
         end)
         |> Enum.filter(& &1)
         |> Enum.reverse()
+        |> Chat.Messaging.preload_content(&Proxy.get_data_by_keys(server, &1))
         |> Enum.map(fn
           %{type: type, content: json} = msg when type in [:image, :audio, :file, :video] ->
             {id, secret} = json |> StorageId.from_json()
 
-            file_info =
-              Proxy.get_file_info(server, id)
-              |> Enum.map(&Enigma.decipher(&1, secret))
-
             msg
-            |> Map.from_struct()
-            |> Map.put(:file_info, file_info)
             |> Map.put(:file_url, ChatWeb.Utils.get_proxied_file_url(server, id, secret))
 
           simple_message ->
@@ -552,14 +547,6 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
 
     socket
     |> assign(:messages, [])
-
-    # page_messages = Enum.take(messages, -per_page)
-    #
-    #
-    # socket
-    # |> assign(:messages, page_messages)
-    # |> assign(:has_more_messages, length(messages) > per_page)
-    # |> assign(:last_load_timestamp, set_messages_timestamp(page_messages))
   end
 
   defp broadcast_new_message(nil, _, _, _), do: nil

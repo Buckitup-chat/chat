@@ -45,6 +45,7 @@ npm-debug.log
 
 # Database
 /priv/db
+/priv/2nd
 /priv/admin_db*
 /priv/test_backup_db
 /priv/test_db

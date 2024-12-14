@@ -170,6 +170,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         do: Rooms.read_to(room, identity, {nil, 0}, {index + 1, 0}),
         else: Rooms.read(room, identity, {nil, 0}, @per_page + 1)
       )
+      |> Chat.Messaging.preload_content()
     )
     |> assign_last_loaded_index()
     |> push_event("chat:scroll-down", %{})
@@ -615,7 +616,7 @@ defmodule ChatWeb.MainLive.Page.Room do
          per_page
        ) do
     messages = Rooms.read(room, identity, {index, 0}, per_page + 1)
-    page_messages = Enum.take(messages, -per_page)
+    page_messages = Enum.take(messages, -per_page) |> Chat.Messaging.preload_content()
 
     socket
     |> assign(:messages, page_messages)
@@ -665,7 +666,10 @@ defmodule ChatWeb.MainLive.Page.Room do
          } = socket,
          {msg_index, msg_id}
        ) do
-    prev_messages = Rooms.read_to(room, identity, {index - 1, 0}, {msg_index, msg_id})
+    prev_messages =
+      Rooms.read_to(room, identity, {index - 1, 0}, {msg_index, msg_id})
+      |> Chat.Messaging.preload_content()
+
     messages = prev_messages ++ messages
 
     socket

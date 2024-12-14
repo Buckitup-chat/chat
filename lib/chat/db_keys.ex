@@ -27,4 +27,7 @@ defmodule Chat.DbKeys do
   def room_message_prefix(room_ref) do
     {:room_message, room_ref |> Identify.pub_key()}
   end
+
+  def memo(key), do: {:memo, key}
+  def file(key), do: {:file, key}
 end

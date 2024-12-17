@@ -142,8 +142,13 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def show_new(%{assigns: %{me: me, dialog: dialog}} = socket, new_message) do
+    messages =
+      [Dialogs.read_message(dialog, new_message, me)]
+      |> Enum.reject(&is_nil/1)
+      |> Chat.Messaging.preload_content()
+
     socket
-    |> assign(:messages, [Dialogs.read_message(dialog, new_message, me)])
+    |> assign(:messages, messages)
     |> assign(:message_update_mode, :append)
     |> assign(:page, 0)
     |> push_event("chat:scroll-down", %{})

@@ -179,8 +179,15 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   end
 
   def show_new(%{assigns: %{me: me, dialog: dialog}} = socket, new_message) do
+    server = socket |> get_private(:server)
+
+    messages =
+      [DialogMessaging.read(new_message, me, dialog)]
+      |> Enum.reject(&is_nil/1)
+      |> Chat.Messaging.preload_content(&Proxy.get_data_by_keys(server, &1))
+
     socket
-    |> assign(:messages, [DialogMessaging.read(new_message, me, dialog)])
+    |> assign(:messages, messages)
     |> assign(:message_update_mode, :append)
     |> assign(:page, 0)
     |> push_event("chat:scroll-down", %{})

@@ -255,7 +255,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     if verified_message do
       socket
       |> assign(:page, 0)
-      |> assign(:messages, [verified_message])
+      |> assign(:messages, [verified_message] |> Chat.Messaging.preload_content())
       |> assign(:message_update_mode, :append)
       |> maybe_update_requests(verified_message)
       |> push_event("chat:scroll-down", %{})

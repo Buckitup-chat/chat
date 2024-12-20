@@ -11,6 +11,7 @@ defmodule ChatWeb.ProxyLive.Index do
   alias ChatWeb.Hooks.UploaderHook
   alias ChatWeb.MainLive.Layout
   alias ChatWeb.MainLive.Page
+  alias ChatWeb.MainLive.Page.RoomForm
 
   alias ChatWeb.ProxyLive.Page.Dialog, as: ProxyDialog
   alias ChatWeb.ProxyLive.Page.Lobby, as: ProxyLobby

@@ -1,6 +1,8 @@
 defmodule Proxy do
   @moduledoc "Proxy. Client side"
 
+  alias Chat.DbKeys
+
   # Users
   def register_me(server, me) do
     %{
@@ -43,6 +45,12 @@ defmodule Proxy do
     api_key_value(server, {:dialog_message, dialog_key, index, id |> Enigma.hash()})
   end
 
+  # Rooms
+  def get_rooms(server) do
+    api_select(server, min: DbKeys.room_min(), max: DbKeys.room_max(), amount: 10_000)
+  end
+
+  # Content
   def save_parcel(parcel, server, me) do
     %{
       parcel: parcel,
@@ -52,7 +60,6 @@ defmodule Proxy do
     |> api_save_parcel(server)
   end
 
-  # Content
   def get_file_info(server, file_key) do
     api_key_value(server, {:file, file_key})
   end

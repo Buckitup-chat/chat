@@ -11,10 +11,7 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
 
   # alias Chat.Identity
   # alias Chat.Log
-  # alias Chat.Rooms
-  # alias Chat.Rooms.RoomRequest
-  # alias Chat.Rooms.RoomsBroker
-  # alias ChatWeb.MainLive.Page
+  alias Chat.Rooms
 
   alias ChatWeb.ProxyLive.ChannelClients
   alias ChatWeb.ProxyLive.Page
@@ -34,11 +31,12 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
     |> assign(:search_filter, :off)
     |> set_private(:users_cache, [])
     |> assign_user_list()
-    # |> assign_room_list()
+    |> assign_room_list()
     # |> assign_admin()
     # |> process(&approve_pending_requests/1)
     # |> process(&join_approved_requests/1)
-    |> tap(&make_user_list_request(&1))
+    |> tap(&make_user_list_request/1)
+    |> tap(&make_room_list_request/1)
     |> save_started_user_channel()
   end
 
@@ -53,6 +51,7 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
     case msg do
       {:new_user, user} -> socket |> append_user(user)
       {:user_list, list} -> socket |> populate_user_list(list)
+        {:room_list, list} -> socket |> populate_room_list(list)
     end
   end
 
@@ -134,20 +133,20 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
         |> assign(:search_filter, :off)
         |> assign_user_list()
 
-      # %{"_target" => ["reset"], "room" => _} ->
-      #   socket
-      #   |> assign(:search_filter, :off)
-      #   |> assign_room_list()
+      %{"_target" => ["reset"], "room" => _} ->
+        socket
+        |> assign(:search_filter, :off)
+        |> assign_room_list()
 
       %{"dialog" => %{"name" => name}} ->
         socket
         |> assign(:search_filter, :on)
         |> assign_user_list(String.trim(name))
 
-        # %{"room" => %{"name" => name}} ->
-        #   socket
-        #   |> assign(:search_filter, :on)
-        #   |> assign_room_list(String.trim(name))
+      %{"room" => %{"name" => name}} ->
+        socket
+        |> assign(:search_filter, :on)
+        |> assign_room_list(String.trim(name))
     end
   end
 
@@ -288,22 +287,32 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
     |> Enum.filter(fn card -> String.contains?(card.name, search_term) end)
   end
 
-  # defp assign_room_list(%{assigns: %{room_map: rooms, my_id: my_id}} = socket, search_term \\ "") do
-  #   {joined, new} =
-  #     if search_term == "",
-  #       do: RoomsBroker.list(rooms),
-  #       else: RoomsBroker.list(rooms, search_term)
-  #
-  #   new =
-  #     Enum.map(new, fn room ->
-  #       Map.put(room, :is_requested?, Rooms.is_requested_by?(room.pub_key, my_id))
-  #     end)
-  #
-  #   socket
-  #   |> assign(:joined_rooms, joined)
-  #   |> assign(:new_rooms, new)
-  # end
-  #
+  defp assign_room_list(socket, search_term \\ "") do
+    cache = socket |> get_private(:rooms_cache, [])
+    actor = socket |> get_private(:actor)
+    room_map = socket |> get_private(:room_map, %{})
+    my_pubkey = actor.me |> Proto.Identify.pub_key()
+
+    {joined, new} =
+      cache
+      |> Enum.filter(fn room ->
+        (room.type in [:public, :request] or Map.has_key?(room_map, room.pub_key))
+          and (search_term == "" or String.match?(room.name, ~r/#{search_term}/i))
+      end)
+      |> Enum.sort_by(fn room -> room.name end)
+      |> Enum.split_with(&Map.has_key?(room_map, &1.pub_key))
+
+    socket
+    |> assign(:joined_rooms, joined)
+    |> assign(:new_rooms, new |> enrich_with_requested(my_pubkey))
+  end
+
+  defp enrich_with_requested(rooms, my_pubkey) do
+    Enum.map(rooms, fn room ->
+      Map.put(room, :is_requested?, Rooms.requested_by?(room.pub_key, my_pubkey))
+    end)
+  end
+
   # defp assign_admin(%{assigns: %{room_map: rooms}} = socket) do
   #   has_admin_key =
   #     with admin_pub_key <- AdminRoom.pub_key(),
@@ -321,31 +330,26 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
   #   socket |> assign(:is_admin, has_admin_key)
   # end
 
-  defp close_current_mode(%{assigns: %{lobby_mode: :chats}} = socket),
-    do: socket |> Page.Dialog.close()
+  defp close_current_mode(%{assigns: %{lobby_mode: mode}} = socket) do
+    case mode do
+      :chats -> socket |> Page.Dialog.close()
+      :rooms -> socket |> Page.Room.close()
+      _ -> socket
+    end
 
-  # defp close_current_mode(%{assigns: %{lobby_mode: :rooms}} = socket),
-  #   do: socket |> Page.Room.close()
+    # :feed -> socket |> Page.Feed.close()
+    # :admin -> socket |> Page.AdminPanel.close()
+  end
 
-  # defp close_current_mode(%{assigns: %{lobby_mode: :feeds}} = socket),
-  #   do: socket |> Page.Feed.close()
+  defp init_new_mode(%{assigns: %{lobby_mode: new_mode}} = socket) do
+    case new_mode do
+      :chats -> socket |> Page.Dialog.init() |> assign_user_list()
+      :rooms -> socket |> Page.Room.init() |> assign_room_list()
+    end
 
-  # defp close_current_mode(%{assigns: %{lobby_mode: :admin}} = socket),
-  #   do: socket |> Page.AdminPanel.close()
-
-  defp close_current_mode(socket), do: socket
-
-  defp init_new_mode(%{assigns: %{lobby_mode: :chats}} = socket),
-    do: socket |> Page.Dialog.init() |> assign_user_list()
-
-  # defp init_new_mode(%{assigns: %{lobby_mode: :rooms}} = socket),
-  #   do: socket |> Page.Room.init() |> assign_room_list()
-
-  # defp init_new_mode(%{assigns: %{lobby_mode: :feeds}} = socket),
-  #   do: socket |> Page.Feed.init()
-
-  # defp init_new_mode(%{assigns: %{lobby_mode: :admin}} = socket),
-  #   do: socket |> Page.AdminPanel.init()
+    # :feed -> socket |> Page.Feed.init() 
+    # :admin -> socket |> Page.AdminPanel.init()
+  end
 
   # defp approve_pending_requests(socket) do
   #   %{room_map: room_map, me: me, monotonic_offset: time_offset} = socket.assigns
@@ -456,5 +460,25 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
       true ->
         "version should be here"
     end
+  end
+
+  defp make_room_list_request(socket) do
+    server = socket |> get_private(:server)
+    pid = self()
+
+    Task.start(fn ->
+      rooms = Proxy.get_rooms(server)
+
+      if is_list(rooms) do
+        send(pid, {:lobby, {:room_list, rooms}})
+      end
+    end)
+  end
+
+
+  defp populate_room_list(socket, room_list) do
+    socket
+    |> set_private(:rooms_cache, room_list)
+    |> assign_room_list()
   end
 end

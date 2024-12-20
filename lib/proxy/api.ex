@@ -136,6 +136,7 @@ defmodule Proxy.Api do
   defp choose_getter(slug) do
     case slug do
       :users -> &Chat.Db.values/2
+      :rooms -> &Chat.Db.values/2
       _ -> &Chat.Db.select/2
     end
   end

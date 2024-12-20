@@ -29,7 +29,12 @@ defmodule ChatWeb.ProxyLive.Init do
     |> Phoenix.LiveView.get_connect_params()
     |> get_in(["storage", "auth"])
     |> Chat.Actor.from_json()
-    |> then(fn actor -> {:cont, socket |> set_private(:actor, %Chat.Actor{} = actor)} end)
+    |> then(fn actor ->
+      {:cont,
+       socket
+       |> set_private(:actor, %Chat.Actor{} = actor)
+       |> set_private(:room_map, Map.new(actor.rooms, &{&1 |> Proto.Identify.pub_key(), &1}))}
+    end)
   rescue
     _ -> {:halt, socket |> push_navigate(to: ~p"/")}
   end
@@ -59,6 +64,7 @@ defmodule ChatWeb.ProxyLive.Init do
       compacting: false,
       writable: :yes
     })
+    |> assign(:media_settings, %Chat.Admin.MediaSettings{})
     |> Page.Lobby.init()
     |> Page.Dialog.init()
     |> then(&{:cont, &1})

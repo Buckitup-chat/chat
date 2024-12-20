@@ -30,4 +30,7 @@ defmodule Chat.DbKeys do
 
   def memo(key), do: {:memo, key}
   def file(key), do: {:file, key}
+  def room(key), do: {:rooms, key}
+  def room_min, do: {:rooms, 0}
+  def room_max, do: {:"rooms/0", 0}
 end

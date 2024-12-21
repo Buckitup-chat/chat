@@ -48,7 +48,7 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
           class="w-full h-12 px-2 backdrop-blur-lg bg-white/10 fixed z-20 flex justify-between items-center"
         >
           <.back_button type={@type} target={@myself} />
-          <span class="ml-3 text-white truncate"><%= @current[:id] %></span>
+          <span class="ml-3 text-white truncate">{@current[:id]}</span>
         </div>
 
         <div class="h-screen flex justify-center items-center lg:h-[99vh]">

@@ -71,7 +71,7 @@ defmodule ChatWeb.MainLive.Admin.FirmwareUpgradeForm do
         <%= for entry <- @uploads.config.entries do %>
           <div class="mt-4 w-full flex flex-row justify-between space-x-2">
             <progress class="w-full" value={entry.progress} max="100">
-              <%= entry.progress %>%
+              {entry.progress}%
             </progress>
             <button phx-click="cancel-upload" phx-value-ref={entry.ref} phx-target={@myself}>
               <.icon id="close" class="w-5 h-5 flex fill-grayscale" />

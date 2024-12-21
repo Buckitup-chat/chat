@@ -60,7 +60,7 @@ defmodule ChatWeb.MainLive.Admin.ZerotierSettings do
           client_address={@status["address"]}
         />
       <% else %>
-        <%= @status %>...
+        {@status}...
       <% end %>
     </section>
     """
@@ -74,8 +74,8 @@ defmodule ChatWeb.MainLive.Admin.ZerotierSettings do
       <% else %>
         offline
       <% end %>
-      <i><%= @client_address %></i>
-      <%= @version %>
+      <i>{@client_address}</i>
+      {@version}
     </section>
     """
   end
@@ -95,7 +95,7 @@ defmodule ChatWeb.MainLive.Admin.ZerotierSettings do
           />
         <% end %>
       <% else %>
-        <%= @list %>...
+        {@list}...
       <% end %>
       <.add_network target={@target} />
     </section>
@@ -115,10 +115,10 @@ defmodule ChatWeb.MainLive.Admin.ZerotierSettings do
       >
         Leave!
       </button>
-      <%= @name %>
+      {@name}
       <span class="flip">
-        <%= @cidrs %>
-        <%= @status %>
+        {@cidrs}
+        {@status}
         <button
           phx-click={JS.toggle(to: "#zerotier-network-#{@id} .flip")}
           class="items-center justify-center rounded-md px-2 border bg-red-100 border-black/10"

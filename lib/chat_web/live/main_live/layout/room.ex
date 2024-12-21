@@ -116,7 +116,7 @@ defmodule ChatWeb.MainLive.Layout.Room do
 
     ~H"""
     <p class="mt-3 text-sm text-red-500">
-      You have <%= @output %> not backed up. Download the keys to make sure you have access to them after logging out.
+      You have {@output} not backed up. Download the keys to make sure you have access to them after logging out.
     </p>
     """
   end

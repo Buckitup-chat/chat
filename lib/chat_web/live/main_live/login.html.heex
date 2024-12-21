@@ -25,19 +25,19 @@
         class="t-login-form"
         phx-submit="login"
       >
-        <%= text_input(f, :name,
+        {text_input(f, :name,
           placeholder: "Your name",
           class:
             "w-full h-11 bg-transparent border border-white/50 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-0 focus:border-white"
-        ) %>
-        <%= error_tag(f, :name) %>
+        )}
+        {error_tag(f, :name)}
 
         <div class="mt-2.5">
-          <%= submit("Log In",
+          {submit("Log In",
             phx_disable_with: "Saving...",
             class: "w-full h-11 focus:outline-none text-white px-4 rounded-lg",
             style: "background-color: rgb(36, 24, 36);"
-          ) %>
+          )}
         </div>
       </.form>
     </div>

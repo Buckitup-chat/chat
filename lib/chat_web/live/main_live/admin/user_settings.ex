@@ -28,7 +28,7 @@ defmodule ChatWeb.MainLive.Admin.UserSettings do
       <.form for={@form} phx-change="update" phx-target={@myself} data-phx-value-id="">
         <div class="flex items-center">
           <%= label do %>
-            <%= checkbox(@form, "skip_user_creation") %>
+            {checkbox(@form, "skip_user_creation")}
 
             <span class="ml-2 text-sm">
               Disable new user login

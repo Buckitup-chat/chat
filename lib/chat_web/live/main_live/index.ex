@@ -621,8 +621,8 @@ defmodule ChatWeb.MainLive.Index do
   defp action_confirmation_popup(assigns) do
     ~H"""
     <.modal id={@id} class="">
-      <h1 class="text-base font-bold text-grayscale"><%= @title %></h1>
-      <p class="mt-3 text-sm text-black/50"><%= @description %></p>
+      <h1 class="text-base font-bold text-grayscale">{@title}</h1>
+      <p class="mt-3 text-sm text-black/50">{@description}</p>
       <div class="mt-5 flex items-center justify-between">
         <button phx-click={hide_modal(@id)} class="w-full mr-1 h-12 border rounded-lg border-black/10">
           Cancel

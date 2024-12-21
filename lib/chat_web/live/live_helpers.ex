@@ -58,7 +58,7 @@ defmodule ChatWeb.LiveHelpers do
           <.icon id="close" class="w-4 h-4 flex fill-grayscale t-close-popup" />
         </a>
 
-        <%= render_slot(@inner_block) %>
+        {render_slot(@inner_block)}
       </div>
     </div>
     """
@@ -114,7 +114,7 @@ defmodule ChatWeb.LiveHelpers do
       phx-key="escape"
       style="display: none;"
     >
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </div>
     """
   end

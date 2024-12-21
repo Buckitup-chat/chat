@@ -89,11 +89,11 @@ defmodule ChatWeb.MainLive.Page.KeyShareForm do
             </ul>
           </div>
         </div>
-        <%= submit("Share",
+        {submit("Share",
           phx_disable_with: "Sharing the Key...",
           class: "mt-5 w-full h-12 border-0 rounded-lg bg-grayscale text-white disabled:opacity-50",
           disabled: Enum.count(@share_users) < KeyShare.threshold()
-        ) %>
+        )}
       </.form>
     </div>
     """

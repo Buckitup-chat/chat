@@ -18,7 +18,7 @@ defmodule ChatWeb.MainLive.Layout.Timer do
     assigns = assign(assigns, :timer, timer)
 
     ~H"""
-    <div class="w-10 ml-1 text-white/90"><%= @timer %></div>
+    <div class="w-10 ml-1 text-white/90">{@timer}</div>
     """
   end
 

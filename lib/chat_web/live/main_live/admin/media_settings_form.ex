@@ -69,14 +69,14 @@ defmodule ChatWeb.MainLive.Admin.MediaSettingsForm do
         <%= for {value, label} <- Ecto.Enum.mappings(MediaSettings, :functionality) do %>
           <.functionality_radio_button form={f} label={label} value={value} />
         <% end %>
-        <%= error_tag(f, :functionality) %>
+        {error_tag(f, :functionality)}
 
-        <%= submit("Update",
+        {submit("Update",
           class:
             "h-11 px-10 mt-2 text-white border-0 rounded-lg bg-grayscale flex items-center justify-center",
           disabled: !@changeset.valid?,
           phx_disable_with: "Updating..."
-        ) %>
+        )}
       </.form>
     </section>
     """
@@ -86,10 +86,10 @@ defmodule ChatWeb.MainLive.Admin.MediaSettingsForm do
     ~H"""
     <div class="flex items-center">
       <%= label do %>
-        <%= radio_button(@form, :functionality, @value) %>
+        {radio_button(@form, :functionality, @value)}
 
         <span class={"ml-2 text-sm" <> if(selected_functionality?(@form, @value), do: " font-bold", else: "")}>
-          <%= @label %>
+          {@label}
         </span>
       <% end %>
     </div>
@@ -100,10 +100,10 @@ defmodule ChatWeb.MainLive.Admin.MediaSettingsForm do
     ~H"""
     <div class="flex items-center">
       <%= label do %>
-        <%= checkbox(@form, @field) %>
+        {checkbox(@form, @field)}
 
         <span class="ml-2 text-sm">
-          <%= @label %>
+          {@label}
         </span>
       <% end %>
     </div>

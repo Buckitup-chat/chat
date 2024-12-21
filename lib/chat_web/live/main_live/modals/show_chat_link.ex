@@ -28,7 +28,7 @@ defmodule ChatWeb.MainLive.Modals.ShowChatLink do
             |> JS.set_attribute({"disabled", "true"}, to: "#copy-button")
           }
         >
-          <%= @button_text %>
+          {@button_text}
         </button>
       </div>
     </div>

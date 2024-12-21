@@ -67,7 +67,7 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
             </div>
             <%= if Map.has_key?(@invalid_sensors, index) do %>
               <div class="flex-row text-xs text-red-500">
-                <%= Map.get(@invalid_sensors, index) %>
+                {Map.get(@invalid_sensors, index)}
               </div>
             <% end %>
           <% end %>
@@ -88,12 +88,12 @@ defmodule ChatWeb.MainLive.Admin.CargoCameraSensorsForm do
             </div>
           <% end %>
         </fieldset>
-        <%= submit("Update",
+        {submit("Update",
           class:
             "h-11 w-full px-10 mt-4 text-white border-0 rounded-lg bg-grayscale flex items-center justify-center disabled:opacity-50",
           disabled: !@changeset.valid? or !Enum.empty?(@invalid_sensors),
           phx_disable_with: "Updating..."
-        ) %>
+        )}
       </.form>
     </div>
     """

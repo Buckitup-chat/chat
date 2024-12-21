@@ -137,7 +137,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
             role="alert"
           >
             <span class="block sm:inline">
-              <%= @recovery_error %>
+              {@recovery_error}
             </span>
           </div>
         </div>
@@ -187,7 +187,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
 
   def share(assigns) do
     ~H"""
-    <%= @share.name %>
+    {@share.name}
     <button
       type="button"
       phx-click="cancel"
@@ -227,7 +227,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
             <p class="mt-2.5 font-inter text-sm text-white/70">
               <%= if KeyShare.threshold() > Enum.count(@shares) do %>
                 Please, upload at least
-                <a class="font-bold"><%= KeyShare.threshold() - Enum.count(@shares) %></a>
+                <a class="font-bold">{KeyShare.threshold() - Enum.count(@shares)}</a>
                 share files to recover your key
               <% else %>
                 You have uploaded enough files to recover the key

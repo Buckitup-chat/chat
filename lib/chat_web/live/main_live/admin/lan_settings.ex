@@ -54,7 +54,7 @@ defmodule ChatWeb.MainLive.Admin.LanSettings do
       <%= if @ip == :requested do %>
         loading...
       <% else %>
-        <%= @ip %>
+        {@ip}
       <% end %>
     </section>
     """
@@ -74,7 +74,7 @@ defmodule ChatWeb.MainLive.Admin.LanSettings do
         <form phx-change="change-profile" phx-target={@myself}>
           <select name="mode">
             <%= for {value, label} <- @list do %>
-              <option selected={value == @selected} value={value}><%= label %></option>
+              <option selected={value == @selected} value={value}>{label}</option>
             <% end %>
           </select>
         </form>

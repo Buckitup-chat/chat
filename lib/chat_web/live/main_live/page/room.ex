@@ -118,7 +118,7 @@ defmodule ChatWeb.MainLive.Page.Room do
   end
 
   def store_key_copy(%{assigns: %{me: me, room_map: room_map}} = socket, room_identity) do
-    unless Map.has_key?(room_map, Identity.pub_key(room_identity)) do
+    if !Map.has_key?(room_map, Identity.pub_key(room_identity)) do
       my_notes = Dialogs.find_or_open(me)
 
       room_identity

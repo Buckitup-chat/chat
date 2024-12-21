@@ -119,7 +119,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
     ~H"""
     <div class="px-4 w-full">
       <span class="flex-initial break-words">
-        <%= nl2br(@msg.memo) %>
+        {nl2br(@msg.memo)}
       </span>
     </div>
     """
@@ -129,7 +129,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
     ~H"""
     <div class="px-4 w-full">
       <span class="flex-initial break-words">
-        <%= nl2br(@msg.content) %>
+        {nl2br(@msg.content)}
       </span>
     </div>
     """
@@ -385,7 +385,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   defp header_wrapper(%{export?: true, msg_type: type} = assigns) when type in [:audio, :video] do
     ~H"""
     <.link class={@class} id={@id} href={@file[:url]}>
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </.link>
     """
   end
@@ -393,7 +393,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   defp header_wrapper(assigns) do
     ~H"""
     <div class={@class} id={@id}>
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </div>
     """
   end
@@ -627,8 +627,8 @@ defmodule ChatWeb.MainLive.Layout.Message do
         <.file_icon export?={@export?} />
 
         <div class="w-36 flex flex-col pr-3">
-          <span class="truncate text-xs x-file" href={@file.url}><%= @file.name %></span>
-          <span class="text-xs text-black/50 whitespace-pre-line"><%= @file.size %></span>
+          <span class="truncate text-xs x-file" href={@file.url}>{@file.name}</span>
+          <span class="text-xs text-black/50 whitespace-pre-line">{@file.size}</span>
         </div>
       </.link>
       """
@@ -671,8 +671,8 @@ defmodule ChatWeb.MainLive.Layout.Message do
   defp media_file_info(assigns) do
     ~H"""
     <div class="w-full flex flex-row justify-between px-3 py-2">
-      <span class="truncate text-xs x-file" href={@file.url}><%= @file.name %></span>
-      <span class="text-xs text-black/50 whitespace-pre-line"><%= @file.size %></span>
+      <span class="truncate text-xs x-file" href={@file.url}>{@file.name}</span>
+      <span class="text-xs text-black/50 whitespace-pre-line">{@file.size}</span>
     </div>
     """
   end

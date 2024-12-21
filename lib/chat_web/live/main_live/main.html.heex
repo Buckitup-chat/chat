@@ -99,24 +99,24 @@
           >
             <div class="w-ull relative">
               <%= if @is_password_visible do %>
-                <%= text_input(f, :password,
+                {text_input(f, :password,
                   type: "text",
                   placeholder: "Enter Password",
                   phx_debounce: 700,
                   class:
                     "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50"
-                ) %>
+                )}
                 <a phx-click="logout:toggle-password-visibility">
                   <.icon id="visibility" class="w-4 h-4 absolute top-4 right-3 ml-2" />
                 </a>
               <% else %>
-                <%= text_input(f, :password,
+                {text_input(f, :password,
                   type: "password",
                   placeholder: "Enter Password",
                   phx_debounce: 700,
                   class:
                     "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50"
-                ) %>
+                )}
                 <a phx-click="logout:toggle-password-visibility">
                   <.icon id="visibilityOff" class="w-4 h-4 absolute top-4 right-3 ml-2" />
                 </a>
@@ -125,24 +125,24 @@
             <!--<%= error_tag f, :password %> -->
             <div class="mt-3 w-ull relative">
               <%= if @is_password_confirmation_visible do %>
-                <%= text_input(f, :password_confirmation,
+                {text_input(f, :password_confirmation,
                   type: "text",
                   placeholder: "Repeat Password",
                   phx_debounce: 700,
                   class:
                     "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50"
-                ) %>
+                )}
                 <a phx-click="logout:toggle-password-confirmation-visibility">
                   <.icon id="visibility" class="w-4 h-4 absolute top-4 right-3 ml-2" />
                 </a>
               <% else %>
-                <%= text_input(f, :password_confirmation,
+                {text_input(f, :password_confirmation,
                   type: "password",
                   placeholder: "Repeat Password",
                   phx_debounce: 700,
                   class:
                     "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50"
-                ) %>
+                )}
                 <a phx-click="logout:toggle-password-confirmation-visibility">
                   <.icon id="visibilityOff" class="w-4 h-4 absolute top-4 right-3 ml-2" />
                 </a>
@@ -150,12 +150,12 @@
             </div>
             <!-- <%= error_tag f, :password_confirmation %> -->
             <p class="mt-3 text-sm text-black/50">At least 12 symbols</p>
-            <%= submit("Download",
+            {submit("Download",
               phx_disable_with: "Downloading...",
               class:
                 "mt-5 w-full h-12 border-0 rounded-lg bg-grayscale text-white disabled:opacity-50",
               disabled: !@changeset.valid?
-            ) %>
+            )}
           </.form>
           <button
             class="mt-3 w-full h-12 border rounded-lg border-black/10"

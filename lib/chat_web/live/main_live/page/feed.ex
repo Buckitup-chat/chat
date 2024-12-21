@@ -57,7 +57,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
     ~H"""
     <div class="py-1 flex justify-start" id={@dom_id}>
       <div class="border-0 rounded-md bg-white/20 p-2 flex flex-col justify-start">
-        <span class="text-white"><%= @user && @user.name %> <.action action={@action} /></span>
+        <span class="text-white">{@user && @user.name} <.action action={@action} /></span>
         <div class="text-white/70" style="font-size: 10px;">
           <time-stamp id={"timestamp-#{@dom_id}"} data-unixtime={@timestamp} phx-update="ignore">
           </time-stamp>
@@ -92,14 +92,14 @@ defmodule ChatWeb.MainLive.Page.Feed do
       )
 
     ~H"""
-    <%= @act %>
+    {@act}
 
     <%= if @to do %>
-      to <%= @to.name %>
+      to {@to.name}
     <% end %>
 
     <%= if @room do %>
-      <%= @room.name %>
+      {@room.name}
     <% end %>
     """
   end
@@ -111,7 +111,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
       )
 
     ~H"""
-    <%= @act %>
+    {@act}
     """
   end
 

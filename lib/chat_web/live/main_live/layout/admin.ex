@@ -5,7 +5,7 @@ defmodule ChatWeb.MainLive.Layout.Admin do
   def container(assigns) do
     ~H"""
     <div class="flex flex-col overflow-scroll py-[40px] md:py-0 w-full">
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </div>
     """
   end
@@ -13,7 +13,7 @@ defmodule ChatWeb.MainLive.Layout.Admin do
   def row(assigns) do
     ~H"""
     <div class="flex flex-row flex-wrap m-2">
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </div>
     """
   end
@@ -21,8 +21,8 @@ defmodule ChatWeb.MainLive.Layout.Admin do
   def block(assigns) do
     ~H"""
     <article class="m-4 w-50 p-4 rounded-xl bg-gray-200">
-      <header class="text-2xl bg-white/50 rounded-md p-2"><%= @title %></header>
-      <%= render_slot(@inner_block) %>
+      <header class="text-2xl bg-white/50 rounded-md p-2">{@title}</header>
+      {render_slot(@inner_block)}
     </article>
     """
   end
@@ -63,15 +63,15 @@ defmodule ChatWeb.MainLive.Layout.Admin do
     <div class="flex flex-col space-y-5">
       <div>
         <label class="text-black/50"> Internal DB: </label>
-        <span><%= @free_spaces.internal_db %></span>
+        <span>{@free_spaces.internal_db}</span>
       </div>
       <div>
         <label class="text-black/50"> Main DB: </label>
-        <span><%= @free_spaces.main_db %></span>
+        <span>{@free_spaces.main_db}</span>
       </div>
       <div>
         <label class="text-black/50"> Media DB: </label>
-        <span><%= @free_spaces.media_db %></span>
+        <span>{@free_spaces.media_db}</span>
       </div>
     </div>
     """
@@ -85,7 +85,7 @@ defmodule ChatWeb.MainLive.Layout.Admin do
       <div class="mt-4">
         <%= if @status do %>
           <p class="text-gray-700">
-            Status: <span id="status-text" class="font-medium"><%= @status %></span>
+            Status: <span id="status-text" class="font-medium">{@status}</span>
           </p>
           <button
             class="py-2 px-4 mt-3 w-full h-13 border-0 rounded-lg bg-grayscale text-white font-medium"

@@ -60,19 +60,19 @@ defmodule ChatWeb.MainLive.Admin.CargoUserData do
             phx-target={@myself}
             phx-change="validate"
           >
-            <%= text_input(f, :name,
+            {text_input(f, :name,
               placeholder: "Your name",
               class:
                 "w-full h-11 bg-transparent border border-gray/50 rounded-lg text-gray placeholder-gray/50 focus:outline-none focus:ring-0 focus:border-gray"
-            ) %>
+            )}
             <div class="mt-2.5">
-              <%= submit("Create",
+              {submit("Create",
                 phx_disable_with: "Saving...",
                 class:
                   "w-full h-11 focus:outline-none text-white px-4 rounded-lg disabled:opacity-50",
                 style: "background-color: rgb(36, 24, 36);",
                 disabled: !@valid_input?
-              ) %>
+              )}
             </div>
           </.form>
           <div class="mt-7 flex flex-row items-center justify-between">

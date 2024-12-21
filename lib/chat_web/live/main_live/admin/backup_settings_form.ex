@@ -65,14 +65,14 @@ defmodule ChatWeb.MainLive.Admin.BackupSettingsForm do
         <%= for {value, label} <- Ecto.Enum.mappings(BackupSettings, :type) do %>
           <.type_radio_button form={f} label={label} value={value} />
         <% end %>
-        <%= error_tag(f, :type) %>
+        {error_tag(f, :type)}
 
-        <%= submit("Update",
+        {submit("Update",
           class:
             "h-11 px-10 mt-2 text-white border-0 rounded-lg bg-grayscale flex items-center justify-center",
           disabled: !@changeset.valid?,
           phx_disable_with: "Updating..."
-        ) %>
+        )}
       </.form>
     </section>
     """
@@ -82,10 +82,10 @@ defmodule ChatWeb.MainLive.Admin.BackupSettingsForm do
     ~H"""
     <div class="flex items-center">
       <%= label do %>
-        <%= radio_button(@form, :type, @value) %>
+        {radio_button(@form, :type, @value)}
 
         <span class={"ml-2 text-sm" <> if(selected_type?(@form, @value), do: " font-bold", else: "")}>
-          <%= @label %>
+          {@label}
         </span>
       <% end %>
     </div>

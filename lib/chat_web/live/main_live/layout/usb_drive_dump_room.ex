@@ -77,13 +77,13 @@ defmodule ChatWeb.MainLive.Layout.UsbDriveDumpRoom do
 
       <div class="z-30 flex flex-col w-full bg-purple50 text-xs text-black/50 p-2">
         <div class="flex flex-row w-full justify-between">
-          <div>Total size: <%= File.format_size(@progress.total_size) %></div>
-          <div><%= @progress.percentage %>%</div>
+          <div>Total size: {File.format_size(@progress.total_size)}</div>
+          <div>{@progress.percentage}%</div>
         </div>
 
         <div class="flex flex-row w-full justify-between mt-1">
-          <div class="a-file-name truncate">File: <%= @progress.current_filename %></div>
-          <div><%= @progress.current_file %> / <%= @progress.total_files %></div>
+          <div class="a-file-name truncate">File: {@progress.current_filename}</div>
+          <div>{@progress.current_file} / {@progress.total_files}</div>
         </div>
       </div>
     </div>

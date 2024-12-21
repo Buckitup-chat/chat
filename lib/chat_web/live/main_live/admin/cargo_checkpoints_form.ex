@@ -181,7 +181,7 @@ defmodule ChatWeb.MainLive.Admin.CargoCheckpointsForm do
     ~H"""
     <div class="flex w-48 h-64 rounded-md">
       <div class="mx-1 flex w-full h-full flex-col border border-gray-300 rounded-md bg-white">
-        <div class="text-lg bg-gray-100 rounded-t-md p-2 users-title"><%= @title %></div>
+        <div class="text-lg bg-gray-100 rounded-t-md p-2 users-title">{@title}</div>
 
         <.users_list myself={@myself} selected_card={@selected_card} type={@type} users={@users} />
       </div>
@@ -249,7 +249,7 @@ defmodule ChatWeb.MainLive.Admin.CargoCheckpointsForm do
       phx-click={@event}
       phx-target={@myself}
     >
-      <%= @text %>
+      {@text}
     </button>
     """
   end

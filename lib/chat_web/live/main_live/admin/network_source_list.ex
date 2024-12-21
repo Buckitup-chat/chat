@@ -133,15 +133,15 @@ defmodule ChatWeb.MainLive.Admin.NetworkSourceList do
     <div id={"network-source-#{@id}"} class="bg-gray-300 border border-gray-400 mt-1 p-1 rounded">
       <%= if is_nil(@status) do %>
         <form phx-change="item-change" phx-target={@target}>
-          <%= render_slot(@inner_block) %>
+          {render_slot(@inner_block)}
         </form>
       <% else %>
-        <%= then(@status, fn
+        {then(@status, fn
           %Status.ErrorStatus{} -> render_slot(@error)
           %Status.SynchronizingStatus{} -> render_slot(@synchronizing)
           %Status.UpdatingStatus{} -> render_slot(@updating)
           %Status.CoolingStatus{} -> render_slot(@cooling)
-        end) %>
+        end)}
       <% end %>
     </div>
     """
@@ -152,7 +152,7 @@ defmodule ChatWeb.MainLive.Admin.NetworkSourceList do
   def item_row(assigns) do
     ~H"""
     <div class="flex flex-row items-center">
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </div>
     """
   end
@@ -163,7 +163,7 @@ defmodule ChatWeb.MainLive.Admin.NetworkSourceList do
     ~H"""
     <.item_row>
       <div class="grow text-center text-sm font-medium">
-        <%= @title %>
+        {@title}
       </div>
     </.item_row>
     """
@@ -174,7 +174,7 @@ defmodule ChatWeb.MainLive.Admin.NetworkSourceList do
   def error_message(assigns) do
     ~H"""
     <div class="grow bg-yellow-50 m-1 p-1.5 rounded text-center text-2xl">
-      ⚠️&nbsp; <%= @text %>
+      ⚠️&nbsp; {@text}
     </div>
     """
   end
@@ -186,7 +186,7 @@ defmodule ChatWeb.MainLive.Admin.NetworkSourceList do
     ~H"""
     <div class="grow text-2xl text-center">
       <progress value={@current} max={@amount}>
-        <%= trunc(100 * @current / max(1, @amount)) %> %
+        {trunc(100 * @current / max(1, @amount))} %
       </progress>
     </div>
     """

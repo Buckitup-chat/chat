@@ -25,18 +25,18 @@
             autocomplete="off"
             phx-submit={JS.hide() |> JS.push("export-keys")}
           >
-            <%= text_input(f, :code,
+            {text_input(f, :code,
               placeholder: "Enter code",
               type: "number",
               min: 10,
               max: 99,
               class:
                 "w-full  h-11 py-2.5 appearance-none block bg-transparent border border-white/50 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-0 focus:border-white"
-            ) %>
-            <%= submit("Log In",
+            )}
+            {submit("Log In",
               class: "mt-2.5 w-full h-11 focus:outline-none text-white px-4 rounded-lg",
               style: "background-color: rgb(36, 24, 36);"
-            ) %>
+            )}
           </.form>
         <% else %>
           <%= if @export_result == :error do %>

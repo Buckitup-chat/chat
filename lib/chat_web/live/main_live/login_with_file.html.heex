@@ -41,10 +41,10 @@
           />
           <%= for entry <- @uploads.my_keys_file.entries do %>
             <%= if entry.progress > 0 and entry.progress <= 100 do %>
-              <progress value={entry.progress} max="100"><%= entry.progress %>%</progress>
+              <progress value={entry.progress} max="100">{entry.progress}%</progress>
             <% end %>
             <%= for err <- upload_errors(@uploads.my_keys_file, entry) do %>
-              <p class="alert alert-danger"><%= err %></p>
+              <p class="alert alert-danger">{err}</p>
             <% end %>
           <% end %>
         </.form>
@@ -64,7 +64,7 @@
               class="w-[130px] md:w-[200px] h-[14px] text-ellipsis overflow-hidden"
               style="font-size: 14px;"
             >
-              <%= @filename %>
+              {@filename}
             </p>
             <p class="text-xs text-white/50">uploaded</p>
           </div>
@@ -86,13 +86,13 @@
         phx-drop-target={@uploads.my_keys_file.ref}
         class="mt-2.5"
       >
-        <%= text_input(f, :password,
+        {text_input(f, :password,
           type: "password",
           placeholder: "Enter Password",
           phx_debounce: 700,
           class:
             "w-full  h-11 py-2.5 appearance-none block bg-transparent border border-white/50 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-0 focus:border-white"
-        ) %>
+        )}
         <%= if @show_invalid do %>
           <div
             class="mt-2.5 p-2.5 w-full h-11 bg-transparent border border-white/0 rounded-lg text-white flex flex-row items-strech justify-between"
@@ -108,12 +108,12 @@
           </div>
         <% end %>
         <div>
-          <%= submit("Log In",
+          {submit("Log In",
             phx_disable_with: "Checking...",
             class:
               "w-full h-11 mt-7 bg-transparent text-white py-2 px-4 border border-white/0 rounded-lg flex items-center justify-center",
             style: "background-color: rgb(36, 24, 36);"
-          ) %>
+          )}
         </div>
       </.form>
     <% end %>

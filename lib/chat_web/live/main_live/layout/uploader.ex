@@ -59,7 +59,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
         <div
           class="flex flex-col m-2 bg-purple50 rounded-lg h-fit overflow-scroll sm:hidden"
           id="mobile-file-uploader"
-          style={unless(@active?, do: "display: none;")}
+          style={if(!@active?, do: "display: none;")}
         >
           <.file_form config={@config} operating_system={@operating_system} type={@type} />
 
@@ -158,7 +158,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
       <%= for entry <- @config.entries do %>
         <%= for err <- upload_errors(@config, entry) do %>
           <p id={"err-" <> Utils.random_id()} phx-mounted={pause_upload(entry.uuid)}>
-            <%= err %>
+            {err}
           </p>
         <% end %>
       <% end %>
@@ -207,10 +207,10 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
           </div>
 
           <div class="flex text-xs ml-2 min-w-[20%] max-w-[50%]">
-            <span class="truncate"><%= @entry.client_name %></span>
+            <span class="truncate">{@entry.client_name}</span>
           </div>
 
-          <div class="flex text-xs ml-auto text-black/50"><%= @entry.progress %>%</div>
+          <div class="flex text-xs ml-auto text-black/50">{@entry.progress}%</div>
         </div>
 
         <%= if @metadata.status == :active do %>
@@ -268,7 +268,7 @@ defmodule ChatWeb.MainLive.Layout.Uploader do
   defp upload_control(assigns) do
     ~H"""
     <.link class={"flex text-xs" <> if(@class, do: " #{@class}", else: "")} href="#" {@rest}>
-      <%= render_slot(@inner_block) %>
+      {render_slot(@inner_block)}
     </.link>
     """
   end

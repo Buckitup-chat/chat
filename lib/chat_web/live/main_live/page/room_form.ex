@@ -89,10 +89,10 @@ defmodule ChatWeb.MainLive.Page.RoomForm do
         phx-target={@myself}
         data-success={hide_modal("create-room-popup")}
       >
-        <%= text_input(f, :name,
+        {text_input(f, :name,
           placeholder: "Name your Room",
           class: "w-full h-11 mt-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-0"
-        ) %>
+        )}
 
         <.error_message form={f} field={:name} />
 
@@ -125,16 +125,16 @@ defmodule ChatWeb.MainLive.Page.RoomForm do
         <div class="mt-5 py-1 w-full min-h-fit flex items-center justify-start border-0 rounded-lg bg-black/10">
           <.icon id="alert" class="basis-1/12 mr-2 w-4 h-4 fill-black/40" />
           <blockquote id="roomTypeDescription" class="basis-11/12 text-xs text-black/50 mr-3">
-            <%= Map.get(@types_map, selected_type(f)) %>
+            {Map.get(@types_map, selected_type(f))}
           </blockquote>
         </div>
 
-        <%= submit("Create",
+        {submit("Create",
           disabled: !@changeset.valid?,
           phx_disable_with: "Saving...",
           class:
             "w-full h-11 mt-2 text-white border-0 rounded-lg bg-grayscale flex items-center justify-center t-submit-create"
-        ) %>
+        )}
       </.form>
     </div>
     """
@@ -143,7 +143,7 @@ defmodule ChatWeb.MainLive.Page.RoomForm do
   defp error_message(assigns) do
     ~H"""
     <div class="my-2">
-      <%= error_tag(@form, @field) %>
+      {error_tag(@form, @field)}
     </div>
     """
   end
@@ -156,14 +156,14 @@ defmodule ChatWeb.MainLive.Page.RoomForm do
     ~H"""
     <a class={"flex items-center" <> if(@class, do: " #{@class}", else: "")}>
       <%= label class: "cursor-pointer" do %>
-        <%= radio_button(@form, :type, @value,
+        {radio_button(@form, :type, @value,
           class:
             "text-orange-500" <> if(selected_type?(@form, @value), do: " checkedBackground", else: ""),
           id: @id
-        ) %>
+        )}
 
         <span class={"ml-1 text-black/50 text-sm" <>if(selected_type?(@form, @value), do:  " font-bold", else: "")}>
-          <%= @name %>
+          {@name}
         </span>
       <% end %>
     </a>

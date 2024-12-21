@@ -40,7 +40,7 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
                       document.getElementById('dialog-form-submit-button').click()
                     }"
         >
-          <%= textarea(di, :text,
+          {textarea(di, :text,
             placeholder: "Enter message",
             class:
               classes("w-full h-10 resize-none border-0 overflow-y-auto focus:ring-0 t-chat-input", %{
@@ -49,7 +49,7 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
             id: "dialog-input",
             spellcheck: "false",
             autocomplete: "off"
-          ) %>
+          )}
           <button id="dialog-form-submit-button" class="t-chat-send-message-btn" type="submit">
             <.icon
               id="send"
@@ -64,7 +64,7 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
             <div class="w-[70vw]">
               <h1 class="text-purple t-edit">Editing</h1>
               <span class="truncate block text-xs text-black/50">
-                <%= @edit_content %>
+                {@edit_content}
               </span>
             </div>
             <button type="button" class="t-cancel-edit" phx-click="dialog/cancel-edit">
@@ -89,14 +89,14 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
                       }
                       "
           >
-            <%= textarea(dei, :text,
+            {textarea(dei, :text,
               class:
                 "w-full px-0 resize-none outline-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0 t-chat-edit-input",
               id: "dialog-edit-input",
               spellcheck: "false",
               autocomplete: "off",
               value: @edit_content
-            ) %>
+            )}
             <button id="dialog-edit-form-submit-button" class="t-chat-edit-send-btn" type="submit">
               <.icon id="send" class="w-7 h-7 flex fill-purple" />
             </button>
@@ -167,7 +167,7 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
                       document.getElementById('room-form-submit-button').click()
                     }"
         >
-          <%= textarea(di, :text,
+          {textarea(di, :text,
             placeholder: "Enter message",
             class:
               classes("w-full h-10 resize-none border-0 overflow-y-auto focus:ring-0 t-room-input", %{
@@ -176,7 +176,7 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
             id: "room-input",
             spellcheck: "false",
             autocomplete: "off"
-          ) %>
+          )}
           <button id="room-form-submit-button" class="t-room-send-message-btn" type="submit">
             <.icon
               id="send"
@@ -191,7 +191,7 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
             <div class="w-[95%]">
               <h1 class="text-purple t-edit">Editing</h1>
               <span class="truncate block text-xs text-black/50">
-                <%= @edit_content %>
+                {@edit_content}
               </span>
             </div>
             <button type="button" class="t-cancel-edit" phx-click="room/cancel-edit">
@@ -216,14 +216,14 @@ defmodule ChatWeb.MainLive.Layout.MessageInput do
                       }
                       "
           >
-            <%= textarea(dei, :text,
+            {textarea(dei, :text,
               class:
                 "w-full px-0 resize-none outline-none border-0 overflow-scroll text-black placeholder-black/50 focus:ring-0 t-room-edit-input",
               id: "room-edit-input",
               spellcheck: "false",
               autocomplete: "off",
               value: @edit_content
-            ) %>
+            )}
             <button id="room-edit-form-submit-button" type="submit">
               <.icon id="send" class="w-7 h-7 flex fill-purple t-room-edit-send-btn" />
             </button>

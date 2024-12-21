@@ -8,7 +8,7 @@
       >
         <div class="flex items-center">
           <.icon id="checked" class="w-5 h-5 fill-white" />
-          <p class="ml-2 text-white"><%= Phoenix.Flash.get(@flash, :info) %></p>
+          <p class="ml-2 text-white">{Phoenix.Flash.get(@flash, :info)}</p>
         </div>
         <div phx-click="lv:clear-flash" phx-value-key="info" phx-no-format>
           <.icon id="close" class="w-5 h-5 fill-white cursor-pointer t-close-flash-notification" />
@@ -16,5 +16,5 @@
       </div>
     <% end %>
   </div>
-  <%= @inner_content %>
+  {@inner_content}
 </main>

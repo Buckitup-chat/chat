@@ -46,65 +46,65 @@ defmodule ChatWeb.MainLive.Admin.CargoWeightSensorForm do
       >
         <div class="flex flex-col">
           <div class="flex flex-col mt-2">
-            <%= label(form, :type, "Weight sensor type") %>
-            <%= select(form, :type, ["NCI", "Balena D700"],
+            {label(form, :type, "Weight sensor type")}
+            {select(form, :type, ["NCI", "Balena D700"],
               selected: "NCI",
               class:
                 "w-full bg-gray-300 border border-gray-300 text-gray-900 text-sm rounded-lg block focus:ring-transparent focus:border-transparent"
-            ) %>
+            )}
           </div>
 
           <div class="flex flex-col">
-            <%= label(form, :name, "Port name") %>
-            <%= text_input(form, :name,
+            {label(form, :name, "Port name")}
+            {text_input(form, :name,
               class:
                 "w-full bg-gray-300 border border-gray-300 text-gray-900 text-sm rounded-lg block focus:ring-transparent focus:border-transparent"
-            ) %>
-            <%= error_tag(form, :name) %>
+            )}
+            {error_tag(form, :name)}
           </div>
 
           <div class="flex flex-col mt-2">
-            <%= label(form, :speed) %>
-            <%= select(form, :speed, [115_200, 57600, 38400, 19200, 9600, 4800],
+            {label(form, :speed)}
+            {select(form, :speed, [115_200, 57600, 38400, 19200, 9600, 4800],
               class:
                 "w-full bg-gray-300 border border-gray-300 text-gray-900 text-sm rounded-lg block focus:ring-transparent focus:border-transparent"
-            ) %>
-            <%= error_tag(form, :speed) %>
+            )}
+            {error_tag(form, :speed)}
           </div>
 
           <div class="flex flex-col mt-2">
-            <%= label(form, :data_bits) %>
-            <%= select(form, :data_bits, [5, 6, 7, 8],
+            {label(form, :data_bits)}
+            {select(form, :data_bits, [5, 6, 7, 8],
               selected: 8,
               class:
                 "w-full bg-gray-300 border border-gray-300 text-gray-900 text-sm rounded-lg block focus:ring-transparent focus:border-transparent"
-            ) %>
+            )}
           </div>
 
           <div class="flex flex-col mt-2">
-            <%= label(form, :parity) %>
-            <%= select(form, :parity, [:none, :even, :odd, :space, :mark, :ignore],
+            {label(form, :parity)}
+            {select(form, :parity, [:none, :even, :odd, :space, :mark, :ignore],
               selected: :none,
               class:
                 "w-full bg-gray-300 border border-gray-300 text-gray-900 text-sm rounded-lg block focus:ring-transparent focus:border-transparent"
-            ) %>
+            )}
           </div>
 
           <div class="flex flex-col mt-2">
-            <%= label(form, :stop_bits) %>
-            <%= select(form, :stop_bits, [1, 2],
+            {label(form, :stop_bits)}
+            {select(form, :stop_bits, [1, 2],
               class:
                 "w-full bg-gray-300 border border-gray-300 text-gray-900 text-sm rounded-lg block focus:ring-transparent focus:border-transparent"
-            ) %>
+            )}
           </div>
         </div>
 
-        <%= submit("Update",
+        {submit("Update",
           class:
             "w-full h-11 px-10 mt-4 text-white border-0 rounded-lg bg-grayscale flex items-center justify-center disabled:opacity-50",
           disabled: !@changeset.valid?,
           phx_disable_with: "Updating..."
-        ) %>
+        )}
       </.form>
     </div>
     """
@@ -164,7 +164,7 @@ defmodule ChatWeb.MainLive.Admin.CargoWeightSensorForm do
           "text-green-400" => @status == "Established"
         })
       }>
-        <%= @status %>
+        {@status}
       </div>
     </div>
     """
@@ -174,7 +174,7 @@ defmodule ChatWeb.MainLive.Admin.CargoWeightSensorForm do
     ~H"""
     <div class="flex flex-row">
       <div class="ml-1">
-        <%= @message %>
+        {@message}
       </div>
     </div>
     """

@@ -51,7 +51,6 @@ defmodule Chat.SignedParcel do
         cond do
           some_pkey != public_key and other_okey != public_key -> false
           peers = dialog_peer_keys(dialog_key) -> some_pkey in peers and other_okey in peers
-          true -> false
         end
     end
   end

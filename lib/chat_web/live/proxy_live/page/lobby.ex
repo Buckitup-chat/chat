@@ -51,7 +51,7 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
     case msg do
       {:new_user, user} -> socket |> append_user(user)
       {:user_list, list} -> socket |> populate_user_list(list)
-        {:room_list, list} -> socket |> populate_room_list(list)
+      {:room_list, list} -> socket |> populate_room_list(list)
     end
   end
 
@@ -296,8 +296,8 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
     {joined, new} =
       cache
       |> Enum.filter(fn room ->
-        (room.type in [:public, :request] or Map.has_key?(room_map, room.pub_key))
-          and (search_term == "" or String.match?(room.name, ~r/#{search_term}/i))
+        (room.type in [:public, :request] or Map.has_key?(room_map, room.pub_key)) and
+          (search_term == "" or String.match?(room.name, ~r/#{search_term}/i))
       end)
       |> Enum.sort_by(fn room -> room.name end)
       |> Enum.split_with(&Map.has_key?(room_map, &1.pub_key))
@@ -392,6 +392,14 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
   #   _ -> :skip
   # end
 
+  defp join_approved_requests(socket) do
+    socket
+    |> get_private(:rooms_cache)
+    |> dbg()
+
+    socket
+  end
+
   defp make_user_list_request(socket) do
     server = socket |> get_private(:server)
     actor = socket |> get_private(:actor)
@@ -475,10 +483,10 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
     end)
   end
 
-
   defp populate_room_list(socket, room_list) do
     socket
     |> set_private(:rooms_cache, room_list)
+    |> join_approved_requests()
     |> assign_room_list()
   end
 end

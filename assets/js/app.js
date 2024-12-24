@@ -28,6 +28,8 @@ import topbar from "../vendor/topbar"
 import Hooks from "./hooks"
 import CustomEvents from "./custom-events"
 import { initWebComponents } from "./web-components"
+import { EncryptionManager } from "./EncryptionManager";
+import { Enigma } from "./Enigma";
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
@@ -48,9 +50,9 @@ const listeners = {
   ...CustomEvents,
   ...uploadEventHandlers
 };
-for (key in listeners) {
+Object.keys(listeners).forEach(key => {
   window.addEventListener(key, listeners[key]);
-}
+})
 
 // Show progress bar on live navigation and form submits
 topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" })
@@ -87,52 +89,10 @@ window.liveSocket = liveSocket
 
 initWebComponents();
 
-const WebAuthN = async () => {
-  const createCreds = async () => {
-    const randomStringFromServer = "12345678901234567890123456789012";
-    const publicKeyCredentialCreationOptions = {
-      challenge: Uint8Array.from(
-        randomStringFromServer, c => c.charCodeAt(0)),
-      rp: {
-        name: "BuckitUp",
-        id: "localhost",
-      },
-      user: {
-        id: Uint8Array.from(
-          "UZSL85T9AFC", c => c.charCodeAt(0)),
-        name: "large Blob support check testname",
-        displayName: "Login",
-      },
-      pubKeyCredParams: [{ alg: -7, type: "public-key" }, { alg: -257, type: "public-key" }],
-      authenticatorSelection: {
-        authenticatorAttachment: "platform",
-      },
-      timeout: 60000,
-      attestation: "direct",
-      extensions: {
-        largeBlob: {
-          support: "preferred",//"preferred",  // Or "required".
-        },
-        prf: {
-          support: "preferred"
-        }
-      },
-    };
-
-    const credential = await navigator.credentials.create({
-      publicKey: publicKeyCredentialCreationOptions
-    });
-
-    const extSupport = credential.getClientExtensionResults();
-    console.log("hi", credential, extSupport)
-
-    if (extSupport.largeBlob.supported) {
-      alert("large blob support");
-    } else {
-      alert("no support :(")
-    }
-  };
-
-  return await createCreds();
-};
-// WebAuthN();
+window.BuckitUp = {
+  manager: new EncryptionManager(),
+  enigma: new Enigma(),
+  start: () => {
+    BuckitUp.manager.setData(JSON.stringify({ data: "test" }))
+  }
+}

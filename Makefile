@@ -1,4 +1,4 @@
-.PHONY: check test ci-check empty_db help
+.PHONY: check test ci-check empty_db help assets
 
 help:
 	@clear
@@ -56,6 +56,7 @@ iex_like_prod:
 	iex -S mix phx.server --  --no-validate-compile-env
 
 assets:
+	cp assets/node_modules/@lo-fi/webauthn-local-client/dist/bundlers/walc-external-bundle.js priv/static/
 	mix assets.deploy
 
 deploy:

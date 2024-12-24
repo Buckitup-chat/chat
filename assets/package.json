@@ -3,15 +3,15 @@
     "deploy": "cd .. && mix assets.deploy && rm -f _build/esbuild"
   },
   "devDependencies": {
-    "tailwindcss-font-inter": "^3.0.1"
+    "tailwindcss-font-inter": "^3.1.0"
   },
   "dependencies": {
-    "audio-encoder": "1.0.2",
-    "konva": "^8.4.2",
-    "luxon": "^3.2.1",
-    "peaks.js": "^2.1.0",
-    "recordrtc": "^5.6.2",
-    "sortablejs": "^1.15.0",
-    "waveform-data": "^4.3.0"
+    "@lo-fi/local-vault": "^0.17.1",
+    "@lo-fi/webauthn-local-client": "^0.2000.0",
+    "@noble/secp256k1": "^2.1.0",
+    "buffer": "^6.0.3",
+    "jssha": "^3.3.1",
+    "peaks.js": "^3.4.2",
+    "sortablejs": "^1.15.0"
   }
 }

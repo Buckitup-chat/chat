@@ -31,6 +31,17 @@ import { initWebComponents } from "./web-components"
 import { EncryptionManager } from "./EncryptionManager";
 import { Enigma } from "./Enigma";
 
+window.BuckitUp = {
+  manager: new EncryptionManager(),
+  enigma: new Enigma(),
+  start: () => {
+    BuckitUp.manager.setData(JSON.stringify({ data: "test" }))
+  },
+  clean: () => {
+    BuckitUp.manager.clearVault()
+  }
+}
+
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
   params: {
@@ -89,10 +100,3 @@ window.liveSocket = liveSocket
 
 initWebComponents();
 
-window.BuckitUp = {
-  manager: new EncryptionManager(),
-  enigma: new Enigma(),
-  start: () => {
-    BuckitUp.manager.setData(JSON.stringify({ data: "test" }))
-  }
-}

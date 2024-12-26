@@ -134,7 +134,7 @@ export class EncryptionManager extends EventTarget {
          await this.#vault.set(vaultID, value, {
             signal: this.#abortController.signal,
          });
-         console.log(`Data saved: key = "${vaultID}", value = "${value}"`);
+         // console.log(`Data saved: key = "${vaultID}", value = "${value}"`);
       } catch (error) {
          await this.handleError(error, "Error saving data");
       }
@@ -151,7 +151,7 @@ export class EncryptionManager extends EventTarget {
          const value = await this.#vault.get(vaultID, {
             signal: this.#abortController.signal,
          });
-         console.log(`Data retrieved: key = "${vaultID}", value = "${value || "no data"}"`);
+         // console.log(`Data retrieved: key = "${vaultID}", value = "${value || "no data"}"`);
          return value;
       } catch (error) {
          await this.handleError(error, "Error retrieving data");

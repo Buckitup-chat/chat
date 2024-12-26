@@ -24,7 +24,7 @@ export default {
       },
     }
 
-    Peaks.init(options, (err, peaks) => {
+    Peaks.init(options, (err, _peaks) => {
       if (err) {
         console.error('Failed to initialize Peaks instance: ' + err.message)
         return

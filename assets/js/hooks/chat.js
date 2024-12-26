@@ -5,7 +5,7 @@ export default {
     this.setScrollTop();
     this.loadMorePages(1);
 
-    this.el.addEventListener("scroll", e => {
+    this.el.addEventListener("scroll", _e => {
       if (this.pending === this.page() && this.el.scrollTop === 0 && this.hasMoreMessagesToLoad()) {
         this.oldScrollHeight = this.el.scrollHeight;
         this.loadMorePages(3);
@@ -58,7 +58,7 @@ export default {
       this.pushEvent(`${e.detail.chatType}/toggle-messages-select`, { action: 'off' })
     })
 
-    this.handleEvent("chat:scroll-down", e => { setTimeout(() => { this.setScrollTop() }, 300) })
+    this.handleEvent("chat:scroll-down", _e => { setTimeout(() => { this.setScrollTop() }, 300) })
   },
 
   updated() {
@@ -91,7 +91,7 @@ export default {
       this.showLoader()
       this.pending = Number(this.page()) + 1;
 
-      this.pushEvent("chat:load-more", {}, (reply, ref) => {
+      this.pushEvent("chat:load-more", {}, (_reply, _ref) => {
         this.setScrollTop(this.oldScrollHeight);
 
         if (pages > 1) {

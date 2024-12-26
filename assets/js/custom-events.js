@@ -97,7 +97,7 @@ export default {
   },
   "phx:chat:redirect": (e) => {
     const openUrl = (url) => window.location = url;
-    url = e.detail.url
+    const url = e.detail.url
     url && openUrl(url)
   },
   "phx:chat:focus": (e) => {
@@ -114,13 +114,13 @@ export default {
       el.innerHTML = e.detail.content;
     });
   },
-  "phx:scroll-to-bottom": (e) => {
+  "phx:scroll-to-bottom": (_e) => {
     setTimeout(() => {
       const chatContent = document.querySelector('.a-content-block');
       chatContent.scrollTo({ top: chatContent.scrollHeight })
     }, 0)
   },
-  "phx:scroll-uploads-to-top": (e) => {
+  "phx:scroll-uploads-to-top": (_e) => {
     const uploader = document.querySelector('.a-uploader');
     const mobileUploader = document.querySelector('.a-mobile-uploader');
     uploader.scrollTop = -uploader.scrollHeight;
@@ -128,7 +128,7 @@ export default {
   },
   "phx:gallery:preload": (e) => {
     const img = new Image();
-    img.onload = function () {
+    img.onload = function() {
       const preloadedList = document.getElementById(e.detail.to);
       preloadedList.appendChild(img);
       setTimeout(() => {

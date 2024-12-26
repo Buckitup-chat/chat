@@ -2,38 +2,43 @@
 // The server requests stored data and clears it when requested.
 export default {
   mounted() {
-    this.handleEvent("store", (obj) => this.store(obj))
-    this.handleEvent("clear", (obj) => this.clear(obj))
-    this.handleEvent("restore", (obj) => this.restore(obj))
+    this.handleEvent("store", async (obj) => await this.store(obj))
+    this.handleEvent("clear", async (obj) => await this.clear(obj))
+    this.handleEvent("restore", async (obj) => await this.restore(obj))
     this.handleEvent("store-room", (obj) => this.storeRoom(obj))
     this.handleEvent("reset-rooms-to-backup", (obj) => this.resetRoomsToBackup(obj))
     this.handleEvent("set-legal-notice-accepted", (obj) => this.setLegalNoticeAccepted(obj))
   },
 
-  store(obj) {
+  async store(obj) {
     localStorage.setItem(obj.auth_key, obj.auth_data)
+    await BuckitUp.manager.setData(obj.auth_data)
     localStorage.setItem(obj.room_count_key, obj.room_count)
     this.setupAuthEvents(obj.auth_key);
   },
 
-  restore(obj) {
-    const responseData = this.fullState(obj)
+  async restore(obj) {
+    const responseData = await this.fullState(obj)
     this.pushEvent(obj.event, responseData)
     if (responseData?.auth) { this.setupAuthEvents(obj.auth_key) }
   },
 
-  fullState(obj) {
+  async fullState(obj) {
     const authData = localStorage.getItem(obj.auth_key);
+    const secureData = await BuckitUp.manager.hasVault() ? await BuckitUp.manager.getData() : null
     const roomCount = localStorage.getItem(obj.room_count_key);
     const legalNoticeAccepted = localStorage.getItem(obj.legal_notice_key)
 
-    return authData
+
+    const result = (secureData || authData)
       ? {
-        auth: authData,
+        auth: (secureData || authData),
         room_count: Number(roomCount),
         legal_notice_accepted: legalNoticeAccepted
       }
       : {}
+
+    return result
   },
 
   setLegalNoticeAccepted(obj) {
@@ -41,9 +46,10 @@ export default {
   },
 
 
-  clear(obj) {
+  async clear(obj) {
     localStorage.removeItem(obj.auth_key);
     localStorage.removeItem(obj.room_count_key);
+    await BuckitUp.manager.clearVault();
   },
 
   storeRoom(obj) {

@@ -5,14 +5,13 @@ export default {
     this.handleEvent("store", async (obj) => await this.store(obj))
     this.handleEvent("clear", async (obj) => await this.clear(obj))
     this.handleEvent("restore", async (obj) => await this.restore(obj))
-    this.handleEvent("store-room", (obj) => this.storeRoom(obj))
+    this.handleEvent("store-room", async (obj) => await this.storeRoom(obj))
     this.handleEvent("reset-rooms-to-backup", (obj) => this.resetRoomsToBackup(obj))
     this.handleEvent("set-legal-notice-accepted", (obj) => this.setLegalNoticeAccepted(obj))
   },
 
   async store(obj) {
-    localStorage.setItem(obj.auth_key, obj.auth_data)
-    await BuckitUp.manager.setData(obj.auth_data)
+    await this.storeAuthData(obj, obj.auth_data)
     localStorage.setItem(obj.room_count_key, obj.room_count)
     this.setupAuthEvents(obj.auth_key);
   },
@@ -24,21 +23,18 @@ export default {
   },
 
   async fullState(obj) {
-    const authData = localStorage.getItem(obj.auth_key);
-    const secureData = await BuckitUp.manager.hasVault() ? await BuckitUp.manager.getData() : null
+    const authData = await this.getAuthData(obj)
     const roomCount = localStorage.getItem(obj.room_count_key);
     const legalNoticeAccepted = localStorage.getItem(obj.legal_notice_key)
+    console.log(authData)
 
-
-    const result = (secureData || authData)
+    return authData
       ? {
-        auth: (secureData || authData),
+        auth: authData,
         room_count: Number(roomCount),
         legal_notice_accepted: legalNoticeAccepted
       }
       : {}
-
-    return result
   },
 
   setLegalNoticeAccepted(obj) {
@@ -52,8 +48,8 @@ export default {
     await BuckitUp.manager.clearVault();
   },
 
-  storeRoom(obj) {
-    var authData = localStorage.getItem(obj.auth_key);
+  async storeRoom(obj) {
+    var authData = await this.getAuthData(obj);
     var dataJson = JSON.parse(authData);
     var roomKeys = dataJson.at(1);
 
@@ -62,10 +58,38 @@ export default {
       var newRoomCount = Number(roomCount) + 1;
 
       roomKeys.push(obj.room_key)
-      localStorage.setItem(obj.auth_key, JSON.stringify(dataJson));
+      await this.storeAuthData(obj, JSON.stringify(dataJson));
       localStorage.setItem(obj.room_count_key, newRoomCount);
       this.pushEvent(obj.reply, { room_count: newRoomCount, key: obj.room_key })
     }
+  },
+
+  async getAuthData(obj) {
+    if (await BuckitUp.manager.hasVault()) {
+      const vaultData = await BuckitUp.manager.getData()
+      console.log('getting vault data ', vaultData)
+      if (vaultData) return vaultData;
+    }
+
+    return localStorage.getItem(obj.auth_key)
+  },
+
+  async storeAuthData(obj, data) {
+    if (window.location.search == '?local_storage') {
+      return localStorage.setItem(obj.auth_key, data)
+    }
+
+    const localStoragePresent = !!localStorage.getItem(obj.auth_key)
+    const vaultPresent = await BuckitUp.manager.hasVault()
+    if (vaultPresent || !localStoragePresent) {
+      const saved = await BuckitUp.manager.setData(data)
+      console.log('saving to vault ', saved)
+      if (saved) return;
+
+      return localStorage.setItem(obj.auth_key, data)
+    }
+
+    localStorage.setItem(obj.auth_key, data)
   },
 
   resetRoomsToBackup(obj) { localStorage.setItem(obj.key, 0) },

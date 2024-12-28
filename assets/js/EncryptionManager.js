@@ -135,6 +135,7 @@ export class EncryptionManager extends EventTarget {
             signal: this.#abortController.signal,
          });
          // console.log(`Data saved: key = "${vaultID}", value = "${value}"`);
+         return true;
       } catch (error) {
          await this.handleError(error, "Error saving data");
       }

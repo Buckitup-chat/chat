@@ -26,7 +26,6 @@ export default {
     const authData = await this.getAuthData(obj)
     const roomCount = localStorage.getItem(obj.room_count_key);
     const legalNoticeAccepted = localStorage.getItem(obj.legal_notice_key)
-    console.log(authData)
 
     return authData
       ? {
@@ -67,7 +66,6 @@ export default {
   async getAuthData(obj) {
     if (await BuckitUp.manager.hasVault()) {
       const vaultData = await BuckitUp.manager.getData()
-      console.log('getting vault data ', vaultData)
       if (vaultData) return vaultData;
     }
 
@@ -83,7 +81,6 @@ export default {
     const vaultPresent = await BuckitUp.manager.hasVault()
     if (vaultPresent || !localStoragePresent) {
       const saved = await BuckitUp.manager.setData(data)
-      console.log('saving to vault ', saved)
       if (saved) return;
 
       return localStorage.setItem(obj.auth_key, data)

@@ -33,13 +33,7 @@ import { Enigma } from "./Enigma";
 
 window.BuckitUp = {
   manager: new EncryptionManager(),
-  enigma: new Enigma(),
-  start: () => {
-    BuckitUp.manager.setData(JSON.stringify({ data: "test" }))
-  },
-  clean: () => {
-    BuckitUp.manager.clearVault()
-  }
+  enigma: new Enigma()
 }
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")

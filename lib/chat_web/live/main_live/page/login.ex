@@ -18,7 +18,6 @@ defmodule ChatWeb.MainLive.Page.Login do
 
   @local_store_auth_key "buckitUp-chat-auth-v2"
   @local_store_room_count_key "buckitUp-room-count-v2"
-  @legal_notice_accepted_key "agreementAccepted"
 
   def handshaked(socket), do: socket |> assign(:handshaked, true)
 
@@ -154,12 +153,6 @@ defmodule ChatWeb.MainLive.Page.Login do
 
   defp request_restore(socket) do
     socket
-    # |> push_event("restore", %{
-    #   auth_key: @local_store_auth_key,
-    #   room_count_key: @local_store_room_count_key,
-    #   legal_notice_key: @legal_notice_accepted_key,
-    #   event: "restoreAuth"
-    # })
   end
 
   def sync_stored_room(

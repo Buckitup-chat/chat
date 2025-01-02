@@ -185,6 +185,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
       [DialogMessaging.read(new_message, me, dialog)]
       |> Enum.reject(&is_nil/1)
       |> Chat.Messaging.preload_content(&Proxy.get_data_by_keys(server, &1))
+      |> ensure_proxy_urls(server)
 
     socket
     |> assign(:messages, messages)
@@ -538,22 +539,26 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
         |> Enum.filter(& &1)
         |> Enum.reverse()
         |> Chat.Messaging.preload_content(&Proxy.get_data_by_keys(server, &1))
-        |> Enum.map(fn
-          %{type: type, content: json} = msg when type in [:image, :audio, :file, :video] ->
-            {id, secret} = json |> StorageId.from_json()
-
-            msg
-            |> Map.put(:file_url, ChatWeb.Utils.get_proxied_file_url(server, id, secret))
-
-          simple_message ->
-            simple_message
-        end)
+        |> ensure_proxy_urls(server)
 
       send(pid, {:dialog, {:loaded_messages, messages, per_page, dialog}})
     end)
 
     socket
     |> assign(:messages, [])
+  end
+
+  defp ensure_proxy_urls(messages, server) do
+    Enum.map(messages, fn
+      %{type: type, content: json} = msg when type in [:image, :audio, :file, :video] ->
+        {id, secret} = json |> StorageId.from_json()
+
+        msg
+        |> Map.put(:file_url, ChatWeb.Utils.get_proxied_file_url(server, id, secret))
+
+      simple_message ->
+        simple_message
+    end)
   end
 
   defp broadcast_new_message(nil, _, _, _), do: nil

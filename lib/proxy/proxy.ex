@@ -50,6 +50,15 @@ defmodule Proxy do
     api_select(server, min: DbKeys.room_min(), max: DbKeys.room_max(), amount: 10_000)
   end
 
+  def request_room(server, me, room_key) do
+    %{
+      me: me |> Chat.Card.from_identity(),
+      room_pub_key: room_key
+    }
+    |> add_signed_token(server, me.private_key)
+    |> api_request_room_access(server)
+  end
+
   # Content
   def save_parcel(parcel, server, me) do
     %{
@@ -95,6 +104,7 @@ defmodule Proxy do
   defp api_register_user(args, server), do: api_post(server, "register-user", args)
   defp api_create_dialog(args, server), do: api_post(server, "create-dialog", args)
   defp api_save_parcel(args, server), do: api_post(server, "save-parcel", args)
+  defp api_request_room_access(args, server), do: api_post(server, "request-room-access", args)
 
   #  Request utilities
   ####################################

@@ -43,6 +43,7 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
   def handle_event(msg, params, socket) do
     case msg do
       "lobby/search" -> socket |> filter_search_results(params)
+      "room/send-request" -> socket |> send_room_request(params)
       _ -> socket |> tap(fn _ -> dbg(msg, params) end)
     end
   end
@@ -149,6 +150,22 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
         |> assign_room_list(String.trim(name))
     end
   end
+
+  defp send_room_request(socket, %{"room" => room_key_raw}) do
+    room_key = room_key_raw |> Base.decode16!(case: :lower)
+    rooms = socket.assigns.new_rooms
+
+    if Enum.find(rooms, &(&1.pub_key == room_key)) do
+      server = socket |> get_private(:server)
+      actor = socket |> get_private(:actor)
+
+      Task.start(fn -> Proxy.request_room(server, actor.me, room_key) end)
+    end
+
+    socket
+  end
+
+  # should send updated room as from room update broadcast
 
   # def request_room(
   #       %{assigns: %{me: me, monotonic_offset: time_offset, new_rooms: rooms}} = socket,

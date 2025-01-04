@@ -15,6 +15,7 @@ defmodule ChatWeb.ProxyLive.Index do
 
   alias ChatWeb.ProxyLive.Page.Dialog, as: ProxyDialog
   alias ChatWeb.ProxyLive.Page.Lobby, as: ProxyLobby
+  alias ChatWeb.ProxyLive.Page.Room, as: ProxyRoom
 
   # alias ChatWeb.ProxyLive.Components.Dialog
   # alias ChatWeb.ProxyLive.Components.UserList
@@ -40,8 +41,10 @@ defmodule ChatWeb.ProxyLive.Index do
   def handle_event(msg, params, socket) do
     case msg do
       "lobby/" <> _ -> ProxyLobby.handle_event(msg, params, socket)
-      "switch-lobby-mode" -> socket |> ProxyLobby.switch_lobby_mode(params)
+      "switch-lobby-mode" -> ProxyLobby.switch_lobby_mode(socket, params)
       "dialog/" <> _ -> ProxyDialog.handle_event(msg, params, socket)
+      "room/send-request" <> _ -> ProxyLobby.handle_event(msg, params, socket)
+      "room/" <> _ -> ProxyRoom.handle_event(msg, params, socket)
       "chat:load-more" -> handle_general_event(msg, params, socket)
       "chat:" <> _ -> ProxyDialog.handle_event(msg, params, socket)
       "local-time" -> socket

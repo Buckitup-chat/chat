@@ -37,8 +37,11 @@ defmodule Chat.Rooms.Room do
 
   def add_request(%__MODULE__{type: :private} = room, _), do: room
 
-  def add_request(%__MODULE__{requests: requests} = room, %Identity{} = me) do
-    %{room | requests: [RoomRequest.new(me) | requests]}
+  def add_request(%__MODULE__{requests: requests} = room, me) do
+    case me do
+      %Identity{} -> %{room | requests: [RoomRequest.new(me) | requests]}
+      <<_::binary-size(33)>> -> %{room | requests: [RoomRequest.new(me) | requests]}
+    end
   end
 
   def get_request(%__MODULE__{requests: requests}, user_public_key) do

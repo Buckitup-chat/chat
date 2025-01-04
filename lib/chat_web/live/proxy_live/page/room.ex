@@ -17,6 +17,8 @@ defmodule ChatWeb.ProxyLive.Page.Room do
 
   import Phoenix.Component, only: [assign: 3]
 
+  # import ChatWeb.LiveHelpers.SocketPrivate
+
   # import Phoenix.LiveView,
   #   only: [consume_uploaded_entry: 3, push_event: 3, send_update: 2, push_patch: 2]
   #
@@ -50,6 +52,12 @@ defmodule ChatWeb.ProxyLive.Page.Room do
   # @usb_drive_dump_progress_topic "chat::usb_drive_dump_progress"
 
   def init(socket), do: socket |> assign(:room, nil)
+
+  def handle_event(msg, _params, socket) do
+    case msg do
+      "went into lobby room/send-request" -> socket
+    end
+  end
 
   # def init(%{assigns: %{room_map: rooms}} = socket, room_key) when is_binary(room_key) do
   #   with %Room{} = room <- Rooms.get(room_key),

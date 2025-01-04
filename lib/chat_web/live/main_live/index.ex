@@ -92,6 +92,11 @@ defmodule ChatWeb.MainLive.Index do
   def handle_params(%{"hash" => hash}, _, %{assigns: %{live_action: :room_message_link}} = socket) do
     socket
     |> assign(:room_message_link_hash, hash)
+    |> then(fn socket ->
+      if connected?(socket),
+        do: Page.LiveRouter.action(socket),
+        else: socket
+    end)
     |> noreply()
   end
 
@@ -99,6 +104,11 @@ defmodule ChatWeb.MainLive.Index do
   def handle_params(%{"hash" => hash}, _, %{assigns: %{live_action: :chat_link}} = socket) do
     socket
     |> assign(:chat_link, hash)
+    |> then(fn socket ->
+      if connected?(socket),
+        do: Page.LiveRouter.action(socket),
+        else: socket
+    end)
     |> noreply()
   end
 

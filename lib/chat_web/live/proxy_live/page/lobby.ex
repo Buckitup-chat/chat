@@ -347,7 +347,7 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
       :rooms -> socket |> Page.Room.init() |> assign_room_list()
     end
 
-    # :feed -> socket |> Page.Feed.init() 
+    # :feed -> socket |> Page.Feed.init()
     # :admin -> socket |> Page.AdminPanel.init()
   end
 

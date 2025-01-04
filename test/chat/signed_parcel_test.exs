@@ -1,11 +1,11 @@
 defmodule ChatTest.SignedParcelTest do
   use ExUnit.Case, async: true
 
-  alias Chat.SignedParcel
-  alias Chat.Messages
   alias Chat.Card
   alias Chat.Dialogs
   alias Chat.Identity
+  alias Chat.Mesages
+  alias Chat.SignedParcel
 
   test "text message parcel is corect" do
     {alice, bob, dialog} = create_alice_bob_dialog()

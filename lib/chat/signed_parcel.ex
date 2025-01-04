@@ -5,6 +5,7 @@ defmodule Chat.SignedParcel do
   """
 
   alias Chat.Dialogs.DialogMessaging
+  alias Chat.Dialogs.Message, as: DialogMessage
 
   defstruct data: [], sign: ""
 
@@ -39,14 +40,14 @@ defmodule Chat.SignedParcel do
 
   def scope_valid?(%__MODULE__{data: items}, public_key) do
     case items do
-      [{{:dialog_message, dialog_key, _, _}, %Chat.Dialogs.Message{type: :text}}] ->
+      [{{:dialog_message, dialog_key, _, _}, %DialogMessage{type: :text}}] ->
         public_key in dialog_peer_keys(dialog_key)
 
       [
         {{:memo, _}, _},
         {{:memo_index, some_pkey, _}, true},
         {{:memo_index, other_okey, _}, true},
-        {{:dialog_message, dialog_key, _, _}, %Chat.Dialogs.Message{type: :memo}}
+        {{:dialog_message, dialog_key, _, _}, %DialogMessage{type: :memo}}
       ] ->
         cond do
           some_pkey != public_key and other_okey != public_key -> false
@@ -57,14 +58,14 @@ defmodule Chat.SignedParcel do
 
   def main_item(%__MODULE__{data: items}) do
     case items do
-      [{{:dialog_message, _, _, _}, %Chat.Dialogs.Message{type: :text}} = x] ->
+      [{{:dialog_message, _, _, _}, %DialogMessage{type: :text}} = x] ->
         x
 
       [
         {{:memo, _}, _},
         {{:memo_index, _, _}, true},
         {{:memo_index, _, _}, true},
-        {{:dialog_message, _, _, _}, %Chat.Dialogs.Message{type: :memo}} = x
+        {{:dialog_message, _, _, _}, %DialogMessage{type: :memo}} = x
       ] ->
         x
     end
@@ -72,7 +73,7 @@ defmodule Chat.SignedParcel do
 
   def inject_next_index(%__MODULE__{data: items} = parcel) do
     case items do
-      [{{:dialog_message, dkey, :next, msg_id}, %Chat.Dialogs.Message{} = msg}] ->
+      [{{:dialog_message, dkey, :next, msg_id}, %DialogMessage{} = msg}] ->
         next = Chat.Ordering.next({:dialog_message, dkey})
         %{parcel | data: [{{:dialog_message, dkey, next, msg_id}, msg}]}
 
@@ -92,14 +93,14 @@ defmodule Chat.SignedParcel do
 
   def prepare_for_broadcast(%__MODULE__{data: items}) do
     case items do
-      [{{:dialog_message, key, index, _}, %Chat.Dialogs.Message{type: :text} = msg}] ->
+      [{{:dialog_message, key, index, _}, %DialogMessage{type: :text} = msg}] ->
         {:new_dialog_message, key, {index, msg}}
 
       [
         {{:memo, _}, _},
         {{:memo_index, _, _}, true},
         {{:memo_index, _, _}, true},
-        {{:dialog_message, key, index, _}, %Chat.Dialogs.Message{type: :memo} = msg}
+        {{:dialog_message, key, index, _}, %DialogMessage{type: :memo} = msg}
       ] ->
         {:new_dialog_message, key, {index, msg}}
     end

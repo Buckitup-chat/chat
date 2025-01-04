@@ -62,4 +62,7 @@ defimpl Chat.DryStorable, for: Chat.Messages.File do
 
   @spec type(File.t()) :: atom()
   def type(%File{type: type}), do: type
+
+  # TODO: make proper parcel 
+  def to_parcel(%File{} = msg), do: {msg.data, []}
 end

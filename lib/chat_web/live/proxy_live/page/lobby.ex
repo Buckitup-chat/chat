@@ -392,6 +392,14 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
   #   _ -> :skip
   # end
 
+  defp join_approved_requests(socket) do
+    socket
+    |> get_private(:rooms_cache)
+    |> dbg()
+
+    socket
+  end
+
   defp make_user_list_request(socket) do
     server = socket |> get_private(:server)
     actor = socket |> get_private(:actor)
@@ -478,6 +486,7 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
   defp populate_room_list(socket, room_list) do
     socket
     |> set_private(:rooms_cache, room_list)
+    |> join_approved_requests()
     |> assign_room_list()
   end
 end

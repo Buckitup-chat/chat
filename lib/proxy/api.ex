@@ -10,6 +10,8 @@ defmodule Proxy.Api do
     %{token_key: key, token: token} |> wrap()
   end
 
+  def confirmation_token(_), do: confirmation_token()
+
   def register_user(args) do
     %{
       name: name,
@@ -62,6 +64,35 @@ defmodule Proxy.Api do
   catch
     # x, y -> {:wrong_args, x, y, __STACKTRACE__} |> dbg() |> wrap()
     _, _ -> :wrong_args |> wrap()
+  end
+
+  def request_room_access(args) do
+    %{
+      room_pub_key: room_key,
+      me: requester_pub_key
+    } = args |> unwrap_map_by(fn %{me: key} -> key end)
+
+    time = DateTime.utc_now() |> DateTime.to_unix()
+
+    room =
+      Chat.Rooms.add_request(room_key, requester_pub_key, time, fn req_message ->
+        # Page.Room.broadcast_new_message(req_message, room_key, me, time)
+        req_message |> dbg()
+      end)
+
+    Chat.Rooms.RoomsBroker.put(room)
+
+    Chat.Log.request_room_key(requester_pub_key, time, room.pub_key)
+
+    # PubSub.broadcast!(
+    #   Chat.PubSub,
+    #   @topic,
+    #   {:room_request, room, me}
+    # )
+
+    Chat.Broadcast.room_requested(room, requester_pub_key)
+
+    :ok |> wrap()
   end
 
   def select_data(args) do

@@ -1,47 +1,24 @@
 defmodule ChatWeb.ProxyApiController do
   use ChatWeb, :controller
 
-  def select(conn, params) do
-    run_and_respond(conn, params, fn args ->
-      Proxy.Api.select_data(args)
-    end)
-  end
+  alias Proxy.Api
 
-  def key_value(conn, params) do
-    run_and_respond(conn, params, fn args ->
-      Proxy.Api.key_value_data(args)
-    end)
-  end
-
-  def confirmation_token(conn, params) do
-    run_and_respond(conn, params, fn _ ->
-      Proxy.Api.confirmation_token()
-    end)
-  end
-
-  def register_user(conn, params) do
-    run_and_respond(conn, params, fn body ->
-      Proxy.Api.register_user(body)
-    end)
-  end
-
-  def create_dialog(conn, params) do
-    run_and_respond(conn, params, fn body ->
-      Proxy.Api.create_dialog(body)
-    end)
-  end
-
-  def save_parcel(conn, params) do
-    run_and_respond(conn, params, fn body ->
-      Proxy.Api.save_parcel(body)
-    end)
-  end
-
-  def bulk_get(conn, params) do
-    run_and_respond(conn, params, fn body ->
-      Proxy.Api.bulk_get_data(body)
-    end)
-  end
+  # Endpoint generation
+  %{
+    select: &Api.select_data/1,
+    key_value: &Api.key_value_data/1,
+    confirmation_token: &Api.confirmation_token/1,
+    register_user: &Api.register_user/1,
+    create_dialog: &Api.create_dialog/1,
+    save_parcel: &Api.save_parcel/1,
+    bulk_get: &Api.bulk_get_data/1,
+    request_room_access: &Api.request_room_access/1
+  }
+  |> Enum.each(fn {name, action} ->
+    def unquote(name)(conn, params) do
+      run_and_respond(conn, params, unquote(action))
+    end
+  end)
 
   # Helpers
   ##################

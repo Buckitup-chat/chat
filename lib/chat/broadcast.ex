@@ -27,6 +27,14 @@ defmodule Chat.Broadcast do
     )
   end
 
+  def room_requested(room, requester_pub_key) do
+    # PubSub.broadcast!(
+    #   Chat.PubSub,
+    #   @topic,
+    #   {:room_request, room, me}
+    # )
+  end
+
   defp as_binary(term) do
     term
     |> Proxy.Serialize.serialize()

@@ -55,7 +55,7 @@ defmodule ChatWeb.ProxyLive.Page.Room do
 
   def handle_event(msg, _params, socket) do
     case msg do
-      "went into lobby room/send-request" -> socket
+      "went into lobby for  room/send-request" -> socket
     end
   end
 

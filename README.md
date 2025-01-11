@@ -23,11 +23,11 @@ Using IO data as arguments to the logging function will give a little performanc
 
 # Technical info
 
-  * [Encryption](./lib/enigma/encryption.livemd)
-  * [DB structure](./lib/chat/db_structures.livemd)
-  * [AdminDB structure](./lib/chat/admin_db_structures.livemd)
-  * [Room approval flow](./lib/chat/rooms/approve_flow.livemd)
-  * [DB Prioritization](./lib/chat/db/prioritization.livemd)
-  * [DB and Device Supervision](./lib/chat/db/supervision.livemd)
-  * [Naive API File upload](./lib/naive_api/upload_files.livemd)
-  * [Cargo scenario](./lib/chat/sync/cargo_scenario.livemd)
+  * [Encryption](./docs/encryption.livemd)
+  * [DB structure](./docs/db_structures.livemd)
+  * [AdminDB structure](./docs/admin_db_structures.livemd)
+  * [Room approval flow](./docs/approve_flow.livemd)
+  * [DB Prioritization](./docs/prioritization.livemd)
+  * [DB and Device Supervision](./docs/supervision.livemd)
+  * [Naive API File upload](./docs/upload_files.livemd)
+  * [Cargo scenario](./docs/cargo_scenario.livemd)

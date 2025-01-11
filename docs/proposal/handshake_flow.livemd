@@ -1,0 +1,59 @@
+# Handshake and Contact proposal
+
+## Overview
+
+```mermaid
+sequenceDiagram
+  actor Alice;
+  actor Bob;
+
+  Alice ->> Bob : Initiate handshake
+  Note over Alice,Bob : Handshake TBD
+
+  Alice ->> Alice : Saves Bob's contact
+  Bob ->> Bob : Saves Alice's contact
+ 
+```
+
+## Contact
+
+Contact is a known public key that user can associate name with.
+Initial name comes from handshake procedure
+
+Contacts are stored in User storage
+
+```json
+[_userKeyArray, _roomArray, {
+  "02c6c6f5c8d2854896893977f8c0466ccc6d0490bfc77e60c34d0cf6d6b1057d9e": {name: "Alice"},
+  "02671f665cdee15d10b938ca601a866b6bfe3efbcd06019b4cfb38ebde1926f492": {name: "Bob"}
+}]
+```
+
+Public key of contact is stored hex format.
+
+TODO: move User storage into IndexedDB (for Vault at least).  
+This is needed to overcome 5MB LocalStorage size limit. IndexedDB size has no hard limit. Firefox starts to confirm after 5MB, Chrome might allow to use to 75% of free disk space.
+
+## Handshake
+
+Handshake is performed using public key and digest signing (I guess).
+
+Each user provides public key, name and random digest (in QR code). A peer signs digest and returns signed version (in another QR code). We may claim user known  after checking signature validity.
+
+## Enigma improvement
+
+To operate with signatures we need new methods in `Enigma.js` (compatible with BE encryption, for further deeds)
+This could be done using ECDSA functions from `secp`.
+
+Following code should work.
+
+```javascript
+const privB64 = "0P1FqbaR+M/UKsv1RE5hGOxo8SZs1BezLi2I/DCV6Ug=";
+const pubB64 = "ArLyalm51tJv2uhXhxoESbhRDSP8PDqj3IqfSRGnTows";
+const digestB64 = "YiaRhqL4tXmBkZGw7F/2bPQ41OW4+cRj4gTuPEiWR8A="; // some random data
+
+const signB64 = Enigma.sign(digestB64, privB64);
+if (! Enigma.is_valid_sign(signB64, digestB64, pubB64)) throw "Incorrect signature"
+if (signB64 !== "MEUCIQCcbOEVNgurRLq7LmyO1kAT/4NvjtWV57lw5R3D2/pu1AIgU/mYGTMLFdb1J3xhpeGGSEp9oL8DHtkc+vQ7uc2IS/E=") throw "Not BE compatible signature";
+
+```

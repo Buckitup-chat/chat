@@ -1,0 +1,181 @@
+# Room approve flow
+
+## Open room
+
+Open room suppose to join users on their wish. But only users have room keys. The system doe not store room key (private key).
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Online flow
+
+Both users are online. Channel is the mean of communication.
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+sequenceDiagram
+  actor A as Alice;
+  participant R as Room;
+  participant C as Channel;
+  actor B as Bob;
+
+  A-->>+R: creates room
+  R-->>-A: the key
+  A-->>A: stores the key in LocalStorage
+
+  Note right of B: wants to join Room
+  B->>+C: ask key to Room for Bob
+  C->>-A: sends Bob request for Room
+  B-->>R: stores request
+
+  Note left of A: checking the key for Room
+  A->>+C: Room key encrypted for Bob
+  A-->>R: stores approve
+  C->>-B: delivers key approve
+  B-->>B: saves the key in LocalStorage
+  B-->>R: deletes his request in Room
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Offline flow
+
+Users do not met online. Room (DB) is the mean of communication.
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+sequenceDiagram
+  actor A as Alice;
+  participant R as Room;
+  participant C as Channel;
+  actor B as Bob;
+
+  A-->>+R: creates room
+  R-->>-A: the key
+  A-->>A: stores the key in LocalStorage
+  Note left of A: becomes offline
+
+  Note right of B: becomes online
+  Note right of B: wants to join Room
+  B-->>C: ask key to Room for Bob
+  B->>R: stores request
+  Note right of B: becomes offline
+
+  Note left of A: becomes online
+  A->>+R: get pending requests
+  R->>-A: returns Bob's request
+  A->>R: stores approve
+  A-->>C: Room key encrypted for Bob
+  Note left of A: becomes offline
+
+  Note right of B: becomes online
+  B->>+R: get approved requests
+  R->>-B: returns Bob's request
+  B-->>B: saves the key in LocalStorage
+  B->>R: deletes his request in Room
+  Note right of B: becomes offline
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Mixed flows
+
+Users partially meet online. Both Channel and Room (DB) are used for resulting approve comunication.
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+sequenceDiagram
+  actor A as Alice;
+  participant R as Room;
+  participant C as Channel;
+  actor B as Bob;
+
+  A-->>+R: creates room
+  R-->>-A: the key
+  A-->>A: stores the key in LocalStorage
+  Note left of A: becomes offline
+
+  Note right of B: becomes online
+  Note right of B: wants to join Room
+  B-->>C: ask key to Room for Bob
+  B->>R: stores request
+  
+  Note left of A: becomes online
+  A->>+R: get pending requests
+  R->>-A: returns Bob's request
+  A-->>R: stores approve
+  A->>+C: Room key encrypted for Bob
+  C->>-B: delivers key approve
+  B-->>B: saves the key in LocalStorage
+  B-->>R: deletes his request in Room
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+sequenceDiagram
+  actor A as Alice;
+  participant R as Room;
+  participant C as Channel;
+  actor B as Bob;
+
+  A-->>+R: creates room
+  R-->>-A: the key
+  A-->>A: stores the key in LocalStorage
+
+  Note right of B: wants to join Room
+  B->>+C: ask key to Room for Bob
+  C->>-A: sends Bob request for Room
+  B-->>R: stores request
+  Note right of B: becomes offline
+
+  Note left of A: checking the key for Room
+  A->>R: stores approve
+  A-->>C: Room key encrypted for Bob
+
+  Note right of B: becomes online
+  B->>+R: get approved requests
+  R->>-B: returns Bob's request
+  B-->>B: saves the key in LocalStorage
+  B->>R: deletes his request in Room
+  Note right of B: becomes offline
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Overview
+
+We have 2 tracks of keys to flow to be approved. Channel is fast one, but not persistent. DB is slow (cause of queue and disk performance), but persistent
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph LR;
+  A((Alice))
+  B((Bob))
+  B1((Bob))
+  R[Room]
+  R1[Room w/ approve]
+  C[Channel]
+  C1[Channel]
+
+  B--requests key-->C;
+  B--stores request-->R;
+  
+  C--sends request-->A;
+  R--transfer request-->A
+
+  A--sends approve-->C1;
+  A--stores approve-->R1;
+
+  C1--sends approve-->B1;
+  R1--transfers approve-->B1
+```
+
+```elixir
+
+```

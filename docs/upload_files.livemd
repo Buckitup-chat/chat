@@ -1,0 +1,131 @@
+# Naive API Upload files
+
+## Step 1: Create a new upload key
+
+First create the upload key and provide the file metadata and potential destination for this:
+
+```javascript
+mutation CreateUpload {
+	uploadKey(
+		myKeypair: {
+      privateKey: "2f85164ec6955c2adf047bc446a4268b984b3885df9aac3a5fd3f7b2fb991250",
+      publicKey: "026bcb67707ae152d3417e4d4b0d28876a56c7cf9bda9acff08f2cb47323fefe85"
+    },
+    destination: {
+      type: ROOM,
+      keypair: {
+      	private_key: "8ae262cfade3504370f5fa9aa489cca2d75768416c5c7fc9e3d242a65f44060c",
+				public_key: "02f95e3ebdd2f1f643738d737d01ef5ea5c356574c5d66fa0ff58dcf70480074c9"
+      }
+    },
+    entry: {
+      clientName: "1111111.jpeg",
+			clientType: "image/jpeg",
+    	clientSize: 102400,
+    	clientRelativePath: "/Downloads/1111111.jpeg",
+    	clientLastModified: 1679466076
+    }
+	)
+}
+```
+
+Expected result:
+
+```javascript
+{
+  "data": {
+    "uploadKey": "2559c3aa6b257f5822a30a4dea8ee13bc6fb258f31f1c3782464dc9876ddd314"
+  }
+}
+```
+
+## Step 2: Upload your file
+
+Once you have the upload key, you can start upload your file.  The chunk size should be 10Mb unless last chunk.
+If you are using JS for your client then you can choose https://github.com/muxinc/upchunk as a chunked uploader. 
+If not just write your own script.
+Objective:
+
+* Split the file into chunks 10MB each. You need each one to be 10_485_760 bytes (10 * 1024 * 1024). The exception is the final chunk, which can just be the remainder of the file. Bigger chunks will be a faster upload, but think about each one as its own upload in the sense of needing to restart that one if it fails, but needing to upload fewer chunks can be faster.
+* Set a couple of headers:
+  Content-Length: the size of the current chunk you're uploading.
+  Content-Range: what bytes you're currently uploading. For example, if you've got a 1GB file and you're uploading in 10MB chunks, this header would look like Content-Range: bytes 0-10485759/10485760000 for the first chunk.
+* Now use a PUT request like we were for "normal" uploads, just with those additional headers and each individual chunk as the body.
+* If the server responds with a 200 - the upload is being progressed or is completed.
+
+Here is the lite version of the script like that implemetend in Bash. To use this script, save it as a file (e.g. `upload.sh`), make it executable (`chmod +x upload.sh`), and then run it with the input file and URL as the arguments (e.g. `./upload.sh myfile.txt http://example.com/upload`). This will split `myfile.txt` into 10MB chunks with the suffix .chunk, put them in a temporary directory, send each chunk to the given URL using curl including the headers you specified, and remove the chunks afterwards.
+
+```bash
+#!/bin/bash
+
+# Set the chunk size in bytes
+chunk_size=$((10 * 1024 * 1024))
+
+# Get the input file name and URL from the command line arguments
+input_file=$1
+url=$2
+
+# Create a temporary directory for the chunks
+temp_dir=$(mktemp -d)
+
+# Get the size of the input file in bytes
+input_file_size=$(wc -c < "$input_file")
+
+# Calculate the number of chunks needed
+num_chunks=$((($input_file_size + $chunk_size - 1) / $chunk_size))
+
+# Split the file into chunks and move them to the temporary directory
+split --bytes=$chunk_size --numeric-suffixes=1 --suffix-length=3 --additional-suffix=.chunk "$input_file" "$temp_dir/$input_file".chunk
+
+# Send each chunk to the URL using curl and remove it afterwards
+for ((i=1; i<=$num_chunks; i++)); do
+  chunk_file="$temp_dir/$input_file.$(printf "%03d" $i).chunk"
+  offset=$((($i - 1) * $chunk_size))
+  headers=(
+    "-H" "Content-Range: bytes $offset-$((offset + chunk_size - 1))/$input_file_size"
+    "-H" "Content-Length: $chunk_size"
+  )
+  echo "Sending $chunk_file to $url..."
+  curl -X POST -H "Content-Type: application/octet-stream" "${headers[@]}" --data-binary "@$chunk_file" "$url"
+  rm "$chunk_file"
+done
+
+# Remove the temporary directory
+rmdir "$temp_dir"
+
+echo "File split into $num_chunks chunks of 10MB each and sent to $url."
+```
+
+## Step 3: Create message with assigned file
+
+```javascript
+mutation roomWrite {
+  roomSendFile(
+		roomKeypair: {
+      private_key: "8ae262cfade3504370f5fa9aa489cca2d75768416c5c7fc9e3d242a65f44060c",
+			public_key: "02f95e3ebdd2f1f643738d737d01ef5ea5c356574c5d66fa0ff58dcf70480074c9"
+    }
+		myKeypair: {
+      privateKey: "2f85164ec6955c2adf047bc446a4268b984b3885df9aac3a5fd3f7b2fb991250",
+      publicKey: "026bcb67707ae152d3417e4d4b0d28876a56c7cf9bda9acff08f2cb47323fefe85"
+    }
+    uploadKey: "a79f0b663a01b53df466335d23096e61521ca4d1f1d6ef9919281b4e1b4dbdb9"
+) {
+		id
+		index
+	}   
+}
+```
+
+Expected result:
+
+```javascript
+{
+  "data": {
+    "roomSendFile": {
+      "id": "81fde668-7c89-417c-bf47-234fabc23da7",
+      "index": 19
+    }
+  }
+}
+```

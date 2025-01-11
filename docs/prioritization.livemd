@@ -1,0 +1,176 @@
+# DB prioritization
+
+## Prioritization
+
+We write in DB from several sources
+
+* User messages
+* User uploads
+* DB synchronizations (backup, replication, etc.)
+
+Having no priorities makes UI waiting for more than 30 sec on RPi, which leads to LiveVew reload.
+That is why we need to separate UI from DB writing and make user input as the top priority.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Queueing
+
+Queue categorizes data into 4 buckets
+
+1. User data - everything but `action log`, `db change tracking` and `file chunks`. A list of them
+2. Logs and DB tracing - `action log` and `db change tracking`. A list of them
+3. Read stream - DB name and list of keys to be copied from another DB. Only one
+4. File chunk - Part of a file. First chunk and FIFO queue of next chunks
+
+Queue receives data from callers. 1st and 2nd buckets store multiple items. Queue does not accept data in 3rd or 4th bucket if there is some.
+
+Queue sends data to Writer when it has demand received only. It never sends data first.
+
+Upon receiving demand Queue sends whole bucket to Writer. If there is something in 1st bucket, it gets sent. Otherwise to next bucket and so on.
+
+Read stream yields 100 items or till first `file_chunk`.
+
+Writer sends demand to Queue on start and as soom as it finished writing data received.
+This way we achieve sequential writes and decoupling of UI and data writes.
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph TD;
+  subgraph Queue
+    p1[User data]
+    p2[Logs and DB tracing]
+    p3[Read stream]
+    p4[File chunk]
+    p1 --> p2 --> p3 --> p4
+  end
+  Queue --data--> Writer
+  Writer --demand--> Queue  
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Replication
+
+When Main USB drive plugged we write all data from internal DB into Main DB.
+
+1. InternalDB is current one and MainDB is added.
+2. Diff of keys that absent in main DB is calculated.
+3. Diff is sent as a `read stream` into Main Queue
+4. Mirroring from Internal Queue is set to Main Writer. This way Main DB will get updates while replication in progress.
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph TD;
+  db(Current DB);
+  diff((Diff));
+
+  iq[Internal Queue]
+  iw[Internal Writer]
+
+  mq[Main Queue]
+  mw[Main Writer]
+
+  iq ==> iw
+  mq ==> mw
+  iq --mirror--> mw
+  diff -.-> mq
+  db ---> iq
+
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+When Diff is written to MainDB, CurrentDB gets switched to MainDB. And mirroring gets switched from MainDB to InternalDB. This way InternalDB gets updates that happen while MainDB is currrent one.
+
+Every 5 minutes Diff of MainDB data that is absent in Internal DB formed and being written into Internal DB. After both DBs are synchronized each next replication carries no data and finishes immediately.
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph TD;
+  db(Current DB);
+  diff((Diff));
+
+  iq[Internal Queue]
+  iw[Internal Writer]
+
+  mq[Main Queue]
+  mw[Main Writer]
+
+  iq ==> iw
+  mq ==> mw
+  mq --mirror--> iw
+  diff -.-> iq
+  db ---> mq
+ 
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Backup
+
+Backup happens when 2nd USB drive is plugged. It goes in 2 stages.
+
+Data from backup is copied to currentDB (MainDB). With the same Diff keys mechanics. 
+This gives us copy to internal DB as well.
+
+Important note here that mirrored queue does not accept demand from mirror Writer. I.e. copying happens with pace of source Queue and Writer. Mirror Writer just listens and tries to keep up.
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph TD;
+  db(Current DB);
+  diff((Diff));
+
+  iq[Internal Queue]
+  iw[Internal Writer]
+
+  mq[Main Queue]
+  mw[Main Writer]
+
+  bq[Backup Queue]
+  bw[Backup Writer]
+
+  iq ==> iw
+  mq ==> mw
+  mq --mirror--> iw
+  bq ==> bw
+
+  diff -.-> mq
+  db --> mq
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+When Backup to Main Diff is written, Main to Backup Diff is formed. It gets written into backup DB.
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph TD;
+
+  db(Current DB);
+  diff((Diff));
+
+  iq[Internal Queue]
+  iw[Internal Writer]
+
+  mq[Main Queue]
+  mw[Main Writer]
+
+  bq[Backup Queue]
+  bw[Backup Writer]
+
+  iq ==> iw
+  mq ==> mw
+  mq --mirror--> iw
+  bq ==> bw
+
+  diff -.-> bq
+  db --> mq
+```
+
+When data transfered, the Backup USB drive gets unmounted.

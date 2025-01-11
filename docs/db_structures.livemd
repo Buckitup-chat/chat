@@ -1,0 +1,438 @@
+# DB structures
+
+## User
+
+### User identity
+
+User account represented by name and a private key (generated on first login). It is stored on user side along with room keys(room private keys) that user has.
+
+```javascript
+[
+  [name, private_key],
+  [room_key1, room_key2, ...],
+  [] // contacts
+]
+```
+
+### User list
+
+User list is used to provide dialogs (chats) between users. Users are stored in following format
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:users, public_key},
+ %Card{name, public_key}}
+```
+
+## Dialog (chat)
+
+Dialog binds together two users. They are references as `a` and `b`.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:dialogs, dialog_key},
+ %Dialog{a_pub_key, b_pub_key}}
+```
+
+Dialog key combines hashes of peer pub_keys
+
+#### Messages
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:dialog_message, dialog_key, index, message_id},
+ %Message{timestamp, is_a_to_b, encrypted_and_signed_message, type, message_id, version}}
+```
+
+## Room
+
+Since room has many users, it has its own private key. It allows holder of a key to read and write into room. Having a room key provides an access to it.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:rooms, room_pub_key_hash}
+ %Room{name, pub_key, room_type, requests, signature}}
+```
+
+#### Messages
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:room_message, room_pub_key_binhash, index, message_id}
+ %Message{timestamp, author_hash, encrypted_and_bisigned_message, message_type, id, version}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+classDiagram
+  class Identity {
+    name
+    public_key
+    private_key
+  }
+  class Card {
+    name
+    public_key
+  }
+  class Actor {
+    me: Identity
+    rooms: Identity[]
+    contacts
+  }
+  Actor *-- Identity
+  Identity --o Card
+
+  class Dialog {
+    a_key: public_key
+    b_key: public_key
+  }
+  class DialogMessage {
+    timestamp
+    is_a_to_b: bool
+    message: SafeMessage
+    type: MessageType
+    message_id
+    version
+  }
+  Dialog "1" -- "n" DialogMessage
+
+  class Room {
+    name
+    public_key
+    type
+    requests: []
+    signature
+  }
+  class RoomMessage {
+    timestamp
+    author_public_key
+    message: SafeRoomMessage
+    type: MessageType
+    message_id
+    version
+  }
+  Room "1" -- "n" RoomMessage
+
+  class SafeMessage {
+    encrypted: text or secretId
+    message_author_sign
+  }
+
+  class SafeRoomMessage {
+    encrypted: text or secretId
+    message_author_sign
+    encrypted_room_sign
+  }
+  
+  DialogMessage o-- SafeMessage 
+  RoomMessage o-- SafeRoomMessage 
+
+
+  DB .. "n" Card : public_key
+
+  DB .. "n" Dialog : dialog_key
+  DB .. "n" DialogMessage: dialog_key, index, message_id
+
+  DB .. "n" Room : room_public_key
+  DB .. "n" RoomMessage : room_public_key, index, message_id
+  
+
+```
+
+## Messaging
+
+Room and dialog messages are the same in terms of content.
+
+Message types are
+
+* `:audio`
+* `:text` - short text message that can be encrypted w/ public key (less than 200 bytes)
+* `:memo` - longer text message
+* `:image`
+* `:file`
+* `:video`
+* `:room_invite` - dialog message to invite user in a room. contains private room key
+* `:room_request` - simple placeholder to draw private room members attention to room requests
+
+All the message types beside `:text` store content in different tables. Message itself becomes a `id` and a `secret` in binary. Content in different tebles is encrypted with password stored in the message.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+secret <> id
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Memo
+
+Content of memo - plain text, encoded with the password.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:memo, memo_key}, enc_text}
+```
+
+Memo index tracks who can read it
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:memo_index, reader_key, key}}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Files (audio/image/video/file)
+
+File storing is more complex. We need to store file properties, as well as file body.
+
+File uploads chunk by chunk. Chunk size is 10 Mb.
+
+Also, each file upload is saved in file index for resumable uploads.
+
+#### Upload process
+
+1. Generate hash out of file info and use it both as an upload key and a chunk key.
+2. Generate chunk secret.
+3. Save upload to the upload index.
+4. Give client chunk key.
+5. Receive all the file chunks, cipher them with secret and store (in FS).
+6. When everything is uploaded, store file information and chunk key and secret (in DB).
+
+#### File structures
+
+Message contents
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:file, file_key}, enc_file_data}
+```
+
+The encoded data has following format
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%File{data: [
+  chunk_key,
+  chunk_secret,
+  file_size,
+  file_mime_type,
+  file_name,
+  human_file_size
+],
+timestamp,
+file_type
+}
+```
+
+#### Chunks
+
+Each chunk (up to 10Mb data content) virtually stored as below. In fact it is written in filesystem. In a folder beside the database.
+We pretend as it is  in database to have usual API for getting and storing.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:file_chunk, key, chunk_start, chunk_end},
+ enc_content}
+```
+
+Chunk keys are needed to speedup `:file_chunk` traversal skipping 10M of chunk content
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:chunk_key, {:file_chunk, key, chunk_start, chunk_end}},
+ true}
+```
+
+File index entries keep track of who can read a file.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:file_index, reader_hash, file_key, message_id},
+ true}
+```
+
+Upload index entries keep track of started uploads.
+Each entry contains
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:upload_index, chunk_key}, %Chat.Upload.Upload{}}
+```
+
+This approach has been proposed that involves the use of a new key and initialization vector (IV) for every 100 file chunks, or approximately 1GB of data.The first secret and IV will be used to decipher the first 100 file chunks. Subsequently, the :file_secrets for the file_key will be resecreted for the next 100 file chunks. The resecrets will be generated using the previous secret and IV. The first resecret generated will be used to decipher the second GB of the file, and so on.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:file_secrets, file_key}, resecrets}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+#### Room invites
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:room_invite, invite_key},
+ enc_room_key}
+```
+
+Room invite index tracks who can read it. It contains first bits of room public key hash. More rooms the system has - more detailed bitstring gets
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:room_invite_index, reader_hash, invite_key},
+ {length, bitstring}}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+classDiagram 
+  class DB
+
+  class RoomInvite {
+    encrypted room identity
+  }
+  class RoomInviteIndex {
+    bit_length
+    bitsting
+  }
+  RoomInvite -- RoomInviteIndex
+
+
+  class Memo {
+    encrypted text
+  }
+  Memo -- MemoIndex
+
+  class File {
+    data: encrypted FileMeta
+    timestamp
+    filetype
+  }
+
+  class FileMeta {
+    file_key
+    intial_secret
+    file_size
+    file_mime_type
+    file_name
+    human_file_size
+  }
+
+  
+  class FileChunk {
+    encrypted data
+  }
+
+  class FileSecrets {
+    encrypted secrets
+  }
+
+  class ChunkKey
+
+  class UploadIndex {
+    secret
+    timestamp
+  }
+  File o.. FileMeta
+  File -- FileIndex
+  File -- FileChunk
+  File -- FileSecrets
+  File -- UploadIndex
+  FileChunk -- ChunkKey
+
+
+
+
+  DB .. "n" RoomInvite : invite_key
+  DB .. "n" RoomInviteIndex : reader_key, invite_key
+  DB .. "n" Memo : memo_key
+  DB .. "n" MemoIndex : reader_key, memo_key
+  DB .. "n" File : file_key
+  DB .. "n" FileIndex : reader_key, file_key
+  DB .. "n" FileChunk : file_key, chunk_start, chunk_end
+  DB .. "n" FileSecrets : file_key
+  DB .. "n" ChunkKey : FileChunk key
+  DB .. "n" UploadIndex : file_key
+
+
+  
+```
+
+## Action log (Feed)
+
+Action log keeps track of user actions
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:action_log, index, user_binhash},
+ {time, action, opts?}}
+```
+
+## Change Tracker
+
+Change tracker is used on places where we need to ensure that some data was written in DB.
+
+In the perfect world, we should not use it and split data flows to UI flow (for online users) and DB flow (for offline users). Offline users have no requirement of data being written right now.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{{:change_tracking_marker, uuid},
+ true}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+classDiagram
+  class DB
+  class ActionLog {
+    timestamp
+    action
+    opts?
+  }
+
+  DB .. "n" ActionLog : index, user_key
+  DB .. "n" ChangeTrackerMarker : uuid
+```
+
+## DB Type
+
+We use DB type to mark the database for a specific use. Then we use the DB type to prevent directory from being renamed. Only `backup_db` directory is allowed to be renamed to `main_db` and vice versa. Take a look at `Platform.Storage.Bouncer` and `Platform.Storage.BouncerTest`.
+
+Types:
+
+* `:main_db` (used by `main_db` and `backup_db`)
+* `:cargo_db`
+* `:onliners_db`
+
+```elixir
+{:db_type, type}
+```

@@ -1,5 +1,5 @@
 import { connect, rawStorage, removeAll } from "@lo-fi/local-vault";
-import "@lo-fi/local-vault/adapter/local-storage";
+import "@lo-fi/local-vault/adapter/idb";
 
 /**
  * Class for managing encryption and data storage.
@@ -13,7 +13,7 @@ export class EncryptionManager extends EventTarget {
    // Private properties
    #vault = null; // Storage object
    #isAuth = false; // Authorization state flag
-   #rawStore = rawStorage("local-storage"); // Raw storage for storing the vault ID
+   #rawStore = rawStorage("idb"); // Raw storage for storing the vault ID
    #abortController = new AbortController(); // Controller for canceling operations
 
    /**
@@ -82,7 +82,7 @@ export class EncryptionManager extends EventTarget {
    async createVault() {
       try {
          this.#vault = await connect({
-            storageType: "local-storage",
+            storageType: "idb",
             addNewVault: true,
             keyOptions: {
                username: "biometric-user",
@@ -109,7 +109,7 @@ export class EncryptionManager extends EventTarget {
       try {
          this.#vault = await connect({
             vaultID,
-            storageType: "local-storage",
+            storageType: "idb",
             signal: this.#abortController.signal,
          });
 

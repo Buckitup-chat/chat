@@ -105,7 +105,7 @@ defmodule ChatWeb.MainLive.Index do
     socket
     |> assign(:chat_link, hash)
     |> then(fn socket ->
-      if connected?(socket),
+      if connected?(socket) and not socket.assigns.need_login,
         do: Page.LiveRouter.action(socket),
         else: socket
     end)

@@ -28,12 +28,12 @@ export default {
     const legalNoticeAccepted = localStorage.getItem(obj.legal_notice_key)
 
     return authData
-    ? {
-      auth: authData,
-      room_count: Number(roomCount),
-      legal_notice_accepted: legalNoticeAccepted
-    }
-    : {}
+      ? {
+        auth: authData,
+        room_count: Number(roomCount),
+        legal_notice_accepted: legalNoticeAccepted
+      }
+      : {}
   },
 
   setLegalNoticeAccepted(obj) {

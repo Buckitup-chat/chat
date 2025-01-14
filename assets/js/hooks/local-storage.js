@@ -28,12 +28,12 @@ export default {
     const legalNoticeAccepted = localStorage.getItem(obj.legal_notice_key)
 
     return authData
-      ? {
-        auth: authData,
-        room_count: Number(roomCount),
-        legal_notice_accepted: legalNoticeAccepted
-      }
-      : {}
+    ? {
+      auth: authData,
+      room_count: Number(roomCount),
+      legal_notice_accepted: legalNoticeAccepted
+    }
+    : {}
   },
 
   setLegalNoticeAccepted(obj) {
@@ -66,7 +66,7 @@ export default {
   async getAuthData(obj) {
     if (await BuckitUp.manager.hasVault()) {
       const vaultData = await BuckitUp.manager.getData()
-      if (vaultData) return vaultData;
+      return vaultData;
     }
 
     return localStorage.getItem(obj.auth_key)

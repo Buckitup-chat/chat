@@ -14,7 +14,6 @@ export class EncryptionManager extends EventTarget {
    #vault = null; // Storage object
    #isAuth = false; // Authorization state flag
    #rawStore = rawStorage("idb"); // Raw storage for storing the vault ID
-   #abortController = new AbortController(); // Controller for canceling operations
 
    /**
     * Private constructor to implement Singleton.
@@ -87,8 +86,7 @@ export class EncryptionManager extends EventTarget {
             keyOptions: {
                username: "biometric-user",
                displayName: "Biometric User",
-            },
-            signal: this.#abortController.signal,
+            }
          });
          await this.saveVaultID(this.#vault.id);
 
@@ -109,8 +107,7 @@ export class EncryptionManager extends EventTarget {
       try {
          this.#vault = await connect({
             vaultID,
-            storageType: "idb",
-            signal: this.#abortController.signal,
+            storageType: "idb"
          });
 
          // Set isAuth using the setter
@@ -131,9 +128,7 @@ export class EncryptionManager extends EventTarget {
       try {
          await this.ensureVault();
          const vaultID = await this.getVaultID();
-         await this.#vault.set(vaultID, value, {
-            signal: this.#abortController.signal,
-         });
+         await this.#vault.set(vaultID, value);
          // console.log(`Data saved: key = "${vaultID}", value = "${value}"`);
          return true;
       } catch (error) {
@@ -149,9 +144,7 @@ export class EncryptionManager extends EventTarget {
       try {
          await this.ensureVault();
          const vaultID = await this.getVaultID();
-         const value = await this.#vault.get(vaultID, {
-            signal: this.#abortController.signal,
-         });
+         const value = await this.#vault.get(vaultID);
          // console.log(`Data retrieved: key = "${vaultID}", value = "${value || "no data"}"`);
          return value;
       } catch (error) {
@@ -251,18 +244,5 @@ export class EncryptionManager extends EventTarget {
          error.message?.includes("Identity/Passkey registration failed") ||
          error.name === "AbortError"
       );
-   }
-
-   /**
-    * Cancels the current operation with a specified reason.
-    * @param {string} [reason="Operation canceled"] - The reason for canceling the operation.
-    */
-   cancelOperation(reason = "Operation canceled") {
-      if (this.#abortController) {
-         this.isAuth = false; // Use the setter
-         this.#abortController.abort(reason);
-         this.#abortController = new AbortController();
-         console.warn(`Operation canceled: ${reason}`);
-      }
    }
 }

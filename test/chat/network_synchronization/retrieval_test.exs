@@ -19,7 +19,7 @@ defmodule Chat.NetworkSynchronization.RetrievalTest do
     assert {:error, "Not an API endpoint"} = get_keys_by("http://google.com")
 
     assert {:error, "API error"} =
-             get_keys_by("https://swapi-graphql.netlify.app/.netlify/functions/index")
+             get_keys_by("https://api.sampleapis.com/avatar/graphql")
   end
 
   test "list on getting keys from correct url", %{user: user_pub_key} do

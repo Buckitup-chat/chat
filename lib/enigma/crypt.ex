@@ -31,14 +31,14 @@ defmodule Enigma.Crypt do
   def encrypt_and_sign(data, private, public) do
     {
       encrypt(data, private, public),
-      Curvy.sign(data, private, compact: true)
+      sign(data, private)
     }
   end
 
   def encrypt_and_bisign(data, src_private, dst_private) do
     dst_public = Curvy.Key.to_pubkey(Curvy.Key.from_privkey(dst_private))
     {encrypted_data, data_sign} = encrypt_and_sign(data, src_private, dst_public)
-    encrypted_data_sign = Curvy.sign(encrypted_data, dst_private, compact: true)
+    encrypted_data_sign = sign(encrypted_data, dst_private)
 
     {encrypted_data, data_sign, encrypted_data_sign}
   end
@@ -67,10 +67,16 @@ defmodule Enigma.Crypt do
   end
 
   def sign(data, private) do
-    Curvy.sign(data, private)
+    <<_::8, sign::binary>> = Curvy.sign(data, private, compact: true)
+    sign
   end
 
   def valid_sign?(sign, data, public) do
-    match?(true, Curvy.verify(sign, data, public))
+    case sign do
+      <<sign::binary-size(64)>> -> <<31, sign::binary>>
+      _ -> sign
+    end
+    |> Curvy.verify(data, public)
+    |> then(fn x -> x == true end)
   end
 end

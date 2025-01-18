@@ -66,7 +66,7 @@ export default {
   async getAuthData(obj) {
     if (await BuckitUp.manager.hasVault()) {
       const vaultData = await BuckitUp.manager.getData()
-      if (vaultData) return vaultData;
+      return vaultData;
     }
 
     return localStorage.getItem(obj.auth_key)

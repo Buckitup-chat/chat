@@ -57,3 +57,50 @@ if (! Enigma.is_valid_sign(signB64, digestB64, pubB64)) throw "Incorrect signatu
 if (signB64 !== "MEUCIQCcbOEVNgurRLq7LmyO1kAT/4NvjtWV57lw5R3D2/pu1AIgU/mYGTMLFdb1J3xhpeGGSEp9oL8DHtkc+vQ7uc2IS/E=") throw "Not BE compatible signature";
 
 ```
+
+## System overview
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph TD;
+  subgraph actor[User]
+    css[(client side storage)]
+    info(Name and Key)
+    rooms(Room Key array)
+    contacts(Contacts object)
+    css --> info
+    css --> rooms
+    css --> contacts
+  end
+
+  buckitup{{https://buckitup.app}}
+  buckitup -.-> platform
+  buckitup -.-> landing
+
+  stage{{https://offline-chat.gigalixirapp.com/}}
+  stage -..-> chat
+
+  subgraph device[Device]
+    subgraph platform[Platform]
+      wifi
+      ds[SD card, USB drives]
+
+      subgraph chat[Chat]
+        sse(server-side encryption)
+        sse --> db[(db)]
+        sse --> files[(files)]
+        sse --> css
+      end
+      
+    end
+  end
+
+  subgraph landing[Landing]
+    cse(client-side encryption)
+    cse --> css
+  end
+
+  
+  
+```

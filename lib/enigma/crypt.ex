@@ -53,7 +53,7 @@ defmodule Enigma.Crypt do
   def decrypt_signed({encrypted_data, sign}, private, public, author_public) do
     decrypted = encrypted_data |> decrypt(private, public)
 
-    if Curvy.verify(sign, decrypted, author_public),
+    if valid_sign?(sign, decrypted, author_public),
       do: {:ok, decrypted},
       else: :error
   end
@@ -61,7 +61,7 @@ defmodule Enigma.Crypt do
   def decrypt_bisigned({encrypted_data, data_sign, encrypted_data_sign}, private, author_public) do
     public = Curvy.Key.to_pubkey(Curvy.Key.from_privkey(private))
 
-    if Curvy.verify(encrypted_data_sign, encrypted_data, public),
+    if valid_sign?(encrypted_data_sign, encrypted_data, public),
       do: decrypt_signed({encrypted_data, data_sign}, private, author_public, author_public),
       else: :error_out_sign
   end

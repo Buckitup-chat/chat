@@ -128,11 +128,13 @@ defmodule Enigma.EncryptionTest do
 
   defp bob_decrypts_signed_message_from_alice(context) do
     assert {:ok, decrypted} = decrypt_signed(context, as: :bob, to: :alice, from: :alice)
+    assert decrypted == context.message
     context |> set_decrypted(decrypted)
   end
 
   defp alice_decrypts_signed_own_message(context) do
     assert {:ok, decrypted} = decrypt_signed(context, as: :alice, to: :bob, from: :alice)
+    assert decrypted == context.message
     context |> set_decrypted(decrypted)
   end
 
@@ -145,6 +147,7 @@ defmodule Enigma.EncryptionTest do
 
   defp alice_decrypts_bisigned_own_room_message(context) do
     assert {:ok, decrypted} = decrypt_bisigned_message(context, from: :alice, room: :room)
+    assert decrypted == context.message
     context |> set_decrypted(decrypted)
   end
 
@@ -154,10 +157,9 @@ defmodule Enigma.EncryptionTest do
   end
 
   defp assert_eve_fails_to_decrypt_bisigned_message(context) do
-    tap(
-      context,
-      &assert(:error_out_sign == decrypt_bisigned_message(&1, from: :alice, room: :eve))
-    )
+    tap(context, fn context ->
+      assert :error_out_sign == decrypt_bisigned_message(context, from: :alice, room: :eve)
+    end)
   end
 
   defp assert_eve_can_verify_bisigned_message_is_for_the_room(context) do

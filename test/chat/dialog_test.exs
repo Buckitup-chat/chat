@@ -6,7 +6,6 @@ defmodule Chat.Dialogs.DialogTest do
   alias Chat.Content.Memo
   alias Chat.Db.ChangeTracker
   alias Chat.Dialogs
-  alias Chat.Dialogs.Dialog
   alias Chat.Identity
   alias Chat.Messages
   alias Chat.Rooms

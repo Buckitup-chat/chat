@@ -27,8 +27,8 @@ ci-test:
 	MIX_ENV=test mix test --max-failures=3 --cover 
 
 test: 
-	rm -rf priv/test_db
-	mkdir -p priv/test_db
+	rm -rf priv/test_db priv/test_admin_db
+	mkdir -p priv/test_db priv/test_admin_db
 	MIX_ENV=test mix test --max-failures=3 --cover
 
 coverage:

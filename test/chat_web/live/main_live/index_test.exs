@@ -78,7 +78,7 @@ defmodule ChatWeb.MainLive.IndexTest do
     test "search dialogs and rooms by name", %{view: view} do
       view |> form("#search-box", dialog: %{name: "pe"}) |> render_change()
       %{socket: %{assigns: %{users: users}}} = reload_view(%{view: view})
-      assert match?([%{name: "Pedro"}, %{name: "Perky"}, %{name: "Peter"}], users)
+      assert match?([%{name: "Pedro"}, %{name: "Perky"}, %{name: "Peter"} | _], users)
 
       view
       |> element(

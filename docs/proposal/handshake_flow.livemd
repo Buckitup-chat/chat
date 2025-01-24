@@ -24,12 +24,12 @@ Contacts are stored in User storage
 
 `[userArray, roomsArray, contactsObject]`
 
-* userArray is `[name, fullKey]`
-* name is a string of user name
-* fullKey is base64 of binary concatenated private key (32 bytes) and public key (33 bytes, ASN.1)
-* roomsArray is an array of fullKeys for each allowed room
-* contactObject is an object with hex public key (33 bytes, ASN.1) and contactInfoObject as value
-* contactInfoObject contains at least `name` attribute
+* _userArray_ is `[name, fullKey]`
+* _name_ is a string of user name
+* _fullKey_ is base64 of binary concatenated private key (32 bytes) and public key (33 bytes, ASN.1)
+* _roomsArray_ is an array of _fullKeys_ for each allowed room
+* _contactsObject_ is an object with hex public key (33 bytes, ASN.1) and _contactInfoObject_ as value
+* _contactInfoObject_ contains at least `name` attribute
 
 Populated it will look like
 

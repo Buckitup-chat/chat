@@ -22,17 +22,29 @@ Initial name comes from handshake procedure
 
 Contacts are stored in User storage
 
+`[userArray, roomsArray, contactsObject]`
+
+* userArray is `[name, fullKey]`
+* name is a string of user name
+* fullKey is base64 of binary concatenated private key (32 bytes) and public key (33 bytes, ASN.1)
+* roomsArray is an array of fullKeys for each allowed room
+* contactObject is an object with hex public key (33 bytes, ASN.1) and contactInfoObject as value
+* contactInfoObject contains at least `name` attribute
+
+Populated it will look like
+
 ```json
-[_userKeyArray, _roomArray, {
-  "02c6c6f5c8d2854896893977f8c0466ccc6d0490bfc77e60c34d0cf6d6b1057d9e": {name: "Alice"},
-  "02671f665cdee15d10b938ca601a866b6bfe3efbcd06019b4cfb38ebde1926f492": {name: "Bob"}
-}]
+[
+  ["Charlie", "ioEcyG8l50iIqU/pRaK42Ed6Bl/RRobvVZuCNPlVvT8Dp59rb9LrIPasGtNRBD4EeU/QvPxgnwvqpu3BVSbPsSk="],
+  ["FraUpj7c/hRyUcoZKkKFiDPy3CtDtLqqCOXvmdtBH9IDKuFPJ2/MGGA0VQ0XnLfR0ATJj3NTpW6iw1hzJi6IQrc=", "8H0d4d+P43yCaIwxjTMiYKz6py4GZkvQruvZLr4WKJoCVe4nCUVV7nlXIGJ1A9RPjne1nQB1TUiXflGrJTLmxhE=", "rcxtZWF+v5EOW1hSxWxVaCtA1oE6hCJ+FhmC1bKHpUkDTQluXEkZ5sNXcD1Xh8ylQrrw9hofrG/y0u3qO9oSYyE="],
+  {
+    "02c6c6f5c8d2854896893977f8c0466ccc6d0490bfc77e60c34d0cf6d6b1057d9e": {name: "Alice"},
+    "02671f665cdee15d10b938ca601a866b6bfe3efbcd06019b4cfb38ebde1926f492": {name: "Bob"}
+  }
+]
 ```
 
-Public key of contact is stored hex format.
-
-TODO: move User storage into IndexedDB (for Vault at least).  
-This is needed to overcome 5MB LocalStorage size limit. IndexedDB size has no hard limit. Firefox starts to confirm after 5MB, Chrome might allow to use to 75% of free disk space.
+This is the format used in user key backup file and to pass user info from frontend to backend.
 
 ## Handshake
 

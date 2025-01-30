@@ -412,9 +412,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   defp dialog_topic(%Dialogs.Dialog{} = dialog) do
-    dialog
-    |> Dialogs.key()
-    |> then(&"dialog:#{&1}")
+    Chat.Broadcast.Topic.dialog(dialog)
   end
 
   defp assign_messages(socket, per_page \\ @per_page)
@@ -437,7 +435,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   defp broadcast_new_message(nil, _, _, _), do: nil
 
   defp broadcast_new_message(message, dialog, me, time) do
-    Chat.Broadcast.new_dialog_message(message, dialog |> Dialogs.key())
+    Chat.Broadcast.new_dialog_message(message, dialog)
 
     Log.message_direct(me, time, Dialogs.peer(dialog, me))
   end

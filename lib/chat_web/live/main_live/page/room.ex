@@ -458,7 +458,7 @@ defmodule ChatWeb.MainLive.Page.Room do
     |> Messages.RoomInvite.new()
     |> Dialogs.add_new_message(me, dialog)
     |> RoomInviteIndex.add(dialog, me, room_pub_key)
-    |> Chat.Broadcast.new_dialog_message(dialog |> Chat.Dialogs.key())
+    |> Chat.Broadcast.new_dialog_message(dialog)
 
     socket
     |> push_event("put-flash", %{key: :info, message: "Invitation Sent!"})

@@ -124,12 +124,6 @@ defmodule ChatWeb.MainLive.Page.KeyShareForm do
   end
 
   defp broadcast(message, dialog) do
-    PubSub.broadcast!(
-      Chat.PubSub,
-      dialog
-      |> Dialogs.key()
-      |> then(&"dialog:#{&1}"),
-      {:dialog, {:new_dialog_message, message}}
-    )
+    Chat.Broadcast.new_dialog_message(message, dialog)
   end
 end

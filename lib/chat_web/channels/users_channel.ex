@@ -1,12 +1,16 @@
 defmodule ChatWeb.UsersChannel do
   @moduledoc """
-  Channel for proxy?
+  Channel server to authorize clients (Slipstream and (maybe) js)
   """
   use ChatWeb, :channel
 
   @impl true
-  def join("proxy:clients", _payload, socket) do
-    {:ok, socket}
+  def join(topic, _payload, socket) do
+    case topic do
+      "remote::" <> _ -> {:ok, socket}
+      _ -> {:error, %{reason: "unauthorized"}}
+    end
+
     # if authorized?(payload) do
     #   {:ok, socket}
     # else

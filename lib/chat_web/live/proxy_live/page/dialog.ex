@@ -51,10 +51,12 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
 
     # time = Chat.Time.monotonic_to_unix(socket.assigns.monotonic_offset)
     # peer = User.by_id(user_id |> Base.decode16!(case: :lower))
+
+    # local  but used for key only = kinda ok
     dialog = Dialogs.find_or_open(actor.me, peer)
 
-    # PubSub.subscribe(Chat.PubSub, dialog |> dialog_topic())
     # Log.open_direct(me, time, peer)
+    socket |> get_private(:user_channel_pid) |> send({:join, dialog |> dialog_topic()})
 
     socket
     |> assign(:page, 0)
@@ -91,13 +93,15 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
         socket |> add_loaded_messages(messages, amount, dialog)
 
       {:new_dialog_message, {dialog_key, indexed_message}} ->
+        dialog_key |> dbg()
         current_dialog = socket.assigns.dialog
 
         if current_dialog && Chat.Dialogs.key(current_dialog) == dialog_key,
           do: socket |> show_new(indexed_message),
           else: socket
 
-      {_anything, _} ->
+      anything ->
+        ["unhandled dialog info", anything] |> dbg()
         socket
     end
   end
@@ -500,7 +504,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   def close(%{assigns: %{dialog: nil}} = socket), do: socket
 
   def close(%{assigns: %{dialog: dialog}} = socket) do
-    PubSub.unsubscribe(Chat.PubSub, dialog |> dialog_topic())
+    socket |> get_private(:user_channel_pid) |> send({:leave, dialog |> dialog_topic()})
 
     socket
     |> assign(:dialog, nil)
@@ -510,9 +514,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   end
 
   defp dialog_topic(%Dialogs.Dialog{} = dialog) do
-    dialog
-    |> Dialogs.key()
-    |> then(&"dialog:#{&1}")
+    Chat.Broadcast.Topic.dialog(dialog)
   end
 
   defp assign_messages(socket, per_page \\ @per_page)

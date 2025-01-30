@@ -130,8 +130,8 @@ defmodule Proxy.Api do
 
   def broadcast(msg) do
     case msg do
-      {:new_dialog_message, key, indexed_message} ->
-        Chat.Broadcast.new_dialog_message(indexed_message, key)
+      {:new_dialog_message, dialog_key, indexed_message} ->
+        Chat.Broadcast.new_dialog_message(indexed_message, dialog_key)
 
       {:new_user, card} ->
         Chat.Broadcast.new_user(card)

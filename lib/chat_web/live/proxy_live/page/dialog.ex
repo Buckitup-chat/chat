@@ -5,7 +5,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   require Logger
 
   import ChatWeb.MainLive.Page.Shared
-  import ChatWeb.LiveHelpers.SocketPrivate
+  import Tools.SocketPrivate
   import Phoenix.Component, only: [assign: 3]
 
   import Phoenix.LiveView,

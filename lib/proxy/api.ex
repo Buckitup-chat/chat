@@ -69,9 +69,10 @@ defmodule Proxy.Api do
   def request_room_access(args) do
     %{
       room_pub_key: room_key,
-      me: requester_pub_key
-    } = args |> unwrap_map_by(fn %{me: key} -> key end)
+      me: requester_card
+    } = args |> unwrap_map_by(fn %{me: card} -> Identify.pub_key(card) end)
 
+    requester_pub_key = Identify.pub_key(requester_card)
     time = DateTime.utc_now() |> DateTime.to_unix()
 
     room =
@@ -93,6 +94,9 @@ defmodule Proxy.Api do
     Chat.Broadcast.room_requested(room, requester_pub_key)
 
     :ok |> wrap()
+  catch
+    # x, y -> {:wrong_args, x, y, __STACKTRACE__} |> dbg()
+    _, _ -> :wrong_args |> wrap()
   end
 
   def select_data(args) do

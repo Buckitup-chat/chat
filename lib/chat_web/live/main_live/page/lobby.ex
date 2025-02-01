@@ -182,11 +182,18 @@ defmodule ChatWeb.MainLive.Page.Lobby do
         time = Chat.Time.monotonic_to_unix(time_offset)
         Log.approve_room_request(me, time, room.pub_key)
 
-        PubSub.broadcast!(
-          Chat.PubSub,
-          @topic,
-          {:room_request_approved, ciphered, user_key, room.pub_key}
-        )
+        Task.start(fn ->
+          :timer.sleep(3000)
+
+          # old way
+          PubSub.broadcast!(
+            Chat.PubSub,
+            @topic,
+            {:room_request_approved, ciphered, user_key, room.pub_key}
+          )
+        end)
+
+        Chat.Broadcast.room_request_approved(user_key, room.pub_key, ciphered)
 
       _ ->
         :ok

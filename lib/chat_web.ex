@@ -145,7 +145,7 @@ defmodule ChatWeb do
 
   defp socket_private_helpers do
     quote do
-      import ChatWeb.LiveHelpers.SocketPrivate
+      import Tools.SocketPrivate
     end
   end
 

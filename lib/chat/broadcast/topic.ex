@@ -11,4 +11,8 @@ defmodule Chat.Broadcast.Topic do
     end
     |> then(fn hex -> "dialog:#{hex}" end)
   end
+
+  def user_room_approval(user_key) do
+    "chat::user_room_approval:#{user_key |> Base.encode16(case: :lower)}"
+  end
 end

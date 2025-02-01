@@ -76,8 +76,9 @@ defmodule Chat.MixProject do
       {:cors_plug, "~> 3.0"},
 
       # Build tooling
-      {:esbuild, "~> 0.3", runtime: Mix.env() == :dev && Mix.target() == :host},
-      {:tailwind, "~> 0.1", runtime: Mix.env() == :dev},
+      {:live_vue, "~> 0.5"},
+      # {:esbuild, "~> 0.3", runtime: Mix.env() == :dev && Mix.target() == :host},
+      # {:tailwind, "~> 0.1", runtime: Mix.env() == :dev},
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
       {:sobelow, "~> 0.8", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
@@ -109,8 +110,19 @@ defmodule Chat.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get"],
-      "assets.deploy": ["esbuild default --minify", "tailwind default --minify", "phx.digest"]
+      # setup: ["deps.get"],
+      # "assets.deploy": ["esbuild default --minify", "tailwind default --minify", "phx.digest"],
+      setup: ["deps.get", "assets.setup", "assets.build"],
+      "assets.setup": ["cmd --cd assets npm install"],
+      "assets.build": [
+        "cmd --cd assets npm run build"
+        # "cmd --cd assets npm run build-server"
+      ],
+      "assets.deploy": [
+        "cmd --cd assets npm run build",
+        # "cmd --cd assets npm run build-server",
+        "phx.digest"
+      ]
     ]
   end
 

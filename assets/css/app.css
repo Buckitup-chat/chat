@@ -2,13 +2,19 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
-@import '/fonts/Inter/inter.css';
+@import "../../priv/static/fonts/Inter/inter.css";
 
 /* This file is for your main application CSS */
 
 html {
   min-height: 100%;
-  background: radial-gradient(100% 270.84% at 100% 100%, #C56139 0%, #722F58 48.96%, #502461 81.47%, #162755 100%);
+  background: radial-gradient(
+    100% 270.84% at 100% 100%,
+    #c56139 0%,
+    #722f58 48.96%,
+    #502461 81.47%,
+    #162755 100%
+  );
 }
 
 .dot-yellow {
@@ -40,7 +46,13 @@ html {
 }
 
 .a-content-block {
-  background: radial-gradient(100% 270.84% at 100% 100%, #C56139 0%, #722F58 48.96%, #502461 81.47%, #162755 100%);
+  background: radial-gradient(
+    100% 270.84% at 100% 100%,
+    #c56139 0%,
+    #722f58 48.96%,
+    #502461 81.47%,
+    #162755 100%
+  );
 }
 
 .a-outline {
@@ -56,7 +68,7 @@ html {
   }
   .unauthenticated {
     width: 355px;
-  } 
+  }
 
   .topVectorGroup {
     overflow: hidden;
@@ -65,7 +77,7 @@ html {
     right: -14%;
     top: -40%;
   }
-  
+
   .bottomVectorGroup {
     overflow: hidden;
     width: 836px;
@@ -76,17 +88,17 @@ html {
 }
 
 @media screen and (max-width: 480px) {
-  .unauthenticated { 
+  .unauthenticated {
     width: 288px;
   }
 
   .topVectorGroup {
     width: 357px;
-    height: 281px; 
+    height: 281px;
     right: -45%;
     top: -3%;
   }
-  
+
   .bottomVectorGroup {
     width: 357px;
     height: 281px;
@@ -95,7 +107,9 @@ html {
   }
 }
 
-.contentContainer { @apply basis-[100%] }
+.contentContainer {
+  @apply basis-[100%];
+}
 
 .goldGradient {
   color: rgba(82, 82, 34, 0.72);
@@ -105,11 +119,9 @@ html {
   box-shadow:
     2px 2px 0.5em rgba(155, 122, 89, 0.55),
     inset 1px 1px 0 rgba(255, 255, 255, 0.9),
-    inset -1px -1px 0 rgba(0, 0, 0, 0.5)
-  ;
+    inset -1px -1px 0 rgba(0, 0, 0, 0.5);
   border: 1px solid #caa173;
-  background:
-  -moz-linear-gradient(
+  background: -moz-linear-gradient(
     -72deg,
     #ffdea1,
     #ffffff 16%,
@@ -124,8 +136,7 @@ html {
     #ffdea1 84%,
     #736445
   );
-  background:
-  -webkit-linear-gradient(
+  background: -webkit-linear-gradient(
     -72deg,
     #ffdea1,
     #ffffff 16%,
@@ -140,8 +151,7 @@ html {
     #ffdea1 84%,
     #736445
   );
-  background:
-  -o-linear-gradient(
+  background: -o-linear-gradient(
     -72deg,
     #ffdea1,
     #ffffff 16%,
@@ -156,8 +166,7 @@ html {
     #ffdea1 84%,
     #736445
   );
-  background:
-  linear-gradient(
+  background: linear-gradient(
     -72deg,
     #ffdea1,
     #ffffff 16%,
@@ -182,11 +191,9 @@ html {
   box-shadow:
     2px 2px 0.5em rgba(122, 122, 122, 0.55),
     inset 1px 1px 0 rgba(255, 255, 255, 0.9),
-    inset -1px -1px 0 rgba(0, 0, 0, 0.34)
-  ;
+    inset -1px -1px 0 rgba(0, 0, 0, 0.34);
   border: 1px solid #dedede;
-  background:
-    -moz-linear-gradient(
+  background: -moz-linear-gradient(
     -72deg,
     #dedede,
     #ffffff 16%,
@@ -201,8 +208,7 @@ html {
     #dedede 84%,
     #a1a1a1
   );
-  background:
-  -webkit-linear-gradient(
+  background: -webkit-linear-gradient(
     -72deg,
     #dedede,
     #ffffff 16%,
@@ -217,8 +223,7 @@ html {
     #dedede 84%,
     #a1a1a1
   );
-  background:
-  -o-linear-gradient(
+  background: -o-linear-gradient(
     -72deg,
     #dedede,
     #ffffff 16%,
@@ -233,8 +238,7 @@ html {
     #dedede 84%,
     #a1a1a1
   );
-  background:
-  linear-gradient(
+  background: linear-gradient(
     -72deg,
     #dedede,
     #ffffff 16%,
@@ -257,16 +261,13 @@ html {
   font-weight: bold;
   text-shadow:
     1px 1px 0 #ffffff,
-    -1px -1px 0 #b7b7b7
-  ;
+    -1px -1px 0 #b7b7b7;
   box-shadow:
     2px 2px 0.5em rgba(98, 73, 122, 0.55),
     inset 1px 1px 0 rgba(255, 255, 255, 0.75),
-    inset -1px -1px 0 rgba(0, 0, 0, 0.34)
-  ;
+    inset -1px -1px 0 rgba(0, 0, 0, 0.34);
   border: 1px solid #cacaca;
-  background:
-  -moz-linear-gradient(
+  background: -moz-linear-gradient(
     -72deg,
     #dedede,
     #ffffff 16%,
@@ -283,8 +284,7 @@ html {
     #caa1de 93%,
     #dea1ca
   );
-  background:
-  -webkit-linear-gradient(
+  background: -webkit-linear-gradient(
     -72deg,
     #dedede,
     #ffffff 16%,
@@ -301,8 +301,7 @@ html {
     #caa1de 93%,
     #dea1ca
   );
-  background:
-  -o-linear-gradient(
+  background: -o-linear-gradient(
     -72deg,
     #dedede,
     #ffffff 16%,
@@ -319,8 +318,7 @@ html {
     #caa1de 93%,
     #dea1ca
   );
-  background:
-  linear-gradient(
+  background: linear-gradient(
     -72deg,
     #dedede,
     #ffffff 16%,
@@ -439,7 +437,7 @@ html {
 .tape-section:first-of-type::before {
   transform: rotate(-45deg);
   left: -4vmin;
-  top: 50
+  top: 50;
 }
 
 .tape-section:first-of-type::after {
@@ -459,32 +457,49 @@ html {
 }
 
 @media screen and (min-width: 640px) {
-  .navbar { @apply h-screen w-[70px] flex flex-none flex-col justify-between bg-white }
+  .navbar {
+    @apply h-screen w-[70px] flex flex-none flex-col justify-between bg-white;
+  }
 
-  .navbarTop { @apply hidden }
-  .navbarBottom { @apply hidden }
+  .navbarTop {
+    @apply hidden;
+  }
+  .navbarBottom {
+    @apply hidden;
+  }
 
-  .chatRoomBar { @apply h-screen w-[320px] min-w-fit flex flex-none flex-col bg-white/90 }
+  .chatRoomBar {
+    @apply h-screen w-[320px] min-w-fit flex flex-none flex-col bg-white/90;
+  }
 }
 
 @media screen and (max-width: 640px) {
-  .navbar { @apply hidden }
+  .navbar {
+    @apply hidden;
+  }
 
-  .navbarTop { @apply  w-screen h-12 flex items-center justify-between bg-white fixed top-0}
-  .navbarBottom { @apply  w-screen h-14 flex items-center justify-between bg-white fixed bottom-0 }
+  .navbarTop {
+    @apply w-screen h-12 flex items-center justify-between bg-white fixed top-0;
+  }
+  .navbarBottom {
+    @apply w-screen h-14 flex items-center justify-between bg-white fixed bottom-0;
+  }
 
-  .chatRoomBar { @apply w-screen py-11 bg-white/90 }
+  .chatRoomBar {
+    @apply w-screen py-11 bg-white/90;
+  }
 
   .sidebar-container {
     height: 85%;
     padding: 25px 0;
     overflow: scroll;
   }
-  
 }
 
 @media screen and (max-height: 300px) {
-  .a-content-block { @apply pb-5}
+  .a-content-block {
+    @apply pb-5;
+  }
 }
 
 .selectCheckbox {
@@ -508,12 +523,11 @@ html {
 }
 
 .sidebarIcon {
-  @apply flex flex-col items-center justify-center 
+  @apply flex flex-col items-center justify-center;
 }
 
 .dropdown {
-  @apply 
-  hidden 
+  @apply hidden 
   absolute
   right-0
   z-20
@@ -526,15 +540,15 @@ html {
   flex
   flex-col
   overflow-auto
-  min-w-fit
+  min-w-fit;
 }
 
 .dropdownItem {
-  @apply w-full h-11 px-2 flex items-center justify-start cursor-pointer hover:bg-black/10 
+  @apply w-full h-11 px-2 flex items-center justify-start cursor-pointer hover:bg-black/10;
 }
 
 .dropdownItem span {
-  @apply ml-2
+  @apply ml-2;
 }
 
 .centered {
@@ -589,12 +603,12 @@ html {
   transition: opacity 1s ease-out;
 }
 
-.phx-loading{
+.phx-loading {
   cursor: wait;
 }
 
 .phx-modal {
-  opacity: 1!important;
+  opacity: 1 !important;
   position: fixed;
   z-index: 11;
   left: 0;
@@ -602,7 +616,7 @@ html {
   width: 100%;
   height: 100%;
   overflow: auto;
-  background-color: rgba(0,0,0,0.4);
+  background-color: rgba(0, 0, 0, 0.4);
 }
 
 .phx-modal-content {
@@ -639,27 +653,47 @@ html {
 }
 
 .fade-out-flash {
-  animation: 2.0s ease-out 0s normal forwards 1 fade-out-keys;
+  animation: 2s ease-out 0s normal forwards 1 fade-out-keys;
 }
 
-@keyframes fade-in-scale-keys{
-  0% { scale: 0.95; opacity: 0; }
-  100% { scale: 1.0; opacity: 1; }
+@keyframes fade-in-scale-keys {
+  0% {
+    scale: 0.95;
+    opacity: 0;
+  }
+  100% {
+    scale: 1;
+    opacity: 1;
+  }
 }
 
-@keyframes fade-out-scale-keys{
-  0% { scale: 1.0; opacity: 1; }
-  100% { scale: 0.95; opacity: 0; }
+@keyframes fade-out-scale-keys {
+  0% {
+    scale: 1;
+    opacity: 1;
+  }
+  100% {
+    scale: 0.95;
+    opacity: 0;
+  }
 }
 
-@keyframes fade-in-keys{
-  0% { opacity: 0; }
-  100% { opacity: 1; }
+@keyframes fade-in-keys {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
-@keyframes fade-out-keys{
-  0% { opacity: 1; }
-  100% { opacity: 0; }
+@keyframes fade-out-keys {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 .fill-transparent {
@@ -672,4 +706,3 @@ html {
 .a-progress-bar {
   transform: rotate(280deg);
 }
-

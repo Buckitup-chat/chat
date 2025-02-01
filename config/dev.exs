@@ -18,8 +18,15 @@ config :chat, ChatWeb.Endpoint,
   secret_key_base: "BKyA6n6KrL/mmKlyg5a+4/ZlWq0cN3dFqfvNj9zaw6Acvnp++u6bXN5rkns5xVpE",
   watchers: [
     # Start the esbuild watcher by calling Esbuild.install_and_run(:default, args)
-    esbuild: {Esbuild, :install_and_run, [:default, ~w(--sourcemap=inline --watch)]}
+    # esbuild: {Esbuild, :install_and_run, [:default, ~w(--sourcemap=inline --watch)]}
+    npm: ["--silent", "run", "dev", cd: Path.expand("../assets", __DIR__)]
   ]
+
+config :live_vue,
+  vite_host: "http://localhost:5173",
+  ssr_module: LiveVue.SSR.ViteJS,
+  # if you want to disable SSR by default, make it false
+  ssr: false
 
 # ,
 # https: [
@@ -59,15 +66,23 @@ config :chat, ChatWeb.Endpoint,
 # Watch static and templates for browser reloading.
 config :chat, ChatWeb.Endpoint,
   live_reload: [
+    notify: [
+      live_view: [
+        ~r"lib/chat_web/core_components.ex$",
+        ~r"lib/chat_web/(live|components)/.*(ex|heex)$"
+      ]
+    ],
     patterns: [
+      # ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
+      ~r"lib/chat_web/controllers/.*(ex|heex)$",
       ~r"priv/static/.*(js|css|png|jpeg|jpg|gif|svg)$",
-      ~r"priv/gettext/.*(po)$",
+      # ~r"priv/gettext/.*(po)$",
       ~r"lib/chat_web/(live|views)/.*(ex)$",
       ~r"lib/chat_web/templates/.*(eex)$"
     ]
   ],
   watchers: [
-    tailwind: {Tailwind, :install_and_run, [:default, ~w(--watch)]}
+    # tailwind: {Tailwind, :install_and_run, [:default, ~w(--watch)]}
   ]
 
 # Do not include metadata nor timestamps in development logs

@@ -84,6 +84,10 @@ else
     server: true
 end
 
+config :live_vue,
+  ssr_module: LiveVue.SSR.NodeJS,
+  ssr: false
+
 # url: [host: "buckitup.app", port: 443],
 # secret_key_base: Map.fetch!(System.get_env(), "SECRET_KEY_BASE"),
 # check_origin: ["https://buckitup.app"],

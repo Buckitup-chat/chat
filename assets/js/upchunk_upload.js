@@ -1,4 +1,4 @@
-import * as UpChunk from "./upchunk"
+import * as UpChunk from '@mux/upchunk';
 
 let uploads = {}
 let uploadInitializers = {}

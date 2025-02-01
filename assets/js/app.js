@@ -18,18 +18,23 @@
 //     import "some-package"
 //
 
+import topbar from "topbar" // instead of ../vendor/topbar
+import { getHooks } from "live_vue"
+import liveVueApp from "../vue"
 // Include phoenix_html to handle method=PUT/DELETE in forms and buttons.
 import "phoenix_html"
 // Establish Phoenix Socket and LiveView configuration.
 import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
 import { UpChunkUploader, uploadEventHandlers } from "./upchunk_upload"
-import topbar from "../vendor/topbar"
+// import topbar from "../vendor/topbar"
 import Hooks from "./hooks"
 import CustomEvents from "./custom-events"
 import { initWebComponents } from "./web-components"
 import { EncryptionManager } from "./EncryptionManager";
 import { Enigma } from "./Enigma";
+
+import "../css/app.css"
 
 window.BuckitUp = {
   manager: new EncryptionManager(),
@@ -47,7 +52,10 @@ let liveSocket = new LiveSocket("/live", Socket, {
       legal_notice_key: "agreementAccepted"
     })
   },
-  hooks: Hooks,
+  hooks: {
+    ...Hooks,
+    ...getHooks(liveVueApp)
+  },
   uploaders: { UpChunkUploader }
 })
 

@@ -6,6 +6,7 @@ defmodule Chat.Broadcast do
   remote broadcast is for WebSocket clients
   remote channels are prefixed with "remote::" and has different message format
   """
+  require Logger
 
   alias Chat.Broadcast.Topic
   alias Chat.User.UsersBroker
@@ -47,13 +48,15 @@ defmodule Chat.Broadcast do
 
   defp local_broadcast(topic, message) do
     Phoenix.PubSub.broadcast(Chat.PubSub, topic, message)
-    ["local", topic, message] |> dbg()
+    # ["local", topic, message] |> dbg()
+    log([topic], message)
     topic
   end
 
   defp remote_broadcast(topic, event, message) do
     ChatWeb.Endpoint.broadcast("remote::" <> topic, event, message |> as_binary())
-    ["remote::" <> topic, event, message] |> dbg()
+    # ["remote::" <> topic, event, message] |> dbg()
+    log(["remote::" <> topic, event], message)
     topic
   end
 
@@ -61,5 +64,11 @@ defmodule Chat.Broadcast do
     term
     |> Proxy.Serialize.serialize()
     |> then(&{:binary, &1})
+  end
+
+  defp log(crumbs, message) do
+    topics = Enum.map_join(crumbs, " ", &"[#{&1}]")
+
+    ["[broadcast] ", topics, "  ", message |> inspect()] |> Logger.info()
   end
 end

@@ -63,7 +63,6 @@ defmodule Proxy.SocketClient.ChannelClient do
         socket.assigns.on_room_requested.(args)
 
       {"remote::chat::user_room_approval:" <> hex_user_key, "room_request_approved"} ->
-        [hex_user_key, args] |> dbg() |> inspect() |> Logger.error()
         user_key = Base.decode16!(hex_user_key, case: :lower)
         socket.assigns.on_room_approved.({user_key, args})
 

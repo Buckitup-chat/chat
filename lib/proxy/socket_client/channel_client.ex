@@ -29,44 +29,54 @@ defmodule Proxy.SocketClient.ChannelClient do
       |> Map.new(&{&1, Keyword.fetch!(opts, &1)})
 
     connect!(uri: uri)
+    |> assign(:connected, false)
+    |> assign(:queue, [])
     |> assign(callback_map)
     |> ok()
   end
 
   @impl Slipstream
-  def handle_connect(socket), do: socket |> join(@topic) |> ok()
+  def handle_connect(socket) do
+    socket
+    |> join(@topic)
+    |> assign(:connected, true)
+    |> serve_queue()
+    |> ok()
+  end
 
   @impl Slipstream
-  def handle_join(_topic, _join_response, socket), do: socket |> ok()
+  def handle_join(_topic, _join_response, socket) do
+    # ["joined topic", topic] |> dbg()
+    socket |> ok()
+  end
 
   @impl Slipstream
   def handle_message(topic, event, {:binary, data}, socket) do
     args = data |> Proxy.Serialize.deserialize_with_atoms()
-    ["client handle message", topic, event, args] |> dbg() |> inspect() |> Logger.error()
+    # ["client handle message", topic, event, args] |> dbg() |> inspect() |> Logger.error()
 
-    # case {topic, event} do
-    #   {@topic, "new_user"} ->
-    #     socket.assigns.on_new_user.(args)
-    #
-    #   {@topic, "room_request"} ->
-    #     socket.assigns.on_room_requested.(args)
-    #
-    #   {"remote::chat::user_room_approval:" <> hex_user_key, "room_request_approved"} ->
-    #     [hex_user_key, args] |> dbg() |> inspect() |> Logger.error()
-    #
-    #   # user_key = Base.decode16!(hex_user_key, case: :lower)
-    #   # socket.assigns.on_room_approved.({user_key, args})
-    #
-    #   {"remote::dialog:" <> hex_dialog_key, "new_dialog_message"} ->
-    #     dialog_key = Base.decode16!(hex_dialog_key, case: :lower)
-    #     socket.assigns.on_new_dialog_message.({dialog_key, args})
-    #
-    #   {_, _} ->
-    #     Logger.error(
-    #       "Was not expecting a push (binary) from the server. Heard: " <>
-    #         inspect({topic, event, args})
-    #     )
-    # end
+    case {topic, event} do
+      {@topic, "new_user"} ->
+        socket.assigns.on_new_user.(args)
+
+      {@topic, "room_request"} ->
+        socket.assigns.on_room_requested.(args)
+
+      {"remote::chat::user_room_approval:" <> hex_user_key, "room_request_approved"} ->
+        [hex_user_key, args] |> dbg() |> inspect() |> Logger.error()
+        user_key = Base.decode16!(hex_user_key, case: :lower)
+        socket.assigns.on_room_approved.({user_key, args})
+
+      {"remote::dialog:" <> hex_dialog_key, "new_dialog_message"} ->
+        dialog_key = Base.decode16!(hex_dialog_key, case: :lower)
+        socket.assigns.on_new_dialog_message.({dialog_key, args})
+
+      {_, _} ->
+        Logger.error(
+          "Was not expecting a push (binary) from the server. Heard: " <>
+            inspect({topic, event, args})
+        )
+    end
 
     socket |> ok()
   end
@@ -85,13 +95,13 @@ defmodule Proxy.SocketClient.ChannelClient do
   def handle_info(msg, socket) do
     case msg do
       {:join, topic} ->
-        join(socket, "remote::#{topic}")
+        maybe_join(socket, topic)
 
       {:leave, topic} ->
-        leave(socket, "remote::#{topic}")
+        maybe_leave(socket, topic)
 
       x ->
-        ["channel_clients", x] |> dbg() |> inspect() |> Logger.error()
+        ["!!!! channel_clients", x] |> dbg() |> inspect() |> Logger.error()
         socket
     end
     |> noreply()
@@ -100,5 +110,31 @@ defmodule Proxy.SocketClient.ChannelClient do
   @impl Slipstream
   def handle_disconnect(_reason, socket) do
     {:stop, :normal, socket}
+  end
+
+  defp maybe_join(socket, topic) do
+    if socket.assigns.connected do
+      join(socket, topic)
+    else
+      socket
+      |> assign(:queue, [{:join, topic} | socket.assigns.queue])
+    end
+  end
+
+  defp maybe_leave(socket, topic) do
+    if socket.assigns.connected do
+      leave(socket, topic)
+    else
+      socket
+      |> assign(:queue, [{:leave, topic} | socket.assigns.queue])
+    end
+  end
+
+  defp serve_queue(socket) do
+    Enum.reduce(socket.assigns.queue, socket, fn
+      {:join, topic}, socket -> join(socket, topic)
+      {:leave, topic}, socket -> leave(socket, topic)
+    end)
+    |> assign(:queue, [])
   end
 end

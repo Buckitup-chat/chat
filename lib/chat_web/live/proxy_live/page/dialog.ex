@@ -32,8 +32,11 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   alias Chat.Utils.StorageId
 
   alias ChatWeb.MainLive.Page
+  alias ChatWeb.State.ActorState
+  alias ChatWeb.State.RoomMapState
 
   alias Phoenix.PubSub
+  alias Proxy.SocketClient
 
   @per_page 15
 
@@ -44,7 +47,6 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   end
 
   def init(socket, user_id) do
-    actor = socket |> get_private(:actor)
     user_cache = socket |> get_private(:users_cache)
     peer_pub_key = user_id |> Base.decode16!(case: :lower)
     peer = Enum.find(user_cache, &(&1.pub_key == peer_pub_key))
@@ -53,10 +55,11 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
     # peer = User.by_id(user_id |> Base.decode16!(case: :lower))
 
     # local  but used for key only = kinda ok
-    dialog = Dialogs.find_or_open(actor.me, peer)
+    dialog = Dialogs.find_or_open(ActorState.my_identity(socket), peer)
 
     # Log.open_direct(me, time, peer)
-    socket |> get_private(:user_channel_pid) |> send({:join, dialog |> dialog_topic()})
+    socket
+    |> SocketClient.join(dialog |> dialog_topic())
 
     socket
     |> assign(:page, 0)
@@ -398,18 +401,14 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
     push_event(socket, "chat:redirect", %{url: url(~p"/get/zip/#{key}")})
   end
 
-  def accept_room_invite(
-        %{assigns: %{room_map: room_map}} = socket,
-        %{type: :room_invite, content: content} = msg,
-        render_fun
-      ) do
+  def accept_room_invite(socket, %{type: :room_invite, content: content} = msg, render_fun) do
     new_room_identity =
       content
       |> StorageId.from_json()
       |> RoomInvites.get()
       |> Identity.from_strings()
 
-    if Map.has_key?(room_map, Identity.pub_key(new_room_identity)) do
+    if RoomMapState.has_room?(socket, new_room_identity |> Identity.pub_key()) do
       socket
     else
       socket
@@ -426,7 +425,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   end
 
   def accept_room_invite_and_open_room(
-        %{assigns: %{me: me, dialog: dialog, room_map: room_map}} = socket,
+        %{assigns: %{me: me, dialog: dialog}} = socket,
         message_id
       ) do
     new_room_identity =
@@ -437,7 +436,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
       |> Identity.from_strings()
 
     socket =
-      if Map.has_key?(room_map, Identity.pub_key(new_room_identity)) do
+      if RoomMapState.has_room?(socket, new_room_identity |> Identity.pub_key()) do
         socket
       else
         socket
@@ -504,9 +503,8 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   def close(%{assigns: %{dialog: nil}} = socket), do: socket
 
   def close(%{assigns: %{dialog: dialog}} = socket) do
-    socket |> get_private(:user_channel_pid) |> send({:leave, dialog |> dialog_topic()})
-
     socket
+    |> SocketClient.leave(dialog |> dialog_topic())
     |> assign(:dialog, nil)
     |> assign(:messages, nil)
     |> assign(:peer, nil)
@@ -526,17 +524,17 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
          per_page
        ) do
     server = socket |> get_private(:server)
-    actor = socket |> get_private(:actor)
+    my_identity = ActorState.my_identity(socket)
     pid = self()
 
     Task.start(fn ->
-      peer = Dialogs.peer(dialog, actor.me)
-      Proxy.find_or_create_dialog(server, actor.me, peer)
+      peer = Dialogs.peer(dialog, my_identity)
+      Proxy.find_or_create_dialog(server, my_identity, peer)
 
       messages =
         Proxy.get_dialog_messages(server, dialog, max_index, per_page + 1)
         |> Enum.map(fn {{:dialog_message, _, index, _}, msg} ->
-          {index, msg} |> DialogMessaging.read(actor.me, dialog)
+          {index, msg} |> DialogMessaging.read(my_identity, dialog)
         end)
         |> Enum.filter(& &1)
         |> Enum.reverse()
@@ -603,21 +601,17 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
     |> assign(:message_update_mode, :append)
   end
 
-  defp update_invite_navigation(
-         %{assigns: %{room_map: room_map}} = socket,
-         msg,
-         room_identity,
-         render_fun
-       ) do
+  defp update_invite_navigation(socket, msg, room_identity, render_fun) do
     room_hash = room_identity |> Card.from_identity() |> Enigma.short_hash()
     room_key = room_identity |> Identity.pub_key()
+    known_room_keys = socket |> RoomMapState.get() |> Map.keys()
 
     socket
     |> push_event("chat:bulk-change", %{
       to: ".x-invite-navigation[data-room='#{room_hash}']",
       content:
         render_to_html_string(
-          %{msg: msg, room_key: room_key, room_keys: Map.keys(room_map)},
+          %{msg: msg, room_key: room_key, room_keys: known_room_keys},
           render_fun
         )
     })

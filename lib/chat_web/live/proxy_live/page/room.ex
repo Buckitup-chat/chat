@@ -17,13 +17,16 @@ defmodule ChatWeb.ProxyLive.Page.Room do
 
   import Phoenix.Component, only: [assign: 3]
 
-  # import ChatWeb.LiveHelpers.SocketPrivate
-
   # import Phoenix.LiveView,
   #   only: [consume_uploaded_entry: 3, push_event: 3, send_update: 2, push_patch: 2]
   #
   require Logger
 
+  alias ChatWeb.MainLive.Page.Login, as: MainLoginPage
+  alias ChatWeb.ProxyLive.Page
+  alias ChatWeb.State.ActorState
+  alias ChatWeb.State.RoomMapState
+  # alias Chat.Proto
   # alias Chat.Admin.MediaSettings
   # alias Chat.Broker
   # alias Chat.ChunkedFiles
@@ -44,7 +47,6 @@ defmodule ChatWeb.ProxyLive.Page.Room do
   # alias Chat.Utils
   # alias Chat.Utils.StorageId
   #
-  # alias ChatWeb.MainLive.Page
   #
   # alias Phoenix.PubSub
 
@@ -125,25 +127,29 @@ defmodule ChatWeb.ProxyLive.Page.Room do
   #   end
   # end
   #
-  # def store_key_copy(%{assigns: %{me: me, room_map: room_map}} = socket, room_identity) do
-  #   unless Map.has_key?(room_map, Identity.pub_key(room_identity)) do
-  #     my_notes = Dialogs.find_or_open(me)
+  # def store_key_copy(%{assigns: %{room_map: room_map}} = socket, room_identity) do
+  #   if not Map.has_key?(room_map, room_identity |> Proto.Identify.pub_key()) do
+  #     actor = socket |> get_private(:actor)
+  #     my_notes = Dialogs.find_or_open(actor.me)
   #
   #     room_identity
   #     |> Messages.RoomInvite.new()
-  #     |> Dialogs.add_new_message(me, my_notes)
-  #     |> RoomInviteIndex.add(my_notes, me, room_identity |> Identity.pub_key())
+  #     |> Dialogs.add_new_message(actor.me, my_notes)
+  #     |> RoomInviteIndex.add(my_notes, actor.me, room_identity |> Proto.Identify.pub_key())
   #   end
   #
   #   socket
   # end
-  #
-  # def store_new(socket, new_room_identity) do
-  #   socket
-  #   |> store_key_copy(new_room_identity)
-  #   |> Page.Login.store_new_room(new_room_identity)
-  #   |> Page.Lobby.refresh_room_list()
-  # end
+
+  def store_new(socket, new_room_identity) do
+    socket
+    # |> store_key_copy(new_room_identity)
+    |> ActorState.add_room_identity(new_room_identity)
+    |> RoomMapState.derive()
+    |> MainLoginPage.store_new_room_on_client(new_room_identity)
+    |> Page.Lobby.show_new_room(%{})
+  end
+
   #
   # def load_more_messages(%{assigns: %{page: page}} = socket) do
   #   socket

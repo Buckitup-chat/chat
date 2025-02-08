@@ -107,7 +107,8 @@ defmodule Proxy.SocketClient.ChannelClient do
   end
 
   @impl Slipstream
-  def handle_disconnect(_reason, socket) do
+  def handle_disconnect(reason, socket) do
+    Logger.error("Disconnected from channel client: #{inspect(reason)}")
     {:stop, :normal, socket}
   end
 

@@ -1,6 +1,7 @@
 defmodule ChatWeb.ProxyLive.Page.Room do
   @moduledoc "Room page"
 
+  alias Chat.Dialogs
   use ChatWeb, :component
 
   # import ChatWeb.MainLive.Page.Shared
@@ -26,17 +27,18 @@ defmodule ChatWeb.ProxyLive.Page.Room do
   alias ChatWeb.ProxyLive.Page
   alias ChatWeb.State.ActorState
   alias ChatWeb.State.RoomMapState
-  # alias Chat.Proto
+
+  alias Chat.Proto
   # alias Chat.Admin.MediaSettings
   # alias Chat.Broker
   # alias Chat.ChunkedFiles
   # alias Chat.Content.Memo
-  # alias Chat.Dialogs
+  alias Chat.Dialogs
   # alias Chat.FileIndex
   # alias Chat.Identity
   # alias Chat.Log
   # alias Chat.MemoIndex
-  # alias Chat.Messages
+  alias Chat.Messages
   # alias Chat.RoomInviteIndex
   # alias Chat.Rooms
   # alias Chat.Rooms.{Registry, Room, RoomMessageLinks, RoomRequest}
@@ -127,23 +129,28 @@ defmodule ChatWeb.ProxyLive.Page.Room do
   #   end
   # end
   #
-  # def store_key_copy(%{assigns: %{room_map: room_map}} = socket, room_identity) do
-  #   if not Map.has_key?(room_map, room_identity |> Proto.Identify.pub_key()) do
-  #     actor = socket |> get_private(:actor)
-  #     my_notes = Dialogs.find_or_open(actor.me)
-  #
-  #     room_identity
-  #     |> Messages.RoomInvite.new()
-  #     |> Dialogs.add_new_message(actor.me, my_notes)
-  #     |> RoomInviteIndex.add(my_notes, actor.me, room_identity |> Proto.Identify.pub_key())
-  #   end
-  #
-  #   socket
-  # end
+  def store_key_copy_in_my_notes(socket, room_identity) do
+    room_pub_key = room_identity |> Proto.Identify.pub_key()
+
+    if not RoomMapState.has_room?(socket, room_pub_key) do
+      my_identity = ActorState.my_identity(socket)
+      my_notes_dialog = Dialogs.find_or_open(my_identity)
+      server = socket |> Tools.SocketPrivate.get_private(:server)
+
+      Task.start(fn ->
+        room_identity
+        |> Messages.RoomInvite.new()
+        |> Chat.SignedParcel.wrap_dialog_message(my_notes_dialog, my_identity)
+        |> Proxy.save_parcel(server, my_identity)
+      end)
+    end
+
+    socket
+  end
 
   def store_new(socket, new_room_identity) do
     socket
-    # |> store_key_copy(new_room_identity)
+    |> store_key_copy_in_my_notes(new_room_identity)
     |> ActorState.add_room_identity(new_room_identity)
     |> RoomMapState.derive()
     |> MainLoginPage.store_new_room_on_client(new_room_identity)

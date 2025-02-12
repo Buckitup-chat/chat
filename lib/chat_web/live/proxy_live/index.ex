@@ -44,6 +44,7 @@ defmodule ChatWeb.ProxyLive.Index do
       "switch-lobby-mode" -> ProxyLobby.switch_lobby_mode(socket, params)
       "dialog/" <> _ -> ProxyDialog.handle_event(msg, params, socket)
       "room/send-request" <> _ -> ProxyLobby.handle_event(msg, params, socket)
+      "room/sync-stored" -> ProxyLobby.handle_event(msg, params, socket)
       "room/" <> _ -> ProxyRoom.handle_event(msg, params, socket)
       "chat:load-more" -> handle_general_event(msg, params, socket)
       "chat:" <> _ -> ProxyDialog.handle_event(msg, params, socket)

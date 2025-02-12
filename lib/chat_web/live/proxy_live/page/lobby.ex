@@ -4,23 +4,30 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
   require Logger
 
   alias Chat.Proto
+  alias Chat.Broadcast
 
   # import ChatWeb.LiveHelpers, only: [process: 2]
   import Phoenix.Component, only: [assign: 3]
-  import ChatWeb.LiveHelpers.SocketPrivate
+  import Tools.SocketPrivate
 
   # alias Chat.Identity
   # alias Chat.Log
   alias Chat.Rooms
 
-  alias ChatWeb.ProxyLive.ChannelClients
+  alias ChatWeb.MainLive.Page.Login, as: MainLoginPage
   alias ChatWeb.ProxyLive.Page
+  alias ChatWeb.State.ActorState
+  alias ChatWeb.State.RoomMapState
 
-  # @topic "chat::lobby"
+  alias Proxy.SocketClient
 
   def init(socket) do
-    # PubSub.subscribe(Chat.PubSub, @topic)
     # PubSub.subscribe(Chat.PubSub, StatusPoller.channel())
+
+    user_room_approval_topic =
+      socket
+      |> ActorState.my_pub_key()
+      |> Broadcast.Topic.user_room_approval()
 
     socket
     |> assign(:mode, :lobby)
@@ -37,23 +44,55 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
     # |> process(&join_approved_requests/1)
     |> tap(&make_user_list_request/1)
     |> tap(&make_room_list_request/1)
-    |> save_started_user_channel()
+    |> start_socket_client()
+    |> SocketClient.join(user_room_approval_topic)
   end
 
   def handle_event(msg, params, socket) do
     case msg do
       "lobby/search" -> socket |> filter_search_results(params)
       "room/send-request" -> socket |> send_room_request(params)
+      "room/sync-stored" -> socket |> MainLoginPage.sync_stored_room(params)
       _ -> socket |> tap(fn _ -> dbg(msg, params) end)
     end
   end
 
   def handle_info(msg, socket) do
     case msg do
-      {:new_user, user} -> socket |> append_user(user)
-      {:user_list, list} -> socket |> populate_user_list(list)
-      {:room_list, list} -> socket |> populate_room_list(list)
+      {:new_user, user} ->
+        socket |> append_user(user)
+
+      {:user_list, list} ->
+        socket |> populate_user_list(list)
+
+      {:room_list, list} ->
+        socket |> populate_room_list(list)
+
+      {:room_requested, room, requester_pub_key} ->
+        socket |> maybe_approve_room_requested(room, requester_pub_key)
+
+      {:room_approved, ciphered, room_key, requester_key} ->
+        socket |> join_approved_room(ciphered, room_key, requester_key)
     end
+  end
+
+  defp start_socket_client(socket) do
+    pid = self()
+
+    SocketClient.connect(socket,
+      on_new_user: fn card ->
+        send(pid, {:lobby, {:new_user, card}})
+      end,
+      on_new_dialog_message: fn {dialog_key, indexed_message} ->
+        send(pid, {:dialog, {:new_dialog_message, {dialog_key, indexed_message}}})
+      end,
+      on_room_requested: fn {room, requester_pub_key} ->
+        send(pid, {:lobby, {:room_requested, room, requester_pub_key}})
+      end,
+      on_room_approved: fn {requester_pub_key, {room_key, ciphered}} ->
+        send(pid, {:lobby, {:room_approved, ciphered, room_key, requester_pub_key}})
+      end
+    )
   end
 
   # def refresh_rooms_and_users(%{assigns: %{search_filter: :on}} = socket), do: socket
@@ -110,12 +149,12 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
   #   |> assign_user_list()
   # end
   #
-  # def show_new_room(%{assigns: %{search_filter: :on}} = socket, _), do: socket
-  #
-  # def show_new_room(socket, _room_card) do
-  #   socket
-  #   |> assign_room_list()
-  # end
+  def show_new_room(%{assigns: %{search_filter: :on}} = socket, _), do: socket
+
+  def show_new_room(socket, _room_card) do
+    socket
+    |> assign_room_list()
+  end
 
   def switch_lobby_mode(socket, %{"lobby-mode" => mode}), do: socket |> switch_lobby_mode(mode)
 
@@ -198,6 +237,33 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
   #   )
   # end
   #
+
+  def maybe_approve_room_requested(socket, room, user_key) do
+    room_key = room |> Proto.Identify.pub_key()
+    room_identity = socket.assigns.room_map[room_key]
+
+    if room_identity and Rooms.Room.valid?(room) and room.type == :public do
+      # approve room if in DB
+      #         Rooms.approve_request(room, user_key, room_map[room.pub_key], public_only: true)
+
+      # check room signature
+      # if room type is public
+      # cipher identity for requester
+      # and broadcast it into his channel
+
+      ciphered_room_identity =
+        room_identity
+        |> Chat.Identity.to_strings()
+        |> Enigma.encrypt(room_identity.private_key, user_key)
+
+      Chat.Broadcast.room_request_approved(user_key, room_key, ciphered_room_identity)
+    end
+
+    socket
+  rescue
+    _ -> socket
+  end
+
   # def approve_room_request(
   #       %{assigns: %{room_map: room_map, me: me, monotonic_offset: time_offset}} = socket,
   #       room_or_hash,
@@ -233,6 +299,26 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
   #   _ -> socket
   # end
   #
+  #
+
+  def join_approved_room(socket, ciphered_room_identity, room_key, user_key) do
+    my_public_key = ActorState.my_pub_key(socket)
+
+    if my_public_key == user_key and not RoomMapState.has_room?(socket, room_key) do
+      my_identity = ActorState.my_identity(socket)
+
+      new_room_identity =
+        Rooms.decipher_identity_with_key(ciphered_room_identity, my_identity, room_key)
+
+      # Rooms.clear_approved_request(new_room_identity, my_identity)
+
+      socket
+      |> Page.Room.store_new(new_room_identity)
+    else
+      socket
+    end
+  end
+
   # def join_approved_room(
   #       %{assigns: %{me: me, my_id: my_id, monotonic_offset: time_offset, room_map: room_map}} =
   #         socket,
@@ -272,17 +358,21 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
     # PubSub.unsubscribe(Chat.PubSub, @topic)
     # PubSub.unsubscribe(Chat.PubSub, StatusPoller.channel())
 
+    topic =
+      socket
+      |> ActorState.my_pub_key()
+      |> Chat.Broadcast.Topic.user_room_approval()
+
     socket
+    |> SocketClient.leave(topic)
   end
 
   defp assign_user_list(socket, search_term \\ "") do
     cache = socket |> get_private(:users_cache, [])
-    actor = socket |> get_private(:actor)
-    my_pubkey = actor.me |> Proto.Identify.pub_key()
 
     user_list =
       case search_term do
-        "" -> me_first_and_user_list(cache, my_pubkey)
+        "" -> me_first_and_user_list(cache, ActorState.my_pub_key(socket))
         search_term -> matching_user_list(cache, search_term)
       end
 
@@ -306,9 +396,8 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
 
   defp assign_room_list(socket, search_term \\ "") do
     cache = socket |> get_private(:rooms_cache, [])
-    actor = socket |> get_private(:actor)
-    room_map = socket |> get_private(:room_map, %{})
-    my_pubkey = actor.me |> Proto.Identify.pub_key()
+    room_map = RoomMapState.get(socket)
+    my_pubkey = ActorState.my_pub_key(socket)
 
     {joined, new} =
       cache
@@ -410,18 +499,17 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
   # end
 
   defp join_approved_requests(socket) do
-    socket
-    |> get_private(:rooms_cache)
-    |> dbg()
-
+    # socket
+    # |> get_private(:rooms_cache)
+    # |> dbg()
+    #
     socket
   end
 
   defp make_user_list_request(socket) do
     server = socket |> get_private(:server)
-    actor = socket |> get_private(:actor)
 
-    request_user_list(server, actor.me)
+    request_user_list(server, ActorState.my_identity(socket))
   end
 
   defp request_user_list(server, me) do
@@ -441,27 +529,6 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
     socket
     |> set_private(:users_cache, user_list)
     |> assign_user_list()
-  end
-
-  defp save_started_user_channel(socket) do
-    server = socket |> get_private(:server)
-    {:ok, user_channel_pid} = start_user_channel(server)
-
-    socket |> set_private(:user_channel_pid, user_channel_pid)
-  end
-
-  defp start_user_channel(server) do
-    pid = self()
-
-    ChannelClients.Users.start_link(
-      uri: "ws://#{server}/proxy-socket/websocket",
-      on_new_user: fn card ->
-        send(pid, {:lobby, {:new_user, card}})
-      end,
-      on_new_dialog_message: fn {dialog_key, indexed_message} ->
-        send(pid, {:dialog, {:new_dialog_message, {dialog_key, indexed_message}}})
-      end
-    )
   end
 
   defp append_user(socket, user) do
@@ -506,4 +573,11 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
     |> join_approved_requests()
     |> assign_room_list()
   end
+
+  #
+  # defp append_room_list(socket, room) do
+  #   socket
+  #   |> update_private(:rooms_cache, &[room | &1], [])
+  #   |> assign_room_list()
+  # end
 end

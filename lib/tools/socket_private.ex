@@ -1,4 +1,4 @@
-defmodule ChatWeb.LiveHelpers.SocketPrivate do
+defmodule Tools.SocketPrivate do
   @moduledoc """
   Socket private storage helpers
   """
@@ -14,5 +14,12 @@ defmodule ChatWeb.LiveHelpers.SocketPrivate do
   def set_private(%Socket{} = socket, key, value) do
     socket
     |> LiveView.put_private({@key_prefix, key}, value)
+  end
+
+  def update_private(%Socket{} = socket, key, fun, default) do
+    old_value = get_private(socket, key, default)
+
+    socket
+    |> set_private(key, fun.(old_value))
   end
 end

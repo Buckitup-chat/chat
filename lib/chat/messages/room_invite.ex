@@ -33,7 +33,8 @@ defimpl Chat.DryStorable, for: Chat.Messages.RoomInvite do
   def type(%RoomInvite{} = _), do: :room_invite
 
   def to_parcel(%RoomInvite{} = msg) do
-    {key, {secret, data}} = Chat.Content.RoomInvites.pack(msg.room_identity)
+    {key, {secret, data}} =
+      Chat.Content.RoomInvites.pack(msg.room_identity |> Identity.to_strings())
 
     {
       StorageId.to_json({key, secret}),

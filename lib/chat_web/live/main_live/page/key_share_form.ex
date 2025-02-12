@@ -8,8 +8,6 @@ defmodule ChatWeb.MainLive.Page.KeyShareForm do
 
   alias ChatWeb.MainLive.Layout
 
-  alias Phoenix.PubSub
-
   def mount(socket) do
     {:ok, socket |> assign(:share_users, MapSet.new())}
   end

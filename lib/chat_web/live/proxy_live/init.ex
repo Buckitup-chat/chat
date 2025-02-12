@@ -7,8 +7,9 @@ defmodule ChatWeb.ProxyLive.Init do
 
   use ChatWeb, :live_view
 
-  alias Chat.Proto
   alias ChatWeb.ProxyLive.Page
+  alias ChatWeb.State.ActorState
+  alias ChatWeb.State.RoomMapState
 
   def run_steps(step_list, socket) do
     Enum.reduce_while(step_list, socket, fn step, socket -> step.(socket) end)
@@ -32,8 +33,8 @@ defmodule ChatWeb.ProxyLive.Init do
     |> then(fn actor ->
       {:cont,
        socket
-       |> set_private(:actor, %Chat.Actor{} = actor)
-       |> set_private(:room_map, Map.new(actor.rooms, &{&1 |> Proto.Identify.pub_key(), &1}))}
+       |> ActorState.set(actor)
+       |> RoomMapState.derive()}
     end)
   rescue
     _ -> {:halt, socket |> push_navigate(to: ~p"/")}
@@ -47,16 +48,14 @@ defmodule ChatWeb.ProxyLive.Init do
   end
 
   def mimic_main_page_mount(socket, session) do
-    actor = socket |> get_private(:actor)
+    my_identity = ActorState.my_identity(socket)
+    my_pub_key = ActorState.my_pub_key(socket)
     os_name = session |> Map.get("operating_system", "unknown")
 
     socket
-    |> assign(:me, actor.me)
-    |> assign(:my_id, actor.me |> Proto.Identify.pub_key() |> Base.encode16(case: :lower))
-    |> assign(
-      :room_map,
-      actor.rooms |> Map.new(fn room -> {Proto.Identify.pub_key(room), room} end)
-    )
+    |> assign(:me, my_identity)
+    |> assign(:my_id, my_pub_key |> Base.encode16(case: :lower))
+    |> assign(:room_map, RoomMapState.get(socket))
     |> assign(:operating_system, os_name)
     |> assign(:db_status, %{
       flags: [],

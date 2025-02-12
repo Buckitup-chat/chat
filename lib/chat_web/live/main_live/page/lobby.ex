@@ -21,8 +21,10 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   @topic "chat::lobby"
 
   def init(socket) do
+    user_room_approval_topic = Chat.Broadcast.Topic.user_room_approval(socket.assigns.my_id)
     PubSub.subscribe(Chat.PubSub, @topic)
     PubSub.subscribe(Chat.PubSub, StatusPoller.channel())
+    PubSub.subscribe(Chat.PubSub, user_room_approval_topic)
 
     socket
     |> assign(:mode, :lobby)
@@ -229,8 +231,10 @@ defmodule ChatWeb.MainLive.Page.Lobby do
       |> assign_admin()
 
   def close(socket) do
+    user_room_approval_topic = Chat.Broadcast.Topic.user_room_approval(socket.assigns.my_id)
     PubSub.unsubscribe(Chat.PubSub, @topic)
     PubSub.unsubscribe(Chat.PubSub, StatusPoller.channel())
+    PubSub.unsubscribe(Chat.PubSub, user_room_approval_topic)
 
     socket
   end

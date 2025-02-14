@@ -83,6 +83,7 @@ defmodule ChatWeb.Router do
     post "/create-dialog", ProxyApiController, :create_dialog
     post "/save-parcel", ProxyApiController, :save_parcel
     post "/request-room-access", ProxyApiController, :request_room_access
+    post "/approve-room-request", ProxyApiController, :approve_room_request
     post "/update", ProxyApiController, :update
   end
 

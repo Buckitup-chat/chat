@@ -82,16 +82,32 @@ defmodule Proxy.Api do
       end)
 
     Chat.Rooms.RoomsBroker.put(room)
-
+    Chat.Broadcast.room_requested(room, requester_pub_key)
     Chat.Log.request_room_key(requester_pub_key, time, room.pub_key)
 
-    # PubSub.broadcast!(
-    #   Chat.PubSub,
-    #   @topic,
-    #   {:room_request, room, me}
-    # )
+    :ok |> wrap()
+  catch
+    # x, y -> {:wrong_args, x, y, __STACKTRACE__} |> dbg()
+    _, _ -> :wrong_args |> wrap()
+  end
 
-    Chat.Broadcast.room_requested(room, requester_pub_key)
+  def approve_room_request(args) do
+    %{
+      room_pub_key: room_key,
+      requester_key: user_key,
+      ciphered_room_identity: ciphered_room_identity,
+      me: approver_card
+    } = args |> unwrap_map_by(fn %{me: card} -> Identify.pub_key(card) end)
+
+    approver_pub_key = Identify.pub_key(approver_card)
+    time = DateTime.utc_now() |> DateTime.to_unix()
+
+    room =
+      Chat.Rooms.approve_request(room_key, user_key, ciphered_room_identity, public_only: true)
+
+    Chat.Rooms.RoomsBroker.put(room)
+
+    Chat.Log.approve_room_request(approver_pub_key, time, room.pub_key)
 
     :ok |> wrap()
   catch

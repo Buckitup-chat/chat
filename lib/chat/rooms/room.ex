@@ -71,20 +71,25 @@ defmodule Chat.Rooms.Room do
   def approve_request(
         %__MODULE__{requests: requests, type: type} = room,
         user_public_key,
-        %Identity{} = room_identity,
+        room_identity_or_ciphered,
         opts
       )
       when type in [:public, :request] do
     with public_only? <- Keyword.get(opts, :public_only, false),
          false <- public_only? and type != :public,
          true <- room |> valid?(),
+         ciphered <-
+           if(match?(%Identity{}, room_identity_or_ciphered),
+             do: cipher_identity_with_key(room_identity_or_ciphered, user_public_key),
+             else: room_identity_or_ciphered
+           ),
          new_requests <-
            Enum.map(requests, fn
              %RoomRequest{requester_key: ^user_public_key, pending?: true} ->
                %RoomRequest{
                  requester_key: user_public_key,
                  pending?: false,
-                 ciphered_room_identity: cipher_identity_with_key(room_identity, user_public_key)
+                 ciphered_room_identity: ciphered
                }
 
              x ->

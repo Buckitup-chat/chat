@@ -242,19 +242,25 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
     room_key = room |> Proto.Identify.pub_key()
     room_identity = socket.assigns.room_map[room_key]
 
-    if room_identity and Rooms.Room.valid?(room) and room.type == :public do
-      # approve room if in DB
-      #         Rooms.approve_request(room, user_key, room_map[room.pub_key], public_only: true)
+    room_is_valid_for_approval? =
+      room_identity and
+        room.type == :public and
+        Rooms.Room.valid?(room)
 
-      # check room signature
-      # if room type is public
-      # cipher identity for requester
-      # and broadcast it into his channel
+    if room_is_valid_for_approval? do
+      server = socket |> get_private(:server)
+      my_identity = ActorState.my_identity(socket)
 
       ciphered_room_identity =
         room_identity
         |> Chat.Identity.to_strings()
         |> Enigma.encrypt(room_identity.private_key, user_key)
+
+      Proxy.approve_room_request(
+        server,
+        my_identity,
+        {room_key, user_key, ciphered_room_identity}
+      )
 
       Chat.Broadcast.room_request_approved(user_key, room_key, ciphered_room_identity)
     end

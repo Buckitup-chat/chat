@@ -107,8 +107,13 @@ defmodule Chat.Rooms.Room do
 
   def clear_approved_request(
         %__MODULE__{requests: requests} = room,
-        %Identity{public_key: user_public_key} = _me
+        user_identity_or_pubkey
       ) do
+    user_public_key =
+      if match?(%Identity{}, user_identity_or_pubkey),
+        do: user_identity_or_pubkey |> Identify.pub_key(),
+        else: user_identity_or_pubkey
+
     new_requests =
       requests
       |> Enum.reject(&match?(%RoomRequest{requester_key: ^user_public_key, pending?: false}, &1))

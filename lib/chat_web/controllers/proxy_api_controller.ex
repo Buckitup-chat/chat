@@ -13,7 +13,8 @@ defmodule ChatWeb.ProxyApiController do
     save_parcel: &Api.save_parcel/1,
     bulk_get: &Api.bulk_get_data/1,
     request_room_access: &Api.request_room_access/1,
-    approve_room_request: &Api.approve_room_request/1
+    approve_room_request: &Api.approve_room_request/1,
+    clean_room_request: &Api.clean_room_request/1
   }
   |> Enum.each(fn {name, action} ->
     def unquote(name)(conn, params) do

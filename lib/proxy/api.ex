@@ -115,6 +115,24 @@ defmodule Proxy.Api do
     _, _ -> :wrong_args |> wrap()
   end
 
+  def clean_room_request(args) do
+    %{
+      room_pub_key: room_key,
+      me: requester_card
+    } = args |> unwrap_map_by(fn %{me: card} -> Identify.pub_key(card) end)
+
+    requester_pub_key = Identify.pub_key(requester_card)
+
+    room = Chat.Rooms.clear_approved_request(room_key, requester_pub_key)
+    Chat.Rooms.RoomsBroker.put(room)
+
+    :ok |> wrap()
+  catch
+    # x, y -> {:wrong_args, x, y, __STACKTRACE__} |> dbg()
+    _, _ -> :wrong_args |> wrap()
+  end
+
+  # General
   def select_data(args) do
     %{min: min, max: max, amount: amount} = args |> unwrap_map()
 

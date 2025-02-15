@@ -69,6 +69,15 @@ defmodule Proxy do
     |> api_approve_room_request(server)
   end
 
+  def clean_room_request(server, me, room_key) do
+    %{
+      room_pub_key: room_key,
+      me: me |> Chat.Card.from_identity()
+    }
+    |> add_signed_token(server, me.private_key)
+    |> api_clean_room_request(server)
+  end
+
   # Content
   def save_parcel(parcel, server, me) do
     %{
@@ -116,6 +125,7 @@ defmodule Proxy do
   defp api_save_parcel(args, server), do: api_post(server, "save-parcel", args)
   defp api_request_room_access(args, server), do: api_post(server, "request-room-access", args)
   defp api_approve_room_request(args, server), do: api_post(server, "approve-room-request", args)
+  defp api_clean_room_request(args, server), do: api_post(server, "clean-room-request", args)
 
   #  Request utilities
   ####################################

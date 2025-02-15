@@ -308,20 +308,30 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
   #
 
   def join_approved_room(socket, ciphered_room_identity, room_key, user_key) do
+    my_identity = ActorState.my_identity(socket)
     my_public_key = ActorState.my_pub_key(socket)
+    server = socket |> get_private(:server)
 
-    if my_public_key == user_key and not RoomMapState.has_room?(socket, room_key) do
-      my_identity = ActorState.my_identity(socket)
+    Task.start(fn ->
+      Proxy.clean_room_request(server, my_identity, room_key)
+    end)
 
-      new_room_identity =
-        Rooms.decipher_identity_with_key(ciphered_room_identity, my_identity, room_key)
+    cond do
+      my_public_key != user_key ->
+        socket
 
-      # Rooms.clear_approved_request(new_room_identity, my_identity)
+      RoomMapState.has_room?(socket, room_key) ->
+        socket
 
-      socket
-      |> Page.Room.store_new(new_room_identity)
-    else
-      socket
+      true ->
+        new_room_identity =
+          Rooms.decipher_identity_with_key(ciphered_room_identity, my_identity, room_key)
+
+        new_room_pub_key = new_room_identity.private_key |> Enigma.private_to_public()
+
+        if new_room_pub_key == room_key and new_room_pub_key == new_room_identity.public_key,
+          do: socket |> Page.Room.store_new(new_room_identity),
+          else: socket
     end
   end
 
@@ -402,17 +412,16 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
 
   defp assign_room_list(socket, search_term \\ "") do
     cache = socket |> get_private(:rooms_cache, [])
-    room_map = RoomMapState.get(socket)
     my_pubkey = ActorState.my_pub_key(socket)
 
     {joined, new} =
       cache
       |> Enum.filter(fn room ->
-        (room.type in [:public, :request] or Map.has_key?(room_map, room.pub_key)) and
+        (room.type in [:public, :request] or RoomMapState.has_room?(socket, room.pub_key)) and
           (search_term == "" or String.match?(room.name, ~r/#{search_term}/i))
       end)
       |> Enum.sort_by(fn room -> room.name end)
-      |> Enum.split_with(&Map.has_key?(room_map, &1.pub_key))
+      |> Enum.split_with(&RoomMapState.has_room?(socket, &1.pub_key))
 
     socket
     |> assign(:joined_rooms, joined)
@@ -505,11 +514,21 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
   # end
 
   defp join_approved_requests(socket) do
-    # socket
-    # |> get_private(:rooms_cache)
-    # |> dbg()
-    #
-    socket
+    new_rooms = socket.assigns.new_rooms
+    my_pub_key = ActorState.my_pub_key(socket)
+
+    new_rooms
+    |> Enum.reduce(%{}, fn room, acc ->
+      Rooms.list_approved_requests_for(room, my_pub_key)
+      |> case do
+        [] -> acc
+        [request | _] -> Map.put(acc, room, request)
+      end
+    end)
+    |> Enum.reduce(socket, fn {room, request}, socket ->
+      socket
+      |> join_approved_room(request.ciphered_room_identity, room.pub_key, my_pub_key)
+    end)
   end
 
   defp make_user_list_request(socket) do
@@ -576,6 +595,7 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
   defp populate_room_list(socket, room_list) do
     socket
     |> set_private(:rooms_cache, room_list)
+    |> assign_room_list()
     |> join_approved_requests()
     |> assign_room_list()
   end

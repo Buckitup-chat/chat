@@ -148,11 +148,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
     Log.request_room_key(me, time, room.pub_key)
 
-    PubSub.broadcast!(
-      Chat.PubSub,
-      @topic,
-      {:room_request, room, me |> Identity.pub_key()}
-    )
+    Chat.Broadcast.room_requested(room, me |> Identity.pub_key())
 
     socket
     |> assign(
@@ -330,12 +326,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
         %RoomRequest{ciphered_room_identity: ciphered} when is_bitstring(ciphered) ->
           time = Chat.Time.monotonic_to_unix(time_offset)
           Log.approve_room_request(me, time, room.pub_key)
-
-          PubSub.broadcast!(
-            Chat.PubSub,
-            @topic,
-            {:room_request_approved, ciphered, user_key, room.pub_key}
-          )
+          Chat.Broadcast.room_request_approved(user_key, room.pub_key, ciphered)
 
         _ ->
           :ok

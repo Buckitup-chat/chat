@@ -18,6 +18,7 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
   alias ChatWeb.ProxyLive.Page
   alias ChatWeb.State.ActorState
   alias ChatWeb.State.RoomMapState
+  alias ChatWeb.State.ServerRoomsState
 
   alias Proxy.SocketClient
 
@@ -192,16 +193,18 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
 
   defp send_room_request(socket, %{"room" => room_key_raw}) do
     room_key = room_key_raw |> Base.decode16!(case: :lower)
-    rooms = socket.assigns.new_rooms
 
-    if Enum.find(rooms, &(&1.pub_key == room_key)) do
+    if not RoomMapState.has_room?(socket, room_key) and
+         ServerRoomsState.has_room?(socket, room_key) do
       server = socket |> get_private(:server)
-      actor = socket |> get_private(:actor)
+      my_identity = ActorState.my_identity(socket)
 
-      Task.start(fn -> Proxy.request_room(server, actor.me, room_key) end)
+      Task.start(fn -> Proxy.request_room(server, my_identity, room_key) end)
     end
 
     socket
+    |> ServerRoomsState.mark_as_requested(room_key)
+    |> assign_room_list()
   end
 
   # should send updated room as from room update broadcast
@@ -411,27 +414,11 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
   end
 
   defp assign_room_list(socket, search_term \\ "") do
-    cache = socket |> get_private(:rooms_cache, [])
-    my_pubkey = ActorState.my_pub_key(socket)
-
-    {joined, new} =
-      cache
-      |> Enum.filter(fn room ->
-        (room.type in [:public, :request] or RoomMapState.has_room?(socket, room.pub_key)) and
-          (search_term == "" or String.match?(room.name, ~r/#{search_term}/i))
-      end)
-      |> Enum.sort_by(fn room -> room.name end)
-      |> Enum.split_with(&RoomMapState.has_room?(socket, &1.pub_key))
+    {joined, new} = ServerRoomsState.get_room_lists(socket, search_term)
 
     socket
     |> assign(:joined_rooms, joined)
-    |> assign(:new_rooms, new |> enrich_with_requested(my_pubkey))
-  end
-
-  defp enrich_with_requested(rooms, my_pubkey) do
-    Enum.map(rooms, fn room ->
-      Map.put(room, :is_requested?, Rooms.requested_by?(room.pub_key, my_pubkey))
-    end)
+    |> assign(:new_rooms, new)
   end
 
   # defp assign_admin(%{assigns: %{room_map: rooms}} = socket) do
@@ -594,7 +581,7 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
 
   defp populate_room_list(socket, room_list) do
     socket
-    |> set_private(:rooms_cache, room_list)
+    |> ServerRoomsState.set(room_list)
     |> assign_room_list()
     |> join_approved_requests()
     |> assign_room_list()
@@ -603,7 +590,7 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
   #
   # defp append_room_list(socket, room) do
   #   socket
-  #   |> update_private(:rooms_cache, &[room | &1], [])
+  #   |> ServerRoomsState.insert_room(room) 
   #   |> assign_room_list()
   # end
 end

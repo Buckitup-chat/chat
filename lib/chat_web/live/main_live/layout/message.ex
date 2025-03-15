@@ -559,8 +559,7 @@ defmodule ChatWeb.MainLive.Layout.Message do
   defp timestamp(assigns) do
     ~H"""
     <div class="px-2 text-grayscale600 flex justify-end mr-1" style="font-size: 10px;">
-      <time-stamp id={"timestamp-#{@msg.id}"} data-unixtime={@msg.timestamp} phx-update="ignore">
-      </time-stamp>
+      <time-stamp id={"timestamp-#{@msg.id}"} data-unixtime={@msg.timestamp}></time-stamp>
     </div>
     """
   end

@@ -59,8 +59,7 @@ defmodule ChatWeb.MainLive.Page.Feed do
       <div class="border-0 rounded-md bg-white/20 p-2 flex flex-col justify-start">
         <span class="text-white">{@user && @user.name} <.action action={@action} /></span>
         <div class="text-white/70" style="font-size: 10px;">
-          <time-stamp id={"timestamp-#{@dom_id}"} data-unixtime={@timestamp} phx-update="ignore">
-          </time-stamp>
+          <time-stamp id={"timestamp-#{@dom_id}"} data-unixtime={@timestamp}></time-stamp>
         </div>
       </div>
     </div>

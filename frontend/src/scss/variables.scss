@@ -1,0 +1,57 @@
+$dark: #000000;
+$dark2: rgb(86, 93, 94);
+
+$light_grey0: #f8f8f8;
+$light_grey: #f2f3f3;
+$light_grey2: #dfdfdf;
+$grey: #f2f3f3;
+$grey_dark: #9a9c9d;
+$grey_dark2: rgb(122, 122, 122);
+
+$warning: #fcb75c;
+$red: #dc3545;
+$orange: #fc965c;
+$green: #2ebe21;
+
+$blue: #2933fe;
+
+$white: #fff;
+$black: #000;
+$primary: #8e2b77;
+
+//$primary: #611e52;
+
+$transition: all 0.3s ease;
+
+$blockRadius: 1rem;
+$blockRadiusSm: 0.7rem;
+
+$headerHeighXs: 3.5rem;
+$headerHeighSm: 5rem;
+
+$sideBarWidth: 90px;
+$sideBarHeight: 62px;
+
+$sideBarWidthOpened: 220px;
+$sideBarWidthSm: 60px;
+$sideBarWidthOpenedSm: 250px;
+$footerHeigh: 3.5rem;
+
+$shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+
+$grid-breakpoints: (
+	xs: 0,
+	sm: 690px,
+	md: 768px,
+	lg: 992px,
+	xl: 1200px,
+	xxl: 1400px,
+) !default;
+
+$container-max-widths: (
+	sm: 540px,
+	md: 720px,
+	lg: 850px,
+	xl: 850.01px,
+	xxl: 850.02px,
+) !default;

@@ -60,12 +60,12 @@
 			</div>
 
 			<div class="d-flex justify-content-center mt-2">
-				<button class="btn btn-dark w-100" @click="register()" :disabled="!agree || registerTx">Activate</button>
+				<button class="btn btn-dark w-100" @click="register()" :disabled="!agree || processingTx">Activate</button>
 			</div>
 
-			<div :class="{ _input_block: registerTx }" class="mt-2">
-				<div class="small mb-2" v-if="registerTx">Latest transaction</div>
-				<Transactions :list="registerTx ? [registerTx] : null" only-last="true" />
+			<div :class="[processingTx ? '_input_block mt-2' : 'd-none']">
+				<div class="small mb-2">Latest transaction</div>
+				<Transactions :list="processingTx ? [processingTx] : null" only-last="true" />
 			</div>
 		</div>
 	</div>
@@ -134,7 +134,7 @@
 </style>
 
 <script setup>
-import { ref, inject, computed, watch } from 'vue';
+import { ref, inject, watch, onMounted, onUnmounted } from 'vue';
 import Transactions from '@/views/account/Transactions.vue';
 import axios from 'axios';
 import errorMessage from '@/utils/errorMessage';
@@ -145,18 +145,37 @@ const $timestamp = inject('$timestamp');
 const $web3 = inject('$web3');
 const $swal = inject('$swal');
 const $loader = inject('$loader');
+const $socket = inject('$socket');
 
 const steps = [1, 2, 3, 4];
 const step = ref(1);
 const agree = ref();
+const processingTx = ref();
 
-const registerTx = computed(() => {
-	const metaTxs = $user.transactions.filter((t) => t.method === 'registerWithSign');
-	return metaTxs.length ? metaTxs[0] : null;
+onMounted(async () => {
+	$socket.on('DISPATCH', dispatchListener);
+	$socket.on('WALLET_UPDATE', walletUpdateListener);
 });
 
+onUnmounted(async () => {
+	$socket.off('WALLET_UPDATE', walletUpdateListener);
+	$socket.off('DISPATCH', dispatchListener);
+});
+
+const dispatchListener = async (tx) => {
+	if ($user.account?.address?.toLowerCase() === tx.wallet.toLowerCase() && tx.method === 'registerWithSign') {
+		processingTx.value = tx;
+	}
+};
+
+const walletUpdateListener = async (wallet) => {
+	if ($user.account?.address?.toLowerCase() === wallet.toLowerCase()) {
+		$user.checkMetaWallet();
+	}
+};
+
 watch(
-	() => $user.accountInfo?.registeredMetaWallet,
+	() => $user.registeredMetaWallet,
 	(newVal) => {
 		if (newVal) {
 			closeModal();
@@ -170,6 +189,7 @@ watch(
 );
 
 const register = async () => {
+	if (!$user.checkOnline()) return;
 	try {
 		$loader.show();
 
@@ -209,7 +229,7 @@ const register = async () => {
 			timer: 5000,
 		});
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 		$swal.fire({
 			icon: 'error',
 			title: 'Register error',

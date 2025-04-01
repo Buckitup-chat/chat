@@ -26,27 +26,31 @@
 <script setup>
 import BackupShareItem from './Backup_Share_Item.vue';
 import Account_Item from '@/components/Account_Item.vue';
-import { ref, onMounted, watch, inject, computed } from 'vue';
+import { inject, computed } from 'vue';
 
-const $timestamp = inject('$timestamp');
 const $user = inject('$user');
-const $web3 = inject('$web3');
-const $swal = inject('$swal');
-const $route = inject('$route');
-const $loader = inject('$loader');
 const $breakpoint = inject('$breakpoint');
 
 const { item } = defineProps({
 	item: { type: Object, required: true },
 });
 
-onMounted(async () => {
-	console.log(item);
-});
-
 const contact = computed(() => {
+	let contact;
 	try {
-		return $user.contacts.find((c) => c.address.toLowerCase() === item.wallet.toLowerCase());
+		contact = $user.contacts.find((c) => c.address.toLowerCase() === item.wallet.toLowerCase());
 	} catch (error) {}
+
+	try {
+		if (!contact) {
+			contact = {
+				address: item.wallet,
+				name: 'Unknown',
+				notes: 'Not in contacts',
+				publicKey: item.wallet,
+			};
+		}
+	} catch (error) {}
+	return contact;
 });
 </script>

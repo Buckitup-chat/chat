@@ -43,7 +43,6 @@
 import { Modal } from 'bootstrap';
 import { ref, shallowRef, onMounted, defineAsyncComponent, inject, watch, computed } from 'vue';
 
-//const $user = inject('$user')
 const $mitt = inject('$mitt');
 
 const scrollable = ref(null);

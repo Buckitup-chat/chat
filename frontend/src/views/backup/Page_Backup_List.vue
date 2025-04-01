@@ -29,7 +29,7 @@
 			<div class="d-flex align-items-center justify-content-between w-100 pe-3">
 				<div class="fw-bold fs-5 py-1">My backups</div>
 				<div class="d-flex align-items-center">
-					<TopBarReuseTemplate v-if="$user.accountInfo.registeredMetaWallet && $breakpoint.gte('lg')" />
+					<TopBarReuseTemplate v-if="$user.registeredMetaWallet && $breakpoint.gte('lg')" />
 					<button class="btn btn-dark rounded-pill ms-1 d-flex align-items-center justify-content-center py-2" @click="$router.push({ name: 'backup_create' })">
 						<i class="_icon_plus bg-white"></i>
 						<span class="ms-2" v-if="$breakpoint.gte('sm')">Create</span>
@@ -37,15 +37,15 @@
 				</div>
 			</div>
 		</template>
-		<template #headerbottom v-if="$user.accountInfo.registeredMetaWallet && $breakpoint.lt('lg')">
+		<template #headerbottom v-if="$user.registeredMetaWallet && $breakpoint.lt('lg')">
 			<TopBarReuseTemplate class="mt-2 pe-3" />
 		</template>
 
 		<template #content>
 			<div class="_full_width_block">
 				<Account_Activate_Reminder />
-
-				<template v-if="$user.accountInfo.registeredMetaWallet">
+				<Offline_Reminder />
+				<template v-if="$user.registeredMetaWallet">
 					<div v-if="data.fetched">
 						<div v-if="!data.items.length" class="mt-3">
 							<div class="text-center fs-2 mb-3">No backups found</div>
@@ -56,7 +56,7 @@
 								</div>
 							</div>
 						</div>
-						<div class="_data_block mb-3" v-for="(backup, $index) in data.items" :key="backup.id">
+						<div class="_data_block mb-3" v-for="(backup, $index) in data.items" :key="backup.id + backup.fetchTimestamp">
 							<BackupItem :backup="backup" />
 						</div>
 					</div>
@@ -87,10 +87,11 @@
 import FullContentBlock from '@/components/FullContentBlock.vue';
 import Account_Activate_Reminder from '@/components/Account_Activate_Reminder.vue';
 import { createReusableTemplate } from '@vueuse/core';
+import Offline_Reminder from '../../components/Offline_Reminder.vue';
 
 import BackupItem from './Backup_Item.vue';
 import Paginate from '@/components/Paginate.vue';
-import { ref, onMounted, inject, onUnmounted, watch } from 'vue';
+import { ref, onMounted, inject, onUnmounted, watch, provide } from 'vue';
 import axios from 'axios';
 
 const $router = inject('$router');
@@ -114,18 +115,62 @@ const dataDefault = {
 
 const data = ref(JSON.parse(JSON.stringify(dataDefault)));
 
-onMounted(() => {
-	$socket.on('BACKUP_UPDATE', updateData);
+onMounted(async () => {
+	$socket.on('BACKUP_UPDATE', backupUpdateListener);
+	$socket.on('DISPATCH', dispatchListener);
 	data.value = JSON.parse(JSON.stringify(dataDefault));
+	await $user.checkMetaWallet();
 	getList();
 });
 
 onUnmounted(async () => {
-	$socket.off('BACKUP_UPDATE', updateData);
+	$socket.off('BACKUP_UPDATE', backupUpdateListener);
+	$socket.off('DISPATCH', dispatchListener);
 });
 
+const backupUpdateListener = async (backupUpdateData) => {
+	try {
+		const idx = data.value.items.findIndex((b) => b.tag === backupUpdateData.backup.tag);
+		if (idx > -1) {
+			data.value.items[idx] = backupUpdateData.backup;
+
+			if (backupUpdateData.action === 'updateBackupDisabled') {
+				$swal.fire({
+					icon: 'success',
+					title: 'Backup updated',
+					timer: 5000,
+				});
+			}
+			if (backupUpdateData.action === 'updateShareDelay') {
+				$swal.fire({
+					icon: 'success',
+					title: 'Delay updated',
+					timer: 5000,
+				});
+			}
+			if (backupUpdateData.action === 'updateShareDisabled') {
+				$swal.fire({
+					icon: 'success',
+					title: 'Share updated',
+					timer: 5000,
+				});
+			}
+		}
+	} catch (error) {
+		console.error(error);
+	}
+};
+
+const dispatchListener = async (tx) => {
+	const idx = data.value.items.findIndex((i) => i.tag === tx.methodData.tag);
+	if (idx > -1 && tx.status === 'PROCESSING') {
+		data.value.items[idx].processingTx = tx;
+		data.value.items[idx].fetchTimestamp++;
+	}
+};
+
 watch(
-	() => $user.accountInfo?.registeredMetaWallet,
+	() => $user.registeredMetaWallet,
 	async (newVal) => {
 		if (newVal) {
 			getList();
@@ -145,18 +190,6 @@ const resetSearch = async () => {
 const search = async () => {
 	if (!data.value.query.s) return;
 	getList();
-};
-
-const updateData = async (tagUpdate) => {
-	try {
-		const idx = data.value.items.findIndex((b) => b.tag === tagUpdate);
-		if (idx > -1) {
-			const bk = (await axios.get(API_URL + '/backup/get', { params: { tag: tagUpdate, chainId: $web3.mainChainId } })).data;
-			data.value.items[idx] = bk;
-		}
-	} catch (error) {
-		console.log(error);
-	}
 };
 
 function setPage(page) {
@@ -181,7 +214,7 @@ async function getList() {
 		data.value.totalPages = res.totalPages;
 		data.value.totalResults = res.totalResults;
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 		$swal.fire({
 			icon: 'error',
 			title: 'Fetch error',

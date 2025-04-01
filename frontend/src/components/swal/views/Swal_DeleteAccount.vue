@@ -28,8 +28,13 @@
 
 <script setup>
 import { inject, ref } from 'vue';
+import errorMessage from '@/utils/errorMessage';
 
+const $user = inject('$user');
+const $encryptionManager = inject('$encryptionManager');
 const $mitt = inject('$mitt');
+const $swal = inject('$swal');
+
 const confirmed = ref();
 
 const { data } = defineProps({
@@ -45,7 +50,26 @@ function backup() {
 	$mitt.emit('modal::open', { id: 'account_backup', showLocal: true });
 }
 
-function confirm() {
+async function confirm() {
 	$mitt.emit('swal::close', 'ok');
+	try {
+		await $encryptionManager.removeVault();
+		await $user.logout();
+		$user.vaults = await $encryptionManager.getVaults();
+
+		$swal.fire({
+			icon: 'success',
+			title: 'Account deleted',
+			timer: 5000,
+		});
+	} catch (error) {
+		console.error(error);
+		$swal.fire({
+			icon: 'error',
+			title: 'Recover error',
+			footer: errorMessage(error),
+			timer: 30000,
+		});
+	}
 }
 </script>

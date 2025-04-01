@@ -48,9 +48,7 @@
 	border-radius: 1rem;
 	overflow: hidden;
 	video {
-		//max-width: 20rem;
 		width: 100%;
-		//height: 30rem;
 	}
 }
 
@@ -64,7 +62,7 @@
 </style>
 
 <script setup>
-import { ref, onMounted, watch, inject, computed } from 'vue';
+import { ref, onMounted, inject } from 'vue';
 import QrScanner from 'qr-scanner';
 import { InvitationEncoder } from '@dxos/client/invitations';
 const qrScannerEl = ref();
@@ -117,7 +115,7 @@ const useManual = async () => {
 			scanning.value = false;
 		}
 	} catch (error) {
-		console.log('authenticate error', error);
+		console.error('authenticate error', error);
 	}
 };
 
@@ -138,7 +136,7 @@ const joinInvite = async () => {
 
 		invitation.value = await $user.dxClient.spaces.join(InvitationEncoder.decode(invitationCode.value));
 	} catch (error) {
-		console.log('authenticate error', error);
+		console.error('authenticate error', error);
 		invitationString.value = null;
 		invitationCode.value = null;
 		encryptionKey.value = null;
@@ -159,7 +157,7 @@ const authenticate = async () => {
 		console.log('Space ready');
 		await decryptAccount();
 	} catch (error) {
-		console.log('authenticate error', error);
+		console.error('authenticate error', error);
 
 		space.value = null;
 		invitation.value = null;
@@ -167,24 +165,24 @@ const authenticate = async () => {
 	authenticating.value = false;
 };
 
-const isWaitingForSpace = ref(false); // 🔹 Reactive flag for UI feedback
+const isWaitingForSpace = ref(false);
 
 const waitForSpaceConnection = async (spaceKey, maxRetries = 10, interval = 1000) => {
-	isWaitingForSpace.value = true; // 🔹 Start showing "Waiting..." message
+	isWaitingForSpace.value = true;
 	for (let i = 0; i < maxRetries; i++) {
-		console.log(`⏳ Checking for space connection... (Attempt ${i + 1}/${maxRetries})`);
+		console.log(`Checking for space connection... (Attempt ${i + 1}/${maxRetries})`);
 		const spaces = $user.dxClient.spaces.get();
 		const spaceToConnect = spaces.find((s) => s.key.toHex() === spaceKey);
 		if (spaceToConnect) {
-			console.log('✅ Space found:', spaceToConnect);
-			isWaitingForSpace.value = false; // 🔹 Stop showing "Waiting..." message
+			console.log('Space found:', spaceToConnect);
+			isWaitingForSpace.value = false;
 			return true;
 		}
 		// Wait before the next attempt
 		await new Promise((resolve) => setTimeout(resolve, interval));
 	}
-	console.log('❌ Space connection timed out.');
-	isWaitingForSpace.value = false; // 🔹 Stop waiting if timed out
+	console.log('Space connection timed out.');
+	isWaitingForSpace.value = false;
 	return null;
 };
 
@@ -207,7 +205,6 @@ const decryptAccount = async () => {
 			const privateKey = $enigma.decryptDataSync(encryptedAccount.privateKey, encryptionKey.value);
 
 			const account = await $user.generateAccount(privateKey);
-			console.log('account', account);
 
 			if (account) {
 				const accountInfoQuery = await space.db.query((doc) => doc.type === 'accountInfo').run();
@@ -231,7 +228,6 @@ const decryptAccount = async () => {
 					await $encryptionManager.setData($user.toVaultFormat($user.account));
 					$user.space = space;
 
-					await $user.updateVault();
 					await $user.openSpace();
 
 					if (qrScanner.value && scanning.value) {
@@ -243,7 +239,7 @@ const decryptAccount = async () => {
 
 					$mitt.emit('account::created');
 					$mitt.emit('modal::close');
-					$router.push({ name: 'account_info' });
+					$router.replace({ name: 'account_info' });
 					$swal.fire({
 						icon: 'success',
 						title: 'Device connected',
@@ -253,7 +249,7 @@ const decryptAccount = async () => {
 			}
 		}
 	} catch (error) {
-		console.log('decryptAccount error', error);
+		console.error('decryptAccount error', error);
 	}
 	decrypting.value = false;
 	$loader.hide();

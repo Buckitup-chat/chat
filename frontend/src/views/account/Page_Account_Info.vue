@@ -50,7 +50,7 @@
 </style>
 
 <script setup>
-import { ref, onMounted, watch, inject, computed } from 'vue';
+import { inject, computed } from 'vue';
 import Account_Info from '@/components/Account_Info.vue';
 import FullContentBlock from '@/components/FullContentBlock.vue';
 
@@ -76,7 +76,7 @@ const deleteAccount = async () => {
 	if (!(await $swalModal.value.open({ id: 'delete_account' }))) return;
 	const idx = $user.vaults.findIndex((v) => v.address === $user.account.address);
 	if (idx > -1) $user.vaults.splice(idx, 1);
-	$user.updateVault();
+
 	$user.logout();
 	$router.push({ name: 'login' });
 };

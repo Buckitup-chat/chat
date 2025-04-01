@@ -1,4 +1,4 @@
-import { BigNumber, utils } from 'ethers';
+import { formatUnits, getAddress } from 'ethers';
 import dayjs from 'dayjs';
 
 export default {
@@ -70,7 +70,7 @@ export default {
 
 	compareAddress(addr1, addr2) {
 		try {
-			return utils.getAddress(addr1) === utils.getAddress(addr2);
+			return getAddress(addr1) === getAddress(addr2);
 		} catch (error) {
 			return false;
 		}
@@ -82,35 +82,30 @@ export default {
 		//BigInt.isBigNumber
 		//if (!BigNumber.isBigNumber(val)) return '--';
 
-		let n = parseFloat(utils.formatUnits(val, decimals)).toFixed(fixed);
+		let n = parseFloat(formatUnits(val, decimals)).toFixed(fixed);
 		return n;
 		//if (n.match(/\./)) n = n.replace(/\.?0+$/, '');
 		n = n.slice(0, n.indexOf('.') + fixed + 1);
 		return this.numberWithCommas(n, fixed); //.replace(/\.0+$/,'');
 	},
 
-	weiToBn(val) {
-		if (val === null || val === undefined) return null;
-		if (typeof val === 'string') return BigNumber.from(val);
-		return null;
-	},
+	//weiToBn(val) {
+	//	if (val === null || val === undefined) return null;
+	//	if (typeof val === 'string') return BigNumber.from(val);
+	//	return null;
+	//},
 
-	anyBNValue(val) {
-		if (val === null || val === undefined) return '--';
-		if (typeof val === 'string') return val;
-		if (!BigNumber.isBigNumber(val)) return '--';
-		return val.toString();
-	},
+	//anyBNValue(val) {
+	//	if (val === null || val === undefined) return '--';
+	//	if (typeof val === 'string') return val;
+	//	if (!BigNumber.isBigNumber(val)) return '--';
+	//	return val.toString();
+	//},
 
 	numberWithCommas(x, fixed) {
 		if (x === undefined || x === null || x === '--') return '--';
 		if (x === '--' || x === 'ERROR') return x;
 		return parseFloat(parseFloat(x).toFixed(fixed));
-		//console.log(parseFloat(parseFloat(x).toFixed(fixed)))
-		var parts = parseFloat(parseFloat(x).toFixed(fixed)).toLocaleString('fullwide', { useGrouping: false }).split('.');
-
-		parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-		return parts.join('.');
 	},
 
 	abbrNum(number, decPlaces = 0) {

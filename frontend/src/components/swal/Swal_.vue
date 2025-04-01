@@ -96,7 +96,7 @@ const open = async (data) => {
 			resolvePromise = resolve;
 		});
 	} catch (error) {
-		console.log('swal modal open', error);
+		console.error('swal modal open', error);
 	}
 };
 

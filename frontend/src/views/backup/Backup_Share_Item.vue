@@ -33,7 +33,7 @@
 			<div class="col-30 col-xl-6 d-flex flex-column flex-xl-row justify-content-start justify-content-xl-center align-items-start align-items-xl-center">
 				<div class="mb-1 d-block d-xl-none fw-bold">Recovery delay</div>
 
-				<div class="_btn_block _blue" v-if="share.delay" @click="updateShareDelay()" :disabled="tx.length" :class="{ _disabled: share.disabled }">
+				<div class="_btn_block _blue" v-if="share.delay" @click="updateShareDelay()" :disabled="tx" :class="{ _disabled: share.disabled }">
 					<i class="_icon_timer me-2"></i>
 					<span class="fw-bold ms-1">{{ $filters.secondsToHMS(share.delay) }}</span>
 
@@ -62,14 +62,26 @@
 
 			<div class="col-30 col-xl-6 d-flex justify-content-end align-items-center text-center">
 				<div class="btn-group w-100" role="group" aria-label="Basic mixed styles example" v-if="isOwner">
-					<button type="button" class="btn btn-outline-dark btn-sm w-100" @click="updateShareDisabled()" v-if="isOwner && !share.unlocked" :disabled="tx.length">
+					<button
+						type="button"
+						class="btn btn-outline-dark btn-sm w-100"
+						@click="updateShareDisabled()"
+						v-if="isOwner && !share.unlocked"
+						:disabled="share.processingTx || backup.processingTx"
+					>
 						{{ share.disabled ? 'Enable' : 'Disable' }}
 					</button>
 
-					<button type="button" class="btn btn-outline-dark btn-sm w-100" @click="deleteBackup()" v-if="share.unlocked">Delete</button>
+					<button type="button" class="btn btn-outline-dark btn-sm w-100" @click="deleteBackup()" v-if="share.unlocked" :disabled="share.processingTx || backup.processingTx">Delete</button>
 
 					<div class="btn-group" role="group" v-if="!share.unlocked">
-						<button type="button" class="btn btn-outline-dark btn-sm dropdown-toggle px-3" data-bs-toggle="dropdown" aria-expanded="false" :disabled="tx.length"></button>
+						<button
+							type="button"
+							class="btn btn-outline-dark btn-sm dropdown-toggle px-3"
+							data-bs-toggle="dropdown"
+							aria-expanded="false"
+							:disabled="share.processingTx || backup.processingTx"
+						></button>
 						<ul class="dropdown-menu">
 							<li>
 								<a class="dropdown-item d-flex align-items-center" href="#" v-if="isOwner" @click="updateShareDelay()">
@@ -87,8 +99,8 @@
 					</div>
 				</div>
 
-				<div class="btn-group w-100" role="group" aria-label="Basic mixed styles example" v-if="share.stealthAddress?.toLowerCase() === stealthAddr">
-					<button type="button" class="btn btn-outline-dark btn-sm w-100" @click="requestRecover()" v-if="isRequestRequired" :disabled="tx.length">Request</button>
+				<div class="btn-group w-100" role="group" aria-label="Basic mixed styles example" v-if="share.stealthAddress?.toLowerCase() === stealthAddr?.toLowerCase()">
+					<button type="button" class="btn btn-outline-dark btn-sm w-100" @click="requestRecover()" v-if="isRequestRequired" :disabled="share.processingTx">Request</button>
 
 					<button type="button" class="btn btn-outline-danger btn-sm w-100" @click="requestRecover()" v-if="share.request && !share.unlocked" disabled>Requested</button>
 
@@ -112,8 +124,9 @@
 			</div>
 		</div>
 
-		<div v-show="tx" v-if="!isOwner" class="mt-2">
-			<Transactions :list="tx" />
+		<div :class="[share.processingTx && !isOwner ? '_input_block mt-2' : 'd-none']">
+			<div class="small mb-2">Latest transaction</div>
+			<Transactions :list="share.processingTx ? [share.processingTx] : null" only-last="true" />
 		</div>
 	</div>
 </template>
@@ -206,7 +219,6 @@
 
 <script setup>
 import { ref, onMounted, watch, inject, computed } from 'vue';
-//import { useReadContract } from '@wagmi/vue';
 import { decryptToString } from '@lit-protocol/encryption';
 import { cipher, decryptWithPrivateKey } from 'eth-crypto';
 import copyToClipboard from '@/utils/copyToClipboard';
@@ -224,7 +236,6 @@ const $loader = inject('$loader');
 const $swalModal = inject('$swalModal');
 const $router = inject('$router');
 const $appstate = inject('$appstate');
-
 const shareDelay = ref();
 const truncated = ref(true);
 
@@ -236,19 +247,11 @@ const { backup, share, idx } = defineProps({
 
 onMounted(async () => {
 	init();
-	//console.log(backup, share, idx);
-});
-
-const tx = computed(() => {
-	return $user.transactions.filter(
-		(t) => (t.method === 'updateShareDelay' || t.method === 'requestRecover' || t.method === 'updateShareDisabled') && t.status === 'PROCESSING' && t.methodData.tag === backup.tag,
-	);
 });
 
 watch(
 	() => backup,
-	async (newResult) => {
-		//console.log('watch backupData', newResult);
+	() => {
 		init();
 	},
 	{ deep: true },
@@ -279,14 +282,13 @@ const init = async () => {
 	privateKey.value = null;
 	shareDelay.value = share.delay;
 	message.value = null;
-	stealthAddr.value = $web3.bukitupClient.getStealthAddressFromEphemeral($user.account.metaPrivateKey, share.ephemeralPubKey).toLowerCase();
-	if (stealthAddr.value === share.stealthAddress.toLowerCase()) {
+	stealthAddr.value = $web3.bukitupClient.getStealthAddressFromEphemeral($user.account.metaPrivateKey, share.ephemeralPubKey);
+	if (stealthAddr.value.toLowerCase() === share.stealthAddress.toLowerCase()) {
 		privateKey.value = $web3.bukitupClient.generateStealthPrivateKey($user.account.metaPrivateKey, share.ephemeralPubKey);
 		try {
 			message.value = await decryptWithPrivateKey(privateKey.value.slice(2), cipher.parse(share.messageEncrypted.slice(2)));
-			//console.log('message', message.value);
 		} catch (error) {
-			console.log('message', error);
+			console.error('message', error);
 		}
 	}
 	if (isOwner.value && share.addressEncrypted) {
@@ -323,7 +325,9 @@ const timeLeft = computed(() => {
 });
 
 const updateShareDisabled = async () => {
-	if (tx.value.length) return;
+	if (!$user.checkOnline()) return;
+
+	if (!isOwner.value) return;
 	if (
 		!(await $swalModal.value.open({
 			id: 'confirm',
@@ -376,7 +380,7 @@ const updateShareDisabled = async () => {
 			timer: 5000,
 		});
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 		$swal.fire({
 			icon: 'error',
 			title: 'Update backup share error',
@@ -388,7 +392,8 @@ const updateShareDisabled = async () => {
 };
 
 const updateShareDelay = async () => {
-	if (tx.value.length) return;
+	if (!$user.checkOnline()) return;
+
 	if (!isOwner.value) return;
 	const newDelay = await $swalModal.value.open({
 		id: 'update_backup_share_delay',
@@ -396,16 +401,6 @@ const updateShareDelay = async () => {
 	});
 
 	if (newDelay === undefined || newDelay === false || newDelay == share.delay) return;
-
-	//await new Promise((resolve) => setTimeout(resolve, 450));
-	//if (
-	//	!(await $swalModal.value.open({
-	//		id: 'confirm',
-	//		title: 'Update recovery delay',
-	//		content: 'Confirm transaction',
-	//	}))
-	//)
-	//	return;
 
 	try {
 		$loader.show();
@@ -450,7 +445,7 @@ const updateShareDelay = async () => {
 			timer: 5000,
 		});
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 		$swal.fire({
 			icon: 'error',
 			title: 'Update recovery delay',
@@ -462,7 +457,8 @@ const updateShareDelay = async () => {
 };
 
 const requestRecover = async () => {
-	if (tx.value.length) return;
+	if (!$user.checkOnline()) return;
+
 	if (
 		!(await $swalModal.value.open({
 			id: 'confirm',
@@ -494,10 +490,12 @@ const requestRecover = async () => {
 			idx: share.idx,
 			expire,
 		};
-		const signature = await $web3.signTypedData($user.account.privateKey, domain, types, message);
+		const wallet = new Wallet(privateKey.value);
+
+		const signature = await $web3.signTypedData(privateKey.value, domain, types, message);
 
 		await axios.post(API_URL + '/dispatch/requestRecover', {
-			wallet: $user.account.address,
+			wallet: stealthAddr.value,
 			chainId: $web3.mainChainId,
 			tag: backup.tag,
 			idx: share.idx,
@@ -512,7 +510,7 @@ const requestRecover = async () => {
 			timer: 5000,
 		});
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 		$swal.fire({
 			icon: 'error',
 			title: 'Recover request',
@@ -527,13 +525,15 @@ const recover = async (saveType) => {
 	try {
 		$loader.show();
 
-		const checkAccess = await $web3.vaultContract.getGranted($user.account.address);
+		const signer = new Wallet(privateKey.value);
+
+		console.log($web3.vaultContract);
+
+		const checkAccess = await $web3.vaultContract.granted(backup.tag, share.idx, signer.address);
 		if (!checkAccess) {
 			$loader.hide();
 			throw new Error('Not granted');
 		}
-
-		const signer = new Wallet(privateKey.value);
 
 		const capacityDelegationAuthSig = (
 			await axios.post(API_URL + '/lit/getCreditsSign', {
@@ -555,6 +555,8 @@ const recover = async (saveType) => {
 			$web3.litClient,
 		);
 		const secret = await $web3.bukitupClient.decryptShare(decodedShare, privateKey.value);
+
+		await $web3.disconnectLit();
 
 		if (saveType === 'copy') {
 			copyToClipboard(secret);
@@ -579,7 +581,7 @@ const recover = async (saveType) => {
 			URL.revokeObjectURL(url);
 		}
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 		$swal.fire({
 			icon: 'error',
 			title: 'Recover error',

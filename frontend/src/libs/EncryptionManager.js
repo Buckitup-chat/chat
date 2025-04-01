@@ -30,8 +30,6 @@ export class EncryptionManager extends EventTarget {
 
 		this.#isProduction = IS_PRODUCTION;
 
-		//console.log('EncryptionManager', IS_PRODUCTION, this.#rawStore);
-
 		this.getVaults();
 	}
 
@@ -109,7 +107,7 @@ export class EncryptionManager extends EventTarget {
 				this.#vault = {
 					id: data.publicKey,
 				};
-				//console.log('this.#vault', this.#vault);
+
 				this.#vaults.push({
 					name: data.keyOptions.username,
 					address: data.address,
@@ -119,14 +117,9 @@ export class EncryptionManager extends EventTarget {
 					vaultId: this.#vault.id,
 				});
 
-				//console.log('this.#vaults', this.#vaults);
-
 				await this.#rawStore.set('test-vaults-registry', this.#vaults);
 
-				//console.log('this.#vaults 2', this.#vaults);
-
-				const vaults = await this.#rawStore.get('test-vaults-registry');
-				//console.log('test-vaults-registry', vaults);
+				await this.#rawStore.get('test-vaults-registry');
 			}
 
 			// Set isAuth using the setter
@@ -134,7 +127,7 @@ export class EncryptionManager extends EventTarget {
 
 			console.log('Created a new vault with ID:', this.#vault.id);
 		} catch (error) {
-			console.log('createVault error', error);
+			console.error('createVault error', error);
 			//await this.handleError(error, "Error creating a new vault");
 		}
 	}
@@ -171,23 +164,23 @@ export class EncryptionManager extends EventTarget {
 		this.isAuth = false;
 	}
 
-	async removeVault() {
+	async removeVault(id) {
+		if (!id) id = this.#vault.id;
 		try {
-			const vaults = this.#vaults.filter((item) => item.id !== this.#vault.id);
+			const vaults = this.#vaults.filter((item) => item.vaultId !== id);
 
 			if (this.#isProduction) {
-				const vaultData = await this.#rawStore.get(`local-vault-${this.#vault.id}`);
+				const vaultData = await this.#rawStore.get(`local-vault-${id}`);
 				await this.#vault.clear();
 				removeLocalAccount(vaultData.accountID);
 				await this.#rawStore.set('vaults-registry', vaults);
 			} else {
-				await this.#rawStore.remove(`test-local-vault-${this.#vault.id}`);
+				await this.#rawStore.remove(`test-local-vault-${id}`);
 				await this.#rawStore.set('test-vaults-registry', vaults);
 			}
 
 			this.#vaults = vaults;
 
-			console.log('removeVault');
 			this.#vault = null;
 			this.isAuth = false;
 		} catch (error) {
@@ -200,7 +193,6 @@ export class EncryptionManager extends EventTarget {
 	 * @param {string} value - Data to save.
 	 */
 	async setData(value) {
-		//console.log(`setData:`, value);
 		try {
 			//await this.ensureVault();
 			//const vaultID = await this.getVaultID();
@@ -210,7 +202,6 @@ export class EncryptionManager extends EventTarget {
 				await this.#rawStore.set(`test-local-vault-${this.#vault.id}`, value);
 			}
 
-			//console.log(`Data saved:`, value);
 			return true;
 		} catch (error) {
 			await this.handleError(error, 'Error saving data');
@@ -225,7 +216,7 @@ export class EncryptionManager extends EventTarget {
 			} else {
 				vaults = await this.#rawStore.get('test-vaults-registry');
 			}
-			//console.log('getVaults', vaults);
+
 			this.#vaults = vaults || [];
 			return this.#vaults;
 		} catch (error) {
@@ -276,7 +267,7 @@ export class EncryptionManager extends EventTarget {
 			} else {
 				data = await this.#rawStore.get(`test-local-vault-${this.#vault.id}`);
 			}
-			//console.log(`getData`, data);
+
 			return data;
 		} catch (error) {
 			await this.handleError(error, 'Error retrieving data');
@@ -309,7 +300,7 @@ export class EncryptionManager extends EventTarget {
 			// Set isAuth using the setter
 			this.isAuth = false;
 
-			console.log('Vault cleared.');
+			console.log('Vault cleared');
 		} catch (error) {
 			console.error('Error clearing the vault:', error);
 		}

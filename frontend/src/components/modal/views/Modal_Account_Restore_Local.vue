@@ -9,7 +9,7 @@
 			<div class="col-md-20">
 				<button type="button" class="btn btn-dark w-100" @click="fileInput.click()">Upload</button>
 			</div>
-			<input type="file" ref="fileInput" accept=".data" style="height: 0px; width: 0px" @change="handleRestore" :key="fileInputKey" />
+			<input type="file" ref="fileInput" accept=".bukitup" style="height: 0px; width: 0px" @change="handleRestore" :key="fileInputKey" />
 		</div>
 
 		<template v-if="fileString && requestDecrypt">
@@ -24,7 +24,19 @@
 				</label>
 
 				<div class="d-flex">
-					<input :type="showPassword ? 'text' : 'password'" id="password" v-model="password" class="form-control" placeholder="password from your backup" />
+					<form autocomplete="off" class="w-100">
+						<input
+							:type="showPassword ? 'text' : 'password'"
+							id="password"
+							v-model="password"
+							class="form-control"
+							placeholder="password from your backup"
+							autocomplete="new-password"
+							readonly
+							@focus="$event.target.removeAttribute('readonly')"
+						/>
+					</form>
+
 					<button class="btn btn-dark ms-2 d-flex align-items-center" @click="showPassword = !showPassword">
 						<i class="bg-white" :class="[showPassword ? '_icon_eye_cross' : '_icon_eye']"> </i>
 					</button>
@@ -49,9 +61,11 @@ import errorMessage from '@/utils/errorMessage';
 const $web3 = inject('$web3');
 const $swal = inject('$swal');
 const $user = inject('$user');
+const $mitt = inject('$mitt');
 const $enigma = inject('$enigma');
 const $router = inject('$router');
 const $swalModal = inject('$swalModal');
+const $encryptionManager = inject('$encryptionManager');
 
 const fileString = ref();
 const requestDecrypt = ref();
@@ -73,7 +87,9 @@ const handleRestore = async (event) => {
 		let data;
 		try {
 			data = JSON.parse(fileString.value);
-		} catch (error) {}
+		} catch (error) {
+			console.error('handleRestore', error);
+		}
 
 		if (!data) {
 			requestDecrypt.value = true;
@@ -105,43 +121,58 @@ const decrypt = async () => {
 
 const applyBackup = async (data) => {
 	try {
-		const account = data.account;
+		const account = await $user.generateAccount(data.account.privateKey);
+		const accountInfo = data.accountInfo;
 
-		if (account && account.privateKey) {
-			//$user.restore({
-			//
-			//})
-			const idx = $user.vaults.findIndex((a) => a.address.toLowerCase() === account.address.toLowerCase());
-			if (idx > -1) {
-				const confirmed = await $swalModal.value.open({
-					id: 'confirm',
-					title: 'Account restore',
-					content: `
-                        Account <strong>${account.name || $web3.addressShort(account.address)}</strong> already present in your list.
-                        <br> Are you sure you want to replace it ?
-                        `,
-				});
-				if (!confirmed) {
-					fileInput.value = null;
-					fileInputKey.value++;
-					return;
-				}
-				$user.vaults[idx] = account;
-				$user.account = account;
-			} else {
-				$user.vaults.push(account);
-				$user.account = account;
+		const idx = $user.vaults.findIndex((a) => a.publicKey === account.publicKey);
+		if (idx > -1) {
+			const confirmed = await $swalModal.value.open({
+				id: 'confirm',
+				title: 'Account restore',
+				content: `
+                    Account <strong>${accountInfo.name}</strong> already present on this device.
+                    <br> Are you sure you want to replace it with one from backup?
+                    `,
+			});
+			if (!confirmed) {
+				fileInput.value = null;
+				fileInputKey.value++;
+				return;
 			}
 
-			$router.push({ name: 'account_info' });
-		} else {
-			$swal.fire({
-				icon: 'error',
-				title: 'Restore error',
-				text: 'Wrong backup format',
-				timer: 15000,
-			});
+			await $encryptionManager.removeVault($user.vaults[idx].vaultId);
+
+			$user.vaults = await $encryptionManager.getVaults();
 		}
+
+		await $encryptionManager.createVault({
+			keyOptions: {
+				username: accountInfo.name,
+				displayName: accountInfo.name,
+			},
+			address: account.address,
+			publicKey: account.publicKey,
+			avatar: accountInfo.avatar,
+			notes: accountInfo.notes,
+		});
+
+		$user.account = account;
+
+		await $user.createSpace();
+		await $user.openSpace({
+			name: accountInfo.name,
+			notes: accountInfo.notes,
+			avatar: accountInfo.avatar,
+		});
+
+		if (data.contacts && data.contacts.length) {
+			await $user.initializeContacts(data.contacts);
+		}
+
+		$mitt.emit('account::created');
+
+		$router.replace({ name: 'account_info' });
+		$mitt.emit('modal::close');
 	} catch (error) {
 		$swal.fire({
 			icon: 'error',

@@ -1,11 +1,13 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
+import topLevelAwait from 'vite-plugin-top-level-await';
+
 import WALC from '@lo-fi/webauthn-local-client/bundlers/vite';
-import svgLoader from 'vite-svg-loader';
+
 import fs from 'fs';
 import path from 'path';
-import topLevelAwait from 'vite-plugin-top-level-await';
+
 import wasm from 'vite-plugin-wasm';
 import { fileURLToPath, URL } from 'node:url';
 import { ConfigPlugin } from '@dxos/config/vite-plugin';
@@ -25,27 +27,10 @@ export default defineConfig({
 		format: 'es',
 		plugins: [topLevelAwait(), wasm()],
 	},
-	//css: {
-	//	preprocessorOptions: {
-	//		scss: {
-	//			additionalData: `@import "bootstrap";`, // ✅ Automatically import Bootstrap
-	//		},
-	//	},
-	//},
 	plugins: [
 		topLevelAwait(),
 		wasm(),
-		//svgLoader(),
 		ConfigPlugin(),
-		//{
-		//  name: 'expose-sodium',
-		//  configureServer() {
-		//    globalThis.sodium = sodium; // Attach sodium globally
-		//  },
-		//  buildEnd() {
-		//    globalThis.sodium = sodium; // Ensure it's available in the final build
-		//  },
-		//},
 		WALC(),
 		nodePolyfills({
 			// To add only specific polyfills, add them here. If no option is passed, adds all polyfills
@@ -57,23 +42,11 @@ export default defineConfig({
 				//'vm',
 				'stream',
 			],
-			// To exclude specific polyfills, add them to this list. Note: if include is provided, this has no effect
-			//exclude: [
-			//  'http', // Excludes the polyfill for `http` and `node:http`.
-			//],
-			// Whether to polyfill specific globals.
 			globals: {
 				Buffer: true, // can also be 'build', 'dev', or false
 				global: true,
 				process: true,
 			},
-			// Override the default polyfills for specific modules.
-			//overrides: {
-			//  // Since `fs` is not supported in browsers, we can use the `memfs` package to polyfill it.
-			//  fs: 'memfs',
-			//},
-			// Whether to polyfill `node:` protocol imports.
-			//protocolImports: true,
 		}),
 		vue(),
 	],
@@ -97,31 +70,6 @@ export default defineConfig({
 			bootstrap: path.resolve(__dirname, 'node_modules/bootstrap'), // ✅ Fix Sass Import
 		},
 	},
-	//resolve: {
-	//  alias: {
-	//    crypto: 'crypto-browserify',
-	//    stream: 'stream-browserify',
-	//    //assert: 'assert',
-	//    //process: 'process',
-	//    buffer: 'buffer',
-	//    //util: 'util',
-	//  },
-	//},
-	//optimizeDeps: {
-	//  esbuildOptions: {
-	//    define: {
-	//      global: 'globalThis',
-	//    },
-	//    plugins: [
-	//      NodeGlobalsPolyfillPlugin({
-	//        process: true,
-	//        buffer: true,
-	//        //Buffer: true,
-	//      }),
-	//      //NodeModulesPolyfillPlugin(),
-	//    ],
-	//  },
-	//},
 	optimizeDeps: {
 		esbuildOptions: {
 			target: 'es2022',
@@ -129,26 +77,11 @@ export default defineConfig({
 		exclude: ['@lo-fi/webauthn-local-client'],
 	},
 	build: {
-		//target: 'es2022',
-		//rollupOptions: {
-		//  plugins: [rollupNodePolyFill()],
-		//},
-		//commonjsOptions: {
-		//  include: ['node_modules/**/*.js']
-		//},
-
 		rollupOptions: {
 			onwarn(warning, warn) {
 				if (warning.message.includes('PURE') || warning.message.includes('has been externalized')) return;
 				warn(warning); // Let Rollup handle other warnings normally
 			},
-			//plugins: [
-			//  //rollupNodePolyFill(),
-			//  inject({
-			//    process: 'process',
-			//    Buffer: ['buffer/','Buffer'],
-			//  }),
-			//],
 		},
 	},
 	server: {

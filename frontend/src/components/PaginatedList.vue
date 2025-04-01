@@ -39,7 +39,7 @@
 <style lang="scss" scoped></style>
 
 <script setup>
-import { ref, onMounted, computed, inject } from 'vue';
+import { ref, onMounted, inject } from 'vue';
 import axios from 'axios';
 import Paginate from './Paginate.vue';
 
@@ -84,7 +84,7 @@ async function getList() {
 		data.value.totalPages = res.totalPages;
 		data.value.totalResults = res.totalResults;
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 	}
 	data.value.fetched = true;
 	data.value.fetching = false;

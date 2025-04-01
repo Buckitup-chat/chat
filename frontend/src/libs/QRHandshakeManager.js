@@ -1,11 +1,10 @@
 import QRCode from 'qrcode';
-import { utils } from 'ethers';
+import { toUtf8Bytes, randomBytes, encodeBase58, concat, computeAddress, decodeBase58 } from 'ethers';
 import * as $enigma from './enigma';
 import QrScanner from 'qr-scanner';
 
 export default class QRHandshakeManager extends EventTarget {
 	constructor(container, account, options) {
-		console.log('QRHandshakeManager', account);
 		super();
 		this.account = account;
 		this.container = container;
@@ -71,9 +70,9 @@ export default class QRHandshakeManager extends EventTarget {
 	}
 
 	generateChallenge() {
-		const staticBytes = utils.toUtf8Bytes(this.staticString); // Convert 'buckitup' to bytes
-		const randomBytes = utils.randomBytes(10); // Generate 16 random bytes
-		this.state.challenge = utils.base58.encode(Buffer.concat([staticBytes, randomBytes])); // .toString('base58')
+		const staticBytes = toUtf8Bytes(this.staticString); // Convert 'buckitup' to bytes
+		const random = randomBytes(10); // Generate 16 random bytes
+		this.state.challenge = encodeBase58(concat([staticBytes, random])); // .toString('base58')
 	}
 
 	async updateQr() {
@@ -84,10 +83,9 @@ export default class QRHandshakeManager extends EventTarget {
 				if ('vibrate' in navigator) navigator.vibrate([50]);
 			}
 
-			const displayName = this.state.signature ? utils.base58.encode(new TextEncoder().encode(this.account.name)) : '';
+			const displayName = this.state.signature ? encodeBase58(new TextEncoder().encode(this.account.name)) : '';
 
 			const msg = `${this.state.verified}${this.state.challenge}${this.state.signature || ''}${displayName}`;
-			console.log('msg1', msg, this.state.verified, this.state.challenge, this.state.signature, this.account.name, displayName);
 
 			if (this.state.signature) color = this.options.detectedColor;
 			if (this.state.verified && this.state.contactVerified) color = this.options.verifiedColor;
@@ -160,11 +158,10 @@ export default class QRHandshakeManager extends EventTarget {
 
 	async showCountdown(seconds) {
 		for (let i = seconds; i > 0; i--) {
-			this.emitEvent('handshakeCountdown', i); // 👈 Send countdown value to UI
-			console.log(i); // ✅ Log countdown in console
-			await new Promise((resolve) => setTimeout(resolve, 1000)); // ⏳ Wait 1 second
+			this.emitEvent('handshakeCountdown', i);
+			await new Promise((resolve) => setTimeout(resolve, 1000));
 		}
-		this.emitEvent('handshakeCountdown', 0); // 🚀 Notify UI to start
+		this.emitEvent('handshakeCountdown', 0);
 	}
 
 	readQr(msg) {
@@ -175,10 +172,8 @@ export default class QRHandshakeManager extends EventTarget {
 			const signature = msg.length > 19 ? msg.slice(19, 107) : null; // 19th to 107th char (if present)
 			const displayNameEnc = msg.length > 107 ? msg.slice(107) : null;
 
-			console.log('msg', { length: msg.length, msg, verified, challenge, signature, displayNameEnc });
-
 			if (challenge) {
-				const decodedChallengeBytes = utils.base58.decode(challenge);
+				const decodedChallengeBytes = decodeBase58(challenge);
 				const contactChallengeDec = new TextDecoder().decode(decodedChallengeBytes);
 
 				if (challenge && contactChallengeDec.startsWith(this.staticString)) {
@@ -190,11 +185,11 @@ export default class QRHandshakeManager extends EventTarget {
 					}
 
 					if (signature) {
-						const decodedNameBytes = utils.base58.decode(displayNameEnc);
+						const decodedNameBytes = decodeBase58(displayNameEnc);
 						const displayName = new TextDecoder().decode(decodedNameBytes);
 
 						const publicKeyCompact = $enigma.recoverPublicKey(this.state.challenge + displayName, signature);
-						const publicKey = utils.computePublicKey('0x' + $enigma.convertPublicKeyToHex(publicKeyCompact));
+						const publicKey = computePublicKey('0x' + $enigma.convertPublicKeyToHex(publicKeyCompact));
 
 						this.state.contactAddress = utils.computeAddress(publicKey);
 						this.state.contactPublicKey = publicKeyCompact;
@@ -214,7 +209,7 @@ export default class QRHandshakeManager extends EventTarget {
 		try {
 			this.qrScanner.dispose();
 		} catch (error) {
-			//console.log(error);
+			console.error(error);
 		}
 	}
 

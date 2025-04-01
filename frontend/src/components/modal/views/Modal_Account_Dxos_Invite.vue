@@ -102,7 +102,6 @@ onMounted(async () => {
 		try {
 			let isComplete;
 			objects.forEach((o) => {
-				console.log('encryptedAccountQuery.subscribe', { ...o });
 				if (o.status === 'COMPLETED') isComplete = true;
 			});
 
@@ -115,7 +114,7 @@ onMounted(async () => {
 				});
 			}
 		} catch (error) {
-			console.log('encryptedAccountQuery.subscribe', error);
+			console.error('encryptedAccountQuery.subscribe', error);
 		}
 	});
 });
@@ -141,14 +140,13 @@ const copyInvite = async () => {
 };
 
 const getInvite = async () => {
-	console.log('getInvite', $user.space);
 	qrString.value = null;
 	mode.value = null;
 	if (unsubscibeInvitation) {
 		try {
 			unsubscibeInvitation();
 		} catch (error) {
-			console.log('unsubscibeInvitation error', error);
+			console.error('unsubscibeInvitation error', error);
 		}
 	}
 
@@ -165,7 +163,6 @@ const getInvite = async () => {
 	qrString.value = `${location.origin}/login?invitationCode=${invitationCode.value}&encryptionKey=${encryptionKey.value}&authCode=${authCode.value}`;
 
 	unsubscibeInvitation = invitation.value.subscribe(async (data) => {
-		console.log('invitation.data', data);
 		if (data.state >= 2 && !showAuthCode.value) {
 			showAuthCode.value = true;
 
@@ -188,28 +185,24 @@ onUnmounted(() => {
 		try {
 			unsubscibeMembers();
 		} catch (error) {
-			console.log('unsubscibeMembers error', error);
+			console.error('unsubscibeMembers error', error);
 		}
 	}
 	if (unsubscibeEncryptedAccount) {
 		try {
 			unsubscibeEncryptedAccount();
 		} catch (error) {
-			console.log('unsubscibeEncryptedAccount error', error);
+			console.error('unsubscibeEncryptedAccount error', error);
 		}
 	}
 	if (unsubscibeInvitation) {
 		try {
 			unsubscibeInvitation();
 		} catch (error) {
-			console.log('unsubscibeInvitation error', error);
+			console.error('unsubscibeInvitation error', error);
 		}
 	}
 });
-
-const getMembers = () => {
-	console.log('space.members', $user.space.members.get());
-};
 
 const checkMembers = () => {
 	if (!$user.space) return;
@@ -221,28 +214,9 @@ const checkMembers = () => {
 			newMemberJoined.value = true;
 			console.log('newMemberJoined', invitation.value);
 			console.log('space.members', $user.space.members.get());
-
-			//addEncryptedAccount();
-			//HOW TO  unsubscribe
 		}
 		currentMembers.value = newMembers;
 	});
-};
-
-const addEncryptedAccount = async () => {
-	await removeAllEncryptedAccounts();
-	encryptionKey.value = $enigma.generateSecurePassword(64);
-	await $user.space.db.add(
-		create(Expando, {
-			privateKey: $enigma.encryptDataSync($user.account.privateKey, encryptionKey.value),
-			status: 'AWAITING',
-			updatedAt: dayjs().valueOf(),
-			type: 'encryptedAccount',
-		}),
-	);
-
-	authCode.value = null;
-	qrString.value = `DECRYPT:${encryptionKey.value}`;
 };
 
 const removeAllEncryptedAccounts = async () => {
@@ -252,26 +226,5 @@ const removeAllEncryptedAccounts = async () => {
 		await $user.space.db.remove(encryptedAccount);
 	}
 	console.log('All encryptedAccount entries removed.');
-};
-
-const removeAllMembersExceptMe = async () => {
-	if (!$user.space) {
-		console.error('❌ Space is not initialized.');
-		return;
-	}
-
-	const identityKey = $user.dxClient.halo.identity.get().identityKey.toHex(); // Get your own identity key
-	const members = $user.space.members.get();
-	console.log('Space Methods:', Object.keys($user.space.members));
-
-	for (const member of members) {
-		console.log('member.identityKey !== myPublicKey', member.identity.identityKey.toHex(), identityKey);
-		const memberIdentityKey = member.identity.identityKey.toHex();
-		if (memberIdentityKey !== identityKey) {
-			await $user.space.removeMember(memberIdentityKey);
-		}
-	}
-
-	console.log('✅ All other members have been removed.');
 };
 </script>

@@ -67,7 +67,6 @@
 .vld-overlay .vld-icon,
 .vld-parent {
 	position: relative;
-	//color: #0E92A6
 }
 </style>
 

@@ -63,20 +63,16 @@
 a {
 	margin-left: 0.5rem;
 	min-width: 2rem;
-	//padding: .5rem;
-	//border: 1px solid darken($white, 10%);
 	&.disabled {
 		pointer-events: none;
 		color: darken($white, 50%);
 	}
 	&.active {
 		pointer-events: none;
-		//color: $gray-400;
 	}
 }
 select {
 	width: unset;
-	//border: unset;
 	cursor: pointer;
 	color: $grey_dark2;
 	font-weight: 400;

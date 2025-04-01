@@ -1,17 +1,18 @@
 import { defineStore } from 'pinia';
+//import { BuckItUpClient } from '../libs/buckitup';
 import { BuckItUpClient } from 'buckitup-sdk';
 import { LIT_ABILITY, LIT_NETWORK } from '@lit-protocol/constants';
 import { LitAccessControlConditionResource, createSiweMessage, generateAuthSig } from '@lit-protocol/auth-helpers';
 import { LitNodeClient } from '@lit-protocol/lit-node-client';
 import bcConfig from '../../../bcConfig.json';
-import { ethers, Wallet } from 'ethers';
+import { Wallet, JsonRpcProvider, Contract } from 'ethers';
 
 const mainChainId = IS_PRODUCTION ? '11155111' : '225'; //
 const bc = bcConfig[mainChainId];
 
-const provider = new ethers.providers.JsonRpcProvider(bc.chain.rpcUrl); // replace with your chain's RPC if needed
-const registryContract = new ethers.Contract(bc.registry.address, JSON.parse(bc.registry.abijson), provider);
-const vaultContract = new ethers.Contract(bc.vault.address, JSON.parse(bc.vault.abijson), provider);
+const provider = new JsonRpcProvider(bc.chain.rpcUrl); // replace with your chain's RPC if needed
+const registryContract = new Contract(bc.registry.address, JSON.parse(bc.registry.abijson), provider);
+const vaultContract = new Contract(bc.vault.address, JSON.parse(bc.vault.abijson), provider);
 export const web3Store = defineStore('web3', () => {
 	const blockExplorer = 'https://localtrace.io';
 
@@ -22,7 +23,7 @@ export const web3Store = defineStore('web3', () => {
 
 	const signTypedData = async (privateKey, domain, types, message) => {
 		const signer = new Wallet(privateKey);
-		const signature = await signer._signTypedData(domain, types, message);
+		const signature = await signer.signTypedData(domain, types, message);
 		return signature;
 	};
 
@@ -62,10 +63,18 @@ export const web3Store = defineStore('web3', () => {
 					});
 				},
 			});
-			//console.log('sessionSignatures', sessionSignatures);
+
 			return sessionSignatures;
 		} catch (error) {
-			console.log('sessionSignatures', error);
+			console.error('sessionSignatures', error);
+		}
+	};
+
+	const disconnectLit = async () => {
+		try {
+			await litClient.disconnect();
+		} catch (error) {
+			console.error('$web3.litClient.disconnect()', error);
 		}
 	};
 
@@ -75,19 +84,6 @@ export const web3Store = defineStore('web3', () => {
 	};
 
 	const getAccessControlConditions = (tag, idx) => {
-		const checkActionIpfs = 'QmezCK5USTbk2Wfwgk4va8FFZCjeimw1NgX3QCPLTBggsY';
-		const checkActionIpfs5 = `
-			const read = async (tag, idx, chainId) => {
-				try {
-					await fetch("https://buckitupss.appdev.pp.ua/api/backup/read?tag=" + tag + "&idx=" + idx + "&chainId=" + chainId);
-					console.log('Action success');
-				} catch (e) {
-					console.log('Action error', e);
-				}
-				return true
-			};
-		`;
-
 		const conditions = [
 			{
 				conditionType: 'evmContract',
@@ -144,28 +140,33 @@ export const web3Store = defineStore('web3', () => {
 			//  },
 			//}
 		];
-		console.log('conditions', conditions);
+
 		return conditions;
+
+		//const checkActionIpfs = 'QmezCK5USTbk2Wfwgk4va8FFZCjeimw1NgX3QCPLTBggsY';
+		//const checkActionIpfs5 = `
+		//	const read = async (tag, idx, chainId) => {
+		//		try {
+		//			await fetch("https://buckitupss.appdev.pp.ua/api/backup/read?tag=" + tag + "&idx=" + idx + "&chainId=" + chainId);
+		//
+		//		} catch (e) {
+		//			console.error('Action error', e);
+		//		}
+		//		return true
+		//	};
+		//`;
 	};
 
 	return {
-		//projectId,
-		//mainChain,
 		mainChainId,
 		addressShort,
 		bukitupClient,
-
 		getSessionSigs,
 		getAccessControlConditions,
-
 		litClient,
-
+		disconnectLit,
 		bc,
-		//networks,
-		//wagmiAdapter,
-
 		blockExplorer,
-
 		signTypedData,
 		registryContract,
 		vaultContract,

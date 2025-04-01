@@ -69,7 +69,7 @@ onMounted(async () => {
 
 			$mitt.emit('modal::open', { id: 'account_dxos_connect' });
 		} catch (error) {
-			console.log('dxClient.initialize', error);
+			console.error('dxClient.initialize', error);
 		}
 	} else if ($user.vaults.length) {
 		mode.value = 'existing';

@@ -171,7 +171,7 @@ import { ref, inject, onMounted, onBeforeUnmount, computed } from 'vue';
 import QrScanner from 'qr-scanner';
 import QRCode from 'qrcode';
 import Account_Item from '@/components/Account_Item.vue';
-import { utils } from 'ethers';
+import { toUtf8Bytes, randomBytes, encodeBase58, concat, computeAddress, decodeBase58 } from 'ethers';
 import { Expando, create } from '@dxos/client/echo';
 import dayjs from 'dayjs';
 
@@ -213,7 +213,6 @@ const state = ref({
 });
 
 const { inputData } = defineProps({ inputData: { type: Object } });
-//console.log('inputData', inputData);
 
 onMounted(async () => {
 	try {
@@ -310,7 +309,7 @@ const readQr = (msg) => {
 		const signature = msg.length > 19 ? msg.slice(19, 107) : null; // 19th to 107th char (if present)
 		const displayNameEnc = msg.length > 107 ? msg.slice(107) : null;
 		if (challenge) {
-			const decodedChallengeBytes = utils.base58.decode(challenge);
+			const decodedChallengeBytes = decodeBase58(challenge);
 			const contactChallengeDec = new TextDecoder().decode(decodedChallengeBytes);
 			if (challenge && contactChallengeDec.startsWith(options.staticString)) {
 				if (stopScanTimeout) startAutoStopCountdown();
@@ -322,11 +321,11 @@ const readQr = (msg) => {
 					state.value.contactChallenge = challenge;
 				}
 				if (signature) {
-					const decodedNameBytes = utils.base58.decode(displayNameEnc);
+					const decodedNameBytes = decodeBase58(displayNameEnc);
 					const displayName = new TextDecoder().decode(decodedNameBytes);
 					const publicKeyCompact = $enigma.recoverPublicKey(state.value.challenge + displayName, signature);
 					const publicKey = '0x' + $enigma.convertPublicKeyToHex(publicKeyCompact);
-					state.value.contactAddress = utils.computeAddress(publicKey);
+					state.value.contactAddress = computeAddress(publicKey);
 					state.value.contactPublicKey = publicKey;
 					state.value.contactName = displayName;
 					state.value.verified = 1;
@@ -348,7 +347,7 @@ const updateQr = async () => {
 			if ('vibrate' in navigator) navigator.vibrate([50]);
 		}
 
-		const displayName = state.value.signature ? utils.base58.encode(new TextEncoder().encode($user.accountInfo.name)) : '';
+		const displayName = state.value.signature ? encodeBase58(new TextEncoder().encode($user.accountInfo.name)) : '';
 		const msg = `${state.value.verified}${state.value.challenge}${state.value.signature || ''}${displayName}`;
 
 		if (state.value.signature) color = options.detectedColor;
@@ -380,9 +379,9 @@ const updateQr = async () => {
 };
 
 const generateChallenge = () => {
-	const staticBytes = utils.toUtf8Bytes(options.staticString); // Convert 'buckitup' to bytes
-	const randomBytes = utils.randomBytes(10); // Generate 16 random bytes
-	state.value.challenge = utils.base58.encode(Buffer.concat([staticBytes, randomBytes])); // .toString('base58')
+	const staticBytes = toUtf8Bytes(options.staticString); // Convert 'buckitup' to bytes
+	const random = randomBytes(10); // Generate 16 random bytes
+	state.value.challenge = encodeBase58(concat([staticBytes, random])); // .toString('base58')
 };
 
 const isInContacts = computed(() => {
@@ -451,7 +450,7 @@ const publicKey = ref();
 const addManually = async () => {
 	let address;
 	try {
-		address = utils.computeAddress(publicKey.value.trim());
+		address = computeAddress(publicKey.value.trim());
 	} catch (error) {}
 	if (!address) {
 		$swal.fire({

@@ -29,19 +29,19 @@
 			<div class="d-flex align-items-center justify-content-between w-100 pe-3">
 				<div class="fw-bold fs-5 py-1">My shares</div>
 				<div class="d-flex align-items-center">
-					<TopBarReuseTemplate v-if="$user.accountInfo.registeredMetaWallet && $breakpoint.gte('lg')" />
+					<TopBarReuseTemplate v-if="$user.registeredMetaWallet && $breakpoint.gte('lg')" />
 				</div>
 			</div>
 		</template>
-		<template #headerbottom v-if="$user.accountInfo.registeredMetaWallet && $breakpoint.lt('lg')">
+		<template #headerbottom v-if="$user.registeredMetaWallet && $breakpoint.lt('lg')">
 			<TopBarReuseTemplate class="mt-2 pe-3" />
 		</template>
 
 		<template #content>
 			<div class="_full_width_block">
 				<Account_Activate_Reminder />
-
-				<template v-if="$user.accountInfo.registeredMetaWallet">
+				<Offline_Reminder />
+				<template v-if="$user.registeredMetaWallet">
 					<div class="_divider" v-if="!data.searched">
 						Find your shares
 						<InfoTooltip class="align-self-center ms-2" :content="'Find your shares'" />
@@ -74,7 +74,6 @@
 	//max-width: 40rem;
 	width: 100%;
 }
-
 ._search {
 	height: 2.2rem;
 	@include media-breakpoint-up(sm) {
@@ -90,8 +89,9 @@ import { ref, onMounted, watch, inject, onUnmounted } from 'vue';
 import axios from 'axios';
 import FullContentBlock from '@/components/FullContentBlock.vue';
 import Account_Activate_Reminder from '@/components/Account_Activate_Reminder.vue';
-import { utils } from 'ethers';
+import { computeAddress } from 'ethers';
 import { createReusableTemplate } from '@vueuse/core';
+import Offline_Reminder from '../../components/Offline_Reminder.vue';
 
 const [TopBarTemplate, TopBarReuseTemplate] = createReusableTemplate();
 
@@ -100,7 +100,8 @@ const $web3 = inject('$web3');
 const $swal = inject('$swal');
 const $socket = inject('$socket');
 const $loader = inject('$loader');
-const backups = ref([]);
+
+let stealthAddresses = [];
 
 const dataDefault = {
 	query: { sort: 'desc', s: '' },
@@ -115,34 +116,78 @@ const dataDefault = {
 const data = ref(JSON.parse(JSON.stringify(dataDefault)));
 
 onMounted(async () => {
-	$socket.on('BACKUP_UPDATE', updateData);
+	$socket.on('BACKUP_UPDATE', backupUpdateListener);
+	$socket.on('DISPATCH', dispatchListener);
+
 	data.value = JSON.parse(JSON.stringify(dataDefault));
-	//if ($user.accountInfo?.registeredMetaWallet) getList();
+	await $user.checkMetaWallet();
 	getList();
 });
 
 onUnmounted(async () => {
-	$socket.off('BACKUP_UPDATE', updateData);
+	$socket.off('BACKUP_UPDATE', backupUpdateListener);
+	$socket.off('DISPATCH', dispatchListener);
 });
 
 watch(
-	() => $user.accountInfo?.registeredMetaWallet,
-	async (newVal) => {
-		if (newVal) {
-			//getList();
-		}
+	() => $user.registeredMetaWallet,
+	() => {
+		getList();
 	},
 );
 
-const updateData = async (tagUpdate) => {
+const dispatchListener = async (tx) => {
+	if (tx.status === 'PROCESSING') {
+		for (let i = 0; i < data.value.items.length; i++) {
+			const group = data.value.items[i];
+			for (let b = 0; b < group.backups.length; b++) {
+				const backup = group.backups[b];
+				if (backup.tag === tx.methodData.tag) {
+					if (data.value.items[i].backups[b].share.idx === tx.methodData.idx) {
+						data.value.items[i].backups[b].share.processingTx = tx;
+						data.value.items[i].backups[b].share.fetchTimestamp++;
+					}
+				}
+			}
+		}
+	}
+};
+
+const backupUpdateListener = async (backupUpdateData) => {
 	try {
-		const idx = backups.value.findIndex((b) => b.tag === tagUpdate);
-		if (idx > -1) {
-			const bk = (await axios.get(API_URL + '/backup/get', { params: { tag: tagUpdate, chainId: $web3.mainChainId } })).data;
-			backups.value[idx] = bk;
+		if (!$user.account || !$user.account.metaPrivateKey) return;
+
+		for (let i = 0; i < data.value.items.length; i++) {
+			const group = data.value.items[i];
+			for (let b = 0; b < group.backups.length; b++) {
+				const backup = group.backups[b];
+				if (backup.tag === backupUpdateData.backup.tag) {
+					const share = backupUpdateData.backup.shares.find((s) => s.id === backup.share.id);
+					if (share) {
+						data.value.items[i].backups[b] = {
+							wallet: backupUpdateData.backup.wallet,
+							createdAt: backupUpdateData.backup.createdAt,
+							disabled: backupUpdateData.backup.disabled,
+							id: backupUpdateData.backup.id,
+							fetchTimestamp: backupUpdateData.backup.fetchTimestamp,
+							tag: backupUpdateData.backup.tag,
+							treshold: backupUpdateData.backup.treshold,
+							share,
+						};
+						const stAddr = stealthAddresses.find((s) => s.toLowerCase() === backupUpdateData.stealthAddress.toLowerCase());
+						if (backupUpdateData.action === 'requestRecover' && stAddr) {
+							$swal.fire({
+								icon: 'success',
+								title: 'Requested recovery',
+								timer: 5000,
+							});
+						}
+					}
+				}
+			}
 		}
 	} catch (error) {
-		console.log(error);
+		console.error('Page_Backup_Shares updateData', error);
 	}
 };
 
@@ -156,27 +201,25 @@ const resetSearch = async () => {
 };
 
 const search = async () => {
-	//if (!data.value.query.s) return;
 	getList();
 };
 
-function setPage(page) {
-	//data.value.query.page = page;
+function setPage() {
 	getList();
 }
 
 const getList = async () => {
+	if (!$user.isOnline || !$user.account || !$user.account.metaPrivateKey) return;
 	$loader.show();
 	data.value.fetching = true;
 	try {
-		const backups = [];
 		const groupedBackups = {};
 		let s;
 		if (data.value.query.s?.length) {
 			try {
-				s = utils.computeAddress(data.value.query.s.trim());
+				s = computeAddress(data.value.query.s.trim());
 			} catch (error) {
-				console.log(error);
+				console.error(error);
 			}
 
 			if (!s) {
@@ -192,6 +235,8 @@ const getList = async () => {
 			})
 		).data;
 
+		let stAddresses = [];
+		// Grouping backups by owner
 		for (let index = 0; index < bk.length; index++) {
 			const backup = bk[index];
 
@@ -200,7 +245,7 @@ const getList = async () => {
 				const stealthAddr = $web3.bukitupClient.getStealthAddressFromEphemeral($user.account.metaPrivateKey, share.ephemeralPubKey);
 
 				if (stealthAddr.toLowerCase() === share.stealthAddress.toLowerCase()) {
-					backups.push(backup);
+					stAddresses.push(stealthAddr.toLowerCase());
 					if (!groupedBackups[backup.wallet]) {
 						groupedBackups[backup.wallet] = {
 							wallet: backup.wallet,
@@ -217,20 +262,18 @@ const getList = async () => {
 						tag: backup.tag,
 						treshold: backup.treshold,
 						share,
-					}); // Grouping backups by owner
-
+					});
 					break;
 				}
 			}
 		}
+		stealthAddresses = stAddresses;
 		const groupedArray = Object.values(groupedBackups);
-
 		data.value.items = groupedArray;
-		console.log(groupedArray);
 		data.value.totalPages = 1;
 		data.value.totalResults = groupedArray.length;
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 		$swal.fire({
 			icon: 'error',
 			title: 'Fetch error',

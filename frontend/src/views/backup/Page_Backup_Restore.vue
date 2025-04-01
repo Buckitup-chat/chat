@@ -18,27 +18,21 @@
 </style>
 
 <script setup>
-import { ref, onMounted, watch, inject, computed } from 'vue';
+import { ref, inject } from 'vue';
 import FullContentBlock from '@/components/FullContentBlock.vue';
 import RestoreFromShares from '@/views/backup/RestoreFromShares.vue';
 
-const secretText = ref(); // 'uehfuh ewufhwue huwehufuhuehu ehfuehuewhu uewhfuewh uhuwef uefhuwehwfhhhhhhhhhhhhhhhhhh wehfuwehfuwhefuhweufhuehuwifhwuieh wuehfuwefhuwhfuiw'
-const $web3 = inject('$web3');
+const secretText = ref();
 const $user = inject('$user');
 const $swal = inject('$swal');
 const $router = inject('$router');
-const $route = inject('$route');
 const updateKey = ref(0);
 
 const setSecret = async (s) => {
 	secretText.value = s;
 };
 
-onMounted(() => {
-	//console.log($route.state);
-});
-
-const setAccount = async (s) => {
+const setAccount = async () => {
 	updateKey.value++;
 	secretText.value = null;
 	$swal.fire({
@@ -46,6 +40,6 @@ const setAccount = async (s) => {
 		title: 'Account restored',
 		timer: 5000,
 	});
-	$router.push({ name: 'account_info' });
+	$router.replace({ name: 'account_info' });
 };
 </script>

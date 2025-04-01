@@ -106,7 +106,6 @@ import Swal from '@/components/swal/Swal_.vue';
 import { ref, provide, watch, onMounted, inject, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 //import { useReadContract } from '@wagmi/vue';
-import axios from 'axios';
 
 const $socket = inject('$socket');
 const $mitt = inject('$mitt');
@@ -143,15 +142,12 @@ watch(
 	},
 );
 
-const $isOnline = ref(navigator.onLine);
-provide('$isOnline', $isOnline);
-
 onMounted(async () => {
 	$user.setEncryptionManager($encryptionManager);
 
 	$socket.on('WALLET_UPDATE', walletUpdateListener);
-	window.addEventListener('online', () => ($isOnline.value = navigator.onLine));
-	window.addEventListener('offline', () => ($isOnline.value = navigator.onLine));
+	window.addEventListener('online', () => ($user.isOnline = navigator.onLine));
+	window.addEventListener('offline', () => ($user.isOnline = navigator.onLine));
 	setTimeout(function tick() {
 		timestamp.value = Math.floor(Date.now().valueOf() / 1000);
 		setTimeout(tick, 1000);
@@ -163,38 +159,14 @@ onMounted(async () => {
 			await $user.dxClient.halo.createIdentity();
 		}
 	} catch (error) {
-		console.log('dxClient.initialize', error);
+		console.error('dxClient.initialize', error);
 	}
 });
 
 const walletUpdateListener = async (wallet) => {
 	if ($user.account?.address && $user.account?.address.toLowerCase() === wallet.toLowerCase()) {
 		$mitt.emit('WALLET_UPDATE');
-		try {
-			if (!$user.accountInfo.registeredMetaWallet) {
-				const metaPublicKey = await $web3.registryContract.metaPublicKeys($user.account.address);
-				if (metaPublicKey && metaPublicKey.length > 2) {
-					$user.accountInfo.registeredMetaWallet = true;
-				}
-			}
-		} catch (error) {}
-		getUserTransactions();
-	}
-};
-
-const getUserTransactions = async () => {
-	try {
-		const res = (
-			await axios.get(API_URL + '/dispatch/getList', {
-				params: {
-					wallet: $user.account.address,
-					chainId: $web3.mainChainId,
-				},
-			})
-		).data;
-		$user.transactions = res.results;
-	} catch (error) {
-		console.log('getUserTransactions', error);
+		$user.checkMetaWallet();
 	}
 };
 </script>

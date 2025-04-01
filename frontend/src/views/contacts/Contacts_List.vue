@@ -102,15 +102,15 @@ const filteredList = computed(() => {
 		list = $user.contacts.filter((c) => [c.name, c.notes].some((value) => value.toLowerCase().includes(searchTerm)));
 	}
 
-	// ✅ Exclude contacts in the `excluded` list
+	// Exclude contacts in the `excluded` list
 	if (excluded?.length) {
 		list = list.filter((item) => !excluded.includes(item.address)); // exclude from excluded)
 	}
 
-	// ✅ Exclude hidden contacts
+	//  Exclude hidden contacts
 	list = list.filter((contact) => !contact.hidden);
 
-	// ✅ Sort: Put contacts with `metaPublicKey` first
+	// Sort: Put contacts with `metaPublicKey` first
 	if (metaRequired) {
 		list.sort((a, b) => {
 			if (a.metaPublicKey && !b.metaPublicKey) return -1; // a goes first
@@ -125,7 +125,7 @@ const filteredList = computed(() => {
 		highlightedAddress: highlightText(c.address, searchTerm),
 		highlightedNotes: highlightText(c.notes, searchTerm),
 	}));
-	//console.log(l);
+
 	return l;
 });
 
@@ -144,7 +144,7 @@ onUnmounted(async () => {});
 
 const checkContacts = async () => {
 	try {
-		const contactsWithoutWetaWallet = $user.contacts.filter((c) => !c.metaPublicKey).map((c) => c.address);
+		const contactsWithoutWetaWallet = $user.contacts.map((c) => c.address); //$user.contacts.filter((c) => !c.metaPublicKey).map((c) => c.address);
 		if (!contactsWithoutWetaWallet.length) return;
 
 		const metaPublicKeys = await $web3.registryContract.getPulicKeys(contactsWithoutWetaWallet);
@@ -163,7 +163,7 @@ const checkContacts = async () => {
 			}
 		}
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 	}
 };
 </script>

@@ -63,15 +63,15 @@
 			</div>
 		</div>
 
-		<div v-show="tx" v-if="isOwner" class="mt-2">
-			<Transactions :list="tx" />
+		<div :class="[backup.processingTx && isOwner ? '_input_block mt-2' : 'd-none']">
+			<div class="small mb-2">Latest transaction</div>
+			<Transactions :list="backup.processingTx ? [backup.processingTx] : null" only-last="true" />
 		</div>
 	</div>
 </template>
 
 <script setup>
 import BackupShareItem from './Backup_Share_Item.vue';
-import Account_Item from '@/components/Account_Item.vue';
 import { ref, onMounted, watch, inject, computed } from 'vue';
 import { decryptWithPrivateKey, cipher } from 'eth-crypto';
 import copyToClipboard from '@/libs/copyToClipboard';
@@ -82,7 +82,6 @@ const $timestamp = inject('$timestamp');
 const $user = inject('$user');
 const $web3 = inject('$web3');
 const $swal = inject('$swal');
-const $route = inject('$route');
 const $loader = inject('$loader');
 const $swalModal = inject('$swalModal');
 
@@ -102,23 +101,7 @@ watch(
 	{ deep: true },
 );
 
-const tx = computed(() => {
-	return $user.transactions.filter(
-		(t) =>
-			(t.method === 'updateBackupDisabled' || t.method === 'updateShareDelay' || t.method === 'requestRecover' || t.method === 'updateShareDisabled') &&
-			t.status === 'PROCESSING' &&
-			t.status === 'PROCESSING' &&
-			t.methodData.tag === backup.tag,
-	);
-});
-
 const comment = ref();
-
-const contact = computed(() => {
-	try {
-		return $user.contacts.find((c) => c.address.toLowerCase() === backup.wallet.toLowerCase());
-	} catch (error) {}
-});
 
 const isOwner = computed(() => {
 	return backup.wallet.toLowerCase() == $user.account?.address?.toLowerCase();
@@ -133,12 +116,13 @@ const init = async () => {
 		try {
 			comment.value = await decryptWithPrivateKey($user.account.metaPrivateKey.slice(2), cipher.parse(backup.commentEncrypted.slice(2)));
 		} catch (error) {
-			console.log('comment', error);
+			console.error('comment', error);
 		}
 	}
 };
 
 const updateBackupDisabled = async () => {
+	if (!$user.checkOnline()) return;
 	if (
 		!(await $swalModal.value.open({
 			id: 'confirm',
@@ -188,7 +172,7 @@ const updateBackupDisabled = async () => {
 			timer: 5000,
 		});
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 		$swal.fire({
 			icon: 'error',
 			title: 'Update backup error',

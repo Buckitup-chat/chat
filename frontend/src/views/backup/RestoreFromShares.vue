@@ -26,7 +26,7 @@
 			</div>
 		</template>
 
-		<template v-if="secretText && !account">
+		<template v-if="secretText && !accountToRecover">
 			<div class="_divider mb-2">Restored secret</div>
 
 			<div class="_input_block text-break">
@@ -40,13 +40,13 @@
 			</div>
 		</template>
 
-		<div class="row justify-content-center gx-2" v-if="account">
+		<div class="row justify-content-center gx-2" v-if="accountToRecover">
 			<div class="_divider mb-3">
 				{{ isInVault ? 'Existing account' : 'Account found' }}
 			</div>
 			<div class="fs-4 mb-4 text-center">
-				<span class="fw-bold">{{ account.name ? account.name : 'Unnamed' }}</span>
-				<span class="text-secondary ms-2">[{{ account.publicKey.slice(-5) }}]</span>
+				<span class="fw-bold">{{ accountToRecover.name ? accountToRecover.name : 'Unnamed' }}</span>
+				<span class="text-secondary ms-2">[{{ accountToRecover.publicKey.slice(-5) }}]</span>
 			</div>
 
 			<div class="col-30 col-md-20">
@@ -66,7 +66,6 @@
 import { ref, onMounted, watch, inject, computed } from 'vue';
 import errorMessage from '@/utils/errorMessage';
 import axios from 'axios';
-import { Wallet } from 'ethers';
 import { decryptWithPrivateKey, cipher } from 'eth-crypto';
 import copyToClipboard from '@/utils/copyToClipboard';
 
@@ -76,13 +75,15 @@ const $swal = inject('$swal');
 const $user = inject('$user');
 const $appstate = inject('$appstate');
 const $encryptionManager = inject('$encryptionManager');
-
+const $swalModal = inject('$swalModal');
 const secretText = ref();
-const account = ref();
+const accountToRecover = ref();
+const offchainData = ref();
 
 const emit = defineEmits(['restore', 'account']);
 
 onMounted(async () => {
+	$user.vaults = await $encryptionManager.getVaults();
 	if ($appstate.value.shareToRestore) {
 		shares.value.push($appstate.value.shareToRestore);
 		$appstate.value.shareToRestore = null;
@@ -92,50 +93,63 @@ onMounted(async () => {
 });
 
 const isInVault = computed(() => {
-	return $user.vaults.find((e) => e.publicKey === account.value.publicKey);
+	return $user.vaults.find((e) => e.publicKey === accountToRecover.value.publicKey);
 });
 
 const addAccount = async () => {
-	if (isInVault.value) {
-	}
 	try {
-		await $user.logout();
+		const acc = await $user.generateAccount(accountToRecover.value.privateKey);
+
+		const idx = $user.vaults.findIndex((a) => a.publicKey === acc.publicKey);
+		if (idx > -1) {
+			const confirmed = await $swalModal.value.open({
+				id: 'confirm',
+				title: 'Account restore',
+				content: `
+                    Account <strong>${accountToRecover.value.name}</strong> already present on this device.
+                    <br> Are you sure you want to replace it with one from backup?
+                    `,
+			});
+			if (!confirmed) return;
+			if ($user.account) await $user.logout();
+			await $encryptionManager.removeVault($user.vaults[idx].vaultId);
+			$user.vaults = await $encryptionManager.getVaults();
+		} else {
+			if ($user.account) await $user.logout();
+		}
+
 		await $encryptionManager.createVault({
 			keyOptions: {
-				username: account.value.name,
-				displayName: account.value.name,
+				username: accountToRecover.value.name,
+				displayName: accountToRecover.value.name,
 			},
-			address: account.value.address,
-			publicKey: account.value.publicKey,
-			avatar: account.value.avatar,
-			notes: account.value.notes,
+			address: acc.address,
+			publicKey: acc.publicKey,
+			avatar: accountToRecover.value.avatar,
+			notes: accountToRecover.value.notes,
 		});
-		console.log('create create');
-		$user.account = await $user.generateAccount(account.value.privateKey);
+
+		$user.account = acc;
 
 		await $user.createSpace();
 		await $user.openSpace({
-			name: account.value.name,
-			notes: account.value.notes,
-			avatar: account.value.avatar,
+			name: accountToRecover.value.name,
+			notes: accountToRecover.value.notes,
+			avatar: accountToRecover.value.avatar,
 		});
 
-		if (account.value.offchain) {
+		if (offchainData.value) {
 			try {
-				const extra = (await axios.get(IPFS_URL + account.value.offchain)).data;
-				const d = await decryptWithPrivateKey(account.value.privateKey.slice(2), extra);
-
-				const decExtra = JSON.parse(d);
-
-				if (decExtra.contacts) {
-					await $user.initializeContacts(decExtra.contacts);
-				}
+				const extra = (await axios.get(IPFS_URL + offchainData.value)).data;
+				const decrypted = await decryptWithPrivateKey(accountToRecover.value.privateKey.slice(2), extra);
+				const decoded = JSON.parse(decrypted);
+				if (decoded.contacts) await $user.initializeContacts(decoded.contacts);
 			} catch (error) {
-				console.log('initializeContacts', error);
+				console.error('initializeContacts', error);
 			}
 		}
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 		$swal.fire({
 			icon: 'error',
 			title: 'Recover error',
@@ -144,7 +158,7 @@ const addAccount = async () => {
 		});
 	}
 
-	emit('account', account.value);
+	emit('account');
 };
 
 const recover = () => {
@@ -153,7 +167,7 @@ const recover = () => {
 		emit('restore', secretText.value);
 		checkAccountRestore(secretText.value);
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 		$swal.fire({
 			icon: 'error',
 			title: 'Recover error',
@@ -165,16 +179,13 @@ const recover = () => {
 
 const checkAccountRestore = async (s) => {
 	try {
-		const dec = JSON.parse(s);
-
-		if (dec.account && dec.account.privateKey) {
-			console.log(acc);
-			account.value = acc;
+		const decoded = JSON.parse(s);
+		if (decoded.account && decoded.account.privateKey) {
+			accountToRecover.value = decoded.account;
+			offchainData.value = decoded.offchain;
 		}
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 	}
-
-	secretText.value = s;
 };
 </script>

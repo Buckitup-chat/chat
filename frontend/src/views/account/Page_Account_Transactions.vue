@@ -3,6 +3,7 @@
 		<template #header><div class="fw-bold fs-5 py-1">Transactions</div> </template>
 		<template #content>
 			<div class="_full_width_block">
+				<Offline_Reminder />
 				<div class="d-flex align-items-center justify-content-between mb-2" v-if="data.query && !onlyLast">
 					<div class="">Recent transactions</div>
 
@@ -17,7 +18,7 @@
 						<div class="text-center fs-5 mb-2">No transactions yet</div>
 					</div>
 
-					<Transactions :list="$user.transactions" />
+					<Transactions :list="data.items" />
 				</div>
 			</div>
 		</template>
@@ -35,7 +36,7 @@
 <script setup>
 import FullContentBlock from '@/components/FullContentBlock.vue';
 import Transactions from './Transactions.vue';
-
+import Offline_Reminder from '../../components/Offline_Reminder.vue';
 import { ref, onMounted, watch, inject, computed, onUnmounted } from 'vue';
 import axios from 'axios';
 
@@ -65,16 +66,11 @@ onUnmounted(async () => {
 
 watch(
 	() => $user.account?.address,
-	async (n, o) => {
-		$user.transactions = [];
-		if (n) getList();
+	(newVal) => {
+		data.value = JSON.parse(JSON.stringify(dataDefault));
+		if (newVal) getList();
 	},
 );
-
-function setPage(page) {
-	data.value.query.page = page;
-	getList();
-}
 
 const getList = async () => {
 	if (!$user.account?.address) return;
@@ -88,12 +84,11 @@ const getList = async () => {
 				},
 			})
 		).data;
-		$user.transactions = res.results;
 		data.value.items = res.results;
 		data.value.totalPages = res.totalPages;
 		data.value.totalResults = res.totalResults;
 	} catch (error) {
-		console.log('transactins update', error);
+		console.error('transactins update', error);
 	}
 	data.value.fetched = true;
 	data.value.fetching = false;

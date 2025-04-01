@@ -1,5 +1,5 @@
 <template>
-	<div v-if="!$user.accountInfo.registeredMetaWallet">
+	<div v-if="!$user.registeredMetaWallet">
 		<div class="_divider">
 			Activate Your Profile
 			<InfoTooltip class="align-self-center ms-2" :content="'Register meta address'" />
@@ -14,12 +14,8 @@
 	</div>
 </template>
 
-<style lang="scss" scoped>
-//@import '@/scss/variables.scss';
-</style>
-
 <script setup>
-import { ref, onMounted, inject, onUnmounted } from 'vue';
+import { inject } from 'vue';
 const $user = inject('$user');
 const $mitt = inject('$mitt');
 </script>

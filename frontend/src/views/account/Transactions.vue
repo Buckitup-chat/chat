@@ -4,8 +4,8 @@
 			<div class="fw-bold d-flex align-items-center">
 				<div v-if="tx.method === 'registerWithSign'">Activation</div>
 				<div v-if="tx.method === 'addBackup'">Backup creation</div>
-				<div v-if="tx.method === 'updateBackupDisabled'">Bacukp {{ tx.methodData.disabled ? 'disable' : 'enable' }}</div>
-				<div v-if="tx.method === 'updateShareDisabled'">Bacukp share {{ tx.methodData.disabled ? 'disable' : 'enable' }}</div>
+				<div v-if="tx.method === 'updateBackupDisabled'">Backup {{ tx.methodData.disabled ? 'disable' : 'enable' }}</div>
+				<div v-if="tx.method === 'updateShareDisabled'">Backup share {{ tx.methodData.disabled ? 'disable' : 'enable' }}</div>
 				<div v-if="tx.method === 'updateShareDelay'">Share delay update</div>
 				<div v-if="tx.method === 'requestRecover'">Recover request</div>
 			</div>

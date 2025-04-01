@@ -109,7 +109,7 @@ async function updateContact(updatedContact) {
 			}
 		}
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 		$swal.fire({
 			icon: 'error',
 			title: 'Saving',

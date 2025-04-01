@@ -7,7 +7,7 @@
 <style lang="scss" scoped></style>
 
 <script setup>
-import { ref, onMounted, watch, inject, computed } from 'vue';
+import { ref, inject } from 'vue';
 
 import RestoreFromShares from '@/views/backup/RestoreFromShares.vue';
 
@@ -20,7 +20,7 @@ const setSecret = (s) => {
 	secretText.value = s;
 };
 
-const setAccount = async (s) => {
+const setAccount = async () => {
 	secretText.value = null;
 	$swal.fire({
 		icon: 'success',
@@ -28,6 +28,6 @@ const setAccount = async (s) => {
 		timer: 5000,
 	});
 	$mitt.emit('modal::close');
-	$router.push({ name: 'account_info' });
+	$router.replace({ name: 'account_info' });
 };
 </script>

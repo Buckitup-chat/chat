@@ -13,7 +13,7 @@ export default function errorMessage(error) {
 			}
 		}
 	} catch (error) {
-		//console.log('ParseErrorMessage web3 reason string', error)
+		//console.error('ParseErrorMessage web3 reason string', error)
 	}
 
 	// web3 ethjs-query
@@ -33,7 +33,7 @@ export default function errorMessage(error) {
 			}
 		}
 	} catch (error) {
-		//console.log('ParseErrorMessage web3 ethjs query', error)
+		//console.error('ParseErrorMessage web3 ethjs query', error)
 	}
 
 	// match
@@ -54,7 +54,7 @@ export default function errorMessage(error) {
 			errStr = errStr.replace(/ *\([^)]*\) */g, '');
 		}
 	} catch (error) {
-		//console.log('ParseErrorMessage match', error)
+		//console.error('ParseErrorMessage match', error)
 	}
 
 	return errStr.length <= 300 ? errStr : errStr.slice(0, 300) + '...';

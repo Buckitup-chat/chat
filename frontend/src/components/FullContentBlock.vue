@@ -3,7 +3,7 @@
 		<div class="_header">
 			<div class="_top">
 				<div class="d-flex align-items-center w-100">
-					<div class="_btn_back" @click="$router.back()" v-if="$router.options.history.state.back && $breakpoint.lt('sm')">
+					<div class="_btn_back" @click="$router.back()" v-if="$router.options.history.state.back && $breakpoint.lt('sm') && !$router.options.history.state.back.includes('login')">
 						<i class="_icon_back"></i>
 					</div>
 					<div class="flex-grow-1">
@@ -149,7 +149,7 @@
 </style>
 
 <script setup>
-import { ref, inject } from 'vue';
+import { inject } from 'vue';
 
 const $menuOpened = inject('$menuOpened');
 const { blockClass } = defineProps({

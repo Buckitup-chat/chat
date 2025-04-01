@@ -21,8 +21,9 @@
 				<div class="d-flex justify-content-between align-items-center">
 					<div class="fw-bold fs-5">Gnosis blockchain</div>
 
-					<div class="_icon_wifi" :class="[$isOnline ? 'bg-success' : 'bg-danger']"></div>
+					<div class="_icon_wifi" :class="[$user.isOnline ? 'bg-success' : 'bg-danger']"></div>
 				</div>
+
 				<div class="text-secondary">Secure your key parts with additional security features on the decentralised network.</div>
 			</div>
 		</div>
@@ -44,14 +45,19 @@
 						</div>
 						<template v-if="protect">
 							<div class="d-flex">
-								<input
-									:type="showPassword ? 'text' : 'password'"
-									id="password"
-									v-model="password"
-									class="form-control"
-									placeholder="strong password"
-									:class="[dirty && (passwordErrors.length ? 'is-invalid' : 'is-valid')]"
-								/>
+								<form autocomplete="off" class="w-100">
+									<input
+										:type="showPassword ? 'text' : 'password'"
+										id="password"
+										v-model="password"
+										class="form-control"
+										placeholder="password from your backup"
+										autocomplete="new-password"
+										readonly
+										@focus="$event.target.removeAttribute('readonly')"
+										:class="[dirty && (passwordErrors.length ? 'is-invalid' : 'is-valid')]"
+									/>
+								</form>
 								<button class="btn btn-dark ms-2 d-flex align-items-center" @click="showPassword = !showPassword">
 									<i class="bg-white" :class="[showPassword ? '_icon_eye_cross' : '_icon_eye']"> </i>
 								</button>
@@ -70,8 +76,6 @@
 </template>
 
 <style lang="scss" scoped>
-//@import '@/scss/variables.scss';
-//@import '@/scss/breakpoints.scss';
 ._select_icon {
 	height: 3rem;
 	min-width: 3rem;
@@ -93,7 +97,6 @@ const $user = inject('$user');
 const $swal = inject('$swal');
 const $router = inject('$router');
 const $mitt = inject('$mitt');
-const $isOnline = inject('$isOnline');
 
 const protect = ref(true);
 const showPassword = ref(true);
@@ -127,15 +130,7 @@ watch(
 );
 
 const createShare = () => {
-	if (!$isOnline.value) {
-		$swal.fire({
-			icon: 'error',
-			title: 'No connection to internet',
-			footer: 'To use this method you must be connected',
-			timer: 15000,
-		});
-		return;
-	}
+	if (!$user.checkOnline()) return;
 	$mitt.emit('modal::close');
 	$router.push({ name: 'backup_create' });
 };
@@ -144,7 +139,14 @@ const backup = async () => {
 	dirty.value = true;
 	if (passwordErrors.value.length) return;
 
-	const backup = { account: $user.account };
+	const backup = {
+		account: {
+			publicKey: $user.account.publicKey,
+			privateKey: $user.account.privateKey,
+		},
+		accountInfo: $user.accountInfo,
+		contacts: $user.contacts,
+	};
 	const jsonString = JSON.stringify(backup, null, 2);
 
 	let backupString;
@@ -160,7 +162,7 @@ const backup = async () => {
 	const url = URL.createObjectURL(blob);
 	const a = document.createElement('a');
 	a.href = url;
-	a.download = generateBackupName($user.account.name);
+	a.download = generateBackupName($user.accountInfo.name);
 	document.body.appendChild(a);
 	a.click();
 	document.body.removeChild(a);
@@ -180,11 +182,12 @@ function generateBackupName(rawName) {
 	const datePart = `${yyyy}_${mm}_${dd}`;
 	// Remove all characters except letters, digits, underscores, and hyphens, spaces
 	const safeName = rawName.replace(/[^a-zA-Z0-9_-]/g, '');
-	return `backup_${datePart}_${safeName}.data`;
+	return `backup_${datePart}_${safeName}${password.value ? '_encrypted' : '_raw'}.bukitup`;
 }
 
 const passwordErrors = computed(() => {
 	const errors = [];
+	if (!protect.value) return errors;
 
 	if (password.value.length < 10) errors.push('Must be at least 10 characters long.');
 	if (!/[A-Z]/.test(password.value)) errors.push('Must contain an uppercase letter (A-Z).');

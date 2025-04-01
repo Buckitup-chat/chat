@@ -13,13 +13,12 @@
 <style lang="scss" scoped></style>
 
 <script setup>
-import { ref, onMounted, watch, inject, computed } from 'vue';
+import { ref, onMounted, inject } from 'vue';
 import Account_Info from '@/components/Account_Info.vue';
 
-const $web3 = inject('$web3');
 const $user = inject('$user');
 const $mitt = inject('$mitt');
-const $enigma = inject('$enigma');
+
 const $router = inject('$router');
 const $encryptionManager = inject('$encryptionManager');
 
@@ -45,7 +44,7 @@ const create = async () => {
 			avatar: account.value.avatar,
 			notes: account.value.notes,
 		});
-		console.log('create create');
+
 		$user.account = await $user.generateAccount(account.value.privateKey);
 
 		await $user.createSpace();
@@ -57,9 +56,9 @@ const create = async () => {
 
 		$mitt.emit('account::created');
 		$mitt.emit('modal::close');
-		$router.push({ name: 'account_info' });
+		$router.replace({ name: 'account_info' });
 	} catch (error) {
-		console.log('createSpace error', error);
+		console.error('createSpace error', error);
 	}
 };
 </script>

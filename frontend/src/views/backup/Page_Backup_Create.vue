@@ -5,8 +5,8 @@
 			<div class="_full_width_block">
 				<Account_Activate_Reminder />
 
-				<template v-if="$user.accountInfo.registeredMetaWallet">
-					<template v-if="tx?.status !== 'PROCESSING'">
+				<template v-if="$user.registeredMetaWallet">
+					<template v-if="processingTx?.status !== 'PROCESSING'">
 						<div class="_divider mb-3">
 							Backup info
 							<InfoTooltip class="align-self-center ms-2" :content="'Prepare your backup info'" />
@@ -161,6 +161,8 @@
 								<InfoTooltip class="align-self-center ms-2" :content="'Submit transaction info'" />
 							</div>
 
+							<Offline_Reminder />
+
 							<div class="row justify-content-center gx-2">
 								<div class="col-lg-12 col-xl-10 mb-2">
 									<button type="button" class="btn btn-dark w-100" @click="backup()" :disabled="tx?.status === 'PROCESSING' || walletsNumberInvalid">Create</button>
@@ -169,11 +171,11 @@
 						</template>
 					</template>
 
-					<div class="text-center fw-bold fs-3" v-if="tx?.status === 'PROCESSING'">Creating Backup ...</div>
+					<div class="text-center fw-bold fs-3" v-if="processingTx?.status === 'PROCESSING'">Creating Backup ...</div>
 
-					<div :class="[tx && submitted ? '_input_block mt-2' : 'd-none']">
+					<div :class="[processingTx ? '_input_block mt-2' : 'd-none']">
 						<div class="small mb-2">Latest transaction</div>
-						<Transactions :list="tx ? [tx] : null" only-last="true" />
+						<Transactions :list="processingTx ? [processingTx] : null" only-last="true" />
 					</div>
 				</template>
 			</div>
@@ -200,7 +202,8 @@ import axios from 'axios';
 import FullContentBlock from '@/components/FullContentBlock.vue';
 import Transactions from '@/views/account/Transactions.vue';
 import { uploadToIPFS } from '../../api/ipfs';
-import { Wallet, utils } from 'ethers';
+import { Wallet, isAddress } from 'ethers';
+import Offline_Reminder from '../../components/Offline_Reminder.vue';
 
 const $user = inject('$user');
 const $timestamp = inject('$timestamp');
@@ -211,7 +214,7 @@ const $socket = inject('$socket');
 const $loader = inject('$loader');
 const $modal = inject('$modal');
 const $swalModal = inject('$swalModal');
-const $route = inject('$route');
+const $router = inject('$router');
 
 const maxTagLength = 30;
 const maxSecretLength = 500;
@@ -225,21 +228,14 @@ const wallets = ref([]);
 
 const secret = ref();
 const comment = ref();
-const submitted = ref();
 
 const tagDirty = ref();
 const secretDirty = ref();
 
 watch(
 	() => advanced.value,
-	(newValue) => {
-		//generateTag();
-		///comment.value = null;
+	() => {
 		treshold.value = wallets.value.length;
-		//for (let i = 0; i < wallets.value.length; i++) {
-		//	//wallets.value[i].message = null;
-		//	//wallets.value[i].delay = 259200;
-		//}
 	},
 );
 
@@ -264,7 +260,6 @@ watch(
 		if (newValue && newValue.length > maxSecretLength) {
 			secret.value = newValue.slice(0, maxSecretLength);
 		}
-		submitted.value = false;
 	},
 );
 
@@ -288,12 +283,13 @@ watch(
 );
 
 const backupAccount = () => {
+	if (!$user.account) return;
 	const backup = {
 		account: {
-			name: $user.accountInfo.name,
 			address: $user.account.address,
 			publicKey: $user.account.publicKey,
 			privateKey: $user.account.privateKey,
+			name: $user.accountInfo.name,
 			notes: $user.accountInfo.notes,
 			avatar: $user.accountInfo.avatar,
 		},
@@ -302,27 +298,7 @@ const backupAccount = () => {
 	secret.value = JSON.stringify(backup);
 };
 
-const tx = computed(() => {
-	const txs = $user.transactions.filter((t) => t.method === 'addBackup');
-	return txs.length ? txs[0] : null;
-});
-
-watch(
-	() => tx.value,
-	(tx) => {
-		if (tx) {
-			if (tag.value?.trim() === tx.methodData.tag && tx.status === 'PROCESSED') {
-				$swal.fire({
-					icon: 'success',
-					title: 'Backup created',
-					timer: 5000,
-				});
-				reset();
-				backupAccount();
-			}
-		}
-	},
-);
+const processingTx = ref();
 
 const setWallet = async (data) => {
 	data.wallet.dirty = true;
@@ -340,12 +316,12 @@ const checkWallets = async () => {
 			continue;
 		}
 
-		if (!utils.isAddress(wallet.address)) {
+		if (!isAddress(wallet.address)) {
 			wallets.value[i].invalid = 'Address not valid';
 			continue;
 		}
 
-		if (!wallet.metaPublicKey) {
+		if (!wallet.metaPublicKey && $user.isOnline) {
 			try {
 				const metaPublicKey = await $web3.registryContract.metaPublicKeys(wallet.address);
 				if (!metaPublicKey || metaPublicKey.length <= 2) {
@@ -354,7 +330,7 @@ const checkWallets = async () => {
 				}
 				wallets.value[i].metaPublicKey = metaPublicKey;
 			} catch (error) {
-				console.log(error);
+				console.error(error);
 				wallets.value[i].invalid = 'Error checking meta address';
 				continue;
 			}
@@ -365,7 +341,7 @@ const checkWallets = async () => {
 
 watch(
 	() => wallets.value.length,
-	async (newValue, oldValue) => {
+	async (newValue) => {
 		if (newValue) {
 			if (!treshold.value || treshold.value > newValue) treshold.value = newValue;
 		} else {
@@ -398,22 +374,34 @@ const addPartiesManually = () => {
 };
 
 onMounted(async () => {
-	if (!$user.accountInfo.registeredMetaWallet) {
-	}
+	await $user.checkMetaWallet();
 	generateTag();
-	$socket.on('BACKUP_UPDATE', updateData);
-	$mitt.on('contacts::selected', applyPartiesFromContacts);
 	backupAccount();
+	$socket.on('DISPATCH', dispatchListener);
+	$socket.on('BACKUP_UPDATE', backupUpdateListener);
+	$mitt.on('contacts::selected', applyPartiesFromContacts);
 });
 
 onUnmounted(async () => {
-	$socket.off('BACKUP_UPDATE', updateData);
+	$socket.off('BACKUP_UPDATE', backupUpdateListener);
+	$socket.off('DISPATCH', dispatchListener);
 	$mitt.off('contacts::selected', applyPartiesFromContacts);
 });
 
-const updateData = async (tagUpdate) => {
-	if (tag.value?.trim() === tagUpdate) {
-		// reset()
+const dispatchListener = async (tx) => {
+	if (tag.value?.trim() === tx.methodData.tag && tx.method === 'addBackup') {
+		processingTx.value = tx;
+	}
+};
+const backupUpdateListener = async (backupUpdateData) => {
+	if (tag.value?.trim() === backupUpdateData.backup.tag && backupUpdateData.action === 'addBackup') {
+		processingTx.value = null;
+		$swal.fire({
+			icon: 'success',
+			title: 'Backup created',
+			timer: 5000,
+		});
+		$router.push({ name: 'account_backups' });
 	}
 };
 
@@ -447,7 +435,7 @@ const reset = () => {
 	comment.value = null;
 	tag.value = null;
 	treshold.value = 1;
-	//submitted.value = false
+
 	advanced.value = false;
 	generateTag();
 	nextTick(() => {
@@ -457,6 +445,7 @@ const reset = () => {
 };
 
 const backup = async () => {
+	if (!$user.checkOnline()) return;
 	await checkWallets();
 	if (isInvalid.value) return;
 
@@ -509,7 +498,6 @@ const backup = async () => {
 			const d = JSON.parse(secret.value);
 			if (d.account && d.account.publicKey === $user.account.publicKey) {
 				const offchainBkp = {
-					accountInfo: $user.accountInfo || {},
 					contacts: $user.contacts || [],
 				};
 				let offchainBkpEncrypted = await encryptWithPublicKey($user.account.publicKey.slice(2), JSON.stringify(offchainBkp));
@@ -518,7 +506,7 @@ const backup = async () => {
 				secret.value = JSON.stringify(d);
 			}
 		} catch (error) {
-			console.log(error);
+			console.error(error);
 		}
 
 		const shares = await $web3.bukitupClient.generateSharesEncrypted(secret.value, stealthPublicKeys.length, treshold.value, stealthPublicKeys);
@@ -535,8 +523,6 @@ const backup = async () => {
 			backup.shares[i].shareEncrypted += Buffer.from(litEncrypted.ciphertext, 'base64').toString('hex');
 			backup.shares[i].shareEncryptedHash += litEncrypted.dataToEncryptHash;
 		}
-
-		console.log('backup', backup);
 
 		const expire = $timestamp.value + 300;
 		const domain = {
@@ -585,7 +571,6 @@ const backup = async () => {
 			expire,
 			signature,
 		});
-		submitted.value = true;
 
 		$swal.fire({
 			icon: 'success',
@@ -593,8 +578,10 @@ const backup = async () => {
 			footer: 'Please wait for transaction confirmation',
 			timer: 5000,
 		});
+
+		$web3.disconnectLit();
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 		$swal.fire({
 			icon: 'error',
 			title: 'Backup error',

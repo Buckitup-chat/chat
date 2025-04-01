@@ -28,7 +28,6 @@
 ._account {
 	display: flex;
 	align-items: center;
-	//width: 100%;
 	._avatar {
 		display: flex;
 		align-items: center;
@@ -81,7 +80,7 @@
 <script setup>
 import { mediaUrl } from '@/utils/mediaUrl';
 import Avatar from 'vue-boring-avatars';
-import { inject, computed, onMounted, onUnmounted, nextTick, ref } from 'vue';
+import { inject, computed } from 'vue';
 
 const defaultAvatar = '/img/profile.webp';
 const $user = inject('$user');
@@ -92,7 +91,6 @@ const { account, self } = defineProps({
 });
 
 const acc = computed(() => {
-	//console.log('=======', { ...$user.account, ...$user.accountInfo });
 	return self ? { ...$user.account, ...$user.accountInfo } : account;
 });
 </script>

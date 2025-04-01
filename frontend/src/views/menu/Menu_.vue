@@ -326,7 +326,6 @@ watch(
 	() => menu.value,
 	async (newVal) => {
 		if (newVal) {
-			console.log('MENU SET 2', newVal);
 			const registry = menuRegistry[newVal];
 			component.value = await defineAsyncComponent(() => import(`./views/${registry.component}.vue`));
 		}

@@ -41,12 +41,6 @@ const routes = [
 				meta: { auth: true, name: 'Create', sub: true },
 			},
 			{
-				path: 'recover',
-				name: 'backup_recover',
-				component: () => import('../views/backup/Page_Backup_Recover.vue'),
-				meta: { auth: true, name: 'Recover', sub: true },
-			},
-			{
 				path: 'restore',
 				name: 'backup_restore',
 				component: () => import('../views/backup/Page_Backup_Restore.vue'),

@@ -115,7 +115,7 @@
 </style>
 
 <script setup>
-import { ref, onMounted, watch, inject, computed } from 'vue';
+import { ref, onMounted, watch, inject } from 'vue';
 import imageResize from '@/utils/imageResize';
 import copyToClipboard from '@/utils/copyToClipboard';
 import errorMessage from '@/utils/errorMessage';
@@ -141,7 +141,6 @@ const { accountIn, self } = defineProps({
 });
 
 onMounted(async () => {
-	//console.log('accountIn', accountIn);
 	account.value = JSON.parse(JSON.stringify(accountIn));
 
 	watch(
@@ -207,7 +206,7 @@ const handleImage = async (event) => {
 		};
 		reader.readAsDataURL(file);
 	} catch (error) {
-		console.log(error);
+		console.error(error);
 		$swal.fire({
 			icon: 'error',
 			title: 'Avatar upload',

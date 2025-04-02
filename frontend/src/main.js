@@ -6,9 +6,6 @@ import App from './App.vue';
 import 'bootstrap';
 import './scss/app.scss';
 
-//import { WagmiPlugin } from '@wagmi/vue';
-//import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
-
 import { web3Store } from './store/web3.store.js';
 import { userStore } from './store/user.store.js';
 import { createPinia } from 'pinia';
@@ -23,19 +20,14 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 dayjs.locale('en');
 dayjs.extend(relativeTime);
 
-// globalFilters
+// libs
 import globalFilters from './libs/filters';
 import * as $enigma from './libs/enigma';
-
 import { EncryptionManager } from './libs/EncryptionManager';
 
-//const queryClient = new QueryClient();
 const app = createApp(App);
 
 const pinia = createPinia();
-
-//import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
-//pinia.use(piniaPluginPersistedstate);
 
 // Pinia
 app.use(pinia);

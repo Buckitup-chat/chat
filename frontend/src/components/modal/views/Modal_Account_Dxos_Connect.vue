@@ -77,6 +77,7 @@ const $mitt = inject('$mitt');
 const $user = inject('$user');
 const $enigma = inject('$enigma');
 const $encryptionManager = inject('$encryptionManager');
+const $swalModal = inject('$swalModal');
 
 const mode = ref();
 
@@ -187,24 +188,27 @@ const waitForSpaceConnection = async (spaceKey, maxRetries = 10, interval = 1000
 };
 
 const decryptAccount = async () => {
+	console.log('decryptAccount', decrypting.value, encryptionKey.value, $user.space, decrypting.value || !encryptionKey.value || $user.space);
 	if (decrypting.value || !encryptionKey.value || $user.space) return;
 	decrypting.value = true;
+	console.log('decryptAccount 1');
 	$loader.show();
 	try {
 		const spaceKey = invitation.value.get().spaceKey.toHex();
 		const spaces = $user.dxClient.spaces.get();
 		const space = spaces.find((s) => s.key.toHex() === spaceKey);
-
+		console.log('decryptAccount spaceKey/space', spaceKey, space);
 		await space.waitUntilReady();
 		await new Promise((resolve) => setTimeout(resolve, 1000));
 
 		const encryptedAccountQuery = await space.db.query((doc) => doc.type === 'encryptedAccount').run();
-
+		console.log('decryptAccount space', encryptedAccountQuery.objects);
 		if (encryptedAccountQuery.objects.length) {
 			const encryptedAccount = encryptedAccountQuery.objects[0];
 			const privateKey = $enigma.decryptDataSync(encryptedAccount.privateKey, encryptionKey.value);
 
 			const account = await $user.generateAccount(privateKey);
+			console.log('decryptAccount account', account);
 
 			if (account) {
 				const accountInfoQuery = await space.db.query((doc) => doc.type === 'accountInfo').run();
@@ -212,6 +216,25 @@ const decryptAccount = async () => {
 				if (accountInfoQuery.objects.length) {
 					const accountInfo = $enigma.decryptObjectKeys(accountInfoQuery.objects[0], $user.accountInfoKeys, account.privateKey);
 
+					$user.vaults = await $encryptionManager.getVaults();
+					const idx = $user.vaults.findIndex((a) => a.publicKey === account.publicKey);
+
+					if (idx > -1) {
+						$loader.hide();
+						const confirmed = await $swalModal.value.open({
+							id: 'confirm',
+							title: 'Account restore',
+							content: `
+								Account <strong>${accountInfo.name}</strong> already present on this device.
+								<br> Are you sure you want to replace it with one from backup?
+								`,
+						});
+						if (!confirmed) return;
+						if ($user.account) await $user.logout();
+						await $encryptionManager.removeVault($user.vaults[idx].vaultId);
+						$user.vaults = await $encryptionManager.getVaults();
+					}
+					$loader.show();
 					await $encryptionManager.createVault({
 						keyOptions: {
 							username: accountInfo.name,

@@ -144,7 +144,8 @@ const getInvite = async () => {
 	mode.value = null;
 	if (unsubscibeInvitation) {
 		try {
-			unsubscibeInvitation();
+			console.log('getInvite unsubscibeInvitation', unsubscibeInvitation);
+			unsubscibeInvitation._cleanup();
 		} catch (error) {
 			console.error('unsubscibeInvitation error', error);
 		}
@@ -162,28 +163,41 @@ const getInvite = async () => {
 	encryptionKey.value = $enigma.generateSecurePassword(64);
 	qrString.value = `${location.origin}/login?invitationCode=${invitationCode.value}&encryptionKey=${encryptionKey.value}&authCode=${authCode.value}`;
 
-	unsubscibeInvitation = invitation.value.subscribe(async (data) => {
-		if (data.state >= 2 && !showAuthCode.value) {
-			showAuthCode.value = true;
-
-			await removeAllEncryptedAccounts();
-			await $user.space.db.add(
-				create(Expando, {
-					privateKey: $enigma.encryptDataSync($user.account.privateKey, encryptionKey.value),
-					status: 'AWAITING',
-					updatedAt: dayjs().valueOf(),
-					type: 'encryptedAccount',
-				}),
-			);
-		}
+	await removeAllEncryptedAccounts();
+	const auth = create(Expando, {
+		privateKey: $enigma.encryptDataSync($user.account.privateKey, encryptionKey.value),
+		status: 'AWAITING',
+		updatedAt: dayjs().valueOf(),
+		type: 'encryptedAccount',
 	});
+
+	console.log('getInvite auth', auth);
+	await $user.space.db.add(auth);
+
+	showAuthCode.value = true;
+
+	//unsubscibeInvitation = invitation.value.subscribe(async (data) => {
+	//	console.log('getInvite invitation.value.subscribe', data);
+	//	if (data.state >= 2 && !showAuthCode.value) {
+	//		showAuthCode.value = true;
+	//		await removeAllEncryptedAccounts();
+	//		const auth = create(Expando, {
+	//			privateKey: $enigma.encryptDataSync($user.account.privateKey, encryptionKey.value),
+	//			status: 'AWAITING',
+	//			updatedAt: dayjs().valueOf(),
+	//			type: 'encryptedAccount',
+	//		});
+	//		console.log('getInvite auth', auth);
+	//		await $user.space.db.add(auth);
+	//	}
+	//});
 };
 
 onUnmounted(() => {
 	removeAllEncryptedAccounts();
 	if (unsubscibeMembers) {
 		try {
-			unsubscibeMembers();
+			unsubscibeMembers._cleanup();
 		} catch (error) {
 			console.error('unsubscibeMembers error', error);
 		}
@@ -197,7 +211,7 @@ onUnmounted(() => {
 	}
 	if (unsubscibeInvitation) {
 		try {
-			unsubscibeInvitation();
+			unsubscibeInvitation._cleanup();
 		} catch (error) {
 			console.error('unsubscibeInvitation error', error);
 		}

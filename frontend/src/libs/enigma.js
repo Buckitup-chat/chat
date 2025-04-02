@@ -1,10 +1,7 @@
 import * as secp from '@noble/secp256k1';
 import blf from './blowfish';
 import jsSHA from 'jssha/dist/sha3';
-import sha256 from 'crypto-js/sha256';
-import encBase64 from 'crypto-js/enc-base64';
-import CryptoJS from 'crypto-js';
-import { Buffer } from 'buffer';
+import { sha256, encodeBase64, decodeBase64 } from 'ethers';
 import { hmac } from '@noble/hashes/hmac';
 import { sha256 as sha256N } from '@noble/hashes/sha256';
 secp.etc.hmacSha256Sync = (k, ...m) => hmac(sha256N, k, secp.etc.concatBytes(...m));
@@ -28,6 +25,7 @@ export const signDigest = async (dataB64, privateKeyB64) => {
 	const compactRaw = signatureObj.toCompactRawBytes();
 	return arrayToBase64(compactRaw);
 };
+
 /**
  * Signs a simple string challenge using secp256k1 and returns a base64-encoded signature.
  *
@@ -309,9 +307,13 @@ export const base64Tohash = (base64Data) => {
  * @returns {string} - SHA-256 hash of the data in base64 format (32 bytes).
  */
 export const base64ToSha256 = (base64Data) => {
-	const dataWordArray = encBase64.parse(base64Data);
-	const hashWordArray = sha256(dataWordArray);
-	return hashWordArray.toString(encBase64);
+	// Decode base64 data to bytes
+	const dataBytes = decodeBase64(base64Data);
+	// Compute SHA-256 hash
+	const hashBytes = sha256(dataBytes);
+	// Ethers' sha256 returns a hex string; convert it to bytes first, then base64
+	const hashBase64 = encodeBase64(hashBytes);
+	return hashBase64;
 };
 /**
  * Converts base64 data to a string.
@@ -365,47 +367,39 @@ export const convertPrivateKeyToHex = (privateKeyBase64) => {
 	return Buffer.from(privateKeyArray).toString('hex');
 };
 
-// 🔹 Convert private key into a 256-bit key
-export const getEncryptionKey = (privateKey) => {
-	return CryptoJS.SHA256(privateKey).toString();
-};
-
-// 🔹 Encrypt (Sync)
 export const encryptDataSync = (data, privateKey) => {
-	const key = getEncryptionKey(privateKey);
-	const jsonData = JSON.stringify({ data, type: typeof data }); // Store type info
-	const encrypted = CryptoJS.AES.encrypt(jsonData, key).toString();
-	return encrypted;
+	const base64PlainData = stringToBase64(JSON.stringify({ data, type: typeof data })); // Store type info
+	const { pass, iv } = deriveKeyAndIV(stringToBase64(privateKey));
+	const ciphered = blowfishCFB(Buffer.from(base64PlainData, 'base64'), pass, iv, false);
+	return ciphered.toString('base64');
 };
 
-// 🔹 Decrypt (Sync)
 export const decryptDataSync = (encryptedData, privateKey) => {
-	const key = getEncryptionKey(privateKey);
-	const decryptedBytes = CryptoJS.AES.decrypt(encryptedData, key);
-	const decryptedJson = decryptedBytes.toString(CryptoJS.enc.Utf8);
-	if (!decryptedJson) throw new Error('Decryption failed');
-
-	const decoded = JSON.parse(decryptedJson);
+	const { pass, iv } = deriveKeyAndIV(stringToBase64(privateKey));
+	const deciphered = blowfishCFB(Buffer.from(encryptedData, 'base64'), pass, iv, true);
+	const decoded = JSON.parse(deciphered.toString());
 	return decoded.type === 'number' ? Number(decoded.data) : decoded.data; // Restore original type
 };
 
 export const decryptObjectKeys = (encryptedObject, keys, privateKey) => {
-	const decryptedObject = { ...encryptedObject }; // Clone object to avoid mutations
+	const decryptedObject = {};
+	Object.assign(decryptedObject, encryptedObject);
 
 	for (const key of keys) {
 		if (key in encryptedObject) {
-			decryptedObject[key] = decryptDataSync(encryptedObject[key], privateKey);
+			const decrypted = decryptDataSync(encryptedObject[key], privateKey);
+			decryptedObject[key] = decrypted;
 		}
 	}
-
 	return decryptedObject;
 };
 export const encryptObjectKeys = (decryptedObject, keys, privateKey) => {
-	const encryptedObject = { ...decryptedObject }; // Clone object to avoid mutations
+	const encryptedObject = {}; // Clone object to avoid mutations
 
 	for (const key of keys) {
 		if (key in decryptedObject) {
-			encryptedObject[key] = encryptDataSync(encryptedObject[key], privateKey);
+			const encrypted = encryptDataSync(decryptedObject[key], privateKey);
+			encryptedObject[key] = encrypted;
 		}
 	}
 

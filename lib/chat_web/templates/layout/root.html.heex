@@ -11,9 +11,11 @@
     <.live_title suffix=" · BuckItUp">
       {assigns[:page_title] || "Chat"}
     </.live_title>
-    <LiveVue.Reload.vite_assets assets={["/js/app.js", "/css/app.css"]}>
+    <LiveVue.Reload.vite_assets assets={["/js/app.js", "js/src/main.js", "/css/app.css"]}>
       <link phx-track-static rel="stylesheet" href="/assets/app.css" />
       <script type="module" phx-track-static type="text/javascript" src="/assets/app.js">
+      </script>
+      <script type="module" phx-track-static type="text/javascript" src="/assets/main.js">
       </script>
     </LiveVue.Reload.vite_assets>
     <!-- <link phx-track-static rel="stylesheet" href={Routes.static_path(@conn, "/assets/app.css")} /> -->

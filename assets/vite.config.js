@@ -82,7 +82,8 @@ export default defineConfig(({ command }) => {
       alias: {
         vue: path.resolve(__dirname, "node_modules/vue"),
         "chat": path.resolve(__dirname, "."),
-        '@': fileURLToPath(new URL('./../frontend/src', import.meta.url)),
+        '@': fileURLToPath(new URL('./js/src', import.meta.url)),
+        // '@': fileURLToPath(new URL('./../frontend/src', import.meta.url)),
         bootstrap: path.resolve(__dirname, 'node_modules/bootstrap'), // ✅ Fix Sass Import
       },
     },
@@ -112,7 +113,8 @@ export default defineConfig(({ command }) => {
         },
         input: {
           app: path.resolve(__dirname, "./js/app.js"),
-          main: path.resolve(__dirname, "./../frontend/src/main.js"),
+          main: path.resolve(__dirname, "./js/src/main.js"),
+          // main: path.resolve(__dirname, "./../frontend/src/main.js"),
         },
         output: {
           // remove hashes to match phoenix way of handling assets

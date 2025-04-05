@@ -66,6 +66,13 @@ defmodule ChatWeb.Router do
 
       live "/proxy/:address/", ProxyLive.Index, :proxy
     end
+
+    get "/login", FrontendController, :index
+    get "/account", FrontendController, :index
+    get "/account/:action", FrontendController, :index
+    get "/backup", FrontendController, :index
+    get "/backup/:action", FrontendController, :index
+    get "/contact/:id", FrontendController, :index
   end
 
   scope "/", ChatWeb do

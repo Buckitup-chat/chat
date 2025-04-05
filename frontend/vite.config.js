@@ -76,7 +76,10 @@ export default defineConfig({
 		},
 		exclude: ['@lo-fi/webauthn-local-client'],
 	},
+	base: '/frontend',
 	build: {
+		outDir: "../priv/static/frontend", // emit assets to priv/static/frontend
+		emptyOutDir: true,
 		rollupOptions: {
 			onwarn(warning, warn) {
 				if (warning.message.includes('PURE') || warning.message.includes('has been externalized')) return;

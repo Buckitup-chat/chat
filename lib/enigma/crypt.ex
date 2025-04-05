@@ -17,6 +17,10 @@ defmodule Enigma.Crypt do
     Curvy.get_shared_secret(private, public)
   end
 
+  def private_to_public(private) do
+    Curvy.Key.to_pubkey(Curvy.Key.from_privkey(private))
+  end
+
   def generate_secret do
     :crypto.strong_rand_bytes(32)
   end

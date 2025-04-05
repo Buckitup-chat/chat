@@ -21,6 +21,10 @@ defmodule Chat.SignedParcel do
         extra = Chat.MemoIndex.pack(dialog, key)
         [[data | extra] | acc]
 
+      {{:room_invite, key}, _} = data, acc ->
+        extra = Chat.RoomInviteIndex.pack(dialog, key)
+        [[data | extra] | acc]
+
       x, acc ->
         [x | acc]
     end)
@@ -53,6 +57,17 @@ defmodule Chat.SignedParcel do
           some_pkey != public_key and other_okey != public_key -> false
           peers = dialog_peer_keys(dialog_key) -> some_pkey in peers and other_okey in peers
         end
+
+      [
+        {{:room_invite, _}, _},
+        {{:room_invite_index, some_pkey, _}, _},
+        {{:room_invite_index, other_okey, _}, _},
+        {{:dialog_message, dialog_key, _, _}, %DialogMessage{type: :room_invite}}
+      ] ->
+        cond do
+          some_pkey != public_key and other_okey != public_key -> false
+          peers = dialog_peer_keys(dialog_key) -> some_pkey in peers and other_okey in peers
+        end
     end
   end
 
@@ -66,6 +81,14 @@ defmodule Chat.SignedParcel do
         {{:memo_index, _, _}, true},
         {{:memo_index, _, _}, true},
         {{:dialog_message, _, _, _}, %DialogMessage{type: :memo}} = x
+      ] ->
+        x
+
+      [
+        {{:room_invite, _}, _},
+        {{:room_invite_index, _, _}, _},
+        {{:room_invite_index, _, _}, _},
+        {{:dialog_message, _, _, _}, %DialogMessage{type: :room_invite}} = x
       ] ->
         x
     end
@@ -86,6 +109,27 @@ defmodule Chat.SignedParcel do
         next = Chat.Ordering.next({:dialog_message, dkey})
         %{parcel | data: [m, i1, i2, {{:dialog_message, dkey, next, msg_id}, msg}]}
 
+      [
+        {{:room_invite, _}, _} = ri,
+        {{:room_invite_index, _, _} = i1, _},
+        {{:room_invite_index, _, _} = i2, _},
+        {{:dialog_message, dkey, :next, msg_id}, %{type: :room_invite} = msg}
+      ] ->
+        next = Chat.Ordering.next({:dialog_message, dkey})
+        # TODO: room trace requires to know both room pub keys and room count
+        room_trace = true
+        # room_trace = Chat.RoomInviteIndex.room_trace(msg.room_pub_key, msg_id)
+
+        %{
+          parcel
+          | data: [
+              ri,
+              {i1, room_trace},
+              {i2, room_trace},
+              {{:dialog_message, dkey, next, msg_id}, msg}
+            ]
+        }
+
       x ->
         x
     end
@@ -101,6 +145,14 @@ defmodule Chat.SignedParcel do
         {{:memo_index, _, _}, true},
         {{:memo_index, _, _}, true},
         {{:dialog_message, key, index, _}, %DialogMessage{type: :memo} = msg}
+      ] ->
+        {:new_dialog_message, key, {index, msg}}
+
+      [
+        {{:room_invite, _}, _},
+        {{:room_invite_index, _, _}, _},
+        {{:room_invite_index, _, _}, _},
+        {{:dialog_message, key, index, _}, %DialogMessage{type: :room_invite} = msg}
       ] ->
         {:new_dialog_message, key, {index, msg}}
     end

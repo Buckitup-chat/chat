@@ -7,6 +7,7 @@ defmodule Enigma do
 
   defdelegate generate_secret, to: Enigma.Crypt
   defdelegate compute_secret(private_key, public_key), to: Enigma.Crypt
+  defdelegate private_to_public(private_key), to: Enigma.Crypt
 
   defdelegate encrypt(bitstring, private_key, public_key), to: Enigma.Crypt
   defdelegate decrypt(encrypted_bitstring, private_key, public_key), to: Enigma.Crypt

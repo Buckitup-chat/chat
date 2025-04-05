@@ -69,9 +69,10 @@ defmodule Proxy.Api do
   def request_room_access(args) do
     %{
       room_pub_key: room_key,
-      me: requester_pub_key
-    } = args |> unwrap_map_by(fn %{me: key} -> key end)
+      me: requester_card
+    } = args |> unwrap_map_by(fn %{me: card} -> Identify.pub_key(card) end)
 
+    requester_pub_key = Identify.pub_key(requester_card)
     time = DateTime.utc_now() |> DateTime.to_unix()
 
     room =
@@ -81,20 +82,57 @@ defmodule Proxy.Api do
       end)
 
     Chat.Rooms.RoomsBroker.put(room)
-
+    Chat.Broadcast.room_requested(room, requester_pub_key)
     Chat.Log.request_room_key(requester_pub_key, time, room.pub_key)
 
-    # PubSub.broadcast!(
-    #   Chat.PubSub,
-    #   @topic,
-    #   {:room_request, room, me}
-    # )
-
-    Chat.Broadcast.room_requested(room, requester_pub_key)
-
     :ok |> wrap()
+  catch
+    # x, y -> {:wrong_args, x, y, __STACKTRACE__} |> dbg()
+    _, _ -> :wrong_args |> wrap()
   end
 
+  def approve_room_request(args) do
+    %{
+      room_pub_key: room_key,
+      requester_key: user_key,
+      ciphered_room_identity: ciphered_room_identity,
+      me: approver_card
+    } = args |> unwrap_map_by(fn %{me: card} -> Identify.pub_key(card) end)
+
+    approver_pub_key = Identify.pub_key(approver_card)
+    time = DateTime.utc_now() |> DateTime.to_unix()
+
+    room =
+      Chat.Rooms.approve_request(room_key, user_key, ciphered_room_identity, public_only: true)
+
+    Chat.Rooms.RoomsBroker.put(room)
+
+    Chat.Log.approve_room_request(approver_pub_key, time, room.pub_key)
+
+    :ok |> wrap()
+  catch
+    # x, y -> {:wrong_args, x, y, __STACKTRACE__} |> dbg()
+    _, _ -> :wrong_args |> wrap()
+  end
+
+  def clean_room_request(args) do
+    %{
+      room_pub_key: room_key,
+      me: requester_card
+    } = args |> unwrap_map_by(fn %{me: card} -> Identify.pub_key(card) end)
+
+    requester_pub_key = Identify.pub_key(requester_card)
+
+    room = Chat.Rooms.clear_approved_request(room_key, requester_pub_key)
+    Chat.Rooms.RoomsBroker.put(room)
+
+    :ok |> wrap()
+  catch
+    # x, y -> {:wrong_args, x, y, __STACKTRACE__} |> dbg()
+    _, _ -> :wrong_args |> wrap()
+  end
+
+  # General
   def select_data(args) do
     %{min: min, max: max, amount: amount} = args |> unwrap_map()
 

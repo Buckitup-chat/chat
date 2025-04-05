@@ -8,6 +8,13 @@ defmodule Chat.RoomInviteIndex do
   alias Chat.Identity
   alias Chat.Utils.StorageId
 
+  def pack(%Dialog{a_key: a_key, b_key: b_key}, key) do
+    [
+      {{:room_invite_index, a_key, key}, true},
+      {{:room_invite_index, b_key, key}, true}
+    ]
+  end
+
   def add({_, _} = indexed_message, %Dialog{} = dialog, %Identity{} = me, room_pub_key) do
     key =
       Dialogs.read_message(dialog, indexed_message, me)
@@ -22,8 +29,9 @@ defmodule Chat.RoomInviteIndex do
 
     room_trace = room_bit_trace(room_pub_key, msg_id, room_count())
 
-    Db.put({:room_invite_index, dialog.a_key, key}, room_trace)
-    Db.put({:room_invite_index, dialog.b_key, key}, room_trace)
+    dialog
+    |> pack(key)
+    |> Enum.each(fn {key, _value} -> Db.put(key, room_trace) end)
 
     indexed_message
   end

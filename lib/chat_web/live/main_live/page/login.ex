@@ -87,6 +87,9 @@ defmodule ChatWeb.MainLive.Page.Login do
   def sync_stored_room(%{assigns: %{me: me}} = socket, %{"room_count" => count, "key" => key}) do
     PubSub.broadcast_from(Chat.PubSub, self(), login_topic(me), {:sync_stored_room, key, count})
 
+    # me
+    #   |> Broadcast.Topic.login()
+    #   |> Broadcast.sync_stored_room(key, count)
     socket
     |> assign(:room_count_to_backup, count)
   end
@@ -98,6 +101,16 @@ defmodule ChatWeb.MainLive.Page.Login do
       :room_map,
       Map.put(room_map, new_room_identity |> Identity.pub_key(), new_room_identity)
     )
+    |> push_event("store-room", %{
+      auth_key: @local_store_auth_key,
+      room_count_key: @local_store_room_count_key,
+      room_key: Identity.priv_key_to_string(new_room_identity),
+      reply: "room/sync-stored"
+    })
+  end
+
+  def store_new_room_on_client(socket, new_room_identity) do
+    socket
     |> push_event("store-room", %{
       auth_key: @local_store_auth_key,
       room_count_key: @local_store_room_count_key,

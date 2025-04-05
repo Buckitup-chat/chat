@@ -21,8 +21,10 @@ defmodule ChatWeb.MainLive.Page.Lobby do
   @topic "chat::lobby"
 
   def init(socket) do
+    user_room_approval_topic = Chat.Broadcast.Topic.user_room_approval(socket.assigns.my_id)
     PubSub.subscribe(Chat.PubSub, @topic)
     PubSub.subscribe(Chat.PubSub, StatusPoller.channel())
+    PubSub.subscribe(Chat.PubSub, user_room_approval_topic)
 
     socket
     |> assign(:mode, :lobby)
@@ -146,11 +148,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
     Log.request_room_key(me, time, room.pub_key)
 
-    PubSub.broadcast!(
-      Chat.PubSub,
-      @topic,
-      {:room_request, room, me |> Identity.pub_key()}
-    )
+    Chat.Broadcast.room_requested(room, me |> Identity.pub_key())
 
     socket
     |> assign(
@@ -182,11 +180,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
         time = Chat.Time.monotonic_to_unix(time_offset)
         Log.approve_room_request(me, time, room.pub_key)
 
-        PubSub.broadcast!(
-          Chat.PubSub,
-          @topic,
-          {:room_request_approved, ciphered, user_key, room.pub_key}
-        )
+        Chat.Broadcast.room_request_approved(user_key, room.pub_key, ciphered)
 
       _ ->
         :ok
@@ -233,8 +227,10 @@ defmodule ChatWeb.MainLive.Page.Lobby do
       |> assign_admin()
 
   def close(socket) do
+    user_room_approval_topic = Chat.Broadcast.Topic.user_room_approval(socket.assigns.my_id)
     PubSub.unsubscribe(Chat.PubSub, @topic)
     PubSub.unsubscribe(Chat.PubSub, StatusPoller.channel())
+    PubSub.unsubscribe(Chat.PubSub, user_room_approval_topic)
 
     socket
   end
@@ -330,12 +326,7 @@ defmodule ChatWeb.MainLive.Page.Lobby do
         %RoomRequest{ciphered_room_identity: ciphered} when is_bitstring(ciphered) ->
           time = Chat.Time.monotonic_to_unix(time_offset)
           Log.approve_room_request(me, time, room.pub_key)
-
-          PubSub.broadcast!(
-            Chat.PubSub,
-            @topic,
-            {:room_request_approved, ciphered, user_key, room.pub_key}
-          )
+          Chat.Broadcast.room_request_approved(user_key, room.pub_key, ciphered)
 
         _ ->
           :ok

@@ -85,51 +85,46 @@ export class EncryptionManager extends EventTarget {
 	 * Creates a new vault and saves its ID.
 	 */
 	async createVault(data) {
-		try {
-			if (this.#isProduction) {
-				this.#vault = await connect({
-					storageType: 'idb',
-					addNewVault: true,
-					keyOptions: data.keyOptions,
-				});
-				//await this.saveVaultID(this.#vault.id);
-				this.#vaults.push({
-					name: data.keyOptions?.username,
-					notes: data.notes,
-					avatar: data.avatar,
-					address: data.address,
-					publicKey: data.publicKey,
-					vaultId: this.#vault.id,
-				});
-				// await this.#vault.set(vaultID ? vaultID : this.#vault.id, value);
-				await this.#rawStore.set('vaults-registry', this.#vaults);
-			} else {
-				this.#vault = {
-					id: data.publicKey,
-				};
+		if (this.#isProduction) {
+			this.#vault = await connect({
+				storageType: 'idb',
+				addNewVault: true,
+				keyOptions: data.keyOptions,
+			});
+			//await this.saveVaultID(this.#vault.id);
+			this.#vaults.push({
+				name: data.keyOptions?.username,
+				notes: data.notes,
+				avatar: data.avatar,
+				address: data.address,
+				publicKey: data.publicKey,
+				vaultId: this.#vault.id,
+			});
+			// await this.#vault.set(vaultID ? vaultID : this.#vault.id, value);
+			await this.#rawStore.set('vaults-registry', this.#vaults);
+		} else {
+			this.#vault = {
+				id: data.publicKey,
+			};
 
-				this.#vaults.push({
-					name: data.keyOptions.username,
-					address: data.address,
-					notes: data.notes,
-					avatar: data.avatar,
-					publicKey: data.publicKey,
-					vaultId: this.#vault.id,
-				});
+			this.#vaults.push({
+				name: data.keyOptions.username,
+				address: data.address,
+				notes: data.notes,
+				avatar: data.avatar,
+				publicKey: data.publicKey,
+				vaultId: this.#vault.id,
+			});
 
-				await this.#rawStore.set('test-vaults-registry', this.#vaults);
+			await this.#rawStore.set('test-vaults-registry', this.#vaults);
 
-				await this.#rawStore.get('test-vaults-registry');
-			}
-
-			// Set isAuth using the setter
-			this.isAuth = true;
-
-			console.log('Created a new vault with ID:', this.#vault.id);
-		} catch (error) {
-			console.error('createVault error', error);
-			//await this.handleError(error, "Error creating a new vault");
+			await this.#rawStore.get('test-vaults-registry');
 		}
+
+		// Set isAuth using the setter
+		this.isAuth = true;
+
+		console.log('Created a new vault with ID:', this.#vault.id);
 	}
 
 	/**

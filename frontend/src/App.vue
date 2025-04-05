@@ -145,7 +145,6 @@ watch(
 onMounted(async () => {
 	$user.setEncryptionManager($encryptionManager);
 
-	$socket.on('WALLET_UPDATE', walletUpdateListener);
 	window.addEventListener('online', () => ($user.isOnline = navigator.onLine));
 	window.addEventListener('offline', () => ($user.isOnline = navigator.onLine));
 	setTimeout(function tick() {
@@ -162,11 +161,4 @@ onMounted(async () => {
 		console.error('dxClient.initialize', error);
 	}
 });
-
-const walletUpdateListener = async (wallet) => {
-	if ($user.account?.address && $user.account?.address.toLowerCase() === wallet.toLowerCase()) {
-		$mitt.emit('WALLET_UPDATE');
-		$user.checkMetaWallet();
-	}
-};
 </script>

@@ -116,6 +116,8 @@ const dataDefault = {
 const data = ref(JSON.parse(JSON.stringify(dataDefault)));
 
 onMounted(async () => {
+	if (!$socket.connected && $user.isOnline) $socket.connect();
+
 	$socket.on('BACKUP_UPDATE', backupUpdateListener);
 	$socket.on('DISPATCH', dispatchListener);
 
@@ -127,6 +129,8 @@ onMounted(async () => {
 onUnmounted(async () => {
 	$socket.off('BACKUP_UPDATE', backupUpdateListener);
 	$socket.off('DISPATCH', dispatchListener);
+
+	if ($socket.connected) $socket.disconnect();
 });
 
 watch(
@@ -274,12 +278,12 @@ const getList = async () => {
 		data.value.totalResults = groupedArray.length;
 	} catch (error) {
 		console.error(error);
-		$swal.fire({
-			icon: 'error',
-			title: 'Fetch error',
-			footer: error.toString(),
-			timer: 30000,
-		});
+		//$swal.fire({
+		//	icon: 'error',
+		//	title: 'Fetch error',
+		//	footer: error.toString(),
+		//	timer: 30000,
+		//});
 	}
 	$loader.hide();
 	data.value.fetched = true;

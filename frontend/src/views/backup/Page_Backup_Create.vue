@@ -377,6 +377,8 @@ onMounted(async () => {
 	await $user.checkMetaWallet();
 	generateTag();
 	backupAccount();
+
+	if (!$socket.connected && $user.isOnline) $socket.connect();
 	$socket.on('DISPATCH', dispatchListener);
 	$socket.on('BACKUP_UPDATE', backupUpdateListener);
 	$mitt.on('contacts::selected', applyPartiesFromContacts);
@@ -386,6 +388,7 @@ onUnmounted(async () => {
 	$socket.off('BACKUP_UPDATE', backupUpdateListener);
 	$socket.off('DISPATCH', dispatchListener);
 	$mitt.off('contacts::selected', applyPartiesFromContacts);
+	if ($socket.connected) $socket.disconnect();
 });
 
 const dispatchListener = async (tx) => {

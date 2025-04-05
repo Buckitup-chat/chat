@@ -62,8 +62,11 @@ onMounted(async () => {
 	if ($route.query.invitationCode) {
 		mode.value = 'dxos_connect';
 		try {
+			await new Promise((resolve) => setTimeout(resolve, 300));
 			await $user.dxClient.initialize();
+			await new Promise((resolve) => setTimeout(resolve, 100));
 			if (!$user.dxClient.halo.identity.get()) {
+				await new Promise((resolve) => setTimeout(resolve, 100));
 				await $user.dxClient.halo.createIdentity();
 			}
 

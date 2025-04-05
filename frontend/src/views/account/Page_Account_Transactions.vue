@@ -43,6 +43,7 @@ import axios from 'axios';
 const $user = inject('$user');
 const $mitt = inject('$mitt');
 const $web3 = inject('$web3');
+const $socket = inject('$socket');
 
 const dataDefault = {
 	query: { sort: 'desc', page: 1, limit: 10 },
@@ -56,13 +57,21 @@ const dataDefault = {
 const data = ref(JSON.parse(JSON.stringify(dataDefault)));
 
 onMounted(async () => {
-	$mitt.on('WALLET_UPDATE', getList);
+	if (!$socket.connected && $user.isOnline) $socket.connect();
+	$socket.on('WALLET_UPDATE', walletUpdateListener);
 	getList();
 });
 
 onUnmounted(async () => {
-	$mitt.off('WALLET_UPDATE', getList);
+	$socket.off('WALLET_UPDATE', walletUpdateListener);
+	if ($socket.connected) $socket.disconnect();
 });
+
+const walletUpdateListener = async (wallet) => {
+	if ($user.account?.address?.toLowerCase() === wallet.toLowerCase()) {
+		$user.getList();
+	}
+};
 
 watch(
 	() => $user.account?.address,

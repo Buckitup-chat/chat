@@ -161,6 +161,7 @@ const filteredList = computed(() => {
 
 const signin = async () => {
 	$loader.show();
+
 	let swalInstance;
 	try {
 		const nextUser = JSON.parse(JSON.stringify(selected.value));
@@ -178,6 +179,7 @@ const signin = async () => {
 				icon: 'info',
 				title: 'Authenticate with PassKey',
 				footer: 'Please confirn PassKey on your device when it prompts',
+				timer: 3000,
 			});
 		}
 

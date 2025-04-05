@@ -64,8 +64,7 @@
 	top: 0;
 }
 
-.vld-overlay .vld-icon,
-.vld-parent {
+.vld-overlay .vld-icon {
 	position: relative;
 }
 </style>

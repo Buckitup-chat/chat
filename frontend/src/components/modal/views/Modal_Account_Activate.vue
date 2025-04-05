@@ -153,6 +153,7 @@ const agree = ref();
 const processingTx = ref();
 
 onMounted(async () => {
+	if (!$socket.connected && $user.isOnline) $socket.connect();
 	$socket.on('DISPATCH', dispatchListener);
 	$socket.on('WALLET_UPDATE', walletUpdateListener);
 });
@@ -160,6 +161,7 @@ onMounted(async () => {
 onUnmounted(async () => {
 	$socket.off('WALLET_UPDATE', walletUpdateListener);
 	$socket.off('DISPATCH', dispatchListener);
+	if ($socket.connected) $socket.disconnect();
 });
 
 const dispatchListener = async (tx) => {

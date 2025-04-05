@@ -13,7 +13,7 @@ import { fileURLToPath, URL } from 'node:url';
 import { ConfigPlugin } from '@dxos/config/vite-plugin';
 
 let production = process.env.NODE_ENV === 'production';
-//production = true;
+production = true;
 //production = false;
 
 // https://vite.dev/config/

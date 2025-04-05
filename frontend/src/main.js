@@ -70,8 +70,6 @@ app.provide('$encryptionManager', new EncryptionManager(IS_PRODUCTION));
 app.config.globalProperties.$swal = $swal;
 app.provide('$swal', $swal);
 
-//app.use(WagmiPlugin, { config: web3Store().wagmiAdapter.wagmiConfig });
-//app.use(VueQueryPlugin, { queryClient });
 // router
 import router from './router';
 app.use(router);
@@ -81,5 +79,23 @@ app.use(FloatingVue);
 
 import InfoTooltip from '@/components/InfoTooltip.vue';
 app.component('InfoTooltip', InfoTooltip);
+
+// check only one tab started
+const channel = new BroadcastChannel('buckitup-app');
+let blocked = false;
+channel.onmessage = (e) => {
+	if (e.data === 'app-already-running') {
+		blocked = true;
+		window.stop();
+		document.body.innerHTML = '<h4 class="text-white text-center mt-5">App is already open in another tab.</h4>';
+	}
+};
+channel.postMessage('ping');
+setTimeout(() => {
+	// Wait a bit for any responses from other tabs
+	if (!blocked) {
+		channel.postMessage('app-already-running'); // If no response, mark this as the main tab
+	}
+}, 100); // can increase to 300ms if needed
 
 app.mount('#app');

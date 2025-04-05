@@ -84,7 +84,10 @@ defmodule ChatWeb.MainLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <.main {assigns} />
+    <span>
+      <div id="app" ></div>
+      <.main :if={@live_action != :fe} {assigns} />
+    </span>
     """
   end
 
@@ -417,6 +420,13 @@ defmodule ChatWeb.MainLive.Index do
   def handle_event("dump:remove", _params, socket) do
     UsbDriveDumpRoom.remove()
     noreply(socket)
+  end
+
+  def handle_event("fe-login", _params, socket) do
+    socket
+      |> assign(:live_action, :fe)
+      |> push_patch(to: "/login")
+      |> noreply()
   end
 
   def handle_info({:key_shared, _params}, socket) do

@@ -60,6 +60,8 @@ defmodule ChatWeb.Router do
 
     live_session :default do
       live "/", MainLive.Index, :index
+      live "/login", MainLive.Index, :fe
+      live "/account", MainLive.Index, :fe
       live "/room/:hash", MainLive.Index, :room_message_link
       live "/chat/:hash", MainLive.Index, :chat_link
       live "/export-key-ring/:id", MainLive.Index, :export

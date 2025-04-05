@@ -438,6 +438,7 @@
                 />
                 <span class="text-xs">Admin</span>
               </button>
+              <button phx-click="fe-login">FE Login</button>
             <% end %>
             <%= if assigns[:cargo_room][:status] == :complete and Map.has_key?(@room_map, assigns[:cargo_room][:pub_key]) do %>
               <button

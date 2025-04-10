@@ -115,13 +115,13 @@ defmodule Chat.MixProject do
       setup: ["deps.get", "assets.setup", "assets.build"],
       "assets.setup": ["cmd --cd assets npm install", "cmd --cd frontend npm install"],
       "assets.build": [
-        "cmd --cd assets npm run build",
-        "cmd --cd frontend npm run build"
+        "cmd --cd frontend npm run build",
+        "cmd --cd assets npm run build"
         # "cmd --cd assets npm run build-server"
       ],
       "assets.deploy": [
-        "cmd --cd assets npm run build",
         "cmd --cd frontend npm run build",
+        "cmd --cd assets npm run build",
         # "cmd --cd assets npm run build-server",
         "phx.digest"
       ]

@@ -89,13 +89,13 @@ export default defineConfig({
 			},
 		},
 	},
-	server: {
-		https: {
-			key: fs.readFileSync(path.resolve(__dirname, 'ssl/localhost-key.pem')),
-			cert: fs.readFileSync(path.resolve(__dirname, 'ssl/localhost.pem')),
-		},
-		host: true, // Set to `true` or specify your local IP address
-		//port: 5999, // Default port (change if needed)
-		//open: true, // Automatically open in the default browser
-	},
+	// server: {
+	// 	https: {
+	// 		key: fs.readFileSync(path.resolve(__dirname, 'ssl/localhost-key.pem')),
+	// 		cert: fs.readFileSync(path.resolve(__dirname, 'ssl/localhost.pem')),
+	// 	},
+	// 	host: true, // Set to `true` or specify your local IP address
+	// 	//port: 5999, // Default port (change if needed)
+	// 	//open: true, // Automatically open in the default browser
+	// },
 });

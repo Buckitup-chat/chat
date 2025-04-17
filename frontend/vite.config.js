@@ -82,13 +82,13 @@ export default defineConfig({
 	build: {
 		outDir: "../priv/static/frontend", // emit assets to priv/static/frontend
 		emptyOutDir: true,
+		commonjsOptions: {
+			exclude: ['@protobufjs/inquire']
+		},
 		rollupOptions: {
 			onwarn(warning, warn) {
 				if (warning.message.includes('PURE') || warning.message.includes('has been externalized')) return;
 				warn(warning); // Let Rollup handle other warnings normally
-			},
-			commonjsOptions: {
-				exclude: ['@protobufjs/inquire']
 			},
 		},
 	},

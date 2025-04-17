@@ -82,6 +82,9 @@ export default defineConfig({
 	build: {
 		outDir: "../priv/static/frontend", // emit assets to priv/static/frontend
 		emptyOutDir: true,
+		// disable source maps & size reports to save memory
+		sourcemap: false,
+		reportCompressedSize: false,
 		minify: 'esbuild',
 		cssCodeSplit: false,
 		commonjsOptions: {

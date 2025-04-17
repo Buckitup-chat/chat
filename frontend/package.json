@@ -4,11 +4,11 @@
   "version": "0.0.1",
   "type": "module",
   "config": {
-    "node_options": "--max-old-space-size=3072"
+    "node_options": "--max-old-space-size=4096"
   },
   "scripts": {
     "dev": "vite",
-    "build": "node --max-old-space-size=3072 node_modules/.bin/vite build",
+    "build": "node --max-old-space-size=4096 node_modules/.bin/vite build",
     "preview": "vite preview"
   },
   "dependencies": {

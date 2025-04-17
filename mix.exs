@@ -120,8 +120,8 @@ defmodule Chat.MixProject do
         # "cmd --cd assets npm run build-server"
       ],
       "assets.deploy": [
-        "cmd --cd frontend npm run build",
         "cmd --cd assets npm run build",
+        "cmd --cd frontend npm run build",
         # "cmd --cd assets npm run build-server",
         "phx.digest"
       ]

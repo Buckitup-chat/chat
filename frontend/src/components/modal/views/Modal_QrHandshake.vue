@@ -171,7 +171,7 @@ import { ref, inject, onMounted, onBeforeUnmount, computed } from 'vue';
 import QrScanner from 'qr-scanner';
 import QRCode from 'qrcode';
 import Account_Item from '@/components/Account_Item.vue';
-import { toUtf8Bytes, randomBytes, encodeBase58, concat, computeAddress, decodeBase58 } from 'ethers';
+import { toUtf8Bytes, randomBytes, encodeBase64, concat, computeAddress, decodeBase64, encodeBase58 } from 'ethers';
 import { Expando, create } from '@dxos/client/echo';
 import dayjs from 'dayjs';
 
@@ -276,7 +276,7 @@ async function toggleScanner() {
 		showCamera.value = true;
 
 		// Start countdown interval
-		countdown.value = 2;
+		countdown.value = 1;
 		countdownInterval = setInterval(() => {
 			countdown.value -= 1;
 			if (countdown.value <= 0) {
@@ -304,13 +304,17 @@ function startAutoStopCountdown(delay = 1000) {
 const readQr = (msg) => {
 	try {
 		// Extract the fixed parts based on known lengths
+		console.log('msg', msg);
 		const verified = parseInt(msg[0]); // First character (1 char)
-		const challenge = msg.slice(1, 19); // Next 18 characters (2nd to 19th char)
-		const signature = msg.length > 19 ? msg.slice(19, 107) : null; // 19th to 107th char (if present)
-		const displayNameEnc = msg.length > 107 ? msg.slice(107) : null;
+		const challenge = msg.slice(1, 21); // Next 18 characters (2nd to 19th char)
+		const signature = msg.length > 21 ? msg.slice(21, 109) : null; // 19th to 107th char (if present)
+		const displayNameEnc = msg.length > 109 ? msg.slice(109) : null;
 		if (challenge) {
-			const decodedChallengeBytes = decodeBase58(challenge);
+			const decodedChallengeBytes = decodeBase64(challenge);
+
 			const contactChallengeDec = new TextDecoder().decode(decodedChallengeBytes);
+
+			console.log('contactChallengeDec', contactChallengeDec);
 			if (challenge && contactChallengeDec.startsWith(options.staticString)) {
 				if (stopScanTimeout) startAutoStopCountdown();
 
@@ -321,7 +325,7 @@ const readQr = (msg) => {
 					state.value.contactChallenge = challenge;
 				}
 				if (signature) {
-					const decodedNameBytes = decodeBase58(displayNameEnc);
+					const decodedNameBytes = decodeBase64(displayNameEnc);
 					const displayName = new TextDecoder().decode(decodedNameBytes);
 					const publicKeyCompact = $enigma.recoverPublicKey(state.value.challenge + displayName, signature);
 					const publicKey = '0x' + $enigma.convertPublicKeyToHex(publicKeyCompact);
@@ -343,11 +347,11 @@ const updateQr = async () => {
 	if (qrCode.value && state.value.challenge) {
 		let color = options.scanningColor;
 		if (state.value.contactChallenge && !state.value.signature) {
-			state.value.signature = $enigma.signChallenge(state.value.contactChallenge + $user.accountInfo.name, $user.account.privateKeyB64);
+			state.value.signature = $enigma.signChallenge(new TextEncoder().encode(state.value.contactChallenge + $user.accountInfo.name), $user.account.privateKeyB64);
 			if ('vibrate' in navigator) navigator.vibrate([50]);
 		}
 
-		const displayName = state.value.signature ? encodeBase58(new TextEncoder().encode($user.accountInfo.name)) : '';
+		const displayName = state.value.signature ? encodeBase64(new TextEncoder().encode($user.accountInfo.name)) : '';
 		const msg = `${state.value.verified}${state.value.challenge}${state.value.signature || ''}${displayName}`;
 
 		if (state.value.signature) color = options.detectedColor;
@@ -381,7 +385,8 @@ const updateQr = async () => {
 const generateChallenge = () => {
 	const staticBytes = toUtf8Bytes(options.staticString); // Convert 'buckitup' to bytes
 	const random = randomBytes(10); // Generate 16 random bytes
-	state.value.challenge = encodeBase58(concat([staticBytes, random])); // .toString('base58')
+	state.value.challenge = encodeBase64(concat([staticBytes, random]));
+	console.log('contactChallengeDec', state.value.challenge.length, encodeBase58(concat([staticBytes, random])).length);
 };
 
 const isInContacts = computed(() => {
@@ -498,4 +503,15 @@ const wait = (delay = 500) => {
 		}, delay),
 	);
 };
+
+function bigintToBytes(bn) {
+	let hex = bn.toString(16);
+	if (hex.length % 2) hex = '0' + hex;
+	const len = hex.length / 2;
+	const u8 = new Uint8Array(len);
+	for (let i = 0; i < len; i++) {
+		u8[i] = parseInt(hex.substr(i * 2, 2), 16);
+	}
+	return u8;
+}
 </script>

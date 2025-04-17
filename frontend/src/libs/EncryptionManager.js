@@ -117,14 +117,14 @@ export class EncryptionManager extends EventTarget {
 			});
 
 			await this.#rawStore.set('test-vaults-registry', this.#vaults);
-
-			await this.#rawStore.get('test-vaults-registry');
 		}
 
 		// Set isAuth using the setter
 		this.isAuth = true;
 
 		console.log('Created a new vault with ID:', this.#vault.id);
+
+		this.setCurrentUser();
 	}
 
 	/**
@@ -148,6 +148,8 @@ export class EncryptionManager extends EventTarget {
 			this.isAuth = true;
 
 			console.log('Connected to existing vault:', vaultID);
+
+			this.setCurrentUser();
 		} catch (error) {
 			this.isAuth = false; // Use the setter
 			console.error(error);
@@ -223,30 +225,37 @@ export class EncryptionManager extends EventTarget {
 
 	async updateAccountInfoVault(accountInfo) {
 		try {
-			if (this.#isProduction) {
-				const vaults = await this.#rawStore.get('vaults-registry');
-				const idx = vaults.findIndex((v) => v.vaultId === this.#vault.id);
-				if (idx > -1) {
-					vaults[idx].name = accountInfo.name;
-					vaults[idx].notes = accountInfo.notes;
-					vaults[idx].avatar = accountInfo.avatar;
-					await this.#rawStore.set(`vaults-registry`, vaults);
-					this.#vaults = vaults;
-				}
-			} else {
-				const vaults = await this.#rawStore.get('test-vaults-registry');
-				const idx = vaults.findIndex((v) => v.vaultId === this.#vault.id);
-				if (idx > -1) {
-					vaults[idx].name = accountInfo.name;
-					vaults[idx].notes = accountInfo.notes;
-					vaults[idx].avatar = accountInfo.avatar;
-					await this.#rawStore.set(`test-vaults-registry`, vaults);
-					this.#vaults = vaults;
-				}
+			const registryKey = this.#isProduction ? 'vaults-registry' : 'test-vaults-registry';
+			const vaults = await this.#rawStore.get(registryKey);
+			const idx = vaults.findIndex((v) => v.vaultId === this.#vault.id);
+			if (idx > -1) {
+				vaults[idx].name = accountInfo.name;
+				vaults[idx].notes = accountInfo.notes;
+				vaults[idx].avatar = accountInfo.avatar;
+				await this.#rawStore.set(registryKey, vaults);
+				this.#vaults = vaults;
 			}
 		} catch (error) {
 			this.handleError(error, 'no vaults');
 			console.error(`getVaults error`, error);
+		}
+	}
+
+	async setCurrentUser() {
+		try {
+			const registryKey = this.#isProduction ? 'vaults-registry' : 'test-vaults-registry';
+			const vaults = await this.#rawStore.get(registryKey);
+			const updatedVaults = vaults.map((vault) => {
+				const isCurrent = vault.vaultId === this.#vault.id;
+				return {
+					...vault,
+					current: isCurrent,
+				};
+			});
+			await this.#rawStore.set(registryKey, updatedVaults);
+			this.#vaults = updatedVaults;
+		} catch (error) {
+			await this.handleError(error, 'Error retrieving data');
 		}
 	}
 
@@ -262,7 +271,6 @@ export class EncryptionManager extends EventTarget {
 			} else {
 				data = await this.#rawStore.get(`test-local-vault-${this.#vault.id}`);
 			}
-
 			return data;
 		} catch (error) {
 			await this.handleError(error, 'Error retrieving data');

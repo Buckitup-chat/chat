@@ -45,7 +45,7 @@ export const signChallenge = (challenge, privateKeyB64) => {
 	const privKey = base64ToArray(privateKeyB64);
 
 	// Generate the signature with recovery ID
-	const { r, s, recovery } = secp.sign(digest, privKey, { lowS: true, extraEntropy: false });
+	const { r, s, recovery } = secp.sign(digest.slice(2), privKey, { lowS: true, extraEntropy: false });
 	const rBytes = bigintToBytes(r); // 32 bytes
 	const sBytes = bigintToBytes(s); // 32 bytes
 	// Combine r, s, and recovery (1 byte) into a single Uint8Array

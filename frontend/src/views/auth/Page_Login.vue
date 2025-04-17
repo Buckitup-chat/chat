@@ -30,6 +30,9 @@
 		<div class="px-3 w-100 mb-3 opacity-50">
 			<button class="btn btn-outline-light w-100" @click="wipe()">Wipe all</button>
 		</div>
+		<div class="px-3 w-100 mb-3 opacity-50">
+			<button class="btn btn-outline-light w-100" @click="connectVaultLocalApp()">Local app connect</button>
+		</div>
 	</div>
 </template>
 
@@ -49,6 +52,7 @@
 <script setup>
 import Account_Selector from '@/components/Account_Selector.vue';
 import { inject, ref, onMounted, onUnmounted } from 'vue';
+import * as $enigma from '@/libs/enigma';
 
 const $mitt = inject('$mitt');
 const $user = inject('$user');
@@ -101,4 +105,22 @@ function setMode(m) {
 	if (m === 'shares') $mitt.emit('modal::open', { id: 'account_restore_shares' });
 	if (m === 'dxos_connect') $mitt.emit('modal::open', { id: 'account_dxos_connect' });
 }
+
+const connectVaultLocalApp = async () => {
+	const vaults = await $encryptionManager.getVaults();
+	if (!vaults?.length) return;
+	let currentUser = vaults.find((u) => u.current);
+	if (!currentUser) currentUser = vaults[0];
+
+	await $encryptionManager.connectToVault(currentUser.vaultId);
+	if (!$encryptionManager.isAuth) return;
+
+	const vault = await $encryptionManager.getData();
+	const privateKeyB64 = $enigma.stringToBase64($enigma.hexToUint8Array(vault.privateKey.slice(2)));
+	const publicKeyB64 = $enigma.stringToBase64($enigma.getPublicKeyFromPrivateKey(vault.privateKey.slice(2)));
+
+	const resp = [[currentUser.name, $enigma.combineKeypair(privateKeyB64, publicKeyB64)], vault.rooms || [], vault.contacts || []];
+	console.log('connectVaultLocalApp', resp);
+	return resp;
+};
 </script>

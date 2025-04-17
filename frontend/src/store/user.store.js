@@ -152,6 +152,7 @@ export const userStore = defineStore(
 						const cd = await mergeContactsDuplicates(objects);
 						contactsDx.splice(0, contactsDx.length, ...cd);
 						contacts.splice(0, contacts.length, ...cd.map((contact) => $enigma.decryptObjectKeys(contact, contactKeys, account.value.privateKey)));
+						await encryptionManager.setData(toVaultFormat(account.value, contacts));
 					} catch (error) {
 						console.error('contacts update error', error);
 					}
@@ -246,7 +247,8 @@ export const userStore = defineStore(
 					// Remove duplicates from DXOS
 					try {
 						for (const duplicate of duplicates) {
-							await space.value.db.remove(duplicate);
+							//await space.value.db.remove(duplicate);
+							space.value.db.remove(duplicate);
 						}
 					} catch (error) {
 						console.error('mergeContactsDuplicates space.value.db.remove error', error);
@@ -346,10 +348,19 @@ export const userStore = defineStore(
 			{ deep: true },
 		);
 
-		const toVaultFormat = (user) => {
+		const toVaultFormat = (user, contacts) => {
+			if (contacts) {
+				const map = contacts.reduce((acc, u) => {
+					acc[u.publicKey] = { name: u.name, notes: u.notes, avatar: u.avatar };
+					return acc;
+				}, {});
+				console.log('toVaultFormat contacts', contacts, map);
+				contacts = map;
+			}
 			return {
 				privateKey: user.privateKey,
 				spaceId: user.spaceId,
+				contacts,
 			};
 			return [
 				[user.name, $enigma.combineKeypair(user.privateKeyB64, user.publicKeyB64)],

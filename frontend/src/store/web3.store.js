@@ -7,7 +7,7 @@ import { LitNodeClient } from '@lit-protocol/lit-node-client';
 import bcConfig from '../../../bcConfig.json';
 import { Wallet, JsonRpcProvider, Contract } from 'ethers';
 
-const mainChainId = IS_PRODUCTION ? '11155111' : '225'; //
+const mainChainId = IS_PRODUCTION_API ? '11155111' : '225'; //
 const bc = bcConfig[mainChainId];
 
 const provider = new JsonRpcProvider(bc.chain.rpcUrl); // replace with your chain's RPC if needed

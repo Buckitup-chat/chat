@@ -76,7 +76,7 @@ export default defineConfig({
 		esbuildOptions: {
 			target: 'es2022',
 		},
-		exclude: ['@lo-fi/webauthn-local-client'],
+		exclude: ['@lo-fi/webauthn-local-client', '@protobufjs/inquire'],
 	},
 	base: '/frontend',
 	build: {
@@ -86,6 +86,9 @@ export default defineConfig({
 			onwarn(warning, warn) {
 				if (warning.message.includes('PURE') || warning.message.includes('has been externalized')) return;
 				warn(warning); // Let Rollup handle other warnings normally
+			},
+			commonjsOptions: {
+				exclude: ['@protobufjs/inquire']
 			},
 		},
 	},

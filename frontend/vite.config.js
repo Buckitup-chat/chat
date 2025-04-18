@@ -16,7 +16,8 @@ import { ConfigPlugin } from '@dxos/config/vite-plugin';
 
 let production = process.env.NODE_ENV === 'production';
 production = true;
-//production = false;
+let productionApi = process.env.NODE_ENV === 'production';
+productionApi = true;
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -56,10 +57,11 @@ export default defineConfig({
 		//sodium,
 		API_URL: JSON.stringify(production ? 'https://buckitupss.appdev.pp.ua/api' : 'http://localhost:3950/api'),
 		IS_PRODUCTION: production,
-		API_SURL: JSON.stringify(production ? 'https://buckitupss.appdev.pp.ua' : 'http://localhost:3950'), //http://192.168.100.28:3900 https://d1ca-2a01-c844-251d-5100-fa2f-930b-157d-3af1.ngrok-free.app
+		IS_PRODUCTION_API: productionApi,
+		API_SURL: JSON.stringify(productionApi ? 'https://buckitupss.appdev.pp.ua' : 'http://localhost:3950'), //http://192.168.100.28:3900 https://d1ca-2a01-c844-251d-5100-fa2f-930b-157d-3af1.ngrok-free.app
 
 		API_SPATH: JSON.stringify('/api'),
-		TM_BOT: JSON.stringify(production ? 'BuckitUpDemoBot' : 'BuckitUpLocalBot'),
+		TM_BOT: JSON.stringify(productionApi ? 'BuckitUpDemoBot' : 'BuckitUpLocalBot'),
 		LIT_PKP_PUBLIC_KEY: JSON.stringify('0x040886717a89b4ca1f41c39006c85f27dad31ef1d53072bc63ba1b69e7cd70363b8e283077071af75f29c48375c98c77ae5e81995986edcd783b8fa3c45e2c1d1e'),
 
 		IPFS_URL: JSON.stringify('https://fanaticodev.infura-ipfs.io/ipfs/'),

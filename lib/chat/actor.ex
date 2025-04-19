@@ -3,39 +3,44 @@ defmodule Chat.Actor do
 
   alias Chat.Identity
 
-  defstruct [:me, rooms: [], contacts: %{}]
+  defstruct [:me, rooms: [], contacts: %{}, payload: %{}]
 
-  def new(%Identity{} = me, rooms, contacts) do
+  def new(%Identity{} = me, rooms, contacts, payload = %{}) do
     %__MODULE__{
       me: me,
       rooms: rooms,
-      contacts: contacts
+      contacts: contacts,
+      payload: payload
     }
   end
 
   def to_json(%__MODULE__{
         me: %Identity{} = identity,
         rooms: rooms,
-        contacts: contacts
+        contacts: contacts,
+        payload: payload
       }) do
     [
       identity |> Identity.to_strings(),
       rooms |> Enum.map(&(&1 |> Identity.priv_key_to_string())),
-      contacts
+      contacts,
+      payload
     ]
     |> Jason.encode!()
   end
 
   def from_json(json) do
     case Jason.decode!(json) do
-      [me, rooms, contacts] -> [me, rooms, contacts]
-      [me, rooms] -> [me, rooms, %{}]
+      [me, rooms, contacts, payload] -> [me, rooms, contacts, payload]
+      [me, rooms, contacts] -> [me, rooms, contacts, %{}]
+      [me, rooms] -> [me, rooms, %{}, %{}]
     end
-    |> then(fn [me, rooms, contacts] ->
+    |> then(fn [me, rooms, contacts, payload] ->
       new(
         Identity.from_strings(me),
         rooms |> Enum.map(&Identity.from_strings(["", &1])),
-        contacts
+        contacts,
+        payload
       )
     end)
   end

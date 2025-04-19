@@ -37,7 +37,9 @@ defmodule Chat.User do
 
   def remove(hash), do: Registry.remove(hash)
 
-  def device_encode(%Identity{} = identity, rooms \\ []), do: LocalStorage.encode(identity, rooms)
+  def device_encode(%Identity{} = identity, rooms \\ [], contacts \\ %{}, payload \\ %{}) do
+    LocalStorage.encode(identity, rooms, contacts, payload)
+  end
   def device_decode(data), do: LocalStorage.decode(data)
 
   def pub_key(%Card{pub_key: key}), do: key

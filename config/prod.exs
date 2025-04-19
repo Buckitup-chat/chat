@@ -45,7 +45,8 @@ if cert_present? do
 
   config :chat, ChatWeb.Endpoint,
     url: [host: hostname],
-    http: [ip: {0, 0, 0, 0}, port: 80],
+    http: [port: System.get_env("PORT")],
+    # http: [ip: {0, 0, 0, 0}, port: 80],
     https: [
       port: 443,
       cipher_suite: :strong,

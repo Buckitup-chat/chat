@@ -3,7 +3,7 @@
 if [ `hostname` = 'eco' ]; then
   export SECRET_KEY_BASE=IGuZPUcM7Vuq1iPemg6pc7EMwLLmMiVA4stbfDstZPshJ8QDqxBBcVqNnQI6clxi
   export MIX_ENV=prod
-  export PORT=80
+  export PORT=4401
   export PHX_SERVER=true
   export DOMAIN=eco-taxi.one
 

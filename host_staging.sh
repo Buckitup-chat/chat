@@ -5,7 +5,7 @@ if [ `hostname` = 'eco' ]; then
   export MIX_ENV=prod
   export PORT=4402
   export PHX_SERVER=true
-  export DOMAIN=128.140.47.184
+  export DOMAIN=buckitup.xyz
   export RELEASE_NAME=staging_chat
 
   # . $HOME/.asdf/asdf.sh

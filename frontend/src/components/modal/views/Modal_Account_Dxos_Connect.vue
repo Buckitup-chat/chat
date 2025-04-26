@@ -248,7 +248,7 @@ const decryptAccount = async () => {
 					$user.account = account;
 					$user.account.spaceId = space.id;
 
-					await $encryptionManager.setData($user.toVaultFormat($user.account));
+					await $encryptionManager.setData($user.toVaultFormat());
 					$user.space = space;
 
 					await $user.openSpace();

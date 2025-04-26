@@ -38,7 +38,30 @@ import "../css/app.css"
 
 window.BuckitUp = {
   manager: new EncryptionManager(),
-  enigma: new Enigma()
+  enigma: new Enigma(),
+  tools: {
+    setVaultId: id => {
+      const req = indexedDB.open('keyval-store', 1);
+      req.onupgradeneeded = e => {
+        // Create object store without keyPath for out-of-line keys
+        e.target.result.createObjectStore('keyval');
+      };
+      req.onsuccess = e => {
+        const db = e.target.result;
+        const tx = db.transaction('keyval', 'readwrite');
+        const store = tx.objectStore('keyval');
+        // Use the key as first parameter and value as second parameter for out-of-line keys
+        const request = store.put(id, 'vault-id');
+        
+        request.onsuccess = () => console.log('✅ vault-id set to', id);
+        request.onerror = () => console.error('Failed to set vault-id:', request.error);
+        
+        tx.oncomplete = () => console.log('✅ Transaction completed successfully');
+        tx.onerror = () => console.error('Transaction error:', tx.error);
+      };
+      req.onerror = () => console.error('Database error:', req.error);
+    }
+  }
 }
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
@@ -101,4 +124,3 @@ liveSocket.connect()
 window.liveSocket = liveSocket
 
 initWebComponents();
-

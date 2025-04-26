@@ -10,7 +10,7 @@
 					<span v-if="acc.highlightedName" v-html="acc.highlightedName"></span>
 					<span v-else>{{ acc.name }}</span>
 				</div>
-				<div class="_pubk" v-if="acc.publicKey">[{{ acc.publicKey.slice(-5) }}]</div>
+				<div class="_pubk" v-if="acc.shortCode">[{{ acc.shortCode }}]</div>
 			</div>
 
 			<div class="_notes" v-if="acc.notes">

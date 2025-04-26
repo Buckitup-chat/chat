@@ -40,6 +40,8 @@ export const userStore = defineStore(
 		const contacts = reactive([]);
 		const contactsDx = reactive([]);
 
+		const rooms = reactive([]);
+
 		const registeredMetaWallet = ref();
 
 		const backups = reactive([]);
@@ -77,7 +79,7 @@ export const userStore = defineStore(
 			try {
 				space.value = await dxClient.value.spaces.create({ role: SpaceMember.Role.ADMIN }); //, encryptionKey: $user.account.metaPrivateKey
 				account.value.spaceId = space.value.id;
-				await encryptionManager.setData(toVaultFormat(account.value));
+				await encryptionManager.setData(toVaultFormat());
 				console.log('User space created', account.value.spaceId);
 			} catch (error) {
 				console.error('createSpace error', error);
@@ -152,7 +154,7 @@ export const userStore = defineStore(
 						const cd = await mergeContactsDuplicates(objects);
 						contactsDx.splice(0, contactsDx.length, ...cd);
 						contacts.splice(0, contacts.length, ...cd.map((contact) => $enigma.decryptObjectKeys(contact, contactKeys, account.value.privateKey)));
-						await encryptionManager.setData(toVaultFormat(account.value, contacts));
+						await encryptionManager.setData(toVaultFormat());
 					} catch (error) {
 						console.error('contacts update error', error);
 					}
@@ -343,39 +345,48 @@ export const userStore = defineStore(
 					});
 					accountInfoDx.updatedAt = dayjs().valueOf();
 					console.log('✨ Updated DXOS object', accountInfoDx.id);
+					encryptionManager.setData(toVaultFormat());
 				}
 			},
 			{ deep: true },
 		);
 
-		const toVaultFormat = (user, contacts) => {
-			if (contacts) {
-				const map = contacts.reduce((acc, u) => {
-					acc[u.publicKey] = { name: u.name, notes: u.notes, avatar: u.avatar };
-					return acc;
-				}, {});
-				console.log('toVaultFormat contacts', contacts, map);
-				contacts = map;
-			}
-			return {
-				privateKey: user.privateKey,
-				spaceId: user.spaceId,
-				contacts,
-			};
-			return [
-				[user.name, $enigma.combineKeypair(user.privateKeyB64, user.publicKeyB64)],
-				user.rooms,
-				user.contacts.reduce((acc, u) => {
+		const toVaultFormat = () => {
+			console.log(account.value.privateKeyB64, account.value.publicKeyB64);
+			const v = [
+				[accountInfo.name, $enigma.combineKeypair(account.value.privateKeyB64, account.value.publicKeyB64)],
+				[...rooms],
+				contacts.reduce((acc, u) => {
 					acc[u.publicKey] = { name: u.name, notes: u.notes, avatar: u.avatar };
 					return acc;
 				}, {}),
+				{
+					privateKey: account.value.privateKey,
+					spaceId: account.value.spaceId,
+				},
 			];
+			console.log(v);
+			return v;
 		};
 
 		const fromVaultFormat = async (vault) => {
-			return {
-				...(await generateAccount(vault.privateKey)),
-				spaceId: vault.spaceId,
+			let privateKey, spaceId;
+
+			if (vault?.length) {
+				const spl = $enigma.splitKeypair(vault[0][1]);
+				console.log(spl);
+				console.log($enigma.convertPrivateKeyToHex(spl.privateKey));
+				privateKey = '0x' + $enigma.convertPrivateKeyToHex(spl.privateKey);
+				spaceId = vault[3]?.spaceId;
+
+				Object.assign(rooms, vault[1]);
+			} else {
+				privateKey = vault.privateKey;
+				spaceId = vault.spaceId;
+			}
+			account.value = {
+				...(await generateAccount(privateKey)),
+				spaceId,
 			};
 		};
 
@@ -400,7 +411,7 @@ export const userStore = defineStore(
 				const wallet = new Wallet(privateKeyHex);
 				const signature = await wallet.signMessage(privateKeyHex);
 				const meta = await web3Store().bukitupClient.generateKeysFromSignature(signature);
-
+				const combined = $enigma.combineKeypair(privateKeyB64, publicKeyB64);
 				const account = {
 					address: wallet.address,
 					privateKey: privateKeyHex,
@@ -409,6 +420,7 @@ export const userStore = defineStore(
 					publicKeyB64,
 					metaPublicKey: meta.spendingKeyPair.account.publicKey,
 					metaPrivateKey: meta.spendingKeyPair.privatekey,
+					shortCode: $enigma.shortcodeFromFullKey(combined),
 				};
 
 				return account;
@@ -449,7 +461,7 @@ export const userStore = defineStore(
 			accountInfo,
 			contacts,
 			contactsDx,
-
+			rooms,
 			defaultAvatar,
 
 			toVaultFormat,

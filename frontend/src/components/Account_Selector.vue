@@ -191,7 +191,8 @@ const signin = async () => {
 			$loader.hide();
 			return;
 		}
-		$user.account = await $user.fromVaultFormat(await $encryptionManager.getData());
+
+		await $user.fromVaultFormat(await $encryptionManager.getData());
 
 		if ($user.account.spaceId) {
 			const spaces = $user.dxClient.spaces.get();

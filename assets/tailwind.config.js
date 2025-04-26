@@ -32,7 +32,10 @@ module.exports = {
       },
       animation: {
         'recording': 'recording 2s normal infinite',
-      }
+      },
+      textShadow: {
+        'green': '0 0 10px #4ade80, 0 0 20px #4ade80, 0 0 30px #4ade80',
+      },
     },
   },
   plugins: [
@@ -61,5 +64,15 @@ module.exports = {
         '.phx-change-loading &',
       ])
     ),
+    function ({ matchUtilities, theme }) {
+      matchUtilities(
+        {
+          'text-shadow': (value) => ({
+            textShadow: value,
+          }),
+        },
+        { values: theme('textShadow') }
+      )
+    },
   ],
 }

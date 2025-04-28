@@ -189,7 +189,23 @@ export class EncryptionManager extends EventTarget {
     * @returns {Promise<string|null>} - The vault ID or null if not found.
     */
    async getVaultID() {
-      return await this.#rawStore.get("vault-id");
+      try {
+         // First, check the vaults registry for a current vault
+         const vaultsRegistry = await this.#rawStore.get("vaults-registry") || [];
+         const currentVault = vaultsRegistry.find(vault => vault.current === true);
+         
+         if (currentVault && currentVault.vaultId) {
+            console.log("Found current vault ID in vaults registry:", currentVault.vaultId);
+            return currentVault.vaultId;
+         }
+         
+         // Fall back to the original method if no current vault is found in the registry
+         return await this.#rawStore.get("vault-id");
+      } catch (error) {
+         console.error("Error retrieving vault ID:", error);
+         // Fall back to the original method if there's an error
+         return await this.#rawStore.get("vault-id");
+      }
    }
 
    /**
@@ -198,13 +214,96 @@ export class EncryptionManager extends EventTarget {
     */
    async saveVaultID(id) {
       await this.#rawStore.set("vault-id", id);
+      await this.updateVaultsRegistry(id);
+   }
+
+   /**
+    * Updates the vaults registry when saving a vault ID.
+    * @param {string} vaultId - The vault ID to set as current.
+    */
+   async updateVaultsRegistry(vaultId) {
+      try {
+         // Get the current vaults registry
+         let vaultsRegistry = await this.#rawStore.get("vaults-registry");
+         
+         // Only proceed if vaults registry exists
+         if (!vaultsRegistry) {
+            console.log("Vaults registry doesn't exist, skipping update");
+            return;
+         }
+         
+         // Find if the vault already exists in the registry
+         const existingVaultIndex = vaultsRegistry.findIndex(vault => vault.vaultId === vaultId);
+         
+         if (existingVaultIndex >= 0) {
+            // If vault exists, update its current status
+            vaultsRegistry = vaultsRegistry.map(vault => ({
+               ...vault,
+               current: vault.vaultId === vaultId
+            }));
+         } else {
+            // If vault doesn't exist, generate a new entry
+            const newVault = {
+               vaultId: vaultId,
+               name: `User ${vaultsRegistry.length + 1}`,
+               current: true,
+               // Add default values for other fields
+               notes: "",
+               avatar: "",
+               // Add timestamp for creation
+               createdAt: new Date().toISOString()
+            };
+            
+            // Reset current status for all existing vaults
+            vaultsRegistry = vaultsRegistry.map(vault => ({
+               ...vault,
+               current: false
+            }));
+            
+            // Add the new vault to the registry
+            vaultsRegistry.push(newVault);
+         }
+         
+         // Save the updated vaults registry
+         await this.#rawStore.set("vaults-registry", vaultsRegistry);
+         console.log("Updated vaults registry with current vault:", vaultId);
+      } catch (error) {
+         console.error("Error updating vaults registry:", error);
+      }
    }
 
    /**
     * Removes the vault ID from raw storage.
     */
    async removeVaultID() {
+      const vaultId = await this.getVaultID();
       await this.#rawStore.remove("vault-id");
+      
+      // Update the vaults registry to remove current status
+      if (vaultId) {
+         try {
+            let vaultsRegistry = await this.#rawStore.get("vaults-registry");
+            
+            // Only proceed if vaults registry exists
+            if (!vaultsRegistry) {
+               console.log("Vaults registry doesn't exist, skipping update on logout");
+               return;
+            }
+            
+            // Remove current status from the logged out vault
+            vaultsRegistry = vaultsRegistry.map(vault => {
+               if (vault.vaultId === vaultId) {
+                  return { ...vault, current: false };
+               }
+               return vault;
+            });
+            
+            await this.#rawStore.set("vaults-registry", vaultsRegistry);
+            console.log("Updated vaults registry on logout for vault:", vaultId);
+         } catch (error) {
+            console.error("Error updating vaults registry on logout:", error);
+         }
+      }
    }
 
    /**

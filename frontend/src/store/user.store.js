@@ -366,12 +366,13 @@ export const userStore = defineStore(
 				},
 			];
 			console.log(v);
-			return v;
+			return JSON.stringify(v);
 		};
 
 		const fromVaultFormat = async (vault) => {
 			let privateKey, spaceId;
 
+			if (typeof vault === 'string') vault = JSON.parse(vault);
 			if (vault?.length) {
 				const spl = $enigma.splitKeypair(vault[0][1]);
 				console.log(spl);

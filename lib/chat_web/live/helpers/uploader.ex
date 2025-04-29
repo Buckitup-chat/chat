@@ -2,6 +2,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
   @moduledoc """
   LiveView helper handling file upload.
   """
+  use Phoenix.VerifiedRoutes, endpoint: ChatWeb.Endpoint, router: ChatWeb.Router, statics: ChatWeb.static_paths()
 
   import Phoenix.LiveView
   import Phoenix.Component
@@ -17,9 +18,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
     UploadSupervisor
   }
 
-  alias ChatWeb.Endpoint
   alias ChatWeb.MainLive.Page
-  alias ChatWeb.Router.Helpers
   alias Phoenix.LiveView.{Socket, UploadEntry}
 
   @client_chunk_size div(Application.compile_env(:chat, :file_chunk_size), 1024)
@@ -170,7 +169,7 @@ defmodule ChatWeb.LiveHelpers.Uploader do
             start_chunked_upload(socket, entry, upload_key, encrypted_secret, next_chunk)
 
           link =
-            Helpers.upload_chunk_url(Endpoint, :put, upload_key |> Base.encode16(case: :lower))
+            ~p"/upload_chunk/#{upload_key |> Base.encode16(case: :lower)}"
 
           uploader_data = Map.merge(%{entrypoint: link, uuid: entry.uuid}, uploader_data)
 

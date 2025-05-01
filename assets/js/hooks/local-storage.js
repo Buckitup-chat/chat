@@ -45,6 +45,7 @@ export default {
     localStorage.removeItem(obj.auth_key);
     localStorage.removeItem(obj.room_count_key);
     await BuckitUp.manager.clearVault();
+    this.clearCache()
   },
 
   async storeRoom(obj) {
@@ -66,7 +67,7 @@ export default {
   async getAuthData(obj) {
     if (await BuckitUp.manager.hasVault()) {
       const vaultData = await BuckitUp.manager.getData()
-      return vaultData;
+      return this.cacheAuthData(vaultData);
     }
 
     return localStorage.getItem(obj.auth_key)
@@ -80,13 +81,42 @@ export default {
     const localStoragePresent = !!localStorage.getItem(obj.auth_key)
     const vaultPresent = await BuckitUp.manager.hasVault()
     if (vaultPresent || !localStoragePresent) {
-      const saved = await BuckitUp.manager.setData(data)
+      const saved = await BuckitUp.manager.setData(this.enrichAuthData(data))
       if (saved) return;
 
       return localStorage.setItem(obj.auth_key, data)
     }
 
     localStorage.setItem(obj.auth_key, data)
+  },
+
+  // Enriches the auth data with cached contacts and payload. I.e. contacts and payload not changed on server
+  enrichAuthData(data) {
+    const list = JSON.parse(data)
+    const me = list[0]
+    const rooms = list[1]
+    const contacts = window?.BuckitUp?.contacts || list[2] || {}
+    const payload = window?.BuckitUp?.payload || list[3] || {}
+    return JSON.stringify([me, rooms, contacts, payload])
+  },
+
+  // Caches the auth data in the window object
+  cacheAuthData(data) {
+    const list = JSON.parse(data)
+    const contacts = list[2] || {}
+    const payload = list[3] || {}
+
+    if (!window.BuckitUp) window.BuckitUp = {}
+    window.BuckitUp.contacts = contacts
+    window.BuckitUp.payload = payload
+    
+    return data
+  },
+
+  // Clears the cached contacts and payload
+  clearCache() {
+    window.BuckitUp.contacts = {}
+    window.BuckitUp.payload = {}
   },
 
   resetRoomsToBackup(obj) { localStorage.setItem(obj.key, 0) },

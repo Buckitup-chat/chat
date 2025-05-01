@@ -4,8 +4,8 @@ defmodule Chat.User.LocalStorage do
   alias Chat.Actor
   alias Chat.Identity
 
-  def encode(%Identity{} = me, rooms) do
-    Actor.new(me, rooms, %{}, %{})
+  def encode(%Identity{} = me, rooms, contacts \\ %{}, payload \\ %{}) do
+    Actor.new(me, rooms, contacts, payload)
     |> Actor.to_json()
   end
 

@@ -31,10 +31,11 @@ defmodule Chat.IdentityTest do
 
       assert name == "Test User"
       assert is_binary(key_str)
-      
+
       # Verify that the key string can be decoded back to the original keys
       decoded = Base.decode64!(key_str)
-      assert byte_size(decoded) == 65 # 32 bytes private key + 33 bytes public key
+      # 32 bytes private key + 33 bytes public key
+      assert byte_size(decoded) == 65
     end
   end
 
@@ -44,10 +45,11 @@ defmodule Chat.IdentityTest do
       key_str = Identity.priv_key_to_string(identity)
 
       assert is_binary(key_str)
-      
+
       # Verify that the key string can be decoded
       decoded = Base.decode64!(key_str)
-      assert byte_size(decoded) == 65 # 32 bytes private key + 33 bytes public key
+      # 32 bytes private key + 33 bytes public key
+      assert byte_size(decoded) == 65
     end
   end
 
@@ -55,9 +57,9 @@ defmodule Chat.IdentityTest do
     test "creates an identity from a list of strings" do
       original = Identity.create("Test User")
       strings = Identity.to_strings(original)
-      
+
       identity = Identity.from_strings(strings)
-      
+
       assert %Identity{} = identity
       assert identity.name == original.name
       assert identity.private_key == original.private_key
@@ -69,9 +71,9 @@ defmodule Chat.IdentityTest do
     test "creates an identity from a map with private and public keys" do
       original = Identity.create("Test User")
       keys = %{private_key: original.private_key, public_key: original.public_key}
-      
+
       identity = Identity.from_keys(keys)
-      
+
       assert %Identity{} = identity
       assert identity.name == ""
       assert identity.private_key == original.private_key

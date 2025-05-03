@@ -2,7 +2,10 @@ defmodule ChatWeb.LiveHelpers.Uploader do
   @moduledoc """
   LiveView helper handling file upload.
   """
-  use Phoenix.VerifiedRoutes, endpoint: ChatWeb.Endpoint, router: ChatWeb.Router, statics: ChatWeb.static_paths()
+  use Phoenix.VerifiedRoutes,
+    endpoint: ChatWeb.Endpoint,
+    router: ChatWeb.Router,
+    statics: ChatWeb.static_paths()
 
   import Phoenix.LiveView
   import Phoenix.Component

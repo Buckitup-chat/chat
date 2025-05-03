@@ -32,15 +32,15 @@ defmodule Enigma.SecretSharingTest do
     # Make sure we create a completely different share to avoid duplicates
     [first_share | rest_shares] = shares
     new_share = :crypto.strong_rand_bytes(byte_size(first_share))
-    
+
     # Ensure the new share is different from all existing shares
-    new_shares = 
+    new_shares =
       if Enum.member?(shares, new_share) do
         [first_share <> <<1>> | rest_shares]
       else
         [new_share | rest_shares]
       end
-      
+
     refute key == Enigma.recover_secret_from_shares(new_shares)
   end
 

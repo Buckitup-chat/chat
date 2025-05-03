@@ -123,7 +123,13 @@ defmodule ChatWeb.MainLive.Page.Login do
     socket
     |> push_event("store", %{
       auth_key: @local_store_auth_key,
-      auth_data: User.device_encode(me, rooms, Map.get(socket.assigns, :contacts, %{}), Map.get(socket.assigns, :payload, %{})),
+      auth_data:
+        User.device_encode(
+          me,
+          rooms,
+          Map.get(socket.assigns, :contacts, %{}),
+          Map.get(socket.assigns, :payload, %{})
+        ),
       room_count_key: @local_store_room_count_key,
       room_count: 0
     })

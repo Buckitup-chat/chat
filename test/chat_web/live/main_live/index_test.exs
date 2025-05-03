@@ -57,6 +57,7 @@ defmodule ChatWeb.MainLive.IndexTest do
 
       Support.RetryHelper.retry_until(2000, fn ->
         html = render(current_tab_view)
+
         if html =~ "acceptInviteButton" do
           current_tab_view |> element(".acceptInviteButton") |> render_click()
         else

@@ -112,10 +112,10 @@ defmodule NaiveApi.ChatTest do
       # Make sure both users are properly registered
       me = User.login("Pedro") |> tap(&User.register/1)
       peer = User.login("Diego") |> tap(&User.register/1)
-      
+
       # Create the dialog to ensure it exists
       dialog = Dialogs.find_or_open(me, Card.from_identity(peer))
-      
+
       [me: me, peer: peer, dialog: dialog]
     end
 

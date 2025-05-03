@@ -3,16 +3,13 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
 
   require Logger
 
-  alias Chat.Proto
   alias Chat.Broadcast
+  alias Chat.Proto
+  alias Chat.Rooms
 
   # import ChatWeb.LiveHelpers, only: [process: 2]
   import Phoenix.Component, only: [assign: 3]
   import Tools.SocketPrivate
-
-  # alias Chat.Identity
-  # alias Chat.Log
-  alias Chat.Rooms
 
   alias ChatWeb.MainLive.Page.Login, as: MainLoginPage
   alias ChatWeb.ProxyLive.Page
@@ -590,7 +587,7 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
   #
   # defp append_room_list(socket, room) do
   #   socket
-  #   |> ServerRoomsState.insert_room(room) 
+  #   |> ServerRoomsState.insert_room(room)
   #   |> assign_room_list()
   # end
 end

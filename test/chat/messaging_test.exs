@@ -1,9 +1,11 @@
 defmodule Chat.MessagingTest do
   use ExUnit.Case, async: true
 
+  alias Chat.Card
+  alias Chat.DbKeys
+  alias Chat.Identity
   alias Chat.Messaging
   alias Chat.Utils.StorageId
-  alias Chat.DbKeys
 
   # Define a test message struct that mimics the real message structs
   defmodule TestMessage do

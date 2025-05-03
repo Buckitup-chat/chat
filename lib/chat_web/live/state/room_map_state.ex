@@ -3,6 +3,7 @@ defmodule ChatWeb.State.RoomMapState do
 
   import Tools.SocketPrivate
 
+  alias Chat.Proto.Identify
   alias ChatWeb.State.ActorState
 
   def get(socket) do
@@ -20,6 +21,6 @@ defmodule ChatWeb.State.RoomMapState do
     actor = socket |> ActorState.get()
 
     socket
-    |> set_private(:room_map, Map.new(actor.rooms, &{&1 |> Chat.Proto.Identify.pub_key(), &1}))
+    |> set_private(:room_map, Map.new(actor.rooms, &{&1 |> Identify.pub_key(), &1}))
   end
 end

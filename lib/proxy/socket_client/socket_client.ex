@@ -3,6 +3,8 @@ defmodule Proxy.SocketClient do
 
   import Tools.SocketPrivate
 
+  alias Proxy.SocketClient.ChannelClient
+
   @pid_key :websocket_client_pid
   @queue_key :websocket_client_queue
 
@@ -32,7 +34,7 @@ defmodule Proxy.SocketClient do
     server = socket |> get_private(:server)
 
     {:ok, pid} =
-      Proxy.SocketClient.ChannelClient.start_link(
+      ChannelClient.start_link(
         Keyword.merge(args, uri: "ws://#{server}/proxy-socket/websocket")
       )
 

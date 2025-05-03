@@ -2,6 +2,7 @@ defmodule ChatWeb.State.ServerRoomsState do
   @moduledoc "ServerRooms state in socket private field"
   import Tools.SocketPrivate
 
+  alias Chat.Rooms.Room
   alias ChatWeb.State.ActorState
   alias ChatWeb.State.RoomMapState
 
@@ -29,7 +30,7 @@ defmodule ChatWeb.State.ServerRoomsState do
       :server_rooms,
       &Enum.map(&1, fn room ->
         if room.pub_key == room_key,
-          do: room |> Chat.Rooms.Room.add_request(my_pubkey),
+          do: room |> Room.add_request(my_pubkey),
           else: room
       end),
       []
@@ -54,7 +55,7 @@ defmodule ChatWeb.State.ServerRoomsState do
 
   defp enrich_with_requested(rooms, my_pubkey) do
     Enum.map(rooms, fn room ->
-      Map.put(room, :is_requested?, Chat.Rooms.Room.requested_by?(room, my_pubkey))
+      Map.put(room, :is_requested?, Room.requested_by?(room, my_pubkey))
     end)
   end
 end

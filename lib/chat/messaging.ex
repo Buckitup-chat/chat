@@ -13,6 +13,9 @@ defmodule Chat.Messaging do
 
   """
 
+  alias Chat.DbKeys, as: DbKeys
+  alias Chat.Utils.StorageId, as: StorageId
+
   def preload_content(messages, data_getter_fn \\ &get_from_current_db/1) do
     messages_and_db_keys =
       messages
@@ -35,13 +38,13 @@ defmodule Chat.Messaging do
   defp message_to_content_key_list(msg) do
     case msg.type do
       file_type when file_type in [:image, :audio, :file, :video] ->
-        [msg.content |> Chat.Utils.StorageId.from_json_to_key() |> Chat.DbKeys.file()]
+        [msg.content |> StorageId.from_json_to_key() |> DbKeys.file()]
 
       :text ->
         []
 
       :memo ->
-        [msg.content |> Chat.Utils.StorageId.from_json_to_key() |> Chat.DbKeys.memo()]
+        [msg.content |> StorageId.from_json_to_key() |> DbKeys.memo()]
 
       _todo ->
         []
@@ -51,8 +54,8 @@ defmodule Chat.Messaging do
   defp message_and_content_data_to_enriched_msg(msg, data_map) do
     case msg.type do
       file_type when file_type in [:image, :audio, :file, :video] ->
-        {key, secret} = msg.content |> Chat.Utils.StorageId.from_json()
-        db_key = Chat.DbKeys.file(key)
+        {key, secret} = msg.content |> StorageId.from_json()
+        db_key = DbKeys.file(key)
 
         file_info =
           data_map[db_key]
@@ -64,8 +67,8 @@ defmodule Chat.Messaging do
         |> Map.put(:file_url, ChatWeb.Utils.get_file_url(:file, key, secret))
 
       :memo ->
-        {key, secret} = msg.content |> Chat.Utils.StorageId.from_json()
-        db_key = Chat.DbKeys.memo(key)
+        {key, secret} = msg.content |> StorageId.from_json()
+        db_key = DbKeys.memo(key)
 
         data =
           if data_map[db_key],

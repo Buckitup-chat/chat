@@ -4,8 +4,11 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
   import Phoenix.LiveView, only: [push_event: 3]
 
   alias Chat.Dialogs
+  alias Chat.Dialogs.DialogMessaging
+  alias Chat.Proxy
   alias Chat.Rooms
   alias Chat.Utils.StorageId
+  alias ChatWeb.Utils
 
   alias Phoenix.LiveView.JS
 
@@ -249,7 +252,7 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
     [message]
     |> Enum.reject(&is_nil/1)
     |> Enum.map(fn msg ->
-      {index, msg} |> Chat.Dialogs.DialogMessaging.read(me, dialog)
+      {index, msg} |> DialogMessaging.read(me, dialog)
     end)
     |> Enum.filter(& &1)
     |> Enum.reverse()
@@ -264,7 +267,7 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
         msg
         |> Map.from_struct()
         |> Map.put(:file_info, file_info)
-        |> Map.put(:file_url, ChatWeb.Utils.get_proxied_file_url(server, id, secret))
+        |> Map.put(:file_url, Utils.get_proxied_file_url(server, id, secret))
     end)
     |> List.first()
   end

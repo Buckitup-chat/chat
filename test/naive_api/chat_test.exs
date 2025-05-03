@@ -109,9 +109,13 @@ defmodule NaiveApi.ChatTest do
       }
     """
     setup do
+      # Make sure both users are properly registered
       me = User.login("Pedro") |> tap(&User.register/1)
       peer = User.login("Diego") |> tap(&User.register/1)
+      
+      # Create the dialog to ensure it exists
       dialog = Dialogs.find_or_open(me, Card.from_identity(peer))
+      
       [me: me, peer: peer, dialog: dialog]
     end
 
@@ -121,8 +125,8 @@ defmodule NaiveApi.ChatTest do
           variables: %{
             "peerPublicKey" => Bitstring.serialize_33(peer.public_key),
             "myKeypair" => %{
-              "public_key" => Bitstring.serialize_33(me.public_key),
-              "private_key" => Bitstring.serialize_32(me.private_key)
+              "publicKey" => Bitstring.serialize_33(me.public_key),
+              "privateKey" => Bitstring.serialize_32(me.private_key)
             },
             "text" => @text,
             "timestamp" => now()

@@ -39,7 +39,7 @@ defmodule Chat.StructuresTest do
   test "actor" do
     struct = %Chat.Actor{me: 1, rooms: [2, 3]}
 
-    assert "%Chat.Actor{me: 1, rooms: [2, 3], contacts: %{}}" == inspect(struct)
+    assert "%Chat.Actor{me: 1, rooms: [2, 3], contacts: %{}, payload: %{}}" == inspect(struct)
   end
 
   test "room.message" do

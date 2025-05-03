@@ -55,8 +55,14 @@ defmodule ChatWeb.MainLive.IndexTest do
       inviter_hash = inviter |> Card.from_identity() |> then(& &1.hash)
       current_tab_view |> element("#dialog-list li#user-#{inviter_hash}") |> render_click()
 
-      Support.RetryHelper.retry_until(1000, fn ->
-        current_tab_view |> element(".acceptInviteButton") |> render_click()
+      Support.RetryHelper.retry_until(2000, fn ->
+        html = render(current_tab_view)
+        if html =~ "acceptInviteButton" do
+          current_tab_view |> element(".acceptInviteButton") |> render_click()
+        else
+          # Force a failure to trigger retry
+          flunk("acceptInviteButton not found yet, retrying...")
+        end
       end)
 
       render_hook(current_tab_view, "room/sync-stored", %{

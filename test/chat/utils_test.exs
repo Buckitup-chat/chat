@@ -61,4 +61,60 @@ defmodule Chat.UtilsTest do
     assert decrypted.rooms |> Enum.map(& &1.private_key) ==
              actor.rooms |> Enum.map(& &1.private_key)
   end
+
+  test "trim_text should handle empty strings" do
+    assert Utils.trim_text("") == [""]
+  end
+
+  test "trim_text should trim leading and trailing whitespace" do
+    assert Utils.trim_text("  hello  ") == ["hello"]
+  end
+
+  test "trim_text should handle multiple lines" do
+    text = """
+    Line 1
+    Line 2
+
+    Line 4
+    """
+    
+    expected = ["Line 1", "Line 2", "", "Line 4"]
+    assert Utils.trim_text(text) == expected
+  end
+
+  test "trim_text should handle consecutive empty lines" do
+    text = """
+    Line 1
+
+
+    Line 4
+    """
+    
+    expected = ["Line 1", "", "Line 4"]
+    assert Utils.trim_text(text) == expected
+  end
+
+  test "qr_base64_from_url should generate a base64 encoded QR code" do
+    url = "https://example.com"
+    result = Utils.qr_base64_from_url(url)
+    
+    assert is_binary(result)
+    assert String.length(result) > 0
+  end
+
+  test "qr_base64_from_url should accept color option" do
+    url = "https://example.com"
+    result = Utils.qr_base64_from_url(url, color: "#FF0000")
+    
+    assert is_binary(result)
+    assert String.length(result) > 0
+  end
+
+  test "qr_base64_from_url should accept background_opacity option" do
+    url = "https://example.com"
+    result = Utils.qr_base64_from_url(url, background_opacity: 0.5)
+    
+    assert is_binary(result)
+    assert String.length(result) > 0
+  end
 end

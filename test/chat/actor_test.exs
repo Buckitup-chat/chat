@@ -44,31 +44,89 @@ defmodule Chat.ActorTest do
     assert enc |> Actor.from_json() == enc |> Actor.from_encrypted_json("")
   end
 
-  # test "contact should recover as well" do
-  #   me = User.login("Alice")
-  #   contacts = %{(me |> Identity.pub_key()) => "Myself"}
-  #   me_actor = Actor.new(me, [], contacts)
+  test "contact should recover as well" do
+    me = User.login("Alice")
+    pub_key_string = me |> Chat.Identity.pub_key() |> Base.encode16(case: :lower)
+    contacts = %{pub_key_string => %{"name" => "Myself"}}
+    me_actor = Actor.new(me, [], contacts)
 
-  #   me_again =
-  #     me_actor
-  #     |> Actor.to_json()
-  #     |> Actor.from_json()
+    me_again =
+      me_actor
+      |> Actor.to_json()
+      |> Actor.from_json()
 
-  #   assert me_again == me_actor
-  # end
+    assert me_again == me_actor
+  end
 
-  # test "contacts should recover from encrypted" do
-  #   me = User.login("Alice")
-  #   contacts = %{(me |> Identity.pub_key()) => "Myself"}
-  #   me_actor = Actor.new(me, [], contacts)
+  test "contacts should recover from encrypted" do
+    me = User.login("Alice")
+    pub_key_string = me |> Chat.Identity.pub_key() |> Base.encode16(case: :lower)
+    contacts = %{pub_key_string => %{"name" => "Myself"}}
+    me_actor = Actor.new(me, [], contacts)
 
-  #   me_again =
-  #     me_actor
-  #     |> Actor.to_encrypted_json("123")
-  #     |> Actor.from_encrypted_json("123")
+    me_again =
+      me_actor
+      |> Actor.to_encrypted_json("123")
+      |> Actor.from_encrypted_json("123")
 
-  #   assert me_again == me_actor
-  # end
+    assert me_again == me_actor
+  end
+
+  test "payload should recover as well" do
+    me = User.login("Alice")
+    payload = %{"settings" => %{"theme" => "dark"}}
+    me_actor = Actor.new(me, [], %{}, payload)
+
+    me_again =
+      me_actor
+      |> Actor.to_json()
+      |> Actor.from_json()
+
+    assert me_again == me_actor
+  end
+
+  test "payload should recover from encrypted" do
+    me = User.login("Alice")
+    payload = %{"settings" => %{"theme" => "dark"}}
+    me_actor = Actor.new(me, [], %{}, payload)
+
+    me_again =
+      me_actor
+      |> Actor.to_encrypted_json("123")
+      |> Actor.from_encrypted_json("123")
+
+    assert me_again == me_actor
+  end
+
+  test "both contacts and payload should recover" do
+    me = User.login("Alice")
+    pub_key_string = me |> Chat.Identity.pub_key() |> Base.encode16(case: :lower)
+    contacts = %{pub_key_string => %{"name" => "Myself"}}
+    payload = %{"settings" => %{"theme" => "dark"}}
+    me_actor = Actor.new(me, [], contacts, payload)
+
+    me_again =
+      me_actor
+      |> Actor.to_json()
+      |> Actor.from_json()
+
+    assert me_again == me_actor
+  end
+
+  test "both contacts and payload should recover from encrypted" do
+    me = User.login("Alice")
+    pub_key_string = me |> Chat.Identity.pub_key() |> Base.encode16(case: :lower)
+    contacts = %{pub_key_string => %{"name" => "Myself"}}
+    payload = %{"settings" => %{"theme" => "dark"}}
+    me_actor = Actor.new(me, [], contacts, payload)
+
+    me_again =
+      me_actor
+      |> Actor.to_encrypted_json("123")
+      |> Actor.from_encrypted_json("123")
+
+    assert me_again == me_actor
+  end
 
   test "old_json should parse as well" do
     me = User.login("Alice")

@@ -29,11 +29,19 @@ defmodule Enigma.SecretSharingTest do
     assert length(shares) == 5
 
     # one of the shares got jumbled in the process, which should skew the key
-    refute key ==
-             shares
-             |> tl()
-             |> List.update_at(0, &:crypto.strong_rand_bytes(byte_size(&1)))
-             |> Enigma.recover_secret_from_shares()
+    # Make sure we create a completely different share to avoid duplicates
+    [first_share | rest_shares] = shares
+    new_share = :crypto.strong_rand_bytes(byte_size(first_share))
+    
+    # Ensure the new share is different from all existing shares
+    new_shares = 
+      if Enum.member?(shares, new_share) do
+        [first_share <> <<1>> | rest_shares]
+      else
+        [new_share | rest_shares]
+      end
+      
+    refute key == Enigma.recover_secret_from_shares(new_shares)
   end
 
   test "failed sharing" do

@@ -47,7 +47,7 @@ defmodule ChatTest.SignedParcelTest do
   defp create_alice_bob_dialog do
     alice = Identity.create("Alice")
     bob = Identity.create("Bob")
-    dialog = Dialogs.find_or_open(bob, alice |> Card.from_identity())
+    dialog = Dialogs.find_or_open(alice, bob |> Card.from_identity())
 
     {alice, bob, dialog}
   end

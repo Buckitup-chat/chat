@@ -34,9 +34,7 @@ defmodule Proxy.SocketClient do
     server = socket |> get_private(:server)
 
     {:ok, pid} =
-      ChannelClient.start_link(
-        Keyword.merge(args, uri: "ws://#{server}/proxy-socket/websocket")
-      )
+      ChannelClient.start_link(Keyword.merge(args, uri: "ws://#{server}/proxy-socket/websocket"))
 
     socket
     |> set_private(@pid_key, pid)

@@ -25,7 +25,6 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   alias Chat.Log
   alias Chat.MemoIndex
   alias Chat.Messages
-  alias Proxy
   alias Chat.Rooms
   alias Chat.Sync.DbBrokers
   alias Chat.Upload.UploadMetadata
@@ -36,6 +35,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   alias ChatWeb.State.RoomMapState
   alias ChatWeb.Utils, as: WebUtils
   alias Phoenix.PubSub
+  alias Proxy
   alias Proxy.SocketClient
 
   @per_page 15

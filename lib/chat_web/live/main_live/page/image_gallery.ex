@@ -5,12 +5,11 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
 
   alias Chat.Dialogs
   alias Chat.Dialogs.DialogMessaging
-  alias Proxy
   alias Chat.Rooms
   alias Chat.Utils.StorageId
   alias ChatWeb.Utils
-
   alias Phoenix.LiveView.JS
+  alias Proxy
 
   @preloading_range 5
 

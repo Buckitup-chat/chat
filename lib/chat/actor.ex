@@ -5,7 +5,7 @@ defmodule Chat.Actor do
 
   defstruct [:me, rooms: [], contacts: %{}, payload: %{}]
 
-  def new(%Identity{} = me, rooms, contacts, payload = %{}) do
+  def new(%Identity{} = me, rooms, contacts \\ %{}, payload \\ %{}) do
     %__MODULE__{
       me: me,
       rooms: rooms,

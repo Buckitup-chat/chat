@@ -71,7 +71,7 @@ defmodule Chat.MixProject do
       {:ecto, "~> 3.7"},
       {:plug_cowboy, "~> 2.5"},
       {:phoenix_live_dashboard, "~> 0.7"},
-      {:gettext, "~> 0.18"},
+      # {:gettext, "~> 0.18"},
       {:jason, "~> 1.2"},
       {:cors_plug, "~> 3.0"},
 

@@ -1,6 +1,7 @@
 import { connect, rawStorage, removeAll } from "@lo-fi/local-vault";
 import "@lo-fi/local-vault/adapter/idb";
-
+import { fullKeyBase64ToPublicKeyHex } from "./enigma-functional";
+import { computeAddress } from "ethers";
 /**
  * Class for managing encryption and data storage.
  * Implements the Singleton pattern to ensure a single instance.
@@ -129,10 +130,66 @@ export class EncryptionManager extends EventTarget {
          await this.ensureVault();
          const vaultID = await this.getVaultID();
          await this.#vault.set(vaultID, value);
+         const me = JSON.parse(value)[0];
+         const name = me[0];
+         const fullKeyBase64 = me[1];
+         const publicKeyHex = fullKeyBase64ToPublicKeyHex(fullKeyBase64);
+         await this.updateVaultsRegistryEntry(vaultID, name, publicKeyHex);
          // console.log(`Data saved: key = "${vaultID}", value = "${value}"`);
          return true;
       } catch (error) {
          await this.handleError(error, "Error saving data");
+      }
+   }
+
+   /**
+    * Updates the vaults registry entry.
+    * @param {string} vaultID - The vault ID.
+    * @param {string} name - The name of the vault.
+    * @param {string} publicKeyHex - The public key of the vault.
+    */
+   async updateVaultsRegistryEntry(vaultID, name, publicKeyHex) {
+      try {
+         let vaultsRegistry = await this.#rawStore.get("vaults-registry") || [];
+         const existingVaultIndex = vaultsRegistry.findIndex(vault => vault.vaultId === vaultID);
+         if (existingVaultIndex >= 0) {
+            // rewrite name and pulicKey in existing vault
+            vaultsRegistry[existingVaultIndex].name = name;
+            vaultsRegistry[existingVaultIndex].publicKey = "0x" + publicKeyHex;
+            vaultsRegistry[existingVaultIndex].address = this.ethAddressFromPublicKey(publicKeyHex);
+         }
+         await this.#rawStore.set("vaults-registry", vaultsRegistry);
+      } catch (error) {
+         console.error("Error updating vaults registry entry:", error);
+      }
+   }
+
+   /**
+    * Generates an Ethereum address from a public key using ethers.js.
+    * @param {string} publicKeyHex - The public key in hex format.
+    * @returns {string} - The Ethereum address.
+    */
+   ethAddressFromPublicKey(publicKeyHex) {
+      try {
+         // Ensure the public key has the '0x' prefix
+         if (!publicKeyHex.startsWith('0x')) {
+            publicKeyHex = '0x' + publicKeyHex;
+         }
+         
+         // Check if ethers is properly loaded
+         if (typeof computeAddress === 'undefined') {
+            console.warn("Ethers.js library not properly loaded, falling back to simple address derivation");
+            // Fallback to a simpler method if ethers.js is not available
+           return undefined;
+         }
+         
+         // Use ethers.js to compute the address
+         const address = computeAddress(publicKeyHex);
+         return address;
+      } catch (error) {
+         console.error("Error generating Ethereum address:", error);
+         // Fallback in case of any error
+         return undefined;
       }
    }
 
@@ -224,13 +281,7 @@ export class EncryptionManager extends EventTarget {
    async updateVaultsRegistry(vaultId) {
       try {
          // Get the current vaults registry
-         let vaultsRegistry = await this.#rawStore.get("vaults-registry");
-         
-         // Only proceed if vaults registry exists
-         if (!vaultsRegistry) {
-            console.log("Vaults registry doesn't exist, skipping update");
-            return;
-         }
+         let vaultsRegistry = await this.#rawStore.get("vaults-registry") || [];
          
          // Find if the vault already exists in the registry
          const existingVaultIndex = vaultsRegistry.findIndex(vault => vault.vaultId === vaultId);
@@ -245,12 +296,8 @@ export class EncryptionManager extends EventTarget {
             // If vault doesn't exist, generate a new entry
             const newVault = {
                vaultId: vaultId,
-               name: `User ${vaultsRegistry.length + 1}`,
                current: true,
-               // Add default values for other fields
                notes: "",
-               avatar: "",
-               // Add timestamp for creation
                createdAt: new Date().toISOString()
             };
             

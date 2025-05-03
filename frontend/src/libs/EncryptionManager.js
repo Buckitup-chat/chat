@@ -157,8 +157,20 @@ export class EncryptionManager extends EventTarget {
 	}
 
 	async disconnect() {
+		// Save the current vault ID before nullifying it
+		const currentVaultId = this.#vault?.id;
+		
 		this.#vault = null;
 		this.isAuth = false;
+		
+		// Update the vaults registry to remove current status
+		if (currentVaultId) {
+			await this.clearCurrentStatusFromAllVaults('Updated vaults registry on disconnect - removed current status');
+			
+			// Remove the vault-id from raw storage
+			await this.#rawStore.remove('vault-id');
+			console.log('Removed vault-id on disconnect');
+		}
 	}
 
 	async removeVault(id) {
@@ -178,8 +190,13 @@ export class EncryptionManager extends EventTarget {
 
 			this.#vaults = vaults;
 
-			this.#vault = null;
-			this.isAuth = false;
+			// If we're removing the current vault, also remove the vault-id
+			if (this.#vault && this.#vault.id === id) {
+				this.#vault = null;
+				this.isAuth = false;
+				await this.#rawStore.remove('vault-id');
+				console.log('Removed vault-id because current vault was removed');
+			}
 		} catch (error) {
 			console.error('removeVault error', error);
 		}
@@ -254,6 +271,11 @@ export class EncryptionManager extends EventTarget {
 			});
 			await this.#rawStore.set(registryKey, updatedVaults);
 			this.#vaults = updatedVaults;
+
+			// Update the vault-id to match the current vault
+			if (this.#vault && this.#vault.id) {
+				await this.saveVaultID(this.#vault.id);
+			}
 		} catch (error) {
 			await this.handleError(error, 'Error retrieving data');
 		}
@@ -330,6 +352,35 @@ export class EncryptionManager extends EventTarget {
 	 */
 	async removeVaultID() {
 		await this.#rawStore.remove('vault-id');
+		
+		// Update the vaults registry to remove current status from all vaults
+		await this.clearCurrentStatusFromAllVaults('Updated vaults registry on logout - removed current status from all vaults');
+	}
+
+	/**
+	 * Clears the current status from all vaults in the registry.
+	 * @param {string} [logMessage='Cleared current status from all vaults'] - Custom log message.
+	 * @returns {Promise<void>}
+	 */
+	async clearCurrentStatusFromAllVaults(logMessage = 'Cleared current status from all vaults') {
+		try {
+			const registryKey = this.#isProduction ? 'vaults-registry' : 'test-vaults-registry';
+			let vaultsRegistry = await this.#rawStore.get(registryKey);
+			
+			if (vaultsRegistry && vaultsRegistry.length > 0) {
+				// Remove current status from all vaults
+				vaultsRegistry = vaultsRegistry.map(vault => ({
+					...vault,
+					current: false
+				}));
+				
+				await this.#rawStore.set(registryKey, vaultsRegistry);
+				this.#vaults = vaultsRegistry;
+				console.log(logMessage);
+			}
+		} catch (error) {
+			console.error('Error clearing current status from vaults registry:', error);
+		}
 	}
 
 	/**

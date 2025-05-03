@@ -1,4 +1,4 @@
-.PHONY: check test ci-check empty_db help assets
+.PHONY: check test ci-check empty_db help assets frontend
 
 help:
 	@clear
@@ -58,6 +58,10 @@ iex_like_prod:
 assets:
 	cp assets/node_modules/@lo-fi/webauthn-local-client/dist/bundlers/walc-external-bundle.js priv/static/
 	mix assets.deploy
+
+frontend:
+	mix assets.setup
+	mix assets.build
 
 deploy:
 	git push gigalixir 

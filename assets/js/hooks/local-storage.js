@@ -66,7 +66,7 @@ export default {
 
   async getAuthData(obj) {
     if (await BuckitUp.manager.hasVault()) {
-      const vaultData = await BuckitUp.manager.getData()
+      const vaultData = await BuckitUp.manager.getData() || "[]"
       return this.cacheAuthData(vaultData);
     }
 

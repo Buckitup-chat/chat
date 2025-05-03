@@ -24,6 +24,7 @@
     "@mux/upchunk": "^3.4.0",
     "@noble/secp256k1": "^2.1.0",
     "buffer": "^6.0.3",
+    "ethers": "^6.8.1",
     "jssha": "^3.3.1",
     "live_vue": "file:../deps/live_vue",
     "peaks.js": "^3.4.2",

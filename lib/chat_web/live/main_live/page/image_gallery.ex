@@ -5,7 +5,7 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
 
   alias Chat.Dialogs
   alias Chat.Dialogs.DialogMessaging
-  alias Chat.Proxy
+  alias Proxy
   alias Chat.Rooms
   alias Chat.Utils.StorageId
   alias ChatWeb.Utils

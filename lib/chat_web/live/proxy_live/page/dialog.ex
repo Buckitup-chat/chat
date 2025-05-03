@@ -25,7 +25,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   alias Chat.Log
   alias Chat.MemoIndex
   alias Chat.Messages
-  alias Chat.Proxy
+  alias Proxy
   alias Chat.Rooms
   alias Chat.Sync.DbBrokers
   alias Chat.Upload.UploadMetadata

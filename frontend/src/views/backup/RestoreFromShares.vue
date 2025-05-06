@@ -131,8 +131,7 @@ const addAccount = async () => {
 
 		$user.account = acc;
 
-		await $user.createSpace();
-		await $user.openSpace({
+		await $user.openStorage({
 			name: accountToRecover.value.name,
 			notes: accountToRecover.value.notes,
 			avatar: accountToRecover.value.avatar,
@@ -143,7 +142,7 @@ const addAccount = async () => {
 				const extra = (await axios.get(IPFS_URL + offchainData.value)).data;
 				const decrypted = await decryptWithPrivateKey(accountToRecover.value.privateKey.slice(2), extra);
 				const decoded = JSON.parse(decrypted);
-				if (decoded.contacts) await $user.initializeContacts(decoded.contacts);
+				//if (decoded.contacts) await $user.initializeContacts(decoded.contacts);
 			} catch (error) {
 				console.error('initializeContacts', error);
 			}

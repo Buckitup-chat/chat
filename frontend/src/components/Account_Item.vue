@@ -10,7 +10,7 @@
 					<span v-if="acc.highlightedName" v-html="acc.highlightedName"></span>
 					<span v-else>{{ acc.name }}</span>
 				</div>
-				<div class="_pubk" v-if="acc.shortCode">[{{ acc.shortCode }}]</div>
+				<div class="_pubk" v-if="shortCode">[{{ shortCode }}]</div>
 			</div>
 
 			<div class="_notes" v-if="acc.notes">
@@ -84,6 +84,7 @@ import { inject, computed } from 'vue';
 
 const defaultAvatar = '/img/profile.webp';
 const $user = inject('$user');
+const $enigma = inject('$enigma');
 
 const { account, self } = defineProps({
 	account: { type: Object },
@@ -92,5 +93,8 @@ const { account, self } = defineProps({
 
 const acc = computed(() => {
 	return self ? { ...$user.account, ...$user.accountInfo } : account;
+});
+const shortCode = computed(() => {
+	if (acc.value.publicKey) return $enigma.shortCode($enigma.stringToBase64(acc.value.publicKey));
 });
 </script>

@@ -63,21 +63,9 @@ const mode = ref();
 onMounted(async () => {
 	await updateData();
 
-	if ($route.query.invitationCode) {
+	if ($route.query.encryptionKey) {
 		mode.value = 'dxos_connect';
-		try {
-			await new Promise((resolve) => setTimeout(resolve, 300));
-			await $user.dxClient.initialize();
-			await new Promise((resolve) => setTimeout(resolve, 100));
-			if (!$user.dxClient.halo.identity.get()) {
-				await new Promise((resolve) => setTimeout(resolve, 100));
-				await $user.dxClient.halo.createIdentity();
-			}
-
-			$mitt.emit('modal::open', { id: 'account_dxos_connect' });
-		} catch (error) {
-			console.error('dxClient.initialize', error);
-		}
+		$mitt.emit('modal::open', { id: 'account_dxos_connect' });
 	} else if ($user.vaults.length) {
 		mode.value = 'existing';
 	}

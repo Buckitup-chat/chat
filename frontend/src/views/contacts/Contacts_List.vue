@@ -24,6 +24,7 @@
 		</div>
 	</div>
 </template>
+
 <style lang="scss" scoped>
 @import '@/scss/variables.scss';
 @import '@/scss/breakpoints.scss';
@@ -63,7 +64,6 @@
 <script setup>
 import { ref, onMounted, watch, inject, computed, nextTick, onUnmounted } from 'vue';
 import Account_Item from '@/components/Account_Item.vue';
-//mport { readContract } from '@wagmi/core';
 import dayjs from 'dayjs';
 
 const $user = inject('$user');
@@ -144,7 +144,7 @@ onUnmounted(async () => {});
 
 const checkContacts = async () => {
 	try {
-		const contactsWithoutWetaWallet = $user.contacts.map((c) => c.address); //$user.contacts.filter((c) => !c.metaPublicKey).map((c) => c.address);
+		const contactsWithoutWetaWallet = $user.contacts.filter((c) => !c.metaPublicKey).map((c) => c.address);
 		if (!contactsWithoutWetaWallet.length) return;
 
 		const metaPublicKeys = await $web3.registryContract.getPulicKeys(contactsWithoutWetaWallet);
@@ -152,13 +152,9 @@ const checkContacts = async () => {
 			const metaPublicKey = metaPublicKeys[i];
 
 			if (metaPublicKey && metaPublicKey.length > 2) {
-				const idx = $user.contacts.findIndex((c) => c.address === contactsWithoutWetaWallet[i]);
-				if (idx > -1) {
-					const contactDx = $user.contactsDx.find((e) => e.id === $user.contacts[idx].id);
-					if (contactDx) {
-						contactDx.metaPublicKey = $enigma.encryptDataSync(metaPublicKey, $user.account.privateKey);
-						contactDx.updatedAt = dayjs().valueOf();
-					}
+				const contact = $user.contacts.find((c) => c.address === contactsWithoutWetaWallet[i]);
+				if (contact) {
+					$user.contactsMap[contact.publicKey].metaPublicKey = metaPublicKey;
 				}
 			}
 		}

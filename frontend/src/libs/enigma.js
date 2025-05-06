@@ -213,6 +213,13 @@ export const shortcodeFromFullKey = (base64FullKey) => {
 	const code = Buffer.from(new Uint8Array(hashBuffer.buffer, 0, 3));
 	return code.toString('hex');
 };
+
+export const shortCode = (publicKeyB64) => {
+	const publicHash = hash(publicKeyB64);
+	const hashBuffer = Buffer.from(publicHash, 'base64');
+	const code = Buffer.from(new Uint8Array(hashBuffer.buffer, 0, 3));
+	return code.toString('hex');
+};
 /**
  * Combines private and public keys into a single Base64-encoded string.
  * @param {string} privateKeyB64 - Private key in base64 format.
@@ -375,8 +382,9 @@ export const encryptDataSync = (data, privateKey) => {
 };
 
 export const decryptDataSync = (encryptedData, privateKey) => {
+	const clean = encryptedData.replace(/ /g, '+');
 	const { pass, iv } = deriveKeyAndIV(stringToBase64(privateKey));
-	const deciphered = blowfishCFB(Buffer.from(encryptedData, 'base64'), pass, iv, true);
+	const deciphered = blowfishCFB(Buffer.from(clean, 'base64'), pass, iv, true);
 	const decoded = JSON.parse(deciphered.toString());
 	return decoded.type === 'number' ? Number(decoded.data) : decoded.data; // Restore original type
 };

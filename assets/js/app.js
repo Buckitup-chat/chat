@@ -60,6 +60,63 @@ window.BuckitUp = {
         tx.onerror = () => console.error('Transaction error:', tx.error);
       };
       req.onerror = () => console.error('Database error:', req.error);
+    },
+    
+    /**
+     * Gets known users from vaults registry and adds them to BuckitUp.contacts
+     * @returns {Promise<void>}
+     */
+    getContactsFromVaultsRegistry: async function() {
+      try {
+        // Get vaults registry from local storage
+        const vaultsRegistry = await window.BuckitUp.manager.getVaultsRegistry();
+        
+        if (!vaultsRegistry || !Array.isArray(vaultsRegistry) || vaultsRegistry.length === 0) {
+          console.log('No vaults registry found or empty registry');
+          return;
+        }
+        
+        console.log(`Found ${vaultsRegistry.length} entries in vaults registry`);
+        
+        // Find current vault to identify current user
+        const currentVault = vaultsRegistry.find(vault => vault.current === true);
+        if (!currentVault) {
+          console.log('No current vault found in registry');
+          return;
+        }
+        
+        // Initialize contacts if not present
+        if (!window.BuckitUp.contacts) {
+          window.BuckitUp.contacts = {};
+        }
+        
+        // Add each vault entry to contacts if not already present
+        vaultsRegistry.forEach(vault => {
+          // Skip current user's vault
+          if (vault.vaultId === currentVault.vaultId) {
+            return;
+          }
+          
+          if (vault.publicKey && vault.name) {
+            // Remove 0x prefix if present
+            const publicKey = vault.publicKey.startsWith('0x') ? 
+              vault.publicKey.substring(2) : vault.publicKey;
+            
+            // Add to contacts if not already present
+            if (!window.BuckitUp.contacts[publicKey]) {
+              window.BuckitUp.contacts[publicKey] = {
+                "name": vault.name,
+                "address": vault.address || ""
+              };
+              console.log(`Added contact: ${vault.name}`);
+            }
+          }
+        });
+        
+        console.log(`Updated BuckitUp.contacts with ${Object.keys(window.BuckitUp.contacts).length} entries`);
+      } catch (error) {
+        console.error('Error adding contacts from vaults registry:', error);
+      }
     }
   }
 }

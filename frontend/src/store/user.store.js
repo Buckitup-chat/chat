@@ -299,11 +299,10 @@ export const userStore = defineStore('user', () => {
 			[accountInfo.name, $enigma.combineKeypair(account.value.privateKeyB64, account.value.publicKeyB64)],
 			[...rooms],
 			Object.fromEntries(Object.entries(contactsMap).map(([publicKey, contact]) => [publicKey, { name: contact.name, notes: contact.notes, avatar: contact.avatar }])),
-			{}, // payload to differ 3rd generation
+			{}, // add payload to differ 3rd generation
 		];
 		//console.log(v);
-		v = JSON.stringify(v);
-		return v;
+		return JSON.stringify(v);
 	};
 
 	const fromVaultFormat = async (vault) => {

@@ -10,7 +10,7 @@ import path from 'path';
 
 import wasm from 'vite-plugin-wasm';
 import { fileURLToPath, URL } from 'node:url';
-import { ConfigPlugin } from '@dxos/config/vite-plugin';
+// import { ConfigPlugin } from '@dxos/config/vite-plugin';
 
 let production = process.env.NODE_ENV === 'production';
 production = true;
@@ -33,7 +33,7 @@ export default defineConfig({
 	plugins: [
 		topLevelAwait(),
 		wasm(),
-		ConfigPlugin(),
+		// ConfigPlugin(),
 		WALC(),
 		nodePolyfills({
 			// To add only specific polyfills, add them here. If no option is passed, adds all polyfills

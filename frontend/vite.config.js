@@ -85,10 +85,10 @@ export default defineConfig({
 		outDir: "../priv/static/frontend", // emit assets to priv/static/frontend
 		emptyOutDir: true,
 		// disable source maps & size reports to save memory
-		// sourcemap: false,
-		// reportCompressedSize: false,
-		// minify: 'esbuild',
-		// cssCodeSplit: false,
+		sourcemap: false,
+		reportCompressedSize: false,
+		minify: 'esbuild',
+		cssCodeSplit: false,
 		rollupOptions: {
 			onwarn(warning, warn) {
 				if (warning.message.includes('PURE') || warning.message.includes('has been externalized')) return;

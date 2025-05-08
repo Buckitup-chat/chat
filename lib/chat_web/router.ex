@@ -39,6 +39,10 @@ defmodule ChatWeb.Router do
     get "/get/zip/:broker_key", ZipController, :get
     get "/privacy-policy.html", PlainController, :privacy_policy
 
+    # Frontend SPA routes
+    get "/frontend", FrontendController, :index
+    get "/frontend/*path", FrontendController, :index
+
     # prod debug
     # coveralls-ignore-start
     get "/log", DeviceLogController, :log

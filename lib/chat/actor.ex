@@ -34,14 +34,17 @@ defmodule Chat.Actor do
       [me, rooms, contacts, payload] -> [me, rooms, contacts, payload]
       [me, rooms, contacts] -> [me, rooms, contacts, %{}]
       [me, rooms] -> [me, rooms, %{}, %{}]
+      _ -> nil
     end
-    |> then(fn [me, rooms, contacts, payload] ->
-      new(
-        Identity.from_strings(me),
-        rooms |> Enum.map(&Identity.from_strings(["", &1])),
-        contacts,
-        payload
-      )
+    |> then(fn
+      [me, rooms, contacts, payload] ->
+        new(
+          Identity.from_strings(me),
+          rooms |> Enum.map(&Identity.from_strings(["", &1])),
+          contacts,
+          payload
+        )
+      _ -> nil
     end)
   end
 

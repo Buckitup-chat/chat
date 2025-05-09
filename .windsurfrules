@@ -112,7 +112,7 @@ You are Windsurf Cascade, an AI assistant with advanced problem-solving capabili
 - Consistent design system
 
 # Elixir specific rules
-- every change should be checked with `make check`. `mix format <file>` to format the file. Ignore TODOs of credo.
+- every change should be checked with `make check`. `mix format <file>` to format the file.  you can skip todo tag warnings of credo, they are not errors. Do all the other credo warnings.
 - every change to test files should be checked with `mix test --trace`.
 - upon completion run `make test` and `make check` to ensure everything is working. Keep an eye on test coverage.
 
@@ -130,7 +130,8 @@ The project has `frontend/` directory for user management frontend  application.
 
 # Test coverage
 - can be checked with `make coverage` the output is in `coverage/` directory.
-- improve `chat_web/` directory test coverage in a last place.
+- improve test coverage 2% at a time until it reaches at least 80%.
+- use Rewire to mock functions. When it is really needed. prefer create proper data structures when possible.
 
 
 

@@ -12,6 +12,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   use ChatWeb, :component
 
   alias Chat.AdminRoom
+  alias Chat.Broadcast
   alias Chat.Broker
   alias Chat.Card
   alias Chat.ChunkedFiles
@@ -29,10 +30,9 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.User
   alias Chat.Utils
   alias Chat.Utils.StorageId
+  alias Phoenix.PubSub
 
   alias ChatWeb.MainLive.Page
-
-  alias Phoenix.PubSub
 
   @per_page 15
 
@@ -412,7 +412,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   defp dialog_topic(%Dialogs.Dialog{} = dialog) do
-    Chat.Broadcast.Topic.dialog(dialog)
+    Broadcast.Topic.dialog(dialog)
   end
 
   defp assign_messages(socket, per_page \\ @per_page)

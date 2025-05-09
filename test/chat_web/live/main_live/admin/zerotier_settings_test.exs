@@ -1,5 +1,5 @@
 defmodule ChatWebTest.MainLive.Admin.ZerotierSettingsTest do
-  use ChatWeb.ConnCase, async: true
+  use ChatWeb.ConnCase, async: false
   import Phoenix.LiveView, only: [send_update: 3]
 
   import Phoenix.LiveViewTest

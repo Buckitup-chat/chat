@@ -8,6 +8,8 @@ defmodule Chat.Application do
   require Logger
 
   alias Chat.AdminDb.AdminLogger
+  alias Chat.NetworkSynchronization
+  alias Chat.NetworkSynchronization.Retrieval
 
   @impl true
   def start(_type, _args) do
@@ -38,7 +40,7 @@ defmodule Chat.Application do
       ChatWeb.Presence,
       # Start the Endpoint (http/https)
       ChatWeb.Endpoint,
-      Chat.NetworkSynchronization.Supervisor,
+      NetworkSynchronization.Supervisor,
       # Supervised tasks caller
       {Task.Supervisor, name: Chat.TaskSupervisor},
       {Task,
@@ -60,8 +62,8 @@ defmodule Chat.Application do
          Task.Supervisor.start_child(
            Chat.TaskSupervisor,
            fn ->
-             Chat.NetworkSynchronization.Retrieval.load_all_chat_modules()
-             Chat.NetworkSynchronization.init_workers()
+             Retrieval.load_all_chat_modules()
+             NetworkSynchronization.init_workers()
            end,
            shutdown: :brutal_kill
          )

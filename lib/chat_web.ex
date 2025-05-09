@@ -25,7 +25,6 @@ defmodule ChatWeb do
       use Phoenix.Controller, namespace: ChatWeb
 
       import Plug.Conn, except: [assign: 3]
-      import ChatWeb.Gettext
       alias ChatWeb.Router.Helpers, as: Routes
 
       unquote(verified_routes())
@@ -89,7 +88,6 @@ defmodule ChatWeb do
   def channel do
     quote do
       use Phoenix.Channel
-      import ChatWeb.Gettext
     end
   end
 
@@ -126,7 +124,6 @@ defmodule ChatWeb do
       import Phoenix.View
 
       import ChatWeb.ErrorHelpers
-      import ChatWeb.Gettext
       alias ChatWeb.Router.Helpers, as: Routes
 
       unquote(verified_routes())

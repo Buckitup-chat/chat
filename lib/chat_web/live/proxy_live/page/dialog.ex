@@ -12,6 +12,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
     only: [consume_uploaded_entry: 3, push_event: 3, send_update: 2, push_patch: 2]
 
   alias Chat.AdminRoom
+  alias Chat.Broadcast
   alias Chat.Broker
   alias Chat.Card
   alias Chat.ChunkedFiles
@@ -27,15 +28,14 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   alias Chat.Rooms
   alias Chat.Sync.DbBrokers
   alias Chat.Upload.UploadMetadata
-  # alias Chat.User
   alias Chat.Utils
   alias Chat.Utils.StorageId
-
   alias ChatWeb.MainLive.Page
   alias ChatWeb.State.ActorState
   alias ChatWeb.State.RoomMapState
-
+  alias ChatWeb.Utils, as: WebUtils
   alias Phoenix.PubSub
+  alias Proxy
   alias Proxy.SocketClient
 
   @per_page 15
@@ -366,7 +366,8 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
 
   defp maybe_redirect_to_file(%{type: type, content: json}, socket)
        when type in [:audio, :file, :image, :video] do
-    {file_id, secret} = StorageId.from_json(json)
+    {file_id, secret} = json |> StorageId.from_json()
+
     file_id = Base.encode16(file_id, case: :lower)
     params = %{a: Base.url_encode64(secret)}
 
@@ -512,7 +513,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   end
 
   defp dialog_topic(%Dialogs.Dialog{} = dialog) do
-    Chat.Broadcast.Topic.dialog(dialog)
+    Broadcast.Topic.dialog(dialog)
   end
 
   defp assign_messages(socket, per_page \\ @per_page)
@@ -554,7 +555,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
         {id, secret} = json |> StorageId.from_json()
 
         msg
-        |> Map.put(:file_url, ChatWeb.Utils.get_proxied_file_url(server, id, secret))
+        |> Map.put(:file_url, WebUtils.get_proxied_file_url(server, id, secret))
 
       simple_message ->
         simple_message

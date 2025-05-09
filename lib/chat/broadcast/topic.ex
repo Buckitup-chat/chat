@@ -6,8 +6,9 @@ defmodule Chat.Broadcast.Topic do
   def dialog(x) do
     cond do
       match?(%Chat.Dialogs.Dialog{}, x) -> x |> Chat.Dialogs.key() |> to_hex()
-      String.match?(x, ~r/^[0-9a-f]{64}$/i) -> x
+      is_binary(x) && String.match?(x, ~r/^[0-9a-f]{64}$/i) -> x
       is_binary(x) -> x |> to_hex()
+      true -> to_hex(inspect(x))
     end
     |> then(fn hex -> "dialog:#{hex}" end)
   end

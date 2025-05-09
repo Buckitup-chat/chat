@@ -145,5 +145,29 @@ defmodule Chat.MessagingTest do
       assert Enum.at(processed_messages, 1).type == :unknown
       assert Enum.at(processed_messages, 1).content == "some_content"
     end
+    
+    test "handles file messages with nil data", context do
+      # Extract context values
+      %{
+        create_storage_id: create_storage_id,
+        create_test_message: create_test_message
+      } = context
+
+      # Setup for file message test
+      key = "file_key"
+      storage_id = create_storage_id.(key)
+      file_message = create_test_message.(:image, storage_id)
+
+      # Create a data getter that returns an empty map
+      # This simulates when the file data isn't available yet
+      data_getter = fn _keys -> %{} end
+
+      # Process the message - this should not raise an error
+      [processed_message] = Messaging.preload_content([file_message], data_getter)
+
+      # File messages with nil data should have empty file_info
+      assert processed_message.file_info == []
+      assert is_binary(processed_message.file_url)
+    end
   end
 end

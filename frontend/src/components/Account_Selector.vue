@@ -194,22 +194,7 @@ const signin = async () => {
 
 		await $user.fromVaultFormat(await $encryptionManager.getData());
 
-		if ($user.account.spaceId) {
-			const spaces = $user.dxClient.spaces.get();
-			const space = spaces.find((s) => s.id === $user.account.spaceId);
-
-			if (space) {
-				$user.space = space;
-				console.log('Space reused', space.id);
-			} else {
-				console.log('Space not found');
-			}
-		}
-		if (!$user.space) {
-			await $user.createSpace();
-		}
-
-		await $user.openSpace(nextUser);
+		await $user.openStorage(nextUser);
 
 		await $user.checkMetaWallet();
 

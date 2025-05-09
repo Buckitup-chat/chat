@@ -158,15 +158,14 @@ const applyBackup = async (data) => {
 
 		$user.account = account;
 
-		await $user.createSpace();
-		await $user.openSpace({
+		await $user.openStorage({
 			name: accountInfo.name,
 			notes: accountInfo.notes,
 			avatar: accountInfo.avatar,
 		});
 
 		if (data.contacts && data.contacts.length) {
-			await $user.initializeContacts(data.contacts);
+			//await $user.initializeContacts(data.contacts);
 		}
 
 		$mitt.emit('account::created');

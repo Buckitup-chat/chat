@@ -90,7 +90,7 @@ const modalRegistry = {
 
 	account_dxos_invite: {
 		header: true,
-		component: 'Modal_Account_Dxos_Invite',
+		component: 'Modal_Account_Invite',
 		modalClass: 'modal-sm',
 		title: 'Invite other device',
 		icon: '_icon_reload',
@@ -98,7 +98,7 @@ const modalRegistry = {
 
 	account_dxos_connect: {
 		header: true,
-		component: 'Modal_Account_Dxos_Connect',
+		component: 'Modal_Account_Connect',
 		modalClass: 'modal-sm',
 		title: 'Connect to other device',
 		icon: '_icon_reload',

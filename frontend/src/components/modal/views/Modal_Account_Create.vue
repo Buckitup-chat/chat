@@ -47,8 +47,9 @@ const create = async () => {
 
 		$user.account = await $user.generateAccount(account.value.privateKey);
 
-		await $user.createSpace();
-		await $user.openSpace({
+		await $encryptionManager.setData($user.toVaultFormat());
+
+		await $user.openStorage({
 			name: account.value.name,
 			notes: account.value.notes,
 			avatar: account.value.avatar,
@@ -58,7 +59,7 @@ const create = async () => {
 		$mitt.emit('modal::close');
 		$router.replace({ name: 'account_info' });
 	} catch (error) {
-		console.error('createSpace error', error);
+		console.error('create error', error);
 	}
 };
 </script>

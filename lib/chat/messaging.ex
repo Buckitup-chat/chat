@@ -9,7 +9,7 @@ defmodule Chat.Messaging do
   - storing
   - retrieval
   - decryption
-  - contnent enrichment 
+  - contnent enrichment
 
   """
 
@@ -58,7 +58,8 @@ defmodule Chat.Messaging do
         db_key = DbKeys.file(key)
 
         file_info =
-          data_map[db_key]
+          data_map
+          |> Map.get(db_key, [])
           |> Enum.map(&Enigma.decipher(&1, secret))
 
         msg
@@ -71,9 +72,9 @@ defmodule Chat.Messaging do
         db_key = DbKeys.memo(key)
 
         data =
-          if data_map[db_key],
-            do: data_map[db_key] |> Enigma.decipher(secret),
-            else: ""
+          data_map
+          |> Map.get(db_key, "")
+          |> Enigma.decipher(secret)
 
         msg
         |> Map.from_struct()

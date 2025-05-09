@@ -105,7 +105,6 @@ import Modal from '@/components/modal/Modal_.vue';
 import Swal from '@/components/swal/Swal_.vue';
 import { ref, provide, watch, onMounted, inject, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-//import { useReadContract } from '@wagmi/vue';
 
 const $socket = inject('$socket');
 const $mitt = inject('$mitt');
@@ -151,14 +150,5 @@ onMounted(async () => {
 		timestamp.value = Math.floor(Date.now().valueOf() / 1000);
 		setTimeout(tick, 1000);
 	}, 1000);
-
-	try {
-		await $user.dxClient.initialize();
-		if (!$user.dxClient.halo.identity.get()) {
-			await $user.dxClient.halo.createIdentity();
-		}
-	} catch (error) {
-		console.error('dxClient.initialize', error);
-	}
 });
 </script>

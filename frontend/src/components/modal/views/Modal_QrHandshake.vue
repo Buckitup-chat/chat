@@ -172,7 +172,7 @@ import QrScanner from 'qr-scanner';
 import QRCode from 'qrcode';
 import Account_Item from '@/components/Account_Item.vue';
 import { toUtf8Bytes, randomBytes, encodeBase64, concat, computeAddress, decodeBase64, encodeBase58 } from 'ethers';
-import { Expando, create } from '@dxos/client/echo';
+
 import dayjs from 'dayjs';
 
 const $user = inject('$user');
@@ -416,20 +416,12 @@ const addContact = async () => {
 			});
 			contact.value = isInContacts.value;
 			manual.value = false;
-			//$router.push({ name: 'contact', params: { address: contact.address } });
+			$router.push({ name: 'contact', params: { address: contact.value.address } });
+			closeModal();
 			return;
 		}
 
-		$user.contacts.push(contact.value);
-
-		const contactDx = create(Expando, {
-			...$enigma.encryptObjectKeys(contact.value, $user.contactKeys, $user.account.privateKey),
-			updatedAt: dayjs().valueOf(),
-			type: 'contact',
-		});
-
-		await $user.space.db.add(contactDx);
-		//$user.contactsDx.value.push(contactDx);
+		$user.contactsMap[contact.value.publicKey] = contact.value;
 
 		$swal.fire({
 			icon: 'success',
@@ -440,7 +432,9 @@ const addContact = async () => {
 		$menuOpened.value = false;
 		$router.push({ name: 'contact', params: { address: contact.value.address } });
 		closeModal();
-	} catch (error) {}
+	} catch (error) {
+		console.log('addContact error', error);
+	}
 };
 
 const setManually = async () => {
@@ -503,15 +497,4 @@ const wait = (delay = 500) => {
 		}, delay),
 	);
 };
-
-function bigintToBytes(bn) {
-	let hex = bn.toString(16);
-	if (hex.length % 2) hex = '0' + hex;
-	const len = hex.length / 2;
-	const u8 = new Uint8Array(len);
-	for (let i = 0; i < len; i++) {
-		u8[i] = parseInt(hex.substr(i * 2, 2), 16);
-	}
-	return u8;
-}
 </script>

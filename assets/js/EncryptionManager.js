@@ -320,6 +320,20 @@ export class EncryptionManager extends EventTarget {
    }
 
    /**
+    * Gets the vaults registry from raw storage.
+    * @returns {Promise<Array>} - The vaults registry array or empty array if not found.
+    */
+   async getVaultsRegistry() {
+      try {
+         const vaultsRegistry = await this.#rawStore.get("vaults-registry");
+         return vaultsRegistry || [];
+      } catch (error) {
+         console.error("Error retrieving vaults registry:", error);
+         return [];
+      }
+   }
+
+   /**
     * Removes the vault ID from raw storage.
     */
    async removeVaultID() {

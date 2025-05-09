@@ -1,6 +1,4 @@
-import path from "path"
-import { defineConfig } from "vite"
-// import { defineConfig } from 'vite';
+import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import topLevelAwait from 'vite-plugin-top-level-await';
@@ -8,15 +6,17 @@ import topLevelAwait from 'vite-plugin-top-level-await';
 import WALC from '@lo-fi/webauthn-local-client/bundlers/vite';
 
 import fs from 'fs';
-// import path from 'path';
+import path from 'path';
 
 import wasm from 'vite-plugin-wasm';
 import { fileURLToPath, URL } from 'node:url';
-import { ConfigPlugin } from '@dxos/config/vite-plugin';
+// import { ConfigPlugin } from '@dxos/config/vite-plugin';
 
 let production = process.env.NODE_ENV === 'production';
 production = true;
 let productionApi = process.env.NODE_ENV === 'production';
+//production = true;
+//production = false;
 productionApi = true;
 
 // https://vite.dev/config/
@@ -33,7 +33,7 @@ export default defineConfig({
 	plugins: [
 		topLevelAwait(),
 		wasm(),
-		ConfigPlugin(),
+		// ConfigPlugin(),
 		WALC(),
 		nodePolyfills({
 			// To add only specific polyfills, add them here. If no option is passed, adds all polyfills
@@ -78,7 +78,7 @@ export default defineConfig({
 		esbuildOptions: {
 			target: 'es2022',
 		},
-		exclude: ['@lo-fi/webauthn-local-client', '@protobufjs/inquire'],
+		exclude: ['@lo-fi/webauthn-local-client'],
 	},
 	base: '/frontend',
 	build: {
@@ -89,9 +89,6 @@ export default defineConfig({
 		reportCompressedSize: false,
 		minify: 'esbuild',
 		cssCodeSplit: false,
-		commonjsOptions: {
-			exclude: ['@protobufjs/inquire']
-		},
 		rollupOptions: {
 			onwarn(warning, warn) {
 				if (warning.message.includes('PURE') || warning.message.includes('has been externalized')) return;

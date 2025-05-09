@@ -92,56 +92,26 @@ const listedContacts = computed(() => {
 });
 
 async function updateContact(updatedContact) {
-	try {
-		const contactDx = $user.contactsDx.find((e) => e.id === updatedContact.id);
-		if (contactDx) {
-			if (contact.value.name !== updatedContact.name) {
-				contactDx.name = $enigma.encryptDataSync(updatedContact.name, $user.account.privateKey);
-				contactDx.updatedAt = dayjs().valueOf();
-			}
-			if (contact.value.avatar !== updatedContact.avatar) {
-				contactDx.avatar = $enigma.encryptDataSync(updatedContact.avatar, $user.account.privateKey);
-				contactDx.updatedAt = dayjs().valueOf();
-			}
-			if (contact.value.notes !== updatedContact.notes) {
-				contactDx.notes = $enigma.encryptDataSync(updatedContact.notes, $user.account.privateKey);
-				contactDx.updatedAt = dayjs().valueOf();
-			}
-		}
-	} catch (error) {
-		console.error(error);
-		$swal.fire({
-			icon: 'error',
-			title: 'Saving',
-			text: errorMessage(error),
-			timer: 15000,
-		});
-	}
+	$user.contactsMap[contact.value.publicKey] = updatedContact;
 }
 
 const toggleHidden = async () => {
-	const contactDx = $user.contactsDx.find((e) => e.id === contact.value.id);
-	if (contactDx) {
-		let hide;
-		if (!contact.value.hidden) {
-			if (!(await $swalModal.value.open({ id: 'delete_contact' }))) return;
-			hide = true;
-		}
+	let hide;
+	if (!contact.value.hidden) {
+		if (!(await $swalModal.value.open({ id: 'delete_contact' }))) return;
+		hide = true;
+	}
 
-		contactDx.hidden = $enigma.encryptDataSync(!contact.value.hidden, $user.account.privateKey);
-		contactDx.updatedAt = dayjs().valueOf();
+	$user.contactsMap[contact.value.publicKey].hidden = !contact.value.hidden;
 
-		if (hide) {
-			await new Promise((resolve) => setTimeout(resolve, 300));
-
-			if (listedContacts.value.length) {
-				$router.push({ name: 'contact', params: { address: listedContacts.value[0].address } });
+	if (hide) {
+		if (listedContacts.value.length) {
+			$router.push({ name: 'contact', params: { address: listedContacts.value[0].address } });
+		} else {
+			if (window.history.length > 1) {
+				$router.go(-1); // ✅ Go back if history exists
 			} else {
-				if (window.history.length > 1) {
-					$router.go(-1); // ✅ Go back if history exists
-				} else {
-					$router.push({ name: 'home' }); // ✅ Otherwise, go home
-				}
+				$router.push({ name: 'home' }); // ✅ Otherwise, go home
 			}
 		}
 	}

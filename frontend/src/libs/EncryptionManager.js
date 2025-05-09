@@ -192,8 +192,8 @@ export class EncryptionManager extends EventTarget {
 
 			// If we're removing the current vault, also remove the vault-id
 			if (this.#vault && this.#vault.id === id) {
-				this.#vault = null;
-				this.isAuth = false;
+			this.#vault = null;
+			this.isAuth = false;
 				await this.#rawStore.remove('vault-id');
 				console.log('Removed vault-id because current vault was removed');
 			}
@@ -270,6 +270,7 @@ export class EncryptionManager extends EventTarget {
 				};
 			});
 			await this.#rawStore.set(registryKey, updatedVaults);
+			await this.#rawStore.set('vaultId', this.#vault.id);
 			this.#vaults = updatedVaults;
 
 			// Update the vault-id to match the current vault

@@ -9,6 +9,7 @@ defmodule Chat.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       # compilers: [] ++ Mix.compilers(),
       start_permanent: Mix.env() == :prod,
+      consolidate_protocols: Mix.env() != :dev,
       aliases: aliases(),
       deps: deps(),
       test_coverage: [tool: ExCoveralls],
@@ -46,6 +47,8 @@ defmodule Chat.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      {:tidewave, "~> 0.1", only: [:dev]},
+      {:igniter, "~> 0.5", only: [:dev, :test]},
       # Chat deps
       {:qr_code, "~> 2.2.1"},
       {:cubdb, "~> 2.0"},

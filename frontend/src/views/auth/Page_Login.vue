@@ -24,7 +24,7 @@
 		</div>
 
 		<div class="px-3 w-100 mb-3">
-			<button class="btn btn-outline-light w-100" @click="setMode('dxos_connect')">Sync with other device</button>
+			<button class="btn btn-outline-light w-100" @click="setMode('connect')">Sync with other device</button>
 		</div>
 
 		<div class="px-3 w-100 mb-3 opacity-50">
@@ -51,12 +51,16 @@
 
 <script setup>
 import Account_Selector from '@/components/Account_Selector.vue';
-import { inject, ref, onMounted, onUnmounted } from 'vue';
+import { inject, ref, onMounted, onUnmounted, nextTick } from 'vue';
 import * as $enigma from '@/libs/enigma';
 
 const $mitt = inject('$mitt');
 const $user = inject('$user');
+const $swal = inject('$swal');
 const $route = inject('$route');
+const $loader = inject('$loader');
+const $isProd = inject('$isProd');
+const $router = inject('$router');
 const $encryptionManager = inject('$encryptionManager');
 const mode = ref();
 
@@ -64,8 +68,8 @@ onMounted(async () => {
 	await updateData();
 
 	if ($route.query.encryptionKey) {
-		mode.value = 'dxos_connect';
-		$mitt.emit('modal::open', { id: 'account_dxos_connect' });
+		mode.value = 'connect';
+		$mitt.emit('modal::open', { id: 'account_connect' });
 	} else if ($user.vaults.length) {
 		mode.value = 'existing';
 	}
@@ -91,7 +95,7 @@ function setMode(m) {
 	if (m === 'create') $mitt.emit('modal::open', { id: 'account_create' });
 	if (m === 'restore') $mitt.emit('modal::open', { id: 'account_restore_local' });
 	if (m === 'shares') $mitt.emit('modal::open', { id: 'account_restore_shares' });
-	if (m === 'dxos_connect') $mitt.emit('modal::open', { id: 'account_dxos_connect' });
+	if (m === 'connect') $mitt.emit('modal::open', { id: 'account_connect' });
 }
 
 const connectVaultLocalApp = async () => {

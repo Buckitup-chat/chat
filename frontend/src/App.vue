@@ -103,7 +103,7 @@ import Loader from './components/Loader.vue';
 import Menu from '@/views/menu/Menu_.vue';
 import Modal from '@/components/modal/Modal_.vue';
 import Swal from '@/components/swal/Swal_.vue';
-import { ref, provide, watch, onMounted, inject, computed } from 'vue';
+import { ref, provide, watch, onMounted, inject, computed, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const $socket = inject('$socket');
@@ -112,6 +112,9 @@ const $user = inject('$user');
 const $breakpoint = inject('$breakpoint');
 const $encryptionManager = inject('$encryptionManager');
 const $web3 = inject('$web3');
+const $swal = inject('$swal');
+const $loader = inject('$loader');
+const $isProd = inject('$isProd');
 
 const $appstate = ref({});
 provide('$appstate', $appstate);
@@ -150,5 +153,49 @@ onMounted(async () => {
 		timestamp.value = Math.floor(Date.now().valueOf() / 1000);
 		setTimeout(tick, 1000);
 	}, 1000);
+
+	$user.vaults = await $encryptionManager.getVaults();
+
+	if ($user.vaults.length) {
+		let currentUser = $user.vaults.find((u) => u.current);
+		if (currentUser) {
+			$loader.show();
+
+			let swalInstance;
+
+			if ($isProd) {
+				swalInstance = $swal.fire({
+					icon: 'info',
+					title: 'Authenticate with PassKey',
+					footer: 'Please confirn PassKey on your device when it prompts',
+					timer: 3000,
+				});
+			}
+
+			await $encryptionManager.connectToVault(currentUser.vaultId);
+
+			if (swalInstance) swalInstance.close();
+
+			if (!$encryptionManager.isAuth) {
+				$loader.hide();
+				return;
+			}
+
+			await $user.fromVaultFormat(await $encryptionManager.getData());
+
+			await $user.openStorage();
+
+			await $user.checkMetaWallet();
+
+			nextTick(() => {
+				try {
+					$router.replace({ name: 'account_info' });
+				} catch (error) {
+					console.log('signin', error);
+				}
+			});
+			$loader.hide();
+		}
+	}
 });
 </script>

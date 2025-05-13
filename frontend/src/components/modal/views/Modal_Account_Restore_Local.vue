@@ -159,9 +159,11 @@ const applyBackup = async (data) => {
 		$user.account = account;
 
 		await $user.openStorage({
-			name: accountInfo.name,
-			notes: accountInfo.notes,
-			avatar: accountInfo.avatar,
+			accountInfo: {
+				name: accountInfo.name,
+				notes: accountInfo.notes,
+				avatar: accountInfo.avatar,
+			},
 		});
 
 		if (data.contacts && data.contacts.length) {

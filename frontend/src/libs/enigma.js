@@ -388,28 +388,3 @@ export const decryptDataSync = (encryptedData, privateKey) => {
 	const decoded = JSON.parse(deciphered.toString());
 	return decoded.type === 'number' ? Number(decoded.data) : decoded.data; // Restore original type
 };
-
-export const decryptObjectKeys = (encryptedObject, keys, privateKey) => {
-	const decryptedObject = {};
-	Object.assign(decryptedObject, encryptedObject);
-
-	for (const key of keys) {
-		if (key in encryptedObject) {
-			const decrypted = decryptDataSync(encryptedObject[key], privateKey);
-			decryptedObject[key] = decrypted;
-		}
-	}
-	return decryptedObject;
-};
-export const encryptObjectKeys = (decryptedObject, keys, privateKey) => {
-	const encryptedObject = {}; // Clone object to avoid mutations
-
-	for (const key of keys) {
-		if (key in decryptedObject) {
-			const encrypted = encryptDataSync(decryptedObject[key], privateKey);
-			encryptedObject[key] = encrypted;
-		}
-	}
-
-	return encryptedObject;
-};

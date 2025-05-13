@@ -194,7 +194,13 @@ const signin = async () => {
 
 		await $user.fromVaultFormat(await $encryptionManager.getData());
 
-		await $user.openStorage(nextUser);
+		await $user.openStorage({
+			accountInfo: {
+				name: nextUser.name,
+				notes: nextUser.notes,
+				avatar: nextUser.avatar,
+			},
+		});
 
 		await $user.checkMetaWallet();
 

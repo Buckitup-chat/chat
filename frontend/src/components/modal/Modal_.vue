@@ -96,7 +96,7 @@ const modalRegistry = {
 		icon: '_icon_reload',
 	},
 
-	account_dxos_connect: {
+	account_connect: {
 		header: true,
 		component: 'Modal_Account_Connect',
 		modalClass: 'modal-sm',

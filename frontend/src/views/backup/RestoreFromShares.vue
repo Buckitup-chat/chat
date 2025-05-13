@@ -132,9 +132,11 @@ const addAccount = async () => {
 		$user.account = acc;
 
 		await $user.openStorage({
-			name: accountToRecover.value.name,
-			notes: accountToRecover.value.notes,
-			avatar: accountToRecover.value.avatar,
+			accountInfo: {
+				name: accountToRecover.value.name,
+				notes: accountToRecover.value.notes,
+				avatar: accountToRecover.value.avatar,
+			},
 		});
 
 		if (offchainData.value) {

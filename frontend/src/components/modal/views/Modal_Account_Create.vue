@@ -50,9 +50,11 @@ const create = async () => {
 		await $encryptionManager.setData($user.toVaultFormat());
 
 		await $user.openStorage({
-			name: account.value.name,
-			notes: account.value.notes,
-			avatar: account.value.avatar,
+			accountInfo: {
+				name: account.value.name,
+				notes: account.value.notes,
+				avatar: account.value.avatar,
+			},
 		});
 
 		$mitt.emit('account::created');

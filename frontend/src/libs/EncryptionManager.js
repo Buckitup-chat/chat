@@ -124,7 +124,7 @@ export class EncryptionManager extends EventTarget {
 
 		console.log('Created a new vault with ID:', this.#vault.id);
 
-		this.setCurrentUser();
+		this.setCurrentUser(true);
 	}
 
 	/**
@@ -149,7 +149,7 @@ export class EncryptionManager extends EventTarget {
 
 			console.log('Connected to existing vault:', vaultID);
 
-			this.setCurrentUser();
+			this.setCurrentUser(true);
 		} catch (error) {
 			this.isAuth = false; // Use the setter
 			console.error(error);
@@ -157,20 +157,9 @@ export class EncryptionManager extends EventTarget {
 	}
 
 	async disconnect() {
-		// Save the current vault ID before nullifying it
-		const currentVaultId = this.#vault?.id;
-		
+		await this.setCurrentUser(false);
 		this.#vault = null;
 		this.isAuth = false;
-		
-		// Update the vaults registry to remove current status
-		if (currentVaultId) {
-			await this.clearCurrentStatusFromAllVaults('Updated vaults registry on disconnect - removed current status');
-			
-			// Remove the vault-id from raw storage
-			await this.#rawStore.remove('vault-id');
-			console.log('Removed vault-id on disconnect');
-		}
 	}
 
 	async removeVault(id) {
@@ -190,13 +179,9 @@ export class EncryptionManager extends EventTarget {
 
 			this.#vaults = vaults;
 
-			// If we're removing the current vault, also remove the vault-id
-			if (this.#vault && this.#vault.id === id) {
 			this.#vault = null;
 			this.isAuth = false;
-				await this.#rawStore.remove('vault-id');
-				console.log('Removed vault-id because current vault was removed');
-			}
+			await this.removeVaultID();
 		} catch (error) {
 			console.error('removeVault error', error);
 		}
@@ -258,7 +243,7 @@ export class EncryptionManager extends EventTarget {
 		}
 	}
 
-	async setCurrentUser() {
+	async setCurrentUser(isSet) {
 		try {
 			const registryKey = this.#isProduction ? 'vaults-registry' : 'test-vaults-registry';
 			const vaults = await this.#rawStore.get(registryKey);
@@ -266,17 +251,12 @@ export class EncryptionManager extends EventTarget {
 				const isCurrent = vault.vaultId === this.#vault.id;
 				return {
 					...vault,
-					current: isCurrent,
+					current: isCurrent && isSet,
 				};
 			});
 			await this.#rawStore.set(registryKey, updatedVaults);
-			await this.#rawStore.set('vaultId', this.#vault.id);
+			await (isSet ? this.saveVaultID(this.#vault.id) : this.removeVaultID());
 			this.#vaults = updatedVaults;
-
-			// Update the vault-id to match the current vault
-			if (this.#vault && this.#vault.id) {
-				await this.saveVaultID(this.#vault.id);
-			}
 		} catch (error) {
 			await this.handleError(error, 'Error retrieving data');
 		}
@@ -353,35 +333,6 @@ export class EncryptionManager extends EventTarget {
 	 */
 	async removeVaultID() {
 		await this.#rawStore.remove('vault-id');
-		
-		// Update the vaults registry to remove current status from all vaults
-		await this.clearCurrentStatusFromAllVaults('Updated vaults registry on logout - removed current status from all vaults');
-	}
-
-	/**
-	 * Clears the current status from all vaults in the registry.
-	 * @param {string} [logMessage='Cleared current status from all vaults'] - Custom log message.
-	 * @returns {Promise<void>}
-	 */
-	async clearCurrentStatusFromAllVaults(logMessage = 'Cleared current status from all vaults') {
-		try {
-			const registryKey = this.#isProduction ? 'vaults-registry' : 'test-vaults-registry';
-			let vaultsRegistry = await this.#rawStore.get(registryKey);
-			
-			if (vaultsRegistry && vaultsRegistry.length > 0) {
-				// Remove current status from all vaults
-				vaultsRegistry = vaultsRegistry.map(vault => ({
-					...vault,
-					current: false
-				}));
-				
-				await this.#rawStore.set(registryKey, vaultsRegistry);
-				this.#vaults = vaultsRegistry;
-				console.log(logMessage);
-			}
-		} catch (error) {
-			console.error('Error clearing current status from vaults registry:', error);
-		}
 	}
 
 	/**

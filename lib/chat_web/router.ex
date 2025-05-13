@@ -62,7 +62,7 @@ defmodule ChatWeb.Router do
     get "/get/device_log/:key", TempSyncController, :device_log
     # coveralls-ignore-stop
 
-    live_session :default do
+    live_session :default, on_mount: {ChatWeb.Hooks.SafariSessionHook, :default} do
       live "/", MainLive.Index, :index
       live "/room/:hash", MainLive.Index, :room_message_link
       live "/chat/:hash", MainLive.Index, :chat_link

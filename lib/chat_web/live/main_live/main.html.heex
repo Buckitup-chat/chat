@@ -1,5 +1,8 @@
 <div style="display: none;" id="session-link" phx-hook="LocalStateStore"></div>
 <div style="display: none;" id="time-link" phx-hook="LocalTime"></div>
+<%= if @is_safari do %>
+  <div style="display: none;" id="safari-session-maintenance" phx-hook="SafariSession"></div>
+<% end %>
 <%= unless connected?(@socket) do %>
   <Layout.Basic.loading_screen />
 <% else %>

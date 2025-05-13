@@ -8,6 +8,7 @@ import LocalTime from "./hooks/local-time"
 import Chat from "./hooks/chat"
 import Flash from "./hooks/flash"
 import ImageForceLoader from "./hooks/image-force-loader"
+import SafariSession from "./hooks/safari-session"
 
 export default {
   AudioFile,
@@ -18,6 +19,7 @@ export default {
   LocalStateStore,
   LocalTime,
   MediaFileInput,
+  SafariSession,
   SortableUploadEntries,
   UploadInProgress
 };

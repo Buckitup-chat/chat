@@ -288,7 +288,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
     key = Broker.store({:dialog, {dialog, messages_ids, me, peer}, timezone})
 
-    push_event(socket, "chat:redirect", %{url: url(~p"/get/zip/#{key}")})
+    push_event(socket, "chat:redirect", %{url: ~p"/get/zip/#{key}"})
   end
 
   def accept_room_invite(

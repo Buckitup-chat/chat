@@ -467,6 +467,5 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
     code = secret |> Base.url_encode64()
 
     ~p"/get/image/#{key}?a=#{code}"
-    |> url()
   end
 end

@@ -98,7 +98,7 @@ defmodule ChatWeb.MainLive.Page.Logout do
 
     socket
     |> Page.Login.reset_rooms_to_backup(sync: true)
-    |> push_event("chat:redirect", %{url: url(~p"/get/backup/#{broker_key}")})
+    |> push_event("chat:redirect", %{url: ~p"/get/backup/#{broker_key}"})
   end
 
   def go_final(%{assigns: %{}} = socket) do

@@ -147,7 +147,7 @@ defmodule ChatWeb.MainLive.Admin.CargoUserData do
       |> Broker.store()
 
     socket
-    |> push_event("chat:redirect", %{url: url(~p"/get/backup/#{broker_key}")})
+    |> push_event("chat:redirect", %{url: ~p"/get/backup/#{broker_key}"})
     |> noreply()
   end
 

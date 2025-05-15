@@ -413,7 +413,7 @@ defmodule ChatWeb.MainLive.Page.Room do
 
     key = Broker.store({:room, {messages_ids, room, my_id, room_identity}, timezone})
 
-    push_event(socket, "chat:redirect", %{url: url(~p"/get/zip/#{key}")})
+    push_event(socket, "chat:redirect", %{url: ~p"/get/zip/#{key}"})
   end
 
   def hide_deleted_message(socket, id) do

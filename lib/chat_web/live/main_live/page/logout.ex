@@ -1,10 +1,9 @@
 defmodule ChatWeb.MainLive.Page.Logout do
   @moduledoc "Logout page"
-  use ChatWeb, :controller
+  use ChatWeb, :live_view
 
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [push_event: 3]
-  import Phoenix.VerifiedRoutes, only: [url: 1]
 
   alias Chat.Actor
   alias Chat.Broker
@@ -98,7 +97,7 @@ defmodule ChatWeb.MainLive.Page.Logout do
 
     socket
     |> Page.Login.reset_rooms_to_backup(sync: true)
-    |> push_event("chat:redirect", %{url: ~p"/get/backup/#{broker_key}"})
+    |> push_event("chat:redirect", %{url: path(socket, ~p"/get/backup/#{broker_key}")})
   end
 
   def go_final(%{assigns: %{}} = socket) do

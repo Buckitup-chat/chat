@@ -423,7 +423,11 @@ defmodule ChatWeb.MainLive.Page.ImageGallery do
          index: index
        }) do
     {file_id, secret} = json |> StorageId.from_json()
-    last = %{url: image_url(file_id, secret), id: id, index: index}
+    last = %{
+      url: unverified_path(socket, ChatWeb.Router, image_url(file_id, secret)),
+      id: id, 
+      index: index
+    }
 
     socket
     |> assign(:next, next || last)

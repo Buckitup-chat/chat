@@ -147,7 +147,7 @@ defmodule Chat.MessagingTest do
       assert Enum.at(processed_messages, 1).type == :unknown
       assert Enum.at(processed_messages, 1).content == "some_content"
     end
-    
+
     test "handles file messages with nil data", context do
       # Extract context values
       %{

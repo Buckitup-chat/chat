@@ -44,7 +44,9 @@ defmodule Chat.Actor do
           contacts,
           payload
         )
-      _ -> nil
+
+      _ ->
+        nil
     end)
   end
 

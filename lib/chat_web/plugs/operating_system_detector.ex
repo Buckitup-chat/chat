@@ -42,16 +42,23 @@ defmodule ChatWeb.Plugs.OperatingSystemDetector do
   # Detect Safari and Safari-based browsers
   defp safari?(browser_family, user_agent) do
     case {browser_family, user_agent} do
-      {"Safari", _} -> true
-      {"Mobile Safari", _} -> true
-      {_, user_agent} when is_binary(user_agent) -> safari_on_ios?(user_agent) || safari_on_mac?(user_agent)
-      _ -> false
+      {"Safari", _} ->
+        true
+
+      {"Mobile Safari", _} ->
+        true
+
+      {_, user_agent} when is_binary(user_agent) ->
+        safari_on_ios?(user_agent) || safari_on_mac?(user_agent)
+
+      _ ->
+        false
     end
   end
 
   defp safari_on_ios?(user_agent) do
     String.contains?(user_agent, "AppleWebKit") && String.contains?(user_agent, "Version") &&
-        (String.contains?(user_agent, "iPhone") || String.contains?(user_agent, "iPad"))
+      (String.contains?(user_agent, "iPhone") || String.contains?(user_agent, "iPad"))
   end
 
   defp safari_on_mac?(user_agent) do

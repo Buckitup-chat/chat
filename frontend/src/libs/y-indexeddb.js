@@ -23,7 +23,7 @@ export const fetchUpdates = (idbPersistence, beforeApplyUpdatesCallback = () => 
 				Y.transact(
 					idbPersistence.doc,
 					() => {
-						updates.forEach((val) => Y.applyUpdate(idbPersistence.doc, idbPersistence.decode(val)));
+						updates.forEach((val) => Y.applyUpdate(idbPersistence.doc, idbPersistence.decrypt(val)));
 					},
 					idbPersistence,
 					false,
@@ -74,15 +74,15 @@ export class IndexeddbPersistence extends Observable {
 	 * @param {string} name
 	 * @param {Y.Doc} doc
 	 */
-	constructor(name, doc, { encode = (u) => u, decode = (u) => u } = {}) {
+	constructor(name, doc, { encrypt = (u) => u, decrypt = (u) => u } = {}) {
 		super();
 		this.doc = doc;
 		this.name = name;
 		this._dbref = 0;
 		this._dbsize = 0;
 		this._destroyed = false;
-		this.encode = encode;
-		this.decode = decode;
+		this.encrypt = encrypt;
+		this.decrypt = decrypt;
 		/**
 		 * @type {IDBDatabase|null}
 		 */
@@ -122,7 +122,7 @@ export class IndexeddbPersistence extends Observable {
 		this._storeUpdate = (update, origin) => {
 			if (this.db && origin !== this) {
 				const [updatesStore] = idb.transact(/** @type {IDBDatabase} */ (this.db), [updatesStoreName]);
-				idb.addAutoKey(updatesStore, this.encode(update));
+				idb.addAutoKey(updatesStore, this.encrypt(update));
 				if (++this._dbsize >= PREFERRED_TRIM_SIZE) {
 					// debounce store call
 					if (this._storeTimeoutId !== null) {

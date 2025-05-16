@@ -10,12 +10,10 @@ import path from 'path';
 
 import wasm from 'vite-plugin-wasm';
 import { fileURLToPath, URL } from 'node:url';
-// import { ConfigPlugin } from '@dxos/config/vite-plugin';
 
 let production = process.env.NODE_ENV === 'production';
-production = true;
 let productionApi = process.env.NODE_ENV === 'production';
-//production = true;
+production = true;
 //production = false;
 productionApi = true;
 
@@ -33,7 +31,6 @@ export default defineConfig({
 	plugins: [
 		topLevelAwait(),
 		wasm(),
-		// ConfigPlugin(),
 		WALC(),
 		nodePolyfills({
 			// To add only specific polyfills, add them here. If no option is passed, adds all polyfills
@@ -56,6 +53,7 @@ export default defineConfig({
 	define: {
 		//sodium,
 		API_URL: JSON.stringify(production ? 'https://buckitupss.appdev.pp.ua/api' : 'http://localhost:3950/api'),
+		CONNECTOR_URL: JSON.stringify(productionApi ? 'wss://buckitupss.appdev.pp.ua/connector' : 'ws://localhost:3953'),
 		IS_PRODUCTION: production,
 		IS_PRODUCTION_API: productionApi,
 		API_SURL: JSON.stringify(productionApi ? 'https://buckitupss.appdev.pp.ua' : 'http://localhost:3950'), //http://192.168.100.28:3900 https://d1ca-2a01-c844-251d-5100-fa2f-930b-157d-3af1.ngrok-free.app
@@ -99,8 +97,8 @@ export default defineConfig({
 	},
 	// server: {
 	// 	https: {
-	// 		key: fs.readFileSync(path.resolve(__dirname, 'ssl/localhost-key.pem')),
-	// 		cert: fs.readFileSync(path.resolve(__dirname, 'ssl/localhost.pem')),
+	// 		key: fs.readFileSync(path.resolve(__dirname, '../ssl/localhost-key.pem')),
+	// 		cert: fs.readFileSync(path.resolve(__dirname, '../ssl/localhost.pem')),
 	// 	},
 	// 	host: true, // Set to `true` or specify your local IP address
 	// 	//port: 5999, // Default port (change if needed)

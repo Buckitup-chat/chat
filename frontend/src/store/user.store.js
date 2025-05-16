@@ -9,6 +9,7 @@ import * as Y from 'yjs';
 //import { WebrtcProvider } from 'y-webrtc';
 import { IndexeddbPersistence } from '../libs/y-indexeddb';
 import { WebrtcProvider } from '../libs/y-webrtc';
+import { WebsocketProvider } from '../libs/y-websocket';
 import crypto from 'crypto-browserify';
 
 export const userStore = defineStore('user', () => {
@@ -69,7 +70,8 @@ export const userStore = defineStore('user', () => {
 		if (yJs.contactsObserver) yJs.contacts.unobserve(yJs.contactsObserver);
 		if (yJs.accountInfoWatcher) yJs.accountInfoWatcher();
 		if (yJs.contactsWatcher) yJs.contactsWatcher();
-		if (yJs.provider) yJs.provider.destroy();
+		if (yJs.rtc) yJs.rtc.destroy();
+		if (yJs.server) yJs.server.destroy();
 		if (yJs.persistence) yJs.persistence.destroy();
 		if (yJs.doc) yJs.doc.destroy();
 		for (const key in yJs) {
@@ -82,7 +84,7 @@ export const userStore = defineStore('user', () => {
 
 		yJs.doc = new Y.Doc();
 
-		yJs.persistence = new IndexeddbPersistence(`buckitup-${account.value.uid}`, yJs.doc, { encode, decode });
+		yJs.persistence = new IndexeddbPersistence(`buckitup-${account.value.address}`, yJs.doc, { encrypt, decrypt });
 		yJs.persistence.whenSynced.then(() => {
 			console.log(`Local storage loaded `);
 
@@ -163,43 +165,53 @@ export const userStore = defineStore('user', () => {
 				},
 				{ deep: true },
 			);
+
+			yJs.rtc = new WebrtcProvider(account.value.address, yJs.doc, {
+				signaling: [
+					//'ws://localhost:3951',
+					//'wss://signaling.yjs.dev',
+					'wss://buckitupss.appdev.pp.ua/signaling',
+				],
+				auth,
+			});
+			yJs.rtc.on('synced', () => {
+				console.log(`WebRTC peers synced`);
+				const accInf = yJs.account.get('accountInfo');
+				Object.assign(accountInfo, accInf);
+				yJs.contacts = yJs.doc.getMap('contacts');
+				const cont = yJs.contacts.toJSON();
+				Object.assign(contactsMap, cont);
+				if (options?.callback) {
+					options.callback();
+					options.callback = null;
+				}
+			});
+			yJs.rtc.on('peer-conn', async ({ peer, webrtcConn }) => {
+				const handshakeOk = await setupSharedSecretAuth(peer); // твоя логіка перевірки
+				if (!handshakeOk) {
+					console.warn('🚫 Peer failed handshake');
+					peer.destroy();
+					return;
+				}
+				console.log('✅ Peer verified');
+				webrtcConn._startSync(); // запускаємо sync вручну
+			});
+
+			yJs.server = new WebsocketProvider('wss://buckitupss.appdev.pp.ua/server', account.value.address, yJs.doc, { privateKey: account.value.privateKey });
 		});
 
-		yJs.provider = new WebrtcProvider(account.value.uid, yJs.doc, {
-			signaling: [
-				//'ws://localhost:3591',
-				//'wss://signaling.yjs.dev',
-				'wss://buckitupss.appdev.pp.ua/signaling',
-			],
-		});
+		// Sync clients with the y-websocket provider
 
-		yJs.provider.on('synced', () => {
-			console.log(`WebRTC peers synced`);
-			const accInf = yJs.account.get('accountInfo');
-			console.log('accInf', accInf);
-			Object.assign(accountInfo, accInf);
+		async function auth() {
+			const ts = Math.floor(Date.now() / 1000);
+			const room = account.value.address;
+			const message = `${room}:${ts}`;
+			const wallet = new Wallet(account.value.privateKey);
+			const sig = await wallet.signMessage(message);
+			return { sig, ts, room };
+		}
 
-			yJs.contacts = yJs.doc.getMap('contacts');
-
-			const cont = yJs.contacts.toJSON();
-			console.log('cont', cont);
-			Object.assign(contactsMap, cont);
-
-			encryptionManager.setData(toVaultFormat());
-		});
-
-		yJs.provider.on('peer-conn', async ({ peer, webrtcConn }) => {
-			const handshakeOk = await setupSharedSecretAuth(peer); // твоя логіка перевірки
-			if (!handshakeOk) {
-				console.warn('🚫 Peer failed handshake');
-				peer.destroy();
-				return;
-			}
-			console.log('✅ Peer verified');
-			webrtcConn._startSync(); // запускаємо sync вручну
-		});
-
-		function encode(data) {
+		function encrypt(data) {
 			if (data.length > 10) {
 				const keyBuffer = crypto.createHash('sha256').update(account.value.privateKey).digest();
 				const cipher = crypto.createCipheriv('aes-256-ctr', keyBuffer, Buffer.alloc(16, 0));
@@ -210,7 +222,7 @@ export const userStore = defineStore('user', () => {
 			}
 		}
 
-		function decode(data) {
+		function decrypt(data) {
 			if (data.length > 10) {
 				const keyBuffer = crypto.createHash('sha256').update(account.value.privateKey).digest();
 				const decipher = crypto.createDecipheriv('aes-256-ctr', keyBuffer, Buffer.alloc(16, 0));
@@ -222,46 +234,11 @@ export const userStore = defineStore('user', () => {
 		}
 	};
 
-	// --- Authentication using Shared Secret ---
-	//function setupSharedSecretAuth(conn) {
-	//	if (!conn) return;
-	//	const myChallenge = $enigma.generateSecurePassword(32);
-	//	conn.on('connect', () => {
-	//		// Це спрацює лише після повного peer-to-peer WebRTC зʼєднання
-	//		const mySignature = $enigma.signChallenge(myChallenge, account.value.privateKeyB64);
-	//		conn.send(
-	//			JSON.stringify({
-	//				type: 'shared-auth-init',
-	//				challenge: myChallenge,
-	//				signature: mySignature,
-	//			}),
-	//		);
-	//	});
-	//	conn.on('data', (data) => {
-	//		try {
-	//			const message = new TextDecoder().decode(data); // SimplePeer send → Uint8Array
-	//			const parsed = JSON.parse(message);
-	//			if (parsed.type === 'shared-auth-init') {
-	//				const publicKeyB64 = $enigma.recoverPublicKey(parsed.challenge, parsed.signature);
-	//				if (publicKeyB64 !== account.value.publicKeyB64) {
-	//					console.warn('❌ Shared secret verification failed. Disconnecting.');
-	//					conn.destroy();
-	//				} else {
-	//					console.log('✅ Peer verified with shared secret');
-	//				}
-	//			}
-	//		} catch (e) {
-	//			console.error('Failed to process shared auth', e);
-	//		}
-	//	});
-	//}
-
 	async function setupSharedSecretAuth(peer) {
 		return new Promise((resolve) => {
 			const myChallenge = $enigma.generateSecurePassword(32);
 			const mySignature = $enigma.signChallenge(new TextEncoder().encode(myChallenge), account.value.privateKeyB64);
 
-			// Очікуємо відповідь
 			peer.on('data', (raw) => {
 				try {
 					const data = JSON.parse(raw.toString());
@@ -275,7 +252,6 @@ export const userStore = defineStore('user', () => {
 				}
 			});
 
-			// Відправляємо
 			peer.send(
 				JSON.stringify({
 					type: 'shared-auth-init',
@@ -284,14 +260,6 @@ export const userStore = defineStore('user', () => {
 				}),
 			);
 		});
-	}
-
-	// --- Crypto helpers ---
-
-	function generateRoomNameFromSecret(secret) {
-		const hash = crypto.createHash('sha256');
-		hash.update(secret);
-		return hash.digest('hex');
 	}
 
 	const toVaultFormat = () => {
@@ -343,8 +311,9 @@ export const userStore = defineStore('user', () => {
 			const signature = await wallet.signMessage(privateKeyHex);
 			const meta = await web3Store().bukitupClient.generateKeysFromSignature(signature);
 			const combinedKeyPairB64 = $enigma.combineKeypair(privateKeyB64, publicKeyB64);
-			const uid = generateRoomNameFromSecret(privateKeyHex);
+
 			const account = {
+				wallet,
 				address: wallet.address,
 				privateKey: privateKeyHex,
 				privateKeyB64,
@@ -353,7 +322,6 @@ export const userStore = defineStore('user', () => {
 				metaPublicKey: meta.spendingKeyPair.account.publicKey,
 				metaPrivateKey: meta.spendingKeyPair.privatekey,
 				combinedKeyPairB64,
-				uid,
 			};
 
 			return account;

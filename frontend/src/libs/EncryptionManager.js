@@ -157,7 +157,9 @@ export class EncryptionManager extends EventTarget {
 	}
 
 	async disconnect() {
-		await this.setCurrentUser(false);
+		if (this.#vault) {
+			await this.setCurrentUser(false);
+		}
 		this.#vault = null;
 		this.isAuth = false;
 	}
@@ -247,6 +249,7 @@ export class EncryptionManager extends EventTarget {
 		try {
 			const registryKey = this.#isProduction ? 'vaults-registry' : 'test-vaults-registry';
 			const vaults = await this.#rawStore.get(registryKey);
+			console.log('setCurrentUser', isSet, vaults, this.#vault);
 			const updatedVaults = vaults.map((vault) => {
 				const isCurrent = vault.vaultId === this.#vault.id;
 				return {

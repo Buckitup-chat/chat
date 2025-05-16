@@ -26,6 +26,10 @@
 					<div>Account</div>
 				</div>
 
+				<div class="_menu_btn order-1" @click="navigateToHome">
+					<div class="fs-4">BE</div>
+				</div>
+
 				<!--div class="_menu_btn order-1" :class="{ _active: menu === 'backup' }" @click="menu = 'backup'">
 					<i class="_icon_share" :class="{ _active: menu === 'backup' }"></i>
 					<div>Share</div>
@@ -321,6 +325,11 @@ onMounted(async () => {
 		component.value = await defineAsyncComponent(() => import(`./views/${registry.component}.vue`));
 	}
 });
+
+const navigateToHome = () => {
+	// Change the browser location to `/` and reload the page
+	window.location.href = '/';
+};
 
 watch(
 	() => menu.value,

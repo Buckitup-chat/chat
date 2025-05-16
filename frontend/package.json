@@ -33,6 +33,7 @@
 		"ipfs-http-client": "^60.0.1",
 		"jssha": "^3.3.1",
 		"mitt": "^3.0.1",
+		"pako": "^2.1.0",
 		"pinia": "^3.0.1",
 		"qr-scanner": "^1.4.2",
 		"qrcode": "^1.5.4",
@@ -44,6 +45,7 @@
 		"vue-router": "^4.5.0",
 		"y-indexeddb": "^9.0.12",
 		"y-webrtc": "^10.3.0",
+		"y-websocket": "^3.0.0",
 		"yjs": "^13.6.26"
 	},
 	"devDependencies": {

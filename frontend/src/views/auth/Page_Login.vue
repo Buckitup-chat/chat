@@ -67,7 +67,7 @@ const mode = ref();
 onMounted(async () => {
 	await updateData();
 
-	if ($route.query.encryptionKey) {
+	if ($route.query.sessionId) {
 		mode.value = 'connect';
 		$mitt.emit('modal::open', { id: 'account_connect' });
 	} else if ($user.vaults.length) {

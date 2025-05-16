@@ -14,7 +14,7 @@
 		<button class="btn btn-outline-dark w-100 mt-3" @click="useManual()">Enter invitation manually</button>
 	</div>
 
-	<div class="px-3 w-100 mb-3 mt-3" v-if="mode === 'manual' && !encryptionKey">
+	<div class="px-3 w-100 mb-3 mt-3" v-if="mode === 'manual' && !sessionId">
 		<div class="text-center fw-bold text-secondary mt-2 mb-2">Enter invitation</div>
 
 		<div class="d-flex justify-content-center">
@@ -24,18 +24,15 @@
 		<button class="btn btn-outline-dark w-100 mt-3" @click="joinInvite()" :disabled="!invitationString">Next</button>
 	</div>
 
-	<div class="px-3 w-100 mb-3 mt-3" v-if="encryptionKey && !authenticated">
-		<div class="text-center fw-bold text-secondary mt-2 mb-3">Enter auth code from first device</div>
+	<div class="px-3 w-100 mb-3 mt-3" v-if="sessionId && authCode">
+		<div class="text-center fw-bold text-secondary mt-2 mb-3">Notify auth code to host device</div>
 
-		<div class="d-flex justify-content-center">
-			<input type="text" class="form-control _code_input" v-model="authCode" @keydown.enter="authenticate()" />
+		<div class="d-flex justify-content-center align-items-center _pointer">
+			<span class="fw-bold fs-1">{{ authCode }}</span>
 		</div>
-
-		<button class="btn btn-outline-dark w-100 mt-3" @click="authenticate()" :disabled="!authCode || isWaitingForSpace">Authenticate</button>
 	</div>
-
-	<div class="text-center fw-bold text-secondary mt-3 mb-2" v-if="isWaitingForSpace">Connecting...</div>
-	<div class="text-center fw-bold text-secondary mt-3 mb-2" v-if="decrypting">Authenticating...</div>
+	<div class="text-center fw-bold text-secondary mt-3 mb-2" v-if="approving">Awaiting approval...</div>
+	<div class="text-center fw-bold text-secondary mt-3 mb-2" v-if="syncing">Creating PassKey...</div>
 </template>
 
 <style lang="scss">
@@ -62,8 +59,10 @@
 </style>
 
 <script setup>
-import { ref, onMounted, inject } from 'vue';
+import { ref, onMounted, inject, onBeforeUnmount, onUnmounted } from 'vue';
 import QrScanner from 'qr-scanner';
+import Peer from 'simple-peer';
+//import { inflate } from 'pako';
 
 const qrScannerEl = ref();
 const qrScanner = ref();
@@ -82,27 +81,57 @@ const $swalModal = inject('$swalModal');
 const mode = ref();
 
 const scanning = ref();
-const authenticating = ref();
-const authenticated = ref();
-const decrypting = ref();
+const syncing = ref();
+const approving = ref();
 
 const invitationString = ref();
-const uid = ref();
 const authCode = ref();
-const encryptionKey = ref();
+const signal = ref();
+const sessionId = ref();
+let peer, socket;
 
 onMounted(async () => {
-	if ($route.query.encryptionKey) {
-		encryptionKey.value = decodeURIComponent($route.query.encryptionKey);
-		mode.value = 'manual';
+	console.log($route.query);
+	if ($route.query.sessionId) {
+		sessionId.value = $route.query.sessionId;
 		$router.replace({ query: {} });
-		joinInvite();
+		if (sessionId.value) {
+			mode.value = 'manual';
+			joinInvite();
+		}
+	} else {
+		useQr();
 	}
+});
+
+onUnmounted(async () => {
+	reset();
 });
 
 const useQr = async () => {
 	mode.value = 'qr';
 	startScan();
+};
+
+const reset = async () => {
+	if (socket) {
+		socket.close();
+		socket = null;
+	}
+	if (peer) {
+		peer.destroy();
+		peer = null;
+	}
+	if (qrScanner.value) {
+		await qrScanner.value.stop();
+		scanning.value = false;
+	}
+	invitationString.value = null;
+	mode.value = null;
+	approving.value = null;
+	syncing.value = null;
+	sessionId.value = null;
+	authCode.value = null;
 };
 
 const useManual = async () => {
@@ -117,53 +146,85 @@ const useManual = async () => {
 	}
 };
 
+const generateAuthCode = () => {
+	return Math.random().toString().slice(2, 8);
+};
+
 const joinInvite = async () => {
-	try {
-		if (invitationString.value) {
-			const params = new URL(invitationString.value).searchParams;
-			//uid.value = params.get('uid') || null;
-			encryptionKey.value = decodeURIComponent(params.get('encryptionKey')) || null;
-			authCode.value = params.get('authCode') || null;
-			console.log('🔑 Extracted Invitation', encryptionKey.value, authCode.value);
-		}
-
-		if (!encryptionKey.value) {
-			console.error('❌ No valid invitation code found.');
-			return;
-		}
-	} catch (error) {
-		console.error('authenticate error', error);
-		invitationString.value = null;
-
-		encryptionKey.value = null;
-		authCode.value = null;
+	if (invitationString.value && !sessionId.value) {
+		sessionId.value = new URL(invitationString.value).searchParams.get('sessionId');
 	}
-};
-//https://localhost:5173/login?encryptionKey=
-//lwuMN3m4GUiHNQjZYyDF92dQX8i2fKbqbRpm%2FPGlRrfceoCvc8Qx1MT%2ByZW0zVTB0TGlDQH9q4dzmP%2BUQ4ROg0dN2ZULXnSBFBm7uYnC13PHBDKmMRRsccsW6gGC
-//lwuMN3m4GUiHNQjZYyDF92dQX8i2fKbqbRpm/PGlRrfceoCvc8Qx1MT+yZW0zVTB0TGlDQH9q4dzmP+UQ4ROg0dN2ZULXnSBFBm7uYnC13PHBDKmMRRsccsW6gGC
-const authenticate = async () => {
-	if (authenticating.value || authenticated.value || !authCode.value) return;
-	authenticating.value = true;
-	try {
-		authenticated.value = true;
-		await decryptAccount();
-	} catch (error) {
-		console.error('authenticate error', error);
 
-		space.value = null;
-		invitation.value = null;
-	}
-	authenticating.value = false;
+	if (!sessionId.value) return;
+
+	console.log('sessionId.value', sessionId.value);
+
+	authCode.value = generateAuthCode();
+
+	socket = new WebSocket(CONNECTOR_URL);
+	//socket = new WebSocket('ws://localhost:3953');
+
+	socket.onopen = () => {
+		console.log('📡 socket.onopen');
+
+		peer = new Peer({
+			initiator: false,
+			trickle: true,
+			config: {
+				iceServers: [
+					{
+						urls: ['turn:135.181.151.155:3954?transport=udp'],
+						username: 'test',
+						credential: 'test',
+					},
+					{
+						urls: ['stun:135.181.151.155:3955'],
+					},
+				],
+			},
+		});
+
+		socket.send(JSON.stringify({ sessionId: sessionId.value, role: 'guest', ready: true }));
+
+		peer.on('signal', (signal) => {
+			console.log('📡 Sending answer to signaling server');
+			socket.send(JSON.stringify({ sessionId: sessionId.value, role: 'guest', signal }));
+		});
+
+		peer.on('connect', () => {
+			console.log('✅ Guest connected to host');
+			peer.send(JSON.stringify({ type: 'auth-request', authCode: authCode.value }));
+			approving.value = true;
+		});
+
+		peer.on('data', async (data) => {
+			console.log('📩 Guest received:', data.toString());
+			const msg = JSON.parse(data);
+			if (msg.encryptedKey) {
+				console.log('📩 Guest received privateKey:', msg.encryptedKey);
+
+				await syncAccount(msg);
+			}
+		});
+
+		socket.onmessage = (event) => {
+			console.log('📡 socket.onmessage');
+			const msg = JSON.parse(event.data);
+			if (msg.signal) {
+				console.log('📡 Guest received offer from host');
+				peer.signal(msg.signal);
+			}
+		};
+	};
 };
 
-const decryptAccount = async () => {
-	if (decrypting.value || !encryptionKey.value) return;
-	decrypting.value = true;
-	console.log('decryptAccount ', encryptionKey.value);
+const syncAccount = async (data) => {
+	if (syncing.value) return;
 	$loader.show();
+	syncing.value = true;
 	try {
-		const privateKey = $enigma.decryptDataSync(encryptionKey.value, authCode.value);
+		const privateKey = $enigma.decryptDataSync(data.encryptedKey, authCode.value);
+
 		console.log('decryptAccount account', privateKey);
 		const account = await $user.generateAccount(privateKey);
 		console.log('decryptAccount account', account);
@@ -181,31 +242,33 @@ const decryptAccount = async () => {
 						Account <strong>${accountInfo.name}</strong> already present on this device.
 						`,
 				});
+				syncing.value = false;
 				return;
 			}
 
 			$user.account = account;
-			await $user.openStorage();
-
 			$loader.show();
-
 			await $encryptionManager.createVault({
 				keyOptions: {
-					username: $user.accountInfo.name,
-					displayName: $user.accountInfo.name,
+					username: data.name,
+					displayName: data.name,
 				},
 				address: account.address,
 				publicKey: account.publicKey,
-				avatar: $user.accountInfo.avatar,
-				notes: $user.accountInfo.notes,
+				avatar: data.avatar,
+				notes: data.notes,
 			});
 
 			await $encryptionManager.setData($user.toVaultFormat());
+
+			$user.openStorage();
 
 			if (qrScanner.value && scanning.value) {
 				await qrScanner.value.stop();
 				scanning.value = false;
 			}
+
+			peer.send(JSON.stringify({ success: true }));
 
 			$mitt.emit('account::created');
 			$mitt.emit('modal::close');
@@ -220,7 +283,7 @@ const decryptAccount = async () => {
 		console.error('decryptAccount error', error);
 		$user.logout();
 	}
-	decrypting.value = false;
+	syncing.value = false;
 	$loader.hide();
 };
 
@@ -235,11 +298,11 @@ const startScan = async () => {
 				async (result) => {
 					if (!invitationString.value) {
 						invitationString.value = result.data;
-						await joinInvite();
-						if (encryptionKey.value) {
+						sessionId.value = new URL(invitationString.value).searchParams.get('sessionId');
+						if (sessionId.value) {
+							joinInvite();
 							await qrScanner.value.stop();
 							scanning.value = false;
-							authenticate();
 						}
 					}
 				},

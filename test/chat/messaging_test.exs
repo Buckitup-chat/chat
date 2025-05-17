@@ -1,9 +1,7 @@
 defmodule Chat.MessagingTest do
   use ExUnit.Case, async: true
 
-  alias Chat.Card
   alias Chat.DbKeys
-  alias Chat.Identity
   alias Chat.Messaging
   alias Chat.Utils.StorageId
 

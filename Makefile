@@ -4,7 +4,7 @@ help:
 	@clear
 	@grep -E '^[a-zA-Z_-]+:' Makefile | cut -f1 -d: | sort
 
-check:
+check: too_long
 	mix deps.clean mime --build
 	mix compile --warnings-as-errors --all-warnings
 	mix format --check-formatted

@@ -130,8 +130,8 @@ defmodule Chat.SignedParcel do
             ]
         }
 
-      x ->
-        x
+      _ ->
+        parcel
     end
   end
 

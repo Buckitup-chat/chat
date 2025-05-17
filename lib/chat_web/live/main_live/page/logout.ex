@@ -114,6 +114,7 @@ defmodule ChatWeb.MainLive.Page.Logout do
     |> assign(:rooms, nil)
     |> assign(:mode, nil)
     |> assign(:need_login, true)
+    |> push_event("clear", %{})
   end
 
   def close(%{assigns: %{}} = socket) do

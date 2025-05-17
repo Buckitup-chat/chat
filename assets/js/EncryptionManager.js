@@ -340,29 +340,29 @@ export class EncryptionManager extends EventTarget {
       const vaultId = await this.getVaultID();
       await this.#rawStore.remove("vault-id");
       
-      // Update the vaults registry to remove current status
+      // Update the vaults registry to remove the vault entry completely
       if (vaultId) {
          try {
             let vaultsRegistry = await this.#rawStore.get("vaults-registry");
             
-            // Only proceed if vaults registry exists
-            if (!vaultsRegistry) {
-               console.log("Vaults registry doesn't exist, skipping update on logout");
+            // Only proceed if vaults registry exists and has entries
+            if (!vaultsRegistry || !Array.isArray(vaultsRegistry)) {
+               console.log("Vaults registry doesn't exist or is empty, skipping update on logout");
                return;
             }
             
-            // Remove current status from the logged out vault
-            vaultsRegistry = vaultsRegistry.map(vault => {
-               if (vault.vaultId === vaultId) {
-                  return { ...vault, current: false };
-               }
-               return vault;
-            });
+            // Remove the vault entry completely from the registry
+            const initialLength = vaultsRegistry.length;
+            vaultsRegistry = vaultsRegistry.filter(vault => vault.vaultId !== vaultId);
             
-            await this.#rawStore.set("vaults-registry", vaultsRegistry);
-            console.log("Updated vaults registry on logout for vault:", vaultId);
+            if (initialLength !== vaultsRegistry.length) {
+               await this.#rawStore.set("vaults-registry", vaultsRegistry);
+               console.log("Removed vault from registry on logout:", vaultId);
+            } else {
+               console.log("Vault not found in registry during logout:", vaultId);
+            }
          } catch (error) {
-            console.error("Error updating vaults registry on logout:", error);
+            console.error("Error removing vault from registry on logout:", error);
          }
       }
    }

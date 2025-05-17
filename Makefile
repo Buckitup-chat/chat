@@ -13,6 +13,16 @@ check:
 	mix sobelow
 	MIX_ENV=test mix dialyzer
 
+## Check for files with more than 300 lines
+too_long:
+	@echo "Checking for files with more than 300 lines..."
+	@find lib test -type f \( -name "*.ex" -o -name "*.exs" -o -name "*.heex" \) \
+		-exec wc -l {} + | \
+		grep -v total | \
+		awk '$$1 > 300' | \
+		sort -n || \
+	echo "No files exceed 300 lines"
+
 ci-check: 
 	mix deps.clean mime --build
 	mix compile --warnings-as-errors

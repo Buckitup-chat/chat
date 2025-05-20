@@ -14,6 +14,9 @@ defmodule ChatWeb.Endpoint do
 
   socket "/proxy-socket", ChatWeb.ProxySocket, websocket: true, longpoll: false
 
+  # WebRTC signaling socket
+  socket "/webrtc-socket", ChatWeb.WebRTCSocket, websocket: true, longpoll: false
+
   # Serve at "/" the static files from "priv/static" directory.
   #
   # You should set gzip to true if you are running phx.digest

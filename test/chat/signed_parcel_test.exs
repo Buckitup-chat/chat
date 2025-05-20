@@ -28,7 +28,7 @@ defmodule ChatTest.SignedParcelTest do
 
     # Test prepare_for_broadcast for text message
     assert {:new_dialog_message, _, {_, %Chat.Dialogs.Message{type: :text}}} =
-      SignedParcel.prepare_for_broadcast(parcel)
+             SignedParcel.prepare_for_broadcast(parcel)
 
     # Test inject_next_index for text message
     injected = SignedParcel.inject_next_index(parcel)
@@ -57,7 +57,7 @@ defmodule ChatTest.SignedParcelTest do
 
     # Test prepare_for_broadcast for memo
     assert {:new_dialog_message, _, {_, %Chat.Dialogs.Message{type: :memo}}} =
-      SignedParcel.prepare_for_broadcast(parcel)
+             SignedParcel.prepare_for_broadcast(parcel)
 
     # Test inject_next_index for memo
     injected = SignedParcel.inject_next_index(parcel)
@@ -87,7 +87,7 @@ defmodule ChatTest.SignedParcelTest do
 
     # Test prepare_for_broadcast for room invite
     assert {:new_dialog_message, _, {_, %Chat.Dialogs.Message{type: :room_invite}}} =
-      SignedParcel.prepare_for_broadcast(parcel)
+             SignedParcel.prepare_for_broadcast(parcel)
 
     # Test inject_next_index for room invite
     injected = SignedParcel.inject_next_index(parcel)

@@ -32,7 +32,8 @@ defmodule Chat.User.UsersBroker do
 
   ## Defining GenServer Callbacks
 
-  def start_link(_opts), do: GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
+  def start_link(opts),
+    do: GenServer.start_link(__MODULE__, :ok, name: Keyword.get(opts, :name, __MODULE__))
 
   def init(_) do
     Process.flag(:sensitive, true)
@@ -53,7 +54,12 @@ defmodule Chat.User.UsersBroker do
   end
 
   def handle_call({:list, search_term}, _from, users) do
-    filtered = Enum.filter(users, &String.match?(&1.name, ~r/#{search_term}/i))
+    filtered =
+      Enum.filter(users, fn
+        %{name: nil} -> false
+        %{name: name} -> String.match?(name, ~r/#{search_term}/i)
+        _ -> false
+      end)
 
     users |> reply(filtered)
   end

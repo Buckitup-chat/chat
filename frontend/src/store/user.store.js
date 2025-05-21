@@ -86,12 +86,16 @@ export const userStore = defineStore('user', () => {
 
 		yJs.persistence = new IndexeddbPersistence(`buckitup-${account.value.address}`, yJs.doc, { encrypt, decrypt });
 		yJs.persistence.whenSynced.then(() => {
-			console.log(`Local storage loaded `);
+			console.log(`Local storage loaded `, options);
 
 			yJs.account = yJs.doc.getMap('account');
 			const accInf = yJs.account.get('accountInfo');
 
-			Object.assign(accountInfo, accInf || (options?.accountInfo ? options.accountInfo : {}));
+			if (accInf && (accInf.name || accInf.notes || accInf.avatar)) {
+				Object.assign(accountInfo, accInf);
+			} else {
+				Object.assign(accountInfo, options?.accountInfo ? options.accountInfo : {});
+			}
 
 			yJs.accountObserver = (event) => {
 				console.log('accountObserver', event);

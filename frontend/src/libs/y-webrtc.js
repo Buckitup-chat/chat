@@ -500,10 +500,6 @@ export class SignalingConn extends ws.WebsocketClient {
 
 		this.on('connect', async () => {
 			log(`connected (${url})`);
-			//const topics = Array.from(rooms.keys());
-			//this.send({ type: 'subscribe', topics });
-			//rooms.forEach((room) => publishSignalingMessage(this, room, { type: 'announce', from: room.peerId }));
-
 			// Send auth message for each provider's room
 			for (const provider of this.providers) {
 				const { sig, ts, room } = await provider.auth();

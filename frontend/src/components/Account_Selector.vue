@@ -110,6 +110,13 @@ const search = ref();
 onMounted(async () => {
 	$user.vaults = await $encryptionManager.getVaults();
 	selected.value = $user.account;
+
+	if ($user.vaults.length) {
+		let currentUser = $user.vaults.find((u) => u.current);
+		if (currentUser) {
+			select(currentUser);
+		}
+	}
 });
 
 const select = (account) => {

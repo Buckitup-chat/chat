@@ -40,79 +40,57 @@ window.BuckitUp = {
   manager: new EncryptionManager(),
   enigma: new Enigma(),
   tools: {
-    setVaultId: id => {
-      const req = indexedDB.open('keyval-store', 1);
-      req.onupgradeneeded = e => {
-        // Create object store without keyPath for out-of-line keys
-        e.target.result.createObjectStore('keyval');
-      };
-      req.onsuccess = e => {
-        const db = e.target.result;
-        const tx = db.transaction('keyval', 'readwrite');
-        const store = tx.objectStore('keyval');
-        // Use the key as first parameter and value as second parameter for out-of-line keys
-        const request = store.put(id, 'vault-id');
-        
-        request.onsuccess = () => console.log('✅ vault-id set to', id);
-        request.onerror = () => console.error('Failed to set vault-id:', request.error);
-        
-        tx.oncomplete = () => console.log('✅ Transaction completed successfully');
-        tx.onerror = () => console.error('Transaction error:', tx.error);
-      };
-      req.onerror = () => console.error('Database error:', req.error);
-    },
-    
     /**
      * Gets known users from vaults registry and adds them to BuckitUp.contacts
      * @returns {Promise<void>}
      */
-    getContactsFromVaultsRegistry: async function() {
+    getContactsFromVaultsRegistry: async function () {
       try {
         // Get vaults registry from local storage
         const vaultsRegistry = await window.BuckitUp.manager.getVaultsRegistry();
-        
+
         if (!vaultsRegistry || !Array.isArray(vaultsRegistry) || vaultsRegistry.length === 0) {
           console.log('No vaults registry found or empty registry');
           return;
         }
-        
+
         console.log(`Found ${vaultsRegistry.length} entries in vaults registry`);
-        
+
         // Find current vault to identify current user
         const currentVault = vaultsRegistry.find(vault => vault.current === true);
         if (!currentVault) {
           console.log('No current vault found in registry');
           return;
         }
-        
+
         // Initialize contacts if not present
         if (!window.BuckitUp.contacts) {
           window.BuckitUp.contacts = {};
         }
-        
+
         // Add each vault entry to contacts if not already present
         vaultsRegistry.forEach(vault => {
           // Skip current user's vault
           if (vault.vaultId === currentVault.vaultId) {
             return;
           }
-          
+
           if (vault.publicKey && vault.name) {
             // Remove 0x prefix if present
-            const publicKey = vault.publicKey.startsWith('0x') ? 
+            const publicKey = vault.publicKey.startsWith('0x') ?
               vault.publicKey.substring(2) : vault.publicKey;
-            
+
             // Add to contacts if not already present
             if (!window.BuckitUp.contacts[publicKey]) {
               window.BuckitUp.contacts[publicKey] = {
-                "name": vault.name,
+                "name": "vault: " + vault.name,
                 "address": vault.address || ""
               };
               console.log(`Added contact: ${vault.name}`);
             }
           }
         });
-        
+
         console.log(`Updated BuckitUp.contacts with ${Object.keys(window.BuckitUp.contacts).length} entries`);
       } catch (error) {
         console.error('Error adding contacts from vaults registry:', error);

@@ -64,6 +64,8 @@ defmodule ChatWeb.Router do
 
     live_session :default, on_mount: {ChatWeb.Hooks.SafariSessionHook, :default} do
       live "/", MainLive.Index, :index
+      live "/chats", MainLive.Index, :chats
+      live "/rooms", MainLive.Index, :rooms
       live "/room/:hash", MainLive.Index, :room_message_link
       live "/chat/:hash", MainLive.Index, :chat_link
       live "/export-key-ring/:id", MainLive.Index, :export

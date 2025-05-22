@@ -11,6 +11,18 @@ defmodule ChatWeb.MainLive.Page.LiveRouter do
       %{live_action: :room_message_link, room_message_link_hash: hash} ->
         socket |> Page.Room.init_with_linked_message(hash)
 
+      %{live_action: :chats} ->
+        Process.send_after(self(), {:push_patch, "/"}, 250)
+
+        socket
+        |> Page.Lobby.switch_lobby_mode("chats")
+
+      %{live_action: :rooms} ->
+        Process.send_after(self(), {:push_patch, "/"}, 250)
+
+        socket
+        |> Page.Lobby.switch_lobby_mode("rooms")
+
       _ ->
         socket
     end

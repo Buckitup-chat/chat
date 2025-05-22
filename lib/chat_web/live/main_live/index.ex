@@ -89,30 +89,33 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   @impl true
-  def handle_params(%{"hash" => hash}, _, %{assigns: %{live_action: :room_message_link}} = socket) do
-    socket
-    |> assign(:room_message_link_hash, hash)
-    |> then(fn socket ->
-      if connected?(socket) and not socket.assigns.need_login,
-        do: Page.LiveRouter.action(socket),
-        else: socket
-    end)
+  def handle_params(params, _, socket) do
+    live_action = Map.get(socket.assigns, :live_action)
+
+    case {live_action, params} do
+      {:room_message_link, %{"hash" => hash}} ->
+        socket
+        |> assign(:room_message_link_hash, hash)
+        |> route_action_when_logged_in()
+
+      {:chat_link, %{"hash" => hash}} ->
+        socket
+        |> assign(:chat_link, hash)
+        |> route_action_when_logged_in()
+
+      {:rooms, _} ->
+        socket
+        |> route_action_when_logged_in()
+
+      {:chats, _} ->
+        socket
+        |> route_action_when_logged_in()
+
+      _ ->
+        socket
+    end
     |> noreply()
   end
-
-  @impl true
-  def handle_params(%{"hash" => hash}, _, %{assigns: %{live_action: :chat_link}} = socket) do
-    socket
-    |> assign(:chat_link, hash)
-    |> then(fn socket ->
-      if connected?(socket) and not socket.assigns.need_login,
-        do: Page.LiveRouter.action(socket),
-        else: socket
-    end)
-    |> noreply()
-  end
-
-  def handle_params(_, _, socket), do: socket |> noreply()
 
   @impl true
   def handle_event("login", %{"login" => %{"name" => name}}, socket) do
@@ -588,6 +591,12 @@ defmodule ChatWeb.MainLive.Index do
     |> noreply()
   end
 
+  def handle_info({:push_patch, url}, socket) do
+    socket
+    |> push_patch(to: url)
+    |> noreply()
+  end
+
   def handle_progress(:my_keys_file, %{done?: true}, socket) do
     socket
     |> Page.ImportOwnKeyRing.read_file()
@@ -690,5 +699,11 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Logout.init()
     |> Page.Shared.track_onliners_presence()
     |> Page.LiveRouter.action()
+  end
+
+  defp route_action_when_logged_in(socket) do
+    if connected?(socket) and not socket.assigns.need_login,
+      do: Page.LiveRouter.action(socket),
+      else: socket
   end
 end

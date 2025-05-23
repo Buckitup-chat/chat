@@ -8,7 +8,7 @@
 
 				<div class="_menu_btn order-1" :class="{ _active: menu === 'rooms' }" @click="menu = 'rooms'">
 					<i class="_icon_rooms" :class="{ _active: menu === 'rooms' }"></i>
-					<div>Rooms</div>
+					<div>Rooms1</div>
 				</div>
 
 				<div class="_menu_btn order-1" :class="{ _active: menu === 'chats' }" @click="menu = 'chats'">

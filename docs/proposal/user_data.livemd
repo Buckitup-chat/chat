@@ -1,0 +1,317 @@
+## User Storage
+
+`[userArray, roomsArray, contactsObject, payloadObject]`
+
+* _userArray_ is `[name, fullKey]`
+* _name_ is a string of user name
+* _fullKey_ is base64 of binary concatenated private key (32 bytes) and public key (33 bytes, ASN.1)
+* _roomsArray_ is an array of _fullKeys_ for each allowed room
+* _contactsObject_ is an object with hex public key (33 bytes, ASN.1) and _contactInfoObject_ as value
+* _contactInfoObject_ contains at least `name` attribute
+* _payloadObject_ is an object with any additional data
+
+Populated it will look like
+
+```json
+[
+  ["Charlie", "ioEcyG8l50iIqU/pRaK42Ed6Bl/RRobvVZuCNPlVvT8Dp59rb9LrIPasGtNRBD4EeU/QvPxgnwvqpu3BVSbPsSk="],
+  ["FraUpj7c/hRyUcoZKkKFiDPy3CtDtLqqCOXvmdtBH9IDKuFPJ2/MGGA0VQ0XnLfR0ATJj3NTpW6iw1hzJi6IQrc=", "8H0d4d+P43yCaIwxjTMiYKz6py4GZkvQruvZLr4WKJoCVe4nCUVV7nlXIGJ1A9RPjne1nQB1TUiXflGrJTLmxhE=", "rcxtZWF+v5EOW1hSxWxVaCtA1oE6hCJ+FhmC1bKHpUkDTQluXEkZ5sNXcD1Xh8ylQrrw9hofrG/y0u3qO9oSYyE="],
+  {
+    "02c6c6f5c8d2854896893977f8c0466ccc6d0490bfc77e60c34d0cf6d6b1057d9e": {name: "Alice"},
+    "02671f665cdee15d10b938ca601a866b6bfe3efbcd06019b4cfb38ebde1926f492": {name: "Bob"}
+  }, 
+  {}
+]
+```
+This is the format used in user key backup file and to pass user info from frontend to backend.
+
+## Actor Storage and Persistence (.data File Creation)
+
+The `Chat.Actor` module represents a user in the system and is responsible for managing user identity, rooms, contacts, and associated payload data. When a user logs out, their actor data is serialized and saved as a `.data` file for backup purposes.
+
+### Actor Data Structure
+
+The `Chat.Actor` struct consists of the following fields:
+
+```elixir
+defstruct [:me, rooms: [], contacts: %{}, payload: %{}]
+```
+
+Where:
+- `me`: A `Chat.Identity` struct containing the user's identity information (name and keys)
+- `rooms`: A list of room identities the user has access to
+- `contacts`: A map of contacts with public keys as keys and contact info as values
+- `payload`: Additional payload data associated with the user
+
+### Key Structure and Combination
+
+The user identity (represented by the `me` field) consists of a name and a "fullKey". The fullKey is constructed by combining the private and public keys:
+
+```elixir
+# Elixir side: Chat.Identity holds the keys
+defmodule Chat.Identity do
+  defstruct [:priv_key, :pub_key, :name]
+  
+  # When serializing to strings, the private and public keys are combined
+  def to_strings(%__MODULE__{name: name, priv_key: priv_key, pub_key: pub_key}) do
+    [name, priv_key <> pub_key |> Base.encode64()]
+  end
+  
+  # When deserializing, the combined key is split back into private and public parts
+  def from_strings([name, full_key]) do
+    full_key = full_key |> Base.decode64!()
+    <<priv_key::binary-size(32), pub_key::binary>> = full_key
+    %__MODULE__{name: name, priv_key: priv_key, pub_key: pub_key}
+  end
+end
+```
+
+In JavaScript, this same combination process is implemented in the `enigma.js` library:
+
+```javascript
+// Combines private and public keys into a single Base64-encoded string
+export const combineKeypair = (privateKeyB64, publicKeyB64) => {
+  const combined = new Uint8Array(32 + 33);
+  const privateKeyArray = base64ToArray(privateKeyB64);
+  const publicKeyArray = base64ToArray(publicKeyB64);
+  combined.set(privateKeyArray, 0);     // First 32 bytes = private key
+  combined.set(publicKeyArray, 32);     // Last 33 bytes = public key
+  return arrayToBase64(combined);       // Return as base64 string
+};
+
+// Splits a combined key back into private and public parts
+export const splitKeypair = (combinedKeyBase64) => {
+  const combinedArray = base64ToArray(combinedKeyBase64);
+  const privateKeyArray = combinedArray.slice(0, 32);
+  const publicKeyArray = combinedArray.slice(32);
+  return {
+    privateKey: arrayToBase64(privateKeyArray),
+    publicKey: arrayToBase64(publicKeyArray)
+  };
+};
+```
+
+Thus, when serialized, the user identity is represented as a simple array with two elements: `["username", "base64EncodedCombinedKey"]`
+
+### Actor Serialization Process
+
+The actor data is serialized to JSON using the following steps:
+
+1. The `Actor.to_json/1` function converts the Actor struct to a JSON-encodable format:
+   ```elixir
+   def to_json(%__MODULE__{me: %Identity{} = identity, rooms: rooms, contacts: contacts, payload: payload}) do
+     [
+       identity |> Identity.to_strings(),
+       rooms |> Enum.map(&(&1 |> Identity.priv_key_to_string())),
+       contacts,
+       payload
+     ]
+     |> Jason.encode!()
+   end
+   ```
+
+2. For secure storage, the data can be optionally encrypted using the `Actor.to_encrypted_json/2` function:
+   ```elixir
+   def to_encrypted_json(%__MODULE__{} = actor, password) when password in ["", nil, false],
+     do: to_json(actor)
+
+   def to_encrypted_json(%__MODULE__{} = actor, password) do
+     actor
+     |> to_json()
+     |> Enigma.cipher(password |> Enigma.hash())
+   end
+   ```
+
+### .data File Creation
+
+The `.data` file is generated during the user logout process. It works as follows:
+1. A new Actor instance is created with the user's identity and rooms
+2. The Actor is converted to encrypted JSON using the user's password
+3. The encrypted data is stored with a filename of "[username].data"
+4. The data is stored via the Broker system and a key is returned
+5. The user is redirected to download the backup file
+
+### Encryption Algorithm
+
+The encryption of the Actor data uses the `Enigma.cipher/2` function, which ultimately calls the Blowfish cipher in CFB mode. The process involves:
+
+1. The password is hashed using SHA3-256
+2. The hash is used as the key for the Blowfish cipher
+3. The cipher is applied to the JSON data using crypto_one_time
+
+The decryption process is the reverse, using `Enigma.decipher/2` to restore the original JSON data.
+
+## JavaScript Implementation
+
+The following is a JavaScript implementation that can serialize, encrypt, and save Actor data in the same format as the Elixir backend. This utilizes the `enigma.js` library to handle the cryptographic operations:
+
+```javascript
+// Example JavaScript implementation for Actor serialization and encryption
+
+import * as enigma from './libs/enigma.js';
+
+/**
+ * Serialize actor data to JSON format compatible with Elixir implementation
+ * 
+ * @param {Object} user - User identity with name and keys
+ * @param {Array} rooms - Array of room identities
+ * @param {Object} contacts - Map of contacts
+ * @param {Object} payload - Additional payload data
+ * @returns {String} - JSON string representation of actor data
+ */
+function actorToJson(user, rooms, contacts = {}, payload = {}) {
+  // Format compatible with Chat.Actor.to_json/1
+  const data = [
+    user,              // User identity as [name, fullKey]
+    rooms,             // Array of room private keys
+    contacts,          // Contacts object
+    payload            // Additional payload
+  ];
+  
+  return JSON.stringify(data);
+}
+
+/**
+ * Encrypt actor data using password for secure storage
+ * 
+ * @param {Object} user - User identity with name and keys
+ * @param {Array} rooms - Array of room identities
+ * @param {Object} contacts - Map of contacts
+ * @param {Object} payload - Additional payload data
+ * @param {String} password - Password for encryption (optional)
+ * @returns {String} - Encrypted JSON string
+ */
+function actorToEncryptedJson(user, rooms, contacts = {}, payload = {}, password = null) {
+  // Convert actor to JSON string
+  const jsonData = actorToJson(user, rooms, contacts, payload);
+  
+  // If no password provided, return unencrypted data
+  if (!password) {
+    return jsonData;
+  }
+  
+  // Hash the password (equivalent to Enigma.hash in Elixir)
+  const hashedPassword = enigma.hash(enigma.stringToBase64(password));
+  
+  // Encrypt the data (equivalent to Enigma.cipher in Elixir)
+  return enigma.encryptData(enigma.stringToBase64(jsonData), hashedPassword);
+}
+
+/**
+ * Save actor data as a downloadable .data file
+ * 
+ * @param {Object} user - User identity with name and keys
+ * @param {Array} rooms - Array of room identities
+ * @param {Object} contacts - Map of contacts
+ * @param {Object} payload - Additional payload data
+ * @param {String} password - Password for encryption (optional)
+ */
+function saveActorAsDataFile(user, rooms, contacts = {}, payload = {}, password = null) {
+  // Get user name from identity
+  const userName = user[0];
+  
+  // Encrypt the actor data
+  const encryptedData = actorToEncryptedJson(user, rooms, contacts, payload, password);
+  
+  // Create a Blob with the encrypted data
+  const blob = new Blob([encryptedData], { type: 'application/octet-stream' });
+  
+  // Create a download link
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${userName}.data`;
+  
+  // Trigger the download
+  document.body.appendChild(a);
+  a.click();
+  
+  // Cleanup
+  URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
+/**
+ * Decrypt and parse actor data from a .data file
+ * 
+ * @param {String} data - Data from .data file (may be encrypted or plaintext)
+ * @param {String} password - Password for decryption (if needed)
+ * @returns {Object} - Parsed actor data
+ */
+function actorFromEncryptedJson(data, password = null) {
+  let jsonData = data;
+  
+  // Auto-detect if the data is encrypted by checking if it starts with [[
+  // Plain text JSON data will start with [[ for the Actor format
+  const isEncrypted = !data.startsWith('[[');
+  
+  // Only attempt decryption if the data appears to be encrypted and password is provided
+  if (isEncrypted && password) {
+    try {
+      // Hash the password
+      const hashedPassword = enigma.hash(enigma.stringToBase64(password));
+      
+      // Decrypt the data (equivalent to Enigma.decipher in Elixir)
+      const decryptedBase64 = enigma.decryptData(data, hashedPassword);
+      jsonData = enigma.base64ToString(decryptedBase64);
+      
+      // Verify the decrypted data has the expected format
+      if (!jsonData.startsWith('[[')) {
+        throw new Error('Decryption failed or invalid data format');
+      }
+    } catch (error) {
+      console.error('Failed to decrypt data:', error);
+      throw new Error('Invalid password or corrupted data');
+    }
+  } else if (isEncrypted && !password) {
+    throw new Error('Password required for encrypted data');
+  }
+  
+  // Parse the JSON data
+  const parsedData = JSON.parse(jsonData);
+  
+  // Extract components
+  const [user, rooms, contacts = {}, payload = {}] = parsedData;
+  
+  return {
+    user,
+    rooms,
+    contacts,
+    payload
+  };
+}
+
+// Example usage
+const exampleUsage = () => {
+  // Example user identity - [name, fullKey]
+  // The fullKey is a combined private and public key created using combineKeypair
+  // fullKey structure: 32 bytes of private key + 33 bytes of public key in ASN.1 format
+  const privateKey = "eBDdzuRnQLxDK+pDOK1HqOh0KJaNrnRH/p6YucR8f2c="; // 32 bytes private key in base64
+  const publicKey = "A6VPYv+6+IZ20vFqBY00I8vmCxNaFRr6EOYK6I/ap78Q"; // 33 bytes public key in base64
+  
+  // Combine them to create fullKey (equivalent to enigma.combineKeypair)
+  // const fullKey = enigma.combineKeypair(privateKey, publicKey);
+  const fullKey = "eBDdzuRnQLxDK+pDOK1HqOh0KJaNrnRH/p6YucR8f2cD6VPYv+6+IZ20vFqBY00I8vmCxNaFRr6EOYK6I/ap78Q=";
+  
+  // User array format: [name, fullKey]
+  const user = ["Alice", fullKey];
+  
+  // Example room keys
+  const rooms = [
+    "FraUpj7c/hRyUcoZKkKFiDPy3CtDtLqqCOXvmdtBH9IDKuFPJ2/MGGA0VQ0XnLfR0ATJj3NTpW6iw1hzJi6IQrc=",
+    "8H0d4d+P43yCaIwxjTMiYKz6py4GZkvQruvZLr4WKJoCVe4nCUVV7nlXIGJ1A9RPjne1nQB1TUiXflGrJTLmxhE="
+  ];
+  
+  // Example contacts
+  const contacts = {
+    "02c6c6f5c8d2854896893977f8c0466ccc6d0490bfc77e60c34d0cf6d6b1057d9e": {name: "Bob"},
+    "02671f665cdee15d10b938ca601a866b6bfe3efbcd06019b4cfb38ebde1926f492": {name: "Charlie"}
+  };
+  
+  // Example password for encryption
+  const password = "SecurePassword123";
+  
+  // Save the actor data as a .data file
+  saveActorAsDataFile(user, rooms, contacts, {}, password);
+};
+```

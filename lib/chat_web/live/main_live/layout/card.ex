@@ -58,13 +58,15 @@ defmodule ChatWeb.MainLive.Layout.Card do
         end
       }
     >
-      <%= if @reverse? do %>
-        <div class={@name_style}>{@card.name}</div>
-        <tt class={"ml-1 #{@hash_style}"}>[{Enigma.short_hash(@card)}]</tt>
-      <% else %>
-        <tt class={@hash_style}>[{Enigma.short_hash(@card)}]</tt>
-        <div class={"ml-1 #{@name_style}"}>{@card.name}</div>
-      <% end %>
+      <.vue
+        v-component="Card"
+        name={@card.name || ""}
+        hash={Enigma.short_hash(@card)}
+        publicKey={@card.pub_key |> Base.encode16(case: :lower)}
+        reverse={@reverse?}
+        nameStyle={@name_style}
+        hashStyle={@hash_style}
+      />
       <%= if @is_me? do %>
         <div class="text-sm t-my-notes ml-1 font-medium">(My notes)</div>
       <% end %>

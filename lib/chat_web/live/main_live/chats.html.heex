@@ -94,9 +94,9 @@
           <Layout.Card.hashed_name card={@peer} style_spec={:chat_header} show_link?={true} />
         <% else %>
           <Layout.Card.hashed_name card={@peer} style_spec={:chat_header} show_link?={true} />
-          <button>
+          <.vue v-component="ContactLink" publicKey={@peer.pub_key |> Base.encode16(case: :lower)}>
             <.icon id="edit" class="w-4 h-4 ml-1 flex fill-white/50" />
-          </button>
+          </.vue>
         <% end %>
       </div>
       <div>

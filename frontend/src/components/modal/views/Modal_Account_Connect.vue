@@ -261,7 +261,13 @@ const syncAccount = async (data) => {
 
 			await $encryptionManager.setData($user.toVaultFormat());
 
-			$user.openStorage();
+			$user.openStorage({
+				accountInfo: {
+					name: data.name,
+					notes: data.notes,
+					avatar: data.avatar,
+				},
+			});
 
 			if (qrScanner.value && scanning.value) {
 				await qrScanner.value.stop();

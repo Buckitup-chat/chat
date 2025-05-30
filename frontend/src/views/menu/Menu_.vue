@@ -6,12 +6,12 @@
 					<div class="_icon_logo"></div>
 				</div>
 
-				<div class="_menu_btn order-1" :class="{ _active: menu === 'rooms' }" @click="menu = 'rooms'">
+				<div class="_menu_btn order-1" :class="{ _active: menu === 'rooms' }" @click="navigateToRooms()">
 					<i class="_icon_rooms" :class="{ _active: menu === 'rooms' }"></i>
 					<div>Rooms</div>
 				</div>
 
-				<div class="_menu_btn order-1" :class="{ _active: menu === 'chats' }" @click="menu = 'chats'">
+				<div class="_menu_btn order-1" :class="{ _active: menu === 'chats' }" @click="navigateToChats()">
 					<i class="_icon_chats" :class="{ _active: menu === 'chats' }"></i>
 					<div>Chats</div>
 				</div>
@@ -329,6 +329,14 @@ onMounted(async () => {
 const navigateToHome = () => {
 	// Change the browser location to `/` and reload the page
 	window.location.href = '/';
+};
+
+const navigateToRooms = () => {
+	window.location.href = 'https://buckitup.xyz/rooms';
+};
+
+const navigateToChats = () => {
+	window.location.href = 'https://buckitup.xyz/chats';
 };
 
 watch(

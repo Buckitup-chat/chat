@@ -88,6 +88,8 @@ You are Windsurf Cascade, an AI assistant with advanced problem-solving capabili
 ### Core Technologies
 - Elixir
 - Phoenix
+- LiveView
+- LiveVue
 ### Frontend
 - Vue.js
 - Tailwind CSS
@@ -121,6 +123,11 @@ You are Windsurf Cascade, an AI assistant with advanced problem-solving capabili
 - use tailwindcss for styling
 - use elixir for backend development
 
+# LiveVue specific rules
+
+ - Use LiveVue for frontend in `assets/vue` directory
+ - Analyze LiveVue documentation and examples to understand how to use it
+ 
 # Vue frontend specific rules
 
 The project has `frontend/` directory for user management frontend  application.

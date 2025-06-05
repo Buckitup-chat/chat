@@ -109,6 +109,12 @@ defmodule ChatWeb.Router do
     forward "/naive_api_console", Absinthe.Plug.GraphiQL, schema: NaiveApi.Schema
   end
 
+  scope "/storage-api/", ChatWeb do
+    get "/confirmation-token", StorageApiController, :confirmation_token
+    post "/put", StorageApiController, :put
+    get "/dump", StorageApiController, :dump
+  end
+
   # Other scopes may use custom stacks.
   # scope "/api", ChatWeb do
   #   pipe_through :api

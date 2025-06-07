@@ -23,7 +23,7 @@ config :chat, ChatWeb.Endpoint,
   ]
 
 config :live_vue,
-  vite_host: "http://localhost:5173",
+  vite_host: "http://localhost:4173",
   ssr_module: LiveVue.SSR.ViteJS,
   # if you want to disable SSR by default, make it false
   ssr: false

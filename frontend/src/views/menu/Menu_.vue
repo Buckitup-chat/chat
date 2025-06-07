@@ -30,6 +30,11 @@
 					<div class="fs-4">BE</div>
 				</div>
 
+				<div class="_menu_btn order-1" :class="{ _active: $route.path === '/storage-api-client' }" @click="$router.push('/storage-api-client')">
+					<i class="_icon_share" :class="{ _active: $route.path === '/storage-api-client' }"></i>
+					<div>storage</div>
+				</div>
+
 				<!--div class="_menu_btn order-1" :class="{ _active: menu === 'backup' }" @click="menu = 'backup'">
 					<i class="_icon_share" :class="{ _active: menu === 'backup' }"></i>
 					<div>Share</div>
@@ -349,6 +354,7 @@ watch(
 			if ($route.name.includes('room')) menu.value = 'rooms';
 			if ($route.name.includes('chat')) menu.value = 'chats';
 			if ($route.name.includes('account') || $route.name.includes('backup')) menu.value = 'account';
+			if ($route.name === 'storage_api_client') menu.value = null;
 		}
 	},
 );

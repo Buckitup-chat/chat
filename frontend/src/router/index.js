@@ -55,6 +55,12 @@ const routes = [
 		meta: { auth: true, name: 'Contact' },
 	},
 	{
+		path: '/storage-api-client',
+		name: 'storage_api_client',
+		component: () => import('../views/storage/Page_Storage_Api.vue'),
+		meta: { auth: true, name: 'Storage API Client' },
+	},
+	{
 		path: '/account',
 		name: 'account',
 		meta: { auth: true, name: 'Account' },

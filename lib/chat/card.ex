@@ -6,6 +6,7 @@ defmodule Chat.Card do
   alias Chat.Identity
 
   @derive {Inspect, only: [:name]}
+  @derive {Jason.Encoder, only: [:name, :hash]}
   defstruct [:name, :pub_key, :hash]
 
   def from_identity(%Identity{name: name} = identity) do

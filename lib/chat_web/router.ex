@@ -110,6 +110,8 @@ defmodule ChatWeb.Router do
   end
 
   scope "/storage-api/", ChatWeb do
+    pipe_through :api
+
     get "/confirmation-token", StorageApiController, :confirmation_token
     post "/put", StorageApiController, :put
     get "/dump", StorageApiController, :dump

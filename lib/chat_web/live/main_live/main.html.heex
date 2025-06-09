@@ -8,7 +8,11 @@
 <% else %>
   <%= if @need_login do %>
     <%= if @handshaked do %>
-      <.login skip_user_creation={assigns[:skip_user_creation]} />
+      <.login
+        skip_user_creation={assigns[:skip_user_creation]}
+        vue_test_count={assigns[:vue_test_count]}
+        socket={@socket}
+      />
     <% else %>
       <.loading_screen />
     <% end %>

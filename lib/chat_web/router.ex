@@ -114,6 +114,7 @@ defmodule ChatWeb.Router do
 
     get "/confirmation-token", StorageApiController, :confirmation_token
     post "/put", StorageApiController, :put
+    post "/put-many", StorageApiController, :put_many
     get "/dump", StorageApiController, :dump
   end
 

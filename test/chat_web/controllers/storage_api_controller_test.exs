@@ -43,6 +43,56 @@ defmodule ChatWeb.StorageApiControllerTest do
     Db.delete(db_key)
   end
 
+  test "with put_many I can store multiple items under my pubkey namespace", %{conn: conn} do
+    {private_key, public_key_bin} = generate_user_keys()
+
+    items = [
+      {["test_payload_1", System.unique_integer([:positive])],
+       %{
+         "message" => "store this securely! #1",
+         "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601()
+       }},
+      {["test_payload_2", System.unique_integer([:positive])],
+       %{
+         "message" => "store this securely! #2",
+         "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601()
+       }}
+    ]
+
+    # Create items to save
+    items_json =
+      items
+      |> Enum.map(fn {key, value} ->
+        %{"key" => key, "value" => value}
+      end)
+
+    {token_key, digest} = get_confirmation_token(conn)
+
+    # Call put_many endpoint
+    conn_put =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> post(
+        Routes.storage_api_path(conn, :put_many,
+          pub_key: public_key_bin |> Base.encode16(case: :lower),
+          token_key: token_key,
+          signature: digest |> Enigma.sign(private_key) |> Base.encode16(case: :lower)
+        ),
+        Jason.encode!(items_json)
+      )
+
+    # Assert successful response
+    assert %{"status" => "success", "items_saved" => 2} = json_response(conn_put, 200)
+
+    # Verify items were stored correctly
+    items
+    |> Enum.each(fn {key, value} ->
+      db_key = {:storage, public_key_bin, key}
+      assert value == Db.get(db_key), "Expected DB value to match payload"
+      Db.delete(db_key)
+    end)
+  end
+
   test "with dump I can retrieve all info stored under my pubkey namespace", %{conn: conn} do
     {private_key, public_key_bin} = generate_user_keys()
 

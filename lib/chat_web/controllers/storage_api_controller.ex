@@ -2,6 +2,9 @@ defmodule ChatWeb.StorageApiController do
   use ChatWeb, :controller
 
   alias Chat.Broker
+  alias Chat.Card
+  alias Chat.Db
+  alias Chat.User
 
   @doc """
   Generates a confirmation token for API authentication.
@@ -49,10 +52,11 @@ defmodule ChatWeb.StorageApiController do
          {:ok, signature} <- Base.decode16(signature_hex, case: :lower),
          token <- Broker.get(token_key),
          false <- is_nil(token) && {:error, "Invalid or expired token key"},
-         true <- Enigma.valid_sign?(signature, token, pub_key) || {:error, "Invalid signature"} do
+         true <- Enigma.valid_sign?(signature, token, pub_key) || {:error, "Invalid signature"},
+         %Card{} <- User.by_id(pub_key) || {:error, "User not found"} do
       db_key = {:storage, pub_key, key}
-      Chat.Db.put(db_key, value)
-      Chat.Db.Copying.await_written_into([db_key], Chat.Db.db())
+      Db.put(db_key, value)
+      Db.Copying.await_written_into([db_key], Db.db())
 
       json(conn, %{status: "success"})
     else
@@ -80,12 +84,13 @@ defmodule ChatWeb.StorageApiController do
          {:ok, signature} <- Base.decode16(signature_hex, case: :lower),
          token <- Broker.get(token_key),
          false <- is_nil(token) && {:error, "Invalid or expired token key"},
-         true <- Enigma.valid_sign?(signature, token, pub_key) || {:error, "Invalid signature"} do
+         true <- Enigma.valid_sign?(signature, token, pub_key) || {:error, "Invalid signature"},
+         %Card{} <- User.by_id(pub_key) || {:error, "User not found"} do
       # Query all data with key pattern {:storage, pub_key, _}
       min_key = {:storage, pub_key, nil}
       max_key = {:storage, pub_key <> "\0", nil}
 
-      values = Chat.Db.list({min_key, max_key})
+      values = Db.list({min_key, max_key})
 
       # Format the result
       result =

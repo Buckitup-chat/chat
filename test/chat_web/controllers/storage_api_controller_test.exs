@@ -1,6 +1,9 @@
 defmodule ChatWeb.StorageApiControllerTest do
   use ChatWeb.ConnCase, async: true
 
+  alias Chat.Db
+  alias Chat.User
+
   test "confirmation_token/2 returns a base64 encoded version of token in Chat.Broker", %{
     conn: conn
   } do
@@ -11,7 +14,7 @@ defmodule ChatWeb.StorageApiControllerTest do
 
   test "with put I can store some info under my pubkey namespace", %{conn: conn} do
     {token_key, digest} = get_confirmation_token(conn)
-    {private_key, public_key_bin} = Enigma.generate_keys()
+    {private_key, public_key_bin} = generate_user_keys()
 
     payload_key = ["test_payload", System.unique_integer([:positive])]
 
@@ -20,19 +23,28 @@ defmodule ChatWeb.StorageApiControllerTest do
       "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601()
     }
 
-    conn_put = put_payload(conn, token_key, digest, public_key_bin, payload_key, payload_value, private_key)
+    conn_put =
+      put_payload(
+        conn,
+        token_key,
+        digest,
+        public_key_bin,
+        payload_key,
+        payload_value,
+        private_key
+      )
 
     assert %{"status" => "success"} = json_response(conn_put, 200)
 
     db_key = {:storage, public_key_bin, payload_key}
 
-    assert payload_value == Chat.Db.get(db_key), "Expected DB value to match payload"
+    assert payload_value == Db.get(db_key), "Expected DB value to match payload"
 
-    Chat.Db.delete(db_key)
+    Db.delete(db_key)
   end
 
   test "with dump I can retrieve all info stored under my pubkey namespace", %{conn: conn} do
-    {private_key, public_key_bin} = Enigma.generate_keys()
+    {private_key, public_key_bin} = generate_user_keys()
 
     p1_key = ["p1", System.unique_integer([:positive])]
     p2_key = ["p0", System.unique_integer([:positive])]
@@ -77,8 +89,8 @@ defmodule ChatWeb.StorageApiControllerTest do
              "value" => p2_value
            } in response
 
-    Chat.Db.delete({:storage, public_key_bin, p1_key})
-    Chat.Db.delete({:storage, public_key_bin, p2_key})
+    Db.delete({:storage, public_key_bin, p1_key})
+    Db.delete({:storage, public_key_bin, p2_key})
   end
 
   defp get_confirmation_token(conn) do
@@ -111,5 +123,13 @@ defmodule ChatWeb.StorageApiControllerTest do
         "value" => payload_value
       }
     )
+  end
+
+  defp generate_user_keys do
+    identity = User.login("test_user") |> tap(&User.register/1)
+
+    Db.Copying.await_written_into([{:users, identity.public_key}], Db.db())
+
+    {identity.private_key, identity.public_key}
   end
 end

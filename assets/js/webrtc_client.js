@@ -67,7 +67,7 @@ class WebRTCClient {
     const defaults = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        // Add your TURN/STUN servers here if needed
+        // Add your TURN/STUN servers here if needed stun:buckitup.xyz:3478
       ]
     };
     

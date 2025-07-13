@@ -118,9 +118,11 @@ defmodule ChatWeb.MainLive.Layout.Message do
   def text(%{msg: %{type: :memo}} = assigns) do
     ~H"""
     <div class="px-4 w-full">
-      <span class="flex-initial break-words">
-        {nl2br(@msg.memo)}
-      </span>
+      <.vue v-component="LinkedText">
+        <span class="flex-initial break-words">
+          {nl2br(@msg.memo)}
+        </span>
+      </.vue>
     </div>
     """
   end
@@ -128,9 +130,11 @@ defmodule ChatWeb.MainLive.Layout.Message do
   def text(%{msg: %{type: :text}} = assigns) do
     ~H"""
     <div class="px-4 w-full">
-      <span class="flex-initial break-words">
-        {nl2br(@msg.content)}
-      </span>
+      <.vue v-component="LinkedText">
+        <span class="flex-initial break-words">
+          {nl2br(@msg.content)}
+        </span>
+      </.vue>
     </div>
     """
   end

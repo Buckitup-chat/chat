@@ -5,31 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased] - yyyy-mm-dd
+## [Unreleased]
 
 Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
 ### Added
- - Spam-less rooms [#600]
+
+- Spam-less rooms [#600]
+- Proxy functionality for room requests and dialogs
+- Room approval system with personal channels
+- Frontend Vue application integration
+- Vault support for secure storage
+- PassKey authentication with localStorage fallback [#593]
+- Legal notices, privacy policy and terms editor [#571]
+- Room signature verification for improved security
 
 ### Changed
+
+- Enhanced proxy broadcast mechanism
+- Improved message handling with client-side timestamps
+- Optimized messaging preload on new message render
+- Code style improvements and reformatting
+- Updated Node.js and esbuild versions
+- Updated Elixir version and libraries
+- Hosting configuration for eco environment
+- Improved gallery operations and image handling
 
 ### Fixed
 
+- Windows scrolling issues
+- Message date and timestamp handling
+- Dialog file URLs in proxy
+- Flanky tests
+- User login and registration flows
+- HTTPS and certificate configurations
+- File corruption during transmission
+- Authentication with key uploading
 
-## 2024-04-08_ef99bc7___2024-04-16_79e8ce2
+## 2024-04-08_ef99bc7\_\_\_2024-04-16_79e8ce2
 
 ### Added
+
 - ZeroTier support [#425]
 
 ### Changed
+
 - improved encryption testing
 - no indication unless cargo [#603]
 - extra logging absence of chat task supervisor
 - cargo scope: invites optimisation [#619]
 
 ### Fixed
+
 - displaying the gallery after go to invited room [#562]
 - cargo sync broken [#594]
 - feeds page ui issue [#583]
@@ -52,7 +80,7 @@ straightforward as possible.
 - Log out. Increase clickable area, all button area should be clickable [#632]
 - Double scroll on Chat page [#640]
 
-## 2023-12-30_167d8d9___2023-12-30_80fe885
+## 2023-12-30_167d8d9\_\_\_2023-12-30_80fe885
 
 ### Added
 
@@ -68,11 +96,11 @@ straightforward as possible.
 - Nerves + Elixir + Phoenix update [#501]
 
 ### Fixed
+
 - mobile upload on Android
 - device log. new format support [#565]
 
-
-## 2023-10-11_c9df216___2023-10-11_8198274
+## 2023-10-11_c9df216\_\_\_2023-10-11_8198274
 
 ### Added
 
@@ -117,7 +145,7 @@ straightforward as possible.
 - invalid invite handling
 - cargo room gets opened on mobile [#492]
 
-## 2023-08-11_279815b___2023-08-11_24d6bac
+## 2023-08-11_279815b\_\_\_2023-08-11_24d6bac
 
 ### Added
 
@@ -142,7 +170,7 @@ straightforward as possible.
 - pause uploads when uploader is busy
 - copying hangups
 
-## 2023-06-30_ad580b9___2023-06-29_6ab0603
+## 2023-06-30_ad580b9\_\_\_2023-06-29_6ab0603
 
 ### Added
 
@@ -175,7 +203,7 @@ straightforward as possible.
 - cargo settings compatibility w/ previous version
 - fix supervision restarts
 
-## 2023-05-22_3fefe32___2023-05-24_98fba24
+## 2023-05-22_3fefe32\_\_\_2023-05-24_98fba24
 
 ### Added
 
@@ -190,7 +218,7 @@ straightforward as possible.
 - fs listing (broken synchronization) + testing
 - Update users/rooms cache on USB plugging/unplugging
 
-## 2023-05-17_f2cf2cc___2023-05-18_ccb67a5
+## 2023-05-17_f2cf2cc\_\_\_2023-05-18_ccb67a5
 
 ### Added
 
@@ -207,7 +235,7 @@ straightforward as possible.
 - FS healer fix and use it for all but cargo
 - cargo copying after main data write
 
-## 2023-05-12_7e5fcce___2023-05-12_b47aebb
+## 2023-05-12_7e5fcce\_\_\_2023-05-12_b47aebb
 
 ### Added
 
@@ -226,7 +254,7 @@ straightforward as possible.
 - large filename in dump statistic
 - Admin panel Wifi rename
 
-## 2023-05-01_344a783___2023-05-03_059ad40
+## 2023-05-01_344a783\_\_\_2023-05-03_059ad40
 
 ### Added
 
@@ -250,7 +278,7 @@ straightforward as possible.
 - Invite list during room switch
 - Change Tracker expiry and nil values tracking
 
-## 2023-04-26_e311fc1___2023-04-26_217f745
+## 2023-04-26_e311fc1\_\_\_2023-04-26_217f745
 
 ### Added
 
@@ -280,7 +308,7 @@ straightforward as possible.
 - Adaptive uploads and users/rooms list for mobile
 - handle lost messages when viewing gallery
 
-## 2023-04-15_c77d709___2023-04-15_64148f8
+## 2023-04-15_c77d709\_\_\_2023-04-15_64148f8
 
 ### Added
 
@@ -300,7 +328,7 @@ straightforward as possible.
 - better broken files handling
 - db changes tracking improvement
 
-## 2023-04-07_a41ea0d___2023-04-07_c06e36f
+## 2023-04-07_a41ea0d\_\_\_2023-04-07_c06e36f
 
 ### Added
 
@@ -322,7 +350,7 @@ straightforward as possible.
 - broken image render
 - fix copying process
 
-## 2023-03-31_d8b27f7___2023-03-31_875d678
+## 2023-03-31_d8b27f7\_\_\_2023-03-31_875d678
 
 ### Added
 
@@ -342,7 +370,7 @@ straightforward as possible.
 - UI: uploads scroll to top on uploader mount
 - submitting of edited message by keyword
 
-## 2023-03-22_4082136___2023-03-23_e2c9aa8
+## 2023-03-22_4082136\_\_\_2023-03-23_e2c9aa8
 
 ### Added
 
@@ -358,7 +386,7 @@ straightforward as possible.
 - file absence ignoring
 - fix read only mode
 
-## 2023-03-17_4ed6f98___2023-03-17_191b7bc
+## 2023-03-17_4ed6f98\_\_\_2023-03-17_191b7bc
 
 ### Changed
 
@@ -374,7 +402,7 @@ straightforward as possible.
 - File corruption during sync
 - markup breaking when key name is long
 
-## 2023-03-11_2200db4___2023-03-11_acb5424
+## 2023-03-11_2200db4\_\_\_2023-03-11_acb5424
 
 ### Added
 
@@ -390,7 +418,3 @@ straightforward as possible.
 - UI: uploader covering chat/room list
 - lost feed names
 - admin room user actions
-
-
-
-

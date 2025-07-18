@@ -135,7 +135,7 @@ export class EncryptionManager extends EventTarget {
          const fullKeyBase64 = me[1];
          const publicKeyHex = fullKeyBase64ToPublicKeyHex(fullKeyBase64);
          await this.updateVaultsRegistryEntry(vaultID, name, publicKeyHex);
-         // console.log(`Data saved: key = "${vaultID}", value = "${value}"`);
+         console.log(`Data saved: key = "${vaultID}", value = "${value}"`);
          return true;
       } catch (error) {
          await this.handleError(error, "Error saving data");
@@ -175,14 +175,14 @@ export class EncryptionManager extends EventTarget {
          if (!publicKeyHex.startsWith('0x')) {
             publicKeyHex = '0x' + publicKeyHex;
          }
-         
+
          // Check if ethers is properly loaded
          if (typeof computeAddress === 'undefined') {
             console.warn("Ethers.js library not properly loaded, falling back to simple address derivation");
             // Fallback to a simpler method if ethers.js is not available
-           return undefined;
+            return undefined;
          }
-         
+
          // Use ethers.js to compute the address
          const address = computeAddress(publicKeyHex);
          return address;
@@ -202,7 +202,7 @@ export class EncryptionManager extends EventTarget {
          await this.ensureVault();
          const vaultID = await this.getVaultID();
          const value = await this.#vault.get(vaultID);
-         // console.log(`Data retrieved: key = "${vaultID}", value = "${value || "no data"}"`);
+         console.log(`Data retrieved: key = "${vaultID}", value = "${value || "no data"}"`);
          return value;
       } catch (error) {
          await this.handleError(error, "Error retrieving data");
@@ -250,12 +250,12 @@ export class EncryptionManager extends EventTarget {
          // First, check the vaults registry for a current vault
          const vaultsRegistry = await this.#rawStore.get("vaults-registry") || [];
          const currentVault = vaultsRegistry.find(vault => vault.current === true);
-         
+
          if (currentVault && currentVault.vaultId) {
             console.log("Found current vault ID in vaults registry:", currentVault.vaultId);
             return currentVault.vaultId;
          }
-         
+
          // Fall back to the original method if no current vault is found in the registry
          return await this.#rawStore.get("vault-id");
       } catch (error) {
@@ -282,10 +282,10 @@ export class EncryptionManager extends EventTarget {
       try {
          // Get the current vaults registry
          let vaultsRegistry = await this.#rawStore.get("vaults-registry") || [];
-         
+
          // Find if the vault already exists in the registry
          const existingVaultIndex = vaultsRegistry.findIndex(vault => vault.vaultId === vaultId);
-         
+
          if (existingVaultIndex >= 0) {
             // If vault exists, update its current status
             vaultsRegistry = vaultsRegistry.map(vault => ({
@@ -300,17 +300,17 @@ export class EncryptionManager extends EventTarget {
                notes: "",
                createdAt: new Date().toISOString()
             };
-            
+
             // Reset current status for all existing vaults
             vaultsRegistry = vaultsRegistry.map(vault => ({
                ...vault,
                current: false
             }));
-            
+
             // Add the new vault to the registry
             vaultsRegistry.push(newVault);
          }
-         
+
          // Save the updated vaults registry
          await this.#rawStore.set("vaults-registry", vaultsRegistry);
          console.log("Updated vaults registry with current vault:", vaultId);
@@ -339,22 +339,22 @@ export class EncryptionManager extends EventTarget {
    async removeVaultID() {
       const vaultId = await this.getVaultID();
       await this.#rawStore.remove("vault-id");
-      
+
       // Update the vaults registry to remove the vault entry completely
       if (vaultId) {
          try {
             let vaultsRegistry = await this.#rawStore.get("vaults-registry");
-            
+
             // Only proceed if vaults registry exists and has entries
             if (!vaultsRegistry || !Array.isArray(vaultsRegistry)) {
                console.log("Vaults registry doesn't exist or is empty, skipping update on logout");
                return;
             }
-            
+
             // Remove the vault entry completely from the registry
             const initialLength = vaultsRegistry.length;
             vaultsRegistry = vaultsRegistry.filter(vault => vault.vaultId !== vaultId);
-            
+
             if (initialLength !== vaultsRegistry.length) {
                await this.#rawStore.set("vaults-registry", vaultsRegistry);
                console.log("Removed vault from registry on logout:", vaultId);

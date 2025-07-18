@@ -68,14 +68,23 @@ export default {
     
     linkifyText(text) {
       // URL regex pattern - matches URLs starting with http://, https://, or www.
-      const urlRegex = /(https?:\/\/|www\.)[^\s<]+[^\s<.,:;"')\]\}!?]/gi;
+      // Updated to better handle UTF-8 characters in URLs
+      const urlRegex = /(https?:\/\/|www\.)[^\s<][^\s<.,:;"')\]\}!?\u0000-\u001F\u007F-\u009F]*[^\s<.,:;"')\]\}!?]/gu;
       
       return text.replace(urlRegex, (url) => {
         // Ensure URL has proper protocol
         const href = url.startsWith('www.') ? 'https://' + url : url;
         
-        // Create link with target="_blank" and rel="noopener" for security
-        return `<a href="${href}" target="_blank" rel="noopener">${url}</a>`;
+        try {
+          // Validate URL encoding
+          const encodedHref = encodeURI(decodeURI(href));
+          
+          // Create link with target="_blank" and rel="noopener" for security
+          return `<a href="${encodedHref}" target="_blank" rel="noopener">${url}</a>`;
+        } catch (e) {
+          console.warn('Failed to process URL:', url, e);
+          return url; // Return the original text if URL processing fails
+        }
       });
     }
   }

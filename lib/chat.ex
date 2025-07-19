@@ -22,13 +22,15 @@ defmodule Chat do
   """
   @spec store_parcel(%SignedParcel{}) :: %SignedParcel{}
   def store_parcel(%SignedParcel{} = parcel, opts \\ []) do
-    processed_data = Enum.map(parcel.data, fn
-      {{:dialog_message, dialog_hash, :next, message_id}, message} ->
-        next_index = Ordering.next({:dialog_message, dialog_hash})
-        {{:dialog_message, dialog_hash, next_index, message_id}, message}
+    processed_data =
+      Enum.map(parcel.data, fn
+        {{:dialog_message, dialog_hash, :next, message_id}, message} ->
+          next_index = Ordering.next({:dialog_message, dialog_hash})
+          {{:dialog_message, dialog_hash, next_index, message_id}, message}
 
-      {key, value} -> {key, value}
-    end)
+        {key, value} ->
+          {key, value}
+      end)
 
     %SignedParcel{parcel | data: processed_data}
     |> tap(fn parcel ->
@@ -41,6 +43,29 @@ defmodule Chat do
         Copying.await_written_into(parcel.data |> Enum.map(fn {key, _} -> key end), Chat.Db.db())
       end
     end)
+  end
+
+  @doc """
+  Starts a task under Chat.TaskSupervisor that awaits for the parcel to be written
+  in the database and then runs the provided function with the parcel.
+
+  ## Parameters
+  - parcel: A SignedParcel struct that has been stored
+  - on_stored: A function that will be called with the parcel once it's written to DB
+
+  ## Returns
+  - The parcel (for chaining)
+  """
+  @spec run_when_parcel_stored(%SignedParcel{}, (SignedParcel.t() -> any())) :: %SignedParcel{}
+  def run_when_parcel_stored(%SignedParcel{} = parcel, on_stored)
+      when is_function(on_stored, 1) do
+    Task.Supervisor.start_child(Chat.TaskSupervisor, fn ->
+      keys = Enum.map(parcel.data, fn {key, _} -> key end)
+      Copying.await_written_into(keys, Chat.Db.db())
+      on_stored.(parcel)
+    end)
+
+    parcel
   end
 
   def db_get(key) do

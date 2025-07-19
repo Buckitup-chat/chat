@@ -20,7 +20,16 @@ defmodule ChatWeb.StorageApiControllerTest do
       "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601()
     }
 
-    conn_put = put_payload(conn, token_key, digest, public_key_bin, payload_key, payload_value, private_key)
+    conn_put =
+      put_payload(
+        conn,
+        token_key,
+        digest,
+        public_key_bin,
+        payload_key,
+        payload_value,
+        private_key
+      )
 
     assert %{"status" => "success"} = json_response(conn_put, 200)
 

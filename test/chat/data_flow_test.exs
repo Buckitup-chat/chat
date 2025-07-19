@@ -42,7 +42,6 @@ defmodule Chat.DataFlowTest do
     assert alice_message.is_mine? == true
   end
 
-
   test "simple memo message" do
     alice = User.login("Alice")
     bob = User.login("Bob")
@@ -65,7 +64,9 @@ defmodule Chat.DataFlowTest do
 
     stored_parcel.data |> dbg()
     # Find the dialog message key
-    dialog_msg_entry = Enum.find(stored_parcel.data, fn {key, _} -> match?({:dialog_message, _, _, _}, key) end)
+    dialog_msg_entry =
+      Enum.find(stored_parcel.data, fn {key, _} -> match?({:dialog_message, _, _, _}, key) end)
+
     assert dialog_msg_entry != nil
     {{:dialog_message, _dialog_hash, index, _msg_id}, msg} = dialog_msg_entry
 
@@ -108,7 +109,8 @@ defmodule Chat.DataFlowTest do
     alice_messages = dialog |> Dialogs.read(alice)
     assert length(alice_messages) == 1
     [alice_message] = alice_messages
-    assert alice_message.content == memo_ref # It's the same reference
+    # It's the same reference
+    assert alice_message.content == memo_ref
     assert alice_message.is_mine? == true
   end
 
@@ -130,7 +132,9 @@ defmodule Chat.DataFlowTest do
       |> Chat.store_parcel(await: true)
 
     # Get the dialog message data
-    dialog_msg_entry = Enum.find(stored_parcel.data, fn {key, _} -> match?({:dialog_message, _, _, _}, key) end)
+    dialog_msg_entry =
+      Enum.find(stored_parcel.data, fn {key, _} -> match?({:dialog_message, _, _, _}, key) end)
+
     assert dialog_msg_entry != nil
     {{:dialog_message, _dialog_hash, _index, _msg_id}, msg} = dialog_msg_entry
 
@@ -147,11 +151,10 @@ defmodule Chat.DataFlowTest do
 
     # Extract the message key information to preserve for the update
     {{:dialog_message, _dialog_hash, index, _msg_id_hash}, message} = dialog_msg_entry
-    
+
     # Get the actual message ID from the message struct, not the hashed version in the key
     # This is what we need to preserve in our edited message - message IDs in the database are stored as hashes
     orig_msg_id = message.id
-    
 
     # Create updated message with new content
     updated_message = %Messages.Text{
@@ -166,7 +169,7 @@ defmodule Chat.DataFlowTest do
     # Note: We don't need to delete the original message because we're using the same 
     # dialog_hash, index, and message ID, which will overwrite the existing record.
     # This happens because Chat.store_parcel will use the same key when storing the new parcel
-    
+
     # Create a new parcel, explicitly preserving the original message ID and index
     # We must use the unhashed message ID from the message struct (not the hashed version in the key)
     # This ensures the message key in the database will be correctly generated
@@ -179,7 +182,9 @@ defmodule Chat.DataFlowTest do
     assert length(updated_parcel.data) > 1
 
     # Find the dialog message entry in the updated parcel
-    updated_msg_entry = Enum.find(updated_parcel.data, fn {key, _} -> match?({:dialog_message, _, _, _}, key) end)
+    updated_msg_entry =
+      Enum.find(updated_parcel.data, fn {key, _} -> match?({:dialog_message, _, _, _}, key) end)
+
     assert updated_msg_entry != nil
     {{:dialog_message, _dialog_hash2, _index2, _msg_id2}, updated_msg} = updated_msg_entry
 
@@ -191,7 +196,8 @@ defmodule Chat.DataFlowTest do
     # Since we preserved the message ID and index, we should only have one message
     # that has been updated from text to memo type
     updated_messages = dialog |> Dialogs.read(bob)
-    assert length(updated_messages) == 1  # We should only have one message - the updated one
+    # We should only have one message - the updated one
+    assert length(updated_messages) == 1
 
     # Get the message and verify it's now a memo
     [updated_message] = updated_messages

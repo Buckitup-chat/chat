@@ -141,15 +141,38 @@ defmodule Chat.DataFlowTest do
     [original_message] = dialog |> Dialogs.read(bob)
     assert original_message.content == short_text
 
-    # For the update, simulate editing by creating a new message with longer content
-    # A real update would preserve the message ID, but we're demonstrating the memo conversion
+    # For the update, we'll create a new message with longer content
+    # Now we can preserve the message ID to properly simulate an edit
     long_text = String.duplicate("This is now a very long message. ", 100)
-    updated_message = %Messages.Text{text: long_text, timestamp: System.system_time(:second)}
 
-    # Create a new parcel (simulating an edit)
+    # Extract the message key information to preserve for the update
+    {{:dialog_message, _dialog_hash, index, _msg_id_hash}, message} = dialog_msg_entry
+    
+    # Get the actual message ID from the message struct, not the hashed version in the key
+    # This is what we need to preserve in our edited message - message IDs in the database are stored as hashes
+    orig_msg_id = message.id
+    
+
+    # Create updated message with new content
+    updated_message = %Messages.Text{
+      text: long_text,
+      timestamp: System.system_time(:second)
+    }
+
+    # We could delete the existing message from the database, but it's not necessary
+    # as we'll overwrite it with the same key when we store the updated parcel
+    # _original_msg_key = {:dialog_message, dialog_hash, index, msg_id_hash}
+
+    # Note: We don't need to delete the original message because we're using the same 
+    # dialog_hash, index, and message ID, which will overwrite the existing record.
+    # This happens because Chat.store_parcel will use the same key when storing the new parcel
+    
+    # Create a new parcel, explicitly preserving the original message ID and index
+    # We must use the unhashed message ID from the message struct (not the hashed version in the key)
+    # This ensures the message key in the database will be correctly generated
     updated_parcel =
       updated_message
-      |> Chat.SignedParcel.wrap_dialog_message(dialog, alice)
+      |> Chat.SignedParcel.wrap_dialog_message(dialog, alice, id: orig_msg_id, index: index)
       |> Chat.store_parcel(await: true)
 
     # Verify the updated parcel contains multiple entries (memo attachments)
@@ -165,17 +188,17 @@ defmodule Chat.DataFlowTest do
     refute updated_msg.content == long_text
 
     # Read the updated message from the dialog
-    # In a real app, this would replace the previous message, but here we're just showing
-    # that the second message is properly stored as a memo
+    # Since we preserved the message ID and index, we should only have one message
+    # that has been updated from text to memo type
     updated_messages = dialog |> Dialogs.read(bob)
-    assert length(updated_messages) == 2  # We now have both the original and updated messages
+    assert length(updated_messages) == 1  # We should only have one message - the updated one
 
-    # The last message should be our memo
-    newest_message = List.last(updated_messages)
-    assert newest_message.type == :memo
+    # Get the message and verify it's now a memo
+    [updated_message] = updated_messages
+    assert updated_message.type == :memo
 
     # Get the memo content
-    memo_ref = newest_message.content
+    memo_ref = updated_message.content
     memo_key_secret = StorageId.from_json(memo_ref)
     decoded_memo = Memo.get(memo_key_secret)
 

@@ -28,7 +28,7 @@
       
       <!-- Store Data -->
       <div class="mb-6">
-        <h3 class="text-lg font-medium mb-3">Store Data</h3>
+        <h3 class="text-lg font-medium mb-3">Store Single Item</h3>
         <div class="mb-3">
           <label class="block text-sm font-medium mb-1">Key:</label>
           <div class="flex items-center gap-2">
@@ -55,10 +55,52 @@
         </div>
         <button @click="storeData" :disabled="!publicKeyHex" 
                 class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed">
-          Store Data
+          Store Single Item
         </button>
         <div v-if="storeResult" class="mt-2 p-2 rounded" :class="storeResult.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
           {{ storeResult.message }}
+        </div>
+      </div>
+      
+      <!-- Store Multiple Data Items -->
+      <div class="mb-6">
+        <h3 class="text-lg font-medium mb-3">Store Multiple Items</h3>
+        <div class="mb-3">
+          <label class="block text-sm font-medium mb-1">Items:</label>
+          <div v-for="(item, index) in bulkItems" :key="index" class="mb-2 p-3 border border-gray-200 rounded">
+            <div class="flex justify-between mb-2">
+              <h4 class="font-medium">Item {{ index + 1 }}</h4>
+              <button @click="removeBulkItem(index)" class="text-red-500 hover:text-red-700">
+                Remove
+              </button>
+            </div>
+            <div class="mb-2">
+              <label class="block text-xs font-medium mb-1">Key:</label>
+              <input 
+                v-model="item.keyName" 
+                placeholder="Key name" 
+                class="w-full p-2 border border-gray-300 rounded" 
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium mb-1">Value (JSON):</label>
+              <textarea 
+                v-model="item.valueText" 
+                class="w-full h-20 p-2 border border-gray-300 rounded font-mono text-xs"
+                placeholder='{"message": "bulk item value", "timestamp": "2025-06-12T20:15:22Z"}'
+              ></textarea>
+            </div>
+          </div>
+          <button @click="addBulkItem" class="mt-2 bg-gray-300 hover:bg-gray-400 px-3 py-1 text-sm rounded">
+            + Add Item
+          </button>
+        </div>
+        <button @click="storeBulkData" :disabled="!publicKeyHex || bulkItems.length === 0" 
+                class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed">
+          Store Multiple Items ({{ bulkItems.length }})
+        </button>
+        <div v-if="bulkStoreResult" class="mt-2 p-2 rounded" :class="bulkStoreResult.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
+          {{ bulkStoreResult.message }}
         </div>
       </div>
       
@@ -134,6 +176,10 @@ export default {
       retrievedData: [],
       retrievedError: null,
       retrieveAttempted: false,
+      bulkStoreResult: null,
+      
+      // Bulk storage items
+      bulkItems: [],
       
       // Logs
       logs: []
@@ -270,6 +316,98 @@ export default {
     },
     
     // Data operations/
+    // Bulk item management
+    addBulkItem() {
+      this.bulkItems.push({
+        keyName: `item-${Date.now()}`,
+        valueText: JSON.stringify({
+          message: "bulk item value",
+          timestamp: new Date().toISOString()
+        }, null, 2)
+      });
+      this.addLog(`Added new bulk item (total: ${this.bulkItems.length})`);
+    },
+    
+    removeBulkItem(index) {
+      this.bulkItems.splice(index, 1);
+      this.addLog(`Removed bulk item (remaining: ${this.bulkItems.length})`);
+    },
+    
+    // Prepare bulk items for submission
+    prepareBulkItems() {
+      return this.bulkItems.map(item => {
+        try {
+          const parsedValue = JSON.parse(item.valueText);
+          return {
+            key: item.keyName,
+            value: parsedValue
+          };
+        } catch (e) {
+          throw new Error(`Invalid JSON for item with key '${item.keyName}': ${e.message}`);
+        }
+      });
+    },
+    
+    // Store multiple items at once
+    async storeBulkData() {
+      try {
+        // Validate items
+        if (this.bulkItems.length === 0) {
+          throw new Error('Please add at least one item to store');
+        }
+        
+        // Get a fresh token for this operation
+        this.addLog('Getting a new token for bulk storage operation');
+        if (!await this.ensureValidToken()) {
+          return;
+        }
+        
+        // Store token info temporarily for this operation
+        const operationTokenKey = this.tokenKey;
+        const operationSignature = this.signature;
+        
+        this.addLog(`Preparing ${this.bulkItems.length} items for bulk storage...`);
+        
+        // Prepare the bulk items
+        const items = this.prepareBulkItems();
+        
+        // Build the URL with query parameters
+        const url = `/storage-api/put-many?pub_key=${this.publicKeyHex}&token_key=${operationTokenKey}&signature=${operationSignature}`;
+        
+        // Send the request with proper headers
+        const response = await axios.post(url, items, {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        // Clear token after use
+        this.tokenKey = '';
+        this.token = '';
+        this.signature = '';
+        
+        this.bulkStoreResult = {
+          success: true,
+          message: `Successfully stored ${response.data.items_saved} items!`
+        };
+        
+        this.addLog(`Bulk storage successful: ${response.data.items_saved} items saved`, 'success');
+        this.addLog('Token consumed', 'info');
+      } catch (error) {
+        console.error('Error storing bulk data:', error);
+        this.bulkStoreResult = {
+          success: false,
+          message: 'Error: ' + (error.response?.data?.error || error.message)
+        };
+        this.addLog(`Bulk storage error: ${error.response?.data?.error || error.message}`, 'error');
+        
+        // Clear token on error too
+        this.tokenKey = '';
+        this.token = '';
+        this.signature = '';
+      }
+    },
+    
     async storeData() {
       try {
         // Make sure we have a valid key ID

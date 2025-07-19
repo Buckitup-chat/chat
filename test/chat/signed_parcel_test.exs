@@ -4,10 +4,10 @@ defmodule ChatTest.SignedParcelTest do
 
   alias Chat.Card
   alias Chat.Dialogs
+  alias Chat.Dialogs.Message, as: DialogMessage
   alias Chat.Identity
   alias Chat.Messages
   alias Chat.SignedParcel
-  alias Chat.Dialogs.Message, as: DialogMessage
   # alias Chat.Dialogs.Registry, as: DialogRegistry
 
   test "text message parcel is corect" do

@@ -1,7 +1,7 @@
 defmodule Chat.User.UsersBrokerTest do
   use ExUnit.Case, async: true
-  alias Chat.User.UsersBroker
   alias Chat.Card
+  alias Chat.User.UsersBroker
 
   setup do
     # Start the UsersBroker process

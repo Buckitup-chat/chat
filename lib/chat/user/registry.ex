@@ -21,6 +21,10 @@ defmodule Chat.User.Registry do
     |> Db.list(fn {{:users, pub_key}, %Card{} = user} -> {pub_key, user} end)
   end
 
+  def one(pub_key) do
+    Db.get({:users, pub_key})
+  end
+
   def remove(pub_key) do
     Db.delete({:users, pub_key})
   end

@@ -22,7 +22,6 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   alias Chat.FileIndex
   alias Chat.Identity
   alias Chat.Log
-  alias Chat.MemoIndex
   alias Chat.Messages
   alias Chat.Rooms
   alias Chat.Sync.DbBrokers
@@ -96,9 +95,13 @@ defmodule ChatWeb.MainLive.Page.Dialog do
 
       text ->
         %Messages.Text{text: text, timestamp: time}
-        |> Dialogs.add_new_message(me, dialog)
-        |> MemoIndex.add(dialog, me)
-        |> broadcast_new_message(dialog, me, time)
+        |> Chat.SignedParcel.wrap_dialog_message(dialog, me)
+        |> Chat.store_parcel()
+        |> Chat.run_when_parcel_stored(fn parcel ->
+          parcel
+          |> Chat.Dialogs.parsel_to_indexed_message()
+          |> broadcast_new_message(dialog, me, time)
+        end)
     end
 
     socket
@@ -124,6 +127,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
             time
           )
           |> Dialogs.add_new_message(me, dialog)
+          # TODO: use wrap_dialog_message to create parcel
           |> then(&{:ok, &1})
         end
       )
@@ -186,12 +190,17 @@ defmodule ChatWeb.MainLive.Page.Dialog do
       ) do
     time = Chat.Time.monotonic_to_unix(time_offset)
 
-    text
-    |> Messages.Text.new(time)
-    |> Dialogs.update_message(msg_id, me, dialog)
-    |> MemoIndex.add(dialog, me)
-    |> Dialogs.on_saved(dialog, fn ->
-      broadcast_message_updated(msg_id, dialog, me, time)
+    {index, id} = msg_id
+
+    %Messages.Text{text: text, timestamp: time}
+    |> Chat.SignedParcel.wrap_dialog_message(dialog, me, id: id, index: index)
+    |> Chat.store_parcel()
+    |> Chat.run_when_parcel_stored(fn parcel ->
+      parcel
+      |> Chat.Dialogs.parsel_to_indexed_message()
+      |> then(fn {_index, _message} ->
+        broadcast_message_updated(msg_id, dialog, me, time)
+      end)
     end)
 
     socket
@@ -203,10 +212,9 @@ defmodule ChatWeb.MainLive.Page.Dialog do
         {_time, id} = msg_id,
         render_fun
       ) do
-    content =
-      Dialogs.read_message(dialog, msg_id, me)
-      |> then(&%{msg: &1})
-      |> render_to_html_string(render_fun)
+    message = Dialogs.read_message(dialog, msg_id, me)
+    [loaded_message] = Chat.Messaging.preload_content([message])
+    content = render_to_html_string(%{msg: loaded_message}, render_fun)
 
     socket
     |> forget_current_messages()

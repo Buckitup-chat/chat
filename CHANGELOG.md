@@ -12,6 +12,7 @@ straightforward as possible.
 
 ### Added
 
+- [UI] Link detection in messages [#669]
 - Spam-less rooms [#600]
 - Proxy functionality for room requests and dialogs
 - Room approval system with personal channels

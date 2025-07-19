@@ -6,6 +6,7 @@ import { ref, watch, reactive, computed } from 'vue';
 import { clearLockKeyCache } from '@lo-fi/local-data-lock';
 import $swal from '../libs/swal';
 import * as Y from 'yjs';
+import { toRaw } from 'vue';
 //import { WebrtcProvider } from 'y-webrtc';
 import { IndexeddbPersistence } from '../libs/y-indexeddb';
 import { WebrtcProvider } from '../libs/y-webrtc';
@@ -66,14 +67,43 @@ export const userStore = defineStore('user', () => {
 	const yJs = {};
 
 	const closeStorage = () => {
-		if (yJs.accountObserver) yJs.account.unobserve(yJs.accountObserver);
-		if (yJs.contactsObserver) yJs.contacts.unobserve(yJs.contactsObserver);
-		if (yJs.accountInfoWatcher) yJs.accountInfoWatcher();
-		if (yJs.contactsWatcher) yJs.contactsWatcher();
-		if (yJs.rtc) yJs.rtc.destroy();
-		if (yJs.server) yJs.server.destroy();
-		if (yJs.persistence) yJs.persistence.destroy();
-		if (yJs.doc) yJs.doc.destroy();
+		try {
+			if (yJs.accountObserver && yJs.account?.unobserve) {
+				yJs.account.unobserve(yJs.accountObserver);
+			}
+
+			if (yJs.contactsObserver && yJs.contacts?.unobserve) {
+				yJs.contacts.unobserve(yJs.contactsObserver);
+			}
+
+			if (typeof yJs.accountInfoWatcher === 'function') {
+				yJs.accountInfoWatcher();
+			}
+
+			if (typeof yJs.contactsWatcher === 'function') {
+				yJs.contactsWatcher();
+			}
+
+			if (yJs.rtc?.destroy) {
+				yJs.rtc.destroy();
+			}
+
+			if (yJs.server?.destroy) {
+				yJs.server.destroy();
+			}
+
+			if (yJs.persistence?.destroy) {
+				yJs.persistence.destroy();
+			}
+
+			if (yJs.doc?.destroy) {
+				yJs.doc.destroy();
+			}
+		} catch (err) {
+			console.warn('Error during storage cleanup:', err);
+		}
+
+		// Clear all references in yJs
 		for (const key in yJs) {
 			yJs[key] = null;
 		}
@@ -82,38 +112,47 @@ export const userStore = defineStore('user', () => {
 	const openStorage = async (options) => {
 		closeStorage();
 
+		yJs.key = crypto.createHash('sha256').update(account.value.privateKey).digest();
+
 		yJs.doc = new Y.Doc();
 
-		yJs.persistence = new IndexeddbPersistence(`buckitup-${account.value.address}`, yJs.doc, { encrypt, decrypt });
+		yJs.persistence = new IndexeddbPersistence(`buckitup-${account.value.address}`, yJs.doc);
 		yJs.persistence.whenSynced.then(() => {
 			console.log(`Local storage loaded `, options);
 
 			yJs.account = yJs.doc.getMap('account');
 			const accInf = yJs.account.get('accountInfo');
 
-			if (accInf && (accInf.name || accInf.notes || accInf.avatar)) {
-				Object.assign(accountInfo, accInf);
+			const hasEncryptedData = accInf && typeof accInf === 'object' && accountInfoKeys.some((key) => accInf[key]);
+
+			if (hasEncryptedData) {
+				Object.assign(accountInfo, decrypt(accInf, accountInfoKeys));
 			} else {
-				Object.assign(accountInfo, options?.accountInfo ? options.accountInfo : {});
+				Object.assign(accountInfo, options?.accountInfo ?? {});
 			}
 
 			yJs.accountObserver = (event) => {
 				console.log('accountObserver', event);
-				let changed = false;
-				const data = yJs.account.get('accountInfo') || {};
-				if (JSON.stringify(data) !== JSON.stringify(accountInfo)) {
-					Object.assign(accountInfo, data);
-					changed = true;
-				}
-				if (changed) {
-					console.log('accountInfo updated from Y.Map', data);
+				const accInf = yJs.account.get('accountInfo');
+				if (accInf) {
+					const decrypted = decrypt(accInf, accountInfoKeys);
+
+					if (decrypted && typeof decrypted === 'object' && accountInfoKeys.every((k) => k in decrypted)) {
+						for (let key of accountInfoKeys) {
+							if (decrypted[key] !== accountInfo[key]) {
+								Object.assign(accountInfo, decrypted);
+								console.log('accountObserver updated', decrypted);
+								break;
+							}
+						}
+					}
 				}
 			};
 			yJs.account.observe(yJs.accountObserver);
 
 			yJs.accountInfoWatcher = watch(accountInfo, () => {
 				console.log('accountInfoWatcher', accountInfo);
-				yJs.account.set('accountInfo', { ...accountInfo });
+				yJs.account.set('accountInfo', encrypt(toRaw(accountInfo), accountInfoKeys));
 				encryptionManager.setData(toVaultFormat());
 				encryptionManager.updateAccountInfoVault(accountInfo);
 			});
@@ -121,30 +160,11 @@ export const userStore = defineStore('user', () => {
 			yJs.contacts = yJs.doc.getMap('contacts');
 			const initial = yJs.contacts.toJSON();
 			for (const key in initial) {
-				contactsMap[key] = initial[key];
+				contactsMap[key] = decrypt(initial[key], contactKeys);
 			}
 
 			yJs.contactsObserver = () => {
-				const all = yJs.contacts.toJSON();
-				let changed = false;
-
-				for (const key in all) {
-					if (JSON.stringify(contactsMap[key]) !== JSON.stringify(all[key])) {
-						contactsMap[key] = all[key];
-						changed = true;
-					}
-				}
-				// Remove deleted keys
-				Object.keys(contactsMap).forEach((k) => {
-					if (!all[k]) {
-						delete contactsMap[k];
-						changed = true;
-					}
-				});
-
-				if (changed) {
-					console.log('contacts updated from Y.Map', all);
-				}
+				syncContactsFromYjs();
 			};
 
 			yJs.contacts.observe(yJs.contactsObserver);
@@ -155,7 +175,7 @@ export const userStore = defineStore('user', () => {
 					const newKeys = new Set(Object.keys(newVal));
 					// Set or update
 					for (const [publicKey, contact] of Object.entries(newVal)) {
-						yJs.contacts.set(publicKey, contact);
+						yJs.contacts.set(publicKey, encrypt(contact, contactKeys));
 					}
 					// Delete keys that were removed
 					if (oldVal) {
@@ -177,14 +197,26 @@ export const userStore = defineStore('user', () => {
 					'wss://buckitupss.appdev.pp.ua/signaling',
 				],
 				auth,
+				signChallenge,
 			});
 			yJs.rtc.on('synced', () => {
 				console.log(`WebRTC peers synced`);
+
 				const accInf = yJs.account.get('accountInfo');
-				Object.assign(accountInfo, accInf);
-				yJs.contacts = yJs.doc.getMap('contacts');
-				const cont = yJs.contacts.toJSON();
-				Object.assign(contactsMap, cont);
+				if (accInf) {
+					console.log(`synced`, accInf);
+					const decrypted = decrypt(accInf, accountInfoKeys);
+
+					for (let key of accountInfoKeys) {
+						if (decrypted[key] !== accountInfo[key]) {
+							Object.assign(accountInfo, decrypted);
+							console.log('accountInfo updated from Y.Map', decrypted);
+							break;
+						}
+					}
+				}
+				syncContactsFromYjs();
+
 				if (options?.callback) {
 					options.callback();
 					options.callback = null;
@@ -204,6 +236,28 @@ export const userStore = defineStore('user', () => {
 			yJs.server = new WebsocketProvider('wss://buckitupss.appdev.pp.ua/server', account.value.address, yJs.doc, { privateKey: account.value.privateKey });
 		});
 
+		function syncContactsFromYjs() {
+			const all = yJs.contacts.toJSON();
+			if (all && typeof all === 'object') {
+				for (const key in all) {
+					const decrypted = decrypt(all[key], contactKeys);
+					for (const cKey of contactKeys) {
+						if (!contactsMap[key] || contactsMap[key][cKey] !== decrypted[cKey]) {
+							contactsMap[key] = decrypted;
+							console.log('contact updated');
+							break;
+						}
+					}
+				}
+				Object.keys(contactsMap).forEach((k) => {
+					if (!all[k]) {
+						delete contactsMap[k];
+						console.log('contact deleted');
+					}
+				});
+			}
+		}
+
 		// Sync clients with the y-websocket provider
 
 		async function auth() {
@@ -215,26 +269,43 @@ export const userStore = defineStore('user', () => {
 			return { sig, ts, room };
 		}
 
-		function encrypt(data) {
-			if (data.length > 10) {
-				const keyBuffer = crypto.createHash('sha256').update(account.value.privateKey).digest();
-				const cipher = crypto.createCipheriv('aes-256-ctr', keyBuffer, Buffer.alloc(16, 0));
-				const encrypted = Buffer.concat([cipher.update(data), cipher.final()]);
-				return new Uint8Array(encrypted);
-			} else {
-				return data;
-			}
+		async function signChallenge(challenge) {
+			const wallet = new Wallet(account.value.privateKey);
+			return await wallet.signMessage(challenge);
 		}
 
-		function decrypt(data) {
-			if (data.length > 10) {
-				const keyBuffer = crypto.createHash('sha256').update(account.value.privateKey).digest();
-				const decipher = crypto.createDecipheriv('aes-256-ctr', keyBuffer, Buffer.alloc(16, 0));
-				const decrypted = Buffer.concat([decipher.update(Buffer.from(data)), decipher.final()]);
-				return new Uint8Array(decrypted);
-			} else {
-				return data;
+		function encrypt(obj, keys) {
+			const result = {};
+			console.log('encrypt', obj, keys);
+			for (const field of keys) {
+				const value = obj[field] || null;
+				const serialized = JSON.stringify(value);
+				const cipher = crypto.createCipheriv('aes-256-ctr', yJs.key, Buffer.alloc(16, 0));
+				const encrypted = Buffer.concat([cipher.update(Buffer.from(serialized, 'utf-8')), cipher.final()]);
+				result[field] = encrypted.toString('base64');
 			}
+
+			return result;
+		}
+
+		function decrypt(obj, keys) {
+			const result = {};
+			console.log('decrypt', obj, keys);
+			for (const field of keys) {
+				const base64 = obj[field];
+				if (typeof base64 !== 'string') continue;
+
+				try {
+					const decipher = crypto.createDecipheriv('aes-256-ctr', yJs.key, Buffer.alloc(16, 0));
+					const decrypted = Buffer.concat([decipher.update(Buffer.from(base64, 'base64')), decipher.final()]);
+					result[field] = JSON.parse(decrypted.toString('utf-8'));
+				} catch (err) {
+					console.error(`Failed to decrypt or parse field "${field}"`, err);
+					result[field] = null;
+				}
+			}
+
+			return result;
 		}
 	};
 

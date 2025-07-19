@@ -512,7 +512,29 @@ export class SignalingConn extends ws.WebsocketClient {
 				});
 			}
 		});
-		this.on('message', (m) => {
+		this.on('message', async (m) => {
+			if (m.type === 'auth-challenge') {
+				console.log('auth-challenge', m, this.providers);
+				const roomName = m.room;
+				const challenge = m.challenge;
+
+				// Find provider for the room
+				const provider = [...this.providers].find((p) => p.roomName === roomName);
+				if (!provider) {
+					console.warn(`No provider found for room ${roomName}`);
+					return;
+				}
+
+				const sig = await provider.signChallenge(challenge);
+
+				this.send({
+					type: 'auth-challenge-response',
+					room: roomName,
+					sig,
+				});
+				return;
+			}
+
 			if (m.type === 'auth-ok') {
 				const roomName = m.room;
 				this.authenticatedRooms.add(roomName);
@@ -653,6 +675,7 @@ export class WebrtcProvider extends ObservableV2 {
 			filterBcConns = true,
 			peerOpts = {}, // simple-peer options. See https://github.com/feross/simple-peer#peer--new-peeropts
 			auth = () => {},
+			signChallenge = () => {},
 		} = {},
 	) {
 		super();
@@ -669,6 +692,7 @@ export class WebrtcProvider extends ObservableV2 {
 		this.maxConns = maxConns;
 		this.peerOpts = peerOpts;
 		this.auth = auth;
+		this.signChallenge = signChallenge;
 		/**
 		 * @type {PromiseLike<CryptoKey | null>}
 		 */

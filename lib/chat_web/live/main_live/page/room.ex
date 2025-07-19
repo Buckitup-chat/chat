@@ -202,6 +202,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         |> Messages.Text.new(time)
         |> Rooms.add_new_message(me, rooms[room.pub_key])
         |> MemoIndex.add(room, rooms[room.pub_key])
+        # here
         |> broadcast_new_message(room.pub_key, me, time)
     end
 
@@ -324,10 +325,9 @@ defmodule ChatWeb.MainLive.Page.Room do
         {_time, id} = msg_id,
         render_fun
       ) do
-    content =
-      Rooms.read_message(msg_id, room_identity)
-      |> then(&%{msg: &1, my_id: my_id})
-      |> render_to_html_string(render_fun)
+    message = Rooms.read_message(msg_id, room_identity)
+    [loaded_message] = Chat.Messaging.preload_content([message])
+    content = render_to_html_string(%{msg: loaded_message, my_id: my_id}, render_fun)
 
     socket
     |> forget_current_messages()

@@ -21,7 +21,9 @@ defmodule Chat.SignedParcel do
     type = Chat.DryStorable.type(message)
     {content, data_list} = Chat.DryStorable.to_parcel(message)
 
-    msg = DialogMessaging.content_to_message(content, me, dialog, opts |> Keyword.put(:type, type))
+    msg =
+      DialogMessaging.content_to_message(content, me, dialog, opts |> Keyword.put(:type, type))
+
     msg_key = DialogMessaging.msg_key(dialog, opts |> Keyword.get(:index, :next), msg.id)
 
     Enum.reduce(data_list, [{msg_key, msg}], fn

@@ -6,8 +6,8 @@ First create the upload key and provide the file metadata and potential destinat
 
 ```javascript
 mutation CreateUpload {
-	uploadKey(
-		myKeypair: {
+  uploadKey(
+    myKeypair: {
       privateKey: "2f85164ec6955c2adf047bc446a4268b984b3885df9aac3a5fd3f7b2fb991250",
       publicKey: "026bcb67707ae152d3417e4d4b0d28876a56c7cf9bda9acff08f2cb47323fefe85"
     },
@@ -15,17 +15,17 @@ mutation CreateUpload {
       type: ROOM,
       keypair: {
       	private_key: "8ae262cfade3504370f5fa9aa489cca2d75768416c5c7fc9e3d242a65f44060c",
-				public_key: "02f95e3ebdd2f1f643738d737d01ef5ea5c356574c5d66fa0ff58dcf70480074c9"
+	public_key: "02f95e3ebdd2f1f643738d737d01ef5ea5c356574c5d66fa0ff58dcf70480074c9"
       }
     },
     entry: {
       clientName: "1111111.jpeg",
-			clientType: "image/jpeg",
-    	clientSize: 102400,
-    	clientRelativePath: "/Downloads/1111111.jpeg",
-    	clientLastModified: 1679466076
+      clientType: "image/jpeg",
+      clientSize: 102400,
+      clientRelativePath: "/Downloads/1111111.jpeg",
+      clientLastModified: 1679466076
     }
-	)
+  )
 }
 ```
 
@@ -101,19 +101,19 @@ echo "File split into $num_chunks chunks of 10MB each and sent to $url."
 ```javascript
 mutation roomWrite {
   roomSendFile(
-		roomKeypair: {
+    roomKeypair: {
       private_key: "8ae262cfade3504370f5fa9aa489cca2d75768416c5c7fc9e3d242a65f44060c",
-			public_key: "02f95e3ebdd2f1f643738d737d01ef5ea5c356574c5d66fa0ff58dcf70480074c9"
+      public_key: "02f95e3ebdd2f1f643738d737d01ef5ea5c356574c5d66fa0ff58dcf70480074c9"
     }
-		myKeypair: {
+    myKeypair: {
       privateKey: "2f85164ec6955c2adf047bc446a4268b984b3885df9aac3a5fd3f7b2fb991250",
       publicKey: "026bcb67707ae152d3417e4d4b0d28876a56c7cf9bda9acff08f2cb47323fefe85"
     }
     uploadKey: "a79f0b663a01b53df466335d23096e61521ca4d1f1d6ef9919281b4e1b4dbdb9"
-) {
-		id
-		index
-	}   
+  ) {
+    id
+    index
+  }   
 }
 ```
 

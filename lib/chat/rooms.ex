@@ -181,16 +181,36 @@ defmodule Chat.Rooms do
   ## Returns
   - {index, message} tuple where index is the message index and message is the room message
   """
-  @spec extract_message_from_parcel(Chat.SignedParcel.t(), Identity.t()) :: {integer(), Message.t()}
-  def extract_message_from_parcel(%Chat.SignedParcel{data: data}, %Identity{} = room_identity) do
-    room_key = room_identity |> Identity.pub_key()
+  @spec extract_message_from_parcel(Chat.SignedParcel.t(), Identity.t() | nil) ::
+          {integer(), Message.t()}
+  def extract_message_from_parcel(parcel, room_identity \\ nil) do
+    # Check if the parcel contains a room message
+    if Chat.SignedParcel.message_type(parcel) == :room_message do
+      # Extract the message first
+      result = Chat.SignedParcel.extract_indexed_message(parcel)
 
-    case Enum.find(data, fn {k, _} -> match?({:room_message, _, _, _}, k) end) do
-      {{:room_message, ^room_key, index, _msg_id}, message} ->
-        {index, message}
+      # If room_identity is provided, validate that the room key matches
+      if room_identity do
+        room_key = Identity.pub_key(room_identity)
 
-      nil ->
-        raise ArgumentError, "Parcel does not contain a room message for this room"
+        # Check if any room message entry in the data has the matching room key
+        has_matching_room =
+          Enum.any?(parcel.data, fn
+            {{:room_message, ^room_key, _, _}, _} -> true
+            _ -> false
+          end)
+
+        if has_matching_room do
+          result
+        else
+          raise ArgumentError, "Parcel does not contain a room message for this room"
+        end
+      else
+        # No room identity check needed
+        result
+      end
+    else
+      raise ArgumentError, "Parcel does not contain a room message"
     end
   end
 end

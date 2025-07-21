@@ -12,6 +12,8 @@ defmodule Chat.SignedParcel do
 
   defstruct data: [], sign: ""
 
+  @type t() :: %__MODULE__{data: list(), sign: binary()}
+
   @doc """
   Wrap message into parcel.
 
@@ -65,11 +67,12 @@ defmodule Chat.SignedParcel do
       content
       |> Enigma.encrypt_and_bisign(author.private_key, room_identity.private_key)
 
-    msg = RoomMessage.new(
-      encrypted_content,
-      author.public_key,
-      opts |> Keyword.put(:type, type)
-    )
+    msg =
+      RoomMessage.new(
+        encrypted_content,
+        author.public_key,
+        opts |> Keyword.put(:type, type)
+      )
 
     id = opts |> Keyword.get(:id, msg.id)
     index = opts |> Keyword.get(:index, :next)
@@ -126,14 +129,16 @@ defmodule Chat.SignedParcel do
         end
 
       [{{:room_message, room_key, _, _}, %RoomMessage{type: :text}}] ->
-        match?(%RoomMessage{author_key: ^public_key}, elem(List.last(items), 1)) or public_key == room_key
+        match?(%RoomMessage{author_key: ^public_key}, elem(List.last(items), 1)) or
+          public_key == room_key
 
       [
         {{:memo, _}, _},
         {{:memo_index, room_key, _}, true},
         {{:room_message, room_key, _, _}, %RoomMessage{type: :memo}}
       ] ->
-        match?(%RoomMessage{author_key: ^public_key}, elem(List.last(items), 1)) or public_key == room_key
+        match?(%RoomMessage{author_key: ^public_key}, elem(List.last(items), 1)) or
+          public_key == room_key
     end
   end
 
@@ -244,6 +249,39 @@ defmodule Chat.SignedParcel do
       Chat.Dialogs.Registry.find(dialog_key)
 
     [dialog.a_key, dialog.b_key]
+  end
+
+  @doc """
+  Extracts the main message from a signed parcel as an {index, message} tuple.
+  Works for any message type (room_message, dialog_message, etc.)
+
+  ## Returns
+  - {index, message} tuple where index is the message index and message is the extracted message
+
+  ## Examples
+      extract_indexed_message(parcel)
+  """
+  @spec extract_indexed_message(t()) :: {integer(), any()}
+  def extract_indexed_message(%__MODULE__{data: data}) do
+    # Extract based on message type pattern and transform in one step
+    Enum.find_value(data, fn
+      {{:dialog_message, _dialog_hash, index, _msg_id}, message} -> {index, message}
+      {{:room_message, _room_key, index, _msg_id}, message} -> {index, message}
+      _ -> false
+    end) || raise ArgumentError, "Parcel does not contain a message"
+  end
+
+  @doc """
+  Gets the type of the main message in the parcel (:dialog_message, :room_message, etc.)
+  """
+  @spec message_type(t()) :: atom() | nil
+  def message_type(%__MODULE__{data: data}) do
+    Enum.find_value(data, fn {key, _} ->
+      case key do
+        {type, _, _, _} when type in [:dialog_message, :room_message] -> type
+        _ -> false
+      end
+    end)
   end
 end
 

@@ -142,14 +142,12 @@ defmodule Chat.Dialogs do
   - {index, message} tuple where index is the message index and message is the dialog message
   """
   @spec parsel_to_indexed_message(Chat.SignedParcel.t()) :: {integer(), Message.t()}
-  def parsel_to_indexed_message(%Chat.SignedParcel{data: data}) do
-    # Find the dialog message entry in the parcel data
-    case Enum.find(data, fn {key, _} -> match?({:dialog_message, _, _, _}, key) end) do
-      {{:dialog_message, _dialog_hash, index, _msg_id}, message} ->
-        {index, message}
-
-      nil ->
-        raise ArgumentError, "Parcel does not contain a dialog message"
+  def parsel_to_indexed_message(parcel) do
+    # Use the centralized extraction function
+    if Chat.SignedParcel.message_type(parcel) == :dialog_message do
+      Chat.SignedParcel.extract_indexed_message(parcel)
+    else
+      raise ArgumentError, "Parcel does not contain a dialog message"
     end
   end
 end

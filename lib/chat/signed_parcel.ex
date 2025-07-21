@@ -6,6 +6,9 @@ defmodule Chat.SignedParcel do
 
   alias Chat.Dialogs.DialogMessaging
   alias Chat.Dialogs.Message, as: DialogMessage
+  alias Chat.Rooms.RoomMessages
+  alias Chat.Identity
+  alias Chat.Rooms.Message, as: RoomMessage
 
   defstruct data: [], sign: ""
 
@@ -44,6 +47,49 @@ defmodule Chat.SignedParcel do
     |> sign(me.private_key)
   end
 
+  @doc """
+  Wrap message into room parcel.
+
+  Options:
+    * `type` - message type
+    * `id` - message id
+    * `index` - message index
+  """
+  def wrap_room_message(message, room_identity, author, opts \\ []) do
+    type = Chat.DryStorable.type(message)
+    {content, data_list} = Chat.DryStorable.to_parcel(message)
+
+    room_pub_key = Identity.pub_key(room_identity)
+
+    encrypted_content =
+      content
+      |> Enigma.encrypt_and_bisign(author.private_key, room_identity.private_key)
+
+    msg = RoomMessage.new(
+      encrypted_content,
+      author.public_key,
+      opts |> Keyword.put(:type, type)
+    )
+
+    id = opts |> Keyword.get(:id, msg.id)
+    index = opts |> Keyword.get(:index, :next)
+    msg_key = RoomMessages.key(room_pub_key, index, id)
+
+    Enum.reduce(data_list, [{msg_key, msg}], fn
+      {{:memo, key}, _} = data, acc ->
+        room = %Chat.Rooms.Room{pub_key: room_pub_key}
+        extra = Chat.MemoIndex.pack(room, key)
+        [[data | extra] | acc]
+
+      x, acc ->
+        [x | acc]
+    end)
+    |> List.flatten()
+    |> Enum.sort()
+    |> new()
+    |> sign(author.private_key)
+  end
+
   def sign_valid?(%__MODULE__{} = parcel, public_key) do
     Enigma.valid_sign?(
       parcel.sign,
@@ -78,6 +124,16 @@ defmodule Chat.SignedParcel do
           some_pkey != public_key and other_okey != public_key -> false
           peers = dialog_peer_keys(dialog_key) -> some_pkey in peers and other_okey in peers
         end
+
+      [{{:room_message, room_key, _, _}, %RoomMessage{type: :text}}] ->
+        match?(%RoomMessage{author_key: ^public_key}, elem(List.last(items), 1)) or public_key == room_key
+
+      [
+        {{:memo, _}, _},
+        {{:memo_index, room_key, _}, true},
+        {{:room_message, room_key, _, _}, %RoomMessage{type: :memo}}
+      ] ->
+        match?(%RoomMessage{author_key: ^public_key}, elem(List.last(items), 1)) or public_key == room_key
     end
   end
 

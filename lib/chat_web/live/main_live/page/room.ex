@@ -198,12 +198,14 @@ defmodule ChatWeb.MainLive.Page.Room do
         nil
 
       content ->
-        content
-        |> Messages.Text.new(time)
-        |> Rooms.add_new_message(me, rooms[room.pub_key])
-        |> MemoIndex.add(room, rooms[room.pub_key])
-        # here
-        |> broadcast_new_message(room.pub_key, me, time)
+        %Messages.Text{text: content, timestamp: time}
+        |> Chat.SignedParcel.wrap_room_message(rooms[room.pub_key], me)
+        |> Chat.store_parcel()
+        |> Chat.run_when_parcel_stored(fn parcel ->
+          # Extract and broadcast the message
+          {index, message} = Chat.Rooms.extract_message_from_parcel(parcel, rooms[room.pub_key])
+          broadcast_new_message({index, message}, room.pub_key, me, time)
+        end)
     end
 
     socket

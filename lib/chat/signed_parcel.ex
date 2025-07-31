@@ -66,8 +66,13 @@ defmodule Chat.SignedParcel do
     * `type` - message type
     * `id` - message id
     * `index` - message index
+    * `now` - timestamp
   """
   def wrap_room_message(message, room_identity, author, opts \\ []) do
+    timestamp =
+      Chat.DryStorable.timestamp(message) ||
+        Keyword.get(opts, :now, System.system_time(:millisecond))
+
     type = Chat.DryStorable.type(message)
     {content, data_list} = Chat.DryStorable.to_parcel(message)
 
@@ -81,7 +86,7 @@ defmodule Chat.SignedParcel do
       RoomMessage.new(
         encrypted_content,
         author.public_key,
-        opts |> Keyword.put(:type, type)
+        opts |> Keyword.put(:type, type) |> Keyword.put(:now, timestamp)
       )
 
     id = opts |> Keyword.get(:id, msg.id)

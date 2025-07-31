@@ -7,7 +7,6 @@ defmodule Chat.RoomDataFlowTest do
   alias Chat.Rooms
   alias Chat.User
   alias Chat.Utils.StorageId
-  alias Support.FakeData
 
   @moduledoc """
   Tests for room message data flow, mirroring the test cases from DataFlowTest but for rooms.
@@ -34,6 +33,7 @@ defmodule Chat.RoomDataFlowTest do
 
     assert received_message.type == :text
     assert received_message.content == text_message
+    assert received_message.timestamp == message.timestamp
 
     alice_key = alice |> Identity.pub_key()
     assert received_message.author_key == alice_key
@@ -99,10 +99,12 @@ defmodule Chat.RoomDataFlowTest do
 
     stored_parcel =
       updated_message
-      |> Chat.SignedParcel.wrap_room_message(room_identity, alice, [
-        id: original_message.id,  # Use the original message ID
-        index: original_message.index  # Use the original message index
-      ])
+      |> Chat.SignedParcel.wrap_room_message(room_identity, alice,
+        # Use the original message ID
+        id: original_message.id,
+        # Use the original message index
+        index: original_message.index
+      )
       |> Chat.store_parcel(await: true)
 
     assert Chat.SignedParcel.sign_valid?(stored_parcel, alice.public_key)

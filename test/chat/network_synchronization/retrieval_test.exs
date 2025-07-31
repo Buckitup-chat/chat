@@ -19,7 +19,7 @@ defmodule Chat.NetworkSynchronization.RetrievalTest do
     assert {:error, "Not an API endpoint"} = get_keys_by("http://google.com")
 
     assert {:error, "API error"} =
-             get_keys_by("https://api.sampleapis.com/avatar/graphql")
+             get_keys_by("https://countries.trevorblades.com/graphql ")
   end
 
   test "list on getting keys from correct url", %{user: user_pub_key} do
@@ -48,6 +48,11 @@ defmodule Chat.NetworkSynchronization.RetrievalTest do
 
   test "special helper to make a sync" do
     assert :ok = Retrieval.all_from(ChatWeb.Endpoint.url() <> "/naive_api/")
+  end
+
+  test "buckitup.xyz" do
+    assert {:error, "Not an API endpoint"} = get_keys_by("https://buckitup.xyz")
+    assert {:ok, _} = get_keys_by("http://buckitup.xyz:4402/naive_api")
   end
 
   defp get_keys_by(url), do: Retrieval.remote_keys(url)

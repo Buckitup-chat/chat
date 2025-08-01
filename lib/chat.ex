@@ -28,6 +28,10 @@ defmodule Chat do
           next_index = Ordering.next({:dialog_message, dialog_hash})
           {{:dialog_message, dialog_hash, next_index, message_id}, message}
 
+        {{:room_message, room_key, :next, message_id}, message} ->
+          next_index = Ordering.next({:room_message, room_key})
+          {{:room_message, room_key, next_index, message_id}, message}
+
         {key, value} ->
           {key, value}
       end)

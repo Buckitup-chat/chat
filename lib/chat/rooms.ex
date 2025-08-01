@@ -181,9 +181,9 @@ defmodule Chat.Rooms do
   ## Returns
   - {index, message} tuple where index is the message index and message is the room message
   """
-  @spec extract_message_from_parcel(Chat.SignedParcel.t(), Identity.t() | nil) ::
+  @spec parcel_to_indexed_message(Chat.SignedParcel.t(), Identity.t() | nil) ::
           {integer(), Message.t()}
-  def extract_message_from_parcel(parcel, room_identity \\ nil) do
+  def parcel_to_indexed_message(parcel, room_identity \\ nil) do
     # Check if the parcel contains a room message
     if Chat.SignedParcel.message_type(parcel) == :room_message do
       # Extract the message first

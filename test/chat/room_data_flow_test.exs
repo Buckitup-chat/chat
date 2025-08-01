@@ -19,12 +19,12 @@ defmodule Chat.RoomDataFlowTest do
     text_message = "Hello from Alice to the room"
     message = %Messages.Text{text: text_message, timestamp: System.system_time(:second)}
 
-    stored_parcel =
-      message
-      |> Chat.SignedParcel.wrap_room_message(room_identity, alice)
-      |> Chat.store_parcel(await: true)
-
-    assert Chat.SignedParcel.sign_valid?(stored_parcel, alice.public_key)
+    message
+    |> Chat.SignedParcel.wrap_room_message(room_identity, alice)
+    |> tap(fn parcel ->
+      assert Chat.SignedParcel.sign_valid?(parcel, alice.public_key)
+    end)
+    |> Chat.store_parcel(await: true)
 
     messages = room |> Rooms.read(room_identity)
 
@@ -46,12 +46,12 @@ defmodule Chat.RoomDataFlowTest do
     long_text = String.duplicate("This is a long memo message for a room. ", 100)
     memo_message = %Messages.Text{text: long_text, timestamp: System.system_time(:second)}
 
-    stored_parcel =
-      memo_message
-      |> Chat.SignedParcel.wrap_room_message(room_identity, alice)
-      |> Chat.store_parcel(await: true)
-
-    assert Chat.SignedParcel.sign_valid?(stored_parcel, alice.public_key)
+    memo_message
+    |> Chat.SignedParcel.wrap_room_message(room_identity, alice)
+    |> tap(fn parcel ->
+      assert Chat.SignedParcel.sign_valid?(parcel, alice.public_key)
+    end)
+    |> Chat.store_parcel(await: true)
 
     messages = room |> Rooms.read(room_identity)
 
@@ -79,12 +79,12 @@ defmodule Chat.RoomDataFlowTest do
     short_text = "This is a short room message"
     text_message = %Messages.Text{text: short_text, timestamp: System.system_time(:second)}
 
-    stored_parcel =
-      text_message
-      |> Chat.SignedParcel.wrap_room_message(room_identity, alice)
-      |> Chat.store_parcel(await: true)
-
-    assert Chat.SignedParcel.sign_valid?(stored_parcel, alice.public_key)
+    text_message
+    |> Chat.SignedParcel.wrap_room_message(room_identity, alice)
+    |> tap(fn parcel ->
+      assert Chat.SignedParcel.sign_valid?(parcel, alice.public_key)
+    end)
+    |> Chat.store_parcel(await: true)
 
     [original_message] = room |> Rooms.read(room_identity)
     assert original_message.content == short_text
@@ -97,17 +97,17 @@ defmodule Chat.RoomDataFlowTest do
       timestamp: System.system_time(:second)
     }
 
-    stored_parcel =
-      updated_message
-      |> Chat.SignedParcel.wrap_room_message(room_identity, alice,
-        # Use the original message ID
-        id: original_message.id,
-        # Use the original message index
-        index: original_message.index
-      )
-      |> Chat.store_parcel(await: true)
-
-    assert Chat.SignedParcel.sign_valid?(stored_parcel, alice.public_key)
+    updated_message
+    |> Chat.SignedParcel.wrap_room_message(room_identity, alice,
+      # Use the original message ID
+      id: original_message.id,
+      # Use the original message index
+      index: original_message.index
+    )
+    |> tap(fn parcel ->
+      assert Chat.SignedParcel.sign_valid?(parcel, alice.public_key)
+    end)
+    |> Chat.store_parcel(await: true)
 
     updated_messages = room |> Rooms.read(room_identity)
     assert length(updated_messages) == 1
@@ -132,12 +132,12 @@ defmodule Chat.RoomDataFlowTest do
     text_message = "Hello from Alice to the room"
     message = %Messages.Text{text: text_message}
 
-    stored_parcel =
-      message
-      |> Chat.SignedParcel.wrap_room_message(room_identity, alice)
-      |> Chat.store_parcel(await: true)
-
-    assert Chat.SignedParcel.sign_valid?(stored_parcel, alice.public_key)
+    message
+    |> Chat.SignedParcel.wrap_room_message(room_identity, alice)
+    |> tap(fn parcel ->
+      assert Chat.SignedParcel.sign_valid?(parcel, alice.public_key)
+    end)
+    |> Chat.store_parcel(await: true)
 
     # Room message verification could be added in the future similar to dialog messages
     # We might need to implement scope_valid? logic for room messages

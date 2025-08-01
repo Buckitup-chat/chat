@@ -203,7 +203,7 @@ defmodule ChatWeb.MainLive.Page.Room do
         |> Chat.store_parcel()
         |> Chat.run_when_parcel_stored(fn parcel ->
           # Extract and broadcast the message
-          {index, message} = Chat.Rooms.extract_message_from_parcel(parcel, rooms[room.pub_key])
+          {index, message} = Chat.Rooms.parcel_to_indexed_message(parcel, rooms[room.pub_key])
           broadcast_new_message({index, message}, room.pub_key, me, time)
         end)
     end

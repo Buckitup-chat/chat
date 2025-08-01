@@ -152,7 +152,7 @@ export class EncryptionManager extends EventTarget {
 			this.setCurrentUser(true);
 		} catch (error) {
 			this.isAuth = false; // Use the setter
-			console.error(error);
+			console.log('Passkey auth failed');
 		}
 	}
 

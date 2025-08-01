@@ -16,7 +16,7 @@
 				<div class="text-danger text-center fw-bold mt-2" v-if="contact.hidden">Contact is hidden in your list of contacts</div>
 
 				<div class="d-flex justify-content-center align-items-center mt-4 mb-3">
-					<button type="button" class="btn btn-dark rounded-pill _action_btn" v-tooltip="'Chat with contact'">
+					<button type="button" class="btn btn-dark rounded-pill _action_btn" v-tooltip="'Chat with contact'" @click="goToChat()">
 						<i class="_icon_chats bg-white"></i>
 					</button>
 
@@ -82,6 +82,10 @@ onMounted(async () => {
 		return $router.push({ name: 'account_info' });
 	}
 });
+
+const goToChat = async () => {
+	window.location.href = `https://buckitup.xyz/chat/${contact.value.publicKey}`;
+};
 
 const contact = computed(() => {
 	return $user.contacts.find((e) => e.address === $route.params.address);

@@ -174,4 +174,43 @@ defmodule Chat.Rooms do
       _ -> default
     end
   end
+
+  @doc """
+  Extracts a room message from a signed parcel.
+
+  ## Returns
+  - {index, message} tuple where index is the message index and message is the room message
+  """
+  @spec parcel_to_indexed_message(Chat.SignedParcel.t(), Identity.t() | nil) ::
+          {integer(), Message.t()}
+  def parcel_to_indexed_message(parcel, room_identity \\ nil) do
+    # Check if the parcel contains a room message
+    if Chat.SignedParcel.message_type(parcel) == :room_message do
+      # Extract the message first
+      result = Chat.SignedParcel.extract_indexed_message(parcel)
+
+      # If room_identity is provided, validate that the room key matches
+      if room_identity do
+        room_key = Identity.pub_key(room_identity)
+
+        # Check if any room message entry in the data has the matching room key
+        has_matching_room =
+          Enum.any?(parcel.data, fn
+            {{:room_message, ^room_key, _, _}, _} -> true
+            _ -> false
+          end)
+
+        if has_matching_room do
+          result
+        else
+          raise ArgumentError, "Parcel does not contain a room message for this room"
+        end
+      else
+        # No room identity check needed
+        result
+      end
+    else
+      raise ArgumentError, "Parcel does not contain a room message"
+    end
+  end
 end

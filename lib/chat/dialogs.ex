@@ -131,4 +131,23 @@ defmodule Chat.Dialogs do
       x -> x |> Identity.from_strings()
     end
   end
+
+  @doc """
+  Extracts the index and message from a parcel containing a dialog message.
+
+  ## Parameters
+  - parcel: A SignedParcel struct containing dialog message data
+
+  ## Returns
+  - {index, message} tuple where index is the message index and message is the dialog message
+  """
+  @spec parsel_to_indexed_message(Chat.SignedParcel.t()) :: {integer(), Message.t()}
+  def parsel_to_indexed_message(parcel) do
+    # Use the centralized extraction function
+    if Chat.SignedParcel.message_type(parcel) == :dialog_message do
+      Chat.SignedParcel.extract_indexed_message(parcel)
+    else
+      raise ArgumentError, "Parcel does not contain a dialog message"
+    end
+  end
 end

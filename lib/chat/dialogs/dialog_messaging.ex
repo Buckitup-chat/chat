@@ -29,12 +29,14 @@ defmodule Chat.Dialogs.DialogMessaging do
     |> add_message(dialog, source, now: now, type: type)
   end
 
+  @deprecated "should use Chat.store_parcel"
   def on_saved({next, %{id: id}}, dialog, ok_fn) do
     dialog
     |> msg_key(next, id)
     |> ChangeTracker.promise(ok_fn)
   end
 
+  @deprecated "should use copying.await"
   def await_saved({next, %{id: id}}, dialog) do
     dialog
     |> msg_key(next, id)

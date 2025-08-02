@@ -25,3 +25,12 @@ config :chat,
   writable: :yes
 
 config :chat, Chat.Db.ChangeTracker, expire_seconds: 3
+
+# Configure your database for testing
+config :chat, Chat.Repo,
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost",
+  database: "chat_test",
+  pool: Ecto.Adapters.SQL.Sandbox,
+  pool_size: 10

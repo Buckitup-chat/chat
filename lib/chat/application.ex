@@ -21,6 +21,8 @@ defmodule Chat.Application do
       ChatWeb.Telemetry,
       # Start the PubSub system
       {Phoenix.PubSub, name: Chat.PubSub},
+      # Start Ecto repository
+      Chat.Repo,
       # Start DB
       Chat.Ordering.Counters,
       Chat.Db.Supervisor,
@@ -97,13 +99,21 @@ defmodule Chat.Application do
   # coveralls-ignore-end
 
   defp log_version do
-    ver = System.get_env("RELEASE_SYS_CONFIG")
+    Logger.info(["[chat] ", get_version()])
+  end
 
-    if ver do
-      ver
-      |> String.split("/", trim: true)
-      |> Enum.at(3)
-      |> then(&Logger.info(["[chat] ", &1]))
+  defp get_version do
+    cond do
+      version = System.get_env("RELEASE_SYS_CONFIG") ->
+        version
+        |> String.split("/", trim: true)
+        |> Enum.at(3)
+
+      version = System.get_env("CHAT_GIT_COMMIT") ->
+        version
+
+      true -> 
+        "version should be here"
     end
   end
 end

@@ -72,6 +72,8 @@ defmodule Chat.MixProject do
       {:phoenix_live_view, "~> 1.0"},
       {:phoenix_ecto, "~> 4.0"},
       {:ecto, "~> 3.7"},
+      {:ecto_sql, "~> 3.7"},
+      {:postgrex, "~> 0.16"},
       {:plug_cowboy, "~> 2.5"},
       {:phoenix_live_dashboard, "~> 0.7"},
       # {:gettext, "~> 0.18"},

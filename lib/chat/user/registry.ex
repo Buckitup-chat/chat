@@ -2,40 +2,49 @@ defmodule Chat.User.Registry do
   @moduledoc "Registry of User Cards"
 
   alias Chat.Card
-  alias Chat.Db
-  alias Chat.Db.Copying
   alias Chat.Identity
+  alias Chat.Data.User
 
-  def enlist(%Identity{} = user) do
-    user |> Card.from_identity() |> enlist()
+  @doc """
+  Registers a user from an Identity or Card
+  """
+  def enlist(%Identity{} = identity) do
+    User.register(identity)
   end
 
   def enlist(%Card{} = card) do
-    Db.put({:users, card.pub_key}, card)
-
-    card.pub_key
+    User.register(card)
   end
 
+  @doc """
+  Gets all users
+  """
   def all do
-    {{:users, 0}, {:"users\0", 0}}
-    |> Db.list(fn {{:users, pub_key}, %Card{} = user} -> {pub_key, user} end)
+    User.all()
   end
 
+  @doc """
+  Gets a user by public key
+  """
   def one(pub_key) do
-    Db.get({:users, pub_key})
+    User.get(pub_key)
   end
 
+  @doc """
+  Removes a user by public key
+  """
   def remove(pub_key) do
-    Db.delete({:users, pub_key})
+    User.remove(pub_key)
   end
 
+  @doc """
+  Waits for users to be written to storage
+  """
   def await_saved(pub_key_list) when is_list(pub_key_list) do
-    pub_key_list
-    |> Enum.map(&{:users, &1})
-    |> Copying.await_written_into(Db.db())
+    User.await_saved(pub_key_list)
   end
 
   def await_saved(pub_key) do
-    Copying.await_written_into([{:users, pub_key}], Db.db())
+    User.await_saved(pub_key)
   end
 end

@@ -1,11 +1,16 @@
-defmodule Chat.Schema.User do
+defmodule Chat.Data.Schemas.User do
   use Ecto.Schema
   import Ecto.Changeset
 
   @primary_key {:pub_key, :binary, []}
+  @timestamps_opts [type: :utc_datetime]
+
   schema "users" do
     field :name, :string
     field :hash, :string, virtual: true
+
+    # Explicitly disable timestamps since they were removed in migration
+    timestamps(inserted_at: false, updated_at: false)
   end
 
   @doc false
@@ -41,18 +46,18 @@ defmodule Chat.Schema.User do
   def fetch(user, :hash) do
     {:ok, Enigma.Hash.short_hash(user.pub_key)}
   end
-  
+
   def fetch(user, key) do
     Map.fetch(user, key)
   end
-  
+
   def get(user, key, default \\ nil) do
     case fetch(user, key) do
       {:ok, value} -> value
       :error -> default
     end
   end
-  
+
   def get_and_update(user, key, fun) do
     case fetch(user, key) do
       {:ok, value} ->
@@ -63,7 +68,7 @@ defmodule Chat.Schema.User do
         {get, Map.put(user, key, update)}
     end
   end
-  
+
   def pop(user, key, default \\ nil) do
     value = get(user, key, default)
     {value, Map.delete(user, key)}

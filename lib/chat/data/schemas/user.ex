@@ -6,8 +6,8 @@ defmodule Chat.Data.Schemas.User do
   @timestamps_opts [type: :utc_datetime]
 
   schema "users" do
-    field :name, :string
-    field :hash, :string, virtual: true
+    field(:name, :string)
+    field(:hash, :string, virtual: true)
 
     # Explicitly disable timestamps since they were removed in migration
     timestamps(inserted_at: false, updated_at: false)
@@ -63,6 +63,7 @@ defmodule Chat.Data.Schemas.User do
       {:ok, value} ->
         {get, update} = fun.(value)
         {get, Map.put(user, key, update)}
+
       :error ->
         {get, update} = fun.(nil)
         {get, Map.put(user, key, update)}

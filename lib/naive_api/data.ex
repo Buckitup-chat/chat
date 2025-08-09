@@ -40,7 +40,7 @@ defmodule NaiveApi.Data do
       <<_::64, ?-, _::32, ?-, _::32, ?-, _::32, ?-, _::96>> = uuid -> uuid
       b when is_bitstring(b) -> b |> bits_encode()
       t when is_tuple(t) -> t |> serialize_key()
-      l when is_list(l) -> l |> Jason.encode!() |> bits_encode() 
+      l when is_list(l) -> l |> Jason.encode!() |> bits_encode()
     end)
   end
 
@@ -100,7 +100,7 @@ defmodule NaiveApi.Data do
       ["action_log", index, key] ->
         {:action_log, index |> to_int(), key |> bits_decode()}
 
-      ["storage", user_key, data_key] -> 
+      ["storage", user_key, data_key] ->
         {:storage, user_key |> bits_decode(), data_key |> bits_decode() |> Jason.decode!()}
 
       _ ->

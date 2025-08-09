@@ -21,8 +21,8 @@ defmodule Chat.Application do
       ChatWeb.Telemetry,
       # Start the PubSub system
       {Phoenix.PubSub, name: Chat.PubSub},
-      # Start Ecto repository
-      Chat.Repo,
+      # Start Ecto repository with retry mechanism
+      Chat.RepoSupervisor,
       # Start DB
       Chat.Ordering.Counters,
       Chat.Db.Supervisor,
@@ -31,7 +31,7 @@ defmodule Chat.Application do
       Chat.KeyRingTokens,
       Chat.Broker,
       Chat.ChunkedFilesBroker,
-      Chat.User.UsersBroker,
+      # Chat.User.UsersBroker,
       Chat.Rooms.RoomsBroker,
       Chat.RoomMessageLinksBroker,
       Chat.Sync.CargoRoom,
@@ -112,7 +112,7 @@ defmodule Chat.Application do
       version = System.get_env("CHAT_GIT_COMMIT") ->
         version
 
-      true -> 
+      true ->
         "version should be here"
     end
   end

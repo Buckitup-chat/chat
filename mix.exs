@@ -69,7 +69,7 @@ defmodule Chat.MixProject do
       {:phoenix_html_helpers, "~> 1.0"},
       {:phoenix_view, "~> 2.0"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 1.0"},
+      {:phoenix_live_view, "1.0.17"},
       {:phoenix_ecto, "~> 4.0"},
       {:ecto, "~> 3.7"},
       {:plug_cowboy, "~> 2.5"},

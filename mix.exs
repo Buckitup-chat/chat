@@ -91,6 +91,7 @@ defmodule Chat.MixProject do
       # {:live_isolated_component, git: "https://github.com/Aratramba/live_isolated_component.git", branch: "upgrade-liveview-1.1", only: [:dev, :test]},
       # {:live_isolated_component, git: "https://github.com/geofflane/live_isolated_component.git", branch: "chore/phoenix_18", only: [:dev, :test]},
       {:live_isolated_component, github: "sergey-lukianov/live_isolated_component", only: [:dev, :test]},
+      {:lazy_html, ">= 0.1.0", only: :test},
 
       # other
       {:absinthe, "~> 1.7"},

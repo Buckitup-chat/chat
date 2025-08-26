@@ -46,6 +46,10 @@ defmodule ChatWeb.MainLive.Index do
 
     socket =
       socket
+      |> assign(:vue_test_count, 7)
+
+    socket =
+      socket
       |> assign(:operating_system, operating_system)
       |> assign_backup_settings()
       |> assign_cargo_settings()
@@ -142,6 +146,12 @@ defmodule ChatWeb.MainLive.Index do
     |> Page.Login.handshaked()
     |> Page.Login.load_user(data)
     |> login_init()
+    |> noreply()
+  end
+
+  def handle_event("vue_test_inc", %{"value" => diff}, socket) do
+    socket
+    |> assign(:vue_test_count, socket.assigns.vue_test_count + diff)
     |> noreply()
   end
 

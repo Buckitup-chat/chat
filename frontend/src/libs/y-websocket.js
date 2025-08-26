@@ -137,14 +137,64 @@ const setupWS = async (provider) => {
 		provider.wsconnected = false;
 		provider.synced = false;
 
-		websocket.onmessage = (event) => {
+		websocket.onmessage = async (event) => {
 			provider.wsLastMessageReceived = time.getUnixTime();
 
-			const raw = new Uint8Array(event.data);
-			const encoder = readMessage(provider, raw, true);
+			console.log('websocket.onmessage', event);
 
-			if (encoding.length(encoder) > 1) {
-				websocket.send(encoding.toUint8Array(encoder));
+			if (typeof event.data === 'string') {
+				const msg = JSON.parse(event.data);
+
+				switch (msg.type) {
+					case 'auth-challenge': {
+						const challengeSig = await wallet.signMessage(msg.challenge);
+						websocket.send(
+							JSON.stringify({
+								type: 'auth-challenge-response',
+								room: provider.roomname,
+								sig: challengeSig,
+							}),
+						);
+						break;
+					}
+					case 'auth-ok': {
+						// Now safe to send sync messages
+						provider.wsconnected = true;
+						provider.wsconnecting = false;
+						provider.wsUnsuccessfulReconnects = 0;
+
+						provider.emit('status', [{ status: 'connected' }]);
+
+						const encoder = encoding.createEncoder();
+						encoding.writeVarUint(encoder, messageSync);
+						syncProtocol.writeSyncStep1(encoder, provider.doc);
+						websocket.send(encoding.toUint8Array(encoder));
+
+						if (provider.awareness.getLocalState() !== null) {
+							const encoderAwareness = encoding.createEncoder();
+							encoding.writeVarUint(encoderAwareness, messageAwareness);
+							encoding.writeVarUint8Array(encoderAwareness, awarenessProtocol.encodeAwarenessUpdate(provider.awareness, [provider.doc.clientID]));
+							websocket.send(encoding.toUint8Array(encoderAwareness));
+						}
+						break;
+					}
+					case 'auth-fail': {
+						provider.emit('connection-error', [new Error(msg.error), provider]);
+						websocket.close();
+						break;
+					}
+					case 'error': {
+						provider.emit('connection-error', [new Error(msg.error), provider]);
+						break;
+					}
+				}
+			} else {
+				// Binary sync messages
+				const raw = new Uint8Array(event.data);
+				const encoder = readMessage(provider, raw, true);
+				if (encoding.length(encoder) > 1) {
+					websocket.send(encoding.toUint8Array(encoder));
+				}
 			}
 		};
 		websocket.onerror = (event) => {
@@ -155,27 +205,15 @@ const setupWS = async (provider) => {
 		};
 		websocket.onopen = () => {
 			provider.wsLastMessageReceived = time.getUnixTime();
-			provider.wsconnecting = false;
-			provider.wsconnected = true;
-			provider.wsUnsuccessfulReconnects = 0;
-			provider.emit('status', [
-				{
-					status: 'connected',
-				},
-			]);
-			// always send sync step 1 when connected
-			const encoder = encoding.createEncoder();
-			encoding.writeVarUint(encoder, messageSync);
-			syncProtocol.writeSyncStep1(encoder, provider.doc);
-			websocket.send(encoding.toUint8Array(encoder));
-
-			// broadcast local awareness state
-			if (provider.awareness.getLocalState() !== null) {
-				const encoderAwarenessState = encoding.createEncoder();
-				encoding.writeVarUint(encoderAwarenessState, messageAwareness);
-				encoding.writeVarUint8Array(encoderAwarenessState, awarenessProtocol.encodeAwarenessUpdate(provider.awareness, [provider.doc.clientID]));
-				websocket.send(encoding.toUint8Array(encoderAwarenessState));
-			}
+			// Initial auth message — wait for challenge
+			websocket.send(
+				JSON.stringify({
+					type: 'auth',
+					room: provider.roomname,
+					ts,
+					sig,
+				}),
+			);
 		};
 		provider.emit('status', [
 			{

@@ -36,7 +36,9 @@ defmodule Chat.Dialogs do
   defdelegate add_new_message(message, author, dialog), to: DialogMessaging
   defdelegate update_message(message, msg_id, author, dialog), to: DialogMessaging
   defdelegate delete(dialog, author, msg_time_id), to: DialogMessaging
+  @deprecated "should use copying.await"
   defdelegate await_saved(added_message, dialog), to: DialogMessaging
+  @deprecated "should use Chat.store_parcel"
   defdelegate on_saved(added_message, dialog, action), to: DialogMessaging
 
   def read(

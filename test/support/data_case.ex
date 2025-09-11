@@ -21,8 +21,12 @@ defmodule ChatWeb.DataCase do
   end
 
   setup tags do
-    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Chat.Repo, shared: not tags[:async])
-    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Chat.Repo)
+
+    unless tags[:async] do
+      Ecto.Adapters.SQL.Sandbox.mode(Chat.Repo, {:shared, self()})
+    end
+
     :ok
   end
 

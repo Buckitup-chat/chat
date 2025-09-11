@@ -1,5 +1,5 @@
 defmodule Chat.DB.SyncTest do
-  use ExUnit.Case, async: false
+  use ChatWeb.DataCase, async: false
 
   import Support.Db.Sync
 

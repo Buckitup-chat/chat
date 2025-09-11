@@ -1,5 +1,5 @@
 defmodule Chat.Dialogs.DialogTest do
-  use ExUnit.Case, async: true
+  use ChatWeb.DataCase, async: true
 
   alias Chat.Card
   alias Chat.Content.Files

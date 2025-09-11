@@ -1,5 +1,5 @@
 defmodule Chat.User.UsersBrokerTest do
-  use ExUnit.Case, async: true
+  use ChatWeb.DataCase, async: false
   alias Chat.Card
   alias Chat.User.UsersBroker
 

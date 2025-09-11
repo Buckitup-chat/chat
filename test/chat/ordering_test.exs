@@ -1,5 +1,5 @@
 defmodule Chat.OrderingTest do
-  use ExUnit.Case, async: false
+  use ChatWeb.DataCase, async: false
 
   alias Chat.Card
   alias Chat.Db.ChangeTracker

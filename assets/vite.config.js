@@ -33,6 +33,7 @@ export default defineConfig(({ command }) => {
       // we want to enable it for better DX
       // more https://vitejs.dev/guide/dep-pre-bundling#monorepos-and-linked-dependencies
       include: ["live_vue", "phoenix", "phoenix_html", "phoenix_live_view"],
+      exclude: ["@lo-fi/local-vault"],
       esbuildOptions: {
         // WALC (dependency) uses "top-level await", which is ES2022+
         target: "es2022",

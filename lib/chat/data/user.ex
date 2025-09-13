@@ -15,7 +15,6 @@ defmodule Chat.Data.User do
   end
 
   def register(%Card{} = card) do
-    # Save to Postgres using Ecto with conflict handling
     UserQueries.insert_card(card)
 
     card.pub_key
@@ -26,8 +25,7 @@ defmodule Chat.Data.User do
   """
   def all do
     UserQueries.list_all()
-    |> Enum.map(fn user -> {user.pub_key, Chat.Data.Schemas.User.to_card(user)} end)
-    |> Enum.into(%{})
+    |> Map.new(fn user -> {user.pub_key, Chat.Data.Schemas.User.to_card(user)} end)
   end
 
   @doc """
@@ -51,11 +49,7 @@ defmodule Chat.Data.User do
   Legacy function maintained for compatibility.
   In Postgres-only mode, no need to wait for writes.
   """
-  def await_saved(pub_key_list) when is_list(pub_key_list) do
-    :ok
-  end
-
-  def await_saved(_pub_key) do
+  def await_saved(_) do
     :ok
   end
 end

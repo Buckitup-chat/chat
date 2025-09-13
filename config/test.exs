@@ -33,4 +33,10 @@ config :chat, Chat.Repo,
   hostname: "localhost",
   database: "chat_test",
   pool: Ecto.Adapters.SQL.Sandbox,
-  pool_size: 10
+  pool_size: 10,
+  ownership_timeout: 60_000,
+  queue_target: 1000,
+  # Disable connection awaiting in test environment for faster startup
+  connect_timeout: 1000,
+  handshake_timeout: 1000,
+  prepare: :unnamed

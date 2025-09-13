@@ -5,8 +5,6 @@ defmodule Chat.RepoStarter do
   use GenServer
   require Logger
 
-  @retry_interval :timer.seconds(3)
-
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(args) do
     opts =
@@ -18,24 +16,40 @@ defmodule Chat.RepoStarter do
     GenServer.start_link(__MODULE__, args, opts)
   end
 
-  @impl GenServer
-  @spec init(keyword()) :: {:ok, map()}
-  def init(args) do
-    supervisor = Keyword.get(args, :supervisor, Chat.RepoDynamicSupervisor)
+  if Mix.env() == :test do
+    @impl GenServer
+    @spec init(keyword()) :: {:ok, map()}
+    def init(args) do
+      supervisor = Keyword.get(args, :supervisor, Chat.RepoDynamicSupervisor)
+      # Start repo with proper name registration for test environment
+      {:ok, _pid} = DynamicSupervisor.start_child(supervisor, {Chat.Repo, [name: Chat.Repo]})
+      run_migrations()
+      {:ok, _pid} = DynamicSupervisor.start_child(supervisor, Chat.User.UsersBroker)
 
-    Process.send_after(self(), :start_repo, @retry_interval)
+      {:ok, %{supervisor: supervisor}}
+    end
+  else
+    @retry_interval :timer.seconds(3)
 
-    {:ok, %{supervisor: supervisor}}
-  end
+    @impl GenServer
+    @spec init(keyword()) :: {:ok, map()}
+    def init(args) do
+      supervisor = Keyword.get(args, :supervisor, Chat.RepoDynamicSupervisor)
 
-  @impl GenServer
-  @spec handle_info(:start_repo, map()) :: {:noreply, map()}
-  def handle_info(:start_repo, state) do
-    {:ok, _pid} = DynamicSupervisor.start_child(state.supervisor, Chat.Repo)
-    run_migrations()
-    {:ok, _pid} = DynamicSupervisor.start_child(state.supervisor, Chat.User.UsersBroker)
-    # {:ok, _pid} = DynamicSupervisor.start_child(state.supervisor, Chat.Rooms.RoomsBroker)
-    {:noreply, state}
+      Process.send_after(self(), :start_repo, @retry_interval)
+
+      {:ok, %{supervisor: supervisor}}
+    end
+
+    @impl GenServer
+    @spec handle_info(:start_repo, map()) :: {:noreply, map()}
+    def handle_info(:start_repo, state) do
+      {:ok, _pid} = DynamicSupervisor.start_child(state.supervisor, Chat.Repo)
+      run_migrations()
+      {:ok, _pid} = DynamicSupervisor.start_child(state.supervisor, Chat.User.UsersBroker)
+      # {:ok, _pid} = DynamicSupervisor.start_child(state.supervisor, Chat.Rooms.RoomsBroker)
+      {:noreply, state}
+    end
   end
 
   @doc """

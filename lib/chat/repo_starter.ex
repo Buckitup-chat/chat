@@ -48,6 +48,9 @@ defmodule Chat.RepoStarter do
       run_migrations()
       {:ok, _pid} = DynamicSupervisor.start_child(state.supervisor, Chat.User.UsersBroker)
       # {:ok, _pid} = DynamicSupervisor.start_child(state.supervisor, Chat.Rooms.RoomsBroker)
+      {:ok, _pid} =
+        DynamicSupervisor.start_child(state.supervisor, {Chat.Repo, [name: Chat.InternalRepo]})
+
       {:noreply, state}
     end
   end
@@ -55,12 +58,11 @@ defmodule Chat.RepoStarter do
   @doc """
   Runs Ecto migrations for the application.
   """
-  @spec run_migrations() :: [any()]
-  def run_migrations do
+  def run_migrations(repo \\ Chat.Repo) do
     Logger.info("Running database migrations")
     path = Application.app_dir(:chat, "priv/repo/migrations")
 
-    Ecto.Migrator.run(Chat.Repo, path, :up, all: true)
+    Ecto.Migrator.run(repo, path, :up, all: true)
     |> tap(fn
       [] -> Logger.info("No migrations to run, database is up to date")
       migrations -> Logger.info("Successfully ran #{length(migrations)} migrations")

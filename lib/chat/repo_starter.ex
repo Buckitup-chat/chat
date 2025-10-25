@@ -59,17 +59,17 @@ defmodule Chat.RepoStarter do
   Runs Ecto migrations for the application.
   """
   def run_migrations(repo \\ Chat.Repo) do
-    Logger.info("Running database migrations")
+    Logger.info("Running database migrations on #{repo}")
     path = Application.app_dir(:chat, "priv/repo/migrations")
 
     Ecto.Migrator.run(repo, path, :up, all: true)
     |> tap(fn
       [] -> Logger.info("No migrations to run, database is up to date")
-      migrations -> Logger.info("Successfully ran #{length(migrations)} migrations")
+      migrations -> Logger.info("Successfully ran #{length(migrations)} migrations on #{repo}")
     end)
   rescue
     e ->
-      Logger.error("Migration failed with error: #{inspect(e)}")
+      Logger.error("Migration on #{repo} failed with error: #{inspect(e)}")
       []
   end
 end

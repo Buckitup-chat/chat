@@ -26,7 +26,6 @@ defmodule Chat.RepoSupervisor do
   end
 
   @impl Supervisor
-  @spec init(term()) :: {:ok, {Supervisor.supervisor_flags(), [Supervisor.child_spec()]}}
   def init(_init_arg) do
     children = [
       # DynamicSupervisor for the Repo

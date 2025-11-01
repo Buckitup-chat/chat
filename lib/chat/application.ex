@@ -16,63 +16,66 @@ defmodule Chat.Application do
     Logger.put_application_level(:ssl, :error)
     log_version()
 
-    children = [
-      # Start the Telemetry supervisor
-      ChatWeb.Telemetry,
-      # Start the PubSub system
-      {Phoenix.PubSub, name: Chat.PubSub},
-      # Start Ecto repository with retry mechanism
-      Chat.RepoSupervisor,
-      # Start DB
-      Chat.Ordering.Counters,
-      Chat.Db.Supervisor,
-      Chat.AdminDb,
-      # Application Services
-      Chat.KeyRingTokens,
-      Chat.Broker,
-      Chat.ChunkedFilesBroker,
-      # Chat.User.UsersBroker,
-      Chat.Rooms.RoomsBroker,
-      Chat.RoomMessageLinksBroker,
-      Chat.Sync.CargoRoom,
-      Chat.Sync.OnlinersSync,
-      Chat.Sync.UsbDriveDumpRoom,
-      {DynamicSupervisor, name: Chat.Upload.UploadSupervisor},
-      {DynamicSupervisor, name: Chat.Db.FreeSpacesSupervisor},
-      ChatWeb.Presence,
-      # Start the Endpoint (http/https)
-      ChatWeb.Endpoint,
-      NetworkSynchronization.Supervisor,
-      # Supervised tasks caller
-      {Task.Supervisor, name: Chat.TaskSupervisor},
-      {Task,
-       fn ->
-         {:ok, _pid} = AdminLogger |> Logger.add_backend()
+    children =
+      [
+        # Start the Telemetry supervisor
+        ChatWeb.Telemetry,
+        # Start the PubSub system
+        {Phoenix.PubSub, name: Chat.PubSub},
+        # Start Ecto repository with retry mechanism
+        Chat.Repo |> if_on_host(),
+        # TODO: remove Chat.RepoSupervisor,
+        # Start DB
+        Chat.Ordering.Counters,
+        Chat.Db.Supervisor,
+        Chat.AdminDb,
+        # Application Services
+        Chat.KeyRingTokens,
+        Chat.Broker,
+        Chat.ChunkedFilesBroker,
+        Chat.User.UsersBroker,
+        Chat.Rooms.RoomsBroker,
+        Chat.RoomMessageLinksBroker,
+        Chat.Sync.CargoRoom,
+        Chat.Sync.OnlinersSync,
+        Chat.Sync.UsbDriveDumpRoom,
+        {DynamicSupervisor, name: Chat.Upload.UploadSupervisor},
+        {DynamicSupervisor, name: Chat.Db.FreeSpacesSupervisor},
+        ChatWeb.Presence,
+        # Start the Endpoint (http/https)
+        ChatWeb.Endpoint,
+        NetworkSynchronization.Supervisor,
+        # Supervised tasks caller
+        {Task.Supervisor, name: Chat.TaskSupervisor},
+        {Task,
+         fn ->
+           {:ok, _pid} = AdminLogger |> Logger.add_backend()
 
-         Task.Supervisor.start_child(
-           Chat.TaskSupervisor,
-           fn ->
-             log_version()
-             Process.sleep(:timer.minutes(5))
+           Task.Supervisor.start_child(
+             Chat.TaskSupervisor,
+             fn ->
+               log_version()
+               Process.sleep(:timer.minutes(5))
 
-             AdminLogger.get_current_generation()
-             |> AdminLogger.remove_old_generations()
-           end,
-           shutdown: :brutal_kill
-         )
+               AdminLogger.get_current_generation()
+               |> AdminLogger.remove_old_generations()
+             end,
+             shutdown: :brutal_kill
+           )
 
-         Task.Supervisor.start_child(
-           Chat.TaskSupervisor,
-           fn ->
-             Retrieval.load_all_chat_modules()
-             NetworkSynchronization.init_workers()
-           end,
-           shutdown: :brutal_kill
-         )
-       end}
-      # Start a worker by calling: Chat.Worker.start_link(arg)
-      # {Chat.Worker, arg}
-    ]
+           Task.Supervisor.start_child(
+             Chat.TaskSupervisor,
+             fn ->
+               Retrieval.load_all_chat_modules()
+               NetworkSynchronization.init_workers()
+             end,
+             shutdown: :brutal_kill
+           )
+         end}
+        # Start a worker by calling: Chat.Worker.start_link(arg)
+        # {Chat.Worker, arg}
+      ]
+      |> Enum.reject(&is_nil/1)
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
@@ -94,6 +97,14 @@ defmodule Chat.Application do
   def config_change(changed, _new, removed) do
     ChatWeb.Endpoint.config_change(changed, removed)
     :ok
+  end
+
+  defp if_on_host(repo) do
+    cond do
+      is_nil(System.get_env("MIX_TARGET")) -> repo
+      System.get_env("MIX_TARGET") == "host" -> repo
+      true -> nil
+    end
   end
 
   # coveralls-ignore-end

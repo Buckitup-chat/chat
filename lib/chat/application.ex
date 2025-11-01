@@ -99,7 +99,7 @@ defmodule Chat.Application do
     :ok
   end
 
-  @target Mix.target() |> IO.inspect()
+  @target Mix.target()
   defp if_on_host(repo) do
     if @target == :host do
       repo

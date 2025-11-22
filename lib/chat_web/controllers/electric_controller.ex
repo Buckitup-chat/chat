@@ -1,16 +1,10 @@
 defmodule ChatWeb.ElectricController do
   use ChatWeb, :controller
 
-  import Phoenix.Sync.Controller
-
   alias Phoenix.Sync.Writer
   alias Writer.Format
 
   alias Chat.Data.Schemas.User
-
-  def sync(conn, params) do
-    sync_render(conn, params, User)
-  end
 
   def ingest(conn, %{"mutations" => mutations}) when is_list(mutations) do
     # TanStack DB-style ingestion, users-only, via Phoenix.Sync.Writer

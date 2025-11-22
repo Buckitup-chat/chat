@@ -24,6 +24,17 @@ defmodule ChatWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :electric do
+    plug CORSPlug, origin: "*"
+
+    plug Plug.Parsers,
+      parsers: [:urlencoded, :multipart, :json],
+      pass: ["*/*"],
+      json_decoder: Phoenix.json_library()
+
+    plug :accepts, ["json", "event-stream"]
+  end
+
   pipeline :upload do
     plug ChatWeb.Plugs.PreferSSL
   end
@@ -39,6 +50,7 @@ defmodule ChatWeb.Router do
     get "/get/image/:id", FileController, :image
     get "/get/zip/:broker_key", ZipController, :get
     get "/privacy-policy.html", PlainController, :privacy_policy
+    get "/electric-test", PlainController, :electric_test
 
     # Frontend SPA routes
     get "/frontend", FrontendController, :index
@@ -72,6 +84,7 @@ defmodule ChatWeb.Router do
       live "/export-key-ring/:id", MainLive.Index, :export
 
       live "/proxy/:address/", ProxyLive.Index, :proxy
+      live "/users", UsersLive.Index, :index
     end
 
     get "/login", FrontendController, :index
@@ -120,9 +133,12 @@ defmodule ChatWeb.Router do
   end
 
   scope "/electric/v1", ChatWeb do
-    pipe_through :api
+    pipe_through :electric
 
-    post "/sync", ElectricController, :sync
+    # SSE stream endpoint for EventSource clients
+    get "/user/stream", ElectricStreamController, :stream
+    # Original Phoenix.Sync endpoint (JSON format)
+    sync("/user", Chat.Data.Schemas.User)
     post "/ingest", ElectricController, :ingest
   end
 

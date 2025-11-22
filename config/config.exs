@@ -82,7 +82,8 @@ config :chat,
 
 config :mime, :types, %{
   "text/plain" => ["social_part", "data"],
-  "application/zip" => ["fw"]
+  "application/zip" => ["fw"],
+  "text/event-stream" => ["event-stream"]
 }
 
 # Configure Ecto repos

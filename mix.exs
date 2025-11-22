@@ -51,7 +51,8 @@ defmodule Chat.MixProject do
       {:igniter, "~> 0.5", only: [:dev, :test]},
       # Chat deps
       {:qr_code, "~> 2.2.1"},
-      {:cubdb, "~> 2.0"},
+      # Using electric_cubdb instead of cubdb to avoid conflicts with Electric
+      {:electric_cubdb, "~> 2.0", override: true},
       {:curvy, "~> 0.3.1"},
       {:struct_access, "~> 1.1"},
       {:uuid, "~> 1.1"},

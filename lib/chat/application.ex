@@ -43,7 +43,7 @@ defmodule Chat.Application do
         {DynamicSupervisor, name: Chat.Db.FreeSpacesSupervisor},
         ChatWeb.Presence,
         # Start the Endpoint (http/https)
-        ChatWeb.Endpoint,
+        {ChatWeb.Endpoint, phoenix_sync: Phoenix.Sync.plug_opts()},
         NetworkSynchronization.Supervisor,
         # Supervised tasks caller
         {Task.Supervisor, name: Chat.TaskSupervisor},

@@ -88,6 +88,10 @@ config :mime, :types, %{
 # Configure Ecto repos
 config :chat, ecto_repos: [Chat.Repo]
 
+config :phoenix_sync,
+  mode: :embedded,
+  repo: Chat.Repo
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

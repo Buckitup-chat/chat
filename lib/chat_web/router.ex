@@ -1,5 +1,6 @@
 defmodule ChatWeb.Router do
   use ChatWeb, :router
+  import Phoenix.Sync.Router
 
   pipeline :browser do
     plug :accepts, ["html"]
@@ -116,6 +117,13 @@ defmodule ChatWeb.Router do
     post "/put", StorageApiController, :put
     post "/put-many", StorageApiController, :put_many
     get "/dump", StorageApiController, :dump
+  end
+
+  scope "/electric/v1", ChatWeb do
+    pipe_through :api
+
+    post "/sync", ElectricController, :sync
+    post "/ingest", ElectricController, :ingest
   end
 
   # Other scopes may use custom stacks.

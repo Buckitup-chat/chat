@@ -16,7 +16,6 @@ defmodule Chat.Data.User do
 
   def register(%Card{} = card) do
     UserQueries.insert_card(card)
-
     card.pub_key
   end
 
@@ -51,5 +50,16 @@ defmodule Chat.Data.User do
   """
   def await_saved(_) do
     :ok
+  end
+
+  @doc """
+  Creates a user directly in Postgres.
+  Electric will automatically detect and sync the change.
+  """
+  def create(attrs) do
+    alias Chat.Data.Schemas.User
+
+    changeset = User.changeset(%User{}, attrs)
+    Chat.Repo.insert(changeset)
   end
 end

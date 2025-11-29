@@ -50,7 +50,6 @@ defmodule ChatWeb.Router do
     get "/get/image/:id", FileController, :image
     get "/get/zip/:broker_key", ZipController, :get
     get "/privacy-policy.html", PlainController, :privacy_policy
-    get "/electric-test", PlainController, :electric_test
 
     # Frontend SPA routes
     get "/frontend", FrontendController, :index
@@ -135,9 +134,7 @@ defmodule ChatWeb.Router do
   scope "/electric/v1", ChatWeb do
     pipe_through :electric
 
-    # SSE stream endpoint for EventSource clients
-    get "/user/stream", ElectricStreamController, :stream
-    # Original Phoenix.Sync endpoint (JSON format)
+    # Phoenix.Sync endpoint for LiveView real-time sync
     sync("/user", Chat.Data.Schemas.User)
     post "/ingest", ElectricController, :ingest
   end

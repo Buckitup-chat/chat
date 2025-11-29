@@ -2,65 +2,61 @@ defmodule ChatWeb.UsersLive.Index do
   @moduledoc """
   LiveView page that displays all users synced via Electric.
 
-  This attempts to use Phoenix.Sync.Client (Electric's Elixir client) to demonstrate
-  how sync works. However, due to Electric's embedded mode file storage issues,
-  it falls back to direct Repo queries.
+  Uses a patched version of Phoenix.Sync.LiveView.sync_stream/4 that fixes the nil resume bug.
+  The bug exists in phoenix_sync 0.6.1 where it passes `resume: nil` to Electric.Client.stream/2.
 
-  The data shown is what Electric would sync to external clients via /electric/v1/user.
+  See ChatWeb.PhoenixSyncPatch for the fix.
   """
   use ChatWeb, :live_view
+  import ChatWeb.PhoenixSyncPatch
 
   alias Chat.Data.Schemas.User
 
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
-      # Start streaming from Electric
+      # Use patched Phoenix.Sync to stream users from Electric endpoint
+      # This connects to the sync("/user", Chat.Data.Schemas.User) route
+      # Note: User schema uses :pub_key as primary key, so we need custom DOM IDs
       {:ok,
        socket
-       |> assign(:users, [])
-       |> assign(:loading, true)
+       |> Phoenix.LiveView.stream_configure(:users, dom_id: &dom_id_for_user/1)
+       |> sync_stream_fixed(:users, User)
+       |> assign(:loading, false)
        |> assign(:error, nil)
-       |> start_async(:load_users, fn -> stream_users() end)}
+       |> assign(:connected, true)
+       |> assign(:live, false)}
     else
       {:ok,
        socket
-       |> assign(:users, [])
        |> assign(:loading, true)
-       |> assign(:error, nil)}
+       |> assign(:error, nil)
+       |> assign(:connected, false)
+       |> assign(:live, false)}
     end
   end
 
-  @impl true
-  def handle_async(:load_users, {:ok, users}, socket) do
-    {:noreply,
-     socket
-     |> assign(:users, users)
-     |> assign(:loading, false)}
+  # Generate DOM ID from pub_key (base16 encoded)
+  defp dom_id_for_user(%User{pub_key: pub_key}) do
+    "user-#{Base.encode16(pub_key, case: :lower)}"
   end
 
   @impl true
-  def handle_async(:load_users, {:exit, reason}, socket) do
-    {:noreply,
-     socket
-     |> assign(:error, "Failed to load users: #{inspect(reason)}")
-     |> assign(:loading, false)}
+  def handle_info({:sync, {:users, :loaded}}, socket) do
+    # Initial sync completed - all existing users loaded
+    {:noreply, assign(socket, :loading, false)}
   end
 
-  defp stream_users do
-    # Electric embedded mode has file storage issues (:enoent errors)
-    # Use direct Repo query to show the data that Electric would sync
-    import Ecto.Query
-    query = from(u in User, order_by: u.name)
+  @impl true
+  def handle_info({:sync, {:users, :live}}, socket) do
+    # Stream is now live - receiving real-time updates
+    {:noreply, assign(socket, :live, true)}
+  end
 
-    Chat.Repo.all(query)
-    |> Enum.map(fn user ->
-      %{
-        "name" => user.name,
-        "pub_key" => Base.encode16(user.pub_key, case: :lower),
-        "hash" => Enigma.Hash.short_hash(user.pub_key)
-      }
-    end)
+  @impl true
+  def handle_info({:sync, event}, socket) do
+    # Handle all other sync events (inserts, updates, deletes)
+    {:noreply, sync_stream_update(socket, event)}
   end
 
   @impl true
@@ -69,13 +65,31 @@ defmodule ChatWeb.UsersLive.Index do
     <div class="min-h-screen bg-gray-50 py-8">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="mb-8">
-          <h1 class="text-3xl font-bold text-gray-900">Users Stream</h1>
-          <p class="mt-2 text-sm text-gray-600">
-            Real-time user list synced via Electric HTTP endpoint
-          </p>
-          <p class="mt-1 text-xs text-gray-500 font-mono">
-            Using Electric.Client.stream(User) from http://localhost:4444/electric/v1/user
-          </p>
+          <div class="flex items-center justify-between">
+            <div>
+              <h1 class="text-3xl font-bold text-gray-900">Users Stream (LiveView + Electric)</h1>
+              <p class="mt-2 text-sm text-gray-600">
+                Real-time user list synced via Phoenix.Sync.Client
+              </p>
+              <p class="mt-1 text-xs text-gray-500 font-mono">
+                Using sync("/user", Chat.Data.Schemas.User) endpoint
+              </p>
+            </div>
+            <div class="flex items-center space-x-4">
+              <div class="flex items-center space-x-2">
+                <span class={"inline-block w-2 h-2 rounded-full #{if @connected, do: "bg-green-500", else: "bg-red-500"}"}>
+                </span>
+                <span class="text-sm font-medium text-gray-700">
+                  {if @connected, do: "Connected", else: "Disconnected"}
+                </span>
+              </div>
+              <%= if @live do %>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  Live
+                </span>
+              <% end %>
+            </div>
+          </div>
         </div>
 
         <%= if @error do %>
@@ -101,70 +115,50 @@ defmodule ChatWeb.UsersLive.Index do
         <%= if @loading do %>
           <div class="flex flex-col justify-center items-center py-12">
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            <p class="mt-4 text-sm text-gray-600">Loading users from Electric...</p>
+            <p class="mt-4 text-sm text-gray-600">Syncing users from Electric...</p>
           </div>
         <% else %>
           <div class="bg-white shadow overflow-hidden sm:rounded-lg">
             <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
               <h3 class="text-lg leading-6 font-medium text-gray-900">
-                Total Users: {length(@users)}
+                Users Stream
               </h3>
             </div>
-
-            <%= if Enum.empty?(@users) do %>
-              <div class="px-4 py-12 text-center">
-                <svg
-                  class="mx-auto h-12 w-12 text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-                  />
-                </svg>
-                <h3 class="mt-2 text-sm font-medium text-gray-900">No users found</h3>
-                <p class="mt-1 text-sm text-gray-500">
-                  Users will appear here when they are synced via Electric.
-                </p>
-              </div>
-            <% else %>
-              <ul role="list" class="divide-y divide-gray-200">
-                <%= for user <- @users do %>
-                  <li class="px-4 py-4 sm:px-6 hover:bg-gray-50 transition-colors duration-150">
-                    <div class="flex items-center justify-between">
-                      <div class="flex items-center min-w-0 flex-1">
-                        <div class="flex-shrink-0">
-                          <div class="h-12 w-12 rounded-full bg-blue-600 flex items-center justify-center">
-                            <span class="text-white font-semibold text-lg">
-                              {String.first(user["name"]) |> String.upcase()}
-                            </span>
-                          </div>
-                        </div>
-                        <div class="min-w-0 flex-1 px-4">
-                          <div>
-                            <p class="text-sm font-medium text-gray-900 truncate">
-                              {user["name"]}
-                            </p>
-                            <p class="mt-1 text-sm text-gray-500 font-mono truncate">
-                              {user["hash"]}...
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div class="ml-5 flex-shrink-0">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Synced
+            <%!-- Use phx-update="stream" for LiveView stream updates --%>
+            <div id="users" phx-update="stream" class="divide-y divide-gray-200">
+              <div
+                :for={{dom_id, user} <- @streams.users}
+                id={dom_id}
+                class="px-4 py-4 sm:px-6 hover:bg-gray-50 transition-colors duration-150"
+              >
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center min-w-0 flex-1">
+                    <div class="flex-shrink-0">
+                      <div class="h-12 w-12 rounded-full bg-blue-600 flex items-center justify-center">
+                        <span class="text-white font-semibold text-lg">
+                          {String.first(user.name) |> String.upcase()}
                         </span>
                       </div>
                     </div>
-                  </li>
-                <% end %>
-              </ul>
-            <% end %>
+                    <div class="min-w-0 flex-1 px-4">
+                      <div>
+                        <p class="text-sm font-medium text-gray-900 truncate">
+                          {user.name}
+                        </p>
+                        <p class="mt-1 text-sm text-gray-500 font-mono truncate">
+                          {Enigma.Hash.short_hash(user.pub_key)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="ml-5 flex-shrink-0">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Synced
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         <% end %>
       </div>

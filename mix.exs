@@ -108,7 +108,7 @@ defmodule Chat.MixProject do
 
       # ElectricSQL / Phoenix.Sync
       {:electric, ">= 1.0.0-beta.20"},
-      {:phoenix_sync, "~> 0.3"}
+      {:phoenix_sync, "~> 0.6.1"}
     ]
   end
 

@@ -84,6 +84,7 @@ empty_db:
 	rm -rf priv/test_backup_db
 	rm -rf priv/test_admin_db
 	rm -rf priv/test_db
+	rm -rf persistent
 
 firmware: empty_db
 	rm -rf _build/prod

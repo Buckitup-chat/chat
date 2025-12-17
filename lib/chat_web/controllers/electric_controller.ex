@@ -5,75 +5,18 @@ defmodule ChatWeb.ElectricController do
   alias Phoenix.Sync.Writer
   alias Phoenix.Sync.Writer.Format
 
-  def ingest(conn, %{"mutations" => mutations}) when is_list(mutations) do
-    with {:ok, mutations} <- normalize_mutations(mutations),
+  def ingest(conn, params) do
+    with {_, %{"mutations" => mutations}} <- {:correct_params, params},
+         {_, true} <- {:is_mutation_list, is_list(mutations)},
+         {:ok, mutations} <- normalize_mutations(mutations),
          {:ok, txid, _changes} <-
            Writer.new()
            |> Writer.allow(User)
            |> Writer.apply(mutations, Chat.Repo, format: Format.TanstackDB) do
       json(conn, %{txid: txid})
     else
-      error ->
-        handle_ingest_error(conn, error)
+      error -> handle_ingest_error(conn, error)
     end
-  end
-
-  def ingest(conn, _params) do
-    send_resp(conn, 400, "invalid_payload")
-  end
-
-  defp handle_ingest_error(
-         conn,
-         {:error, _failed_operation, %Ecto.Changeset{} = changeset, _changes}
-       ) do
-    {status, body} =
-      if pub_key_unique_conflict?(changeset),
-        do: {:conflict, %{error: "pub_key_taken"}},
-        else:
-          {:unprocessable_entity,
-           %{error: "validation_failed", details: changeset_errors(changeset)}}
-
-    conn
-    |> put_status(status)
-    |> json(body)
-  end
-
-  defp handle_ingest_error(
-         conn,
-         {:error, _failed_operation, %Writer.Error{message: message}, _changes}
-       )
-       when is_binary(message) do
-    send_resp(conn, 400, message)
-  end
-
-  defp handle_ingest_error(conn, {:error, reason}) when is_binary(reason) do
-    send_resp(conn, 400, reason)
-  end
-
-  defp handle_ingest_error(conn, _error) do
-    send_resp(conn, 400, "invalid_payload")
-  end
-
-  defp pub_key_unique_conflict?(%Ecto.Changeset{} = changeset) do
-    case Keyword.fetch(changeset.errors, :pub_key) do
-      {:ok, {msg, opts}} ->
-        msg == "has already been taken" && Keyword.get(opts, :constraint) == :unique
-
-      :error ->
-        false
-    end
-  end
-
-  defp changeset_errors(%Ecto.Changeset{} = changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-      Enum.reduce(opts, msg, fn
-        {key, value}, acc when is_binary(acc) ->
-          String.replace(acc, "%{#{key}}", to_string(value))
-
-        {_key, _value}, acc ->
-          acc
-      end)
-    end)
   end
 
   defp normalize_mutations(mutations) do
@@ -113,20 +56,63 @@ defmodule ChatWeb.ElectricController do
     end
   end
 
-  defp normalize_pub_key("\\x" <> hex) do
-    case Base.decode16(hex, case: :mixed) do
-      {:ok, bytes} -> {:ok, bytes}
+  defp normalize_pub_key(key) do
+    case key do
+      "\\x" <> hex -> Base.decode16(hex, case: :mixed)
+      "0x" <> hex -> Base.decode16(hex, case: :mixed)
+      str when is_binary(str) -> {:ok, str}
+      _ -> :error
+    end
+    |> case do
       :error -> {:error, "invalid_pub_key"}
+      x -> x
     end
   end
 
-  defp normalize_pub_key("0x" <> hex) do
-    case Base.decode16(hex, case: :mixed) do
-      {:ok, bytes} -> {:ok, bytes}
-      :error -> {:error, "invalid_pub_key"}
+  defp handle_ingest_error(conn, error) do
+    case error do
+      {:error, _, %Ecto.Changeset{} = changeset, _} ->
+        {status, body} =
+          if pub_key_unique_conflict?(changeset),
+            do: {:conflict, %{error: "pub_key_taken"}},
+            else:
+              {:unprocessable_entity,
+               %{error: "validation_failed", details: changeset_errors(changeset)}}
+
+        conn
+        |> put_status(status)
+        |> json(body)
+
+      {:error, _, %Writer.Error{message: msg}, _} when is_binary(msg) ->
+        send_resp(conn, 400, msg)
+
+      {:error, reason} when is_binary(reason) ->
+        send_resp(conn, 400, reason)
+
+      _ ->
+        send_resp(conn, 400, "invalid_payload")
     end
   end
 
-  defp normalize_pub_key(value) when is_binary(value), do: {:ok, value}
-  defp normalize_pub_key(_), do: {:error, "invalid_pub_key"}
+  defp pub_key_unique_conflict?(%Ecto.Changeset{} = changeset) do
+    case Keyword.fetch(changeset.errors, :pub_key) do
+      {:ok, {msg, opts}} ->
+        msg == "has already been taken" && Keyword.get(opts, :constraint) == :unique
+
+      :error ->
+        false
+    end
+  end
+
+  defp changeset_errors(%Ecto.Changeset{} = changeset) do
+    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+      Enum.reduce(opts, msg, fn
+        {key, value}, acc when is_binary(acc) ->
+          String.replace(acc, "%{#{key}}", to_string(value))
+
+        {_key, _value}, acc ->
+          acc
+      end)
+    end)
+  end
 end

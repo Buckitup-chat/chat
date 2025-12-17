@@ -14,7 +14,7 @@ defmodule Chat.Sync.DbBrokers do
 
     broadcast_refresh()
   catch
-    _, _  ->
+    _, _ ->
       Task.start(fn ->
         5
         |> :timer.seconds()

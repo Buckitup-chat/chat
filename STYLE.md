@@ -321,6 +321,20 @@ else
 end
 ```
 
+#### Tag `with` preconditions with tuples
+
+When a `with` step is validating shape/booleans (not returning `{:ok, ...}`), wrap the expression in a tagged tuple so the failing value keeps context:
+
+```elixir
+with {_, %{"mutations" => mutations}} <- {:correct_params, params},
+     {_, true} <- {:is_mutation_list, is_list(mutations)},
+     {:ok, mutations} <- normalize_mutations(mutations) do
+  # success path
+else
+  error -> handle_error(conn, error)
+end
+```
+
 ### Code Organization
 
 1. **Imports/aliases** at the top

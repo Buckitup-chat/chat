@@ -90,6 +90,7 @@ config :mime, :types, %{
 config :chat, ecto_repos: [Chat.Repo]
 
 config :phoenix_sync,
+  env: config_env(),
   mode: :embedded,
   repo: Chat.Repo
 

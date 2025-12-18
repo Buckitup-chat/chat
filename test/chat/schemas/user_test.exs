@@ -1,8 +1,9 @@
 defmodule Chat.Schema.UserTest do
   use ChatWeb.DataCase
 
-  alias Chat.Schema.User
-  alias Chat.Repo
+  import Chat.Db, only: [repo: 0]
+
+  alias Chat.User
   alias Chat.Card
 
   describe "User schema" do
@@ -12,14 +13,14 @@ defmodule Chat.Schema.UserTest do
       user = User.from_card(card)
 
       # Save user to DB
-      {:ok, saved_user} = Repo.insert(user)
+      {:ok, saved_user} = repo().insert(user)
 
       # Verify user was saved correctly
       assert saved_user.pub_key == <<1, 2, 3, 4>>
       assert saved_user.name == "Test User"
 
       # Retrieve user from DB
-      retrieved_user = Repo.get(User, <<1, 2, 3, 4>>)
+      retrieved_user = repo().get(User, <<1, 2, 3, 4>>)
 
       # Verify retrieved user matches
       assert retrieved_user.pub_key == card.pub_key
@@ -41,14 +42,14 @@ defmodule Chat.Schema.UserTest do
       user = User.from_card(card)
 
       # Save user to DB
-      {:ok, saved_user} = Repo.insert(user)
+      {:ok, saved_user} = repo().insert(user)
 
       # Verify user was saved with long name
       assert saved_user.name == long_name
       assert byte_size(saved_user.name) == 300
 
       # Retrieve and verify
-      retrieved_user = Repo.get(User, <<5, 6, 7, 8>>)
+      retrieved_user = repo().get(User, <<5, 6, 7, 8>>)
       assert retrieved_user.name == long_name
     end
   end

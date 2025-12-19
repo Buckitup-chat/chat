@@ -10,15 +10,6 @@ defmodule Chat.RepoSupervisor do
 
   @doc """
   Starts the RepoSupervisor process.
-
-  ## Parameters
-
-    * `init_arg` - Arguments passed to the supervisor
-
-  ## Return Values
-
-    * `{:ok, pid}` - Process started successfully
-    * `{:error, reason}` - Failed to start process
   """
   @spec start_link(term()) :: Supervisor.on_start()
   def start_link(init_arg) do

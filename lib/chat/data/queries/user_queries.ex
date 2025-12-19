@@ -30,6 +30,18 @@ defmodule Chat.Data.Queries.UserQueries do
   end
 
   @doc """
+  Creates a user from raw attributes.
+
+  This is used when Electric or other parts of the system
+  need to insert a user directly into Postgres.
+  """
+  def create(attrs) do
+    %User{}
+    |> User.changeset(attrs)
+    |> repo().insert()
+  end
+
+  @doc """
   Gets a user by public key
   """
   def get_by_pub_key(pub_key) do

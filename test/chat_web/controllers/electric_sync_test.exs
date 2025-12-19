@@ -70,7 +70,7 @@ defmodule ChatWeb.ElectricSyncTest do
   end
 
   describe "User data format" do
-    test "users have required fields for Electric sync", %{conn: _conn} do
+    test "users have required fields for Electric sync", _context do
       pub_key = :crypto.strong_rand_bytes(32)
 
       {:ok, user} =
@@ -92,7 +92,7 @@ defmodule ChatWeb.ElectricSyncTest do
       assert retrieved_user.pub_key == user.pub_key
     end
 
-    test "users can be encoded to JSON format", %{conn: _conn} do
+    test "users can be encoded to JSON format", _context do
       {:ok, user} =
         %User{}
         |> User.changeset(%{

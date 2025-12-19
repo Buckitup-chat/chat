@@ -57,9 +57,6 @@ defmodule Chat.Data.User do
   Electric will automatically detect and sync the change.
   """
   def create(attrs) do
-    alias Chat.Data.Schemas.User
-
-    changeset = User.changeset(%User{}, attrs)
-    Chat.Repo.insert(changeset)
+    UserQueries.create(attrs)
   end
 end

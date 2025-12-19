@@ -1,6 +1,8 @@
 defmodule ChatWeb.ElectricController do
   use ChatWeb, :controller
 
+  import Chat.Db, only: [repo: 0]
+
   alias Chat.Data.Schemas.User
   alias Phoenix.Sync.Writer
   alias Phoenix.Sync.Writer.Format
@@ -12,7 +14,7 @@ defmodule ChatWeb.ElectricController do
          {:ok, txid, _changes} <-
            Writer.new()
            |> Writer.allow(User)
-           |> Writer.apply(mutations, Chat.Repo, format: Format.TanstackDB) do
+           |> Writer.apply(mutations, repo(), format: Format.TanstackDB) do
       json(conn, %{txid: txid})
     else
       error -> handle_ingest_error(conn, error)

@@ -1,5 +1,6 @@
 defmodule ChatWeb.MainLive.IndexTest do
   use ChatWeb.ConnCase, async: false
+  use ChatWeb.DataCase
 
   import ChatWeb.LiveTestHelpers
   import Phoenix.LiveViewTest

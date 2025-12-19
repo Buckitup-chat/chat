@@ -59,7 +59,7 @@ defmodule ChatWeb.LiveTestHelpers do
           boolean()
   def has_vue_content?(view, component_name, content_or_validator, opts \\ []) do
     debug_mode = Keyword.get(opts, :debug, false)
-    html = render(view)
+    html = if is_binary(view), do: view, else: render(view)
 
     # Special handling for LinkedText component which may have specific structure
     result =
@@ -79,23 +79,51 @@ defmodule ChatWeb.LiveTestHelpers do
 
           true
         else
-          # Check for LinkedText specifically with various patterns
-          linked_text_patterns = [
-            ~r/<[^>]*class="[^"]*flex-initial[^"]*"[^>]*>(.*?#{content_or_validator}.*?)<\/span>/s,
-            ~r/<span[^>]*class="[^"]*break-words[^"]*"[^>]*>(.*?#{content_or_validator}.*?)<\/span>/s,
-            ~r/v-component="LinkedText"[^>]*>.*?(#{content_or_validator})/s
-          ]
+          # Check for LinkedText in LiveVue data-slots base64 encoded content
+          case Regex.run(
+                 ~r/data-name="#{component_name}"[^>]*data-slots="[^"]*default[^"]*:&quot;([^&]+)&quot;/,
+                 html
+               ) do
+            [_, base64_content] ->
+              try do
+                decoded_content = Base.decode64!(base64_content)
 
-          Enum.any?(linked_text_patterns, fn pattern ->
-            case Regex.run(pattern, html) do
-              [match | _] ->
-                if debug_mode, do: IO.puts("\n[DEBUG] Found LinkedText match: #{match}")
-                true
+                if is_binary(content_or_validator) && decoded_content =~ content_or_validator do
+                  if debug_mode do
+                    IO.puts(
+                      "\n[DEBUG] Found text '#{content_or_validator}' in base64 decoded content"
+                    )
 
-              nil ->
-                false
-            end
-          end)
+                    IO.puts("[DEBUG] Decoded content: #{decoded_content}")
+                  end
+
+                  true
+                else
+                  false
+                end
+              rescue
+                _ -> false
+              end
+
+            nil ->
+              # Fallback to original patterns for non-LiveVue components
+              linked_text_patterns = [
+                ~r/<[^>]*class="[^"]*flex-initial[^"]*"[^>]*>(.*?#{content_or_validator}.*?)<\/span>/s,
+                ~r/<span[^>]*class="[^"]*break-words[^"]*"[^>]*>(.*?#{content_or_validator}.*?)<\/span>/s,
+                ~r/v-component="LinkedText"[^>]*>.*?(#{content_or_validator})/s
+              ]
+
+              Enum.any?(linked_text_patterns, fn pattern ->
+                case Regex.run(pattern, html) do
+                  [match | _] ->
+                    if debug_mode, do: IO.puts("\n[DEBUG] Found LinkedText match: #{match}")
+                    true
+
+                  nil ->
+                    false
+                end
+              end)
+          end
         end
       else
         # Standard component search for other components

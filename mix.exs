@@ -65,12 +65,12 @@ defmodule Chat.MixProject do
       {:tzdata, "~> 1.1"},
 
       # Phoenix
-      {:phoenix, "~> 1.7.2"},
+      {:phoenix, "~> 1.8"},
       {:phoenix_html, "~> 4.0"},
       {:phoenix_html_helpers, "~> 1.0"},
       {:phoenix_view, "~> 2.0"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 1.0"},
+      {:phoenix_live_view, "1.0.17"},
       {:phoenix_ecto, "~> 4.0"},
       {:ecto, "~> 3.7"},
       {:ecto_sql, "~> 3.7"},
@@ -90,7 +90,11 @@ defmodule Chat.MixProject do
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.14", only: [:test]},
       {:rewire, "~> 0.9", only: [:test]},
-      {:live_isolated_component, "~> 0.8", only: [:dev, :test]},
+      # {:live_isolated_component, "~> 0.8", only: [:dev, :test]},
+      # {:live_isolated_component, git: "https://github.com/Aratramba/live_isolated_component.git", branch: "upgrade-liveview-1.1", only: [:dev, :test]},
+      # {:live_isolated_component, git: "https://github.com/geofflane/live_isolated_component.git", branch: "chore/phoenix_18", only: [:dev, :test]},
+      {:live_isolated_component, github: "sergey-lukianov/live_isolated_component", only: [:dev, :test]},
+      {:lazy_html, ">= 0.1.0", only: :test},
 
       # other
       {:absinthe, "~> 1.7"},

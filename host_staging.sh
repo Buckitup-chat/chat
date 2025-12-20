@@ -12,7 +12,7 @@ if [ `hostname` = 'eco' ]; then
   cd chat 
   git pull
 	mix deps.get --only prod
-	mix do compile, assets.setup, assets.deploy
+	mix do compile, assets.setup, assets.deploy, ecto.create, ecto.migrate
   mix phx.gen.release
   MIX_ENV=prod mix release --overwrite
   sudo systemctl restart staging.service

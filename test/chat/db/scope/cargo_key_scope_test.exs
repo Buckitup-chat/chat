@@ -1,5 +1,5 @@
 defmodule Chat.Db.Scope.CargoKeyScopeTest do
-  use ExUnit.Case, async: false
+  use ChatWeb.DataCase, async: false
 
   alias Chat.{
     AdminRoom,

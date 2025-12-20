@@ -1,5 +1,5 @@
 defmodule Chat.Sync.CargoRoomTest do
-  use ExUnit.Case, async: false
+  use ChatWeb.DataCase, async: false
 
   alias Chat.AdminRoom
   alias Chat.Content.Files

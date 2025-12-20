@@ -13,6 +13,15 @@ defmodule Chat.Sync.DbBrokers do
     :ok = UsersBroker.sync()
 
     broadcast_refresh()
+  catch
+    _, _ ->
+      Task.start(fn ->
+        5
+        |> :timer.seconds()
+        |> Process.sleep()
+
+        Chat.Sync.DbBrokers.refresh()
+      end)
   end
 
   def broadcast_refresh do

@@ -51,7 +51,8 @@ defmodule Chat.MixProject do
       {:igniter, "~> 0.5", only: [:dev, :test]},
       # Chat deps
       {:qr_code, "~> 2.2.1"},
-      {:cubdb, "~> 2.0"},
+      # Using electric_cubdb instead of cubdb to avoid conflicts with Electric
+      {:electric_cubdb, "~> 2.0", override: true},
       {:curvy, "~> 0.3.1"},
       {:struct_access, "~> 1.1"},
       {:uuid, "~> 1.1"},
@@ -72,6 +73,8 @@ defmodule Chat.MixProject do
       {:phoenix_live_view, "1.0.17"},
       {:phoenix_ecto, "~> 4.0"},
       {:ecto, "~> 3.7"},
+      {:ecto_sql, "~> 3.7"},
+      {:postgrex, "~> 0.16"},
       {:plug_cowboy, "~> 2.5"},
       {:phoenix_live_dashboard, "~> 0.7"},
       # {:gettext, "~> 0.18"},
@@ -105,7 +108,11 @@ defmodule Chat.MixProject do
       {:zstream, "~> 0.6"},
       {:ua_parser, github: "beam-community/ua_parser"},
       {:httpoison, "~> 2.0"},
-      {:tesla, "~> 1.7"}
+      {:tesla, "~> 1.7"},
+
+      # ElectricSQL / Phoenix.Sync
+      {:electric, ">= 1.0.0-beta.20"},
+      {:phoenix_sync, "~> 0.6.1"}
     ]
   end
 

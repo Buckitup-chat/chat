@@ -95,4 +95,16 @@ defmodule Chat.Db do
   end
 
   def version_path, do: @db_version
+
+  def repo do
+    Application.get_env(:chat, :repo, Chat.Repo)
+  end
+
+  def set_repo(repo) do
+    with pid <- Process.whereis(repo),
+         true <- is_pid(pid),
+         true <- Process.alive?(pid) do
+      Application.put_env(:chat, :repo, repo)
+    end
+  end
 end

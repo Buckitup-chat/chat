@@ -43,10 +43,14 @@ defmodule Chat.User.UsersBroker do
 
   def handle_continue(:sync, _) do
     User.list() |> noreply()
+  catch
+    _, _ -> noreply([])
   end
 
-  def handle_call(:sync, _from, _users) do
+  def handle_call(:sync, _from, users) do
     User.list() |> reply(:ok)
+  catch
+    _, _ -> reply(:ok, users)
   end
 
   def handle_call(:list, _from, users) do

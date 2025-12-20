@@ -1,5 +1,5 @@
 defmodule Chat.User.UsersBrokerTest do
-  use ExUnit.Case, async: true
+  use ChatWeb.DataCase, async: false
   alias Chat.Card
   alias Chat.User.UsersBroker
 
@@ -30,13 +30,13 @@ defmodule Chat.User.UsersBrokerTest do
       await_users_set()
 
       # Test search with a term that should match one user
-      assert  list_users("doe") |> Enum.find(&(&1.pub_key == "1"))
+      assert list_users("doe") |> Enum.find(&(&1.pub_key == "1"))
 
       # Test search with a term that should match one specific user
       assert list_users("alice") |> Enum.find(&(&1.pub_key == "3"))
 
       # Test search with a term that should match another specific user
-      assert list_users("bob")|> Enum.find(&(&1.pub_key == "4"))
+      assert list_users("bob") |> Enum.find(&(&1.pub_key == "4"))
 
       # Test that empty search returns all users with non-nil names
       results = list_users("") |> Enum.filter(&(&1 in users)) |> Enum.sort_by(& &1.name)

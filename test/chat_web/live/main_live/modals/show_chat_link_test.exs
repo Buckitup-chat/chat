@@ -1,5 +1,6 @@
 defmodule ChatWeb.MainLive.Modals.ShowChatLinkTest do
   use ChatWeb.ConnCase, async: false
+  use ChatWeb.DataCase
 
   import Phoenix.LiveViewTest
   import ChatWeb.LiveTestHelpers

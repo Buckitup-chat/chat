@@ -5,7 +5,7 @@ import Config
 config :chat, ChatWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "ABUZKxav/bWgALTw9KJRhIKc03955IEvFKODEKAl8MdscEm5iNfRO0VyM88gxe7w",
-  server: true
+  server: false
 
 # In test we don't send emails.
 config :chat, Chat.Mailer, adapter: Swoosh.Adapters.Test
@@ -25,3 +25,18 @@ config :chat,
   writable: :yes
 
 config :chat, Chat.Db.ChangeTracker, expire_seconds: 3
+
+# Configure your database for testing
+config :chat, Chat.Repo,
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost",
+  database: "chat_test",
+  pool: Ecto.Adapters.SQL.Sandbox,
+  pool_size: 10,
+  ownership_timeout: 60_000,
+  queue_target: 1000,
+  # Disable connection awaiting in test environment for faster startup
+  connect_timeout: 1000,
+  handshake_timeout: 1000,
+  prepare: :unnamed

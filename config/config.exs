@@ -82,8 +82,17 @@ config :chat,
 
 config :mime, :types, %{
   "text/plain" => ["social_part", "data"],
-  "application/zip" => ["fw"]
+  "application/zip" => ["fw"],
+  "text/event-stream" => ["event-stream"]
 }
+
+# Configure Ecto repos
+config :chat, ecto_repos: [Chat.Repo]
+
+config :phoenix_sync,
+  env: config_env(),
+  mode: :embedded,
+  repo: Chat.Repo
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

@@ -1,5 +1,6 @@
 defmodule ChatWeb.MainLive.IndexTest do
   use ChatWeb.ConnCase, async: false
+  use ChatWeb.DataCase
 
   import ChatWeb.LiveTestHelpers
   import Phoenix.LiveViewTest
@@ -152,13 +153,14 @@ defmodule ChatWeb.MainLive.IndexTest do
       # Give Vue components time to render properly
       # Check for message text using the Vue component helper
       assert wait_until(
-        fn ->
-          has_vue_content?(view, "LinkedText", "Dialog message text")
-        end,
-        "Message should appear in UI",
-        timeout: 1000,
-        interval: 50
-      ) == :ok, "Message text should be displayed in the UI"
+               fn ->
+                 has_vue_content?(view, "LinkedText", "Dialog message text")
+               end,
+               "Message should appear in UI",
+               timeout: 1000,
+               interval: 50
+             ) == :ok,
+             "Message text should be displayed in the UI"
 
       # Log success message
       IO.puts("\nMessage successfully rendered in Vue component")

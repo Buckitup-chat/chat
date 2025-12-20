@@ -1,5 +1,6 @@
 defmodule ChatWeb.StorageApiControllerTest do
   use ChatWeb.ConnCase, async: true
+  use ChatWeb.DataCase
 
   alias Chat.Db
   alias Chat.User

@@ -36,7 +36,9 @@ defmodule Chat.Dialogs do
   defdelegate add_new_message(message, author, dialog), to: DialogMessaging
   defdelegate update_message(message, msg_id, author, dialog), to: DialogMessaging
   defdelegate delete(dialog, author, msg_time_id), to: DialogMessaging
+  @deprecated "should use copying.await"
   defdelegate await_saved(added_message, dialog), to: DialogMessaging
+  @deprecated "should use Chat.store_parcel"
   defdelegate on_saved(added_message, dialog, action), to: DialogMessaging
 
   def read(
@@ -129,6 +131,25 @@ defmodule Chat.Dialogs do
     |> case do
       nil -> nil
       x -> x |> Identity.from_strings()
+    end
+  end
+
+  @doc """
+  Extracts the index and message from a parcel containing a dialog message.
+
+  ## Parameters
+  - parcel: A SignedParcel struct containing dialog message data
+
+  ## Returns
+  - {index, message} tuple where index is the message index and message is the dialog message
+  """
+  @spec parsel_to_indexed_message(Chat.SignedParcel.t()) :: {integer(), Message.t()}
+  def parsel_to_indexed_message(parcel) do
+    # Use the centralized extraction function
+    if Chat.SignedParcel.message_type(parcel) == :dialog_message do
+      Chat.SignedParcel.extract_indexed_message(parcel)
+    else
+      raise ArgumentError, "Parcel does not contain a dialog message"
     end
   end
 end

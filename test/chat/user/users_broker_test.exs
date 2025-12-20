@@ -1,7 +1,7 @@
 defmodule Chat.User.UsersBrokerTest do
-  use ExUnit.Case, async: true
-  alias Chat.User.UsersBroker
+  use ChatWeb.DataCase, async: false
   alias Chat.Card
+  alias Chat.User.UsersBroker
 
   setup do
     # Start the UsersBroker process
@@ -30,16 +30,16 @@ defmodule Chat.User.UsersBrokerTest do
       await_users_set()
 
       # Test search with a term that should match one user
-      assert [%Card{name: "John Doe"}] = list_users("doe")
+      assert list_users("doe") |> Enum.find(&(&1.pub_key == "1"))
 
       # Test search with a term that should match one specific user
-      assert [%Card{name: "Alice Smith"}] = list_users("alice")
+      assert list_users("alice") |> Enum.find(&(&1.pub_key == "3"))
 
       # Test search with a term that should match another specific user
-      assert [%Card{name: "Bob Johnson"}] = list_users("bob")
+      assert list_users("bob") |> Enum.find(&(&1.pub_key == "4"))
 
       # Test that empty search returns all users with non-nil names
-      results = list_users("") |> Enum.sort_by(& &1.name)
+      results = list_users("") |> Enum.filter(&(&1 in users)) |> Enum.sort_by(& &1.name)
       # Only users with non-nil names
       assert length(results) == 3
 

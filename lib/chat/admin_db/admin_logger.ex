@@ -81,6 +81,8 @@ defmodule Chat.AdminDb.AdminLogger do
       [{{:log, generation, _}, _}] -> generation + 1
       _ -> 1
     end
+  catch
+    _, _ -> 1
   end
 
   def remove_old_generations(generation) do
@@ -93,9 +95,13 @@ defmodule Chat.AdminDb.AdminLogger do
 
   defp write_message(key, value) do
     Chat.AdminDb.put(key, value)
+  catch
+    _, _ -> :ignore
   end
 
   defp sync_db do
     CubDB.file_sync(Chat.AdminDb.db())
+  catch
+    _, _ -> :ignore
   end
 end

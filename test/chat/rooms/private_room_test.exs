@@ -1,5 +1,5 @@
 defmodule Chat.Rooms.PrivateRoomTest do
-  use ExUnit.Case, async: true
+  use ChatWeb.DataCase, async: true
 
   alias Chat.Content.RoomInvites
   alias Chat.Db.ChangeTracker

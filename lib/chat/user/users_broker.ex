@@ -43,10 +43,14 @@ defmodule Chat.User.UsersBroker do
 
   def handle_continue(:sync, _) do
     User.list() |> noreply()
+  catch
+    _, _ -> noreply([])
   end
 
-  def handle_call(:sync, _from, _users) do
+  def handle_call(:sync, _from, users) do
     User.list() |> reply(:ok)
+  catch
+    _, _ -> reply(:ok, users)
   end
 
   def handle_call(:list, _from, users) do
@@ -54,14 +58,33 @@ defmodule Chat.User.UsersBroker do
   end
 
   def handle_call({:list, search_term}, _from, users) do
-    filtered =
-      Enum.filter(users, fn
-        %{name: nil} -> false
-        %{name: name} -> String.match?(name, ~r/#{search_term}/i)
-        _ -> false
-      end)
+    # Don't perform filtering if search term is empty
+    if search_term == "" do
+      filtered =
+        Enum.filter(users, fn
+          %{name: nil} -> false
+          _ -> true
+        end)
 
-    users |> reply(filtered)
+      users |> reply(filtered)
+    else
+      # Convert search term to lowercase for case-insensitive comparison
+      downcased_term = String.downcase(search_term)
+
+      filtered =
+        Enum.filter(users, fn
+          %{name: nil} ->
+            false
+
+          %{name: name} ->
+            name && String.contains?(String.downcase(name), downcased_term)
+
+          _ ->
+            false
+        end)
+
+      users |> reply(filtered)
+    end
   end
 
   def handle_cast({:put, user}, users) do

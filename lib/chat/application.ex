@@ -16,61 +16,66 @@ defmodule Chat.Application do
     Logger.put_application_level(:ssl, :error)
     log_version()
 
-    children = [
-      # Start the Telemetry supervisor
-      ChatWeb.Telemetry,
-      # Start the PubSub system
-      {Phoenix.PubSub, name: Chat.PubSub},
-      # Start DB
-      Chat.Ordering.Counters,
-      Chat.Db.Supervisor,
-      Chat.AdminDb,
-      # Application Services
-      Chat.KeyRingTokens,
-      Chat.Broker,
-      Chat.ChunkedFilesBroker,
-      Chat.User.UsersBroker,
-      Chat.Rooms.RoomsBroker,
-      Chat.RoomMessageLinksBroker,
-      Chat.Sync.CargoRoom,
-      Chat.Sync.OnlinersSync,
-      Chat.Sync.UsbDriveDumpRoom,
-      {DynamicSupervisor, name: Chat.Upload.UploadSupervisor},
-      {DynamicSupervisor, name: Chat.Db.FreeSpacesSupervisor},
-      ChatWeb.Presence,
-      # Start the Endpoint (http/https)
-      ChatWeb.Endpoint,
-      NetworkSynchronization.Supervisor,
-      # Supervised tasks caller
-      {Task.Supervisor, name: Chat.TaskSupervisor},
-      {Task,
-       fn ->
-         {:ok, _pid} = AdminLogger |> Logger.add_backend()
+    children =
+      [
+        # Start the Telemetry supervisor
+        ChatWeb.Telemetry,
+        # Start the PubSub system
+        {Phoenix.PubSub, name: Chat.PubSub},
+        # Start Ecto repository with retry mechanism
+        Chat.Repo |> if_on_host(),
+        # TODO: remove Chat.RepoSupervisor,
+        # Start DB
+        Chat.Ordering.Counters,
+        Chat.Db.Supervisor,
+        Chat.AdminDb,
+        # Application Services
+        Chat.KeyRingTokens,
+        Chat.Broker,
+        Chat.ChunkedFilesBroker,
+        Chat.User.UsersBroker,
+        Chat.Rooms.RoomsBroker,
+        Chat.RoomMessageLinksBroker,
+        Chat.Sync.CargoRoom,
+        Chat.Sync.OnlinersSync,
+        Chat.Sync.UsbDriveDumpRoom,
+        {DynamicSupervisor, name: Chat.Upload.UploadSupervisor},
+        {DynamicSupervisor, name: Chat.Db.FreeSpacesSupervisor},
+        ChatWeb.Presence,
+        # Start the Endpoint (http/https)
+        {ChatWeb.Endpoint, phoenix_sync: Phoenix.Sync.plug_opts()},
+        NetworkSynchronization.Supervisor,
+        # Supervised tasks caller
+        {Task.Supervisor, name: Chat.TaskSupervisor},
+        {Task,
+         fn ->
+           {:ok, _pid} = AdminLogger |> Logger.add_backend()
 
-         Task.Supervisor.start_child(
-           Chat.TaskSupervisor,
-           fn ->
-             log_version()
-             Process.sleep(:timer.minutes(5))
+           Task.Supervisor.start_child(
+             Chat.TaskSupervisor,
+             fn ->
+               log_version()
+               Process.sleep(:timer.minutes(5))
 
-             AdminLogger.get_current_generation()
-             |> AdminLogger.remove_old_generations()
-           end,
-           shutdown: :brutal_kill
-         )
+               AdminLogger.get_current_generation()
+               |> AdminLogger.remove_old_generations()
+             end,
+             shutdown: :brutal_kill
+           )
 
-         Task.Supervisor.start_child(
-           Chat.TaskSupervisor,
-           fn ->
-             Retrieval.load_all_chat_modules()
-             NetworkSynchronization.init_workers()
-           end,
-           shutdown: :brutal_kill
-         )
-       end}
-      # Start a worker by calling: Chat.Worker.start_link(arg)
-      # {Chat.Worker, arg}
-    ]
+           Task.Supervisor.start_child(
+             Chat.TaskSupervisor,
+             fn ->
+               Retrieval.load_all_chat_modules()
+               NetworkSynchronization.init_workers()
+             end,
+             shutdown: :brutal_kill
+           )
+         end}
+        # Start a worker by calling: Chat.Worker.start_link(arg)
+        # {Chat.Worker, arg}
+      ]
+      |> Enum.reject(&is_nil/1)
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
@@ -94,16 +99,31 @@ defmodule Chat.Application do
     :ok
   end
 
+  @target Mix.target()
+  defp if_on_host(repo) do
+    if @target == :host do
+      repo
+    end
+  end
+
   # coveralls-ignore-end
 
   defp log_version do
-    ver = System.get_env("RELEASE_SYS_CONFIG")
+    Logger.info(["[chat] ", get_version()])
+  end
 
-    if ver do
-      ver
-      |> String.split("/", trim: true)
-      |> Enum.at(3)
-      |> then(&Logger.info(["[chat] ", &1]))
+  defp get_version do
+    cond do
+      version = System.get_env("RELEASE_SYS_CONFIG") ->
+        version
+        |> String.split("/", trim: true)
+        |> Enum.at(3)
+
+      version = System.get_env("CHAT_GIT_COMMIT") ->
+        version
+
+      true ->
+        "version should be here"
     end
   end
 end

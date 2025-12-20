@@ -1,5 +1,6 @@
 defmodule ChatWeb.Router do
   use ChatWeb, :router
+  import Phoenix.Sync.Router
 
   pipeline :browser do
     plug :accepts, ["html"]
@@ -21,6 +22,17 @@ defmodule ChatWeb.Router do
       json_decoder: Phoenix.json_library()
 
     plug :accepts, ["json"]
+  end
+
+  pipeline :electric do
+    plug CORSPlug, origin: "*"
+
+    plug Plug.Parsers,
+      parsers: [:urlencoded, :multipart, :json],
+      pass: ["*/*"],
+      json_decoder: Phoenix.json_library()
+
+    plug :accepts, ["json", "event-stream"]
   end
 
   pipeline :upload do
@@ -71,6 +83,7 @@ defmodule ChatWeb.Router do
       live "/export-key-ring/:id", MainLive.Index, :export
 
       live "/proxy/:address/", ProxyLive.Index, :proxy
+      live "/users", UsersLive.Index, :index
     end
 
     get "/login", FrontendController, :index
@@ -114,7 +127,16 @@ defmodule ChatWeb.Router do
 
     get "/confirmation-token", StorageApiController, :confirmation_token
     post "/put", StorageApiController, :put
+    post "/put-many", StorageApiController, :put_many
     get "/dump", StorageApiController, :dump
+  end
+
+  scope "/electric/v1", ChatWeb do
+    pipe_through :electric
+
+    # Phoenix.Sync endpoint for LiveView real-time sync
+    sync("/user", Chat.Data.Schemas.User)
+    post "/ingest", ElectricController, :ingest
   end
 
   # Other scopes may use custom stacks.

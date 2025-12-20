@@ -1,5 +1,5 @@
 defmodule Chat.Dialogs.DialogTest do
-  use ExUnit.Case, async: true
+  use ChatWeb.DataCase, async: true
 
   alias Chat.Card
   alias Chat.Content.Files
@@ -336,6 +336,83 @@ defmodule Chat.Dialogs.DialogTest do
     text
     |> String.pad_trailing(160, "-")
     |> then(&%Messages.Text{text: &1})
+  end
+
+  describe "parsel_to_indexed_message/1" do
+    test "extracts index and message from simple text parcel" do
+      {alice, _bob, _bob_card, dialog} = alice_bob_dialog()
+
+      text_message = "Hello from Alice to Bob"
+      message = %Messages.Text{text: text_message}
+
+      parcel =
+        message
+        |> Chat.SignedParcel.wrap_dialog_message(dialog, alice)
+        |> Chat.store_parcel()
+
+      {index, extracted_message} = Dialogs.parsel_to_indexed_message(parcel)
+
+      assert is_integer(index)
+      assert index > 0
+      assert extracted_message.type == :text
+      assert extracted_message.content != nil
+    end
+
+    test "extracts index and message from memo parcel with multiple items" do
+      {alice, _bob, _bob_card, dialog} = alice_bob_dialog()
+
+      long_text = String.duplicate("This is a long memo message. ", 100)
+      memo_message = %Messages.Text{text: long_text}
+
+      parcel =
+        memo_message
+        |> Chat.SignedParcel.wrap_dialog_message(dialog, alice)
+        |> Chat.store_parcel()
+
+      assert length(parcel.data) > 1
+
+      {index, extracted_message} = Dialogs.parsel_to_indexed_message(parcel)
+
+      assert is_integer(index)
+      assert index > 0
+      assert extracted_message.type == :memo
+      refute extracted_message.content == long_text
+    end
+
+    test "raises error when parcel has no dialog message" do
+      empty_parcel = %Chat.SignedParcel{data: []}
+
+      assert_raise ArgumentError, "Parcel does not contain a dialog message", fn ->
+        Dialogs.parsel_to_indexed_message(empty_parcel)
+      end
+
+      non_dialog_parcel = %Chat.SignedParcel{data: [{{:memo, "some-id"}, "some content"}]}
+
+      assert_raise ArgumentError, "Parcel does not contain a dialog message", fn ->
+        Dialogs.parsel_to_indexed_message(non_dialog_parcel)
+      end
+    end
+
+    test "handles parcel with dialog message among other items" do
+      {alice, _bob, _bob_card, dialog} = alice_bob_dialog()
+
+      long_text = String.duplicate("This is a long memo message. ", 100)
+      memo_message = %Messages.Text{text: long_text}
+
+      parcel =
+        memo_message
+        |> Chat.SignedParcel.wrap_dialog_message(dialog, alice)
+        |> Chat.store_parcel()
+
+      assert length(parcel.data) > 1
+      assert Enum.any?(parcel.data, fn {key, _} -> match?({:memo, _}, key) end)
+      assert Enum.any?(parcel.data, fn {key, _} -> match?({:dialog_message, _, _, _}, key) end)
+
+      {index, extracted_message} = Dialogs.parsel_to_indexed_message(parcel)
+
+      assert is_integer(index)
+      assert extracted_message.type == :memo
+    end
   end
 
   defp alice_bob_dialog do

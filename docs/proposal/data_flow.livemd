@@ -1,0 +1,150 @@
+# Data Flow doc
+
+## Message Processing Flow
+
+### Overview
+
+The chat system processes messages through several key steps from creation to storage:
+
+```mermaid
+graph TD;
+  creation["Message Creation"] --> dryStorable["DryStorable Protocol"];
+  dryStorable --> content["Content Extraction"];
+  dryStorable --> pack["Message Packing"];
+  content --> addMsg["Add Message"];
+  pack --> signedParcel["Signed Parcel"];
+  addMsg --> storeMsg["Store Message"];
+  signedParcel --> db[("Database Storage")];
+  storeMsg --> db;
+  
+  edit["Message Edit"] --> preserveId["Preserve Message ID"];
+  preserveId --> dryStorable;
+  preserveId -.-> deleteOld["Delete Original"];
+  deleteOld -.-> db;
+```
+
+### Message Packing Process
+
+The packing process is a critical step that prepares messages for storage by extracting and potentially relocating their content:
+
+1. **DryStorable Protocol**: All message types implement this protocol, which defines methods for working with message content regardless of the content type
+
+2. **Content Handling**: Different content types are processed based on their characteristics:
+
+   * **Short text** (`< 150 chars`): Stored directly with the message
+   * **Memo** (`> 150 chars`): Content is moved to a separate storage with keys/secrets
+   * **Files**: Similar to memo, content is stored separately with reference information
+
+3. **Pack Function**: The `pack` function is responsible for:
+
+   * Generating unique keys for content identification
+   * Creating access secrets when needed
+   * Preparing content for separate storage
+   * Returning a tuple with key, secret, and data: `{key, {secret, data}}`
+
+4. **Content Separation**: The packing process moves larger content into separate database entries:
+
+   * Original message retains only references (keys and secrets)
+   * Actual content is moved to specialized tables (`:memo`, `:file`, etc.)
+   * This improves performance by keeping message objects small
+
+5. **Security**: For sensitive content, the pack function can also handle encryption with the appropriate secrets
+
+### Pack Function Implementation by Content Type
+
+```elixir
+# For memo (large text)
+def pack(data) do
+  key = UUID.uuid4()
+  # Returns {key, {secret, data}} format
+  {key, Storage.cipher_and_pack(db_key(key), data)}
+end
+
+# For files
+# Similar approach with file-specific handling
+```
+
+The `to_parcel` function in the `DryStorable` protocol implementation determines whether to use packing based on content type (memo vs text vs file).
+
+### Working with Signed Parcels
+
+Signed Parcels are the core data structure for message transport and storage. They provide a consistent interface for handling different message types while ensuring data integrity.
+
+#### Creating New Messages with Parcels
+
+1. **Message Creation**:
+
+   ```elixir
+   message = %Messages.Text{text: "Hello", timestamp: System.system_time(:second)}
+   ```
+
+2. **Parcel Wrapping**:
+
+   ```elixir
+   parcel = Chat.SignedParcel.wrap_dialog_message(message, dialog, author)
+   ```
+
+3. **Storage**:
+
+   ```elixir
+   stored_parcel = Chat.store_parcel(parcel, await: true)
+   ```
+
+   * This replaces `:next` placeholders with numeric indexes
+   * Stores all parcel data in the database
+
+#### Editing Existing Messages
+
+Editing messages requires preserving the original message ID to maintain message history:
+
+1. **Retrieve Original Message**:
+
+   * Access message from the database or dialog
+   * Extract the original unhashed message ID from the message struct
+     ```elixir
+     original_message = dialog_msg.message  # Get from database or dialog
+     orig_msg_id = original_message.id       # Get unhashed ID from struct
+     ```
+
+2. **Create Updated Message**:
+
+   ```elixir
+   updated_message = %Messages.Text{text: "New content", timestamp: System.system_time(:second)}
+   ```
+
+3. **Preserve Message ID and Index**:
+
+   ```elixir
+   updated_parcel = Chat.SignedParcel.wrap_dialog_message(updated_message, dialog, author, 
+                                                           id: orig_msg_id, index: index)
+   ```
+
+   * Use the unhashed ID from the original message, not the hashed ID from the database key
+   * Specify the original index to replace at the same position
+
+4. **Store Updated Message**:
+
+   ```elixir
+   Chat.store_parcel(updated_parcel, await: true)
+   ```
+
+   * This will overwrite the existing message with the same key
+
+#### Important Considerations for Message Editing
+
+1. **Message ID vs Database Key**:
+
+   * Message IDs in `Message` structs are unhashed UUIDs
+   * Database keys use hashed IDs: `{:dialog_message, dialog_hash, index, msg_id_hash}`
+   * Always use the unhashed ID from the message struct when preserving message identity
+
+2. **Content Type Changes**:
+
+   * When editing changes content type (e.g., text to memo), the content storage will change automatically
+   * Short text (≤ 150 chars): Content stored directly in the message
+   * Long text (> 150 chars): Content stored as a memo with reference in the message
+
+3. **Parcel Structure During Edits**:
+
+   * New attachments (memos, files) will be added to the parcel automatically
+   * Old attachments not referenced by the new message remain in the database but become inaccessible

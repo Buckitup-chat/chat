@@ -4,10 +4,12 @@ defmodule ChatTest.SignedParcelTest do
 
   alias Chat.Card
   alias Chat.Dialogs
+  alias Chat.Dialogs.Message, as: DialogMessage
   alias Chat.Identity
   alias Chat.Messages
   alias Chat.SignedParcel
   alias Chat.Dialogs.Message, as: DialogMessage
+  alias Chat.Rooms.Message, as: RoomMessage
   # alias Chat.Dialogs.Registry, as: DialogRegistry
 
   test "text message parcel is corect" do
@@ -95,6 +97,75 @@ defmodule ChatTest.SignedParcelTest do
     refute next == :next
   end
 
+  test "extract_indexed_message extracts dialog message correctly" do
+    {alice, _bob, dialog} = create_alice_bob_dialog()
+
+    parcel =
+      Messages.Text.new("Hello", 1159)
+      |> SignedParcel.wrap_dialog_message(dialog, alice)
+
+    parcel = SignedParcel.inject_next_index(parcel)
+
+    {index, message} = SignedParcel.extract_indexed_message(parcel)
+
+    assert is_integer(index)
+    assert %DialogMessage{} = message
+    assert message.type == :text
+  end
+
+  test "extract_indexed_message extracts room message correctly" do
+    alice = Identity.create("Alice")
+    room = Identity.create("Room")
+
+    index = 123
+
+    parcel =
+      Messages.Text.new("Room message", 1159)
+      |> SignedParcel.wrap_room_message(room, alice, index: index)
+
+    {extracted_index, message} = SignedParcel.extract_indexed_message(parcel)
+
+    assert extracted_index == index
+    assert %RoomMessage{} = message
+    assert message.type == :text
+  end
+
+  test "message_type correctly identifies message types" do
+    {alice, _bob, dialog} = create_alice_bob_dialog()
+    room = Identity.create("Room")
+
+    dialog_parcel =
+      Messages.Text.new("Hello", 1159)
+      |> SignedParcel.wrap_dialog_message(dialog, alice)
+
+    room_parcel =
+      Messages.Text.new("Room message", 1159)
+      |> SignedParcel.wrap_room_message(room, alice)
+
+    assert SignedParcel.message_type(dialog_parcel) == :dialog_message
+    assert SignedParcel.message_type(room_parcel) == :room_message
+
+    empty_parcel = %SignedParcel{data: [], sign: ""}
+    assert SignedParcel.message_type(empty_parcel) == nil
+  end
+
+  test "extract_indexed_message raises for parcels without messages" do
+    empty_parcel = %SignedParcel{data: [], sign: ""}
+
+    assert_raise ArgumentError, "Parcel does not contain a message", fn ->
+      SignedParcel.extract_indexed_message(empty_parcel)
+    end
+
+    parcel_without_message = %SignedParcel{
+      data: [{{:not_a_message, "key"}, "value"}],
+      sign: ""
+    }
+
+    assert_raise ArgumentError, "Parcel does not contain a message", fn ->
+      SignedParcel.extract_indexed_message(parcel_without_message)
+    end
+  end
+
   test "invalid signature is detected" do
     {alice, _bob, dialog} = create_alice_bob_dialog()
     charlie = Identity.create("Charlie")
@@ -160,32 +231,18 @@ defmodule ChatTest.SignedParcelTest do
 
   #   # Test when neither key matches
   #   refute SignedParcel.scope_valid?(parcel, charlie.public_key)
-
-  #   # Test when keys are not in dialog peers
-  #   mock_dialog = %{a_key: alice.public_key, b_key: david.public_key}
-  #   with_mock DialogRegistry, [find: fn _ -> mock_dialog end] do
-  #     parcel = %SignedParcel{
-  #       data: [
-  #         {{:room_invite, "key"}, "data"},
-  #         {{:room_invite_index, charlie.public_key, "key"}, true},
-  #         {{:room_invite_index, david.public_key, "key"}, true},
-  #         {{:dialog_message, "dialog_key", :next, "msg_id"}, %DialogMessage{type: :room_invite}}
-  #       ]
-  #     }
-  #     refute SignedParcel.scope_valid?(parcel, charlie.public_key)
-  #   end
   # end
 
-  test "main_item handles unknown message type" do
+  test "main_item returns nil for unknown message type" do
     parcel = %SignedParcel{
       data: [
-        {{:dialog_message, "dialog_key", :next, "msg_id"}, %DialogMessage{type: :unknown}}
-      ]
+        {{:not_a_message, "key"}, "data"}
+      ],
+      sign: ""
     }
 
-    assert_raise CaseClauseError, fn ->
-      SignedParcel.main_item(parcel)
-    end
+    # With our updated implementation, main_item should return nil for unknown types
+    assert SignedParcel.main_item(parcel) == nil
   end
 
   test "inject_next_index handles unknown message type" do

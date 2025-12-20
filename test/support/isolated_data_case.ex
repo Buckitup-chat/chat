@@ -20,6 +20,12 @@ defmodule ChatTest.IsolatedDataCase do
       import ChatTest.IsolatedDataCase, only: [use_db: 2, db_name: 2]
       alias ChatTest.IsolatedDataCase
 
+      setup tags do
+        :ok = Ecto.Adapters.SQL.Sandbox.checkout(Chat.Repo)
+        Ecto.Adapters.SQL.Sandbox.mode(Chat.Repo, {:shared, self()})
+        :ok
+      end
+
       setup_all context do
         default_db = Chat.Db.db()
 

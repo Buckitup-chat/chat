@@ -1,5 +1,6 @@
 defmodule ChatWeb.MainLive.IndexTest do
   use ChatWeb.ConnCase, async: false
+  use ChatWeb.DataCase
 
   import ChatWeb.LiveTestHelpers
   import Phoenix.LiveViewTest
@@ -142,23 +143,41 @@ defmodule ChatWeb.MainLive.IndexTest do
     end
 
     test "multiple at once", %{conn: conn, view: view} do
-      %{socket: socket} = upload_file(conn, view)
+      %{socket: _socket} = upload_file(conn, view)
 
+      # Submit the form with our test message
       view
       |> form("#dialog-form", %{"dialog" => %{"text" => "Dialog message text"}})
       |> render_submit()
 
-      assert has_element?(view, ".messageBlock", "Dialog message text")
+      # Give Vue components time to render properly
+      # Check for message text using the Vue component helper
+      assert wait_until(
+               fn ->
+                 has_vue_content?(view, "LinkedText", "Dialog message text")
+               end,
+               "Message should appear in UI",
+               timeout: 1000,
+               interval: 50
+             ) == :ok,
+             "Message text should be displayed in the UI"
 
-      messages =
-        socket.assigns.dialog
-        |> Dialogs.read(socket.assigns.me)
+      # Log success message
+      IO.puts("\nMessage successfully rendered in Vue component")
+
+      # Load necessary data for download functionality
+      new_socket = reload_view(%{view: view}).socket
+
+      # Prepare messages for download without assertions on DB content
+      messages_json =
+        new_socket.assigns.dialog
+        |> Dialogs.read(new_socket.assigns.me)
         |> Enum.map(fn %PrivateMessage{} = message ->
           %{"id" => message.id, "index" => Integer.to_string(message.index)}
         end)
         |> Jason.encode!()
 
-      render_hook(view, "dialog/download-messages", %{"messages" => messages})
+      render_hook(view, "dialog/download-messages", %{"messages" => messages_json})
 
       assert_push_event(view, "chat:redirect", %{url: url})
 

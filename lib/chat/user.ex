@@ -25,8 +25,7 @@ defmodule Chat.User do
       |> Enum.sort_by(&"#{&1.name} #{&1.pub_key}")
 
   def by_id(id) do
-    Registry.all()
-    |> Map.get(id)
+    Registry.one(id)
   end
 
   def id_map_builder(ids) do

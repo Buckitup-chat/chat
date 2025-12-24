@@ -41,27 +41,28 @@ defmodule Chat.PhoenixSyncReinit do
 
   defp stop_electric_stack do
     # Electric.StackSupervisor is started with name Electric.StackSupervisor
+    # First terminate the process if running
     case Process.whereis(Electric.StackSupervisor) do
       nil ->
         Logger.debug("[PhoenixSyncReinit] Electric.StackSupervisor not running")
-        :ok
 
       pid when is_pid(pid) ->
         Logger.debug("[PhoenixSyncReinit] Stopping Electric.StackSupervisor")
 
-        # Terminate the supervisor under Phoenix.Sync.Supervisor
         case Supervisor.terminate_child(Phoenix.Sync.Supervisor, Electric.StackSupervisor) do
           :ok ->
-            # Delete the child spec so we can add it again
-            Supervisor.delete_child(Phoenix.Sync.Supervisor, Electric.StackSupervisor)
             :ok
 
           {:error, :not_found} ->
             # Try direct termination if not under Phoenix.Sync.Supervisor
             Supervisor.stop(pid, :normal)
-            :ok
         end
     end
+
+    # Always try to delete the child spec (it may exist even if process isn't running)
+    # This handles the case where Electric failed to start at boot
+    _ = Supervisor.delete_child(Phoenix.Sync.Supervisor, Electric.StackSupervisor)
+    :ok
   rescue
     e ->
       Logger.warning("[PhoenixSyncReinit] Error stopping Electric stack: #{inspect(e)}")
@@ -137,14 +138,8 @@ defmodule Chat.PhoenixSyncReinit do
       {:ok, children} ->
         # Start each child under Phoenix.Sync.Supervisor
         Enum.reduce_while(children, :ok, fn child_spec, _acc ->
-          case Supervisor.start_child(Phoenix.Sync.Supervisor, child_spec) do
-            {:ok, _pid} ->
-              {:cont, :ok}
-
-            {:ok, _pid, _info} ->
-              {:cont, :ok}
-
-            {:error, {:already_started, _pid}} ->
+          case start_or_restart_child(child_spec) do
+            :ok ->
               {:cont, :ok}
 
             {:error, reason} ->
@@ -160,4 +155,29 @@ defmodule Chat.PhoenixSyncReinit do
         {:error, reason}
     end
   end
+
+  defp start_or_restart_child(child_spec) do
+    case Supervisor.start_child(Phoenix.Sync.Supervisor, child_spec) do
+      {:ok, _pid} ->
+        :ok
+
+      {:ok, _pid, _info} ->
+        :ok
+
+      {:error, {:already_started, _pid}} ->
+        :ok
+
+      {:error, :already_present} ->
+        # Child spec exists but process not running - delete and re-add
+        _ = Supervisor.delete_child(Phoenix.Sync.Supervisor, child_id(child_spec))
+        start_or_restart_child(child_spec)
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp child_id(%{id: id}), do: id
+  defp child_id({module, _opts}), do: module
+  defp child_id(module) when is_atom(module), do: module
 end

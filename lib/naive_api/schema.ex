@@ -120,5 +120,13 @@ defmodule NaiveApi.Schema do
       arg(:timestamp, :integer)
       resolve(&Chat.send_text/3)
     end
+
+    @desc "Send file in the chat(dialog)."
+    field :chat_send_file, non_null(:message_reference) do
+      arg(:peer_public_key, non_null(:public_key))
+      arg(:my_keypair, non_null(:input_key_pair))
+      arg(:upload_key, non_null(:file_key))
+      resolve(&Chat.send_file/3)
+    end
   end
 end

@@ -1,4 +1,4 @@
-import { connect, rawStorage, removeAll } from '@lo-fi/local-vault';
+import { connect, rawStorage, removeAll, supportsWebAuthn, supportsWAUserVerification } from '@lo-fi/local-vault';
 import '@lo-fi/local-vault/adapter/idb';
 import { removeLocalAccount } from '@lo-fi/local-data-lock';
 
@@ -49,6 +49,8 @@ export class EncryptionManager extends EventTarget {
 	 * @returns {boolean} - Authorization state (true or false).
 	 */
 	get isAuth() {
+		console.log('is supported', supportsWebAuthn, supportsWAUserVerification)
+
 		return this.#isAuth;
 	}
 
@@ -89,7 +91,9 @@ export class EncryptionManager extends EventTarget {
 			this.#vault = await connect({
 				storageType: 'idb',
 				addNewVault: true,
-				keyOptions: data.keyOptions,
+				keyOptions: {
+					...data.keyOptions,
+				},
 			});
 			//await this.saveVaultID(this.#vault.id);
 			this.#vaults.push({

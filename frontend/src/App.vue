@@ -1,13 +1,20 @@
 <template>
-	<div class="wrapper" v-if="$user.account">
-		<Menu class="_menu" :class="{ _opened: $menuOpened }" />
-		<div class="_menu_backdrop" :class="{ _opened: $menuOpened && $breakpoint.lt('md') }" @click="$menuOpened = false"></div>
 
-		<div class="_main" v-if="$user.account">
-			<router-view v-slot="{ Component, route }">
-				<component :is="Component" :key="route.path" />
-			</router-view>
-		</div>
+	<div class="wrapper" v-if="$user.account">
+		<Suspense>
+			<PGLiteProvider>
+				<Menu class="_menu" :class="{ _opened: $menuOpened }" />
+				<div class="_menu_backdrop" :class="{ _opened: $menuOpened && $breakpoint.lt('md') }"
+					@click="$menuOpened = false">
+				</div>
+
+				<div class="_main" v-if="$user.account">
+					<router-view v-slot="{ Component, route }">
+						<component :is="Component" :key="route.path" />
+					</router-view>
+				</div>
+			</PGLiteProvider>
+		</Suspense>
 	</div>
 
 	<div v-if="!$user.account" class="_login">
@@ -26,10 +33,14 @@
 @import '@/scss/breakpoints.scss';
 
 ._login {
-	width: 100vw; /* full browser width */
-	display: flex; /* use Flexbox */
-	justify-content: center; /* horizontally center items */
-	align-items: center; /* vertically center items */
+	width: 100vw;
+	/* full browser width */
+	display: flex;
+	/* use Flexbox */
+	justify-content: center;
+	/* horizontally center items */
+	align-items: center;
+	/* vertically center items */
 }
 
 .wrapper {
@@ -48,18 +59,22 @@
 	left: 0;
 	width: 0;
 	transition: $transition;
+
 	&._opened {
 		width: 360px;
 		max-width: 360px;
 	}
+
 	@include media-breakpoint-up(md) {
 		position: unset;
 		width: 360px;
 		max-width: 360px;
 	}
+
 	box-shadow: 15px 0rem 1rem 0px rgb(0 0 0 / 12%);
 	overflow: hidden;
 }
+
 ._menu_backdrop {
 	position: fixed;
 	height: 100%;
@@ -68,6 +83,7 @@
 	background-color: rgba(0, 0, 0, 0.3);
 	//transition: backdrop-filter .3s ease;
 	pointer-events: none;
+
 	&._opened {
 		width: 100%;
 		pointer-events: all;
@@ -76,6 +92,7 @@
 		//-webkit-backdrop-filter: blur(3px); // For Safari support
 	}
 }
+
 /* 📌 Main Section */
 ._main {
 	display: flex;
@@ -103,6 +120,7 @@ import Loader from './components/Loader.vue';
 import Menu from '@/views/menu/Menu_.vue';
 import Modal from '@/components/modal/Modal_.vue';
 import Swal from '@/components/swal/Swal_.vue';
+import PGLiteProvider from '@/components/providers/PGLiteProvider.vue';
 import { ref, provide, watch, onMounted, inject, computed, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 

@@ -12,8 +12,13 @@
 				</div>
 
 				<div class="_menu_btn order-1" :class="{ _active: menu === 'chats' }" @click="navigateToChats()">
-					<i class="_icon_chats" :class="{ _active: menu === 'chats' }"></i>
+					<i class="_icon_chats"></i>
 					<div>Chats</div>
+				</div>
+
+				<div class="_menu_btn order-1" :class="{ _active: menu === 'chats' }" @click="menu = 'chats'">
+					<i class="_icon_chats" :class="{ _active: menu === 'chats' }"></i>
+					<div>Chats (Test)</div>
 				</div>
 
 				<div class="_menu_btn order-1" :class="{ _active: menu === 'contacts' }" @click="menu = 'contacts'">
@@ -30,7 +35,8 @@
 					<div class="fs-4">BE</div>
 				</div>
 
-				<div class="_menu_btn order-1" :class="{ _active: $route.path === '/storage-api-client' }" @click="$router.push('/storage-api-client')">
+				<div class="_menu_btn order-1" :class="{ _active: $route.path === '/storage-api-client' }"
+					@click="$router.push('/storage-api-client')">
 					<i class="_icon_share" :class="{ _active: $route.path === '/storage-api-client' }"></i>
 					<div>storage</div>
 				</div>
@@ -62,7 +68,8 @@
 						<i class="_icon_logout bg-white opacity-75"></i>
 					</button-->
 
-					<div class="_btn_back" @click="$menuOpened = false" v-if="$router.options.history.state.back && $breakpoint.lt('md')">
+					<div class="_btn_back" @click="$menuOpened = false"
+						v-if="$router.options.history.state.back && $breakpoint.lt('md')">
 						<i class="_icon_times"></i>
 					</div>
 				</div>
@@ -77,6 +84,7 @@
 <style lang="scss" scoped>
 @import '@/scss/variables.scss';
 @import '@/scss/breakpoints.scss';
+
 ._account {
 	display: flex;
 	flex-direction: column;
@@ -86,6 +94,7 @@
 	padding-left: 0.5rem;
 	padding-right: 0.5rem;
 	cursor: pointer;
+
 	._avatar {
 		display: flex;
 		align-items: center;
@@ -96,6 +105,7 @@
 		overflow: hidden;
 		flex-shrink: 0; // Prevents shrinking when text overflows
 		margin-bottom: 0.2rem;
+
 		img,
 		svg {
 			height: 100%;
@@ -104,6 +114,7 @@
 			object-fit: cover;
 		}
 	}
+
 	._name {
 		font-weight: 500;
 		font-size: 0.9rem;
@@ -113,6 +124,7 @@
 		max-width: 100%; // Ensures truncation works properly
 		display: block; // Ensures proper alignment
 	}
+
 	&:hover {
 		._name {
 			color: $primary;
@@ -123,9 +135,11 @@
 ._menu {
 	display: flex;
 	width: 100%;
+
 	@include media-breakpoint-up(sm) {
 		width: unset;
 	}
+
 	._main {
 		display: flex;
 		flex-direction: column;
@@ -134,11 +148,13 @@
 		justify-content: space-between;
 		width: 4.4rem;
 		max-width: 4.4rem;
+
 		._logo_block {
 			display: flex;
 			align-items: center;
 			justify-content: center;
 			padding: 0.8rem 0rem;
+
 			._icon_logo {
 				width: 3rem;
 				height: 3rem;
@@ -158,8 +174,10 @@
 			padding: 0.5rem 0.5rem;
 			margin-bottom: 0.5rem;
 			font-weight: 500;
+
 			span {
 				display: none;
+
 				@include media-breakpoint-up(lg) {
 					display: block;
 				}
@@ -174,6 +192,7 @@
 
 			&:hover {
 				color: $primary;
+
 				i {
 					background-color: $primary;
 				}
@@ -181,6 +200,7 @@
 
 			&._active {
 				color: $primary;
+
 				i {
 					background-color: $primary;
 				}
@@ -195,6 +215,7 @@
 			text-align: center;
 		}
 	}
+
 	._sub {
 		background-color: darken($white, 5%);
 		flex-grow: 1;
@@ -285,6 +306,7 @@
 				display: block;
 			}
 		}
+
 		._logout_btn {
 			i {
 				background-color: $dark;

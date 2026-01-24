@@ -40,7 +40,8 @@ export default defineConfig({
 				'crypto',
 				//'util',
 				//'vm',
-				'stream',
+				// 'stream',
+				// 'stream-browserify'
 			],
 			globals: {
 				Buffer: true, // can also be 'build', 'dev', or false
@@ -70,13 +71,38 @@ export default defineConfig({
 		alias: {
 			'@': fileURLToPath(new URL('./src', import.meta.url)),
 			bootstrap: path.resolve(__dirname, 'node_modules/bootstrap'), // ✅ Fix Sass Import
+			// '@noble/hashes/hmac': '@noble/hashes/hmac.js',
+			// '@noble/hashes/sha256': '@noble/hashes/sha256.js',
+			// '@noble/hashes/sha512': '@noble/hashes/sha512.js',
+			// '@noble/hashes/utils': '@noble/hashes/utils.js',
+
+			// 'stream/promises': require.resolve('./src/polyfills/stream-promises.js'),
 		},
 	},
 	optimizeDeps: {
 		esbuildOptions: {
 			target: 'es2022',
 		},
-		exclude: ['@lo-fi/webauthn-local-client'],
+		exclude: [
+			'@lo-fi/webauthn-local-client',
+			'@electric-sql/pglite',
+			'@electric-sql/pglite/worker',
+			'@noble/hashes',
+			'@noble/hashes/hmac',
+			'@noble/hashes/sha256',
+			// 'stream',
+			// 'stream/promises'
+		],
+	},
+	server: {
+		proxy: {
+			'/api': {
+				target: 'https://buckitup.xyz',
+				changeOrigin: true,
+				rewrite: (path) => path.replace(/^\/api/, ''),
+				// secure: false,
+			},
+		},
 	},
 	base: '/frontend',
 	build: {

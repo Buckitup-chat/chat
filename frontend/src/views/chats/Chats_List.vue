@@ -1,7 +1,11 @@
 <template>
-	<div>Chats</div>
+	<div>
+		<UserList />
+	</div>
 </template>
 
 <style lang="scss" scoped></style>
 
-<script setup></script>
+<script setup>
+import UserList from '../../components/UserList.vue';
+</script>

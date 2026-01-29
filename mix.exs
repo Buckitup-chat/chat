@@ -108,6 +108,7 @@ defmodule Chat.MixProject do
       {:zstream, "~> 0.6"},
       {:ua_parser, github: "beam-community/ua_parser"},
       {:httpoison, "~> 2.0"},
+      {:req, "~> 0.5"},
       {:tesla, "~> 1.7"},
 
       # ElectricSQL / Phoenix.Sync

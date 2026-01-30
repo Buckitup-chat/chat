@@ -20,9 +20,6 @@ defmodule ChatWeb.MainLive.Admin.GithubFirmwareUpgradeForm do
   def update(assigns, socket) do
     assigns
     |> case do
-      %{platform_response: response} ->
-        socket |> handle_platform_response(response)
-
       %{fetched_releases: {:error, message}} ->
         socket
         |> assign(:substep, :error)
@@ -39,29 +36,34 @@ defmodule ChatWeb.MainLive.Admin.GithubFirmwareUpgradeForm do
         |> assign(:releases, releases)
         |> assign(:selected_release, List.first(releases))
 
+      %{platform_response: response} ->
+        socket |> handle_platform_response(response)
+
       %{action: :start_download} ->
         socket |> start_download()
 
-      other ->
+      _other ->
         socket
-        |> assign(other)
+        |> assign(assigns)
         |> maybe_fetch_releases()
     end
     |> ok()
   end
 
   defp maybe_fetch_releases(%{assigns: %{substep: :loading}} = socket) do
-    fetch_releases_async(socket.assigns.id)
+    lv_pid = self()
+    fetch_releases_async(socket.assigns.id, lv_pid)
     socket
   end
 
   defp maybe_fetch_releases(socket), do: socket
 
-  defp fetch_releases_async(component_id) do
+  defp fetch_releases_async(component_id, lv_pid) do
     Task.start(fn ->
       result = fetch_releases()
 
-      send_update(
+      Phoenix.LiveView.send_update(
+        lv_pid,
         __MODULE__,
         id: component_id,
         fetched_releases: result
@@ -203,7 +205,8 @@ defmodule ChatWeb.MainLive.Admin.GithubFirmwareUpgradeForm do
   end
 
   def handle_event("retry-fetch", _, socket) do
-    fetch_releases_async(socket.assigns.id)
+    lv_pid = self()
+    fetch_releases_async(socket.assigns.id, lv_pid)
 
     socket
     |> assign(:substep, :loading)

@@ -17,6 +17,7 @@ defmodule ChatWeb.MainLive.Index do
     CargoUserData,
     CargoWeightSensorForm,
     FirmwareUpgradeForm,
+    GithubFirmwareUpgradeForm,
     LanSettings,
     MediaSettingsForm,
     NetworkSourceList,

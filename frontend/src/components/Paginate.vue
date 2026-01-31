@@ -81,7 +81,7 @@ select {
 	-moz-appearance: none;
 	-webkit-appearance: none;
 	background: transparent;
-	background-image: url('/icons2/arrow_down.svg');
+	background-image: url('/icons/arrow_down.svg');
 	background-repeat: no-repeat;
 	background-position: right 10px center;
 	background-size: 1rem;

@@ -640,6 +640,7 @@ defmodule ChatWeb.MainLive.Page.Room do
       |> Rooms.list_pending_requests()
       |> Enum.reject(fn %RoomRequest{requester_key: pub_key} -> pub_key in to_ignore end)
       |> Enum.map(fn %RoomRequest{requester_key: pub_key} -> User.by_id(pub_key) end)
+      |> Enum.reject(&is_nil/1)
 
     socket
     |> assign(:room_requests, request_list)

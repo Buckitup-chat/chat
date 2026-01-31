@@ -22,7 +22,7 @@ defmodule ChatWeb do
 
   def controller do
     quote do
-      use Phoenix.Controller, namespace: ChatWeb
+      use Phoenix.Controller, formats: []
 
       import Plug.Conn, except: [assign: 3]
       alias ChatWeb.Router.Helpers, as: Routes

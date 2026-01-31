@@ -26,6 +26,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
   alias ChatWeb.MainLive.Admin.CargoUserData
   alias ChatWeb.MainLive.Admin.CargoWeightSensorForm
   alias ChatWeb.MainLive.Admin.FirmwareUpgradeForm
+  alias ChatWeb.MainLive.Admin.GithubFirmwareUpgradeForm
   alias ChatWeb.MainLive.Admin.LanSettings
   alias ChatWeb.Router.Helpers, as: Routes
 
@@ -311,6 +312,30 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
 
     socket
     |> put_flash(:info, "Firmware upgraded")
+  end
+
+  def github_upgrade_firmware_confirmation(socket, release) do
+    socket
+    |> open_modal(ChatWeb.MainLive.Modals.ConfirmGithubFirmwareUpgrade, %{release: release})
+  end
+
+  def github_upgrade_firmware(socket) do
+    send_update(GithubFirmwareUpgradeForm,
+      id: :github_firmware_upgrade_form,
+      action: :start_download
+    )
+
+    socket
+    |> close_modal()
+  end
+
+  def github_firmware_upgrade_response(socket, message) do
+    send_update(GithubFirmwareUpgradeForm,
+      id: :github_firmware_upgrade_form,
+      platform_response: message
+    )
+
+    socket
   end
 
   def request_platform(message),

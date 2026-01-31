@@ -50,7 +50,7 @@ defmodule Chat.User.UsersBroker do
   def handle_call(:sync, _from, users) do
     User.list() |> reply(:ok)
   catch
-    _, _ -> reply(:ok, users)
+    _, _ -> reply(users, {:error, :failed_to_list_users})
   end
 
   def handle_call(:list, _from, users) do

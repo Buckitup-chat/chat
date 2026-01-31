@@ -39,6 +39,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
 
       {"upgrade-firmware", _} ->
         socket |> AdminPanel.upgrade_firmware()
+
+      {"github-upgrade-firmware", _} ->
+        socket |> AdminPanel.github_upgrade_firmware()
     end
   end
 
@@ -95,6 +98,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
       :upgrade_firmware_confirmation ->
         socket |> AdminPanel.upgrade_firmware_confirmation()
 
+      {:github_upgrade_firmware_confirmation, release} ->
+        socket |> AdminPanel.github_upgrade_firmware_confirmation(release)
+
       :firmware_upgraded ->
         socket |> AdminPanel.notify_firmware_upgraded()
 
@@ -103,6 +109,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
 
       {:network_source_status, source_id, status} ->
         socket |> AdminPanel.send_network_source_list_update(source_id, status)
+
+      {:github_firmware_upgrade, _} = message ->
+        socket |> AdminPanel.github_firmware_upgrade_response(message)
     end
   end
 

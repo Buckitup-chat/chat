@@ -20,7 +20,12 @@ defmodule Chat.MixProject do
           applications: [chat: :permanent]
         ]
       ],
-      preferred_cli_env: [
+    ]
+  end
+
+  def cli do
+    [
+      preferred_envs: [
         coveralls: :test,
         "coveralls.detail": :test,
         "coveralls.html": :test

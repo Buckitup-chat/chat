@@ -68,17 +68,17 @@ config :chat, ChatWeb.Endpoint,
   live_reload: [
     notify: [
       live_view: [
-        ~r"lib/chat_web/core_components.ex$",
-        ~r"lib/chat_web/(live|components)/.*(ex|heex)$"
+        ~r"lib/chat_web/core_components.ex$"E,
+        ~r"lib/chat_web/(live|components)/.*(ex|heex)$"E
       ]
     ],
     patterns: [
-      # ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
-      ~r"lib/chat_web/controllers/.*(ex|heex)$",
-      ~r"priv/static/.*(js|css|png|jpeg|jpg|gif|svg)$",
-      # ~r"priv/gettext/.*(po)$",
-      ~r"lib/chat_web/(live|views)/.*(ex)$",
-      ~r"lib/chat_web/templates/.*(eex)$"
+      # ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$"E,
+      ~r"lib/chat_web/controllers/.*(ex|heex)$"E,
+      ~r"priv/static/.*(js|css|png|jpeg|jpg|gif|svg)$"E,
+      # ~r"priv/gettext/.*(po)$"E,
+      ~r"lib/chat_web/(live|views)/.*(ex)$"E,
+      ~r"lib/chat_web/templates/.*(eex)$"E
     ]
   ],
   watchers: [

@@ -3,11 +3,11 @@ defmodule Chat.Data.User do
   User context for managing user data in Postgres
   """
 
-  alias Chat.Card
+  alias Chat.{Card, Identity}
   alias Chat.Data.Queries.UserQueries
-  alias Chat.Identity
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Types.Consts
+  alias Enigma
   alias EnigmaPq
 
   @doc """
@@ -69,6 +69,7 @@ defmodule Chat.Data.User do
   """
   def generate_pq_identity(name) do
     EnigmaPq.generate_identity()
+    |> Map.merge(generate_contact_identity())
     |> Map.put(:name, name)
   end
 
@@ -76,41 +77,69 @@ defmodule Chat.Data.User do
   Extracts a UserCard (schema struct) from a PQ identity map.
   Computes the user_hash and signs the encryption key (certificate).
   """
-  def extract_pq_card(%{sign_pkey: sign_pkey, sign_skey: sign_skey, crypt_pkey: crypt_pkey, name: name}) do
-    raw_hash = EnigmaPq.hash(sign_pkey)
-    user_hash = Consts.user_hash_prefix() <> raw_hash
+  def extract_pq_card(%{
+        sign_pkey: sign_pkey,
+        sign_skey: sign_skey,
+        crypt_pkey: crypt_pkey,
+        contact_pkey: contact_pkey,
+        name: name
+      }) do
+    user_hash =
+      sign_pkey
+      |> EnigmaPq.hash()
+      |> then(&(Consts.user_hash_prefix() <> &1))
 
-    cert = EnigmaPq.sign(crypt_pkey, sign_skey)
+    crypt_cert = EnigmaPq.sign(crypt_pkey, sign_skey)
+    contact_cert = EnigmaPq.sign(contact_pkey, sign_skey)
 
     %UserCard{
       user_hash: user_hash,
       sign_pkey: sign_pkey,
+      contact_pkey: contact_pkey,
+      contact_cert: contact_cert,
       crypt_pkey: crypt_pkey,
-      crypt_pkey_cert: cert,
+      crypt_cert: crypt_cert,
       name: name
     }
   end
 
   @doc """
   Verifies a UserCard's integrity.
+
   Checks:
   1. user_hash matches prefix + hash(sign_pkey)
-  2. crypt_pkey_cert is a valid signature of crypt_pkey by sign_pkey
+  2. crypt_cert is a valid signature of crypt_pkey by sign_pkey
+  3. contact_cert is a valid signature of contact_pkey by sign_pkey
   """
-  def valid_card?(%UserCard{user_hash: hash, sign_pkey: sign_pkey, crypt_pkey: crypt_pkey, crypt_pkey_cert: cert}) do
-    verify_card_data(hash, sign_pkey, crypt_pkey, cert)
+  def valid_card?(card) do
+    case card do
+      %UserCard{} = user_card ->
+        verify_card_data(user_card.user_hash, user_card.sign_pkey, user_card)
+
+      %{user_hash: hash, sign_pkey: sign_pkey} = card_data ->
+        verify_card_data(hash, sign_pkey, card_data)
+    end
   end
 
-  def valid_card?(%{user_hash: hash, sign_pkey: sign_pkey, crypt_pkey: crypt_pkey, crypt_pkey_cert: cert}) do
-    verify_card_data(hash, sign_pkey, crypt_pkey, cert)
-  end
-
-  defp verify_card_data(hash, sign_pkey, crypt_pkey, cert) do
+  defp verify_card_data(hash, sign_pkey, card_data) do
     expected_hash = Consts.user_hash_prefix() <> EnigmaPq.hash(sign_pkey)
     hash_valid? = hash == expected_hash
 
-    cert_valid? = EnigmaPq.verify(crypt_pkey, cert, sign_pkey)
+    crypt_cert_valid? =
+      EnigmaPq.verify(card_data.crypt_pkey, card_data.crypt_cert, sign_pkey)
 
-    hash_valid? and cert_valid?
+    contact_cert_valid? =
+      EnigmaPq.verify(card_data.contact_pkey, card_data.contact_cert, sign_pkey)
+
+    hash_valid? and crypt_cert_valid? and contact_cert_valid?
+  end
+
+  defp generate_contact_identity do
+    {contact_skey, contact_pkey} = Enigma.generate_keys()
+
+    %{
+      contact_pkey: contact_pkey,
+      contact_skey: contact_skey
+    }
   end
 end

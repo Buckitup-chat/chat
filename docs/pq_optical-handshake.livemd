@@ -3,17 +3,14 @@
 # Post-Quantum Optical Handshake
 
 ## Given
-Alice has PQ sign keypair (sign_pubA, sign_secA), PQ encrypt keypair (enc_pubA, enc_secA) and userhash hashA.
-Bob has PQ sign keypair (sign_pubB, sign_secB), PQ encrypt keypair (enc_pubB, enc_secB) and userhash hashB.
+Alice has PQ sign keypair (sign_pubA, sign_secA), PQ encrypt keypair (enc_pubA, enc_secA), ECC contact keypair (ecc_pubA, ecc_secA)  and userhash hashA.
+Bob has PQ sign keypair (sign_pubB, sign_secB), PQ encrypt keypair (enc_pubB, enc_secB), ECC contact keypair (ecc_pubB, ecc_secB) and userhash hashB.
 
 
 ## Optical Handshake 
-Alice creates ephemeral ECC keypair (ecc_pubA, ecc_secA) and random nonceA.
-Bob creates ephemeral ECC keypair (ecc_pubB, ecc_secB) and random nonceB.
+Alice and Bob exchange public ECC keys (ecc_pubA, ecc_pubB) and random nonces (nonceA, nonceB).
 
-Alice and Bob exchange public ECC keys and random nonces.
-
-Alice signs nonceB with secret key and sends it to Bob. Alice also sends hashA and signs of hashA + nonceB with Alice's secret key.
+Alice signs nonceB with secret key (ecc_secA) and sends it to Bob. Alice also sends hashA and signs of hashA + nonceB with Alice's secret key.
 Bob verifies nonceB with Alice's public key.
 -> Confirms Alice has ECC key she claims.
 Bob recieves unencrypted hashA and verifies the signature of hashA + nonceB with Alice's public key. 
@@ -27,37 +24,38 @@ sequenceDiagram
     participant Alice
     participant Bob
     
-    Note over Alice, Bob: 1. Generation
-    Alice->>Alice: Create ecc_pubA, ecc_secA, nonceA
-    Bob->>Bob: Create ecc_pubB, ecc_secB, nonceB
+    Note over Alice, Bob: 1) Each side creates a fresh nonce
+    Alice->>Alice: Generate nonceA
+    Bob->>Bob: Generate nonceB
     
-    Note over Alice, Bob: 2. Exchange
+    Note over Alice, Bob: 2) Exchange ECC public keys + nonces
     Alice->>Bob: ecc_pubA, nonceA
     Bob->>Alice: ecc_pubB, nonceB
     
-    Note over Alice, Bob: 3. Verification (Alice Side)
+    Note over Alice, Bob: 3) Alice proves key ownership and hash claim
     Note right of Alice: Sign nonceB with ecc_secA
     Note right of Alice: Sign (hashA + nonceB) with ecc_secA
     Alice->>Bob: Sig(nonceB), hashA, Sig(hashA + nonceB)
     
     Note right of Bob: Verify Sig(nonceB) with ecc_pubA
+    Note right of Bob: Confirms Alice owns ecc_pubA
     Note right of Bob: Verify Sig(hashA + nonceB) with ecc_pubA
-    Note right of Bob: Confirms sender owns ecc_pubA & claims hashA
+    Note right of Bob: Confirms hashA claim is fresh (bound to nonceB)
     
-    Note over Alice, Bob: 4. Verification (Bob Side - Symmetric)
+    Note over Alice, Bob: 4) Bob does the same symmetrically
     Note left of Bob: Sign nonceA with ecc_secB
     Note left of Bob: Sign (hashB + nonceA) with ecc_secB
     Bob->>Alice: Sig(nonceA), hashB, Sig(hashB + nonceA)
     
     Note left of Alice: Verify Sig(nonceA) with ecc_pubB
     Note left of Alice: Verify Sig(hashB + nonceA) with ecc_pubB
+    Note left of Alice: Confirms Bob owns ecc_pubB and claims hashB
 ```
 
 ## ContactCandidate
 
-Alice saves hashB and ecc_pubB. Also signs ecc_pubA with her secret key(sign_secA).
-When Alice discovers Usercard that has hashB, she sends ecc_pubA she signed to Bob.
-Bob verifies the signature of ecc_pubA with Alice's public key. confirms that optical handshake he did to hashA is valid to sign_pubA and optically handshaked with ecc_pubA.
+Alice saves hashB and ecc_pubB. 
+When Alice discovers Usercard that has hashB, she checks that Usercard has ecc_pubB. And (optionally) checks ucercard contact_cert (which is a signature of ecc_pubB with Alice sign_secA).
 ContactCandidate becomes (trusted?) Contact
 
 Bob does the same symmetrically.
@@ -68,25 +66,20 @@ sequenceDiagram
     participant Bob
     
     Note over Alice, Bob: Pre-requisite: Optical Handshake Complete
+    Note over Alice, Bob: Each side already stored peer hash + peer ecc_pub
     
-    Note over Alice: Discovers Usercard(hashB, sign_pubB)
-    Note over Alice: Sign ecc_pubA with sign_secA (Identity Key)
+    Note over Alice: Stored candidate: (hashB, ecc_pubB)
+    Note over Alice: Discovers Usercard(hashB, ecc_pubB, contact_cert?)
+    Note over Alice: Check Usercard hashB has matching ecc_pubB
+    Note over Alice: Optional check: verify contact_cert
     
-    Alice->>Bob: Sig(ecc_pubA, sign_secA)
+    Note over Alice: Promote ContactCandidate -> Trusted Contact
     
-    Note right of Bob: Has Usercard(hashA, sign_pubA)
-    Note right of Bob: Verify Sig(ecc_pubA) with sign_pubA
-    Note right of Bob: Validates: hashA -> sign_pubA -> ecc_pubA
-    Note right of Bob: Promotes ContactCandidate to Trusted Contact
-    
-    Note over Bob: Symmetric Process
-    Note over Bob: Sign ecc_pubB with sign_secB
-    Bob->>Alice: Sig(ecc_pubB, sign_secB)
-    
-    Note left of Alice: Verify Sig(ecc_pubB) with sign_pubB
-    Note left of Alice: Validates: hashB -> sign_pubB -> ecc_pubB
+    Note over Bob: Symmetric process with (hashA, ecc_pubA)
+    Note over Bob: Discover Usercard(hashA, ecc_pubA, contact_cert?)
+    Note over Bob: Check hashA and ecc_pubA match stored candidate
+    Note over Bob: Optional check: verify contact_cert
+    Note over Bob: Promote ContactCandidate -> Trusted Contact
 ```
 
 
-## Note
-Ephemeral keys are not stored and one time per handshake.

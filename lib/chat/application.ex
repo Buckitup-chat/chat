@@ -30,6 +30,7 @@ defmodule Chat.Application do
         Chat.Db.Supervisor,
         Chat.AdminDb,
         # Application Services
+        Chat.Challenge,
         Chat.KeyRingTokens,
         Chat.Broker,
         Chat.ChunkedFilesBroker,

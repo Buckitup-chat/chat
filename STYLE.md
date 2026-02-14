@@ -335,6 +335,22 @@ else
 end
 ```
 
+### Inverted `with` for Special Cases
+
+When a function has a common return value but a specific condition requires special handling (like adding an error), use `with` to isolate the special case in the `do` block and let the common case fall through to `else`.
+
+```elixir
+# Preferred
+with true <- changeset.valid?,
+     false <- is_special_condition?(changeset) do
+  # Special case: modify return value
+  add_error(changeset, :field, "error")
+else
+  # Common case: return original value
+  _ -> changeset
+end
+```
+
 ### Code Organization
 
 1. **Imports/aliases** at the top

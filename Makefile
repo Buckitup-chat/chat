@@ -39,6 +39,8 @@ ci-test:
 test: 
 	rm -rf priv/test_db priv/test_admin_db
 	mkdir -p priv/test_db priv/test_admin_db
+	MIX_ENV=test mix ecto.create
+	MIX_ENV=test mix ecto.migrate
 	MIX_ENV=test mix test --max-failures=3 --cover
 
 coverage:

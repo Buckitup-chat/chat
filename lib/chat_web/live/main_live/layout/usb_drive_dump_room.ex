@@ -100,6 +100,7 @@ defmodule ChatWeb.MainLive.Layout.UsbDriveDumpRoom do
 
   defp remove_button(assigns) do
     ~H"""
+
     """
   end
 
@@ -119,6 +120,7 @@ defmodule ChatWeb.MainLive.Layout.UsbDriveDumpRoom do
 
   def button(assigns) do
     ~H"""
+
     """
   end
 end

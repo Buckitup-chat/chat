@@ -136,7 +136,13 @@ defmodule ChatWeb.Router do
 
     # Phoenix.Sync endpoint for LiveView real-time sync
     sync("/user", Chat.Data.Schemas.User)
-    post "/ingest", ElectricController, :ingest
+
+    get "/challenge", ChallengeController, :create
+
+    scope "/" do
+      pipe_through ChatWeb.Plugs.ElectricChallengeInjector
+      post "/ingest", ElectricController, :ingest
+    end
   end
 
   # Other scopes may use custom stacks.

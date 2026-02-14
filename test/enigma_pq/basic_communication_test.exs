@@ -28,20 +28,22 @@ defmodule EnigmaPq.BasicCommunicationTest do
     assert is_binary(alice.crypt_skey)
 
     # 2. Create Certificate: Alice signs her encryption public key with her signing secret key
-    crypt_pkey_cert = EnigmaPq.sign(alice.crypt_pkey, alice.sign_skey)
-    assert is_binary(crypt_pkey_cert)
+    crypt_cert = EnigmaPq.sign(alice.crypt_pkey, alice.sign_skey)
+    assert is_binary(crypt_cert)
 
     # 3. Verify Certificate: Anyone should be able to verify using Alice's signing public key
-    assert EnigmaPq.verify(alice.crypt_pkey, crypt_pkey_cert, alice.sign_pkey)
+    assert EnigmaPq.verify(alice.crypt_pkey, crypt_cert, alice.sign_pkey)
 
     # 4. Verify User Hash generation (Prefix check)
     # The requirement says User Hash is SHA3-512 with 0x01 prefix.
     # EnigmaPq.hash/1 returns raw SHA3-512.
     # We verify that we can construct the correct format.
-    raw_hash = EnigmaPq.hash(alice.sign_pkey) # Example data to hash
+    # Example data to hash
+    raw_hash = EnigmaPq.hash(alice.sign_pkey)
     user_hash = @user_hash_prefix <> raw_hash
 
-    assert byte_size(user_hash) == 1 + 64 # 1 byte prefix + 64 bytes (512 bits)
+    # 1 byte prefix + 64 bytes (512 bits)
+    assert byte_size(user_hash) == 1 + 64
     assert String.starts_with?(user_hash, @user_hash_prefix)
   end
 

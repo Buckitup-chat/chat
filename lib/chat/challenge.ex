@@ -63,7 +63,7 @@ defmodule Chat.Challenge do
     schedule_cleanup()
 
     data
-    |> Enum.filter(fn _, {_, expires_at} -> expires_at > now end)
+    |> Enum.filter(fn {_, {_, expires_at}} -> expires_at > now end)
     |> Map.new()
     |> noreply()
   end

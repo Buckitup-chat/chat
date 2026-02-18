@@ -18,7 +18,7 @@ defmodule Chat.Data.UserDataTest do
       expected_hash = Consts.user_hash_prefix() <> EnigmaPq.hash(identity.sign_pkey)
       assert card_struct.user_hash == expected_hash
       assert card_struct.name == "Alice"
-      assert is_binary(card_struct.crypt_pkey_cert)
+      assert is_binary(card_struct.crypt_cert)
 
       # Insert using changeset (simulating what would happen in a real insert,
       # though we already have the struct, we might want to validate)
@@ -62,14 +62,14 @@ defmodule Chat.Data.UserDataTest do
     end
 
     test "rejects card with invalid prefix in hash" do
-        identity = User.generate_pq_identity("BadPrefix")
-        card = User.extract_pq_card(identity)
+      identity = User.generate_pq_identity("BadPrefix")
+      card = User.extract_pq_card(identity)
 
-        # Wrong prefix
-        bad_hash = Consts.dialog_hash_prefix() <> EnigmaPq.hash(card.sign_pkey)
-        bad_card = %{card | user_hash: bad_hash}
+      # Wrong prefix
+      bad_hash = Consts.dialog_hash_prefix() <> EnigmaPq.hash(card.sign_pkey)
+      bad_card = %{card | user_hash: bad_hash}
 
-        refute User.valid_card?(bad_card)
+      refute User.valid_card?(bad_card)
     end
 
     test "fails with invalid user hash prefix" do
@@ -78,10 +78,20 @@ defmodule Chat.Data.UserDataTest do
       raw_hash = :crypto.strong_rand_bytes(64)
       bad_hash = bad_prefix <> raw_hash
 
+      {sign_pkey, sign_skey} = :crypto.generate_key(:mldsa87, [])
+      {contact_pkey, _contact_skey} = :crypto.generate_key(:mldsa44, [])
+      {crypt_pkey, _crypt_skey} = :crypto.generate_key(:mlkem1024, [])
+
+      contact_cert = EnigmaPq.sign(contact_pkey, sign_skey)
+      crypt_cert = EnigmaPq.sign(crypt_pkey, sign_skey)
+
       attrs = %{
         user_hash: bad_hash,
-        sign_pkey: "key",
-        crypt_pkey: "key",
+        sign_pkey: sign_pkey,
+        contact_pkey: contact_pkey,
+        contact_cert: contact_cert,
+        crypt_pkey: crypt_pkey,
+        crypt_cert: crypt_cert,
         name: "Bob"
       }
 

@@ -13,7 +13,7 @@ defmodule ChatWeb.ElectricControllerTest do
 
       conn = post_ingest(conn, payload, identity.sign_skey)
 
-      assert conn.status == 200
+      assert conn.status == 200, conn.resp_body
       assert %{"txid" => txid} = Jason.decode!(conn.resp_body)
       assert is_integer(txid)
     end
@@ -184,22 +184,19 @@ defmodule ChatWeb.ElectricControllerTest do
   defp to_hex_escape(bin), do: "\\x" <> Base.encode16(bin, case: :lower)
 
   defp post_ingest(conn, payload, sign_skey) do
-    conn
-    |> put_req_header("content-type", "application/json")
-    |> with_pop_headers(sign_skey)
-    |> post("/electric/v1/ingest", Jason.encode!(payload))
-  end
-
-  defp with_pop_headers(conn, sign_skey) do
     {challenge_id, challenge} = Challenge.store()
 
-    signature_hex =
+    signature_b64 =
       challenge
       |> EnigmaPq.sign(sign_skey)
-      |> Base.encode16(case: :lower)
+      |> Base.encode64(padding: false)
+
+    payload =
+      payload
+      |> Map.put("auth", %{"challenge_id" => challenge_id, "signature" => signature_b64})
 
     conn
-    |> put_req_header("x-user-challenge-id", challenge_id)
-    |> put_req_header("x-user-signature", signature_hex)
+    |> put_req_header("content-type", "application/json")
+    |> post("/electric/v1/ingest", Jason.encode!(payload))
   end
 end

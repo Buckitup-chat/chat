@@ -3,6 +3,8 @@ defmodule Chat.Challenge do
 
   use GenServer
 
+  import Tools.GenServerHelpers, only: [noreply: 1]
+
   @expiration_ms 60_000
   @cleanup_interval_ms 30_000
 
@@ -61,8 +63,9 @@ defmodule Chat.Challenge do
     schedule_cleanup()
 
     data
-    |> :maps.filter(fn _, {_, expires_at} -> expires_at > now end)
-    |> then(&{:noreply, &1})
+    |> Enum.filter(fn _, {_, expires_at} -> expires_at > now end)
+    |> Map.new()
+    |> noreply()
   end
 
   defp schedule_cleanup do

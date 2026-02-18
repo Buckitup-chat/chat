@@ -3,7 +3,7 @@
 Mix.install([{:req, "~> 0.5.0"}, {:jason, "~> 1.4"}])
 
 base = System.get_env("BASE_URL") || "http://127.0.0.1:4444"
-path = "/electric/v1/user"
+path = "/electric/v1/user_card"
 
 resp1 =
   Req.get!(

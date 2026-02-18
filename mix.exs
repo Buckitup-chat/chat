@@ -94,7 +94,7 @@ defmodule Chat.MixProject do
       {:sobelow, "~> 0.8", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.14", only: [:test]},
-      {:rewire, "~> 0.9", only: [:test]},
+      {:rewire, "~> 0.9", only: [:dev, :test]},
       # {:live_isolated_component, "~> 0.8", only: [:dev, :test]},
       # {:live_isolated_component, git: "https://github.com/Aratramba/live_isolated_component.git", branch: "upgrade-liveview-1.1", only: [:dev, :test]},
       # {:live_isolated_component, git: "https://github.com/geofflane/live_isolated_component.git", branch: "chore/phoenix_18", only: [:dev, :test]},
@@ -118,7 +118,7 @@ defmodule Chat.MixProject do
       {:tesla, "~> 1.7"},
 
       # ElectricSQL / Phoenix.Sync
-      {:electric, ">= 1.0.0-beta.20"},
+      {:electric, "~> 1.1"},
       {:phoenix_sync, "~> 0.6.1"}
     ]
   end

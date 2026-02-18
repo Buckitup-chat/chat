@@ -135,7 +135,7 @@ defmodule ChatWeb.Router do
     pipe_through :electric
 
     # Phoenix.Sync endpoint for LiveView real-time sync
-    sync("/user", Chat.Data.Schemas.User)
+    sync("/user_card", Chat.Data.Schemas.UserCard)
 
     get "/challenge", ChallengeController, :create
 

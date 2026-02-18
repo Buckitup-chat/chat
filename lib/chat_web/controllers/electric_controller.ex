@@ -18,7 +18,7 @@ defmodule ChatWeb.ElectricController do
     with {_, %{"mutations" => mutations}} <- {:correct_params, params},
          {_, true} <- {:is_mutation_list, is_list(mutations)},
          {:ok, mutations} <- IngestUtil.decode_mutation_fields(mutations, binary_suffixes),
-         {:ok, user_pop_context} <- user_pop_context(conn),
+         {:ok, user_pop_context} <- user_pop_context(params),
          {:ok, txid, _changes} <-
            Writer.new()
            |> Writer.allow(UserCard,
@@ -35,20 +35,26 @@ defmodule ChatWeb.ElectricController do
     end
   end
 
-  defp user_pop_context(conn) do
-    challenge_id = get_req_header(conn, "x-user-challenge-id") |> List.first()
-    signature_hex = get_req_header(conn, "x-user-signature") |> List.first()
+  defp user_pop_context(params) do
+    {challenge_id, signature_encoded} = pop_from_body(params)
 
-    with {_, true} <- {:has_headers, is_binary(challenge_id) and is_binary(signature_hex)},
+    with {_, true} <- {:has_auth, is_binary(challenge_id) and is_binary(signature_encoded)},
          {:ok, challenge} <- fetch_challenge(challenge_id),
-         {:ok, signature} <- decode_hex(signature_hex) do
+         {:ok, signature} <- decode_signature(signature_encoded) do
       {:ok, %{challenge: challenge, signature: signature}}
     else
-      {:has_headers, false} -> {:error, {:unauthorized, "Missing x-user challenge headers"}}
+      {:has_auth, false} -> {:error, {:unauthorized, "Missing user PoP auth"}}
       :error -> {:error, {:unauthorized, "Invalid or expired challenge"}}
-      _ -> {:error, {:unauthorized, "Invalid x-user signature format"}}
+      _ -> {:error, {:unauthorized, "Invalid user signature format"}}
     end
   end
+
+  defp pop_from_body(%{"auth" => %{"challenge_id" => challenge_id, "signature" => signature}})
+       when is_binary(challenge_id) and is_binary(signature) do
+    {challenge_id, signature}
+  end
+
+  defp pop_from_body(_params), do: {nil, nil}
 
   defp check_user_card_operation(operation, %{challenge: challenge, signature: signature}) do
     case operation do
@@ -91,11 +97,8 @@ defmodule ChatWeb.ElectricController do
     end
   end
 
-  defp decode_hex(hex) do
-    case Base.decode16(hex, case: :mixed) do
-      {:ok, bin} -> {:ok, bin}
-      _ -> :error
-    end
+  defp decode_signature(signature_encoded) do
+    Base.decode64(signature_encoded, padding: false)
   end
 
   defp handle_ingest_error(conn, error) do

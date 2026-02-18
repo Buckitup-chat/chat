@@ -19,6 +19,9 @@ defmodule Chat.MixProject do
           version: build_version(),
           applications: [chat: :permanent]
         ]
+      ],
+      listeners: [
+        Phoenix.CodeReloader
       ]
     ]
   end

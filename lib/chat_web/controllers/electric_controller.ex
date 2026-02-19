@@ -62,6 +62,18 @@ defmodule ChatWeb.ElectricController do
         {:ok, sign_pkey} = operation_change(operation, "sign_pkey")
         true = EnigmaPq.verify(challenge, signature, sign_pkey)
         :ok
+
+      %Operation{operation: :update, data: data} ->
+        user_hash = Map.get(data, "user_hash")
+        card = repo().get(UserCard, user_hash)
+        true = EnigmaPq.verify(challenge, signature, card.sign_pkey)
+        :ok
+
+      %Operation{operation: :delete, data: data} ->
+        user_hash = Map.get(data, "user_hash")
+        card = repo().get(UserCard, user_hash)
+        true = EnigmaPq.verify(challenge, signature, card.sign_pkey)
+        :ok
     end
   rescue
     _ -> {:error, "Invalid operation"}

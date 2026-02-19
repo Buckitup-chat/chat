@@ -71,3 +71,10 @@ IO.puts("pub_key=" <> pub_key)
 IO.puts("ingest_status=" <> to_string(resp.status))
 IO.puts("ingest_headers=" <> inspect(resp.headers))
 IO.puts("ingest_body=" <> inspect(resp.body))
+
+if resp.status == 200 do
+  IO.puts("\n✓ Successfully created user card")
+  IO.puts("\nTo update this user's name later, save these values:")
+  IO.puts("USER_HASH=" <> Base.encode16(user_hash, case: :lower))
+  IO.puts("SIGN_SKEY=" <> Base.encode16(sign_skey, case: :lower))
+end

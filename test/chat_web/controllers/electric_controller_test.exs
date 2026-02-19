@@ -17,6 +17,42 @@ defmodule ChatWeb.ElectricControllerTest do
       assert %{"txid" => txid} = Jason.decode!(conn.resp_body)
       assert is_integer(txid)
     end
+
+    test "POST /electric/v1/ingest with valid update mutation returns txid", %{conn: conn} do
+      identity = UserData.generate_pq_identity("Bob")
+      card = UserData.extract_pq_card(identity)
+      insert_payload = user_card_payload(user_card_modified(card))
+
+      # Insert the card first
+      insert_conn = post_ingest(conn, insert_payload, identity.sign_skey)
+      assert insert_conn.status == 200
+
+      # Update the name
+      update_payload = update_name_payload(card.user_hash, "Bob Updated")
+      update_conn = post_ingest(conn, update_payload, identity.sign_skey)
+
+      assert update_conn.status == 200, update_conn.resp_body
+      assert %{"txid" => txid} = Jason.decode!(update_conn.resp_body)
+      assert is_integer(txid)
+    end
+
+    test "POST /electric/v1/ingest with valid delete mutation returns txid", %{conn: conn} do
+      identity = UserData.generate_pq_identity("Bob")
+      card = UserData.extract_pq_card(identity)
+      insert_payload = user_card_payload(user_card_modified(card))
+
+      # Insert the card first
+      insert_conn = post_ingest(conn, insert_payload, identity.sign_skey)
+      assert insert_conn.status == 200
+
+      # Delete the card
+      delete_payload = delete_card_payload(card.user_hash)
+      delete_conn = post_ingest(conn, delete_payload, identity.sign_skey)
+
+      assert delete_conn.status == 200, delete_conn.resp_body
+      assert %{"txid" => txid} = Jason.decode!(delete_conn.resp_body)
+      assert is_integer(txid)
+    end
   end
 
   describe "error checking scenarios" do
@@ -155,6 +191,84 @@ defmodule ChatWeb.ElectricControllerTest do
 
       assert "invalid_user_card_integrity" in error_msgs
     end
+
+    test "POST /electric/v1/ingest update with invalid PoP returns 400", %{conn: conn} do
+      identity = UserData.generate_pq_identity("Bob")
+      card = UserData.extract_pq_card(identity)
+      insert_payload = user_card_payload(user_card_modified(card))
+
+      # Insert the card first
+      insert_conn = post_ingest(conn, insert_payload, identity.sign_skey)
+      assert insert_conn.status == 200
+
+      # Try to update with wrong signature (different user's key)
+      other_identity = UserData.generate_pq_identity("Alice")
+      update_payload = update_name_payload(card.user_hash, "Hacked Name")
+      update_conn = post_ingest(conn, update_payload, other_identity.sign_skey)
+
+      assert update_conn.status == 400
+      assert update_conn.resp_body == "Invalid operation"
+    end
+
+    test "POST /electric/v1/ingest update without PoP returns 401", %{conn: conn} do
+      identity = UserData.generate_pq_identity("Bob")
+      card = UserData.extract_pq_card(identity)
+      insert_payload = user_card_payload(user_card_modified(card))
+
+      # Insert the card first
+      insert_conn = post_ingest(conn, insert_payload, identity.sign_skey)
+      assert insert_conn.status == 200
+
+      # Try to update without auth
+      update_payload = update_name_payload(card.user_hash, "Hacked Name")
+
+      conn =
+        conn
+        |> put_req_header("content-type", "application/json")
+        |> post("/electric/v1/ingest", Jason.encode!(update_payload))
+
+      assert conn.status == 401
+      assert %{"error" => "Missing user PoP auth"} = Jason.decode!(conn.resp_body)
+    end
+
+    test "POST /electric/v1/ingest delete with invalid PoP returns 400", %{conn: conn} do
+      identity = UserData.generate_pq_identity("Bob")
+      card = UserData.extract_pq_card(identity)
+      insert_payload = user_card_payload(user_card_modified(card))
+
+      # Insert the card first
+      insert_conn = post_ingest(conn, insert_payload, identity.sign_skey)
+      assert insert_conn.status == 200
+
+      # Try to delete with wrong signature (different user's key)
+      other_identity = UserData.generate_pq_identity("Alice")
+      delete_payload = delete_card_payload(card.user_hash)
+      delete_conn = post_ingest(conn, delete_payload, other_identity.sign_skey)
+
+      assert delete_conn.status == 400
+      assert delete_conn.resp_body == "Invalid operation"
+    end
+
+    test "POST /electric/v1/ingest delete without PoP returns 401", %{conn: conn} do
+      identity = UserData.generate_pq_identity("Bob")
+      card = UserData.extract_pq_card(identity)
+      insert_payload = user_card_payload(user_card_modified(card))
+
+      # Insert the card first
+      insert_conn = post_ingest(conn, insert_payload, identity.sign_skey)
+      assert insert_conn.status == 200
+
+      # Try to delete without auth
+      delete_payload = delete_card_payload(card.user_hash)
+
+      conn =
+        conn
+        |> put_req_header("content-type", "application/json")
+        |> post("/electric/v1/ingest", Jason.encode!(delete_payload))
+
+      assert conn.status == 401
+      assert %{"error" => "Missing user PoP auth"} = Jason.decode!(conn.resp_body)
+    end
   end
 
   defp user_card_payload(modified) do
@@ -163,6 +277,31 @@ defmodule ChatWeb.ElectricControllerTest do
         %{
           "type" => "insert",
           "modified" => modified,
+          "syncMetadata" => %{"relation" => "user_cards"}
+        }
+      ]
+    }
+  end
+
+  defp update_name_payload(user_hash, new_name) do
+    %{
+      "mutations" => [
+        %{
+          "type" => "update",
+          "original" => %{"user_hash" => to_hex_escape(user_hash)},
+          "changes" => %{"name" => new_name},
+          "syncMetadata" => %{"relation" => "user_cards"}
+        }
+      ]
+    }
+  end
+
+  defp delete_card_payload(user_hash) do
+    %{
+      "mutations" => [
+        %{
+          "type" => "delete",
+          "original" => %{"user_hash" => to_hex_escape(user_hash)},
           "syncMetadata" => %{"relation" => "user_cards"}
         }
       ]

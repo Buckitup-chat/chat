@@ -41,4 +41,8 @@ defmodule Chat.Data.Schemas.UserCard do
     |> cast(attrs, [:name])
     |> validate_required([:name])
   end
+
+  defimpl Enigma.Hash.Protocol, for: __MODULE__ do
+    def to_iodata(user_card), do: user_card.user_hash
+  end
 end

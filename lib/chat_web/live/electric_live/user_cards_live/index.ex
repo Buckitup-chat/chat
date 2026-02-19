@@ -1,6 +1,10 @@
-defmodule ChatWeb.UsersLive.Index do
+defmodule ChatWeb.ElectricLive.UserCardsLive.Index do
   @moduledoc """
-  LiveView page that displays all users synced via Electric.
+  LiveView page that displays all user cards synced via Electric.
+
+  This migrates functionality from UsersLive.Index to use the new user_cards
+  table with Post-Quantum cryptography support. Uses Electric sync for real-time
+  updates without direct database queries.
 
   Uses a patched version of Phoenix.Sync.LiveView.sync_stream/4 that fixes the nil resume bug.
   The bug exists in phoenix_sync 0.6.1 where it passes `resume: nil` to Electric.Client.stream/2.
@@ -10,18 +14,18 @@ defmodule ChatWeb.UsersLive.Index do
   use ChatWeb, :live_view
   import ChatWeb.PhoenixSyncPatch
 
-  alias Chat.Data.Schemas.User
+  alias Chat.Data.Schemas.UserCard
 
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
-      # Use patched Phoenix.Sync to stream users from Electric endpoint
-      # This connects to the sync("/user", Chat.Data.Schemas.User) route
-      # Note: User schema uses :pub_key as primary key, so we need custom DOM IDs
+      # Use patched Phoenix.Sync to stream user_cards from Electric endpoint
+      # This connects to the sync("/user_card", Chat.Data.Schemas.UserCard) route
+      # Note: UserCard schema uses :user_hash as primary key, so we need custom DOM IDs
       {:ok,
        socket
-       |> Phoenix.LiveView.stream_configure(:users, dom_id: &dom_id_for_user/1)
-       |> sync_stream_fixed(:users, User)
+       |> Phoenix.LiveView.stream_configure(:user_cards, dom_id: &dom_id_for_user_card/1)
+       |> sync_stream_fixed(:user_cards, UserCard)
        |> assign(:loading, false)
        |> assign(:error, nil)
        |> assign(:connected, true)
@@ -36,19 +40,19 @@ defmodule ChatWeb.UsersLive.Index do
     end
   end
 
-  # Generate DOM ID from pub_key (base16 encoded)
-  defp dom_id_for_user(%User{pub_key: pub_key}) do
-    "user-#{Base.encode16(pub_key, case: :lower)}"
+  # Generate DOM ID from user_hash (base16 encoded)
+  defp dom_id_for_user_card(%UserCard{user_hash: user_hash}) do
+    "user-card-#{Base.encode16(user_hash, case: :lower)}"
   end
 
   @impl true
-  def handle_info({:sync, {:users, :loaded}}, socket) do
-    # Initial sync completed - all existing users loaded
+  def handle_info({:sync, {:user_cards, :loaded}}, socket) do
+    # Initial sync completed - all existing user cards loaded
     {:noreply, assign(socket, :loading, false)}
   end
 
   @impl true
-  def handle_info({:sync, {:users, :live}}, socket) do
+  def handle_info({:sync, {:user_cards, :live}}, socket) do
     # Stream is now live - receiving real-time updates
     {:noreply, assign(socket, :live, true)}
   end
@@ -64,47 +68,17 @@ defmodule ChatWeb.UsersLive.Index do
     ~H"""
     <div class="min-h-screen bg-gray-50 py-8">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <%!-- Deprecation notice --%>
-        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
-          <div class="flex">
-            <div class="flex-shrink-0">
-              <svg
-                class="h-5 w-5 text-yellow-400"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fill-rule="evenodd"
-                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-            </div>
-            <div class="ml-3">
-              <p class="text-sm text-yellow-700">
-                <strong>Deprecated:</strong>
-                This page is deprecated. Please use
-                <a
-                  href="/electric/user_cards"
-                  class="font-medium underline hover:text-yellow-900"
-                >
-                  /electric/user_cards
-                </a>
-                instead for the new Post-Quantum user cards.
-              </p>
-            </div>
-          </div>
-        </div>
-
         <div class="mb-8">
           <div class="flex items-center justify-between">
             <div>
-              <h1 class="text-3xl font-bold text-gray-900">Users Stream (LiveView + Electric)</h1>
+              <h1 class="text-3xl font-bold text-gray-900">
+                User Cards Stream (LiveView + Electric)
+              </h1>
               <p class="mt-2 text-sm text-gray-600">
-                Real-time user list synced via Phoenix.Sync.Client
+                Real-time user card list with Post-Quantum cryptography support
               </p>
               <p class="mt-1 text-xs text-gray-500 font-mono">
-                Using sync("/user", Chat.Data.Schemas.User) endpoint
+                Using sync("/user_card", Chat.Data.Schemas.UserCard) endpoint
               </p>
             </div>
             <div class="flex items-center space-x-4">
@@ -147,19 +121,17 @@ defmodule ChatWeb.UsersLive.Index do
         <%= if @loading do %>
           <div class="flex flex-col justify-center items-center py-12">
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            <p class="mt-4 text-sm text-gray-600">Syncing users from Electric...</p>
+            <p class="mt-4 text-sm text-gray-600">Syncing user cards from Electric...</p>
           </div>
         <% else %>
           <div class="bg-white shadow overflow-hidden sm:rounded-lg">
             <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-              <h3 class="text-lg leading-6 font-medium text-gray-900">
-                Users Stream
-              </h3>
+              <h3 class="text-lg leading-6 font-medium text-gray-900">User Cards Stream</h3>
             </div>
             <%!-- Use phx-update="stream" for LiveView stream updates --%>
-            <div id="users" phx-update="stream" class="divide-y divide-gray-200">
+            <div id="user_cards" phx-update="stream" class="divide-y divide-gray-200">
               <div
-                :for={{dom_id, user} <- @streams.users}
+                :for={{dom_id, user_card} <- @streams.user_cards}
                 id={dom_id}
                 class="px-4 py-4 sm:px-6 hover:bg-gray-50 transition-colors duration-150"
               >
@@ -168,17 +140,17 @@ defmodule ChatWeb.UsersLive.Index do
                     <div class="flex-shrink-0">
                       <div class="h-12 w-12 rounded-full bg-blue-600 flex items-center justify-center">
                         <span class="text-white font-semibold text-lg">
-                          {String.first(user.name) |> String.upcase()}
+                          {String.first(user_card.name) |> String.upcase()}
                         </span>
                       </div>
                     </div>
                     <div class="min-w-0 flex-1 px-4">
                       <div>
                         <p class="text-sm font-medium text-gray-900 truncate">
-                          {user.name}
+                          {user_card.name}
                         </p>
                         <p class="mt-1 text-sm text-gray-500 font-mono truncate">
-                          {Enigma.Hash.short_hash(user.pub_key)}
+                          {Enigma.Hash.short_hash(user_card)}
                         </p>
                       </div>
                     </div>

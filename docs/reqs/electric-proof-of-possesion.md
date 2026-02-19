@@ -6,7 +6,6 @@ Challenge should be a random string. And expire in 1 minute.
 It can be retrieved from the /api/v1/challenge endpoint. Or from a responce to /api/v1/ingest
 
 When client does user related operation (register, update, remove) it should sign a challenge with user sign key.
-And put x-user-challange-id and x-user-signature headers to the request.
-For room operations another challenge should be used. And x-room-challange-id and x-room-signature headers should be used.
+And put the challenge_id and signature in the request body under `auth.challenge_id` and `auth.signature` (base64-encoded).
 
 When operation requires both user and room sign keys same challenge can be used.

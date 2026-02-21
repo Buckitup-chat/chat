@@ -92,6 +92,7 @@ defmodule ChatWeb.Router do
       live "/electric", ElectricLive.Index, :index
       live "/electric/user_cards", ElectricLive.UserCardsLive.Index, :index
       live "/electric/user_storage", ElectricLive.UserStorageLive.Index, :index
+      live "/electric/user_sandbox", ElectricLive.UserSandboxLive.Index, :index
     end
 
     get "/login", FrontendController, :index

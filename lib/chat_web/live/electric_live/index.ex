@@ -109,6 +109,44 @@ defmodule ChatWeb.ElectricLive.Index do
             </div>
           </a>
 
+          <%!-- User API Sandbox --%>
+          <a
+            href="/electric/user_sandbox"
+            class="block bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-shadow duration-200"
+          >
+            <div class="px-4 py-5 sm:p-6">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <svg
+                    class="h-8 w-8 text-green-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+                    />
+                  </svg>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">User API Sandbox</dt>
+                    <dd class="mt-1 text-lg font-semibold text-gray-900">API Testing</dd>
+                  </dl>
+                </div>
+              </div>
+              <div class="mt-4">
+                <p class="text-sm text-gray-600">
+                  Interactive test client for user_card and user_storage Electric API operations.
+                </p>
+                <p class="mt-2 text-xs text-gray-500 font-mono">/electric/v1/ingest</p>
+              </div>
+            </div>
+          </a>
+
           <div class="block bg-white overflow-hidden shadow rounded-lg opacity-50">
             <div class="px-4 py-5 sm:p-6">
               <div class="flex items-center">

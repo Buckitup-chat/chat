@@ -52,8 +52,10 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
       "mutations" => [
         %{
           "type" => "update",
-          "modified" => %{
-            "user_hash" => encode_hex(user_hash),
+          "original" => %{
+            "user_hash" => encode_hex(user_hash)
+          },
+          "changes" => %{
             "name" => new_name
           },
           "syncMetadata" => %{
@@ -87,7 +89,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
       "mutations" => [
         %{
           "type" => "delete",
-          "modified" => %{
+          "original" => %{
             "user_hash" => encode_hex(user_hash)
           },
           "syncMetadata" => %{
@@ -162,9 +164,11 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
       "mutations" => [
         %{
           "type" => "update",
-          "modified" => %{
+          "original" => %{
             "user_hash" => encode_hex(user_hash),
-            "uuid" => uuid,
+            "uuid" => uuid
+          },
+          "changes" => %{
             "value" => encode_hex(value_binary)
           },
           "syncMetadata" => %{
@@ -198,7 +202,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
       "mutations" => [
         %{
           "type" => "delete",
-          "modified" => %{
+          "original" => %{
             "user_hash" => encode_hex(user_hash),
             "uuid" => uuid
           },

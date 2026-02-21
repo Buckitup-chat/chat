@@ -67,13 +67,16 @@ defmodule ChatWeb.ElectricLive.Index do
             </div>
           </a>
 
-          <%!-- Placeholder for future Electric-synced views --%>
-          <div class="block bg-white overflow-hidden shadow rounded-lg opacity-50">
+          <%!-- User Storage --%>
+          <a
+            href="/electric/user_storage"
+            class="block bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-shadow duration-200"
+          >
             <div class="px-4 py-5 sm:p-6">
               <div class="flex items-center">
                 <div class="flex-shrink-0">
                   <svg
-                    class="h-8 w-8 text-gray-400"
+                    class="h-8 w-8 text-purple-600"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -82,24 +85,29 @@ defmodule ChatWeb.ElectricLive.Index do
                       stroke-linecap="round"
                       stroke-linejoin="round"
                       stroke-width="2"
-                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                      d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
                     />
                   </svg>
                 </div>
                 <div class="ml-5 w-0 flex-1">
                   <dl>
-                    <dt class="text-sm font-medium text-gray-500 truncate">Coming Soon</dt>
-                    <dd class="mt-1 text-lg font-semibold text-gray-900">Dialogs & Messages</dd>
+                    <dt class="text-sm font-medium text-gray-500 truncate">User Storage</dt>
+                    <dd class="mt-1 text-lg font-semibold text-gray-900">
+                      Encrypted Storage
+                    </dd>
                   </dl>
                 </div>
               </div>
               <div class="mt-4">
                 <p class="text-sm text-gray-600">
-                  Real-time messaging streams will be available here.
+                  Real-time encrypted user storage entries (max 10MB per entry).
+                </p>
+                <p class="mt-2 text-xs text-gray-500 font-mono">
+                  /electric/v1/user_storage
                 </p>
               </div>
             </div>
-          </div>
+          </a>
 
           <div class="block bg-white overflow-hidden shadow rounded-lg opacity-50">
             <div class="px-4 py-5 sm:p-6">

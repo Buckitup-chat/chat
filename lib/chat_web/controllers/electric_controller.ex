@@ -5,12 +5,11 @@ defmodule ChatWeb.ElectricController do
 
   alias Chat.Challenge
   alias Chat.Data.Schemas.UserCard
-  alias Chat.Data.User, as: UserData
+  alias Chat.Data.Schemas.UserStorage
+  alias Chat.Data.User.Validation, as: UserValidation
   alias ChatWeb.Utils.IngestUtil
-  alias EnigmaPq
   alias Phoenix.Sync.Writer
   alias Phoenix.Sync.Writer.Format
-  alias Phoenix.Sync.Writer.Operation
 
   def ingest(conn, params) do
     binary_suffixes = ~w[_pkey _cert _hash]
@@ -23,10 +22,13 @@ defmodule ChatWeb.ElectricController do
            Writer.new()
            |> Writer.allow(UserCard,
              accept: [:insert, :update, :delete],
-             check: &check_user_card_operation(&1, user_pop_context),
-             insert: [validate: &validate_user_card_insert/2],
-             update: [validate: &validate_user_card_update/2],
-             delete: [validate: &validate_user_card_delete/2]
+             check: &UserValidation.user_card_allowed(&1, user_pop_context),
+             validate: &UserValidation.user_card_validate/3
+           )
+           |> Writer.allow(UserStorage,
+             accept: [:insert, :update, :delete],
+             check: &UserValidation.user_storage_allowed(&1, user_pop_context),
+             validate: &UserValidation.user_storage_validate/3
            )
            |> Writer.apply(mutations, repo(), format: Format.TanstackDB) do
       json(conn, %{txid: txid})
@@ -55,52 +57,6 @@ defmodule ChatWeb.ElectricController do
   end
 
   defp pop_from_body(_params), do: {nil, nil}
-
-  defp check_user_card_operation(operation, %{challenge: challenge, signature: signature}) do
-    case operation do
-      %Operation{operation: :insert} ->
-        {:ok, sign_pkey} = operation_change(operation, "sign_pkey")
-        true = EnigmaPq.verify(challenge, signature, sign_pkey)
-        :ok
-
-      %Operation{operation: :update, data: data} ->
-        user_hash = Map.get(data, "user_hash")
-        card = repo().get(UserCard, user_hash)
-        true = EnigmaPq.verify(challenge, signature, card.sign_pkey)
-        :ok
-
-      %Operation{operation: :delete, data: data} ->
-        user_hash = Map.get(data, "user_hash")
-        card = repo().get(UserCard, user_hash)
-        true = EnigmaPq.verify(challenge, signature, card.sign_pkey)
-        :ok
-    end
-  rescue
-    _ -> {:error, "Invalid operation"}
-  end
-
-  defp validate_user_card_update(card, changes), do: UserCard.update_name_changeset(card, changes)
-
-  defp validate_user_card_delete(card, _changes), do: card
-
-  defp validate_user_card_insert(card, changes) do
-    changeset = UserCard.create_changeset(card, changes)
-
-    with true <- changeset.valid?,
-         card_data <- Ecto.Changeset.apply_changes(changeset),
-         false <- UserData.valid_card?(card_data) do
-      Ecto.Changeset.add_error(changeset, :user_hash, "invalid_user_card_integrity")
-    else
-      _ -> changeset
-    end
-  end
-
-  defp operation_change(%Operation{changes: changes}, field) do
-    case Map.get(changes, field) || Map.get(changes, String.to_atom(field)) do
-      value when is_binary(value) -> {:ok, value}
-      _ -> {:error, "Missing #{field} in mutation changes"}
-    end
-  end
 
   defp fetch_challenge(challenge_id) do
     case Challenge.get(challenge_id) do

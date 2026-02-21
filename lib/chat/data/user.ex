@@ -3,6 +3,8 @@ defmodule Chat.Data.User do
   User context for managing user data in Postgres
   """
 
+  import Chat.Db, only: [repo: 0]
+
   alias Chat.{Card, Identity}
   alias Chat.Data.Queries.UserQueries
   alias Chat.Data.Schemas.UserCard
@@ -38,6 +40,13 @@ defmodule Chat.Data.User do
       nil -> nil
       user -> Chat.Data.Schemas.User.to_card(user)
     end
+  end
+
+  @doc """
+  Gets a UserCard by user_hash from Postgres
+  """
+  def get_card(user_hash) do
+    repo().get(UserCard, user_hash)
   end
 
   @doc """

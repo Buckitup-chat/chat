@@ -91,6 +91,7 @@ defmodule ChatWeb.Router do
     live_session :electric, on_mount: {ChatWeb.Hooks.SafariSessionHook, :default} do
       live "/electric", ElectricLive.Index, :index
       live "/electric/user_cards", ElectricLive.UserCardsLive.Index, :index
+      live "/electric/user_storage", ElectricLive.UserStorageLive.Index, :index
     end
 
     get "/login", FrontendController, :index
@@ -143,6 +144,8 @@ defmodule ChatWeb.Router do
 
     # Phoenix.Sync endpoint for LiveView real-time sync
     sync("/user_card", Chat.Data.Schemas.UserCard)
+    sync("/user_storage", Chat.Data.Schemas.UserStorage)
+    sync("/user_storage/:user_hash", Chat.Data.Schemas.UserStorage, where: "user_hash = :user_hash")
 
     get "/challenge", ChallengeController, :create
 

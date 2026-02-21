@@ -58,15 +58,28 @@ end)
 
 ### Pattern Matching in Function Heads
 
-**Prefer `case` over multiple function clauses when logic spans 30+ lines:**
+**Prefer `case` over multiple function clauses when:**
+1. Any clause has complex nested logic (`with`, `case`, multi-line blocks)
+2. Total function definition spans 20+ lines
+3. Clauses share common setup or can be simplified by extraction
 
 ```elixir
-# Preferred for complex branching
-def handle_message(msg) do
-  case msg do
-    %{type: :text, content: content} -> process_text(content)
-    %{type: :file, path: path} -> process_file(path)
-    _ -> {:error, :unknown_type}
+# Preferred - consolidate and extract complex logic
+def user_card_validate(card, changes, op) do
+  case op do
+    :insert -> card |> UserCard.create_changeset(changes) |> fail_invalid_user_card()
+    :update -> card |> UserCard.update_name_changeset(changes)
+    :delete -> card
+  end
+end
+
+defp fail_invalid_user_card(changeset) do
+  with true <- changeset.valid?,
+       card_data <- Ecto.Changeset.apply_changes(changeset),
+       false <- UserData.valid_card?(card_data) do
+    Ecto.Changeset.add_error(changeset, :user_hash, "invalid_user_card_integrity")
+  else
+    _ -> changeset
   end
 end
 

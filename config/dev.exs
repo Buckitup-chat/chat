@@ -16,6 +16,22 @@ config :chat, ChatWeb.Endpoint,
   code_reloader: true,
   debug_errors: true,
   secret_key_base: "BKyA6n6KrL/mmKlyg5a+4/ZlWq0cN3dFqfvNj9zaw6Acvnp++u6bXN5rkns5xVpE",
+  live_reload: [
+    notify: [
+      live_view: [
+        ~r"lib/chat_web/core_components.ex$"E,
+        ~r"lib/chat_web/(live|components)/.*(ex|heex)$"E
+      ]
+    ],
+    patterns: [
+      # ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$"E,
+      ~r"lib/chat_web/controllers/.*(ex|heex)$"E,
+      ~r"priv/static/.*(js|css|png|jpeg|jpg|gif|svg)$"E,
+      # ~r"priv/gettext/.*(po)$"E,
+      ~r"lib/chat_web/(live|views)/.*(ex)$"E,
+      ~r"lib/chat_web/templates/.*(eex)$"E
+    ]
+  ],
   watchers: [
     # Start the esbuild watcher by calling Esbuild.install_and_run(:default, args)
     # esbuild: {Esbuild, :install_and_run, [:default, ~w(--sourcemap=inline --watch)]}
@@ -63,27 +79,6 @@ config :live_vue,
 # configured to run both http and https servers on
 # different ports.
 
-# Watch static and templates for browser reloading.
-config :chat, ChatWeb.Endpoint,
-  live_reload: [
-    notify: [
-      live_view: [
-        ~r"lib/chat_web/core_components.ex$"E,
-        ~r"lib/chat_web/(live|components)/.*(ex|heex)$"E
-      ]
-    ],
-    patterns: [
-      # ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$"E,
-      ~r"lib/chat_web/controllers/.*(ex|heex)$"E,
-      ~r"priv/static/.*(js|css|png|jpeg|jpg|gif|svg)$"E,
-      # ~r"priv/gettext/.*(po)$"E,
-      ~r"lib/chat_web/(live|views)/.*(ex)$"E,
-      ~r"lib/chat_web/templates/.*(eex)$"E
-    ]
-  ],
-  watchers: [
-    # tailwind: {Tailwind, :install_and_run, [:default, ~w(--watch)]}
-  ]
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :console, format: "[$level] $message\n"

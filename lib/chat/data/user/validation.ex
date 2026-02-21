@@ -29,6 +29,24 @@ defmodule Chat.Data.User.Validation do
     _ -> {:error, "Invalid operation"}
   end
 
+  def user_card_validate(card, changes, op) do
+    case op do
+      :insert -> card |> UserCard.create_changeset(changes) |> fail_invalid_user_card()
+      :update -> card |> UserCard.update_name_changeset(changes)
+      :delete -> card
+    end
+  end
+
+  defp fail_invalid_user_card(changeset) do
+    with true <- changeset.valid?,
+         card_data <- Ecto.Changeset.apply_changes(changeset),
+         false <- UserData.valid_card?(card_data) do
+      Ecto.Changeset.add_error(changeset, :user_hash, "invalid_user_card_integrity")
+    else
+      _ -> changeset
+    end
+  end
+
   def user_card_validate(card, changes, :insert) do
     changeset = UserCard.create_changeset(card, changes)
 

@@ -114,3 +114,42 @@ User Storage schema:
 - Output: 512 bits (64 bytes) with version prefix 0x01
 - Security: NIST-approved, post-quantum resistant, suitable for long-term archival
 - Final format: `<<0x01, sha3_512_digest::binary>>`
+
+### Shortcode Display
+
+For user-friendly display, user_hash is shortened to a 6-character hex code:
+
+**Implementation:**
+- Extract bytes 2-4 from user_hash (skipping the 0x01 prefix)
+- Encode as lowercase hexadecimal
+- Example: `0x01aabbccdddddddd...` → shortcode `"aabbcc"`
+
+**Protocol:**
+
+```elixir
+defprotocol Chat.Proto.Shortcode do
+  @moduledoc """
+  Protocol for extracting a short code from entities with user_hash.
+
+  Skips the first byte (prefix) and takes the next 3 bytes, encoded as hex.
+  Example: user_hash 0x01aabbccdddddddd... => shortcode "aabbcc"
+  """
+
+  @doc """
+  Returns a 6-character hex string representing bytes 2-4 of the user_hash.
+  """
+  def short_code(entity)
+end
+
+defimpl Chat.Proto.Shortcode, for: Chat.Data.Schemas.UserCard do
+  def short_code(%Chat.Data.Schemas.UserCard{user_hash: user_hash}) do
+    <<_prefix::binary-size(1), code::binary-size(3), _rest::binary>> = user_hash
+    Base.encode16(code, case: :lower)
+  end
+end
+```
+
+**Usage:**
+- UI displays: `Chat.Proto.Shortcode.short_code(user_card)`
+- Provides collision-resistant identification (24 bits = 16.7M combinations)
+- Used in LiveView pages like `/electric/user_cards`

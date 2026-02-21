@@ -47,26 +47,6 @@ defmodule Chat.Data.User.Validation do
     end
   end
 
-  def user_card_validate(card, changes, :insert) do
-    changeset = UserCard.create_changeset(card, changes)
-
-    with true <- changeset.valid?,
-         card_data <- Ecto.Changeset.apply_changes(changeset),
-         false <- UserData.valid_card?(card_data) do
-      Ecto.Changeset.add_error(changeset, :user_hash, "invalid_user_card_integrity")
-    else
-      _ -> changeset
-    end
-  end
-
-  def user_card_validate(card, changes, :update) do
-    UserCard.update_name_changeset(card, changes)
-  end
-
-  def user_card_validate(card, _changes, :delete) do
-    card
-  end
-
   def user_storage_allowed(operation, %{challenge: challenge, signature: signature}) do
     user_hash =
       case operation do

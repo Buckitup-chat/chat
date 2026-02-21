@@ -150,7 +150,7 @@ defmodule ChatWeb.ElectricLive.UserCardsLive.Index do
                           {user_card.name}
                         </p>
                         <p class="mt-1 text-sm text-gray-500 font-mono truncate">
-                          {Enigma.Hash.short_hash(user_card)}
+                          {Chat.Proto.Shortcode.short_code(user_card)}
                         </p>
                       </div>
                     </div>

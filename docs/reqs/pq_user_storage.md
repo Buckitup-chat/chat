@@ -133,7 +133,7 @@ All write operations (create, update, delete) use the centralized ingest endpoin
       "data": {
         "user_hash": "<base16_encoded_hash>",
         "uuid": "<uuid>",
-        "value": "<encrypted_blob>"
+        "value_b64": "<base64_encoded_encrypted_blob>"
       }
     }
   ],
@@ -173,7 +173,7 @@ All write operations (create, update, delete) use the centralized ingest endpoin
 - `mutations[].operation`: One of: insert, update, delete
 - `mutations[].data.user_hash`: Base16-encoded hash (hex string)
 - `mutations[].data.uuid`: Client-generated UUID
-- `mutations[].data.value`: Encrypted blob (for insert/update)
+- `mutations[].data.value_b64`: Base64-encoded encrypted blob (for insert/update)
 - `auth.challenge_id`: Valid challenge identifier
 - `auth.signature`: Base64-encoded signature
 
@@ -189,7 +189,7 @@ All write operations (create, update, delete) use the centralized ingest endpoin
 **Key Fields**:
 - `user_hash`: Binary, part of composite primary key, identifies storage owner
 - `uuid`: UUID, part of composite primary key, client-generated
-- `value`: Binary, encrypted blob, ≤10 MB
+- `value_b64`: Base64-encoded text, encrypted blob, ≤10 MB (≤13.33 MB base64-encoded)
 
 **Indexes**:
 - Composite primary key on `(user_hash, uuid)`
@@ -224,9 +224,10 @@ Add `user_storage` table to Electric publication following the pattern from migr
 
 **Binary Field Encoding**:
 - `user_hash`: Base16-encoded (hex string) for JSON transport
-- `value`: Stored as-is by server; client MAY use base64 encoding to optimize traffic
-- Server stores value without modification
-- Response shapes return data in same encoding as received
+- `value_b64`: Base64-encoded text (no padding) for JSON transport and storage
+- Client MUST base64-encode binary data before sending
+- Server stores base64-encoded text without modification
+- Response shapes return data in base64 encoding
 
 ### 7.4 Performance Considerations
 

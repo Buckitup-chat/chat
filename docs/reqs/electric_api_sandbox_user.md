@@ -40,9 +40,9 @@ The Electric ingest API supports operations on `user_card` and `user_storage` ta
 
 **REQ-5:** Documentation SHALL include:
 - `user_card` schema: user_hash, name, sign_pkey, contact_pkey, contact_cert, crypt_pkey, crypt_cert
-- `user_storage` schema: user_hash, uuid, value
+- `user_storage` schema: user_hash, uuid, value_b64
 - Field type information (bytea, text, uuid)
-- Encoding formats (e.g., `\x<hex>` for binaries)
+- Encoding formats (base64 for value_b64)
 
 ### User Management (Main Content)
 

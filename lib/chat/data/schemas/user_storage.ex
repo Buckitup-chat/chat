@@ -8,28 +8,28 @@ defmodule Chat.Data.Schemas.UserStorage do
   schema "user_storage" do
     field(:user_hash, Chat.Data.Types.UserHash, primary_key: true)
     field(:uuid, Ecto.UUID, primary_key: true)
-    field(:value, :binary)
+    field(:value_b64, :binary)
   end
 
   def create_changeset(storage, attrs) do
     storage
-    |> cast(attrs, [:user_hash, :uuid, :value])
-    |> validate_required([:user_hash, :uuid, :value])
+    |> cast(attrs, [:user_hash, :uuid, :value_b64])
+    |> validate_required([:user_hash, :uuid, :value_b64])
     |> validate_value_size()
     |> unique_constraint([:user_hash, :uuid], name: :user_storage_pkey)
   end
 
   def update_changeset(storage, attrs) do
     storage
-    |> cast(attrs, [:value])
-    |> validate_required([:value])
+    |> cast(attrs, [:value_b64])
+    |> validate_required([:value_b64])
     |> validate_value_size()
   end
 
   def delete_changeset(storage, _attrs), do: storage
 
   defp validate_value_size(changeset) do
-    case get_field(changeset, :value) do
+    case get_field(changeset, :value_b64) do
       nil ->
         changeset
 
@@ -37,7 +37,7 @@ defmodule Chat.Data.Schemas.UserStorage do
         changeset
 
       _ ->
-        add_error(changeset, :value, "exceeds 10 MB limit")
+        add_error(changeset, :value_b64, "exceeds 10 MB limit")
     end
   end
 end

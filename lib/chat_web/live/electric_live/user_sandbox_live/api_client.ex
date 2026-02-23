@@ -112,7 +112,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   @doc """
   Creates a storage entry via the Electric API.
 
-  `value` should be raw binary data. It will be encoded as `\\x<hex>` in the JSON payload.
+  `value` should be raw binary data. It will be encoded as base64 in the JSON payload.
 
   Returns:
   - `{:ok, %{uuid: uuid, log_entries: [log_entry1, log_entry2]}}`
@@ -128,7 +128,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
           "modified" => %{
             "user_hash" => encode_hex(user_hash),
             "uuid" => uuid,
-            "value" => encode_hex(value_binary)
+            "value_b64" => encode_base64(value_binary)
           },
           "syncMetadata" => %{
             "relation" => "user_storage"
@@ -151,7 +151,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   @doc """
   Updates a storage entry via the Electric API.
 
-  `value_binary` should be raw binary data. It will be encoded as `\\x<hex>` in the JSON payload.
+  `value_binary` should be raw binary data. It will be encoded as base64 in the JSON payload.
 
   Returns:
   - `{:ok, %{log_entries: [log_entry1, log_entry2]}}`
@@ -169,7 +169,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
             "uuid" => uuid
           },
           "changes" => %{
-            "value" => encode_hex(value_binary)
+            "value_b64" => encode_base64(value_binary)
           },
           "syncMetadata" => %{
             "relation" => "user_storage"
@@ -376,5 +376,9 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
 
   defp encode_hex(bin) when is_binary(bin) do
     "\\x" <> Base.encode16(bin, case: :lower)
+  end
+
+  defp encode_base64(bin) when is_binary(bin) do
+    Base.encode64(bin, padding: false)
   end
 end

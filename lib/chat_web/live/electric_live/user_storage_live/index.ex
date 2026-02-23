@@ -164,7 +164,7 @@ defmodule ChatWeb.ElectricLive.UserStorageLive.Index do
                             User Hash: {Base.encode16(storage.user_hash, case: :lower) |> String.slice(0..31)}...
                           </p>
                           <p class="mt-1 text-xs text-gray-600">
-                            Value Size: {format_bytes(byte_size(storage.value))}
+                            Value Size: {format_bytes(byte_size(storage.value_b64))}
                           </p>
                         </div>
                       </div>

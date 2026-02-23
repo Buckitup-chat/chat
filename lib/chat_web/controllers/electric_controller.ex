@@ -12,11 +12,13 @@ defmodule ChatWeb.ElectricController do
   alias Phoenix.Sync.Writer.Format
 
   def ingest(conn, params) do
-    binary_suffixes = ~w[_pkey _cert _hash]
+    hex_suffixes = ~w[_pkey _cert _hash]
+    base64_suffixes = ~w[_b64]
 
     with {_, %{"mutations" => mutations}} <- {:correct_params, params},
          {_, true} <- {:is_mutation_list, is_list(mutations)},
-         {:ok, mutations} <- IngestUtil.decode_mutation_fields(mutations, binary_suffixes),
+         {:ok, mutations} <-
+           IngestUtil.decode_mutation_fields(mutations, hex_suffixes, base64_suffixes),
          {:ok, user_pop_context} <- user_pop_context(params),
          {:ok, txid, _changes} <-
            Writer.new()

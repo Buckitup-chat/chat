@@ -84,8 +84,6 @@ defmodule ChatWeb.Router do
       live "/export-key-ring/:id", MainLive.Index, :export
 
       live "/proxy/:address/", ProxyLive.Index, :proxy
-      # DEPRECATED: Use /electric/user_cards instead
-      live "/users", UsersLive.Index, :index
     end
 
     # Electric-synced LiveViews (read-only, real-time via PostgreSQL logical replication)

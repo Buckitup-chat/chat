@@ -139,6 +139,12 @@ GET http://<ip>:<peer_port>/electric/v1/user_card?offset=-1
 3. Skip IPs already known as Electric peers
 4. Call `NetworkSynchronization.add_electric_peer/1` for each discovered peer
 
+### Manual peer via admin panel
+
+When a GraphQL source is started via the admin panel (`start_source/1`), the base URL is derived from the GraphQL source URL and `add_electric_peer/1` is called automatically. When the source is stopped, `remove_electric_peer/1` is called to terminate the corresponding `PeerSync`.
+
+Base URL derivation: `http://IP:PORT/naive_api` → `http://IP:PORT`
+
 ## API Endpoints
 
 ### `GET /electric/v1/system_identifier`
@@ -185,6 +191,43 @@ Added to `Chat.NetworkSynchronization`:
 - `add_electric_peer(peer_url)` — starts a `PeerSync` supervisor for the peer
 - `remove_electric_peer(peer_url)` — terminates the peer's supervisor
 - `list_electric_peers()` — returns list of registered peer URLs
+
+## Admin UI
+
+Electric sync status is displayed inline on each network source card in the admin panel (`NetworkSourceList` component).
+
+### Status badges
+
+Each card shows a row of per-shape badges below the GraphQL status section, visible only when Electric sync is active for that peer:
+
+```
+[ user_card  ✓ live ]  [ user_storage  ↻ syncing... ]
+```
+
+Badge states:
+
+| Symbol | Meaning | Color |
+| ------ | ------- | ----- |
+| `✓ live` | Connected, receiving real-time updates | green |
+| `↻ syncing...` | Initial snapshot download in progress | gray |
+| `✗ err: <reason>` | Stream error, retrying with backoff | red |
+
+Symbols are the primary indicator to ensure readability without color perception.
+
+### Data flow
+
+```
+ShapeConsumer
+  → PubSub {:electric_sync_status, peer_url, shape, status}
+    → AdminPanelRouter
+      → AdminPanel.send_electric_sync_update/4
+        → send_update(NetworkSourceList, electric_status_update: ...)
+          → NetworkSourceList.update/2 merges into electric_status assign
+            → electric_status_for/2 correlates by base URL
+              → electric_shape_badge renders per shape
+```
+
+Correlation between GraphQL source and Electric peer is done by matching the base URL (`scheme://host:port`) extracted from the source's `/naive_api` URL against the Electric `peer_url`.
 
 ## What Stays on GraphQL
 

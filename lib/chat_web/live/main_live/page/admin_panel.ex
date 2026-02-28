@@ -216,6 +216,15 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     socket
   end
 
+  def send_electric_sync_update(socket, peer_url, shape, status) do
+    send_update(ChatWeb.MainLive.Admin.NetworkSourceList,
+      id: :network_sources,
+      electric_status_update: {peer_url, shape, status}
+    )
+
+    socket
+  end
+
   def close(%{assigns: %{me: %{name: admin}}} = socket) do
     PubSub.unsubscribe(Chat.PubSub, @admin_topic)
     PubSub.unsubscribe(Chat.PubSub, @incoming_topic)

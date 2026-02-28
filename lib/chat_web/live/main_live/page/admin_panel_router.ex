@@ -110,6 +110,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
       {:network_source_status, source_id, status} ->
         socket |> AdminPanel.send_network_source_list_update(source_id, status)
 
+      {:electric_sync_status, peer_url, shape, status} ->
+        socket |> AdminPanel.send_electric_sync_update(peer_url, shape, status)
+
       {:github_firmware_upgrade, _} = message ->
         socket |> AdminPanel.github_firmware_upgrade_response(message)
     end

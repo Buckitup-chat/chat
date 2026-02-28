@@ -43,17 +43,44 @@ defmodule Chat.NetworkSynchronization do
   def start_source(id) do
     find_source_by_id(id)
     |> tap(&start_worker/1)
+    |> tap(&maybe_start_electric_peer/1)
     |> struct(started?: true)
     |> Store.update_source()
   end
 
   def stop_source(id) do
+    source = find_source_by_id(id)
     stop_worker(id)
+    maybe_remove_electric_peer(source)
 
-    find_source_by_id(id)
+    source
     |> struct(started?: false)
     |> Store.update_source()
     |> update_status(nil)
+  end
+
+  defp maybe_start_electric_peer(source) do
+    case source_base_url(source) do
+      {:ok, base_url} -> add_electric_peer(base_url)
+      :error -> :ok
+    end
+  end
+
+  defp maybe_remove_electric_peer(source) do
+    case source_base_url(source) do
+      {:ok, base_url} -> remove_electric_peer(base_url)
+      :error -> :ok
+    end
+  end
+
+  defp source_base_url(%{url: url}) do
+    case URI.parse(url) do
+      %URI{scheme: scheme, host: host, port: port} when is_binary(host) ->
+        {:ok, "#{scheme}://#{host}:#{port}"}
+
+      _ ->
+        :error
+    end
   end
 
   defp cast_source(id), do: Source.new(id)

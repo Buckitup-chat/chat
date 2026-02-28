@@ -8,6 +8,7 @@ defmodule ChatWeb.MainLive.Admin.NetworkSourceList do
   def mount(socket) do
     socket
     |> assign(:list, load_list())
+    |> assign(:electric_status, %{})
     |> ok()
   end
 
@@ -15,6 +16,11 @@ defmodule ChatWeb.MainLive.Admin.NetworkSourceList do
     case new do
       %{status_update: data} ->
         socket |> assign(:list, merge_new_status(data, socket.assigns[:list] || []))
+
+      %{electric_status_update: {peer_url, shape, status}} ->
+        socket.assigns.electric_status
+        |> merge_electric_status(peer_url, shape, status)
+        |> then(&assign(socket, :electric_status, &1))
 
       _ ->
         socket |> assign(new)
@@ -71,7 +77,8 @@ defmodule ChatWeb.MainLive.Admin.NetworkSourceList do
     ~H"""
     <div>
       <%= for {item, status} <- @list do %>
-        <.network_source id={item.id} target={@myself} status={status}>
+        <.network_source id={item.id} target={@myself} status={status}
+          electric={electric_status_for(item, @electric_status)}>
           <.item_row>
             <.url_input id={item.id} value={item.url} />
             <.delete_item_button id={item.id} target={@myself} />
@@ -122,6 +129,7 @@ defmodule ChatWeb.MainLive.Admin.NetworkSourceList do
   attr :id, :integer, required: true
   attr :target, :any, required: true
   attr :status, :any, default: nil
+  attr :electric, :map, default: %{}
   slot :inner_block, required: true
   slot :error, required: true
   slot :synchronizing, required: true
@@ -143,7 +151,34 @@ defmodule ChatWeb.MainLive.Admin.NetworkSourceList do
           %Status.CoolingStatus{} -> render_slot(@cooling)
         end)}
       <% end %>
+      <.electric_status_row electric={@electric} />
     </div>
+    """
+  end
+
+  attr :electric, :map, required: true
+
+  def electric_status_row(assigns) do
+    ~H"""
+    <%= if map_size(@electric) > 0 do %>
+      <div class="flex flex-row flex-wrap gap-1 mt-1 border-t border-gray-400 pt-1">
+        <%= for {shape, status} <- @electric do %>
+          <.electric_shape_badge shape={shape} status={status} />
+        <% end %>
+      </div>
+    <% end %>
+    """
+  end
+
+  attr :shape, :atom, required: true
+  attr :status, :any, required: true
+
+  def electric_shape_badge(assigns) do
+    ~H"""
+    <span class="text-xs px-1.5 py-0.5 rounded bg-gray-200 flex items-center gap-1">
+      <span class="font-mono">{@shape}</span>
+      <span class={electric_status_class(@status)}>{electric_status_text(@status)}</span>
+    </span>
     """
   end
 
@@ -303,6 +338,29 @@ defmodule ChatWeb.MainLive.Admin.NetworkSourceList do
     do: ~H"""
     <button type="button" phx-click={@action} phx-target={@target}>+ Add</button>
     """
+
+  defp electric_status_text(%Status.LiveStatus{}), do: "✓ live"
+  defp electric_status_text(%Status.SynchronizingStatus{}), do: "↻ syncing..."
+  defp electric_status_text(%Status.ErrorStatus{reason: r}), do: "✗ err: #{r}"
+  defp electric_status_text(_), do: "? unknown"
+
+  defp electric_status_class(%Status.LiveStatus{}), do: "text-green-700"
+  defp electric_status_class(%Status.ErrorStatus{}), do: "text-red-700"
+  defp electric_status_class(_), do: "text-gray-500"
+
+  defp electric_status_for(%{url: url}, electric_status) do
+    case URI.parse(url) do
+      %URI{scheme: scheme, host: host, port: port} when is_binary(host) ->
+        Map.get(electric_status, "#{scheme}://#{host}:#{port}", %{})
+
+      _ ->
+        %{}
+    end
+  end
+
+  defp merge_electric_status(electric_status, peer_url, shape, status) do
+    Map.update(electric_status, peer_url, %{shape => status}, &Map.put(&1, shape, status))
+  end
 
   defp load_list, do: NetworkSynchronization.synchronisation()
   defp append_new_to_list, do: NetworkSynchronization.add_source()

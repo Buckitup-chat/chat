@@ -6,6 +6,10 @@ defmodule ChatWeb.UploadChunkController do
   alias Chat.ChunkedFiles
   alias Chat.Upload.UploadStatus
 
+  def options(conn, _params) do
+    send_resp(conn, 204, "")
+  end
+
   def put(conn, params) do
     with %{"key" => text_key} <- params,
          {:ok, key} <- Base.decode16(text_key, case: :lower),

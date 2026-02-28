@@ -8,6 +8,17 @@ defmodule ChatWeb.UploadChunkControllerTest do
   @upload_key "a79f0b663a01b53df466335d23096e61521ca4d1f1d6ef9919281b4e1b4dbdb9"
   @upload_fixture "test/support/fixtures/files/text.txt"
 
+  test "OPTIONS /upload_chunk/{key} returns CORS headers", %{conn: conn} do
+    response =
+      conn
+      |> put_req_header("origin", "https://eco-taxi.one")
+      |> put_req_header("access-control-request-method", "PUT")
+      |> options("/upload_chunk/#{@upload_key}")
+
+    assert get_resp_header(response, "access-control-allow-origin") == ["*"]
+    assert response.status in [200, 204]
+  end
+
   test "PUT /upload_chunk/{key}", %{conn: conn} do
     with_mock ChunkedFiles, save_upload_chunk: fn _, _, _, _ -> :ok end do
       # fill the file

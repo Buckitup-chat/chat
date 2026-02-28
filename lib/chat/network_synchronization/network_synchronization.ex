@@ -1,6 +1,7 @@
 defmodule Chat.NetworkSynchronization do
   @moduledoc "Network synchronisation"
 
+  alias Chat.NetworkSynchronization.Electric.PeerSync
   alias Chat.NetworkSynchronization.Source
   alias Chat.NetworkSynchronization.Store
   alias Chat.NetworkSynchronization.Worker
@@ -9,6 +10,8 @@ defmodule Chat.NetworkSynchronization do
 
   @registry Chat.NetworkSynchronization.Supervisor.Registry
   @dynamic_supervisor Chat.NetworkSynchronization.Supervisor.Dynamic
+  @electric_dynamic Chat.NetworkSynchronization.Supervisor.ElectricDynamic
+  @electric_registry Chat.NetworkSynchronization.Supervisor.ElectricRegistry
 
   def synchronisation, do: Store.list_sources_with_status()
 
@@ -102,6 +105,30 @@ defmodule Chat.NetworkSynchronization do
     list
     |> Enum.filter(&match?({%{started?: true}, nil}, &1))
     |> Enum.each(fn {source, _} -> start_worker(source, true) end)
+  end
+
+  # Electric peer management
+
+  def add_electric_peer(peer_url) do
+    DynamicSupervisor.start_child(
+      @electric_dynamic,
+      {PeerSync, peer_url: peer_url, name: electric_via(peer_url)}
+    )
+  end
+
+  def remove_electric_peer(peer_url) do
+    case Registry.lookup(@electric_registry, peer_url) do
+      [{pid, _}] -> DynamicSupervisor.terminate_child(@electric_dynamic, pid)
+      [] -> {:error, :not_found}
+    end
+  end
+
+  def list_electric_peers do
+    Registry.select(@electric_registry, [{{:"$1", :_, :_}, [], [:"$1"]}])
+  end
+
+  defp electric_via(peer_url) do
+    {:via, Registry, {@electric_registry, peer_url}}
   end
 
   # Supervision

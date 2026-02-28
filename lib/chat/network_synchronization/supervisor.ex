@@ -23,10 +23,22 @@ defmodule Chat.NetworkSynchronization.Supervisor do
     registry_name = Keyword.get(opts, :registry_name, Module.concat(supervisor_name, Registry))
     detector_name = Keyword.get(opts, :detector_name, Module.concat(supervisor_name, Detector))
 
+    electric_dynamic_name =
+      Keyword.get(opts, :electric_dynamic_name, Module.concat(supervisor_name, ElectricDynamic))
+
+    electric_registry_name =
+      Keyword.get(
+        opts,
+        :electric_registry_name,
+        Module.concat(supervisor_name, ElectricRegistry)
+      )
+
     children = [
       {DynamicSupervisor, name: dynamic_name, strategy: :one_for_one},
       {Registry, name: registry_name, keys: :unique},
-      {LanDetector, name: detector_name}
+      {LanDetector, name: detector_name},
+      {DynamicSupervisor, name: electric_dynamic_name, strategy: :one_for_one},
+      {Registry, name: electric_registry_name, keys: :unique}
     ]
 
     Store.init()

@@ -4,11 +4,14 @@ defmodule ChatTest.NetworkSynchronization.PeerDetection.DetectionTest do
 
   alias Chat.NetworkSynchronization.PeerDetection.LanDetection
   alias ChatSupport.Mocks.NetworkSynchronization.NeuronMockForLanDetection
+  alias ChatSupport.Mocks.NetworkSynchronization.ReqMockForLanDetection
   alias ChatSupport.Mocks.NetworkSynchronization.SynchronizationMockForLanDetection
 
   rewire(LanDetection, [
     {Chat.NetworkSynchronization, SynchronizationMockForLanDetection},
-    {Neuron, NeuronMockForLanDetection}
+    {Neuron, NeuronMockForLanDetection},
+    {Req, ReqMockForLanDetection},
+    {ChatWeb.Endpoint, ChatSupport.Mocks.NetworkSynchronization.EndpointMockForLanDetection}
   ])
 
   test "lan_detection" do
@@ -16,12 +19,14 @@ defmodule ChatTest.NetworkSynchronization.PeerDetection.DetectionTest do
       ip: "10.10.10.10",
       mask: "255.255.255.0",
       known_peers: ["10.10.10.11", "10.10.10.120", "10.10.10.253", "some.domain.host"],
-      new_peers: NeuronMockForLanDetection.new_peers_list()
+      new_peers: NeuronMockForLanDetection.new_peers_list(),
+      new_electric_peers: ReqMockForLanDetection.electric_peers_list()
     }
     |> set_known_peers
     |> assert_known_peers_in_place
     |> run_lan_detection
     |> assert_correct_peers_added
+    |> assert_electric_peers_added
   end
 
   defp set_known_peers(context) do
@@ -43,6 +48,20 @@ defmodule ChatTest.NetworkSynchronization.PeerDetection.DetectionTest do
 
     context.new_peers
     |> Enum.all?(fn host -> Enum.member?(current_peers, host) end)
+    |> tap(fn in_place? ->
+      assert in_place?
+    end)
+
+    context
+  end
+
+  defp assert_electric_peers_added(context) do
+    electric_peers =
+      SynchronizationMockForLanDetection.list_electric_peers()
+      |> Enum.map(fn url -> URI.parse(url) |> Map.get(:host) end)
+
+    context.new_electric_peers
+    |> Enum.all?(fn host -> Enum.member?(electric_peers, host) end)
     |> tap(fn in_place? ->
       assert in_place?
     end)

@@ -7,6 +7,10 @@ defmodule ChatSupport.Mocks.NetworkSynchronization.SynchronizationMockForLanDete
   def add_source, do: Source.new(:rand.uniform(1_000_000)) |> add_to_sources()
   def update_source(id, fields), do: Source.new(id) |> struct(fields) |> update_in_sources()
   def start_source(_), do: :ok
+  def list_electric_peers, do: Process.get(:electric_peers, [])
+
+  def add_electric_peer(peer_url),
+    do: Process.put(:electric_peers, [peer_url | list_electric_peers()])
 
   defp set_sources(sources), do: Process.put(:sources, sources)
   defp add_to_sources(source), do: tap(source, &set_sources([&1 | Process.get(:sources, [])]))

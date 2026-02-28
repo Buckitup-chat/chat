@@ -24,7 +24,11 @@ defmodule ChatWeb.Router do
   end
 
   pipeline :upload do
-    plug CORSPlug, origin: "*"
+    plug CORSPlug,
+      origin: "*",
+      methods: ["PUT", "OPTIONS"],
+      headers: ["Content-Type", "Content-Range", "Content-Length"]
+
     plug ChatWeb.Plugs.PreferSSL
   end
 

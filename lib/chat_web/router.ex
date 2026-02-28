@@ -24,6 +24,7 @@ defmodule ChatWeb.Router do
   end
 
   pipeline :upload do
+    plug CORSPlug, origin: "*"
     plug ChatWeb.Plugs.PreferSSL
   end
 
@@ -71,6 +72,7 @@ defmodule ChatWeb.Router do
   scope "/", ChatWeb do
     pipe_through :upload
 
+    options "/upload_chunk/:key", UploadChunkController, :options
     put "/upload_chunk/:key", UploadChunkController, :put
   end
 

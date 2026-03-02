@@ -9,18 +9,187 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
+### Added
+
+- Post-quantum user card with Electric sync
+- Post-quantum user storage API (shortcode, scripts, ingest)
+- Post-quantum network sync between Electric peers
+- PGlite + Electric implementation in Vue frontend
+- CORS support for file uploads
+
+### Changed
+
+- Elixir update
+- [platform] USB network interface moved to .26 subnet
+
+## 2026-01-30_13c4d5b\_\_\_2026-01-31_765e0746
+
+### Added
+
+- Firmware update from GitHub releases
+- [platform] Firmware update from URL (artifact-based delivery)
+
+### Changed
+
+- Dependencies update
+- [platform] Split postgres tool
+- [platform] Switch on Toolbox.OriginLog
+- [platform] Updated firmware tools
+
+### Fixed
+
+- User list: propagate error to trigger refetch
+- Fix compile warning
+
+## 2026-01-17_e8f930d\_\_\_2026-01-20_e68f2842
+
+### Added
+
+- [naive api] Chat file upload endpoint
+- [platform] Connected to fresh skeleton
+
+## 2026-01-10_ab1b5c2\_\_\_2025-12-24_c5a5909f
+
+### Changed
+
+- [platform] pg_run_dir per server instance
+- [platform] Code cleanup and styling
+- [platform] Documentation updates
+
+### Fixed
+
+- [platform] Bugfix (PostgreSQL stabilization)
+
+## 2025-12-27_f893bb7\_\_\_2025-12-24_c5a5909f
+
+### Added
+
+- Electric sync: controller implementation and cleanup
+- [platform] Electric integration: config, slot, storageconfig, shared memory
+- [platform] Postgres max connections tuning
+- [platform] Broker sync stabilization
+
+### Changed
+
+- Phoenix and LiveView updates
+- JavaScript lock file updates
+- [platform] Repo revert logic
+
+### Fixed
+
+- Electric reinit on reconnect
+- User broker state fix
+- [platform] Electric reinit (stabilize iterations 29–39)
+- [platform] Dedup repos on reconnect
+
+## 2025-12-13_a007558\_\_\_2025-12-06_064be832
+
+### Fixed
+
+- [platform] Race conditions in drive supervision
+- [platform] Wait for internal DB before USB handoff
+- [platform] PostgreSQL permissions
+- [platform] pg init recheck
+
+### Changed
+
+- [platform] Code organization and cleanup
+
+## 2025-12-08_bda318c\_\_\_2025-12-06_064be832
+
+### Added
+
+- Electric sync: initial integration (#664)
+- Failsafe database brokers
+- [platform] PostgreSQL internal-to-main sync with replication slots (#664)
+- [platform] OpenSpec initialized
+
+### Fixed
+
+- [platform] PostgreSQL shared memory sizing
+- [platform] Replication configuration and slot handling
+- [platform] Stepped supervisor startup
+- [platform] Boot speedup cleanup
+
+## 2025-11-08_b03716c\_\_\_2025-11-01_eef5b989
+
+### Changed
+
+- Delegate PostgreSQL repo start to device (#664)
+- [platform] Boot speedup: PostgreSQL recovery optimization (#664)
+- [platform] Mount optimization and file permissions tuning
+
+## 2025-10-25_389b2fe\_\_\_2025-10-25_ec4b2129
+
+### Added
+
+- Dynamic PostgreSQL repo switching (#664)
+- Migrator for multiple repos (#664)
+- [platform] USB drive with PostgreSQL: dynamic repo, internal db, global repo switcher (#664)
+- [platform] Brokers update for USB+PG integration
+
+### Changed
+
+- Tests adapted for PostgreSQL
+
+### Fixed
+
+- [platform] Postmaster lock on restart
+- [platform] Port conflicts on server start
+
+## 2025-09-06_3077727\_\_\_2025-08-13_d2f85b5f
+
+### Fixed
+
+- [platform] PostgreSQL filesystem permissions (#664)
+- [platform] Code reorganization for PG-related modules
+
+## 2025-08-25_63e0fdc\_\_\_2025-08-13_d2f85b5f
+
+### Fixed
+
+- [platform] PostgreSQL supervision stability (multiple fixes)
+- [platform] Database creation on new drive
+
+## 2025-08-09_abf84da\_\_\_2025-08-09_d6c4929b
+
+### Added
+
+- PostgreSQL initial PoC: per-drive repo, user switching, delayed start (#664)
+- [platform] PostgreSQL supervision and per-drive database (#664)
+
+## 2025-07-10_a7ea452\_\_\_2025-08-01_bfd0181d
 
 ### Added
 
 - [UI] Link detection in messages [#669]
 - Spam-less rooms [#600]
 - Proxy functionality for room requests and dialogs
+- New data flow for rooms and dialogs (#670)
+
+### Changed
+
+- Storage API improvements: put_many, per-user limits
+
+## 2025-07-10_a7ea452\_\_\_2025-07-08_50d6a052
+
+### Added
+
+- Vault support (dual vault, IndexedDB switch)
+- Proxy functionality: dialogs, room requests, gallery, image handling
 - Room approval system with personal channels
-- Frontend Vue application integration
-- Vault support for secure storage
-- PassKey authentication with localStorage fallback [#593]
+- Frontend Vue application integration (contact link, card, timestamp components)
+- PassKey / WebAuthn authentication with localStorage fallback [#593]
 - Legal notices, privacy policy and terms editor [#571]
-- Room signature verification for improved security
+- Room signature verification [#600]
+- Spam-less rooms [#600]
+- Storage API client and backend
+- WebRTC support
+- [platform] F2Fs optimisation for empty devices [#541]
+- [platform] Legal notice shown to new users
+- [platform] DNS proxy concurrency fixes [#639]
+- [platform] Certificate management
+- [platform] OTP 27 upgrade
 
 ### Changed
 
@@ -32,6 +201,9 @@ straightforward as possible.
 - Updated Elixir version and libraries
 - Hosting configuration for eco environment
 - Improved gallery operations and image handling
+- [platform] HTTP-only version support
+- [platform] Boot params cleanup
+- [platform] Network security improvements
 
 ### Fixed
 

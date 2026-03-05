@@ -78,7 +78,10 @@ defmodule ChatWeb.Utils.IngestUtil do
         decode_base64(value)
 
       Enum.any?(hex_suffixes, &String.ends_with?(field, &1)) ->
-        decode_hex(value)
+        case decode_hex(value) do
+          {:ok, bin} -> {:ok, bin}
+          {:error, _} -> {:error, "invalid_binary_field"}
+        end
 
       true ->
         {:ok, value}
@@ -123,10 +126,28 @@ defmodule ChatWeb.Utils.IngestUtil do
 
   @doc """
   Legacy function for backwards compatibility.
-  Decodes binary fields assuming hex encoding.
+  Decodes binary fields: hex-prefixed values (\\x... or 0x...) are decoded,
+  plain binary strings are returned as-is.
   """
-  def decode_binary(binary) do
-    decode_hex(binary)
+  def decode_binary(value) when is_binary(value) do
+    case value do
+      "\\x" <> hex ->
+        case Base.decode16(hex, case: :mixed) do
+          {:ok, bin} -> {:ok, bin}
+          :error -> {:error, "invalid_binary_field"}
+        end
+
+      "0x" <> hex ->
+        case Base.decode16(hex, case: :mixed) do
+          {:ok, bin} -> {:ok, bin}
+          :error -> {:error, "invalid_binary_field"}
+        end
+
+      plain ->
+        {:ok, plain}
+    end
   end
+
+  def decode_binary(_), do: {:error, "invalid_binary_field"}
 end
 

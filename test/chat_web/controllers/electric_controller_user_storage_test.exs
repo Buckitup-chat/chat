@@ -38,7 +38,7 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
 
       # Insert storage with large value (1MB - well under 10MB limit)
       uuid = Ecto.UUID.generate()
-      value = :crypto.strong_rand_bytes(1_048_576) |> Base.encode64(padding: false)
+      value = :crypto.strong_rand_bytes(1_048_576)
       storage_payload = user_storage_insert_payload(card.user_hash, uuid, value)
 
       conn = post_ingest(conn, storage_payload, identity.sign_skey)
@@ -296,7 +296,7 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
         )
 
       assert bob_storage != nil
-      assert bob_storage.value == "bob_value"
+      assert bob_storage.value_b64 == "bob_value"
     end
   end
 
@@ -322,7 +322,7 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
             "modified" => %{
               "user_hash" => to_hex_escape(card.user_hash),
               "uuid" => uuid1,
-              "value" => "value1"
+              "value_b64" => Base.encode64("value1", padding: false)
             },
             "syncMetadata" => %{"relation" => "user_storage"}
           },
@@ -331,7 +331,7 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
             "modified" => %{
               "user_hash" => to_hex_escape(card.user_hash),
               "uuid" => uuid2,
-              "value" => "value2"
+              "value_b64" => Base.encode64("value2", padding: false)
             },
             "syncMetadata" => %{"relation" => "user_storage"}
           },
@@ -340,7 +340,7 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
             "modified" => %{
               "user_hash" => to_hex_escape(card.user_hash),
               "uuid" => uuid3,
-              "value" => "value3"
+              "value_b64" => Base.encode64("value3", padding: false)
             },
             "syncMetadata" => %{"relation" => "user_storage"}
           }
@@ -364,7 +364,7 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
           "modified" => %{
             "user_hash" => to_hex_escape(user_hash),
             "uuid" => uuid,
-            "value" => value
+            "value_b64" => Base.encode64(value, padding: false)
           },
           "syncMetadata" => %{"relation" => "user_storage"}
         }
@@ -381,7 +381,7 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
             "user_hash" => to_hex_escape(user_hash),
             "uuid" => uuid
           },
-          "changes" => %{"value" => new_value},
+          "changes" => %{"value_b64" => Base.encode64(new_value, padding: false)},
           "syncMetadata" => %{"relation" => "user_storage"}
         }
       ]

@@ -15,10 +15,9 @@ defmodule Chat.NetworkSynchronization.Electric.PeerIdentifierTest do
   end
 
   describe "build_postgres_url/1" do
-    test "converts Electric URL to PostgreSQL URL" do
+    test "returns error for unreachable peer" do
       peer_url = "http://192.168.1.100:6000"
-      assert {:ok, pg_url} = PeerIdentifier.query_system_identifier(peer_url)
-      assert pg_url == {:error, _}
+      assert {:error, _reason} = PeerIdentifier.query_system_identifier(peer_url)
     end
   end
 end

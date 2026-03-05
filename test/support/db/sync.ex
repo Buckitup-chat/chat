@@ -70,7 +70,7 @@ defmodule Support.Db.Sync do
     )
     |> Stream.run()
 
-    context.internal |> CubDB.file_sync()
+    context.internal |> await_writes_complete()
 
     context
   end
@@ -93,6 +93,17 @@ defmodule Support.Db.Sync do
 
     context
     |> Map.put(:main_to_backup_keys, keys)
+  end
+
+  defp await_writes_complete(db, prev \\ nil) do
+    size = CubDB.size(db)
+
+    if size == prev do
+      CubDB.file_sync(db)
+    else
+      Process.sleep(100)
+      await_writes_complete(db, size)
+    end
   end
 
   defp switch_on(name) do

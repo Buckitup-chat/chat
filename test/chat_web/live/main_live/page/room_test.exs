@@ -43,7 +43,8 @@ defmodule ChatWeb.MainLive.Page.RoomTest do
       assert true = new_assigns.is_room_linked?
 
       %{messages: [msg]} = new_assigns
-      assert view |> element("#message-block-#{msg.id}") |> render() =~ @msg_text
+      html = view |> element("#message-block-#{msg.id}") |> render()
+      assert has_vue_content?(html, "LinkedText", @msg_text)
     end
 
     test "404 if link is canceled or non-existed", %{conn: conn} do
@@ -64,10 +65,23 @@ defmodule ChatWeb.MainLive.Page.RoomTest do
 
     defp create_and_link_message(%{view: view}) do
       view |> form("#room-form", room: %{text: @msg_text}) |> render_submit()
-      %{view: view, socket: %{assigns: %{messages: [%{id: id}]}}} = reload_view(%{view: view})
+      %{view: view, socket: %{assigns: %{messages: [%{id: id}]}}} = await_messages(view)
 
       view |> element("#message-block-#{id} .t-link-action") |> render_click()
       reload_view(%{view: view})
+    end
+
+    # Message delivery is async (WriteQueue -> Decider -> CubDB -> PubSub broadcast).
+    # Retry until messages appear or timeout.
+    defp await_messages(view, attempts \\ 60) do
+      state = reload_view(%{view: view})
+
+      if Map.get(state.socket.assigns, :messages, []) == [] and attempts > 0 do
+        Process.sleep(50)
+        await_messages(view, attempts - 1)
+      else
+        state
+      end
     end
 
     defp close_sharelink_modal(%{view: view}) do

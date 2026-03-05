@@ -9,7 +9,10 @@ defmodule Chat.NetworkSynchronization.RetrievalTest do
     def refresh, do: :called
   end
 
-  rewire(Retrieval, [{Chat.Sync.DbBrokers, DbBrokersMock}])
+  rewire(Retrieval, [
+    {Chat.Sync.DbBrokers, DbBrokersMock},
+    {Neuron, ChatSupport.Mocks.NetworkSynchronization.NeuronMockForRetrieval}
+  ])
 
   setup_all [:create_user]
 

@@ -6,11 +6,12 @@ defmodule ChatWeb.MainLive.Layout.PopupTest do
 
   test "renders popup #restrict-write-actions" do
     component = render_component(&Popup.restrict_write_actions/1, [])
-    button = component |> Floki.find("button")
+    parsed = Floki.parse_document!(component)
+    button = parsed |> Floki.find("button")
 
-    assert component |> Floki.text() =~ "Read only mode"
+    assert parsed |> Floki.text() =~ "Read only mode"
 
-    assert component |> Floki.text() =~
+    assert parsed |> Floki.text() =~
              "The device switched into read only mode. Storage drive needs to be upgraded."
 
     assert button |> Floki.text() =~ "Ok"

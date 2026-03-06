@@ -1,0 +1,110 @@
+## Problem
+
+Guarantee that every row arriving via Electric sync was written by its legitimate owner,
+and that the state converges correctly when that owner writes from multiple devices.
+
+The owner is responsible for ordering their own writes.
+The receiving peer only needs to verify authenticity and
+apply the owner's stated ordering — it does not need to reason about time independently.
+
+## Solution
+
+Every piece of information in the system has an owner (author), who is eligible to update/delete it.
+
+We can be interestend in keeping versions of data or not.
+
+Unversioned data has integrity and conflict resolving info as extra metadata.
+
+- deleted_flag
+- owner_timestamp to resolve conflicts (latest wins)
+- sign_b64(rest of table fields) to prove integrity
+
+Versioned date has integrity, conflict resolving info and versioning info as extra metadata.
+
+- deleted_flag
+- parent_sign_b64 to point to previous version
+- owner_timestamp to resolve conflicts
+- sign_b64(rest of table fields including parent_sign_b64) to prove integrity
+
+Versioned data has 2 tables:
+
+- data - stores last versions
+- data_versions - stores all previous versions
+
+
+## Examples
+
+### Unversioned `user_cards`
+
+```mermaid
+erDiagram
+    user_cards {
+        binary user_hash PK
+        binary sign_pkey
+        binary contact_pkey
+        binary contact_cert
+        binary crypt_pkey
+        binary crypt_cert
+        string name
+        boolean deleted_flag
+        bigint owner_timestamp
+        binary sign_b64
+    }
+```
+
+
+### Versioned `user_storage` (one table)
+
+```mermaid
+erDiagram
+    user_storage {
+        binary user_hash PK
+        uuid uuid PK
+        binary value_b64
+        boolean deleted_flag
+        binary parent_sign_b64 FK
+        bigint owner_timestamp
+        binary sign_b64 PK
+    }
+```
+
+### Versioned `user_storage` (two tables)
+
+```mermaid
+erDiagram
+    user_storage {
+        binary user_hash PK
+        uuid uuid PK
+        binary value_b64
+        boolean deleted_flag
+        bigint owner_timestamp
+        binary parent_sign_b64 FK
+        binary sign_b64
+    }
+
+    user_storage_versions {
+        binary user_hash FK
+        uuid storage_uuid FK
+        binary value_b64
+        boolean deleted_flag
+        bigint owner_timestamp
+        binary parent_sign_b64 FK
+        binary sign_b64 PK
+    }
+
+    user_storage ||--o{ user_storage_versions : "has versions"
+```
+
+**`user_storage`** — last version only per entry:
+
+| user_hash | uuid | value_b64 | deleted_flag | parent_sign_b64 | owner_timestamp | sign_b64 |
+|-----------|------|-----------|--------------|-----------------|-----------------|----------|
+| `a1b2...` | `550e8400-...` | `<<...>>` | false | `uBOJk3PTAO...` | 1700000002 | `VtKP+7CCc...` |
+| `c3d4...` | `f47ac10b-...` | `<<...>>` | false | `null`        | 1700000010 | `fTbWcKdjA...` |
+
+**`user_storage_versions`** — all previous versions:
+
+| user_hash | storage_uuid | value_b64 | deleted_flag | parent_sign_b64 | owner_timestamp | sign_b64 |
+|-----------|--------------|-----------|--------------|-----------------|-----------------|----------|
+| `a1b2...` | `550e8400-...` | `<<...>>` | false | `null` | 1700000000 | `11U3zdLYxO...` |
+| `a1b2...` | `550e8400-...` | `<<...>>` | false | `11U3zdLYxO...` | 1700000001 | `uBOJk3PTAO...` |

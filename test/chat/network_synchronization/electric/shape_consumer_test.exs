@@ -26,6 +26,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
     on_exit(fn ->
       Application.delete_env(:chat, :consumer_test_pid)
       Application.delete_env(:chat, :electric_mock_messages)
+      Application.delete_env(:chat, :consumer_test_write_result)
     end)
 
     :ok
@@ -109,6 +110,41 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
 
     # Satisfy the compiler — backoff was reset
     assert is_integer(backoff)
+  end
+
+  test "cancels task and retries with backoff when repo is not available" do
+    card = %UserCard{
+      user_hash: <<1::256>>,
+      name: "Alice",
+      sign_pkey: "s",
+      contact_pkey: "c",
+      contact_cert: "cc",
+      crypt_pkey: "cp",
+      crypt_cert: "ccc"
+    }
+
+    Application.put_env(:chat, :consumer_test_write_result, {:error, :repo_not_available})
+
+    Application.put_env(:chat, :electric_mock_messages, [
+      %Message.ChangeMessage{headers: %{operation: :insert}, value: card}
+    ])
+
+    {:ok, consumer} =
+      start_supervised({ShapeConsumer,
+       peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card})
+
+    await_till(
+      fn ->
+        {_url, _si, _shape, _task_info, backoff} = :sys.get_state(consumer)
+        backoff > 1_000
+      end,
+      time: 1500,
+      step: 50
+    )
+
+    assert Process.alive?(consumer)
+    {_url, _si, _shape, _task_info, backoff} = :sys.get_state(consumer)
+    assert backoff == 2_000
   end
 
   test "schedules retry after stream task exits" do

@@ -57,8 +57,24 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
 
   @impl true
   def handle_info({:change, op, value}, {peer_url, system_identifier, shape, task_info, backoff}) do
-    ShapeWriter.write(shape, op, value)
-    {peer_url, system_identifier, shape, task_info, backoff} |> noreply()
+    case ShapeWriter.write(shape, op, value) do
+      {:ok, _} ->
+        {peer_url, system_identifier, shape, task_info, backoff} |> noreply()
+
+      {:error, :repo_not_available} ->
+        Logger.warning(
+          "ShapeConsumer #{peer_url}/#{shape}: repo not available, retrying in #{backoff}ms"
+        )
+
+        cancel_task(task_info)
+        broadcast_status(peer_url, shape, ErrorStatus.new("repo_not_available"))
+        Process.send_after(self(), :restart_stream, backoff)
+        next_backoff = min(backoff * 2, @max_backoff_ms)
+        {peer_url, system_identifier, shape, nil, next_backoff} |> noreply()
+
+      {:error, _} ->
+        {peer_url, system_identifier, shape, task_info, backoff} |> noreply()
+    end
   end
 
   def handle_info(

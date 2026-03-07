@@ -18,7 +18,8 @@ defmodule Chat.AdminDb do
   @doc false
   @impl true
   def init(_opts) do
-    {:ok, db} = CubDB.start_link(file_path(), auto_file_sync: true)
+    auto_compact = Application.get_env(:chat, :admin_cub_db_auto_compact, true)
+    {:ok, db} = CubDB.start_link(file_path(), auto_file_sync: true, auto_compact: auto_compact)
     {:ok, db, {:continue, :manage_placeholders}}
   end
 

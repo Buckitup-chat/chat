@@ -119,15 +119,15 @@ defmodule Chat.Data.UserDataTest do
       attrs = %{
         user_hash: card_struct.user_hash,
         uuid: uuid,
-        value: value
+        value_b64: value
       }
 
-      changeset = UserStorage.changeset(%UserStorage{}, attrs)
+      changeset = UserStorage.create_changeset(%UserStorage{}, attrs)
       assert changeset.valid?
 
       {:ok, storage} = Repo.insert(changeset)
       assert storage.user_hash == card_struct.user_hash
-      assert storage.value == value
+      assert storage.value_b64 == value
     end
   end
 end

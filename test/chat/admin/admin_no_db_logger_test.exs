@@ -56,7 +56,7 @@ defmodule Chat.Admin.AdminNoDbLoggerTest do
 
   test "adding logger twice" do
     {:ok, _pid} = Logger.add_backend(AdminLogger)
-    {:ok, _pid} = Logger.add_backend(AdminLogger)
+    assert Logger.add_backend(AdminLogger) == {:error, :already_present}
 
     Logger.remove_backend(AdminLogger)
   end

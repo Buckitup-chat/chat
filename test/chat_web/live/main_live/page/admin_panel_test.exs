@@ -253,17 +253,24 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
       assert view |> render() =~ "Download the Keys"
 
       :timer.sleep(1000)
+      ChangeTracker.await()
 
       view
       |> element(".navbar button", "Chats")
       |> render_click()
 
+      %{socket: socket} = reload_view(%{view: view})
+      cargo_bot_hash = socket.assigns.users |> Enum.find(&(&1.name == "CargoBot888")) |> Map.get(:hash)
+
       view
-      |> element("li.hidden", "CargoBot888")
+      |> element("#user-#{cargo_bot_hash}")
       |> render_click()
 
-      assert view |> render() =~
+      assert has_vue_content?(
+               view |> render(),
+               "LinkedText",
                "The backup `CargoBot888.data` is not encrypted. Do not share it with anyone."
+             )
 
       assert view |> render() =~ "CargoBot888.data"
     end
@@ -278,6 +285,10 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
       assert view |> render() =~ "Cargo user"
 
       content = File.read!("test/support/fixtures/import_keys/TestUser.data")
+
+      [identity_strings | _] = Jason.decode!(content)
+      test_user = Chat.Identity.from_strings(identity_strings)
+      test_user_hash = test_user.public_key |> Base.encode16(case: :lower)
 
       cargo_user =
         file_input(view, "#upload-cargo-user", :config, [
@@ -296,17 +307,21 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
       assert view |> render() =~ "Download the Keys"
 
       :timer.sleep(1000)
+      ChangeTracker.await()
 
       view
       |> element(".navbar button", "Chats")
       |> render_click()
 
       view
-      |> element("li.hidden", "Test User")
+      |> element("#user-#{test_user_hash}")
       |> render_click()
 
-      assert view |> render() =~
+      assert has_vue_content?(
+               view |> render(),
+               "LinkedText",
                "The backup `TestUser.data` is not encrypted. Do not share it with anyone."
+             )
 
       assert view |> render() =~ "TestUser.data"
     end

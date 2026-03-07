@@ -11,6 +11,7 @@ defmodule ChatWeb.ElectricSyncTest do
   use ChatWeb.DataCase
 
   alias Chat.Data.Schemas.UserCard
+  alias Chat.Data.Types.Consts
   alias Chat.Repo
 
   setup do
@@ -20,7 +21,7 @@ defmodule ChatWeb.ElectricSyncTest do
 
   defp user_card_attrs(name) do
     %{
-      user_hash: :crypto.strong_rand_bytes(32),
+      user_hash: Consts.user_hash_prefix() <> :crypto.strong_rand_bytes(64),
       sign_pkey: :crypto.strong_rand_bytes(32),
       contact_pkey: :crypto.strong_rand_bytes(32),
       contact_cert: :crypto.strong_rand_bytes(64),

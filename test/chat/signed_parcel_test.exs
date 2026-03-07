@@ -301,6 +301,7 @@ defmodule ChatTest.SignedParcelTest do
     alice = Identity.create("Alice")
     bob = Identity.create("Bob")
     dialog = Dialogs.find_or_open(alice, bob |> Card.from_identity())
+    Chat.Db.ChangeTracker.await()
 
     {alice, bob, dialog}
   end

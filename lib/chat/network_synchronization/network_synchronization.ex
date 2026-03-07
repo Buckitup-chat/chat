@@ -40,6 +40,12 @@ defmodule Chat.NetworkSynchronization do
     |> started_workers_for_started_sources()
   end
 
+  def init_electric_peers do
+    synchronisation()
+    |> Enum.filter(&match?({%{started?: true}, _}, &1))
+    |> Enum.each(fn {source, _} -> maybe_start_electric_peer(source) end)
+  end
+
   def start_source(id) do
     find_source_by_id(id)
     |> tap(&start_worker/1)

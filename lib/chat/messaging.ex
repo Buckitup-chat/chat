@@ -59,7 +59,8 @@ defmodule Chat.Messaging do
 
         file_info =
           data_map
-          |> Map.get(db_key, [])
+          |> Map.get(db_key)
+          |> then(&(&1 || []))
           |> Enum.map(&Enigma.decipher(&1, secret))
 
         msg
@@ -73,7 +74,8 @@ defmodule Chat.Messaging do
 
         data =
           data_map
-          |> Map.get(db_key, "")
+          |> Map.get(db_key)
+          |> then(&(&1 || ""))
           |> Enigma.decipher(secret)
 
         msg

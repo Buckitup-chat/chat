@@ -146,28 +146,60 @@ defmodule Chat.MessagingTest do
       assert Enum.at(processed_messages, 1).content == "some_content"
     end
 
-    test "handles file messages with nil data", context do
-      # Extract context values
+    test "handles file messages with nil data (key absent)", context do
       %{
         create_storage_id: create_storage_id,
         create_test_message: create_test_message
       } = context
 
-      # Setup for file message test
       key = "file_key"
       storage_id = create_storage_id.(key)
       file_message = create_test_message.(:image, storage_id)
 
-      # Create a data getter that returns an empty map
-      # This simulates when the file data isn't available yet
       data_getter = fn _keys -> %{} end
 
-      # Process the message - this should not raise an error
       [processed_message] = Messaging.preload_content([file_message], data_getter)
 
-      # File messages with nil data should have empty file_info
       assert processed_message.file_info == []
       assert is_binary(processed_message.file_url)
+    end
+
+    test "handles file messages with nil data (key present with nil value)", context do
+      %{
+        create_storage_id: create_storage_id,
+        create_test_message: create_test_message
+      } = context
+
+      key = "file_key"
+      storage_id = create_storage_id.(key)
+      file_message = create_test_message.(:video, storage_id)
+
+      db_key = DbKeys.file(key)
+      # Simulate get_from_current_db returning {db_key => nil} when chunk not yet in DB
+      data_getter = fn _keys -> %{db_key => nil} end
+
+      [processed_message] = Messaging.preload_content([file_message], data_getter)
+
+      assert processed_message.file_info == []
+      assert is_binary(processed_message.file_url)
+    end
+
+    test "handles memo messages with nil data (key present with nil value)", context do
+      %{
+        create_storage_id: create_storage_id,
+        create_test_message: create_test_message
+      } = context
+
+      key = "memo_key"
+      storage_id = create_storage_id.(key)
+      memo_message = create_test_message.(:memo, storage_id)
+
+      db_key = DbKeys.memo(key)
+      data_getter = fn _keys -> %{db_key => nil} end
+
+      [processed_message] = Messaging.preload_content([memo_message], data_getter)
+
+      assert processed_message.memo == ""
     end
   end
 end

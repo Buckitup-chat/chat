@@ -122,7 +122,10 @@ defmodule Chat.MixProject do
 
       # ElectricSQL / Phoenix.Sync
       {:electric, "~> 1.1"},
-      {:phoenix_sync, "~> 0.6.1"}
+      {:phoenix_sync, "~> 0.6.1"},
+
+      # Internal
+      {:toolbox, path: "../toolbox"}
     ]
   end
 

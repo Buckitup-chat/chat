@@ -1,6 +1,8 @@
 defmodule Chat.NetworkSynchronization.PeerDetection.LanDetection do
   @moduledoc "Checks peers in a LAN for naive_api (GraphQL) and Electric shape endpoints"
 
+  use Toolbox.OriginLog
+
   alias Chat.NetworkSynchronization
 
   def on_lan(ip, mask) do
@@ -119,9 +121,12 @@ defmodule Chat.NetworkSynchronization.PeerDetection.LanDetection do
   defp probe_electric_peer(base_url) do
     probe_url = "#{base_url}/electric/v1/user_card?offset=-1"
 
-    case Req.get(probe_url, receive_timeout: 3_000) do
+    case Req.get(probe_url, receive_timeout: 3_000, retry: false) do
       {:ok, %Req.Response{status: 200, headers: headers}} ->
-        if Map.has_key?(headers, "electric-handle"), do: base_url, else: nil
+        if Map.has_key?(headers, "electric-handle") do
+          log("found electric peer #{base_url}", :info)
+          base_url
+        end
 
       _ ->
         nil

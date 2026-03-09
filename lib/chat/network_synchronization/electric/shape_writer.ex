@@ -26,28 +26,75 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
   end
 
   defp do_write(shape, operation, value) do
-    try do
-      case {shape, operation, value} do
-        {:user_card, op, %UserCard{} = card} when op in [:insert, :update] ->
-          repo().insert(card,
-            on_conflict: {:replace_all_except, [:user_hash]},
-            conflict_target: :user_hash
-          )
+    case {shape, operation, value} do
+      {:user_card, :insert, %UserCard{} = card} ->
+        %UserCard{}
+        |> UserCard.create_changeset(Map.from_struct(card))
+        |> case do
+          %{valid?: true} = changeset ->
+            repo().insert(changeset,
+              on_conflict: {:replace_all_except, [:user_hash]},
+              conflict_target: :user_hash
+            )
 
-        {:user_card, :delete, %UserCard{user_hash: user_hash}} ->
-          repo().delete(%UserCard{user_hash: user_hash}, allow_stale: true)
+          _invalid ->
+            {:ok, card}
+        end
 
-        {:user_storage, op, %UserStorage{} = storage} when op in [:insert, :update] ->
-          repo().insert(storage,
-            on_conflict: {:replace, [:value_b64]},
-            conflict_target: [:user_hash, :uuid]
-          )
+      {:user_card, :update, %UserCard{} = card} ->
+        case repo().get(UserCard, card.user_hash) do
+          nil ->
+            {:ok, card}
 
-        {:user_storage, :delete, %UserStorage{user_hash: user_hash, uuid: uuid}} ->
-          repo().delete(%UserStorage{user_hash: user_hash, uuid: uuid}, allow_stale: true)
-      end
-    rescue
-      RuntimeError -> {:error, :repo_not_available}
+          existing ->
+            attrs =
+              card
+              |> Map.take([:name])
+              |> Map.reject(fn {_k, v} -> is_nil(v) end)
+
+            existing
+            |> UserCard.update_name_changeset(attrs)
+            |> repo().update()
+        end
+
+      {:user_card, :delete, %UserCard{user_hash: user_hash}} ->
+        repo().delete(%UserCard{user_hash: user_hash}, allow_stale: true)
+
+      {:user_storage, :insert, %UserStorage{} = storage} ->
+        %UserStorage{}
+        |> UserStorage.create_changeset(Map.from_struct(storage))
+        |> case do
+          %{valid?: true} = changeset ->
+            repo().insert(changeset,
+              on_conflict: {:replace, [:value_b64]},
+              conflict_target: [:user_hash, :uuid]
+            )
+
+          _invalid ->
+            {:ok, storage}
+        end
+
+      {:user_storage, :update, %UserStorage{} = storage} ->
+        case repo().get_by(UserStorage, user_hash: storage.user_hash, uuid: storage.uuid) do
+          nil ->
+            {:ok, storage}
+
+          existing ->
+            attrs =
+              storage
+              |> Map.take([:value_b64])
+              |> Map.reject(fn {_k, v} -> is_nil(v) end)
+
+            existing
+            |> UserStorage.update_changeset(attrs)
+            |> repo().update()
+        end
+
+      {:user_storage, :delete, %UserStorage{user_hash: user_hash, uuid: uuid}} ->
+        repo().delete(%UserStorage{user_hash: user_hash, uuid: uuid}, allow_stale: true)
     end
+  rescue
+    RuntimeError -> {:error, :repo_not_available}
+    e in Postgrex.Error -> {:error, e}
   end
 end

@@ -11,8 +11,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
   """
 
   use GenServer
-
-  require Logger
+  use Toolbox.OriginLog
 
   import Tools.GenServerHelpers
 
@@ -62,9 +61,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
         {peer_url, system_identifier, shape, task_info, backoff} |> noreply()
 
       {:error, :repo_not_available} ->
-        Logger.warning(
-          "ShapeConsumer #{peer_url}/#{shape}: repo not available, retrying in #{backoff}ms"
-        )
+        log("ShapeConsumer #{peer_url}/#{shape}: repo not available, retrying in #{backoff}ms", :warning)
 
         cancel_task(task_info)
         broadcast_status(peer_url, shape, ErrorStatus.new("repo_not_available"))
@@ -72,7 +69,9 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
         next_backoff = min(backoff * 2, @max_backoff_ms)
         {peer_url, system_identifier, shape, nil, next_backoff} |> noreply()
 
-      {:error, _} ->
+      {:error, reason} ->
+        log("ShapeConsumer #{peer_url}/#{shape}: write failed (#{inspect(reason)}), skipping", :warning)
+
         {peer_url, system_identifier, shape, task_info, backoff} |> noreply()
     end
   end
@@ -108,9 +107,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
         {:DOWN, ref, :process, _down_pid, reason},
         {peer_url, system_identifier, shape, {_task_pid, ref}, backoff}
       ) do
-    Logger.warning(
-      "ShapeConsumer #{peer_url}/#{shape}: stream exited (#{inspect(reason)}), retrying in #{backoff}ms"
-    )
+    log("ShapeConsumer #{peer_url}/#{shape}: stream exited (#{inspect(reason)}), retrying in #{backoff}ms", :warning)
 
     broadcast_status(peer_url, shape, ErrorStatus.new(inspect(reason)))
     Process.send_after(self(), :restart_stream, backoff)

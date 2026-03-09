@@ -57,6 +57,21 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriterTest do
       assert Repo.get(UserCard, @user_hash).name == "Carol"
     end
 
+    test "update does not change keys, only name" do
+      {:ok, _} = ShapeWriter.write(:user_card, :insert, user_card())
+
+      {:ok, _} =
+        ShapeWriter.write(
+          :user_card,
+          :update,
+          user_card(%{sign_pkey: "hacked", name: "NewName"})
+        )
+
+      updated = Repo.get(UserCard, @user_hash)
+      assert updated.name == "NewName"
+      assert updated.sign_pkey == "spk"
+    end
+
     test "delete removes the row" do
       {:ok, _} = ShapeWriter.write(:user_card, :insert, user_card())
       assert Repo.get(UserCard, @user_hash) != nil

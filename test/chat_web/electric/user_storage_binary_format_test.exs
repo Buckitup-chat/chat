@@ -59,11 +59,11 @@ defmodule ChatWeb.Electric.UserStorageBinaryFormatTest do
       binary_size = byte_size(@test_binary)
       overhead_ratio = payload_size / binary_size
 
-      IO.puts("\n=== BASE64 ENCODING (_b64 suffix) ===")
-      IO.puts("Binary size: #{binary_size} bytes")
-      IO.puts("Encoded string: #{base64_encoded}")
-      IO.puts("JSON payload size: #{payload_size} bytes")
-      IO.puts("Overhead ratio: #{Float.round(overhead_ratio, 2)}x")
+      # IO.puts("\n=== BASE64 ENCODING (_b64 suffix) ===")
+      # IO.puts("Binary size: #{binary_size} bytes")
+      # IO.puts("Encoded string: #{base64_encoded}")
+      # IO.puts("JSON payload size: #{payload_size} bytes")
+      # IO.puts("Overhead ratio: #{Float.round(overhead_ratio, 2)}x")
     end
 
     test "hex encoding comparison (for reference)", %{user_hash: user_hash} do
@@ -83,10 +83,10 @@ defmodule ChatWeb.Electric.UserStorageBinaryFormatTest do
       json_payload = Jason.encode!(%{"mutations" => [mutation]})
       payload_size = byte_size(json_payload)
 
-      IO.puts("\n=== HEX ENCODING (for comparison) ===")
-      IO.puts("Binary size: #{byte_size(@test_binary)} bytes")
-      IO.puts("Encoded string: #{hex_encoded}")
-      IO.puts("JSON payload size: #{payload_size} bytes")
+      # IO.puts("\n=== HEX ENCODING (for comparison) ===")
+      # IO.puts("Binary size: #{byte_size(@test_binary)} bytes")
+      # IO.puts("Encoded string: #{hex_encoded}")
+      # IO.puts("JSON payload size: #{payload_size} bytes")
     end
   end
 
@@ -106,10 +106,10 @@ defmodule ChatWeb.Electric.UserStorageBinaryFormatTest do
       assert is_binary(inserted.value_b64)
       assert byte_size(inserted.value_b64) == byte_size(@test_binary)
 
-      IO.puts("\n=== DATABASE STORAGE ===")
-      IO.puts("Original binary: #{inspect(@test_binary)}")
-      IO.puts("Stored binary: #{inspect(inserted.value_b64)}")
-      IO.puts("Match: #{inserted.value_b64 == @test_binary}")
+      # IO.puts("\n=== DATABASE STORAGE ===")
+      # IO.puts("Original binary: #{inspect(@test_binary)}")
+      # IO.puts("Stored binary: #{inspect(inserted.value_b64)}")
+      # IO.puts("Match: #{inserted.value_b64 == @test_binary}")
     end
   end
 
@@ -134,10 +134,10 @@ defmodule ChatWeb.Electric.UserStorageBinaryFormatTest do
       json_encoded = Jason.encode!(%{value_b64: base64_encoded_value})
       json_decoded = Jason.decode!(json_encoded)
 
-      IO.puts("\n=== ELECTRIC SYNC RESPONSE ===")
-      IO.puts("Original binary: #{inspect(@test_binary)}")
-      IO.puts("Jason.encode! result: #{json_encoded}")
-      IO.puts("Decoded value_b64: #{inspect(json_decoded["value_b64"])}")
+      # IO.puts("\n=== ELECTRIC SYNC RESPONSE ===")
+      # IO.puts("Original binary: #{inspect(@test_binary)}")
+      # IO.puts("Jason.encode! result: #{json_encoded}")
+      # IO.puts("Decoded value_b64: #{inspect(json_decoded["value_b64"])}")
 
       # Jason encodes binary as base64 by default
       assert is_binary(json_decoded["value_b64"])
@@ -170,15 +170,15 @@ defmodule ChatWeb.Electric.UserStorageBinaryFormatTest do
       json_payload = Jason.encode!(map_result)
       parsed = Jason.decode!(json_payload)
 
-      IO.puts("\n=== ELECTRIC SSE FORMAT ===")
-      IO.puts("JSON payload: #{String.slice(json_payload, 0..200)}")
-      IO.puts("Parsed value_b64 type: #{inspect(parsed["value_b64"])}")
+      # IO.puts("\n=== ELECTRIC SSE FORMAT ===")
+      # IO.puts("JSON payload: #{String.slice(json_payload, 0..200)}")
+      # IO.puts("Parsed value_b64 type: #{inspect(parsed["value_b64"])}")
 
       # Verify the value_b64 can be decoded
       {:ok, decoded} = Base.decode64(parsed["value_b64"])
       assert decoded == @test_binary
 
-      IO.puts("Base64 decoded successfully: #{decoded == @test_binary}")
+      # IO.puts("Base64 decoded successfully: #{decoded == @test_binary}")
     end
   end
 
@@ -214,13 +214,13 @@ defmodule ChatWeb.Electric.UserStorageBinaryFormatTest do
       {:ok, sync_decoded} = Base.decode64(sync_parsed["value_b64"])
       assert sync_decoded == @test_binary
 
-      IO.puts("\n=== FULL ROUND-TRIP ===")
-      IO.puts("1. Client sends (base64): #{String.slice(base64_value, 0..20)}...")
-      IO.puts("   Size: #{byte_size(base64_value)} bytes")
-      IO.puts("2. Stored in DB (binary): #{byte_size(@test_binary)} bytes")
-      IO.puts("3. Sync returns (base64): #{String.slice(sync_parsed["value_b64"], 0..20)}...")
-      IO.puts("   Size: #{byte_size(sync_parsed["value_b64"])} bytes")
-      IO.puts("\nRound-trip successful: #{sync_decoded == @test_binary}")
+      # IO.puts("\n=== FULL ROUND-TRIP ===")
+      # IO.puts("1. Client sends (base64): #{String.slice(base64_value, 0..20)}...")
+      # IO.puts("   Size: #{byte_size(base64_value)} bytes")
+      # IO.puts("2. Stored in DB (binary): #{byte_size(@test_binary)} bytes")
+      # IO.puts("3. Sync returns (base64): #{String.slice(sync_parsed["value_b64"], 0..20)}...")
+      # IO.puts("   Size: #{byte_size(sync_parsed["value_b64"])} bytes")
+      # IO.puts("\nRound-trip successful: #{sync_decoded == @test_binary}")
     end
 
     test "compare efficiency: 10MB payload base64 vs hex", %{user_hash: user_hash} do
@@ -259,21 +259,21 @@ defmodule ChatWeb.Electric.UserStorageBinaryFormatTest do
       hex_json_size = byte_size(Jason.encode!(%{"mutations" => [hex_mutation]}))
       base64_json_size = byte_size(Jason.encode!(%{"mutations" => [base64_mutation]}))
 
-      IO.puts("\n=== 10MB PAYLOAD COMPARISON ===")
-      IO.puts("Original binary: 10,485,760 bytes (10 MB)")
-      IO.puts("")
-      IO.puts("HEX ENCODING (old):")
-      IO.puts("  Encoded size: #{format_bytes(hex_size)}")
-      IO.puts("  JSON payload: #{format_bytes(hex_json_size)}")
-      IO.puts("  Overhead: #{Float.round(hex_size / 10_485_760, 2)}x")
-      IO.puts("")
-      IO.puts("BASE64 ENCODING (new):")
-      IO.puts("  Encoded size: #{format_bytes(base64_size)}")
-      IO.puts("  JSON payload: #{format_bytes(base64_json_size)}")
-      IO.puts("  Overhead: #{Float.round(base64_size / 10_485_760, 2)}x")
-      IO.puts("")
-      IO.puts("Savings with base64: #{format_bytes(hex_json_size - base64_json_size)}")
-      IO.puts("Percentage reduction: #{Float.round((1 - base64_json_size / hex_json_size) * 100, 1)}%")
+      # IO.puts("\n=== 10MB PAYLOAD COMPARISON ===")
+      # IO.puts("Original binary: 10,485,760 bytes (10 MB)")
+      # IO.puts("")
+      # IO.puts("HEX ENCODING (old):")
+      # IO.puts("  Encoded size: #{format_bytes(hex_size)}")
+      # IO.puts("  JSON payload: #{format_bytes(hex_json_size)}")
+      # IO.puts("  Overhead: #{Float.round(hex_size / 10_485_760, 2)}x")
+      # IO.puts("")
+      # IO.puts("BASE64 ENCODING (new):")
+      # IO.puts("  Encoded size: #{format_bytes(base64_size)}")
+      # IO.puts("  JSON payload: #{format_bytes(base64_json_size)}")
+      # IO.puts("  Overhead: #{Float.round(base64_size / 10_485_760, 2)}x")
+      # IO.puts("")
+      # IO.puts("Savings with base64: #{format_bytes(hex_json_size - base64_json_size)}")
+      # IO.puts("Percentage reduction: #{Float.round((1 - base64_json_size / hex_json_size) * 100, 1)}%")
     end
   end
 

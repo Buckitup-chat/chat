@@ -21,13 +21,14 @@ defmodule ChatWeb.Utils.IngestUtilTest do
 
   describe "decode_mutation_fields/2" do
     test "decodes fields by suffix across sections and preserves others" do
-      suffixes = ~w[_pkey _cert _hash]
+      hex_suffixes = ~w[_hash]
+      base64_suffixes = ~w[_pkey _cert]
 
       mutations = [
         %{
           "modified" => %{
-            "sign_pkey" => "\\xA1",
-            "contact_cert" => "0xB2",
+            "sign_pkey" => Base.encode64(<<0xA1>>, padding: false),
+            "contact_cert" => Base.encode64(<<0xB2>>, padding: false),
             "name" => "Bob"
           },
           "changes" => %{"user_hash" => "\\xC3"},
@@ -36,7 +37,8 @@ defmodule ChatWeb.Utils.IngestUtilTest do
         }
       ]
 
-      assert {:ok, [decoded]} = IngestUtil.decode_mutation_fields(mutations, suffixes)
+      assert {:ok, [decoded]} =
+               IngestUtil.decode_mutation_fields(mutations, hex_suffixes, base64_suffixes)
 
       assert decoded["modified"]["sign_pkey"] == <<0xA1>>
       assert decoded["modified"]["contact_cert"] == <<0xB2>>
@@ -47,14 +49,15 @@ defmodule ChatWeb.Utils.IngestUtilTest do
     end
 
     test "returns invalid_payload when an item is not a map" do
-      assert {:error, "invalid_payload"} = IngestUtil.decode_mutation_fields(["bad"], ["_pkey"])
+      assert {:error, "invalid_payload"} =
+               IngestUtil.decode_mutation_fields(["bad"], ["_hash"], ["_pkey"])
     end
 
-    test "returns invalid_binary_field when a suffix field has invalid hex" do
+    test "returns invalid_base64_field when a suffix field has invalid base64" do
       mutations = [%{"modified" => %{"sign_pkey" => "\\xzz"}}]
 
-      assert {:error, "invalid_binary_field"} =
-               IngestUtil.decode_mutation_fields(mutations, ["_pkey"])
+      assert {:error, "invalid_base64_field"} =
+               IngestUtil.decode_mutation_fields(mutations, ["_hash"], ["_pkey"])
     end
   end
 end

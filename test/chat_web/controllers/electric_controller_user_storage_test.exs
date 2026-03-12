@@ -156,7 +156,6 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
       assert is_integer(txid)
     end
 
-
     test "POST /electric/v1/ingest update with wrong user's signature returns 400", %{conn: conn} do
       identity = UserData.generate_pq_identity("Bob")
       card = UserData.extract_pq_card(identity)
@@ -228,9 +227,10 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
       assert conn.resp_body == "Invalid operation"
     end
 
-    test "POST /electric/v1/ingest batch delete with Alice challenge deleting both Alice and Bob keys - only deletes Alice key", %{
-      conn: conn
-    } do
+    test "POST /electric/v1/ingest batch delete with Alice challenge deleting both Alice and Bob keys - only deletes Alice key",
+         %{
+           conn: conn
+         } do
       alice_identity = UserData.generate_pq_identity("Alice")
       alice_card = UserData.extract_pq_card(alice_identity)
       bob_identity = UserData.generate_pq_identity("Bob")
@@ -242,7 +242,10 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
       assert alice_card_conn.status == 200
 
       alice_uuid = Ecto.UUID.generate()
-      alice_storage_payload = user_storage_insert_payload(alice_card.user_hash, alice_uuid, "alice_value")
+
+      alice_storage_payload =
+        user_storage_insert_payload(alice_card.user_hash, alice_uuid, "alice_value")
+
       alice_insert_conn = post_ingest(conn, alice_storage_payload, alice_identity.sign_skey)
       assert alice_insert_conn.status == 200
 
@@ -301,7 +304,9 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
   end
 
   describe "batch operations" do
-    test "POST /electric/v1/ingest with multiple user_storage inserts in batch succeeds", %{conn: conn} do
+    test "POST /electric/v1/ingest with multiple user_storage inserts in batch succeeds", %{
+      conn: conn
+    } do
       identity = UserData.generate_pq_identity("Bob")
       card = UserData.extract_pq_card(identity)
 
@@ -418,16 +423,18 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
   defp user_card_modified(card) do
     %{
       "user_hash" => to_hex_escape(card.user_hash),
-      "sign_pkey" => to_hex_escape(card.sign_pkey),
-      "contact_pkey" => to_hex_escape(card.contact_pkey),
-      "contact_cert" => to_hex_escape(card.contact_cert),
-      "crypt_pkey" => to_hex_escape(card.crypt_pkey),
-      "crypt_cert" => to_hex_escape(card.crypt_cert),
+      "sign_pkey" => to_base64(card.sign_pkey),
+      "contact_pkey" => to_base64(card.contact_pkey),
+      "contact_cert" => to_base64(card.contact_cert),
+      "crypt_pkey" => to_base64(card.crypt_pkey),
+      "crypt_cert" => to_base64(card.crypt_cert),
       "name" => card.name
     }
   end
 
   defp to_hex_escape(bin) when is_binary(bin), do: "\\x" <> Base.encode16(bin, case: :lower)
+
+  defp to_base64(bin) when is_binary(bin), do: Base.encode64(bin, padding: false)
 
   defp post_ingest(conn, payload, sign_skey) do
     {challenge_id, challenge} = Challenge.store()

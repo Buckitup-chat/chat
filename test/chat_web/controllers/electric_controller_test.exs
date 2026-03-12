@@ -104,13 +104,13 @@ defmodule ChatWeb.ElectricControllerTest do
         identity
         |> UserData.extract_pq_card()
         |> user_card_modified()
-        |> Map.put("sign_pkey", "\\xzz")
+        |> Map.put("sign_pkey", "not-base64")
         |> user_card_payload()
 
       conn = post_ingest(conn, payload, identity.sign_skey)
 
       assert conn.status == 400
-      assert conn.resp_body == "invalid_binary_field"
+      assert conn.resp_body == "invalid_base64_field"
     end
 
     test "POST /electric/v1/ingest with tampered user_hash returns 422", %{conn: conn} do
@@ -147,7 +147,7 @@ defmodule ChatWeb.ElectricControllerTest do
         card.crypt_cert
         |> byte_size()
         |> :crypto.strong_rand_bytes()
-        |> to_hex_escape()
+        |> to_base64()
 
       payload =
         card
@@ -174,7 +174,7 @@ defmodule ChatWeb.ElectricControllerTest do
         card.contact_cert
         |> byte_size()
         |> :crypto.strong_rand_bytes()
-        |> to_hex_escape()
+        |> to_base64()
 
       payload =
         card
@@ -311,16 +311,18 @@ defmodule ChatWeb.ElectricControllerTest do
   defp user_card_modified(card) do
     %{
       "user_hash" => to_hex_escape(card.user_hash),
-      "sign_pkey" => to_hex_escape(card.sign_pkey),
-      "contact_pkey" => to_hex_escape(card.contact_pkey),
-      "contact_cert" => to_hex_escape(card.contact_cert),
-      "crypt_pkey" => to_hex_escape(card.crypt_pkey),
-      "crypt_cert" => to_hex_escape(card.crypt_cert),
+      "sign_pkey" => to_base64(card.sign_pkey),
+      "contact_pkey" => to_base64(card.contact_pkey),
+      "contact_cert" => to_base64(card.contact_cert),
+      "crypt_pkey" => to_base64(card.crypt_pkey),
+      "crypt_cert" => to_base64(card.crypt_cert),
       "name" => card.name
     }
   end
 
   defp to_hex_escape(bin), do: "\\x" <> Base.encode16(bin, case: :lower)
+
+  defp to_base64(bin), do: Base.encode64(bin, padding: false)
 
   defp post_ingest(conn, payload, sign_skey) do
     {challenge_id, challenge} = Challenge.store()

@@ -39,7 +39,7 @@ Each side has to
 Dialog Message
 
 - dialog_hash
-- message_uuid
+- message_uuid = uuid v7
 - sender_hash
 - author_sign_of
 - message
@@ -48,7 +48,7 @@ Dialog Message
 
 # Problems
 
-- message order mergabe
+- message order mergeble
 - message read status
 - polymorphic/embdded content
 - read versions?

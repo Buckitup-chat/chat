@@ -108,3 +108,31 @@ erDiagram
 |-----------|--------------|-----------|--------------|-----------------|-----------------|----------|
 | `a1b2...` | `550e8400-...` | `<<...>>` | false | `null` | 1700000000 | `11U3zdLYxO...` |
 | `a1b2...` | `550e8400-...` | `<<...>>` | false | `11U3zdLYxO...` | 1700000001 | `uBOJk3PTAO...` |
+
+
+## Row Signature Algorithm
+
+The signature should be formed in unified way:
+It should not expose structure (like field delimiters)
+The main goal - same record should be signed same way on backend and frontend.
+
+So signature should be formed of concatenation of string representatation of all fields (except signature itself)
+in lexographical order of string values.
+
+Depending on column type, string representation can be different:
+- binary (_b64, _cert,) - base64
+- binary (_hash, _pkey) - hex
+- uuid - itsown representation
+- string - UTF-8
+- numeric (integer/timestamp) - decimal representation
+- boolean - "true" or "false"
+- null - "null"
+
+It would be something like this simplified:
+```elixir
+  data
+  |> Enum.map(fn {k, v} -> {k, to_string(v)} end)
+  |> Enum.map(&to_string/1)
+  |> Enum.sort()
+  |> Enum.join("")
+```

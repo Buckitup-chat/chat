@@ -61,7 +61,10 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
         {peer_url, system_identifier, shape, task_info, backoff} |> noreply()
 
       {:error, :repo_not_available} ->
-        log("ShapeConsumer #{peer_url}/#{shape}: repo not available, retrying in #{backoff}ms", :warning)
+        log(
+          "ShapeConsumer #{peer_url}/#{shape}: repo not available, retrying in #{backoff}ms",
+          :warning
+        )
 
         cancel_task(task_info)
         broadcast_status(peer_url, shape, ErrorStatus.new("repo_not_available"))
@@ -70,7 +73,10 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
         {peer_url, system_identifier, shape, nil, next_backoff} |> noreply()
 
       {:error, reason} ->
-        log("ShapeConsumer #{peer_url}/#{shape}: write failed (#{inspect(reason)}), skipping", :warning)
+        log(
+          "ShapeConsumer #{peer_url}/#{shape}: write failed (#{inspect(reason)}), skipping",
+          :warning
+        )
 
         {peer_url, system_identifier, shape, task_info, backoff} |> noreply()
     end
@@ -107,7 +113,10 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
         {:DOWN, ref, :process, _down_pid, reason},
         {peer_url, system_identifier, shape, {_task_pid, ref}, backoff}
       ) do
-    log("ShapeConsumer #{peer_url}/#{shape}: stream exited (#{inspect(reason)}), retrying in #{backoff}ms", :warning)
+    log(
+      "ShapeConsumer #{peer_url}/#{shape}: stream exited (#{inspect(reason)}), retrying in #{backoff}ms",
+      :warning
+    )
 
     broadcast_status(peer_url, shape, ErrorStatus.new(inspect(reason)))
     Process.send_after(self(), :restart_stream, backoff)

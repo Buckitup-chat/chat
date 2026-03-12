@@ -260,7 +260,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
       |> render_click()
 
       %{socket: socket} = reload_view(%{view: view})
-      cargo_bot_hash = socket.assigns.users |> Enum.find(&(&1.name == "CargoBot888")) |> Map.get(:hash)
+
+      cargo_bot_hash =
+        socket.assigns.users |> Enum.find(&(&1.name == "CargoBot888")) |> Map.get(:hash)
 
       view
       |> element("#user-#{cargo_bot_hash}")

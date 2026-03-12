@@ -77,8 +77,12 @@ defmodule ChatWeb.MainLive.Admin.NetworkSourceList do
     ~H"""
     <div>
       <%= for {item, status} <- @list do %>
-        <.network_source id={item.id} target={@myself} status={status}
-          electric={electric_status_for(item, @electric_status)}>
+        <.network_source
+          id={item.id}
+          target={@myself}
+          status={status}
+          electric={electric_status_for(item, @electric_status)}
+        >
           <.item_row>
             <.url_input id={item.id} value={item.url} />
             <.delete_item_button id={item.id} target={@myself} />

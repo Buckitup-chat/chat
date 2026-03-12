@@ -47,7 +47,11 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
       %Message.ChangeMessage{headers: %{operation: :insert}, value: card}
     ])
 
-    {:ok, _pid} = start_supervised({ShapeConsumer, peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card})
+    {:ok, _pid} =
+      start_supervised(
+        {ShapeConsumer,
+         peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card}
+      )
 
     assert_receive {:write_called, :user_card, :insert, ^card}, 500
   end
@@ -67,7 +71,11 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
       %Message.ChangeMessage{headers: %{operation: :update}, value: card}
     ])
 
-    {:ok, _pid} = start_supervised({ShapeConsumer, peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card})
+    {:ok, _pid} =
+      start_supervised(
+        {ShapeConsumer,
+         peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card}
+      )
 
     assert_receive {:write_called, :user_card, :update, ^card}, 500
   end
@@ -77,7 +85,11 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
 
     Application.put_env(:chat, :electric_mock_messages, [resume])
 
-    {:ok, _pid} = start_supervised({ShapeConsumer, peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card})
+    {:ok, _pid} =
+      start_supervised(
+        {ShapeConsumer,
+         peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card}
+      )
 
     assert_receive {:offset_saved, ^resume}, 500
   end
@@ -89,7 +101,11 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
       %Message.ControlMessage{control: :must_refetch}
     ])
 
-    {:ok, consumer} = start_supervised({ShapeConsumer, peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card})
+    {:ok, consumer} =
+      start_supervised(
+        {ShapeConsumer,
+         peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card}
+      )
 
     assert_receive :offset_deleted, 500
 
@@ -101,7 +117,9 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
 
     await_till(
       fn ->
-        {_url, _si, _shape, _task_info, b} = :sys.get_state(pid_holder |> then(fn _ -> consumer end))
+        {_url, _si, _shape, _task_info, b} =
+          :sys.get_state(pid_holder |> then(fn _ -> consumer end))
+
         b == 1_000
       end,
       time: 500,
@@ -130,8 +148,10 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
     ])
 
     {:ok, consumer} =
-      start_supervised({ShapeConsumer,
-       peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card})
+      start_supervised(
+        {ShapeConsumer,
+         peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card}
+      )
 
     await_till(
       fn ->
@@ -152,7 +172,10 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
     Application.put_env(:chat, :electric_mock_messages, [])
 
     {:ok, consumer} =
-      start_supervised({ShapeConsumer, peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card})
+      start_supervised(
+        {ShapeConsumer,
+         peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card}
+      )
 
     # Task exits, GenServer schedules restart; verify backoff doubles
     await_till(

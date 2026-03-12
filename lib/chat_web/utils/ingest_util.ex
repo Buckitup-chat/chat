@@ -150,4 +150,3 @@ defmodule ChatWeb.Utils.IngestUtil do
 
   def decode_binary(_), do: {:error, "invalid_binary_field"}
 end
-

@@ -32,8 +32,8 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
           Interactive test client for user_card and user_storage Electric API operations
         </p>
       </div>
-
-      <!-- Main Layout -->
+      
+    <!-- Main Layout -->
       <div class="flex-1 flex overflow-hidden">
         <!-- Left Sidebar (Documentation) -->
         <aside class={"transition-all duration-200 #{if @show_docs, do: "w-80", else: "w-12"} bg-white border-r overflow-y-auto"}>
@@ -43,7 +43,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
               class="w-full flex items-center justify-center p-2 hover:bg-gray-100 rounded"
               title={if @show_docs, do: "Hide docs", else: "Show docs"}
             >
-              <span class="text-lg"><%= if @show_docs, do: "◄", else: "►" %></span>
+              <span class="text-lg">{if @show_docs, do: "◄", else: "►"}</span>
             </button>
           </div>
 
@@ -59,22 +59,22 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
                     class="w-full text-left flex items-start gap-2 p-2 hover:bg-gray-50 rounded"
                   >
                     <span class="text-sm mt-0.5">
-                      <%= if section_key in @expanded_docs, do: "▼", else: "►" %>
+                      {if section_key in @expanded_docs, do: "▼", else: "►"}
                     </span>
-                    <span class="font-medium text-gray-900"><%= section.title %></span>
+                    <span class="font-medium text-gray-900">{section.title}</span>
                   </button>
 
                   <%= if section_key in @expanded_docs do %>
                     <div class="ml-6 mt-2 text-sm space-y-3">
-                      <p class="text-gray-700"><%= section.description %></p>
+                      <p class="text-gray-700">{section.description}</p>
 
                       <div>
                         <h5 class="font-semibold text-gray-900 mb-1">Fields:</h5>
                         <ul class="space-y-1">
                           <%= for field <- section.fields do %>
                             <li class="text-gray-700">
-                              <strong class="text-gray-900"><%= field.name %></strong>
-                              <span class="text-gray-500">(<%= field.type %>)</span>: <%= field.description %>
+                              <strong class="text-gray-900">{field.name}</strong>
+                              <span class="text-gray-500">(<%= field.type %>)</span>: {field.description}
                             </li>
                           <% end %>
                         </ul>
@@ -91,15 +91,15 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
             </div>
           <% end %>
         </aside>
-
-        <!-- Main Content Area -->
+        
+    <!-- Main Content Area -->
         <main class="flex-1 overflow-y-auto p-6">
           <%= if @error_message do %>
             <div class="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
               <div class="flex justify-between items-start">
                 <div>
                   <strong class="font-semibold">Error:</strong>
-                  <span class="block mt-1"><%= @error_message %></span>
+                  <span class="block mt-1">{@error_message}</span>
                 </div>
                 <button phx-click="clear_error" class="text-red-600 hover:text-red-800">
                   ✕
@@ -109,13 +109,13 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
           <% end %>
 
           <%= if @user do %>
-            <%= render_user_loaded(assigns) %>
+            {render_user_loaded(assigns)}
           <% else %>
-            <%= render_initial_state(assigns) %>
+            {render_initial_state(assigns)}
           <% end %>
         </main>
-
-        <!-- Right Sidebar (Request Log) -->
+        
+    <!-- Right Sidebar (Request Log) -->
         <aside class="w-96 bg-gray-50 border-l overflow-y-auto">
           <div class="p-4">
             <div class="flex justify-between items-center mb-4">
@@ -134,10 +134,10 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
                 <div class="mb-4 bg-white p-3 rounded shadow-sm">
                   <div class="flex justify-between items-start mb-2">
                     <span class="font-mono text-sm font-bold text-gray-900">
-                      <%= log_entry.method %> <%= URI.parse(log_entry.url).path %>
+                      {log_entry.method} {URI.parse(log_entry.url).path}
                     </span>
                     <span class={"text-xs px-2 py-1 rounded #{status_color(log_entry.response_status)}"}>
-                      <%= log_entry.response_status %>
+                      {log_entry.response_status}
                     </span>
                   </div>
 
@@ -169,23 +169,25 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
                     <pre class="mt-1 bg-gray-100 p-2 rounded overflow-x-auto"><%= log_entry.response_body %></pre>
                   </details>
 
-                  <p class="text-xs text-gray-500 mt-2"><%= format_timestamp(log_entry.timestamp) %></p>
+                  <p class="text-xs text-gray-500 mt-2">{format_timestamp(log_entry.timestamp)}</p>
                 </div>
               <% end %>
             <% end %>
           </div>
         </aside>
       </div>
-
-      <!-- Storage Item Form Modal (shown when creating/editing) -->
+      
+    <!-- Storage Item Form Modal (shown when creating/editing) -->
       <%= if @show_storage_form do %>
         <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
             <h3 class="text-lg font-bold mb-4">
-              <%= if @editing_storage_uuid, do: "Edit Storage Item", else: "Create Storage Item" %>
+              {if @editing_storage_uuid, do: "Edit Storage Item", else: "Create Storage Item"}
             </h3>
 
-            <form phx-submit={if @editing_storage_uuid, do: "save_storage_edit", else: "create_storage"}>
+            <form phx-submit={
+              if @editing_storage_uuid, do: "save_storage_edit", else: "create_storage"
+            }>
               <%= if @editing_storage_uuid do %>
                 <input type="hidden" name="uuid" value={@editing_storage_uuid} />
               <% else %>
@@ -246,7 +248,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
                   class="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                   disabled={@operation_in_progress}
                 >
-                  <%= if @editing_storage_uuid, do: "Save", else: "Create" %>
+                  {if @editing_storage_uuid, do: "Save", else: "Create"}
                 </button>
                 <button
                   type="button"
@@ -260,8 +262,8 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
           </div>
         </div>
       <% end %>
-
-      <!-- Storage Details Modal (shown when viewing) -->
+      
+    <!-- Storage Details Modal (shown when viewing) -->
       <%= if @viewing_storage_uuid do %>
         <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full">
@@ -272,19 +274,19 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
               <div class="space-y-3 mb-4">
                 <div>
                   <label class="text-sm font-medium text-gray-600">UUID:</label>
-                  <p class="font-mono text-sm"><%= item.uuid %></p>
+                  <p class="font-mono text-sm">{item.uuid}</p>
                 </div>
 
                 <%= if item.label do %>
                   <div>
                     <label class="text-sm font-medium text-gray-600">Label:</label>
-                    <p class="text-sm"><%= item.label %></p>
+                    <p class="text-sm">{item.label}</p>
                   </div>
                 <% end %>
 
                 <div>
                   <label class="text-sm font-medium text-gray-600">Size:</label>
-                  <p class="text-sm font-mono"><%= format_bytes(item.size) %></p>
+                  <p class="text-sm font-mono">{format_bytes(item.size)}</p>
                 </div>
 
                 <div>
@@ -332,7 +334,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
             disabled={@operation_in_progress}
             class="block w-full bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
           >
-            <%= if @operation_in_progress, do: "Creating...", else: "Create Test User" %>
+            {if @operation_in_progress, do: "Creating...", else: "Create Test User"}
           </button>
         </form>
       </div>
@@ -346,18 +348,18 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
       <!-- User Card -->
       <div class="bg-white shadow rounded-lg p-6">
         <h3 class="text-lg font-bold mb-4">User</h3>
-
-        <!-- User Info -->
+        
+    <!-- User Info -->
         <div class="mb-4 pl-4 border-l-4 border-blue-500">
           <p class="text-sm text-gray-600">
-            Name: <span class="font-mono font-semibold"><%= @user.name %></span>
+            Name: <span class="font-mono font-semibold">{@user.name}</span>
           </p>
           <p class="text-xs text-gray-500 font-mono">
-            Hash: <%= short_hash(@user.user_hash_hex) %>
+            Hash: {short_hash(@user.user_hash_hex)}
           </p>
         </div>
-
-        <!-- User Actions -->
+        
+    <!-- User Actions -->
         <div class="mb-6">
           <form phx-submit="update_name" class="flex gap-2 mb-2">
             <input
@@ -386,8 +388,8 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
             Delete User
           </button>
         </div>
-
-        <!-- Storage Items Section -->
+        
+    <!-- Storage Items Section -->
         <div>
           <h4 class="text-md font-semibold mb-3 text-gray-700">Storage Items</h4>
 
@@ -398,9 +400,9 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
               <%= for item <- @storage_items do %>
                 <li class="flex items-center gap-2 pl-4">
                   <span class="flex-1 font-mono text-sm text-gray-700">
-                    <%= item.uuid %>
+                    {item.uuid}
                     <%= if item.label do %>
-                      <span class="text-gray-500 text-xs ml-2">(<%= item.label %>)</span>
+                      <span class="text-gray-500 text-xs ml-2">({item.label})</span>
                     <% end %>
                   </span>
                   <button
@@ -432,8 +434,8 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
               <% end %>
             </ul>
           <% end %>
-
-          <!-- Create Storage Item Button -->
+          
+    <!-- Create Storage Item Button -->
           <button
             phx-click="show_create_storage_form"
             class="px-4 py-2 bg-green-500 text-white rounded text-sm w-full hover:bg-green-600"
@@ -605,7 +607,11 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
     end
   end
 
-  def handle_event("save_storage_edit", %{"uuid" => uuid, "size" => size_str, "label" => label}, socket) do
+  def handle_event(
+        "save_storage_edit",
+        %{"uuid" => uuid, "size" => size_str, "label" => label},
+        socket
+      ) do
     base_url = get_base_url(socket)
     user = socket.assigns.user
     size = String.to_integer(size_str)
@@ -623,7 +629,12 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
           |> update(:storage_items, fn items ->
             Enum.map(items, fn item ->
               if item.uuid == uuid do
-                %{item | value_b64: value_b64, size: size, label: if(label == "", do: nil, else: label)}
+                %{
+                  item
+                  | value_b64: value_b64,
+                    size: size,
+                    label: if(label == "", do: nil, else: label)
+                }
               else
                 item
               end

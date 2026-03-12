@@ -140,8 +140,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
     with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
          {:ok, ingest_resp, ingest_log} <-
            post_ingest(challenge_resp, payload, sign_skey, base_url) do
-      {:ok,
-       %{uuid: uuid, txid: ingest_resp["txid"], log_entries: [challenge_log, ingest_log]}}
+      {:ok, %{uuid: uuid, txid: ingest_resp["txid"], log_entries: [challenge_log, ingest_log]}}
     else
       {:error, reason, log_entries} ->
         {:error, %{reason: reason, log_entries: log_entries}}

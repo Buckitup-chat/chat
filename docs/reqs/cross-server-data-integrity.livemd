@@ -117,22 +117,36 @@ It should not expose structure (like field delimiters)
 The main goal - same record should be signed same way on backend and frontend.
 
 So signature should be formed of concatenation of string representatation of all fields (except signature itself)
-in lexographical order of string values.
+in lexicographical order of collumns names in the table.
 
 Depending on column type, string representation can be different:
-- binary (_b64, _cert,) - base64
-- binary (_hash, _pkey) - hex
-- uuid - itsown representation
+- binary (_b64, _cert,_pkey) - base64
+- binary (_hash) - hex
+- uuid - its own representation
 - string - UTF-8
-- numeric (integer/timestamp) - decimal representation
+- numeric (integer) - decimal representation
+- datetime - ISO8601 basic format
 - boolean - "true" or "false"
 - null - "null"
 
 It would be something like this simplified:
 ```elixir
   data
-  |> Enum.map(fn {k, v} -> {k, to_string(v)} end)
-  |> Enum.map(&to_string/1)
-  |> Enum.sort()
+  |> Enum.sort_by(fn {key, _value} -> key end)
+  |> Enum.map(fn {key, value} -> 
+    cond do
+      String.ends_with?(key, "_b64") -> Base.encode64(value)
+      String.ends_with?(key, "_cert") -> Base.encode64(value)
+      String.ends_with?(key, "_pkey") -> Base.encode64(value)
+      String.ends_with?(key, "_hash") -> Base.encode16(value)
+      is_uuid(value) -> value
+      is_integer(value) -> Integer.to_string(value)
+      value == true -> "true"
+      value == false -> "false"
+      is_nil(value) -> "null"
+      match?(%DateTime{}, value) -> value |> DateTime.to_iso8601(:basic)
+      true -> value
+    end
+  end)
   |> Enum.join("")
 ```

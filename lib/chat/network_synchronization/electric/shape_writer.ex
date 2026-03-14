@@ -37,17 +37,17 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
   defp do_write(shape, operation, value) do
     case {shape, operation, value} do
       {:user_card, :insert, %UserCard{} = card} ->
-        %UserCard{}
-        |> UserCard.create_changeset(Map.from_struct(card))
-        |> case do
-          %{valid?: true} = changeset ->
-            repo().insert(changeset,
-              on_conflict: {:replace_all_except, [:user_hash]},
-              conflict_target: :user_hash
-            )
+        changeset =
+          %UserCard{}
+          |> UserCard.create_changeset(Map.from_struct(card))
 
-          _invalid ->
-            {:ok, card}
+        with %{valid?: true} <- changeset do
+          repo().insert(changeset,
+            on_conflict: {:replace_all_except, [:user_hash]},
+            conflict_target: :user_hash
+          )
+        else
+          _invalid -> {:ok, card}
         end
 
       {:user_card, :update, %UserCard{} = card} ->
@@ -70,33 +70,55 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
         repo().delete(%UserCard{user_hash: user_hash}, allow_stale: true)
 
       {:user_storage, :insert, %UserStorage{} = storage} ->
-        %UserStorage{}
-        |> UserStorage.create_changeset(Map.from_struct(storage))
-        |> case do
-          %{valid?: true} = changeset ->
-            repo().insert(changeset,
-              on_conflict: {:replace, [:value_b64]},
-              conflict_target: [:user_hash, :uuid]
+        # Verify parent user_card exists - required for data integrity
+        with parent when not is_nil(parent) <- repo().get(UserCard, storage.user_hash),
+             changeset <- UserStorage.create_changeset(%UserStorage{}, Map.from_struct(storage)),
+             %{valid?: true} <- changeset do
+          repo().insert(changeset,
+            on_conflict: {:replace, [:value_b64]},
+            conflict_target: [:user_hash, :uuid]
+          )
+        else
+          nil ->
+            # Parent not synced yet - skip this record
+            # Electric live sync will re-deliver it once parent exists
+            log(
+              "Skipping user_storage insert - parent user_card not yet synced (user_hash: #{Base.encode16(storage.user_hash, case: :lower)})",
+              :debug
             )
+
+            {:ok, :skipped_no_parent}
 
           _invalid ->
             {:ok, storage}
         end
 
       {:user_storage, :update, %UserStorage{} = storage} ->
-        case repo().get_by(UserStorage, user_hash: storage.user_hash, uuid: storage.uuid) do
-          nil ->
+        # Verify parent user_card exists before updating
+        with {_, parent} when not is_nil(parent) <-
+               {:parent, repo().get(UserCard, storage.user_hash)},
+             {_, existing} when not is_nil(existing) <-
+               {:existing, repo().get_by(UserStorage, user_hash: storage.user_hash, uuid: storage.uuid)} do
+          attrs =
+            storage
+            |> Map.take([:value_b64])
+            |> Map.reject(fn {_k, v} -> is_nil(v) end)
+
+          existing
+          |> UserStorage.update_changeset(attrs)
+          |> repo().update()
+        else
+          {:parent, nil} ->
+            # Parent doesn't exist or was deleted - skip update
+            log(
+              "Skipping user_storage update - parent user_card not found (user_hash: #{Base.encode16(storage.user_hash, case: :lower)})",
+              :debug
+            )
+
+            {:ok, :skipped_no_parent}
+
+          {:existing, nil} ->
             {:ok, storage}
-
-          existing ->
-            attrs =
-              storage
-              |> Map.take([:value_b64])
-              |> Map.reject(fn {_k, v} -> is_nil(v) end)
-
-            existing
-            |> UserStorage.update_changeset(attrs)
-            |> repo().update()
         end
 
       {:user_storage, :delete, %UserStorage{user_hash: user_hash, uuid: uuid}} ->

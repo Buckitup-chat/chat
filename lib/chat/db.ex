@@ -3,6 +3,8 @@ defmodule Chat.Db do
   Manages the state of the CubDB instance.
   """
 
+  use Toolbox.OriginLog
+
   import Chat.Db.Common
 
   alias Chat.Db.Queries
@@ -100,11 +102,56 @@ defmodule Chat.Db do
     Application.get_env(:chat, :repo, Chat.Repo)
   end
 
+  def repo_ready? do
+    repo_ready?(repo())
+  end
+
+  def repo_ready?(repo) when is_atom(repo) do
+    case Process.whereis(repo) do
+      pid when is_pid(pid) ->
+        Process.alive?(pid) and repo_query_ok?(repo)
+
+      _ ->
+        false
+    end
+  rescue
+    _ -> false
+  catch
+    :exit, _ -> false
+  end
+
   def set_repo(repo) do
+    current_repo = repo()
+
     with pid <- Process.whereis(repo),
          true <- is_pid(pid),
          true <- Process.alive?(pid) do
       Application.put_env(:chat, :repo, repo)
+      maybe_reinit_phoenix_sync(current_repo, repo)
+    end
+  end
+
+  defp repo_query_ok?(repo) do
+    case repo.query("SELECT 1", []) do
+      {:ok, _} -> true
+      _ -> false
+    end
+  rescue
+    _ -> false
+  catch
+    :exit, _ -> false
+  end
+
+  defp maybe_reinit_phoenix_sync(repo, repo), do: :ok
+
+  defp maybe_reinit_phoenix_sync(_previous_repo, _current_repo) do
+    case Chat.PhoenixSyncReinit.reinit() do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        log("Phoenix.Sync reinit failed after repo switch: #{inspect(reason)}", :error)
+        {:error, reason}
     end
   end
 end

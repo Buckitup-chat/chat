@@ -1,7 +1,7 @@
 defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
   @moduledoc "Writes Electric shape change messages to local PostgreSQL"
 
-  require Logger
+  use Toolbox.OriginLog
 
   import Chat.Db, only: [repo: 0]
 
@@ -14,11 +14,20 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
         result
 
       {:error, :repo_not_available} = error ->
+        log("repo not available while writing #{inspect(shape)}/#{inspect(operation)}", :warning)
+        error
+
+      {:error, {:repo_not_available, reason}} = error ->
+        log(
+          "repo not available while writing #{inspect(shape)}/#{inspect(operation)}: #{Exception.message(reason)}",
+          :warning
+        )
         error
 
       {:error, reason} = error ->
-        Logger.warning(
-          "ShapeWriter: failed to write #{inspect(shape)}/#{inspect(operation)}: #{inspect(reason)}"
+        log(
+          "failed to write #{inspect(shape)}/#{inspect(operation)}: #{inspect(reason)}",
+          :warning
         )
 
         error
@@ -94,7 +103,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
         repo().delete(%UserStorage{user_hash: user_hash, uuid: uuid}, allow_stale: true)
     end
   rescue
-    RuntimeError -> {:error, :repo_not_available}
+    e in RuntimeError -> {:error, {:repo_not_available, e}}
     e in Postgrex.Error -> {:error, e}
   end
 end

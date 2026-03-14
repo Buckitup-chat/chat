@@ -48,13 +48,18 @@ defmodule ChatWeb.ElectricLive.UserStorageLive.Index do
   @impl true
   def handle_info({:sync, {:user_storage, :loaded}}, socket) do
     # Initial sync completed - all existing user storage entries loaded
-    {:noreply, assign(socket, :loading, false)}
+    {:noreply, assign(socket, loading: false, error: nil)}
   end
 
   @impl true
   def handle_info({:sync, {:user_storage, :live}}, socket) do
     # Stream is now live - receiving real-time updates
-    {:noreply, assign(socket, :live, true)}
+    {:noreply, assign(socket, live: true, error: nil)}
+  end
+
+  @impl true
+  def handle_info({:sync, {:user_storage, {:error, reason}}}, socket) do
+    {:noreply, assign(socket, loading: false, live: false, error: reason)}
   end
 
   @impl true

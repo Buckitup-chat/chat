@@ -48,13 +48,18 @@ defmodule ChatWeb.ElectricLive.UserCardsLive.Index do
   @impl true
   def handle_info({:sync, {:user_cards, :loaded}}, socket) do
     # Initial sync completed - all existing user cards loaded
-    {:noreply, assign(socket, :loading, false)}
+    {:noreply, assign(socket, loading: false, error: nil)}
   end
 
   @impl true
   def handle_info({:sync, {:user_cards, :live}}, socket) do
     # Stream is now live - receiving real-time updates
-    {:noreply, assign(socket, :live, true)}
+    {:noreply, assign(socket, live: true, error: nil)}
+  end
+
+  @impl true
+  def handle_info({:sync, {:user_cards, {:error, reason}}}, socket) do
+    {:noreply, assign(socket, loading: false, live: false, error: reason)}
   end
 
   @impl true

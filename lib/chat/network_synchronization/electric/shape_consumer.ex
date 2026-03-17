@@ -43,34 +43,34 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
 
   @impl true
   def init({peer_url, system_identifier, shape}) do
-    {peer_url, system_identifier, shape, nil, @initial_backoff_ms}
+    {peer_url, system_identifier, shape, nil, @initial_backoff_ms, nil}
     |> ok_continue(:start_stream)
   end
 
   @impl true
-  def handle_continue(:start_stream, {peer_url, system_identifier, shape, _task_info, backoff}) do
-    broadcast_status(peer_url, shape, SynchronizingStatus.new())
-    task_info = launch_task(peer_url, system_identifier, shape)
-    {peer_url, system_identifier, shape, task_info, backoff} |> noreply()
+  def handle_continue(
+        :start_stream,
+        {peer_url, system_identifier, shape, task_info, backoff, restart_ref}
+      ) do
+    {peer_url, system_identifier, shape, task_info, backoff, restart_ref}
+    |> maybe_start_stream()
+    |> noreply()
   end
 
   @impl true
-  def handle_info({:change, op, value}, {peer_url, system_identifier, shape, task_info, backoff}) do
+  def handle_info(
+        {:change, op, value},
+        {peer_url, system_identifier, shape, task_info, backoff, restart_ref} = state
+      ) do
     case ShapeWriter.write(shape, op, value) do
       {:ok, _} ->
-        {peer_url, system_identifier, shape, task_info, backoff} |> noreply()
+        {peer_url, system_identifier, shape, task_info, backoff, restart_ref} |> noreply()
 
       {:error, :repo_not_available} ->
-        log(
-          "ShapeConsumer #{peer_url}/#{shape}: repo not available, retrying in #{backoff}ms",
-          :warning
-        )
+        state |> schedule_repo_retry(nil) |> noreply()
 
-        cancel_task(task_info)
-        broadcast_status(peer_url, shape, ErrorStatus.new("repo_not_available"))
-        Process.send_after(self(), :restart_stream, backoff)
-        next_backoff = min(backoff * 2, @max_backoff_ms)
-        {peer_url, system_identifier, shape, nil, next_backoff} |> noreply()
+      {:error, {:repo_not_available, reason}} ->
+        state |> schedule_repo_retry(reason) |> noreply()
 
       {:error, reason} ->
         log(
@@ -78,40 +78,55 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
           :warning
         )
 
-        {peer_url, system_identifier, shape, task_info, backoff} |> noreply()
+        {peer_url, system_identifier, shape, task_info, backoff, restart_ref} |> noreply()
     end
   end
 
   def handle_info(
         {:resume, resume_msg},
-        {peer_url, system_identifier, shape, task_info, _backoff}
+        {peer_url, system_identifier, shape, task_info, _backoff, restart_ref}
       ) do
     OffsetStore.save(system_identifier, shape, resume_msg)
-    {peer_url, system_identifier, shape, task_info, @initial_backoff_ms} |> noreply()
+    {peer_url, system_identifier, shape, task_info, @initial_backoff_ms, restart_ref} |> noreply()
   end
 
-  def handle_info(:up_to_date, {peer_url, system_identifier, shape, task_info, _backoff}) do
+  def handle_info(
+        :up_to_date,
+        {peer_url, system_identifier, shape, task_info, _backoff, restart_ref}
+      ) do
     broadcast_status(peer_url, shape, LiveStatus.new())
-    {peer_url, system_identifier, shape, task_info, @initial_backoff_ms} |> noreply()
+    {peer_url, system_identifier, shape, task_info, @initial_backoff_ms, restart_ref} |> noreply()
   end
 
-  def handle_info(:must_refetch, {peer_url, system_identifier, shape, task_info, _backoff}) do
+  def handle_info(
+        :must_refetch,
+        {peer_url, system_identifier, shape, task_info, _backoff, restart_ref}
+      ) do
     cancel_task(task_info)
+    cancel_restart(restart_ref)
     OffsetStore.delete(system_identifier)
-    broadcast_status(peer_url, shape, SynchronizingStatus.new())
-    new_task_info = launch_task(peer_url, system_identifier, shape)
-    {peer_url, system_identifier, shape, new_task_info, @initial_backoff_ms} |> noreply()
+    {peer_url, system_identifier, shape, nil, @initial_backoff_ms, nil}
+    |> maybe_start_stream()
+    |> noreply()
   end
 
-  def handle_info(:restart_stream, {peer_url, system_identifier, shape, _task_info, backoff}) do
-    task_info = launch_task(peer_url, system_identifier, shape)
-    {peer_url, system_identifier, shape, task_info, backoff} |> noreply()
+  def handle_info(
+        :restart_stream,
+        {peer_url, system_identifier, shape, nil, backoff, _restart_ref}
+      ) do
+    {peer_url, system_identifier, shape, nil, backoff, nil}
+    |> maybe_start_stream()
+    |> noreply()
+  end
+
+  def handle_info(:restart_stream, state) do
+    state |> noreply()
   end
 
   # Current task exited — schedule retry with exponential backoff
   def handle_info(
         {:DOWN, ref, :process, _down_pid, reason},
-        {peer_url, system_identifier, shape, {_task_pid, ref}, backoff}
+        {peer_url, system_identifier, shape, {_task_pid, ref}, backoff, nil}
       ) do
     log(
       "ShapeConsumer #{peer_url}/#{shape}: stream exited (#{inspect(reason)}), retrying in #{backoff}ms",
@@ -119,9 +134,9 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
     )
 
     broadcast_status(peer_url, shape, ErrorStatus.new(inspect(reason)))
-    Process.send_after(self(), :restart_stream, backoff)
+    restart_ref = Process.send_after(self(), :restart_stream, backoff)
     next_backoff = min(backoff * 2, @max_backoff_ms)
-    {peer_url, system_identifier, shape, nil, next_backoff} |> noreply()
+    {peer_url, system_identifier, shape, nil, next_backoff, restart_ref} |> noreply()
   end
 
   # Stale :DOWN from a previously cancelled task — ignore
@@ -132,8 +147,9 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
   def handle_info(_msg, state), do: state |> noreply()
 
   @impl true
-  def terminate(_reason, {_peer_url, _system_identifier, _shape, task_info, _backoff}) do
+  def terminate(_reason, {_peer_url, _system_identifier, _shape, task_info, _backoff, restart_ref}) do
     cancel_task(task_info)
+    cancel_restart(restart_ref)
   end
 
   # Private
@@ -171,8 +187,63 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
 
   defp cancel_task({pid, ref}) do
     Process.demonitor(ref, [:flush])
-    Process.exit(pid, :kill)
+    if Process.alive?(pid) do
+      Process.exit(pid, :kill)
+    end
   end
+
+  defp cancel_restart(nil), do: :ok
+
+  defp cancel_restart(ref) do
+    Process.cancel_timer(ref)
+    :ok
+  end
+
+  defp maybe_start_stream({peer_url, system_identifier, shape, nil, backoff, _restart_ref}) do
+    case Chat.Db.repo_ready?() do
+      true ->
+        broadcast_status(peer_url, shape, SynchronizingStatus.new())
+        task_info = launch_task(peer_url, system_identifier, shape)
+        {peer_url, system_identifier, shape, task_info, backoff, nil}
+
+      false ->
+        schedule_repo_retry({peer_url, system_identifier, shape, nil, backoff, nil}, nil)
+    end
+  end
+
+  defp maybe_start_stream(state), do: state
+
+  defp schedule_repo_retry(
+         {peer_url, system_identifier, shape, task_info, backoff, nil},
+         reason
+       ) do
+    detail =
+      case format_reason(reason) do
+        nil -> ""
+        message -> " (#{message})"
+      end
+
+    log(
+      "ShapeConsumer #{peer_url}/#{shape}: repo not available#{detail}, retrying in #{backoff}ms",
+      :warning
+    )
+
+    cancel_task(task_info)
+    broadcast_status(peer_url, shape, ErrorStatus.new("repo_not_available"))
+    restart_ref = Process.send_after(self(), :restart_stream, backoff)
+    next_backoff = min(backoff * 2, @max_backoff_ms)
+    {peer_url, system_identifier, shape, nil, next_backoff, restart_ref}
+  end
+
+  defp schedule_repo_retry({peer_url, system_identifier, shape, _task_info, backoff, restart_ref}, _reason) do
+    {peer_url, system_identifier, shape, nil, backoff, restart_ref}
+  end
+
+  defp format_reason(nil), do: nil
+  defp format_reason(%{message: message}) when is_binary(message), do: message
+  defp format_reason(%{__exception__: true} = error), do: Exception.message(error)
+  defp format_reason(reason) when is_binary(reason), do: reason
+  defp format_reason(reason), do: inspect(reason)
 
   defp dispatch_message(message, parent, _url, _shape) do
     case message do

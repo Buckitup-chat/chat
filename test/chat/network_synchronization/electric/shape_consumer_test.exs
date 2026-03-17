@@ -12,6 +12,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
     {Electric.Client, ChatSupport.Mocks.NetworkSynchronization.Electric.ElectricClientMock},
     {Chat.NetworkSynchronization.Electric.ShapeWriter,
      ChatSupport.Mocks.NetworkSynchronization.Electric.ShapeWriterMock},
+    {Chat.Db, ChatSupport.Mocks.NetworkSynchronization.Electric.DbMock},
     {Chat.NetworkSynchronization.Electric.OffsetStore,
      ChatSupport.Mocks.NetworkSynchronization.Electric.OffsetStoreMock}
   ])
@@ -22,11 +23,13 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
   setup do
     Application.put_env(:chat, :consumer_test_pid, self())
     Application.put_env(:chat, :electric_mock_messages, [])
+    Application.put_env(:chat, :consumer_test_repo_ready, true)
 
     on_exit(fn ->
       Application.delete_env(:chat, :consumer_test_pid)
       Application.delete_env(:chat, :electric_mock_messages)
       Application.delete_env(:chat, :consumer_test_write_result)
+      Application.delete_env(:chat, :consumer_test_repo_ready)
     end)
 
     :ok
@@ -113,11 +116,11 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
     assert Process.alive?(consumer)
 
     # Verify state has reset backoff by inspecting the GenServer state
-    {_url, _si, _shape, _task_info, backoff} = :sys.get_state(consumer)
+    {_url, _si, _shape, _task_info, backoff, _restart_ref} = :sys.get_state(consumer)
 
     await_till(
       fn ->
-        {_url, _si, _shape, _task_info, b} =
+        {_url, _si, _shape, _task_info, b, _restart_ref} =
           :sys.get_state(pid_holder |> then(fn _ -> consumer end))
 
         b == 1_000
@@ -155,7 +158,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
 
     await_till(
       fn ->
-        {_url, _si, _shape, _task_info, backoff} = :sys.get_state(consumer)
+        {_url, _si, _shape, _task_info, backoff, _restart_ref} = :sys.get_state(consumer)
         backoff > 1_000
       end,
       time: 1500,
@@ -163,8 +166,61 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
     )
 
     assert Process.alive?(consumer)
-    {_url, _si, _shape, _task_info, backoff} = :sys.get_state(consumer)
+    {_url, _si, _shape, _task_info, backoff, restart_ref} = :sys.get_state(consumer)
     assert backoff == 2_000
+    assert is_reference(restart_ref)
+  end
+
+  test "waits for the repo before launching the stream" do
+    Application.put_env(:chat, :consumer_test_repo_ready, false)
+
+    {:ok, consumer} =
+      start_supervised(
+        {ShapeConsumer,
+         peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card}
+      )
+
+    refute_receive {:write_called, _, _, _}, 200
+
+    {_url, _si, _shape, task_info, backoff, restart_ref} = :sys.get_state(consumer)
+    assert task_info == nil
+    assert backoff == 2_000
+    assert is_reference(restart_ref)
+  end
+
+  test "does not stack retries when a restart is already scheduled" do
+    card = %UserCard{
+      user_hash: <<1::256>>,
+      name: "Alice",
+      sign_pkey: "s",
+      contact_pkey: "c",
+      contact_cert: "cc",
+      crypt_pkey: "cp",
+      crypt_cert: "ccc"
+    }
+
+    Application.put_env(:chat, :consumer_test_write_result, {:error, :repo_not_available})
+
+    Application.put_env(:chat, :electric_mock_messages, [
+      %Message.ChangeMessage{headers: %{operation: :insert}, value: card},
+      %Message.ChangeMessage{headers: %{operation: :insert}, value: card},
+      %Message.ChangeMessage{headers: %{operation: :insert}, value: card}
+    ])
+
+    {:ok, consumer} =
+      start_supervised(
+        {ShapeConsumer,
+         peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card}
+      )
+
+    Process.sleep(100)
+
+    {_url, _si, _shape, _task_info, backoff, restart_ref} = :sys.get_state(consumer)
+    assert backoff == 2_000
+    assert is_reference(restart_ref)
+
+    # Verify only one restart is scheduled even though multiple messages failed
+    assert Process.read_timer(restart_ref) != false
   end
 
   test "schedules retry after stream task exits" do
@@ -180,14 +236,14 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
     # Task exits, GenServer schedules restart; verify backoff doubles
     await_till(
       fn ->
-        {_url, _si, _shape, _task_info, backoff} = :sys.get_state(consumer)
+        {_url, _si, _shape, _task_info, backoff, _restart_ref} = :sys.get_state(consumer)
         backoff > 1_000
       end,
       time: 500,
       step: 50
     )
 
-    {_url, _si, _shape, _task_info, backoff} = :sys.get_state(consumer)
+    {_url, _si, _shape, _task_info, backoff, _restart_ref} = :sys.get_state(consumer)
     assert backoff == 2_000
   end
 end

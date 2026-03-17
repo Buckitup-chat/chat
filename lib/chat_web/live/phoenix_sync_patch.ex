@@ -86,8 +86,12 @@ defmodule ChatWeb.PhoenixSyncPatch do
     {[], {error, nil}}
   end
 
-  defp update_mode_fixed({%Electric.Client.Error{} = error, _resume}, _state) do
-    raise error
+  defp update_mode_fixed(
+         {%Electric.Client.Error{} = error, _resume},
+         {_client, name, _query, pid, component}
+       ) do
+    send(pid, {:sync, wrap_event(component, {name, {:error, format_client_error(error)}})})
+    []
   end
 
   # THIS IS THE FIX: Only pass resume option if resume is not nil
@@ -103,9 +107,9 @@ defmodule ChatWeb.PhoenixSyncPatch do
       # FIX: Build stream options conditionally based on resume
       stream_opts =
         if resume do
-          [resume: resume, replica: :full]
+          [resume: resume, replica: :full, errors: :stream]
         else
-          [replica: :full]
+          [replica: :full, errors: :stream]
         end
 
       client
@@ -121,6 +125,10 @@ defmodule ChatWeb.PhoenixSyncPatch do
 
   defp send_live_event(%Message.ControlMessage{control: :up_to_date}, pid, name, component) do
     send(pid, {:sync, wrap_event(component, {name, :live})})
+  end
+
+  defp send_live_event(%Electric.Client.Error{} = error, pid, name, component) do
+    send(pid, {:sync, wrap_event(component, {name, {:error, format_client_error(error)}})})
   end
 
   defp send_live_event(_msg, _pid, _name, _component) do
@@ -148,4 +156,17 @@ defmodule ChatWeb.PhoenixSyncPatch do
   defp wrap_event(component, event) do
     component_event(component: component, event: event)
   end
+
+  defp format_client_error(%Electric.Client.Error{message: message, resp: resp}) do
+    [message, resp && Map.get(resp, :body)]
+    |> Enum.map(&extract_client_error_message/1)
+    |> Enum.find("Electric sync failed", &is_binary/1)
+  end
+
+  defp extract_client_error_message(message) when is_binary(message), do: message
+  defp extract_client_error_message(%{message: message}) when is_binary(message), do: message
+  defp extract_client_error_message([%{message: message} | _]) when is_binary(message), do: message
+  defp extract_client_error_message(%{__exception__: true} = error), do: Exception.message(error)
+  defp extract_client_error_message(nil), do: nil
+  defp extract_client_error_message(message), do: inspect(message)
 end

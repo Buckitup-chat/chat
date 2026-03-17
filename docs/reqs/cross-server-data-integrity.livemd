@@ -15,16 +15,17 @@ We can be interestend in keeping versions of data or not.
 
 Unversioned data has integrity and conflict resolving info as extra metadata.
 
-- deleted_flag
+- deleted boolean flag
 - owner_timestamp to resolve conflicts (latest wins)
 - sign_b64(rest of table fields) to prove integrity
 
 Versioned date has integrity, conflict resolving info and versioning info as extra metadata.
 
 - deleted_flag
-- parent_sign_b64 to point to previous version
+- parent_sign_hash to point to previous version
 - owner_timestamp to resolve conflicts
 - sign_b64(rest of table fields including parent_sign_b64) to prove integrity
+- sign_hash()
 
 Versioned data has 2 tables:
 

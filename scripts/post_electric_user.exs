@@ -20,6 +20,26 @@ user_hash = <<0x01>> <> :crypto.hash(:sha3_512, sign_pkey)
 crypt_cert = :crypto.sign(:mldsa87, :none, crypt_pkey, sign_skey)
 contact_cert = :crypto.sign(:mldsa87, :none, contact_pkey, sign_skey)
 
+# Create signature payload for integrity verification
+owner_timestamp = 0
+deleted_flag = false
+
+signature_payload = %{
+  user_hash: user_hash,
+  sign_pkey: sign_pkey,
+  contact_pkey: contact_pkey,
+  contact_cert: contact_cert,
+  crypt_pkey: crypt_pkey,
+  crypt_cert: crypt_cert,
+  name: name,
+  deleted_flag: deleted_flag,
+  owner_timestamp: owner_timestamp
+}
+
+# Sign the payload (excluding sign_b64 itself)
+signature_data = :erlang.term_to_binary(signature_payload)
+sign_b64 = :crypto.sign(:mldsa87, :none, signature_data, sign_skey)
+
 payload = %{
   "mutations" => [
     %{
@@ -31,7 +51,10 @@ payload = %{
         "contact_cert" => encode_hex.(contact_cert),
         "crypt_pkey" => encode_hex.(crypt_pkey),
         "crypt_cert" => encode_hex.(crypt_cert),
-        "name" => name
+        "name" => name,
+        "deleted_flag" => deleted_flag,
+        "owner_timestamp" => owner_timestamp,
+        "sign_b64" => encode_hex.(sign_b64)
       },
       "syncMetadata" => %{
         "relation" => "user_cards"

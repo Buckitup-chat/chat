@@ -39,10 +39,11 @@ The Electric ingest API supports operations on `user_card` and `user_storage` ta
 - Provide example JSON payloads
 
 **REQ-5:** Documentation SHALL include:
-- `user_card` schema: user_hash, name, sign_pkey, contact_pkey, contact_cert, crypt_pkey, crypt_cert
+- `user_card` schema: user_hash, sign_pkey, contact_pkey, contact_cert, crypt_pkey, crypt_cert, name, deleted_flag, owner_timestamp, sign_b64
 - `user_storage` schema: user_hash, uuid, value_b64
-- Field type information (bytea, text, uuid)
-- Encoding formats (base64 for value_b64)
+- Field type information (bytea, text, uuid, integer, boolean)
+- Encoding formats (base64 for binary fields, hex escape for user_hash)
+- Integrity fields: owner_timestamp (monotonic counter), sign_b64 (ML-DSA-87 signature), deleted_flag (soft delete marker)
 
 ### User Management (Main Content)
 

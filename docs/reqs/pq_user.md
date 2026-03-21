@@ -26,6 +26,9 @@ Secret keys never leave the Frontend. If the server is compromised, it holds no 
 | `contact_skey` | 32 bytes | secp256k1 | Classical private key; FE/bots only |
 | `contact_cert` | ~4627 bytes | ML-DSA-87 signature of `contact_pkey` | Binds contact key to identity |
 | `name` | text | UTF-8 | Display name |
+| `deleted_flag` | boolean | true/false | Soft delete marker; true indicates deleted |
+| `owner_timestamp` | integer | Monotonic counter | Prevents replay attacks; must increase on updates |
+| `sign_b64` | ~4627 bytes | ML-DSA-87 signature | Signature of all fields except sign_b64 itself |
 
 ### Algorithms
 
@@ -86,6 +89,9 @@ User card is stored in the database.
 - contact_pkey
 - contact_cert
 - name
+- deleted_flag
+- owner_timestamp
+- sign_b64
 
 ### User Identity [FE only or bots or tests]
 
@@ -148,23 +154,33 @@ User Card schema:
 
     schema "user_cards" do
       field(:sign_pkey, :binary)
-      field(:crypt_pkey, :binary)
-      field(:crypt_cert, :binary)
       field(:contact_pkey, :binary)
       field(:contact_cert, :binary)
-      field(:name, :text)
+      field(:crypt_pkey, :binary)
+      field(:crypt_cert, :binary)
+      field(:name, :string)
+      field(:deleted_flag, :boolean)
+      field(:owner_timestamp, :integer)
+      field(:sign_b64, :binary)
     end
 
     def create_changeset(card, attrs) do
       card
-      |> cast(attrs, [:user_hash, :sign_pkey, :crypt_pkey, :crypt_cert, :contact_pkey, :contact_cert, :name])
-      |> validate_required([:user_hash, :sign_pkey, :crypt_pkey, :name])
+      |> cast(attrs, [:user_hash, :sign_pkey, :contact_pkey, :contact_cert, :crypt_pkey, :crypt_cert, :name, :deleted_flag, :owner_timestamp, :sign_b64])
+      |> validate_required([:user_hash, :sign_pkey, :contact_pkey, :contact_cert, :crypt_pkey, :crypt_cert, :name, :deleted_flag, :owner_timestamp, :sign_b64])
+      |> unique_constraint(:user_hash, name: :user_cards_pkey)
     end
 
     def update_name_changeset(card, attrs) do
       card
-      |> cast(attrs, [:user_hash, :name])
-      |> validate_required([:user_hash, :name])
+      |> cast(attrs, [:name, :owner_timestamp, :sign_b64])
+      |> validate_required([:name, :owner_timestamp, :sign_b64])
+    end
+
+    def update_deleted_flag_changeset(card, attrs) do
+      card
+      |> cast(attrs, [:deleted_flag, :owner_timestamp, :sign_b64])
+      |> validate_required([:deleted_flag, :owner_timestamp, :sign_b64])
     end
   end
 ```

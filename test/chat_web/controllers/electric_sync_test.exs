@@ -27,7 +27,10 @@ defmodule ChatWeb.ElectricSyncTest do
       contact_cert: :crypto.strong_rand_bytes(64),
       crypt_pkey: :crypto.strong_rand_bytes(32),
       crypt_cert: :crypto.strong_rand_bytes(64),
-      name: name
+      name: name,
+      deleted_flag: false,
+      owner_timestamp: 0,
+      sign_b64: :crypto.strong_rand_bytes(64)
     }
   end
 

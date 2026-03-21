@@ -44,6 +44,44 @@ sign_skey =
     :error -> raise "Invalid SIGN_SKEY hex string"
   end
 
+# Get current user card to retrieve sign_pkey and current timestamp
+get_resp =
+  Req.get!(
+    base <> "/electric/v1/shape/user_card?where=user_hash='#{encode_hex.(user_hash)}'",
+    headers: [{"accept", "application/json"}]
+  )
+
+IO.puts("get_status=" <> to_string(get_resp.status))
+
+current_card =
+  case get_resp.body do
+    [card | _] -> card
+    _ -> raise "User card not found"
+  end
+
+current_timestamp = Map.get(current_card, "owner_timestamp", 0)
+new_timestamp = current_timestamp + 1
+
+# Retrieve sign_pkey from current card
+sign_pkey_hex = String.replace_prefix(current_card["sign_pkey"], "\\x", "")
+{:ok, sign_pkey} = Base.decode16(sign_pkey_hex, case: :mixed)
+
+# Create signature payload for the update
+signature_payload = %{
+  user_hash: user_hash,
+  sign_pkey: sign_pkey,
+  contact_pkey: Base.decode16!(String.replace_prefix(current_card["contact_pkey"], "\\x", ""), case: :mixed),
+  contact_cert: Base.decode16!(String.replace_prefix(current_card["contact_cert"], "\\x", ""), case: :mixed),
+  crypt_pkey: Base.decode16!(String.replace_prefix(current_card["crypt_pkey"], "\\x", ""), case: :mixed),
+  crypt_cert: Base.decode16!(String.replace_prefix(current_card["crypt_cert"], "\\x", ""), case: :mixed),
+  name: new_name,
+  deleted_flag: Map.get(current_card, "deleted_flag", false),
+  owner_timestamp: new_timestamp
+}
+
+signature_data = :erlang.term_to_binary(signature_payload)
+sign_b64 = :crypto.sign(:mldsa87, :none, signature_data, sign_skey)
+
 payload = %{
   "mutations" => [
     %{
@@ -52,7 +90,9 @@ payload = %{
         "user_hash" => encode_hex.(user_hash)
       },
       "changes" => %{
-        "name" => new_name
+        "name" => new_name,
+        "owner_timestamp" => new_timestamp,
+        "sign_b64" => encode_hex.(sign_b64)
       },
       "syncMetadata" => %{
         "relation" => "user_cards"

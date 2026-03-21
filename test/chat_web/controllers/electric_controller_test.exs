@@ -3,6 +3,7 @@ defmodule ChatWeb.ElectricControllerTest do
   use ChatWeb.DataCase
 
   alias Chat.Challenge
+  alias Chat.Data.Integrity
   alias Chat.Data.User, as: UserData
 
   describe "sunny day scenarios" do
@@ -28,7 +29,7 @@ defmodule ChatWeb.ElectricControllerTest do
       assert insert_conn.status == 200
 
       # Update the name
-      update_payload = update_name_payload(card.user_hash, "Bob Updated")
+      update_payload = update_name_payload(card, identity.sign_skey, "Bob Updated")
       update_conn = post_ingest(conn, update_payload, identity.sign_skey)
 
       assert update_conn.status == 200, update_conn.resp_body
@@ -46,7 +47,7 @@ defmodule ChatWeb.ElectricControllerTest do
       assert insert_conn.status == 200
 
       # Delete the card
-      delete_payload = delete_card_payload(card.user_hash)
+      delete_payload = delete_card_payload(card, identity.sign_skey)
       delete_conn = post_ingest(conn, delete_payload, identity.sign_skey)
 
       assert delete_conn.status == 200, delete_conn.resp_body
@@ -132,10 +133,10 @@ defmodule ChatWeb.ElectricControllerTest do
 
       assert conn.status == 422
 
-      assert %{"error" => "validation_failed", "details" => %{"user_hash" => error_msgs}} =
+      assert %{"error" => "validation_failed", "details" => %{"sign_b64" => error_msgs}} =
                Jason.decode!(conn.resp_body)
 
-      assert "invalid_user_card_integrity" in error_msgs
+      assert Enum.any?(List.wrap(error_msgs), &String.contains?(&1, "invalid signature"))
     end
 
     test "POST /electric/v1/ingest with invalid crypt_cert returns 422", %{conn: conn} do
@@ -159,10 +160,10 @@ defmodule ChatWeb.ElectricControllerTest do
 
       assert conn.status == 422
 
-      assert %{"error" => "validation_failed", "details" => %{"user_hash" => error_msgs}} =
+      assert %{"error" => "validation_failed", "details" => %{"sign_b64" => error_msgs}} =
                Jason.decode!(conn.resp_body)
 
-      assert "invalid_user_card_integrity" in error_msgs
+      assert Enum.any?(List.wrap(error_msgs), &String.contains?(&1, "invalid signature"))
     end
 
     test "POST /electric/v1/ingest with invalid contact_cert returns 422", %{conn: conn} do
@@ -186,10 +187,10 @@ defmodule ChatWeb.ElectricControllerTest do
 
       assert conn.status == 422
 
-      assert %{"error" => "validation_failed", "details" => %{"user_hash" => error_msgs}} =
+      assert %{"error" => "validation_failed", "details" => %{"sign_b64" => error_msgs}} =
                Jason.decode!(conn.resp_body)
 
-      assert "invalid_user_card_integrity" in error_msgs
+      assert Enum.any?(List.wrap(error_msgs), &String.contains?(&1, "invalid signature"))
     end
 
     test "POST /electric/v1/ingest update with invalid PoP returns 400", %{conn: conn} do
@@ -203,7 +204,7 @@ defmodule ChatWeb.ElectricControllerTest do
 
       # Try to update with wrong signature (different user's key)
       other_identity = UserData.generate_pq_identity("Alice")
-      update_payload = update_name_payload(card.user_hash, "Hacked Name")
+      update_payload = update_name_payload(card, other_identity.sign_skey, "Hacked Name")
       update_conn = post_ingest(conn, update_payload, other_identity.sign_skey)
 
       assert update_conn.status == 400
@@ -220,7 +221,7 @@ defmodule ChatWeb.ElectricControllerTest do
       assert insert_conn.status == 200
 
       # Try to update without auth
-      update_payload = update_name_payload(card.user_hash, "Hacked Name")
+      update_payload = update_name_payload(card, identity.sign_skey, "Hacked Name")
 
       conn =
         conn
@@ -242,7 +243,7 @@ defmodule ChatWeb.ElectricControllerTest do
 
       # Try to delete with wrong signature (different user's key)
       other_identity = UserData.generate_pq_identity("Alice")
-      delete_payload = delete_card_payload(card.user_hash)
+      delete_payload = delete_card_payload(card, other_identity.sign_skey)
       delete_conn = post_ingest(conn, delete_payload, other_identity.sign_skey)
 
       assert delete_conn.status == 400
@@ -259,7 +260,7 @@ defmodule ChatWeb.ElectricControllerTest do
       assert insert_conn.status == 200
 
       # Try to delete without auth
-      delete_payload = delete_card_payload(card.user_hash)
+      delete_payload = delete_card_payload(card, identity.sign_skey)
 
       conn =
         conn
@@ -283,25 +284,42 @@ defmodule ChatWeb.ElectricControllerTest do
     }
   end
 
-  defp update_name_payload(user_hash, new_name) do
+  defp update_name_payload(card, sign_skey, new_name) do
+    updated = signed_user_card(card, sign_skey, %{name: new_name, owner_timestamp: card.owner_timestamp + 1})
+
     %{
       "mutations" => [
         %{
           "type" => "update",
-          "original" => %{"user_hash" => to_hex_escape(user_hash)},
-          "changes" => %{"name" => new_name},
+          "original" => %{"user_hash" => to_hex_escape(card.user_hash)},
+          "changes" => %{
+            "name" => updated.name,
+            "owner_timestamp" => updated.owner_timestamp,
+            "sign_b64" => to_base64(updated.sign_b64)
+          },
           "syncMetadata" => %{"relation" => "user_cards"}
         }
       ]
     }
   end
 
-  defp delete_card_payload(user_hash) do
+  defp delete_card_payload(card, sign_skey) do
+    updated =
+      signed_user_card(card, sign_skey, %{
+        deleted_flag: true,
+        owner_timestamp: card.owner_timestamp + 1
+      })
+
     %{
       "mutations" => [
         %{
           "type" => "delete",
-          "original" => %{"user_hash" => to_hex_escape(user_hash)},
+          "original" => %{"user_hash" => to_hex_escape(card.user_hash)},
+          "changes" => %{
+            "deleted_flag" => updated.deleted_flag,
+            "owner_timestamp" => updated.owner_timestamp,
+            "sign_b64" => to_base64(updated.sign_b64)
+          },
           "syncMetadata" => %{"relation" => "user_cards"}
         }
       ]
@@ -316,8 +334,22 @@ defmodule ChatWeb.ElectricControllerTest do
       "contact_cert" => to_base64(card.contact_cert),
       "crypt_pkey" => to_base64(card.crypt_pkey),
       "crypt_cert" => to_base64(card.crypt_cert),
-      "name" => card.name
+      "name" => card.name,
+      "deleted_flag" => card.deleted_flag,
+      "owner_timestamp" => card.owner_timestamp,
+      "sign_b64" => to_base64(card.sign_b64)
     }
+  end
+
+  defp signed_user_card(card, sign_skey, attrs) do
+    updated_card = struct(card, attrs)
+
+    sign_b64 =
+      updated_card
+      |> Integrity.signature_payload()
+      |> EnigmaPq.sign(sign_skey)
+
+    %{updated_card | sign_b64: sign_b64}
   end
 
   defp to_hex_escape(bin), do: "\\x" <> Base.encode16(bin, case: :lower)

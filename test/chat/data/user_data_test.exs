@@ -1,10 +1,22 @@
 defmodule Chat.Data.UserDataTest do
   use ChatWeb.DataCase
+  alias Chat.Data.Integrity
   alias Chat.Data.Schemas.{UserCard, UserStorage}
+  alias Chat.Data.User.Validation
   alias Chat.Repo
   alias EnigmaPq
   alias Chat.Data.Types.Consts
   alias Chat.Data.User
+
+  defp signed_user_card(identity, attrs \\ %{}) do
+    card =
+      identity
+      |> User.extract_pq_card()
+      |> struct(Map.merge(%{deleted_flag: false, owner_timestamp: 1}, attrs))
+
+    sign_b64 = Integrity.signature_payload(card) |> EnigmaPq.sign(identity.sign_skey)
+    %{card | sign_b64: sign_b64}
+  end
 
   describe "UserCard" do
     test "creates user card with valid hash" do
@@ -12,7 +24,7 @@ defmodule Chat.Data.UserDataTest do
       identity = User.generate_pq_identity("Alice")
 
       # Extract card via User context
-      card_struct = User.extract_pq_card(identity)
+      card_struct = signed_user_card(identity)
 
       # Verify calculated fields
       expected_hash = Consts.user_hash_prefix() <> EnigmaPq.hash(identity.sign_pkey)
@@ -24,14 +36,58 @@ defmodule Chat.Data.UserDataTest do
       # though we already have the struct, we might want to validate)
       # Usually we'd use the attrs from the struct or the struct itself if we trust it.
       # Let's convert to map for changeset to ensure validations pass.
-      attrs = Map.from_struct(card_struct)
+      changeset =
+        card_struct
+        |> Map.from_struct()
+        |> then(&UserCard.create_changeset(%UserCard{}, &1))
 
-      changeset = UserCard.create_changeset(%UserCard{}, attrs)
       assert changeset.valid?
 
       {:ok, card} = Repo.insert(changeset)
       assert card.user_hash == expected_hash
       assert card.name == "Alice"
+    end
+
+    test "soft-delete then undelete stays valid through user_card_validate/3" do
+      identity = User.generate_pq_identity("SoftDelete")
+      existing = signed_user_card(identity)
+
+      softdelete =
+        existing
+        |> struct(%{
+          deleted_flag: true,
+          owner_timestamp: existing.owner_timestamp + 1
+        })
+
+      softdelete =
+        %{softdelete | sign_b64: Integrity.signature_payload(softdelete) |> EnigmaPq.sign(identity.sign_skey)}
+
+      softdelete_changeset =
+        Validation.validate_user_card_delete(existing, softdelete)
+
+      assert softdelete_changeset.valid?, inspect(softdelete_changeset.errors)
+      {:ok, softdeleted_card} = Ecto.Changeset.apply_action(softdelete_changeset, :validate)
+      assert softdeleted_card.deleted_flag == true
+
+      undelete =
+        softdeleted_card
+        |> struct(%{
+          deleted_flag: false,
+          owner_timestamp: softdeleted_card.owner_timestamp + 1
+        })
+
+      undelete_sign_b64 =
+        undelete
+        |> Integrity.signature_payload()
+        |> EnigmaPq.sign(identity.sign_skey)
+
+      undelete_changeset =
+        Validation.validate_user_card_delete(softdeleted_card, %{undelete | sign_b64: undelete_sign_b64})
+
+      assert undelete_changeset.valid?, inspect(undelete_changeset.errors)
+      {:ok, undeleted_card} = Ecto.Changeset.apply_action(undelete_changeset, :validate)
+      refute undeleted_card.deleted_flag
+      assert undeleted_card.owner_timestamp == softdeleted_card.owner_timestamp + 1
     end
 
     test "verifies valid card" do
@@ -108,7 +164,7 @@ defmodule Chat.Data.UserDataTest do
     test "creates storage for existing user" do
       # Setup User via Context
       identity = User.generate_pq_identity("Charlie")
-      card_struct = User.extract_pq_card(identity)
+      card_struct = signed_user_card(identity)
 
       Repo.insert!(card_struct)
 

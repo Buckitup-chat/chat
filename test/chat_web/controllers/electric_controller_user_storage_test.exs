@@ -428,7 +428,10 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
       "contact_cert" => to_base64(card.contact_cert),
       "crypt_pkey" => to_base64(card.crypt_pkey),
       "crypt_cert" => to_base64(card.crypt_cert),
-      "name" => card.name
+      "name" => card.name,
+      "deleted_flag" => card.deleted_flag,
+      "owner_timestamp" => card.owner_timestamp,
+      "sign_b64" => to_base64(card.sign_b64)
     }
   end
 

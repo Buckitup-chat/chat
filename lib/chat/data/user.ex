@@ -5,6 +5,7 @@ defmodule Chat.Data.User do
 
   import Chat.Db, only: [repo: 0]
 
+  alias Chat.Data.Integrity
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Types.Consts
   alias Enigma
@@ -46,15 +47,24 @@ defmodule Chat.Data.User do
     crypt_cert = EnigmaPq.sign(crypt_pkey, sign_skey)
     contact_cert = EnigmaPq.sign(contact_pkey, sign_skey)
 
-    %UserCard{
+    card = %UserCard{
       user_hash: user_hash,
       sign_pkey: sign_pkey,
       contact_pkey: contact_pkey,
       contact_cert: contact_cert,
       crypt_pkey: crypt_pkey,
       crypt_cert: crypt_cert,
-      name: name
+      name: name,
+      deleted_flag: false,
+      owner_timestamp: System.system_time(:second)
     }
+
+    sign_b64 =
+      card
+      |> Integrity.signature_payload()
+      |> EnigmaPq.sign(sign_skey)
+
+    %{card | sign_b64: sign_b64}
   end
 
   @doc """

@@ -117,6 +117,62 @@ defmodule Chat.Data.UserDataTest do
       refute User.valid_card?(bad_card)
     end
 
+    test "rejects card with tampered crypt_cert" do
+      identity = User.generate_pq_identity("TamperedCryptCert")
+      card = User.extract_pq_card(identity)
+
+      # Tamper with crypt_cert directly
+      tampered_cert = :crypto.strong_rand_bytes(byte_size(card.crypt_cert))
+      bad_card = %{card | crypt_cert: tampered_cert}
+
+      refute User.valid_card?(bad_card)
+    end
+
+    test "rejects card with tampered contact_cert" do
+      identity = User.generate_pq_identity("TamperedContactCert")
+      card = User.extract_pq_card(identity)
+
+      # Tamper with contact_cert directly
+      tampered_cert = :crypto.strong_rand_bytes(byte_size(card.contact_cert))
+      bad_card = %{card | contact_cert: tampered_cert}
+
+      refute User.valid_card?(bad_card)
+    end
+
+    test "rejects card with swapped crypt_cert and contact_cert" do
+      identity = User.generate_pq_identity("SwappedCerts")
+      card = User.extract_pq_card(identity)
+
+      # Swap the certificates (both are valid signatures but for wrong keys)
+      bad_card = %{card | crypt_cert: card.contact_cert, contact_cert: card.crypt_cert}
+
+      refute User.valid_card?(bad_card)
+    end
+
+    test "rejects card with crypt_cert signed by wrong key" do
+      identity = User.generate_pq_identity("WrongSignerCrypt")
+      card = User.extract_pq_card(identity)
+
+      # Generate a different signing key and sign crypt_pkey with it
+      {_other_sign_pkey, other_sign_skey} = :crypto.generate_key(:mldsa87, [])
+      wrong_crypt_cert = EnigmaPq.sign(card.crypt_pkey, other_sign_skey)
+      bad_card = %{card | crypt_cert: wrong_crypt_cert}
+
+      refute User.valid_card?(bad_card)
+    end
+
+    test "rejects card with contact_cert signed by wrong key" do
+      identity = User.generate_pq_identity("WrongSignerContact")
+      card = User.extract_pq_card(identity)
+
+      # Generate a different signing key and sign contact_pkey with it
+      {_other_sign_pkey, other_sign_skey} = :crypto.generate_key(:mldsa87, [])
+      wrong_contact_cert = EnigmaPq.sign(card.contact_pkey, other_sign_skey)
+      bad_card = %{card | contact_cert: wrong_contact_cert}
+
+      refute User.valid_card?(bad_card)
+    end
+
     test "rejects card with invalid prefix in hash" do
       identity = User.generate_pq_identity("BadPrefix")
       card = User.extract_pq_card(identity)

@@ -58,7 +58,7 @@ payload = %{
         "uuid" => uuid
       },
       "changes" => %{
-        "value" => encode_hex.(new_value_bin)
+        "value_b64" => encode_hex.(new_value_bin)
       },
       "syncMetadata" => %{
         "relation" => "user_storage"

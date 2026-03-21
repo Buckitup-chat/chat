@@ -151,3 +151,10 @@ It would be something like this simplified:
   end)
   |> Enum.join("")
 ```
+
+
+
+### Protocols or behaviors? 
+
+- integrity + conflict resolution
+- versioning

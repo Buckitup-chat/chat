@@ -9,24 +9,56 @@ defmodule Chat.Data.Schemas.UserStorage do
     field(:user_hash, Chat.Data.Types.UserHash, primary_key: true)
     field(:uuid, Ecto.UUID, primary_key: true)
     field(:value_b64, :binary)
+    field(:deleted_flag, :boolean)
+    field(:parent_sign_hash, :binary)
+    field(:owner_timestamp, :integer)
+    field(:sign_b64, :binary)
+    field(:sign_hash, :binary)
   end
 
   def create_changeset(storage, attrs) do
     storage
-    |> cast(attrs, [:user_hash, :uuid, :value_b64])
-    |> validate_required([:user_hash, :uuid, :value_b64])
+    |> cast(attrs, [
+      :user_hash,
+      :uuid,
+      :value_b64,
+      :deleted_flag,
+      :parent_sign_hash,
+      :owner_timestamp,
+      :sign_b64,
+      :sign_hash
+    ])
+    |> validate_required([
+      :user_hash,
+      :uuid,
+      :value_b64,
+      :deleted_flag,
+      :owner_timestamp,
+      :sign_b64,
+      :sign_hash
+    ])
     |> validate_value_size()
     |> unique_constraint([:user_hash, :uuid], name: :user_storage_pkey)
   end
 
   def update_changeset(storage, attrs) do
     storage
-    |> cast(attrs, [:value_b64])
-    |> validate_required([:value_b64])
+    |> cast(attrs, [
+      :value_b64,
+      :deleted_flag,
+      :parent_sign_hash,
+      :owner_timestamp,
+      :sign_b64,
+      :sign_hash
+    ])
+    |> validate_required([
+      :owner_timestamp,
+      :sign_b64,
+      :sign_hash
+    ])
     |> validate_value_size()
   end
 
-  def delete_changeset(storage, _attrs), do: storage
 
   defp validate_value_size(changeset) do
     case get_field(changeset, :value_b64) do
@@ -39,5 +71,25 @@ defmodule Chat.Data.Schemas.UserStorage do
       _ ->
         add_error(changeset, :value_b64, "exceeds 10 MB limit")
     end
+  end
+
+  defimpl Chat.Data.User.Validation.TimestampedData, for: __MODULE__ do
+    def existing_timestamp(%{owner_timestamp: timestamp}), do: timestamp
+  end
+
+  defimpl Chat.Data.Integrity.Signable, for: __MODULE__ do
+    alias Chat.Data.User
+
+    def signable_fields(storage) do
+      storage
+      |> Map.from_struct()
+      |> Map.drop([:sign_b64, :__meta__])
+    end
+
+    def signing_key(storage) do
+      User.get_card(storage.user_hash).sign_pkey
+    end
+
+    def signature(storage), do: storage.sign_b64
   end
 end

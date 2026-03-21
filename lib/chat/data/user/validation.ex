@@ -144,10 +144,49 @@ defmodule Chat.Data.User.Validation do
 
   def user_storage_validate(storage, changes, op) do
     case op do
-      :insert -> storage |> UserStorage.create_changeset(changes)
-      :update -> storage |> UserStorage.update_changeset(changes)
-      :delete -> storage
+      :insert ->
+        storage
+        |> UserStorage.create_changeset(changes)
+        |> validate_signature()
+
+      :update ->
+        storage
+        |> UserStorage.update_changeset(changes)
+        |> validate_signature()
     end
+  end
+
+  @doc """
+  Validates and builds changeset for user_storage insert from Electric sync.
+  Returns changeset with signature verification.
+  """
+  def validate_user_storage_insert(storage_struct) do
+    %UserStorage{}
+    |> UserStorage.create_changeset(Map.from_struct(storage_struct))
+    |> validate_signature()
+  end
+
+  @doc """
+  Validates and builds changeset for user_storage update from Electric sync.
+  Returns changeset with signature verification.
+  """
+  def validate_user_storage_update(existing, storage_struct) do
+    attrs =
+      storage_struct
+      |> Map.from_struct()
+      |> Map.take([
+        :value_b64,
+        :deleted_flag,
+        :parent_sign_hash,
+        :owner_timestamp,
+        :sign_b64,
+        :sign_hash
+      ])
+      |> Map.reject(fn {_k, v} -> is_nil(v) end)
+
+    existing
+    |> UserStorage.update_changeset(attrs)
+    |> validate_signature()
   end
 
   defp operation_change(%Operation{changes: changes}, field) do

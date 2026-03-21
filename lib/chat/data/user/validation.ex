@@ -29,11 +29,6 @@ defmodule Chat.Data.User.Validation do
           data["user_hash"]
           |> UserData.get_card()
           |> then(fn card -> card.sign_pkey end)
-
-        %Operation{operation: :delete, data: data} ->
-          data["user_hash"]
-          |> UserData.get_card()
-          |> then(fn card -> card.sign_pkey end)
       end
 
     true = EnigmaPq.verify(challenge, signature, sign_pkey)
@@ -64,12 +59,6 @@ defmodule Chat.Data.User.Validation do
             |> validate_signature()
             |> validate_timestamp_newer_than_existing()
         end
-
-      :delete ->
-        card
-        |> UserCard.update_deleted_flag_changeset(changes)
-        |> validate_signature()
-        |> validate_timestamp_newer_than_existing()
     end
   end
 

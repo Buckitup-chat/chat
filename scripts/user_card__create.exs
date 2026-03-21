@@ -6,6 +6,7 @@ base = System.get_env("BASE_URL") || "http://127.0.0.1:4444"
 name = System.get_env("NAME") || "John Doe"
 
 encode_hex = fn bin -> "\\x" <> Base.encode16(bin, case: :lower) end
+encode_b64 = fn bin -> Base.encode64(bin, padding: false) end
 
 pub_key_bin = :crypto.strong_rand_bytes(32)
 pub_key_hex = Base.encode16(pub_key_bin, case: :lower)
@@ -24,20 +25,44 @@ contact_cert = :crypto.sign(:mldsa87, :none, contact_pkey, sign_skey)
 owner_timestamp = 0
 deleted_flag = false
 
-signature_payload = %{
-  user_hash: user_hash,
-  sign_pkey: sign_pkey,
-  contact_pkey: contact_pkey,
-  contact_cert: contact_cert,
-  crypt_pkey: crypt_pkey,
-  crypt_cert: crypt_cert,
-  name: name,
-  deleted_flag: deleted_flag,
-  owner_timestamp: owner_timestamp
+# Build signature payload according to the algorithm:
+# 1. All fields except sign_b64
+# 2. Sort alphabetically by field name
+# 3. Encode each field by type
+# 4. Concatenate into single string
+signature_fields = %{
+  "contact_cert" => contact_cert,
+  "contact_pkey" => contact_pkey,
+  "crypt_cert" => crypt_cert,
+  "crypt_pkey" => crypt_pkey,
+  "deleted_flag" => deleted_flag,
+  "name" => name,
+  "owner_timestamp" => owner_timestamp,
+  "sign_pkey" => sign_pkey,
+  "user_hash" => user_hash
 }
 
-# Sign the payload (excluding sign_b64 itself)
-signature_data = :erlang.term_to_binary(signature_payload)
+encode_field = fn {key, value} ->
+  cond do
+    String.ends_with?(key, "_b64") -> Base.encode64(value)
+    String.ends_with?(key, "_cert") -> Base.encode64(value)
+    String.ends_with?(key, "_pkey") -> Base.encode64(value)
+    String.ends_with?(key, "_hash") -> Base.encode16(value, case: :lower)
+    value == true -> "true"
+    value == false -> "false"
+    is_nil(value) -> "null"
+    is_integer(value) -> Integer.to_string(value)
+    is_binary(value) -> value
+    true -> to_string(value)
+  end
+end
+
+signature_data =
+  signature_fields
+  |> Enum.sort_by(fn {key, _value} -> key end)
+  |> Enum.map(encode_field)
+  |> Enum.join("")
+
 sign_b64 = :crypto.sign(:mldsa87, :none, signature_data, sign_skey)
 
 payload = %{
@@ -46,15 +71,15 @@ payload = %{
       "type" => "insert",
       "modified" => %{
         "user_hash" => encode_hex.(user_hash),
-        "sign_pkey" => encode_hex.(sign_pkey),
-        "contact_pkey" => encode_hex.(contact_pkey),
-        "contact_cert" => encode_hex.(contact_cert),
-        "crypt_pkey" => encode_hex.(crypt_pkey),
-        "crypt_cert" => encode_hex.(crypt_cert),
+        "sign_pkey" => encode_b64.(sign_pkey),
+        "contact_pkey" => encode_b64.(contact_pkey),
+        "contact_cert" => encode_b64.(contact_cert),
+        "crypt_pkey" => encode_b64.(crypt_pkey),
+        "crypt_cert" => encode_b64.(crypt_cert),
         "name" => name,
         "deleted_flag" => deleted_flag,
         "owner_timestamp" => owner_timestamp,
-        "sign_b64" => encode_hex.(sign_b64)
+        "sign_b64" => encode_b64.(sign_b64)
       },
       "syncMetadata" => %{
         "relation" => "user_cards"

@@ -33,7 +33,7 @@ defmodule ChatWeb.ElectricController do
   defp config_writer(writer, user_pop_context) do
     writer
     |> Writer.allow(UserCard,
-      accept: [:insert, :update, :delete],
+      accept: [:insert, :update],
       check: &UserValidation.user_card_allowed(&1, user_pop_context),
       validate: &UserValidation.user_card_validate/3
     )

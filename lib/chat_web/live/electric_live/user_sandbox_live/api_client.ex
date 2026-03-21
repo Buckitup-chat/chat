@@ -23,13 +23,11 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
     with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
          {:ok, _ingest_resp, ingest_log} <-
            ingest_user_card(challenge_resp, card, identity.sign_skey, base_url) do
-      user_data = %{
-        name: card.name,
-        user_hash: card.user_hash,
-        user_hash_hex: Base.encode16(card.user_hash, case: :lower),
-        sign_skey: identity.sign_skey,
-        sign_pkey: card.sign_pkey
-      }
+      user_data =
+        card
+        |> Map.from_struct()
+        |> Map.put(:user_hash_hex, Base.encode16(card.user_hash, case: :lower))
+        |> Map.put(:sign_skey, identity.sign_skey)
 
       {:ok, %{user: user_data, log_entries: [challenge_log, ingest_log]}}
     else
@@ -41,22 +39,37 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   @doc """
   Updates a user's name via the Electric API.
 
+  `existing_card` must be the full UserCard struct with all fields.
+
   Returns:
   - `{:ok, %{txid: txid, log_entries: [log_entry1, log_entry2]}}`
   - `{:error, %{reason: reason, log_entries: [log_entry, ...]}}`
   """
-  def update_user_name(user_hash, sign_skey, new_name, base_url) do
+  def update_user_name(existing_card, sign_skey, new_name, base_url) do
     challenge_url = base_url <> "/electric/v1/challenge"
+
+    new_timestamp = existing_card.owner_timestamp + 1
+
+    updated_card_struct =
+      struct(Chat.Data.Schemas.UserCard, Map.put(existing_card, :name, new_name))
+      |> Map.put(:owner_timestamp, new_timestamp)
+
+    sign_b64 =
+      updated_card_struct
+      |> Chat.Data.Integrity.signature_payload()
+      |> then(&:crypto.sign(:mldsa87, :none, &1, sign_skey))
 
     payload = %{
       "mutations" => [
         %{
           "type" => "update",
           "original" => %{
-            "user_hash" => encode_hex(user_hash)
+            "user_hash" => encode_hex(existing_card.user_hash)
           },
           "changes" => %{
-            "name" => new_name
+            "name" => new_name,
+            "owner_timestamp" => new_timestamp,
+            "sign_b64" => encode_base64(sign_b64)
           },
           "syncMetadata" => %{
             "relation" => "user_cards"
@@ -76,7 +89,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   end
 
   @doc """
-  Deletes a user via the Electric API.
+  Soft-deletes a user via the Electric API by setting deleted_flag=true.
 
   Returns:
   - `{:ok, %{log_entries: [log_entry1, log_entry2]}}`
@@ -85,12 +98,43 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   def delete_user(user_hash, sign_skey, base_url) do
     challenge_url = base_url <> "/electric/v1/challenge"
 
+    # Fetch current user card to get current timestamp
+    repo = Chat.Db.repo()
+    existing_card = repo.get(Chat.Data.Schemas.UserCard, user_hash)
+
+    if is_nil(existing_card) do
+      {:error, %{reason: "User not found", log_entries: []}}
+    else
+      delete_user_with_card(existing_card, user_hash, sign_skey, base_url, challenge_url)
+    end
+  end
+
+  defp delete_user_with_card(existing_card, user_hash, sign_skey, base_url, challenge_url) do
+
+    new_timestamp = existing_card.owner_timestamp + 1
+
+    # Create updated card with deleted_flag=true for signing
+    updated_card_struct =
+      existing_card
+      |> Map.put(:deleted_flag, true)
+      |> Map.put(:owner_timestamp, new_timestamp)
+
+    sign_b64 =
+      updated_card_struct
+      |> Chat.Data.Integrity.signature_payload()
+      |> then(&:crypto.sign(:mldsa87, :none, &1, sign_skey))
+
     payload = %{
       "mutations" => [
         %{
-          "type" => "delete",
+          "type" => "update",
           "original" => %{
             "user_hash" => encode_hex(user_hash)
+          },
+          "changes" => %{
+            "deleted_flag" => true,
+            "owner_timestamp" => new_timestamp,
+            "sign_b64" => encode_base64(sign_b64)
           },
           "syncMetadata" => %{
             "relation" => "user_cards"
@@ -285,12 +329,15 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
           "type" => "insert",
           "modified" => %{
             "user_hash" => encode_hex(card.user_hash),
-            "sign_pkey" => encode_hex(card.sign_pkey),
-            "contact_pkey" => encode_hex(card.contact_pkey),
-            "contact_cert" => encode_hex(card.contact_cert),
-            "crypt_pkey" => encode_hex(card.crypt_pkey),
-            "crypt_cert" => encode_hex(card.crypt_cert),
-            "name" => card.name
+            "sign_pkey" => encode_base64(card.sign_pkey),
+            "contact_pkey" => encode_base64(card.contact_pkey),
+            "contact_cert" => encode_base64(card.contact_cert),
+            "crypt_pkey" => encode_base64(card.crypt_pkey),
+            "crypt_cert" => encode_base64(card.crypt_cert),
+            "name" => card.name,
+            "deleted_flag" => card.deleted_flag,
+            "owner_timestamp" => card.owner_timestamp,
+            "sign_b64" => encode_base64(card.sign_b64)
           },
           "syncMetadata" => %{
             "relation" => "user_cards"

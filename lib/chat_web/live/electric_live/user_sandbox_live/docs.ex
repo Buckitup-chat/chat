@@ -16,20 +16,26 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Docs do
           },
           %{name: "name", type: "text", description: "User display name"},
           %{name: "sign_pkey", type: "bytea", description: "ML-DSA-87 public signing key"},
-          %{name: "contact_pkey", type: "bytea", description: "ML-KEM-1024 public contact key"},
-          %{name: "contact_cert", type: "bytea", description: "Contact certificate"},
+          %{name: "contact_pkey", type: "bytea", description: "ECC secp256k1 public contact key"},
+          %{name: "contact_cert", type: "bytea", description: "Contact certificate (sign_pkey signature of contact_pkey)"},
           %{name: "crypt_pkey", type: "bytea", description: "ML-KEM-1024 public encryption key"},
-          %{name: "crypt_cert", type: "bytea", description: "Encryption certificate"}
+          %{name: "crypt_cert", type: "bytea", description: "Encryption certificate (sign_pkey signature of crypt_pkey)"},
+          %{name: "deleted_flag", type: "boolean", description: "Soft delete flag for conflict resolution"},
+          %{name: "owner_timestamp", type: "bigint", description: "Owner's timestamp for conflict resolution (latest wins)"},
+          %{name: "sign_b64", type: "bytea", description: "Signature of all other fields for data integrity verification"}
         ],
         example: """
         {
           "user_hash": "\\\\x013a4f2b1c...",
           "name": "Alice",
-          "sign_pkey": "\\\\x9f2a1b...",
-          "contact_pkey": "\\\\x8c3d4e...",
-          "contact_cert": "\\\\x7b2c3a...",
-          "crypt_pkey": "\\\\x4e5f6a...",
-          "crypt_cert": "\\\\x9d8e7f..."
+          "sign_pkey": "n5Khu7...",
+          "contact_pkey": "jD1O5a...",
+          "contact_cert": "eyxDqm...",
+          "crypt_pkey": "Tl9mpQ...",
+          "crypt_cert": "nY5/8w...",
+          "deleted_flag": false,
+          "owner_timestamp": 1710000000000,
+          "sign_b64": "GisxPT..."
         }
         """
       },

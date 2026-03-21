@@ -37,7 +37,7 @@ defmodule ChatWeb.ElectricControllerTest do
       assert is_integer(txid)
     end
 
-    test "POST /electric/v1/ingest with valid delete mutation returns txid", %{conn: conn} do
+    test "POST /electric/v1/ingest with valid delete mutation soft-deletes card", %{conn: conn} do
       identity = UserData.generate_pq_identity("Bob")
       card = UserData.extract_pq_card(identity)
       insert_payload = user_card_payload(user_card_modified(card))
@@ -46,13 +46,18 @@ defmodule ChatWeb.ElectricControllerTest do
       insert_conn = post_ingest(conn, insert_payload, identity.sign_skey)
       assert insert_conn.status == 200
 
-      # Delete the card
+      # Soft-delete the card (sets deleted_flag=true)
       delete_payload = delete_card_payload(card, identity.sign_skey)
       delete_conn = post_ingest(conn, delete_payload, identity.sign_skey)
 
       assert delete_conn.status == 200, delete_conn.resp_body
       assert %{"txid" => txid} = Jason.decode!(delete_conn.resp_body)
       assert is_integer(txid)
+
+      # Verify card still exists but with deleted_flag=true
+      deleted_card = Repo.get(UserCard, card.user_hash)
+      assert deleted_card != nil
+      assert deleted_card.deleted_flag == true
     end
   end
 
@@ -313,7 +318,7 @@ defmodule ChatWeb.ElectricControllerTest do
     %{
       "mutations" => [
         %{
-          "type" => "delete",
+          "type" => "update",
           "original" => %{"user_hash" => to_hex_escape(card.user_hash)},
           "changes" => %{
             "deleted_flag" => updated.deleted_flag,

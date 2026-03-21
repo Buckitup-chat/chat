@@ -162,15 +162,33 @@ defmodule ChatWeb.ElectricLive.UserStorageLive.Index do
                       </div>
                       <div class="flex-1 min-w-0">
                         <div>
-                          <p class="text-sm font-medium text-gray-900 font-mono">
-                            UUID: {storage.uuid}
-                          </p>
+                          <div class="flex items-center space-x-2">
+                            <p class="text-sm font-medium text-gray-900 font-mono">
+                              UUID: {storage.uuid}
+                            </p>
+                            <%= if storage.deleted_flag do %>
+                              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                Deleted
+                              </span>
+                            <% end %>
+                          </div>
                           <p class="mt-1 text-xs text-gray-500 font-mono truncate">
                             User Hash: {Base.encode16(storage.user_hash, case: :lower)
                             |> String.slice(0..31)}...
                           </p>
-                          <p class="mt-1 text-xs text-gray-600">
-                            Value Size: {format_bytes(byte_size(storage.value_b64))}
+                          <div class="mt-1 flex items-center space-x-4 text-xs text-gray-600">
+                            <span>Value: {format_bytes(byte_size(storage.value_b64))}</span>
+                            <span>Timestamp: {format_timestamp(storage.owner_timestamp)}</span>
+                          </div>
+                          <%= if storage.parent_sign_hash do %>
+                            <p class="mt-1 text-xs text-purple-600 font-mono truncate">
+                              Parent: {Base.encode16(storage.parent_sign_hash, case: :lower)
+                              |> String.slice(0..15)}...
+                            </p>
+                          <% end %>
+                          <p class="mt-1 text-xs text-gray-400 font-mono truncate">
+                            Sign Hash: {Base.encode16(storage.sign_hash, case: :lower)
+                            |> String.slice(0..15)}...
                           </p>
                         </div>
                       </div>
@@ -199,4 +217,19 @@ defmodule ChatWeb.ElectricLive.UserStorageLive.Index do
     do: "#{Float.round(bytes / 1_048_576, 2)} MB"
 
   defp format_bytes(bytes), do: "#{Float.round(bytes / 1_073_741_824, 2)} GB"
+
+  # Format timestamp to relative time
+  defp format_timestamp(timestamp) when is_integer(timestamp) do
+    now = System.system_time(:second)
+    diff = now - timestamp
+
+    cond do
+      diff < 60 -> "#{diff}s ago"
+      diff < 3600 -> "#{div(diff, 60)}m ago"
+      diff < 86400 -> "#{div(diff, 3600)}h ago"
+      true -> "#{div(diff, 86400)}d ago"
+    end
+  end
+
+  defp format_timestamp(_), do: "unknown"
 end

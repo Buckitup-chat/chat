@@ -28,6 +28,10 @@ config :chat,
 config :chat, Chat.Db.ChangeTracker, expire_seconds: 3
 
 # Configure your database for testing
+config :phoenix_sync,
+  env: config_env(),
+  mode: :sandbox
+
 config :chat, Chat.Repo,
   username: "postgres",
   password: "postgres",

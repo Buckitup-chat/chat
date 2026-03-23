@@ -146,10 +146,7 @@ defmodule ChatWeb.Router do
     # Phoenix.Sync endpoint for LiveView real-time sync
     sync("/user_card", Chat.Data.Schemas.UserCard)
     sync("/user_storage", Chat.Data.Schemas.UserStorage)
-
-    sync("/user_storage/:user_hash", Chat.Data.Schemas.UserStorage,
-      where: "user_hash = :user_hash"
-    )
+    sync("/user_storage_version", Chat.Data.Schemas.UserStorageVersion)
 
     get "/challenge", ChallengeController, :create
     get "/system_identifier", SystemIdentifierController, :show

@@ -10,10 +10,16 @@ defmodule Chat.Data.Schemas.UserStorage do
     field(:uuid, Ecto.UUID, primary_key: true)
     field(:value_b64, :binary)
     field(:deleted_flag, :boolean)
-    field(:parent_sign_hash, :binary)
+    field(:parent_sign_hash, Chat.Data.Types.UserStorageSignHash)
     field(:owner_timestamp, :integer)
     field(:sign_b64, :binary)
-    field(:sign_hash, :binary)
+    field(:sign_hash, Chat.Data.Types.UserStorageSignHash)
+
+    belongs_to :parent_version, Chat.Data.Schemas.UserStorageVersion,
+      foreign_key: :parent_sign_hash,
+      references: :sign_hash,
+      type: Chat.Data.Types.UserStorageSignHash,
+      define_field: false
   end
 
   def create_changeset(storage, attrs) do

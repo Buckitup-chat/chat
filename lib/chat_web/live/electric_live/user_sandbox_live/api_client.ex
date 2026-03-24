@@ -179,7 +179,11 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
     storage_struct = struct(Chat.Data.Schemas.UserStorage, storage_attrs)
     sign_payload = Chat.Data.Integrity.signature_payload(storage_struct)
     sign_b64 = :crypto.sign(:mldsa87, :none, sign_payload, sign_skey)
-    sign_hash = EnigmaPq.hash(sign_b64)
+
+    sign_hash =
+      sign_b64
+      |> EnigmaPq.hash()
+      |> Chat.Data.Types.UserStorageSignHash.from_binary()
 
     payload = %{
       "mutations" => [
@@ -193,7 +197,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
             "parent_sign_hash" => nil,
             "owner_timestamp" => owner_timestamp,
             "sign_b64" => encode_base64(sign_b64),
-            "sign_hash" => encode_base64(sign_hash)
+            "sign_hash" => sign_hash
           },
           "syncMetadata" => %{
             "relation" => "user_storage"
@@ -247,7 +251,11 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
       storage_struct = struct(Chat.Data.Schemas.UserStorage, storage_attrs)
       sign_payload = Chat.Data.Integrity.signature_payload(storage_struct)
       sign_b64 = :crypto.sign(:mldsa87, :none, sign_payload, sign_skey)
-      sign_hash = EnigmaPq.hash(sign_b64)
+
+      sign_hash =
+        sign_b64
+        |> EnigmaPq.hash()
+        |> Chat.Data.Types.UserStorageSignHash.from_binary()
 
       payload = %{
         "mutations" => [
@@ -260,10 +268,10 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
             "changes" => %{
               "value_b64" => encode_base64(value_binary),
               "deleted_flag" => false,
-              "parent_sign_hash" => encode_base64(parent_sign_hash),
+              "parent_sign_hash" => parent_sign_hash,
               "owner_timestamp" => owner_timestamp,
               "sign_b64" => encode_base64(sign_b64),
-              "sign_hash" => encode_base64(sign_hash)
+              "sign_hash" => sign_hash
             },
             "syncMetadata" => %{
               "relation" => "user_storage"
@@ -316,7 +324,11 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
       storage_struct = struct(Chat.Data.Schemas.UserStorage, storage_attrs)
       sign_payload = Chat.Data.Integrity.signature_payload(storage_struct)
       sign_b64 = :crypto.sign(:mldsa87, :none, sign_payload, sign_skey)
-      sign_hash = EnigmaPq.hash(sign_b64)
+
+      sign_hash =
+        sign_b64
+        |> EnigmaPq.hash()
+        |> Chat.Data.Types.UserStorageSignHash.from_binary()
 
       payload = %{
         "mutations" => [
@@ -328,10 +340,10 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
             },
             "changes" => %{
               "deleted_flag" => true,
-              "parent_sign_hash" => encode_base64(parent_sign_hash),
+              "parent_sign_hash" => parent_sign_hash,
               "owner_timestamp" => owner_timestamp,
               "sign_b64" => encode_base64(sign_b64),
-              "sign_hash" => encode_base64(sign_hash)
+              "sign_hash" => sign_hash
             },
             "syncMetadata" => %{
               "relation" => "user_storage"

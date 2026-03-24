@@ -240,7 +240,12 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
   end
 
   defp calculate_sign_hash(%UserStorage{sign_b64: sign_b64} = storage) when is_binary(sign_b64) do
-    %{storage | sign_hash: EnigmaPq.hash(sign_b64)}
+    sign_hash =
+      sign_b64
+      |> EnigmaPq.hash()
+      |> Chat.Data.Types.UserStorageSignHash.from_binary()
+
+    %{storage | sign_hash: sign_hash}
   end
 
   defp calculate_sign_hash(storage), do: storage

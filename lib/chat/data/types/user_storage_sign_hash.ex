@@ -1,8 +1,8 @@
-defmodule Chat.Data.Types.UserHash do
+defmodule Chat.Data.Types.UserStorageSignHash do
   use Ecto.Type
   alias Chat.Data.Types.Consts
 
-  @prefix Consts.user_prefix()
+  @prefix Consts.user_storage_sign_prefix()
   @expected_hex_length 128
 
   @impl true

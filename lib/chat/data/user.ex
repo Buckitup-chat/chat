@@ -42,7 +42,7 @@ defmodule Chat.Data.User do
     user_hash =
       sign_pkey
       |> EnigmaPq.hash()
-      |> then(&(Consts.user_hash_prefix() <> &1))
+      |> Chat.Data.Types.UserHash.from_binary()
 
     crypt_cert = EnigmaPq.sign(crypt_pkey, sign_skey)
     contact_cert = EnigmaPq.sign(contact_pkey, sign_skey)
@@ -86,7 +86,11 @@ defmodule Chat.Data.User do
   end
 
   defp verify_card_data(hash, sign_pkey, card_data) do
-    expected_hash = Consts.user_hash_prefix() <> EnigmaPq.hash(sign_pkey)
+    expected_hash =
+      sign_pkey
+      |> EnigmaPq.hash()
+      |> Chat.Data.Types.UserHash.from_binary()
+
     hash_valid? = hash == expected_hash
 
     crypt_cert_valid? =

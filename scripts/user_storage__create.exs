@@ -3,14 +3,12 @@
 Mix.install([{:req, "~> 0.5.0"}, {:jason, "~> 1.4"}])
 
 base = System.get_env("BASE_URL") || "http://127.0.0.1:4444"
-user_hash_hex = System.get_env("USER_HASH")
+user_hash = System.get_env("USER_HASH")  # Now expects "u_" prefixed string
 sign_skey_hex = System.get_env("SIGN_SKEY")
 uuid = System.get_env("UUID") || Ecto.UUID.generate()
 value = System.get_env("VALUE") || "default_storage_value"
 
-encode_hex = fn bin -> "\\x" <> Base.encode16(bin, case: :lower) end
-
-unless user_hash_hex && sign_skey_hex do
+unless user_hash && sign_skey_hex do
   IO.puts(:stderr, """
   Error: Missing required environment variables
 
@@ -23,7 +21,7 @@ unless user_hash_hex && sign_skey_hex do
     USER_HASH=01abc... SIGN_SKEY=def... UUID=550e8400-e29b-41d4-a716-446655440000 VALUE="encrypted_data" #{__ENV__.file}
 
   Environment variables:
-    USER_HASH   - User hash from the user card (hex string without 0x prefix) [REQUIRED]
+    USER_HASH   - User hash from the user card (string with "u_" prefix) [REQUIRED]
     SIGN_SKEY   - Signing secret key (hex string without 0x prefix) [REQUIRED]
     UUID        - UUID for this storage entry (default: auto-generated)
     VALUE       - Binary value to store (default: "default_storage_value")
@@ -33,13 +31,12 @@ unless user_hash_hex && sign_skey_hex do
   System.halt(1)
 end
 
-# Decode the hex strings
-user_hash =
-  case Base.decode16(user_hash_hex, case: :mixed) do
-    {:ok, bin} -> bin
-    :error -> raise "Invalid USER_HASH hex string"
-  end
+# Validate user_hash format
+unless String.starts_with?(user_hash, "u_") && String.length(user_hash) == 130 do
+  raise "Invalid USER_HASH format. Expected 'u_' prefix followed by 128 hex characters."
+end
 
+# Decode sign_skey
 sign_skey =
   case Base.decode16(sign_skey_hex, case: :mixed) do
     {:ok, bin} -> bin
@@ -48,15 +45,57 @@ sign_skey =
 
 # Encode value as binary
 value_bin = :erlang.term_to_binary(value)
+value_b64 = Base.encode64(value_bin, padding: false)
+
+# Generate integrity fields
+owner_timestamp = System.system_time(:second)
+deleted_flag = false
+parent_sign_hash = nil
+
+# Build signature payload (simplified - in production use Chat.Data.Integrity.signature_payload)
+signature_fields = %{
+  "deleted_flag" => deleted_flag,
+  "owner_timestamp" => owner_timestamp,
+  "parent_sign_hash" => parent_sign_hash,
+  "user_hash" => user_hash,
+  "uuid" => uuid,
+  "value_b64" => value_b64
+}
+
+signature_data =
+  signature_fields
+  |> Enum.sort_by(fn {key, _value} -> key end)
+  |> Enum.map(fn {_key, value} ->
+    cond do
+      value == true -> "true"
+      value == false -> "false"
+      is_nil(value) -> "null"
+      is_integer(value) -> Integer.to_string(value)
+      is_binary(value) -> value
+      true -> to_string(value)
+    end
+  end)
+  |> Enum.join("")
+
+sign_b64 = :crypto.sign(:mldsa87, :none, signature_data, sign_skey)
+
+# Compute sign_hash as "uss_" + hex(SHA3-512(sign_b64))
+sign_hash_binary = :crypto.hash(:sha3_512, sign_b64)
+sign_hash = "uss_" <> Base.encode16(sign_hash_binary, case: :lower)
 
 payload = %{
   "mutations" => [
     %{
       "type" => "insert",
       "modified" => %{
-        "user_hash" => encode_hex.(user_hash),
+        "user_hash" => user_hash,
         "uuid" => uuid,
-        "value_b64" => encode_hex.(value_bin)
+        "value_b64" => value_b64,
+        "deleted_flag" => deleted_flag,
+        "parent_sign_hash" => parent_sign_hash,
+        "owner_timestamp" => owner_timestamp,
+        "sign_b64" => Base.encode64(sign_b64, padding: false),
+        "sign_hash" => sign_hash
       },
       "syncMetadata" => %{
         "relation" => "user_storage"
@@ -98,8 +137,9 @@ IO.puts("ingest_body=" <> inspect(resp.body))
 if resp.status == 200 do
   IO.puts("\n✓ Successfully created user_storage entry")
   IO.puts("\nStorage details:")
-  IO.puts("USER_HASH=" <> user_hash_hex)
+  IO.puts("USER_HASH=" <> user_hash)
   IO.puts("UUID=" <> uuid)
+  IO.puts("SIGN_HASH=" <> sign_hash)
   IO.puts("VALUE_SIZE=" <> to_string(byte_size(value_bin)) <> " bytes")
 else
   IO.puts(:stderr, "\n✗ Failed to create user_storage entry")

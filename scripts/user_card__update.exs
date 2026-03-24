@@ -4,12 +4,10 @@ Mix.install([{:req, "~> 0.5.0"}, {:jason, "~> 1.4"}])
 
 base = System.get_env("BASE_URL") || "http://127.0.0.1:4444"
 new_name = System.get_env("NEW_NAME") || "Updated Name"
-user_hash_hex = System.get_env("USER_HASH")
+user_hash = System.get_env("USER_HASH")  # Now expects "u_" prefixed string
 sign_skey_hex = System.get_env("SIGN_SKEY")
 
-encode_hex = fn bin -> "\\x" <> Base.encode16(bin, case: :lower) end
-
-unless user_hash_hex && sign_skey_hex do
+unless user_hash && sign_skey_hex do
   IO.puts(:stderr, """
   Error: Missing required environment variables
 
@@ -22,7 +20,7 @@ unless user_hash_hex && sign_skey_hex do
     USER_HASH=01abc... SIGN_SKEY=def... NEW_NAME="Alice Updated" #{__ENV__.file}
 
   Environment variables:
-    USER_HASH   - User hash from the user card (hex string without 0x prefix)
+    USER_HASH   - User hash from the user card (string with "u_" prefix, e.g., "u_abc...")
     SIGN_SKEY   - Signing secret key (hex string without 0x prefix)
     NEW_NAME    - New name for the user (default: "Updated Name")
     BASE_URL    - API base URL (default: http://127.0.0.1:4444)
@@ -31,13 +29,12 @@ unless user_hash_hex && sign_skey_hex do
   System.halt(1)
 end
 
-# Decode the hex strings
-user_hash =
-  case Base.decode16(user_hash_hex, case: :mixed) do
-    {:ok, bin} -> bin
-    :error -> raise "Invalid USER_HASH hex string"
-  end
+# Validate user_hash format
+unless String.starts_with?(user_hash, "u_") && String.length(user_hash) == 130 do
+  raise "Invalid USER_HASH format. Expected 'u_' prefix followed by 128 hex characters."
+end
 
+# Decode sign_skey
 sign_skey =
   case Base.decode16(sign_skey_hex, case: :mixed) do
     {:ok, bin} -> bin
@@ -47,7 +44,7 @@ sign_skey =
 # Get current user card to retrieve sign_pkey and current timestamp
 get_resp =
   Req.get!(
-    base <> "/electric/v1/shape/user_card?where=user_hash='#{encode_hex.(user_hash)}'",
+    base <> "/electric/v1/shape/user_card?where=user_hash='#{user_hash}'",
     headers: [{"accept", "application/json"}]
   )
 
@@ -87,12 +84,12 @@ payload = %{
     %{
       "type" => "update",
       "original" => %{
-        "user_hash" => encode_hex.(user_hash)
+        "user_hash" => user_hash
       },
       "changes" => %{
         "name" => new_name,
         "owner_timestamp" => new_timestamp,
-        "sign_b64" => encode_hex.(sign_b64)
+        "sign_b64" => Base.encode64(sign_b64, padding: false)
       },
       "syncMetadata" => %{
         "relation" => "user_cards"

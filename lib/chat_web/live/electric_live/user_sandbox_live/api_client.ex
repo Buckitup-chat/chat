@@ -26,7 +26,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
       user_data =
         card
         |> Map.from_struct()
-        |> Map.put(:user_hash_hex, Base.encode16(card.user_hash, case: :lower))
+        |> Map.put(:user_hash_hex, String.slice(card.user_hash, 2..-1//1))  # Remove "u_" prefix for display
         |> Map.put(:sign_skey, identity.sign_skey)
 
       {:ok, %{user: user_data, log_entries: [challenge_log, ingest_log]}}
@@ -64,7 +64,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
         %{
           "type" => "update",
           "original" => %{
-            "user_hash" => encode_hex(existing_card.user_hash)
+            "user_hash" => existing_card.user_hash
           },
           "changes" => %{
             "name" => new_name,
@@ -129,7 +129,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
         %{
           "type" => "update",
           "original" => %{
-            "user_hash" => encode_hex(user_hash)
+            "user_hash" => user_hash
           },
           "changes" => %{
             "deleted_flag" => true,
@@ -190,7 +190,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
         %{
           "type" => "insert",
           "modified" => %{
-            "user_hash" => encode_hex(user_hash),
+            "user_hash" => user_hash,
             "uuid" => uuid,
             "value_b64" => encode_base64(value_binary),
             "deleted_flag" => false,
@@ -262,7 +262,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
           %{
             "type" => "update",
             "original" => %{
-              "user_hash" => encode_hex(user_hash),
+              "user_hash" => user_hash,
               "uuid" => uuid
             },
             "changes" => %{
@@ -335,7 +335,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
           %{
             "type" => "update",
             "original" => %{
-              "user_hash" => encode_hex(user_hash),
+              "user_hash" => user_hash,
               "uuid" => uuid
             },
             "changes" => %{
@@ -425,7 +425,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
         %{
           "type" => "insert",
           "modified" => %{
-            "user_hash" => encode_hex(card.user_hash),
+            "user_hash" => card.user_hash,
             "sign_pkey" => encode_base64(card.sign_pkey),
             "contact_pkey" => encode_base64(card.contact_pkey),
             "contact_cert" => encode_base64(card.contact_cert),
@@ -515,10 +515,6 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
 
         {:error, "Ingest request failed: #{inspect(error)}", [log_entry]}
     end
-  end
-
-  defp encode_hex(bin) when is_binary(bin) do
-    "\\x" <> Base.encode16(bin, case: :lower)
   end
 
   defp encode_base64(bin) when is_binary(bin) do

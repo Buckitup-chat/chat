@@ -51,7 +51,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
         else
           %{valid?: false} = invalid_changeset ->
             log(
-              "Invalid user_card insert signature for #{Base.encode16(card.user_hash, case: :lower)}: #{inspect(invalid_changeset.errors)}",
+              "Invalid user_card insert signature for #{card.user_hash}: #{inspect(invalid_changeset.errors)}",
               :warning
             )
 
@@ -71,7 +71,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
             else
               %{valid?: false} = invalid_changeset ->
                 log(
-                  "Invalid user_card update signature for #{Base.encode16(card.user_hash, case: :lower)}: #{inspect(invalid_changeset.errors)}",
+                  "Invalid user_card update signature for #{card.user_hash}: #{inspect(invalid_changeset.errors)}",
                   :warning
                 )
 
@@ -92,7 +92,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
             else
               %{valid?: false} = invalid_changeset ->
                 log(
-                  "Invalid user_card delete signature for #{Base.encode16(card.user_hash, case: :lower)}: #{inspect(invalid_changeset.errors)}",
+                  "Invalid user_card delete signature for #{card.user_hash}: #{inspect(invalid_changeset.errors)}",
                   :warning
                 )
 
@@ -130,7 +130,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
     else
       nil ->
         log(
-          "Skipping user_storage insert - parent user_card not yet synced (user_hash: #{Base.encode16(storage.user_hash, case: :lower)})",
+          "Skipping user_storage insert - parent user_card not yet synced (user_hash: #{storage.user_hash})",
           :debug
         )
 
@@ -160,7 +160,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
     else
       {:parent, nil} ->
         log(
-          "Skipping user_storage update - parent user_card not found (user_hash: #{Base.encode16(storage.user_hash, case: :lower)})",
+          "Skipping user_storage update - parent user_card not found (user_hash: #{storage.user_hash})",
           :debug
         )
 

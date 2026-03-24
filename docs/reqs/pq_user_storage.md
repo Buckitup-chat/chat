@@ -77,7 +77,7 @@ User storage is exposed via Electric shapes with two supported patterns:
 **Endpoint**: `GET /electric/v1/user_storage/{user_hash}`
 
 **Query Parameters**:
-- `user_hash`: Base64-encoded user hash
+- `user_hash`: URL-friendly hex string with "u_" prefix (e.g., "u_a3f2b9c4d5e6f789...")
 
 **Router Configuration**:
 ```elixir
@@ -87,7 +87,7 @@ sync "/user_storage/:user_hash", Chat.Data.Schemas.UserStorage,
 
 **Client Request Example**:
 ```
-GET /electric/v1/user_storage/{user_hash}?user_hash=<base16_encoded_hash>
+GET /electric/v1/user_storage/{user_hash}?user_hash=u_a3f2b9c4d5e6f789...
 ```
 
 **Benefits**:
@@ -131,9 +131,14 @@ All write operations (create, update, delete) use the centralized ingest endpoin
       "table": "user_storage",
       "operation": "insert",
       "data": {
-        "user_hash": "<base16_encoded_hash>",
+        "user_hash": "u_a3f2b9c4d5e6f789...",
         "uuid": "<uuid>",
-        "value_b64": "<base64_encoded_encrypted_blob>"
+        "value_b64": "<base64_encoded_encrypted_blob>",
+        "sign_hash": "uss_9f86d081884c7d65...",
+        "parent_sign_hash": "uss_...",
+        "owner_timestamp": 1234567890,
+        "sign_b64": "<base64_signature>",
+        "deleted_flag": false
       }
     }
   ],
@@ -171,9 +176,14 @@ All write operations (create, update, delete) use the centralized ingest endpoin
 **Required Fields**:
 - `mutations[].table`: Must be "user_storage"
 - `mutations[].operation`: One of: insert, update, delete
-- `mutations[].data.user_hash`: Base16-encoded hash (hex string)
+- `mutations[].data.user_hash`: URL-friendly hex string with "u_" prefix (130 chars)
 - `mutations[].data.uuid`: Client-generated UUID
 - `mutations[].data.value_b64`: Base64-encoded encrypted blob (for insert/update)
+- `mutations[].data.sign_hash`: Signature hash with "uss_" prefix (132 chars)
+- `mutations[].data.parent_sign_hash`: Parent signature hash with "uss_" prefix or null
+- `mutations[].data.owner_timestamp`: Monotonic timestamp for conflict resolution
+- `mutations[].data.sign_b64`: ML-DSA-87 signature for integrity verification
+- `mutations[].data.deleted_flag`: Soft delete flag (boolean)
 - `auth.challenge_id`: Valid challenge identifier
 - `auth.signature`: Base64-encoded signature
 
@@ -187,9 +197,14 @@ All write operations (create, update, delete) use the centralized ingest endpoin
 **Primary Table**: `user_storage`
 
 **Key Fields**:
-- `user_hash`: Binary, part of composite primary key, identifies storage owner
+- `user_hash`: Text (130 chars), part of composite primary key, identifies storage owner (format: "u_" + 128 hex chars)
 - `uuid`: UUID, part of composite primary key, client-generated
 - `value_b64`: Base64-encoded text, encrypted blob, ≤10 MB (≤13.33 MB base64-encoded)
+- `sign_hash`: Text (132 chars), part of composite primary key for versions table (format: "uss_" + 128 hex chars)
+- `parent_sign_hash`: Text (132 chars), references parent version's sign_hash
+- `owner_timestamp`: Integer, monotonic counter for conflict resolution
+- `sign_b64`: Binary, ML-DSA-87 signature for integrity verification
+- `deleted_flag`: Boolean, soft delete marker
 
 **Indexes**:
 - Composite primary key on `(user_hash, uuid)`
@@ -222,12 +237,15 @@ Add `user_storage` table to Electric publication following the pattern from migr
 
 ### 7.3 Data Encoding
 
-**Binary Field Encoding**:
-- `user_hash`: Base16-encoded (hex string) for JSON transport
+**Field Encoding**:
+- `user_hash`: URL-friendly hex string with "u_" prefix (e.g., "u_a3f2b9c4d5e6f789...")
+- `sign_hash`: URL-friendly hex string with "uss_" prefix (e.g., "uss_9f86d081884c7d65...")
+- `parent_sign_hash`: URL-friendly hex string with "uss_" prefix or null
 - `value_b64`: Base64-encoded text (no padding) for JSON transport and storage
+- `sign_b64`: Base64-encoded ML-DSA-87 signature
 - Client MUST base64-encode binary data before sending
 - Server stores base64-encoded text without modification
-- Response shapes return data in base64 encoding
+- Response shapes return data in same encoding
 
 ### 7.4 Performance Considerations
 

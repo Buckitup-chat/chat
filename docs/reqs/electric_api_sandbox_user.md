@@ -40,10 +40,10 @@ The Electric ingest API supports operations on `user_card` and `user_storage` ta
 
 **REQ-5:** Documentation SHALL include:
 - `user_card` schema: user_hash, sign_pkey, contact_pkey, contact_cert, crypt_pkey, crypt_cert, name, deleted_flag, owner_timestamp, sign_b64
-- `user_storage` schema: user_hash, uuid, value_b64
-- Field type information (bytea, text, uuid, integer, boolean)
-- Encoding formats (base64 for binary fields, hex escape for user_hash)
-- Integrity fields: owner_timestamp (monotonic counter), sign_b64 (ML-DSA-87 signature), deleted_flag (soft delete marker)
+- `user_storage` schema: user_hash, uuid, value_b64, sign_hash, parent_sign_hash, owner_timestamp, sign_b64, deleted_flag
+- Field type information (text for hashes, bytea for keys/certs, uuid, integer, boolean)
+- Encoding formats (URL-friendly hex strings with prefixes for hashes: "u_" for user_hash, "uss_" for sign_hash; base64 for binary fields)
+- Integrity fields: owner_timestamp (monotonic counter), sign_b64 (ML-DSA-87 signature), sign_hash (signature hash), deleted_flag (soft delete marker)
 
 ### User Management (Main Content)
 
@@ -52,9 +52,9 @@ The Electric ingest API supports operations on `user_card` and `user_storage` ta
 
 **REQ-7:** User Creation SHALL:
 - Generate Post-Quantum keypairs (ML-DSA-87 signing, ML-KEM-1024 encryption/contact)
-- Compute user_hash as SHA3-512(sign_pkey) with 0x01 prefix
+- Compute user_hash as "u_" + hex(SHA3-512(sign_pkey))
 - Create user via Electric API challenge-response flow
-- Display user information (name, truncated hash)
+- Display user information (name, truncated hash showing first 12 hex chars after prefix)
 - Log all requests/responses
 
 **REQ-8:** User Loaded State SHALL provide:
@@ -142,10 +142,11 @@ The Electric ingest API supports operations on `user_card` and `user_storage` ta
 - Full response body
 - Exact timestamp of each request
 
-**REQ-21:** Binary data encoding SHALL:
-- Store random binary data internally
-- Display as base64 in UI
-- Encode as `\x<hex>` format in JSON payloads sent to API
+**REQ-21:** Hash and binary data encoding SHALL:
+- user_hash: URL-friendly hex string with "u_" prefix (130 chars total)
+- sign_hash: URL-friendly hex string with "uss_" prefix (132 chars total)
+- Binary fields (sign_pkey, crypt_pkey, etc.): Base64-encoded in JSON
+- Storage values: Store random binary data internally, display as base64 in UI, encode as base64 in JSON payloads
 - Match encoding used in reference scripts
 
 ### Error Handling

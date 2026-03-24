@@ -5,7 +5,6 @@ Mix.install([{:req, "~> 0.5.0"}, {:jason, "~> 1.4"}])
 base = System.get_env("BASE_URL") || "http://127.0.0.1:4444"
 name = System.get_env("NAME") || "John Doe"
 
-encode_hex = fn bin -> "\\x" <> Base.encode16(bin, case: :lower) end
 encode_b64 = fn bin -> Base.encode64(bin, padding: false) end
 
 pub_key_bin = :crypto.strong_rand_bytes(32)
@@ -16,7 +15,9 @@ pub_key = "\\x" <> pub_key_hex
 {crypt_pkey, _crypt_skey} = :crypto.generate_key(:mlkem1024, [])
 {contact_pkey, _contact_skey} = :crypto.generate_key(:mldsa44, [])
 
-user_hash = <<0x01>> <> :crypto.hash(:sha3_512, sign_pkey)
+# Compute user_hash as "u_" + hex(SHA3-512(sign_pkey))
+user_hash_binary = :crypto.hash(:sha3_512, sign_pkey)
+user_hash = "u_" <> Base.encode16(user_hash_binary, case: :lower)
 
 crypt_cert = :crypto.sign(:mldsa87, :none, crypt_pkey, sign_skey)
 contact_cert = :crypto.sign(:mldsa87, :none, contact_pkey, sign_skey)
@@ -47,7 +48,7 @@ encode_field = fn {key, value} ->
     String.ends_with?(key, "_b64") -> Base.encode64(value)
     String.ends_with?(key, "_cert") -> Base.encode64(value)
     String.ends_with?(key, "_pkey") -> Base.encode64(value)
-    String.ends_with?(key, "_hash") -> Base.encode16(value, case: :lower)
+    String.ends_with?(key, "_hash") -> value  # Already a string with prefix
     value == true -> "true"
     value == false -> "false"
     is_nil(value) -> "null"
@@ -70,7 +71,7 @@ payload = %{
     %{
       "type" => "insert",
       "modified" => %{
-        "user_hash" => encode_hex.(user_hash),
+        "user_hash" => user_hash,
         "sign_pkey" => encode_b64.(sign_pkey),
         "contact_pkey" => encode_b64.(contact_pkey),
         "contact_cert" => encode_b64.(contact_cert),
@@ -123,6 +124,6 @@ IO.puts("ingest_body=" <> inspect(resp.body))
 if resp.status == 200 do
   IO.puts("\n✓ Successfully created user card")
   IO.puts("\nTo update this user's name later, save these values:")
-  IO.puts("USER_HASH=" <> Base.encode16(user_hash, case: :lower))
+  IO.puts("USER_HASH=" <> user_hash)
   IO.puts("SIGN_SKEY=" <> Base.encode16(sign_skey, case: :lower))
 end

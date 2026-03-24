@@ -50,10 +50,10 @@ NetworkSynchronization.Supervisor
 
 Central registry of synced shapes and their Ecto schema modules.
 
-| Shape          | Schema Module                  | Table          | Primary Key         |
-| -------------- | ------------------------------ | -------------- | ------------------- |
-| `:user_card`   | `Chat.Data.Schemas.UserCard`   | `user_cards`   | `user_hash`         |
-| `:user_storage`| `Chat.Data.Schemas.UserStorage`| `user_storage` | `(user_hash, uuid)` |
+| Shape          | Schema Module                  | Table          | Primary Key         | Hash Format |
+| -------------- | ------------------------------ | -------------- | ------------------- | ----------- |
+| `:user_card`   | `Chat.Data.Schemas.UserCard`   | `user_cards`   | `user_hash`         | `"u_" + 128 hex chars` |
+| `:user_storage`| `Chat.Data.Schemas.UserStorage`| `user_storage` | `(user_hash, uuid)` | `user_hash: "u_" + 128 hex`, `sign_hash: "uss_" + 128 hex` |
 
 ### `Electric.PeerIdentifier`
 

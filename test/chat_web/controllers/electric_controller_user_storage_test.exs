@@ -265,7 +265,7 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
           %{
             "type" => "delete",
             "original" => %{
-              "user_hash" => to_hex_escape(alice_card.user_hash),
+              "user_hash" => alice_card.user_hash,
               "uuid" => alice_uuid
             },
             "syncMetadata" => %{"relation" => "user_storage"}
@@ -273,7 +273,7 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
           %{
             "type" => "delete",
             "original" => %{
-              "user_hash" => to_hex_escape(bob_card.user_hash),
+              "user_hash" => bob_card.user_hash,
               "uuid" => bob_uuid
             },
             "syncMetadata" => %{"relation" => "user_storage"}
@@ -361,13 +361,13 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
   end
 
   # Helper functions
-  defp user_storage_insert_payload(user_hash, uuid, value) do
+  defp insert_storage_payload(user_hash, uuid, value) do
     %{
       "mutations" => [
         %{
           "type" => "insert",
           "modified" => %{
-            "user_hash" => to_hex_escape(user_hash),
+            "user_hash" => user_hash,
             "uuid" => uuid,
             "value_b64" => Base.encode64(value, padding: false)
           },
@@ -377,13 +377,13 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
     }
   end
 
-  defp user_storage_update_payload(user_hash, uuid, new_value) do
+  defp update_storage_payload(user_hash, uuid, new_value) do
     %{
       "mutations" => [
         %{
           "type" => "update",
           "original" => %{
-            "user_hash" => to_hex_escape(user_hash),
+            "user_hash" => user_hash,
             "uuid" => uuid
           },
           "changes" => %{"value_b64" => Base.encode64(new_value, padding: false)},
@@ -393,13 +393,13 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
     }
   end
 
-  defp user_storage_delete_payload(user_hash, uuid) do
+  defp delete_storage_payload(user_hash, uuid) do
     %{
       "mutations" => [
         %{
           "type" => "delete",
           "original" => %{
-            "user_hash" => to_hex_escape(user_hash),
+            "user_hash" => user_hash,
             "uuid" => uuid
           },
           "syncMetadata" => %{"relation" => "user_storage"}
@@ -422,7 +422,7 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
 
   defp user_card_modified(card) do
     %{
-      "user_hash" => to_hex_escape(card.user_hash),
+      "user_hash" => card.user_hash,
       "sign_pkey" => to_base64(card.sign_pkey),
       "contact_pkey" => to_base64(card.contact_pkey),
       "contact_cert" => to_base64(card.contact_cert),

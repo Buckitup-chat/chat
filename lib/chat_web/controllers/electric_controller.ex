@@ -12,7 +12,7 @@ defmodule ChatWeb.ElectricController do
   alias Phoenix.Sync.Writer.Format
 
   def ingest(conn, params) do
-    hex_suffixes = ~w[_hash]
+    hex_suffixes = ~w[]
     base64_suffixes = ~w[_pkey _cert _b64]
 
     with {_, %{"mutations" => mutations}} <- {:correct_params, params},

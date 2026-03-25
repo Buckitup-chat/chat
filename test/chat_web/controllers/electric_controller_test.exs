@@ -4,7 +4,9 @@ defmodule ChatWeb.ElectricControllerTest do
 
   alias Chat.Challenge
   alias Chat.Data.Integrity
+  alias Chat.Data.Schemas.UserCard
   alias Chat.Data.User, as: UserData
+  alias Chat.Repo
 
   describe "sunny day scenarios" do
     test "POST /electric/v1/ingest with valid mutations returns txid", %{conn: conn} do
@@ -123,10 +125,8 @@ defmodule ChatWeb.ElectricControllerTest do
       identity = UserData.generate_pq_identity("Bob")
       card = UserData.extract_pq_card(identity)
 
-      # Tamper with user_hash: Keep prefix (0x01) and length (65), but change content
-      <<prefix, _rest::binary>> = card.user_hash
-      tampered_bin = <<prefix, :crypto.strong_rand_bytes(64)::binary>>
-      tampered_hash = to_hex_escape(tampered_bin)
+      # Tamper with user_hash: Keep u_ prefix and length (130 chars), but change content
+      tampered_hash = "u_" <> Base.encode16(:crypto.strong_rand_bytes(64), case: :lower)
 
       payload =
         card
@@ -296,7 +296,7 @@ defmodule ChatWeb.ElectricControllerTest do
       "mutations" => [
         %{
           "type" => "update",
-          "original" => %{"user_hash" => to_hex_escape(card.user_hash)},
+          "original" => %{"user_hash" => card.user_hash},
           "changes" => %{
             "name" => updated.name,
             "owner_timestamp" => updated.owner_timestamp,
@@ -319,7 +319,7 @@ defmodule ChatWeb.ElectricControllerTest do
       "mutations" => [
         %{
           "type" => "update",
-          "original" => %{"user_hash" => to_hex_escape(card.user_hash)},
+          "original" => %{"user_hash" => card.user_hash},
           "changes" => %{
             "deleted_flag" => updated.deleted_flag,
             "owner_timestamp" => updated.owner_timestamp,
@@ -333,7 +333,7 @@ defmodule ChatWeb.ElectricControllerTest do
 
   defp user_card_modified(card) do
     %{
-      "user_hash" => to_hex_escape(card.user_hash),
+      "user_hash" => card.user_hash,
       "sign_pkey" => to_base64(card.sign_pkey),
       "contact_pkey" => to_base64(card.contact_pkey),
       "contact_cert" => to_base64(card.contact_cert),

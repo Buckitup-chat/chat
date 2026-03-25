@@ -27,7 +27,10 @@ defmodule Chat.Data.UserDataTest do
       card_struct = signed_user_card(identity)
 
       # Verify calculated fields
-      expected_hash = Consts.user_hash_prefix() <> EnigmaPq.hash(identity.sign_pkey)
+      expected_hash =
+        identity.sign_pkey
+        |> EnigmaPq.hash()
+        |> Chat.Data.Types.UserHash.from_binary()
       assert card_struct.user_hash == expected_hash
       assert card_struct.name == "Alice"
       assert is_binary(card_struct.crypt_cert)
@@ -101,7 +104,10 @@ defmodule Chat.Data.UserDataTest do
       card = User.extract_pq_card(identity)
 
       # Tamper with hash
-      fake_hash = Consts.user_hash_prefix() <> EnigmaPq.hash("fake_key")
+      fake_hash =
+        "fake_key"
+        |> EnigmaPq.hash()
+        |> Chat.Data.Types.UserHash.from_binary()
       bad_card = %{card | user_hash: fake_hash}
 
       refute User.valid_card?(bad_card)
@@ -228,14 +234,34 @@ defmodule Chat.Data.UserDataTest do
       uuid = Ecto.UUID.generate()
       value = "some_encrypted_blob"
 
+      # Create a storage struct with all required fields
+      storage_struct = %UserStorage{
+        user_hash: card_struct.user_hash,
+        uuid: uuid,
+        value_b64: value,
+        deleted_flag: false,
+        parent_sign_hash: nil,
+        owner_timestamp: System.system_time(:second)
+      }
+
+      # Generate signature
+      sign_b64 = Integrity.signature_payload(storage_struct) |> EnigmaPq.sign(identity.sign_skey)
+      sign_hash_binary = :crypto.hash(:sha3_512, sign_b64)
+      sign_hash = Consts.user_storage_sign_prefix() <> Base.encode16(sign_hash_binary, case: :lower)
+
       attrs = %{
         user_hash: card_struct.user_hash,
         uuid: uuid,
-        value_b64: value
+        value_b64: value,
+        deleted_flag: false,
+        parent_sign_hash: nil,
+        owner_timestamp: storage_struct.owner_timestamp,
+        sign_b64: sign_b64,
+        sign_hash: sign_hash
       }
 
       changeset = UserStorage.create_changeset(%UserStorage{}, attrs)
-      assert changeset.valid?
+      assert changeset.valid?, inspect(changeset.errors)
 
       {:ok, storage} = Repo.insert(changeset)
       assert storage.user_hash == card_struct.user_hash

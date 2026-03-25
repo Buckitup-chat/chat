@@ -89,7 +89,7 @@ defmodule Chat.Data.Schemas.UserStorage do
     def signable_fields(storage) do
       storage
       |> Map.from_struct()
-      |> Map.drop([:sign_b64, :sign_hash, :__meta__])
+      |> Map.drop([:sign_b64, :sign_hash, :parent_version, :__meta__])
     end
 
     def signing_key(storage) do

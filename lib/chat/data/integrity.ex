@@ -60,7 +60,6 @@ defmodule Chat.Data.Integrity do
       String.ends_with?(key_str, "_b64") -> encode_base64(value)
       String.ends_with?(key_str, "_cert") -> encode_base64(value)
       String.ends_with?(key_str, "_pkey") -> encode_base64(value)
-      String.ends_with?(key_str, "_hash") -> encode_hex(value)
       value == true -> "true"
       value == false -> "false"
       is_nil(value) -> "null"

@@ -4,7 +4,6 @@ Mix.install([{:req, "~> 0.5.0"}, {:jason, "~> 1.4"}])
 
 base = System.get_env("BASE_URL") || "http://127.0.0.1:4444"
 
-encode_hex = fn bin -> "\\x" <> Base.encode16(bin, case: :lower) end
 encode_b64 = fn bin -> Base.encode64(bin, padding: false) end
 
 IO.puts("=== User Storage Scenario ===\n")
@@ -15,16 +14,17 @@ IO.puts("Step 1: Creating user card...")
 name = "Test User #{:rand.uniform(1000)}"
 {sign_pkey, sign_skey} = :crypto.generate_key(:mldsa87, [])
 {crypt_pkey, _crypt_skey} = :crypto.generate_key(:mlkem1024, [])
-{contact_pkey, _contact_skey} = :crypto.generate_key(:mldsa44, [])
+{contact_pkey, _contact_skey} = :crypto.generate_key(:eddsa, :ed25519)
 
-user_hash = <<0x01>> <> :crypto.hash(:sha3_512, sign_pkey)
-user_hash_hex = Base.encode16(user_hash, case: :lower)
+user_hash_binary = :crypto.hash(:sha3_512, sign_pkey)
+user_hash = "u_" <> Base.encode16(user_hash_binary, case: :lower)
+user_hash_hex = user_hash
 sign_skey_hex = Base.encode16(sign_skey, case: :lower)
 
 crypt_cert = :crypto.sign(:mldsa87, :none, crypt_pkey, sign_skey)
 contact_cert = :crypto.sign(:mldsa87, :none, contact_pkey, sign_skey)
 
-owner_timestamp = 0
+owner_timestamp = System.system_time(:second)
 deleted_flag = false
 
 signature_fields = %{
@@ -45,7 +45,7 @@ encode_field = fn {key, value} ->
     String.ends_with?(key, "_b64") -> Base.encode64(value)
     String.ends_with?(key, "_cert") -> Base.encode64(value)
     String.ends_with?(key, "_pkey") -> Base.encode64(value)
-    String.ends_with?(key, "_hash") -> Base.encode16(value, case: :lower)
+    # user_hash is a string field (not _hash suffix), pass through as-is
     value == true -> "true"
     value == false -> "false"
     is_integer(value) -> Integer.to_string(value)
@@ -68,7 +68,7 @@ card_payload = %{
     %{
       "type" => "insert",
       "modified" => %{
-        "user_hash" => encode_hex.(user_hash),
+        "user_hash" => user_hash,
         "name" => name,
         "sign_pkey" => encode_b64.(sign_pkey),
         "contact_pkey" => encode_b64.(contact_pkey),
@@ -113,7 +113,7 @@ value1 = "My first storage value"
 value1_bin = :erlang.term_to_binary(value1)
 timestamp1 = System.system_time(:second)
 
-# Build signature for storage
+# Build signature for storage (sign_hash is NOT included in signature payload)
 storage_sig_fields = %{
   "deleted_flag" => false,
   "owner_timestamp" => timestamp1,
@@ -131,20 +131,22 @@ storage_sig_data =
 
 storage_sign_b64_raw = :crypto.sign(:mldsa87, :none, storage_sig_data, sign_skey)
 storage_sign_b64 = encode_b64.(storage_sign_b64_raw)
-storage_sign_hash = :crypto.hash(:sha3_256, storage_sign_b64_raw)
+# sign_hash is computed from the signature itself, not included in what was signed
+storage_sign_hash_binary = :crypto.hash(:sha3_512, storage_sign_b64_raw)
+storage_sign_hash = "uss_" <> Base.encode16(storage_sign_hash_binary, case: :lower)
 
 storage_payload = %{
   "mutations" => [
     %{
       "type" => "insert",
       "modified" => %{
-        "user_hash" => encode_hex.(user_hash),
+        "user_hash" => user_hash,
         "uuid" => uuid1,
         "value_b64" => encode_b64.(value1_bin),
         "deleted_flag" => false,
         "owner_timestamp" => timestamp1,
         "sign_b64" => storage_sign_b64,
-        "sign_hash" => encode_hex.(storage_sign_hash)
+        "sign_hash" => storage_sign_hash
       },
       "syncMetadata" => %{
         "relation" => "user_storage"
@@ -177,7 +179,7 @@ value2 = "My updated storage value"
 value2_bin = :erlang.term_to_binary(value2)
 timestamp2 = System.system_time(:second) + 10
 
-# Build signature for updated storage
+# Build signature for updated storage (sign_hash is NOT included in signature payload)
 update_sig_fields = %{
   "deleted_flag" => false,
   "owner_timestamp" => timestamp2,
@@ -195,21 +197,23 @@ update_sig_data =
 
 update_sign_b64_raw = :crypto.sign(:mldsa87, :none, update_sig_data, sign_skey)
 update_sign_b64 = encode_b64.(update_sign_b64_raw)
-update_sign_hash = :crypto.hash(:sha3_256, update_sign_b64_raw)
+# sign_hash is computed from the signature itself, not included in what was signed
+update_sign_hash_binary = :crypto.hash(:sha3_512, update_sign_b64_raw)
+update_sign_hash = "uss_" <> Base.encode16(update_sign_hash_binary, case: :lower)
 
 update_payload = %{
   "mutations" => [
     %{
       "type" => "update",
       "original" => %{
-        "user_hash" => encode_hex.(user_hash),
+        "user_hash" => user_hash,
         "uuid" => uuid1
       },
       "changes" => %{
         "value_b64" => encode_b64.(value2_bin),
         "owner_timestamp" => timestamp2,
         "sign_b64" => update_sign_b64,
-        "sign_hash" => encode_hex.(update_sign_hash)
+        "sign_hash" => update_sign_hash
       },
       "syncMetadata" => %{
         "relation" => "user_storage"
@@ -241,7 +245,7 @@ IO.puts("Step 4: Getting storage items...")
 # Give Electric a moment to sync
 Process.sleep(1000)
 
-path = "/electric/v1/user_storage/#{user_hash_hex}"
+path = "/electric/v1/user_storage/#{user_hash}"
 
 resp1 = Req.get(base <> path, params: %{offset: "-1"}, headers: [{"accept", "application/json"}])
 
@@ -267,7 +271,7 @@ IO.puts("Step 5: Deleting storage item (soft delete)...")
 
 timestamp3 = System.system_time(:second) + 20
 
-# Build signature for deleted storage
+# Build signature for deleted storage (sign_hash is NOT included in signature payload)
 delete_sig_fields = %{
   "deleted_flag" => true,
   "owner_timestamp" => timestamp3,
@@ -285,21 +289,23 @@ delete_sig_data =
 
 delete_sign_b64_raw = :crypto.sign(:mldsa87, :none, delete_sig_data, sign_skey)
 delete_sign_b64 = encode_b64.(delete_sign_b64_raw)
-delete_sign_hash = :crypto.hash(:sha3_256, delete_sign_b64_raw)
+# sign_hash is computed from the signature itself, not included in what was signed
+delete_sign_hash_binary = :crypto.hash(:sha3_512, delete_sign_b64_raw)
+delete_sign_hash = "uss_" <> Base.encode16(delete_sign_hash_binary, case: :lower)
 
 delete_payload = %{
   "mutations" => [
     %{
       "type" => "update",
       "original" => %{
-        "user_hash" => encode_hex.(user_hash),
+        "user_hash" => user_hash,
         "uuid" => uuid1
       },
       "changes" => %{
         "deleted_flag" => true,
         "owner_timestamp" => timestamp3,
         "sign_b64" => delete_sign_b64,
-        "sign_hash" => encode_hex.(delete_sign_hash)
+        "sign_hash" => delete_sign_hash
       },
       "syncMetadata" => %{
         "relation" => "user_storage"

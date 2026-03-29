@@ -39,6 +39,48 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Docs do
         }
         """
       },
+      "user_storage_versions" => %{
+        title: "User Storage Versions",
+        description: "Immutable version history of user_storage entries. Every write to user_storage appends a new version here, enabling full audit trail and conflict resolution via parent chain.",
+        fields: [
+          %{
+            name: "user_hash",
+            type: "text",
+            description: "Foreign key to user_card.user_hash (part of composite primary key, format: \"u_\" + 128 hex chars)"
+          },
+          %{
+            name: "uuid",
+            type: "uuid",
+            description: "Storage entry identifier — same as the parent user_storage row (part of composite primary key)"
+          },
+          %{
+            name: "sign_hash",
+            type: "text",
+            description: "Signature hash of this version (format: \"uss_\" + 128 hex chars = 132 chars total, part of composite primary key)"
+          },
+          %{
+            name: "parent_sign_hash",
+            type: "text",
+            description: "sign_hash of the previous version (format: \"uss_\" + 128 hex chars, null for the initial version)"
+          },
+          %{name: "value_b64", type: "text", description: "Base64-encoded binary value snapshot at this version (max 10MB)"},
+          %{name: "owner_timestamp", type: "bigint", description: "Monotonic timestamp at the time this version was written"},
+          %{name: "sign_b64", type: "text", description: "Base64-encoded ML-DSA-87 signature for integrity verification"},
+          %{name: "deleted_flag", type: "boolean", description: "Soft delete flag — mirrors the user_storage row state at this version"}
+        ],
+        example: """
+        {
+          "user_hash": "u_3a4f2b1c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e",
+          "uuid": "550e8400-e29b-41d4-a716-446655440000",
+          "sign_hash": "uss_9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a0854657374206461746120696e2062696e6172799f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+          "parent_sign_hash": null,
+          "value_b64": "VGVzdCBkYXRhIGluIGJpbmFyeQ==",
+          "owner_timestamp": 1710000000000,
+          "sign_b64": "GisxPT...",
+          "deleted_flag": false
+        }
+        """
+      },
       "user_storage" => %{
         title: "User Storage",
         description: "Key-value storage entries owned by a user (max 10MB per entry)",

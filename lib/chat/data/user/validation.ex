@@ -3,8 +3,11 @@ defmodule Chat.Data.User.Validation do
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Schemas.UserStorage
   alias Chat.Data.User, as: UserData
+  alias Chat.Data.User.Versioning
   alias EnigmaPq
   alias Phoenix.Sync.Writer.Operation
+
+  import Chat.Db, only: [repo: 0]
 
   defprotocol TimestampedData do
     @moduledoc """
@@ -153,6 +156,102 @@ defmodule Chat.Data.User.Validation do
         storage
         |> UserStorage.update_changeset(changes)
         |> validate_signature()
+    end
+  end
+
+  @doc """
+  Validation function for user_storage that integrates versioning logic.
+  This is used by HTTP ingestion to handle versioning automatically.
+
+  Returns an Ecto.Multi that includes both validation and versioning operations.
+  """
+  def user_storage_validate_with_versioning(storage, changes, op) do
+    # First validate the changeset
+    changeset = user_storage_validate(storage, changes, op)
+
+    case {op, changeset.valid?} do
+      {:insert, true} ->
+        # For inserts, check if a conflict exists and handle versioning
+        with {:ok, new_storage} <- Ecto.Changeset.apply_action(changeset, :insert),
+             existing when not is_nil(existing) <-
+               repo().get_by(UserStorage, user_hash: new_storage.user_hash, uuid: new_storage.uuid) do
+          # Conflict exists - use versioning logic
+          handle_insert_with_versioning(changeset, existing, new_storage)
+        else
+          _ -> changeset
+        end
+
+      {:update, true} ->
+        # For updates, check timestamp and handle versioning
+        with {:ok, new_storage} <- Ecto.Changeset.apply_action(changeset, :update),
+             existing <- changeset.data do
+          handle_update_with_versioning(changeset, existing, new_storage)
+        else
+          _ -> changeset
+        end
+
+      _ ->
+        changeset
+    end
+  end
+
+  defp handle_insert_with_versioning(changeset, existing, new_storage) do
+    if new_storage.owner_timestamp > existing.owner_timestamp do
+      # New version is newer - return changeset with on_conflict to replace
+      # The existing will be archived in pre_apply
+      Ecto.Changeset.put_change(changeset, :parent_sign_hash, existing.sign_hash)
+    else
+      # New version is older - mark changeset as ignored and archive new version
+      %{changeset | action: :ignore}
+    end
+  end
+
+  defp handle_update_with_versioning(changeset, existing, new_storage) do
+    if new_storage.owner_timestamp > existing.owner_timestamp do
+      # New version is newer - update with parent_sign_hash
+      Ecto.Changeset.put_change(changeset, :parent_sign_hash, existing.sign_hash)
+    else
+      # New version is older - mark as ignored
+      %{changeset | action: :ignore}
+    end
+  end
+
+  @doc """
+  Pre-apply callback for user_storage that handles versioning.
+  Archives the existing version when a newer version is being inserted/updated.
+  When an older version comes in, it archives the old version to the versions table.
+  """
+  def user_storage_pre_apply_versioning(multi, changeset, _context) do
+    # Only proceed if changeset is valid and not marked as :ignore
+    if changeset.valid? and changeset.action != :ignore do
+      with {:ok, new_storage} <- Ecto.Changeset.apply_action(changeset, changeset.action || :insert) do
+        # Get the existing record if it exists
+        existing =
+          case changeset.action do
+            :update -> changeset.data
+            _ -> repo().get_by(UserStorage, user_hash: new_storage.user_hash, uuid: new_storage.uuid)
+          end
+
+        if existing && new_storage.owner_timestamp > existing.owner_timestamp do
+          # New version is newer - archive the existing version
+          Ecto.Multi.insert(multi, :archive_existing, Versioning.archive_changeset(existing))
+        else
+          multi
+        end
+      else
+        _ -> multi
+      end
+    else
+      # If changeset is marked as :ignore (older version), archive the new version to versions table
+      if changeset.action == :ignore do
+        with {:ok, new_storage} <- Ecto.Changeset.apply_action(%{changeset | action: :insert}, :insert) do
+          Ecto.Multi.insert(multi, :archive_old_version, Versioning.archive_changeset(new_storage))
+        else
+          _ -> multi
+        end
+      else
+        multi
+      end
     end
   end
 

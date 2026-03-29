@@ -7,7 +7,6 @@ defmodule Chat.Data.User do
 
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.UserCard
-  alias Chat.Data.Types.Consts
   alias Enigma
   alias EnigmaPq
 

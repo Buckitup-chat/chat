@@ -40,7 +40,13 @@ defmodule ChatWeb.ElectricController do
     |> Writer.allow(UserStorage,
       accept: [:insert, :update],
       check: &UserValidation.user_storage_allowed(&1, user_pop_context),
-      validate: &UserValidation.user_storage_validate/3
+      validate: &UserValidation.user_storage_validate_with_versioning/3,
+      insert: [
+        pre_apply: &UserValidation.user_storage_pre_apply_versioning/3
+      ],
+      update: [
+        pre_apply: &UserValidation.user_storage_pre_apply_versioning/3
+      ]
     )
   end
 

@@ -7,9 +7,8 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
 
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Schemas.UserStorage
-  alias Chat.Data.Schemas.UserStorageVersion
   alias Chat.Data.User.Validation
-  alias Ecto.Multi
+  alias Chat.Data.User.Versioning
 
   def write(shape, operation, value) do
     case do_write(shape, operation, value) do
@@ -124,8 +123,8 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
           repo().insert(changeset)
 
         existing ->
-          # Conflict - compare timestamps
-          compare_and_version_insert(existing, storage_with_hash)
+          # Conflict - compare timestamps and version
+          Versioning.handle_insert_with_conflict(repo(), existing, storage_with_hash)
       end
     else
       nil ->
@@ -156,7 +155,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
          changeset <- Validation.validate_user_storage_update(existing, storage_with_hash),
          %{valid?: true} <- changeset do
       # Compare timestamps and version
-      compare_and_version_update(existing, storage_with_hash)
+      Versioning.handle_update_with_versioning(repo(), existing, storage_with_hash)
     else
       {:parent, nil} ->
         log(
@@ -179,66 +178,6 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
     end
   end
 
-  defp compare_and_version_insert(existing, new_storage) do
-    if new_storage.owner_timestamp > existing.owner_timestamp do
-      # New version is newer - archive existing to versions, insert new to main
-      Multi.new()
-      |> Multi.insert(:archive, archive_changeset(existing))
-      |> Multi.insert(
-        :update_main,
-        UserStorage.create_changeset(%UserStorage{}, %{
-          user_hash: new_storage.user_hash,
-          uuid: new_storage.uuid,
-          value_b64: new_storage.value_b64,
-          deleted_flag: new_storage.deleted_flag,
-          parent_sign_hash: existing.sign_hash,
-          owner_timestamp: new_storage.owner_timestamp,
-          sign_b64: new_storage.sign_b64,
-          sign_hash: new_storage.sign_hash
-        }),
-        on_conflict: {:replace_all_except, [:user_hash, :uuid]},
-        conflict_target: [:user_hash, :uuid]
-      )
-      |> repo().transaction()
-      |> case do
-        {:ok, %{update_main: result}} -> {:ok, result}
-        {:error, _step, reason, _changes} -> {:error, reason}
-      end
-    else
-      # New version is older - insert to versions, keep existing in main
-      archive_changeset(new_storage)
-      |> repo().insert()
-    end
-  end
-
-  defp compare_and_version_update(existing, new_storage) do
-    if new_storage.owner_timestamp > existing.owner_timestamp do
-      # New version is newer - archive existing to versions, update main
-      Multi.new()
-      |> Multi.insert(:archive, archive_changeset(existing))
-      |> Multi.update(
-        :update_main,
-        UserStorage.update_changeset(existing, %{
-          value_b64: new_storage.value_b64,
-          deleted_flag: new_storage.deleted_flag,
-          parent_sign_hash: existing.sign_hash,
-          owner_timestamp: new_storage.owner_timestamp,
-          sign_b64: new_storage.sign_b64,
-          sign_hash: new_storage.sign_hash
-        })
-      )
-      |> repo().transaction()
-      |> case do
-        {:ok, %{update_main: result}} -> {:ok, result}
-        {:error, _step, reason, _changes} -> {:error, reason}
-      end
-    else
-      # New version is older - insert to versions, keep existing in main
-      archive_changeset(new_storage)
-      |> repo().insert()
-    end
-  end
-
   defp calculate_sign_hash(%UserStorage{sign_b64: sign_b64} = storage) when is_binary(sign_b64) do
     sign_hash =
       sign_b64
@@ -249,17 +188,4 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
   end
 
   defp calculate_sign_hash(storage), do: storage
-
-  defp archive_changeset(storage) do
-    UserStorageVersion.changeset(%UserStorageVersion{}, %{
-      user_hash: storage.user_hash,
-      uuid: storage.uuid,
-      sign_hash: storage.sign_hash,
-      value_b64: storage.value_b64,
-      deleted_flag: storage.deleted_flag,
-      parent_sign_hash: storage.parent_sign_hash,
-      owner_timestamp: storage.owner_timestamp,
-      sign_b64: storage.sign_b64
-    })
-  end
 end

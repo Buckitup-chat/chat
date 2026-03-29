@@ -45,6 +45,7 @@ defmodule Chat.Data.Schemas.UserStorage do
     ])
     |> validate_value_size()
     |> unique_constraint([:user_hash, :uuid], name: :user_storage_pkey)
+    |> foreign_key_constraint(:parent_sign_hash, name: :user_storage_parent_sign_hash_fkey)
   end
 
   def update_changeset(storage, attrs) do
@@ -63,6 +64,7 @@ defmodule Chat.Data.Schemas.UserStorage do
       :sign_hash
     ])
     |> validate_value_size()
+    |> foreign_key_constraint(:parent_sign_hash, name: :user_storage_parent_sign_hash_fkey)
   end
 
 

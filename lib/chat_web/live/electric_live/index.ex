@@ -109,6 +109,48 @@ defmodule ChatWeb.ElectricLive.Index do
             </div>
           </a>
 
+          <%!-- User Storage Versions --%>
+          <a
+            href="/electric/user_storage_versions"
+            class="block bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-shadow duration-200"
+          >
+            <div class="px-4 py-5 sm:p-6">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <svg
+                    class="h-8 w-8 text-indigo-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">User Storage Versions</dt>
+                    <dd class="mt-1 text-lg font-semibold text-gray-900">
+                      Version History
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+              <div class="mt-4">
+                <p class="text-sm text-gray-600">
+                  Complete version history of user storage entries with Post-Quantum cryptography.
+                </p>
+                <p class="mt-2 text-xs text-gray-500 font-mono">
+                  /electric/v1/user_storage_version
+                </p>
+              </div>
+            </div>
+          </a>
+
           <%!-- User API Sandbox --%>
           <a
             href="/electric/user_sandbox"

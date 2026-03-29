@@ -71,7 +71,4 @@ defmodule Chat.Data.Integrity do
 
   defp encode_base64(nil), do: "null"
   defp encode_base64(value) when is_binary(value), do: Base.encode64(value)
-
-  defp encode_hex(nil), do: "null"
-  defp encode_hex(value) when is_binary(value), do: Base.encode16(value, case: :lower)
 end

@@ -12,8 +12,8 @@ defmodule ChatWeb.ElectricController do
   alias Phoenix.Sync.Writer.Format
 
   def ingest(conn, params) do
-    hex_suffixes = ~w[_pkey _cert _hash]
-    base64_suffixes = ~w[_b64]
+    hex_suffixes = ~w[]
+    base64_suffixes = ~w[_pkey _cert _b64]
 
     with {_, %{"mutations" => mutations}} <- {:correct_params, params},
          {_, true} <- {:is_mutation_list, is_list(mutations)},
@@ -22,21 +22,32 @@ defmodule ChatWeb.ElectricController do
          {:ok, user_pop_context} <- user_pop_context(params),
          {:ok, txid, _changes} <-
            Writer.new()
-           |> Writer.allow(UserCard,
-             accept: [:insert, :update, :delete],
-             check: &UserValidation.user_card_allowed(&1, user_pop_context),
-             validate: &UserValidation.user_card_validate/3
-           )
-           |> Writer.allow(UserStorage,
-             accept: [:insert, :update, :delete],
-             check: &UserValidation.user_storage_allowed(&1, user_pop_context),
-             validate: &UserValidation.user_storage_validate/3
-           )
+           |> config_writer(user_pop_context)
            |> Writer.apply(mutations, repo(), format: Format.TanstackDB) do
       json(conn, %{txid: txid})
     else
       error -> handle_ingest_error(conn, error)
     end
+  end
+
+  defp config_writer(writer, user_pop_context) do
+    writer
+    |> Writer.allow(UserCard,
+      accept: [:insert, :update],
+      check: &UserValidation.user_card_allowed(&1, user_pop_context),
+      validate: &UserValidation.user_card_validate/3
+    )
+    |> Writer.allow(UserStorage,
+      accept: [:insert, :update],
+      check: &UserValidation.user_storage_allowed(&1, user_pop_context),
+      validate: &UserValidation.user_storage_validate_with_versioning/3,
+      insert: [
+        pre_apply: &UserValidation.user_storage_pre_apply_versioning/3
+      ],
+      update: [
+        pre_apply: &UserValidation.user_storage_pre_apply_versioning/3
+      ]
+    )
   end
 
   defp user_pop_context(params) do

@@ -91,6 +91,7 @@ defmodule ChatWeb.Router do
       live "/electric", ElectricLive.Index, :index
       live "/electric/user_cards", ElectricLive.UserCardsLive.Index, :index
       live "/electric/user_storage", ElectricLive.UserStorageLive.Index, :index
+      live "/electric/user_storage_versions", ElectricLive.UserStorageVersionLive.Index, :index
       live "/electric/user_sandbox", ElectricLive.UserSandboxLive.Index, :index
     end
 
@@ -146,10 +147,7 @@ defmodule ChatWeb.Router do
     # Phoenix.Sync endpoint for LiveView real-time sync
     sync("/user_card", Chat.Data.Schemas.UserCard)
     sync("/user_storage", Chat.Data.Schemas.UserStorage)
-
-    sync("/user_storage/:user_hash", Chat.Data.Schemas.UserStorage,
-      where: "user_hash = :user_hash"
-    )
+    sync("/user_storage_version", Chat.Data.Schemas.UserStorageVersion)
 
     get "/challenge", ChallengeController, :create
     get "/system_identifier", SystemIdentifierController, :show

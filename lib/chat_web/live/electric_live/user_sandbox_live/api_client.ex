@@ -23,13 +23,11 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
     with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
          {:ok, _ingest_resp, ingest_log} <-
            ingest_user_card(challenge_resp, card, identity.sign_skey, base_url) do
-      user_data = %{
-        name: card.name,
-        user_hash: card.user_hash,
-        user_hash_hex: Base.encode16(card.user_hash, case: :lower),
-        sign_skey: identity.sign_skey,
-        sign_pkey: card.sign_pkey
-      }
+      user_data =
+        card
+        |> Map.from_struct()
+        |> Map.put(:user_hash_hex, String.slice(card.user_hash, 2..-1//1))  # Remove "u_" prefix for display
+        |> Map.put(:sign_skey, identity.sign_skey)
 
       {:ok, %{user: user_data, log_entries: [challenge_log, ingest_log]}}
     else
@@ -41,22 +39,37 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   @doc """
   Updates a user's name via the Electric API.
 
+  `existing_card` must be the full UserCard struct with all fields.
+
   Returns:
   - `{:ok, %{txid: txid, log_entries: [log_entry1, log_entry2]}}`
   - `{:error, %{reason: reason, log_entries: [log_entry, ...]}}`
   """
-  def update_user_name(user_hash, sign_skey, new_name, base_url) do
+  def update_user_name(existing_card, sign_skey, new_name, base_url) do
     challenge_url = base_url <> "/electric/v1/challenge"
+
+    new_timestamp = existing_card.owner_timestamp + 1
+
+    updated_card_struct =
+      struct(Chat.Data.Schemas.UserCard, Map.put(existing_card, :name, new_name))
+      |> Map.put(:owner_timestamp, new_timestamp)
+
+    sign_b64 =
+      updated_card_struct
+      |> Chat.Data.Integrity.signature_payload()
+      |> then(&:crypto.sign(:mldsa87, :none, &1, sign_skey))
 
     payload = %{
       "mutations" => [
         %{
           "type" => "update",
           "original" => %{
-            "user_hash" => encode_hex(user_hash)
+            "user_hash" => existing_card.user_hash
           },
           "changes" => %{
-            "name" => new_name
+            "name" => new_name,
+            "owner_timestamp" => new_timestamp,
+            "sign_b64" => encode_base64(sign_b64)
           },
           "syncMetadata" => %{
             "relation" => "user_cards"
@@ -76,7 +89,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   end
 
   @doc """
-  Deletes a user via the Electric API.
+  Soft-deletes a user via the Electric API by setting deleted_flag=true.
 
   Returns:
   - `{:ok, %{log_entries: [log_entry1, log_entry2]}}`
@@ -85,12 +98,43 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   def delete_user(user_hash, sign_skey, base_url) do
     challenge_url = base_url <> "/electric/v1/challenge"
 
+    # Fetch current user card to get current timestamp
+    repo = Chat.Db.repo()
+    existing_card = repo.get(Chat.Data.Schemas.UserCard, user_hash)
+
+    if is_nil(existing_card) do
+      {:error, %{reason: "User not found", log_entries: []}}
+    else
+      delete_user_with_card(existing_card, user_hash, sign_skey, base_url, challenge_url)
+    end
+  end
+
+  defp delete_user_with_card(existing_card, user_hash, sign_skey, base_url, challenge_url) do
+
+    new_timestamp = existing_card.owner_timestamp + 1
+
+    # Create updated card with deleted_flag=true for signing
+    updated_card_struct =
+      existing_card
+      |> Map.put(:deleted_flag, true)
+      |> Map.put(:owner_timestamp, new_timestamp)
+
+    sign_b64 =
+      updated_card_struct
+      |> Chat.Data.Integrity.signature_payload()
+      |> then(&:crypto.sign(:mldsa87, :none, &1, sign_skey))
+
     payload = %{
       "mutations" => [
         %{
-          "type" => "delete",
+          "type" => "update",
           "original" => %{
-            "user_hash" => encode_hex(user_hash)
+            "user_hash" => user_hash
+          },
+          "changes" => %{
+            "deleted_flag" => true,
+            "owner_timestamp" => new_timestamp,
+            "sign_b64" => encode_base64(sign_b64)
           },
           "syncMetadata" => %{
             "relation" => "user_cards"
@@ -120,15 +164,40 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   """
   def create_storage(user_hash, sign_skey, uuid, value_binary, base_url) do
     challenge_url = base_url <> "/electric/v1/challenge"
+    owner_timestamp = System.system_time(:second)
+
+    # Create storage struct for signing
+    storage_attrs = %{
+      user_hash: user_hash,
+      uuid: uuid,
+      value_b64: value_binary,
+      deleted_flag: false,
+      parent_sign_hash: nil,
+      owner_timestamp: owner_timestamp
+    }
+
+    storage_struct = struct(Chat.Data.Schemas.UserStorage, storage_attrs)
+    sign_payload = Chat.Data.Integrity.signature_payload(storage_struct)
+    sign_b64 = :crypto.sign(:mldsa87, :none, sign_payload, sign_skey)
+
+    sign_hash =
+      sign_b64
+      |> EnigmaPq.hash()
+      |> Chat.Data.Types.UserStorageSignHash.from_binary()
 
     payload = %{
       "mutations" => [
         %{
           "type" => "insert",
           "modified" => %{
-            "user_hash" => encode_hex(user_hash),
+            "user_hash" => user_hash,
             "uuid" => uuid,
-            "value_b64" => encode_base64(value_binary)
+            "value_b64" => encode_base64(value_binary),
+            "deleted_flag" => false,
+            "parent_sign_hash" => nil,
+            "owner_timestamp" => owner_timestamp,
+            "sign_b64" => encode_base64(sign_b64),
+            "sign_hash" => sign_hash
           },
           "syncMetadata" => %{
             "relation" => "user_storage"
@@ -159,36 +228,71 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   def update_storage(user_hash, sign_skey, uuid, value_binary, base_url) do
     challenge_url = base_url <> "/electric/v1/challenge"
 
-    payload = %{
-      "mutations" => [
-        %{
-          "type" => "update",
-          "original" => %{
-            "user_hash" => encode_hex(user_hash),
-            "uuid" => uuid
-          },
-          "changes" => %{
-            "value_b64" => encode_base64(value_binary)
-          },
-          "syncMetadata" => %{
-            "relation" => "user_storage"
-          }
-        }
-      ]
-    }
+    # Fetch existing storage to get current timestamp and sign_hash for parent reference
+    repo = Chat.Db.repo()
+    existing = repo.get_by(Chat.Data.Schemas.UserStorage, user_hash: user_hash, uuid: uuid)
 
-    with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
-         {:ok, ingest_resp, ingest_log} <-
-           post_ingest(challenge_resp, payload, sign_skey, base_url) do
-      {:ok, %{txid: ingest_resp["txid"], log_entries: [challenge_log, ingest_log]}}
+    if is_nil(existing) do
+      {:error, %{reason: "Storage entry not found", log_entries: []}}
     else
-      {:error, reason, log_entries} ->
-        {:error, %{reason: reason, log_entries: log_entries}}
+      owner_timestamp = existing.owner_timestamp + 1
+      parent_sign_hash = existing.sign_hash
+
+      # Create storage struct for signing
+      storage_attrs = %{
+        user_hash: user_hash,
+        uuid: uuid,
+        value_b64: value_binary,
+        deleted_flag: false,
+        parent_sign_hash: parent_sign_hash,
+        owner_timestamp: owner_timestamp
+      }
+
+      storage_struct = struct(Chat.Data.Schemas.UserStorage, storage_attrs)
+      sign_payload = Chat.Data.Integrity.signature_payload(storage_struct)
+      sign_b64 = :crypto.sign(:mldsa87, :none, sign_payload, sign_skey)
+
+      sign_hash =
+        sign_b64
+        |> EnigmaPq.hash()
+        |> Chat.Data.Types.UserStorageSignHash.from_binary()
+
+      payload = %{
+        "mutations" => [
+          %{
+            "type" => "update",
+            "original" => %{
+              "user_hash" => user_hash,
+              "uuid" => uuid
+            },
+            "changes" => %{
+              "value_b64" => encode_base64(value_binary),
+              "deleted_flag" => false,
+              "parent_sign_hash" => parent_sign_hash,
+              "owner_timestamp" => owner_timestamp,
+              "sign_b64" => encode_base64(sign_b64),
+              "sign_hash" => sign_hash
+            },
+            "syncMetadata" => %{
+              "relation" => "user_storage"
+            }
+          }
+        ]
+      }
+
+      with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
+           {:ok, ingest_resp, ingest_log} <-
+             post_ingest(challenge_resp, payload, sign_skey, base_url) do
+        {:ok, %{txid: ingest_resp["txid"], log_entries: [challenge_log, ingest_log]}}
+      else
+        {:error, reason, log_entries} ->
+          {:error, %{reason: reason, log_entries: log_entries}}
+      end
     end
   end
 
   @doc """
-  Deletes a storage entry via the Electric API.
+  Soft-deletes a storage entry via the Electric API by setting deleted_flag=true.
 
   Returns:
   - `{:ok, %{log_entries: [log_entry1, log_entry2]}}`
@@ -197,28 +301,65 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   def delete_storage(user_hash, sign_skey, uuid, base_url) do
     challenge_url = base_url <> "/electric/v1/challenge"
 
-    payload = %{
-      "mutations" => [
-        %{
-          "type" => "delete",
-          "original" => %{
-            "user_hash" => encode_hex(user_hash),
-            "uuid" => uuid
-          },
-          "syncMetadata" => %{
-            "relation" => "user_storage"
-          }
-        }
-      ]
-    }
+    # Fetch existing storage to get current timestamp and sign_hash for parent reference
+    repo = Chat.Db.repo()
+    existing = repo.get_by(Chat.Data.Schemas.UserStorage, user_hash: user_hash, uuid: uuid)
 
-    with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
-         {:ok, _ingest_resp, ingest_log} <-
-           post_ingest(challenge_resp, payload, sign_skey, base_url) do
-      {:ok, %{log_entries: [challenge_log, ingest_log]}}
+    if is_nil(existing) do
+      {:error, %{reason: "Storage entry not found", log_entries: []}}
     else
-      {:error, reason, log_entries} ->
-        {:error, %{reason: reason, log_entries: log_entries}}
+      owner_timestamp = existing.owner_timestamp + 1
+      parent_sign_hash = existing.sign_hash
+
+      # Create storage struct for signing with deleted_flag=true
+      storage_attrs = %{
+        user_hash: user_hash,
+        uuid: uuid,
+        value_b64: existing.value_b64,
+        deleted_flag: true,
+        parent_sign_hash: parent_sign_hash,
+        owner_timestamp: owner_timestamp
+      }
+
+      storage_struct = struct(Chat.Data.Schemas.UserStorage, storage_attrs)
+      sign_payload = Chat.Data.Integrity.signature_payload(storage_struct)
+      sign_b64 = :crypto.sign(:mldsa87, :none, sign_payload, sign_skey)
+
+      sign_hash =
+        sign_b64
+        |> EnigmaPq.hash()
+        |> Chat.Data.Types.UserStorageSignHash.from_binary()
+
+      payload = %{
+        "mutations" => [
+          %{
+            "type" => "update",
+            "original" => %{
+              "user_hash" => user_hash,
+              "uuid" => uuid
+            },
+            "changes" => %{
+              "deleted_flag" => true,
+              "parent_sign_hash" => parent_sign_hash,
+              "owner_timestamp" => owner_timestamp,
+              "sign_b64" => encode_base64(sign_b64),
+              "sign_hash" => sign_hash
+            },
+            "syncMetadata" => %{
+              "relation" => "user_storage"
+            }
+          }
+        ]
+      }
+
+      with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
+           {:ok, _ingest_resp, ingest_log} <-
+             post_ingest(challenge_resp, payload, sign_skey, base_url) do
+        {:ok, %{log_entries: [challenge_log, ingest_log]}}
+      else
+        {:error, reason, log_entries} ->
+          {:error, %{reason: reason, log_entries: log_entries}}
+      end
     end
   end
 
@@ -284,13 +425,16 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
         %{
           "type" => "insert",
           "modified" => %{
-            "user_hash" => encode_hex(card.user_hash),
-            "sign_pkey" => encode_hex(card.sign_pkey),
-            "contact_pkey" => encode_hex(card.contact_pkey),
-            "contact_cert" => encode_hex(card.contact_cert),
-            "crypt_pkey" => encode_hex(card.crypt_pkey),
-            "crypt_cert" => encode_hex(card.crypt_cert),
-            "name" => card.name
+            "user_hash" => card.user_hash,
+            "sign_pkey" => encode_base64(card.sign_pkey),
+            "contact_pkey" => encode_base64(card.contact_pkey),
+            "contact_cert" => encode_base64(card.contact_cert),
+            "crypt_pkey" => encode_base64(card.crypt_pkey),
+            "crypt_cert" => encode_base64(card.crypt_cert),
+            "name" => card.name,
+            "deleted_flag" => card.deleted_flag,
+            "owner_timestamp" => card.owner_timestamp,
+            "sign_b64" => encode_base64(card.sign_b64)
           },
           "syncMetadata" => %{
             "relation" => "user_cards"
@@ -371,10 +515,6 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
 
         {:error, "Ingest request failed: #{inspect(error)}", [log_entry]}
     end
-  end
-
-  defp encode_hex(bin) when is_binary(bin) do
-    "\\x" <> Base.encode16(bin, case: :lower)
   end
 
   defp encode_base64(bin) when is_binary(bin) do

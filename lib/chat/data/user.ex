@@ -5,8 +5,8 @@ defmodule Chat.Data.User do
 
   import Chat.Db, only: [repo: 0]
 
+  alias Chat.Data.Integrity
   alias Chat.Data.Schemas.UserCard
-  alias Chat.Data.Types.Consts
   alias Enigma
   alias EnigmaPq
 
@@ -41,20 +41,29 @@ defmodule Chat.Data.User do
     user_hash =
       sign_pkey
       |> EnigmaPq.hash()
-      |> then(&(Consts.user_hash_prefix() <> &1))
+      |> Chat.Data.Types.UserHash.from_binary()
 
     crypt_cert = EnigmaPq.sign(crypt_pkey, sign_skey)
     contact_cert = EnigmaPq.sign(contact_pkey, sign_skey)
 
-    %UserCard{
+    card = %UserCard{
       user_hash: user_hash,
       sign_pkey: sign_pkey,
       contact_pkey: contact_pkey,
       contact_cert: contact_cert,
       crypt_pkey: crypt_pkey,
       crypt_cert: crypt_cert,
-      name: name
+      name: name,
+      deleted_flag: false,
+      owner_timestamp: System.system_time(:second)
     }
+
+    sign_b64 =
+      card
+      |> Integrity.signature_payload()
+      |> EnigmaPq.sign(sign_skey)
+
+    %{card | sign_b64: sign_b64}
   end
 
   @doc """
@@ -76,7 +85,11 @@ defmodule Chat.Data.User do
   end
 
   defp verify_card_data(hash, sign_pkey, card_data) do
-    expected_hash = Consts.user_hash_prefix() <> EnigmaPq.hash(sign_pkey)
+    expected_hash =
+      sign_pkey
+      |> EnigmaPq.hash()
+      |> Chat.Data.Types.UserHash.from_binary()
+
     hash_valid? = hash == expected_hash
 
     crypt_cert_valid? =

@@ -15,16 +15,17 @@ We can be interestend in keeping versions of data or not.
 
 Unversioned data has integrity and conflict resolving info as extra metadata.
 
-- deleted_flag
+- deleted boolean flag
 - owner_timestamp to resolve conflicts (latest wins)
 - sign_b64(rest of table fields) to prove integrity
 
 Versioned date has integrity, conflict resolving info and versioning info as extra metadata.
 
 - deleted_flag
-- parent_sign_b64 to point to previous version
+- parent_sign_hash to point to previous version
 - owner_timestamp to resolve conflicts
-- sign_b64(rest of table fields including parent_sign_b64) to prove integrity
+- sign_b64 (rest of table fields including parent_sign_hash) to prove integrity
+- sign_hash (sha3_512 of sign_b64) to be linked through parent_sign_hash
 
 Versioned data has 2 tables:
 
@@ -62,9 +63,10 @@ erDiagram
         uuid uuid PK
         binary value_b64
         boolean deleted_flag
-        binary parent_sign_b64 FK
+        binary parent_sign_hash FK
         bigint owner_timestamp
-        binary sign_b64 PK
+        binary sign_b64
+        binary sign_hash
     }
 ```
 
@@ -78,7 +80,7 @@ erDiagram
         binary value_b64
         boolean deleted_flag
         bigint owner_timestamp
-        binary parent_sign_b64 FK
+        binary parent_sign_hash FK
         binary sign_b64
     }
 
@@ -88,8 +90,9 @@ erDiagram
         binary value_b64
         boolean deleted_flag
         bigint owner_timestamp
-        binary parent_sign_b64 FK
-        binary sign_b64 PK
+        binary parent_sign_hash FK
+        binary sign_b64
+        binary sign_hash PK
     }
 
     user_storage ||--o{ user_storage_versions : "has versions"
@@ -97,17 +100,17 @@ erDiagram
 
 **`user_storage`** — last version only per entry:
 
-| user_hash | uuid | value_b64 | deleted_flag | parent_sign_b64 | owner_timestamp | sign_b64 |
-|-----------|------|-----------|--------------|-----------------|-----------------|----------|
+| user_hash | uuid | value_b64 | deleted_flag | parent_sign_hash | owner_timestamp | sign_b64 |
+|-----------|------|-----------|--------------|------------------|-----------------|----------|
 | `a1b2...` | `550e8400-...` | `<<...>>` | false | `uBOJk3PTAO...` | 1700000002 | `VtKP+7CCc...` |
-| `c3d4...` | `f47ac10b-...` | `<<...>>` | false | `null`        | 1700000010 | `fTbWcKdjA...` |
+| `c3d4...` | `f47ac10b-...` | `<<...>>` | false | `null`          | 1700000010 | `fTbWcKdjA...` |
 
 **`user_storage_versions`** — all previous versions:
 
-| user_hash | storage_uuid | value_b64 | deleted_flag | parent_sign_b64 | owner_timestamp | sign_b64 |
-|-----------|--------------|-----------|--------------|-----------------|-----------------|----------|
-| `a1b2...` | `550e8400-...` | `<<...>>` | false | `null` | 1700000000 | `11U3zdLYxO...` |
-| `a1b2...` | `550e8400-...` | `<<...>>` | false | `11U3zdLYxO...` | 1700000001 | `uBOJk3PTAO...` |
+| user_hash | storage_uuid | value_b64 | deleted_flag | parent_sign_hash | owner_timestamp | sign_b64 | sign_hash |
+|-----------|--------------|-----------|--------------|------------------|-----------------|----------|--------------------|
+| `a1b2...` | `550e8400-...` | `<<...>>` | false | `null`           | 1700000000 | `11U3zdLYxO...` | `sha3(11U3zdLY...)` |
+| `a1b2...` | `550e8400-...` | `<<...>>` | false | `sha3(11U3zdLY...)` | 1700000001 | `uBOJk3PTAO...` | `sha3(uBOJk3PT...)` |
 
 
 ## Row Signature Algorithm
@@ -150,3 +153,10 @@ It would be something like this simplified:
   end)
   |> Enum.join("")
 ```
+
+
+
+### Protocols or behaviors? 
+
+- integrity + conflict resolution
+- versioning

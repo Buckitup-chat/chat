@@ -105,6 +105,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
     cancel_task(task_info)
     cancel_restart(restart_ref)
     OffsetStore.delete(system_identifier)
+
     {peer_url, system_identifier, shape, nil, @initial_backoff_ms, nil}
     |> maybe_start_stream()
     |> noreply()
@@ -147,7 +148,10 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
   def handle_info(_msg, state), do: state |> noreply()
 
   @impl true
-  def terminate(_reason, {_peer_url, _system_identifier, _shape, task_info, _backoff, restart_ref}) do
+  def terminate(
+        _reason,
+        {_peer_url, _system_identifier, _shape, task_info, _backoff, restart_ref}
+      ) do
     cancel_task(task_info)
     cancel_restart(restart_ref)
   end
@@ -187,6 +191,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
 
   defp cancel_task({pid, ref}) do
     Process.demonitor(ref, [:flush])
+
     if Process.alive?(pid) do
       Process.exit(pid, :kill)
     end
@@ -235,7 +240,10 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
     {peer_url, system_identifier, shape, nil, next_backoff, restart_ref}
   end
 
-  defp schedule_repo_retry({peer_url, system_identifier, shape, _task_info, backoff, restart_ref}, _reason) do
+  defp schedule_repo_retry(
+         {peer_url, system_identifier, shape, _task_info, backoff, restart_ref},
+         _reason
+       ) do
     {peer_url, system_identifier, shape, nil, backoff, restart_ref}
   end
 

@@ -27,6 +27,10 @@ defmodule ChatWeb.DataCase do
       Ecto.Adapters.SQL.Sandbox.mode(Chat.Repo, {:shared, self()})
     end
 
+    Process.put(:phoenix_sync_validating, true)
+    Phoenix.Sync.Sandbox.start!(Chat.Repo, shared: not tags[:async])
+    Process.delete(:phoenix_sync_validating)
+
     :ok
   end
 

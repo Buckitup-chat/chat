@@ -7,6 +7,8 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
 
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Schemas.UserStorage
+  alias Chat.Data.User.Validation
+  alias Chat.Data.User.Versioning
 
   def write(shape, operation, value) do
     case do_write(shape, operation, value) do
@@ -22,6 +24,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
           "repo not available while writing #{inspect(shape)}/#{inspect(operation)}: #{Exception.message(reason)}",
           :warning
         )
+
         error
 
       {:error, reason} = error ->
@@ -37,9 +40,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
   defp do_write(shape, operation, value) do
     case {shape, operation, value} do
       {:user_card, :insert, %UserCard{} = card} ->
-        changeset =
-          %UserCard{}
-          |> UserCard.create_changeset(Map.from_struct(card))
+        changeset = Validation.validate_user_card_insert(card)
 
         with %{valid?: true} <- changeset do
           repo().insert(changeset,
@@ -47,7 +48,13 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
             conflict_target: :user_hash
           )
         else
-          _invalid -> {:ok, card}
+          %{valid?: false} = invalid_changeset ->
+            log(
+              "Invalid user_card insert signature for #{card.user_hash}: #{inspect(invalid_changeset.errors)}",
+              :warning
+            )
+
+            {:ok, card}
         end
 
       {:user_card, :update, %UserCard{} = card} ->
@@ -56,76 +63,129 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
             {:ok, card}
 
           existing ->
-            attrs =
-              card
-              |> Map.take([:name])
-              |> Map.reject(fn {_k, v} -> is_nil(v) end)
+            changeset = Validation.validate_user_card_update(existing, card)
 
-            existing
-            |> UserCard.update_name_changeset(attrs)
-            |> repo().update()
+            with %{valid?: true} <- changeset do
+              repo().update(changeset)
+            else
+              %{valid?: false} = invalid_changeset ->
+                log(
+                  "Invalid user_card update signature for #{card.user_hash}: #{inspect(invalid_changeset.errors)}",
+                  :warning
+                )
+
+                {:ok, card}
+            end
         end
 
-      {:user_card, :delete, %UserCard{user_hash: user_hash}} ->
-        repo().delete(%UserCard{user_hash: user_hash}, allow_stale: true)
+      {:user_card, :delete, %UserCard{} = card} ->
+        case repo().get(UserCard, card.user_hash) do
+          nil ->
+            {:ok, card}
+
+          existing ->
+            changeset = Validation.validate_user_card_delete(existing, card)
+
+            with %{valid?: true} <- changeset do
+              repo().update(changeset)
+            else
+              %{valid?: false} = invalid_changeset ->
+                log(
+                  "Invalid user_card delete signature for #{card.user_hash}: #{inspect(invalid_changeset.errors)}",
+                  :warning
+                )
+
+                {:ok, card}
+            end
+        end
 
       {:user_storage, :insert, %UserStorage{} = storage} ->
-        # Verify parent user_card exists - required for data integrity
-        with parent when not is_nil(parent) <- repo().get(UserCard, storage.user_hash),
-             changeset <- UserStorage.create_changeset(%UserStorage{}, Map.from_struct(storage)),
-             %{valid?: true} <- changeset do
-          repo().insert(changeset,
-            on_conflict: {:replace, [:value_b64]},
-            conflict_target: [:user_hash, :uuid]
-          )
-        else
-          nil ->
-            # Parent not synced yet - skip this record
-            # Electric live sync will re-deliver it once parent exists
-            log(
-              "Skipping user_storage insert - parent user_card not yet synced (user_hash: #{Base.encode16(storage.user_hash, case: :lower)})",
-              :debug
-            )
-
-            {:ok, :skipped_no_parent}
-
-          _invalid ->
-            {:ok, storage}
-        end
+        handle_user_storage_insert(storage)
 
       {:user_storage, :update, %UserStorage{} = storage} ->
-        # Verify parent user_card exists before updating
-        with {_, parent} when not is_nil(parent) <-
-               {:parent, repo().get(UserCard, storage.user_hash)},
-             {_, existing} when not is_nil(existing) <-
-               {:existing, repo().get_by(UserStorage, user_hash: storage.user_hash, uuid: storage.uuid)} do
-          attrs =
-            storage
-            |> Map.take([:value_b64])
-            |> Map.reject(fn {_k, v} -> is_nil(v) end)
-
-          existing
-          |> UserStorage.update_changeset(attrs)
-          |> repo().update()
-        else
-          {:parent, nil} ->
-            # Parent doesn't exist or was deleted - skip update
-            log(
-              "Skipping user_storage update - parent user_card not found (user_hash: #{Base.encode16(storage.user_hash, case: :lower)})",
-              :debug
-            )
-
-            {:ok, :skipped_no_parent}
-
-          {:existing, nil} ->
-            {:ok, storage}
-        end
-
-      {:user_storage, :delete, %UserStorage{user_hash: user_hash, uuid: uuid}} ->
-        repo().delete(%UserStorage{user_hash: user_hash, uuid: uuid}, allow_stale: true)
+        handle_user_storage_update(storage)
     end
   rescue
     e in RuntimeError -> {:error, {:repo_not_available, e}}
     e in Postgrex.Error -> {:error, e}
   end
+
+  defp handle_user_storage_insert(storage) do
+    # Verify parent user_card exists
+    with parent when not is_nil(parent) <- repo().get(UserCard, storage.user_hash),
+         storage_with_hash <- calculate_sign_hash(storage),
+         changeset <- Validation.validate_user_storage_insert(storage_with_hash),
+         %{valid?: true} <- changeset do
+      # Check if record already exists
+      case repo().get_by(UserStorage, user_hash: storage.user_hash, uuid: storage.uuid) do
+        nil ->
+          # No conflict - insert directly
+          repo().insert(changeset)
+
+        existing ->
+          # Conflict - compare timestamps and version
+          Versioning.handle_insert_with_conflict(repo(), existing, storage_with_hash)
+      end
+    else
+      nil ->
+        log(
+          "Skipping user_storage insert - parent user_card not yet synced (user_hash: #{storage.user_hash})",
+          :debug
+        )
+
+        {:ok, :skipped_no_parent}
+
+      %{valid?: false} = invalid_changeset ->
+        log(
+          "Invalid user_storage insert signature: #{inspect(invalid_changeset.errors)}",
+          :warning
+        )
+
+        {:ok, storage}
+    end
+  end
+
+  defp handle_user_storage_update(storage) do
+    # Verify parent user_card exists
+    with {_, parent} when not is_nil(parent) <-
+           {:parent, repo().get(UserCard, storage.user_hash)},
+         {_, existing} when not is_nil(existing) <-
+           {:existing, repo().get_by(UserStorage, user_hash: storage.user_hash, uuid: storage.uuid)},
+         storage_with_hash <- calculate_sign_hash(storage),
+         changeset <- Validation.validate_user_storage_update(existing, storage_with_hash),
+         %{valid?: true} <- changeset do
+      # Compare timestamps and version
+      Versioning.handle_update_with_versioning(repo(), existing, storage_with_hash)
+    else
+      {:parent, nil} ->
+        log(
+          "Skipping user_storage update - parent user_card not found (user_hash: #{storage.user_hash})",
+          :debug
+        )
+
+        {:ok, :skipped_no_parent}
+
+      {:existing, nil} ->
+        {:ok, storage}
+
+      %{valid?: false} = invalid_changeset ->
+        log(
+          "Invalid user_storage update signature: #{inspect(invalid_changeset.errors)}",
+          :warning
+        )
+
+        {:ok, storage}
+    end
+  end
+
+  defp calculate_sign_hash(%UserStorage{sign_b64: sign_b64} = storage) when is_binary(sign_b64) do
+    sign_hash =
+      sign_b64
+      |> EnigmaPq.hash()
+      |> Chat.Data.Types.UserStorageSignHash.from_binary()
+
+    %{storage | sign_hash: sign_hash}
+  end
+
+  defp calculate_sign_hash(storage), do: storage
 end

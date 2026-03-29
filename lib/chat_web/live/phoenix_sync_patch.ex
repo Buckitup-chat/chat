@@ -165,7 +165,10 @@ defmodule ChatWeb.PhoenixSyncPatch do
 
   defp extract_client_error_message(message) when is_binary(message), do: message
   defp extract_client_error_message(%{message: message}) when is_binary(message), do: message
-  defp extract_client_error_message([%{message: message} | _]) when is_binary(message), do: message
+
+  defp extract_client_error_message([%{message: message} | _]) when is_binary(message),
+    do: message
+
   defp extract_client_error_message(%{__exception__: true} = error), do: Exception.message(error)
   defp extract_client_error_message(nil), do: nil
   defp extract_client_error_message(message), do: inspect(message)

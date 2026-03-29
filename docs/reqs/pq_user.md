@@ -16,7 +16,7 @@ Secret keys never leave the Frontend. If the server is compromised, it holds no 
 
 | Field | Size | Algorithm / Format | Notes |
 |---|---|---|---|
-| `user_hash` | 65 bytes | `<<0x01, SHA3-512(sign_pkey)>>` | Version-prefixed identity anchor |
+| `user_hash` | 130 chars | `"u_" + hex(SHA3-512(sign_pkey))` | URL-friendly hex string with prefix |
 | `sign_pkey` | ~2592 bytes | ML-DSA-87 (FIPS 204) | Post-quantum signing public key |
 | `sign_skey` | ~4896 bytes | ML-DSA-87 (FIPS 204) | Post-quantum signing private key; FE/bots only |
 | `crypt_pkey` | ~1568 bytes | ML-KEM-1024 (FIPS 203) | Post-quantum KEM encapsulation key |
@@ -26,6 +26,9 @@ Secret keys never leave the Frontend. If the server is compromised, it holds no 
 | `contact_skey` | 32 bytes | secp256k1 | Classical private key; FE/bots only |
 | `contact_cert` | ~4627 bytes | ML-DSA-87 signature of `contact_pkey` | Binds contact key to identity |
 | `name` | text | UTF-8 | Display name |
+| `deleted_flag` | boolean | true/false | Soft delete marker; true indicates deleted |
+| `owner_timestamp` | integer | Monotonic counter | Prevents replay attacks; must increase on updates |
+| `sign_b64` | ~4627 bytes | ML-DSA-87 signature | Signature of all fields except sign_b64 itself |
 
 ### Algorithms
 
@@ -68,7 +71,7 @@ Key generation:
 
 Derived values:
 
-- `user_hash` = `<<0x01, SHA3-512(sign_pkey)>>`
+- `user_hash` = `"u_" + Base.encode16(SHA3-512(sign_pkey), case: :lower)`
 - `crypt_cert` = `ML-DSA-87.sign(crypt_pkey, sign_skey)`
 - `contact_cert` = `ML-DSA-87.sign(contact_pkey, sign_skey)`
 
@@ -86,6 +89,9 @@ User card is stored in the database.
 - contact_pkey
 - contact_cert
 - name
+- deleted_flag
+- owner_timestamp
+- sign_b64
 
 ### User Identity [FE only or bots or tests]
 
@@ -110,10 +116,11 @@ User storage is a simple key-value store.
 
 ## Implementation
 
-Postgres domain types (prefix-versioned bytea):
+PostgreSQL custom domain types with format validation:
 
 ```SQL
-  CREATE DOMAIN user_hash AS bytea NOT NULL CHECK (substring(VALUE from 1 for 1) = '\x01'::bytea);
+CREATE DOMAIN user_hash_type AS TEXT
+  CHECK (VALUE ~ '^u_[a-f0-9]{128}$');
 ```
 
 Custom Ecto type:
@@ -121,19 +128,47 @@ Custom Ecto type:
 ```elixir
   defmodule Chat.Data.Types.UserHash do
     use Ecto.Type
+    alias Chat.Data.Types.Consts
+
+    @prefix Consts.user_prefix()  # "u_"
+    @expected_hex_length 128  # 64 bytes * 2
 
     @impl true
-    def type, do: :bytea
+    def type, do: :string
 
     @impl true
-    def cast(<<0x01, _>> = hash) when is_binary(hash), do: {:ok, hash}
+    def cast(@prefix <> hex_string) when byte_size(hex_string) == @expected_hex_length do
+      case Base.decode16(hex_string, case: :mixed) do
+        {:ok, _binary} -> {:ok, @prefix <> String.downcase(hex_string)}
+        :error -> :error
+      end
+    end
+
     def cast(_), do: :error
 
     @impl true
-    def dump(value), do: cast(value)
+    def dump(@prefix <> hex_string) do
+      {:ok, @prefix <> String.downcase(hex_string)}
+    end
+
+    def dump(_), do: :error
 
     @impl true
-    def load(value), do: cast(value)
+    def load(@prefix <> _hex_string = value), do: {:ok, value}
+    def load(_), do: :error
+
+    @doc "Convert binary hash to string format"
+    def from_binary(binary) when byte_size(binary) == 64 do
+      @prefix <> Base.encode16(binary, case: :lower)
+    end
+
+    @doc "Convert string hash to binary format"
+    def to_binary(@prefix <> hex_string) do
+      case Base.decode16(hex_string, case: :mixed) do
+        {:ok, binary} -> binary
+        :error -> nil
+      end
+    end
   end
 ```
 
@@ -148,23 +183,33 @@ User Card schema:
 
     schema "user_cards" do
       field(:sign_pkey, :binary)
-      field(:crypt_pkey, :binary)
-      field(:crypt_cert, :binary)
       field(:contact_pkey, :binary)
       field(:contact_cert, :binary)
-      field(:name, :text)
+      field(:crypt_pkey, :binary)
+      field(:crypt_cert, :binary)
+      field(:name, :string)
+      field(:deleted_flag, :boolean)
+      field(:owner_timestamp, :integer)
+      field(:sign_b64, :binary)
     end
 
     def create_changeset(card, attrs) do
       card
-      |> cast(attrs, [:user_hash, :sign_pkey, :crypt_pkey, :crypt_cert, :contact_pkey, :contact_cert, :name])
-      |> validate_required([:user_hash, :sign_pkey, :crypt_pkey, :name])
+      |> cast(attrs, [:user_hash, :sign_pkey, :contact_pkey, :contact_cert, :crypt_pkey, :crypt_cert, :name, :deleted_flag, :owner_timestamp, :sign_b64])
+      |> validate_required([:user_hash, :sign_pkey, :contact_pkey, :contact_cert, :crypt_pkey, :crypt_cert, :name, :deleted_flag, :owner_timestamp, :sign_b64])
+      |> unique_constraint(:user_hash, name: :user_cards_pkey)
     end
 
     def update_name_changeset(card, attrs) do
       card
-      |> cast(attrs, [:user_hash, :name])
-      |> validate_required([:user_hash, :name])
+      |> cast(attrs, [:name, :owner_timestamp, :sign_b64])
+      |> validate_required([:name, :owner_timestamp, :sign_b64])
+    end
+
+    def update_deleted_flag_changeset(card, attrs) do
+      card
+      |> cast(attrs, [:deleted_flag, :owner_timestamp, :sign_b64])
+      |> validate_required([:deleted_flag, :owner_timestamp, :sign_b64])
     end
   end
 ```
@@ -220,18 +265,18 @@ User Storage schema:
 **Hash Algorithm: SHA3-512**
 
 - Use `:crypto.hash(:sha3_512, data)` for computing user hashes
-- Output: 512 bits (64 bytes) with version prefix 0x01
+- Output: 512 bits (64 bytes) encoded as hex with "u_" prefix
 - Security: NIST-approved, post-quantum resistant, suitable for long-term archival
-- Final format: `<<0x01, sha3_512_digest::binary>>`
+- Final format: `"u_" <> Base.encode16(sha3_512_digest, case: :lower)` (130 characters total)
 
 ### Shortcode Display
 
 For user-friendly display, user_hash is shortened to a 6-character hex code:
 
 **Implementation:**
-- Extract bytes 2-4 from user_hash (skipping the 0x01 prefix)
-- Encode as lowercase hexadecimal
-- Example: `0x01aabbccdddddddd...` → shortcode `"aabbcc"`
+- Extract first 3 bytes from the hex portion (after "u_" prefix)
+- Take first 6 hex characters
+- Example: `"u_aabbccdddddddd..."` → shortcode `"aabbcc"`
 
 **Protocol:**
 
@@ -251,9 +296,9 @@ defprotocol Chat.Proto.Shortcode do
 end
 
 defimpl Chat.Proto.Shortcode, for: Chat.Data.Schemas.UserCard do
-  def short_code(%Chat.Data.Schemas.UserCard{user_hash: user_hash}) do
-    <<_prefix::binary-size(1), code::binary-size(3), _rest::binary>> = user_hash
-    Base.encode16(code, case: :lower)
+  def short_code(%Chat.Data.Schemas.UserCard{user_hash: "u_" <> hex_string}) do
+    # Take first 6 hex characters (3 bytes worth)
+    String.slice(hex_string, 0, 6)
   end
 end
 ```

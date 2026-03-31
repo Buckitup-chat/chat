@@ -103,14 +103,7 @@ defmodule Chat.PhoenixSyncReinit do
     try do
       %{opts: opts} = Ecto.Adapter.lookup_meta(repo)
 
-      [
-        hostname: opts[:hostname] || "localhost",
-        port: opts[:port] || 5432,
-        database: opts[:database],
-        username: opts[:username],
-        password: opts[:password]
-      ]
-      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+      build_connection_opts(opts)
     rescue
       _ ->
         # Fallback to static config if runtime lookup fails
@@ -122,12 +115,17 @@ defmodule Chat.PhoenixSyncReinit do
   defp get_static_connection_opts(repo) do
     config = repo.config()
 
+    build_connection_opts(config)
+  end
+
+  defp build_connection_opts(source) do
     [
-      hostname: config[:hostname] || "localhost",
-      port: config[:port] || 5432,
-      database: config[:database],
-      username: config[:username],
-      password: config[:password]
+      hostname: source[:hostname] || "localhost",
+      port: source[:port] || 5432,
+      database: source[:database],
+      username: source[:username],
+      password: source[:password],
+      socket_options: [{:keepalive, true}]
     ]
     |> Enum.reject(fn {_k, v} -> is_nil(v) end)
   end

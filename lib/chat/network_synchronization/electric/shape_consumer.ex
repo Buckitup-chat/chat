@@ -169,7 +169,16 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
 
     {:ok, pid} =
       Task.start(fn ->
-        Electric.Client.new!(endpoint: "#{peer_url}/electric/v1/#{shape}")
+        Electric.Client.new!(
+          endpoint: "#{peer_url}/electric/v1/#{shape}",
+          fetch:
+            {Electric.Client.Fetch.HTTP,
+             request: [
+               connect_options: [
+                 transport_opts: [{:keepalive, true}]
+               ]
+             ]}
+        )
         |> Electric.Client.stream(schema_module, stream_opts)
         |> Stream.each(&dispatch_message(&1, parent, peer_url, shape))
         |> Stream.run()

@@ -2,14 +2,41 @@ defmodule ChatWeb.ElectricLive.Index do
   @moduledoc """
   Landing page that lists all Electric-synced LiveViews.
 
-  This is a static page (no streaming) that provides quick access to all
-  available Electric-synced resources in the application.
+  Shows real-time initialization status when the Electric stack is not yet
+  ready, then transitions to the resource listing once everything is up.
   """
   use ChatWeb, :live_view
 
+  alias ChatWeb.Plugs.ElectricReadiness
+
+  @poll_interval_ms 1_000
+
   @impl true
   def mount(_params, _session, socket) do
+    socket = socket |> assign(:readiness, check_readiness())
+
+    if connected?(socket) do
+      Process.send_after(self(), :poll_readiness, @poll_interval_ms)
+    end
+
     {:ok, socket}
+  end
+
+  @impl true
+  def handle_info(:poll_readiness, socket) do
+    readiness = check_readiness()
+    socket = assign(socket, :readiness, readiness)
+
+    Process.send_after(self(), :poll_readiness, @poll_interval_ms)
+
+    {:noreply, socket}
+  end
+
+  defp check_readiness do
+    case ElectricReadiness.check_readiness() do
+      :ready -> :ready
+      {:not_ready, phase, _message} -> phase
+    end
   end
 
   @impl true
@@ -24,7 +51,12 @@ defmodule ChatWeb.ElectricLive.Index do
           </p>
         </div>
 
-        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <.init_status :if={@readiness != :ready} readiness={@readiness} />
+
+        <div
+          :if={@readiness == :ready}
+          class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+        >
           <%!-- User Cards --%>
           <a
             href="/electric/user_cards"
@@ -245,6 +277,65 @@ defmodule ChatWeb.ElectricLive.Index do
           </div>
         </div>
       </div>
+    </div>
+    """
+  end
+
+  defp phase_label(phase) do
+    case phase do
+      "db_initializing" -> "Database initializing..."
+      "electric_starting" -> "Electric stack starting..."
+      _ -> "Initializing..."
+    end
+  end
+
+  defp phase_step(phase) do
+    case phase do
+      "db_initializing" -> 1
+      "electric_starting" -> 2
+      _ -> 1
+    end
+  end
+
+  defp step_class(current_step, step) do
+    case current_step >= step do
+      true -> "flex items-center text-sm font-medium text-blue-600"
+      _ -> "flex items-center text-sm font-medium text-gray-400"
+    end
+  end
+
+  defp step_badge_class(current_step, step) do
+    case current_step >= step do
+      true ->
+        "mr-3 flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs border-blue-600 bg-blue-600 text-white"
+
+      _ ->
+        "mr-3 flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs border-gray-300 text-gray-400"
+    end
+  end
+
+  attr :readiness, :string, required: true
+
+  defp init_status(assigns) do
+    ~H"""
+    <div class="rounded-lg bg-white shadow p-8 max-w-lg mx-auto mt-8">
+      <div class="flex items-center justify-center mb-6">
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+      </div>
+      <h2 class="text-xl font-semibold text-gray-900 text-center mb-2">System Initializing</h2>
+      <p class="text-sm text-gray-500 text-center mb-8">
+        {phase_label(@readiness)}
+      </p>
+      <ol class="space-y-4">
+        <li class={step_class(phase_step(@readiness), 1)}>
+          <span class={step_badge_class(phase_step(@readiness), 1)}>1</span>
+          Database initializing
+        </li>
+        <li class={step_class(phase_step(@readiness), 2)}>
+          <span class={step_badge_class(phase_step(@readiness), 2)}>2</span>
+          Electric stack starting
+        </li>
+      </ol>
     </div>
     """
   end

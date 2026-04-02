@@ -144,17 +144,24 @@ defmodule ChatWeb.Router do
   scope "/electric/v1", ChatWeb do
     pipe_through :electric
 
-    # Phoenix.Sync endpoint for LiveView real-time sync
-    sync("/user_card", Chat.Data.Schemas.UserCard)
-    sync("/user_storage", Chat.Data.Schemas.UserStorage)
-    sync("/user_storage_version", Chat.Data.Schemas.UserStorageVersion)
-
+    # Always accessible — status probe and challenge generation don't need Electric
+    get "/status", ElectricStatusController, :show
     get "/challenge", ChallengeController, :create
-    get "/system_identifier", SystemIdentifierController, :show
 
     scope "/" do
-      pipe_through ChatWeb.Plugs.ElectricChallengeInjector
-      post "/ingest", ElectricController, :ingest
+      pipe_through ChatWeb.Plugs.ElectricReadiness
+
+      # Phoenix.Sync endpoint for LiveView real-time sync
+      sync("/user_card", Chat.Data.Schemas.UserCard)
+      sync("/user_storage", Chat.Data.Schemas.UserStorage)
+      sync("/user_storage_version", Chat.Data.Schemas.UserStorageVersion)
+
+      get "/system_identifier", SystemIdentifierController, :show
+
+      scope "/" do
+        pipe_through ChatWeb.Plugs.ElectricChallengeInjector
+        post "/ingest", ElectricController, :ingest
+      end
     end
   end
 

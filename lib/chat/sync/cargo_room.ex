@@ -62,7 +62,7 @@ defmodule Chat.Sync.CargoRoom do
         destination = %{pub_key: Base.encode16(room_key, case: :lower), type: :room}
 
         with file_info <- %{
-               time: DateTime.utc_now() |> DateTime.to_unix(),
+               time: Chat.TimeKeeper.now_unix(),
                size: Map.get(metadata, "Content-Length", "0") |> String.to_integer(),
                type: Map.get(metadata, "Content-Type", "application/octet-stream"),
                name_prefix: Map.get(metadata, "Name-Prefix", "")
@@ -107,7 +107,7 @@ defmodule Chat.Sync.CargoRoom do
         if room_identiny = get_room_identity_fn.(room_key) do
           message =
             content
-            |> Messages.Text.new(DateTime.utc_now() |> DateTime.to_unix())
+            |> Messages.Text.new(Chat.TimeKeeper.now_unix())
             |> Rooms.add_new_message(writer, room_identiny)
 
           {msg_index, msg} = message

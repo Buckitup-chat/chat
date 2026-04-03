@@ -5,7 +5,7 @@ defmodule ChatWeb.TempSyncController do
   alias Chat.Db
 
   def backup(conn, _) do
-    date_str = DateTime.utc_now() |> DateTime.to_string()
+    date_str = Chat.TimeKeeper.now() |> DateTime.to_string()
     filename = "backup_#{date_str}.cub"
 
     conn

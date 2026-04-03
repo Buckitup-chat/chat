@@ -173,7 +173,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
     trimmed_text = String.trim(text)
 
     if trimmed_text != "" do
-      time = DateTime.utc_now() |> DateTime.to_unix(:second)
+      time = Chat.TimeKeeper.now_unix()
 
       Task.start(fn ->
         %Messages.Text{text: text, timestamp: time}

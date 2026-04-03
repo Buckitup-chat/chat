@@ -366,7 +366,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   # Private helpers
 
   defp get_challenge(challenge_url) do
-    timestamp = DateTime.utc_now()
+    timestamp = Chat.TimeKeeper.now()
 
     case Req.get(challenge_url, headers: [{"accept", "application/json"}]) do
       {:ok, %{status: 200, body: body, headers: headers}} ->
@@ -465,7 +465,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
       })
 
     ingest_url = base_url <> "/electric/v1/ingest"
-    timestamp = DateTime.utc_now()
+    timestamp = Chat.TimeKeeper.now()
 
     headers = [
       {"accept", "application/json"},

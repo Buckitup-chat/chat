@@ -20,7 +20,7 @@ defmodule NaiveApi.Upload do
 
     UploadIndex.add(upload_key, %Upload{
       encrypted_secret: encrypted_secret,
-      timestamp: DateTime.utc_now() |> DateTime.to_unix(),
+      timestamp: Chat.TimeKeeper.now_unix(),
       client_size: entry.client_size,
       client_type: entry.client_type,
       client_name: entry.client_name

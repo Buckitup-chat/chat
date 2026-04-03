@@ -284,7 +284,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
 
         :ok = save_file({file_key, backup_content}, {backup_entry.client_size, file_secret})
 
-        now = DateTime.utc_now() |> DateTime.to_unix()
+        now = Chat.TimeKeeper.now_unix()
 
         text =
           "The backup `#{backup_entry.client_name}` is not encrypted. Do not share it with anyone."

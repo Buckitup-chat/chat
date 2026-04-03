@@ -48,7 +48,7 @@ defmodule Chat.KeyRingTokens do
 
   defmodule Logic do
     @moduledoc "Keyring export token logic"
-    def generate_token_data(now \\ DateTime.utc_now() |> DateTime.to_unix()) do
+    def generate_token_data(now \\ Chat.TimeKeeper.now_unix()) do
       pid = self()
       <<code::integer>> = :crypto.strong_rand_bytes(1)
 
@@ -60,7 +60,7 @@ defmodule Chat.KeyRingTokens do
 
     def exporter_data({key, {_, code, _}}), do: {key, code}
 
-    def valid_importer_pid(value, exporter_code, now \\ DateTime.utc_now() |> DateTime.to_unix()) do
+    def valid_importer_pid(value, exporter_code, now \\ Chat.TimeKeeper.now_unix()) do
       with {pid, ^exporter_code, time} <- value,
            true <- time + 180 > now do
         {:ok, pid}

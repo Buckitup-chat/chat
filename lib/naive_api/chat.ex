@@ -92,5 +92,5 @@ defmodule NaiveApi.Chat do
   defp author_card(%{is_mine?: false}, _me, peer), do: peer
   defp author_card(_message, me, _peer), do: me |> Card.from_identity()
 
-  defp now, do: DateTime.utc_now() |> DateTime.to_unix()
+  defp now, do: Chat.TimeKeeper.now_unix()
 end

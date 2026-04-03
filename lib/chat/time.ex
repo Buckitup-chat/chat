@@ -15,8 +15,22 @@ defmodule Chat.Time do
   end
 
   def init_time do
-    decide_time()
-    |> set_time()
+    path = Chat.TimeKeeper.persist_path()
+
+    case Chat.TimeKeeper.try_ntp() do
+      {:ok, unix} ->
+        Logger.info("[Time] NTP time acquired")
+        DateTime.from_unix!(unix)
+
+      :error ->
+        persisted = Chat.TimeKeeper.read_persisted_time(path)
+        decided = decide_time()
+
+        [persisted, decided]
+        |> Enum.reject(&is_nil/1)
+        |> Enum.max_by(&DateTime.to_unix/1, fn -> decided end)
+    end
+    |> set_system_time_once()
   end
 
   @doc """
@@ -27,23 +41,17 @@ defmodule Chat.Time do
 
   """
   def set_time(%NaiveDateTime{} = time) do
-    if NaiveDateTime.compare(time, NaiveDateTime.utc_now()) == :gt do
-      string_time = time |> NaiveDateTime.truncate(:second) |> NaiveDateTime.to_string()
-
-      if Application.get_env(:chat, :set_time, false) do
-        set_system_time(string_time)
-      else
-        Logger.debug(["Set clock to ", string_time, " UTC"])
-        :ok
-      end
-    end
+    time
+    |> DateTime.from_naive!("Etc/UTC")
+    |> DateTime.to_unix()
+    |> Chat.TimeKeeper.update_time()
   end
 
   def set_time(%DateTime{} = time) do
     time
     |> DateTime.shift_zone!("Etc/UTC")
-    |> DateTime.to_naive()
-    |> set_time()
+    |> DateTime.to_unix()
+    |> Chat.TimeKeeper.update_time()
   end
 
   def monotonic_offset(unix_timestamp) do
@@ -52,6 +60,22 @@ defmodule Chat.Time do
 
   def monotonic_to_unix(monotonic_offset) do
     System.monotonic_time(:second) + monotonic_offset
+  end
+
+  defp set_system_time_once(%DateTime{} = time) do
+    string_time =
+      time
+      |> DateTime.shift_zone!("Etc/UTC")
+      |> DateTime.to_naive()
+      |> NaiveDateTime.truncate(:second)
+      |> NaiveDateTime.to_string()
+
+    if Application.get_env(:chat, :set_time, false) do
+      set_system_time(string_time)
+    else
+      Logger.debug(["Set clock to ", string_time, " UTC"])
+      :ok
+    end
   end
 
   defp set_system_time(string_time) do

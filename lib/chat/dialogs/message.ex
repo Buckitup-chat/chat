@@ -15,7 +15,7 @@ defmodule Chat.Dialogs.Message do
   end
 
   defp new(content, opts) do
-    now = opts |> Keyword.get(:now, DateTime.utc_now())
+    now = opts |> Keyword.get(:now, Chat.TimeKeeper.now())
     type = opts |> Keyword.get(:type, :text)
     id = opts |> Keyword.get(:id, UUID.uuid4())
     is_a_to_b? = opts |> Keyword.get(:is_a_to_b?, true)

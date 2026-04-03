@@ -121,7 +121,7 @@ defmodule ChatWeb.MainLive.Admin.CargoUserData do
     content = identity |> Actor.new([], %{}) |> Actor.to_encrypted_json("")
 
     entry = %{
-      client_last_modified: DateTime.utc_now() |> DateTime.to_unix(),
+      client_last_modified: Chat.TimeKeeper.now_unix(),
       client_name: name <> ".data",
       client_relative_path: nil,
       client_size: byte_size(content),

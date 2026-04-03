@@ -83,7 +83,7 @@ defmodule Proxy.Api do
     } = args |> unwrap_map_by(fn %{me: card} -> Identify.pub_key(card) end)
 
     requester_pub_key = Identify.pub_key(requester_card)
-    time = DateTime.utc_now() |> DateTime.to_unix()
+    time = Chat.TimeKeeper.now_unix()
 
     room =
       Rooms.add_request(room_key, requester_pub_key, time, fn req_message ->
@@ -109,7 +109,7 @@ defmodule Proxy.Api do
     } = args |> unwrap_map_by(fn %{me: card} -> Identify.pub_key(card) end)
 
     approver_pub_key = Identify.pub_key(approver_card)
-    time = DateTime.utc_now() |> DateTime.to_unix()
+    time = Chat.TimeKeeper.now_unix()
 
     room =
       Rooms.approve_request(room_key, user_key, ciphered_room_identity, public_only: true)

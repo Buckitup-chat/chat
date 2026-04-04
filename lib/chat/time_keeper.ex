@@ -118,6 +118,8 @@ defmodule Chat.TimeKeeper do
       new_offset = monotonic_offset(unix_timestamp)
       :persistent_term.put(@pt_key, new_offset)
 
+      persist_time(unix_timestamp, state.persist_path)
+
       log(["offset updated, delta=", Integer.to_string(unix_timestamp - current_unix), "s"], :debug)
 
       {:noreply, %{state | offset: new_offset}}
@@ -130,16 +132,20 @@ defmodule Chat.TimeKeeper do
   def handle_info(:persist, state) do
     unix = System.monotonic_time(:second) + state.offset
 
-    case File.write(state.persist_path, Integer.to_string(unix)) do
-      :ok -> :ok
-      {:error, reason} -> log("persist failed: #{inspect(reason)}", :warning)
-    end
+    persist_time(unix, state.persist_path)
 
     timer = Process.send_after(self(), :persist, @persist_interval)
     {:noreply, %{state | persist_timer: timer}}
   end
 
   def handle_info(_msg, state), do: {:noreply, state}
+
+  defp persist_time(unix, path) do
+    case File.write(path, Integer.to_string(unix)) do
+      :ok -> :ok
+      {:error, reason} -> log("persist failed: #{inspect(reason)}", :warning)
+    end
+  end
 
   defp monotonic_offset(unix_timestamp) do
     unix_timestamp - System.monotonic_time(:second)

@@ -1,5 +1,6 @@
 defmodule ChatWeb.ElectricLive.UserStorageLive.IndexTest do
-  use ChatWeb.ConnCase, async: true
+  use ChatWeb.ConnCase, async: false
+  use ChatWeb.DataCase
 
   import Phoenix.LiveViewTest
 

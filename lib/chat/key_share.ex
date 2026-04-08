@@ -189,15 +189,18 @@ defmodule Chat.KeyShare do
     try_number
     |> Combinatorics.n_combinations(shares)
     |> Enum.reduce_while([], fn share, acc ->
-      with keypair <- build_keypair_without({shares, share}),
-           user_from_share <- user_in_share(keypair) do
-        case user_from_share do
-          :user_keystring_broken ->
-            {:cont, []}
+      case build_keypair_without({shares, share}) do
+        :error ->
+          {:cont, []}
 
-          {:ok, _user} ->
-            {:halt, acc ++ share}
-        end
+        keypair ->
+          case user_in_share(keypair) do
+            :user_keystring_broken ->
+              {:cont, []}
+
+            {:ok, _user} ->
+              {:halt, acc ++ share}
+          end
       end
     end)
   end
@@ -235,6 +238,8 @@ defmodule Chat.KeyShare do
     |> Kernel.--(exclude_check_list(exclude))
     |> Enum.map(&Map.get(&1, :key))
     |> Enigma.recover_secret_from_shares()
+  rescue
+    RuntimeError -> :error
   end
 
   defp exclude_check_list(exclude) when is_list(exclude), do: exclude

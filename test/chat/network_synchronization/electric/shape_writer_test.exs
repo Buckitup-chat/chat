@@ -33,15 +33,28 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriterTest do
     %{updated_card | sign_b64: sign_b64}
   end
 
-  defp user_storage(user_hash, attrs \\ %{}) do
-    Map.merge(
+  defp signed_user_storage(identity, user_hash, attrs \\ %{}) do
+    storage =
       %UserStorage{
         user_hash: user_hash,
         uuid: Ecto.UUID.generate(),
-        value_b64: "dmFsdWU="
-      },
-      attrs
-    )
+        value_b64: "dmFsdWU=",
+        deleted_flag: false,
+        owner_timestamp: System.os_time(:millisecond)
+      }
+      |> struct(attrs)
+
+    sign_b64 =
+      storage
+      |> Integrity.signature_payload()
+      |> EnigmaPq.sign(identity.sign_skey)
+
+    sign_hash =
+      sign_b64
+      |> EnigmaPq.hash()
+      |> Chat.Data.Types.UserStorageSignHash.from_binary()
+
+    %{storage | sign_b64: sign_b64, sign_hash: sign_hash}
   end
 
   describe "user_card" do
@@ -138,34 +151,51 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriterTest do
       card = signed_user_card(identity)
       {:ok, _} = ShapeWriter.write(:user_card, :insert, card)
 
-      {:ok, user_hash: card.user_hash}
+      {:ok, user_hash: card.user_hash, identity: identity}
     end
 
-    test "insert writes a new row", %{user_hash: user_hash} do
-      row = user_storage(user_hash)
+    test "insert writes a new row", %{user_hash: user_hash, identity: identity} do
+      row = signed_user_storage(identity, user_hash)
       assert {:ok, _} = ShapeWriter.write(:user_storage, :insert, row)
 
       stored = Repo.get_by(UserStorage, user_hash: user_hash, uuid: row.uuid)
       assert stored.value_b64 == "dmFsdWU="
     end
 
-    test "insert is idempotent — upserts on conflict", %{user_hash: user_hash} do
+    test "insert is idempotent — upserts on conflict", %{user_hash: user_hash, identity: identity} do
       uuid = Ecto.UUID.generate()
-      row = user_storage(user_hash, %{uuid: uuid})
+      row = signed_user_storage(identity, user_hash, %{uuid: uuid})
 
       {:ok, _} = ShapeWriter.write(:user_storage, :insert, row)
-      {:ok, _} = ShapeWriter.write(:user_storage, :insert, %{row | value_b64: "dXBkYXRlZA=="})
+
+      updated_row =
+        signed_user_storage(identity, user_hash, %{
+          uuid: uuid,
+          value_b64: "dXBkYXRlZA==",
+          owner_timestamp: row.owner_timestamp + 1
+        })
+
+      {:ok, _} = ShapeWriter.write(:user_storage, :insert, updated_row)
 
       stored = Repo.get_by(UserStorage, user_hash: user_hash, uuid: uuid)
       assert stored.value_b64 == "dXBkYXRlZA=="
     end
 
-    test "delete removes the row", %{user_hash: user_hash} do
-      row = user_storage(user_hash)
+    test "soft delete marks the row as deleted", %{user_hash: user_hash, identity: identity} do
+      row = signed_user_storage(identity, user_hash)
       {:ok, _} = ShapeWriter.write(:user_storage, :insert, row)
-      {:ok, _} = ShapeWriter.write(:user_storage, :delete, row)
 
-      assert Repo.get_by(UserStorage, user_hash: user_hash, uuid: row.uuid) == nil
+      deleted_row =
+        signed_user_storage(identity, user_hash, %{
+          uuid: row.uuid,
+          deleted_flag: true,
+          owner_timestamp: row.owner_timestamp + 1
+        })
+
+      {:ok, _} = ShapeWriter.write(:user_storage, :update, deleted_row)
+
+      stored = Repo.get_by(UserStorage, user_hash: user_hash, uuid: row.uuid)
+      assert stored.deleted_flag == true
     end
   end
 end

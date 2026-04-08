@@ -28,6 +28,7 @@ chat-*.tar
 /priv/static/*.gz
 /priv/certs/
 /priv/data
+/priv/timekeeper_time
 /persistent
 
 # Ignore digested assets cache.

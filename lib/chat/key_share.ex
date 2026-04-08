@@ -1,7 +1,7 @@
 defmodule Chat.KeyShare do
   @moduledoc "Manipulate social sharing keys"
 
-  alias Chat.{Dialogs, Dialogs.Dialog, Identity, User.Registry}
+  alias Chat.{Card, Dialogs, Dialogs.Dialog, Identity, User.Registry}
   alias Chat.{ChunkedFiles, ChunkedFilesMultisecret}
   alias Chat.Upload.UploadKey
 
@@ -95,13 +95,10 @@ defmodule Chat.KeyShare do
   def user_in_share(keystring) do
     case keystring |> Base.decode64() do
       {:ok, <<_private::binary-size(32), public::binary-size(33)>>} ->
-        {_, user} =
-          Registry.all()
-          |> Enum.find(fn {_, user} ->
-            user.pub_key == public
-          end)
-
-        {:ok, user}
+        case Registry.one(public) do
+          %Card{} = user -> {:ok, user}
+          nil -> :user_keystring_broken
+        end
 
       :error ->
         :user_keystring_broken

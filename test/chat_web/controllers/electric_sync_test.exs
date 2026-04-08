@@ -11,7 +11,7 @@ defmodule ChatWeb.ElectricSyncTest do
   use ChatWeb.DataCase
 
   alias Chat.Data.Schemas.UserCard
-  alias Chat.Data.Types.Consts
+  alias Chat.Data.Types.UserHash
   alias Chat.Repo
 
   setup %{conn: conn} do
@@ -21,7 +21,7 @@ defmodule ChatWeb.ElectricSyncTest do
 
   defp user_card_attrs(name) do
     %{
-      user_hash: Consts.user_hash_prefix() <> :crypto.strong_rand_bytes(64),
+      user_hash: UserHash.from_binary(:crypto.strong_rand_bytes(64)),
       sign_pkey: :crypto.strong_rand_bytes(32),
       contact_pkey: :crypto.strong_rand_bytes(32),
       contact_cert: :crypto.strong_rand_bytes(64),
@@ -93,7 +93,7 @@ defmodule ChatWeb.ElectricSyncTest do
 
       card_data = %{
         "name" => card.name,
-        "user_hash" => Base.encode16(card.user_hash, case: :lower)
+        "user_hash" => card.user_hash
       }
 
       {:ok, json} = Jason.encode(card_data)

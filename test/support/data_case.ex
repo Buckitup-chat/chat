@@ -38,19 +38,45 @@ defmodule ChatWeb.DataCase do
 
   @stack_id "electric-embedded"
   @ets_table :"#{@stack_id}:status_monitor"
+  @conditions [:pg_lock_acquired, :replication_client_ready, :connection_pool_ready, :shape_log_collector_ready]
 
   defp ensure_electric_ready do
-    unless ets_table_exists?(@ets_table) do
-      :ets.new(@ets_table, [:named_table, :public])
-    end
+    ensure_ets_table()
+    insert_ready_conditions()
+  rescue
+    ArgumentError ->
+      ensure_ets_table()
+      insert_ready_conditions()
+  end
 
-    for condition <- [:pg_lock_acquired, :replication_client_ready, :connection_pool_ready, :shape_log_collector_ready] do
+  defp ensure_ets_table do
+    case :ets.whereis(@ets_table) do
+      :undefined ->
+        :ets.new(@ets_table, [:named_table, :public, :set])
+        :ets.give_away(@ets_table, keeper_pid(), [])
+
+      _ref ->
+        :ok
+    end
+  rescue
+    ArgumentError -> :ok
+  end
+
+  defp insert_ready_conditions do
+    for condition <- @conditions do
       :ets.insert(@ets_table, {condition, {true, %{process: self()}}})
     end
   end
 
-  defp ets_table_exists?(name) do
-    :ets.whereis(name) != :undefined
+  defp keeper_pid do
+    case Process.whereis(:electric_test_ets_keeper) do
+      pid when is_pid(pid) ->
+        pid
+
+      nil ->
+        {:ok, pid} = Agent.start(fn -> :ok end, name: :electric_test_ets_keeper)
+        pid
+    end
   end
 
   def errors_on(changeset) do

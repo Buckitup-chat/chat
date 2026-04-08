@@ -2,13 +2,24 @@ defmodule Chat.Data.UserStorageVersioningTest do
   use ChatWeb.DataCase
 
   alias Chat.Data.Schemas.{UserCard, UserStorage, UserStorageVersion}
+  alias Chat.Data.Types.{UserHash, UserStorageSignHash}
   alias Chat.Repo
+
+  defp compute_sign_hash(sign_b64) do
+    sign_b64
+    |> EnigmaPq.hash()
+    |> UserStorageSignHash.from_binary()
+  end
 
   describe "user_storage versioning" do
     setup do
       # Create a test user card
       identity = EnigmaPq.generate_identity()
-      user_hash = Chat.Data.Types.Consts.user_hash_prefix() <> EnigmaPq.hash(identity.sign_pkey)
+
+      user_hash =
+        identity.sign_pkey
+        |> EnigmaPq.hash()
+        |> Chat.Data.Types.UserHash.from_binary()
 
       card_attrs = %{
         user_hash: user_hash,
@@ -50,7 +61,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
       # Sign the storage
       sign_payload = Chat.Data.Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs))
       sign_b64 = EnigmaPq.sign(sign_payload, identity.sign_skey)
-      sign_hash = EnigmaPq.hash(sign_b64)
+      sign_hash = compute_sign_hash(sign_b64)
 
       storage_attrs =
         storage_attrs
@@ -91,7 +102,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
 
       sign_payload1 = Chat.Data.Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs1))
       sign_b64_1 = EnigmaPq.sign(sign_payload1, identity.sign_skey)
-      sign_hash_1 = EnigmaPq.hash(sign_b64_1)
+      sign_hash_1 = compute_sign_hash(sign_b64_1)
 
       storage1 =
         %UserStorage{}
@@ -116,7 +127,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
 
       sign_payload2 = Chat.Data.Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs2))
       sign_b64_2 = EnigmaPq.sign(sign_payload2, identity.sign_skey)
-      sign_hash_2 = EnigmaPq.hash(sign_b64_2)
+      sign_hash_2 = compute_sign_hash(sign_b64_2)
 
       # First archive the old version
       %UserStorageVersion{}
@@ -163,7 +174,9 @@ defmodule Chat.Data.UserStorageVersioningTest do
     } do
       uuid = Ecto.UUID.generate()
       timestamp = System.system_time(:second)
-      invalid_parent_hash = :crypto.strong_rand_bytes(32)
+      invalid_parent_hash =
+        :crypto.strong_rand_bytes(64)
+        |> UserStorageSignHash.from_binary()
 
       storage_attrs = %{
         user_hash: user_hash,
@@ -176,10 +189,10 @@ defmodule Chat.Data.UserStorageVersioningTest do
 
       sign_payload = Chat.Data.Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs))
       sign_b64 = EnigmaPq.sign(sign_payload, identity.sign_skey)
-      sign_hash = EnigmaPq.hash(sign_b64)
+      sign_hash = compute_sign_hash(sign_b64)
 
       # This should fail due to FK constraint
-      assert_raise Ecto.ConstraintError, fn ->
+      assert_raise Ecto.InvalidChangesetError, fn ->
         %UserStorage{}
         |> UserStorage.create_changeset(
           storage_attrs
@@ -206,7 +219,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
       # Sign correctly
       sign_payload = Chat.Data.Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs))
       sign_b64 = EnigmaPq.sign(sign_payload, identity.sign_skey)
-      sign_hash = EnigmaPq.hash(sign_b64)
+      sign_hash = compute_sign_hash(sign_b64)
 
       storage =
         %UserStorage{}
@@ -236,7 +249,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
 
       sign_payload1 = Chat.Data.Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs1))
       sign_b64_1 = EnigmaPq.sign(sign_payload1, identity.sign_skey)
-      sign_hash_1 = EnigmaPq.hash(sign_b64_1)
+      sign_hash_1 = compute_sign_hash(sign_b64_1)
 
       storage1 =
         %UserStorage{}
@@ -275,7 +288,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
 
       sign_payload2 = Chat.Data.Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs2))
       sign_b64_2 = EnigmaPq.sign(sign_payload2, identity.sign_skey)
-      sign_hash_2 = EnigmaPq.hash(sign_b64_2)
+      sign_hash_2 = compute_sign_hash(sign_b64_2)
 
       storage2 =
         storage1

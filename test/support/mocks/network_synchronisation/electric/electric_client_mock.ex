@@ -9,7 +9,7 @@ defmodule ChatSupport.Mocks.NetworkSynchronization.Electric.ElectricClientMock d
 
   alias Electric.Client.Message
 
-  def new!(endpoint: _), do: :mock_client
+  def new!(opts) when is_list(opts), do: :mock_client
 
   def stream(:mock_client, _schema, _opts) do
     Application.get_env(:chat, :electric_mock_messages, [])

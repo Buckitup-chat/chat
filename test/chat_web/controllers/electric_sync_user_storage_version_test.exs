@@ -3,7 +3,7 @@ defmodule ChatWeb.ElectricSyncUserStorageVersionTest do
   use ChatWeb.DataCase
 
   alias Chat.Data.Schemas.{UserCard, UserStorage, UserStorageVersion}
-  alias Chat.Data.Types.Consts
+  alias Chat.Data.Types.{UserHash, UserStorageSignHash}
   alias Chat.Repo
 
   setup %{conn: conn} do
@@ -13,7 +13,7 @@ defmodule ChatWeb.ElectricSyncUserStorageVersionTest do
 
   defp user_card_attrs(name) do
     %{
-      user_hash: Consts.user_hash_prefix() <> :crypto.strong_rand_bytes(64),
+      user_hash: UserHash.from_binary(:crypto.strong_rand_bytes(64)),
       sign_pkey: :crypto.strong_rand_bytes(32),
       contact_pkey: :crypto.strong_rand_bytes(32),
       contact_cert: :crypto.strong_rand_bytes(64),
@@ -30,7 +30,7 @@ defmodule ChatWeb.ElectricSyncUserStorageVersionTest do
     %{
       user_hash: user_hash,
       uuid: uuid,
-      sign_hash: :crypto.strong_rand_bytes(32),
+      sign_hash: UserStorageSignHash.from_binary(:crypto.strong_rand_bytes(64)),
       value_b64: :crypto.strong_rand_bytes(64),
       deleted_flag: false,
       parent_sign_hash: nil,
@@ -92,9 +92,9 @@ defmodule ChatWeb.ElectricSyncUserStorageVersionTest do
       uuid_alice = Ecto.UUID.generate()
       uuid_bob = Ecto.UUID.generate()
 
-      sign_hash1 = :crypto.strong_rand_bytes(32)
-      sign_hash2 = :crypto.strong_rand_bytes(32)
-      sign_hash3 = :crypto.strong_rand_bytes(32)
+      sign_hash1 = UserStorageSignHash.from_binary(:crypto.strong_rand_bytes(64))
+      sign_hash2 = UserStorageSignHash.from_binary(:crypto.strong_rand_bytes(64))
+      sign_hash3 = UserStorageSignHash.from_binary(:crypto.strong_rand_bytes(64))
 
       {:ok, _v1} =
         %UserStorageVersion{}
@@ -182,8 +182,8 @@ defmodule ChatWeb.ElectricSyncUserStorageVersionTest do
         |> Repo.insert()
 
       uuid = Ecto.UUID.generate()
-      sign_hash1 = :crypto.strong_rand_bytes(32)
-      sign_hash2 = :crypto.strong_rand_bytes(32)
+      sign_hash1 = UserStorageSignHash.from_binary(:crypto.strong_rand_bytes(64))
+      sign_hash2 = UserStorageSignHash.from_binary(:crypto.strong_rand_bytes(64))
 
       {:ok, v1} =
         %UserStorageVersion{}

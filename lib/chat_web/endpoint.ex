@@ -14,8 +14,10 @@ defmodule ChatWeb.Endpoint do
 
   socket "/proxy-socket", ChatWeb.ProxySocket, websocket: true, longpoll: false
 
-  # WebRTC signaling socket
-  socket "/webrtc-socket", ChatWeb.WebRTCSocket, websocket: true, longpoll: false
+  # WebRTC signaling socket (check_origin: false for cross-domain bridge clients)
+  socket "/webrtc-socket", ChatWeb.WebRTCSocket,
+    websocket: [check_origin: false, connect_info: [:peer_data]],
+    longpoll: false
 
   # Serve at "/" the static files from "priv/static" directory.
   #

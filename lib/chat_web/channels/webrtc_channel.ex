@@ -6,6 +6,11 @@ defmodule ChatWeb.WebRTCChannel do
   require Logger
 
   @impl true
+  def join("room:identify:" <> hash, _params, socket) do
+    ip = socket.assigns[:peer_ip] || "unknown"
+    {:error, %{reason: "redirect", room: "device:#{ip}:#{hash}"}}
+  end
+
   def join("room:" <> room_id, params, socket) do
     if String.length(room_id) > 0 do
       user_id = params["user_id"] || "user_#{System.unique_integer([:positive, :monotonic])}"

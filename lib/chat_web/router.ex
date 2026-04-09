@@ -51,6 +51,7 @@ defmodule ChatWeb.Router do
     get "/get/image/:id", FileController, :image
     get "/get/zip/:broker_key", ZipController, :get
     get "/privacy-policy.html", PlainController, :privacy_policy
+    get "/dev/device_webrtc", PlainController, :device_webrtc
 
     # Frontend SPA routes
     get "/frontend", FrontendController, :index

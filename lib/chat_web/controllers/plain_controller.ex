@@ -16,4 +16,10 @@ defmodule ChatWeb.PlainController do
     |> put_resp_content_type("text/html")
     |> send_file(200, "priv/static/electric_test.html")
   end
+
+  def device_webrtc(conn, _) do
+    conn
+    |> put_resp_content_type("text/html")
+    |> send_file(200, "priv/static/device_webrtc.html")
+  end
 end

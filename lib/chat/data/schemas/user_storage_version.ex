@@ -46,5 +46,8 @@ defmodule Chat.Data.Schemas.UserStorageVersion do
       :owner_timestamp,
       :sign_b64
     ])
+    |> unique_constraint([:user_hash, :uuid, :sign_hash],
+      name: :user_storage_versions_pkey
+    )
   end
 end

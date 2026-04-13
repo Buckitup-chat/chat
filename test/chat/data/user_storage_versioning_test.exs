@@ -1,14 +1,38 @@
 defmodule Chat.Data.UserStorageVersioningTest do
   use ChatWeb.DataCase
 
+  import Ecto.Query
+
   alias Chat.Data.Schemas.{UserCard, UserStorage, UserStorageVersion}
   alias Chat.Data.Types.{UserHash, UserStorageSignHash}
+  alias Chat.Data.User
   alias Chat.Repo
 
   defp compute_sign_hash(sign_b64) do
     sign_b64
     |> EnigmaPq.hash()
     |> UserStorageSignHash.from_binary()
+  end
+
+  defp signed_storage(identity, user_hash, attrs \\ %{}) do
+    storage =
+      %UserStorage{
+        user_hash: user_hash,
+        uuid: Ecto.UUID.generate(),
+        value_b64: "test value",
+        deleted_flag: false,
+        parent_sign_hash: nil,
+        owner_timestamp: System.system_time(:second)
+      }
+      |> struct(attrs)
+
+    sign_b64 =
+      storage
+      |> Chat.Data.Integrity.signature_payload()
+      |> EnigmaPq.sign(identity.sign_skey)
+
+    sign_hash = compute_sign_hash(sign_b64)
+    %{storage | sign_b64: sign_b64, sign_hash: sign_hash}
   end
 
   describe "user_storage versioning" do
@@ -231,6 +255,150 @@ defmodule Chat.Data.UserStorageVersioningTest do
 
       # Verify signature
       assert Chat.Data.Integrity.verify_signature(storage) == :ok
+    end
+
+    test "insert_storage upserts with newer timestamp on conflict", %{
+      user_hash: user_hash,
+      identity: identity
+    } do
+      uuid = Ecto.UUID.generate()
+      storage1 = signed_storage(identity, user_hash, %{uuid: uuid, value_b64: "v1"})
+
+      changeset1 = UserStorage.create_changeset(%UserStorage{}, Map.from_struct(storage1))
+      {:ok, _} = User.insert_storage(changeset1)
+
+      storage2 =
+        signed_storage(identity, user_hash, %{
+          uuid: uuid,
+          value_b64: "v2",
+          owner_timestamp: storage1.owner_timestamp + 10
+        })
+
+      changeset2 = UserStorage.create_changeset(%UserStorage{}, Map.from_struct(storage2))
+      {:ok, _} = User.insert_storage(changeset2)
+
+      stored = Repo.get_by(UserStorage, user_hash: user_hash, uuid: uuid)
+      assert stored.value_b64 == "v2"
+      assert stored.owner_timestamp == storage2.owner_timestamp
+    end
+
+    test "insert_storage ignores older timestamp on conflict", %{
+      user_hash: user_hash,
+      identity: identity
+    } do
+      uuid = Ecto.UUID.generate()
+      timestamp = System.system_time(:second) + 100
+
+      storage1 =
+        signed_storage(identity, user_hash, %{uuid: uuid, value_b64: "newer", owner_timestamp: timestamp})
+
+      changeset1 = UserStorage.create_changeset(%UserStorage{}, Map.from_struct(storage1))
+      {:ok, _} = User.insert_storage(changeset1)
+
+      storage2 =
+        signed_storage(identity, user_hash, %{
+          uuid: uuid,
+          value_b64: "older",
+          owner_timestamp: timestamp - 50
+        })
+
+      changeset2 = UserStorage.create_changeset(%UserStorage{}, Map.from_struct(storage2))
+      {:ok, _} = User.insert_storage(changeset2)
+
+      stored = Repo.get_by(UserStorage, user_hash: user_hash, uuid: uuid)
+      assert stored.value_b64 == "newer"
+      assert stored.owner_timestamp == timestamp
+    end
+
+    test "insert_storage_with_conflict replaces main when newer and archives existing", %{
+      user_hash: user_hash,
+      identity: identity
+    } do
+      uuid = Ecto.UUID.generate()
+      storage1 = signed_storage(identity, user_hash, %{uuid: uuid, value_b64: "v1"})
+
+      changeset1 = UserStorage.create_changeset(%UserStorage{}, Map.from_struct(storage1))
+      {:ok, inserted} = Repo.insert(changeset1)
+
+      storage2 =
+        signed_storage(identity, user_hash, %{
+          uuid: uuid,
+          value_b64: "v2",
+          owner_timestamp: storage1.owner_timestamp + 10
+        })
+
+      {:ok, _} = User.insert_storage_with_conflict(inserted, storage2)
+
+      stored = Repo.get_by(UserStorage, user_hash: user_hash, uuid: uuid)
+      assert stored.value_b64 == "v2"
+
+      version =
+        Repo.get_by(UserStorageVersion, user_hash: user_hash, uuid: uuid, sign_hash: storage1.sign_hash)
+
+      assert version != nil
+      assert version.value_b64 == "v1"
+    end
+
+    test "insert_storage_with_conflict archives new when older and keeps existing", %{
+      user_hash: user_hash,
+      identity: identity
+    } do
+      uuid = Ecto.UUID.generate()
+      timestamp = System.system_time(:second) + 100
+
+      storage1 =
+        signed_storage(identity, user_hash, %{uuid: uuid, value_b64: "newer", owner_timestamp: timestamp})
+
+      changeset1 = UserStorage.create_changeset(%UserStorage{}, Map.from_struct(storage1))
+      {:ok, inserted} = Repo.insert(changeset1)
+
+      storage2 =
+        signed_storage(identity, user_hash, %{
+          uuid: uuid,
+          value_b64: "older",
+          owner_timestamp: timestamp - 50
+        })
+
+      {:ok, _} = User.insert_storage_with_conflict(inserted, storage2)
+
+      stored = Repo.get_by(UserStorage, user_hash: user_hash, uuid: uuid)
+      assert stored.value_b64 == "newer"
+
+      version =
+        Repo.get_by(UserStorageVersion, user_hash: user_hash, uuid: uuid, sign_hash: storage2.sign_hash)
+
+      assert version != nil
+      assert version.value_b64 == "older"
+    end
+
+    test "duplicate archive insert is idempotent", %{
+      user_hash: user_hash,
+      identity: identity
+    } do
+      uuid = Ecto.UUID.generate()
+      storage1 = signed_storage(identity, user_hash, %{uuid: uuid, value_b64: "v1"})
+
+      changeset1 = UserStorage.create_changeset(%UserStorage{}, Map.from_struct(storage1))
+      {:ok, inserted} = Repo.insert(changeset1)
+
+      storage2 =
+        signed_storage(identity, user_hash, %{
+          uuid: uuid,
+          value_b64: "v2",
+          owner_timestamp: storage1.owner_timestamp + 10
+        })
+
+      {:ok, _} = User.insert_storage_with_conflict(inserted, storage2)
+      # Repeat the same conflict resolution — should not fail
+      {:ok, _} = User.insert_storage_with_conflict(inserted, storage2)
+
+      versions =
+        Repo.all(
+          from v in UserStorageVersion,
+            where: v.user_hash == ^user_hash and v.uuid == ^uuid
+        )
+
+      assert length(versions) == 1
     end
 
     test "soft delete sets deleted_flag", %{user_hash: user_hash, identity: identity} do

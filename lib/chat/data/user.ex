@@ -114,10 +114,15 @@ defmodule Chat.Data.User do
   end
 
   @doc """
-  Inserts a new UserStorage record.
+  Inserts a new UserStorage record with upsert semantics.
+  On conflict, updates only if the incoming timestamp is newer.
   """
   def insert_storage(changeset) do
-    repo().insert(changeset)
+    repo().insert(changeset,
+      on_conflict: user_storage_upsert_query(),
+      conflict_target: [:user_hash, :uuid],
+      allow_stale: true
+    )
   end
 
   @doc """
@@ -134,6 +139,22 @@ defmodule Chat.Data.User do
   """
   def update_storage_with_versioning(existing, new_storage) do
     Versioning.handle_update_with_versioning(repo(), existing, new_storage)
+  end
+
+  defp user_storage_upsert_query do
+    from(s in UserStorage,
+      update: [
+        set: [
+          value_b64: fragment("EXCLUDED.value_b64"),
+          deleted_flag: fragment("EXCLUDED.deleted_flag"),
+          parent_sign_hash: fragment("EXCLUDED.parent_sign_hash"),
+          owner_timestamp: fragment("EXCLUDED.owner_timestamp"),
+          sign_b64: fragment("EXCLUDED.sign_b64"),
+          sign_hash: fragment("EXCLUDED.sign_hash")
+        ]
+      ],
+      where: is_nil(s.owner_timestamp) or s.owner_timestamp < fragment("EXCLUDED.owner_timestamp")
+    )
   end
 
   defp user_card_upsert_query do

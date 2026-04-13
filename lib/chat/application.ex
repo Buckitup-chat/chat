@@ -22,8 +22,7 @@ defmodule Chat.Application do
         ChatWeb.Telemetry,
         # Start the PubSub system
         {Phoenix.PubSub, name: Chat.PubSub},
-        # Time tracking (monotonic offset, no system clock jumps after boot)
-        Chat.TimeKeeper,
+        Chat.TimeKeeper |> if_on_host(),
         # Start Ecto repository with retry mechanism
         Chat.Repo |> if_on_host(),
         # TODO: remove Chat.RepoSupervisor,

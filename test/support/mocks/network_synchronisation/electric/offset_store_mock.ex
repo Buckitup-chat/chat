@@ -11,6 +11,10 @@ defmodule ChatSupport.Mocks.NetworkSynchronization.Electric.OffsetStoreMock do
     notify(:offset_deleted)
   end
 
+  def delete(_peer_url, _shape) do
+    notify(:offset_deleted)
+  end
+
   defp notify(msg) do
     case Application.get_env(:chat, :consumer_test_pid) do
       pid when is_pid(pid) -> send(pid, msg)

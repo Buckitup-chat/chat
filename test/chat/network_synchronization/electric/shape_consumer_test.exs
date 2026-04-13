@@ -223,7 +223,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
     assert Process.read_timer(restart_ref) != false
   end
 
-  test "schedules retry after stream task exits" do
+  test "clears offset and schedules retry after stream task exits" do
     # Empty stream — Task exits immediately with :normal
     Application.put_env(:chat, :electric_mock_messages, [])
 
@@ -232,6 +232,9 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
         {ShapeConsumer,
          peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card}
       )
+
+    # Offset is cleared on :DOWN to force full re-snapshot on restart
+    assert_receive :offset_deleted, 500
 
     # Task exits, GenServer schedules restart; verify backoff doubles
     await_till(

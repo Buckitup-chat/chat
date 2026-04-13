@@ -124,16 +124,19 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
     state |> noreply()
   end
 
-  # Current task exited — schedule retry with exponential backoff
+  # Current task exited — clear offset and schedule retry with exponential backoff.
+  # Clearing the offset forces a full snapshot re-sync on restart, avoiding data gaps
+  # when the replication stream drops (e.g., WAL sender timeout, PG restart).
   def handle_info(
         {:DOWN, ref, :process, _down_pid, reason},
         {peer_url, system_identifier, shape, {_task_pid, ref}, backoff, nil}
       ) do
     log(
-      "ShapeConsumer #{peer_url}/#{shape}: stream exited (#{inspect(reason)}), retrying in #{backoff}ms",
+      "ShapeConsumer #{peer_url}/#{shape}: stream exited (#{inspect(reason)}), clearing offset and retrying in #{backoff}ms",
       :warning
     )
 
+    OffsetStore.delete(system_identifier, shape)
     broadcast_status(peer_url, shape, ErrorStatus.new(inspect(reason)))
     restart_ref = Process.send_after(self(), :restart_stream, backoff)
     next_backoff = min(backoff * 2, @max_backoff_ms)

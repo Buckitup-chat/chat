@@ -44,6 +44,19 @@ defmodule Chat.NetworkSynchronization.Electric.OffsetStoreTest do
     assert OffsetStore.load(@peer_url, :user_storage) == nil
   end
 
+  test "delete/2 removes only specified shape offset" do
+    resume_card = %{shape_handle: "card_handle", offset: "0/1", schema: %{}}
+    resume_storage = %{shape_handle: "storage_handle", offset: "0/2", schema: %{}}
+
+    OffsetStore.save(@peer_url, :user_card, resume_card)
+    OffsetStore.save(@peer_url, :user_storage, resume_storage)
+
+    OffsetStore.delete(@peer_url, :user_card)
+
+    assert OffsetStore.load(@peer_url, :user_card) == nil
+    assert OffsetStore.load(@peer_url, :user_storage) == resume_storage
+  end
+
   test "delete does not affect other peers" do
     other_peer = "http://192.168.1.100"
 

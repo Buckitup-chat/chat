@@ -3,12 +3,10 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
 
   use Toolbox.OriginLog
 
-  import Chat.Db, only: [repo: 0]
-
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Schemas.UserStorage
+  alias Chat.Data.User
   alias Chat.Data.User.Validation
-  alias Chat.Data.User.Versioning
 
   def write(shape, operation, value) do
     case do_write(shape, operation, value) do
@@ -43,10 +41,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
         changeset = Validation.validate_user_card_insert(card)
 
         with %{valid?: true} <- changeset do
-          repo().insert(changeset,
-            on_conflict: {:replace_all_except, [:user_hash]},
-            conflict_target: :user_hash
-          )
+          User.upsert_card(changeset)
         else
           %{valid?: false} = invalid_changeset ->
             log(
@@ -58,7 +53,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
         end
 
       {:user_card, :update, %UserCard{} = card} ->
-        case repo().get(UserCard, card.user_hash) do
+        case User.get_card(card.user_hash) do
           nil ->
             {:ok, card}
 
@@ -66,8 +61,11 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
             changeset = Validation.validate_user_card_update(existing, card)
 
             with %{valid?: true} <- changeset do
-              repo().update(changeset)
+              User.update_card(changeset)
             else
+              %{valid?: false, action: :ignore} ->
+                {:ok, card}
+
               %{valid?: false} = invalid_changeset ->
                 log(
                   "Invalid user_card update signature for #{card.user_hash}: #{inspect(invalid_changeset.errors)}",
@@ -79,7 +77,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
         end
 
       {:user_card, :delete, %UserCard{} = card} ->
-        case repo().get(UserCard, card.user_hash) do
+        case User.get_card(card.user_hash) do
           nil ->
             {:ok, card}
 
@@ -87,8 +85,11 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
             changeset = Validation.validate_user_card_delete(existing, card)
 
             with %{valid?: true} <- changeset do
-              repo().update(changeset)
+              User.update_card(changeset)
             else
+              %{valid?: false, action: :ignore} ->
+                {:ok, card}
+
               %{valid?: false} = invalid_changeset ->
                 log(
                   "Invalid user_card delete signature for #{card.user_hash}: #{inspect(invalid_changeset.errors)}",
@@ -112,19 +113,17 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
 
   defp handle_user_storage_insert(storage) do
     # Verify parent user_card exists
-    with parent when not is_nil(parent) <- repo().get(UserCard, storage.user_hash),
+    with parent when not is_nil(parent) <- User.get_card(storage.user_hash),
          storage_with_hash <- calculate_sign_hash(storage),
          changeset <- Validation.validate_user_storage_insert(storage_with_hash),
          %{valid?: true} <- changeset do
       # Check if record already exists
-      case repo().get_by(UserStorage, user_hash: storage.user_hash, uuid: storage.uuid) do
+      case User.get_storage(storage.user_hash, storage.uuid) do
         nil ->
-          # No conflict - insert directly
-          repo().insert(changeset)
+          User.insert_storage(changeset)
 
         existing ->
-          # Conflict - compare timestamps and version
-          Versioning.handle_insert_with_conflict(repo(), existing, storage_with_hash)
+          User.insert_storage_with_conflict(existing, storage_with_hash)
       end
     else
       nil ->
@@ -148,14 +147,13 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
   defp handle_user_storage_update(storage) do
     # Verify parent user_card exists
     with {_, parent} when not is_nil(parent) <-
-           {:parent, repo().get(UserCard, storage.user_hash)},
+           {:parent, User.get_card(storage.user_hash)},
          {_, existing} when not is_nil(existing) <-
-           {:existing, repo().get_by(UserStorage, user_hash: storage.user_hash, uuid: storage.uuid)},
+           {:existing, User.get_storage(storage.user_hash, storage.uuid)},
          storage_with_hash <- calculate_sign_hash(storage),
          changeset <- Validation.validate_user_storage_update(existing, storage_with_hash),
          %{valid?: true} <- changeset do
-      # Compare timestamps and version
-      Versioning.handle_update_with_versioning(repo(), existing, storage_with_hash)
+      User.update_storage_with_versioning(existing, storage_with_hash)
     else
       {:parent, nil} ->
         log(

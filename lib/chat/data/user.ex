@@ -4,18 +4,14 @@ defmodule Chat.Data.User do
   """
 
   import Chat.Db, only: [repo: 0]
+  import Ecto.Query
 
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.UserCard
+  alias Chat.Data.Schemas.UserStorage
+  alias Chat.Data.User.Versioning
   alias Enigma
   alias EnigmaPq
-
-  @doc """
-  Gets a UserCard by user_hash from Postgres
-  """
-  def get_card(user_hash) do
-    repo().get(UserCard, user_hash)
-  end
 
   @doc """
   Generates a new Post-Quantum Identity (map) with a name.
@@ -82,6 +78,81 @@ defmodule Chat.Data.User do
       %{user_hash: hash, sign_pkey: sign_pkey} = card_data ->
         verify_card_data(hash, sign_pkey, card_data)
     end
+  end
+
+  @doc """
+  Gets a UserCard by user_hash from Postgres
+  """
+  def get_card(user_hash) do
+    repo().get(UserCard, user_hash)
+  end
+
+  @doc """
+  Inserts a UserCard with upsert semantics.
+  On conflict, updates only if the incoming timestamp is newer.
+  """
+  def upsert_card(changeset) do
+    repo().insert(changeset,
+      on_conflict: user_card_upsert_query(),
+      conflict_target: :user_hash,
+      allow_stale: true
+    )
+  end
+
+  @doc """
+  Updates an existing UserCard changeset.
+  """
+  def update_card(changeset) do
+    repo().update(changeset)
+  end
+
+  @doc """
+  Gets a UserStorage record by user_hash and uuid.
+  """
+  def get_storage(user_hash, uuid) do
+    repo().get_by(UserStorage, user_hash: user_hash, uuid: uuid)
+  end
+
+  @doc """
+  Inserts a new UserStorage record.
+  """
+  def insert_storage(changeset) do
+    repo().insert(changeset)
+  end
+
+  @doc """
+  Inserts a UserStorage record when one with the same key already exists.
+  Delegates to Versioning to handle timestamp-based conflict resolution.
+  """
+  def insert_storage_with_conflict(existing, new_storage) do
+    Versioning.handle_insert_with_conflict(repo(), existing, new_storage)
+  end
+
+  @doc """
+  Updates a UserStorage record with versioning.
+  Archives the old version and applies the update based on timestamps.
+  """
+  def update_storage_with_versioning(existing, new_storage) do
+    Versioning.handle_update_with_versioning(repo(), existing, new_storage)
+  end
+
+  defp user_card_upsert_query do
+    from(c in UserCard,
+      update: [
+        set: [
+          sign_pkey: fragment("EXCLUDED.sign_pkey"),
+          contact_pkey: fragment("EXCLUDED.contact_pkey"),
+          contact_cert: fragment("EXCLUDED.contact_cert"),
+          crypt_pkey: fragment("EXCLUDED.crypt_pkey"),
+          crypt_cert: fragment("EXCLUDED.crypt_cert"),
+          name: fragment("EXCLUDED.name"),
+          deleted_flag: fragment("EXCLUDED.deleted_flag"),
+          owner_timestamp: fragment("EXCLUDED.owner_timestamp"),
+          sign_b64: fragment("EXCLUDED.sign_b64")
+        ]
+      ],
+      where: is_nil(c.owner_timestamp) or c.owner_timestamp < fragment("EXCLUDED.owner_timestamp")
+    )
   end
 
   defp verify_card_data(hash, sign_pkey, card_data) do

@@ -66,13 +66,28 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriterTest do
       assert Repo.get(UserCard, card.user_hash) != nil
     end
 
-    test "insert is idempotent — upserts on conflict" do
+    test "insert with newer timestamp upserts on conflict" do
       identity = User.generate_pq_identity("Alice")
       card = signed_user_card(identity)
       {:ok, _} = ShapeWriter.write(:user_card, :insert, card)
-      {:ok, _} = ShapeWriter.write(:user_card, :insert, signed_user_card(identity, %{name: "Bob"}))
+
+      newer_card =
+        signed_user_card(identity, %{name: "Bob", owner_timestamp: card.owner_timestamp + 1})
+
+      {:ok, _} = ShapeWriter.write(:user_card, :insert, newer_card)
 
       assert Repo.get(UserCard, card.user_hash).name == "Bob"
+    end
+
+    test "insert with same timestamp is skipped — no WAL ping-pong" do
+      identity = User.generate_pq_identity("Alice")
+      card = signed_user_card(identity)
+      {:ok, _} = ShapeWriter.write(:user_card, :insert, card)
+
+      same_ts_card = signed_user_card(identity, %{name: "Bob"})
+      {:ok, _} = ShapeWriter.write(:user_card, :insert, same_ts_card)
+
+      assert Repo.get(UserCard, card.user_hash).name == "Alice"
     end
 
     test "update overwrites existing row" do

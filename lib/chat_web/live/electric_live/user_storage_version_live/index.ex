@@ -135,12 +135,7 @@ defmodule ChatWeb.ElectricLive.UserStorageVersionLive.Index do
             class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
           >
             <%= if @group_by_key do %>
-              <svg
-                class="mr-2 h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
+              <svg class="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -150,12 +145,7 @@ defmodule ChatWeb.ElectricLive.UserStorageVersionLive.Index do
               </svg>
               Show All Versions
             <% else %>
-              <svg
-                class="mr-2 h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
+              <svg class="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -175,9 +165,9 @@ defmodule ChatWeb.ElectricLive.UserStorageVersionLive.Index do
           </div>
         <% else %>
           <%= if @group_by_key do %>
-            <%= render_grouped_versions(assigns) %>
+            {render_grouped_versions(assigns)}
           <% else %>
-            <%= render_flat_versions(assigns) %>
+            {render_flat_versions(assigns)}
           <% end %>
         <% end %>
       </div>
@@ -189,7 +179,9 @@ defmodule ChatWeb.ElectricLive.UserStorageVersionLive.Index do
     ~H"""
     <div class="bg-white shadow overflow-hidden sm:rounded-lg">
       <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-        <h3 class="text-lg leading-6 font-medium text-gray-900">Version History (Grouped by Storage Key)</h3>
+        <h3 class="text-lg leading-6 font-medium text-gray-900">
+          Version History (Grouped by Storage Key)
+        </h3>
         <p class="mt-1 text-sm text-gray-500">
           Versions are displayed grouped by user_hash and UUID. Use "Show All Versions" to see ungrouped list.
         </p>
@@ -208,7 +200,7 @@ defmodule ChatWeb.ElectricLive.UserStorageVersionLive.Index do
               {Base.encode16(version.user_hash, case: :lower) |> String.slice(0..15)}...
             </span>
           </div>
-          <%= render_version_item(assigns, version) %>
+          {render_version_item(assigns, version)}
         </div>
       </div>
     </div>
@@ -227,7 +219,7 @@ defmodule ChatWeb.ElectricLive.UserStorageVersionLive.Index do
           id={dom_id}
           class="px-4 py-4 sm:px-6 hover:bg-gray-50 transition-colors duration-150"
         >
-          <%= render_version_item(assigns, version) %>
+          {render_version_item(assigns, version)}
         </div>
       </div>
     </div>
@@ -274,7 +266,8 @@ defmodule ChatWeb.ElectricLive.UserStorageVersionLive.Index do
               </div>
               <%= if @version.parent_sign_hash do %>
                 <p class="mt-1 text-xs text-purple-600 font-mono truncate">
-                  Parent: {Base.encode16(@version.parent_sign_hash, case: :lower) |> String.slice(0..15)}...
+                  Parent: {Base.encode16(@version.parent_sign_hash, case: :lower)
+                  |> String.slice(0..15)}...
                 </p>
               <% else %>
                 <p class="mt-1 text-xs text-gray-400 italic">Initial version (no parent)</p>
@@ -310,8 +303,8 @@ defmodule ChatWeb.ElectricLive.UserStorageVersionLive.Index do
     cond do
       diff < 60 -> "#{diff}s ago"
       diff < 3600 -> "#{div(diff, 60)}m ago"
-      diff < 86400 -> "#{div(diff, 3600)}h ago"
-      true -> "#{div(diff, 86400)}d ago"
+      diff < 86_400 -> "#{div(diff, 3600)}h ago"
+      true -> "#{div(diff, 86_400)}d ago"
     end
   end
 

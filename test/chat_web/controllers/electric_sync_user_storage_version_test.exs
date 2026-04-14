@@ -5,9 +5,10 @@ defmodule ChatWeb.ElectricSyncUserStorageVersionTest do
   alias Chat.Data.Schemas.{UserCard, UserStorage, UserStorageVersion}
   alias Chat.Data.Types.{UserHash, UserStorageSignHash}
   alias Chat.Repo
+  alias Phoenix.Sync.Sandbox
 
   setup %{conn: conn} do
-    conn = Phoenix.Sync.Sandbox.init_test_session(conn, Chat.Repo)
+    conn = Sandbox.init_test_session(conn, Chat.Repo)
     {:ok, conn: conn}
   end
 
@@ -131,7 +132,9 @@ defmodule ChatWeb.ElectricSyncUserStorageVersionTest do
         |> Repo.insert()
 
       user_hash_hex = Base.encode16(card1.user_hash, case: :lower)
-      conn = get(conn, "/electric/v1/user_storage_version/#{user_hash_hex}/#{uuid_alice}?offset=-1")
+
+      conn =
+        get(conn, "/electric/v1/user_storage_version/#{user_hash_hex}/#{uuid_alice}?offset=-1")
 
       assert conn.status == 200
     end
@@ -164,10 +167,11 @@ defmodule ChatWeb.ElectricSyncUserStorageVersionTest do
 
       retrieved =
         Repo.one(
-          from v in UserStorageVersion,
+          from(v in UserStorageVersion,
             where:
               v.user_hash == ^card.user_hash and v.uuid == ^uuid and
                 v.sign_hash == ^version.sign_hash
+          )
         )
 
       assert retrieved.user_hash == version.user_hash
@@ -211,9 +215,10 @@ defmodule ChatWeb.ElectricSyncUserStorageVersionTest do
 
       versions =
         Repo.all(
-          from v in UserStorageVersion,
+          from(v in UserStorageVersion,
             where: v.user_hash == ^card.user_hash and v.uuid == ^uuid,
             order_by: [asc: v.owner_timestamp]
+          )
         )
 
       assert length(versions) == 2

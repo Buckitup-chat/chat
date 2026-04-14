@@ -152,7 +152,9 @@ defmodule Chat.TimeKeeperTest do
   end
 
   test "read_persisted_time returns nil for garbage content" do
-    path = Path.join(System.tmp_dir!(), "timekeeper_garbage_#{:erlang.unique_integer([:positive])}")
+    path =
+      Path.join(System.tmp_dir!(), "timekeeper_garbage_#{:erlang.unique_integer([:positive])}")
+
     File.write!(path, "not_a_number")
 
     on_exit(fn -> File.rm(path) end)
@@ -195,7 +197,8 @@ defmodule Chat.TimeKeeperTest do
   # --- persist survives across restart ---
 
   test "persisted time survives GenServer restart" do
-    path = Path.join(System.tmp_dir!(), "timekeeper_restart_#{:erlang.unique_integer([:positive])}")
+    path =
+      Path.join(System.tmp_dir!(), "timekeeper_restart_#{:erlang.unique_integer([:positive])}")
 
     on_exit(fn -> File.rm(path) end)
 

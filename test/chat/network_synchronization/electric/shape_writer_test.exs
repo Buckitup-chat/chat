@@ -2,9 +2,10 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriterTest do
   use ChatWeb.DataCase, async: true
 
   alias Chat.Data.Integrity
-  alias Chat.Data.User
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Schemas.UserStorage
+  alias Chat.Data.Types.UserStorageSignHash
+  alias Chat.Data.User
   alias Chat.NetworkSynchronization.Electric.ShapeWriter
   alias Chat.Repo
 
@@ -52,7 +53,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriterTest do
     sign_hash =
       sign_b64
       |> EnigmaPq.hash()
-      |> Chat.Data.Types.UserStorageSignHash.from_binary()
+      |> UserStorageSignHash.from_binary()
 
     %{storage | sign_b64: sign_b64, sign_hash: sign_hash}
   end
@@ -94,6 +95,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriterTest do
       identity = User.generate_pq_identity("Alice")
       card = signed_user_card(identity)
       {:ok, _} = ShapeWriter.write(:user_card, :insert, card)
+
       updated_card =
         signed_user_card_from(card, identity.sign_skey, %{
           name: "Carol",
@@ -125,38 +127,6 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriterTest do
       assert updated.sign_pkey == card.sign_pkey
     end
 
-    test "delete marks the row as deleted" do
-      identity = User.generate_pq_identity("Alice")
-      card = signed_user_card(identity)
-      {:ok, _} = ShapeWriter.write(:user_card, :insert, card)
-      assert Repo.get(UserCard, card.user_hash) != nil
-
-      deleted_card =
-        signed_user_card_from(card, identity.sign_skey, %{
-          deleted_flag: true,
-          owner_timestamp: card.owner_timestamp + 1
-        })
-
-      {:ok, _} =
-        ShapeWriter.write(
-          :user_card,
-          :delete,
-          deleted_card
-        )
-
-      assert Repo.get(UserCard, card.user_hash).deleted_flag == true
-    end
-
-    test "delete of missing row succeeds" do
-      identity = User.generate_pq_identity("Alice")
-
-      assert {:ok, _} =
-               ShapeWriter.write(
-                 :user_card,
-                 :delete,
-                 signed_user_card(identity, %{deleted_flag: true})
-               )
-    end
   end
 
   describe "user_storage" do

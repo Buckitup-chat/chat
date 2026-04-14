@@ -5,8 +5,10 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
 
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Schemas.UserStorage
+  alias Chat.Data.Types.UserStorageSignHash
   alias Chat.Data.User
   alias Chat.Data.User.Validation
+  alias EnigmaPq
 
   def write(shape, operation, value) do
     case do_write(shape, operation, value) do
@@ -38,67 +40,10 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
   defp do_write(shape, operation, value) do
     case {shape, operation, value} do
       {:user_card, :insert, %UserCard{} = card} ->
-        changeset = Validation.validate_user_card_insert(card)
-
-        with %{valid?: true} <- changeset do
-          User.upsert_card(changeset)
-        else
-          %{valid?: false} = invalid_changeset ->
-            log(
-              "Invalid user_card insert signature for #{card.user_hash}: #{inspect(invalid_changeset.errors)}",
-              :warning
-            )
-
-            {:ok, card}
-        end
+        handle_user_card_insert(card)
 
       {:user_card, :update, %UserCard{} = card} ->
-        case User.get_card(card.user_hash) do
-          nil ->
-            {:ok, card}
-
-          existing ->
-            changeset = Validation.validate_user_card_update(existing, card)
-
-            with %{valid?: true} <- changeset do
-              User.update_card(changeset)
-            else
-              %{valid?: false, action: :ignore} ->
-                {:ok, card}
-
-              %{valid?: false} = invalid_changeset ->
-                log(
-                  "Invalid user_card update signature for #{card.user_hash}: #{inspect(invalid_changeset.errors)}",
-                  :warning
-                )
-
-                {:ok, card}
-            end
-        end
-
-      {:user_card, :delete, %UserCard{} = card} ->
-        case User.get_card(card.user_hash) do
-          nil ->
-            {:ok, card}
-
-          existing ->
-            changeset = Validation.validate_user_card_delete(existing, card)
-
-            with %{valid?: true} <- changeset do
-              User.update_card(changeset)
-            else
-              %{valid?: false, action: :ignore} ->
-                {:ok, card}
-
-              %{valid?: false} = invalid_changeset ->
-                log(
-                  "Invalid user_card delete signature for #{card.user_hash}: #{inspect(invalid_changeset.errors)}",
-                  :warning
-                )
-
-                {:ok, card}
-            end
-        end
+        handle_user_card_change(card, &Validation.validate_user_card_update/2)
 
       {:user_storage, :insert, %UserStorage{} = storage} ->
         handle_user_storage_insert(storage)
@@ -109,6 +54,49 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
   rescue
     e in RuntimeError -> {:error, {:repo_not_available, e}}
     e in Postgrex.Error -> {:error, e}
+  end
+
+  defp handle_user_card_insert(card) do
+    case Validation.validate_user_card_insert(card) do
+      %{valid?: true} = changeset ->
+        User.upsert_card(changeset)
+
+      %{valid?: false} = invalid_changeset ->
+        log(
+          "Invalid user_card insert signature for #{card.user_hash}: #{inspect(invalid_changeset.errors)}",
+          :warning
+        )
+
+        {:ok, card}
+    end
+  end
+
+  defp handle_user_card_change(card, validate_fn) do
+    case User.get_card(card.user_hash) do
+      nil ->
+        {:ok, card}
+
+      existing ->
+        apply_card_changeset(card, validate_fn.(existing, card))
+    end
+  end
+
+  defp apply_card_changeset(card, changeset) do
+    case changeset do
+      %{valid?: true} ->
+        User.update_card(changeset)
+
+      %{valid?: false, action: :ignore} ->
+        {:ok, card}
+
+      %{valid?: false} ->
+        log(
+          "Invalid user_card signature for #{card.user_hash}: #{inspect(changeset.errors)}",
+          :warning
+        )
+
+        {:ok, card}
+    end
   end
 
   defp handle_user_storage_insert(storage) do
@@ -180,7 +168,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
     sign_hash =
       sign_b64
       |> EnigmaPq.hash()
-      |> Chat.Data.Types.UserStorageSignHash.from_binary()
+      |> UserStorageSignHash.from_binary()
 
     %{storage | sign_hash: sign_hash}
   end

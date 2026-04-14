@@ -12,17 +12,52 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Docs do
           %{
             name: "user_hash",
             type: "text",
-            description: "SHA3-512 hash of sign_pkey as URL-friendly hex string (primary key, format: \"u_\" + 128 hex chars = 130 chars total)"
+            description:
+              "SHA3-512 hash of sign_pkey as URL-friendly hex string (primary key, format: \"u_\" + 128 hex chars = 130 chars total)"
           },
           %{name: "name", type: "text", description: "User display name"},
-          %{name: "sign_pkey", type: "text", description: "Base64-encoded ML-DSA-87 public signing key"},
-          %{name: "contact_pkey", type: "text", description: "Base64-encoded ECC secp256k1 public contact key"},
-          %{name: "contact_cert", type: "text", description: "Base64-encoded contact certificate (sign_pkey signature of contact_pkey)"},
-          %{name: "crypt_pkey", type: "text", description: "Base64-encoded ML-KEM-1024 public encryption key"},
-          %{name: "crypt_cert", type: "text", description: "Base64-encoded encryption certificate (sign_pkey signature of crypt_pkey)"},
-          %{name: "deleted_flag", type: "boolean", description: "Soft delete flag for conflict resolution"},
-          %{name: "owner_timestamp", type: "bigint", description: "Owner's timestamp for conflict resolution (latest wins)"},
-          %{name: "sign_b64", type: "bytea", description: "Signature of all other fields for data integrity verification"}
+          %{
+            name: "sign_pkey",
+            type: "text",
+            description: "Base64-encoded ML-DSA-87 public signing key"
+          },
+          %{
+            name: "contact_pkey",
+            type: "text",
+            description: "Base64-encoded ECC secp256k1 public contact key"
+          },
+          %{
+            name: "contact_cert",
+            type: "text",
+            description:
+              "Base64-encoded contact certificate (sign_pkey signature of contact_pkey)"
+          },
+          %{
+            name: "crypt_pkey",
+            type: "text",
+            description: "Base64-encoded ML-KEM-1024 public encryption key"
+          },
+          %{
+            name: "crypt_cert",
+            type: "text",
+            description:
+              "Base64-encoded encryption certificate (sign_pkey signature of crypt_pkey)"
+          },
+          %{
+            name: "deleted_flag",
+            type: "boolean",
+            description: "Soft delete flag for conflict resolution"
+          },
+          %{
+            name: "owner_timestamp",
+            type: "bigint",
+            description: "Owner's timestamp for conflict resolution (latest wins)"
+          },
+          %{
+            name: "sign_b64",
+            type: "bytea",
+            description: "Signature of all other fields for data integrity verification"
+          }
         ],
         example: """
         {
@@ -41,32 +76,53 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Docs do
       },
       "user_storage_versions" => %{
         title: "User Storage Versions",
-        description: "Immutable version history of user_storage entries. Every write to user_storage appends a new version here, enabling full audit trail and conflict resolution via parent chain.",
+        description:
+          "Immutable version history of user_storage entries. Every write to user_storage appends a new version here, enabling full audit trail and conflict resolution via parent chain.",
         fields: [
           %{
             name: "user_hash",
             type: "text",
-            description: "Foreign key to user_card.user_hash (part of composite primary key, format: \"u_\" + 128 hex chars)"
+            description:
+              "Foreign key to user_card.user_hash (part of composite primary key, format: \"u_\" + 128 hex chars)"
           },
           %{
             name: "uuid",
             type: "uuid",
-            description: "Storage entry identifier — same as the parent user_storage row (part of composite primary key)"
+            description:
+              "Storage entry identifier — same as the parent user_storage row (part of composite primary key)"
           },
           %{
             name: "sign_hash",
             type: "text",
-            description: "Signature hash of this version (format: \"uss_\" + 128 hex chars = 132 chars total, part of composite primary key)"
+            description:
+              "Signature hash of this version (format: \"uss_\" + 128 hex chars = 132 chars total, part of composite primary key)"
           },
           %{
             name: "parent_sign_hash",
             type: "text",
-            description: "sign_hash of the previous version (format: \"uss_\" + 128 hex chars, null for the initial version)"
+            description:
+              "sign_hash of the previous version (format: \"uss_\" + 128 hex chars, null for the initial version)"
           },
-          %{name: "value_b64", type: "text", description: "Base64-encoded binary value snapshot at this version (max 10MB)"},
-          %{name: "owner_timestamp", type: "bigint", description: "Monotonic timestamp at the time this version was written"},
-          %{name: "sign_b64", type: "text", description: "Base64-encoded ML-DSA-87 signature for integrity verification"},
-          %{name: "deleted_flag", type: "boolean", description: "Soft delete flag — mirrors the user_storage row state at this version"}
+          %{
+            name: "value_b64",
+            type: "text",
+            description: "Base64-encoded binary value snapshot at this version (max 10MB)"
+          },
+          %{
+            name: "owner_timestamp",
+            type: "bigint",
+            description: "Monotonic timestamp at the time this version was written"
+          },
+          %{
+            name: "sign_b64",
+            type: "text",
+            description: "Base64-encoded ML-DSA-87 signature for integrity verification"
+          },
+          %{
+            name: "deleted_flag",
+            type: "boolean",
+            description: "Soft delete flag — mirrors the user_storage row state at this version"
+          }
         ],
         example: """
         {
@@ -88,14 +144,19 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Docs do
           %{
             name: "user_hash",
             type: "text",
-            description: "Foreign key to user_card.user_hash (part of composite primary key, format: \"u_\" + 128 hex chars)"
+            description:
+              "Foreign key to user_card.user_hash (part of composite primary key, format: \"u_\" + 128 hex chars)"
           },
           %{
             name: "uuid",
             type: "uuid",
             description: "Storage entry identifier (part of composite primary key)"
           },
-          %{name: "value_b64", type: "text", description: "Base64-encoded binary value (max 10MB)"},
+          %{
+            name: "value_b64",
+            type: "text",
+            description: "Base64-encoded binary value (max 10MB)"
+          },
           %{
             name: "sign_hash",
             type: "text",
@@ -104,10 +165,19 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Docs do
           %{
             name: "parent_sign_hash",
             type: "text",
-            description: "Parent version's signature hash (format: \"uss_\" + 128 hex chars, nullable)"
+            description:
+              "Parent version's signature hash (format: \"uss_\" + 128 hex chars, nullable)"
           },
-          %{name: "owner_timestamp", type: "bigint", description: "Monotonic timestamp for conflict resolution"},
-          %{name: "sign_b64", type: "text", description: "Base64-encoded ML-DSA-87 signature for integrity verification"},
+          %{
+            name: "owner_timestamp",
+            type: "bigint",
+            description: "Monotonic timestamp for conflict resolution"
+          },
+          %{
+            name: "sign_b64",
+            type: "text",
+            description: "Base64-encoded ML-DSA-87 signature for integrity verification"
+          },
           %{name: "deleted_flag", type: "boolean", description: "Soft delete flag"}
         ],
         example: """

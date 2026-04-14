@@ -53,10 +53,7 @@ defmodule ChatWeb.ElectricLive.Index do
 
         <.init_status :if={@readiness != :ready} readiness={@readiness} />
 
-        <div
-          :if={@readiness == :ready}
-          class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
-        >
+        <div :if={@readiness == :ready} class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           <%!-- User Cards --%>
           <a
             href="/electric/user_cards"
@@ -328,12 +325,10 @@ defmodule ChatWeb.ElectricLive.Index do
       </p>
       <ol class="space-y-4">
         <li class={step_class(phase_step(@readiness), 1)}>
-          <span class={step_badge_class(phase_step(@readiness), 1)}>1</span>
-          Database initializing
+          <span class={step_badge_class(phase_step(@readiness), 1)}>1</span> Database initializing
         </li>
         <li class={step_class(phase_step(@readiness), 2)}>
-          <span class={step_badge_class(phase_step(@readiness), 2)}>2</span>
-          Electric stack starting
+          <span class={step_badge_class(phase_step(@readiness), 2)}>2</span> Electric stack starting
         </li>
       </ol>
     </div>

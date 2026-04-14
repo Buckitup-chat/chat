@@ -290,7 +290,11 @@ defmodule ChatWeb.ElectricControllerTest do
   end
 
   defp update_name_payload(card, sign_skey, new_name) do
-    updated = signed_user_card(card, sign_skey, %{name: new_name, owner_timestamp: card.owner_timestamp + 1})
+    updated =
+      signed_user_card(card, sign_skey, %{
+        name: new_name,
+        owner_timestamp: card.owner_timestamp + 1
+      })
 
     %{
       "mutations" => [

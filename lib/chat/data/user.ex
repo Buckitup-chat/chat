@@ -9,6 +9,7 @@ defmodule Chat.Data.User do
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Schemas.UserStorage
+  alias Chat.Data.Types.UserHash
   alias Chat.Data.User.Versioning
   alias Enigma
   alias EnigmaPq
@@ -37,7 +38,7 @@ defmodule Chat.Data.User do
     user_hash =
       sign_pkey
       |> EnigmaPq.hash()
-      |> Chat.Data.Types.UserHash.from_binary()
+      |> UserHash.from_binary()
 
     crypt_cert = EnigmaPq.sign(crypt_pkey, sign_skey)
     contact_cert = EnigmaPq.sign(contact_pkey, sign_skey)
@@ -180,7 +181,7 @@ defmodule Chat.Data.User do
     expected_hash =
       sign_pkey
       |> EnigmaPq.hash()
-      |> Chat.Data.Types.UserHash.from_binary()
+      |> UserHash.from_binary()
 
     hash_valid? = hash == expected_hash
 

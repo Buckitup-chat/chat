@@ -13,9 +13,10 @@ defmodule ChatWeb.ElectricSyncTest do
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Types.UserHash
   alias Chat.Repo
+  alias Phoenix.Sync.Sandbox
 
   setup %{conn: conn} do
-    conn = Phoenix.Sync.Sandbox.init_test_session(conn, Chat.Repo)
+    conn = Sandbox.init_test_session(conn, Chat.Repo)
     {:ok, conn: conn}
   end
 

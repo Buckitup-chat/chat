@@ -100,16 +100,14 @@ defmodule Chat.PhoenixSyncReinit do
   defp get_runtime_connection_opts(repo) do
     # Try to get the runtime config from the repo's Ecto adapter
     # This reflects the actual connection parameters being used
-    try do
-      %{opts: opts} = Ecto.Adapter.lookup_meta(repo)
+    %{opts: opts} = Ecto.Adapter.lookup_meta(repo)
 
-      build_connection_opts(opts)
-    rescue
-      _ ->
-        # Fallback to static config if runtime lookup fails
-        Logger.warning("[PhoenixSyncReinit] Could not get runtime config, using static config")
-        get_static_connection_opts(repo)
-    end
+    build_connection_opts(opts)
+  rescue
+    _ ->
+      # Fallback to static config if runtime lookup fails
+      Logger.warning("[PhoenixSyncReinit] Could not get runtime config, using static config")
+      get_static_connection_opts(repo)
   end
 
   defp get_static_connection_opts(repo) do
@@ -131,26 +129,22 @@ defmodule Chat.PhoenixSyncReinit do
   end
 
   defp start_electric_stack do
-    # Get children config from Phoenix.Sync.Application
-    case Phoenix.Sync.Application.children() do
-      {:ok, children} ->
-        # Start each child under Phoenix.Sync.Supervisor
-        Enum.reduce_while(children, :ok, fn child_spec, _acc ->
-          case start_or_restart_child(child_spec) do
-            :ok ->
-              {:cont, :ok}
+    with {:ok, children} <- Phoenix.Sync.Application.children() do
+      Enum.reduce_while(children, :ok, &start_child_step/2)
+    end
+  end
 
-            {:error, reason} ->
-              Logger.error(
-                "[PhoenixSyncReinit] Failed to start child #{inspect(child_spec)}: #{inspect(reason)}"
-              )
+  defp start_child_step(child_spec, _acc) do
+    case start_or_restart_child(child_spec) do
+      :ok ->
+        {:cont, :ok}
 
-              {:halt, {:error, reason}}
-          end
-        end)
+      {:error, reason} = err ->
+        Logger.error(
+          "[PhoenixSyncReinit] Failed to start child #{inspect(child_spec)}: #{inspect(reason)}"
+        )
 
-      {:error, reason} ->
-        {:error, reason}
+        {:halt, err}
     end
   end
 

@@ -186,18 +186,11 @@ defmodule Chat.KeyShare do
     try_number
     |> Combinatorics.n_combinations(shares)
     |> Enum.reduce_while([], fn share, acc ->
-      case build_keypair_without({shares, share}) do
-        :error ->
-          {:cont, []}
-
-        keypair ->
-          case user_in_share(keypair) do
-            :user_keystring_broken ->
-              {:cont, []}
-
-            {:ok, _user} ->
-              {:halt, acc ++ share}
-          end
+      with keypair when keypair != :error <- build_keypair_without({shares, share}),
+           {:ok, _user} <- user_in_share(keypair) do
+        {:halt, acc ++ share}
+      else
+        _ -> {:cont, []}
       end
     end)
   end

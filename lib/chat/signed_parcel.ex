@@ -16,9 +16,9 @@ defmodule Chat.SignedParcel do
 
   alias Chat.Dialogs.DialogMessaging
   alias Chat.Dialogs.Message, as: DialogMessage
-  alias Chat.Rooms.RoomMessages
   alias Chat.Identity
   alias Chat.Rooms.Message, as: RoomMessage
+  alias Chat.Rooms.RoomMessages
 
   defstruct data: [], sign: ""
 

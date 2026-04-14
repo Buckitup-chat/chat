@@ -5,6 +5,7 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
   alias Chat.Challenge
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.UserStorage
+  alias Chat.Data.Types.UserStorageSignHash
   alias Chat.Data.User, as: UserData
 
   describe "user storage insert operations" do
@@ -20,7 +21,9 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
       # Now insert user storage
       uuid = Ecto.UUID.generate()
       value = "encrypted_blob_here"
-      storage_payload = user_storage_insert_payload(card.user_hash, uuid, value, identity.sign_skey)
+
+      storage_payload =
+        user_storage_insert_payload(card.user_hash, uuid, value, identity.sign_skey)
 
       conn = post_ingest(conn, storage_payload, identity.sign_skey)
 
@@ -41,7 +44,9 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
       # Insert storage with large value (1MB - well under 10MB limit)
       uuid = Ecto.UUID.generate()
       value = :crypto.strong_rand_bytes(1_048_576)
-      storage_payload = user_storage_insert_payload(card.user_hash, uuid, value, identity.sign_skey)
+
+      storage_payload =
+        user_storage_insert_payload(card.user_hash, uuid, value, identity.sign_skey)
 
       conn = post_ingest(conn, storage_payload, identity.sign_skey)
 
@@ -60,14 +65,23 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
       # Insert first storage entry
       uuid = Ecto.UUID.generate()
       value = "encrypted_blob_1"
-      storage_payload = user_storage_insert_payload(card.user_hash, uuid, value, identity.sign_skey)
+
+      storage_payload =
+        user_storage_insert_payload(card.user_hash, uuid, value, identity.sign_skey)
+
       first_conn = post_ingest(conn, storage_payload, identity.sign_skey)
       assert first_conn.status == 200
 
       # Try to insert with same UUID — unique constraint violation
-      duplicate_payload = user_storage_insert_payload_with_timestamp(
-        card.user_hash, uuid, "different_value", identity.sign_skey, System.system_time(:second) + 1
-      )
+      duplicate_payload =
+        user_storage_insert_payload_with_timestamp(
+          card.user_hash,
+          uuid,
+          "different_value",
+          identity.sign_skey,
+          System.system_time(:second) + 1
+        )
+
       conn = post_ingest(conn, duplicate_payload, identity.sign_skey)
 
       assert conn.status == 422
@@ -81,7 +95,9 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
 
       uuid = Ecto.UUID.generate()
       value = "encrypted_blob"
-      storage_payload = user_storage_insert_payload(card.user_hash, uuid, value, identity.sign_skey)
+
+      storage_payload =
+        user_storage_insert_payload(card.user_hash, uuid, value, identity.sign_skey)
 
       conn = post_ingest(conn, storage_payload, identity.sign_skey)
 
@@ -101,7 +117,9 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
       # Try to insert storage without auth
       uuid = Ecto.UUID.generate()
       value = "encrypted_blob"
-      storage_payload = user_storage_insert_payload(card.user_hash, uuid, value, identity.sign_skey)
+
+      storage_payload =
+        user_storage_insert_payload(card.user_hash, uuid, value, identity.sign_skey)
 
       conn =
         conn
@@ -125,7 +143,9 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
       other_identity = UserData.generate_pq_identity("Alice")
       uuid = Ecto.UUID.generate()
       value = "encrypted_blob"
-      storage_payload = user_storage_insert_payload(card.user_hash, uuid, value, identity.sign_skey)
+
+      storage_payload =
+        user_storage_insert_payload(card.user_hash, uuid, value, identity.sign_skey)
 
       conn = post_ingest(conn, storage_payload, other_identity.sign_skey)
 
@@ -147,12 +167,17 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
       # Insert storage entry
       uuid = Ecto.UUID.generate()
       value = "original_value"
-      storage_payload = user_storage_insert_payload(card.user_hash, uuid, value, identity.sign_skey)
+
+      storage_payload =
+        user_storage_insert_payload(card.user_hash, uuid, value, identity.sign_skey)
+
       insert_conn = post_ingest(conn, storage_payload, identity.sign_skey)
       assert insert_conn.status == 200
 
       # Update the value
-      update_payload = user_storage_update_payload(card.user_hash, uuid, "updated_value", identity.sign_skey)
+      update_payload =
+        user_storage_update_payload(card.user_hash, uuid, "updated_value", identity.sign_skey)
+
       update_conn = post_ingest(conn, update_payload, identity.sign_skey)
 
       assert update_conn.status == 200, update_conn.resp_body
@@ -170,13 +195,19 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
       assert card_conn.status == 200
 
       uuid = Ecto.UUID.generate()
-      storage_payload = user_storage_insert_payload(card.user_hash, uuid, "original", identity.sign_skey)
+
+      storage_payload =
+        user_storage_insert_payload(card.user_hash, uuid, "original", identity.sign_skey)
+
       insert_conn = post_ingest(conn, storage_payload, identity.sign_skey)
       assert insert_conn.status == 200
 
       # Try to update with different user's key
       other_identity = UserData.generate_pq_identity("Alice")
-      update_payload = user_storage_update_payload(card.user_hash, uuid, "hacked", identity.sign_skey)
+
+      update_payload =
+        user_storage_update_payload(card.user_hash, uuid, "hacked", identity.sign_skey)
+
       conn = post_ingest(conn, update_payload, other_identity.sign_skey)
 
       assert conn.status == 400
@@ -195,7 +226,10 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
       assert card_conn.status == 200
 
       uuid = Ecto.UUID.generate()
-      storage_payload = user_storage_insert_payload(card.user_hash, uuid, "value", identity.sign_skey)
+
+      storage_payload =
+        user_storage_insert_payload(card.user_hash, uuid, "value", identity.sign_skey)
+
       insert_conn = post_ingest(conn, storage_payload, identity.sign_skey)
       assert insert_conn.status == 200
 
@@ -226,7 +260,9 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
 
       mutations =
         for {uuid, value} <- [{uuid1, "value1"}, {uuid2, "value2"}, {uuid3, "value3"}] do
-          %{"mutations" => [mutation]} = user_storage_insert_payload(card.user_hash, uuid, value, identity.sign_skey)
+          %{"mutations" => [mutation]} =
+            user_storage_insert_payload(card.user_hash, uuid, value, identity.sign_skey)
+
           mutation
         end
 
@@ -241,8 +277,15 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
   end
 
   # Helper functions
-  defp user_storage_insert_payload_with_timestamp(user_hash, uuid, value, sign_skey, owner_timestamp) do
-    {sign_b64, sign_hash} = sign_storage(user_hash, uuid, value, false, nil, owner_timestamp, sign_skey)
+  defp user_storage_insert_payload_with_timestamp(
+         user_hash,
+         uuid,
+         value,
+         sign_skey,
+         owner_timestamp
+       ) do
+    {sign_b64, sign_hash} =
+      sign_storage(user_hash, uuid, value, false, nil, owner_timestamp, sign_skey)
 
     %{
       "mutations" => [
@@ -265,7 +308,9 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
 
   defp user_storage_insert_payload(user_hash, uuid, value, sign_skey) do
     owner_timestamp = System.system_time(:second)
-    {sign_b64, sign_hash} = sign_storage(user_hash, uuid, value, false, nil, owner_timestamp, sign_skey)
+
+    {sign_b64, sign_hash} =
+      sign_storage(user_hash, uuid, value, false, nil, owner_timestamp, sign_skey)
 
     %{
       "mutations" => [
@@ -289,7 +334,9 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
   defp user_storage_update_payload(user_hash, uuid, new_value, sign_skey) do
     # Timestamp must be strictly greater than the insert timestamp for versioning
     owner_timestamp = System.system_time(:second) + 1
-    {sign_b64, sign_hash} = sign_storage(user_hash, uuid, new_value, false, nil, owner_timestamp, sign_skey)
+
+    {sign_b64, sign_hash} =
+      sign_storage(user_hash, uuid, new_value, false, nil, owner_timestamp, sign_skey)
 
     %{
       "mutations" => [
@@ -326,7 +373,15 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
     }
   end
 
-  defp sign_storage(user_hash, uuid, value, deleted_flag, parent_sign_hash, owner_timestamp, sign_skey) do
+  defp sign_storage(
+         user_hash,
+         uuid,
+         value,
+         deleted_flag,
+         parent_sign_hash,
+         owner_timestamp,
+         sign_skey
+       ) do
     storage = %UserStorage{
       user_hash: user_hash,
       uuid: uuid,
@@ -344,7 +399,7 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
     sign_hash =
       sign_b64
       |> EnigmaPq.hash()
-      |> Chat.Data.Types.UserStorageSignHash.from_binary()
+      |> UserStorageSignHash.from_binary()
 
     {sign_b64, sign_hash}
   end

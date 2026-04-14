@@ -38,7 +38,12 @@ defmodule ChatWeb.DataCase do
 
   @stack_id "electric-embedded"
   @ets_table :"#{@stack_id}:status_monitor"
-  @conditions [:pg_lock_acquired, :replication_client_ready, :connection_pool_ready, :shape_log_collector_ready]
+  @conditions [
+    :pg_lock_acquired,
+    :replication_client_ready,
+    :connection_pool_ready,
+    :shape_log_collector_ready
+  ]
 
   defp ensure_electric_ready do
     ensure_ets_table()

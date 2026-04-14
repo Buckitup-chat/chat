@@ -2,11 +2,12 @@ defmodule Chat.Data.UserDataTest do
   use ChatWeb.DataCase
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.{UserCard, UserStorage}
+  alias Chat.Data.Types.Consts
+  alias Chat.Data.Types.UserHash
+  alias Chat.Data.User
   alias Chat.Data.User.Validation
   alias Chat.Repo
   alias EnigmaPq
-  alias Chat.Data.Types.Consts
-  alias Chat.Data.User
 
   defp signed_user_card(identity, attrs \\ %{}) do
     card =
@@ -30,7 +31,8 @@ defmodule Chat.Data.UserDataTest do
       expected_hash =
         identity.sign_pkey
         |> EnigmaPq.hash()
-        |> Chat.Data.Types.UserHash.from_binary()
+        |> UserHash.from_binary()
+
       assert card_struct.user_hash == expected_hash
       assert card_struct.name == "Alice"
       assert is_binary(card_struct.crypt_cert)
@@ -63,10 +65,13 @@ defmodule Chat.Data.UserDataTest do
         })
 
       softdelete =
-        %{softdelete | sign_b64: Integrity.signature_payload(softdelete) |> EnigmaPq.sign(identity.sign_skey)}
+        %{
+          softdelete
+          | sign_b64: Integrity.signature_payload(softdelete) |> EnigmaPq.sign(identity.sign_skey)
+        }
 
       softdelete_changeset =
-        Validation.validate_user_card_delete(existing, softdelete)
+        Validation.validate_user_card_update(existing, softdelete)
 
       assert softdelete_changeset.valid?, inspect(softdelete_changeset.errors)
       {:ok, softdeleted_card} = Ecto.Changeset.apply_action(softdelete_changeset, :validate)
@@ -85,7 +90,10 @@ defmodule Chat.Data.UserDataTest do
         |> EnigmaPq.sign(identity.sign_skey)
 
       undelete_changeset =
-        Validation.validate_user_card_delete(softdeleted_card, %{undelete | sign_b64: undelete_sign_b64})
+        Validation.validate_user_card_update(softdeleted_card, %{
+          undelete
+          | sign_b64: undelete_sign_b64
+        })
 
       assert undelete_changeset.valid?, inspect(undelete_changeset.errors)
       {:ok, undeleted_card} = Ecto.Changeset.apply_action(undelete_changeset, :validate)
@@ -107,7 +115,8 @@ defmodule Chat.Data.UserDataTest do
       fake_hash =
         "fake_key"
         |> EnigmaPq.hash()
-        |> Chat.Data.Types.UserHash.from_binary()
+        |> UserHash.from_binary()
+
       bad_card = %{card | user_hash: fake_hash}
 
       refute User.valid_card?(bad_card)
@@ -247,7 +256,9 @@ defmodule Chat.Data.UserDataTest do
       # Generate signature
       sign_b64 = Integrity.signature_payload(storage_struct) |> EnigmaPq.sign(identity.sign_skey)
       sign_hash_binary = :crypto.hash(:sha3_512, sign_b64)
-      sign_hash = Consts.user_storage_sign_prefix() <> Base.encode16(sign_hash_binary, case: :lower)
+
+      sign_hash =
+        Consts.user_storage_sign_prefix() <> Base.encode16(sign_hash_binary, case: :lower)
 
       attrs = %{
         user_hash: card_struct.user_hash,

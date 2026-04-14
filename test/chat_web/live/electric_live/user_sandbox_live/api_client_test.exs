@@ -8,8 +8,8 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClientTest do
   """
   use ChatWeb.DataCase
 
-  alias ChatWeb.ElectricLive.UserSandboxLive.ApiClient
   alias Chat.Data.User
+  alias ChatWeb.ElectricLive.UserSandboxLive.ApiClient
 
   describe "create_user/2" do
     test "returns user data and log entries on success" do

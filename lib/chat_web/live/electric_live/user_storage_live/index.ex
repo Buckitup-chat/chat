@@ -91,12 +91,7 @@ defmodule ChatWeb.ElectricLive.UserStorageLive.Index do
                 navigate={~p"/electric/user_storage_versions"}
                 class="inline-flex items-center px-3 py-2 border border-purple-300 rounded-md shadow-sm text-sm font-medium text-purple-700 bg-white hover:bg-purple-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
-                <svg
-                  class="mr-2 h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
+                <svg class="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
                     stroke-linecap="round"
                     stroke-linejoin="round"
@@ -245,8 +240,8 @@ defmodule ChatWeb.ElectricLive.UserStorageLive.Index do
     cond do
       diff < 60 -> "#{diff}s ago"
       diff < 3600 -> "#{div(diff, 60)}m ago"
-      diff < 86400 -> "#{div(diff, 3600)}h ago"
-      true -> "#{div(diff, 86400)}d ago"
+      diff < 86_400 -> "#{div(diff, 3600)}h ago"
+      true -> "#{div(diff, 86_400)}d ago"
     end
   end
 

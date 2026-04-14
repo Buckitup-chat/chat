@@ -67,7 +67,6 @@ defmodule Chat.Data.Schemas.UserStorage do
     |> foreign_key_constraint(:parent_sign_hash, name: :user_storage_parent_sign_hash_fkey)
   end
 
-
   defp validate_value_size(changeset) do
     case get_field(changeset, :value_b64) do
       nil ->

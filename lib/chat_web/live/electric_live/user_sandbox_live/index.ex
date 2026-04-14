@@ -32,7 +32,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
           Interactive test client for user_card and user_storage Electric API operations
         </p>
       </div>
-
+      
     <!-- Main Layout -->
       <div class="flex-1 flex overflow-hidden">
         <!-- Left Sidebar (Documentation) -->
@@ -91,7 +91,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
             </div>
           <% end %>
         </aside>
-
+        
     <!-- Main Content Area -->
         <main class="flex-1 overflow-y-auto p-6">
           <%= if @error_message do %>
@@ -114,7 +114,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
             {render_initial_state(assigns)}
           <% end %>
         </main>
-
+        
     <!-- Right Sidebar (Request Log) -->
         <aside class="w-96 bg-gray-50 border-l overflow-y-auto">
           <div class="p-4">
@@ -176,7 +176,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
           </div>
         </aside>
       </div>
-
+      
     <!-- Storage Item Form Modal (shown when creating/editing) -->
       <%= if @show_storage_form do %>
         <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -262,7 +262,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
           </div>
         </div>
       <% end %>
-
+      
     <!-- Storage Details Modal (shown when viewing) -->
       <%= if @viewing_storage_uuid do %>
         <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -348,7 +348,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
       <!-- User Card -->
       <div class="bg-white shadow rounded-lg p-6">
         <h3 class="text-lg font-bold mb-4">User</h3>
-
+        
     <!-- User Info -->
         <div class="mb-4 pl-4 border-l-4 border-blue-500">
           <p class="text-sm text-gray-600">
@@ -358,7 +358,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
             Hash: {short_hash(@user.user_hash_hex)}
           </p>
         </div>
-
+        
     <!-- User Actions -->
         <div class="mb-6">
           <form phx-submit="update_name" class="flex gap-2 mb-2">
@@ -388,7 +388,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
             Delete User
           </button>
         </div>
-
+        
     <!-- Storage Items Section -->
         <div>
           <h4 class="text-md font-semibold mb-3 text-gray-700">Storage Items</h4>
@@ -434,7 +434,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
               <% end %>
             </ul>
           <% end %>
-
+          
     <!-- Create Storage Item Button -->
           <button
             phx-click="show_create_storage_form"
@@ -625,22 +625,14 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
 
     case ApiClient.update_storage(user.user_hash, user.sign_skey, uuid, value_binary, base_url) do
       {:ok, %{log_entries: log_entries}} ->
+        updated_label = if(label == "", do: nil, else: label)
+
         socket =
           socket
-          |> update(:storage_items, fn items ->
-            Enum.map(items, fn item ->
-              if item.uuid == uuid do
-                %{
-                  item
-                  | value_b64: value_b64,
-                    size: size,
-                    label: if(label == "", do: nil, else: label)
-                }
-              else
-                item
-              end
-            end)
-          end)
+          |> update(
+            :storage_items,
+            &update_storage_item(&1, uuid, value_b64, size, updated_label)
+          )
           |> assign(:show_storage_form, false)
           |> assign(:editing_storage_uuid, nil)
           |> update(:request_log, &(&1 ++ log_entries))
@@ -722,9 +714,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
   defp status_color(_), do: "bg-gray-100 text-gray-800"
 
   defp format_headers(headers) do
-    headers
-    |> Enum.map(fn {k, v} -> "#{k}: #{v}" end)
-    |> Enum.join("\n")
+    Enum.map_join(headers, "\n", fn {k, v} -> "#{k}: #{v}" end)
   end
 
   defp format_timestamp(timestamp) do
@@ -745,6 +735,13 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
   end
 
   defp format_bytes(bytes), do: "#{bytes} bytes"
+
+  defp update_storage_item(items, uuid, value_b64, size, label) do
+    Enum.map(items, fn
+      %{uuid: ^uuid} = item -> %{item | value_b64: value_b64, size: size, label: label}
+      item -> item
+    end)
+  end
 
   # Generate random binary data and base64 encode it
   defp generate_storage_value(size) do

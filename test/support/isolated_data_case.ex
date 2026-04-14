@@ -14,6 +14,7 @@ defmodule ChatTest.IsolatedDataCase do
   use ExUnit.CaseTemplate, async: false
 
   alias Chat.Db
+  alias Ecto.Adapters.SQL.Sandbox
 
   using options do
     quote do
@@ -21,8 +22,8 @@ defmodule ChatTest.IsolatedDataCase do
       alias ChatTest.IsolatedDataCase
 
       setup tags do
-        :ok = Ecto.Adapters.SQL.Sandbox.checkout(Chat.Repo)
-        Ecto.Adapters.SQL.Sandbox.mode(Chat.Repo, {:shared, self()})
+        :ok = Sandbox.checkout(Chat.Repo)
+        Sandbox.mode(Chat.Repo, {:shared, self()})
         :ok
       end
 

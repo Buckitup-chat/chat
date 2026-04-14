@@ -120,7 +120,9 @@ defmodule Chat.TimeKeeper do
 
       persist_time(unix_timestamp, state.persist_path)
 
-      log(["offset updated, delta=", Integer.to_string(unix_timestamp - current_unix), "s"], :debug)
+      ["offset updated, delta=", Integer.to_string(unix_timestamp - current_unix), "s"]
+      |> log(:debug)
+
 
       {:noreply, %{state | offset: new_offset}}
     else

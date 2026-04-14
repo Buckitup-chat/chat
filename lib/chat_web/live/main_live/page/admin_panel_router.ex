@@ -62,20 +62,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
       {:updated_wifi_settings, _} ->
         socket |> AdminPanel.confirm_wifi_updated()
 
-      {:lan_ip, ip} ->
-        AdminPanel.update_lan_settings(ip: ip)
-        socket
-
-      {:lan_profile, profile} ->
-        AdminPanel.update_lan_settings(profile: profile)
-        socket
-
-      {:lan_known_profiles, list} ->
-        AdminPanel.update_lan_settings(known_profiles: list)
-        socket
-
-      {:updated_lan_profile, :ok} ->
-        socket
+      lan_msg
+      when elem(lan_msg, 0) in [:lan_ip, :lan_profile, :lan_known_profiles, :updated_lan_profile] ->
+        handle_lan_message(socket, lan_msg)
 
       {:device_log, log} ->
         socket |> AdminPanel.render_device_log(log)
@@ -116,6 +105,17 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
       {:github_firmware_upgrade, _} = message ->
         socket |> AdminPanel.github_firmware_upgrade_response(message)
     end
+  end
+
+  defp handle_lan_message(socket, message) do
+    case message do
+      {:lan_ip, ip} -> AdminPanel.update_lan_settings(ip: ip)
+      {:lan_profile, profile} -> AdminPanel.update_lan_settings(profile: profile)
+      {:lan_known_profiles, list} -> AdminPanel.update_lan_settings(known_profiles: list)
+      {:updated_lan_profile, :ok} -> :noop
+    end
+
+    socket
   end
 
   defp decode(x), do: Base.decode16!(x, case: :lower)

@@ -33,8 +33,7 @@ defmodule Chat.Data.Integrity do
     data
     |> Signable.signable_fields()
     |> Enum.sort_by(fn {key, _value} -> to_string(key) end)
-    |> Enum.map(&encode_field/1)
-    |> Enum.join("")
+    |> Enum.map_join("", &encode_field/1)
   end
 
   @doc """

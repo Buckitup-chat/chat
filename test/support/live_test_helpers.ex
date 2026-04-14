@@ -61,101 +61,98 @@ defmodule ChatWeb.LiveTestHelpers do
     debug_mode = Keyword.get(opts, :debug, false)
     html = if is_binary(view), do: view, else: render(view)
 
-    # Special handling for LinkedText component which may have specific structure
     result =
       if component_name == "LinkedText" do
-        # Try direct string search first for LinkedText content
-        if is_binary(content_or_validator) && html =~ content_or_validator do
-          if debug_mode do
-            IO.puts("\n[DEBUG] Found text '#{content_or_validator}' in general HTML")
-            # Find the context around the content for debugging
-            [context] =
-              Regex.run(~r/(.{0,100}#{content_or_validator}.{0,100})/s, html,
-                capture: :all_but_first
-              )
-
-            IO.puts("[DEBUG] Context: #{context}")
-          end
-
-          true
-        else
-          # Check for LinkedText in LiveVue data-slots base64 encoded content
-          case Regex.run(
-                 ~r/data-name="#{component_name}"[^>]*data-slots="[^"]*default[^"]*:&quot;([^&]+)&quot;/,
-                 html
-               ) do
-            [_, base64_content] ->
-              try do
-                decoded_content = Base.decode64!(base64_content)
-
-                if is_binary(content_or_validator) && decoded_content =~ content_or_validator do
-                  if debug_mode do
-                    IO.puts(
-                      "\n[DEBUG] Found text '#{content_or_validator}' in base64 decoded content"
-                    )
-
-                    IO.puts("[DEBUG] Decoded content: #{decoded_content}")
-                  end
-
-                  true
-                else
-                  false
-                end
-              rescue
-                _ -> false
-              end
-
-            nil ->
-              # Fallback to original patterns for non-LiveVue components
-              linked_text_patterns = [
-                ~r/<[^>]*class="[^"]*flex-initial[^"]*"[^>]*>(.*?#{content_or_validator}.*?)<\/span>/s,
-                ~r/<span[^>]*class="[^"]*break-words[^"]*"[^>]*>(.*?#{content_or_validator}.*?)<\/span>/s,
-                ~r/v-component="LinkedText"[^>]*>.*?(#{content_or_validator})/s
-              ]
-
-              Enum.any?(linked_text_patterns, fn pattern ->
-                case Regex.run(pattern, html) do
-                  [match | _] ->
-                    if debug_mode, do: IO.puts("\n[DEBUG] Found LinkedText match: #{match}")
-                    true
-
-                  nil ->
-                    false
-                end
-              end)
-          end
-        end
+        find_linked_text_content(html, content_or_validator, debug_mode)
       else
-        # Standard component search for other components
-        case find_vue_component(html, component_name) do
-          nil ->
-            if debug_mode, do: IO.puts("\n[DEBUG] Component '#{component_name}' not found")
-            false
-
-          component_html ->
-            if debug_mode, do: IO.puts("\n[DEBUG] Found component '#{component_name}'")
-
-            result =
-              case content_or_validator do
-                validator when is_function(validator, 1) ->
-                  validator.(component_html)
-
-                text when is_binary(text) ->
-                  component_html =~ text
-              end
-
-            if debug_mode && !result, do: IO.puts("[DEBUG] Content not found in component")
-            result
-        end
+        find_standard_component_content(html, component_name, content_or_validator, debug_mode)
       end
 
-    # Print full debug info if requested and not found
     if debug_mode && !result do
       IO.puts("[DEBUG] Full Vue component analysis:")
       IO.puts(debug_vue_components(view, component_name))
     end
 
     result
+  end
+
+  defp find_linked_text_content(html, content_or_validator, debug_mode) do
+    if is_binary(content_or_validator) && html =~ content_or_validator do
+      if debug_mode do
+        IO.puts("\n[DEBUG] Found text '#{content_or_validator}' in general HTML")
+
+        [context] =
+          Regex.run(~r/(.{0,100}#{content_or_validator}.{0,100})/s, html, capture: :all_but_first)
+
+        IO.puts("[DEBUG] Context: #{context}")
+      end
+
+      true
+    else
+      find_linked_text_in_slots(html, content_or_validator, debug_mode)
+    end
+  end
+
+  defp find_linked_text_in_slots(html, content_or_validator, debug_mode) do
+    case Regex.run(
+           ~r/data-name="LinkedText"[^>]*data-slots="[^"]*default[^"]*:&quot;([^&]+)&quot;/,
+           html
+         ) do
+      [_, base64_content] ->
+        find_in_base64_content(base64_content, content_or_validator, debug_mode)
+
+      nil ->
+        find_linked_text_by_patterns(html, content_or_validator, debug_mode)
+    end
+  end
+
+  defp find_in_base64_content(base64_content, content_or_validator, debug_mode) do
+    with {:ok, decoded_content} <- Base.decode64(base64_content),
+         true <- is_binary(content_or_validator) && decoded_content =~ content_or_validator do
+      if debug_mode do
+        IO.puts("\n[DEBUG] Found text '#{content_or_validator}' in base64 decoded content")
+        IO.puts("[DEBUG] Decoded content: #{decoded_content}")
+      end
+
+      true
+    else
+      _ -> false
+    end
+  end
+
+  defp find_linked_text_by_patterns(html, content_or_validator, debug_mode) do
+    linked_text_patterns = [
+      ~r/<[^>]*class="[^"]*flex-initial[^"]*"[^>]*>(.*?#{content_or_validator}.*?)<\/span>/s,
+      ~r/<span[^>]*class="[^"]*break-words[^"]*"[^>]*>(.*?#{content_or_validator}.*?)<\/span>/s,
+      ~r/v-component="LinkedText"[^>]*>.*?(#{content_or_validator})/s
+    ]
+
+    Enum.find_value(linked_text_patterns, false, fn pattern ->
+      with [match | _] <- Regex.run(pattern, html) do
+        if debug_mode, do: IO.puts("\n[DEBUG] Found LinkedText match: #{match}")
+        true
+      end
+    end)
+  end
+
+  defp find_standard_component_content(html, component_name, content_or_validator, debug_mode) do
+    case find_vue_component(html, component_name) do
+      nil ->
+        if debug_mode, do: IO.puts("\n[DEBUG] Component '#{component_name}' not found")
+        false
+
+      component_html ->
+        if debug_mode, do: IO.puts("\n[DEBUG] Found component '#{component_name}'")
+
+        result =
+          case content_or_validator do
+            validator when is_function(validator, 1) -> validator.(component_html)
+            text when is_binary(text) -> component_html =~ text
+          end
+
+        if debug_mode && !result, do: IO.puts("[DEBUG] Content not found in component")
+        result
+    end
   end
 
   @doc """

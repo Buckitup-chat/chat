@@ -3,13 +3,13 @@ defmodule ChatTest.SignedParcelTest do
   # import Mock
 
   alias Chat.Card
+  alias Chat.Db.ChangeTracker
   alias Chat.Dialogs
   alias Chat.Dialogs.Message, as: DialogMessage
   alias Chat.Identity
   alias Chat.Messages
-  alias Chat.SignedParcel
-  alias Chat.Dialogs.Message, as: DialogMessage
   alias Chat.Rooms.Message, as: RoomMessage
+  alias Chat.SignedParcel
   # alias Chat.Dialogs.Registry, as: DialogRegistry
 
   test "text message parcel is corect" do
@@ -301,7 +301,7 @@ defmodule ChatTest.SignedParcelTest do
     alice = Identity.create("Alice")
     bob = Identity.create("Bob")
     dialog = Dialogs.find_or_open(alice, bob |> Card.from_identity())
-    Chat.Db.ChangeTracker.await()
+    ChangeTracker.await()
 
     {alice, bob, dialog}
   end

@@ -1,6 +1,7 @@
 defmodule Chat.Sync.DbBrokers do
   @moduledoc "Db brokers handlers"
   alias Chat.Rooms.RoomsBroker
+  alias Chat.Sync.DbBrokers
   alias Chat.User.UsersBroker
 
   alias Phoenix.PubSub
@@ -20,7 +21,7 @@ defmodule Chat.Sync.DbBrokers do
         |> :timer.seconds()
         |> Process.sleep()
 
-        Chat.Sync.DbBrokers.refresh()
+        DbBrokers.refresh()
       end)
   end
 

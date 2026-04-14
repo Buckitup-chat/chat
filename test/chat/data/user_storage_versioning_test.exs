@@ -3,6 +3,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
 
   import Ecto.Query
 
+  alias Chat.Data.Integrity
   alias Chat.Data.Schemas.{UserCard, UserStorage, UserStorageVersion}
   alias Chat.Data.Types.{UserHash, UserStorageSignHash}
   alias Chat.Data.User
@@ -28,7 +29,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
 
     sign_b64 =
       storage
-      |> Chat.Data.Integrity.signature_payload()
+      |> Integrity.signature_payload()
       |> EnigmaPq.sign(identity.sign_skey)
 
     sign_hash = compute_sign_hash(sign_b64)
@@ -43,7 +44,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
       user_hash =
         identity.sign_pkey
         |> EnigmaPq.hash()
-        |> Chat.Data.Types.UserHash.from_binary()
+        |> UserHash.from_binary()
 
       card_attrs = %{
         user_hash: user_hash,
@@ -58,7 +59,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
       }
 
       # Sign the card
-      sign_payload = Chat.Data.Integrity.signature_payload(%UserCard{} |> struct(card_attrs))
+      sign_payload = Integrity.signature_payload(%UserCard{} |> struct(card_attrs))
       sign_b64 = EnigmaPq.sign(sign_payload, identity.sign_skey)
 
       card =
@@ -69,7 +70,10 @@ defmodule Chat.Data.UserStorageVersioningTest do
       %{card: card, identity: identity, user_hash: user_hash}
     end
 
-    test "creates user_storage with versioning fields", %{user_hash: user_hash, identity: identity} do
+    test "creates user_storage with versioning fields", %{
+      user_hash: user_hash,
+      identity: identity
+    } do
       uuid = Ecto.UUID.generate()
       timestamp = System.system_time(:second)
 
@@ -83,7 +87,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
       }
 
       # Sign the storage
-      sign_payload = Chat.Data.Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs))
+      sign_payload = Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs))
       sign_b64 = EnigmaPq.sign(sign_payload, identity.sign_skey)
       sign_hash = compute_sign_hash(sign_b64)
 
@@ -124,7 +128,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
         owner_timestamp: timestamp1
       }
 
-      sign_payload1 = Chat.Data.Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs1))
+      sign_payload1 = Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs1))
       sign_b64_1 = EnigmaPq.sign(sign_payload1, identity.sign_skey)
       sign_hash_1 = compute_sign_hash(sign_b64_1)
 
@@ -149,7 +153,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
         owner_timestamp: timestamp2
       }
 
-      sign_payload2 = Chat.Data.Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs2))
+      sign_payload2 = Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs2))
       sign_b64_2 = EnigmaPq.sign(sign_payload2, identity.sign_skey)
       sign_hash_2 = compute_sign_hash(sign_b64_2)
 
@@ -186,7 +190,9 @@ defmodule Chat.Data.UserStorageVersioningTest do
       assert storage2.parent_sign_hash == sign_hash_1
 
       # Verify old version is in versions table
-      version = Repo.get_by(UserStorageVersion, user_hash: user_hash, uuid: uuid, sign_hash: sign_hash_1)
+      version =
+        Repo.get_by(UserStorageVersion, user_hash: user_hash, uuid: uuid, sign_hash: sign_hash_1)
+
       assert version != nil
       assert version.value_b64 == "version 1"
       assert version.owner_timestamp == timestamp1
@@ -198,6 +204,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
     } do
       uuid = Ecto.UUID.generate()
       timestamp = System.system_time(:second)
+
       invalid_parent_hash =
         :crypto.strong_rand_bytes(64)
         |> UserStorageSignHash.from_binary()
@@ -211,7 +218,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
         owner_timestamp: timestamp
       }
 
-      sign_payload = Chat.Data.Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs))
+      sign_payload = Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs))
       sign_b64 = EnigmaPq.sign(sign_payload, identity.sign_skey)
       sign_hash = compute_sign_hash(sign_b64)
 
@@ -241,7 +248,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
       }
 
       # Sign correctly
-      sign_payload = Chat.Data.Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs))
+      sign_payload = Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs))
       sign_b64 = EnigmaPq.sign(sign_payload, identity.sign_skey)
       sign_hash = compute_sign_hash(sign_b64)
 
@@ -254,7 +261,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
         )
 
       # Verify signature
-      assert Chat.Data.Integrity.verify_signature(storage) == :ok
+      assert Integrity.verify_signature(storage) == :ok
     end
 
     test "insert_storage upserts with newer timestamp on conflict", %{
@@ -290,7 +297,11 @@ defmodule Chat.Data.UserStorageVersioningTest do
       timestamp = System.system_time(:second) + 100
 
       storage1 =
-        signed_storage(identity, user_hash, %{uuid: uuid, value_b64: "newer", owner_timestamp: timestamp})
+        signed_storage(identity, user_hash, %{
+          uuid: uuid,
+          value_b64: "newer",
+          owner_timestamp: timestamp
+        })
 
       changeset1 = UserStorage.create_changeset(%UserStorage{}, Map.from_struct(storage1))
       {:ok, _} = User.insert_storage(changeset1)
@@ -333,7 +344,11 @@ defmodule Chat.Data.UserStorageVersioningTest do
       assert stored.value_b64 == "v2"
 
       version =
-        Repo.get_by(UserStorageVersion, user_hash: user_hash, uuid: uuid, sign_hash: storage1.sign_hash)
+        Repo.get_by(UserStorageVersion,
+          user_hash: user_hash,
+          uuid: uuid,
+          sign_hash: storage1.sign_hash
+        )
 
       assert version != nil
       assert version.value_b64 == "v1"
@@ -347,7 +362,11 @@ defmodule Chat.Data.UserStorageVersioningTest do
       timestamp = System.system_time(:second) + 100
 
       storage1 =
-        signed_storage(identity, user_hash, %{uuid: uuid, value_b64: "newer", owner_timestamp: timestamp})
+        signed_storage(identity, user_hash, %{
+          uuid: uuid,
+          value_b64: "newer",
+          owner_timestamp: timestamp
+        })
 
       changeset1 = UserStorage.create_changeset(%UserStorage{}, Map.from_struct(storage1))
       {:ok, inserted} = Repo.insert(changeset1)
@@ -365,7 +384,11 @@ defmodule Chat.Data.UserStorageVersioningTest do
       assert stored.value_b64 == "newer"
 
       version =
-        Repo.get_by(UserStorageVersion, user_hash: user_hash, uuid: uuid, sign_hash: storage2.sign_hash)
+        Repo.get_by(UserStorageVersion,
+          user_hash: user_hash,
+          uuid: uuid,
+          sign_hash: storage2.sign_hash
+        )
 
       assert version != nil
       assert version.value_b64 == "older"
@@ -394,8 +417,9 @@ defmodule Chat.Data.UserStorageVersioningTest do
 
       versions =
         Repo.all(
-          from v in UserStorageVersion,
+          from(v in UserStorageVersion,
             where: v.user_hash == ^user_hash and v.uuid == ^uuid
+          )
         )
 
       assert length(versions) == 1
@@ -415,7 +439,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
         owner_timestamp: timestamp1
       }
 
-      sign_payload1 = Chat.Data.Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs1))
+      sign_payload1 = Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs1))
       sign_b64_1 = EnigmaPq.sign(sign_payload1, identity.sign_skey)
       sign_hash_1 = compute_sign_hash(sign_b64_1)
 
@@ -454,7 +478,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
         owner_timestamp: timestamp2
       }
 
-      sign_payload2 = Chat.Data.Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs2))
+      sign_payload2 = Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs2))
       sign_b64_2 = EnigmaPq.sign(sign_payload2, identity.sign_skey)
       sign_hash_2 = compute_sign_hash(sign_b64_2)
 

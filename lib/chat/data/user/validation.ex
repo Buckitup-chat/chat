@@ -49,18 +49,16 @@ defmodule Chat.Data.User.Validation do
         |> fail_invalid_user_card()
 
       :update ->
-        cond do
-          user_card_deleted_flag_change?(card, changes) ->
-            card
-            |> UserCard.update_deleted_flag_changeset(changes)
-            |> validate_signature()
-            |> validate_timestamp_newer_than_existing()
-
-          true ->
-            card
-            |> UserCard.update_name_changeset(changes)
-            |> validate_signature()
-            |> validate_timestamp_newer_than_existing()
+        if user_card_deleted_flag_change?(card, changes) do
+          card
+          |> UserCard.update_deleted_flag_changeset(changes)
+          |> validate_signature()
+          |> validate_timestamp_newer_than_existing()
+        else
+          card
+          |> UserCard.update_name_changeset(changes)
+          |> validate_signature()
+          |> validate_timestamp_newer_than_existing()
         end
     end
   end
@@ -97,22 +95,6 @@ defmodule Chat.Data.User.Validation do
         |> UserCard.update_name_changeset(attrs)
         |> validate_signature()
         |> validate_timestamp_newer_than_existing()
-  end
-
-  @doc """
-  Validates and builds changeset for user_card delete from Electric sync.
-  Returns changeset with signature and timestamp verification.
-  """
-  def validate_user_card_delete(existing, card_struct) do
-    attrs =
-      card_struct
-      |> Map.take([:deleted_flag, :owner_timestamp, :sign_b64])
-      |> Map.reject(fn {_k, v} -> is_nil(v) end)
-
-    existing
-    |> UserCard.update_deleted_flag_changeset(attrs)
-    |> validate_signature()
-    |> validate_timestamp_newer_than_existing()
   end
 
   defp fail_invalid_user_card(changeset) do
@@ -174,7 +156,10 @@ defmodule Chat.Data.User.Validation do
         # For inserts, check if a conflict exists and handle versioning
         with {:ok, new_storage} <- Ecto.Changeset.apply_action(changeset, :insert),
              existing when not is_nil(existing) <-
-               repo().get_by(UserStorage, user_hash: new_storage.user_hash, uuid: new_storage.uuid) do
+               repo().get_by(UserStorage,
+                 user_hash: new_storage.user_hash,
+                 uuid: new_storage.uuid
+               ) do
           # Conflict exists - use versioning logic
           handle_insert_with_versioning(changeset, existing, new_storage)
         else
@@ -222,36 +207,47 @@ defmodule Chat.Data.User.Validation do
   When an older version comes in, it archives the old version to the versions table.
   """
   def user_storage_pre_apply_versioning(multi, changeset, _context) do
-    # Only proceed if changeset is valid and not marked as :ignore
-    if changeset.valid? and changeset.action != :ignore do
-      with {:ok, new_storage} <- Ecto.Changeset.apply_action(changeset, changeset.action || :insert) do
-        # Get the existing record if it exists
-        existing =
-          case changeset.action do
-            :update -> changeset.data
-            _ -> repo().get_by(UserStorage, user_hash: new_storage.user_hash, uuid: new_storage.uuid)
-          end
+    cond do
+      changeset.valid? and changeset.action != :ignore ->
+        archive_if_newer(multi, changeset)
+
+      changeset.action == :ignore ->
+        archive_old_version(multi, changeset)
+
+      true ->
+        multi
+    end
+  end
+
+  defp archive_if_newer(multi, changeset) do
+    case Ecto.Changeset.apply_action(changeset, changeset.action || :insert) do
+      {:ok, new_storage} ->
+        existing = fetch_existing_storage(changeset, new_storage)
 
         if existing && new_storage.owner_timestamp > existing.owner_timestamp do
-          # New version is newer - archive the existing version
           Ecto.Multi.insert(multi, :archive_existing, Versioning.archive_changeset(existing))
         else
           multi
         end
-      else
-        _ -> multi
-      end
-    else
-      # If changeset is marked as :ignore (older version), archive the new version to versions table
-      if changeset.action == :ignore do
-        with {:ok, new_storage} <- Ecto.Changeset.apply_action(%{changeset | action: :insert}, :insert) do
-          Ecto.Multi.insert(multi, :archive_old_version, Versioning.archive_changeset(new_storage))
-        else
-          _ -> multi
-        end
-      else
+
+      _ ->
         multi
-      end
+    end
+  end
+
+  defp fetch_existing_storage(%{action: :update, data: data}, _new_storage), do: data
+
+  defp fetch_existing_storage(_changeset, new_storage) do
+    repo().get_by(UserStorage, user_hash: new_storage.user_hash, uuid: new_storage.uuid)
+  end
+
+  defp archive_old_version(multi, changeset) do
+    case Ecto.Changeset.apply_action(%{changeset | action: :insert}, :insert) do
+      {:ok, new_storage} ->
+        Ecto.Multi.insert(multi, :archive_old_version, Versioning.archive_changeset(new_storage))
+
+      _ ->
+        multi
     end
   end
 

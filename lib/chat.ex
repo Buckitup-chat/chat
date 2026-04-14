@@ -20,7 +20,7 @@ defmodule Chat do
   ## Returns
   - A new SignedParcel with proper numeric indexes
   """
-  @spec store_parcel(%SignedParcel{}) :: %SignedParcel{}
+  @spec store_parcel(SignedParcel.t()) :: SignedParcel.t()
   def store_parcel(%SignedParcel{} = parcel, opts \\ []) do
     processed_data =
       Enum.map(parcel.data, fn
@@ -36,17 +36,16 @@ defmodule Chat do
           {key, value}
       end)
 
-    %SignedParcel{parcel | data: processed_data}
-    |> tap(fn parcel ->
-      Enum.each(parcel.data, fn {key, value} ->
-        Chat.Db.put(key, value)
-      end)
-    end)
-    |> tap(fn parcel ->
-      if opts[:await] do
-        Copying.await_written_into(parcel.data |> Enum.map(fn {key, _} -> key end), Chat.Db.db())
-      end
-    end)
+    parcel = %SignedParcel{parcel | data: processed_data}
+
+    Enum.each(parcel.data, fn {key, value} -> Chat.Db.put(key, value) end)
+
+    if opts[:await] do
+      keys = Enum.map(parcel.data, fn {key, _} -> key end)
+      Copying.await_written_into(keys, Chat.Db.db())
+    end
+
+    parcel
   end
 
   @doc """
@@ -60,7 +59,7 @@ defmodule Chat do
   ## Returns
   - The parcel (for chaining)
   """
-  @spec run_when_parcel_stored(%SignedParcel{}, (SignedParcel.t() -> any())) :: %SignedParcel{}
+  @spec run_when_parcel_stored(SignedParcel.t(), (SignedParcel.t() -> any())) :: SignedParcel.t()
   def run_when_parcel_stored(%SignedParcel{} = parcel, on_stored)
       when is_function(on_stored, 1) do
     Task.Supervisor.start_child(Chat.TaskSupervisor, fn ->

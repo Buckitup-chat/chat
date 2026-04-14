@@ -3,7 +3,13 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   API client for Electric ingest operations with request/response logging.
   """
 
+  alias Chat.Data.Integrity
+  alias Chat.Data.Schemas.UserCard
+  alias Chat.Data.Schemas.UserStorage
+  alias Chat.Data.Types.UserStorageSignHash
   alias Chat.Data.User
+  alias Chat.Db
+  alias Chat.TimeKeeper
 
   @doc """
   Creates a new user via the Electric API.
@@ -26,7 +32,8 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
       user_data =
         card
         |> Map.from_struct()
-        |> Map.put(:user_hash_hex, String.slice(card.user_hash, 2..-1//1))  # Remove "u_" prefix for display
+        # Remove "u_" prefix for display
+        |> Map.put(:user_hash_hex, String.slice(card.user_hash, 2..-1//1))
         |> Map.put(:sign_skey, identity.sign_skey)
 
       {:ok, %{user: user_data, log_entries: [challenge_log, ingest_log]}}
@@ -51,12 +58,12 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
     new_timestamp = existing_card.owner_timestamp + 1
 
     updated_card_struct =
-      struct(Chat.Data.Schemas.UserCard, Map.put(existing_card, :name, new_name))
+      struct(UserCard, Map.put(existing_card, :name, new_name))
       |> Map.put(:owner_timestamp, new_timestamp)
 
     sign_b64 =
       updated_card_struct
-      |> Chat.Data.Integrity.signature_payload()
+      |> Integrity.signature_payload()
       |> then(&:crypto.sign(:mldsa87, :none, &1, sign_skey))
 
     payload = %{
@@ -99,8 +106,8 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
     challenge_url = base_url <> "/electric/v1/challenge"
 
     # Fetch current user card to get current timestamp
-    repo = Chat.Db.repo()
-    existing_card = repo.get(Chat.Data.Schemas.UserCard, user_hash)
+    repo = Db.repo()
+    existing_card = repo.get(UserCard, user_hash)
 
     if is_nil(existing_card) do
       {:error, %{reason: "User not found", log_entries: []}}
@@ -110,7 +117,6 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   end
 
   defp delete_user_with_card(existing_card, user_hash, sign_skey, base_url, challenge_url) do
-
     new_timestamp = existing_card.owner_timestamp + 1
 
     # Create updated card with deleted_flag=true for signing
@@ -121,7 +127,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
 
     sign_b64 =
       updated_card_struct
-      |> Chat.Data.Integrity.signature_payload()
+      |> Integrity.signature_payload()
       |> then(&:crypto.sign(:mldsa87, :none, &1, sign_skey))
 
     payload = %{
@@ -176,14 +182,14 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
       owner_timestamp: owner_timestamp
     }
 
-    storage_struct = struct(Chat.Data.Schemas.UserStorage, storage_attrs)
-    sign_payload = Chat.Data.Integrity.signature_payload(storage_struct)
+    storage_struct = struct(UserStorage, storage_attrs)
+    sign_payload = Integrity.signature_payload(storage_struct)
     sign_b64 = :crypto.sign(:mldsa87, :none, sign_payload, sign_skey)
 
     sign_hash =
       sign_b64
       |> EnigmaPq.hash()
-      |> Chat.Data.Types.UserStorageSignHash.from_binary()
+      |> UserStorageSignHash.from_binary()
 
     payload = %{
       "mutations" => [
@@ -229,8 +235,8 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
     challenge_url = base_url <> "/electric/v1/challenge"
 
     # Fetch existing storage to get current timestamp and sign_hash for parent reference
-    repo = Chat.Db.repo()
-    existing = repo.get_by(Chat.Data.Schemas.UserStorage, user_hash: user_hash, uuid: uuid)
+    repo = Db.repo()
+    existing = repo.get_by(UserStorage, user_hash: user_hash, uuid: uuid)
 
     if is_nil(existing) do
       {:error, %{reason: "Storage entry not found", log_entries: []}}
@@ -248,14 +254,14 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
         owner_timestamp: owner_timestamp
       }
 
-      storage_struct = struct(Chat.Data.Schemas.UserStorage, storage_attrs)
-      sign_payload = Chat.Data.Integrity.signature_payload(storage_struct)
+      storage_struct = struct(UserStorage, storage_attrs)
+      sign_payload = Integrity.signature_payload(storage_struct)
       sign_b64 = :crypto.sign(:mldsa87, :none, sign_payload, sign_skey)
 
       sign_hash =
         sign_b64
         |> EnigmaPq.hash()
-        |> Chat.Data.Types.UserStorageSignHash.from_binary()
+        |> UserStorageSignHash.from_binary()
 
       payload = %{
         "mutations" => [
@@ -302,8 +308,8 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
     challenge_url = base_url <> "/electric/v1/challenge"
 
     # Fetch existing storage to get current timestamp and sign_hash for parent reference
-    repo = Chat.Db.repo()
-    existing = repo.get_by(Chat.Data.Schemas.UserStorage, user_hash: user_hash, uuid: uuid)
+    repo = Db.repo()
+    existing = repo.get_by(UserStorage, user_hash: user_hash, uuid: uuid)
 
     if is_nil(existing) do
       {:error, %{reason: "Storage entry not found", log_entries: []}}
@@ -321,14 +327,14 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
         owner_timestamp: owner_timestamp
       }
 
-      storage_struct = struct(Chat.Data.Schemas.UserStorage, storage_attrs)
-      sign_payload = Chat.Data.Integrity.signature_payload(storage_struct)
+      storage_struct = struct(UserStorage, storage_attrs)
+      sign_payload = Integrity.signature_payload(storage_struct)
       sign_b64 = :crypto.sign(:mldsa87, :none, sign_payload, sign_skey)
 
       sign_hash =
         sign_b64
         |> EnigmaPq.hash()
-        |> Chat.Data.Types.UserStorageSignHash.from_binary()
+        |> UserStorageSignHash.from_binary()
 
       payload = %{
         "mutations" => [
@@ -366,7 +372,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   # Private helpers
 
   defp get_challenge(challenge_url) do
-    timestamp = Chat.TimeKeeper.now()
+    timestamp = TimeKeeper.now()
 
     case Req.get(challenge_url, headers: [{"accept", "application/json"}]) do
       {:ok, %{status: 200, body: body, headers: headers}} ->
@@ -465,7 +471,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
       })
 
     ingest_url = base_url <> "/electric/v1/ingest"
-    timestamp = Chat.TimeKeeper.now()
+    timestamp = TimeKeeper.now()
 
     headers = [
       {"accept", "application/json"},

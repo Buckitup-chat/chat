@@ -96,9 +96,9 @@ Writes incoming shape changes to local PostgreSQL.
 | Shape / Op     | Strategy                                                       |
 | -------------- | -------------------------------------------------------------- |
 | user_card insert/update  | `Repo.insert(card, on_conflict: {:replace_all_except, [:user_hash]}, conflict_target: :user_hash)` |
-| user_card delete         | `Repo.delete(%UserCard{user_hash: ...}, allow_stale: true)`   |
 | user_storage insert/update | `Repo.insert(storage, on_conflict: {:replace, [:value_b64]}, conflict_target: [:user_hash, :uuid])` |
-| user_storage delete      | `Repo.delete(%UserStorage{user_hash: ..., uuid: ...}, allow_stale: true)` |
+
+Both shapes use soft-delete semantics: removal is represented as an UPDATE that sets `deleted_flag: true` (and bumps `owner_timestamp`). Electric emits `:insert`/`:update` ops only; `:delete` ops are not part of the sync contract.
 
 - Uses `Chat.Db.repo()` for dynamic repo resolution
 - Logs warnings on write failures but does not crash

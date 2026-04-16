@@ -23,11 +23,16 @@ Using IO data as arguments to the logging function will give a little performanc
 
 # Technical info
 
-  * [Encryption](./docs/encryption.livemd)
-  * [DB structure](./docs/db_structures.livemd)
-  * [AdminDB structure](./docs/admin_db_structures.livemd)
-  * [Room approval flow](./docs/approve_flow.livemd)
-  * [DB Prioritization](./docs/prioritization.livemd)
-  * [DB and Device Supervision](./docs/supervision.livemd)
-  * [Naive API File upload](./docs/upload_files.livemd)
-  * [Cargo scenario](./docs/cargo_scenario.livemd)
+See [docs/README.md](./docs/README.md) for the full documentation index.
+
+**Architecture**
+  * [Encryption](./docs/architecture/encryption.livemd)
+  * [DB structure](./docs/architecture/db_structures.livemd)
+  * [AdminDB structure](./docs/architecture/admin_db_structures.livemd)
+  * [DB Prioritization](./docs/architecture/prioritization.livemd)
+  * [DB and Device Supervision](./docs/architecture/supervision.livemd)
+
+**Flows**
+  * [Room approval flow](./docs/flows/approve_flow.livemd)
+  * [Naive API File upload](./docs/flows/upload_files.livemd)
+  * [Cargo scenario](./docs/flows/cargo_scenario.livemd)

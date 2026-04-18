@@ -41,6 +41,6 @@ Hard requirements and specs.
 - [Electric API sandbox user](./reqs/electric_api_sandbox_user.md)
 - [Electric network sync](./reqs/electric_network_sync.md)
 - [Electric proof-of-possession](./reqs/electric-proof-of-possesion.md)
-- [Post-quantum dialog](./reqs/post-quantum-dialog.md)
+- [PQ dialogs](./reqs/pq_dialogs.md)
 - [PQ user](./reqs/pq_user.md)
 - [PQ user storage](./reqs/pq_user_storage.md)

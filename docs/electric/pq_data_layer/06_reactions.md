@@ -31,7 +31,7 @@ Removal (unreact) follows the same soft-delete pattern as `user_cards`: a fresh 
 
 ## Where this touches existing work
 
-- **Flagged as open**: [post-quantum-dialog.md](../../reqs/post-quantum-dialog.md) lists "message read status" and "proves/likes?" as unsolved.
+- **Flagged as open**: [pq_dialogs.md](../../reqs/pq_dialogs.md) lists "message read status" and "proves/likes?" as unsolved.
 - **Existing mention**: the [README](./README.md) groups reactions with "including reading" — one row type for both.
 - **Integrity**: reuses [02_integrity.md](./02_integrity.md) verbatim; a reaction is just a small signed row.
 

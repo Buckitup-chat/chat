@@ -20,11 +20,11 @@ Each message carries two identifiers forming a hash-linked chain *per conversati
 
 Reading the history is a DAG walk rooted at the tip: each node names its predecessor, and because `sign_b64` signs `prev_message_uuid`, a peer cannot retroactively "adopt" a different parent. UUIDv7's embedded timestamp breaks ties when two authors legitimately observed the same tip (concurrent sends) — the older one wins for display order; both remain reachable.
 
-Compared to [post-quantum-dialog.md](../../reqs/post-quantum-dialog.md)'s current draft (which lists `message_uuid` but not `prev_message_uuid`), the PQ data layer adds the hash-link requirement because Electric sync offers no guarantee about delivery order.
+Compared to [pq_dialogs.md](../../reqs/pq_dialogs.md)'s current draft (which lists `message_uuid` but not `prev_message_uuid`), the PQ data layer adds the hash-link requirement because Electric sync offers no guarantee about delivery order.
 
 ## Where this touches existing work
 
-- **Current dialog sketch**: [post-quantum-dialog.md](../../reqs/post-quantum-dialog.md) — flags "message order mergeble" as an open problem; this doc is the proposed answer.
+- **Current dialog sketch**: [pq_dialogs.md](../../reqs/pq_dialogs.md) — flags "message order mergeble" as an open problem; this doc is the proposed answer.
 - **Integrity primitive it reuses**: [02_integrity.md](./02_integrity.md)
 - **Why Electric alone isn't enough**: [electric_network_sync.md §Conflict Resolution](../../reqs/electric_network_sync.md) — LWW per row is fine for `user_storage`, insufficient for a shared timeline.
 
@@ -37,6 +37,6 @@ Compared to [post-quantum-dialog.md](../../reqs/post-quantum-dialog.md)'s curren
 ## Open questions
 
 - Schema: one table per conversation vs. one global `messages` table with `conversation_hash` column.
-- Where `conversation_hash` comes from — reuse `dialog_hash` from [post-quantum-dialog.md](../../reqs/post-quantum-dialog.md)?
+- Where `conversation_hash` comes from — reuse `dialog_hash` from [pq_dialogs.md](../../reqs/pq_dialogs.md)?
 - Catch-up protocol: when a peer joins mid-conversation, how do tails get backfilled efficiently over Electric shapes (likely a per-conversation shape with `WHERE conversation_hash = ?`).
 - Garbage-collection / retention story for very long conversations.

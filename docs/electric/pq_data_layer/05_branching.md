@@ -37,7 +37,7 @@ The storage layer does **not** pick one branch as canonical. It preserves all si
 
 - **Existing mention**: the [README](./README.md) calls this "responding to custom message_uuid".
 - **Primitive reused**: [04_ordering.md](./04_ordering.md) — branching is an add-on to the ordering chain, not a separate mechanism.
-- **Original dialog draft**: [post-quantum-dialog.md](../../reqs/post-quantum-dialog.md) leaves "polymorphic/embedded content" and "read versions" open; branching is the structural piece under both.
+- **Original dialog draft**: [pq_dialogs.md](../../reqs/pq_dialogs.md) leaves "polymorphic/embedded content" and "read versions" open; branching is the structural piece under both.
 
 ## Invariants
 

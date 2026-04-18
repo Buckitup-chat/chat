@@ -14,6 +14,94 @@ Deterministic derivation means **no forward secrecy at the dialog level**. If an
 
 ---
 
+## Schema at a glance
+
+All four dialog tables are self-authenticating via the integrity triad (`sign_b64`, `owner_timestamp`, `deleted_flag`) defined in [02_integrity.md](../electric/pq_data_layer/02_integrity.md). `user_cards` is shown because every verification path starts there — fetch the author's `sign_pkey` / `crypt_pkey` from `user_cards`, then check the dialog row's signature. No database-level foreign keys to `user_cards` exist (PQ rows are self-verifying), but the logical dependency is real.
+
+```mermaid
+erDiagram
+    user_cards ||--o{ dialog_keys              : "sender_hash,peer_hash"
+    user_cards ||--o{ dialog_messages          : "sender_hash"
+    user_cards ||--o{ dialog_messages_versions : "sender_hash"
+    user_cards ||--o{ dialog_reactions         : "sender_hash"
+
+    dialog_messages          ||--o{ dialog_messages_versions : "message_id"
+    dialog_messages_versions ||--o| dialog_messages          : "sign_hash → parent_sign_hash"
+    dialog_messages_versions ||--o{ dialog_messages_versions : "sign_hash → parent_sign_hash (self)"
+
+    dialog_messages          ||--o{ dialog_reactions : "message_id"
+    dialog_messages_versions ||--o{ dialog_reactions : "sign_hash → message_sign_hash"
+
+    user_cards {
+        user_hash_type  user_hash        PK
+        bytea           sign_pkey
+        bytea           contact_pkey
+        bytea           contact_cert
+        bytea           crypt_pkey
+        bytea           crypt_cert
+        text            name
+        boolean         deleted_flag
+        integer         owner_timestamp
+        bytea           sign_b64
+    }
+
+    dialog_keys {
+        dialog_hash_type dialog_hash              PK
+        user_hash_type   sender_hash              PK
+        user_hash_type   peer_hash
+        bytea            peer_kem_wrap_key_b64
+        bytea            peer_wrapped_msg_key_b64
+        integer          owner_timestamp
+        boolean          deleted_flag
+        bytea            sign_b64
+    }
+
+    dialog_messages {
+        dialog_message_id_type        message_id        PK
+        dialog_hash_type              dialog_hash
+        user_hash_type                sender_hash
+        bytea                         content_b64
+        boolean                       deleted_flag
+        dialog_message_sign_hash_type parent_sign_hash  FK
+        integer                       owner_timestamp
+        bytea                         sign_b64
+        dialog_message_sign_hash_type sign_hash
+    }
+
+    dialog_messages_versions {
+        dialog_message_id_type        message_id        PK
+        dialog_message_sign_hash_type sign_hash         PK
+        dialog_hash_type              dialog_hash
+        user_hash_type                sender_hash
+        bytea                         content_b64
+        boolean                       deleted_flag
+        dialog_message_sign_hash_type parent_sign_hash  FK
+        integer                       owner_timestamp
+        bytea                         sign_b64
+    }
+
+    dialog_reactions {
+        dialog_reaction_hash_type     reaction_hash      PK
+        dialog_hash_type              dialog_hash        UK
+        dialog_message_id_type        message_id         UK
+        user_hash_type                sender_hash        UK
+        text                          type               UK
+        dialog_message_sign_hash_type message_sign_hash
+        boolean                       deleted_flag
+        integer                       owner_timestamp
+        bytea                         sign_b64
+    }
+```
+
+Key relationships in words:
+
+- `dialog_keys` has a composite PK `(dialog_hash, sender_hash)`. In the steady state there are two rows per `dialog_hash` — one per direction.
+- `dialog_messages.parent_sign_hash` → `dialog_messages_versions.sign_hash` (nullable; NULL for the first version of a message).
+- `dialog_messages_versions.parent_sign_hash` → `dialog_messages_versions.sign_hash` (self-referential; append-only chain).
+- `dialog_reactions.message_sign_hash` **logically** targets a specific version in `dialog_messages` *or* `dialog_messages_versions` — there is no database FK, because the referenced row can live in either table, and reactions may arrive before the message.
+
+---
+
 ## Identifiers
 
 ### `dialog_hash`
@@ -161,7 +249,7 @@ Wrapped `sender_msg_key` published by one author for one dialog. Two rows per di
 | `peer_kem_wrap_key_b64`    | `bytea`            | ML-KEM ciphertext to peer's `crypt_pkey`                                                        |
 | `peer_wrapped_msg_key_b64` | `bytea`            | AES-GCM(sender_msg_key) with ss from `peer_kem_wrap_key_b64`                                    |
 | `owner_timestamp`          | `integer`          | Monotonic counter; must increase on updates; prevents replay attacks                            |
-| `delete_flag`              | `boolean`          | Soft delete marker; `true` indicates deleted                                                    |
+| `deleted_flag`             | `boolean`          | Soft delete marker; `true` indicates deleted                                                    |
 | `sign_b64`                 | `bytea`            | ML-DSA-87 signature by `sender_hash` over canonical serialization of all preceding columns      |
 
 PK: `(dialog_hash, sender_hash)`.
@@ -175,6 +263,13 @@ Flooding: an attacker can still publish a row naming an uninvolved `peer_hash` (
 Current tip of each message's version chain. Each message is identified by `message_id = "dmsg_" + UUID v7` — globally unique and time-ordered within a dialog. Messages follow the integrity triad in [02_integrity.md](../electric/pq_data_layer/02_integrity.md) (`sign_b64`, `owner_timestamp`, `deleted_flag`) and the hash-linked versioning model in [03_data_versioning.md](../electric/pq_data_layer/03_data_versioning.md), mirroring `user_storage` / `user_storage_versions` (see `Chat.Data.Schemas.UserStorage`).
 
 Content is a single opaque blob: the first 12 bytes are the per-message AES-GCM nonce, the remainder is AES-256-GCM ciphertext under `sender_msg_key`. Plaintext shape — bare-string text vs. `{"<type>": <value>}` envelopes for media, plus inline-vs-out-of-band rules — lives in [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md). Keeping the type *inside* the ciphertext means the database never reveals whether a message is text, image, or attachment.
+
+Two cross-author relational fields are deliberately **not** listed in the column table below and will be added by separate specs:
+
+- `prev_message_uuid` — timeline predecessor forming a hash-linked chain per dialog. Owned by [04_ordering.md](../electric/pq_data_layer/04_ordering.md); required because Electric sync offers no delivery-order guarantee and `parent_sign_hash` only chains revisions *by the same author*.
+- `reply_to_message_id` — explicit reply/quote target (any earlier `message_id` in the same dialog, not necessarily the tip). Owned by [05_branching.md](../electric/pq_data_layer/05_branching.md); the `{"quote": ...}` envelope from [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md) carries display payload, while `reply_to_message_id` carries the structural link so it is covered by `sign_b64` and tamper-evident.
+
+Both will be signable columns (covered by `sign_b64`) rather than in-envelope fields, so that ingest can reject forged or cross-dialog links without decrypting.
 
 | Column             | Type                            | Notes                                                                                                       |
 | ------------------ | ------------------------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -288,4 +383,6 @@ Both sides compute the same `dialog_hash`. Each inserts its own `dialog_keys` ro
 ## Out of scope
 
 - **Group conversations** — covered by `pq_rooms.md` (TBD); this doc covers two-party dialogs only.
+- **Cross-author message ordering** — the `dialog_messages` schema here gives per-author revision chains (`parent_sign_hash`) but no shared timeline across authors. The hash-linked `prev_message_uuid` chain that provides a tamper-evident total order per dialog is owned by [04_ordering.md](../electric/pq_data_layer/04_ordering.md); until it lands, clients linearize by UUIDv7 timestamp as a best-effort display order.
+- **Replies and concurrent forks** — explicit reply targeting and sibling-branch rendering (two peers answering the same tip) are owned by [05_branching.md](../electric/pq_data_layer/05_branching.md), which adds `reply_to_message_id` on top of the ordering chain. The `{"quote": ...}` envelope in [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md) is a UI-payload concern and does not replace the structural pointer.
 - **Sync filtering** — which rows propagate to which peer is a frontend / sync-layer choice, not part of the dialog data contract.

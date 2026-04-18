@@ -41,7 +41,7 @@ The snapshot is a peer's honest assertion about what it saw. It is not proof tha
 ## Where this touches existing work
 
 - **Existing mention**: [README](./README.md) — "snapshot of conversation state signed by peer [full graph of message_uuids and sign_hashes]".
-- **Originally flagged**: implicit in [post-quantum-dialog.md](../../reqs/post-quantum-dialog.md)'s open problems (none of which can be fully resolved without a checkpointing story).
+- **Originally flagged**: implicit in [pq_dialogs.md](../../reqs/pq_dialogs.md)'s open problems (none of which can be fully resolved without a checkpointing story).
 
 ## Invariants
 

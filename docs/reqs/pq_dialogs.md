@@ -381,3 +381,63 @@ Both sides compute the same `dialog_hash`. Each inserts its own `dialog_keys` ro
 - **Cross-author message ordering** — the `dialog_messages` schema here gives per-author revision chains (`parent_sign_hash`) but no shared timeline across authors. The hash-linked `prev_message_uuid` chain that provides a tamper-evident total order per dialog is owned by [04_ordering.md](../electric/pq_data_layer/04_ordering.md); until it lands, clients linearize by UUIDv7 timestamp as a best-effort display order.
 - **Replies and concurrent forks** — explicit reply targeting and sibling-branch rendering (two peers answering the same tip) are owned by [05_branching.md](../electric/pq_data_layer/05_branching.md), which adds `reply_to_message_id` on top of the ordering chain. The `{"quote": ...}` envelope in [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md) is a UI-payload concern and does not replace the structural pointer.
 - **Sync filtering** — which rows propagate to which peer is a frontend / sync-layer choice, not part of the dialog data contract.
+
+---
+
+## Problems to address
+
+Open items surfaced by design review. Status tags: **[resolved]** folded into this revision, **[open]** still to decide, **[deferred]** owned by another spec.
+
+### Naming / consistency
+
+1. **[resolved]** `delete_flag` vs `deleted_flag` in `dialog_keys` — unified to `deleted_flag` to match the canonical triad in [02_integrity.md](../electric/pq_data_layer/02_integrity.md) and the other three tables.
+2. **[open]** Receipt rows reuse `deleted_flag` semantically as "un-react". For `delivered`/`read` receipts this has no coherent meaning — document that well-known receipt types MUST keep `deleted_flag = false`, or split receipts into their own contract.
+
+### Integrity / signing
+
+3. **[open]** `dialog_keys` carries no `sign_hash` column (unlike `dialog_messages` / `dialog_messages_versions`). Arguably unneeded because `(dialog_hash, sender_hash)` is already the natural key and there is no version chain — but call this out explicitly so it doesn't read as an omission.
+4. **[open]** Canonical serialization reference is only spelled out for `dialog_messages_versions`. State once, uniformly: "signable = all fields except `sign_b64` (and `sign_hash` where present), serialized per `Chat.Data.Integrity.signature_payload/1`".
+5. **[open]** Each new table needs a `validate/3` ingestion hook per [02_integrity.md](../electric/pq_data_layer/02_integrity.md), plus the parent-existence precondition for `dialog_messages_versions.parent_sign_hash` (mirrors `UserStorageVersion`).
+
+### Message model
+
+6. **[deferred]** Cross-author ordering — owned by [04_ordering.md](../electric/pq_data_layer/04_ordering.md) (`prev_message_uuid`). Forward-referenced in the `dialog_messages` section.
+7. **[deferred]** Replies / quotes — owned by [05_branching.md](../electric/pq_data_layer/05_branching.md) (`reply_to_message_id`). Forward-referenced in the `dialog_messages` section.
+8. **[open]** `UNIQUE (dialog_hash, message_id)` on `dialog_messages` is redundant — `message_id` is already PK (globally unique). Intent is a composite **index** for sync filtering; reword.
+9. **[open]** Edit across size classes — when a small inline message is edited into a large blob-referenced one (or vice versa), `content_b64` shape changes across versions. Nothing breaks, but document that the version chain mixes inline and blob-ref payloads.
+
+### Keys / crypto
+
+10. **[open]** Random-nonce criticality — because `sender_msg_key` is deterministic across all of an author's devices, AES-GCM nonce reuse is catastrophic. Explicitly forbid counter-based nonces and acknowledge the ~2^-32 birthday bound after ~2^40 messages per author.
+11. **[open]** `sender_msg_key` rotation policy — currently none. Document that the only rotation is identity rotation (new `user_hash` → new dialog), so suspected compromise of any `*_skey` invalidates the whole dialog.
+12. **[open]** Peer `crypt_pkey` rotation coupling — the "rotation = new identity" rule means this can't happen silently, but the coupling between peer key rotation and `dialog_keys` re-wrap should be stated.
+13. **[open]** Ad-hoc KEM+AES vs HPKE / KEM-DEM — the wrap is hand-rolled. Acknowledge the choice, cite `HYBRID.md` rationale, and note that the ML-KEM shared secret is used directly as AES-256 key (no KDF separation).
+
+### Metadata leakage
+
+14. **[open]** `peer_hash` is plaintext in `dialog_keys` — server and replicating peers see the full social graph. Probably unavoidable for sync filtering; document as an accepted trade-off alongside the no-forward-secrecy note.
+15. **[open]** `dialog_reactions.type` is plaintext — emoji reactions leak to the database. Decide: encrypt non-receipt `type`s under `sender_msg_key`, or accept and document the leak.
+16. **[open]** Flooding mitigation is client-side only — no rate-limit or proof-of-peer-consent. Cross-ref a future abuse / rate-limiting doc when one exists.
+
+### Sync / access control
+
+17. **[open]** Sync filter invariant for `dialog_messages` — even if implementation lives in the sync layer, restate the invariant here: a `dialog_messages` row is only replicated to peer P if a `dialog_keys` row exists with `(sender_hash = P OR peer_hash = P)` for the same `dialog_hash`.
+18. **[open]** Reaction-before-message delivery — `dialog_reactions.message_sign_hash` can point at a version not yet synced. Define deferred-verify / pending-queue semantics, in contrast to `parent_sign_hash` which requires parent-local.
+
+### Lifecycle
+
+19. **[open]** GC / retention — `dialog_messages_versions` is append-only forever; receipts can grow to ~2× message count. No pruning story. Cross-ref [06_reactions.md](../electric/pq_data_layer/06_reactions.md) / [08_snapshots.md](../electric/pq_data_layer/08_snapshots.md).
+20. **[open]** Tombstone blob GC — on delete, large blobs referenced by superseded versions become orphaned. [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md) mentions this in passing; cross-ref.
+21. **[open]** Dialog-level UI state — archive / mute / pin / rename have no schema. Belongs in per-user `user_storage` keyed by `dialog_hash`; say so explicitly so readers don't expect a `dialogs` table.
+
+### Multi-device subtleties
+
+22. **[open]** "Author on a new device" assumes identity material transfer — cross-ref the device-onboarding flow in `pq_user.md`. Also define race resolution when two devices concurrently publish `dialog_keys` (different KEM randomness, same `sender_msg_key`, LWW by `owner_timestamp`).
+23. **[open]** Multi-device peer receipts — if the peer has two devices, each `delivered` receipt collides on `(dialog_hash, message_id, sender_hash, type)`, so LWW drops "which device delivered first". Acceptable; document.
+24. **[open]** Own-device read state — no way for author to broadcast "I read this on device B" to sync read cursors across their own devices (receipts are peer-authored). Either separate concern (per-user `user_storage` read cursor) or note as gap.
+
+### Minor / editorial
+
+25. **[open]** `dialog_hash` uses SHA3-512 (128 hex chars) — overkill, but consistent with `user_hash`. One-line ADR note.
+26. **[open]** `Chat.Data.Schemas.*` target module names (`DialogKey`, `DialogMessage`, `DialogMessageVersion`, `DialogReaction`) should be called out for discoverability, matching the `UserStorage` / `UserStorageVersion` references elsewhere.
+27. **[open]** Cross-refs to [04_ordering.md](../electric/pq_data_layer/04_ordering.md), [05_branching.md](../electric/pq_data_layer/05_branching.md), [06_reactions.md](../electric/pq_data_layer/06_reactions.md) — now partially present via "Out of scope"; add inline pointers where each primitive is first mentioned.

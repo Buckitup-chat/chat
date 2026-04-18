@@ -25,6 +25,10 @@ erDiagram
     user_cards ||--o{ dialog_messages_versions : "sender_hash"
     user_cards ||--o{ dialog_reactions         : "sender_hash"
 
+    dialog_keys ||--o{ dialog_messages          : "dialog_hash"
+    dialog_keys ||--o{ dialog_messages_versions : "dialog_hash"
+    dialog_keys ||--o{ dialog_reactions         : "dialog_hash"
+
     dialog_messages          ||--o{ dialog_messages_versions : "message_id"
     dialog_messages_versions ||--o| dialog_messages          : "sign_hash → parent_sign_hash"
     dialog_messages_versions ||--o{ dialog_messages_versions : "sign_hash → parent_sign_hash (self)"
@@ -34,15 +38,6 @@ erDiagram
 
     user_cards {
         user_hash_type  user_hash        PK
-        bytea           sign_pkey
-        bytea           contact_pkey
-        bytea           contact_cert
-        bytea           crypt_pkey
-        bytea           crypt_cert
-        text            name
-        boolean         deleted_flag
-        integer         owner_timestamp
-        bytea           sign_b64
     }
 
     dialog_keys {
@@ -58,7 +53,7 @@ erDiagram
 
     dialog_messages {
         dialog_message_id_type        message_id        PK
-        dialog_hash_type              dialog_hash
+        dialog_hash_type              dialog_hash       FK
         user_hash_type                sender_hash
         bytea                         content_b64
         boolean                       deleted_flag
@@ -71,7 +66,7 @@ erDiagram
     dialog_messages_versions {
         dialog_message_id_type        message_id        PK
         dialog_message_sign_hash_type sign_hash         PK
-        dialog_hash_type              dialog_hash
+        dialog_hash_type              dialog_hash       FK
         user_hash_type                sender_hash
         bytea                         content_b64
         boolean                       deleted_flag
@@ -82,7 +77,7 @@ erDiagram
 
     dialog_reactions {
         dialog_reaction_hash_type     reaction_hash      PK
-        dialog_hash_type              dialog_hash        UK
+        dialog_hash_type              dialog_hash        FK "UK"
         dialog_message_id_type        message_id         UK
         user_hash_type                sender_hash        UK
         text                          type               UK

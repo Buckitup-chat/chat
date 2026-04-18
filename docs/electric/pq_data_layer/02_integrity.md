@@ -8,13 +8,13 @@ Because writes propagate between peers without central arbitration (see [electri
 
 ## Approach
 
-Each PQ row carries the same integrity triad:
+**Integrity is achieved by three fields — `deleted_flag`, `owner_timestamp`, `sign_b64` — carried by every signable PQ row.** Together they form the universal integrity triad; nothing else is required to make a row self-authenticating, replay-resistant, and deletion-safe.
 
 | Field | Role |
 |---|---|
-| `sign_b64` | ML-DSA-87 signature over a canonical serialization of every other field in the row. Any mutation to any signed field invalidates it. |
-| `owner_timestamp` | Monotonic counter chosen by the owner. Included in `sign_b64`, so it cannot be rewritten; used to reject replays and to order supersessions (a newer signed row with a higher `owner_timestamp` overrides an older one). |
 | `deleted_flag` | Boolean under the signature — makes *deletion* a first-class, signed claim rather than an unauthenticated server-side op. A soft-delete is a newer signed row with `deleted_flag: true` and a higher `owner_timestamp`. |
+| `owner_timestamp` | Monotonic counter chosen by the owner. Included in `sign_b64`, so it cannot be rewritten; used to reject replays and to order supersessions (a newer signed row with a higher `owner_timestamp` overrides an older one). |
+| `sign_b64` | ML-DSA-87 signature over a canonical serialization of every other field in the row (including `deleted_flag` and `owner_timestamp`). Any mutation to any signed field invalidates it. |
 
 These three fields are the universal contract — every signable PQ row includes them, and they are added together as one migration (`priv/repo/migrations/20260317071358_add_integrity_fields_to_user_cards.exs`). The signing key is the row owner's `sign_skey`; the verifying key (`sign_pkey`) is discoverable via the owner's `user_cards` row, which itself is self-signed.
 

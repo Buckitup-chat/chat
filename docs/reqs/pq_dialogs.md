@@ -77,7 +77,7 @@ erDiagram
 
     dialog_reactions {
         dialog_reaction_hash_type     reaction_hash      PK
-        dialog_hash_type              dialog_hash        FK "UK"
+        dialog_hash_type              dialog_hash        FK
         dialog_message_id_type        message_id         UK
         user_hash_type                sender_hash        UK
         text                          type               UK
@@ -276,7 +276,7 @@ Both will be signable columns (covered by `sign_b64`) rather than in-envelope fi
 | `parent_sign_hash` | `dialog_message_sign_hash_type` | FK → `dialog_messages_versions.sign_hash`; NULL for the first version                                       |
 | `owner_timestamp`  | `integer`                       | Monotonic per `message_id`; strictly increases on edit; prevents replay                                     |
 | `sign_b64`         | `bytea`                         | ML-DSA-87 signature by `sender_hash` over the signable fields (everything except `sign_b64` / `sign_hash`)  |
-| `sign_hash`        | `dialog_message_sign_hash_type` | `dms_` + hex(SHA3-512(`sign_b64`)) — identity of this tip version                                           |
+| `sign_hash`        | `dialog_message_sign_hash_type` | `dms_` + hex(SHA3-512(`sign_b64`)) — identity of this tip version. Denormalized convenience copy per [03_data_versioning.md](../electric/pq_data_layer/03_data_versioning.md): derivable from `sign_b64`, not itself covered by the signature, nothing FK-references it; kept on the master to avoid recomputing the hash when archiving the outgoing tip and when populating the next edit's `parent_sign_hash`. |
 
 PK: `(message_id)`. UNIQUE: `(dialog_hash, message_id)` — supports dialog-scoped sync filtering and inbox listings without a separate `dialogs` table.
 

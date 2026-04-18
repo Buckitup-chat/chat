@@ -8,16 +8,19 @@ Under multi-peer sync with last-write-wins, a single row cannot preserve authors
 
 ## Approach
 
-Two tables per versioned entity — one for the current tip, one for the history.
+**Versioning is achieved by pairing two tables per versioned entity — a _master_ table holding the current (tip) version, and a _versions_ table holding every superseded version.** The canonical pair is `user_storage` (master) and `user_storage_versions` (history); every other versioned entity follows the same shape.
 
-| Field | Role |
-|---|---|
-| `sign_hash` | Identity of *this version* — hash of the row's signature. |
-| `parent_sign_hash` | Points to the previous version's `sign_hash` (nullable for the first version). |
-| `owner_timestamp` | Monotonic counter — defeats replay and tie-breaks concurrent branches. |
-| `sign_b64` | ML-DSA-87 signature covering the row fields, including `parent_sign_hash`. |
+- **Master** (e.g. `user_storage`) — stores the latest version only. Carries `parent_sign_hash` pointing back into the versions table (NULL for a brand-new key with no history yet). On edit, the outgoing tip is appended to the versions table and the master row is rewritten in place with the new payload and a `parent_sign_hash` pointing at the just-archived row.
+- **Versions** (e.g. `user_storage_versions`) — append-only history. Each row carries both `parent_sign_hash` (linking to its own predecessor) and `sign_hash` (its own identity, used as the FK target from descendants and from the next master-row archive step). Rows here are never mutated.
 
-Because `sign_b64` signs `parent_sign_hash`, the chain is tamper-evident: rewriting any historical version breaks all descendants' signatures. The tip (`user_storage`) always points into the history table via a foreign key on `parent_sign_hash`.
+| Field | Where | Role |
+|---|---|---|
+| `sign_hash` | versions (required) + master (denormalized) | Identity of *this version* — hash of the row's signature. Required on versions rows where it is the FK target. The master row carries a denormalized copy for convenience: it is derivable from `sign_b64`, is not itself covered by the signature, and nothing FK-references it. Keeping it on the master avoids recomputing the hash both when archiving the outgoing tip into versions and when populating the next edit's `parent_sign_hash`. |
+| `parent_sign_hash` | master + versions | Points to the previous version's `sign_hash` (nullable for the first version). |
+| `owner_timestamp` | master + versions | Monotonic counter — defeats replay and tie-breaks concurrent branches. |
+| `sign_b64` | master + versions | ML-DSA-87 signature covering the row fields, including `parent_sign_hash`. |
+
+Because `sign_b64` signs `parent_sign_hash`, the chain is tamper-evident: rewriting any historical version breaks all descendants' signatures. The master row always points into the versions table via a foreign key on `parent_sign_hash`.
 
 Encoding: `sign_hash` is an "uss_"-prefixed hex string for user-storage entities (see [pq_user_storage.md §7.3](../../reqs/pq_user_storage.md)).
 

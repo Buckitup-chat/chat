@@ -5,7 +5,6 @@ Here is the problems we are solving:
 - [Data Versioning](./03_data_versioning.md) — `[signature hash + prev sign_hash]` **(solved for user storage)**
 - [Ordering](./04_ordering.md) — `[message_uuid and prev message_uuid]`
 - [Branching](./05_branching.md) — responding to custom `message_uuid`
-- [Reactions](./06_reactions.md) — including reading
 - [Content Polymorphism](./07_content_polymorphism.md) — text, image, video, audio, file
 - [Snapshoting](./08_snapshots.md) — snapshot of conversation state signed by peer `[full graph of message_uuids and sign_hashes]`
 

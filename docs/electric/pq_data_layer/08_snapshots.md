@@ -1,6 +1,6 @@
 # Snapshots
 
-> Status: **not yet implemented** — design sketch. Depends on [ordering](./04_ordering.md), [branching](./05_branching.md), and [reactions](./06_reactions.md) being in place.
+> Status: **not yet implemented** — design sketch. Depends on [ordering](./04_ordering.md) and [branching](./05_branching.md) being in place.
 
 ## Problem
 
@@ -19,9 +19,9 @@ A **snapshot** is a signed row that references the full reachable graph of `(mes
 | `conversation_hash` | Scope. |
 | `author_hash` | Who took the snapshot. |
 | `taken_at` | `owner_timestamp` at snapshot time. |
-| `graph_root_hash` | Merkle root over the sorted list of `(message_uuid, sign_hash)` pairs + reactions. |
+| `graph_root_hash` | Merkle root over the sorted list of `(message_uuid, sign_hash)` pairs. |
 | `tip_uuids` | List of tip `message_uuid`s (multiple if the conversation is forked — see [branching](./05_branching.md)). |
-| `graph_payload` | The full `(message_uuid, sign_hash, parent_uuid, reply_to_uuid)` list, plus reaction hashes. Can be inlined for small conversations or stored by `graph_root_hash` in User Storage — same split as [content polymorphism](./07_content_polymorphism.md). |
+| `graph_payload` | The full `(message_uuid, sign_hash, parent_uuid, reply_to_uuid)` list. Can be inlined for small conversations or stored by `graph_root_hash` in User Storage — same split as [content polymorphism](./07_content_polymorphism.md). |
 | `sign_b64` | ML-DSA-87 over everything above. |
 
 Verification of a snapshot:
@@ -34,7 +34,7 @@ The snapshot is a peer's honest assertion about what it saw. It is not proof tha
 
 ## Relationship to other problems
 
-- **Built on**: `sign_hash` from [integrity](./02_integrity.md), `message_uuid` / `prev_message_uuid` from [ordering](./04_ordering.md), `reply_to_uuid` from [branching](./05_branching.md), reaction rows from [reactions](./06_reactions.md).
+- **Built on**: `sign_hash` from [integrity](./02_integrity.md), `message_uuid` / `prev_message_uuid` from [ordering](./04_ordering.md), `reply_to_uuid` from [branching](./05_branching.md).
 - **Storage channel**: the graph payload follows the same inline-vs-blob rule as [content polymorphism](./07_content_polymorphism.md) — small graph inline, large graph out-of-band in User Storage.
 - **Not a consensus mechanism**: snapshots are per-author attestations, not a shared agreement. Two peers can produce divergent snapshots if they observed different tips; comparing them is how divergence is detected.
 
@@ -54,4 +54,3 @@ The snapshot is a peer's honest assertion about what it saw. It is not proof tha
 - Frequency / policy: on-demand vs. periodic vs. pinned-by-UI.
 - Can a snapshot be partial (e.g., "everything since `message_uuid = X`")? Useful for large conversations, but doubles the verification logic.
 - Do we need a "snapshot of snapshots" — a peer attesting to a canon set of snapshots? Probably overkill for now.
-- Interaction with reaction retention (see [06_reactions.md](./06_reactions.md)) — if old receipts are pruned, older snapshots' graph roots won't re-verify; either pin reactions referenced by live snapshots, or accept that old snapshots age out of verifiability.

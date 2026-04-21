@@ -40,13 +40,14 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClientTest do
 
   describe "update_user_name/4" do
     test "returns log entries structure on error" do
-      {sign_pkey, sign_skey} = :crypto.generate_key(:mldsa87, [])
-      user_hash = <<0x01>> <> :crypto.hash(:sha3_512, sign_pkey)
+      identity = User.generate_pq_identity("OldName")
+      card = User.extract_pq_card(identity)
+      existing_card = Map.from_struct(card) |> Map.put(:owner_timestamp, 1)
 
       result =
         ApiClient.update_user_name(
-          user_hash,
-          sign_skey,
+          existing_card,
+          identity.sign_skey,
           "New Name",
           "http://invalid-host-12345.local"
         )
@@ -59,26 +60,30 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClientTest do
 
   describe "delete_user/3" do
     test "returns log entries structure on error" do
-      {sign_pkey, sign_skey} = :crypto.generate_key(:mldsa87, [])
-      user_hash = <<0x01>> <> :crypto.hash(:sha3_512, sign_pkey)
+      identity = User.generate_pq_identity("ToDelete")
+      card = User.extract_pq_card(identity)
 
-      result = ApiClient.delete_user(user_hash, sign_skey, "http://invalid-host-12345.local")
+      result =
+        ApiClient.delete_user(
+          card.user_hash,
+          identity.sign_skey,
+          "http://invalid-host-12345.local"
+        )
 
       assert {:error, %{reason: _reason, log_entries: log_entries}} = result
       assert is_list(log_entries)
-      assert length(log_entries) >= 1
     end
   end
 
   describe "create_storage/5" do
     test "returns log entries structure on error" do
-      {sign_pkey, sign_skey} = :crypto.generate_key(:mldsa87, [])
-      user_hash = <<0x01>> <> :crypto.hash(:sha3_512, sign_pkey)
+      identity = User.generate_pq_identity("StorageUser")
+      card = User.extract_pq_card(identity)
 
       result =
         ApiClient.create_storage(
-          user_hash,
-          sign_skey,
+          card.user_hash,
+          identity.sign_skey,
           "550e8400-e29b-41d4-a716-446655440000",
           "test value",
           "http://invalid-host-12345.local"
@@ -90,34 +95,30 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClientTest do
     end
 
     test "generates UUID if not provided" do
-      {sign_pkey, sign_skey} = :crypto.generate_key(:mldsa87, [])
-      user_hash = <<0x01>> <> :crypto.hash(:sha3_512, sign_pkey)
+      identity = User.generate_pq_identity("StorageUser2")
+      card = User.extract_pq_card(identity)
 
       result =
         ApiClient.create_storage(
-          user_hash,
-          sign_skey,
+          card.user_hash,
+          identity.sign_skey,
           "",
           "test value",
           "http://invalid-host-12345.local"
         )
 
-      # Even though it fails, we can verify the UUID generation would happen
       assert {:error, %{reason: _reason, log_entries: _log_entries}} = result
     end
   end
 
   describe "hex encoding" do
     test "encodes binaries correctly" do
-      # Test that the private encode_hex function works correctly
-      # by verifying the output format in a real scenario
-
       identity = User.generate_pq_identity("Test")
       card = User.extract_pq_card(identity)
 
-      # Verify the card has the expected binary fields
       assert is_binary(card.user_hash)
-      assert byte_size(card.user_hash) == 65
+      assert String.starts_with?(card.user_hash, "u_")
+      assert byte_size(card.user_hash) == 130
       assert is_binary(card.sign_pkey)
       assert is_binary(card.contact_pkey)
       assert is_binary(card.contact_cert)

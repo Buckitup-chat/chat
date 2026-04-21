@@ -4,7 +4,6 @@ Mix.install([{:req, "~> 0.5.0"}, {:jason, "~> 1.4"}])
 
 base = System.get_env("BASE_URL") || "http://127.0.0.1:4444"
 
-encode_hex = fn bin -> "\\x" <> Base.encode16(bin, case: :lower) end
 encode_b64 = fn bin -> Base.encode64(bin, padding: false) end
 
 IO.puts("\n" <> String.duplicate("=", 80))
@@ -22,7 +21,7 @@ name = "Test User #{:rand.uniform(1000)}"
 {crypt_pkey, _crypt_skey} = :crypto.generate_key(:mlkem1024, [])
 {contact_pkey, _contact_skey} = :crypto.generate_key(:mldsa44, [])
 
-user_hash = <<0x01>> <> :crypto.hash(:sha3_512, sign_pkey)
+user_hash = "u_" <> Base.encode16(:crypto.hash(:sha3_512, sign_pkey), case: :lower)
 
 crypt_cert = :crypto.sign(:mldsa87, :none, crypt_pkey, sign_skey)
 contact_cert = :crypto.sign(:mldsa87, :none, contact_pkey, sign_skey)
@@ -47,7 +46,6 @@ encode_field = fn {key, value} ->
     String.ends_with?(key, "_b64") -> Base.encode64(value)
     String.ends_with?(key, "_cert") -> Base.encode64(value)
     String.ends_with?(key, "_pkey") -> Base.encode64(value)
-    String.ends_with?(key, "_hash") -> Base.encode16(value, case: :lower)
     value == true -> "true"
     value == false -> "false"
     is_nil(value) -> "null"
@@ -70,7 +68,7 @@ payload = %{
     %{
       "type" => "insert",
       "modified" => %{
-        "user_hash" => encode_hex.(user_hash),
+        "user_hash" => user_hash,
         "sign_pkey" => encode_b64.(sign_pkey),
         "contact_pkey" => encode_b64.(contact_pkey),
         "contact_cert" => encode_b64.(contact_cert),
@@ -114,9 +112,8 @@ if create_resp.status != 200 do
   System.halt(1)
 end
 
-user_hash_hex = Base.encode16(user_hash, case: :lower)
 IO.puts("✓ Created user: #{name}")
-IO.puts("  User hash: #{user_hash_hex}")
+IO.puts("  User hash: #{user_hash}")
 
 # Wait for propagation through Phoenix.Sync
 Process.sleep(5000)
@@ -150,22 +147,21 @@ get_resp =
     receive_timeout: 10_000
   )
 
-# Filter for our specific user
-user_hash_hex_encoded = encode_hex.(user_hash)
+all_messages = resp1.body ++ get_resp.body
 
-# Parse response - body should be a list of messages
-messages = get_resp.body
-
-retrieved_card =
-  messages
-  |> Enum.find_value(fn
-    %{"value" => %{"user_hash" => hash} = card} when hash == user_hash_hex_encoded -> card
-    _ -> nil
+matching_cards =
+  all_messages
+  |> Enum.flat_map(fn
+    %{"value" => %{"user_hash" => hash} = card} when hash == user_hash -> [card]
+    _ -> []
   end)
 
-if is_nil(retrieved_card) do
-  raise "User card not found after creation"
-end
+retrieved_card =
+  case matching_cards do
+    [] -> raise "User card not found after creation"
+    [single] -> single
+    [first | rest] -> Enum.reduce(rest, first, &Map.merge(&2, &1))
+  end
 
 IO.puts("✓ Retrieved user card:")
 IO.puts("  Name: #{retrieved_card["name"]}")
@@ -220,7 +216,7 @@ update_payload = %{
     %{
       "type" => "update",
       "original" => %{
-        "user_hash" => encode_hex.(user_hash)
+        "user_hash" => user_hash
       },
       "changes" => %{
         "name" => new_name,
@@ -297,7 +293,7 @@ delete_payload = %{
     %{
       "type" => "update",
       "original" => %{
-        "user_hash" => encode_hex.(user_hash)
+        "user_hash" => user_hash
       },
       "changes" => %{
         "deleted_flag" => true,
@@ -367,17 +363,20 @@ verify_resp =
     receive_timeout: 10_000
   )
 
-# Filter for our specific user
-messages_verify = verify_resp.body
+all_messages = verify_resp1.body ++ verify_resp.body
 
-final_card =
-  messages_verify
-  |> Enum.find_value(fn
-    %{"value" => %{"user_hash" => hash} = card} when hash == user_hash_hex_encoded -> card
-    _ -> nil
+matching_cards =
+  all_messages
+  |> Enum.flat_map(fn
+    %{"value" => %{"user_hash" => hash} = card} when hash == user_hash -> [card]
+    _ -> []
   end)
 
-if is_nil(final_card) do
+final_card =
+  matching_cards
+  |> Enum.reduce(fn card, acc -> Map.merge(acc, card) end)
+
+if Enum.empty?(matching_cards) do
   raise "User card not found after deletion"
 end
 
@@ -394,5 +393,5 @@ IO.puts("  1. Created user: #{name}")
 IO.puts("  2. Retrieved user card")
 IO.puts("  3. Updated name: #{new_name}")
 IO.puts("  4. Soft deleted user (deleted_flag = true)")
-IO.puts("\nUser hash: #{user_hash_hex}")
+IO.puts("\nUser hash: #{user_hash}")
 IO.puts(String.duplicate("=", 80) <> "\n")

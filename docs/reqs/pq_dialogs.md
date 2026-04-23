@@ -293,7 +293,7 @@ Current tip of each message's version chain. Each message is identified by `mess
 
 Content is a single opaque blob: the first 12 bytes are the per-message AES-GCM nonce, the remainder is AES-256-GCM ciphertext under `sender_msg_key`. Plaintext shape — bare-string text vs. `{"<type>": <value>}` envelopes for media, plus inline-vs-out-of-band rules — lives in [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md). Keeping the type *inside* the ciphertext means the database never reveals whether a message is text, image, or attachment.
 
-`ref_message_id` carries the **causal context** a message was authored against — the `message_id` of the tip the author had observed at send time. It is the cross-author hash-linked chain owned by [04_ordering.md](../electric/pq_data_layer/04_ordering.md), required because Electric sync offers no delivery-order guarantee and `parent_sign_hash` only chains revisions *by the same author*. Distinct from `reply_to_message_id` (explicit reply target, owned by [05_branching.md](../electric/pq_data_layer/05_branching.md) and still deferred), which names a semantic ancestor rather than the most-recent observed predecessor. Because `ref_message_id` is covered by `sign_b64`, ingest can reject forged or cross-dialog links without decrypting.
+`ref_message_id` carries the **causal context** a message was authored against — the `message_id` of the tip the author had observed at send time. It is the cross-author hash-linked chain owned by [04_ordering.md](../electric/pq_data_layer/04_ordering.md), required because Electric sync offers no delivery-order guarantee and `parent_sign_hash` only chains revisions *by the same author*. Because `ref_message_id` is covered by `sign_b64`, ingest can reject forged or cross-dialog links without decrypting.
 
 | Column             | Type                            | Notes                                                                                                       |
 | ------------------ | ------------------------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -415,53 +415,6 @@ Both sides compute the same `dialog_hash`. Each inserts its own `dialog_keys` ro
 
 - **Group conversations** — covered by `pq_rooms.md` (TBD); this doc covers two-party dialogs only.
 - **Cross-author message ordering rendering** — `ref_message_id` (column present on `dialog_messages` / `dialog_messages_versions`) provides the tamper-evident hash-linked chain per dialog, but the semantics (ingest rules, pending-queue behavior, fork surfacing, catch-up) are owned by [04_ordering.md](../electric/pq_data_layer/04_ordering.md). Until that spec lands, clients may linearize by UUIDv7 timestamp as a best-effort display order.
-- **Replies and concurrent forks** — explicit reply targeting and sibling-branch rendering (two peers answering the same tip) are owned by [05_branching.md](../electric/pq_data_layer/05_branching.md), which adds `reply_to_message_id` on top of the ordering chain. The `{"quote": ...}` envelope in [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md) is a UI-payload concern and does not replace the structural pointer.
+- **Replies and concurrent forks** — reply targeting will be handled via the `{"quote": ...}` content envelope in [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md). Concurrent forks (two peers answering the same tip) are surfaced by the ordering layer and resolved at the UI level.
 - **Sync filtering** — which rows propagate to which peer is a frontend / sync-layer choice, not part of the dialog data contract.
 
----
-
-## Problems to address
-
-Open items surfaced by design review. Status tags: **[resolved]** folded into this revision, **[open]** still to decide, **[deferred]** owned by another spec.
-
-
-### Message model
-
-6. **[deferred]** Cross-author ordering — `ref_message_id` column is present on `dialog_messages` / `dialog_messages_versions`; semantics (ingest rules, pending queue, fork surfacing, catch-up) owned by [04_ordering.md](../electric/pq_data_layer/04_ordering.md).
-7. **[deferred]** Replies / quotes — owned by [05_branching.md](../electric/pq_data_layer/05_branching.md) (`reply_to_message_id`). Forward-referenced in the `dialog_messages` section.
-
-### Keys / crypto
-
-10. **[resolved]** Random-nonce criticality — see §Key wrapping → AES / construction limitations: deterministic `sender_msg_key` makes GCM nonce reuse catastrophic, counter-based nonces are forbidden, birthday bound (~2⁻³² collision probability after ~2⁴⁰ messages) is documented.
-11. **[open]** `sender_msg_key` rotation policy — currently none. Document that the only rotation is identity rotation (new `user_hash` → new dialog), so suspected compromise of any `*_skey` invalidates the whole dialog.
-12. **[open]** Peer `crypt_pkey` rotation coupling — the "rotation = new identity" rule means this can't happen silently, but the coupling between peer key rotation and `dialog_keys` re-wrap should be stated.
-13. **[resolved]** Ad-hoc KEM+AES vs HPKE / KEM-DEM — §Key wrapping → AES / construction limitations documents the hand-rolled composition, the absence of KDF separation (ML-KEM SS used directly as AES key), the reliance on `sign_b64` for ciphertext-pair binding, and the `HYBRID.md` rationale. Re-evaluation when HPKE-PQ profiles stabilize remains open but is tracked there rather than here.
-
-### Metadata leakage
-
-14. **[open]** `peer_hash` is plaintext in `dialog_keys` — server and replicating peers see the full social graph. Probably unavoidable for sync filtering; document as an accepted trade-off alongside the no-forward-secrecy note.
-15. **[resolved]** `dialog_reactions.type` is encrypted as `type_b64` under a derived `reaction_subkey`, and `reaction_hash` is a keyed MAC (HMAC-SHA3-512) under the same subkey rather than a plain hash. This closes both the column-read leak *and* the recompute-the-hash oracle that a small enumerable type space would otherwise expose. `reaction_subkey = SHA3-256("buckitup/dialog-reaction/v1" ‖ sender_msg_key)` — one-way derivation, isolates the reaction crypto surface (independent nonce space, independent oracle) without an independent trust domain.
-16. **[open]** Flooding mitigation is client-side only — no rate-limit or proof-of-peer-consent. Cross-ref a future abuse / rate-limiting doc when one exists.
-
-### Sync / access control
-
-17. **[open]** Sync filter invariant for `dialog_messages` — even if implementation lives in the sync layer, restate the invariant here: a `dialog_messages` row is only replicated to peer P if a `dialog_keys` row exists with `(sender_hash = P OR peer_hash = P)` for the same `dialog_hash`.
-18. **[open]** Reaction-before-message delivery — `dialog_reactions.message_sign_hash` can point at a version not yet synced. Define deferred-verify / pending-queue semantics, in contrast to `parent_sign_hash` which requires parent-local.
-
-### Lifecycle
-
-19. **[open]** GC / retention — `dialog_messages_versions` is append-only forever; receipts can grow to ~2× message count. No pruning story. Cross-ref [08_snapshots.md](../electric/pq_data_layer/08_snapshots.md).
-20. **[open]** Tombstone blob GC — on delete, large blobs referenced by superseded versions become orphaned. [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md) mentions this in passing; cross-ref.
-21. **[open]** Dialog-level UI state — archive / mute / pin / rename have no schema. Belongs in per-user `user_storage` keyed by `dialog_hash`; say so explicitly so readers don't expect a `dialogs` table.
-
-### Multi-device subtleties
-
-22. **[open]** "Author on a new device" assumes identity material transfer — cross-ref the device-onboarding flow in `pq_user.md`. Also define race resolution when two devices concurrently publish `dialog_keys` (different KEM randomness, same `sender_msg_key`, LWW by `owner_timestamp`).
-23. **[open]** Multi-device peer receipts — if the peer has two devices, each `delivered` receipt collides on `(dialog_hash, message_id, sender_hash, type)`, so LWW drops "which device delivered first". Acceptable; document.
-24. **[open]** Own-device read state — no way for author to broadcast "I read this on device B" to sync read cursors across their own devices (receipts are peer-authored). Either separate concern (per-user `user_storage` read cursor) or note as gap.
-
-### Minor / editorial
-
-25. **[open]** `dialog_hash` uses SHA3-512 (128 hex chars) — overkill, but consistent with `user_hash`. One-line ADR note.
-26. **[open]** `Chat.Data.Schemas.*` target module names (`DialogKey`, `DialogMessage`, `DialogMessageVersion`, `DialogReaction`) should be called out for discoverability, matching the `UserStorage` / `UserStorageVersion` references elsewhere.
-27. **[open]** Cross-refs to [04_ordering.md](../electric/pq_data_layer/04_ordering.md) and [05_branching.md](../electric/pq_data_layer/05_branching.md) — now partially present via "Out of scope"; add inline pointers where each primitive is first mentioned.

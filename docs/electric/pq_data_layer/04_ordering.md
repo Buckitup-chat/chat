@@ -22,7 +22,7 @@ The `<thing>_id` / `ref_<thing>_id` shape is the convention: the primary identif
 
 Reading history is a DAG walk rooted at the tip: each node names its predecessor via `ref_message_id`, and because `sign_b64` covers `ref_message_id`, a peer cannot retroactively "adopt" a different parent — the signature would break. UUIDv7's embedded timestamp breaks ties when two authors legitimately observed the same tip (concurrent sends); the older one wins for display order, but both remain reachable through their siblings' `ref_message_id` links.
 
-`ref_message_id` is **not** a reply pointer (explicit replies are owned by [05_branching.md](./05_branching.md) as `reply_to_message_id`). It is the *causal context* — "this is the tip I had seen when I pressed send" — analogous to a git parent. A reply targets a semantic ancestor; `ref_message_id` targets the most recent observed predecessor regardless of semantics.
+`ref_message_id` is **not** a reply pointer. It is the *causal context* — "this is the tip I had seen when I pressed send" — analogous to a git parent. A reply targets a semantic ancestor; `ref_message_id` targets the most recent observed predecessor regardless of semantics.
 
 Compared to the current draft of [pq_dialogs.md](../../reqs/pq_dialogs.md) (which lists `message_id` but no causal-context field), the PQ data layer adds `ref_message_id` because Electric sync offers no guarantee about delivery order and `parent_sign_hash` only chains revisions *by the same author*.
 
@@ -39,7 +39,7 @@ Compared to the current draft of [pq_dialogs.md](../../reqs/pq_dialogs.md) (whic
 - `sign_b64` must cover at minimum `(dialog_hash, message_id, ref_message_id, sender_hash, content_b64, owner_timestamp, deleted_flag)` — anything less lets a peer swap parents or retarget across dialogs.
 - `ref_message_id` must belong to the same `dialog_hash` as `message_id`. Cross-dialog references are forbidden and MUST be rejected at ingest without decryption.
 - UUIDv7 ordering is advisory for *display*; the DAG formed by `ref_message_id` is authoritative for *causality*. Two messages with out-of-order UUIDv7 timestamps but a valid `ref_message_id` link are legal (clock skew, offline authoring).
-- Forks are allowed at the data layer (two peers signing off the same `ref_message_id`) but are surfaced explicitly to the UI; sibling resolution and branch rendering are owned by [05_branching.md](./05_branching.md).
+- Forks are allowed at the data layer (two peers signing off the same `ref_message_id`) but are surfaced explicitly to the UI; sibling resolution and branch rendering are a UI concern.
 - `ref_message_id` is orthogonal to `parent_sign_hash`: edits to a message do **not** change its `ref_message_id` (causal context is fixed at first authoring), whereas `parent_sign_hash` advances with each edit.
 
 ## Ingest rules
@@ -54,5 +54,5 @@ Compared to the current draft of [pq_dialogs.md](../../reqs/pq_dialogs.md) (whic
 - **Schema shape.** One table per conversation vs. one global `dialog_messages` table with `dialog_hash` column. Current direction from [pq_dialogs.md](../../reqs/pq_dialogs.md): single table, `dialog_hash` as filter.
 - **Conversation scope.** `ref_message_id` is defined per `dialog_hash`; the same mechanism extends to rooms once `room_hash` lands in `pq_rooms.md`.
 - **Catch-up protocol.** When a peer joins mid-conversation, tails must be backfilled so `ref_message_id` can resolve. Likely a per-conversation Electric shape with `WHERE dialog_hash = ?` plus a bounded pending queue for rows whose `ref_message_id` has not yet arrived.
-- **Malicious stale references.** An author can deliberately point `ref_message_id` at an old tip to fork the DAG even when fresher tips are visible. Detectable (the fork is explicit) but not preventable; rendering policy is a UI concern owned by [05_branching.md](./05_branching.md).
+- **Malicious stale references.** An author can deliberately point `ref_message_id` at an old tip to fork the DAG even when fresher tips are visible. Detectable (the fork is explicit) but not preventable; rendering policy is a UI concern.
 - **Garbage collection.** Pruning old messages breaks `ref_message_id` resolution for anything downstream. Retention story is owned by [08_snapshots.md](./08_snapshots.md); until then, assume append-only.

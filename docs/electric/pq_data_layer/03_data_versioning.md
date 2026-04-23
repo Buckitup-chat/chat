@@ -41,7 +41,7 @@ Encoding: `sign_hash` is an "uss_"-prefixed hex string for user-storage entities
 ## What it does not yet solve
 
 - **Message ordering** across authors in a dialog — versioning models per-key lineage from a single author, not interleaved conversation state. See [04_ordering.md](./04_ordering.md).
-- **Branching / reply threads** — the chain is linear per key. A fan-out graph would need a different structure. See [05_branching.md](./05_branching.md).
+- **Branching / reply threads** — the chain is linear per key. A fan-out graph would need a different structure.
 - **Cross-key snapshots** — versioning proves *this* key's history; a conversation-wide snapshot is a separate concern. See [08_snapshots.md](./08_snapshots.md).
 
 ## Open extensions

@@ -19,12 +19,35 @@ Examples:
 
 ```json
 "hello"
+["here is example of composed message", {"inline_image": [16, 9, "some.jpg", ... ]}]
 {"image": [16, 9, "filename.jpg", "<inline-base64>"]}
-{"file":  {"name": "doc.pdf", "size": 1048576, "blob_hash": "uss_<hex>"}}
-{"audio": {"duration_ms": 4200, "blob_hash": "uss_<hex>"}}
+{"file":  ["doc.pdf",1048576, ...]}
+{"audio": [4200, ...]}
 ```
 
 Because the type lives inside the ciphertext, the database (and any peer without the dialog secret) cannot tell whether a row is text, image, or attachment — only its size class.
+
+## Known types
+
+### `"inline_file"`
+- filename - Orinignal filename file was uploaded from
+- size - bytesize
+- type - mime type. AI: Why do we need it?
+- creation_unixtime - Unix seconds of uploaded file creation
+- data_b64 - contents of a file in base64.
+
+### `"inline_image"`
+- width_aspect - width of spect ratio
+- height_aspect - height of spect ratio
+- thumb_hash_b64 - ThumbHash in base 64 - https://evanw.github.io/thumbhash/
+- filename - Orinignal filename file was uploaded from
+- size - bytesize
+- type - mime type. AI: Why do we need it?
+- creation_unixtime - Unix seconds of uploaded file creation
+- data_b64 - contents of a file in base64.
+
+
+--- 
 
 ### Inline vs. out-of-band
 

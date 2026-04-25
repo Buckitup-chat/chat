@@ -164,6 +164,107 @@ reaction_subkey = SHA3-256(
 - **Same derivation on every device.** Like `sender_msg_key`, `reaction_subkey` is deterministic — multi-device authors produce identical reaction subkeys without coordination.
 - **Two operations, one key.** `reaction_subkey` is used both as the HMAC key for `reaction_hash` and as the AES-256-GCM key for `type_b64`. HMAC-SHA3-512 and AES-GCM are standard, independently-analyzed primitives; using the same key under both does not leak key material between them. If stronger separation is ever required, split into `reaction_mac_key` / `reaction_enc_key` via two tagged derivations.
 
+```
+REACTION ENCRYPTION & HASHING
+─────────────────────────────────────────────────────────────
+  inputs:  sender_msg_key        (derived, see §Key derivation)
+           dialog_hash           (from the dialog)
+           message_id            (reacted message)
+           sender_hash           (who reacts)
+           type_plaintext        (emoji or "delivered"/"read")
+
+  ┌─────────────────────────────────────────────────────────┐
+  │  step 1 — derive reaction subkey                        │
+  │                                                         │
+  │     reaction_subkey = SHA3-256(                          │
+  │         "buckitup/dialog-reaction/v1"                    │
+  │      || sender_msg_key                                   │
+  │     )                                                    │
+  └────────────────────┬────────────────────────────────────┘
+                       │
+          ┌────────────┴────────────┐
+          │                         │
+          ▼                         ▼
+  ┌───────────────────────┐ ┌───────────────────────────────┐
+  │  step 2a — HMAC hash  │ │  step 2b — encrypt type       │
+  │  (PK / uniqueness)    │ │  (confidentiality)             │
+  │                       │ │                               │
+  │  reaction_hash =      │ │  nonce = random 12 bytes      │
+  │    "dr_" + hex(       │ │                               │
+  │      HMAC-SHA3-512(   │ │  type_b64 =                   │
+  │        key  = reaction│ │    nonce ‖ AES-256-GCM(       │
+  │               _subkey,│ │      key       = reaction     │
+  │        data =         │ │                  _subkey,     │
+  │          dialog_hash  │ │      plaintext = type         │
+  │       ‖ message_id    │ │                  _plaintext   │
+  │       ‖ sender_hash   │ │    )                          │
+  │       ‖ type_plaintext│ │                               │
+  │      )                │ │  (only participants can       │
+  │    )                  │ │   decrypt — subkey required)  │
+  │                       │ │                               │
+  │  keyed MAC ⇒ observer │ │                               │
+  │  cannot brute-force   │ │                               │
+  │  the small plaintext  │ │                               │
+  │  space                │ │                               │
+  └───────────┬───────────┘ └──────────────┬────────────────┘
+              │                            │
+              ▼                            ▼
+        ┌────────────────────────────────────────┐
+        │  publish: one row in `dialog_reactions` │
+        │     reaction_hash       (PK)           │
+        │     type_b64            (encrypted)    │
+        │     message_sign_hash   (version ref)  │
+        │     (+ identity & signature fields)    │
+        └────────────────────────────────────────┘
+
+
+PEER (verify & decrypt reaction)
+─────────────────────────────────────────────────────────────
+  inputs:  sender_msg_key of the reactor  (unwrapped or re-derived)
+           dialog_reactions row
+
+  ┌─────────────────────────────────────────────────────────┐
+  │  step 1 — derive reactor's reaction_subkey              │
+  │                                                         │
+  │     reaction_subkey = SHA3-256(                          │
+  │         "buckitup/dialog-reaction/v1"                    │
+  │      || reactor_sender_msg_key                           │
+  │     )                                                    │
+  └────────────────────┬────────────────────────────────────┘
+                       │
+          ┌────────────┴────────────┐
+          │                         │
+          ▼                         ▼
+  ┌───────────────────────┐ ┌───────────────────────────────┐
+  │  step 2a — decrypt    │ │  step 2b — verify hash        │
+  │                       │ │  (optional)                    │
+  │  split type_b64 into  │ │                               │
+  │    nonce (12 bytes)   │ │  recompute HMAC-SHA3-512 with │
+  │    ciphertext (rest)  │ │  recovered type_plaintext     │
+  │                       │ │                               │
+  │  type_plaintext =     │ │  compare against reaction_hash│
+  │    AES-256-GCM.decrypt│ │  from the row                 │
+  │      (reaction_subkey,│ │                               │
+  │       nonce,          │ │  mismatch ⇒ reject            │
+  │       ciphertext)     │ │                               │
+  └───────────────────────┘ └───────────────────────────────┘
+```
+
+Compact form:
+
+```
+subkey:   reaction_subkey    = SHA3-256("buckitup/dialog-reaction/v1" || sender_msg_key)
+
+hash:     reaction_hash      = "dr_" + hex(HMAC-SHA3-512(reaction_subkey,
+                                 dialog_hash || message_id || sender_hash || type_plaintext))
+
+encrypt:  type_b64           = nonce || AES-256-GCM.encrypt(reaction_subkey, type_plaintext)
+                               nonce = fresh random 12 bytes
+
+decrypt:  type_plaintext     = AES-256-GCM.decrypt(reaction_subkey, nonce, ciphertext)
+verify:   recompute reaction_hash from decrypted type_plaintext, compare with row PK
+```
+
 ---
 
 ## Key wrapping

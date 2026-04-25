@@ -1,6 +1,6 @@
 # File Storage
 
-Constraints, design, and schema for storing large files on BuckitUp platform devices.
+Constraints, design, and schema for storing large files on BuckitUp platform devices. See also [PostgreSQL Constraints](pg_constraints.md) for TOAST, WAL amplification, and VACUUM considerations affecting large-value columns.
 
 ## 1. Hardware Constraints
 

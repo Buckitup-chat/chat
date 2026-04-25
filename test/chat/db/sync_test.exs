@@ -67,8 +67,8 @@ defmodule Chat.DB.SyncTest do
     main = db_name(context, :main)
     backup = db_name(context, :backup)
 
-    assert_copied(context.internal_to_main_keys, main)
-    assert_copied(context.main_to_backup_keys, backup)
+    assert_copied(context.internal_to_main_keys, internal, main)
+    assert_copied(context.main_to_backup_keys, main, backup)
 
     assert internal |> files_list() == main |> files_list()
     assert main |> files_list() == backup |> files_list()
@@ -85,16 +85,33 @@ defmodule Chat.DB.SyncTest do
     end)
   end
 
-  defp assert_copied(src, dst_db) do
+  defp assert_copied(src_keys, src_db, dst_db) do
     dst = dst_db |> FullScope.keys() |> MapSet.new()
-    diff = MapSet.difference(MapSet.new(src), dst)
+    diff = MapSet.difference(MapSet.new(src_keys), dst)
     assert MapSet.size(diff) == 0, "#{inspect(diff)} not copied"
+
+    src_keys
+    |> Enum.each(&assert_value_copied(&1, src_db, dst_db))
   end
+
+  defp assert_value_copied({:file_chunk, key, first, last}, src_db, dst_db) do
+    {src_data, _} = Chat.FileFs.read_exact_file_chunk({first, last}, key, files_prefix(src_db))
+    {dst_data, _} = Chat.FileFs.read_exact_file_chunk({first, last}, key, files_prefix(dst_db))
+
+    assert src_data == dst_data,
+           "file chunk #{Base.encode16(key, case: :lower)}:#{first}-#{last} differs"
+  end
+
+  defp assert_value_copied(key, src_db, dst_db) do
+    assert CubDB.get(src_db, key) == CubDB.get(dst_db, key),
+           "value for #{inspect(key)} differs"
+  end
+
+  defp files_prefix(db), do: "#{CubDB.data_dir(db)}_files"
 
   defp files_list(db) do
     db
-    |> CubDB.data_dir()
-    |> then(&"#{&1}_files")
+    |> files_prefix()
     |> Chat.FileFs.list_all_db_keys()
     |> Enum.sort()
   end

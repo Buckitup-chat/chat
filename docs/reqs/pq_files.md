@@ -1,6 +1,6 @@
 # File Storage
 
-Constraints, design, and schema for storing large files on BuckitUp platform devices. See also [PostgreSQL Constraints](pg_constraints.md) for TOAST, WAL amplification, and VACUUM considerations affecting large-value columns.
+Constraints, design, and schema for storing large files on BuckitUp platform devices. All chunk data lives in PostgreSQL — no filesystem storage. See also [PostgreSQL Constraints](pg_constraints.md) for TOAST, WAL amplification, and VACUUM considerations affecting large-value columns.
 
 ## 1. Hardware Constraints
 
@@ -8,13 +8,9 @@ Constraints, design, and schema for storing large files on BuckitUp platform dev
 - **Total RAM**: 4 GB, shared between PostgreSQL and the Elixir/Erlang application
 - Chunk size must be small enough that the device can buffer a chunk during transfer (device does not encrypt/decrypt — it stores and serves opaque blobs)
 
-### 1.2 Filesystem
-- Storage medium uses **FAT** (possibly FAT16)
-- **FAT16 root directory**: 512 entries (fixed at format time)
-- **FAT16 subdirectory**: up to ~65,536 entries, but long filenames (LFN) consume multiple entries (each LFN segment holds 13 characters) — a typical filename uses 3 directory entries, reducing effective capacity to ~21,000 files per directory
-- **FAT16 max file size**: 2 GB
-- **FAT uses linear directory scan** (no B-tree) — large directories degrade performance
-- A 4 TB file at 1 MB chunks would produce ~4.2 million chunk files — far beyond any single FAT directory limit
+### 1.2 Storage
+- PostgreSQL stores all chunk data in TOAST tables (no filesystem sharding needed)
+- FAT directory limitations are irrelevant — all data is inside the database
 
 ## 2. Cryptographic Constraints
 
@@ -42,73 +38,33 @@ Constraints, design, and schema for storing large files on BuckitUp platform dev
 **Rationale**:
 - Fits comfortably in browser memory for AES-GCM (full plaintext required)
 - Device only buffers opaque encrypted blobs during transfer — no crypto overhead on device
-- Negligible cluster waste on FAT16 (even with 64 KB clusters)
 - Good resumability on unreliable connections
-- Well within FAT16 per-file size limit
+- Reasonable TOAST overhead per row (~1 MB per TOAST entry)
 
 ### 3.2 Trade-offs Considered
 
 | Alternative | Pro | Con |
 |---|---|---|
-| 64-256 KB | Better resume granularity | Multiplies metadata and FAT directory entries; 1 GB file at 64 KB = ~16K entries |
-| 4-8 MB | Less metadata overhead, fewer FS entries | Spikes browser memory on low-end devices; worse resumability |
-| 1 MB (chosen) | Balanced across all constraints | ~4.2M chunks for a 4 TB file — requires directory sharding |
+| 64-256 KB | Better resume granularity | Multiplies row count and TOAST entries; 1 GB file at 64 KB = ~16K rows |
+| 4-8 MB | Less row overhead | Spikes browser memory on low-end devices; worse resumability; higher WAL amplification per write |
+| 1 MB (chosen) | Balanced across all constraints | ~4.2M rows for a 4 TB file — large but manageable in PostgreSQL |
 
-## 4. Metadata Budget
+## 4. Chunk Encryption
 
-### 4.1 Per-File Metadata (stored once)
+All encryption/decryption happens client-side (browser, Web Crypto API).
 
-| Field | Size |
-|---|---|
-| AES-256 key | 32 B |
-| File hash / folder name (SHA-256) | 32-64 B |
-| **Subtotal** | ~64 B |
+- **Algorithm**: AES-256-GCM
+- **Key**: `enc_secret` — random 32 bytes, unique per file
+- **Nonce**: 12 bytes — `chunk_index` zero-padded to 12 bytes (deterministic)
+- **Auth tag**: 16 bytes, appended to ciphertext (standard GCM output)
 
-### 4.2 Per-Chunk Metadata
+```
+encrypted_chunk = AES-256-GCM(enc_secret, nonce=pad(chunk_index, 12), plaintext_chunk)
+```
 
-**Minimal (with optimizations)**:
+Nonce safety: `enc_secret` is unique per file (no reuse across files), `chunk_index` is unique within file (no reuse within file). The 2^32 nonce space supports files up to ~4 TB per key.
 
-| Field | Size |
-|---|---|
-| Chunk index (u32) | 4 B |
-| AES-GCM auth tag | 16 B |
-| **Subtotal** | 20 B |
-
-**Full (without optimizations)**:
-
-| Field | Size |
-|---|---|
-| Start offset (u64) | 8 B |
-| End offset (u64) | 8 B |
-| AES-GCM IV/nonce (12 B) | 12 B |
-| AES-GCM auth tag | 16 B |
-| **Subtotal** | 44 B |
-
-### 4.3 Total Metadata for 4 TB File (4,194,304 chunks)
-
-| Variant | Per-chunk | Total |
-|---|---|---|
-| Full (offsets + IV + tag) | 44 B | ~176 MB |
-| Optimized (index + tag, derived IVs) | 20 B | ~80 MB |
-
-### 4.4 Optimization Notes
-- **Drop offsets**: if all chunks are fixed 1 MB (last chunk is remainder), a 4-byte chunk index replaces both 8-byte offsets
-- **Derive IVs from chunk index**: safe as long as the same key is never reused for a different file — saves 12 B per chunk (~50 MB at 4 TB scale)
-
-## 5. FAT Directory Strategies
-
-Storing millions of chunk files requires directory sharding to stay within FAT limits and maintain performance.
-
-### 5.1 Nested Subdirectories
-Split by hash prefix: `ab/cd/chunk_abcd0001.enc`. Two levels of 256 directories = 65,536 leaf directories, ~64 chunks each for a 4 TB file.
-
-### 5.2 Container Files
-Pack multiple chunks into larger container files (e.g., 256 chunks / 256 MB per container). Reduces 4.2M entries to ~16K files. Metadata index tracks offsets within containers.
-
-### 5.3 Alternative Filesystem
-ext4 or an append-only log file if the platform supports it — eliminates FAT directory limitations entirely.
-
-## 6. Content Type
+## 5. Content Type
 
 File metadata lives inside the encrypted `content_b64` of the carrier message (see [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md)). The content type key is `"file"`, value is a positional array:
 
@@ -121,156 +77,192 @@ File metadata lives inside the encrypted `content_b64` of the carrier message (s
 | 0 | name | Original filename |
 | 1 | size | Plaintext byte size |
 | 2 | mime_type | MIME type |
-| 3 | file_id | References `file_blobs.file_id` |
+| 3 | file_id | References `files.file_id` |
 | 4 | enc_secret_b64 | AES-256 key for chunk decryption (base64) |
 | 5 | original_hash_b64 | SHA3-256 of plaintext file for end-to-end verification (base64) |
 
 Because this lives inside ciphertext, the database cannot tell whether a row is text or a file attachment. Only dialog members who can decrypt `content_b64` learn the file exists and obtain `enc_secret` to decrypt chunks.
 
-## 7. Tables
+## 6. Tables
 
-### 7.1 `file_blobs` (Electric-synced)
+### 6.1 `files` (Electric-synced)
 
-One row per file. Signed by uploader. Replicated across devices via Electric SQL.
+One row per completed file. Created only after all chunks are uploaded and verified. The trust anchor — a receiving device uses this row to decide whether to accept `file_chunks`.
 
 | Column | Type | Description |
 |---|---|---|
 | `file_id` | TEXT, PK | `"fb_" + UUIDv7` |
-| `uploader_hash` | user_hash_type, NOT NULL | Who uploaded |
+| `uploader_hash` | TEXT, NOT NULL | FK-like → user_cards |
 | `total_size` | BIGINT, NOT NULL | Plaintext file size in bytes |
-| `chunk_size` | INTEGER, NOT NULL | Bytes per chunk (1048576) |
+| `chunk_size` | INTEGER, NOT NULL, DEFAULT 1048576 | Bytes per chunk (1 MB) |
 | `chunk_count` | INTEGER, NOT NULL | Total number of chunks |
-| `chunks_digest` | BYTEA, NOT NULL | `SHA3-256(chunk_hash_0 \|\| … \|\| chunk_hash_n)` |
-| `sign_b64` | BYTEA, NOT NULL | ML-DSA-87 signature over all other fields |
+| `chunk_sign_hashes` | BYTEA[], NOT NULL | Array of `SHA3-256(chunk.sign_b64)` for each chunk, ordered by `chunk_index` |
 | `owner_timestamp` | BIGINT, NOT NULL | Monotonic counter |
 | `deleted_flag` | BOOLEAN, NOT NULL, DEFAULT false | Soft delete |
+| `sign_b64` | BYTEA, NOT NULL | ML-DSA-87 signature over all other fields |
 
-**Verification**: concatenate all `file_chunks.chunk_hash` values in `chunk_index` order, compute SHA3-256, compare with `chunks_digest`. The signature covers `chunks_digest`, so chunk integrity is transitively bound to `sign_b64`.
+**Verification**: for each chunk, compute `SHA3-256(chunk.sign_b64)` and compare against `chunk_sign_hashes[chunk_index]`. Since each chunk's `sign_b64` covers the chunk's data hash, this transitively binds chunk data integrity to the `files` manifest signature.
 
-### 7.2 `file_chunks` (Electric-synced)
+### 6.2 `file_chunks` (Electric-synced)
 
-One row per chunk. Not individually signed — integrity is derived from `file_blobs.chunks_digest` → `sign_b64`.
+One row per chunk. Contains the actual encrypted blob data. Uploaded via the standard ingest endpoint (`data` provided as base64 in the ingest payload). Client-signed for integrity.
 
 | Column | Type | Description |
 |---|---|---|
-| `file_id` | TEXT, FK → file_blobs | Parent file |
-| `chunk_index` | INTEGER | 0-based position |
-| `chunk_hash` | BYTEA, NOT NULL | `SHA3-256(encrypted_chunk_blob)` |
+| `file_id` | TEXT, NOT NULL | Parent file reference |
+| `chunk_index` | INTEGER, NOT NULL | 0-based position |
+| `data` | BYTEA, NOT NULL | Encrypted chunk blob (~1 MB). **STORAGE EXTERNAL** |
 | `size` | INTEGER, NOT NULL | Encrypted chunk byte size |
+| `uploader_hash` | TEXT, NOT NULL | FK-like → user_cards |
+| `owner_timestamp` | BIGINT, NOT NULL | Monotonic counter |
+| `sign_b64` | BYTEA, NOT NULL | Signature over `(file_id, chunk_index, SHA3-256(data), size, uploader_hash, owner_timestamp)` |
 | | PK | `(file_id, chunk_index)` |
 
-Offsets are not stored — they are derivable: `offset = chunk_index * chunk_size`. The `size` column handles the last chunk being shorter.
+The `sign_b64` covers a **hash** of `data`, not `data` itself — the signature payload includes `SHA3-256(data)` so verification does not require re-reading the blob. This hash is what `files.chunk_sign_hashes` binds to.
 
-### 7.3 `chunk_uploads` (local only, NOT Electric-synced)
+**Sync filtering** (in ShapeWriter): on receiving a `file_chunk` via Electric, skip it if:
+- No matching `files` row exists for this `file_id`, OR
+- The `files.uploader_hash` differs from the chunk's `uploader_hash`
 
-Tracks uploaded chunk blobs before the signed manifest arrives. Provides ownership tracking, upload resume, and unsigned-data accounting.
+This prevents unbounded storage from unverified chunks during device-to-device sync.
 
-| Column | Type | Description |
-|---|---|---|
+### 6.3 `upload_files` (local only, NOT Electric-synced)
+
+Tracks uploaded chunks before the signed `files` manifest arrives. Populated as a side effect of `file_chunks` ingest — the device writes a bookkeeping row with server-set `updated_at` from TimeKeeper. Provides ownership tracking, upload resume, and unsigned-data budget accounting.
+
+| Column | Type | Description                      |
+|---|---|----------------------------------|
 | `file_id` | TEXT | Client-provided `"fb_" + UUIDv7` |
-| `chunk_index` | INTEGER | Position in file |
-| `chunk_hash` | BYTEA, NOT NULL | `SHA3-256(blob)` — also its filesystem address |
-| `uploader_hash` | TEXT, NOT NULL | Who uploaded this chunk |
-| `size` | INTEGER, NOT NULL | Blob byte size |
-| `uploaded_at` | BIGINT, NOT NULL | Unix seconds |
-| | PK | `(file_id, chunk_index)` |
+| `chunk_index` | INTEGER | Position in file                 |
+| `chunk_hash` | BYTEA, NOT NULL | `SHA3-256(encrypted blob)`       |
+| `uploader_hash` | TEXT, NOT NULL | Who uploaded this chunk          |
+| `size` | INTEGER, NOT NULL | Blob byte size                   |
+| `updated_at` | BIGINT, NOT NULL | Unix seconds (from TimeKeeper)   |
+| | PK | `(file_id, chunk_index)`         |
+
+Indexes: `uploader_hash` (budget queries), `updated_at` (GC queries).
 
 **Queries this table supports**:
-- **Ownership**: `WHERE uploader_hash = ?` — attribute disk usage
 - **Resume**: `WHERE file_id = ?` — client queries which indexes are already uploaded
-- **Unsigned budget**: `SUM(size) WHERE uploader_hash = ? AND file_id NOT IN (SELECT file_id FROM file_blobs)` — uncommitted bytes per user; device rejects further uploads if exceeded
-- **GC**: `WHERE uploaded_at < threshold AND file_id NOT IN (SELECT file_id FROM file_blobs)` — delete stale rows + orphan filesystem blobs
+- **Unsigned budget**: `SUM(size) WHERE uploader_hash = ? AND file_id NOT IN (SELECT file_id FROM files)` — uncommitted bytes per user; device rejects further uploads if exceeded
+- **GC**: `WHERE updated_at < threshold AND file_id NOT IN (SELECT file_id FROM files)` — delete stale rows + orphan `file_chunks` rows
 
-## 8. Filesystem Layout
+## 7. PostgreSQL Storage Configuration
 
-### 8.1 Content-Addressed Storage
+### 7.1 STORAGE EXTERNAL
 
-Chunks are stored by their hash, two-level hex sharding:
+Encrypted blobs are high-entropy and will not compress. PostgreSQL will waste CPU attempting LZ4 compression on every write, then store uncompressed anyway. Set storage to `EXTERNAL` to skip compression and store out-of-line directly:
 
-```
-<drive>/chunks/<chunk_hash[0:2]>/<chunk_hash[2:4]>/<chunk_hash_full_hex>
-```
-
-Example: chunk with SHA3-256 hash `ab12cd34ef...` →
-
-```
-chunks/ab/12/ab12cd34ef56789...
+```sql
+ALTER TABLE file_chunks ALTER COLUMN data SET STORAGE EXTERNAL;
 ```
 
-- 256 x 256 = 65,536 leaf directories
-- 4.2M chunks (4 TB file) → ~64 files per directory — well within FAT16 limits
-- Linear directory scan stays fast at <100 entries per directory
-- Content-addressing gives natural dedup of identical encrypted blobs
+### 7.2 AUTOVACUUM Tuning
 
-No staging directory. Uploaded chunks go directly to their content-addressed path. The `chunk_uploads` table (§7.3) tracks which blobs are uncommitted.
+`file_chunks` has write-once semantics: chunks are inserted, never updated, eventually deleted. But each dead row carries ~1 MB of TOAST data — even a few dead rows mean significant bloat on a 4 GB RAM device.
 
-## 9. Upload Protocol
-
-```
- Client                              Device
-   │                                    │
-   │─── GET /api/v1/challenge ─────────>│  PoP authentication
-   │<── {challenge_id, challenge} ──────│
-   │                                    │
-   │  encrypt chunk 0, compute hash     │
-   │─── PUT /files/<file_id>/0 ────────>│  PoP-authenticated, blob body
-   │    device: SHA3-256(blob)           │  store at chunks/<h[0:2]>/<h[2:4]>/<h>
-   │    insert into chunk_uploads        │  track ownership + file origin
-   │<── 200 {chunk_hash} ──────────────│
-   │                                    │
-   │  encrypt chunk 1, compute hash     │
-   │─── PUT /files/<file_id>/1 ────────>│  same flow
-   │<── 200 {chunk_hash} ──────────────│
-   │─── ...                             │  progressive encrypt + upload
-   │                                    │
-   │─── GET /files/<file_id>/status ───>│  resume support (optional)
-   │<── [0, 1, 4, 5] ─────────────────│  uploaded chunk indexes
-   │                                    │
-   │  all chunks uploaded               │
-   │  compute chunks_digest, sign       │
-   │─── POST /electric/v1/ingest ──────>│  signed file_blobs + file_chunks rows
-   │    device verifies:                │  1. sign_b64 on file_blobs
-   │      chunks_digest matches          │  2. SHA3-256(all chunk_hashes) == chunks_digest
-   │      every chunk_hash on disk       │  3. each blob exists on filesystem
-   │<── 200 {txid} ────────────────────│  committed to Electric tables
-   │                                    │  chunk_uploads rows for this file can be GC'd
+```sql
+ALTER TABLE file_chunks SET (
+  autovacuum_vacuum_scale_factor = 0.01,
+  autovacuum_analyze_scale_factor = 0.02,
+  autovacuum_vacuum_cost_delay = 40
+);
 ```
 
-The client encrypts and uploads chunks progressively (no need to encrypt everything upfront). After all chunks are on the device, the client computes `chunks_digest` from the chunk hashes it received, signs the `file_blobs` manifest, and commits via the standard ingest endpoint.
+| Setting | Value | Default | Rationale |
+|---|---|---|---|
+| `vacuum_scale_factor` | 0.01 (1%) | 0.20 (20%) | Trigger vacuum early — each dead row is ~1 MB of TOAST bloat |
+| `analyze_scale_factor` | 0.02 (2%) | 0.10 (10%) | Keep planner statistics fresh as chunks are added/removed |
+| `vacuum_cost_delay` | 40 ms | 2 ms | Reduce I/O pressure on USB/SD storage, spread vacuum cost over longer periods |
 
-## 10. Sync Protocol
+### 7.3 WAL Considerations
 
-When Device B receives `file_blobs` + `file_chunks` rows via Electric:
+`file_chunks` is in the Electric publication — 1 MB blob INSERTs go through WAL and logical replication:
 
-1. **Verify signature** — `ML-DSA-87.verify(sign_b64, sign_pkey)` on `file_blobs` → drop if invalid
-2. **Verify chunk binding** — `SHA3-256(chunk_hash_0 || … || chunk_hash_n) == chunks_digest` → drop if mismatch
-3. **Download chunks** — for each `file_chunks` row where the blob is not on local filesystem:
-   - Request encrypted chunk from source device (HTTP out-of-band)
-   - Compute `SHA3-256(received_blob)`
-   - Compare with `chunk_hash` → discard blob if mismatch
-   - Write to content-addressed path: `chunks/<h[0:2]>/<h[2:4]>/<h>`
-4. **File is available** once all chunks are present on local filesystem
+- **2-3x write amplification** per chunk (WAL + heap + possible full-page write)
+- 100 MB file (100 chunks) → ~200-300 MB WAL burst
+- `max_wal_size = 512MB` (doubled from 256 MB to accommodate concurrent file uploads)
+- `wal_compression = on` is already enabled but provides no benefit for encrypted (high-entropy) data
 
-## 11. Chunk Encryption
+## 8. Upload Protocol
 
-All encryption/decryption happens client-side (browser, Web Crypto API).
-
-- **Algorithm**: AES-256-GCM
-- **Key**: `enc_secret` — random 32 bytes, unique per file
-- **Nonce**: 12 bytes — `chunk_index` zero-padded to 12 bytes (deterministic)
-- **Auth tag**: 16 bytes, appended to ciphertext (standard GCM output)
+All uploads use the standard ingest endpoint — no dedicated file upload endpoints.
 
 ```
-encrypted_chunk = AES-256-GCM(enc_secret, nonce=pad(chunk_index, 12), plaintext_chunk)
-chunk_hash      = SHA3-256(encrypted_chunk || auth_tag)
+Client                              Device
+  │                                    │
+  │─── GET /electric/v1/challenge ────>│  PoP authentication
+  │<── {challenge_id, challenge} ──────│
+  │                                    │
+  │  encrypt chunk 0 client-side       │
+  │  sign chunk (file_id, index,       │
+  │    SHA3-256(data), size,           │
+  │    uploader, owner_timestamp)      │
+  │─── POST /electric/v1/ingest ──────>│  file_chunks insert, data as base64
+  │    device: verify sign_b64         │
+  │    insert into file_chunks         │
+  │    insert into upload_files        │
+  │      (updated_at = TimeKeeper)     │
+  │<── 200 {txid} ─────────────────────│
+  │                                    │
+  │  encrypt chunk 1 ...               │
+  │─── POST /electric/v1/ingest ──────>│  same flow
+  │<── 200 {txid} ─────────────────────│
+  │─── ...                             │  progressive encrypt + upload
+  │                                    │
+  │  resume: query Electric shape      │
+  │  for file_chunks WHERE file_id=?   │
+  │  → learn which chunk_indexes exist │
+  │                                    │
+  │  all chunks uploaded               │
+  │  build files manifest with         │
+  │    chunk_sign_hashes array         │
+  │    (computed locally from own      │
+  │     sign_b64 values)               │
+  │  sign manifest                     │
+  │─── POST /electric/v1/ingest ──────>│  files insert
+  │    device verifies:                │
+  │      1. sign_b64 on files          │
+  │      2. all chunk_count rows       │
+  │         exist in file_chunks       │
+  │      3. each chunk_sign_hash       │
+  │         matches actual chunk       │
+  │    delete upload_files rows        │
+  │      for this file_id              │
+  │<── 200 {txid} ─────────────────────│  committed to Electric
 ```
 
-Nonce safety: `enc_secret` is unique per file (no reuse across files), `chunk_index` is unique within file (no reuse within file). The 2^32 nonce space supports files up to ~4 TB per key.
+The client encrypts, signs, and uploads chunks progressively via ingest (no need to encrypt everything upfront). The device verifies each chunk's signature on ingest and writes a local `upload_files` bookkeeping row (with server-set `updated_at` from TimeKeeper) for budget/GC tracking. After all chunks are on the device, the client builds the `files` manifest with `chunk_sign_hashes` (computed locally from its own `sign_b64` values), signs it, and commits via ingest. The device validates that all chunks are present before accepting the `files` row.
 
-## 12. Open Questions
+## 9. Sync Protocol
 
-- **Unsigned budget**: configurable per device? Suggested default ~256 MB per user.
-- **GC policy**: how long before uncommitted `chunk_uploads` entries (and their blobs) are cleaned up? Suggested: 1 hour.
-- **Max file size**: hard cap? Crypto supports ~4 TB per key. Practical limit is device storage.
-- **Chunk download protocol**: HTTP range requests? Dedicated endpoint? Batched transfers?
-- **Partial file availability**: can a client begin downloading/decrypting before all chunks are synced to a device?
+When Device B receives rows via Electric:
+
+1. **`files` row arrives** → verify `ML-DSA-87` signature → store locally
+2. **`file_chunks` rows arrive** → for each:
+   - Check: does a `files` row exist for this `file_id`?
+   - Check: is `files.deleted_flag` false?
+   - Check: does `files.uploader_hash` match `chunk.uploader_hash`?
+   - If all yes → verify chunk signature → store locally
+   - If any no → **skip** (do not store, do not waste disk)
+3. **File is available** once `files.chunk_count` matches count of stored `file_chunks`
+
+**Ordering**: Electric may deliver `file_chunks` before the `files` manifest. Chunks without a matching `files` row are skipped (not stored). When a `files` row arrives, the receiving device checks whether all `chunk_count` chunks are present locally. If any are missing (skipped during earlier sync), it opens a short-lived Electric shape with a WHERE filter for the specific missing chunks (`file_id = $1 AND chunk_index IN ($2, $3, ...)`) and fetches only those.
+
+## 10. Garbage Collection
+
+Runs every hour. Two triggers clean up `file_chunks` and `upload_files` rows:
+
+1. **Deleted files**: when `files.deleted_flag = true`, delete all `file_chunks` rows for that `file_id`
+2. **Stale uploads**: when `upload_files.updated_at + 2 days < TimeKeeper.now()`, delete the `upload_files` row and its corresponding `file_chunks` row (upload never completed)
+
+Trigger 1 handles normal file deletion. Trigger 2 handles abandoned uploads where the `files` manifest was never ingested.
+
+## 11. Resolved Questions
+
+- **Unsigned budget**: no explicit budget — GC (§10, trigger 2) clears stale unsigned data after 2 days.
+- **Max file size**: 1 TB hard cap.
+- **Partial file availability**: client's call — the client decides when to start downloading/decrypting. For videos, streaming before all chunks are synced makes sense.
+- **WAL sizing**: increase `max_wal_size` to 512 MB (double the current 256 MB) to accommodate concurrent file uploads.
+
+- **Electric chunk re-delivery**: when `file_chunks` arrive before the `files` manifest, the device skips them. On `files` manifest arrival, if any chunks are missing, fetch them via a targeted Electric shape with a WHERE filter (`file_id = $1 AND chunk_index IN (...)`) — no full re-sync needed.

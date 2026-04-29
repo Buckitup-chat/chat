@@ -53,7 +53,7 @@ Tracks uploaded chunks before the signed `files` manifest arrives. Populated as 
 |---|---|----------------------------------|
 | `file_id` | TEXT | Client-provided `"f_" + UUIDv7` |
 | `chunk_index` | INTEGER | Position in file                 |
-| `chunk_hash` | BYTEA, NOT NULL | `SHA3-256(encrypted blob)`       |
+| `chunk_sign_hash` | BYTEA, NOT NULL | `SHA3-256(chunk.sign_b64)` — matches `files.chunk_sign_hashes` for GC verification |
 | `uploader_hash` | TEXT, NOT NULL | Who uploaded this chunk          |
 | `size` | INTEGER, NOT NULL | Blob byte size                   |
 | `updated_at` | BIGINT, NOT NULL | Unix seconds (from TimeKeeper)   |
@@ -150,7 +150,16 @@ When Device B receives rows via Electric:
 
 **Ordering**: Electric may deliver `file_chunks` before the `files` manifest. Chunks without a matching `files` row are skipped (not stored). When a `files` row arrives, the receiving device checks whether all `chunk_count` chunks are present locally. If any are missing (skipped during earlier sync), it opens a short-lived Electric shape with a WHERE filter for the specific missing chunks (`file_id = $1 AND chunk_index IN ($2, $3, ...)`) and fetches only those.
 
-## 6. Garbage Collection
+## 6. Deletion Protocol
+
+To delete a file, the client updates the `files` row:
+1. Set `deleted_flag = true`
+2. Set `chunk_sign_hashes = '{}'` (empty array)
+3. Re-sign the row
+
+Emptying `chunk_sign_hashes` ensures receiving devices cannot verify any chunks for this file, so the sync protocol (§5) will skip them. The signed update propagates via Electric to all devices, where GC (§7) reclaims the chunk data.
+
+## 7. Garbage Collection
 
 Runs every hour. Two triggers clean up `file_chunks` and `upload_files` rows:
 
@@ -159,9 +168,9 @@ Runs every hour. Two triggers clean up `file_chunks` and `upload_files` rows:
 
 Trigger 1 handles normal file deletion. Trigger 2 handles abandoned uploads where the `files` manifest was never ingested.
 
-## 7. PostgreSQL Storage Configuration
+## 8. PostgreSQL Storage Configuration
 
-### 7.1 STORAGE EXTERNAL
+### 8.1 STORAGE EXTERNAL
 
 Encrypted blobs are high-entropy and will not compress. PostgreSQL will waste CPU attempting LZ4 compression on every write, then store uncompressed anyway. Set storage to `EXTERNAL` to skip compression and store out-of-line directly:
 
@@ -169,7 +178,7 @@ Encrypted blobs are high-entropy and will not compress. PostgreSQL will waste CP
 ALTER TABLE file_chunks ALTER COLUMN data_b64 SET STORAGE EXTERNAL;
 ```
 
-### 7.2 AUTOVACUUM Tuning
+### 8.2 AUTOVACUUM Tuning
 
 `file_chunks` has write-once semantics: chunks are inserted, never updated, eventually deleted. But each dead row carries ~1 MB of TOAST data — even a few dead rows mean significant bloat on a 4 GB RAM device.
 
@@ -187,7 +196,7 @@ ALTER TABLE file_chunks SET (
 | `analyze_scale_factor` | 0.02 (2%) | 0.10 (10%) | Keep planner statistics fresh as chunks are added/removed |
 | `vacuum_cost_delay` | 40 ms | 2 ms | Reduce I/O pressure on USB/SD storage, spread vacuum cost over longer periods |
 
-### 7.3 WAL Considerations
+### 8.3 WAL Considerations
 
 `file_chunks` is in the Electric publication — 1 MB blob INSERTs go through WAL and logical replication:
 
@@ -196,9 +205,9 @@ ALTER TABLE file_chunks SET (
 - `max_wal_size = 512MB` (doubled from 256 MB to accommodate concurrent file uploads)
 - `wal_compression = on` is already enabled but provides no benefit for encrypted (high-entropy) data
 
-## 8. Hardware Constraints
+## 9. Hardware Constraints
 
-### 8.1 Device Memory
+### 9.1 Device Memory
 - **Total RAM**: 4 GB, shared between PostgreSQL and the Elixir/Erlang application
 - Chunk size must be small enough that the device can buffer a chunk during transfer (device does not encrypt/decrypt — it stores and serves opaque blobs)
 

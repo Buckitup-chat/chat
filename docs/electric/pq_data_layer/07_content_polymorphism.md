@@ -32,7 +32,7 @@ Because the type lives inside the ciphertext, the database (and any peer without
 ### `"inline_file"`
 - filename - Orinignal filename file was uploaded from
 - size - bytesize
-- type - mime type. AI: Why do we need it?
+- type - mime type
 - creation_unixtime - Unix seconds of uploaded file creation
 - data_b64 - contents of a file in base64.
 
@@ -101,4 +101,3 @@ A signed deletion is `deleted_flag = true` plus an empty `content_b64`. The empt
 - Threshold for inline vs. out-of-band JSON-embedded bytes (1 kB? 10 kB? config?).
 - Registry of compound type keys (`image`, `video`, `audio`, `file`, `location`, `quote`, ...) and their canonical value shapes (positional array vs. named object).
 - Blob lifecycle: when is the backing blob in User Storage allowed to be GC'd? Proposal: only after every peer acks the message is fully archived elsewhere.
-- Streaming media (audio/video live) — out of scope for the data layer; likely belongs to a separate WebRTC path ([device_webrtc.md](../../proposal/device_webrtc.md)).

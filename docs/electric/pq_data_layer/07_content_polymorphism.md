@@ -46,6 +46,23 @@ Because the type lives inside the ciphertext, the database (and any peer without
 - creation_unixtime - Unix seconds of uploaded file creation
 - data_b64 - contents of a file in base64.
 
+### `"file"`
+
+Out-of-band file stored as encrypted chunks in PostgreSQL. See [pq_files.md](../../reqs/pq_files.md) for chunk encryption, tables, upload/sync protocols, and GC.
+
+```json
+{"file": [name, size, mime_type, file_id, enc_secret_b64]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | name | Original filename |
+| 1 | size | Plaintext byte size |
+| 2 | mime_type | MIME type |
+| 3 | file_id | References `files.file_id` |
+| 4 | enc_secret_b64 | AES-256 key for chunk decryption (base64) |
+
+Because this lives inside ciphertext, the database cannot tell whether a row is text or a file attachment. Only dialog members who can decrypt `content_b64` learn the file exists and obtain `enc_secret` to decrypt chunks.
 
 --- 
 

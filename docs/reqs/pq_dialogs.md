@@ -16,18 +16,18 @@ Deterministic derivation means **no forward secrecy at the dialog level**. If an
 
 ## Schema at a glance
 
-All four dialog tables are self-authenticating via the integrity triad (`sign_b64`, `owner_timestamp`, `deleted_flag`) defined in [02_integrity.md](../electric/pq_data_layer/02_integrity.md). `user_cards` is shown because every verification path starts there — fetch the author's `sign_pkey` / `crypt_pkey` from `user_cards`, then check the dialog row's signature. No database-level foreign keys to `user_cards` exist (PQ rows are self-verifying), but the logical dependency is real.
+All five dialog tables are self-authenticating via the integrity triad (`sign_b64`, `owner_timestamp`, `deleted_flag`) defined in [02_integrity.md](../electric/pq_data_layer/02_integrity.md), with one exception: `dialog_message_receipts` omits `deleted_flag` because delivery and read events are irreversible. `user_cards` is shown because every verification path starts there — fetch the author's `sign_pkey` / `crypt_pkey` from `user_cards`, then check the dialog row's signature. No database-level foreign keys to `user_cards` exist (PQ rows are self-verifying), but the logical dependency is real.
 
 ```mermaid
 erDiagram
     user_cards ||--o{ dialog_keys              : "sender_hash,peer_hash"
     user_cards ||--o{ dialog_messages          : "sender_hash"
     user_cards ||--o{ dialog_messages_versions : "sender_hash"
-    user_cards ||--o{ dialog_reactions         : "sender_hash"
+    user_cards ||--o{ dialog_message_reactions  : "reactor_hash"
+    user_cards ||--o{ dialog_message_receipts   : "peer_hash"
 
     dialog_keys ||--o{ dialog_messages          : "dialog_hash"
     dialog_keys ||--o{ dialog_messages_versions : "dialog_hash"
-    dialog_keys ||--o{ dialog_reactions         : "dialog_hash"
 
     dialog_messages          ||--o{ dialog_messages_versions : "message_id"
     dialog_messages_versions ||--o| dialog_messages          : "sign_hash → parent_sign_hash"
@@ -35,8 +35,11 @@ erDiagram
     dialog_messages          ||--o{ dialog_messages          : "message_id → ref_message_id (self)"
     dialog_messages          ||--o{ dialog_messages_versions : "message_id → ref_message_id"
 
-    dialog_messages          ||--o{ dialog_reactions : "message_id"
-    dialog_messages_versions ||--o{ dialog_reactions : "sign_hash → message_sign_hash"
+    dialog_messages          ||--o{ dialog_message_reactions : "message_id"
+    dialog_messages_versions ||--o{ dialog_message_reactions : "sign_hash → message_sign_hash"
+
+    dialog_messages          ||--o{ dialog_message_receipts  : "message_id"
+    dialog_messages_versions ||--o{ dialog_message_receipts  : "sign_hash → message_sign_hash"
 
     user_cards {
         user_hash_type  user_hash        PK
@@ -79,16 +82,25 @@ erDiagram
         bytea                         sign_b64
     }
 
-    dialog_reactions {
-        dialog_reaction_hash_type     reaction_hash      PK
-        dialog_hash_type              dialog_hash        FK
-        dialog_message_id_type        message_id
-        user_hash_type                sender_hash
-        bytea                         type_b64
-        dialog_message_sign_hash_type message_sign_hash
-        boolean                       deleted_flag
-        integer                       owner_timestamp
-        bytea                         sign_b64
+    dialog_message_reactions {
+        dialog_message_reaction_hash_type reaction_hash      PK
+        dialog_message_id_type            message_id
+        user_hash_type                    reactor_hash
+        bytea                             type_b64
+        dialog_message_sign_hash_type     message_sign_hash
+        boolean                           deleted_flag
+        integer                           owner_timestamp
+        bytea                             sign_b64
+    }
+
+    dialog_message_receipts {
+        dialog_message_receipt_hash_type  receipt_hash       PK
+        dialog_message_id_type            message_id
+        user_hash_type                    peer_hash
+        text                              type
+        dialog_message_sign_hash_type     message_sign_hash
+        integer                           owner_timestamp
+        bytea                             sign_b64
     }
 ```
 
@@ -98,7 +110,8 @@ Key relationships in words:
 - `dialog_messages.parent_sign_hash` → `dialog_messages_versions.sign_hash` (nullable; NULL for the first version of a message).
 - `dialog_messages_versions.parent_sign_hash` → `dialog_messages_versions.sign_hash` (self-referential; append-only chain).
 - `dialog_messages.ref_message_id` → `dialog_messages.message_id` (self-referential; nullable — NULL only for the genesis message of the dialog). Forms the per-dialog causal chain across authors; owned by [04_ordering.md](../electric/pq_data_layer/04_ordering.md). Orthogonal to `parent_sign_hash` (edit chain by the same author).
-- `dialog_reactions.message_sign_hash` **logically** targets a specific version in `dialog_messages` *or* `dialog_messages_versions` — there is no database FK, because the referenced row can live in either table, and reactions may arrive before the message.
+- `dialog_message_reactions.message_sign_hash` **logically** targets a specific version in `dialog_messages` *or* `dialog_messages_versions` — there is no database FK, because the referenced row can live in either table, and reactions may arrive before the message.
+- `dialog_message_receipts.message_sign_hash` — same logical targeting as reactions; no database FK for the same reasons.
 
 ---
 
@@ -148,95 +161,64 @@ Rationale:
 
 Symmetric encryption uses AES-256-GCM with `sender_msg_key`; per-message nonce is fresh random 12 bytes prepended to the ciphertext in the single `content_b64` blob.
 
-### Reaction subkey
+### Reaction encryption
 
-Reactions (including receipts) are numerous and have a small, partially predictable plaintext space (`delivered`, `read`, a handful of common emoji). Rather than draw on `sender_msg_key` directly — which would crowd its nonce space and tie the reaction-hash oracle to the content key — a derived subkey is used:
+Emoji reactions use `sender_msg_key` directly — no subkey derivation. Receipts (`delivered` / `read`) are split into a separate unencrypted table (`dialog_message_receipts`), so the encrypted reaction table only handles user-initiated emoji with a richer plaintext space.
 
-```
-reaction_subkey = SHA3-256(
-    "buckitup/dialog-reaction/v1"
- || sender_msg_key
-)
-```
-
-- **One-way derivation.** Compromising `reaction_subkey` reveals nothing about `sender_msg_key`; the reverse is not true, but both keys share the same identity trust boundary anyway. The goal is isolation of the *crypto surface* (independent nonce space, independent oracle), not an independent trust domain.
-- **Domain separation tag** `"buckitup/dialog-reaction/v1"` keeps the subkey disjoint from any future per-dialog derivations.
-- **Same derivation on every device.** Like `sender_msg_key`, `reaction_subkey` is deterministic — multi-device authors produce identical reaction subkeys without coordination.
-- **Two operations, one key.** `reaction_subkey` is used both as the HMAC key for `reaction_hash` and as the AES-256-GCM key for `type_b64`. HMAC-SHA3-512 and AES-GCM are standard, independently-analyzed primitives; using the same key under both does not leak key material between them. If stronger separation is ever required, split into `reaction_mac_key` / `reaction_enc_key` via two tagged derivations.
+`reaction_hash` is a **keyed MAC** under `sender_msg_key`. Because only participants know the key, an observer cannot brute-force `type_plaintext` by recomputing hashes over a small enumerable set. `type_b64` is encrypted under the same `sender_msg_key` with a fresh random 12-byte AES-GCM nonce.
 
 ```
 REACTION ENCRYPTION & HASHING
 ─────────────────────────────────────────────────────────────
   inputs:  sender_msg_key        (derived, see §Key derivation)
-           dialog_hash           (from the dialog)
            message_id            (reacted message)
-           sender_hash           (who reacts)
-           type_plaintext        (emoji or "delivered"/"read")
+           reactor_hash          (who reacts)
+           type_plaintext        (emoji)
 
-  ┌─────────────────────────────────────────────────────────┐
-  │  step 1 — derive reaction subkey                        │
-  │                                                         │
-  │     reaction_subkey = SHA3-256(                          │
-  │         "buckitup/dialog-reaction/v1"                    │
-  │      || sender_msg_key                                   │
-  │     )                                                    │
-  └────────────────────┬────────────────────────────────────┘
-                       │
-          ┌────────────┴────────────┐
-          │                         │
-          ▼                         ▼
+          ┌────────────────────────┐
+          │                        │
+          ▼                        ▼
   ┌───────────────────────┐ ┌───────────────────────────────┐
-  │  step 2a — HMAC hash  │ │  step 2b — encrypt type       │
+  │  step 1a — HMAC hash  │ │  step 1b — encrypt type       │
   │  (PK / uniqueness)    │ │  (confidentiality)             │
   │                       │ │                               │
   │  reaction_hash =      │ │  nonce = random 12 bytes      │
-  │    "dr_" + hex(       │ │                               │
+  │    "dmr_" + hex(      │ │                               │
   │      HMAC-SHA3-512(   │ │  type_b64 =                   │
-  │        key  = reaction│ │    nonce ‖ AES-256-GCM(       │
-  │               _subkey,│ │      key       = reaction     │
-  │        data =         │ │                  _subkey,     │
-  │          dialog_hash  │ │      plaintext = type         │
-  │       ‖ message_id    │ │                  _plaintext   │
-  │       ‖ sender_hash   │ │    )                          │
-  │       ‖ type_plaintext│ │                               │
-  │      )                │ │  (only participants can       │
-  │    )                  │ │   decrypt — subkey required)  │
-  │                       │ │                               │
+  │        key  = sender  │ │    nonce ‖ AES-256-GCM(       │
+  │               _msg_key│ │      key       = sender       │
+  │        data =         │ │                  _msg_key,    │
+  │          message_id   │ │      plaintext = type         │
+  │       ‖ reactor_hash  │ │                  _plaintext   │
+  │       ‖ type_plaintext│ │    )                          │
+  │      )                │ │                               │
+  │    )                  │ │  (only participants can       │
+  │                       │ │   decrypt — key required)     │
   │  keyed MAC ⇒ observer │ │                               │
   │  cannot brute-force   │ │                               │
-  │  the small plaintext  │ │                               │
-  │  space                │ │                               │
+  │  the emoji space      │ │                               │
   └───────────┬───────────┘ └──────────────┬────────────────┘
               │                            │
               ▼                            ▼
-        ┌────────────────────────────────────────┐
-        │  publish: one row in `dialog_reactions` │
-        │     reaction_hash       (PK)           │
-        │     type_b64            (encrypted)    │
-        │     message_sign_hash   (version ref)  │
-        │     (+ identity & signature fields)    │
-        └────────────────────────────────────────┘
+        ┌──────────────────────────────────────────────┐
+        │  publish: one row in `dialog_message_reactions`│
+        │     reaction_hash       (PK)                 │
+        │     type_b64            (encrypted)          │
+        │     message_sign_hash   (version ref)        │
+        │     (+ identity & signature fields)          │
+        └──────────────────────────────────────────────┘
 
 
 PEER (verify & decrypt reaction)
 ─────────────────────────────────────────────────────────────
   inputs:  sender_msg_key of the reactor  (unwrapped or re-derived)
-           dialog_reactions row
+           dialog_message_reactions row
 
-  ┌─────────────────────────────────────────────────────────┐
-  │  step 1 — derive reactor's reaction_subkey              │
-  │                                                         │
-  │     reaction_subkey = SHA3-256(                          │
-  │         "buckitup/dialog-reaction/v1"                    │
-  │      || reactor_sender_msg_key                           │
-  │     )                                                    │
-  └────────────────────┬────────────────────────────────────┘
-                       │
-          ┌────────────┴────────────┐
-          │                         │
-          ▼                         ▼
+          ┌────────────────────────┐
+          │                        │
+          ▼                        ▼
   ┌───────────────────────┐ ┌───────────────────────────────┐
-  │  step 2a — decrypt    │ │  step 2b — verify hash        │
+  │  step 1a — decrypt    │ │  step 1b — verify hash        │
   │                       │ │  (optional)                    │
   │  split type_b64 into  │ │                               │
   │    nonce (12 bytes)   │ │  recompute HMAC-SHA3-512 with │
@@ -244,7 +226,7 @@ PEER (verify & decrypt reaction)
   │                       │ │                               │
   │  type_plaintext =     │ │  compare against reaction_hash│
   │    AES-256-GCM.decrypt│ │  from the row                 │
-  │      (reaction_subkey,│ │                               │
+  │      (sender_msg_key, │ │                               │
   │       nonce,          │ │  mismatch ⇒ reject            │
   │       ciphertext)     │ │                               │
   └───────────────────────┘ └───────────────────────────────┘
@@ -253,15 +235,13 @@ PEER (verify & decrypt reaction)
 Compact form:
 
 ```
-subkey:   reaction_subkey    = SHA3-256("buckitup/dialog-reaction/v1" || sender_msg_key)
+hash:     reaction_hash      = "dmr_" + hex(HMAC-SHA3-512(sender_msg_key,
+                                 message_id || reactor_hash || type_plaintext))
 
-hash:     reaction_hash      = "dr_" + hex(HMAC-SHA3-512(reaction_subkey,
-                                 dialog_hash || message_id || sender_hash || type_plaintext))
-
-encrypt:  type_b64           = nonce || AES-256-GCM.encrypt(reaction_subkey, type_plaintext)
+encrypt:  type_b64           = nonce || AES-256-GCM.encrypt(sender_msg_key, type_plaintext)
                                nonce = fresh random 12 bytes
 
-decrypt:  type_plaintext     = AES-256-GCM.decrypt(reaction_subkey, nonce, ciphertext)
+decrypt:  type_plaintext     = AES-256-GCM.decrypt(sender_msg_key, nonce, ciphertext)
 verify:   recompute reaction_hash from decrypted type_plaintext, compare with row PK
 ```
 
@@ -442,43 +422,67 @@ Append-only history for `dialog_messages`, mirroring `Chat.Data.Schemas.UserStor
 
 PK: `(message_id, sign_hash)`. Append-only — rows are never mutated. A version cannot be inserted unless its `parent_sign_hash` is already known locally (or NULL for the root).
 
-### 3. `dialog_reactions`
+### 3. `dialog_message_reactions`
 
-Reactions bind to a specific message **version** via `message_sign_hash` — the `sign_hash` (SHA3-512 of `sign_b64`) of the reacted-to version in the message's chain (tip or historical). Reacting to an edited message does not automatically carry over.
+Encrypted emoji reactions. Each reaction binds to a specific message **version** via `message_sign_hash` — the `sign_hash` (SHA3-512 of `sign_b64`) of the reacted-to version in the message's chain (tip or historical). Reacting to an edited message does not automatically carry over.
 
-The reaction kind (`type`) — emoji for user reactions, or the well-known strings `delivered` / `read` for receipts — is **encrypted** under `reaction_subkey` (derived from `sender_msg_key`, see §Key derivation → Reaction subkey). The stored column is `type_b64 = nonce ‖ AES-256-GCM(reaction_subkey, type_plaintext)` with a fresh random 12-byte nonce per row. Only the author and peer can decrypt; the database sees opaque ciphertext and cannot tell emoji reactions apart from receipts or from each other.
+The reaction emoji (`type`) is **encrypted** under `sender_msg_key` (see §Key derivation). The stored column is `type_b64 = nonce ‖ AES-256-GCM(sender_msg_key, type_plaintext)` with a fresh random 12-byte nonce per row. Only the author and peer can decrypt; the database sees opaque ciphertext.
 
-`reaction_hash` is a **keyed MAC** under `reaction_subkey`, not a plain hash. Because only participants know the key, an observer cannot brute-force `type_plaintext` by recomputing hashes over a small enumerable set — the fundamental oracle that would leak emoji / receipt choice from a plain `SHA3-512(tuple)` is eliminated. Participants still reproduce `reaction_hash` deterministically from their own copy of `reaction_subkey`, so PK-level idempotency and uniqueness continue to work.
+`reaction_hash` is a **keyed MAC** under `sender_msg_key`, not a plain hash. Because only participants know the key, an observer cannot brute-force `type_plaintext` by recomputing hashes over the emoji set. Participants still reproduce `reaction_hash` deterministically from their own copy of `sender_msg_key`, so PK-level idempotency and uniqueness continue to work.
 
-| Column              | Type                            | Notes                                                                                               |
-| ------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `reaction_hash`     | `dialog_reaction_hash_type`     | PK; `dr_` + hex(HMAC-SHA3-512(`reaction_subkey`, `dialog_hash` ‖ `message_id` ‖ `sender_hash` ‖ `type_plaintext`)) — keyed, so only participants can recompute or verify |
-| `dialog_hash`       | `dialog_hash_type`              | scope                                                                                               |
-| `message_id`        | `dialog_message_id_type`        | reacted message; `dmsg_<UUID7>`                                                                     |
-| `sender_hash`       | `user_hash_type`                | who reacted                                                                                         |
-| `type_b64`          | `bytea`                         | 12-byte AES-GCM nonce ‖ AES-256-GCM ciphertext of the UTF-8 `type` string, under `reaction_subkey`  |
-| `message_sign_hash` | `dialog_message_sign_hash_type` | `sign_hash` of the reacted version in `dialog_messages(_versions)`                                  |
-| `deleted_flag`      | `boolean`                       | Signed un-react marker; toggling a reaction is a new row with `true` and a higher `owner_timestamp` |
-| `owner_timestamp`   | `integer`                       | Monotonic per `reaction_hash`; prevents replay                                                      |
-| `sign_b64`          | `bytea`                         | ML-DSA-87 signature by `sender_hash` over all preceding columns (including `type_b64`)              |
+| Column              | Type                                | Notes                                                                                               |
+| ------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `reaction_hash`     | `dialog_message_reaction_hash_type` | PK; `dmr_` + hex(HMAC-SHA3-512(`sender_msg_key`, `message_id` ‖ `reactor_hash` ‖ `type_plaintext`)) — keyed, so only participants can recompute or verify |
+| `message_id`        | `dialog_message_id_type`            | reacted message; `dmsg_<UUID7>`                                                                     |
+| `message_sign_hash` | `dialog_message_sign_hash_type`     | `sign_hash` of the reacted version in `dialog_messages(_versions)`                                  |
+| `reactor_hash`      | `user_hash_type`                    | who reacted                                                                                         |
+| `type_b64`          | `bytea`                             | 12-byte AES-GCM nonce ‖ AES-256-GCM ciphertext of the UTF-8 emoji string, under `sender_msg_key`   |
+| `deleted_flag`      | `boolean`                           | Signed un-react marker; toggling a reaction is a new row with `true` and a higher `owner_timestamp` |
+| `owner_timestamp`   | `integer`                           | Monotonic per `reaction_hash`; prevents replay                                                      |
+| `sign_b64`          | `bytea`                             | ML-DSA-87 signature by `reactor_hash` over all preceding columns (including `type_b64`)             |
 
-PK: `(reaction_hash)`. Uniqueness of "one reaction per `(message, reactor, type)`" is enforced by `reaction_hash` alone — the MAC is deterministic given the key, so two signed rows for the same `(dialog_hash, message_id, sender_hash, type_plaintext)` collide on PK regardless of which random AES-GCM nonce each encryption used. No separate plaintext UNIQUE constraint is needed (the database cannot see `type` plaintext and has no key to recompute the MAC).
+PK: `(reaction_hash)`. Uniqueness of "one reaction per `(message, reactor, emoji)`" is enforced by `reaction_hash` alone — the MAC is deterministic given the key, so two signed rows for the same `(message_id, reactor_hash, type_plaintext)` collide on PK regardless of which random AES-GCM nonce each encryption used. No separate plaintext UNIQUE constraint is needed (the database cannot see `type` plaintext and has no key to recompute the MAC).
 
 Postgres domain:
 
 ```sql
-CREATE DOMAIN dialog_reaction_hash_type AS TEXT
-  CHECK (VALUE ~ '^dr_[a-f0-9]{128}$');
+CREATE DOMAIN dialog_message_reaction_hash_type AS TEXT
+  CHECK (VALUE ~ '^dmr_[a-f0-9]{128}$');
 ```
 
-Carries the full integrity triad per [02_integrity.md](../electric/pq_data_layer/02_integrity.md): `sign_b64` over all other fields, `owner_timestamp` strictly monotonic per `reaction_hash`, `deleted_flag` as a signed un-react. Reactions are not versioned (no chain) — the row is overwritten on each new signed update. Because `reaction_hash` is a MAC over the `(dialog_hash, message_id, sender_hash, type)` tuple, an attacker cannot forge a `reaction_hash` pointing at a different tuple without the key; and because `type_b64` is covered by `sign_b64`, it cannot be swapped independently of the hash.
+Carries the full integrity triad per [02_integrity.md](../electric/pq_data_layer/02_integrity.md): `sign_b64` over all other fields, `owner_timestamp` strictly monotonic per `reaction_hash`, `deleted_flag` as a signed un-react. Reactions are not versioned (no chain) — the row is overwritten on each new signed update. Because `reaction_hash` is a MAC over the `(message_id, reactor_hash, type)` tuple, an attacker cannot forge a `reaction_hash` pointing at a different tuple without the key; and because `type_b64` is covered by `sign_b64`, it cannot be swapped independently of the hash.
 
-**Reserved `type` plaintext values for receipts:**
+### 4. `dialog_message_receipts`
+
+Unencrypted delivery and read receipts. Each receipt binds to a specific message **version** via `message_sign_hash`, same as reactions. Receipts are irreversible — once delivered or read, the event cannot be retracted — so `deleted_flag` is omitted.
+
+The `type` column is plaintext, enabling server-side queries for unread counts, push notification badges, and inbox state without requiring decryption keys.
+
+| Column              | Type                                | Notes                                                                                               |
+| ------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `receipt_hash`      | `dialog_message_receipt_hash_type`  | PK; `dmrc_` + hex(SHA3-512(`message_id` ‖ `peer_hash` ‖ `type`)) — plain hash, not keyed (type is already plaintext) |
+| `message_id`        | `dialog_message_id_type`            | receipted message; `dmsg_<UUID7>`                                                                   |
+| `peer_hash`         | `user_hash_type`                    | who generated the receipt (the peer, not the message author)                                        |
+| `type`              | `text`                              | `delivered` or `read` — plaintext, not encrypted                                                    |
+| `message_sign_hash` | `dialog_message_sign_hash_type`     | `sign_hash` of the received/read version in `dialog_messages(_versions)`                            |
+| `owner_timestamp`   | `integer`                           | Monotonic per `receipt_hash`; prevents replay                                                       |
+| `sign_b64`          | `bytea`                             | ML-DSA-87 signature by `peer_hash` over all preceding columns                                       |
+
+PK: `(receipt_hash)`. Uniqueness of "one receipt per `(message, peer, type)`" is enforced by `receipt_hash` alone — the hash is deterministic, so two signed rows for the same `(message_id, peer_hash, type)` collide on PK.
+
+Postgres domains:
+
+```sql
+CREATE DOMAIN dialog_message_receipt_hash_type AS TEXT
+  CHECK (VALUE ~ '^dmrc_[a-f0-9]{128}$');
+```
+
+Self-authenticating per [02_integrity.md](../electric/pq_data_layer/02_integrity.md): `sign_b64` over all other fields, `owner_timestamp` strictly monotonic per `receipt_hash`. No `deleted_flag` — delivery and read events are append-only facts. Receipts are not versioned (no chain) — the row is overwritten on each new signed update.
+
+**`type` values:**
 
 - `delivered` — published by the peer's device when the message lands locally. Bound to the version actually received via `message_sign_hash`.
 - `read` — published by the peer when their UI displays the message.
-
-Receipts use the same row shape and integrity contract as emoji reactions; the only difference is that the decrypted plaintext is a well-known string, and the convention that they are not user-toggled (`deleted_flag` stays `false` in normal use). This avoids a separate receipts table.
 
 ---
 
@@ -497,7 +501,8 @@ Receipts use the same row shape and integrity contract as emoji reactions; the o
 2. For each row authored by a counterparty: verify `sign_b64` against `sender_hash`'s `sign_pkey`, then unwrap via `peer_kem_wrap_key_b64` / `peer_wrapped_msg_key_b64` using own `crypt_skey` ⇒ their `sender_msg_key`.
 3. For messages authored by self: re-derive `sender_msg_key` from own private keys (deterministic derivation). (Or unwrap from a counterparty's `dialog_keys` row where self is the peer.)
 4. For each `dialog_messages` row: verify `sign_b64`, split `content_b64` into the 12-byte nonce and ciphertext, AES-GCM decrypt under the matching author's `sender_msg_key`, then JSON-decode the plaintext to discover the content shape.
-5. For each `dialog_reactions` row: verify `sign_b64`, derive the reaction author's `reaction_subkey` from their `sender_msg_key`, split `type_b64` into nonce and ciphertext, AES-GCM decrypt under `reaction_subkey` to recover the plaintext `type` (an emoji or the well-known `delivered` / `read` string). Optionally verify `reaction_hash` by recomputing `dr_` + hex(HMAC-SHA3-512(`reaction_subkey`, `dialog_hash` ‖ `message_id` ‖ `sender_hash` ‖ `type_plaintext`)) and comparing.
+5. For each `dialog_message_reactions` row: verify `sign_b64`, split `type_b64` into nonce and ciphertext, AES-GCM decrypt under the reactor's `sender_msg_key` to recover the emoji. Optionally verify `reaction_hash` by recomputing `dmr_` + hex(HMAC-SHA3-512(`sender_msg_key`, `message_id` ‖ `reactor_hash` ‖ `type_plaintext`)) and comparing.
+6. For each `dialog_message_receipts` row: verify `sign_b64` against `peer_hash`'s `sign_pkey`. The `type` column is plaintext (`delivered` / `read`) — no decryption needed.
 
 ### Author on a new device
 

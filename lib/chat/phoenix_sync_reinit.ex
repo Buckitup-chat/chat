@@ -87,7 +87,7 @@ defmodule Chat.PhoenixSyncReinit do
 
     new_config =
       current_config
-      |> Keyword.delete(:repo)
+      |> Keyword.put(:repo, current_repo)
       |> Keyword.put(:connection_opts, connection_opts)
 
     Enum.each(new_config, fn {key, value} ->

@@ -32,8 +32,7 @@ erDiagram
     dialog_messages          ||--o{ dialog_messages_versions : "message_id"
     dialog_messages_versions ||--o| dialog_messages          : "sign_hash → parent_sign_hash"
     dialog_messages_versions ||--o{ dialog_messages_versions : "sign_hash → parent_sign_hash (self)"
-    dialog_messages          ||--o{ dialog_messages          : "message_id → ref_message_id (self)"
-    dialog_messages          ||--o{ dialog_messages_versions : "message_id → ref_message_id"
+    dialog_messages          }o--|| dialog_messages          : "refs_map_b64 (encrypted DAG refs)"
 
     dialog_messages          ||--o{ dialog_message_reactions : "message_id"
     dialog_messages_versions ||--o{ dialog_message_reactions : "sign_hash → message_sign_hash"
@@ -62,7 +61,7 @@ erDiagram
         user_hash_type                sender_hash
         bytea                         content_b64
         boolean                       deleted_flag
-        dialog_message_id_type        ref_message_id    FK
+        bytea                         refs_map_b64
         dialog_message_sign_hash_type parent_sign_hash  FK
         integer                       owner_timestamp
         bytea                         sign_b64
@@ -76,7 +75,7 @@ erDiagram
         user_hash_type                sender_hash
         bytea                         content_b64
         boolean                       deleted_flag
-        dialog_message_id_type        ref_message_id    FK
+        bytea                         refs_map_b64
         dialog_message_sign_hash_type parent_sign_hash  FK
         integer                       owner_timestamp
         bytea                         sign_b64
@@ -109,7 +108,7 @@ Key relationships in words:
 - `dialog_keys` has a composite PK `(dialog_hash, sender_hash)`. In the steady state there are two rows per `dialog_hash` — one per direction.
 - `dialog_messages.parent_sign_hash` → `dialog_messages_versions.sign_hash` (nullable; NULL for the first version of a message).
 - `dialog_messages_versions.parent_sign_hash` → `dialog_messages_versions.sign_hash` (self-referential; append-only chain).
-- `dialog_messages.ref_message_id` → `dialog_messages.message_id` (self-referential; nullable — NULL only for the genesis message of the dialog). Forms the per-dialog causal chain across authors; owned by [04_ordering.md](../electric/pq_data_layer/04_ordering.md). Orthogonal to `parent_sign_hash` (edit chain by the same author).
+- `dialog_messages.refs_map_b64` — encrypted map of `{message_id: sign_hash}` capturing the DAG tail set the sender observed at authoring time (see §References). Opaque to the server; the causal graph is a frontend concern. Orthogonal to `parent_sign_hash` (edit chain by the same author).
 - `dialog_message_reactions.message_sign_hash` **logically** targets a specific version in `dialog_messages` *or* `dialog_messages_versions` — there is no database FK, because the referenced row can live in either table, and reactions may arrive before the message.
 - `dialog_message_receipts.message_sign_hash` — same logical targeting as reactions; no database FK for the same reasons.
 
@@ -343,6 +342,54 @@ Trade-off accepted for now: simplicity and auditability of the composition vs. t
 
 ---
 
+## References (`refs_map_b64`)
+
+![DAG example: messages 0→1→2→A→B→C→D with fork at A and A'](dm_graph_example.svg)
+
+Each message carries an encrypted snapshot of the dialog's DAG state at the moment the sender authored it. This replaces a single-predecessor pointer with a full frontier, giving the ordering layer a true DAG rather than a linear chain.
+
+### What it is
+
+`refs_map_b64` is an AES-256-GCM-encrypted JSON map of `{message_id: sign_hash}` pairs — every **tail** (DAG leaf) the sender observed at send time. A tail is a `(message_id, sign_hash)` pair that does not appear in the `refs_map` of any other message the sender has loaded. Only leaves, not their transitive predecessors. Each entry pins both the message identity and the exact version the sender saw — an edit produces a new `sign_hash` and therefore a new tail even if an older version of the same message is already referenced.
+
+### Encryption
+
+Same scheme as `content_b64`: 12-byte fresh-random AES-GCM nonce prepended to ciphertext, encrypted under `sender_msg_key`. The signature (`sign_b64`) covers the ciphertext blob, not the plaintext — the server sees opaque bytes and cannot inspect or validate causal references. All causal validation is a frontend responsibility.
+
+### Tail calculation
+
+Tails are computed from the messages the user has loaded into the viewport. The unit of tracking is a `(message_id, sign_hash)` pair — a specific version of a specific message. The algorithm:
+
+1. Collect all messages the sender has loaded for this `dialog_hash`.
+2. For each loaded message, decrypt its `refs_map_b64` to obtain the set of `(message_id, sign_hash)` pairs it references.
+3. Build the set of all referenced pairs across every loaded message's refs_map.
+4. For each loaded message, take its current `(message_id, sign_hash)` from the tip row. If that exact pair does **not** appear in the referenced set from step 3, it is a **tail**.
+
+The resulting `{message_id: sign_hash}` map of all tails is the `refs_map` plaintext.
+
+Because matching is on the full pair, an edit (which produces a new `sign_hash`) turns the edited message into a new tail — the old `(message_id, old_sign_hash)` may be referenced elsewhere, but the new `(message_id, new_sign_hash)` is not. This is intentional: the sender's refs_map records exactly which versions they observed.
+
+### Special cases
+
+- **Genesis message** — the first message in a dialog. `refs_map` plaintext is an empty map `{}`. Encrypted as usual (the ciphertext is non-empty even though the plaintext is `{}`).
+- **Linear conversation** — when both parties take strict turns, refs_map typically contains a single entry: the last message from the other party. Degenerates to the same information as the old `ref_message_id`.
+- **Concurrent sends (fork)** — both parties send without seeing each other's message. Each message's refs_map points to the same predecessor. The next message from either party that has loaded both fork tips will carry both in its refs_map, merging the fork.
+- **Offline burst** — one party sends 50 messages while the other is offline. When the offline party reconnects and loads all 50, only the latest (the single tail) appears in their next refs_map — transitive reduction keeps the map small.
+
+### Behavior on edit
+
+`refs_map_b64` is **not** immutable across edits. When a message is edited, the new tip's `refs_map_b64` is recomputed from the sender's current viewport tails, which may have changed since the original authoring. The original `refs_map_b64` is preserved verbatim in the `dialog_messages_versions` row for the superseded version. This means the edit chain records the causal context as it actually was at each point in time.
+
+### Privacy properties
+
+Because `refs_map_b64` is encrypted under `sender_msg_key`:
+
+- The server cannot see which messages a given message references — the dialog's causal graph is hidden.
+- An observer with database access sees only ciphertext; they cannot reconstruct conversation flow, detect forks, or infer who replied to whom.
+- Only the two dialog participants (who hold or can derive `sender_msg_key`) can decrypt and validate the causal structure.
+
+---
+
 ## Tables
 
 There is no `dialogs` table. Participation is derived from `dialog_keys` via `sender_hash = me OR peer_hash = me`, which is also the sync filter. Dialog existence is advisory; trust is in the signed rows below.
@@ -374,7 +421,7 @@ Current tip of each message's version chain. Each message is identified by `mess
 
 Content is a single opaque blob: the first 12 bytes are the per-message AES-GCM nonce, the remainder is AES-256-GCM ciphertext under `sender_msg_key`. Plaintext shape — bare-string text vs. `{"<type>": <value>}` envelopes for media, plus inline-vs-out-of-band rules — lives in [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md). Keeping the type *inside* the ciphertext means the database never reveals whether a message is text, image, or attachment.
 
-`ref_message_id` carries the **causal context** a message was authored against — the `message_id` of the tip the author had observed at send time. It is the cross-author hash-linked chain owned by [04_ordering.md](../electric/pq_data_layer/04_ordering.md), required because Electric sync offers no delivery-order guarantee and `parent_sign_hash` only chains revisions *by the same author*. Because `ref_message_id` is covered by `sign_b64`, ingest can reject forged or cross-dialog links without decrypting.
+`refs_map_b64` carries the **causal context** a message was authored against — a map of every DAG tail the sender observed at send time, encrypted under `sender_msg_key` (see §References). Required because Electric sync offers no delivery-order guarantee and `parent_sign_hash` only chains revisions *by the same author*. The map is opaque to the server; causal validation is a frontend responsibility.
 
 | Column             | Type                            | Notes                                                                                                       |
 | ------------------ | ------------------------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -383,7 +430,7 @@ Content is a single opaque blob: the first 12 bytes are the per-message AES-GCM 
 | `sender_hash`      | `user_hash_type`                | author                                                                                                      |
 | `content_b64`          | `bytea`                         | 12-byte AES-GCM nonce ‖ AES-256-GCM ciphertext of the JSON payload — see [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md). Empty when `deleted_flag = true` |
 | `deleted_flag`     | `boolean`                       | Signed tombstone marker; retractions are a new tip with empty `content_b64` and `deleted_flag: true`        |
-| `ref_message_id`   | `dialog_message_id_type`        | Self-referential FK → `dialog_messages.message_id` in the same `dialog_hash`; causal-context pointer owned by [04_ordering.md](../electric/pq_data_layer/04_ordering.md). NULL only for the genesis message of the dialog. Fixed at first authoring — does **not** change on edit. |
+| `refs_map_b64`     | `bytea`                         | Encrypted causal-context map — see §References. 12-byte AES-GCM nonce ‖ AES-256-GCM ciphertext under `sender_msg_key`. Plaintext is a JSON map `{message_id: sign_hash}` of all DAG tails the sender observed. Empty map `{}` for the genesis message. Updated on edit (may reference new tails observed since original authoring). |
 | `parent_sign_hash` | `dialog_message_sign_hash_type` | FK → `dialog_messages_versions.sign_hash`; NULL for the first version                                       |
 | `owner_timestamp`  | `integer`                       | Monotonic per `message_id`; strictly increases on edit; prevents replay                                     |
 | `sign_b64`         | `bytea`                         | ML-DSA-87 signature by `sender_hash` over the signable fields (everything except `sign_b64` / `sign_hash`)  |
@@ -415,7 +462,7 @@ Append-only history for `dialog_messages`, mirroring `Chat.Data.Schemas.UserStor
 | `sender_hash`      | `user_hash_type`                |                                                                                             |
 | `content_b64`          | `bytea`                         | 12-byte AES-GCM nonce ‖ ciphertext (same shape as the tip)                                  |
 | `deleted_flag`     | `boolean`                       |                                                                                             |
-| `ref_message_id`   | `dialog_message_id_type`        | Carried verbatim from the tip at first authoring; immutable across the version chain        |
+| `refs_map_b64`     | `bytea`                         | Encrypted causal-context map carried from the tip at the time this version was current       |
 | `parent_sign_hash` | `dialog_message_sign_hash_type` | Self-referential FK into `dialog_messages_versions.sign_hash`; NULL for the root version    |
 | `owner_timestamp`  | `integer`                       |                                                                                             |
 | `sign_b64`         | `bytea`                         | ML-DSA-87 signature by `sender_hash` covering every field except `sign_b64` and `sign_hash` |
@@ -460,7 +507,7 @@ The `type` column is plaintext, enabling server-side queries for unread counts, 
 
 | Column              | Type                                | Notes                                                                                               |
 | ------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `receipt_hash`      | `dialog_message_receipt_hash_type`  | PK; `dmrc_` + hex(SHA3-512(`message_id` ‖ `peer_hash` ‖ `type`)) — plain hash, not keyed (type is already plaintext) |
+| `receipt_hash`      | `dialog_message_receipt_hash_type`  | PK; `dmrc_` + hex(SHA3-512(`message_id` ‖ `message_sign_hash` ‖ `peer_hash` ‖ `type`)) — plain hash, not keyed (type is already plaintext) |
 | `message_id`        | `dialog_message_id_type`            | receipted message; `dmsg_<UUID7>`                                                                   |
 | `peer_hash`         | `user_hash_type`                    | who generated the receipt (the peer, not the message author)                                        |
 | `type`              | `text`                              | `delivered` or `read` — plaintext, not encrypted                                                    |
@@ -468,7 +515,7 @@ The `type` column is plaintext, enabling server-side queries for unread counts, 
 | `owner_timestamp`   | `integer`                           | Monotonic per `receipt_hash`; prevents replay                                                       |
 | `sign_b64`          | `bytea`                             | ML-DSA-87 signature by `peer_hash` over all preceding columns                                       |
 
-PK: `(receipt_hash)`. Uniqueness of "one receipt per `(message, peer, type)`" is enforced by `receipt_hash` alone — the hash is deterministic, so two signed rows for the same `(message_id, peer_hash, type)` collide on PK.
+PK: `(receipt_hash)`. Uniqueness of "one receipt per `(message version, peer, type)`" is enforced by `receipt_hash` alone — the hash is deterministic, so two signed rows for the same `(message_id, message_sign_hash, peer_hash, type)` collide on PK. An edited message (new `sign_hash`) can receive its own independent receipt.
 
 Postgres domains:
 
@@ -493,7 +540,7 @@ Self-authenticating per [02_integrity.md](../electric/pq_data_layer/02_integrity
 1. Compute `dialog_hash` from `(sender_hash, peer_hash)`.
 2. Derive `sender_msg_key` (formula above).
 3. If no `dialog_keys` row exists for `(dialog_hash, sender_hash)`: wrap `sender_msg_key` self + peer, sign, insert (row carries `peer_hash`).
-4. Build message: fresh `message_id = "dmsg_" + UUID v7`, `parent_sign_hash = NULL`, `deleted_flag = false`, fresh `owner_timestamp`. Set `ref_message_id` to the `message_id` of the currently-observed tip in this `dialog_hash` (or `NULL` for the genesis message). Encode payload as JSON (bare string for text, `{"<type>": <value>}` for compound), AES-GCM encrypt under `sender_msg_key` with a fresh 12-byte nonce, store as `content_b64 = nonce ‖ ciphertext`. Sign, set `sign_hash = "dms_" + hex(SHA3-512(sign_b64))`, insert into `dialog_messages`. Edits append the prior tip to `dialog_messages_versions` and rewrite the tip with `parent_sign_hash` set to the superseded row's `sign_hash` and a higher `owner_timestamp`; `ref_message_id` is carried over unchanged.
+4. Build message: fresh `message_id = "dmsg_" + UUID v7`, `parent_sign_hash = NULL`, `deleted_flag = false`, fresh `owner_timestamp`. Compute `refs_map` — collect all DAG tails currently in the sender's viewport (see §References), build the `{message_id: sign_hash}` map, JSON-encode, AES-GCM encrypt under `sender_msg_key` with a fresh 12-byte nonce, store as `refs_map_b64 = nonce ‖ ciphertext` (empty map `{}` for the genesis message). Encode payload as JSON (bare string for text, `{"<type>": <value>}` for compound), AES-GCM encrypt under `sender_msg_key` with a fresh 12-byte nonce, store as `content_b64 = nonce ‖ ciphertext`. Sign, set `sign_hash = "dms_" + hex(SHA3-512(sign_b64))`, insert into `dialog_messages`. Edits append the prior tip to `dialog_messages_versions` and rewrite the tip with `parent_sign_hash` set to the superseded row's `sign_hash` and a higher `owner_timestamp`; `refs_map_b64` is recomputed from the current viewport tails (may differ from the original).
 
 ### Peer reads
 
@@ -520,7 +567,7 @@ Both sides compute the same `dialog_hash`. Each inserts its own `dialog_keys` ro
 ## Out of scope
 
 - **Group conversations** — covered by `pq_rooms.md` (TBD); this doc covers two-party dialogs only.
-- **Cross-author message ordering rendering** — `ref_message_id` (column present on `dialog_messages` / `dialog_messages_versions`) provides the tamper-evident hash-linked chain per dialog, but the semantics (ingest rules, pending-queue behavior, fork surfacing, catch-up) are owned by [04_ordering.md](../electric/pq_data_layer/04_ordering.md). Until that spec lands, clients may linearize by UUIDv7 timestamp as a best-effort display order.
-- **Replies and concurrent forks** — reply targeting will be handled via the `{"quote": ...}` content envelope in [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md). Concurrent forks (two peers answering the same tip) are surfaced by the ordering layer and resolved at the UI level.
+- **Cross-author message ordering rendering** — `refs_map_b64` (column present on `dialog_messages` / `dialog_messages_versions`) provides the encrypted DAG-aware causal context per dialog, but the rendering semantics (ingest rules, pending-queue behavior, fork surfacing, catch-up) are owned by [04_ordering.md](../electric/pq_data_layer/04_ordering.md). Until that spec lands, clients may linearize by UUIDv7 timestamp as a best-effort display order.
+- **Replies and concurrent forks** — reply targeting will be handled via the `{"quote": ...}` content envelope in [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md). Concurrent forks (two peers sending without seeing each other's messages) are captured naturally by `refs_map_b64` and resolved at the UI level.
 - **Sync filtering** — which rows propagate to which peer is a frontend / sync-layer choice, not part of the dialog data contract.
 

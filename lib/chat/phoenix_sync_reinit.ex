@@ -98,22 +98,13 @@ defmodule Chat.PhoenixSyncReinit do
   end
 
   defp get_runtime_connection_opts(repo) do
-    # Try to get the runtime config from the repo's Ecto adapter
-    # This reflects the actual connection parameters being used
-    %{opts: opts} = Ecto.Adapter.lookup_meta(repo)
-
-    build_connection_opts(opts)
+    build_connection_opts(repo.config())
   rescue
     _ ->
-      # Fallback to static config if runtime lookup fails
-      Logger.warning("[PhoenixSyncReinit] Could not get runtime config, using static config")
-      get_static_connection_opts(repo)
-  end
+      Logger.warning("[PhoenixSyncReinit] Could not get repo config, using adapter metadata")
 
-  defp get_static_connection_opts(repo) do
-    config = repo.config()
-
-    build_connection_opts(config)
+      %{opts: opts} = Ecto.Adapter.lookup_meta(repo)
+      build_connection_opts(opts)
   end
 
   defp build_connection_opts(source) do

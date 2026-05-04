@@ -9,6 +9,129 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
+### Fixed
+
+- Electric user shortcodes generation
+
+## 2026-05-02_6c207f8\_\_\_2026-05-02_8d051c83
+
+### Added
+
+- Post-quantum dialog message references and reactions
+- Post-quantum file storage requirements and content types
+- [platform] PostgreSQL replication: correct table set
+
+### Changed
+
+- Documentation updates
+- [platform] NAT iptables monitoring (less verbose)
+
+### Fixed
+
+- Electric: connect to correct PostgreSQL instance for client
+- [platform] Clean stale WAL on repo start (#701)
+- [platform] Storage mounter error reason (#478)
+- [platform] NAT: fix missing iptables rules
+- [platform] Configuration and test fixes
+
+## 2026-04-21_bcbf3c6\_\_\_2026-04-21_d58502f8
+
+### Added
+
+- Post-quantum dialog requirements: base tables, ordering, reaction encryption, addressing
+
+### Changed
+
+- Documentation reorganization and deduplication
+
+### Fixed
+
+- [platform] Hosts configuration fix
+
+## 2026-04-14_f09f34c\_\_\_2026-04-14_3c00233e
+
+### Added
+
+- WebRTC proof of concept (device connectivity)
+- [platform] NAT iptables state monitoring
+
+### Changed
+
+- Post-quantum conflict resolution on insert
+- Time supervision improvements
+- [platform] Time supervision refactor
+- [platform] Code cleanup
+
+### Fixed
+
+- Electric test fixes
+
+## 2026-04-07_61c11fc\_\_\_2026-04-04_0ffcf216
+
+### Fixed
+
+- [platform] PostgreSQL init sequence fix
+
+## 2026-04-04_6be607a\_\_\_2026-04-04_0ffcf216
+
+### Added
+
+- Post-quantum user storage integrity and versioning LiveViews
+- Post-quantum versioning for data fields
+
+### Changed
+
+- Electric: clean startup and deferred sync after start
+- Electric: time keeper timestamp updates
+- [platform] Electric: clean startup, deferred sync, and keepalive
+- [platform] PostgreSQL: shared memory and permissions cleanup
+
+### Fixed
+
+- Post-quantum hash migration to text fields (signature fix)
+- [platform] PostgreSQL server error handling (try-wrap)
+- [platform] PostgreSQL permissions check fix
+
+## 2026-03-23_e645a81\_\_\_2026-03-23_9ef134d3
+
+### Added
+
+- Post-quantum user card integrity verification and client support
+- Post-quantum user storage integrity and versioning
+- Post-quantum dialog requirements (initial)
+- Electric signing algorithm for sync data
+
+### Changed
+
+- Electric consumer fixes and base64 encoding for certs/keys
+- UI: refresh time display on resume
+
+### Fixed
+
+- [platform] PostgreSQL device DB sync
+- [platform] PostgreSQL replica for user_storage_versions
+- [platform] PostgreSQL sync timeout increase
+
+## 2026-03-07_010c417\_\_\_2026-03-09_67c54fb3
+
+### Added
+
+- Electric network sync initialization
+- [platform] Electric LAN sync started on DB ready
+
+### Changed
+
+- Post-quantum data versioning discovery
+- Electric consumer resilience (survive missing repo)
+- Test coverage improvements
+
+### Fixed
+
+- Messaging issues fix
+- Electric consumer fix
+
+## 2026-03-02_4d37ff9\_\_\_2026-03-02_f4fd6db1
+
 ### Added
 
 - Post-quantum user card with Electric sync
@@ -21,6 +144,13 @@ straightforward as possible.
 
 - Elixir update
 - [platform] USB network interface moved to .26 subnet
+- [platform] Device redirect via inject
+
+### Fixed
+
+- Electric shapes fix
+- Post-quantum migration fixes
+- [platform] Localhost redirect fix
 
 ## 2026-01-30_13c4d5b\_\_\_2026-01-31_765e0746
 

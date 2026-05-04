@@ -125,7 +125,7 @@ defmodule Chat.MixProject do
       {:phoenix_sync, "~> 0.6.1"},
 
       # Internal
-      {:toolbox, path: "../toolbox"}
+      {:toolbox, github: "Buckitup-chat/toolbox"}
     ]
   end
 

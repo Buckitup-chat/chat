@@ -8,7 +8,7 @@ Every write to a PQ-replicated table must carry cryptographic proof that the cli
 
 ## Approach
 
-Client signs a short-lived, server-issued challenge with its `sign_skey` (ML-DSA-87) and submits `{challenge_id, signature}` alongside the mutation batch. Server:
+The challenge is a random string with a 1-minute TTL. Client signs it with its `sign_skey` (ML-DSA-87) and submits the proof in the request body as `auth.challenge_id` and `auth.signature` (base64-encoded). Server:
 
 1. Resolves `challenge_id` (1-minute TTL, single-use).
 2. Looks up `sign_pkey` via the claimed `user_hash`.

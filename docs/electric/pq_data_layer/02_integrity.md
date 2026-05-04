@@ -18,7 +18,24 @@ Because writes propagate between peers without central arbitration (see [electri
 
 These three fields are the universal contract — every signable PQ row includes them, and they are added together as one migration (`priv/repo/migrations/20260317071358_add_integrity_fields_to_user_cards.exs`). The signing key is the row owner's `sign_skey`; the verifying key (`sign_pkey`) is discoverable via the owner's `user_cards` row, which itself is self-signed.
 
-Canonical serialization is alphabetical-by-key concatenation with per-type encoding (base64 for `_b64`/`_cert`/`_pkey` fields, `"true"`/`"false"` for booleans, `"null"` for nil, decimal for integers, raw UTF-8 for strings). See `Chat.Data.Integrity.signature_payload/1`.
+### Canonical serialization
+
+The signature payload is the concatenation of string representations of all fields (except `sign_b64` itself), sorted in lexicographical order by column name. No delimiters — the same record must produce the same payload on backend and frontend.
+
+Per-type encoding:
+
+| Column type | Encoding |
+|---|---|
+| binary (`_b64`, `_cert`, `_pkey`) | base64 |
+| binary (`_hash`) | prefixed hex (e.g. `"u_"`, `"uss_"`) |
+| uuid | standard UUID string |
+| string | raw UTF-8 |
+| integer | decimal |
+| datetime | ISO 8601 basic format |
+| boolean | `"true"` / `"false"` |
+| null | `"null"` |
+
+See `Chat.Data.Integrity.signature_payload/1` for the reference implementation.
 
 Trust bootstrap:
 

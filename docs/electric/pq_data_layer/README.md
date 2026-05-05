@@ -6,5 +6,6 @@ Here is the problems we are solving:
 - [Ordering](./04_ordering.md) — `[message_uuid and prev message_uuid]`
 - [Content Polymorphism](./07_content_polymorphism.md) — text, image, video, audio, file
 - [Snapshoting](./08_snapshots.md) — snapshot of conversation state signed by peer `[full graph of message_uuids and sign_hashes]`
+- [Symmetric Key Derivation](./09_symmetric_keys.md) — HKDF-based subkey derivation for AES-256-GCM encryption and HMAC
 
 See also: [SCHEMAS.md](./SCHEMAS.md) for the tables backing the solved problems.

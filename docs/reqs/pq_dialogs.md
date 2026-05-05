@@ -372,7 +372,7 @@ Because matching is on the full pair, an edit (which produces a new `sign_hash`)
 ### Special cases
 
 - **Genesis message** — the first message in a dialog. `refs_map` plaintext is an empty map `{}`. Encrypted as usual (the ciphertext is non-empty even though the plaintext is `{}`).
-- **Linear conversation** — when both parties take strict turns, refs_map typically contains a single entry: the last message from the other party. Degenerates to the same information as the old `ref_message_id`.
+- **Linear conversation** — when both parties take strict turns, refs_map typically contains a single entry: the last message from the other party.
 - **Concurrent sends (fork)** — both parties send without seeing each other's message. Each message's refs_map points to the same predecessor. The next message from either party that has loaded both fork tips will carry both in its refs_map, merging the fork.
 - **Offline burst** — one party sends 50 messages while the other is offline. When the offline party reconnects and loads all 50, only the latest (the single tail) appears in their next refs_map — transitive reduction keeps the map small.
 

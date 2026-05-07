@@ -69,7 +69,7 @@ defmodule Chat.Application do
              fn ->
                Retrieval.load_all_chat_modules()
                NetworkSynchronization.init_workers()
-               if if_on_host(true), do: NetworkSynchronization.init_electric_peers()
+               maybe_init_electric_peers()
              end,
              shutdown: :brutal_kill
            )
@@ -103,8 +103,10 @@ defmodule Chat.Application do
 
   if Mix.target() == :host do
     defp if_on_host(x), do: x
+    defp maybe_init_electric_peers, do: NetworkSynchronization.init_electric_peers()
   else
     defp if_on_host(_), do: nil
+    defp maybe_init_electric_peers, do: :ok
   end
 
   # coveralls-ignore-end

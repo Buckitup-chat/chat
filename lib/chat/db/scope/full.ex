@@ -3,6 +3,8 @@ defmodule Chat.Db.Scope.Full do
   Db keys manipulation functions
   """
 
+  @dialyzer {:no_opaque, join_keys_of: 2}
+
   alias Chat.FileFs
 
   @doc "Data keys in db and associated files"

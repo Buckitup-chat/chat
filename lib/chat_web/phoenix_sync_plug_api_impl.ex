@@ -4,6 +4,7 @@ defimpl Phoenix.Sync.Adapter.PlugApi, for: Electric.Shapes.Api do
   alias Phoenix.Sync.Electric.ApiAdapter
   alias Phoenix.Sync.PredefinedShape
 
+  @dialyzer {:nowarn_function, predefined_shape: 2}
   def predefined_shape(api, %PredefinedShape{} = shape) do
     ApiAdapter.new(api, shape)
   end

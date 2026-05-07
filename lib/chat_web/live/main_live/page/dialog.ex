@@ -440,8 +440,6 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:last_load_timestamp, set_messages_timestamp(page_messages))
   end
 
-  defp broadcast_new_message(nil, _, _, _), do: nil
-
   defp broadcast_new_message(message, dialog, me, time) do
     Chat.Broadcast.new_dialog_message(message, dialog)
 

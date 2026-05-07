@@ -16,6 +16,8 @@ defmodule Chat.Data.User.Versioning do
   alias Chat.Data.Schemas.UserStorageVersion
   alias Ecto.Multi
 
+  @dialyzer {:no_opaque, archive_and_insert: 3, archive_and_update: 3}
+
   @doc """
   Handles insert with versioning when a record with the same (user_hash, uuid) already exists.
 

@@ -3,6 +3,8 @@ defmodule Chat.Rooms.Message do
 
   defstruct [:timestamp, :author_key, :encrypted, :type, :id, version: 1]
 
+  @type t :: %__MODULE__{}
+
   def new(encrypted, author_key, opts) do
     id = opts |> Keyword.get(:id, UUID.uuid4())
     now = opts |> Keyword.get(:now)

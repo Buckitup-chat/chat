@@ -19,19 +19,19 @@ defmodule Proxy.SocketClient.ChannelClient do
   def init(opts) do
     uri = Keyword.fetch!(opts, :uri)
 
-    callback_map =
+    callback_assigns =
       [
         :on_new_user,
         :on_new_dialog_message,
         :on_room_requested,
         :on_room_approved
       ]
-      |> Map.new(&{&1, Keyword.fetch!(opts, &1)})
+      |> Enum.map(&{&1, Keyword.fetch!(opts, &1)})
 
     connect!(uri: uri)
     |> assign(:connected, false)
     |> assign(:queue, [])
-    |> assign(callback_map)
+    |> assign(callback_assigns)
     |> ok()
   end
 

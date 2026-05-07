@@ -93,7 +93,7 @@ defmodule Chat.Sync.UsbDriveFileDumper do
 
   defp copy_file(file_key, file, file_number, next_chunk) do
     file.path
-    |> File.stream!([], @chunk_size)
+    |> File.stream!(@chunk_size)
     |> Stream.with_index()
     |> Enum.each(fn {chunk, index} ->
       chunk_start = @chunk_size * index

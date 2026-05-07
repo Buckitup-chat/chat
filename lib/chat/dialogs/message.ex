@@ -6,6 +6,8 @@ defmodule Chat.Dialogs.Message do
   @derive {Inspect, only: [:timestamp, :is_a_to_b?, :type, :id]}
   defstruct [:timestamp, :is_a_to_b?, :content, :type, :id, version: 1]
 
+  @type t :: %__MODULE__{}
+
   def a_to_b(content, opts) do
     new(content, opts |> Keyword.merge(is_a_to_b?: true))
   end

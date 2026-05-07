@@ -3,6 +3,13 @@ defmodule ChatWeb.ElectricController do
 
   import Chat.Db, only: [repo: 0]
 
+  @dialyzer [
+    {:nowarn_function, ingest: 2},
+    {:nowarn_function, handle_ingest_error: 2},
+    {:nowarn_function, pub_key_unique_conflict?: 1},
+    {:nowarn_function, changeset_errors: 1}
+  ]
+
   alias Chat.Challenge
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Schemas.UserStorage
@@ -60,7 +67,6 @@ defmodule ChatWeb.ElectricController do
     else
       {:has_auth, false} -> {:error, {:unauthorized, "Missing user PoP auth"}}
       :error -> {:error, {:unauthorized, "Invalid or expired challenge"}}
-      _ -> {:error, {:unauthorized, "Invalid user signature format"}}
     end
   end
 

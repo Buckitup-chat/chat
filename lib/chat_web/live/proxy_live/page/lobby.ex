@@ -243,8 +243,8 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
     room_identity = socket.assigns.room_map[room_key]
 
     room_is_valid_for_approval? =
-      room_identity and
-        room.type == :public and
+      room_identity &&
+        room.type == :public &&
         Rooms.Room.valid?(room)
 
     if room_is_valid_for_approval? do

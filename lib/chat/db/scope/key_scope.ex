@@ -3,6 +3,8 @@ defmodule Chat.Db.Scope.KeyScope do
   Builds db keys accessible by keys_list
   """
 
+  @dialyzer {:no_opaque, add_full_users: 2, get_cargo_keys: 3, traverse: 3}
+
   import Chat.Db.Scope.Utils
   import Chat.Db.Scope.InvitationLevel
   alias Chat.Dialogs.Dialog

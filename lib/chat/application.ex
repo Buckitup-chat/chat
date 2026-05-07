@@ -25,7 +25,6 @@ defmodule Chat.Application do
         Chat.TimeKeeper |> if_on_host(),
         # Start Ecto repository with retry mechanism
         Chat.Repo |> if_on_host(),
-        # TODO: remove Chat.RepoSupervisor,
         # Start DB
         Chat.Ordering.Counters,
         Chat.Db.Supervisor,
@@ -102,11 +101,10 @@ defmodule Chat.Application do
     :ok
   end
 
-  @target Mix.target()
-  defp if_on_host(repo) do
-    if @target == :host do
-      repo
-    end
+  if Mix.target() == :host do
+    defp if_on_host(x), do: x
+  else
+    defp if_on_host(_), do: nil
   end
 
   # coveralls-ignore-end

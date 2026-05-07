@@ -69,9 +69,7 @@ defmodule Chat.SignedParcel do
     * `now` - timestamp
   """
   def wrap_room_message(message, room_identity, author, opts \\ []) do
-    timestamp =
-      Chat.DryStorable.timestamp(message) ||
-        Keyword.get(opts, :now, System.system_time(:millisecond))
+    timestamp = Keyword.get(opts, :now) || Chat.DryStorable.timestamp(message)
 
     type = Chat.DryStorable.type(message)
     {content, data_list} = Chat.DryStorable.to_parcel(message)

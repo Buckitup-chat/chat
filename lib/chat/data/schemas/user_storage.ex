@@ -1,4 +1,6 @@
 defmodule Chat.Data.Schemas.UserStorage do
+  @moduledoc "Ecto schema for encrypted per-user key-value storage entries."
+
   use Ecto.Schema
   import Ecto.Changeset
 
@@ -15,11 +17,12 @@ defmodule Chat.Data.Schemas.UserStorage do
     field(:sign_b64, :binary)
     field(:sign_hash, Chat.Data.Types.UserStorageSignHash)
 
-    belongs_to :parent_version, Chat.Data.Schemas.UserStorageVersion,
+    belongs_to(:parent_version, Chat.Data.Schemas.UserStorageVersion,
       foreign_key: :parent_sign_hash,
       references: :sign_hash,
       type: Chat.Data.Types.UserStorageSignHash,
       define_field: false
+    )
   end
 
   def create_changeset(storage, attrs) do

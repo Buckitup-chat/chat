@@ -1,4 +1,6 @@
 defmodule Chat.Data.Schemas.UserCard do
+  @moduledoc "Ecto schema for user identity cards containing public keys and metadata."
+
   use Ecto.Schema
   import Ecto.Changeset
 

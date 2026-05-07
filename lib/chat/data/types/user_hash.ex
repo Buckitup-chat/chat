@@ -1,4 +1,6 @@
 defmodule Chat.Data.Types.UserHash do
+  @moduledoc "Unique identifier derived from a user's public key. Custom Ecto type."
+
   use Ecto.Type
   alias Chat.Data.Types.Consts
 

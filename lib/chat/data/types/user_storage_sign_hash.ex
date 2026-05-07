@@ -1,4 +1,6 @@
 defmodule Chat.Data.Types.UserStorageSignHash do
+  @moduledoc "Signature hash identifying a specific version of a user storage entry. Custom Ecto type."
+
   use Ecto.Type
   alias Chat.Data.Types.Consts
 

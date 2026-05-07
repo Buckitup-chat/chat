@@ -1,4 +1,6 @@
 defmodule Chat.Data.Schemas.UserStorageVersion do
+  @moduledoc "Ecto schema for archived versions of user storage entries."
+
   use Ecto.Schema
   import Ecto.Changeset
 
@@ -14,15 +16,17 @@ defmodule Chat.Data.Schemas.UserStorageVersion do
     field(:owner_timestamp, :integer)
     field(:sign_b64, :binary)
 
-    belongs_to :parent_version, Chat.Data.Schemas.UserStorageVersion,
+    belongs_to(:parent_version, Chat.Data.Schemas.UserStorageVersion,
       foreign_key: :parent_sign_hash,
       references: :sign_hash,
       type: Chat.Data.Types.UserStorageSignHash,
       define_field: false
+    )
 
-    has_many :child_versions, Chat.Data.Schemas.UserStorageVersion,
+    has_many(:child_versions, Chat.Data.Schemas.UserStorageVersion,
       foreign_key: :parent_sign_hash,
       references: :sign_hash
+    )
   end
 
   def changeset(version, attrs) do

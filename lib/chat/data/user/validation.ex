@@ -1,4 +1,6 @@
 defmodule Chat.Data.User.Validation do
+  @moduledoc "Signature and timestamp validation for user cards and storage operations."
+
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Schemas.UserStorage

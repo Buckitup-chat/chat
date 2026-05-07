@@ -126,7 +126,6 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriterTest do
       assert updated.name == "NewName"
       assert updated.sign_pkey == card.sign_pkey
     end
-
   end
 
   describe "user_storage" do

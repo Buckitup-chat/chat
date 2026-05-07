@@ -123,7 +123,6 @@ defmodule Chat.TimeKeeper do
       ["offset updated, delta=", Integer.to_string(unix_timestamp - current_unix), "s"]
       |> log(:debug)
 
-
       {:noreply, %{state | offset: new_offset}}
     else
       {:noreply, state}

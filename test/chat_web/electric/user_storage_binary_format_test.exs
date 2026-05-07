@@ -12,7 +12,9 @@ defmodule ChatWeb.Electric.UserStorageBinaryFormatTest do
 
   import Chat.Db, only: [repo: 0]
 
+  alias Chat.Data.Integrity
   alias Chat.Data.Schemas.UserStorage
+  alias Chat.Data.Types.UserStorageSignHash
   alias Chat.Data.User
   alias ChatWeb.Utils.IngestUtil
 
@@ -32,6 +34,29 @@ defmodule ChatWeb.Electric.UserStorageBinaryFormatTest do
       sign_skey: identity.sign_skey,
       uuid: @test_uuid
     }
+  end
+
+  defp build_signed_storage(user_hash, uuid, value, sign_skey) do
+    storage = %UserStorage{
+      user_hash: user_hash,
+      uuid: uuid,
+      value_b64: value,
+      deleted_flag: false,
+      parent_sign_hash: nil,
+      owner_timestamp: System.system_time(:second)
+    }
+
+    sign_b64 =
+      storage
+      |> Integrity.signature_payload()
+      |> then(&:crypto.sign(:mldsa87, :none, &1, sign_skey))
+
+    sign_hash =
+      sign_b64
+      |> EnigmaPq.hash()
+      |> UserStorageSignHash.from_binary()
+
+    %{storage | sign_b64: sign_b64, sign_hash: sign_hash}
   end
 
   describe "binary encoding formats for ingest" do
@@ -91,13 +116,9 @@ defmodule ChatWeb.Electric.UserStorageBinaryFormatTest do
   end
 
   describe "storage in database" do
-    test "bytea stores raw binary efficiently", %{user_hash: user_hash} do
+    test "bytea stores raw binary efficiently", %{user_hash: user_hash, sign_skey: sign_skey} do
       # Direct insert
-      storage = %UserStorage{
-        user_hash: user_hash,
-        uuid: @test_uuid,
-        value_b64: @test_binary
-      }
+      storage = build_signed_storage(user_hash, @test_uuid, @test_binary, sign_skey)
 
       {:ok, inserted} = repo().insert(storage)
 
@@ -114,13 +135,9 @@ defmodule ChatWeb.Electric.UserStorageBinaryFormatTest do
   end
 
   describe "sync response format from Electric" do
-    test "examine Electric JSON response format for bytea", %{user_hash: user_hash} do
+    test "examine Electric JSON response format for bytea", %{user_hash: user_hash, sign_skey: sign_skey} do
       # Insert test data
-      storage = %UserStorage{
-        user_hash: user_hash,
-        uuid: @test_uuid,
-        value_b64: @test_binary
-      }
+      storage = build_signed_storage(user_hash, @test_uuid, @test_binary, sign_skey)
 
       repo().insert!(storage)
 
@@ -146,13 +163,9 @@ defmodule ChatWeb.Electric.UserStorageBinaryFormatTest do
       assert decoded_binary == @test_binary
     end
 
-    test "verify Electric SSE stream format", %{user_hash: user_hash, uuid: uuid} do
+    test "verify Electric SSE stream format", %{user_hash: user_hash, uuid: uuid, sign_skey: sign_skey} do
       # Insert test data
-      storage = %UserStorage{
-        user_hash: user_hash,
-        uuid: uuid,
-        value_b64: @test_binary
-      }
+      storage = build_signed_storage(user_hash, uuid, @test_binary, sign_skey)
 
       repo().insert!(storage)
 

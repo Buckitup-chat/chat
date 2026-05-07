@@ -57,43 +57,15 @@ defmodule Chat.Data.UserDataTest do
       identity = User.generate_pq_identity("SoftDelete")
       existing = signed_user_card(identity)
 
-      softdelete =
-        existing
-        |> struct(%{
-          deleted_flag: true,
-          owner_timestamp: existing.owner_timestamp + 1
-        })
-
-      softdelete =
-        %{
-          softdelete
-          | sign_b64: Integrity.signature_payload(softdelete) |> EnigmaPq.sign(identity.sign_skey)
-        }
-
-      softdelete_changeset =
-        Validation.validate_user_card_update(existing, softdelete)
+      softdelete = resign_card(existing, identity, deleted_flag: true, owner_timestamp: existing.owner_timestamp + 1)
+      softdelete_changeset = Validation.validate_user_card_update(existing, softdelete)
 
       assert softdelete_changeset.valid?, inspect(softdelete_changeset.errors)
       {:ok, softdeleted_card} = Ecto.Changeset.apply_action(softdelete_changeset, :validate)
       assert softdeleted_card.deleted_flag == true
 
-      undelete =
-        softdeleted_card
-        |> struct(%{
-          deleted_flag: false,
-          owner_timestamp: softdeleted_card.owner_timestamp + 1
-        })
-
-      undelete_sign_b64 =
-        undelete
-        |> Integrity.signature_payload()
-        |> EnigmaPq.sign(identity.sign_skey)
-
-      undelete_changeset =
-        Validation.validate_user_card_update(softdeleted_card, %{
-          undelete
-          | sign_b64: undelete_sign_b64
-        })
+      undelete = resign_card(softdeleted_card, identity, deleted_flag: false, owner_timestamp: softdeleted_card.owner_timestamp + 1)
+      undelete_changeset = Validation.validate_user_card_update(softdeleted_card, undelete)
 
       assert undelete_changeset.valid?, inspect(undelete_changeset.errors)
       {:ok, undeleted_card} = Ecto.Changeset.apply_action(undelete_changeset, :validate)
@@ -233,50 +205,41 @@ defmodule Chat.Data.UserDataTest do
 
   describe "UserStorage" do
     test "creates storage for existing user" do
-      # Setup User via Context
       identity = User.generate_pq_identity("Charlie")
       card_struct = signed_user_card(identity)
-
       Repo.insert!(card_struct)
 
-      # Insert Storage
-      uuid = Ecto.UUID.generate()
-      value = "some_encrypted_blob"
-
-      # Create a storage struct with all required fields
-      storage_struct = %UserStorage{
-        user_hash: card_struct.user_hash,
-        uuid: uuid,
-        value_b64: value,
-        deleted_flag: false,
-        parent_sign_hash: nil,
-        owner_timestamp: System.system_time(:second)
-      }
-
-      # Generate signature
-      sign_b64 = Integrity.signature_payload(storage_struct) |> EnigmaPq.sign(identity.sign_skey)
-      sign_hash_binary = :crypto.hash(:sha3_512, sign_b64)
-
-      sign_hash =
-        Consts.user_storage_sign_prefix() <> Base.encode16(sign_hash_binary, case: :lower)
-
-      attrs = %{
-        user_hash: card_struct.user_hash,
-        uuid: uuid,
-        value_b64: value,
-        deleted_flag: false,
-        parent_sign_hash: nil,
-        owner_timestamp: storage_struct.owner_timestamp,
-        sign_b64: sign_b64,
-        sign_hash: sign_hash
-      }
+      attrs = signed_storage_attrs(identity, card_struct.user_hash, value_b64: "some_encrypted_blob")
 
       changeset = UserStorage.create_changeset(%UserStorage{}, attrs)
       assert changeset.valid?, inspect(changeset.errors)
 
       {:ok, storage} = Repo.insert(changeset)
       assert storage.user_hash == card_struct.user_hash
-      assert storage.value_b64 == value
+      assert storage.value_b64 == "some_encrypted_blob"
     end
+
+    defp signed_storage_attrs(identity, user_hash, opts) do
+      storage = %UserStorage{
+        user_hash: user_hash,
+        uuid: Keyword.get(opts, :uuid, Ecto.UUID.generate()),
+        value_b64: Keyword.fetch!(opts, :value_b64),
+        deleted_flag: false,
+        parent_sign_hash: nil,
+        owner_timestamp: System.system_time(:second)
+      }
+
+      sign_b64 = Integrity.signature_payload(storage) |> EnigmaPq.sign(identity.sign_skey)
+      sign_hash_binary = :crypto.hash(:sha3_512, sign_b64)
+      sign_hash = Consts.user_storage_sign_prefix() <> Base.encode16(sign_hash_binary, case: :lower)
+
+      Map.from_struct(storage) |> Map.merge(%{sign_b64: sign_b64, sign_hash: sign_hash})
+    end
+  end
+
+  defp resign_card(card, identity, attrs) do
+    updated = struct(card, attrs)
+    sign_b64 = Integrity.signature_payload(updated) |> EnigmaPq.sign(identity.sign_skey)
+    %{updated | sign_b64: sign_b64}
   end
 end

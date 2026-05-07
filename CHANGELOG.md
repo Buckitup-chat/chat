@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
+
+### Changed
+
+- Dialyzer fixes
+- Dependencies update
+- Post-quantum data layer documentation (symmetric keys, ordering, snapshots)
+
 ### Fixed
 
 - Electric user shortcodes generation

@@ -62,7 +62,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLiveTest do
       refute html =~ "SHA3-512 hash of sign_pkey"
 
       # Expand user_storage
-      view |> element("button", "User Storage") |> render_click()
+      view |> element("button[phx-value-section='user_storage']") |> render_click()
       html = render(view)
       assert html =~ "max 10MB per entry"
     end

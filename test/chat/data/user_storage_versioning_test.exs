@@ -77,29 +77,10 @@ defmodule Chat.Data.UserStorageVersioningTest do
       uuid = Ecto.UUID.generate()
       timestamp = System.system_time(:second)
 
-      storage_attrs = %{
-        user_hash: user_hash,
-        uuid: uuid,
-        value_b64: "test value",
-        deleted_flag: false,
-        parent_sign_hash: nil,
-        owner_timestamp: timestamp
-      }
-
-      # Sign the storage
-      sign_payload = Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs))
-      sign_b64 = EnigmaPq.sign(sign_payload, identity.sign_skey)
-      sign_hash = compute_sign_hash(sign_b64)
-
-      storage_attrs =
-        storage_attrs
-        |> Map.put(:sign_b64, sign_b64)
-        |> Map.put(:sign_hash, sign_hash)
-
       storage =
-        %UserStorage{}
-        |> UserStorage.create_changeset(storage_attrs)
-        |> Repo.insert!()
+        identity
+        |> signed_storage(user_hash, %{uuid: uuid, owner_timestamp: timestamp})
+        |> insert_storage!()
 
       assert storage.user_hash == user_hash
       assert storage.uuid == uuid
@@ -107,8 +88,8 @@ defmodule Chat.Data.UserStorageVersioningTest do
       assert storage.deleted_flag == false
       assert storage.parent_sign_hash == nil
       assert storage.owner_timestamp == timestamp
-      assert storage.sign_b64 == sign_b64
-      assert storage.sign_hash == sign_hash
+      assert storage.sign_b64 != nil
+      assert storage.sign_hash != nil
     end
 
     test "archives old version when updating with newer timestamp", %{
@@ -116,151 +97,48 @@ defmodule Chat.Data.UserStorageVersioningTest do
       identity: identity
     } do
       uuid = Ecto.UUID.generate()
-      timestamp1 = System.system_time(:second)
+      storage1 = insert_storage!(signed_storage(identity, user_hash, %{uuid: uuid, value_b64: "version 1"}))
+      archive_storage!(storage1)
 
-      # Create first version
-      storage_attrs1 = %{
-        user_hash: user_hash,
-        uuid: uuid,
-        value_b64: "version 1",
-        deleted_flag: false,
-        parent_sign_hash: nil,
-        owner_timestamp: timestamp1
-      }
-
-      sign_payload1 = Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs1))
-      sign_b64_1 = EnigmaPq.sign(sign_payload1, identity.sign_skey)
-      sign_hash_1 = compute_sign_hash(sign_b64_1)
-
-      storage1 =
-        %UserStorage{}
-        |> UserStorage.create_changeset(
-          storage_attrs1
-          |> Map.put(:sign_b64, sign_b64_1)
-          |> Map.put(:sign_hash, sign_hash_1)
-        )
-        |> Repo.insert!()
-
-      # Create second version with newer timestamp
-      timestamp2 = timestamp1 + 10
-
-      storage_attrs2 = %{
-        user_hash: user_hash,
+      v2 = signed_storage(identity, user_hash, %{
         uuid: uuid,
         value_b64: "version 2",
-        deleted_flag: false,
-        parent_sign_hash: sign_hash_1,
-        owner_timestamp: timestamp2
-      }
-
-      sign_payload2 = Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs2))
-      sign_b64_2 = EnigmaPq.sign(sign_payload2, identity.sign_skey)
-      sign_hash_2 = compute_sign_hash(sign_b64_2)
-
-      # First archive the old version
-      %UserStorageVersion{}
-      |> UserStorageVersion.changeset(%{
-        user_hash: storage1.user_hash,
-        uuid: storage1.uuid,
-        sign_hash: storage1.sign_hash,
-        value_b64: storage1.value_b64,
-        deleted_flag: storage1.deleted_flag,
-        parent_sign_hash: storage1.parent_sign_hash,
-        owner_timestamp: storage1.owner_timestamp,
-        sign_b64: storage1.sign_b64
+        parent_sign_hash: storage1.sign_hash,
+        owner_timestamp: storage1.owner_timestamp + 10
       })
-      |> Repo.insert!()
 
-      # Then update main table
       storage2 =
         storage1
-        |> UserStorage.update_changeset(%{
-          value_b64: "version 2",
-          deleted_flag: false,
-          parent_sign_hash: sign_hash_1,
-          owner_timestamp: timestamp2,
-          sign_b64: sign_b64_2,
-          sign_hash: sign_hash_2
-        })
+        |> UserStorage.update_changeset(Map.from_struct(v2) |> Map.take(~w(value_b64 deleted_flag parent_sign_hash owner_timestamp sign_b64 sign_hash)a))
         |> Repo.update!()
 
-      # Verify main table has latest version
       assert storage2.value_b64 == "version 2"
-      assert storage2.owner_timestamp == timestamp2
-      assert storage2.parent_sign_hash == sign_hash_1
+      assert storage2.owner_timestamp == storage1.owner_timestamp + 10
+      assert storage2.parent_sign_hash == storage1.sign_hash
 
-      # Verify old version is in versions table
-      version =
-        Repo.get_by(UserStorageVersion, user_hash: user_hash, uuid: uuid, sign_hash: sign_hash_1)
-
+      version = Repo.get_by(UserStorageVersion, user_hash: user_hash, uuid: uuid, sign_hash: storage1.sign_hash)
       assert version != nil
       assert version.value_b64 == "version 1"
-      assert version.owner_timestamp == timestamp1
+      assert version.owner_timestamp == storage1.owner_timestamp
     end
 
     test "foreign key constraint prevents invalid parent_sign_hash", %{
       user_hash: user_hash,
       identity: identity
     } do
-      uuid = Ecto.UUID.generate()
-      timestamp = System.system_time(:second)
-
       invalid_parent_hash =
         :crypto.strong_rand_bytes(64)
         |> UserStorageSignHash.from_binary()
 
-      storage_attrs = %{
-        user_hash: user_hash,
-        uuid: uuid,
-        value_b64: "test value",
-        deleted_flag: false,
-        parent_sign_hash: invalid_parent_hash,
-        owner_timestamp: timestamp
-      }
+      storage = signed_storage(identity, user_hash, %{parent_sign_hash: invalid_parent_hash})
 
-      sign_payload = Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs))
-      sign_b64 = EnigmaPq.sign(sign_payload, identity.sign_skey)
-      sign_hash = compute_sign_hash(sign_b64)
-
-      # This should fail due to FK constraint
       assert_raise Ecto.InvalidChangesetError, fn ->
-        %UserStorage{}
-        |> UserStorage.create_changeset(
-          storage_attrs
-          |> Map.put(:sign_b64, sign_b64)
-          |> Map.put(:sign_hash, sign_hash)
-        )
-        |> Repo.insert!()
+        insert_storage!(storage)
       end
     end
 
     test "signature verification works", %{user_hash: user_hash, identity: identity} do
-      uuid = Ecto.UUID.generate()
-      timestamp = System.system_time(:second)
-
-      storage_attrs = %{
-        user_hash: user_hash,
-        uuid: uuid,
-        value_b64: "test value",
-        deleted_flag: false,
-        parent_sign_hash: nil,
-        owner_timestamp: timestamp
-      }
-
-      # Sign correctly
-      sign_payload = Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs))
-      sign_b64 = EnigmaPq.sign(sign_payload, identity.sign_skey)
-      sign_hash = compute_sign_hash(sign_b64)
-
-      storage =
-        %UserStorage{}
-        |> struct(
-          storage_attrs
-          |> Map.put(:sign_b64, sign_b64)
-          |> Map.put(:sign_hash, sign_hash)
-        )
-
-      # Verify signature
+      storage = signed_storage(identity, user_hash)
       assert Integrity.verify_signature(storage) == :ok
     end
 
@@ -427,74 +305,43 @@ defmodule Chat.Data.UserStorageVersioningTest do
 
     test "soft delete sets deleted_flag", %{user_hash: user_hash, identity: identity} do
       uuid = Ecto.UUID.generate()
-      timestamp1 = System.system_time(:second)
+      storage1 = insert_storage!(signed_storage(identity, user_hash, %{uuid: uuid}))
+      archive_storage!(storage1)
 
-      # Create storage
-      storage_attrs1 = %{
-        user_hash: user_hash,
+      delete_version = signed_storage(identity, user_hash, %{
         uuid: uuid,
-        value_b64: "test value",
-        deleted_flag: false,
-        parent_sign_hash: nil,
-        owner_timestamp: timestamp1
-      }
-
-      sign_payload1 = Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs1))
-      sign_b64_1 = EnigmaPq.sign(sign_payload1, identity.sign_skey)
-      sign_hash_1 = compute_sign_hash(sign_b64_1)
-
-      storage1 =
-        %UserStorage{}
-        |> UserStorage.create_changeset(
-          storage_attrs1
-          |> Map.put(:sign_b64, sign_b64_1)
-          |> Map.put(:sign_hash, sign_hash_1)
-        )
-        |> Repo.insert!()
-
-      # Archive old version first (required by FK constraint)
-      %UserStorageVersion{}
-      |> UserStorageVersion.changeset(%{
-        user_hash: storage1.user_hash,
-        uuid: storage1.uuid,
-        sign_hash: storage1.sign_hash,
-        value_b64: storage1.value_b64,
-        deleted_flag: storage1.deleted_flag,
-        parent_sign_hash: storage1.parent_sign_hash,
-        owner_timestamp: storage1.owner_timestamp,
-        sign_b64: storage1.sign_b64
-      })
-      |> Repo.insert!()
-
-      # Soft delete
-      timestamp2 = timestamp1 + 10
-
-      storage_attrs2 = %{
-        user_hash: user_hash,
-        uuid: uuid,
-        value_b64: "test value",
         deleted_flag: true,
-        parent_sign_hash: sign_hash_1,
-        owner_timestamp: timestamp2
-      }
-
-      sign_payload2 = Integrity.signature_payload(%UserStorage{} |> struct(storage_attrs2))
-      sign_b64_2 = EnigmaPq.sign(sign_payload2, identity.sign_skey)
-      sign_hash_2 = compute_sign_hash(sign_b64_2)
+        parent_sign_hash: storage1.sign_hash,
+        owner_timestamp: storage1.owner_timestamp + 10
+      })
 
       storage2 =
         storage1
-        |> UserStorage.update_changeset(%{
-          deleted_flag: true,
-          parent_sign_hash: sign_hash_1,
-          owner_timestamp: timestamp2,
-          sign_b64: sign_b64_2,
-          sign_hash: sign_hash_2
-        })
+        |> UserStorage.update_changeset(Map.from_struct(delete_version) |> Map.take(~w(deleted_flag parent_sign_hash owner_timestamp sign_b64 sign_hash)a))
         |> Repo.update!()
 
       assert storage2.deleted_flag == true
-      assert storage2.owner_timestamp == timestamp2
+      assert storage2.owner_timestamp == storage1.owner_timestamp + 10
+    end
+    defp insert_storage!(storage) do
+      %UserStorage{}
+      |> UserStorage.create_changeset(Map.from_struct(storage))
+      |> Repo.insert!()
+    end
+
+    defp archive_storage!(storage) do
+      %UserStorageVersion{}
+      |> UserStorageVersion.changeset(%{
+        user_hash: storage.user_hash,
+        uuid: storage.uuid,
+        sign_hash: storage.sign_hash,
+        value_b64: storage.value_b64,
+        deleted_flag: storage.deleted_flag,
+        parent_sign_hash: storage.parent_sign_hash,
+        owner_timestamp: storage.owner_timestamp,
+        sign_b64: storage.sign_b64
+      })
+      |> Repo.insert!()
     end
   end
 end

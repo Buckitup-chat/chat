@@ -4,17 +4,19 @@ defmodule Chat.Time do
 
   alias Chat.Db
 
-  def decide_time do
-    if time = db_time() do
-      time
-    else
-      static_time()
-    end
+  @build_timestamp System.os_time(:second)
+
+  def best_local_time do
+    (db_time() || static_time())
     |> Enum.max()
     |> DateTime.from_unix!()
   end
 
-  def init_time do
+  def set_initial_system_time do
+    @build_timestamp
+    |> DateTime.from_unix!()
+    |> advance_system_time()
+
     path = Chat.TimeKeeper.persist_path()
 
     case Chat.TimeKeeper.try_ntp() do
@@ -23,14 +25,9 @@ defmodule Chat.Time do
         DateTime.from_unix!(unix)
 
       :error ->
-        persisted = Chat.TimeKeeper.read_persisted_time(path)
-        decided = decide_time()
-
-        [persisted, decided]
-        |> Enum.reject(&is_nil/1)
-        |> Enum.max_by(&DateTime.to_unix/1, fn -> decided end)
+        best_known_time(path)
     end
-    |> set_system_time_once()
+    |> advance_system_time()
   end
 
   @doc """
@@ -62,23 +59,31 @@ defmodule Chat.Time do
     System.monotonic_time(:second) + monotonic_offset
   end
 
-  defp set_system_time_once(%DateTime{} = time) do
-    string_time =
-      time
-      |> DateTime.shift_zone!("Etc/UTC")
-      |> DateTime.to_naive()
-      |> NaiveDateTime.truncate(:second)
-      |> NaiveDateTime.to_string()
+  defp advance_system_time(%DateTime{} = time) do
+    case DateTime.compare(time, DateTime.utc_now()) do
+      :gt ->
+        time
+        |> DateTime.shift_zone!("Etc/UTC")
+        |> DateTime.to_naive()
+        |> NaiveDateTime.truncate(:second)
+        |> NaiveDateTime.to_string()
+        |> set_system_time()
 
-    if Application.get_env(:chat, :set_time, false) do
-      set_system_time(string_time)
-    else
-      Logger.debug(["Set clock to ", string_time, " UTC"])
-      :ok
+      _ ->
+        :ok
     end
   end
 
   defp set_system_time(string_time) do
+    case Application.get_env(:chat, :set_time, false) do
+      true -> set_os_clock(string_time)
+      false ->
+        Logger.debug(["Set clock to ", string_time, " UTC"])
+        :ok
+    end
+  end
+
+  defp set_os_clock(string_time) do
     case System.cmd("date", ["-u", "-s", string_time]) do
       {_result, 0} ->
         Logger.info(["nerves_time set system clock to ", string_time, " UTC"])
@@ -98,17 +103,21 @@ defmodule Chat.Time do
     end
   end
 
+  defp best_known_time(path) do
+    persisted = Chat.TimeKeeper.read_persisted_time(path)
+    decided = best_local_time()
+
+    [persisted, decided]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.max_by(&DateTime.to_unix/1, fn -> decided end)
+  end
+
   defp db_time do
     "#{Db.file_path()}/*.cub"
     |> path_time()
   end
 
-  defp static_time do
-    Application.app_dir(:chat)
-    |> Path.join("priv/static")
-    |> then(&"#{&1}/*")
-    |> path_time
-  end
+  defp static_time, do: [@build_timestamp]
 
   defp path_time(wildcard) do
     wildcard

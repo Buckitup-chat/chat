@@ -66,11 +66,7 @@ defmodule Chat.Data.User.Versioning do
 
   defp archive_and_insert(repo, existing, new_storage) do
     Multi.new()
-    |> Multi.insert(:archive, archive_changeset(existing),
-      on_conflict: :nothing,
-      conflict_target: [:user_hash, :uuid, :sign_hash],
-      allow_stale: true
-    )
+    |> archive_multi_insert(:archive, existing)
     |> Multi.insert(
       :update_main,
       UserStorage.create_changeset(%UserStorage{}, %{
@@ -96,11 +92,7 @@ defmodule Chat.Data.User.Versioning do
 
   defp archive_and_update(repo, existing, new_storage) do
     Multi.new()
-    |> Multi.insert(:archive, archive_changeset(existing),
-      on_conflict: :nothing,
-      conflict_target: [:user_hash, :uuid, :sign_hash],
-      allow_stale: true
-    )
+    |> archive_multi_insert(:archive, existing)
     |> Multi.update(
       :update_main,
       UserStorage.update_changeset(existing, %{
@@ -132,6 +124,17 @@ defmodule Chat.Data.User.Versioning do
         ]
       ],
       where: is_nil(s.owner_timestamp) or s.owner_timestamp < fragment("EXCLUDED.owner_timestamp")
+    )
+  end
+
+  @doc """
+  Inserts an archive changeset into a Multi with correct conflict handling.
+  """
+  def archive_multi_insert(multi, name, storage) do
+    Multi.insert(multi, name, archive_changeset(storage),
+      on_conflict: :nothing,
+      conflict_target: [:user_hash, :uuid, :sign_hash],
+      allow_stale: true
     )
   end
 

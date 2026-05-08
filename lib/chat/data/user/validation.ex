@@ -227,7 +227,7 @@ defmodule Chat.Data.User.Validation do
         existing = fetch_existing_storage(changeset, new_storage)
 
         if existing && new_storage.owner_timestamp > existing.owner_timestamp do
-          Ecto.Multi.insert(multi, :archive_existing, Versioning.archive_changeset(existing))
+          Versioning.archive_multi_insert(multi, :archive_existing, existing)
         else
           multi
         end
@@ -246,7 +246,7 @@ defmodule Chat.Data.User.Validation do
   defp archive_old_version(multi, changeset) do
     case Ecto.Changeset.apply_action(%{changeset | action: :insert}, :insert) do
       {:ok, new_storage} ->
-        Ecto.Multi.insert(multi, :archive_old_version, Versioning.archive_changeset(new_storage))
+        Versioning.archive_multi_insert(multi, :archive_old_version, new_storage)
 
       _ ->
         multi

@@ -112,42 +112,54 @@ This resolves problem #13 from `pq_dialogs.md` (no KDF separation in the wrap st
 
 ### Affected tables
 
-| Table | Field | Current key | After HKDF |
+| Table | Field | Key | Encrypt / MAC |
 |---|---|---|---|
-| `dialog_messages` | `content_b64` | raw SHA3-512 output | `sender_msg_key` (HKDF-derived, 256-bit) |
-| `dialog_messages` | `refs_map_b64` | raw SHA3-512 output | `sender_msg_key` |
-| `dialog_messages_versions` | `content_b64` | raw SHA3-512 output | `sender_msg_key` |
-| `dialog_messages_versions` | `refs_map_b64` | raw SHA3-512 output | `sender_msg_key` |
-| `dialog_message_reactions` | `type_b64` | raw SHA3-512 output | `sender_msg_key` |
-| `dialog_message_reactions` | `reaction_hash` | raw SHA3-512 output (HMAC key) | `sender_msg_key` |
-| `dialog_keys` | `peer_wrapped_msg_key_b64` | KEM shared secret (direct) | `wrap_key` (via HKDF) |
+| `dialog_messages` | `content_b64` | `sender_msg_key` via `hkdf_derive/3` | `aes_gcm_encrypt/2` |
+| `dialog_messages` | `refs_map_b64` | `sender_msg_key` via `hkdf_derive/3` | `aes_gcm_encrypt/2` |
+| `dialog_messages_versions` | `content_b64` | `sender_msg_key` via `hkdf_derive/3` | `aes_gcm_encrypt/2` |
+| `dialog_messages_versions` | `refs_map_b64` | `sender_msg_key` via `hkdf_derive/3` | `aes_gcm_encrypt/2` |
+| `dialog_message_reactions` | `type_b64` | `sender_msg_key` via `hkdf_derive/3` | `aes_gcm_encrypt/2` |
+| `dialog_message_reactions` | `reaction_hash` | `sender_msg_key` via `hkdf_derive/3` | `hmac_sha3_512/2` |
+| `dialog_keys` | `peer_wrapped_msg_key_b64` | `wrap_key` via `hkdf_derive/3` | `aes_gcm_encrypt/2` |
 
-### Reference implementation
+All functions are in `EnigmaPq` (`lib/enigma_pq/enigma_pq.ex`).
+
+### Implementation
+
+Implemented in `EnigmaPq` (`lib/enigma_pq/enigma_pq.ex`):
+
+| Function | Role |
+|---|---|
+| `EnigmaPq.hkdf_extract/2` | HKDF Extract — `HMAC-SHA3-256(key = salt, data = ikm)` |
+| `EnigmaPq.hkdf_expand/2,3` | HKDF Expand — iterative `HMAC-SHA3-256` with counter byte |
+| `EnigmaPq.hkdf_derive/3,4` | Extract-then-expand convenience |
+| `EnigmaPq.hmac_sha3_256/2` | Underlying PRF |
+| `EnigmaPq.hmac_sha3_512/2` | Keyed MAC for `reaction_hash` |
+| `EnigmaPq.aes_gcm_encrypt/2` | AES-256-GCM producing `nonce \|\| ciphertext \|\| tag` |
+| `EnigmaPq.aes_gcm_decrypt/2` | AES-256-GCM decryption, returns plaintext or `:error` |
 
 OTP 28 does not export a dedicated HKDF function. The construction uses `crypto:mac/4`:
 
 ```elixir
-defmodule Chat.Crypto.Hkdf do
-  @hash :sha3_256
-  @hash_len 32
+# EnigmaPq.hkdf_extract/2
+def hkdf_extract(ikm, salt) do
+  :crypto.mac(:hmac, :sha3_256, salt, ikm)
+end
 
-  def extract(ikm, salt) do
-    :crypto.mac(:hmac, @hash, salt, ikm)
-  end
+# EnigmaPq.hkdf_expand/2,3
+def hkdf_expand(prk, info, length \\ 32) do
+  1..ceil(length / 32)
+  |> Enum.reduce({<<>>, <<>>}, fn i, {acc, prev} ->
+    t = :crypto.mac(:hmac, :sha3_256, prk, prev <> info <> <<i::8>>)
+    {acc <> t, t}
+  end)
+  |> elem(0)
+  |> binary_part(0, length)
+end
 
-  def expand(prk, info, length \\ @hash_len) do
-    1..ceil(length / @hash_len)
-    |> Enum.reduce({<<>>, <<>>}, fn i, {acc, prev} ->
-      t = :crypto.mac(:hmac, @hash, prk, prev <> info <> <<i::8>>)
-      {acc <> t, t}
-    end)
-    |> elem(0)
-    |> binary_part(0, length)
-  end
-
-  def derive(ikm, salt, info, length \\ @hash_len) do
-    ikm |> extract(salt) |> expand(info, length)
-  end
+# EnigmaPq.hkdf_derive/3,4
+def hkdf_derive(ikm, salt, info, length \\ 32) do
+  ikm |> hkdf_extract(salt) |> hkdf_expand(info, length)
 end
 ```
 

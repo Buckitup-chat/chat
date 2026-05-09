@@ -105,6 +105,7 @@ A signed deletion is `deleted_flag = true` plus an empty `content_b64`. The empt
 ## Where this touches existing work
 
 - **Carrier row**: [pq_dialogs.md §dialog_messages](../../reqs/pq_dialogs.md) — `content_b64` is the single-blob field.
+- **Encryption**: `EnigmaPq.aes_gcm_encrypt/2` and `EnigmaPq.aes_gcm_decrypt/2` (`lib/enigma_pq/enigma_pq.ex`) — produce and consume the `nonce(12) || ciphertext || tag(16)` blob format.
 - **Out-of-band file storage**: [pq_files.md](../../reqs/pq_files.md) — encrypted chunk storage in PostgreSQL for large files; inline content for small payloads.
 - **Integrity primitive**: [02_integrity.md](./02_integrity.md) — `content_b64` is one of the signed fields like any other.
 

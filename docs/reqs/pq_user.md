@@ -32,14 +32,19 @@ Secret keys never leave the Frontend. If the server is compromised, it holds no 
 
 ### Algorithms
 
-| Purpose | Algorithm | Standard | Library |
+| Purpose | Algorithm | Standard | Implementation |
 |---|---|---|---|
-| Identity hash | SHA3-512 + `0x01` prefix | NIST FIPS 202 | OTP 28 `:crypto` |
-| Signing | ML-DSA-87 | NIST FIPS 204 | OTP 28 `:crypto` |
-| Key encapsulation | ML-KEM-1024 | NIST FIPS 203 | OTP 28 `:crypto` |
-| Contact key exchange | secp256k1 ECDH | SEC 2 | Curvy ~> 0.3 |
-| Symmetric encryption | AES-256-GCM | NIST SP 800-38D | OTP 28 `:crypto` |
-| Secret sharing | Shamir's Secret Sharing | — | KeyX ~> 0.4 |
+| Identity hash | SHA3-512 + `0x01` prefix | NIST FIPS 202 | `EnigmaPq.hash/1` |
+| Signing | ML-DSA-87 | NIST FIPS 204 | `EnigmaPq.sign/2`, `EnigmaPq.verify/3` |
+| Key encapsulation | ML-KEM-1024 | NIST FIPS 203 | `EnigmaPq.encapsulate_secret/1`, `EnigmaPq.decapsulate_secret/2` |
+| Contact key exchange | secp256k1 ECDH | SEC 2 | `Enigma.compute_secret/2` (Curvy) |
+| Symmetric encryption | AES-256-GCM | NIST SP 800-38D | `EnigmaPq.aes_gcm_encrypt/2`, `EnigmaPq.aes_gcm_decrypt/2` |
+| Key derivation | HKDF-SHA3-256 | RFC 5869 | `EnigmaPq.hkdf_derive/3` |
+| HMAC (KDF PRF) | HMAC-SHA3-256 | RFC 2104 | `EnigmaPq.hmac_sha3_256/2` |
+| HMAC (reaction MAC) | HMAC-SHA3-512 | RFC 2104 | `EnigmaPq.hmac_sha3_512/2` |
+| Secret sharing | Shamir's Secret Sharing | — | `Enigma.hide_secret_in_shares/3` (KeyX) |
+
+All PQ primitives live in `lib/enigma_pq/enigma_pq.ex`. Classical primitives remain in `lib/enigma.ex`.
 
 ### Certificate format
 

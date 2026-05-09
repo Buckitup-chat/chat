@@ -145,7 +145,7 @@ CREATE DOMAIN dialog_hash_type AS TEXT
 
 ## Key derivation
 
-Each author derives one `sender_msg_key` per peer. It is the symmetric key for every message that author writes in that dialog. Derivation uses HKDF (RFC 5869) with HMAC-SHA3-256 as the underlying PRF — see [09_symmetric_keys.md](../electric/pq_data_layer/09_symmetric_keys.md) for the full rationale and reference implementation.
+Each author derives one `sender_msg_key` per peer. It is the symmetric key for every message that author writes in that dialog. Derivation uses HKDF (RFC 5869) with HMAC-SHA3-256 as the underlying PRF — see [09_symmetric_keys.md](../electric/pq_data_layer/09_symmetric_keys.md) for the full rationale. Implementation: `EnigmaPq.hkdf_derive/3` (`lib/enigma_pq/enigma_pq.ex`).
 
 ```
 IKM  = sign_skey || kem_skey || contact_skey || peer_user_hash
@@ -166,13 +166,13 @@ Rationale:
 - **Domain separation salt** `"buckitup/dialog-mk/v1"` prevents collisions with future derivations (rooms, groups, subchannels).
 - **Peer binding by `peer_user_hash`** — itself `SHA3-512(peer_sign_pkey)`, so transitively bound to peer's signing identity.
 
-Symmetric encryption uses AES-256-GCM with `sender_msg_key`; per-message nonce is fresh random 12 bytes prepended to the ciphertext in the single `content_b64` blob.
+Symmetric encryption uses AES-256-GCM with `sender_msg_key`; per-message nonce is fresh random 12 bytes prepended to the ciphertext in the single `content_b64` blob. Implementation: `EnigmaPq.aes_gcm_encrypt/2` and `EnigmaPq.aes_gcm_decrypt/2` (`lib/enigma_pq/enigma_pq.ex`).
 
 ### Reaction encryption
 
 Emoji reactions use `sender_msg_key` directly — no subkey derivation. Receipts (`delivered` / `read`) are split into a separate unencrypted table (`dialog_message_receipts`), so the encrypted reaction table only handles user-initiated emoji with a richer plaintext space.
 
-`reaction_hash` is a **keyed MAC** under `sender_msg_key`. Because only participants know the key, an observer cannot brute-force `type_plaintext` by recomputing hashes over a small enumerable set. `type_b64` is encrypted under the same `sender_msg_key` with a fresh random 12-byte AES-GCM nonce.
+`reaction_hash` is a **keyed MAC** under `sender_msg_key` (implementation: `EnigmaPq.hmac_sha3_512/2`). Because only participants know the key, an observer cannot brute-force `type_plaintext` by recomputing hashes over a small enumerable set. `type_b64` is encrypted under the same `sender_msg_key` with a fresh random 12-byte AES-GCM nonce (implementation: `EnigmaPq.aes_gcm_encrypt/2`).
 
 ```
 REACTION ENCRYPTION & HASHING
@@ -256,7 +256,7 @@ verify:   recompute reaction_hash from decrypted type_plaintext, compare with ro
 
 ## Key wrapping
 
-Both the author and the peer need to read messages. `sender_msg_key` is wrapped for the peer and published in `dialog_keys`:
+Both the author and the peer need to read messages. `sender_msg_key` is wrapped for the peer and published in `dialog_keys`. Implementation: `EnigmaPq.encapsulate_secret/1`, `EnigmaPq.decapsulate_secret/2`, `EnigmaPq.hkdf_derive/3`, `EnigmaPq.aes_gcm_encrypt/2` (`lib/enigma_pq/enigma_pq.ex`).
 
 - **Peer-wrap** — KEM-encapsulated to the peer's `crypt_pkey`. Lets the peer read.
 - **Author reads own messages** by re-deriving `sender_msg_key` deterministically from private keys (no self-wrap column needed).

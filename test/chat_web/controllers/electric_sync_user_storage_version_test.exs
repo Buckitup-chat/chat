@@ -46,12 +46,25 @@ defmodule ChatWeb.ElectricSyncUserStorageVersionTest do
       sign_hash3 = generate_sign_hash()
 
       insert_version!(card1.user_hash, uuid_alice, sign_hash: sign_hash1, owner_timestamp: 1000)
-      insert_version!(card1.user_hash, uuid_alice, sign_hash: sign_hash2, parent_sign_hash: sign_hash1, owner_timestamp: 2000)
-      insert_version!(card1.user_hash, uuid_alice, sign_hash: sign_hash3, parent_sign_hash: sign_hash2, owner_timestamp: 3000)
+
+      insert_version!(card1.user_hash, uuid_alice,
+        sign_hash: sign_hash2,
+        parent_sign_hash: sign_hash1,
+        owner_timestamp: 2000
+      )
+
+      insert_version!(card1.user_hash, uuid_alice,
+        sign_hash: sign_hash3,
+        parent_sign_hash: sign_hash2,
+        owner_timestamp: 3000
+      )
+
       insert_version!(card2.user_hash, uuid_bob)
 
       user_hash_hex = Base.encode16(card1.user_hash, case: :lower)
-      conn = get(conn, "/electric/v1/user_storage_version/#{user_hash_hex}/#{uuid_alice}?offset=-1")
+
+      conn =
+        get(conn, "/electric/v1/user_storage_version/#{user_hash_hex}/#{uuid_alice}?offset=-1")
 
       assert conn.status == 200
     end
@@ -71,11 +84,14 @@ defmodule ChatWeb.ElectricSyncUserStorageVersionTest do
       assert is_integer(version.owner_timestamp)
       assert is_binary(version.sign_b64)
 
-      retrieved = Repo.one(
-        from(v in UserStorageVersion,
-          where: v.user_hash == ^card.user_hash and v.uuid == ^uuid and v.sign_hash == ^version.sign_hash
+      retrieved =
+        Repo.one(
+          from(v in UserStorageVersion,
+            where:
+              v.user_hash == ^card.user_hash and v.uuid == ^uuid and
+                v.sign_hash == ^version.sign_hash
+          )
         )
-      )
 
       assert retrieved.user_hash == version.user_hash
       assert retrieved.uuid == version.uuid
@@ -89,7 +105,13 @@ defmodule ChatWeb.ElectricSyncUserStorageVersionTest do
       sign_hash2 = generate_sign_hash()
 
       v1 = insert_version!(card.user_hash, uuid, sign_hash: sign_hash1, owner_timestamp: 1000)
-      v2 = insert_version!(card.user_hash, uuid, sign_hash: sign_hash2, parent_sign_hash: sign_hash1, owner_timestamp: 2000)
+
+      v2 =
+        insert_version!(card.user_hash, uuid,
+          sign_hash: sign_hash2,
+          parent_sign_hash: sign_hash1,
+          owner_timestamp: 2000
+        )
 
       assert v1.parent_sign_hash == nil
       assert v2.parent_sign_hash == sign_hash1

@@ -57,14 +57,24 @@ defmodule Chat.Data.UserDataTest do
       identity = User.generate_pq_identity("SoftDelete")
       existing = signed_user_card(identity)
 
-      softdelete = resign_card(existing, identity, deleted_flag: true, owner_timestamp: existing.owner_timestamp + 1)
+      softdelete =
+        resign_card(existing, identity,
+          deleted_flag: true,
+          owner_timestamp: existing.owner_timestamp + 1
+        )
+
       softdelete_changeset = Validation.validate_user_card_update(existing, softdelete)
 
       assert softdelete_changeset.valid?, inspect(softdelete_changeset.errors)
       {:ok, softdeleted_card} = Ecto.Changeset.apply_action(softdelete_changeset, :validate)
       assert softdeleted_card.deleted_flag == true
 
-      undelete = resign_card(softdeleted_card, identity, deleted_flag: false, owner_timestamp: softdeleted_card.owner_timestamp + 1)
+      undelete =
+        resign_card(softdeleted_card, identity,
+          deleted_flag: false,
+          owner_timestamp: softdeleted_card.owner_timestamp + 1
+        )
+
       undelete_changeset = Validation.validate_user_card_update(softdeleted_card, undelete)
 
       assert undelete_changeset.valid?, inspect(undelete_changeset.errors)
@@ -209,7 +219,8 @@ defmodule Chat.Data.UserDataTest do
       card_struct = signed_user_card(identity)
       Repo.insert!(card_struct)
 
-      attrs = signed_storage_attrs(identity, card_struct.user_hash, value_b64: "some_encrypted_blob")
+      attrs =
+        signed_storage_attrs(identity, card_struct.user_hash, value_b64: "some_encrypted_blob")
 
       changeset = UserStorage.create_changeset(%UserStorage{}, attrs)
       assert changeset.valid?, inspect(changeset.errors)
@@ -231,7 +242,9 @@ defmodule Chat.Data.UserDataTest do
 
       sign_b64 = Integrity.signature_payload(storage) |> EnigmaPq.sign(identity.sign_skey)
       sign_hash_binary = :crypto.hash(:sha3_512, sign_b64)
-      sign_hash = Consts.user_storage_sign_prefix() <> Base.encode16(sign_hash_binary, case: :lower)
+
+      sign_hash =
+        Consts.user_storage_sign_prefix() <> Base.encode16(sign_hash_binary, case: :lower)
 
       Map.from_struct(storage) |> Map.merge(%{sign_b64: sign_b64, sign_hash: sign_hash})
     end

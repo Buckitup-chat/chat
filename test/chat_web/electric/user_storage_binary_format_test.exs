@@ -135,7 +135,10 @@ defmodule ChatWeb.Electric.UserStorageBinaryFormatTest do
   end
 
   describe "sync response format from Electric" do
-    test "examine Electric JSON response format for bytea", %{user_hash: user_hash, sign_skey: sign_skey} do
+    test "examine Electric JSON response format for bytea", %{
+      user_hash: user_hash,
+      sign_skey: sign_skey
+    } do
       # Insert test data
       storage = build_signed_storage(user_hash, @test_uuid, @test_binary, sign_skey)
 
@@ -163,7 +166,11 @@ defmodule ChatWeb.Electric.UserStorageBinaryFormatTest do
       assert decoded_binary == @test_binary
     end
 
-    test "verify Electric SSE stream format", %{user_hash: user_hash, uuid: uuid, sign_skey: sign_skey} do
+    test "verify Electric SSE stream format", %{
+      user_hash: user_hash,
+      uuid: uuid,
+      sign_skey: sign_skey
+    } do
       # Insert test data
       storage = build_signed_storage(user_hash, uuid, @test_binary, sign_skey)
 

@@ -76,7 +76,9 @@ defmodule Chat.Time do
 
   defp set_system_time(string_time) do
     case Application.get_env(:chat, :set_time, false) do
-      true -> set_os_clock(string_time)
+      true ->
+        set_os_clock(string_time)
+
       false ->
         Logger.debug(["Set clock to ", string_time, " UTC"])
         :ok

@@ -98,26 +98,43 @@ defmodule Chat.Data.UserStorageVersioningTest do
       identity: identity
     } do
       uuid = Ecto.UUID.generate()
-      storage1 = insert_storage!(signed_storage(identity, user_hash, %{uuid: uuid, value_b64: "version 1"}))
+
+      storage1 =
+        insert_storage!(
+          signed_storage(identity, user_hash, %{uuid: uuid, value_b64: "version 1"})
+        )
+
       archive_storage!(storage1)
 
-      v2 = signed_storage(identity, user_hash, %{
-        uuid: uuid,
-        value_b64: "version 2",
-        parent_sign_hash: storage1.sign_hash,
-        owner_timestamp: storage1.owner_timestamp + 10
-      })
+      v2 =
+        signed_storage(identity, user_hash, %{
+          uuid: uuid,
+          value_b64: "version 2",
+          parent_sign_hash: storage1.sign_hash,
+          owner_timestamp: storage1.owner_timestamp + 10
+        })
 
       storage2 =
         storage1
-        |> UserStorage.update_changeset(Map.from_struct(v2) |> Map.take(~w(value_b64 deleted_flag parent_sign_hash owner_timestamp sign_b64 sign_hash)a))
+        |> UserStorage.update_changeset(
+          Map.from_struct(v2)
+          |> Map.take(
+            ~w(value_b64 deleted_flag parent_sign_hash owner_timestamp sign_b64 sign_hash)a
+          )
+        )
         |> Repo.update!()
 
       assert storage2.value_b64 == "version 2"
       assert storage2.owner_timestamp == storage1.owner_timestamp + 10
       assert storage2.parent_sign_hash == storage1.sign_hash
 
-      version = Repo.get_by(UserStorageVersion, user_hash: user_hash, uuid: uuid, sign_hash: storage1.sign_hash)
+      version =
+        Repo.get_by(UserStorageVersion,
+          user_hash: user_hash,
+          uuid: uuid,
+          sign_hash: storage1.sign_hash
+        )
+
       assert version != nil
       assert version.value_b64 == "version 1"
       assert version.owner_timestamp == storage1.owner_timestamp
@@ -309,17 +326,20 @@ defmodule Chat.Data.UserStorageVersioningTest do
       identity: identity
     } do
       uuid = Ecto.UUID.generate()
-      inserted = insert_storage!(signed_storage(identity, user_hash, %{uuid: uuid, value_b64: "v1"}))
+
+      inserted =
+        insert_storage!(signed_storage(identity, user_hash, %{uuid: uuid, value_b64: "v1"}))
 
       # ShapeWriter sync already archived this version
       archive_storage!(inserted)
 
       # HTTP ingest updates the same record — tries to archive existing again
-      storage2 = signed_storage(identity, user_hash, %{
-        uuid: uuid,
-        value_b64: "v2",
-        owner_timestamp: inserted.owner_timestamp + 10
-      })
+      storage2 =
+        signed_storage(identity, user_hash, %{
+          uuid: uuid,
+          value_b64: "v2",
+          owner_timestamp: inserted.owner_timestamp + 10
+        })
 
       changeset = newer_update_changeset(inserted, storage2)
 
@@ -337,17 +357,20 @@ defmodule Chat.Data.UserStorageVersioningTest do
       uuid = Ecto.UUID.generate()
       timestamp = System.system_time(:second) + 100
 
-      insert_storage!(signed_storage(identity, user_hash, %{
-        uuid: uuid,
-        value_b64: "newer",
-        owner_timestamp: timestamp
-      }))
+      insert_storage!(
+        signed_storage(identity, user_hash, %{
+          uuid: uuid,
+          value_b64: "newer",
+          owner_timestamp: timestamp
+        })
+      )
 
-      older = signed_storage(identity, user_hash, %{
-        uuid: uuid,
-        value_b64: "older",
-        owner_timestamp: timestamp - 50
-      })
+      older =
+        signed_storage(identity, user_hash, %{
+          uuid: uuid,
+          value_b64: "older",
+          owner_timestamp: timestamp - 50
+        })
 
       archive_storage_from_signed!(older)
 
@@ -360,21 +383,26 @@ defmodule Chat.Data.UserStorageVersioningTest do
       storage1 = insert_storage!(signed_storage(identity, user_hash, %{uuid: uuid}))
       archive_storage!(storage1)
 
-      delete_version = signed_storage(identity, user_hash, %{
-        uuid: uuid,
-        deleted_flag: true,
-        parent_sign_hash: storage1.sign_hash,
-        owner_timestamp: storage1.owner_timestamp + 10
-      })
+      delete_version =
+        signed_storage(identity, user_hash, %{
+          uuid: uuid,
+          deleted_flag: true,
+          parent_sign_hash: storage1.sign_hash,
+          owner_timestamp: storage1.owner_timestamp + 10
+        })
 
       storage2 =
         storage1
-        |> UserStorage.update_changeset(Map.from_struct(delete_version) |> Map.take(~w(deleted_flag parent_sign_hash owner_timestamp sign_b64 sign_hash)a))
+        |> UserStorage.update_changeset(
+          Map.from_struct(delete_version)
+          |> Map.take(~w(deleted_flag parent_sign_hash owner_timestamp sign_b64 sign_hash)a)
+        )
         |> Repo.update!()
 
       assert storage2.deleted_flag == true
       assert storage2.owner_timestamp == storage1.owner_timestamp + 10
     end
+
     defp insert_storage!(storage) do
       %UserStorage{}
       |> UserStorage.create_changeset(Map.from_struct(storage))

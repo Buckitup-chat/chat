@@ -13,14 +13,14 @@ One row per completed file. Created only after all chunks are uploaded and verif
 | `file_id` | TEXT, PK | `"f_" + UUIDv7` |
 | `uploader_hash` | TEXT, NOT NULL | FK-like → user_cards |
 | `total_size` | BIGINT, NOT NULL | Plaintext file size in bytes |
-| `chunk_size` | INTEGER, NOT NULL, DEFAULT 1048576 | Bytes per chunk (1 MB) |
+| `chunk_size` | INTEGER, NOT NULL, DEFAULT 4194304 | Bytes per chunk (4 MB) |
 | `chunk_count` | INTEGER, NOT NULL | Total number of chunks |
-| `chunk_sign_hashes` | BYTEA[], NOT NULL | Array of `SHA3-256(chunk.sign_b64)` for each chunk, ordered by `chunk_index` |
+| `chunk_sign_hashes` | BYTEA[], NOT NULL | Array of `SHA3-512(chunk.sign_b64)` for each chunk, ordered by `chunk_index` |
 | `owner_timestamp` | BIGINT, NOT NULL | Monotonic counter |
 | `deleted_flag` | BOOLEAN, NOT NULL, DEFAULT false | Soft delete |
 | `sign_b64` | BYTEA, NOT NULL | ML-DSA-87 signature over all other fields |
 
-**Verification**: for each chunk, compute `SHA3-256(chunk.sign_b64)` and compare against `chunk_sign_hashes[chunk_index]`. Since each chunk's `sign_b64` covers the chunk's data hash, this transitively binds chunk data integrity to the `files` manifest signature.
+**Verification**: for each chunk, compute `SHA3-512(chunk.sign_b64)` and compare against `chunk_sign_hashes[chunk_index]`. Since each chunk's `sign_b64` covers the chunk's data hash, this transitively binds chunk data integrity to the `files` manifest signature.
 
 ### 1.2 `file_chunks` (Electric-synced)
 
@@ -30,14 +30,14 @@ One row per chunk. Contains the actual encrypted blob data. Uploaded via the sta
 |---|---|---|
 | `file_id` | TEXT, NOT NULL | Parent file reference |
 | `chunk_index` | INTEGER, NOT NULL | 0-based position |
-| `data_b64` | BYTEA, NOT NULL | Encrypted chunk blob (~1 MB). **STORAGE EXTERNAL** |
+| `data_b64` | BYTEA, NOT NULL | Encrypted chunk blob (~4 MB). **STORAGE EXTERNAL** |
 | `size` | INTEGER, NOT NULL | Encrypted chunk byte size |
 | `uploader_hash` | TEXT, NOT NULL | FK-like → user_cards |
 | `owner_timestamp` | BIGINT, NOT NULL | Monotonic counter |
-| `sign_b64` | BYTEA, NOT NULL | Signature over `(file_id, chunk_index, SHA3-256(data_b64), size, uploader_hash, owner_timestamp)` |
+| `sign_b64` | BYTEA, NOT NULL | Signature over `(file_id, chunk_index, SHA3-512(data_b64), size, uploader_hash, owner_timestamp)` |
 | | PK | `(file_id, chunk_index)` |
 
-The `sign_b64` covers a **hash** of `data_b64`, not `data_b64` itself — the signature payload includes `SHA3-256(data_b64)` so verification does not require re-reading the blob. This hash is what `files.chunk_sign_hashes` binds to.
+The `sign_b64` covers a **hash** of `data_b64`, not `data_b64` itself — the signature payload includes `SHA3-512(data_b64)` so verification does not require re-reading the blob. This hash is what `files.chunk_sign_hashes` binds to.
 
 **Sync filtering** (in ShapeWriter): on receiving a `file_chunk` via Electric, skip it if:
 - No matching `files` row exists for this `file_id`, OR
@@ -53,7 +53,7 @@ Tracks uploaded chunks before the signed `files` manifest arrives. Populated as 
 |---|---|----------------------------------|
 | `file_id` | TEXT | Client-provided `"f_" + UUIDv7` |
 | `chunk_index` | INTEGER | Position in file                 |
-| `chunk_sign_hash` | BYTEA, NOT NULL | `SHA3-256(chunk.sign_b64)` — matches `files.chunk_sign_hashes` for GC verification |
+| `chunk_sign_hash` | BYTEA, NOT NULL | `SHA3-512(chunk.sign_b64)` — matches `files.chunk_sign_hashes` for GC verification |
 | `uploader_hash` | TEXT, NOT NULL | Who uploaded this chunk          |
 | `size` | INTEGER, NOT NULL | Blob byte size                   |
 | `updated_at` | BIGINT, NOT NULL | Unix seconds (from TimeKeeper)   |
@@ -79,7 +79,7 @@ All encryption/decryption happens client-side (browser, Web Crypto API).
 encrypted_chunk = AES-256-GCM(enc_secret, nonce=pad(chunk_index, 12), plaintext_chunk)
 ```
 
-Nonce safety: `enc_secret` is unique per file (no reuse across files), `chunk_index` is unique within file (no reuse within file). The 2^32 nonce space supports files up to ~4 TB per key.
+Nonce safety: `enc_secret` is unique per file (no reuse across files), `chunk_index` is unique within file (no reuse within file). The 2^32 nonce space supports files up to ~16 TB per key.
 
 ## 3. Content Type
 
@@ -97,7 +97,7 @@ Client                              Device
   │                                    │
   │  encrypt chunk 0 client-side       │
   │  sign chunk (file_id, index,       │
-  │    SHA3-256(data_b64), size,       │
+  │    SHA3-512(data_b64), size,       │
   │    uploader, owner_timestamp)      │
   │─── POST /electric/v1/ingest ──────>│  file_chunks insert, data_b64 as base64
   │    device: verify sign_b64         │
@@ -180,7 +180,7 @@ ALTER TABLE file_chunks ALTER COLUMN data_b64 SET STORAGE EXTERNAL;
 
 ### 8.2 AUTOVACUUM Tuning
 
-`file_chunks` has write-once semantics: chunks are inserted, never updated, eventually deleted. But each dead row carries ~1 MB of TOAST data — even a few dead rows mean significant bloat on a 4 GB RAM device.
+`file_chunks` has write-once semantics: chunks are inserted, never updated, eventually deleted. But each dead row carries ~4 MB of TOAST data — even a few dead rows mean significant bloat on a 4 GB RAM device.
 
 ```sql
 ALTER TABLE file_chunks SET (
@@ -192,16 +192,16 @@ ALTER TABLE file_chunks SET (
 
 | Setting | Value | Default | Rationale |
 |---|---|---|---|
-| `vacuum_scale_factor` | 0.01 (1%) | 0.20 (20%) | Trigger vacuum early — each dead row is ~1 MB of TOAST bloat |
+| `vacuum_scale_factor` | 0.01 (1%) | 0.20 (20%) | Trigger vacuum early — each dead row is ~4 MB of TOAST bloat |
 | `analyze_scale_factor` | 0.02 (2%) | 0.10 (10%) | Keep planner statistics fresh as chunks are added/removed |
 | `vacuum_cost_delay` | 40 ms | 2 ms | Reduce I/O pressure on USB/SD storage, spread vacuum cost over longer periods |
 
 ### 8.3 WAL Considerations
 
-`file_chunks` is in the Electric publication — 1 MB blob INSERTs go through WAL and logical replication:
+`file_chunks` is in the Electric publication — 4 MB blob INSERTs go through WAL and logical replication:
 
 - **2-3x write amplification** per chunk (WAL + heap + possible full-page write)
-- 100 MB file (100 chunks) → ~200-300 MB WAL burst
+- 100 MB file (25 chunks) → ~200-300 MB WAL burst
 - `max_wal_size = 512MB` (doubled from 256 MB to accommodate concurrent file uploads)
 - `wal_compression = on` is already enabled but provides no benefit for encrypted (high-entropy) data
 
@@ -210,53 +210,56 @@ ALTER TABLE file_chunks SET (
 ### 9.1 Device Memory
 - **Total RAM**: 4 GB, shared between PostgreSQL and the Elixir/Erlang application
 - Chunk size must be small enough that the device can buffer a chunk during transfer (device does not encrypt/decrypt — it stores and serves opaque blobs)
+- At 4 MB per chunk, the device needs ~4-8 MB to buffer a chunk during ingest — well within budget
 
-### 8.2 Storage
+### 9.2 Storage
 - PostgreSQL stores all chunk data in TOAST tables (no filesystem sharding needed)
 - FAT directory limitations are irrelevant — all data is inside the database
 
 ## 9. Cryptographic Constraints
 
-### 9.1 AES-256-GCM
+### 9.3 AES-256-GCM
 - **Per-key data limit**: ~64 GB (2^32 blocks x 16 bytes)
 - **No streaming mode**: GCM requires the entire plaintext in memory for encryption/decryption (authentication tag is computed over the full message)
 - **Nonce**: 12 bytes (96 bits), must be unique per encryption under the same key
 - **Auth tag**: 16 bytes per chunk
 
-### 9.2 Nonce Exhaustion
+### 9.4 Nonce Exhaustion
 - With **random 96-bit nonces**, collision probability becomes meaningful after ~2^32 messages per key (birthday bound)
-- At 1 MB chunks, 2^32 messages = ~4 TB per key before nonce collision risk
+- At 4 MB chunks, 2^32 messages = ~16 TB per key before nonce collision risk
 - **Deterministic nonce scheme** (e.g., chunk index) eliminates collision risk but requires careful design to avoid reuse across different files under the same key
 
-### 9.3 Client-Side Encryption
+### 9.5 Client-Side Encryption
 - All encryption/decryption happens **exclusively in the browser** (Web Crypto API / SubtleCrypto)
 - The device (server) never sees plaintext — it stores, serves, and transfers opaque encrypted chunks
-- Browser memory is constrained — large ArrayBuffers cause pressure
+- At 4 MB chunks, browser needs ~10 MB per encryption (plaintext + ciphertext + overhead) — safe on all modern devices including mobile
 - SubtleCrypto does not natively support streaming AES-GCM
 
 ## 10. Chunk Size Decision
 
-### 10.1 Chosen Size: 1 MB
+### 10.1 Chosen Size: 4 MB
 
 **Rationale**:
-- Fits comfortably in browser memory for AES-GCM (full plaintext required)
+- Fits comfortably in browser memory for AES-GCM (~10 MB working set per chunk)
+- 4x fewer rows than 1 MB — reduces TOAST entries, row overhead, and `chunk_sign_hashes` array size
+- Allows SHA3-512 for hashing (64 bytes per entry) while keeping manifest size reasonable: 1 TB file = 256K entries × 64 bytes = 16 MB
+- Unifies hashing with existing `EnigmaPq.hash/1` (SHA3-512) — no separate hash function needed
 - Device only buffers opaque encrypted blobs during transfer — no crypto overhead on device
-- Good resumability on unreliable connections
-- Reasonable TOAST overhead per row (~1 MB per TOAST entry)
+- Acceptable resumability on LAN/WiFi connections (4 MB retry on failure)
 
 ### 10.2 Trade-offs Considered
 
 | Alternative | Pro | Con |
 |---|---|---|
-| 64-256 KB | Better resume granularity | Multiplies row count and TOAST entries; 1 GB file at 64 KB = ~16K rows |
-| 4-8 MB | Less row overhead | Spikes browser memory on low-end devices; worse resumability; higher WAL amplification per write |
-| 1 MB (chosen) | Balanced across all constraints | ~4.2M rows for a 4 TB file — large but manageable in PostgreSQL |
+| 1 MB | Fine-grained resume; smaller WAL writes | 4x more rows; forces SHA3-256 to keep manifest size down; needs separate hash function |
+| 4 MB (chosen) | Balanced — enables SHA3-512, reasonable row count | 4 MB retry on resume; ~8-12 MB WAL per write |
+| 8-16 MB | Smallest manifests | Memory pressure on low-end mobile; large WAL bursts; poor resumability |
 
 ## 11. Resolved Questions
 
 - **Unsigned budget**: no explicit budget — GC (§6, trigger 2) clears stale unsigned data after 2 days.
 - **Max file size**: 1 TB hard cap.
 - **Partial file availability**: client's call — the client decides when to start downloading/decrypting. For videos, streaming before all chunks are synced makes sense.
-- **WAL sizing**: increase `max_wal_size` to 512 MB (double the current 256 MB) to accommodate concurrent file uploads.
-
+- **WAL sizing**: `max_wal_size = 512 MB` to accommodate concurrent 4 MB chunk uploads with write amplification.
+- **Hash algorithm**: SHA3-512 — matches `EnigmaPq.hash/1`, same Keccak family as ML-DSA-87's internal SHAKE-256. 64-byte output is acceptable at 4 MB chunk size (1 TB = 256K entries = 16 MB manifest).
 - **Electric chunk re-delivery**: when `file_chunks` arrive before the `files` manifest, the device skips them. On `files` manifest arrival, if any chunks are missing, fetch them via a targeted Electric shape with a WHERE filter (`file_id = $1 AND chunk_index IN (...)`) — no full re-sync needed.

@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
+### Added
+
+- Post-quantum symmetric encryption primitives
+
+## 2026-05-09_8efbd61\_\_\_2026-05-09_c5fc6a57
+
 ### Changed
 
 - Dialyzer fixes
@@ -19,6 +25,9 @@ straightforward as possible.
 ### Fixed
 
 - Electric user shortcodes generation
+- Time slipping on start (certificate error)
+- User storage versioning
+- [platform] Electric: handle time slips
 
 ## 2026-05-02_6c207f8\_\_\_2026-05-02_8d051c83
 

@@ -139,23 +139,25 @@ CREATE DOMAIN dialog_hash_type AS TEXT
 
 ## Key derivation
 
-Each author derives one `sender_msg_key` per peer. It is the symmetric key for every message that author writes in that dialog.
+Each author derives one `sender_msg_key` per peer. It is the symmetric key for every message that author writes in that dialog. Derivation uses HKDF (RFC 5869) with HMAC-SHA3-256 as the underlying PRF — see [09_symmetric_keys.md](../electric/pq_data_layer/09_symmetric_keys.md) for the full rationale and reference implementation.
 
 ```
-sender_msg_key = SHA3-512(
-    "buckitup/dialog-mk/v1"
- || sign_skey
- || kem_skey
- || contact_skey
- || peer_user_hash
-)
+IKM  = sign_skey || kem_skey || contact_skey || peer_user_hash
+salt = "buckitup/dialog-mk/v1"
+
+PRK            = HMAC-SHA3-256(key = salt, data = IKM)                    # Extract
+sender_msg_key = HMAC-SHA3-256(key = PRK,  data = "dialog-mk" || 0x01)   # Expand
 ```
+
+Output: 256-bit key used for all AES-256-GCM encryption and HMAC-SHA3-512 MAC operations in this dialog direction.
 
 Rationale:
 
+- **Formal KDF** — HKDF has a security proof in the standard model (Krawczyk, 2010). Raw `SHA3(secrets)` does not.
+- **Explicit output length** — `L=32` means exactly 256 bits. No ambiguous truncation of a 512-bit hash.
 - **Hybrid posture** (per `HYBRID.md`): `kem_skey` is ML-KEM-1024, `contact_skey` is secp256k1. A break in either family alone does not compromise the secret.
 - **`sign_skey` is folded in** to bind derivation to the full identity. `sign_skey` never leaves the frontend, same as the other skeys.
-- **Domain separation tag** `"buckitup/dialog-mk/v1"` prevents collisions with future derivations (rooms, groups, subchannels).
+- **Domain separation salt** `"buckitup/dialog-mk/v1"` prevents collisions with future derivations (rooms, groups, subchannels).
 - **Peer binding by `peer_user_hash`** — itself `SHA3-512(peer_sign_pkey)`, so transitively bound to peer's signing identity.
 
 Symmetric encryption uses AES-256-GCM with `sender_msg_key`; per-message nonce is fresh random 12 bytes prepended to the ciphertext in the single `content_b64` blob.
@@ -260,18 +262,29 @@ SENDER (wrap, once per dialog)
            peer.crypt_pkey       (from peer's user_cards row)
 
   ┌─────────────────────────────────────────────────────────┐
-  │  step 1                                                 │
+  │  step 1 — KEM encapsulation                             │
   │     ML-KEM-1024.Encap(peer.crypt_pkey)                  │
   │            │                                            │
-  │            └──►  ( peer_kem_wrap_key , wrap_key )       │
-  │                    KEM ciphertext     ephemeral AES key │
+  │            └──►  ( peer_kem_wrap_key , shared_secret )  │
+  │                    KEM ciphertext     32-byte SS        │
   └────────────────────┬──────────────────────────┬─────────┘
                        │                          │
                        │           ┌──────────────┘
-                       │           │
                        │           ▼
                        │   ┌─────────────────────────────────┐
-                       │   │  step 2                         │
+                       │   │  step 2 — KDF                   │
+                       │   │     wrap_key = HKDF-SHA3-256(   │
+                       │   │        IKM  = shared_secret,    │
+                       │   │        salt = "buckitup/dialog  │
+                       │   │               -wrap/v1",        │
+                       │   │        info = "wrap",           │
+                       │   │        L    = 32)               │
+                       │   └────────────────────┬────────────┘
+                       │                        │
+                       │           ┌────────────┘
+                       │           ▼
+                       │   ┌─────────────────────────────────┐
+                       │   │  step 3 — wrap                  │
                        │   │     AES-256-GCM.encrypt(        │
                        │   │        key       = wrap_key,    │
                        │   │        plaintext = sender_msg_key) │
@@ -295,15 +308,27 @@ PEER (unwrap, on first read)
            own.crypt_skey         (peer's private KEM key, never leaves device)
 
   ┌─────────────────────────────────────────────────────────┐
-  │  step 1                                                 │
+  │  step 1 — KEM decapsulation                             │
   │     ML-KEM-1024.Decap(own.crypt_skey, peer_kem_wrap_key)│
   │            │                                            │
-  │            └──►  wrap_key       (same AES key sender used) │
+  │            └──►  shared_secret    (same 32-byte SS)     │
   └────────────────────┬────────────────────────────────────┘
                        │
                        ▼
   ┌─────────────────────────────────────────────────────────┐
-  │  step 2                                                 │
+  │  step 2 — KDF                                           │
+  │     wrap_key = HKDF-SHA3-256(                           │
+  │        IKM  = shared_secret,                            │
+  │        salt = "buckitup/dialog-wrap/v1",                │
+  │        info = "wrap",                                   │
+  │        L    = 32)                                       │
+  │            │                                            │
+  │            └──►  wrap_key       (same key sender used)  │
+  └────────────────────┬────────────────────────────────────┘
+                       │
+                       ▼
+  ┌─────────────────────────────────────────────────────────┐
+  │  step 3 — unwrap                                        │
   │     AES-256-GCM.decrypt(                                │
   │        key        = wrap_key,                           │
   │        ciphertext = peer_wrapped_msg_key)               │
@@ -317,28 +342,32 @@ PEER (unwrap, on first read)
 Compact form:
 
 ```
-wrap:    (peer_kem_wrap_key, wrap_key) = ML-KEM-1024.Encap(peer.crypt_pkey)
-         peer_wrapped_msg_key          = AES-256-GCM.encrypt(wrap_key, sender_msg_key)
+wrap:    (peer_kem_wrap_key, shared_secret) = ML-KEM-1024.Encap(peer.crypt_pkey)
+         wrap_key                           = HKDF-SHA3-256(shared_secret,
+                                                salt = "buckitup/dialog-wrap/v1",
+                                                info = "wrap", L = 32)
+         peer_wrapped_msg_key               = AES-256-GCM.encrypt(wrap_key, sender_msg_key)
          publish (peer_kem_wrap_key_b64, peer_wrapped_msg_key_b64)
 
-unwrap:  wrap_key       = ML-KEM-1024.Decap(own.crypt_skey, peer_kem_wrap_key)
+unwrap:  shared_secret  = ML-KEM-1024.Decap(own.crypt_skey, peer_kem_wrap_key)
+         wrap_key       = HKDF-SHA3-256(shared_secret,
+                              salt = "buckitup/dialog-wrap/v1",
+                              info = "wrap", L = 32)
          sender_msg_key = AES-256-GCM.decrypt(wrap_key, peer_wrapped_msg_key)
 ```
 
-Note that `sender_msg_key` is **never** an input to Encap — Encap operates only on the peer's KEM public key. The KEM produces an ephemeral `wrap_key`; that ephemeral key is what actually encrypts `sender_msg_key`.
+Note that `sender_msg_key` is **never** an input to Encap — Encap operates only on the peer's KEM public key. The KEM produces an ephemeral shared secret; that secret is run through HKDF to derive `wrap_key`, which actually encrypts `sender_msg_key`.
 
 ### AES / construction limitations
 
 The wrap is hand-rolled rather than a standardized AEAD-with-KEM construction (HPKE, KEM-DEM). Known trade-offs to acknowledge explicitly:
 
-- **No KDF separation.** The ML-KEM-1024 shared secret is used **directly** as the AES-256-GCM `wrap_key`. A proper construction (HPKE-style) would run the shared secret through HKDF with a context string to derive independent keys for encryption, authentication, and any future uses. Absent that, the KEM output is single-purpose by convention only; any future reuse of the same `wrap_key` for a second purpose would break the security argument.
 - **AES-GCM nonce is catastrophic under key reuse.** GCM loses both confidentiality *and* authenticity if a `(key, nonce)` pair is ever reused. Two separate risks apply here:
-  - **Wrap step (`peer_wrapped_msg_key`).** `wrap_key` is ephemeral — one fresh value per Encap call — so a fixed nonce (e.g., all-zero 12 bytes) is safe for the single wrap operation under it. A second encryption under the same `wrap_key`, even with a different nonce, is out of scope by construction and MUST NOT be introduced later.
+  - **Wrap step (`peer_wrapped_msg_key`).** `wrap_key` is derived from an ephemeral shared secret — one fresh value per Encap call — so a fixed nonce (e.g., all-zero 12 bytes) is safe for the single wrap operation under it. A second encryption under the same `wrap_key`, even with a different nonce, is out of scope by construction and MUST NOT be introduced later.
   - **Content step (`content_b64`).** `sender_msg_key` is deterministic across every device the author holds and across the lifetime of the dialog. Nonces MUST be fresh-random 96-bit values; counter-based nonces are forbidden because two offline devices would collide. The birthday bound gives ≈2⁻³² collision probability after ≈2⁴⁰ messages authored by one user in one dialog — well above realistic traffic, but documented so that any future "compress the nonce" optimization is rejected.
 - **No KEM-DEM authentication tag over the ciphertext pair.** `peer_kem_wrap_key_b64` and `peer_wrapped_msg_key_b64` are bound together only by the row's `sign_b64`. An attacker who could strip the signature would be able to substitute either ciphertext independently; the signature is load-bearing for ciphertext integrity, not just authorship.
-- **AES-256 key size vs. ML-KEM-1024 shared-secret size.** ML-KEM-1024 outputs 32 bytes, which is consumed whole as the AES-256 key. No truncation or expansion, but also no domain separation, so any future change to either primitive's output length requires revisiting this mapping.
 
-Trade-off accepted for now: simplicity and auditability of the composition vs. the stronger guarantees of HPKE. See `HYBRID.md` for the broader hybrid-PQ rationale. Revisiting this is tracked as problem #13 in the list below.
+Trade-off accepted: simplicity and auditability of the composition vs. the stronger guarantees of HPKE. See `HYBRID.md` for the broader hybrid-PQ rationale.
 
 ---
 
@@ -404,7 +433,7 @@ Wrapped `sender_msg_key` published by one author for one dialog. Two rows per di
 | `sender_hash`              | `user_hash_type`   | PK part; author of this `sender_msg_key`                                                        |
 | `peer_hash`                | `user_hash_type`   | the other participant; enables sync filter and inbox listing without a separate `dialogs` table |
 | `peer_kem_wrap_key_b64`    | `bytea`            | ML-KEM ciphertext to peer's `crypt_pkey`                                                        |
-| `peer_wrapped_msg_key_b64` | `bytea`            | AES-GCM(sender_msg_key) with ss from `peer_kem_wrap_key_b64`                                    |
+| `peer_wrapped_msg_key_b64` | `bytea`            | AES-GCM(sender_msg_key) with wrap_key = HKDF-SHA3-256(KEM shared secret)                        |
 | `owner_timestamp`          | `integer`          | Monotonic counter; must increase on updates; prevents replay attacks                            |
 | `deleted_flag`             | `boolean`          | Soft delete marker; `true` indicates deleted                                                    |
 | `sign_b64`                 | `bytea`            | ML-DSA-87 signature by `sender_hash` over canonical serialization of all preceding columns      |
@@ -538,14 +567,14 @@ Self-authenticating per [02_integrity.md](../electric/pq_data_layer/02_integrity
 ### Author sends a message
 
 1. Compute `dialog_hash` from `(sender_hash, peer_hash)`.
-2. Derive `sender_msg_key` (formula above).
-3. If no `dialog_keys` row exists for `(dialog_hash, sender_hash)`: wrap `sender_msg_key` self + peer, sign, insert (row carries `peer_hash`).
+2. Derive `sender_msg_key` via HKDF-SHA3-256 (see §Key derivation).
+3. If no `dialog_keys` row exists for `(dialog_hash, sender_hash)`: KEM-encapsulate to peer's `crypt_pkey`, derive `wrap_key` via HKDF-SHA3-256, wrap `sender_msg_key`, sign, insert (row carries `peer_hash`).
 4. Build message: fresh `message_id = "dmsg_" + UUID v7`, `parent_sign_hash = NULL`, `deleted_flag = false`, fresh `owner_timestamp`. Compute `refs_map` — collect all DAG tails currently in the sender's viewport (see §References), build the `{message_id: sign_hash}` map, JSON-encode, AES-GCM encrypt under `sender_msg_key` with a fresh 12-byte nonce, store as `refs_map_b64 = nonce ‖ ciphertext` (empty map `{}` for the genesis message). Encode payload as JSON (bare string for text, `{"<type>": <value>}` for compound), AES-GCM encrypt under `sender_msg_key` with a fresh 12-byte nonce, store as `content_b64 = nonce ‖ ciphertext`. Sign, set `sign_hash = "dms_" + hex(SHA3-512(sign_b64))`, insert into `dialog_messages`. Edits append the prior tip to `dialog_messages_versions` and rewrite the tip with `parent_sign_hash` set to the superseded row's `sign_hash` and a higher `owner_timestamp`; `refs_map_b64` is recomputed from the current viewport tails (may differ from the original).
 
 ### Peer reads
 
 1. Fetch `dialog_keys` rows for `dialog_hash`.
-2. For each row authored by a counterparty: verify `sign_b64` against `sender_hash`'s `sign_pkey`, then unwrap via `peer_kem_wrap_key_b64` / `peer_wrapped_msg_key_b64` using own `crypt_skey` ⇒ their `sender_msg_key`.
+2. For each row authored by a counterparty: verify `sign_b64` against `sender_hash`'s `sign_pkey`, then decapsulate `peer_kem_wrap_key_b64` with own `crypt_skey`, derive `wrap_key` via HKDF-SHA3-256, decrypt `peer_wrapped_msg_key_b64` ⇒ their `sender_msg_key`.
 3. For messages authored by self: re-derive `sender_msg_key` from own private keys (deterministic derivation). (Or unwrap from a counterparty's `dialog_keys` row where self is the peer.)
 4. For each `dialog_messages` row: verify `sign_b64`, split `content_b64` into the 12-byte nonce and ciphertext, AES-GCM decrypt under the matching author's `sender_msg_key`, then JSON-decode the plaintext to discover the content shape.
 5. For each `dialog_message_reactions` row: verify `sign_b64`, split `type_b64` into nonce and ciphertext, AES-GCM decrypt under the reactor's `sender_msg_key` to recover the emoji. Optionally verify `reaction_hash` by recomputing `dmr_` + hex(HMAC-SHA3-512(`sender_msg_key`, `message_id` ‖ `reactor_hash` ‖ `type_plaintext`)) and comparing.

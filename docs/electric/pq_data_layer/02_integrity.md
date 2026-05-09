@@ -20,7 +20,7 @@ These three fields are the universal contract — every signable PQ row includes
 
 ### Canonical serialization
 
-The signature payload is the concatenation of string representations of all fields (except `sign_b64` itself), sorted in lexicographical order by column name. No delimiters — the same record must produce the same payload on backend and frontend.
+The signature payload is the concatenation of string representations of all fields (except `sign_b64` itself and any field derived from it, such as `sign_hash`), sorted in lexicographical order by column name. No delimiters — the same record must produce the same payload on backend and frontend.
 
 Per-type encoding:
 

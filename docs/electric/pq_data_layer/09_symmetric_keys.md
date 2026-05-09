@@ -1,6 +1,6 @@
 # Symmetric Key Derivation
 
-> Status: **open** — current dialogs use raw SHA3-512; migration to HKDF planned.
+> Status: **solved** — `pq_dialogs.md` specifies HKDF-SHA3-256 for all symmetric key derivation.
 
 ## Problem
 

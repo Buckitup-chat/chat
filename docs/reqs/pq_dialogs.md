@@ -36,9 +36,11 @@ erDiagram
 
     dialog_messages          ||--o{ dialog_message_reactions : "message_id"
     dialog_messages_versions ||--o{ dialog_message_reactions : "sign_hash → message_sign_hash"
+    dialog_keys              }o--o{ dialog_message_reactions : "dialog_hash"
 
     dialog_messages          ||--o{ dialog_message_receipts  : "message_id"
     dialog_messages_versions ||--o{ dialog_message_receipts  : "sign_hash → message_sign_hash"
+    dialog_keys              }o--o{ dialog_message_receipts  : "dialog_hash"
 
     user_cards {
         user_hash_type  user_hash        PK
@@ -83,6 +85,7 @@ erDiagram
 
     dialog_message_reactions {
         dialog_message_reaction_hash_type reaction_hash      PK
+        dialog_hash_type                  dialog_hash
         dialog_message_id_type            message_id
         user_hash_type                    reactor_hash
         bytea                             type_b64
@@ -94,6 +97,7 @@ erDiagram
 
     dialog_message_receipts {
         dialog_message_receipt_hash_type  receipt_hash       PK
+        dialog_hash_type                  dialog_hash
         dialog_message_id_type            message_id
         user_hash_type                    peer_hash
         text                              type
@@ -115,6 +119,8 @@ Key relationships in words:
 ---
 
 ## Identifiers
+
+**Notation:** `||` throughout this document denotes raw binary concatenation. String-typed fields (e.g. `user_hash`, `message_id`) are encoded as UTF-8 bytes before concatenation. Private key material (`sign_skey`, `kem_skey`, `contact_skey`) is concatenated as raw bytes in its native algorithm-specific encoding.
 
 ### `dialog_hash`
 
@@ -285,11 +291,12 @@ SENDER (wrap, once per dialog)
                        │           ▼
                        │   ┌─────────────────────────────────┐
                        │   │  step 3 — wrap                  │
-                       │   │     AES-256-GCM.encrypt(        │
-                       │   │        key       = wrap_key,    │
-                       │   │        plaintext = sender_msg_key) │
-                       │   │            │                    │
-                       │   │            └──► peer_wrapped_msg_key │
+                       │   │     nonce = random 12 bytes      │
+                       │   │     peer_wrapped_msg_key =       │
+                       │   │        nonce ‖ AES-256-GCM(      │
+                       │   │          key       = wrap_key,   │
+                       │   │          plaintext = sender      │
+                       │   │                     _msg_key)    │
                        │   └────────────────────┬────────────┘
                        │                        │
                        ▼                        ▼
@@ -329,9 +336,13 @@ PEER (unwrap, on first read)
                        ▼
   ┌─────────────────────────────────────────────────────────┐
   │  step 3 — unwrap                                        │
+  │     split peer_wrapped_msg_key into                     │
+  │        nonce      (first 12 bytes)                      │
+  │        ciphertext (remainder)                           │
   │     AES-256-GCM.decrypt(                                │
   │        key        = wrap_key,                           │
-  │        ciphertext = peer_wrapped_msg_key)               │
+  │        nonce      = nonce,                              │
+  │        ciphertext = ciphertext)                         │
   │            │                                            │
   │            └──►  sender_msg_key                         │
   │                  (now usable for every message authored │
@@ -346,14 +357,16 @@ wrap:    (peer_kem_wrap_key, shared_secret) = ML-KEM-1024.Encap(peer.crypt_pkey)
          wrap_key                           = HKDF-SHA3-256(shared_secret,
                                                 salt = "buckitup/dialog-wrap/v1",
                                                 info = "wrap", L = 32)
-         peer_wrapped_msg_key               = AES-256-GCM.encrypt(wrap_key, sender_msg_key)
+         nonce                              = fresh random 12 bytes
+         peer_wrapped_msg_key               = nonce ‖ AES-256-GCM.encrypt(wrap_key, sender_msg_key)
          publish (peer_kem_wrap_key_b64, peer_wrapped_msg_key_b64)
 
 unwrap:  shared_secret  = ML-KEM-1024.Decap(own.crypt_skey, peer_kem_wrap_key)
          wrap_key       = HKDF-SHA3-256(shared_secret,
                               salt = "buckitup/dialog-wrap/v1",
                               info = "wrap", L = 32)
-         sender_msg_key = AES-256-GCM.decrypt(wrap_key, peer_wrapped_msg_key)
+         (nonce, ct)    = split peer_wrapped_msg_key at 12 bytes
+         sender_msg_key = AES-256-GCM.decrypt(wrap_key, nonce, ct)
 ```
 
 Note that `sender_msg_key` is **never** an input to Encap — Encap operates only on the peer's KEM public key. The KEM produces an ephemeral shared secret; that secret is run through HKDF to derive `wrap_key`, which actually encrypts `sender_msg_key`.
@@ -363,7 +376,7 @@ Note that `sender_msg_key` is **never** an input to Encap — Encap operates onl
 The wrap is hand-rolled rather than a standardized AEAD-with-KEM construction (HPKE, KEM-DEM). Known trade-offs to acknowledge explicitly:
 
 - **AES-GCM nonce is catastrophic under key reuse.** GCM loses both confidentiality *and* authenticity if a `(key, nonce)` pair is ever reused. Two separate risks apply here:
-  - **Wrap step (`peer_wrapped_msg_key`).** `wrap_key` is derived from an ephemeral shared secret — one fresh value per Encap call — so a fixed nonce (e.g., all-zero 12 bytes) is safe for the single wrap operation under it. A second encryption under the same `wrap_key`, even with a different nonce, is out of scope by construction and MUST NOT be introduced later.
+  - **Wrap step (`peer_wrapped_msg_key`).** `wrap_key` is derived from an ephemeral shared secret — one fresh value per Encap call. Each device independently Encaps with fresh randomness, producing a different `wrap_key`; LWW on `(dialog_hash, sender_hash)` resolves which row the peer sees. `peer_wrapped_msg_key_b64` uses the same format as `content_b64`: fresh random 12-byte nonce prepended to ciphertext (`nonce ‖ AES-256-GCM ciphertext`). A second encryption under the same `wrap_key` MUST NOT be introduced later.
   - **Content step (`content_b64`).** `sender_msg_key` is deterministic across every device the author holds and across the lifetime of the dialog. Nonces MUST be fresh-random 96-bit values; counter-based nonces are forbidden because two offline devices would collide. The birthday bound gives ≈2⁻³² collision probability after ≈2⁴⁰ messages authored by one user in one dialog — well above realistic traffic, but documented so that any future "compress the nonce" optimization is rejected.
 - **No KEM-DEM authentication tag over the ciphertext pair.** `peer_kem_wrap_key_b64` and `peer_wrapped_msg_key_b64` are bound together only by the row's `sign_b64`. An attacker who could strip the signature would be able to substitute either ciphertext independently; the signature is load-bearing for ciphertext integrity, not just authorship.
 
@@ -425,7 +438,7 @@ There is no `dialogs` table. Participation is derived from `dialog_keys` via `se
 
 ### 1. `dialog_keys`
 
-Wrapped `sender_msg_key` published by one author for one dialog. Two rows per dialog in the common case (one per direction). An author republishes the same row idempotently from any of their devices (deterministic `sender_msg_key` ⇒ same plaintext, different KEM randomness ⇒ compatible).
+Wrapped `sender_msg_key` published by one author for one dialog. Two rows per dialog in the common case (one per direction). An author republishes the same row idempotently from any of their devices (deterministic `sender_msg_key` ⇒ same plaintext, different KEM randomness ⇒ compatible). Concurrent publishes from multiple devices are resolved by LWW on `owner_timestamp` per the integrity triad in [02_integrity.md](../electric/pq_data_layer/02_integrity.md).
 
 | Column                     | Type               | Notes                                                                                           |
 | -------------------------- | ------------------ | ----------------------------------------------------------------------------------------------- |
@@ -433,16 +446,16 @@ Wrapped `sender_msg_key` published by one author for one dialog. Two rows per di
 | `sender_hash`              | `user_hash_type`   | PK part; author of this `sender_msg_key`                                                        |
 | `peer_hash`                | `user_hash_type`   | the other participant; enables sync filter and inbox listing without a separate `dialogs` table |
 | `peer_kem_wrap_key_b64`    | `bytea`            | ML-KEM ciphertext to peer's `crypt_pkey`                                                        |
-| `peer_wrapped_msg_key_b64` | `bytea`            | AES-GCM(sender_msg_key) with wrap_key = HKDF-SHA3-256(KEM shared secret)                        |
+| `peer_wrapped_msg_key_b64` | `bytea`            | 12-byte random nonce ‖ AES-256-GCM ciphertext of `sender_msg_key`, under `wrap_key` = HKDF-SHA3-256(KEM shared secret). Same `nonce ‖ ciphertext` format as `content_b64` |
 | `owner_timestamp`          | `integer`          | Monotonic counter; must increase on updates; prevents replay attacks                            |
-| `deleted_flag`             | `boolean`          | Soft delete marker; `true` indicates deleted                                                    |
+| `deleted_flag`             | `boolean`          | Blocking marker; `true` means the author has blocked the peer from this conversation. The peer can no longer unwrap the author's `sender_msg_key`. The author may also update KEM ciphertexts to nonsense values (with a higher `owner_timestamp`) to revoke decryption of their messages. Existing messages remain in the database |
 | `sign_b64`                 | `bytea`            | ML-DSA-87 signature by `sender_hash` over canonical serialization of all preceding columns      |
 
 PK: `(dialog_hash, sender_hash)`.
 
 Self-authenticating per [02_integrity.md](../electric/pq_data_layer/02_integrity.md), same bootstrap as `user_cards`: fetch `user_cards` for `sender_hash`, verify its self-signature, then verify this row's `sign_b64` under that `sign_pkey`. A row with invalid `sign_b64` is rejected on ingest and re-verified on peer-sync receive. Because `dialog_hash`, `peer_hash`, and both KEM ciphertexts are all covered by the signature, no field can be rewritten, retargeted to a different peer, or lifted into a different dialog without detection.
 
-Flooding: an attacker can still publish a row naming an uninvolved `peer_hash` (PoP proves submitter identity, not peer consent). Clients mitigate by hiding a dialog until the local user has either authored a message in it or the peer has published their own `dialog_keys` row for the same `dialog_hash`.
+Flooding: an attacker can still publish a row naming an uninvolved `peer_hash` (PoP proves submitter identity, not peer consent). There is no server-side spam filtering — accepting or ignoring unsolicited dialogs is the receiver's decision. Clients mitigate by hiding a dialog until the local user has either authored a message in it or the peer has published their own `dialog_keys` row for the same `dialog_hash`.
 
 ### 2. `dialog_messages`
 
@@ -457,13 +470,13 @@ Content is a single opaque blob: the first 12 bytes are the per-message AES-GCM 
 | `message_id`       | `dialog_message_id_type`        | PK; `dmsg_<UUID7>`                                                                                          |
 | `dialog_hash`      | `dialog_hash_type`              | dialog this message belongs to                                                                              |
 | `sender_hash`      | `user_hash_type`                | author                                                                                                      |
-| `content_b64`          | `bytea`                         | 12-byte AES-GCM nonce ‖ AES-256-GCM ciphertext of the JSON payload — see [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md). Empty when `deleted_flag = true` |
-| `deleted_flag`     | `boolean`                       | Signed tombstone marker; retractions are a new tip with empty `content_b64` and `deleted_flag: true`        |
-| `refs_map_b64`     | `bytea`                         | Encrypted causal-context map — see §References. 12-byte AES-GCM nonce ‖ AES-256-GCM ciphertext under `sender_msg_key`. Plaintext is a JSON map `{message_id: sign_hash}` of all DAG tails the sender observed. Empty map `{}` for the genesis message. Updated on edit (may reference new tails observed since original authoring). |
+| `content_b64`          | `bytea`                         | 12-byte AES-GCM nonce ‖ AES-256-GCM ciphertext of the JSON payload — see [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md). Empty when `deleted_flag = true`. Max 1 MB |
+| `deleted_flag`     | `boolean`                       | Signed tombstone marker; retractions are a new tip with empty `content_b64`, recomputed `refs_map_b64` (current viewport tails at deletion time), and `deleted_flag: true` |
+| `refs_map_b64`     | `bytea`                         | Encrypted causal-context map — see §References. 12-byte AES-GCM nonce ‖ AES-256-GCM ciphertext under `sender_msg_key`. Plaintext is a JSON map `{message_id: sign_hash}` of all DAG tails the sender observed. Empty map `{}` for the genesis message. Updated on edit (may reference new tails observed since original authoring). Max 1 MB |
 | `parent_sign_hash` | `dialog_message_sign_hash_type` | FK → `dialog_messages_versions.sign_hash`; NULL for the first version                                       |
 | `owner_timestamp`  | `integer`                       | Monotonic per `message_id`; strictly increases on edit; prevents replay                                     |
 | `sign_b64`         | `bytea`                         | ML-DSA-87 signature by `sender_hash` over the signable fields (everything except `sign_b64` / `sign_hash`)  |
-| `sign_hash`        | `dialog_message_sign_hash_type` | `dms_` + hex(SHA3-512(`sign_b64`)) — identity of this tip version. Denormalized convenience copy per [03_data_versioning.md](../electric/pq_data_layer/03_data_versioning.md): derivable from `sign_b64`, not itself covered by the signature, nothing FK-references it; kept on the master to avoid recomputing the hash when archiving the outgoing tip and when populating the next edit's `parent_sign_hash`. |
+| `sign_hash`        | `dialog_message_sign_hash_type` | `dms_` + hex(SHA3-512(`sign_b64`)) — identity of this tip version. Denormalized convenience copy per [03_data_versioning.md](../electric/pq_data_layer/03_data_versioning.md): derivable from `sign_b64`, not itself covered by the signature; kept on the master to avoid recomputing the hash when archiving the outgoing tip and when populating the next edit's `parent_sign_hash`. Referenced logically (not via database FK) by `dialog_messages_versions.parent_sign_hash`, `dialog_message_reactions.message_sign_hash`, and `dialog_message_receipts.message_sign_hash`. |
 
 PK: `(message_id)`. UNIQUE: `(dialog_hash, message_id)` — supports dialog-scoped sync filtering and inbox listings without a separate `dialogs` table.
 
@@ -489,9 +502,9 @@ Append-only history for `dialog_messages`, mirroring `Chat.Data.Schemas.UserStor
 | `sign_hash`        | `dialog_message_sign_hash_type` | PK part; `dms_` + hex(SHA3-512(`sign_b64`)) — identity of this version                      |
 | `dialog_hash`      | `dialog_hash_type`              |                                                                                             |
 | `sender_hash`      | `user_hash_type`                |                                                                                             |
-| `content_b64`          | `bytea`                         | 12-byte AES-GCM nonce ‖ ciphertext (same shape as the tip)                                  |
+| `content_b64`          | `bytea`                         | 12-byte AES-GCM nonce ‖ ciphertext (same shape as the tip). Max 1 MB                        |
 | `deleted_flag`     | `boolean`                       |                                                                                             |
-| `refs_map_b64`     | `bytea`                         | Encrypted causal-context map carried from the tip at the time this version was current       |
+| `refs_map_b64`     | `bytea`                         | Encrypted causal-context map carried from the tip at the time this version was current. Max 1 MB |
 | `parent_sign_hash` | `dialog_message_sign_hash_type` | Self-referential FK into `dialog_messages_versions.sign_hash`; NULL for the root version    |
 | `owner_timestamp`  | `integer`                       |                                                                                             |
 | `sign_b64`         | `bytea`                         | ML-DSA-87 signature by `sender_hash` covering every field except `sign_b64` and `sign_hash` |
@@ -500,7 +513,7 @@ PK: `(message_id, sign_hash)`. Append-only — rows are never mutated. A version
 
 ### 3. `dialog_message_reactions`
 
-Encrypted emoji reactions. Each reaction binds to a specific message **version** via `message_sign_hash` — the `sign_hash` (SHA3-512 of `sign_b64`) of the reacted-to version in the message's chain (tip or historical). Reacting to an edited message does not automatically carry over.
+Encrypted emoji reactions. Each reaction binds to a specific message **version** via `message_sign_hash` — the `sign_hash` (SHA3-512 of `sign_b64`) of the reacted-to version in the message's chain (tip or historical). Reacting to an edited message does not carry over — the reaction row stays bound to the historical version's `sign_hash` and is not migrated to the new tip.
 
 The reaction emoji (`type`) is **encrypted** under `sender_msg_key` (see §Key derivation). The stored column is `type_b64 = nonce ‖ AES-256-GCM(sender_msg_key, type_plaintext)` with a fresh random 12-byte nonce per row. Only the author and peer can decrypt; the database sees opaque ciphertext.
 
@@ -509,13 +522,14 @@ The reaction emoji (`type`) is **encrypted** under `sender_msg_key` (see §Key d
 | Column              | Type                                | Notes                                                                                               |
 | ------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------- |
 | `reaction_hash`     | `dialog_message_reaction_hash_type` | PK; `dmr_` + hex(HMAC-SHA3-512(`sender_msg_key`, `message_id` ‖ `reactor_hash` ‖ `type_plaintext`)) — keyed, so only participants can recompute or verify |
+| `dialog_hash`       | `dialog_hash_type`                  | dialog this reaction belongs to; enables Electric SQL sync shape filtering                          |
 | `message_id`        | `dialog_message_id_type`            | reacted message; `dmsg_<UUID7>`                                                                     |
 | `message_sign_hash` | `dialog_message_sign_hash_type`     | `sign_hash` of the reacted version in `dialog_messages(_versions)`                                  |
 | `reactor_hash`      | `user_hash_type`                    | who reacted                                                                                         |
 | `type_b64`          | `bytea`                             | 12-byte AES-GCM nonce ‖ AES-256-GCM ciphertext of the UTF-8 emoji string, under `sender_msg_key`   |
 | `deleted_flag`      | `boolean`                           | Signed un-react marker; toggling a reaction is a new row with `true` and a higher `owner_timestamp` |
 | `owner_timestamp`   | `integer`                           | Monotonic per `reaction_hash`; prevents replay                                                      |
-| `sign_b64`          | `bytea`                             | ML-DSA-87 signature by `reactor_hash` over all preceding columns (including `type_b64`)             |
+| `sign_b64`          | `bytea`                             | ML-DSA-87 signature by `reactor_hash` over all preceding columns (including `dialog_hash` and `type_b64`) |
 
 PK: `(reaction_hash)`. Uniqueness of "one reaction per `(message, reactor, emoji)`" is enforced by `reaction_hash` alone — the MAC is deterministic given the key, so two signed rows for the same `(message_id, reactor_hash, type_plaintext)` collide on PK regardless of which random AES-GCM nonce each encryption used. No separate plaintext UNIQUE constraint is needed (the database cannot see `type` plaintext and has no key to recompute the MAC).
 
@@ -537,6 +551,7 @@ The `type` column is plaintext, enabling server-side queries for unread counts, 
 | Column              | Type                                | Notes                                                                                               |
 | ------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------- |
 | `receipt_hash`      | `dialog_message_receipt_hash_type`  | PK; `dmrc_` + hex(SHA3-512(`message_id` ‖ `message_sign_hash` ‖ `peer_hash` ‖ `type`)) — plain hash, not keyed (type is already plaintext) |
+| `dialog_hash`       | `dialog_hash_type`                  | dialog this receipt belongs to; enables Electric SQL sync shape filtering                           |
 | `message_id`        | `dialog_message_id_type`            | receipted message; `dmsg_<UUID7>`                                                                   |
 | `peer_hash`         | `user_hash_type`                    | who generated the receipt (the peer, not the message author)                                        |
 | `type`              | `text`                              | `delivered` or `read` — plaintext, not encrypted                                                    |
@@ -574,8 +589,8 @@ Self-authenticating per [02_integrity.md](../electric/pq_data_layer/02_integrity
 ### Peer reads
 
 1. Fetch `dialog_keys` rows for `dialog_hash`.
-2. For each row authored by a counterparty: verify `sign_b64` against `sender_hash`'s `sign_pkey`, then decapsulate `peer_kem_wrap_key_b64` with own `crypt_skey`, derive `wrap_key` via HKDF-SHA3-256, decrypt `peer_wrapped_msg_key_b64` ⇒ their `sender_msg_key`.
-3. For messages authored by self: re-derive `sender_msg_key` from own private keys (deterministic derivation). (Or unwrap from a counterparty's `dialog_keys` row where self is the peer.)
+2. For each row authored by a counterparty: verify `sign_b64` against `sender_hash`'s `sign_pkey`, then decapsulate `peer_kem_wrap_key_b64` with own `crypt_skey`, derive `wrap_key` via HKDF-SHA3-256, split `peer_wrapped_msg_key_b64` into the 12-byte nonce and ciphertext, AES-GCM decrypt under `wrap_key` ⇒ their `sender_msg_key`.
+3. For messages authored by self: re-derive `sender_msg_key` from own private keys (deterministic derivation).
 4. For each `dialog_messages` row: verify `sign_b64`, split `content_b64` into the 12-byte nonce and ciphertext, AES-GCM decrypt under the matching author's `sender_msg_key`, then JSON-decode the plaintext to discover the content shape.
 5. For each `dialog_message_reactions` row: verify `sign_b64`, split `type_b64` into nonce and ciphertext, AES-GCM decrypt under the reactor's `sender_msg_key` to recover the emoji. Optionally verify `reaction_hash` by recomputing `dmr_` + hex(HMAC-SHA3-512(`sender_msg_key`, `message_id` ‖ `reactor_hash` ‖ `type_plaintext`)) and comparing.
 6. For each `dialog_message_receipts` row: verify `sign_b64` against `peer_hash`'s `sign_pkey`. The `type` column is plaintext (`delivered` / `read`) — no decryption needed.
@@ -599,4 +614,5 @@ Both sides compute the same `dialog_hash`. Each inserts its own `dialog_keys` ro
 - **Cross-author message ordering rendering** — `refs_map_b64` (column present on `dialog_messages` / `dialog_messages_versions`) provides the encrypted DAG-aware causal context per dialog, but the rendering semantics (ingest rules, pending-queue behavior, fork surfacing, catch-up) are owned by [04_ordering.md](../electric/pq_data_layer/04_ordering.md). Until that spec lands, clients may linearize by UUIDv7 timestamp as a best-effort display order.
 - **Replies and concurrent forks** — reply targeting will be handled via the `{"quote": ...}` content envelope in [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md). Concurrent forks (two peers sending without seeing each other's messages) are captured naturally by `refs_map_b64` and resolved at the UI level.
 - **Sync filtering** — which rows propagate to which peer is a frontend / sync-layer choice, not part of the dialog data contract.
+- **Typing indicators and presence** — BuckitUp is not an online-first chat; real-time presence is out of scope for the dialog data layer.
 

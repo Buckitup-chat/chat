@@ -41,7 +41,7 @@ defmodule Chat.TimeTest do
     end
 
     defp assert_within_last_day(datetime) do
-      assert DateTime.diff(DateTime.utc_now(), datetime) < 86400
+      assert DateTime.diff(DateTime.utc_now(), datetime) < 86_400
     end
   end
 

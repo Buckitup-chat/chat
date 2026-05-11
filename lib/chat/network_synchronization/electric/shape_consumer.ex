@@ -16,6 +16,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
   import Tools.GenServerHelpers
 
   alias Chat.Data.Shapes
+  alias Chat.NetworkSynchronization.Electric.DeferredStore
   alias Chat.NetworkSynchronization.Electric.OffsetStore
   alias Chat.NetworkSynchronization.Electric.ShapeWriter
   alias Chat.NetworkSynchronization.Status.ErrorStatus
@@ -62,7 +63,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
         {:change, op, value},
         {peer_url, system_identifier, shape, task_info, backoff, restart_ref} = state
       ) do
-    case ShapeWriter.write(shape, op, value) do
+    case ShapeWriter.write(shape, op, value, peer_url: peer_url) do
       {:ok, _} ->
         {peer_url, system_identifier, shape, task_info, backoff, restart_ref} |> noreply()
 
@@ -105,6 +106,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
     cancel_task(task_info)
     cancel_restart(restart_ref)
     OffsetStore.delete(system_identifier)
+    DeferredStore.purge_shape(peer_url, shape)
 
     {peer_url, system_identifier, shape, nil, @initial_backoff_ms, nil}
     |> maybe_start_stream()

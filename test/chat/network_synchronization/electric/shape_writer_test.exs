@@ -1,61 +1,18 @@
 defmodule Chat.NetworkSynchronization.Electric.ShapeWriterTest do
-  use ChatWeb.DataCase, async: true
+  use ChatWeb.DataCase, async: false
 
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Schemas.UserStorage
   alias Chat.Data.Types.UserStorageSignHash
   alias Chat.Data.User
+  alias Chat.NetworkSynchronization.Electric.DeferredStore
   alias Chat.NetworkSynchronization.Electric.ShapeWriter
   alias Chat.Repo
 
-  defp signed_user_card(identity, attrs \\ %{}) do
-    card =
-      identity
-      |> User.extract_pq_card()
-      |> struct(attrs)
-
-    sign_b64 =
-      card
-      |> Integrity.signature_payload()
-      |> EnigmaPq.sign(identity.sign_skey)
-
-    %{card | sign_b64: sign_b64}
-  end
-
-  defp signed_user_card_from(card, sign_skey, attrs \\ %{}) do
-    updated_card = struct(card, attrs)
-
-    sign_b64 =
-      updated_card
-      |> Integrity.signature_payload()
-      |> EnigmaPq.sign(sign_skey)
-
-    %{updated_card | sign_b64: sign_b64}
-  end
-
-  defp signed_user_storage(identity, user_hash, attrs \\ %{}) do
-    storage =
-      %UserStorage{
-        user_hash: user_hash,
-        uuid: Ecto.UUID.generate(),
-        value_b64: "dmFsdWU=",
-        deleted_flag: false,
-        owner_timestamp: System.os_time(:millisecond)
-      }
-      |> struct(attrs)
-
-    sign_b64 =
-      storage
-      |> Integrity.signature_payload()
-      |> EnigmaPq.sign(identity.sign_skey)
-
-    sign_hash =
-      sign_b64
-      |> EnigmaPq.hash()
-      |> UserStorageSignHash.from_binary()
-
-    %{storage | sign_b64: sign_b64, sign_hash: sign_hash}
+  setup do
+    :ets.delete_all_objects(:buckitup_deferred_records)
+    :ok
   end
 
   describe "user_card" do
@@ -129,7 +86,6 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriterTest do
   end
 
   describe "user_storage" do
-    # user_storage has a FK to user_cards — the card must exist first
     setup do
       identity = User.generate_pq_identity("Alice")
       card = signed_user_card(identity)
@@ -181,5 +137,106 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriterTest do
       stored = Repo.get_by(UserStorage, user_hash: user_hash, uuid: row.uuid)
       assert stored.deleted_flag == true
     end
+  end
+
+  describe "deferred store" do
+    setup do
+      identity = User.generate_pq_identity("Alice")
+      card = signed_user_card(identity)
+      {:ok, identity: identity, card: card, user_hash: card.user_hash}
+    end
+
+    test "skipped record is deferred when peer_url provided", %{
+      identity: identity,
+      user_hash: user_hash
+    } do
+      storage = signed_user_storage(identity, user_hash)
+
+      assert {:ok, :skipped_no_parent} =
+               ShapeWriter.write(:user_storage, :insert, storage, peer_url: "http://peer1:4444")
+
+      assert [record] = DeferredStore.check_children(:user_card, user_hash)
+      assert record.shape == :user_storage
+      assert record.peer_url == "http://peer1:4444"
+    end
+
+    test "no deferral when peer_url not provided", %{identity: identity, user_hash: user_hash} do
+      storage = signed_user_storage(identity, user_hash)
+
+      assert {:ok, :skipped_no_parent} = ShapeWriter.write(:user_storage, :insert, storage)
+
+      assert [] = DeferredStore.check_children(:user_card, user_hash)
+    end
+
+    test "successful user_card write triggers check_children for deferred user_storage", %{
+      identity: identity,
+      card: card,
+      user_hash: user_hash
+    } do
+      storage = signed_user_storage(identity, user_hash)
+
+      DeferredStore.defer(
+        :user_storage,
+        Ecto.primary_key(storage),
+        :insert,
+        [{:user_card, user_hash}],
+        "http://peer1:4444"
+      )
+
+      {:ok, _} = ShapeWriter.write(:user_card, :insert, card)
+
+      assert [] = DeferredStore.check_children(:user_card, user_hash)
+    end
+  end
+
+  # Helpers — used across multiple describe blocks
+
+  defp signed_user_card(identity, attrs \\ %{}) do
+    card =
+      identity
+      |> User.extract_pq_card()
+      |> struct(attrs)
+
+    sign_b64 =
+      card
+      |> Integrity.signature_payload()
+      |> EnigmaPq.sign(identity.sign_skey)
+
+    %{card | sign_b64: sign_b64}
+  end
+
+  defp signed_user_card_from(card, sign_skey, attrs) do
+    updated_card = struct(card, attrs)
+
+    sign_b64 =
+      updated_card
+      |> Integrity.signature_payload()
+      |> EnigmaPq.sign(sign_skey)
+
+    %{updated_card | sign_b64: sign_b64}
+  end
+
+  defp signed_user_storage(identity, user_hash, attrs \\ %{}) do
+    storage =
+      %UserStorage{
+        user_hash: user_hash,
+        uuid: Ecto.UUID.generate(),
+        value_b64: "dmFsdWU=",
+        deleted_flag: false,
+        owner_timestamp: System.os_time(:millisecond)
+      }
+      |> struct(attrs)
+
+    sign_b64 =
+      storage
+      |> Integrity.signature_payload()
+      |> EnigmaPq.sign(identity.sign_skey)
+
+    sign_hash =
+      sign_b64
+      |> EnigmaPq.hash()
+      |> UserStorageSignHash.from_binary()
+
+    %{storage | sign_b64: sign_b64, sign_hash: sign_hash}
   end
 end

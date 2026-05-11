@@ -1,6 +1,7 @@
 defmodule Chat.NetworkSynchronization do
   @moduledoc "Network synchronisation"
 
+  alias Chat.NetworkSynchronization.Electric.DeferredStore
   alias Chat.NetworkSynchronization.Electric.PeerSync
   alias Chat.NetworkSynchronization.Source
   alias Chat.NetworkSynchronization.Store
@@ -151,8 +152,12 @@ defmodule Chat.NetworkSynchronization do
 
   def remove_electric_peer(peer_url) do
     case Registry.lookup(@electric_registry, peer_url) do
-      [{pid, _}] -> DynamicSupervisor.terminate_child(@electric_dynamic, pid)
-      [] -> {:error, :not_found}
+      [{pid, _}] ->
+        DeferredStore.purge_peer(peer_url)
+        DynamicSupervisor.terminate_child(@electric_dynamic, pid)
+
+      [] ->
+        {:error, :not_found}
     end
   end
 

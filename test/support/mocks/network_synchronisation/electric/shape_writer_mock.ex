@@ -1,10 +1,10 @@
 defmodule ChatSupport.Mocks.NetworkSynchronization.Electric.ShapeWriterMock do
   @moduledoc "ShapeWriter mock for ShapeConsumer test"
 
-  @spec write(atom(), atom(), term()) :: {:ok, term()} | {:error, atom()}
-  def write(shape, op, value) do
+  @spec write(atom(), atom(), term(), keyword()) :: {:ok, term()} | {:error, atom()}
+  def write(shape, op, value, opts \\ []) do
     case Application.get_env(:chat, :consumer_test_pid) do
-      pid when is_pid(pid) -> send(pid, {:write_called, shape, op, value})
+      pid when is_pid(pid) -> send(pid, {:write_called, shape, op, value, opts})
       _ -> :ok
     end
 

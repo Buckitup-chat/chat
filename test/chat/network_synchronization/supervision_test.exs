@@ -84,7 +84,10 @@ defmodule ChatTest.NetworkSynchronization.SupervisionTest do
     assert {:ok, pid} =
              start_supervised(
                {Chat.NetworkSynchronization.Supervisor,
-                name: S5, dynamic_name: context.dynamic, registry_name: context.registry}
+                name: S5,
+                dynamic_name: context.dynamic,
+                registry_name: context.registry,
+                deferred_store_name: :"S5.DeferredStore"}
              )
 
     context |> Map.put(:supervisor_pid, pid)

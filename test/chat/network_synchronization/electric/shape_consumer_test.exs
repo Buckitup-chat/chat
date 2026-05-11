@@ -56,7 +56,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
          peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card}
       )
 
-    assert_receive {:write_called, :user_card, :insert, ^card}, 500
+    assert_receive {:write_called, :user_card, :insert, ^card, _opts}, 500
   end
 
   test "forwards update change to ShapeWriter" do
@@ -80,7 +80,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
          peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card}
       )
 
-    assert_receive {:write_called, :user_card, :update, ^card}, 500
+    assert_receive {:write_called, :user_card, :update, ^card, _opts}, 500
   end
 
   test "saves ResumeMessage to OffsetStore" do
@@ -180,7 +180,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
          peer_url: @peer_url, system_identifier: @system_identifier, shape: :user_card}
       )
 
-    refute_receive {:write_called, _, _, _}, 200
+    refute_receive {:write_called, _, _, _, _}, 200
 
     {_url, _si, _shape, task_info, backoff, restart_ref} = :sys.get_state(consumer)
     assert task_info == nil

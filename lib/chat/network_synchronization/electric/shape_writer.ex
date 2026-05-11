@@ -6,9 +6,10 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
   import Chat.Db, only: [repo: 0]
 
   alias Chat.Data.Shapes
+  alias Chat.NetworkSynchronization.Electric.DeferredStore
 
-  def write(shape, operation, value) do
-    case do_write(shape, operation, value) do
+  def write(shape, operation, value, opts \\ []) do
+    case do_write(shape, operation, value, opts) do
       {:ok, _} = result ->
         result
 
@@ -34,13 +35,22 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
     end
   end
 
-  defp do_write(shape_name, operation, value) do
+  defp do_write(shape_name, operation, value, opts) do
     shape_mod = Shapes.by_name(shape_name)
 
-    with :ok <- check_parents(shape_mod, operation, value) do
-      value
-      |> shape_mod.sync_derive_fields()
-      |> then(&shape_mod.sync_persist(operation, &1))
+    case check_parents(shape_mod, operation, value) do
+      :ok ->
+        value
+        |> shape_mod.sync_derive_fields()
+        |> then(&shape_mod.sync_persist(operation, &1))
+        |> tap_ok(&notify_deferred_children(shape_name, &1))
+
+      {:skip, missing_parents} ->
+        maybe_defer(shape_name, operation, value, missing_parents, opts)
+        {:ok, :skipped_no_parent}
+
+      {:error, _} = error ->
+        error
     end
   rescue
     e in RuntimeError -> {:error, {:repo_not_available, e}}
@@ -49,22 +59,17 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
 
   defp check_parents(shape_mod, operation, value) do
     shape_mod.sync_required_parents(operation, value)
-    |> Enum.reduce_while(:ok, fn ref, :ok ->
+    |> Enum.reduce_while([], fn ref, acc ->
       case check_parent(shape_mod, ref, value) do
-        :ok ->
-          {:cont, :ok}
-
-        {:skip, parent_shape} ->
-          log(
-            "Skipping #{shape_mod.shape_name()} #{operation} - parent #{parent_shape} not found",
-            :debug
-          )
-
-          {:halt, {:ok, :skipped_no_parent}}
-
-        {:reject, reason} ->
-          {:halt, {:error, {:rejected, reason}}}
+        :ok -> {:cont, acc}
+        {:skip, parent_ref} -> {:cont, [parent_ref | acc]}
+        {:reject, reason} -> {:halt, {:error, {:rejected, reason}}}
       end
+    end)
+    |> then(fn
+      {:error, _} = error -> error
+      [] -> :ok
+      missing -> {:skip, Enum.reverse(missing)}
     end)
   end
 
@@ -72,8 +77,59 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
     parent_mod = Shapes.by_name(parent_shape)
 
     case repo().get(parent_mod.schema_module(), parent_key) do
-      nil -> {:skip, parent_shape}
+      nil -> {:skip, ref}
       _parent -> shape_mod.sync_validate_parent(ref, value)
     end
   end
+
+  defp maybe_defer(shape_name, operation, value, missing_parents, opts) do
+    case Keyword.fetch(opts, :peer_url) do
+      {:ok, peer_url} ->
+        key = Ecto.primary_key(value)
+        DeferredStore.defer(shape_name, key, operation, missing_parents, peer_url)
+
+        log(
+          "Deferred #{shape_name} #{operation} - waiting on #{inspect(missing_parents)}",
+          :debug
+        )
+
+      :error ->
+        log_missing_parents(shape_name, operation, missing_parents)
+    end
+  end
+
+  defp log_missing_parents(shape_name, operation, missing_parents) do
+    parent_names = Enum.map(missing_parents, &elem(&1, 0))
+
+    log(
+      "Skipping #{shape_name} #{operation} - parents #{inspect(parent_names)} not found",
+      :debug
+    )
+  end
+
+  defp notify_deferred_children(shape_name, persisted_struct) do
+    shape_name
+    |> extract_parent_key(persisted_struct)
+    |> then(&DeferredStore.check_children(shape_name, &1))
+    |> case do
+      [] -> :ok
+      children -> DeferredStore.trigger_redeliver(children)
+    end
+  end
+
+  defp extract_parent_key(shape_name, struct) do
+    Shapes.by_name(shape_name).schema_module().__schema__(:primary_key)
+    |> Enum.map(&Map.fetch!(struct, &1))
+    |> then(fn
+      [single] -> single
+      multiple -> List.to_tuple(multiple)
+    end)
+  end
+
+  defp tap_ok({:ok, result}, fun) do
+    fun.(result)
+    {:ok, result}
+  end
+
+  defp tap_ok(other, _fun), do: other
 end

@@ -3,6 +3,7 @@ defmodule Chat.NetworkSynchronization.Supervisor do
 
   use Supervisor
 
+  alias Chat.NetworkSynchronization.Electric.DeferredStore
   alias Chat.NetworkSynchronization.PeerDetection.LanDetector
   alias Chat.NetworkSynchronization.Store
 
@@ -33,10 +34,14 @@ defmodule Chat.NetworkSynchronization.Supervisor do
         Module.concat(supervisor_name, ElectricRegistry)
       )
 
+    deferred_store_name =
+      Keyword.get(opts, :deferred_store_name, DeferredStore)
+
     children = [
       {DynamicSupervisor, name: dynamic_name, strategy: :one_for_one},
       {Registry, name: registry_name, keys: :unique},
       {LanDetector, name: detector_name},
+      {DeferredStore, name: deferred_store_name},
       {DynamicSupervisor, name: electric_dynamic_name, strategy: :one_for_one},
       {Registry, name: electric_registry_name, keys: :unique}
     ]

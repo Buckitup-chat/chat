@@ -46,7 +46,7 @@ defmodule ChatWeb.ElectricLive.UserStorageVersionLive.Index do
          uuid: uuid,
          sign_hash: sign_hash
        }) do
-    "user-storage-version-#{Base.encode16(user_hash, case: :lower)}-#{uuid}-#{Base.encode16(sign_hash, case: :lower)}"
+    "user-storage-version-#{user_hash}-#{uuid}-#{sign_hash}"
   end
 
   @impl true
@@ -197,7 +197,7 @@ defmodule ChatWeb.ElectricLive.UserStorageVersionLive.Index do
               Key: {version.uuid}
             </span>
             <span class="text-xs text-gray-400 font-mono">
-              {Base.encode16(version.user_hash, case: :lower) |> String.slice(0..15)}...
+              {version.user_hash |> String.slice(0..15)}...
             </span>
           </div>
           {render_version_item(assigns, version)}
@@ -258,7 +258,7 @@ defmodule ChatWeb.ElectricLive.UserStorageVersionLive.Index do
                 <% end %>
               </div>
               <p class="mt-1 text-xs text-gray-500 font-mono truncate">
-                User Hash: {Base.encode16(@version.user_hash, case: :lower) |> String.slice(0..31)}...
+                User Hash: {@version.user_hash |> String.slice(0..31)}...
               </p>
               <div class="mt-1 flex items-center space-x-4 text-xs text-gray-600">
                 <span>Value: {format_bytes(byte_size(@version.value_b64))}</span>
@@ -266,14 +266,14 @@ defmodule ChatWeb.ElectricLive.UserStorageVersionLive.Index do
               </div>
               <%= if @version.parent_sign_hash do %>
                 <p class="mt-1 text-xs text-purple-600 font-mono truncate">
-                  Parent: {Base.encode16(@version.parent_sign_hash, case: :lower)
+                  Parent: {@version.parent_sign_hash
                   |> String.slice(0..15)}...
                 </p>
               <% else %>
                 <p class="mt-1 text-xs text-gray-400 italic">Initial version (no parent)</p>
               <% end %>
               <p class="mt-1 text-xs text-gray-400 font-mono truncate">
-                Sign Hash: {Base.encode16(@version.sign_hash, case: :lower) |> String.slice(0..15)}...
+                Sign Hash: {@version.sign_hash |> String.slice(0..15)}...
               </p>
             </div>
           </div>

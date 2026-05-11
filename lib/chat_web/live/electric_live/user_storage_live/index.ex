@@ -40,9 +40,8 @@ defmodule ChatWeb.ElectricLive.UserStorageLive.Index do
     end
   end
 
-  # Generate DOM ID from composite primary key (user_hash + uuid)
   defp dom_id_for_user_storage(%UserStorage{user_hash: user_hash, uuid: uuid}) do
-    "user-storage-#{Base.encode16(user_hash, case: :lower)}-#{uuid}"
+    "user-storage-#{user_hash}-#{uuid}"
   end
 
   @impl true
@@ -187,7 +186,7 @@ defmodule ChatWeb.ElectricLive.UserStorageLive.Index do
                             <% end %>
                           </div>
                           <p class="mt-1 text-xs text-gray-500 font-mono truncate">
-                            User Hash: {Base.encode16(storage.user_hash, case: :lower)
+                            User Hash: {storage.user_hash
                             |> String.slice(0..31)}...
                           </p>
                           <div class="mt-1 flex items-center space-x-4 text-xs text-gray-600">
@@ -196,12 +195,12 @@ defmodule ChatWeb.ElectricLive.UserStorageLive.Index do
                           </div>
                           <%= if storage.parent_sign_hash do %>
                             <p class="mt-1 text-xs text-purple-600 font-mono truncate">
-                              Parent: {Base.encode16(storage.parent_sign_hash, case: :lower)
+                              Parent: {storage.parent_sign_hash
                               |> String.slice(0..15)}...
                             </p>
                           <% end %>
                           <p class="mt-1 text-xs text-gray-400 font-mono truncate">
-                            Sign Hash: {Base.encode16(storage.sign_hash, case: :lower)
+                            Sign Hash: {storage.sign_hash
                             |> String.slice(0..15)}...
                           </p>
                         </div>

@@ -30,7 +30,7 @@ As the shape inventory grows (dialog tables, file storage tables), this scatter 
 ## Behaviour
 
 ```elixir
-defmodule Chat.NetworkSynchronization.Electric.Shape do
+defmodule Chat.Data.Shapes.Shape do
   @moduledoc """
   Behaviour for Electric-synced shapes.
 
@@ -137,15 +137,83 @@ defmodule Chat.NetworkSynchronization.Electric.Shape do
 end
 ```
 
-## Deferred redeliver
+## Pipelines
+
+The behaviour enables two generic pipeline modules that handle universal concerns. Shape-specific logic lives in callbacks; the pipelines handle signature verification, timestamp checks, deferred tracking, error wrapping, and logging.
+
+### Peer sync pipeline
+
+Replaces the current `ShapeWriter.do_write/3` pattern match with a generic dispatch.
+
+#### Full flow
+
+```
+ShapeConsumer
+     │
+     ▼
+{:change, op, value}
+     │
+     ▼
+┌────────────────────────────────────┐
+│  sync_required_parents(op, value)  │
+└─────────────────┬──────────────────┘
+                  │
+                  ▼
+         ┌────────────────┐
+         │  check parents │  for each {shape, key}:
+         │                │    Shapes.by_name → repo.get
+         │                │    → sync_validate_parent
+         └────────┬───────┘
+                  │
+           ┌──────┴───────┐
+           │              │
+      all present    any missing/rejected
+           │              │
+           │              ▼
+           │       ┌──────────────┐
+           │       │ DeferredStore│
+           │       │  store ref   │
+           │       └──────┬───────┘
+           │              │
+           │         {:ok, :deferred}
+           │
+           ▼
+┌────────────────────────┐
+│  sync_derive_fields    │
+└───────────┬────────────┘
+            │
+            ▼
+┌────────────────────────┐
+│  verify_signature      │── invalid? → log warning, skip
+└───────────┬────────────┘
+            │
+            ▼
+┌────────────────────────┐
+│  validate_timestamp    │── stale? → skip
+└───────────┬────────────┘
+            │
+            ▼
+┌────────────────────────┐
+│  sync_persist(op, val) │
+└───────────┬────────────┘
+            │
+            ▼
+┌────────────────────────────────┐
+│  check DeferredStore           │
+│  for children waiting on       │── found? → redeliver queue
+│  {shape_name, primary_key}     │              │
+└────────────────────────────────┘              ▼
+                                        re-fetch from peer
+                                        → feed back to top ↺
+```
+
+#### Deferred redeliver
 
 Electric streams are offset-based: once a record passes the consumer, it won't be redelivered until the next full sync (offset reset). When `sync_required_parents/2` names a parent that doesn't exist yet, dropping the record silently means waiting for a full re-sync to pick it up — potentially minutes of backoff.
 
 The deferred redeliver mechanism solves this by tracking skipped records and retrying them as soon as their parents arrive.
 
-### Data model
-
-Each skipped record is stored as a reference, not the full struct (file_chunks can be ~1 MB):
+**Data model.** Each skipped record is stored as a reference, not the full struct (file_chunks can be ~1 MB):
 
 ```elixir
 %DeferredRecord{
@@ -158,83 +226,18 @@ Each skipped record is stored as a reference, not the full struct (file_chunks c
 }
 ```
 
-### Flow
-
-```
-1. ShapeConsumer receives {:change, op, value}
-
-2. Pipeline calls shape_mod.sync_required_parents(op, value)
-   → [{:user_card, "u_abc..."}, {:files, "f_xyz..."}]
-
-3. Pipeline checks each parent:
-   a. Look up parent shape module via Shapes.by_name(:user_card)
-   b. Check existence via repo().get(parent_schema, key)
-   c. If exists, call shape_mod.sync_validate_parent({:user_card, key}, value)
-
-4. If any parent missing or rejected:
-   → Store DeferredRecord in DeferredStore (ETS)
-     keyed by each missing parent_ref
-   → return {:ok, :deferred}
-
-5. If all parents present and valid:
-   → Continue pipeline: sync_derive_fields → verify signature
-     → check timestamp → sync_persist
-
-6. After any successful sync_persist:
-   → Extract {shape_name, primary_key} from the written record
-   → Look up DeferredStore for records waiting on this parent_ref
-   → Move matches to redeliver queue
-
-7. Redeliver queue:
-   → For each deferred record, re-fetch from peer via targeted
-     Electric shape request with WHERE filter on primary key
-   → Feed re-fetched record through the full pipeline (step 2)
-   → Recursive: if a redelivered record is itself a parent
-     of other deferred records, those get unblocked too
-```
-
-### Storage
-
-`DeferredStore` is shared across all ShapeConsumers (a parent from one peer can unblock a child from another peer). Implementation: ETS table under `NetworkSynchronization.Supervisor`.
+**Storage.** `DeferredStore` is shared across all ShapeConsumers (a parent from one peer can unblock a child from another peer). Implementation: ETS table under `NetworkSynchronization.Supervisor`.
 
 Index: `{parent_shape, parent_key}` → list of `DeferredRecord`s. A record with multiple missing parents appears under each missing parent's key. On redeliver, the pipeline re-checks all parents (some may still be missing).
 
-### Redeliver strategy
-
-Redelivery re-fetches from the original peer via a short-lived Electric shape stream with a WHERE filter on the record's primary key. This avoids storing potentially large structs (file_chunks) in memory while waiting.
+**Redeliver strategy.** Redelivery re-fetches from the original peer via a short-lived Electric shape stream with a WHERE filter on the record's primary key. This avoids storing potentially large structs (file_chunks) in memory while waiting.
 
 If the peer is unreachable at redeliver time, the deferred record stays in the queue. The next full sync (offset reset on reconnect) will pick it up naturally.
 
-### Cleanup
-
+**Cleanup:**
 - When a PeerSync is terminated (peer removed), purge all DeferredRecords for that `peer_url`.
 - When a ShapeConsumer does a full re-sync (`must_refetch`), purge DeferredRecords for that `{peer_url, shape}` — the full sync will redeliver everything.
 - TTL: deferred records older than 1 hour are purged (the peer has likely reconnected and done a full sync by then).
-
-## Generic pipeline
-
-The behaviour enables two generic pipeline modules that handle universal concerns:
-
-### Peer sync pipeline
-
-Replaces the current `ShapeWriter.do_write/3` pattern match with a generic dispatch:
-
-```
-ShapeConsumer
-  → {:change, op, value}
-  → shape_mod.sync_required_parents(op, value)
-      → pipeline checks each parent exists + sync_validate_parent
-      → any missing/rejected? → store in DeferredStore, return {:ok, :deferred}
-  → shape_mod.sync_derive_fields(value)
-  → Integrity.verify_signature(value)
-      invalid? → log warning, return {:ok, value}
-  → validate_timestamp_newer(op, value)
-      stale? → return {:ok, value}
-  → shape_mod.sync_persist(op, value)
-      success? → check DeferredStore for children to redeliver
-```
-
-Signature verification, timestamp checks, deferred tracking, error wrapping, and logging are in the pipeline — not in per-shape code.
 
 ### HTTP ingestion pipeline
 
@@ -242,7 +245,7 @@ Signature verification, timestamp checks, deferred tracking, error wrapping, and
 
 ```
 Writer.new()
-|> Shapes.all()
+|> Chat.Data.Shapes.all()
    |> Enum.reduce(writer, fn shape_mod, w ->
         shape_mod.ingest_configure_writer(w, pop_context)
       end)
@@ -448,8 +451,8 @@ def ingest_configure_writer(writer, pop_context) do
     check: &file_manifest_pop_check(&1, pop_context),
     validate: &file_manifest_verify_chunks/3
     # validate: all chunk_count chunks exist in file_chunks,
-    # each SHA3-256(chunk.sign_b64) matches chunk_sign_hashes[index].
-    # On success, deletes corresponding upload_files rows.
+    # each SHA3-512(chunk.sign_b64) matches chunk_sign_hashes[index].
+    # On success, deletes corresponding upload_chunks rows.
   )
 end
 ```
@@ -458,9 +461,9 @@ end
 
 ### `Shape.FileChunks`
 
-Chunks carry encrypted blob data (~1 MB each). Their `sign_b64` covers a **hash** of `data_b64` (not `data_b64` itself) to avoid re-reading the blob during verification. The Signable protocol implementation must compute `SHA3-256(data_b64)` and substitute it into the signature payload.
+Chunks carry encrypted blob data (~1 MB each). Their `sign_b64` covers a **hash** of `data_b64` (not `data_b64` itself) to avoid re-reading the blob during verification. The Signable protocol implementation must compute `SHA3-512(data_b64)` and substitute it into the signature payload.
 
-On HTTP ingest the server writes a side-effect bookkeeping row to `upload_files` (local-only table, not Electric-synced) with server-set `updated_at` from TimeKeeper for budget/GC tracking.
+On HTTP ingest the server writes a side-effect bookkeeping row to `upload_chunks` (local-only table, not Electric-synced) with server-set `updated_at` from TimeKeeper for budget/GC tracking.
 
 Parents: `user_card` by `uploader_hash` and `files` by `file_id`. The `files` parent has extra constraints checked via `sync_validate_parent/2`: `uploader_hash` must match and `deleted_flag` must be `false`.
 
@@ -494,29 +497,29 @@ def ingest_configure_writer(writer, pop_context) do
     accept: [:insert],
     check: &file_chunk_pop_check(&1, pop_context),
     validate: &file_chunk_verify_signature/3
-    # signature covers SHA3-256(data_b64), not data_b64 itself
-    # side effect: insert upload_files bookkeeping row with TimeKeeper timestamp
+    # signature covers SHA3-512(data_b64), not data_b64 itself
+    # side effect: insert upload_chunks bookkeeping row with TimeKeeper timestamp
   )
 end
 ```
 
-**Signable note**: non-standard. The `Signable` protocol implementation for `FileChunk` must replace `data_b64` with `SHA3-256(data_b64)` in the signable fields map, since the signature covers the hash of the blob, not the blob itself.
+**Signable note**: non-standard. The `Signable` protocol implementation for `FileChunk` must replace `data_b64` with `SHA3-512(data_b64)` in the signable fields map, since the signature covers the hash of the blob, not the blob itself.
 
 ## Shape registry
 
-`Shapes` becomes a lookup over behaviour-implementing modules:
+`Chat.Data.Shapes` becomes a lookup over behaviour-implementing modules:
 
 ```elixir
-defmodule Chat.NetworkSynchronization.Electric.Shapes do
+defmodule Chat.Data.Shapes do
   @shapes [
-    Shape.UserCard,
-    Shape.UserStorage,
-    Shape.DialogKeys,
-    Shape.DialogMessages,
-    Shape.DialogMessageReactions,
-    Shape.DialogMessageReceipts,
-    Shape.Files,
-    Shape.FileChunks
+    Chat.Data.Shapes.UserCard,
+    Chat.Data.Shapes.UserStorage,
+    Chat.Data.Shapes.DialogKeys,
+    Chat.Data.Shapes.DialogMessages,
+    Chat.Data.Shapes.DialogMessageReactions,
+    Chat.Data.Shapes.DialogMessageReceipts,
+    Chat.Data.Shapes.Files,
+    Chat.Data.Shapes.FileChunks
   ]
 
   def all, do: @shapes
@@ -529,18 +532,18 @@ end
 
 | Current location | What | Moves to |
 |---|---|---|
-| `Validation.validate_user_card_insert/1` | peer sync card validation | `Shape.UserCard.sync_persist/2` |
-| `Validation.validate_user_card_update/2` | peer sync card update validation | `Shape.UserCard.sync_persist/2` |
-| `Validation.validate_user_storage_insert/1` | peer sync storage validation | `Shape.UserStorage.sync_persist/2` |
-| `Validation.validate_user_storage_update/2` | peer sync storage update validation | `Shape.UserStorage.sync_persist/2` |
-| `Validation.user_card_allowed/2` | HTTP PoP check for cards | `Shape.UserCard.ingest_configure_writer/2` |
-| `Validation.user_card_validate/3` | HTTP card changeset validation | `Shape.UserCard.ingest_configure_writer/2` |
-| `Validation.user_storage_allowed/2` | HTTP PoP check for storage | `Shape.UserStorage.ingest_configure_writer/2` |
-| `Validation.user_storage_validate_with_versioning/3` | HTTP storage validation + versioning | `Shape.UserStorage.ingest_configure_writer/2` |
-| `Validation.user_storage_pre_apply_versioning/3` | HTTP storage pre-apply hook | `Shape.UserStorage.ingest_configure_writer/2` |
-| `ShapeWriter.do_write/3` (pattern match) | peer sync dispatch | generic pipeline + `Shape.*.sync_persist/2` |
-| `ShapeWriter` parent checks | peer sync preconditions | `Shape.*.sync_required_parents/2` + pipeline |
-| `ShapeWriter` sign_hash calculation | peer sync derived fields | `Shape.*.sync_derive_fields/1` |
+| `Validation.validate_user_card_insert/1` | peer sync card validation | `Shapes.UserCard.sync_persist/2` |
+| `Validation.validate_user_card_update/2` | peer sync card update validation | `Shapes.UserCard.sync_persist/2` |
+| `Validation.validate_user_storage_insert/1` | peer sync storage validation | `Shapes.UserStorage.sync_persist/2` |
+| `Validation.validate_user_storage_update/2` | peer sync storage update validation | `Shapes.UserStorage.sync_persist/2` |
+| `Validation.user_card_allowed/2` | HTTP PoP check for cards | `Shapes.UserCard.ingest_configure_writer/2` |
+| `Validation.user_card_validate/3` | HTTP card changeset validation | `Shapes.UserCard.ingest_configure_writer/2` |
+| `Validation.user_storage_allowed/2` | HTTP PoP check for storage | `Shapes.UserStorage.ingest_configure_writer/2` |
+| `Validation.user_storage_validate_with_versioning/3` | HTTP storage validation + versioning | `Shapes.UserStorage.ingest_configure_writer/2` |
+| `Validation.user_storage_pre_apply_versioning/3` | HTTP storage pre-apply hook | `Shapes.UserStorage.ingest_configure_writer/2` |
+| `ShapeWriter.do_write/3` (pattern match) | peer sync dispatch | generic pipeline + `Shapes.*.sync_persist/2` |
+| `ShapeWriter` parent checks | peer sync preconditions | `Shapes.*.sync_required_parents/2` + pipeline |
+| `ShapeWriter` sign_hash calculation | peer sync derived fields | `Shapes.*.sync_derive_fields/1` |
 | `ElectricController.config_writer/2` | HTTP writer setup | generic fold over `Shapes.all()` via `ingest_configure_writer/2` |
 | _(new)_ | deferred record tracking | `DeferredStore` + redeliver queue |
 
@@ -550,11 +553,11 @@ end
 
 ## Migration path
 
-1. Define the `Shape` behaviour module with `@callback` declarations and a `__using__` macro providing defaults for `sync_derive_fields/1`, `sync_validate_parent/2`, and `versions_schema/0`.
-2. Implement `Shape.UserCard` and `Shape.UserStorage` extracting logic from current modules.
+1. Define the `Chat.Data.Shapes.Shape` behaviour module in `lib/chat/data/shapes/shape.ex` with `@callback` declarations and a `__using__` macro providing defaults for `sync_derive_fields/1`, `sync_validate_parent/2`, and `versions_schema/0`.
+2. Implement `Shapes.UserCard` and `Shapes.UserStorage` in `lib/chat/data/shapes/` extracting logic from current modules.
 3. Build the generic sync pipeline: replace `ShapeWriter.do_write/3` pattern match with dispatch through `sync_required_parents/2` → `sync_derive_fields/1` → verify → `sync_persist/2`.
 4. Build `DeferredStore` (ETS) and redeliver queue under `NetworkSynchronization.Supervisor`. Wire post-persist hook to check for deferred children.
 5. Update `ElectricController` to fold `ingest_configure_writer/2` over registered shapes.
 6. Verify existing tests pass with no behavior change.
-7. Implement dialog shape modules (`Shape.DialogKeys`, `Shape.DialogMessages`, etc.) as their schemas are created.
-8. Implement file shape modules (`Shape.Files`, `Shape.FileChunks`) — note the non-standard `Signable` implementation for `FileChunk` and the cross-table `sync_validate_parent/2` for chunk→manifest constraint.
+7. Implement dialog shape modules (`Shapes.DialogKeys`, `Shapes.DialogMessages`, etc.) as their schemas are created.
+8. Implement file shape modules (`Shapes.Files`, `Shapes.FileChunks`) — note the non-standard `Signable` implementation for `FileChunk` and the cross-table `sync_validate_parent/2` for chunk→manifest constraint.

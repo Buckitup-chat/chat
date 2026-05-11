@@ -45,7 +45,7 @@ The `sign_b64` covers a **hash** of `data_b64`, not `data_b64` itself — the si
 
 This prevents unbounded storage from unverified chunks during device-to-device sync.
 
-### 1.3 `upload_files` (local only, NOT Electric-synced)
+### 1.3 `upload_chunks` (local only, NOT Electric-synced)
 
 Tracks uploaded chunks before the signed `files` manifest arrives. Populated as a side effect of `file_chunks` ingest — the device writes a bookkeeping row with server-set `updated_at` from TimeKeeper. Provides ownership tracking, upload resume, and unsigned-data budget accounting.
 
@@ -102,7 +102,7 @@ Client                              Device
   │─── POST /electric/v1/ingest ──────>│  file_chunks insert, data_b64 as base64
   │    device: verify sign_b64         │
   │    insert into file_chunks         │
-  │    insert into upload_files        │
+  │    insert into upload_chunks        │
   │      (updated_at = TimeKeeper)     │
   │<── 200 {txid} ─────────────────────│
   │                                    │
@@ -128,12 +128,12 @@ Client                              Device
   │         exist in file_chunks       │
   │      3. each chunk_sign_hash       │
   │         matches actual chunk       │
-  │    delete upload_files rows        │
+  │    delete upload_chunks rows        │
   │      for this file_id              │
   │<── 200 {txid} ─────────────────────│  committed to Electric
 ```
 
-The client encrypts, signs, and uploads chunks progressively via ingest (no need to encrypt everything upfront). The device verifies each chunk's signature on ingest and writes a local `upload_files` bookkeeping row (with server-set `updated_at` from TimeKeeper) for budget/GC tracking. After all chunks are on the device, the client builds the `files` manifest with `chunk_sign_hashes` (computed locally from its own `sign_b64` values), signs it, and commits via ingest. The device validates that all chunks are present before accepting the `files` row.
+The client encrypts, signs, and uploads chunks progressively via ingest (no need to encrypt everything upfront). The device verifies each chunk's signature on ingest and writes a local `upload_chunks` bookkeeping row (with server-set `updated_at` from TimeKeeper) for budget/GC tracking. After all chunks are on the device, the client builds the `files` manifest with `chunk_sign_hashes` (computed locally from its own `sign_b64` values), signs it, and commits via ingest. The device validates that all chunks are present before accepting the `files` row.
 
 ## 5. Sync Protocol
 
@@ -161,10 +161,10 @@ Emptying `chunk_sign_hashes` ensures receiving devices cannot verify any chunks 
 
 ## 7. Garbage Collection
 
-Runs every hour. Two triggers clean up `file_chunks` and `upload_files` rows:
+Runs every hour. Two triggers clean up `file_chunks` and `upload_chunks` rows:
 
 1. **Deleted files**: when `files.deleted_flag = true`, delete all `file_chunks` rows for that `file_id`
-2. **Stale uploads**: when `upload_files.updated_at + 2 days < TimeKeeper.now()`, delete the `upload_files` row and its corresponding `file_chunks` row (upload never completed)
+2. **Stale uploads**: when `upload_chunks.updated_at + 2 days < TimeKeeper.now()`, delete the `upload_chunks` row and its corresponding `file_chunks` row (upload never completed)
 
 Trigger 1 handles normal file deletion. Trigger 2 handles abandoned uploads where the `files` manifest was never ingested.
 

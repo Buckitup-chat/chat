@@ -13,9 +13,9 @@ defmodule Chat.NetworkSynchronization.Electric.PeerSync do
 
   require Logger
 
+  alias Chat.Data.Shapes
   alias Chat.NetworkSynchronization.Electric.PeerIdentifier
   alias Chat.NetworkSynchronization.Electric.ShapeConsumer
-  alias Chat.NetworkSynchronization.Electric.Shapes
 
   def start_link(opts) do
     peer_url = Keyword.fetch!(opts, :peer_url)
@@ -27,7 +27,7 @@ defmodule Chat.NetworkSynchronization.Electric.PeerSync do
     case PeerIdentifier.fetch_system_identifier(peer_url) do
       {:ok, system_identifier} ->
         children =
-          Enum.map(Shapes.all(), fn shape ->
+          Enum.map(Shapes.shape_names(), fn shape ->
             Supervisor.child_spec(
               {ShapeConsumer,
                peer_url: peer_url, system_identifier: system_identifier, shape: shape},

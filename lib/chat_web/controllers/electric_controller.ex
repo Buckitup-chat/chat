@@ -11,9 +11,7 @@ defmodule ChatWeb.ElectricController do
   ]
 
   alias Chat.Challenge
-  alias Chat.Data.Schemas.UserCard
-  alias Chat.Data.Schemas.UserStorage
-  alias Chat.Data.User.Validation, as: UserValidation
+  alias Chat.Data.Shapes
   alias ChatWeb.Utils.IngestUtil
   alias Phoenix.Sync.Writer
   alias Phoenix.Sync.Writer.Format
@@ -38,23 +36,10 @@ defmodule ChatWeb.ElectricController do
   end
 
   defp config_writer(writer, user_pop_context) do
-    writer
-    |> Writer.allow(UserCard,
-      accept: [:insert, :update],
-      check: &UserValidation.user_card_allowed(&1, user_pop_context),
-      validate: &UserValidation.user_card_validate/3
-    )
-    |> Writer.allow(UserStorage,
-      accept: [:insert, :update],
-      check: &UserValidation.user_storage_allowed(&1, user_pop_context),
-      validate: &UserValidation.user_storage_validate_with_versioning/3,
-      insert: [
-        pre_apply: &UserValidation.user_storage_pre_apply_versioning/3
-      ],
-      update: [
-        pre_apply: &UserValidation.user_storage_pre_apply_versioning/3
-      ]
-    )
+    Shapes.all()
+    |> Enum.reduce(writer, fn shape_mod, w ->
+      shape_mod.ingest_configure_writer(w, user_pop_context)
+    end)
   end
 
   defp user_pop_context(params) do

@@ -15,8 +15,8 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
 
   import Tools.GenServerHelpers
 
+  alias Chat.Data.Shapes
   alias Chat.NetworkSynchronization.Electric.OffsetStore
-  alias Chat.NetworkSynchronization.Electric.Shapes
   alias Chat.NetworkSynchronization.Electric.ShapeWriter
   alias Chat.NetworkSynchronization.Status.ErrorStatus
   alias Chat.NetworkSynchronization.Status.LiveStatus
@@ -163,7 +163,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
 
   defp launch_task(peer_url, system_identifier, shape) do
     resume = OffsetStore.load(system_identifier, shape)
-    schema_module = Shapes.schema_module(shape)
+    schema_module = Shapes.by_name(shape).schema_module()
     parent = self()
 
     stream_opts =

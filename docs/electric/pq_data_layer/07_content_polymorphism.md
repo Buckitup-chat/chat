@@ -20,10 +20,11 @@ Examples:
 
 ```json
 "hello"
-["here is example of composed message", {"inline_image": [16, 9, "some.jpg", ... ]}]
-{"image": [16, 9, "filename.jpg", "<inline-base64>"]}
-{"file":  ["doc.pdf",1048576, ...]}
-{"audio": [4200, ...]}
+["here is example of composed message", {"inline_image": [16, 9, "thumbhash...", "some.jpg", ... ]}]
+{"inline_image": [16, 9, "thumbhash...", "photo.jpg", 204800, "image/jpeg", 1715000000, "<data_b64>"]}
+{"image": [16, 9, "thumbhash...", "photo.jpg", 5242880, "image/jpeg", 1715000000, "f_01964...", "<enc_secret_b64>"]}
+{"video": [16, 9, "thumbhash...", "clip.mp4", 52428800, "video/mp4", 1715000000, "f_01964...", "<enc_secret_b64>"]}
+{"file":  ["doc.pdf", 1048576, "application/pdf", 1715000000, "f_01964...", "<enc_secret_b64>"]}
 ```
 
 Because the type lives inside the ciphertext, the database (and any peer without the dialog secret) cannot tell whether a row is text, image, or attachment — only its size class.
@@ -33,6 +34,8 @@ Because the type lives inside the ciphertext, the database (and any peer without
 - [`"inline_file"`](#inline_file) — small file, inline base64
 - [`"inline_image"`](#inline_image) — small image, inline base64 with aspect ratio and thumbhash
 - [`"file"`](#file) — large file, out-of-band encrypted chunks in PostgreSQL
+- [`"image"`](#image) — large image, out-of-band with aspect ratio and thumbhash
+- [`"video"`](#video) — video, out-of-band with aspect ratio and thumbhash
 
 ### `"inline_file"`
 
@@ -88,13 +91,57 @@ Out-of-band file stored as encrypted chunks in PostgreSQL. See [pq_files.md](../
 
 Because this lives inside ciphertext, the database cannot tell whether a row is text or a file attachment. Only dialog members who can decrypt `content_b64` learn the file exists and obtain `enc_secret` to decrypt chunks.
 
+### `"image"`
+
+Out-of-band image stored as encrypted chunks in PostgreSQL. Extends the `"file"` type with aspect ratio and thumbhash for preview rendering before chunk download. See [pq_files.md](../../reqs/pq_files.md) for chunk encryption.
+
+```json
+{"image": [width_aspect, height_aspect, thumb_hash_b64, name, size, mime_type, creation_unixtime, file_id, enc_secret_b64]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | width_aspect | Width component of aspect ratio |
+| 1 | height_aspect | Height component of aspect ratio |
+| 2 | thumb_hash_b64 | [ThumbHash](https://evanw.github.io/thumbhash/) in base64 |
+| 3 | name | Original filename |
+| 4 | size | Plaintext byte size |
+| 5 | mime_type | MIME type |
+| 6 | creation_unixtime | Unix seconds of uploaded file creation |
+| 7 | file_id | References `files.file_id` |
+| 8 | enc_secret_b64 | AES-256 key for chunk decryption (base64) |
+
+Small images (under the inline size limit) should use [`"inline_image"`](#inline_image) instead. The sender decides: if the image fits inline, embed it; otherwise upload chunks and reference via `"image"`.
+
+### `"video"`
+
+Out-of-band video stored as encrypted chunks in PostgreSQL. Carries aspect ratio and thumbhash (from a representative frame) for preview rendering before chunk download. See [pq_files.md](../../reqs/pq_files.md) for chunk encryption.
+
+```json
+{"video": [width_aspect, height_aspect, thumb_hash_b64, name, size, mime_type, creation_unixtime, file_id, enc_secret_b64]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | width_aspect | Width component of aspect ratio |
+| 1 | height_aspect | Height component of aspect ratio |
+| 2 | thumb_hash_b64 | [ThumbHash](https://evanw.github.io/thumbhash/) in base64 — computed from a representative frame |
+| 3 | name | Original filename |
+| 4 | size | Plaintext byte size |
+| 5 | mime_type | MIME type |
+| 6 | creation_unixtime | Unix seconds of uploaded file creation |
+| 7 | file_id | References `files.file_id` |
+| 8 | enc_secret_b64 | AES-256 key for chunk decryption (base64) |
+
+Videos are always out-of-band — there is no inline variant.
+
 --- 
 
 ### Inline vs. out-of-band
 
 For small payloads, the bytes sit inside the JSON value directly (base64-encoded). **Soft limit: 500 KB** for inline objects. **Hard limit: the top-level `content_b64` field must not exceed 1 MB** after encryption.
 
-For large payloads, use the out-of-band `"file"` content type — the JSON value carries a reference (`file_id` + `enc_secret_b64`) and the actual bytes live in encrypted chunks in PostgreSQL (see [pq_files.md](../../reqs/pq_files.md)).
+For large payloads, use an out-of-band content type (`"file"`, `"image"`, or `"video"`) — the JSON value carries a reference (`file_id` + `enc_secret_b64`) and the actual bytes live in encrypted chunks in PostgreSQL (see [pq_files.md](../../reqs/pq_files.md)). The `"image"` and `"video"` types add visual metadata (aspect ratio, thumbhash) so the client can render a placeholder before downloading chunks.
 
 The carrier row's `sign_b64` covers the whole `content_b64` (nonce + ciphertext), so any tampering with the envelope — including embedded references — is detected.
 

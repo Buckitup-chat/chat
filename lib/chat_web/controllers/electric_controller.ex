@@ -20,7 +20,7 @@ defmodule ChatWeb.ElectricController do
 
   def ingest(conn, params) do
     hex_suffixes = ~w[]
-    base64_suffixes = ~w[_pkey _cert _b64]
+    base64_suffixes = ~w[_pkey _cert _b64 _hashes]
 
     with {_, %{"mutations" => mutations}} <- {:correct_params, params},
          {_, true} <- {:is_mutation_list, is_list(mutations)},

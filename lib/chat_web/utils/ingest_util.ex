@@ -75,18 +75,37 @@ defmodule ChatWeb.Utils.IngestUtil do
   defp decode_section_field(field, value, hex_suffixes, base64_suffixes) do
     cond do
       Enum.any?(base64_suffixes, &String.ends_with?(field, &1)) ->
-        decode_base64(value)
+        decode_field_value(value, &decode_base64/1)
 
       Enum.any?(hex_suffixes, &String.ends_with?(field, &1)) ->
-        case decode_hex(value) do
-          {:ok, bin} -> {:ok, bin}
-          {:error, _} -> {:error, "invalid_binary_field"}
-        end
+        decode_field_value(value, &decode_hex_field/1)
 
       true ->
         {:ok, value}
     end
   end
+
+  defp decode_hex_field(v) do
+    case decode_hex(v) do
+      {:ok, bin} -> {:ok, bin}
+      {:error, _} -> {:error, "invalid_binary_field"}
+    end
+  end
+
+  defp decode_field_value(values, decoder) when is_list(values) do
+    Enum.reduce_while(values, {:ok, []}, fn v, {:ok, acc} ->
+      case decoder.(v) do
+        {:ok, decoded} -> {:cont, {:ok, [decoded | acc]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, decoded} -> {:ok, Enum.reverse(decoded)}
+      error -> error
+    end
+  end
+
+  defp decode_field_value(value, decoder), do: decoder.(value)
 
   @doc """
   Decodes hex-encoded binary fields.

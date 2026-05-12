@@ -1,6 +1,6 @@
 # Integrity
 
-> Status: **solved** — every row in `user_cards` and `user_storage` is self-authenticating via `sign_b64`.
+> Status: **solved** — every row in `user_cards`, `user_storage`, `files`, and `file_chunks` is self-authenticating via `sign_b64`.
 
 ## Problem
 
@@ -32,6 +32,7 @@ Per-type encoding:
 | string | raw UTF-8 |
 | integer | decimal |
 | datetime | ISO 8601 basic format |
+| array of binary | concatenated base64 elements: `base64(el0)base64(el1)...` |
 | boolean | `"true"` / `"false"` |
 | null | `"null"` |
 
@@ -48,7 +49,7 @@ Trust bootstrap:
 - **Field-level schema + algorithms**: [pq_user.md](../../reqs/pq_user.md)
 - **Storage row integrity**: [pq_user_storage.md §3.1 / §5.2](../../reqs/pq_user_storage.md) (`sign_hash`, `sign_b64`)
 - **Table layout**: [SCHEMAS.md](./SCHEMAS.md) — `user_cards` is the canonical example; `sign_b64`, `owner_timestamp`, `deleted_flag` all listed as `NOT NULL`.
-- **Reference schema module**: `Chat.Data.Schemas.UserCard` — `@create_fields` includes the triad; `Signable` impl drops only `sign_b64` and `__meta__`, so every other field (including `owner_timestamp` and `deleted_flag`) is covered by the signature.
+- **Reference schema modules**: `Chat.Data.Schemas.UserCard`, `Chat.Data.Schemas.File`, `Chat.Data.Schemas.FileChunk` — `Signable` impl drops only `sign_b64` (and derived fields like `sign_hash`) and `__meta__`, so every other field is covered by the signature.
 - **Verification primitive**: `Chat.Data.Integrity.verify_signature/1` (protocol-driven, same for every signable schema).
 - **Where verification runs**: `validate/3` per-model ingestion callback — see [Electric_Abstraction_Layer.md](../Electric_Abstraction_Layer.md)
 

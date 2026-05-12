@@ -64,6 +64,7 @@ defmodule Chat.MixProject do
       {:curvy, "~> 0.3.1"},
       {:struct_access, "~> 1.1"},
       {:uuid, "~> 1.1"},
+      {:uuidv7, "~> 0.2"},
       {:ip, "~> 2.0"},
       {:slipstream, "~> 1.1"},
       {:onvif, github: "sergey-lukianov/onvif"},

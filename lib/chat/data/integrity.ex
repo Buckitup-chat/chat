@@ -59,6 +59,7 @@ defmodule Chat.Data.Integrity do
       String.ends_with?(key_str, "_b64") -> encode_base64(value)
       String.ends_with?(key_str, "_cert") -> encode_base64(value)
       String.ends_with?(key_str, "_pkey") -> encode_base64(value)
+      is_list(value) -> Enum.map_join(value, "", &encode_list_element/1)
       value == true -> "true"
       value == false -> "false"
       is_nil(value) -> "null"
@@ -67,6 +68,9 @@ defmodule Chat.Data.Integrity do
       true -> to_string(value)
     end
   end
+
+  defp encode_list_element(bin) when is_binary(bin), do: Base.encode64(bin)
+  defp encode_list_element(value), do: to_string(value)
 
   defp encode_base64(nil), do: "null"
   defp encode_base64(value) when is_binary(value), do: Base.encode64(value)

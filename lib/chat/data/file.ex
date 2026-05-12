@@ -1,0 +1,110 @@
+defmodule Chat.Data.File do
+  @moduledoc "File context for managing file storage data in Postgres"
+
+  import Chat.Db, only: [repo: 0]
+  import Ecto.Query
+
+  alias Chat.Data.Schemas.File
+  alias Chat.Data.Schemas.FileChunk
+  alias Chat.Data.Schemas.UploadChunk
+
+  def get_file(file_id) do
+    repo().get(File, file_id)
+  end
+
+  def get_file_chunks(file_id) do
+    from(c in FileChunk, where: c.file_id == ^file_id)
+    |> repo().all()
+  end
+
+  def get_file_chunk_count(file_id) do
+    from(c in FileChunk, where: c.file_id == ^file_id, select: count())
+    |> repo().one()
+  end
+
+  def upsert_file(changeset) do
+    repo().insert(changeset,
+      on_conflict: file_upsert_query(),
+      conflict_target: :file_id,
+      allow_stale: true
+    )
+  end
+
+  def update_file(existing, new_file) do
+    existing
+    |> File.delete_changeset(Map.from_struct(new_file))
+    |> repo().update()
+  end
+
+  def insert_file_chunk(changeset) do
+    repo().insert(changeset,
+      on_conflict: :nothing,
+      conflict_target: [:file_id, :chunk_index]
+    )
+  end
+
+  def insert_upload_chunk(attrs) do
+    %UploadChunk{}
+    |> UploadChunk.create_changeset(attrs)
+    |> repo().insert(
+      on_conflict: :nothing,
+      conflict_target: [:file_id, :chunk_index]
+    )
+  end
+
+  def delete_upload_chunks_for_file(file_id) do
+    from(u in UploadChunk, where: u.file_id == ^file_id)
+    |> repo().delete_all()
+  end
+
+  def delete_file_chunks_for_file(file_id) do
+    from(c in FileChunk, where: c.file_id == ^file_id)
+    |> repo().delete_all()
+  end
+
+  def deleted_file_ids do
+    from(f in File, where: f.deleted_flag == true, select: f.file_id)
+    |> repo().all()
+  end
+
+  def stale_upload_chunk_file_ids(threshold_unix) do
+    committed_file_ids = from(f in File, select: f.file_id)
+
+    from(u in UploadChunk,
+      where: u.updated_at < ^threshold_unix,
+      where: u.file_id not in subquery(committed_file_ids),
+      distinct: u.file_id,
+      select: u.file_id
+    )
+    |> repo().all()
+  end
+
+  def delete_upload_chunks_for_files(file_ids) do
+    from(u in UploadChunk, where: u.file_id in ^file_ids)
+    |> repo().delete_all()
+  end
+
+  def delete_file_chunks_for_files(file_ids) do
+    from(c in FileChunk, where: c.file_id in ^file_ids)
+    |> repo().delete_all()
+  end
+
+  defp file_upsert_query do
+    from(f in File,
+      update: [
+        set: [
+          total_size: fragment("EXCLUDED.total_size"),
+          chunk_size: fragment("EXCLUDED.chunk_size"),
+          chunk_count: fragment("EXCLUDED.chunk_count"),
+          chunk_sign_hashes: fragment("EXCLUDED.chunk_sign_hashes"),
+          deleted_flag: fragment("EXCLUDED.deleted_flag"),
+          owner_timestamp: fragment("EXCLUDED.owner_timestamp"),
+          sign_b64: fragment("EXCLUDED.sign_b64")
+        ]
+      ],
+      where:
+        is_nil(f.owner_timestamp) or
+          f.owner_timestamp < fragment("EXCLUDED.owner_timestamp")
+    )
+  end
+end

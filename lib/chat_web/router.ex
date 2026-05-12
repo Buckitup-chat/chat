@@ -153,6 +153,8 @@ defmodule ChatWeb.Router do
       pipe_through ChatWeb.Plugs.ElectricReadiness
 
       # Phoenix.Sync endpoint for LiveView real-time sync
+      sync("/file", Chat.Data.Schemas.File)
+      sync("/file_chunk", Chat.Data.Schemas.FileChunk)
       sync("/user_card", Chat.Data.Schemas.UserCard)
       sync("/user_storage", Chat.Data.Schemas.UserStorage)
       sync("/user_storage_version", Chat.Data.Schemas.UserStorageVersion)

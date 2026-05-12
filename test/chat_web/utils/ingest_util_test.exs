@@ -59,5 +59,44 @@ defmodule ChatWeb.Utils.IngestUtilTest do
       assert {:error, "invalid_base64_field"} =
                IngestUtil.decode_mutation_fields(mutations, ["_hash"], ["_pkey"])
     end
+
+    test "decodes array values element-by-element for matching suffix" do
+      bin_a = :crypto.strong_rand_bytes(8)
+      bin_b = :crypto.strong_rand_bytes(8)
+
+      mutations = [
+        %{
+          "modified" => %{
+            "chunk_sign_hashes" => [
+              Base.encode64(bin_a, padding: false),
+              Base.encode64(bin_b, padding: false)
+            ]
+          }
+        }
+      ]
+
+      assert {:ok, [decoded]} =
+               IngestUtil.decode_mutation_fields(mutations, [], ["_hashes"])
+
+      assert decoded["modified"]["chunk_sign_hashes"] == [bin_a, bin_b]
+    end
+
+    test "decodes empty array" do
+      mutations = [%{"modified" => %{"chunk_sign_hashes" => []}}]
+
+      assert {:ok, [decoded]} =
+               IngestUtil.decode_mutation_fields(mutations, [], ["_hashes"])
+
+      assert decoded["modified"]["chunk_sign_hashes"] == []
+    end
+
+    test "returns error for array with invalid base64 element" do
+      mutations = [
+        %{"modified" => %{"chunk_sign_hashes" => ["validbase64", "not!valid!"]}}
+      ]
+
+      assert {:error, "invalid_base64_field"} =
+               IngestUtil.decode_mutation_fields(mutations, [], ["_hashes"])
+    end
   end
 end

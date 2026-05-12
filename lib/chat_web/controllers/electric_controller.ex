@@ -16,6 +16,8 @@ defmodule ChatWeb.ElectricController do
   alias Phoenix.Sync.Writer
   alias Phoenix.Sync.Writer.Format
 
+  def options(conn, _params), do: send_resp(conn, 204, "")
+
   def ingest(conn, params) do
     hex_suffixes = ~w[]
     base64_suffixes = ~w[_pkey _cert _b64]

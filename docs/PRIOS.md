@@ -6,4 +6,5 @@
 4. Create client side file uploader/downloader
 5. Create client side image uploader/viewer
 6. Create client side video uploader/viewer
-7. Implement dialog shapes ([pq_dialogs.md](reqs/pq_dialogs.md))
+7. ~~Deal with migrations on start of chat~~ ✅
+8. Implement dialog shapes ([pq_dialogs.md](reqs/pq_dialogs.md))

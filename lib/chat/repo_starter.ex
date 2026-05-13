@@ -24,7 +24,6 @@ defmodule Chat.RepoStarter do
       # Start repo with proper name registration for test environment
       {:ok, _pid} = DynamicSupervisor.start_child(supervisor, {Chat.Repo, [name: Chat.Repo]})
       run_migrations()
-      {:ok, _pid} = DynamicSupervisor.start_child(supervisor, Chat.User.UsersBroker)
 
       {:ok, %{supervisor: supervisor}}
     end
@@ -46,8 +45,6 @@ defmodule Chat.RepoStarter do
     def handle_info(:start_repo, state) do
       {:ok, _pid} = DynamicSupervisor.start_child(state.supervisor, Chat.Repo)
       run_migrations()
-      {:ok, _pid} = DynamicSupervisor.start_child(state.supervisor, Chat.User.UsersBroker)
-      # {:ok, _pid} = DynamicSupervisor.start_child(state.supervisor, Chat.Rooms.RoomsBroker)
       {:ok, _pid} =
         DynamicSupervisor.start_child(state.supervisor, {Chat.Repo, [name: Chat.InternalRepo]})
 

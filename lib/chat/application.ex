@@ -24,7 +24,7 @@ defmodule Chat.Application do
         {Phoenix.PubSub, name: Chat.PubSub},
         Chat.TimeKeeper |> if_on_host(),
         # Start Ecto repository with retry mechanism
-        Chat.Repo |> if_on_host(),
+        Chat.RepoSupervisor |> if_on_host(),
         # Start DB
         Chat.Ordering.Counters,
         Chat.Db.Supervisor,

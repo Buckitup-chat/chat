@@ -24,7 +24,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="h-screen flex flex-col bg-gray-50">
+    <div class="h-screen flex flex-col bg-gray-50" id="user-sandbox" phx-hook="DownloadFile">
       <!-- Header -->
       <div class="bg-white border-b px-6 py-4">
         <h1 class="text-2xl font-bold text-gray-900">Electric API Sandbox</h1>
@@ -379,14 +379,23 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
             </button>
           </form>
 
-          <button
-            phx-click="delete_user"
-            data-confirm="Delete this user and all storage items?"
-            class="px-4 py-2 bg-red-500 text-white rounded text-sm w-full hover:bg-red-600 disabled:bg-gray-400"
-            disabled={@operation_in_progress}
-          >
-            Delete User
-          </button>
+          <div class="flex gap-2">
+            <button
+              phx-click="export_keys"
+              class="flex-1 px-4 py-2 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+              id="export-keys-btn"
+            >
+              Export Keys
+            </button>
+            <button
+              phx-click="delete_user"
+              data-confirm="Delete this user and all storage items?"
+              class="flex-1 px-4 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600 disabled:bg-gray-400"
+              disabled={@operation_in_progress}
+            >
+              Delete User
+            </button>
+          </div>
         </div>
         
     <!-- Storage Items Section -->
@@ -678,6 +687,22 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
 
         {:noreply, socket}
     end
+  end
+
+  def handle_event("export_keys", _params, socket) do
+    user = socket.assigns.user
+
+    identity_json =
+      Jason.encode!(%{
+        type: "buckitup_pq_identity",
+        version: 1,
+        user_hash: user.user_hash,
+        name: user.name,
+        sign_pkey: Base.encode64(user.sign_pkey, padding: false),
+        sign_skey: Base.encode64(user.sign_skey, padding: false)
+      })
+
+    {:noreply, push_event(socket, "download_file", %{data: identity_json, filename: "identity.json"})}
   end
 
   def handle_event("toggle_docs", _params, socket) do

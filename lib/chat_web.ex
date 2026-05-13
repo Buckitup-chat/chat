@@ -17,7 +17,7 @@ defmodule ChatWeb do
   and import those modules here.
   """
   def static_paths do
-    ~w(assets fonts frontend images favicon.ico robots.txt walc-external-bundle.js)
+    ~w(assets fonts frontend images favicon.ico robots.txt walc-external-bundle.js file_sandbox.html)
   end
 
   def controller do

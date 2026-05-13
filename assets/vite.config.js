@@ -49,6 +49,7 @@ export default defineConfig(({ command }) => {
       rollupOptions: {
         input: {
           app: path.resolve(__dirname, "./js/app.js"),
+          "file-sandbox": path.resolve(__dirname, "./js/file-sandbox-entry.js"),
         },
         output: {
           // remove hashes to match phoenix way of handling assets

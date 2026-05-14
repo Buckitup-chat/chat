@@ -22,6 +22,8 @@ function init() {
   document.getElementById('import-btn').addEventListener('click', handleKeyImport);
   document.getElementById('upload-btn').addEventListener('click', handleUpload);
   document.getElementById('download-btn').addEventListener('click', handleDownload);
+  document.getElementById('view-btn').addEventListener('click', handleView);
+  document.getElementById('close-preview-btn').addEventListener('click', closePreview);
   document.getElementById('clear-log-btn').addEventListener('click', clearLog);
   document.getElementById('toggle-docs-btn').addEventListener('click', toggleDocs);
 }
@@ -211,7 +213,7 @@ async function downloadStreaming(chunkRows, encSecret, fileHandle) {
   }
 }
 
-async function downloadInMemory(chunkRows, encSecret, fileId) {
+async function decryptToBlob(chunkRows, encSecret) {
   const decryptedChunks = [];
   for (let i = 0; i < chunkRows.length; i++) {
     updateProgress(i, chunkRows.length, 'Decrypting');
@@ -219,8 +221,11 @@ async function downloadInMemory(chunkRows, encSecret, fileId) {
       await decryptChunk(parseChunkData(chunkRows[i].data_b64), encSecret)
     );
   }
+  return new Blob(decryptedChunks);
+}
 
-  const blob = new Blob(decryptedChunks);
+async function downloadInMemory(chunkRows, encSecret, fileId) {
+  const blob = await decryptToBlob(chunkRows, encSecret);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -270,6 +275,48 @@ async function handleDownload() {
     }
   } finally {
     downloadBtn.disabled = false;
+  }
+}
+
+let previewBlobUrl = null;
+
+async function handleView() {
+  const fileId = document.getElementById('download-file-id').value.trim();
+  const encSecretHex = document.getElementById('download-enc-secret').value.trim();
+
+  if (!fileId || !encSecretHex) return setStatus('Enter file_id and encryption secret', 'error');
+
+  const viewBtn = document.getElementById('view-btn');
+  viewBtn.disabled = true;
+  setStatus('Decrypting for preview...', 'info');
+
+  try {
+    const encSecret = hexToUint8(encSecretHex);
+    const chunkRows = await fetchAndSortChunks(fileId);
+    const blob = await decryptToBlob(chunkRows, encSecret);
+
+    if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
+    previewBlobUrl = URL.createObjectURL(blob);
+
+    const img = document.getElementById('preview-img');
+    img.src = previewBlobUrl;
+    document.getElementById('image-preview').classList.remove('hidden');
+
+    updateProgress(chunkRows.length, chunkRows.length, 'Complete');
+    setStatus('Preview ready', 'success');
+  } catch (e) {
+    console.error('View failed:', e);
+    setStatus(`View failed: ${e.message}`, 'error');
+  } finally {
+    viewBtn.disabled = false;
+  }
+}
+
+function closePreview() {
+  document.getElementById('image-preview').classList.add('hidden');
+  if (previewBlobUrl) {
+    URL.revokeObjectURL(previewBlobUrl);
+    previewBlobUrl = null;
   }
 }
 

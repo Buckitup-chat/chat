@@ -57,7 +57,6 @@ async function handleKeyImport() {
     document.getElementById('key-status').textContent =
       `Loaded: ${identity.name} (${identity.user_hash.slice(0, 18)}...)`;
     document.getElementById('upload-section').classList.remove('hidden');
-    document.getElementById('download-section').classList.remove('hidden');
     setStatus('Keys imported successfully', 'success');
   } catch (e) {
     setStatus(`Key import failed: ${e.message}`, 'error');
@@ -178,8 +177,6 @@ async function handleUpload() {
 // --- Download ---
 
 async function handleDownload() {
-  if (!state.keys) return setStatus('Import keys first', 'error');
-
   const fileId = document.getElementById('download-file-id').value.trim();
   const encSecretHex = document.getElementById('download-enc-secret').value.trim();
 

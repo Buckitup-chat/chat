@@ -4,7 +4,7 @@
 2. ~~DefferedStore for UserStoreage~~ ✅
 3. ~~Implement file storage shapes ([pq_files.md](reqs/pq_files.md))~~ ✅
 4. ~~Create client side file uploader/downloader~~ ✅
-5. Create client side image uploader/viewer
+5. ~~Create client side image uploader/viewer~~ ✅
 6. Create client side video uploader/viewer
 7. ~~Deal with migrations on start of chat~~ ✅
 8. Implement dialog shapes ([pq_dialogs.md](reqs/pq_dialogs.md))

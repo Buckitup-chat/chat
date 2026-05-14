@@ -176,6 +176,61 @@ async function handleUpload() {
 
 // --- Download ---
 
+function parseChunkData(rawData) {
+  if (typeof rawData === 'string' && rawData.startsWith('\\x')) return hexToUint8(rawData);
+  if (typeof rawData === 'string') return base64ToUint8(rawData);
+  return new Uint8Array(rawData);
+}
+
+async function fetchAndSortChunks(fileId) {
+  setStatus('Fetching file manifest...', 'info');
+  const files = await fetchShape(state.baseUrl, 'file', r => r.file_id === fileId);
+  if (files.length === 0) throw new Error('File manifest not found');
+
+  const chunkCount = parseInt(files[0].chunk_count);
+  setStatus(`Fetching ${chunkCount} chunk(s)...`, 'info');
+  const chunkRows = await fetchShape(state.baseUrl, 'file_chunk', r => r.file_id === fileId);
+  if (chunkRows.length < chunkCount) {
+    throw new Error(`Missing chunks: have ${chunkRows.length}, need ${chunkCount}`);
+  }
+
+  chunkRows.sort((a, b) => parseInt(a.chunk_index) - parseInt(b.chunk_index));
+  return chunkRows;
+}
+
+async function downloadStreaming(chunkRows, encSecret, fileHandle) {
+  const writable = await fileHandle.createWritable();
+  try {
+    for (let i = 0; i < chunkRows.length; i++) {
+      updateProgress(i, chunkRows.length, 'Decrypting');
+      const decrypted = await decryptChunk(parseChunkData(chunkRows[i].data_b64), encSecret);
+      await writable.write(decrypted);
+    }
+  } finally {
+    await writable.close();
+  }
+}
+
+async function downloadInMemory(chunkRows, encSecret, fileId) {
+  const decryptedChunks = [];
+  for (let i = 0; i < chunkRows.length; i++) {
+    updateProgress(i, chunkRows.length, 'Decrypting');
+    decryptedChunks.push(
+      await decryptChunk(parseChunkData(chunkRows[i].data_b64), encSecret)
+    );
+  }
+
+  const blob = new Blob(decryptedChunks);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `download_${fileId}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 async function handleDownload() {
   const fileId = document.getElementById('download-file-id').value.trim();
   const encSecretHex = document.getElementById('download-enc-secret').value.trim();
@@ -189,64 +244,30 @@ async function handleDownload() {
   try {
     const encSecret = hexToUint8(encSecretHex);
 
-    setStatus('Fetching file manifest...', 'info');
-    const files = await fetchShape(state.baseUrl, 'file', r => r.file_id === fileId);
-    console.log('File manifest results:', files.length, 'matching', fileId);
-    if (files.length === 0) throw new Error('File manifest not found');
-    const manifest = files[0];
-
-    const chunkCount = parseInt(manifest.chunk_count);
-    setStatus(`Fetching ${chunkCount} chunk(s)...`, 'info');
-    const chunkRows = await fetchShape(state.baseUrl, 'file_chunk', r => r.file_id === fileId);
-    console.log('Chunk results:', chunkRows.length, 'matching', fileId);
-    if (chunkRows.length < chunkCount) {
-      throw new Error(`Missing chunks: have ${chunkRows.length}, need ${chunkCount}`);
+    let fileHandle = null;
+    if (window.showSaveFilePicker) {
+      fileHandle = await window.showSaveFilePicker({
+        suggestedName: `download_${fileId}`,
+      });
     }
 
-    chunkRows.sort((a, b) => parseInt(a.chunk_index) - parseInt(b.chunk_index));
+    const chunkRows = await fetchAndSortChunks(fileId);
 
-    const decryptedChunks = [];
-    for (let i = 0; i < chunkRows.length; i++) {
-      updateProgress(i, chunkRows.length, 'Decrypting');
-
-      const rawData = chunkRows[i].data_b64;
-      let dataBytes;
-      if (typeof rawData === 'string' && rawData.startsWith('\\x')) {
-        dataBytes = hexToUint8(rawData);
-      } else if (typeof rawData === 'string') {
-        dataBytes = base64ToUint8(rawData);
-      } else {
-        dataBytes = new Uint8Array(rawData);
-      }
-
-      console.log(`Chunk ${i}: ${dataBytes.length} bytes (nonce: ${dataBytes.slice(0, 12)})`);
-      const decrypted = await decryptChunk(dataBytes, encSecret);
-      decryptedChunks.push(decrypted);
+    if (fileHandle) {
+      await downloadStreaming(chunkRows, encSecret, fileHandle);
+    } else {
+      await downloadInMemory(chunkRows, encSecret, fileId);
     }
-
-    const totalSize = decryptedChunks.reduce((sum, c) => sum + c.length, 0);
-    const assembled = new Uint8Array(totalSize);
-    let offset = 0;
-    for (const chunk of decryptedChunks) {
-      assembled.set(chunk, offset);
-      offset += chunk.length;
-    }
-
-    const blob = new Blob([assembled]);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `download_${fileId}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
 
     updateProgress(chunkRows.length, chunkRows.length, 'Complete');
     setStatus('Download complete', 'success');
   } catch (e) {
-    console.error('Download failed:', e);
-    setStatus(`Download failed: ${e.message}`, 'error');
+    if (e.name === 'AbortError') {
+      setStatus('Download cancelled', 'info');
+    } else {
+      console.error('Download failed:', e);
+      setStatus(`Download failed: ${e.message}`, 'error');
+    }
   } finally {
     downloadBtn.disabled = false;
   }

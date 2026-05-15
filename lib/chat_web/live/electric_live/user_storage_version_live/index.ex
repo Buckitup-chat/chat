@@ -297,7 +297,7 @@ defmodule ChatWeb.ElectricLive.UserStorageVersionLive.Index do
   defp format_bytes(bytes), do: "#{Float.round(bytes / 1_073_741_824, 2)} GB"
 
   defp format_timestamp(timestamp) when is_integer(timestamp) do
-    now = System.system_time(:second)
+    now = Chat.TimeKeeper.now_unix()
     diff = now - timestamp
 
     cond do

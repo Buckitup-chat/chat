@@ -12,7 +12,24 @@ straightforward as possible.
 
 ### Added
 
-- Post-quantum symmetric encryption primitives
+- Post-quantum file storage: schemas, shapes, validation, GC, and ingest (files + chunks)
+- Post-quantum file sandbox with on-the-fly decryption and image viewing
+- Post-quantum symmetric encryption primitives and tests
+- Post-quantum Shape behaviours for user_card and user_storage
+- Electric deferred store for UserStorage
+- Electric: run migrations on chat start
+- Post-quantum video streaming requirements
+- External frontend integration proposal
+
+### Changed
+
+- Post-quantum file content types: updated chunk size and algorithms
+
+### Fixed
+
+- Electric: CORS for ingest endpoint
+- Electric UI: hash over-encoding fix
+- [platform] Build fix (Makefile and deps)
 
 ## 2026-05-09_8efbd61\_\_\_2026-05-09_c5fc6a57
 

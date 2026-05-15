@@ -52,7 +52,7 @@ defmodule Chat.Data.User do
       crypt_cert: crypt_cert,
       name: name,
       deleted_flag: false,
-      owner_timestamp: System.system_time(:second)
+      owner_timestamp: Chat.TimeKeeper.now_unix()
     }
 
     sign_b64 =

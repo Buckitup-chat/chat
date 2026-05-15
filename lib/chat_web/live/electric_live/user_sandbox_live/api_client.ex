@@ -170,7 +170,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   """
   def create_storage(user_hash, sign_skey, uuid, value_binary, base_url) do
     challenge_url = base_url <> "/electric/v1/challenge"
-    owner_timestamp = System.system_time(:second)
+    owner_timestamp = Chat.TimeKeeper.now_unix()
 
     # Create storage struct for signing
     storage_attrs = %{

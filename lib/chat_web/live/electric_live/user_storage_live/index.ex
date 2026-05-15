@@ -233,7 +233,7 @@ defmodule ChatWeb.ElectricLive.UserStorageLive.Index do
 
   # Format timestamp to relative time
   defp format_timestamp(timestamp) when is_integer(timestamp) do
-    now = System.system_time(:second)
+    now = Chat.TimeKeeper.now_unix()
     diff = now - timestamp
 
     cond do

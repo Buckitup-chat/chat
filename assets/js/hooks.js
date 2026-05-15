@@ -1,4 +1,5 @@
 import AudioFile from "./hooks/audio-file"
+import DownloadFile from "./hooks/download-file"
 import DraggableCheckpoints from "./hooks/draggable-checkpoints"
 import MediaFileInput from "./hooks/media-file-input"
 import SortableUploadEntries from "./hooks/sortable-upload-entries"
@@ -13,6 +14,7 @@ import SafariSession from "./hooks/safari-session"
 export default {
   AudioFile,
   Chat,
+  DownloadFile,
   DraggableCheckpoints,
   Flash,
   ImageForceLoader,

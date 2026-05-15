@@ -32,9 +32,10 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
       user_data =
         card
         |> Map.from_struct()
-        # Remove "u_" prefix for display
         |> Map.put(:user_hash_hex, String.slice(card.user_hash, 2..-1//1))
         |> Map.put(:sign_skey, identity.sign_skey)
+        |> Map.put(:crypt_skey, identity.crypt_skey)
+        |> Map.put(:contact_skey, identity.contact_skey)
 
       {:ok, %{user: user_data, log_entries: [challenge_log, ingest_log]}}
     else

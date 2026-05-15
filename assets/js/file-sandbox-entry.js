@@ -53,7 +53,11 @@ async function handleKeyImport() {
       user_hash: identity.user_hash,
       name: identity.name,
       sign_pkey: base64ToUint8(identity.sign_pkey),
-      sign_skey: base64ToUint8(identity.sign_skey)
+      sign_skey: base64ToUint8(identity.sign_skey),
+      ...(identity.crypt_pkey && { crypt_pkey: base64ToUint8(identity.crypt_pkey) }),
+      ...(identity.crypt_skey && { crypt_skey: base64ToUint8(identity.crypt_skey) }),
+      ...(identity.contact_pkey && { contact_pkey: base64ToUint8(identity.contact_pkey) }),
+      ...(identity.contact_skey && { contact_skey: base64ToUint8(identity.contact_skey) }),
     };
 
     document.getElementById('key-status').textContent =

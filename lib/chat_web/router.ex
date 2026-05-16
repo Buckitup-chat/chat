@@ -93,6 +93,8 @@ defmodule ChatWeb.Router do
       live "/electric/user_cards", ElectricLive.UserCardsLive.Index, :index
       live "/electric/user_storage", ElectricLive.UserStorageLive.Index, :index
       live "/electric/user_storage_versions", ElectricLive.UserStorageVersionLive.Index, :index
+      live "/electric/files", ElectricLive.FilesLive.Index, :index
+      live "/electric/file_chunks", ElectricLive.FileChunksLive.Index, :index
       live "/electric/user_sandbox", ElectricLive.UserSandboxLive.Index, :index
     end
 

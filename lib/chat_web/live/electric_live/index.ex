@@ -180,6 +180,90 @@ defmodule ChatWeb.ElectricLive.Index do
             </div>
           </a>
 
+          <%!-- Files --%>
+          <a
+            href="/electric/files"
+            class="block bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-shadow duration-200"
+          >
+            <div class="px-4 py-5 sm:p-6">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <svg
+                    class="h-8 w-8 text-indigo-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                    />
+                  </svg>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">Files</dt>
+                    <dd class="mt-1 text-lg font-semibold text-gray-900">
+                      File Manifests
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+              <div class="mt-4">
+                <p class="text-sm text-gray-600">
+                  Real-time file manifests with size, chunk count, and upload metadata.
+                </p>
+                <p class="mt-2 text-xs text-gray-500 font-mono">
+                  /electric/v1/file
+                </p>
+              </div>
+            </div>
+          </a>
+
+          <%!-- File Chunks --%>
+          <a
+            href="/electric/file_chunks"
+            class="block bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-shadow duration-200"
+          >
+            <div class="px-4 py-5 sm:p-6">
+              <div class="flex items-center">
+                <div class="flex-shrink-0">
+                  <svg
+                    class="h-8 w-8 text-purple-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
+                    />
+                  </svg>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt class="text-sm font-medium text-gray-500 truncate">File Chunks</dt>
+                    <dd class="mt-1 text-lg font-semibold text-gray-900">
+                      Chunk Data
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+              <div class="mt-4">
+                <p class="text-sm text-gray-600">
+                  Real-time encrypted file chunks (~4 MB each) with integrity signatures.
+                </p>
+                <p class="mt-2 text-xs text-gray-500 font-mono">
+                  /electric/v1/file_chunk
+                </p>
+              </div>
+            </div>
+          </a>
+
           <%!-- User API Sandbox --%>
           <a
             href="/electric/user_sandbox"

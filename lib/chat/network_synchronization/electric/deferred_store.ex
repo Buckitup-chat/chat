@@ -108,8 +108,8 @@ defmodule Chat.NetworkSynchronization.Electric.DeferredStore do
   end
 
   defp refetch(%DeferredRecord{shape: shape, key: pk, peer_url: peer_url}) do
-    shape
-    |> electric_client(peer_url)
+    peer_url
+    |> shapes_client()
     |> Electric.Client.stream(build_refetch_query(shape, pk), live: false, replica: :full)
     |> Stream.each(&replay_change(shape, &1))
     |> Stream.run()
@@ -118,9 +118,9 @@ defmodule Chat.NetworkSynchronization.Electric.DeferredStore do
       log("Deferred redeliver failed for #{shape}: #{inspect({kind, reason})}", :warning)
   end
 
-  defp electric_client(shape, peer_url) do
+  defp shapes_client(peer_url) do
     Electric.Client.new!(
-      endpoint: "#{peer_url}/electric/v1/#{shape}",
+      endpoint: "#{peer_url}/electric/v1/shapes",
       fetch:
         {Electric.Client.Fetch.HTTP,
          request: [connect_options: [transport_opts: [{:keepalive, true}]]]}

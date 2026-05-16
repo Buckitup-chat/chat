@@ -251,7 +251,9 @@ defmodule ChatWeb.ElectricLive.Index do
                 <p class="text-sm text-gray-600">
                   Client-side file upload/download with AES-256-GCM encryption and ML-DSA-87 signing.
                 </p>
-                <p class="mt-2 text-xs text-gray-500 font-mono">/electric/v1/file, /electric/v1/file_chunk</p>
+                <p class="mt-2 text-xs text-gray-500 font-mono">
+                  /electric/v1/file, /electric/v1/file_chunk
+                </p>
               </div>
             </div>
           </a>

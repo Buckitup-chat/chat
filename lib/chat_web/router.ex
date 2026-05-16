@@ -163,8 +163,12 @@ defmodule ChatWeb.Router do
 
       scope "/" do
         pipe_through ChatWeb.Plugs.ElectricChallengeInjector
+
         options "/ingest", ElectricController, :options
+        options "/ingest_each", ElectricController, :options
+
         post "/ingest", ElectricController, :ingest
+        post "/ingest_each", ElectricController, :ingest_each
       end
     end
   end

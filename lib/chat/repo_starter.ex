@@ -45,6 +45,7 @@ defmodule Chat.RepoStarter do
     def handle_info(:start_repo, state) do
       {:ok, _pid} = DynamicSupervisor.start_child(state.supervisor, Chat.Repo)
       run_migrations()
+
       {:ok, _pid} =
         DynamicSupervisor.start_child(state.supervisor, {Chat.Repo, [name: Chat.InternalRepo]})
 

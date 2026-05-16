@@ -5,7 +5,10 @@ defmodule ChatWeb.ElectricController do
 
   @dialyzer [
     {:nowarn_function, ingest: 2},
+    {:nowarn_function, ingest_each: 2},
     {:nowarn_function, handle_ingest_error: 2},
+    {:nowarn_function, apply_single_mutation: 2},
+    {:nowarn_function, format_mutation_error: 1},
     {:nowarn_function, pub_key_unique_conflict?: 1},
     {:nowarn_function, changeset_errors: 1}
   ]
@@ -16,16 +19,16 @@ defmodule ChatWeb.ElectricController do
   alias Phoenix.Sync.Writer
   alias Phoenix.Sync.Writer.Format
 
+  @hex_suffixes ~w[]
+  @base64_suffixes ~w[_pkey _cert _b64 _hashes]
+
   def options(conn, _params), do: send_resp(conn, 204, "")
 
   def ingest(conn, params) do
-    hex_suffixes = ~w[]
-    base64_suffixes = ~w[_pkey _cert _b64 _hashes]
-
     with {_, %{"mutations" => mutations}} <- {:correct_params, params},
          {_, true} <- {:is_mutation_list, is_list(mutations)},
          {:ok, mutations} <-
-           IngestUtil.decode_mutation_fields(mutations, hex_suffixes, base64_suffixes),
+           IngestUtil.decode_mutation_fields(mutations, @hex_suffixes, @base64_suffixes),
          {:ok, user_pop_context} <- user_pop_context(params),
          {:ok, txid, _changes} <-
            Writer.new()
@@ -34,6 +37,56 @@ defmodule ChatWeb.ElectricController do
       json(conn, %{txid: txid})
     else
       error -> handle_ingest_error(conn, error)
+    end
+  end
+
+  def ingest_each(conn, params) do
+    with {_, %{"mutations" => mutations}} <- {:correct_params, params},
+         {_, true} <- {:is_mutation_list, is_list(mutations)},
+         {:ok, user_pop_context} <- user_pop_context(params) do
+      writer = Writer.new() |> config_writer(user_pop_context)
+
+      results =
+        mutations
+        |> IngestUtil.decode_mutation_fields_each(@hex_suffixes, @base64_suffixes)
+        |> Enum.map(&apply_single_mutation(writer, &1))
+
+      status = if Enum.all?(results, &(&1.status == "ok")), do: 200, else: 422
+      conn |> put_status(status) |> json(%{results: results})
+    else
+      error -> handle_ingest_error(conn, error)
+    end
+  end
+
+  defp apply_single_mutation(writer, {index, decode_result}) do
+    with {:ok, mutation} <- decode_result,
+         {:ok, txid, _changes} <-
+           Writer.apply(writer, [mutation], repo(), format: Format.TanstackDB) do
+      %{index: index, status: "ok", txid: txid}
+    else
+      {:error, reason} when is_binary(reason) ->
+        %{index: index, status: "error", error: reason}
+
+      error ->
+        Map.merge(%{index: index, status: "error"}, format_mutation_error(error))
+    end
+  end
+
+  defp format_mutation_error(error) do
+    case error do
+      {:error, _, %Ecto.Changeset{} = changeset, _} ->
+        if pub_key_unique_conflict?(changeset),
+          do: %{error: "pub_key_taken"},
+          else: %{error: "validation_failed", details: changeset_errors(changeset)}
+
+      {:error, _, %Writer.Error{message: msg}, _} when is_binary(msg) ->
+        %{error: msg}
+
+      {:error, reason} when is_binary(reason) ->
+        %{error: reason}
+
+      _ ->
+        %{error: "unknown_error"}
     end
   end
 

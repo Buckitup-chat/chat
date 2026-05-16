@@ -34,6 +34,14 @@ defmodule ChatWeb.Utils.IngestUtil do
     end
   end
 
+  def decode_mutation_fields_each(mutations, hex_suffixes, base64_suffixes \\ []) do
+    mutations
+    |> Enum.with_index()
+    |> Enum.map(fn {mutation, index} ->
+      {index, decode_mutation(mutation, hex_suffixes, base64_suffixes)}
+    end)
+  end
+
   defp decode_mutation(%{} = mutation, hex_suffixes, base64_suffixes) do
     ["modified", "changes", "original"]
     |> Enum.reduce_while({:ok, mutation}, fn section, {:ok, acc_mutation} ->

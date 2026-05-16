@@ -6,6 +6,7 @@ import {
 } from './file-sandbox/crypto.js';
 import { ingest, fetchShape } from './file-sandbox/electric-client.js';
 import { chunkFile, generateFileId, generateEncSecret } from './file-sandbox/file-chunker.js';
+import { VideoSWStreamer } from './file-sandbox/video-sw-streamer.js';
 
 const CHUNK_SIZE = 4_194_304;
 const textEncoder = new TextEncoder();
@@ -23,7 +24,9 @@ function init() {
   document.getElementById('upload-btn').addEventListener('click', handleUpload);
   document.getElementById('download-btn').addEventListener('click', handleDownload);
   document.getElementById('view-btn').addEventListener('click', handleView);
+  document.getElementById('play-video-btn').addEventListener('click', handlePlayVideo);
   document.getElementById('close-preview-btn').addEventListener('click', closePreview);
+  document.getElementById('close-video-btn').addEventListener('click', closeVideo);
   document.getElementById('clear-log-btn').addEventListener('click', clearLog);
   document.getElementById('toggle-docs-btn').addEventListener('click', toggleDocs);
 }
@@ -322,6 +325,67 @@ function closePreview() {
     URL.revokeObjectURL(previewBlobUrl);
     previewBlobUrl = null;
   }
+}
+
+// --- Video Streaming ---
+
+let activeStreamer = null;
+
+async function handlePlayVideo() {
+  const fileId = document.getElementById('download-file-id').value.trim();
+  const encSecretHex = document.getElementById('download-enc-secret').value.trim();
+
+  if (!fileId || !encSecretHex) return setStatus('Enter file_id and encryption secret', 'error');
+
+  const playBtn = document.getElementById('play-video-btn');
+  playBtn.disabled = true;
+  setStatus('Starting video stream...', 'info');
+
+  try {
+    closeVideo();
+    closePreview();
+
+    const encSecret = hexToUint8(encSecretHex);
+    const files = await fetchShape(state.baseUrl, 'file', r => r.file_id === fileId);
+    if (files.length === 0) throw new Error('File manifest not found');
+
+    const manifest = files[0];
+    const chunkCount = parseInt(manifest.chunk_count);
+    const totalSize = parseInt(manifest.total_size);
+
+    const videoElement = document.getElementById('preview-video');
+    const chunkSize = parseInt(manifest.chunk_size) || 4_194_304;
+    activeStreamer = new VideoSWStreamer({
+      fileId,
+      encSecret,
+      chunkCount,
+      totalSize,
+      chunkSize,
+      videoElement,
+      baseUrl: state.baseUrl,
+      onStatus(msg, type) { setVideoStatus(msg); setStatus(msg, type); }
+    });
+
+    document.getElementById('video-player').classList.remove('hidden');
+    await activeStreamer.start();
+  } catch (e) {
+    console.error('Video stream failed:', e);
+    setStatus(`Video stream failed: ${e.message}`, 'error');
+  } finally {
+    playBtn.disabled = false;
+  }
+}
+
+function closeVideo() {
+  if (activeStreamer) {
+    activeStreamer.destroy();
+    activeStreamer = null;
+  }
+  document.getElementById('video-player').classList.add('hidden');
+}
+
+function setVideoStatus(msg) {
+  document.getElementById('video-status').textContent = msg;
 }
 
 // --- UI Helpers ---

@@ -69,3 +69,36 @@ export async function fetchShape(baseUrl, table, filterFn) {
 
   return filterFn ? rows.filter(filterFn) : rows;
 }
+
+export async function fetchShapeWhere(baseUrl, table, where) {
+  const rows = [];
+  let offset = '-1';
+  let handle = null;
+
+  while (true) {
+    const url = new URL(`${baseUrl}/electric/v1/shapes`);
+    url.searchParams.set('table', table);
+    url.searchParams.set('where', where);
+    url.searchParams.set('offset', offset);
+    if (handle) url.searchParams.set('handle', handle);
+
+    const resp = await fetch(url, { cache: 'no-store' });
+    if (!resp.ok) throw new Error(`Shape fetch failed: ${resp.status}`);
+
+    if (!handle) handle = resp.headers.get('electric-handle');
+    offset = resp.headers.get('electric-offset') || offset;
+
+    const body = await resp.json();
+    if (Array.isArray(body)) {
+      for (const entry of body) {
+        if (entry.value) rows.push(entry.value);
+      }
+    }
+
+    const isUpToDate = resp.headers.has('electric-up-to-date')
+      || body.some(e => e.headers?.control === 'up-to-date');
+    if (isUpToDate) break;
+  }
+
+  return rows;
+}

@@ -159,6 +159,7 @@ defmodule ChatWeb.Router do
       sync("/user_storage", Chat.Data.Schemas.UserStorage)
       sync("/user_storage_version", Chat.Data.Schemas.UserStorageVersion)
 
+
       get "/system_identifier", SystemIdentifierController, :show
 
       scope "/" do
@@ -171,6 +172,15 @@ defmodule ChatWeb.Router do
         post "/ingest_each", ElectricController, :ingest_each
       end
     end
+  end
+
+  # Client-controlled shapes — allows where/columns from query params
+  scope "/electric/v1/shapes" do
+    pipe_through [:electric]
+    pipe_through ChatWeb.Plugs.ElectricReadiness
+    pipe_through ChatWeb.Plugs.ElectricTableGuard
+
+    forward "/", Phoenix.Sync.Electric
   end
 
   # Other scopes may use custom stacks.

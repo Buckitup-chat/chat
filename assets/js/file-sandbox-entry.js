@@ -4,7 +4,7 @@ import {
   signMlDsa87, hash, encryptChunk, decryptChunk,
   buildSignaturePayload
 } from './file-sandbox/crypto.js';
-import { ingest, fetchShape } from './file-sandbox/electric-client.js';
+import { ingest, fetchShape, fetchShapeWhere } from './file-sandbox/electric-client.js';
 import { chunkFile, generateFileId, generateEncSecret } from './file-sandbox/file-chunker.js';
 import { VideoSWStreamer } from './file-sandbox/video-sw-streamer.js';
 
@@ -191,56 +191,18 @@ function parseChunkData(rawData) {
   return new Uint8Array(rawData);
 }
 
-async function fetchAndSortChunks(fileId) {
+async function fetchManifest(fileId) {
   setStatus('Fetching file manifest...', 'info');
-  const files = await fetchShape(state.baseUrl, 'file', r => r.file_id === fileId);
+  const files = await fetchShapeWhere(state.baseUrl, 'files', `file_id = '${fileId}'`);
   if (files.length === 0) throw new Error('File manifest not found');
-
-  const chunkCount = parseInt(files[0].chunk_count);
-  setStatus(`Fetching ${chunkCount} chunk(s)...`, 'info');
-  const chunkRows = await fetchShape(state.baseUrl, 'file_chunk', r => r.file_id === fileId);
-  if (chunkRows.length < chunkCount) {
-    throw new Error(`Missing chunks: have ${chunkRows.length}, need ${chunkCount}`);
-  }
-
-  chunkRows.sort((a, b) => parseInt(a.chunk_index) - parseInt(b.chunk_index));
-  return chunkRows;
+  return files[0];
 }
 
-async function downloadStreaming(chunkRows, encSecret, fileHandle) {
-  const writable = await fileHandle.createWritable();
-  try {
-    for (let i = 0; i < chunkRows.length; i++) {
-      updateProgress(i, chunkRows.length, 'Decrypting');
-      const decrypted = await decryptChunk(parseChunkData(chunkRows[i].data_b64), encSecret);
-      await writable.write(decrypted);
-    }
-  } finally {
-    await writable.close();
-  }
-}
-
-async function decryptToBlob(chunkRows, encSecret) {
-  const decryptedChunks = [];
-  for (let i = 0; i < chunkRows.length; i++) {
-    updateProgress(i, chunkRows.length, 'Decrypting');
-    decryptedChunks.push(
-      await decryptChunk(parseChunkData(chunkRows[i].data_b64), encSecret)
-    );
-  }
-  return new Blob(decryptedChunks);
-}
-
-async function downloadInMemory(chunkRows, encSecret, fileId) {
-  const blob = await decryptToBlob(chunkRows, encSecret);
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `download_${fileId}`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+async function fetchChunk(fileId, index) {
+  const where = `file_id = '${fileId}' AND chunk_index = ${index}`;
+  const rows = await fetchShapeWhere(state.baseUrl, 'file_chunks', where);
+  if (rows.length === 0) throw new Error(`Chunk ${index} not found`);
+  return rows[0];
 }
 
 async function handleDownload() {
@@ -255,23 +217,56 @@ async function handleDownload() {
 
   try {
     const encSecret = hexToUint8(encSecretHex);
+    const manifest = await fetchManifest(fileId);
+    const chunkCount = parseInt(manifest.chunk_count);
 
     let fileHandle = null;
     if (window.showSaveFilePicker) {
-      fileHandle = await window.showSaveFilePicker({
-        suggestedName: `download_${fileId}`,
-      });
+      try {
+        fileHandle = await window.showSaveFilePicker({
+          suggestedName: `download_${fileId}`,
+        });
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        console.warn('File System Access API failed, falling back to blob download:', e);
+      }
+    } else {
+      console.warn('File System Access API not supported, using blob download fallback');
     }
-
-    const chunkRows = await fetchAndSortChunks(fileId);
 
     if (fileHandle) {
-      await downloadStreaming(chunkRows, encSecret, fileHandle);
+      const writable = await fileHandle.createWritable();
+      try {
+        for (let i = 0; i < chunkCount; i++) {
+          updateProgress(i, chunkCount, 'Downloading');
+          const chunk = await fetchChunk(fileId, i);
+          const decrypted = await decryptChunk(parseChunkData(chunk.data_b64), encSecret);
+          await writable.write(decrypted);
+        }
+      } finally {
+        await writable.close();
+      }
     } else {
-      await downloadInMemory(chunkRows, encSecret, fileId);
+      const decryptedChunks = [];
+      for (let i = 0; i < chunkCount; i++) {
+        updateProgress(i, chunkCount, 'Downloading');
+        const chunk = await fetchChunk(fileId, i);
+        decryptedChunks.push(
+          await decryptChunk(parseChunkData(chunk.data_b64), encSecret)
+        );
+      }
+      const blob = new Blob(decryptedChunks);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `download_${fileId}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     }
 
-    updateProgress(chunkRows.length, chunkRows.length, 'Complete');
+    updateProgress(chunkCount, chunkCount, 'Complete');
     setStatus('Download complete', 'success');
   } catch (e) {
     if (e.name === 'AbortError') {
@@ -299,8 +294,18 @@ async function handleView() {
 
   try {
     const encSecret = hexToUint8(encSecretHex);
-    const chunkRows = await fetchAndSortChunks(fileId);
-    const blob = await decryptToBlob(chunkRows, encSecret);
+    const manifest = await fetchManifest(fileId);
+    const chunkCount = parseInt(manifest.chunk_count);
+
+    const decryptedChunks = [];
+    for (let i = 0; i < chunkCount; i++) {
+      updateProgress(i, chunkCount, 'Downloading');
+      const chunk = await fetchChunk(fileId, i);
+      decryptedChunks.push(
+        await decryptChunk(parseChunkData(chunk.data_b64), encSecret)
+      );
+    }
+    const blob = new Blob(decryptedChunks);
 
     if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
     previewBlobUrl = URL.createObjectURL(blob);
@@ -309,7 +314,7 @@ async function handleView() {
     img.src = previewBlobUrl;
     document.getElementById('image-preview').classList.remove('hidden');
 
-    updateProgress(chunkRows.length, chunkRows.length, 'Complete');
+    updateProgress(chunkCount, chunkCount, 'Complete');
     setStatus('Preview ready', 'success');
   } catch (e) {
     console.error('View failed:', e);

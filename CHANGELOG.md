@@ -12,12 +12,24 @@ straightforward as possible.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## 2026-05-09_513f94e\_\_\_2026-05-18_4ef567db
+
+### Added
+
 - Post-quantum file storage: schemas, shapes, validation, GC, and ingest (files + chunks)
-- Post-quantum file sandbox with on-the-fly decryption and image viewing
+- Post-quantum file sandbox with on-the-fly decryption, image viewing, and video streaming
 - Post-quantum symmetric encryption primitives and tests
 - Post-quantum Shape behaviours for user_card and user_storage
-- Electric deferred store for UserStorage
+- Electric deferred store for UserStorage with refetch support
 - Electric: run migrations on chat start
+- Electric: individual shape ingest processing
+- Electric: shape-level access control for precise retrieval
+- Electric: file and chunk sync clients
+- Electric: full user data export with file download
 - Post-quantum video streaming requirements
 - External frontend integration proposal
 

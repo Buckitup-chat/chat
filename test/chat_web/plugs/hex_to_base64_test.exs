@@ -113,6 +113,17 @@ defmodule ChatWeb.Plugs.HexToBase64Test do
       assert conn.resp_body == "data: hello\n\n"
     end
 
+    test "skips chunked responses with nil body" do
+      conn =
+        :get
+        |> conn("/")
+        |> put_resp_content_type("application/json")
+        |> HexToBase64.call(HexToBase64.init([]))
+        |> send_chunked(200)
+
+      assert conn.state == :chunked
+    end
+
     test "skips error responses" do
       conn =
         :get

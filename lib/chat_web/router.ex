@@ -153,6 +153,7 @@ defmodule ChatWeb.Router do
 
     scope "/" do
       pipe_through ChatWeb.Plugs.ElectricReadiness
+      pipe_through ChatWeb.Plugs.HexToBase64
 
       # Phoenix.Sync endpoint for LiveView real-time sync
       sync("/file", Chat.Data.Schemas.File)
@@ -181,6 +182,7 @@ defmodule ChatWeb.Router do
     pipe_through [:electric]
     pipe_through ChatWeb.Plugs.ElectricReadiness
     pipe_through ChatWeb.Plugs.ElectricTableGuard
+    pipe_through ChatWeb.Plugs.HexToBase64
 
     forward "/", Phoenix.Sync.Electric
   end

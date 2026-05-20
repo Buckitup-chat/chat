@@ -181,9 +181,8 @@ defmodule ChatWeb.Router do
     pipe_through [:electric]
     pipe_through ChatWeb.Plugs.ElectricReadiness
     pipe_through ChatWeb.Plugs.ElectricTableGuard
-    pipe_through ChatWeb.Plugs.HexToBase64Adapter
 
-    forward "/", Phoenix.Sync.Electric
+    forward "/", ChatWeb.Plugs.HexToBase64Electric
   end
 
   # Other scopes may use custom stacks.

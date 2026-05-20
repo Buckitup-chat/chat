@@ -7,10 +7,18 @@ defmodule ChatWeb.Plugs.HexToBase64Adapter do
 
   def init(opts), do: opts
 
-  def call(conn, _opts) do
+  def call(conn, _opts), do: wrap(conn)
+
+  def wrap(conn) do
     {adapter, payload} = conn.adapter
     %{conn | adapter: {__MODULE__, {adapter, payload}}}
   end
+
+  def unwrap(%{adapter: {__MODULE__, {adapter, payload}}} = conn) do
+    %{conn | adapter: {adapter, payload}}
+  end
+
+  def unwrap(conn), do: conn
 
   @impl true
   def chunk({adapter, payload}, chunk_data) do

@@ -109,6 +109,36 @@ defmodule ChatWeb.ElectricControllerFileTest do
 
       assert conn.status == 401
     end
+
+    test "create then delete leaves single row with deleted_flag=true", %{
+      conn: conn,
+      identity: identity,
+      user_hash: user_hash
+    } do
+      file_id = FileId.generate()
+      file = upload_file(conn, identity, user_hash, file_id)
+
+      assert Repo.get(FileSchema, file_id).deleted_flag == false
+
+      delete_file = build_signed_delete(identity, file_id, file.owner_timestamp)
+      delete_conn = post_ingest(conn, file_delete_payload(delete_file, file_id, user_hash), identity.sign_skey)
+      assert delete_conn.status == 200, delete_conn.resp_body
+
+      assert Repo.get(FileSchema, file_id).deleted_flag == true
+
+      assert from(f in FileSchema, where: f.file_id == ^file_id and f.deleted_flag == false, select: count())
+             |> Repo.one() == 0
+    end
+  end
+
+  defp upload_file(conn, identity, user_hash, file_id) do
+    {chunk, _} = build_signed_chunk(identity, user_hash, file_id, 0)
+    assert post_ingest(conn, file_chunk_insert_payload(chunk), identity.sign_skey).status == 200
+
+    file = build_signed_file(identity, user_hash, file_id, [chunk])
+    assert post_ingest(conn, file_insert_payload(file), identity.sign_skey).status == 200
+
+    file
   end
 
   # --- Payload builders ---
@@ -191,6 +221,41 @@ defmodule ChatWeb.ElectricControllerFileTest do
 
     sign_b64 = file |> Integrity.signature_payload() |> EnigmaPq.sign(identity.sign_skey)
     %{file | sign_b64: sign_b64}
+  end
+
+  defp build_signed_delete(identity, file_id, prev_timestamp) do
+    existing = Repo.get(FileSchema, file_id)
+
+    updated = %{
+      existing
+      | deleted_flag: true,
+        chunk_sign_hashes: [],
+        owner_timestamp: prev_timestamp + 1
+    }
+
+    sign_b64 = updated |> Integrity.signature_payload() |> EnigmaPq.sign(identity.sign_skey)
+    %{updated | sign_b64: sign_b64}
+  end
+
+  defp file_delete_payload(file, file_id, user_hash) do
+    %{
+      "mutations" => [
+        %{
+          "type" => "update",
+          "original" => %{
+            "file_id" => file_id,
+            "uploader_hash" => user_hash
+          },
+          "changes" => %{
+            "deleted_flag" => true,
+            "chunk_sign_hashes" => [],
+            "owner_timestamp" => file.owner_timestamp,
+            "sign_b64" => to_base64(file.sign_b64)
+          },
+          "syncMetadata" => %{"relation" => "files"}
+        }
+      ]
+    }
   end
 
   # --- Shared helpers ---

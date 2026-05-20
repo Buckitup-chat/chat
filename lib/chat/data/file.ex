@@ -57,13 +57,29 @@ defmodule Chat.Data.File do
     |> repo().delete_all()
   end
 
-  def delete_file_chunks_for_file(file_id) do
-    from(c in FileChunk, where: c.file_id == ^file_id)
-    |> repo().delete_all()
+  def delete_file_chunks_batch(file_id, limit, opts \\ []) do
+    batch =
+      from(c in FileChunk,
+        where: c.file_id == ^file_id,
+        limit: ^limit,
+        select: c.chunk_index
+      )
+
+    from(c in FileChunk,
+      where: c.file_id == ^file_id,
+      where: c.chunk_index in subquery(batch)
+    )
+    |> repo().delete_all(opts)
   end
 
-  def deleted_file_ids do
-    from(f in File, where: f.deleted_flag == true, select: f.file_id)
+  def deleted_file_ids_with_chunks do
+    chunk_file_ids = from(c in FileChunk, distinct: true, select: c.file_id)
+
+    from(f in File,
+      where: f.deleted_flag == true,
+      where: f.file_id in subquery(chunk_file_ids),
+      select: f.file_id
+    )
     |> repo().all()
   end
 

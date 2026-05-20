@@ -2,6 +2,18 @@ import { signMlDsa87, uint8ToBase64Unpadded, base64ToUint8 } from './crypto.js';
 
 const textEncoder = new TextEncoder();
 
+function applyShapeLog(rowMap, entries) {
+  for (const entry of entries) {
+    if (!entry.key) continue;
+    if (entry.headers?.operation === 'delete') {
+      rowMap.delete(entry.key);
+    } else if (entry.value) {
+      const existing = rowMap.get(entry.key);
+      rowMap.set(entry.key, existing ? { ...existing, ...entry.value } : entry.value);
+    }
+  }
+}
+
 export async function getChallenge(baseUrl) {
   const resp = await fetch(`${baseUrl}/electric/v1/challenge`, {
     headers: { 'Accept': 'application/json' }
@@ -40,7 +52,7 @@ export async function ingest(baseUrl, mutations, signSkey, logger) {
 }
 
 export async function fetchShape(baseUrl, table, filterFn) {
-  const rows = [];
+  const rowMap = new Map();
   let offset = '-1';
   let handle = null;
 
@@ -57,9 +69,7 @@ export async function fetchShape(baseUrl, table, filterFn) {
 
     const body = await resp.json();
     if (Array.isArray(body)) {
-      for (const entry of body) {
-        if (entry.value) rows.push(entry.value);
-      }
+      applyShapeLog(rowMap, body);
     }
 
     const isUpToDate = resp.headers.has('electric-up-to-date')
@@ -67,11 +77,12 @@ export async function fetchShape(baseUrl, table, filterFn) {
     if (isUpToDate) break;
   }
 
+  const rows = [...rowMap.values()];
   return filterFn ? rows.filter(filterFn) : rows;
 }
 
 export async function fetchShapeWhere(baseUrl, table, where) {
-  const rows = [];
+  const rowMap = new Map();
   let offset = '-1';
   let handle = null;
 
@@ -90,9 +101,7 @@ export async function fetchShapeWhere(baseUrl, table, where) {
 
     const body = await resp.json();
     if (Array.isArray(body)) {
-      for (const entry of body) {
-        if (entry.value) rows.push(entry.value);
-      }
+      applyShapeLog(rowMap, body);
     }
 
     const isUpToDate = resp.headers.has('electric-up-to-date')
@@ -100,5 +109,5 @@ export async function fetchShapeWhere(baseUrl, table, where) {
     if (isUpToDate) break;
   }
 
-  return rows;
+  return [...rowMap.values()];
 }

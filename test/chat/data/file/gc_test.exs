@@ -26,7 +26,8 @@ defmodule Chat.Data.File.GCTest do
 
       assert Repo.get_by(FileChunk, file_id: file.file_id, chunk_index: 0) != nil
 
-      FileData.deleted_file_ids() |> FileData.delete_file_chunks_for_files()
+      FileData.deleted_file_ids_with_chunks()
+      |> Enum.each(&FileData.delete_file_chunks_batch(&1, 50))
 
       assert Repo.get_by(FileChunk, file_id: file.file_id, chunk_index: 0) == nil
     end
@@ -44,8 +45,8 @@ defmodule Chat.Data.File.GCTest do
       stale_ids = FileData.stale_upload_chunk_file_ids(2_000_000)
       assert file_id in stale_ids
 
-      FileData.delete_upload_chunks_for_files(stale_ids)
-      FileData.delete_file_chunks_for_files(stale_ids)
+      Enum.each(stale_ids, &FileData.delete_upload_chunks_for_file/1)
+      Enum.each(stale_ids, &FileData.delete_file_chunks_batch(&1, 50))
 
       assert Repo.get_by(UploadChunk, file_id: file_id, chunk_index: 0) == nil
       assert Repo.get_by(FileChunk, file_id: file_id, chunk_index: 0) == nil

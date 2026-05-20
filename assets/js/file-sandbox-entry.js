@@ -29,6 +29,7 @@ function init() {
   document.getElementById('close-video-btn').addEventListener('click', closeVideo);
   document.getElementById('clear-log-btn').addEventListener('click', clearLog);
   document.getElementById('toggle-docs-btn').addEventListener('click', toggleDocs);
+  document.getElementById('refresh-files-btn').addEventListener('click', loadMyFiles);
 }
 
 if (document.readyState === 'loading') {
@@ -66,7 +67,9 @@ async function handleKeyImport() {
     document.getElementById('key-status').textContent =
       `Loaded: ${identity.name} (${identity.user_hash.slice(0, 18)}...)`;
     document.getElementById('upload-section').classList.remove('hidden');
+    document.getElementById('my-files-section').classList.remove('hidden');
     setStatus('Keys imported successfully', 'success');
+    loadMyFiles();
   } catch (e) {
     setStatus(`Key import failed: ${e.message}`, 'error');
   }
@@ -175,6 +178,7 @@ async function handleUpload() {
     updateProgress(chunks.length, chunks.length, 'Complete');
     setStatus(`Uploaded ${file.name} — save the encryption secret!`, 'success');
     fileInput.value = '';
+    loadMyFiles();
   } catch (e) {
     console.error('Upload failed:', e);
     setStatus(`Upload failed: ${e.message}`, 'error');
@@ -391,6 +395,130 @@ function closeVideo() {
 
 function setVideoStatus(msg) {
   document.getElementById('video-status').textContent = msg;
+}
+
+// --- My Files ---
+
+async function loadMyFiles() {
+  if (!state.keys) return;
+
+  const listEl = document.getElementById('files-list');
+  listEl.innerHTML = '<p class="text-sm text-gray-500 italic">Loading...</p>';
+
+  try {
+    const files = await fetchShapeWhere(
+      state.baseUrl, 'files',
+      `uploader_hash = '${state.keys.user_hash}'`
+    );
+    console.log('[My Files] fetched', files.length, 'files:', files);
+    renderFilesList(files);
+  } catch (e) {
+    listEl.innerHTML = `<p class="text-sm status-error">Failed to load files: ${e.message}</p>`;
+  }
+}
+
+function renderFilesList(files) {
+  const listEl = document.getElementById('files-list');
+
+  if (files.length === 0) {
+    listEl.innerHTML = '<p class="text-sm text-gray-500 italic">No files uploaded yet</p>';
+    return;
+  }
+
+  const rows = files.map(f => {
+    const size = formatBytes(parseInt(f.total_size));
+    const shortId = f.file_id;
+    const deleted = f.deleted_flag === 'true' || f.deleted_flag === true || f.deleted_flag === 't';
+    const rowClass = deleted ? 'border-b opacity-50' : 'border-b';
+    const nameStyle = deleted ? 'line-through' : '';
+    return `
+      <tr class="${rowClass}">
+        <td class="py-2 pr-3 font-mono text-xs" style="text-decoration:${nameStyle}">${shortId}</td>
+        <td class="py-2 pr-3 text-sm">${size}</td>
+        <td class="py-2 pr-3 text-sm">${f.chunk_count}</td>
+        <td class="py-2 text-sm space-x-2">${deleted
+          ? '<span class="px-2 py-1 bg-gray-200 text-gray-500 rounded text-xs">Deleted</span>'
+          : `<button class="x-use-file px-2 py-1 bg-green-100 text-green-800 rounded text-xs hover:bg-green-200"
+            data-file-id="${f.file_id}">Use</button>
+          <button class="x-delete-file px-2 py-1 bg-red-100 text-red-800 rounded text-xs hover:bg-red-200"
+            data-file-id="${f.file_id}">Delete</button>`}
+        </td>
+      </tr>`;
+  }).join('');
+
+  listEl.innerHTML = `
+    <table class="w-full text-left">
+      <thead>
+        <tr class="border-b text-xs text-gray-500 uppercase">
+          <th class="py-2 pr-3">File ID</th>
+          <th class="py-2 pr-3">Size</th>
+          <th class="py-2 pr-3">Chunks</th>
+          <th class="py-2">Actions</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+  listEl.querySelectorAll('.x-use-file').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('download-file-id').value = btn.dataset.fileId;
+      document.getElementById('download-enc-secret').value = '';
+      document.getElementById('download-enc-secret').focus();
+    });
+  });
+
+  listEl.querySelectorAll('.x-delete-file').forEach(btn => {
+    btn.addEventListener('click', () => handleDeleteFile(btn.dataset.fileId));
+  });
+}
+
+async function handleDeleteFile(fileId) {
+  if (!state.keys) return;
+  if (!confirm(`Delete file ${fileId}?`)) return;
+
+  setStatus('Deleting file...', 'info');
+
+  try {
+    const files = await fetchShapeWhere(state.baseUrl, 'files', `file_id = '${fileId}'`);
+    if (files.length === 0) throw new Error('File not found');
+
+    const manifest = files[0];
+    const newTimestamp = parseInt(manifest.owner_timestamp) + 1;
+
+    const signableFields = {
+      chunk_count: parseInt(manifest.chunk_count),
+      chunk_sign_hashes: [],
+      chunk_size: parseInt(manifest.chunk_size),
+      deleted_flag: true,
+      file_id: fileId,
+      owner_timestamp: newTimestamp,
+      total_size: parseInt(manifest.total_size),
+      uploader_hash: state.keys.user_hash
+    };
+
+    const payloadStr = buildSignaturePayload(signableFields);
+    const payloadBytes = textEncoder.encode(payloadStr);
+    const signB64 = signMlDsa87(payloadBytes, state.keys.sign_skey);
+
+    const mutation = {
+      type: 'update',
+      original: { file_id: fileId, uploader_hash: state.keys.user_hash },
+      changes: {
+        deleted_flag: true,
+        chunk_sign_hashes: [],
+        owner_timestamp: newTimestamp,
+        sign_b64: uint8ToBase64Unpadded(signB64)
+      },
+      syncMetadata: { relation: 'files' }
+    };
+
+    await ingest(state.baseUrl, [mutation], state.keys.sign_skey, addLogEntry);
+    setStatus(`Deleted file ${fileId}`, 'success');
+    loadMyFiles();
+  } catch (e) {
+    console.error('Delete failed:', e);
+    setStatus(`Delete failed: ${e.message}`, 'error');
+  }
 }
 
 // --- UI Helpers ---

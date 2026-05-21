@@ -3,6 +3,8 @@ defmodule Chat.Data.Shapes do
 
   @shapes [
     Chat.Data.Shapes.DialogKeys,
+    Chat.Data.Shapes.DialogMessageReactions,
+    Chat.Data.Shapes.DialogMessageReceipts,
     Chat.Data.Shapes.DialogMessages,
     Chat.Data.Shapes.File,
     Chat.Data.Shapes.FileChunk,

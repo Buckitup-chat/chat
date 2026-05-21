@@ -5,6 +5,8 @@ defmodule Chat.Data.Dialog.Validation do
   alias Chat.Data.Dialog.Versioning
   alias Chat.Data.Schemas.DialogKey
   alias Chat.Data.Schemas.DialogMessage
+  alias Chat.Data.Schemas.DialogMessageReaction
+  alias Chat.Data.Schemas.DialogMessageReceipt
   alias Chat.Data.User, as: UserData
   alias Chat.Data.User.Validation, as: UserValidation
   alias EnigmaPq
@@ -215,5 +217,87 @@ defmodule Chat.Data.Dialog.Validation do
       _ ->
         multi
     end
+  end
+
+  # --- Dialog Message Reactions: Peer sync validation ---
+
+  def validate_reaction_insert(reaction_struct) do
+    %DialogMessageReaction{}
+    |> DialogMessageReaction.create_changeset(Map.from_struct(reaction_struct))
+    |> UserValidation.validate_signature()
+  end
+
+  def validate_reaction_update(existing, reaction_struct) do
+    attrs =
+      reaction_struct
+      |> Map.from_struct()
+      |> Map.take([:type_b64, :deleted_flag, :owner_timestamp, :sign_b64])
+      |> Map.reject(fn {_k, v} -> is_nil(v) end)
+
+    existing
+    |> DialogMessageReaction.update_changeset(attrs)
+    |> UserValidation.validate_signature()
+    |> UserValidation.validate_timestamp_newer_than_existing()
+  end
+
+  # --- Dialog Message Reactions: HTTP ingestion ---
+
+  def reaction_allowed(operation, %{challenge: challenge, signature: signature}) do
+    reactor_hash =
+      case operation do
+        %Operation{operation: :insert, changes: changes} ->
+          changes["reactor_hash"] || changes[:reactor_hash]
+
+        %Operation{operation: :update, data: %{"reactor_hash" => hash}} ->
+          hash
+      end
+
+    card = UserData.get_card(reactor_hash)
+    true = EnigmaPq.verify(challenge, signature, card.sign_pkey)
+    :ok
+  rescue
+    _ -> {:error, "Invalid operation"}
+  end
+
+  def reaction_validate(reaction, changes, op) do
+    case op do
+      :insert ->
+        reaction
+        |> DialogMessageReaction.create_changeset(changes)
+        |> UserValidation.validate_signature()
+
+      :update ->
+        reaction
+        |> DialogMessageReaction.update_changeset(changes)
+        |> UserValidation.validate_signature()
+        |> UserValidation.validate_timestamp_newer_than_existing()
+    end
+  end
+
+  # --- Dialog Message Receipts: Peer sync validation ---
+
+  def validate_receipt_insert(receipt_struct) do
+    %DialogMessageReceipt{}
+    |> DialogMessageReceipt.create_changeset(Map.from_struct(receipt_struct))
+    |> UserValidation.validate_signature()
+  end
+
+  # --- Dialog Message Receipts: HTTP ingestion ---
+
+  def receipt_allowed(operation, %{challenge: challenge, signature: signature}) do
+    %Operation{operation: :insert, changes: changes} = operation
+
+    peer_hash = changes["peer_hash"] || changes[:peer_hash]
+    card = UserData.get_card(peer_hash)
+    true = EnigmaPq.verify(challenge, signature, card.sign_pkey)
+    :ok
+  rescue
+    _ -> {:error, "Invalid operation"}
+  end
+
+  def receipt_validate(receipt, changes, :insert) do
+    receipt
+    |> DialogMessageReceipt.create_changeset(changes)
+    |> UserValidation.validate_signature()
   end
 end

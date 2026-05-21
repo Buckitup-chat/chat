@@ -7,6 +7,8 @@ defmodule Chat.Data.Dialog do
   alias Chat.Data.Dialog.Versioning
   alias Chat.Data.Schemas.DialogKey
   alias Chat.Data.Schemas.DialogMessage
+  alias Chat.Data.Schemas.DialogMessageReaction
+  alias Chat.Data.Schemas.DialogMessageReceipt
 
   def get_dialog_key(dialog_hash, sender_hash) do
     repo().get_by(DialogKey, dialog_hash: dialog_hash, sender_hash: sender_hash)
@@ -58,6 +60,49 @@ defmodule Chat.Data.Dialog do
       where:
         is_nil(m.owner_timestamp) or
           m.owner_timestamp < fragment("EXCLUDED.owner_timestamp")
+    )
+  end
+
+  # --- Dialog Message Reactions ---
+
+  def get_reaction(reaction_hash) do
+    repo().get(DialogMessageReaction, reaction_hash)
+  end
+
+  def upsert_reaction(changeset) do
+    repo().insert(changeset,
+      on_conflict: reaction_upsert_query(),
+      conflict_target: :reaction_hash,
+      allow_stale: true
+    )
+  end
+
+  # --- Dialog Message Receipts ---
+
+  def get_receipt(receipt_hash) do
+    repo().get(DialogMessageReceipt, receipt_hash)
+  end
+
+  def upsert_receipt(changeset) do
+    repo().insert(changeset,
+      on_conflict: :nothing,
+      conflict_target: :receipt_hash
+    )
+  end
+
+  defp reaction_upsert_query do
+    from(r in DialogMessageReaction,
+      update: [
+        set: [
+          type_b64: fragment("EXCLUDED.type_b64"),
+          deleted_flag: fragment("EXCLUDED.deleted_flag"),
+          owner_timestamp: fragment("EXCLUDED.owner_timestamp"),
+          sign_b64: fragment("EXCLUDED.sign_b64")
+        ]
+      ],
+      where:
+        is_nil(r.owner_timestamp) or
+          r.owner_timestamp < fragment("EXCLUDED.owner_timestamp")
     )
   end
 

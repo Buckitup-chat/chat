@@ -12,5 +12,7 @@ defmodule Chat.Data.Types.Consts do
   def dialog_prefix, do: "di_"
   def dialog_message_prefix, do: "dmsg_"
   def dialog_message_sign_prefix, do: "dms_"
+  def dialog_message_reaction_prefix, do: "dmr_"
+  def dialog_message_receipt_prefix, do: "dmrc_"
   def file_prefix, do: "f_"
 end

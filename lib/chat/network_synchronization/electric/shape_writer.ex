@@ -76,11 +76,20 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
   defp check_parent(shape_mod, {parent_shape, parent_key} = ref, value) do
     parent_mod = Shapes.by_name(parent_shape)
 
-    case repo().get(parent_mod.schema_module(), parent_key) do
+    case get_parent(parent_mod.schema_module(), parent_key) do
       nil -> {:skip, ref}
       _parent -> shape_mod.sync_validate_parent(ref, value)
     end
   end
+
+  defp get_parent(schema, key) when is_tuple(key) do
+    pk_fields = schema.__schema__(:primary_key)
+    pk_values = Tuple.to_list(key)
+    clauses = Enum.zip(pk_fields, pk_values)
+    repo().get_by(schema, clauses)
+  end
+
+  defp get_parent(schema, key), do: repo().get(schema, key)
 
   defp maybe_defer(shape_name, operation, value, missing_parents, opts) do
     case Keyword.fetch(opts, :peer_url) do

@@ -2,6 +2,7 @@ defmodule Chat.Data.Shapes do
   @moduledoc "Registry of Electric-synced shape behaviour modules"
 
   @shapes [
+    Chat.Data.Shapes.DialogKeys,
     Chat.Data.Shapes.File,
     Chat.Data.Shapes.FileChunk,
     Chat.Data.Shapes.UserCard,

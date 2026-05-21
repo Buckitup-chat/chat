@@ -9,5 +9,6 @@ defmodule Chat.Data.Types.Consts do
 
   def user_prefix, do: "u_"
   def user_storage_sign_prefix, do: "uss_"
+  def dialog_prefix, do: "di_"
   def file_prefix, do: "f_"
 end

@@ -1,5 +1,9 @@
 defmodule Chat.Data.Schemas.DialogMessageReceipt do
-  @moduledoc "Ecto schema for plaintext delivery and read receipts on dialog messages."
+  @moduledoc """
+  Ecto schema for plaintext delivery and read receipts on dialog messages.
+
+  Spec: `docs/reqs/pq_dialogs.md` §4 `dialog_message_receipts`.
+  """
 
   use Ecto.Schema
   import Ecto.Changeset

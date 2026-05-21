@@ -1,5 +1,9 @@
 defmodule Chat.Data.Schemas.DialogKey do
-  @moduledoc "Ecto schema for dialog key exchange rows. One row per participant per dialog."
+  @moduledoc """
+  Ecto schema for dialog key exchange rows. One row per participant per dialog.
+
+  Spec: `docs/reqs/pq_dialogs.md` §1 `dialog_keys`.
+  """
 
   use Ecto.Schema
   import Ecto.Changeset

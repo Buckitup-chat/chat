@@ -1,5 +1,9 @@
 defmodule Chat.Data.Schemas.DialogMessageReaction do
-  @moduledoc "Ecto schema for encrypted emoji reactions on dialog messages."
+  @moduledoc """
+  Ecto schema for encrypted emoji reactions on dialog messages.
+
+  Spec: `docs/reqs/pq_dialogs.md` §3 `dialog_message_reactions`.
+  """
 
   use Ecto.Schema
   import Ecto.Changeset

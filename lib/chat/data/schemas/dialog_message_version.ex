@@ -1,5 +1,9 @@
 defmodule Chat.Data.Schemas.DialogMessageVersion do
-  @moduledoc "Ecto schema for archived versions of dialog messages."
+  @moduledoc """
+  Ecto schema for archived versions of dialog messages.
+
+  Spec: `docs/reqs/pq_dialogs.md` §2a `dialog_messages_versions`.
+  """
 
   use Ecto.Schema
   import Ecto.Changeset

@@ -438,6 +438,8 @@ There is no `dialogs` table. Participation is derived from `dialog_keys` via `se
 
 ### 1. `dialog_keys`
 
+> **Implementation:** `Chat.Data.Schemas.DialogKey` (`lib/chat/data/schemas/dialog_key.ex`)
+
 Wrapped `sender_msg_key` published by one author for one dialog. Two rows per dialog in the common case (one per direction). An author republishes the same row idempotently from any of their devices (deterministic `sender_msg_key` ⇒ same plaintext, different KEM randomness ⇒ compatible). Concurrent publishes from multiple devices are resolved by LWW on `owner_timestamp` per the integrity triad in [02_integrity.md](../electric/pq_data_layer/02_integrity.md).
 
 | Column                     | Type               | Notes                                                                                           |
@@ -458,6 +460,8 @@ Self-authenticating per [02_integrity.md](../electric/pq_data_layer/02_integrity
 Flooding: an attacker can still publish a row naming an uninvolved `peer_hash` (PoP proves submitter identity, not peer consent). There is no server-side spam filtering — accepting or ignoring unsolicited dialogs is the receiver's decision. Clients mitigate by hiding a dialog until the local user has either authored a message in it or the peer has published their own `dialog_keys` row for the same `dialog_hash`.
 
 ### 2. `dialog_messages`
+
+> **Implementation:** `Chat.Data.Schemas.DialogMessage` (`lib/chat/data/schemas/dialog_message.ex`)
 
 Current tip of each message's version chain. Each message is identified by `message_id = "dmsg_" + UUID v7` — globally unique and time-ordered within a dialog. Messages follow the integrity triad in [02_integrity.md](../electric/pq_data_layer/02_integrity.md) (`sign_b64`, `owner_timestamp`, `deleted_flag`) and the hash-linked versioning model in [03_data_versioning.md](../electric/pq_data_layer/03_data_versioning.md), mirroring `user_storage` / `user_storage_versions` (see `Chat.Data.Schemas.UserStorage`).
 
@@ -494,6 +498,8 @@ Self-authenticating per [02_integrity.md](../electric/pq_data_layer/02_integrity
 
 ### 2a. `dialog_messages_versions`
 
+> **Implementation:** `Chat.Data.Schemas.DialogMessageVersion` (`lib/chat/data/schemas/dialog_message_version.ex`)
+
 Append-only history for `dialog_messages`, mirroring `Chat.Data.Schemas.UserStorageVersion`. On each edit, the superseded tip row is inserted here verbatim (carrying its own `sign_hash`); the new tip's `parent_sign_hash` then points at that row's `sign_hash`. Because `sign_b64` covers `parent_sign_hash`, rewriting any historical version breaks every descendant's signature.
 
 | Column             | Type                            | Notes                                                                                       |
@@ -512,6 +518,8 @@ Append-only history for `dialog_messages`, mirroring `Chat.Data.Schemas.UserStor
 PK: `(message_id, sign_hash)`. Append-only — rows are never mutated. A version cannot be inserted unless its `parent_sign_hash` is already known locally (or NULL for the root).
 
 ### 3. `dialog_message_reactions`
+
+> **Implementation:** `Chat.Data.Schemas.DialogMessageReaction` (`lib/chat/data/schemas/dialog_message_reaction.ex`)
 
 Encrypted emoji reactions. Each reaction binds to a specific message **version** via `message_sign_hash` — the `sign_hash` (SHA3-512 of `sign_b64`) of the reacted-to version in the message's chain (tip or historical). Reacting to an edited message does not carry over — the reaction row stays bound to the historical version's `sign_hash` and is not migrated to the new tip.
 
@@ -543,6 +551,8 @@ CREATE DOMAIN dialog_message_reaction_hash_type AS TEXT
 Carries the full integrity triad per [02_integrity.md](../electric/pq_data_layer/02_integrity.md): `sign_b64` over all other fields, `owner_timestamp` strictly monotonic per `reaction_hash`, `deleted_flag` as a signed un-react. Reactions are not versioned (no chain) — the row is overwritten on each new signed update. Because `reaction_hash` is a MAC over the `(message_id, reactor_hash, type)` tuple, an attacker cannot forge a `reaction_hash` pointing at a different tuple without the key; and because `type_b64` is covered by `sign_b64`, it cannot be swapped independently of the hash.
 
 ### 4. `dialog_message_receipts`
+
+> **Implementation:** `Chat.Data.Schemas.DialogMessageReceipt` (`lib/chat/data/schemas/dialog_message_receipt.ex`)
 
 Unencrypted delivery and read receipts. Each receipt binds to a specific message **version** via `message_sign_hash`, same as reactions. Receipts are irreversible — once delivered or read, the event cannot be retracted — so `deleted_flag` is omitted.
 

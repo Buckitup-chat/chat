@@ -212,7 +212,7 @@ The SW approach has **better** iOS support than MSE — iOS has always supported
 
 - **MSE vs Service Worker:** Service Worker chosen — MSE was too fragile (QuotaExceeded, codec detection, buffer management complexity). SW delegates all media handling to the browser's native stack.
 - **Crypto algorithm:** AES-256-GCM per [pq_files.md §2](pq_files.md#2-chunk-encryption)
-- **Chunk size:** 4 MB per [pq_files.md §10](pq_files.md#10-chunk-size-decision)
+- **Chunk size:** 4 MB per [pq_files.md §12](pq_files.md#12-chunk-size-decision)
 - **Nonce handling:** each chunk carries its own random nonce prepended to the ciphertext; `decryptChunk()` extracts it transparently
 - **Seeking:** native — the browser issues range requests, SW maps bytes to chunks
 - **iOS:** native `<video>` + SW works on iOS 11.3+ (no ManagedMediaSource needed)

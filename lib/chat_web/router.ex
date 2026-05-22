@@ -162,6 +162,8 @@ defmodule ChatWeb.Router do
       sync("/user_storage_version", Chat.Data.Schemas.UserStorageVersion)
 
 
+      get "/file_chunk/:file_id/:chunk_index", FileChunkController, :show
+
       get "/system_identifier", SystemIdentifierController, :show
 
       scope "/" do

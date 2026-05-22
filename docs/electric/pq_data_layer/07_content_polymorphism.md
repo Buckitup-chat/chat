@@ -171,4 +171,4 @@ A signed deletion is `deleted_flag = true` plus an empty `content_b64`. The empt
 
 ## Open questions
 
-- Out-of-band file GC: when can chunk data be reclaimed? See [pq_files.md §7](../../reqs/pq_files.md) for the current GC design.
+- Out-of-band file GC: when can chunk data be reclaimed? See [pq_files.md §8](../../reqs/pq_files.md) for the current GC design.

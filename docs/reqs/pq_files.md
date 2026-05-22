@@ -150,16 +150,50 @@ When Device B receives rows via Electric:
 
 **Ordering**: Electric may deliver `file_chunks` before the `files` manifest. Chunks without a matching `files` row are skipped (not stored). When a `files` row arrives, the receiving device checks whether all `chunk_count` chunks are present locally. If any are missing (skipped during earlier sync), it opens a short-lived Electric shape with a WHERE filter for the specific missing chunks (`file_id = $1 AND chunk_index IN ($2, $3, ...)`) and fetches only those.
 
-## 6. Deletion Protocol
+## 6. Download Protocol
+
+### 6.1 Direct Chunk Endpoint
+
+```
+GET /electric/v1/file_chunk/:file_id/:chunk_index
+```
+
+Returns the raw `data_b64` BYTEA as `application/octet-stream`. Response header `x-chunk-size` carries the chunk's `size` value.
+
+**Implementation**: `ChatWeb.FileChunkController.show/2` → `Chat.Data.File.get_file_chunk/2` (single PG primary-key lookup).
+
+**Why not Electric shapes?** Each unique `(table, where)` combination creates a persistent Electric shape: a Consumer GenServer, a PG snapshot transaction, disk-backed shape log, and ongoing WAL filtering. Fetching N chunks via shapes (one shape per `file_id + chunk_index` WHERE clause) creates N long-lived server-side resources for what is a simple point read. The direct endpoint performs one PG query with no persistent overhead.
+
+### 6.2 Download Flow
+
+```
+Client                              Device
+  │                                    │
+  │─── GET /electric/v1/shapes ───────>│  fetch files manifest
+  │    ?table=files&where=file_id=?    │  (one Electric shape, small row)
+  │<── {chunk_count, chunk_sign_hashes}│
+  │                                    │
+  │  for i in 0..chunk_count-1:        │
+  │─── GET /electric/v1/file_chunk ───>│  direct endpoint, raw binary
+  │       /:file_id/:i                 │
+  │<── application/octet-stream ───────│  x-chunk-size header
+  │  verify chunk signature            │
+  │  decrypt with AES-256-GCM          │
+  │  append to output                  │
+```
+
+The `files` manifest is fetched once via an Electric shape (small row, acceptable overhead). Individual chunks use the direct endpoint — no shape creation per chunk.
+
+## 7. Deletion Protocol
 
 To delete a file, the client updates the `files` row:
 1. Set `deleted_flag = true`
 2. Set `chunk_sign_hashes = '{}'` (empty array)
 3. Re-sign the row
 
-Emptying `chunk_sign_hashes` ensures receiving devices cannot verify any chunks for this file, so the sync protocol (§5) will skip them. The signed update propagates via Electric to all devices, where GC (§7) reclaims the chunk data.
+Emptying `chunk_sign_hashes` ensures receiving devices cannot verify any chunks for this file, so the sync protocol (§5) will skip them. The signed update propagates via Electric to all devices, where GC (§8) reclaims the chunk data.
 
-## 7. Garbage Collection
+## 8. Garbage Collection
 
 Runs every hour. Two triggers clean up `file_chunks` and `upload_chunks` rows:
 
@@ -168,9 +202,9 @@ Runs every hour. Two triggers clean up `file_chunks` and `upload_chunks` rows:
 
 Trigger 1 handles normal file deletion. Trigger 2 handles abandoned uploads where the `files` manifest was never ingested.
 
-## 8. PostgreSQL Storage Configuration
+## 9. PostgreSQL Storage Configuration
 
-### 8.1 STORAGE EXTERNAL
+### 9.1 STORAGE EXTERNAL
 
 Encrypted blobs are high-entropy and will not compress. PostgreSQL will waste CPU attempting LZ4 compression on every write, then store uncompressed anyway. Set storage to `EXTERNAL` to skip compression and store out-of-line directly:
 
@@ -178,7 +212,7 @@ Encrypted blobs are high-entropy and will not compress. PostgreSQL will waste CP
 ALTER TABLE file_chunks ALTER COLUMN data_b64 SET STORAGE EXTERNAL;
 ```
 
-### 8.2 AUTOVACUUM Tuning
+### 9.2 AUTOVACUUM Tuning
 
 `file_chunks` has write-once semantics: chunks are inserted, never updated, eventually deleted. But each dead row carries ~4 MB of TOAST data — even a few dead rows mean significant bloat on a 4 GB RAM device.
 
@@ -196,7 +230,7 @@ ALTER TABLE file_chunks SET (
 | `analyze_scale_factor` | 0.02 (2%) | 0.10 (10%) | Keep planner statistics fresh as chunks are added/removed |
 | `vacuum_cost_delay` | 40 ms | 2 ms | Reduce I/O pressure on USB/SD storage, spread vacuum cost over longer periods |
 
-### 8.3 WAL Considerations
+### 9.3 WAL Considerations
 
 `file_chunks` is in the Electric publication — 4 MB blob INSERTs go through WAL and logical replication:
 
@@ -205,39 +239,39 @@ ALTER TABLE file_chunks SET (
 - `max_wal_size = 512MB` (doubled from 256 MB to accommodate concurrent file uploads)
 - `wal_compression = on` is already enabled but provides no benefit for encrypted (high-entropy) data
 
-## 9. Hardware Constraints
+## 10. Hardware Constraints
 
-### 9.1 Device Memory
+### 10.1 Device Memory
 - **Total RAM**: 4 GB, shared between PostgreSQL and the Elixir/Erlang application
 - Chunk size must be small enough that the device can buffer a chunk during transfer (device does not encrypt/decrypt — it stores and serves opaque blobs)
 - At 4 MB per chunk, the device needs ~4-8 MB to buffer a chunk during ingest — well within budget
 
-### 9.2 Storage
+### 10.2 Storage
 - PostgreSQL stores all chunk data in TOAST tables (no filesystem sharding needed)
 - FAT directory limitations are irrelevant — all data is inside the database
 
-## 9. Cryptographic Constraints
+## 11. Cryptographic Constraints
 
-### 9.3 AES-256-GCM
+### 11.1 AES-256-GCM
 - **Per-key data limit**: ~64 GB (2^32 blocks x 16 bytes)
 - **No streaming mode**: GCM requires the entire plaintext in memory for encryption/decryption (authentication tag is computed over the full message)
 - **Nonce**: 12 bytes (96 bits), must be unique per encryption under the same key
 - **Auth tag**: 16 bytes per chunk
 
-### 9.4 Nonce Exhaustion
+### 11.2 Nonce Exhaustion
 - With **random 96-bit nonces**, collision probability becomes meaningful after ~2^32 messages per key (birthday bound)
 - At 4 MB chunks, 2^32 messages = ~16 TB per key before nonce collision risk
 - **Deterministic nonce scheme** (e.g., chunk index) eliminates collision risk but requires careful design to avoid reuse across different files under the same key
 
-### 9.5 Client-Side Encryption
+### 11.3 Client-Side Encryption
 - All encryption/decryption happens **exclusively in the browser** (Web Crypto API / SubtleCrypto)
 - The device (server) never sees plaintext — it stores, serves, and transfers opaque encrypted chunks
 - At 4 MB chunks, browser needs ~10 MB per encryption (plaintext + ciphertext + overhead) — safe on all modern devices including mobile
 - SubtleCrypto does not natively support streaming AES-GCM
 
-## 10. Chunk Size Decision
+## 12. Chunk Size Decision
 
-### 10.1 Chosen Size: 4 MB
+### 12.1 Chosen Size: 4 MB
 
 **Rationale**:
 - Fits comfortably in browser memory for AES-GCM (~10 MB working set per chunk)
@@ -247,7 +281,7 @@ ALTER TABLE file_chunks SET (
 - Device only buffers opaque encrypted blobs during transfer — no crypto overhead on device
 - Acceptable resumability on LAN/WiFi connections (4 MB retry on failure)
 
-### 10.2 Trade-offs Considered
+### 12.2 Trade-offs Considered
 
 | Alternative | Pro | Con |
 |---|---|---|
@@ -255,9 +289,9 @@ ALTER TABLE file_chunks SET (
 | 4 MB (chosen) | Balanced — enables SHA3-512, reasonable row count | 4 MB retry on resume; ~8-12 MB WAL per write |
 | 8-16 MB | Smallest manifests | Memory pressure on low-end mobile; large WAL bursts; poor resumability |
 
-## 11. Resolved Questions
+## 13. Resolved Questions
 
-- **Unsigned budget**: no explicit budget — GC (§6, trigger 2) clears stale unsigned data after 2 days.
+- **Unsigned budget**: no explicit budget — GC (§8, trigger 2) clears stale unsigned data after 2 days.
 - **Max file size**: 1 TB hard cap.
 - **Partial file availability**: client's call — the client decides when to start downloading/decrypting. For videos, streaming before all chunks are synced makes sense.
 - **WAL sizing**: `max_wal_size = 512 MB` to accommodate concurrent 4 MB chunk uploads with write amplification.

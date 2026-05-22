@@ -12,6 +12,10 @@ defmodule Chat.Data.File do
     repo().get(File, file_id)
   end
 
+  def get_file_chunk(file_id, chunk_index) do
+    repo().get_by(FileChunk, file_id: file_id, chunk_index: chunk_index)
+  end
+
   def get_file_chunks(file_id) do
     from(c in FileChunk, where: c.file_id == ^file_id)
     |> repo().all()

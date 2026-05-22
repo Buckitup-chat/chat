@@ -12,7 +12,15 @@ straightforward as possible.
 
 ### Added
 
+- Post-quantum dialog data layer: keys, messages (with versioning), receipts, and reactions — schemas, shapes, validations, and Electric sync
+- REST endpoint for post-quantum file chunks
+- Electric shapes integrity tests
+
 ### Changed
+
+- Electric shapes: hex-to-base64 encoding adapter for binary data
+- Electric file_chunks LiveView: lightweight rendering
+- [platform] Dependencies update
 
 ### Fixed
 

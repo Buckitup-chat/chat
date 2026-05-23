@@ -1,5 +1,5 @@
 defmodule ChatWeb.MainLive.Page.DialogTest do
-  use ChatWeb.ConnCase, async: false
+  use ChatWeb.ConnCase, async: true, group: :cubdb
 
   import ChatWeb.LiveTestHelpers
 

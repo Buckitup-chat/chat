@@ -7,7 +7,7 @@ defmodule ChatWeb.ElectricSyncTest do
   being in use. These tests are primarily for documentation and should be verified
   manually using the /electric page.
   """
-  use ChatWeb.ConnCase, async: false
+  use ChatWeb.ConnCase, async: true, group: :electric_http
   use ChatWeb.DataCase
 
   alias Chat.Data.Schemas.UserCard

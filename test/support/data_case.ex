@@ -23,12 +23,14 @@ defmodule ChatWeb.DataCase do
   setup tags do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Chat.Repo)
 
-    unless tags[:async] do
+    shared? = not tags[:async] or tags[:shared_sandbox]
+
+    if shared? do
       Ecto.Adapters.SQL.Sandbox.mode(Chat.Repo, {:shared, self()})
     end
 
     Process.put(:phoenix_sync_validating, true)
-    Phoenix.Sync.Sandbox.start!(Chat.Repo, shared: not tags[:async])
+    Phoenix.Sync.Sandbox.start!(Chat.Repo, shared: shared?)
     Process.delete(:phoenix_sync_validating)
 
     ensure_electric_ready()

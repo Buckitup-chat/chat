@@ -1,5 +1,5 @@
 defmodule Chat.NetworkSynchronization.Electric.OffsetStoreTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true, group: :ets_deferred
 
   alias Chat.NetworkSynchronization.Electric.OffsetStore
 

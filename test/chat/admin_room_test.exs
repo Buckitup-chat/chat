@@ -1,5 +1,5 @@
 defmodule Chat.AdminRoomTest do
-  use ChatWeb.DataCase, async: false
+  use ChatWeb.DataCase, async: true, group: :cubdb
 
   alias Chat.Admin.MediaSettings
   alias Chat.Db.ChangeTracker

@@ -1,5 +1,5 @@
 defmodule ChatWeb.ElectricLive.IndexTest do
-  use ChatWeb.ConnCase
+  use ChatWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
   use Rewire

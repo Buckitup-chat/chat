@@ -1,5 +1,7 @@
 defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
   use ChatTest.IsolatedDataCase,
+    async: true,
+    group: :cubdb,
     dbs: [
       :operator,
       :point1_db,

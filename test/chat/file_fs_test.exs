@@ -1,5 +1,5 @@
 defmodule Chat.FileFsTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   import Chat.FileFs.Common, only: [binread: 1]
 

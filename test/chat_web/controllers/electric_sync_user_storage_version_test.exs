@@ -1,5 +1,5 @@
 defmodule ChatWeb.ElectricSyncUserStorageVersionTest do
-  use ChatWeb.ConnCase, async: false
+  use ChatWeb.ConnCase, async: true, group: :electric_http
   use ChatWeb.DataCase
 
   import Ecto.Query

@@ -1,5 +1,5 @@
 defmodule Chat.Data.UserStorageVersioningTest do
-  use ChatWeb.DataCase
+  use ChatWeb.DataCase, async: true
 
   import Ecto.Query
 

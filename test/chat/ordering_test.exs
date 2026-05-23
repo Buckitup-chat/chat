@@ -1,5 +1,5 @@
 defmodule Chat.OrderingTest do
-  use ChatWeb.DataCase, async: false
+  use ChatWeb.DataCase, async: true, group: :cubdb
 
   alias Chat.Card
   alias Chat.Db.ChangeTracker

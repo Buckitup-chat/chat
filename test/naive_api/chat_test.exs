@@ -1,5 +1,5 @@
 defmodule NaiveApi.ChatTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true, group: :cubdb
   alias Chat.Card
   alias Chat.Db.ChangeTracker
   alias Chat.Dialogs

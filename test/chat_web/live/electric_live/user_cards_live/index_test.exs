@@ -6,7 +6,7 @@ defmodule ChatWeb.ElectricLive.UserCardsLive.IndexTest do
   and skipped by default. These should be verified manually as Electric may have
   timing issues in test environments.
   """
-  use ChatWeb.ConnCase, async: false
+  use ChatWeb.ConnCase, async: true, group: :electric_liveview
   use ChatWeb.DataCase
 
   import Phoenix.LiveViewTest

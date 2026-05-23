@@ -1,5 +1,5 @@
 defmodule Chat.Data.DialogReactionTest do
-  use ChatWeb.DataCase, async: false
+  use ChatWeb.DataCase, async: true, group: :ets_deferred
 
   alias Chat.Data.Dialog
   alias Chat.Data.Integrity

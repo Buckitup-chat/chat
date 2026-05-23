@@ -2,7 +2,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLiveTest do
   @moduledoc """
   Tests for Electric API Sandbox LiveView.
   """
-  use ChatWeb.ConnCase, async: false
+  use ChatWeb.ConnCase, async: true, group: :electric_liveview
   use ChatWeb.DataCase
 
   import Phoenix.LiveViewTest

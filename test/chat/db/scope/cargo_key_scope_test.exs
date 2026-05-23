@@ -1,5 +1,5 @@
 defmodule Chat.Db.Scope.CargoKeyScopeTest do
-  use ChatWeb.DataCase, async: false
+  use ChatWeb.DataCase, async: true, group: :cubdb
 
   alias Chat.{
     AdminRoom,

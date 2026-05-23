@@ -7,7 +7,7 @@ defmodule ChatWeb.Electric.UserStorageBinaryFormatTest do
 
   Goal: Verify the base64 encoding strategy works end-to-end.
   """
-  use ChatWeb.ConnCase, async: false
+  use ChatWeb.ConnCase, async: true, group: :electric_http
   use ChatWeb.DataCase
 
   import Chat.Db, only: [repo: 0]

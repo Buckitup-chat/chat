@@ -1,5 +1,5 @@
 defmodule Chat.DB.SyncTest do
-  use ChatTest.IsolatedDataCase, dbs: [:internal, :main, :backup]
+  use ChatTest.IsolatedDataCase, async: true, group: :cubdb, dbs: [:internal, :main, :backup]
 
   alias Chat.Card
   alias Chat.ChunkedFiles

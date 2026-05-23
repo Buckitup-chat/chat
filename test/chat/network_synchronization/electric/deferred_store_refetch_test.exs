@@ -1,5 +1,5 @@
 defmodule Chat.NetworkSynchronization.Electric.DeferredStoreRefetchTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true, group: :ets_deferred
 
   import Rewire
 

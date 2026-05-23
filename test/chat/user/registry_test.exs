@@ -1,5 +1,5 @@
 defmodule Chat.User.RegistryTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true, group: :cubdb
 
   alias Chat.Card
   alias Chat.Db

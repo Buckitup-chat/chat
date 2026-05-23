@@ -1,5 +1,5 @@
 defmodule ChatWeb.MainLive.Page.FeedTest do
-  use ChatWeb.ConnCase, async: false
+  use ChatWeb.ConnCase, async: true, group: :cubdb
 
   import Phoenix.LiveViewTest
   import ChatWeb.LiveTestHelpers

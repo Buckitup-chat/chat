@@ -1,5 +1,5 @@
 defmodule ChatWeb.MemoMessageUpdateTest do
-  use ChatWeb.ConnCase, async: false
+  use ChatWeb.ConnCase, async: true, group: :cubdb
 
   alias Chat.Dialogs
   alias Chat.Identity

@@ -1,5 +1,5 @@
 defmodule Chat.ChunkedFilesMultisecretTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true, group: :cubdb
 
   alias Chat.ChunkedFiles
   alias Chat.ChunkedFilesMultisecret

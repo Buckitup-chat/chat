@@ -1,5 +1,5 @@
 defmodule Chat.NetworkSynchronization.Electric.FileShapeWriterTest do
-  use ChatWeb.DataCase, async: false
+  use ChatWeb.DataCase, async: true, group: :ets_deferred
 
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.File, as: FileSchema

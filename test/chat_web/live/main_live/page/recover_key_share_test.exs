@@ -1,6 +1,6 @@
 defmodule ChatWeb.MainLive.Page.RecoverKeyShareTest do
   @moduledoc false
-  use ChatWeb.ConnCase, async: false
+  use ChatWeb.ConnCase, async: true, group: :cubdb
   import Phoenix.LiveViewTest
   import Chat.KeyShare, only: [generate_key_shares: 1]
 

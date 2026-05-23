@@ -1,5 +1,6 @@
 defmodule ChatWeb.MainLive.IndexTest do
-  use ChatWeb.ConnCase, async: false
+  use ChatWeb.ConnCase, async: true, group: :cubdb
+  @moduletag :shared_sandbox
   use ChatWeb.DataCase
 
   import ChatWeb.LiveTestHelpers

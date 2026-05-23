@@ -1,5 +1,5 @@
 defmodule Chat.Data.UserDataTest do
-  use ChatWeb.DataCase
+  use ChatWeb.DataCase, async: true
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.{UserCard, UserStorage}
   alias Chat.Data.Types.Consts

@@ -1,5 +1,5 @@
 defmodule NaiveApi.RoomTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true, group: :cubdb
   alias Chat.Db.ChangeTracker
   alias Chat.Messages
   alias Chat.Rooms

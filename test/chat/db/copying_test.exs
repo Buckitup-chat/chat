@@ -1,5 +1,5 @@
 defmodule Chat.Db.CopyingTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true, group: :cubdb
 
   alias Chat.ChunkedFiles
   alias Chat.Db

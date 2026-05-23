@@ -3,7 +3,7 @@ defmodule ChatWeb.ElectricShapesTest do
   Tests the /electric/v1/shapes forward endpoint that allows
   client-controlled where/columns query params.
   """
-  use ChatWeb.ConnCase, async: false
+  use ChatWeb.ConnCase, async: true, group: :electric_http
   use ChatWeb.DataCase
 
   alias Chat.Data.Schemas.File

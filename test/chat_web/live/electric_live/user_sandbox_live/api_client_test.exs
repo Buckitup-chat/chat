@@ -6,7 +6,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClientTest do
   Full integration tests with actual API calls should be done manually
   or with the server running.
   """
-  use ChatWeb.DataCase
+  use ChatWeb.DataCase, async: true
 
   alias Chat.Data.User
   alias ChatWeb.ElectricLive.UserSandboxLive.ApiClient

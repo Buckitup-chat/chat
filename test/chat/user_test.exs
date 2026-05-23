@@ -1,5 +1,5 @@
 defmodule Chat.UserTest do
-  use ChatWeb.DataCase, async: false
+  use ChatWeb.DataCase, async: true, group: :cubdb
 
   alias Chat.User
 

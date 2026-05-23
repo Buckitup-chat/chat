@@ -1,5 +1,5 @@
 defmodule Chat.User.UsersBrokerTest do
-  use ChatWeb.DataCase, async: false
+  use ChatWeb.DataCase, async: true, group: :cubdb
   alias Chat.Card
   alias Chat.User.UsersBroker
 

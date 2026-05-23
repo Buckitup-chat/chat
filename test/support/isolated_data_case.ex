@@ -11,7 +11,7 @@ defmodule ChatTest.IsolatedDataCase do
   `db_name(context, db)` to get db registered name
 
   """
-  use ExUnit.CaseTemplate, async: false
+  use ExUnit.CaseTemplate
 
   alias Chat.Db
   alias Ecto.Adapters.SQL.Sandbox

@@ -1,5 +1,5 @@
 defmodule ChatWeb.UploadChunkControllerTest do
-  use ChatWeb.ConnCase
+  use ChatWeb.ConnCase, async: true
   import Mock
 
   alias Chat.ChunkedFiles

@@ -1,5 +1,5 @@
 defmodule ChatTest.Sync.CargoOperatorAndSensorFlowTest do
-  use ChatTest.IsolatedDataCase, dbs: [:sensor, :operator]
+  use ChatTest.IsolatedDataCase, async: true, group: :cubdb, dbs: [:sensor, :operator]
 
   alias Chat.Db.Copying
   alias Chat.Db.Scope.KeyScope

@@ -1,5 +1,5 @@
 defmodule Chat.Sync.UsbDriveFileDumperTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true, group: :cubdb
 
   alias Chat.{ChunkedFiles, ChunkedFilesBroker}
   alias Chat.Content.Files

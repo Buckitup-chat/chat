@@ -1,0 +1,337 @@
+defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
+  use ChatWeb, :live_view
+
+  import ChatWeb.ElectricLive.DialogSandboxLive.Components
+
+  alias ChatWeb.ElectricLive.DialogSandboxLive.{ApiClient, Crypto}
+
+  @impl true
+  def mount(_params, _session, socket) do
+    socket =
+      socket
+      |> assign(:user, nil)
+      |> assign(:dialogs, [])
+      |> assign(:selected_dialog, nil)
+      |> assign(:messages, [])
+      |> assign(:msg_keys_cache, %{})
+      |> assign(:compose_text, "")
+      |> assign(:refs_tails, %{})
+      |> assign(:peer_hash_input, "")
+      |> assign(:available_peers, [])
+      |> assign(:request_log, [])
+      |> assign(:show_docs, true)
+      |> assign(:expanded_docs, MapSet.new(["dialog_keys"]))
+      |> assign(:operation_in_progress, false)
+      |> assign(:error_message, nil)
+      |> allow_upload(:key_file, accept: ~w(.json), max_entries: 1, max_file_size: 100_000)
+
+    {:ok, socket}
+  end
+
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <div class="h-screen flex flex-col bg-gray-50" id="dialog-sandbox">
+      <div class="bg-white border-b px-6 py-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h1 class="text-2xl font-bold text-gray-900">Dialog Sandbox</h1>
+            <p class="text-sm text-gray-600 mt-1">Two-party encrypted dialog via Electric API</p>
+          </div>
+          <a href="/electric" class="text-sm text-blue-600 hover:text-blue-800">← Electric Index</a>
+        </div>
+      </div>
+
+      <div class="flex-1 flex overflow-hidden">
+        <.render_docs_sidebar show_docs={@show_docs} expanded_docs={@expanded_docs} />
+        <main class="flex-1 overflow-y-auto p-6">
+          <.render_error error_message={@error_message} />
+          <.render_identity_section user={@user} uploads={@uploads} />
+          <%= if @user do %>
+            <.render_dialogs_section
+              dialogs={@dialogs}
+              selected_dialog={@selected_dialog}
+              peer_hash_input={@peer_hash_input}
+              available_peers={@available_peers}
+              operation_in_progress={@operation_in_progress}
+            />
+          <% end %>
+          <%= if @user && @selected_dialog do %>
+            <.render_messages_section
+              messages={@messages}
+              user={@user}
+              compose_text={@compose_text}
+              operation_in_progress={@operation_in_progress}
+            />
+          <% end %>
+        </main>
+        <.render_request_log request_log={@request_log} />
+      </div>
+    </div>
+    """
+  end
+
+  # --- Event Handlers ---
+
+  @impl true
+  def handle_event("validate_key_file", _params, socket), do: {:noreply, socket}
+
+  def handle_event("import_keys", _params, socket) do
+    [result] =
+      consume_uploaded_entries(socket, :key_file, fn %{path: path}, _entry ->
+        {:ok, File.read!(path)}
+      end)
+
+    socket =
+      case Crypto.parse_and_validate_identity(result) do
+        {:ok, user_data} ->
+          socket
+          |> assign(:user, user_data)
+          |> assign(:dialogs, [])
+          |> assign(:selected_dialog, nil)
+          |> assign(:messages, [])
+          |> assign(:msg_keys_cache, %{})
+          |> assign(:error_message, nil)
+          |> fetch_available_peers(user_data.user_hash)
+
+        {:error, reason} ->
+          assign(socket, :error_message, "Import failed: #{reason}")
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("fetch_dialogs", _params, socket) do
+    base_url = get_base_url(socket)
+    user_hash = socket.assigns.user.user_hash
+
+    socket =
+      case ApiClient.fetch_dialog_keys(user_hash, base_url) do
+        {:ok, %{keys: keys, log_entries: logs}} ->
+          dialogs = Crypto.build_dialog_list(keys, user_hash)
+
+          socket
+          |> assign(:dialogs, dialogs)
+          |> update(:request_log, &(&1 ++ logs))
+
+        {:error, %{reason: reason, log_entries: logs}} ->
+          socket
+          |> assign(:error_message, reason)
+          |> update(:request_log, &(&1 ++ logs))
+      end
+
+    {:noreply, fetch_available_peers(socket, user_hash)}
+  end
+
+  def handle_event("select_peer", %{"peer_hash" => hash}, socket) do
+    {:noreply, assign(socket, :peer_hash_input, hash)}
+  end
+
+  def handle_event("create_dialog", %{"peer_hash" => peer_hash}, socket) do
+    %{user: user} = socket.assigns
+    base_url = get_base_url(socket)
+
+    socket = assign(socket, :operation_in_progress, true)
+
+    with {:ok, %{card: card, log_entries: card_logs}} <-
+           ApiClient.fetch_user_card(peer_hash, base_url),
+         peer_crypt_pkey <- Crypto.decode_binary_field(card["crypt_pkey"]),
+         {:ok, %{dialog_hash: dialog_hash, log_entries: key_logs}} <-
+           ApiClient.publish_dialog_key(user, peer_hash, peer_crypt_pkey, base_url) do
+      dialog = %{dialog_hash: dialog_hash, peer_hash: peer_hash}
+
+      {:noreply,
+       socket
+       |> update(:dialogs, &[dialog | &1])
+       |> assign(:selected_dialog, dialog_hash)
+       |> assign(:peer_hash_input, "")
+       |> assign(:operation_in_progress, false)
+       |> update(:request_log, &(&1 ++ card_logs ++ key_logs))}
+    else
+      {:error, %{reason: reason, log_entries: logs}} ->
+        {:noreply,
+         socket
+         |> assign(:error_message, reason)
+         |> assign(:operation_in_progress, false)
+         |> update(:request_log, &(&1 ++ logs))}
+    end
+  end
+
+  def handle_event("select_dialog", %{"dialog_hash" => hash, "peer_hash" => peer_hash}, socket) do
+    socket =
+      socket
+      |> assign(:selected_dialog, hash)
+      |> assign(:messages, [])
+      |> assign(:refs_tails, %{})
+
+    {:noreply, fetch_and_decrypt_messages(socket, hash, peer_hash)}
+  end
+
+  def handle_event("refresh_messages", _params, socket) do
+    dialog =
+      Enum.find(socket.assigns.dialogs, &(&1.dialog_hash == socket.assigns.selected_dialog))
+
+    case dialog do
+      nil -> {:noreply, socket}
+      d -> {:noreply, fetch_and_decrypt_messages(socket, d.dialog_hash, d.peer_hash)}
+    end
+  end
+
+  def handle_event("send_message", %{"text" => text}, socket) when text != "" do
+    %{user: user, selected_dialog: dialog_hash} = socket.assigns
+    dialog = Enum.find(socket.assigns.dialogs, &(&1.dialog_hash == dialog_hash))
+    base_url = get_base_url(socket)
+    refs_tails = %{peer_hash: dialog.peer_hash, tails: socket.assigns.refs_tails}
+
+    socket = assign(socket, :operation_in_progress, true)
+
+    with {:ok, socket} <- ensure_dialog_key(socket, user, dialog.peer_hash, base_url),
+         {:ok, %{message_id: msg_id, sign_hash: sign_hash, log_entries: logs}} <-
+           ApiClient.publish_dialog_message(user, dialog_hash, text, refs_tails, base_url) do
+      {:noreply,
+       socket
+       |> assign(:compose_text, "")
+       |> assign(:refs_tails, %{msg_id => sign_hash})
+       |> assign(:operation_in_progress, false)
+       |> update(:request_log, &(&1 ++ logs))
+       |> then(&fetch_and_decrypt_messages(&1, dialog_hash, dialog.peer_hash))}
+    else
+      {:error, %{reason: reason, log_entries: logs}} ->
+        {:noreply,
+         socket
+         |> assign(:error_message, reason)
+         |> assign(:operation_in_progress, false)
+         |> update(:request_log, &(&1 ++ logs))}
+    end
+  end
+
+  def handle_event("send_message", _params, socket), do: {:noreply, socket}
+
+  def handle_event("toggle_docs", _params, socket) do
+    {:noreply, assign(socket, :show_docs, !socket.assigns.show_docs)}
+  end
+
+  def handle_event("toggle_doc_section", %{"section" => section}, socket) do
+    expanded =
+      if section in socket.assigns.expanded_docs,
+        do: MapSet.delete(socket.assigns.expanded_docs, section),
+        else: MapSet.put(socket.assigns.expanded_docs, section)
+
+    {:noreply, assign(socket, :expanded_docs, expanded)}
+  end
+
+  def handle_event("clear_log", _params, socket),
+    do: {:noreply, assign(socket, :request_log, [])}
+
+  def handle_event("clear_error", _params, socket),
+    do: {:noreply, assign(socket, :error_message, nil)}
+
+  # --- Private ---
+
+  defp fetch_available_peers(socket, my_hash) do
+    base_url = get_base_url(socket)
+
+    case ApiClient.fetch_all_user_cards(base_url) do
+      {:ok, %{cards: cards, log_entries: logs}} ->
+        peers =
+          cards
+          |> Enum.reject(&(&1["user_hash"] == my_hash))
+          |> Enum.map(&%{user_hash: &1["user_hash"], name: &1["name"]})
+
+        socket
+        |> assign(:available_peers, peers)
+        |> update(:request_log, &(&1 ++ logs))
+
+      {:error, %{reason: reason, log_entries: logs}} ->
+        socket
+        |> assign(:error_message, reason)
+        |> update(:request_log, &(&1 ++ logs))
+    end
+  end
+
+  defp ensure_dialog_key(socket, user, peer_hash, base_url) do
+    dialog_hash = Crypto.compute_dialog_hash(user.user_hash, peer_hash)
+
+    case ApiClient.fetch_dialog_keys_by_dialog(dialog_hash, base_url) do
+      {:ok, %{keys: keys, log_entries: logs}} ->
+        socket = update(socket, :request_log, &(&1 ++ logs))
+        has_own_key = Enum.any?(keys, &(&1["sender_hash"] == user.user_hash))
+
+        if has_own_key do
+          {:ok, socket}
+        else
+          with {:ok, %{card: card, log_entries: card_logs}} <-
+                 ApiClient.fetch_user_card(peer_hash, base_url),
+               peer_crypt_pkey = Crypto.decode_binary_field(card["crypt_pkey"]),
+               {:ok, %{log_entries: key_logs}} <-
+                 ApiClient.publish_dialog_key(user, peer_hash, peer_crypt_pkey, base_url) do
+            {:ok, update(socket, :request_log, &(&1 ++ card_logs ++ key_logs))}
+          end
+        end
+
+      {:error, _} = error ->
+        error
+    end
+  end
+
+  defp fetch_and_decrypt_messages(socket, dialog_hash, peer_hash) do
+    base_url = get_base_url(socket)
+    user = socket.assigns.user
+
+    case ApiClient.fetch_dialog_messages(dialog_hash, base_url) do
+      {:ok, %{messages: raw_msgs, log_entries: logs}} ->
+        {messages, tails, keys_cache} =
+          decrypt_messages(raw_msgs, user, peer_hash, socket.assigns.msg_keys_cache, base_url)
+
+        socket
+        |> assign(:messages, messages)
+        |> assign(:refs_tails, tails)
+        |> assign(:msg_keys_cache, keys_cache)
+        |> update(:request_log, &(&1 ++ logs))
+
+      {:error, %{reason: reason, log_entries: logs}} ->
+        socket
+        |> assign(:error_message, reason)
+        |> update(:request_log, &(&1 ++ logs))
+    end
+  end
+
+  defp decrypt_messages(raw_msgs, user, peer_hash, keys_cache, base_url) do
+    my_key =
+      Crypto.derive_sender_msg_key(user.sign_skey, user.crypt_skey, user.contact_skey, peer_hash)
+
+    keys_cache =
+      keys_cache
+      |> Map.put(user.user_hash, my_key)
+      |> maybe_unwrap_peer_key(peer_hash, user, base_url)
+
+    sorted = Enum.sort_by(raw_msgs, & &1["owner_timestamp"])
+    messages = Enum.map(sorted, &Crypto.decrypt_single_message(&1, keys_cache))
+    tails = Crypto.compute_tails(sorted, keys_cache)
+
+    {messages, tails, keys_cache}
+  end
+
+  defp maybe_unwrap_peer_key(keys_cache, peer_hash, user, base_url) do
+    if Map.has_key?(keys_cache, peer_hash) do
+      keys_cache
+    else
+      dialog_hash = Crypto.compute_dialog_hash(user.user_hash, peer_hash)
+
+      with {:ok, %{keys: keys}} <- ApiClient.fetch_dialog_keys_by_dialog(dialog_hash, base_url),
+           %{} = row <-
+             Enum.find(keys, &(&1["sender_hash"] == peer_hash)) do
+        kem_wrap = Crypto.decode_binary_field(row["peer_kem_wrap_key_b64"])
+        wrapped = Crypto.decode_binary_field(row["peer_wrapped_msg_key_b64"])
+        Map.put(keys_cache, peer_hash, Crypto.unwrap_peer_key(kem_wrap, wrapped, user.crypt_skey))
+      else
+        _ -> keys_cache
+      end
+    end
+  end
+
+  defp get_base_url(socket) do
+    uri = socket.host_uri
+    "#{uri.scheme}://#{uri.host}:#{uri.port}"
+  end
+end

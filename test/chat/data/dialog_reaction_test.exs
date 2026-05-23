@@ -107,6 +107,60 @@ defmodule Chat.Data.DialogReactionTest do
     end
   end
 
+  describe "update path — peer sync" do
+    test "valid update overwrites existing", ctx do
+      reaction_hash = generate_reaction_hash()
+      shared = [reaction_hash: reaction_hash, message_id: DialogMessageId.generate()]
+
+      r1 = signed_reaction(ctx.alice, ctx.alice_hash, shared ++ [owner_timestamp: 100])
+      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, r1)
+
+      r2 = signed_reaction(ctx.alice, ctx.alice_hash, shared ++ [owner_timestamp: 200])
+      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :update, r2)
+
+      persisted = Dialog.get_reaction(reaction_hash)
+      assert persisted.owner_timestamp == 200
+    end
+
+    test "stale update is rejected", ctx do
+      reaction_hash = generate_reaction_hash()
+      shared = [reaction_hash: reaction_hash, message_id: DialogMessageId.generate()]
+
+      r1 = signed_reaction(ctx.alice, ctx.alice_hash, shared ++ [owner_timestamp: 200])
+      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, r1)
+
+      r2 = signed_reaction(ctx.alice, ctx.alice_hash, shared ++ [owner_timestamp: 100])
+      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :update, r2)
+
+      persisted = Dialog.get_reaction(reaction_hash)
+      assert persisted.owner_timestamp == 200
+    end
+
+    test "update for non-existing reaction is ignored", ctx do
+      reaction = signed_reaction(ctx.alice, ctx.alice_hash)
+      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :update, reaction)
+
+      assert Dialog.get_reaction(reaction.reaction_hash) == nil
+    end
+
+    test "update with invalid signature is rejected", ctx do
+      bob = User.generate_pq_identity("Bob")
+      shared = [reaction_hash: generate_reaction_hash(), message_id: DialogMessageId.generate()]
+
+      r1 = signed_reaction(ctx.alice, ctx.alice_hash, shared ++ [owner_timestamp: 100])
+      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, r1)
+
+      r2 =
+        build_reaction(ctx.alice_hash, shared ++ [owner_timestamp: 200])
+        |> sign_with_key(bob.sign_skey)
+
+      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :update, r2)
+
+      persisted = Dialog.get_reaction(shared[:reaction_hash])
+      assert persisted.owner_timestamp == 100
+    end
+  end
+
   # --- Helpers ---
 
   defp generate_reaction_hash do
@@ -118,7 +172,7 @@ defmodule Chat.Data.DialogReactionTest do
     %DialogMessageReaction{
       reaction_hash: Keyword.get(attrs, :reaction_hash, generate_reaction_hash()),
       dialog_hash: "di_" <> String.duplicate("ab", 64),
-      message_id: DialogMessageId.generate(),
+      message_id: Keyword.get(attrs, :message_id, DialogMessageId.generate()),
       message_sign_hash: "dms_" <> String.duplicate("cd", 64),
       reactor_hash: reactor_hash,
       type_b64: :crypto.strong_rand_bytes(24),

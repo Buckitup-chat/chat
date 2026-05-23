@@ -17,30 +17,26 @@ defmodule Chat.Data.Dialog.Versioning do
   @dialyzer {:no_opaque, archive_and_insert: 3, archive_and_update: 3}
 
   def handle_insert_with_conflict(repo, existing, new_message) do
-    case new_message.owner_timestamp > existing.owner_timestamp do
-      true ->
-        archive_and_insert(repo, existing, new_message)
-
-      false ->
-        archive_changeset(new_message)
-        |> repo.insert(
-          on_conflict: :nothing,
-          conflict_target: [:message_id, :sign_hash]
-        )
+    if new_message.owner_timestamp > existing.owner_timestamp do
+      archive_and_insert(repo, existing, new_message)
+    else
+      archive_changeset(new_message)
+      |> repo.insert(
+        on_conflict: :nothing,
+        conflict_target: [:message_id, :sign_hash]
+      )
     end
   end
 
   def handle_update_with_versioning(repo, existing, new_message) do
-    case new_message.owner_timestamp > existing.owner_timestamp do
-      true ->
-        archive_and_update(repo, existing, new_message)
-
-      false ->
-        archive_changeset(new_message)
-        |> repo.insert(
-          on_conflict: :nothing,
-          conflict_target: [:message_id, :sign_hash]
-        )
+    if new_message.owner_timestamp > existing.owner_timestamp do
+      archive_and_update(repo, existing, new_message)
+    else
+      archive_changeset(new_message)
+      |> repo.insert(
+        on_conflict: :nothing,
+        conflict_target: [:message_id, :sign_hash]
+      )
     end
   end
 

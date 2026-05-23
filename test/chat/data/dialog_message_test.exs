@@ -136,6 +136,94 @@ defmodule Chat.Data.DialogMessageTest do
     end
   end
 
+  describe "update path — peer sync" do
+    test "valid update archives existing and replaces tip", ctx do
+      message_id = DialogMessageId.generate()
+
+      msg1 =
+        signed_message(ctx.alice, ctx.dialog_hash, ctx.alice_hash,
+          message_id: message_id,
+          owner_timestamp: 100
+        )
+
+      {:ok, _} = ShapeWriter.write(:dialog_messages, :insert, msg1)
+
+      msg2 =
+        signed_message(ctx.alice, ctx.dialog_hash, ctx.alice_hash,
+          message_id: message_id,
+          owner_timestamp: 200
+        )
+
+      {:ok, _} = ShapeWriter.write(:dialog_messages, :update, msg2)
+
+      persisted = Dialog.get_message(message_id)
+      assert persisted.owner_timestamp == 200
+
+      archived =
+        Repo.get_by(DialogMessageVersion,
+          message_id: message_id,
+          sign_hash: msg1.sign_hash
+        )
+
+      assert archived != nil
+      assert archived.owner_timestamp == 100
+    end
+
+    test "stale update is rejected", ctx do
+      message_id = DialogMessageId.generate()
+
+      msg1 =
+        signed_message(ctx.alice, ctx.dialog_hash, ctx.alice_hash,
+          message_id: message_id,
+          owner_timestamp: 200
+        )
+
+      {:ok, _} = ShapeWriter.write(:dialog_messages, :insert, msg1)
+
+      msg2 =
+        signed_message(ctx.alice, ctx.dialog_hash, ctx.alice_hash,
+          message_id: message_id,
+          owner_timestamp: 100
+        )
+
+      {:ok, _} = ShapeWriter.write(:dialog_messages, :update, msg2)
+
+      persisted = Dialog.get_message(message_id)
+      assert persisted.owner_timestamp == 200
+    end
+
+    test "update for non-existing message is ignored", ctx do
+      msg = signed_message(ctx.alice, ctx.dialog_hash, ctx.alice_hash)
+      {:ok, _} = ShapeWriter.write(:dialog_messages, :update, msg)
+
+      assert Dialog.get_message(msg.message_id) == nil
+    end
+
+    test "update with invalid signature is rejected", ctx do
+      message_id = DialogMessageId.generate()
+
+      msg1 =
+        signed_message(ctx.alice, ctx.dialog_hash, ctx.alice_hash,
+          message_id: message_id,
+          owner_timestamp: 100
+        )
+
+      {:ok, _} = ShapeWriter.write(:dialog_messages, :insert, msg1)
+
+      msg2 =
+        build_message(ctx.dialog_hash, ctx.alice_hash,
+          message_id: message_id,
+          owner_timestamp: 200
+        )
+        |> sign_with_key(ctx.bob.sign_skey)
+
+      {:ok, _} = ShapeWriter.write(:dialog_messages, :update, msg2)
+
+      persisted = Dialog.get_message(message_id)
+      assert persisted.owner_timestamp == 100
+    end
+  end
+
   # --- Helpers ---
 
   defp compute_dialog_hash(hash_a, hash_b) do

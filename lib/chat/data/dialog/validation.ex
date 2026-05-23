@@ -53,11 +53,12 @@ defmodule Chat.Data.Dialog.Validation do
           hash
       end
 
-    card = UserData.get_card(sender_hash)
-    true = EnigmaPq.verify(challenge, signature, card.sign_pkey)
-    :ok
-  rescue
-    _ -> {:error, "Invalid operation"}
+    with %{sign_pkey: sign_pkey} <- UserData.get_card(sender_hash),
+         true <- EnigmaPq.verify(challenge, signature, sign_pkey) do
+      :ok
+    else
+      _ -> {:error, "Invalid operation"}
+    end
   end
 
   def dialog_key_validate(dialog_key, changes, op) do
@@ -115,11 +116,12 @@ defmodule Chat.Data.Dialog.Validation do
           hash
       end
 
-    card = UserData.get_card(sender_hash)
-    true = EnigmaPq.verify(challenge, signature, card.sign_pkey)
-    :ok
-  rescue
-    _ -> {:error, "Invalid operation"}
+    with %{sign_pkey: sign_pkey} <- UserData.get_card(sender_hash),
+         true <- EnigmaPq.verify(challenge, signature, sign_pkey) do
+      :ok
+    else
+      _ -> {:error, "Invalid operation"}
+    end
   end
 
   def message_validate_with_versioning(message, changes, op) do
@@ -139,18 +141,19 @@ defmodule Chat.Data.Dialog.Validation do
     case {op, changeset.valid?} do
       {:insert, true} ->
         with {:ok, new_message} <- Ecto.Changeset.apply_action(changeset, :insert),
-             existing when not is_nil(existing) <- Dialog.get_message(new_message.message_id) do
+             %DialogMessage{} = existing <- Dialog.get_message(new_message.message_id) do
           handle_insert_with_versioning(changeset, existing, new_message)
         else
           _ -> changeset
         end
 
       {:update, true} ->
-        with {:ok, new_message} <- Ecto.Changeset.apply_action(changeset, :update),
-             existing <- changeset.data do
-          handle_update_with_versioning(changeset, existing, new_message)
-        else
-          _ -> changeset
+        case Ecto.Changeset.apply_action(changeset, :update) do
+          {:ok, new_message} ->
+            handle_update_with_versioning(changeset, changeset.data, new_message)
+
+          _ ->
+            changeset
         end
 
       _ ->
@@ -252,11 +255,12 @@ defmodule Chat.Data.Dialog.Validation do
           hash
       end
 
-    card = UserData.get_card(reactor_hash)
-    true = EnigmaPq.verify(challenge, signature, card.sign_pkey)
-    :ok
-  rescue
-    _ -> {:error, "Invalid operation"}
+    with %{sign_pkey: sign_pkey} <- UserData.get_card(reactor_hash),
+         true <- EnigmaPq.verify(challenge, signature, sign_pkey) do
+      :ok
+    else
+      _ -> {:error, "Invalid operation"}
+    end
   end
 
   def reaction_validate(reaction, changes, op) do
@@ -284,15 +288,18 @@ defmodule Chat.Data.Dialog.Validation do
 
   # --- Dialog Message Receipts: HTTP ingestion ---
 
-  def receipt_allowed(operation, %{challenge: challenge, signature: signature}) do
-    %Operation{operation: :insert, changes: changes} = operation
-
+  def receipt_allowed(
+        %Operation{operation: :insert, changes: changes},
+        %{challenge: challenge, signature: signature}
+      ) do
     peer_hash = changes["peer_hash"] || changes[:peer_hash]
-    card = UserData.get_card(peer_hash)
-    true = EnigmaPq.verify(challenge, signature, card.sign_pkey)
-    :ok
-  rescue
-    _ -> {:error, "Invalid operation"}
+
+    with %{sign_pkey: sign_pkey} <- UserData.get_card(peer_hash),
+         true <- EnigmaPq.verify(challenge, signature, sign_pkey) do
+      :ok
+    else
+      _ -> {:error, "Invalid operation"}
+    end
   end
 
   def receipt_validate(receipt, changes, :insert) do

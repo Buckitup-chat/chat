@@ -119,6 +119,69 @@ defmodule Chat.Data.DialogKeyTest do
     end
   end
 
+  describe "update path — peer sync" do
+    test "valid update overwrites existing", %{
+      alice: alice,
+      alice_hash: ah,
+      bob_hash: bh,
+      dialog_hash: dh
+    } do
+      dk1 = signed_dialog_key(alice, dh, ah, bh, owner_timestamp: 100)
+      {:ok, _} = ShapeWriter.write(:dialog_keys, :insert, dk1)
+
+      dk2 = signed_dialog_key(alice, dh, ah, bh, owner_timestamp: 200)
+      {:ok, _} = ShapeWriter.write(:dialog_keys, :update, dk2)
+
+      persisted = Dialog.get_dialog_key(dh, ah)
+      assert persisted.owner_timestamp == 200
+    end
+
+    test "stale update is rejected", %{
+      alice: alice,
+      alice_hash: ah,
+      bob_hash: bh,
+      dialog_hash: dh
+    } do
+      dk1 = signed_dialog_key(alice, dh, ah, bh, owner_timestamp: 200)
+      {:ok, _} = ShapeWriter.write(:dialog_keys, :insert, dk1)
+
+      dk2 = signed_dialog_key(alice, dh, ah, bh, owner_timestamp: 100)
+      {:ok, _} = ShapeWriter.write(:dialog_keys, :update, dk2)
+
+      persisted = Dialog.get_dialog_key(dh, ah)
+      assert persisted.owner_timestamp == 200
+    end
+
+    test "update with invalid signature is rejected", %{
+      alice: alice,
+      bob: bob,
+      alice_hash: ah,
+      bob_hash: bh,
+      dialog_hash: dh
+    } do
+      dk1 = signed_dialog_key(alice, dh, ah, bh, owner_timestamp: 100)
+      {:ok, _} = ShapeWriter.write(:dialog_keys, :insert, dk1)
+
+      dk2 = build_dialog_key(dh, ah, bh, owner_timestamp: 200) |> sign_with_key(bob.sign_skey)
+      {:ok, _} = ShapeWriter.write(:dialog_keys, :update, dk2)
+
+      persisted = Dialog.get_dialog_key(dh, ah)
+      assert persisted.owner_timestamp == 100
+    end
+
+    test "update for non-existing key is ignored", %{
+      alice: alice,
+      alice_hash: ah,
+      bob_hash: bh,
+      dialog_hash: dh
+    } do
+      dk = signed_dialog_key(alice, dh, ah, bh)
+      {:ok, _} = ShapeWriter.write(:dialog_keys, :update, dk)
+
+      assert Dialog.get_dialog_key(dh, ah) == nil
+    end
+  end
+
   # --- Helpers ---
 
   defp compute_dialog_hash(hash_a, hash_b) do

@@ -162,7 +162,7 @@ Returns the raw `data_b64` BYTEA as `application/octet-stream`. Response header 
 
 **Implementation**: `ChatWeb.FileChunkController.show/2` → `Chat.Data.File.get_file_chunk/2` (single PG primary-key lookup).
 
-**Why not Electric shapes?** Each unique `(table, where)` combination creates a persistent Electric shape: a Consumer GenServer, a PG snapshot transaction, disk-backed shape log, and ongoing WAL filtering. Fetching N chunks via shapes (one shape per `file_id + chunk_index` WHERE clause) creates N long-lived server-side resources for what is a simple point read. The direct endpoint performs one PG query with no persistent overhead.
+**Why not Electric shapes?** Each unique `(table, where)` combination creates a persistent Electric shape: a Consumer GenServer, a PG snapshot transaction, disk-backed shape log, and ongoing WAL filtering. Fetching N chunks via shapes (one shape per `file_id + chunk_index` WHERE clause) creates N long-lived server-side resources for what is a simple point read. The direct endpoint performs one PG query with no persistent overhead. This matters especially for video streaming (see [pq_video_streaming.md §6](pq_video_streaming.md#6-chunk-fetch-strategy)), where seeking triggers many single-chunk fetches.
 
 ### 6.2 Download Flow
 

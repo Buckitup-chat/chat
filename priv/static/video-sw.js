@@ -134,38 +134,13 @@ async function getDecryptedChunk(session, sessionId, chunkIdx) {
   return decrypted;
 }
 
-// --- Electric Shape API fetch ---
-
 async function fetchChunkFromElectric(baseUrl, fileId, chunkIndex) {
-  let offset = '-1';
-  let handle = null;
-
-  while (true) {
-    const url = new URL(`${baseUrl}/electric/v1/shapes`);
-    url.searchParams.set('table', 'file_chunks');
-    url.searchParams.set('where', `file_id = '${fileId}' AND chunk_index = ${chunkIndex}`);
-    url.searchParams.set('offset', offset);
-    if (handle) url.searchParams.set('handle', handle);
-
-    const resp = await fetch(url, { cache: 'no-store' });
-    if (!resp.ok) throw new Error(`Chunk fetch failed: ${resp.status}`);
-
-    if (!handle) handle = resp.headers.get('electric-handle');
-    offset = resp.headers.get('electric-offset') || offset;
-
-    const body = await resp.json();
-    if (Array.isArray(body)) {
-      for (const entry of body) {
-        if (entry.value) return parseChunkData(entry.value.data_b64);
-      }
-    }
-
-    const isUpToDate = resp.headers.has('electric-up-to-date')
-      || body.some(e => e.headers?.control === 'up-to-date');
-    if (isUpToDate) break;
-  }
-
-  throw new Error(`Chunk ${chunkIndex} not found`);
+  const resp = await fetch(`${baseUrl}/electric/v1/file_chunk/${fileId}/${chunkIndex}`, {
+    cache: 'no-store'
+  });
+  if (resp.status === 404) throw new Error(`Chunk ${chunkIndex} not found`);
+  if (!resp.ok) throw new Error(`Chunk fetch failed: ${resp.status}`);
+  return new Uint8Array(await resp.arrayBuffer());
 }
 
 // --- AES-256-GCM decryption ---
@@ -178,22 +153,6 @@ async function decryptChunk(blob, encSecretBytes) {
     { name: 'AES-GCM', iv: nonce, tagLength: 128 }, key, ciphertextWithTag
   );
   return new Uint8Array(plaintext);
-}
-
-// --- Data parsing ---
-
-function parseChunkData(raw) {
-  if (typeof raw === 'string' && raw.startsWith('\\x')) {
-    return hexToBytes(raw.slice(2));
-  }
-  if (typeof raw === 'string') {
-    const padded = raw + '='.repeat((4 - (raw.length % 4)) % 4);
-    const binary = atob(padded);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes;
-  }
-  return new Uint8Array(raw);
 }
 
 function hexToBytes(hex) {

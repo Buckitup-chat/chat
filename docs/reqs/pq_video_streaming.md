@@ -37,14 +37,14 @@ We need progressive video playback where the browser fetches, decrypts, and play
 │                                         │
 │  1. Parse Range header                  │
 │  2. Map byte range → chunk indexes      │
-│  3. Fetch chunks from Electric API      │
+│  3. Fetch chunk via REST endpoint       │
 │  4. Decrypt (AES-256-GCM)              │
 │  5. Slice to exact byte range           │
 │  6. Return 206 Partial Content          │
 └─────────────────────────────────────────┘
         │
         ▼
-  Electric Shape API (encrypted 4 MB chunks in PostgreSQL)
+  REST endpoint: GET /electric/v1/file_chunk/:file_id/:chunk_index
 ```
 
 Each encrypted chunk is independently decryptable — the 12-byte nonce is prepended to the ciphertext (see [§2 Chunk Encryption in pq_files.md](pq_files.md#2-chunk-encryption)). The browser's native `<video>` media stack handles all buffering, codec detection, and seeking via standard HTTP range requests.
@@ -92,7 +92,7 @@ The SW intercepts fetches to `/encrypted-video/{sessionId}`:
 1. **Parse Range header** — `bytes=start-end` (or open-ended `bytes=start-`)
 2. **Map to chunks** — `startChunk = floor(start / chunkSize)`, `endChunk = floor(end / chunkSize)`
 3. **Cap response** — max 4 chunks (16 MB) per response to avoid fetching the entire file
-4. **Fetch + decrypt** each needed chunk from Electric Shape API
+4. **Fetch + decrypt** each needed chunk via REST endpoint (see [pq_files.md §6.1](pq_files.md#61-direct-chunk-endpoint))
 5. **Slice** the decrypted data to the exact requested byte range
 6. **Return** `206 Partial Content` with `Content-Range: bytes start-end/totalSize`
 
@@ -116,13 +116,13 @@ On session `unregister`, all cached chunks for that session are purged.
 
 ## 6. Chunk Fetch Strategy
 
-Individual chunks fetched via Electric Shape API:
+Individual chunks are fetched via the direct REST endpoint (see [pq_files.md §6.1](pq_files.md#61-direct-chunk-endpoint)):
 
 ```
-GET /electric/v1/shapes?table=file_chunks&where=file_id='<id>' AND chunk_index=<n>&offset=-1
+GET /electric/v1/file_chunk/:file_id/:chunk_index → application/octet-stream
 ```
 
-The SW paginates through Electric's offset/handle mechanism until `up-to-date` is received, then extracts `data_b64` from the first matching row.
+A single HTTP request returns the raw encrypted BYTEA blob. No shape creation, no pagination, no JSON parsing overhead. Each unique `(table, where)` Electric shape creates a persistent server-side Consumer GenServer, snapshot transaction, and shape log — the REST endpoint avoids all of this with a single PG primary-key lookup.
 
 ## 7. Integration
 

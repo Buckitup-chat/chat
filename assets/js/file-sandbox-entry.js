@@ -189,12 +189,6 @@ async function handleUpload() {
 
 // --- Download ---
 
-function parseChunkData(rawData) {
-  if (typeof rawData === 'string' && rawData.startsWith('\\x')) return hexToUint8(rawData);
-  if (typeof rawData === 'string') return base64ToUint8(rawData);
-  return new Uint8Array(rawData);
-}
-
 async function fetchManifest(fileId) {
   setStatus('Fetching file manifest...', 'info');
   const files = await fetchShapeWhere(state.baseUrl, 'files', `file_id = '${fileId}'`);
@@ -203,10 +197,10 @@ async function fetchManifest(fileId) {
 }
 
 async function fetchChunk(fileId, index) {
-  const where = `file_id = '${fileId}' AND chunk_index = ${index}`;
-  const rows = await fetchShapeWhere(state.baseUrl, 'file_chunks', where);
-  if (rows.length === 0) throw new Error(`Chunk ${index} not found`);
-  return rows[0];
+  const resp = await fetch(`${state.baseUrl}/electric/v1/file_chunk/${fileId}/${index}`);
+  if (resp.status === 404) throw new Error(`Chunk ${index} not found`);
+  if (!resp.ok) throw new Error(`Chunk fetch failed: ${resp.status}`);
+  return new Uint8Array(await resp.arrayBuffer());
 }
 
 async function handleDownload() {
@@ -244,7 +238,7 @@ async function handleDownload() {
         for (let i = 0; i < chunkCount; i++) {
           updateProgress(i, chunkCount, 'Downloading');
           const chunk = await fetchChunk(fileId, i);
-          const decrypted = await decryptChunk(parseChunkData(chunk.data_b64), encSecret);
+          const decrypted = await decryptChunk(chunk, encSecret);
           await writable.write(decrypted);
         }
       } finally {
@@ -256,7 +250,7 @@ async function handleDownload() {
         updateProgress(i, chunkCount, 'Downloading');
         const chunk = await fetchChunk(fileId, i);
         decryptedChunks.push(
-          await decryptChunk(parseChunkData(chunk.data_b64), encSecret)
+          await decryptChunk(chunk, encSecret)
         );
       }
       const blob = new Blob(decryptedChunks);
@@ -306,7 +300,7 @@ async function handleView() {
       updateProgress(i, chunkCount, 'Downloading');
       const chunk = await fetchChunk(fileId, i);
       decryptedChunks.push(
-        await decryptChunk(parseChunkData(chunk.data_b64), encSecret)
+        await decryptChunk(chunk, encSecret)
       );
     }
     const blob = new Blob(decryptedChunks);

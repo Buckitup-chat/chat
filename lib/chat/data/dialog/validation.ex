@@ -107,19 +107,22 @@ defmodule Chat.Data.Dialog.Validation do
   # --- Dialog Messages: HTTP ingestion ---
 
   def message_allowed(operation, %{challenge: challenge, signature: signature}) do
-    sender_hash =
+    {sender_hash, dialog_hash} =
       case operation do
         %Operation{operation: :insert, changes: changes} ->
-          changes["sender_hash"] || changes[:sender_hash]
+          {changes["sender_hash"] || changes[:sender_hash],
+           changes["dialog_hash"] || changes[:dialog_hash]}
 
-        %Operation{operation: :update, data: %{"sender_hash" => hash}} ->
-          hash
+        %Operation{operation: :update, data: data} ->
+          {data["sender_hash"], data["dialog_hash"]}
       end
 
     with %{sign_pkey: sign_pkey} <- UserData.get_card(sender_hash),
-         true <- EnigmaPq.verify(challenge, signature, sign_pkey) do
+         true <- EnigmaPq.verify(challenge, signature, sign_pkey),
+         %DialogKey{} <- Dialog.get_dialog_key(dialog_hash, sender_hash) do
       :ok
     else
+      nil -> {:error, "dialog_key required before sending messages"}
       _ -> {:error, "Invalid operation"}
     end
   end

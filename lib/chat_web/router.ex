@@ -96,6 +96,7 @@ defmodule ChatWeb.Router do
       live "/electric/files", ElectricLive.FilesLive.Index, :index
       live "/electric/file_chunks", ElectricLive.FileChunksLive.Index, :index
       live "/electric/user_sandbox", ElectricLive.UserSandboxLive.Index, :index
+      live "/electric/dialog_sandbox", ElectricLive.DialogSandboxLive.Index, :index
     end
 
     get "/login", FrontendController, :index
@@ -160,7 +161,8 @@ defmodule ChatWeb.Router do
       sync("/user_card", Chat.Data.Schemas.UserCard)
       sync("/user_storage", Chat.Data.Schemas.UserStorage)
       sync("/user_storage_version", Chat.Data.Schemas.UserStorageVersion)
-
+      sync("/dialog_key", Chat.Data.Schemas.DialogKey)
+      sync("/dialog_message", Chat.Data.Schemas.DialogMessage)
 
       get "/file_chunk/:file_id/:chunk_index", FileChunkController, :show
 

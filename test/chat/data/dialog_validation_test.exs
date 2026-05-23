@@ -76,18 +76,30 @@ defmodule Chat.Data.DialogValidationTest do
   # --- message_allowed/2 ---
 
   describe "message_allowed/2" do
-    test "valid PoP returns :ok", ctx do
+    test "valid PoP with existing dialog_key returns :ok", ctx do
+      insert_dialog_key(ctx.alice, ctx.dialog_hash, ctx.alice_hash, ctx.bob_hash)
       {challenge, signature} = sign_challenge(ctx.alice)
 
-      operation = %Operation{operation: :insert, changes: %{"sender_hash" => ctx.alice_hash}}
-      assert :ok = Validation.message_allowed(operation, %{challenge: challenge, signature: signature})
+      operation = message_operation(:insert, ctx.alice_hash, ctx.dialog_hash)
+
+      assert :ok =
+               Validation.message_allowed(operation, %{challenge: challenge, signature: signature})
+    end
+
+    test "missing dialog_key returns error", ctx do
+      {challenge, signature} = sign_challenge(ctx.alice)
+
+      operation = message_operation(:insert, ctx.alice_hash, ctx.dialog_hash)
+
+      assert {:error, "dialog_key required before sending messages"} =
+               Validation.message_allowed(operation, %{challenge: challenge, signature: signature})
     end
 
     test "invalid signature returns error", ctx do
       {challenge, _} = sign_challenge(ctx.alice)
       {_, wrong_sig} = sign_challenge(ctx.bob)
 
-      operation = %Operation{operation: :insert, changes: %{"sender_hash" => ctx.alice_hash}}
+      operation = message_operation(:insert, ctx.alice_hash, ctx.dialog_hash)
 
       assert {:error, _} =
                Validation.message_allowed(operation, %{challenge: challenge, signature: wrong_sig})
@@ -438,5 +450,18 @@ defmodule Chat.Data.DialogValidationTest do
     card = identity |> User.extract_pq_card() |> sign_with_key(identity.sign_skey)
     {:ok, _} = ShapeWriter.write(:user_card, :insert, card)
     card
+  end
+
+  defp insert_dialog_key(identity, dialog_hash, sender_hash, peer_hash) do
+    dk = signed_dialog_key(identity, dialog_hash, sender_hash, peer_hash)
+    {:ok, _} = ShapeWriter.write(:dialog_keys, :insert, dk)
+    dk
+  end
+
+  defp message_operation(:insert, sender_hash, dialog_hash) do
+    %Operation{
+      operation: :insert,
+      changes: %{"sender_hash" => sender_hash, "dialog_hash" => dialog_hash}
+    }
   end
 end

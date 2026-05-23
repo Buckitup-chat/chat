@@ -106,12 +106,15 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
     <section class="bg-white shadow rounded-lg p-6">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-lg font-bold">3. Messages</h3>
-        <button
-          phx-click="refresh_messages"
-          class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm"
-        >
-          Refresh
-        </button>
+        <div class="flex items-center gap-3">
+          <.sync_badge status={@sync_status} />
+          <button
+            phx-click="refresh_messages"
+            class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm"
+          >
+            Reconnect
+          </button>
+        </div>
       </div>
 
       <div class="border rounded-lg p-4 mb-4 max-h-96 overflow-y-auto bg-gray-50 space-y-3">
@@ -232,6 +235,33 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
         </div>
       <% end %>
     </aside>
+    """
+  end
+
+  defp sync_badge(%{status: :loading} = assigns) do
+    ~H"""
+    <span class="text-xs text-yellow-600 animate-pulse">Syncing...</span>
+    """
+  end
+
+  defp sync_badge(%{status: :loaded} = assigns) do
+    ~H"""
+    <span class="text-xs text-green-600">Synced</span>
+    """
+  end
+
+  defp sync_badge(%{status: :live} = assigns) do
+    ~H"""
+    <span class="inline-flex items-center gap-1 text-xs text-green-700">
+      <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+      Live
+    </span>
+    """
+  end
+
+  defp sync_badge(assigns) do
+    ~H"""
+    <span class="text-xs text-gray-500">Idle</span>
     """
   end
 

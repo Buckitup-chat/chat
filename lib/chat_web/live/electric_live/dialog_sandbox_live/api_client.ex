@@ -10,6 +10,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
   alias Chat.Data.Types.DialogMessageId
   alias Chat.TimeKeeper
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
+  alias Electric.Client.Message
 
   def fetch_all_user_cards(base_url) do
     url = "#{base_url}/electric/v1/shapes?table=user_cards&offset=-1"
@@ -183,6 +184,56 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
     else
       {:error, reason, log_entries} -> {:error, %{reason: reason, log_entries: log_entries}}
     end
+  end
+
+  def start_message_stream(dialog_hash, base_url, subscriber_pid) do
+    client = Electric.Client.new!(endpoint: base_url <> "/electric/v1/shapes")
+
+    shape =
+      Electric.Client.ShapeDefinition.new!("dialog_messages",
+        where: "dialog_hash = '#{dialog_hash}'"
+      )
+
+    spawn(fn ->
+      client
+      |> Electric.Client.stream(shape, live: false, replica: :full, errors: :stream)
+      |> Stream.transform(
+        fn -> {[], nil} end,
+        fn
+          %Message.ChangeMessage{headers: %{operation: :insert}, value: value}, {msgs, resume} ->
+            {[], {[value | msgs], resume}}
+
+          %Message.ResumeMessage{} = resume, {msgs, nil} ->
+            {[], {msgs, resume}}
+
+          _other, acc ->
+            {[], acc}
+        end,
+        fn {msgs, resume} ->
+          send(subscriber_pid, {:dialog_msgs_loaded, Enum.reverse(msgs)})
+
+          stream_opts =
+            if resume,
+              do: [resume: resume, replica: :full, errors: :stream],
+              else: [replica: :full, errors: :stream]
+
+          client
+          |> Electric.Client.stream(shape, stream_opts)
+          |> Stream.each(fn
+            %Message.ChangeMessage{headers: %{operation: :insert}, value: value} ->
+              send(subscriber_pid, {:dialog_msg_new, value})
+
+            %Message.ControlMessage{control: :up_to_date} ->
+              send(subscriber_pid, {:dialog_msg_live})
+
+            _ ->
+              :ok
+          end)
+          |> Stream.run()
+        end
+      )
+      |> Stream.run()
+    end)
   end
 
   # --- Private helpers ---

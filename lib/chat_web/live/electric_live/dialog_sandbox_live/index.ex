@@ -23,6 +23,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
       |> assign(:expanded_docs, MapSet.new(["dialog_keys"]))
       |> assign(:operation_in_progress, false)
       |> assign(:error_message, nil)
+      |> assign(:stream_pid, nil)
+      |> assign(:sync_status, :idle)
       |> allow_upload(:key_file, accept: ~w(.json), max_entries: 1, max_file_size: 100_000)
 
     {:ok, socket}
@@ -62,6 +64,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
               user={@user}
               compose_text={@compose_text}
               operation_in_progress={@operation_in_progress}
+              sync_status={@sync_status}
             />
           <% end %>
         </main>
@@ -158,13 +161,23 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   end
 
   def handle_event("select_dialog", %{"dialog_hash" => hash, "peer_hash" => peer_hash}, socket) do
-    socket =
-      socket
-      |> assign(:selected_dialog, hash)
-      |> assign(:messages, [])
-      |> assign(:refs_tails, %{})
+    %{user: user} = socket.assigns
+    base_url = get_base_url(socket)
 
-    {:noreply, fetch_and_decrypt_messages(socket, hash, peer_hash)}
+    my_key =
+      Crypto.derive_sender_msg_key(user.sign_skey, user.crypt_skey, user.contact_skey, peer_hash)
+
+    keys_cache =
+      %{user.user_hash => my_key}
+      |> maybe_unwrap_peer_key(peer_hash, user, base_url)
+
+    {:noreply,
+     socket
+     |> assign(:selected_dialog, hash)
+     |> assign(:messages, [])
+     |> assign(:refs_tails, %{})
+     |> assign(:msg_keys_cache, keys_cache)
+     |> start_dialog_stream(hash)}
   end
 
   def handle_event("refresh_messages", _params, socket) do
@@ -173,7 +186,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
 
     case dialog do
       nil -> {:noreply, socket}
-      d -> {:noreply, fetch_and_decrypt_messages(socket, d.dialog_hash, d.peer_hash)}
+      d -> {:noreply, start_dialog_stream(socket, d.dialog_hash)}
     end
   end
 
@@ -193,8 +206,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
        |> assign(:compose_text, "")
        |> assign(:refs_tails, %{msg_id => sign_hash})
        |> assign(:operation_in_progress, false)
-       |> update(:request_log, &(&1 ++ logs))
-       |> then(&fetch_and_decrypt_messages(&1, dialog_hash, dialog.peer_hash))}
+       |> update(:request_log, &(&1 ++ logs))}
     else
       {:error, %{reason: reason, log_entries: logs}} ->
         {:noreply,
@@ -226,7 +238,57 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   def handle_event("clear_error", _params, socket),
     do: {:noreply, assign(socket, :error_message, nil)}
 
+  # --- Stream handlers ---
+
+  @impl true
+  def handle_info({:dialog_msgs_loaded, raw_msgs}, socket) do
+    keys_cache = socket.assigns.msg_keys_cache
+    sorted = Enum.sort_by(raw_msgs, & &1["owner_timestamp"])
+    messages = Enum.map(sorted, &Crypto.decrypt_single_message(&1, keys_cache))
+    tails = Crypto.compute_tails(sorted, keys_cache)
+
+    {:noreply, assign(socket, messages: messages, refs_tails: tails, sync_status: :loaded)}
+  end
+
+  def handle_info({:dialog_msg_new, raw_msg}, socket) do
+    already_exists =
+      Enum.any?(socket.assigns.messages, &(&1.message_id == raw_msg["message_id"]))
+
+    if already_exists do
+      {:noreply, socket}
+    else
+      msg = Crypto.decrypt_single_message(raw_msg, socket.assigns.msg_keys_cache)
+
+      {:noreply,
+       socket
+       |> update(:messages, &(&1 ++ [msg]))
+       |> assign(:refs_tails, %{raw_msg["message_id"] => raw_msg["sign_hash"]})}
+    end
+  end
+
+  def handle_info({:dialog_msg_live}, socket) do
+    {:noreply, assign(socket, :sync_status, :live)}
+  end
+
   # --- Private ---
+
+  defp start_dialog_stream(socket, dialog_hash) do
+    socket = stop_dialog_stream(socket)
+    base_url = get_base_url(socket)
+    stream_pid = ApiClient.start_message_stream(dialog_hash, base_url, self())
+    assign(socket, stream_pid: stream_pid, sync_status: :loading)
+  end
+
+  defp stop_dialog_stream(socket) do
+    case socket.assigns[:stream_pid] do
+      pid when is_pid(pid) ->
+        Process.exit(pid, :kill)
+        assign(socket, :stream_pid, nil)
+
+      _ ->
+        socket
+    end
+  end
 
   defp fetch_available_peers(socket, my_hash) do
     base_url = get_base_url(socket)
@@ -272,44 +334,6 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
       {:error, _} = error ->
         error
     end
-  end
-
-  defp fetch_and_decrypt_messages(socket, dialog_hash, peer_hash) do
-    base_url = get_base_url(socket)
-    user = socket.assigns.user
-
-    case ApiClient.fetch_dialog_messages(dialog_hash, base_url) do
-      {:ok, %{messages: raw_msgs, log_entries: logs}} ->
-        {messages, tails, keys_cache} =
-          decrypt_messages(raw_msgs, user, peer_hash, socket.assigns.msg_keys_cache, base_url)
-
-        socket
-        |> assign(:messages, messages)
-        |> assign(:refs_tails, tails)
-        |> assign(:msg_keys_cache, keys_cache)
-        |> update(:request_log, &(&1 ++ logs))
-
-      {:error, %{reason: reason, log_entries: logs}} ->
-        socket
-        |> assign(:error_message, reason)
-        |> update(:request_log, &(&1 ++ logs))
-    end
-  end
-
-  defp decrypt_messages(raw_msgs, user, peer_hash, keys_cache, base_url) do
-    my_key =
-      Crypto.derive_sender_msg_key(user.sign_skey, user.crypt_skey, user.contact_skey, peer_hash)
-
-    keys_cache =
-      keys_cache
-      |> Map.put(user.user_hash, my_key)
-      |> maybe_unwrap_peer_key(peer_hash, user, base_url)
-
-    sorted = Enum.sort_by(raw_msgs, & &1["owner_timestamp"])
-    messages = Enum.map(sorted, &Crypto.decrypt_single_message(&1, keys_cache))
-    tails = Crypto.compute_tails(sorted, keys_cache)
-
-    {messages, tails, keys_cache}
   end
 
   defp maybe_unwrap_peer_key(keys_cache, peer_hash, user, base_url) do

@@ -12,8 +12,20 @@ straightforward as possible.
 
 ### Added
 
+- Post-quantum dialog sandbox: synced dialog with encryption and API client
+
+### Changed
+
+### Fixed
+
+## 2026-05-21_ea9a53e\_\_\_2026-05-23_2166c7d4
+
+### Added
+
 - Post-quantum dialog data layer: keys, messages (with versioning), receipts, and reactions — schemas, shapes, validations, and Electric sync
+- Post-quantum dialog sandbox (initial)
 - REST endpoint for post-quantum file chunks
+- REST endpoint for post-quantum file download and streaming
 - Electric shapes integrity tests
 
 ### Changed
@@ -21,8 +33,6 @@ straightforward as possible.
 - Electric shapes: hex-to-base64 encoding adapter for binary data
 - Electric file_chunks LiveView: lightweight rendering
 - [platform] Dependencies update
-
-### Fixed
 
 ## 2026-05-09_513f94e\_\_\_2026-05-18_4ef567db
 

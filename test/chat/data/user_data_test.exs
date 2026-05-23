@@ -21,34 +21,15 @@ defmodule Chat.Data.UserDataTest do
 
   describe "UserCard" do
     test "creates user card with valid hash" do
-      # Generate real keys via User context
       identity = User.generate_pq_identity("Alice")
-
-      # Extract card via User context
       card_struct = signed_user_card(identity)
-
-      # Verify calculated fields
-      expected_hash =
-        identity.sign_pkey
-        |> EnigmaPq.hash()
-        |> UserHash.from_binary()
+      expected_hash = expected_user_hash(identity)
 
       assert card_struct.user_hash == expected_hash
       assert card_struct.name == "Alice"
       assert is_binary(card_struct.crypt_cert)
 
-      # Insert using changeset (simulating what would happen in a real insert,
-      # though we already have the struct, we might want to validate)
-      # Usually we'd use the attrs from the struct or the struct itself if we trust it.
-      # Let's convert to map for changeset to ensure validations pass.
-      changeset =
-        card_struct
-        |> Map.from_struct()
-        |> then(&UserCard.create_changeset(%UserCard{}, &1))
-
-      assert changeset.valid?
-
-      {:ok, card} = Repo.insert(changeset)
+      {:ok, card} = insert_via_changeset(card_struct)
       assert card.user_hash == expected_hash
       assert card.name == "Alice"
     end
@@ -92,120 +73,68 @@ defmodule Chat.Data.UserDataTest do
     test "rejects card with invalid hash" do
       identity = User.generate_pq_identity("HackerHash")
       card = User.extract_pq_card(identity)
+      fake_hash = "fake_key" |> EnigmaPq.hash() |> UserHash.from_binary()
 
-      # Tamper with hash
-      fake_hash =
-        "fake_key"
-        |> EnigmaPq.hash()
-        |> UserHash.from_binary()
-
-      bad_card = %{card | user_hash: fake_hash}
-
-      refute User.valid_card?(bad_card)
+      refute User.valid_card?(%{card | user_hash: fake_hash})
     end
 
     test "rejects card with invalid certificate" do
       identity = User.generate_pq_identity("HackerCert")
       card = User.extract_pq_card(identity)
 
-      # Tamper with crypt key (cert won't match)
-      bad_card = %{card | crypt_pkey: "tampered_key"}
-
-      refute User.valid_card?(bad_card)
+      refute User.valid_card?(%{card | crypt_pkey: "tampered_key"})
     end
 
     test "rejects card with tampered crypt_cert" do
       identity = User.generate_pq_identity("TamperedCryptCert")
       card = User.extract_pq_card(identity)
-
-      # Tamper with crypt_cert directly
       tampered_cert = :crypto.strong_rand_bytes(byte_size(card.crypt_cert))
-      bad_card = %{card | crypt_cert: tampered_cert}
 
-      refute User.valid_card?(bad_card)
+      refute User.valid_card?(%{card | crypt_cert: tampered_cert})
     end
 
     test "rejects card with tampered contact_cert" do
       identity = User.generate_pq_identity("TamperedContactCert")
       card = User.extract_pq_card(identity)
-
-      # Tamper with contact_cert directly
       tampered_cert = :crypto.strong_rand_bytes(byte_size(card.contact_cert))
-      bad_card = %{card | contact_cert: tampered_cert}
 
-      refute User.valid_card?(bad_card)
+      refute User.valid_card?(%{card | contact_cert: tampered_cert})
     end
 
     test "rejects card with swapped crypt_cert and contact_cert" do
       identity = User.generate_pq_identity("SwappedCerts")
       card = User.extract_pq_card(identity)
 
-      # Swap the certificates (both are valid signatures but for wrong keys)
-      bad_card = %{card | crypt_cert: card.contact_cert, contact_cert: card.crypt_cert}
-
-      refute User.valid_card?(bad_card)
+      refute User.valid_card?(%{card | crypt_cert: card.contact_cert, contact_cert: card.crypt_cert})
     end
 
     test "rejects card with crypt_cert signed by wrong key" do
       identity = User.generate_pq_identity("WrongSignerCrypt")
       card = User.extract_pq_card(identity)
+      wrong_cert = sign_with_other_key(card.crypt_pkey)
 
-      # Generate a different signing key and sign crypt_pkey with it
-      {_other_sign_pkey, other_sign_skey} = :crypto.generate_key(:mldsa87, [])
-      wrong_crypt_cert = EnigmaPq.sign(card.crypt_pkey, other_sign_skey)
-      bad_card = %{card | crypt_cert: wrong_crypt_cert}
-
-      refute User.valid_card?(bad_card)
+      refute User.valid_card?(%{card | crypt_cert: wrong_cert})
     end
 
     test "rejects card with contact_cert signed by wrong key" do
       identity = User.generate_pq_identity("WrongSignerContact")
       card = User.extract_pq_card(identity)
+      wrong_cert = sign_with_other_key(card.contact_pkey)
 
-      # Generate a different signing key and sign contact_pkey with it
-      {_other_sign_pkey, other_sign_skey} = :crypto.generate_key(:mldsa87, [])
-      wrong_contact_cert = EnigmaPq.sign(card.contact_pkey, other_sign_skey)
-      bad_card = %{card | contact_cert: wrong_contact_cert}
-
-      refute User.valid_card?(bad_card)
+      refute User.valid_card?(%{card | contact_cert: wrong_cert})
     end
 
     test "rejects card with invalid prefix in hash" do
       identity = User.generate_pq_identity("BadPrefix")
       card = User.extract_pq_card(identity)
-
-      # Wrong prefix
-      bad_hash = Consts.dialog_hash_prefix() <> EnigmaPq.hash(card.sign_pkey)
-      bad_card = %{card | user_hash: bad_hash}
+      bad_card = %{card | user_hash: Consts.dialog_hash_prefix() <> EnigmaPq.hash(card.sign_pkey)}
 
       refute User.valid_card?(bad_card)
     end
 
     test "fails with invalid user hash prefix" do
-      # Use dialog prefix as invalid prefix for user hash
-      bad_prefix = Consts.dialog_hash_prefix()
-      raw_hash = :crypto.strong_rand_bytes(64)
-      bad_hash = bad_prefix <> raw_hash
+      attrs = card_attrs_with_bad_hash_prefix()
 
-      {sign_pkey, sign_skey} = :crypto.generate_key(:mldsa87, [])
-      {contact_pkey, _contact_skey} = :crypto.generate_key(:mldsa44, [])
-      {crypt_pkey, _crypt_skey} = :crypto.generate_key(:mlkem1024, [])
-
-      contact_cert = EnigmaPq.sign(contact_pkey, sign_skey)
-      crypt_cert = EnigmaPq.sign(crypt_pkey, sign_skey)
-
-      attrs = %{
-        user_hash: bad_hash,
-        sign_pkey: sign_pkey,
-        contact_pkey: contact_pkey,
-        contact_cert: contact_cert,
-        crypt_pkey: crypt_pkey,
-        crypt_cert: crypt_cert,
-        name: "Bob"
-      }
-
-      # The cast in UserHash type should error or the DB constraint will fail
-      # Our custom type `cast` checks for 0x01 prefix
       changeset = UserCard.create_changeset(%UserCard{}, attrs)
 
       refute changeset.valid?
@@ -248,6 +177,38 @@ defmodule Chat.Data.UserDataTest do
 
       Map.from_struct(storage) |> Map.merge(%{sign_b64: sign_b64, sign_hash: sign_hash})
     end
+  end
+
+  defp expected_user_hash(identity) do
+    identity.sign_pkey |> EnigmaPq.hash() |> UserHash.from_binary()
+  end
+
+  defp insert_via_changeset(card_struct) do
+    card_struct
+    |> Map.from_struct()
+    |> then(&UserCard.create_changeset(%UserCard{}, &1))
+    |> Repo.insert()
+  end
+
+  defp sign_with_other_key(payload) do
+    {_pkey, skey} = :crypto.generate_key(:mldsa87, [])
+    EnigmaPq.sign(payload, skey)
+  end
+
+  defp card_attrs_with_bad_hash_prefix do
+    {sign_pkey, sign_skey} = :crypto.generate_key(:mldsa87, [])
+    {contact_pkey, _} = :crypto.generate_key(:mldsa44, [])
+    {crypt_pkey, _} = :crypto.generate_key(:mlkem1024, [])
+
+    %{
+      user_hash: Consts.dialog_hash_prefix() <> :crypto.strong_rand_bytes(64),
+      sign_pkey: sign_pkey,
+      contact_pkey: contact_pkey,
+      contact_cert: EnigmaPq.sign(contact_pkey, sign_skey),
+      crypt_pkey: crypt_pkey,
+      crypt_cert: EnigmaPq.sign(crypt_pkey, sign_skey),
+      name: "Bob"
+    }
   end
 
   defp resign_card(card, identity, attrs) do

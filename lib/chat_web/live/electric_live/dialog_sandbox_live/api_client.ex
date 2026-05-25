@@ -7,6 +7,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.DialogKey
   alias Chat.Data.Schemas.DialogMessage
+  alias Chat.Data.Schemas.DialogMessageReaction
+  alias Chat.Data.Schemas.DialogMessageReceipt
   alias Chat.Data.Types.DialogMessageId
   alias Chat.TimeKeeper
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
@@ -234,6 +236,126 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
       )
       |> Stream.run()
     end)
+  end
+
+  def publish_reaction(
+        user,
+        dialog_hash,
+        message_id,
+        message_sign_hash,
+        emoji,
+        peer_hash,
+        base_url
+      ) do
+    sender_msg_key =
+      Crypto.derive_sender_msg_key(user.sign_skey, user.crypt_skey, user.contact_skey, peer_hash)
+
+    reaction_hash =
+      Crypto.compute_reaction_hash(sender_msg_key, message_id, user.user_hash, emoji)
+
+    type_b64 = Crypto.encrypt_emoji(emoji, sender_msg_key)
+    owner_timestamp = TimeKeeper.now_unix()
+
+    reaction_struct =
+      struct(DialogMessageReaction, %{
+        reaction_hash: reaction_hash,
+        dialog_hash: dialog_hash,
+        message_id: message_id,
+        message_sign_hash: message_sign_hash,
+        reactor_hash: user.user_hash,
+        type_b64: type_b64,
+        deleted_flag: false,
+        owner_timestamp: owner_timestamp
+      })
+
+    sign_b64 =
+      reaction_struct |> Integrity.signature_payload() |> EnigmaPq.sign(user.sign_skey)
+
+    fields = %{
+      "reaction_hash" => reaction_hash,
+      "dialog_hash" => dialog_hash,
+      "message_id" => message_id,
+      "message_sign_hash" => message_sign_hash,
+      "reactor_hash" => user.user_hash,
+      "type_b64" => encode_base64(type_b64),
+      "deleted_flag" => false,
+      "owner_timestamp" => owner_timestamp,
+      "sign_b64" => encode_base64(sign_b64)
+    }
+
+    publish_mutation("dialog_message_reactions", fields, user.sign_skey, base_url)
+  end
+
+  def publish_receipt(user, dialog_hash, message_id, message_sign_hash, type, base_url) do
+    receipt_hash =
+      Crypto.compute_receipt_hash(message_id, message_sign_hash, user.user_hash, type)
+
+    owner_timestamp = TimeKeeper.now_unix()
+
+    receipt_struct =
+      struct(DialogMessageReceipt, %{
+        receipt_hash: receipt_hash,
+        dialog_hash: dialog_hash,
+        message_id: message_id,
+        peer_hash: user.user_hash,
+        type: type,
+        message_sign_hash: message_sign_hash,
+        owner_timestamp: owner_timestamp
+      })
+
+    sign_b64 =
+      receipt_struct |> Integrity.signature_payload() |> EnigmaPq.sign(user.sign_skey)
+
+    fields = %{
+      "receipt_hash" => receipt_hash,
+      "dialog_hash" => dialog_hash,
+      "message_id" => message_id,
+      "peer_hash" => user.user_hash,
+      "type" => type,
+      "message_sign_hash" => message_sign_hash,
+      "owner_timestamp" => owner_timestamp,
+      "sign_b64" => encode_base64(sign_b64)
+    }
+
+    publish_mutation("dialog_message_receipts", fields, user.sign_skey, base_url)
+  end
+
+  def fetch_reactions(dialog_hash, base_url) do
+    url = shapes_url(base_url, "dialog_message_reactions", "dialog_hash='#{dialog_hash}'")
+
+    case fetch_shape(url) do
+      {:ok, rows, log} -> {:ok, %{reactions: rows, log_entries: [log]}}
+      {:error, reason, log} -> {:error, %{reason: reason, log_entries: [log]}}
+    end
+  end
+
+  def fetch_receipts(dialog_hash, base_url) do
+    url = shapes_url(base_url, "dialog_message_receipts", "dialog_hash='#{dialog_hash}'")
+
+    case fetch_shape(url) do
+      {:ok, rows, log} -> {:ok, %{receipts: rows, log_entries: [log]}}
+      {:error, reason, log} -> {:error, %{reason: reason, log_entries: [log]}}
+    end
+  end
+
+  defp publish_mutation(relation, fields, sign_skey, base_url) do
+    payload = %{
+      "mutations" => [
+        %{
+          "type" => "insert",
+          "modified" => fields,
+          "syncMetadata" => %{"relation" => relation}
+        }
+      ]
+    }
+
+    with {:ok, challenge_resp, challenge_log} <- get_challenge(base_url),
+         {:ok, _resp, ingest_log} <-
+           post_ingest(challenge_resp, payload, sign_skey, base_url) do
+      {:ok, %{log_entries: [challenge_log, ingest_log]}}
+    else
+      {:error, reason, log_entries} -> {:error, %{reason: reason, log_entries: log_entries}}
+    end
   end
 
   # --- Private helpers ---

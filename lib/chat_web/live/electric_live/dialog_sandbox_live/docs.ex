@@ -79,6 +79,63 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Docs do
           }
         ]
       },
+      "dialog_message_reactions" => %{
+        title: "dialog_message_reactions",
+        description:
+          "Encrypted emoji reactions. reaction_hash is a keyed MAC — only participants can recompute.",
+        fields: [
+          %{
+            name: "reaction_hash",
+            type: "text",
+            description:
+              "PK; \"dmr_\" + hex(HMAC-SHA3-512(sender_msg_key, message_id || reactor_hash || emoji))"
+          },
+          %{name: "dialog_hash", type: "text", description: "Dialog this reaction belongs to"},
+          %{name: "message_id", type: "text", description: "Reacted-to message"},
+          %{
+            name: "message_sign_hash",
+            type: "text",
+            description: "Binds to specific message version"
+          },
+          %{name: "reactor_hash", type: "text", description: "Who reacted"},
+          %{
+            name: "type_b64",
+            type: "bytea",
+            description: "nonce(12) || AES-256-GCM(sender_msg_key, emoji)"
+          },
+          %{name: "deleted_flag", type: "boolean", description: "true = un-react"},
+          %{name: "owner_timestamp", type: "integer", description: "Monotonic per reaction_hash"},
+          %{name: "sign_b64", type: "bytea", description: "ML-DSA-87 signature by reactor_hash"}
+        ]
+      },
+      "dialog_message_receipts" => %{
+        title: "dialog_message_receipts",
+        description:
+          "Plaintext delivery/read receipts. Insert-only — receipts are irreversible facts.",
+        fields: [
+          %{
+            name: "receipt_hash",
+            type: "text",
+            description:
+              "PK; \"dmrc_\" + hex(SHA3-512(message_id || message_sign_hash || peer_hash || type))"
+          },
+          %{name: "dialog_hash", type: "text", description: "Dialog this receipt belongs to"},
+          %{name: "message_id", type: "text", description: "Receipted message"},
+          %{name: "peer_hash", type: "text", description: "Who generated the receipt"},
+          %{
+            name: "type",
+            type: "string",
+            description: "\"delivered\" or \"read\" — plaintext, no encryption"
+          },
+          %{
+            name: "message_sign_hash",
+            type: "text",
+            description: "Binds to specific message version"
+          },
+          %{name: "owner_timestamp", type: "integer", description: "Monotonic per receipt_hash"},
+          %{name: "sign_b64", type: "bytea", description: "ML-DSA-87 signature by peer_hash"}
+        ]
+      },
       "key_wrapping" => %{
         title: "Key Wrapping",
         description: "KEM-encapsulate sender_msg_key so the peer can decrypt messages.",

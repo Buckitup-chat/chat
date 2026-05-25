@@ -101,6 +101,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
     """
   end
 
+  @emojis ~w(👍 ❤️ 😂 😮 😢 🎉)
+
   def render_messages_section(assigns) do
     ~H"""
     <section class="bg-white shadow rounded-lg p-6">
@@ -122,13 +124,12 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
           <p class="text-sm text-gray-500 italic text-center">No messages yet</p>
         <% else %>
           <%= for msg <- @messages do %>
-            <div class={"p-3 rounded-lg max-w-[80%] #{if msg.sender_hash == @user.user_hash, do: "ml-auto bg-blue-100", else: "bg-white border"}"}>
+            <% msg_reactions = Map.get(@reactions, msg.message_id, []) %>
+            <% msg_receipts = Map.get(@receipts, msg.message_id, []) %>
+            <% is_own = msg.sender_hash == @user.user_hash %>
+            <div class={"p-3 rounded-lg max-w-[80%] #{if is_own, do: "ml-auto bg-blue-100", else: "bg-white border"}"}>
               <div class="flex justify-between text-xs text-gray-500 mb-1">
-                <span>
-                  {if msg.sender_hash == @user.user_hash,
-                    do: "You",
-                    else: short_hash(msg.sender_hash)}
-                </span>
+                <span>{if is_own, do: "You", else: short_hash(msg.sender_hash)}</span>
                 <span class="relative group font-mono text-gray-400 cursor-default">
                   {short_hash(msg.message_id)}
                   <span class="absolute bottom-full right-0 mb-1 px-2 py-1 bg-gray-900 text-white text-[10px] font-mono rounded whitespace-nowrap invisible group-hover:visible z-10">
@@ -138,7 +139,21 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
               </div>
               <div class="text-sm">{msg.content}</div>
               <.refs_list refs_map={msg.refs_map} />
-              <div class="text-xs text-gray-400 mt-1">{format_timestamp(msg.owner_timestamp)}</div>
+              <.reaction_display reactions={msg_reactions} />
+              <.emoji_buttons message_id={msg.message_id} sign_hash={msg.sign_hash} />
+              <div class="flex justify-between items-center mt-1">
+                <span class="text-xs text-gray-400">{format_timestamp(msg.owner_timestamp)}</span>
+                <%= if is_own do %>
+                  <.receipt_status receipts={msg_receipts} />
+                <% else %>
+                  <.receipt_buttons
+                    message_id={msg.message_id}
+                    sign_hash={msg.sign_hash}
+                    receipts={msg_receipts}
+                    user_hash={@user.user_hash}
+                  />
+                <% end %>
+              </div>
             </div>
           <% end %>
         <% end %>
@@ -162,6 +177,103 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
         </button>
       </form>
     </section>
+    """
+  end
+
+  defp reaction_display(%{reactions: []} = assigns), do: ~H""
+
+  defp reaction_display(assigns) do
+    assigns = assign(assigns, :grouped, Enum.frequencies_by(assigns.reactions, & &1.emoji))
+
+    ~H"""
+    <div class="flex flex-wrap gap-1 mt-1">
+      <%= for {emoji, count} <- @grouped do %>
+        <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-gray-100 rounded-full text-xs">
+          <span>{emoji}</span>
+          <%= if count > 1 do %>
+            <span class="text-gray-500">{count}</span>
+          <% end %>
+        </span>
+      <% end %>
+    </div>
+    """
+  end
+
+  defp emoji_buttons(assigns) do
+    assigns = assign(assigns, :emojis, @emojis)
+
+    ~H"""
+    <div class="flex gap-0.5 mt-1">
+      <%= for emoji <- @emojis do %>
+        <button
+          phx-click="react"
+          phx-value-message_id={@message_id}
+          phx-value-sign_hash={@sign_hash}
+          phx-value-emoji={emoji}
+          class="px-1 py-0.5 hover:bg-gray-200 rounded text-sm cursor-pointer"
+          title={"React with #{emoji}"}
+        >
+          {emoji}
+        </button>
+      <% end %>
+    </div>
+    """
+  end
+
+  defp receipt_status(%{receipts: []} = assigns) do
+    ~H"""
+    <span class="text-xs text-gray-400">✓ sent</span>
+    """
+  end
+
+  defp receipt_status(assigns) do
+    assigns = assign(assigns, :has_read, Enum.any?(assigns.receipts, &(&1.type == "read")))
+
+    ~H"""
+    <span class={
+      "text-xs #{if @has_read, do: "text-blue-500 font-medium", else: "text-green-600"}"
+    }>
+      {if @has_read, do: "✓✓ read", else: "✓✓ delivered"}
+    </span>
+    """
+  end
+
+  defp receipt_buttons(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :already_sent,
+        assigns.receipts
+        |> Enum.filter(&(&1.peer_hash == assigns.user_hash))
+        |> Enum.map(& &1.type)
+        |> MapSet.new()
+      )
+
+    ~H"""
+    <div class="flex gap-1">
+      <%= unless "delivered" in @already_sent do %>
+        <button
+          phx-click="send_receipt"
+          phx-value-message_id={@message_id}
+          phx-value-sign_hash={@sign_hash}
+          phx-value-type="delivered"
+          class="text-[10px] px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded text-gray-600"
+        >
+          ✓ Delivered
+        </button>
+      <% end %>
+      <%= unless "read" in @already_sent do %>
+        <button
+          phx-click="send_receipt"
+          phx-value-message_id={@message_id}
+          phx-value-sign_hash={@sign_hash}
+          phx-value-type="read"
+          class="text-[10px] px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 rounded text-blue-600"
+        >
+          ✓✓ Read
+        </button>
+      <% end %>
+    </div>
     """
   end
 
@@ -313,8 +425,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
   defp sync_badge(%{status: :live} = assigns) do
     ~H"""
     <span class="inline-flex items-center gap-1 text-xs text-green-700">
-      <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-      Live
+      <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Live
     </span>
     """
   end

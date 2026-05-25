@@ -5,6 +5,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
   """
 
   alias Chat.Data.Types.DialogHash
+  alias Chat.Data.Types.DialogMessageReactionHash
+  alias Chat.Data.Types.DialogMessageReceiptHash
   alias Chat.Data.Types.DialogMessageSignHash
   alias Chat.Data.Types.UserHash
 
@@ -82,6 +84,22 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
     sign_b64 |> EnigmaPq.hash() |> DialogMessageSignHash.from_binary()
   end
 
+  def compute_reaction_hash(sender_msg_key, message_id, reactor_hash, emoji_plaintext) do
+    (message_id <> reactor_hash <> emoji_plaintext)
+    |> then(&EnigmaPq.hmac_sha3_512(sender_msg_key, &1))
+    |> DialogMessageReactionHash.from_binary()
+  end
+
+  def encrypt_emoji(emoji_plaintext, sender_msg_key) do
+    EnigmaPq.aes_gcm_encrypt(emoji_plaintext, sender_msg_key)
+  end
+
+  def compute_receipt_hash(message_id, message_sign_hash, peer_hash, type) do
+    (message_id <> message_sign_hash <> peer_hash <> type)
+    |> EnigmaPq.hash()
+    |> DialogMessageReceiptHash.from_binary()
+  end
+
   def decrypt_single_message(msg, keys_cache) do
     sender = msg["sender_hash"]
     key = keys_cache[sender]
@@ -109,6 +127,55 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
       sign_hash: msg["sign_hash"],
       refs_map: decrypt_refs_map(msg["refs_map_b64"], key)
     }
+  end
+
+  def decrypt_single_reaction(raw, keys_cache) do
+    reactor = raw["reactor_hash"]
+    key = keys_cache[reactor]
+
+    emoji =
+      case {key, raw["type_b64"]} do
+        {nil, _} ->
+          "[no key]"
+
+        {_, v} when v in [nil, ""] ->
+          "[empty]"
+
+        {k, blob} ->
+          case decrypt_content(decode_binary_field(blob), k) do
+            :error -> "[decrypt failed]"
+            plaintext -> plaintext
+          end
+      end
+
+    %{
+      reaction_hash: raw["reaction_hash"],
+      message_id: raw["message_id"],
+      message_sign_hash: raw["message_sign_hash"],
+      reactor_hash: reactor,
+      emoji: emoji,
+      deleted_flag: raw["deleted_flag"] in [true, "true", "t"]
+    }
+  end
+
+  def group_reactions_by_message(raw_reactions, keys_cache) do
+    raw_reactions
+    |> Enum.map(&decrypt_single_reaction(&1, keys_cache))
+    |> Enum.reject(& &1.deleted_flag)
+    |> Enum.group_by(& &1.message_id)
+  end
+
+  def group_receipts_by_message(raw_receipts) do
+    raw_receipts
+    |> Enum.map(fn raw ->
+      %{
+        message_id: raw["message_id"],
+        message_sign_hash: raw["message_sign_hash"],
+        peer_hash: raw["peer_hash"],
+        type: raw["type"]
+      }
+    end)
+    |> Enum.group_by(& &1.message_id)
   end
 
   def build_dialog_list(keys, my_hash) do

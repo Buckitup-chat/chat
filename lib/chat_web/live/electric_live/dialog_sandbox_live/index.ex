@@ -19,6 +19,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
       |> assign(:peer_hash_input, "")
       |> assign(:available_peers, [])
       |> assign(:request_log, [])
+      |> assign(:reactions, %{})
+      |> assign(:receipts, %{})
       |> assign(:show_docs, true)
       |> assign(:expanded_docs, MapSet.new(["dialog_keys"]))
       |> assign(:operation_in_progress, false)
@@ -65,6 +67,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
               compose_text={@compose_text}
               operation_in_progress={@operation_in_progress}
               sync_status={@sync_status}
+              reactions={@reactions}
+              receipts={@receipts}
             />
           <% end %>
         </main>
@@ -176,6 +180,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
      |> assign(:selected_dialog, hash)
      |> assign(:messages, [])
      |> assign(:refs_tails, %{})
+     |> assign(:reactions, %{})
+     |> assign(:receipts, %{})
      |> assign(:msg_keys_cache, keys_cache)
      |> start_dialog_stream(hash)}
   end
@@ -219,6 +225,61 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
 
   def handle_event("send_message", _params, socket), do: {:noreply, socket}
 
+  def handle_event(
+        "react",
+        %{"message_id" => msg_id, "sign_hash" => sign_hash, "emoji" => emoji},
+        socket
+      ) do
+    %{user: user, selected_dialog: dialog_hash} = socket.assigns
+    dialog = Enum.find(socket.assigns.dialogs, &(&1.dialog_hash == dialog_hash))
+    base_url = get_base_url(socket)
+
+    case ApiClient.publish_reaction(
+           user,
+           dialog_hash,
+           msg_id,
+           sign_hash,
+           emoji,
+           dialog.peer_hash,
+           base_url
+         ) do
+      {:ok, %{log_entries: logs}} ->
+        {:noreply,
+         socket
+         |> update(:request_log, &(&1 ++ logs))
+         |> fetch_reactions_and_receipts()}
+
+      {:error, %{reason: reason, log_entries: logs}} ->
+        {:noreply,
+         socket
+         |> assign(:error_message, reason)
+         |> update(:request_log, &(&1 ++ logs))}
+    end
+  end
+
+  def handle_event(
+        "send_receipt",
+        %{"message_id" => msg_id, "sign_hash" => sign_hash, "type" => type},
+        socket
+      ) do
+    %{user: user, selected_dialog: dialog_hash} = socket.assigns
+    base_url = get_base_url(socket)
+
+    case ApiClient.publish_receipt(user, dialog_hash, msg_id, sign_hash, type, base_url) do
+      {:ok, %{log_entries: logs}} ->
+        {:noreply,
+         socket
+         |> update(:request_log, &(&1 ++ logs))
+         |> fetch_reactions_and_receipts()}
+
+      {:error, %{reason: reason, log_entries: logs}} ->
+        {:noreply,
+         socket
+         |> assign(:error_message, reason)
+         |> update(:request_log, &(&1 ++ logs))}
+    end
+  end
+
   def handle_event("toggle_docs", _params, socket) do
     {:noreply, assign(socket, :show_docs, !socket.assigns.show_docs)}
   end
@@ -247,7 +308,10 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
     messages = Enum.map(sorted, &Crypto.decrypt_single_message(&1, keys_cache))
     tails = Crypto.compute_tails(sorted, keys_cache)
 
-    {:noreply, assign(socket, messages: messages, refs_tails: tails, sync_status: :loaded)}
+    {:noreply,
+     socket
+     |> assign(messages: messages, refs_tails: tails, sync_status: :loaded)
+     |> fetch_reactions_and_receipts()}
   end
 
   def handle_info({:dialog_msg_new, raw_msg}, socket) do
@@ -351,6 +415,38 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
       else
         _ -> keys_cache
       end
+    end
+  end
+
+  defp fetch_reactions_and_receipts(socket) do
+    %{selected_dialog: dialog_hash, msg_keys_cache: keys_cache} = socket.assigns
+    base_url = get_base_url(socket)
+
+    {reactions, logs1} = fetch_and_decrypt_reactions(dialog_hash, keys_cache, base_url)
+    {receipts, logs2} = fetch_and_parse_receipts(dialog_hash, base_url)
+
+    socket
+    |> assign(reactions: reactions, receipts: receipts)
+    |> update(:request_log, &(&1 ++ logs1 ++ logs2))
+  end
+
+  defp fetch_and_decrypt_reactions(dialog_hash, keys_cache, base_url) do
+    case ApiClient.fetch_reactions(dialog_hash, base_url) do
+      {:ok, %{reactions: raw, log_entries: logs}} ->
+        {Crypto.group_reactions_by_message(raw, keys_cache), logs}
+
+      {:error, %{log_entries: logs}} ->
+        {%{}, logs}
+    end
+  end
+
+  defp fetch_and_parse_receipts(dialog_hash, base_url) do
+    case ApiClient.fetch_receipts(dialog_hash, base_url) do
+      {:ok, %{receipts: raw, log_entries: logs}} ->
+        {Crypto.group_receipts_by_message(raw), logs}
+
+      {:error, %{log_entries: logs}} ->
+        {%{}, logs}
     end
   end
 

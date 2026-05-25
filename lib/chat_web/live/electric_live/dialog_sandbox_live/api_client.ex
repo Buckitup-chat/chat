@@ -249,7 +249,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
     case fetch_shape_pages(url, headers, []) do
       {:ok, rows} ->
         {:ok, rows,
-         build_log("GET", url, headers, "", 200, [], "#{length(rows)} row(s)", timestamp)}
+         build_log("GET", url, headers, "", 200, [], Jason.encode!(rows, pretty: true), timestamp)}
 
       {:error, {status, body, rh}} ->
         {:error, "Shape request failed (#{status})",

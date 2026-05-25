@@ -123,13 +123,22 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
         <% else %>
           <%= for msg <- @messages do %>
             <div class={"p-3 rounded-lg max-w-[80%] #{if msg.sender_hash == @user.user_hash, do: "ml-auto bg-blue-100", else: "bg-white border"}"}>
-              <div class="text-xs text-gray-500 mb-1">
-                {if msg.sender_hash == @user.user_hash,
-                  do: "You",
-                  else: short_hash(msg.sender_hash)}
+              <div class="flex justify-between text-xs text-gray-500 mb-1">
+                <span>
+                  {if msg.sender_hash == @user.user_hash,
+                    do: "You",
+                    else: short_hash(msg.sender_hash)}
+                </span>
+                <span class="relative group font-mono text-gray-400 cursor-default">
+                  {short_hash(msg.message_id)}
+                  <span class="absolute bottom-full right-0 mb-1 px-2 py-1 bg-gray-900 text-white text-[10px] font-mono rounded whitespace-nowrap invisible group-hover:visible z-10">
+                    {msg.sign_hash}
+                  </span>
+                </span>
               </div>
               <div class="text-sm">{msg.content}</div>
-              <div class="text-xs text-gray-400 mt-1">{msg.owner_timestamp}</div>
+              <.refs_list refs_map={msg.refs_map} />
+              <div class="text-xs text-gray-400 mt-1">{format_timestamp(msg.owner_timestamp)}</div>
             </div>
           <% end %>
         <% end %>
@@ -217,17 +226,46 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
       <% else %>
         <div class="space-y-2">
           <%= for log <- Enum.reverse(@request_log) do %>
+            <% uri = URI.parse(log.url) %>
+            <% params = if uri.query, do: URI.decode_query(uri.query), else: %{} %>
             <div class="bg-white p-3 rounded shadow-sm text-xs">
               <div class="flex justify-between items-center mb-1">
                 <span class="font-mono font-bold">
-                  {log.method} {URI.parse(log.url).path}
+                  {log.method} {uri.path}
                 </span>
                 <span class={"px-2 py-0.5 rounded #{status_color(log.response_status)}"}>
                   {log.response_status}
                 </span>
               </div>
-              <details>
-                <summary class="text-gray-500 cursor-pointer">Details</summary>
+              <%= if params != %{} do %>
+                <div class="mt-1 space-y-0.5">
+                  <%= for {k, v} <- params do %>
+                    <div class="flex gap-1">
+                      <span class="font-mono text-gray-500">{k}:</span>
+                      <span class="font-mono text-gray-800 break-all">{v}</span>
+                    </div>
+                  <% end %>
+                </div>
+              <% end %>
+              <%= if log.request_body != "" do %>
+                <details class="mt-1">
+                  <summary class="text-gray-500 cursor-pointer">Request body</summary>
+                  <pre class="mt-1 bg-yellow-50 p-2 rounded overflow-x-auto max-h-40 overflow-y-auto whitespace-pre-wrap break-all">{log.request_body}</pre>
+                </details>
+              <% end %>
+              <details class="mt-1">
+                <summary class="text-gray-500 cursor-pointer">Response headers</summary>
+                <div class="mt-1 bg-gray-100 p-2 rounded max-h-40 overflow-y-auto">
+                  <%= for {k, v} <- format_resp_headers(log.response_headers) do %>
+                    <div class="flex gap-1">
+                      <span class="font-mono text-gray-500">{k}:</span>
+                      <span class="font-mono text-gray-800 break-all">{v}</span>
+                    </div>
+                  <% end %>
+                </div>
+              </details>
+              <details class="mt-1">
+                <summary class="text-gray-500 cursor-pointer">Response body</summary>
                 <pre class="mt-1 bg-gray-100 p-2 rounded overflow-x-auto max-h-40 overflow-y-auto whitespace-pre-wrap break-all">{log.response_body}</pre>
               </details>
             </div>
@@ -235,6 +273,28 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
         </div>
       <% end %>
     </aside>
+    """
+  end
+
+  defp refs_list(%{refs_map: refs} = assigns) when map_size(refs) == 0 do
+    ~H""
+  end
+
+  defp refs_list(assigns) do
+    ~H"""
+    <div class="mt-1 flex flex-wrap gap-1">
+      <span class="text-[10px] text-gray-400">refs:</span>
+      <%= for {msg_id, sign_hash} <- @refs_map do %>
+        <span class="relative group">
+          <span class="text-[10px] font-mono text-indigo-500 cursor-default">
+            {short_hash(msg_id)}
+          </span>
+          <span class="absolute bottom-full left-0 mb-1 px-2 py-1 bg-gray-900 text-white text-[10px] font-mono rounded whitespace-nowrap invisible group-hover:visible z-10">
+            {sign_hash}
+          </span>
+        </span>
+      <% end %>
+    </div>
     """
   end
 
@@ -265,8 +325,32 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
     """
   end
 
+  defp format_timestamp(ts) when is_number(ts) do
+    ts
+    |> DateTime.from_unix!()
+    |> Calendar.strftime("%Y-%m-%d %H:%M:%S UTC")
+  end
+
+  defp format_timestamp(ts) when is_binary(ts) do
+    case Integer.parse(ts) do
+      {n, ""} -> format_timestamp(n)
+      _ -> ts
+    end
+  end
+
+  defp format_timestamp(ts), do: inspect(ts)
+
   defp short_hash(nil), do: "?"
   defp short_hash(hash), do: String.slice(hash, 0, 18) <> "..."
+
+  defp format_resp_headers(headers) when is_map(headers) do
+    Enum.flat_map(headers, fn {k, vs} ->
+      Enum.map(List.wrap(vs), &{k, &1})
+    end)
+  end
+
+  defp format_resp_headers(headers) when is_list(headers), do: headers
+  defp format_resp_headers(_), do: []
 
   defp status_color(s) when s >= 200 and s < 300, do: "bg-green-100 text-green-800"
   defp status_color(s) when s >= 400, do: "bg-red-100 text-red-800"

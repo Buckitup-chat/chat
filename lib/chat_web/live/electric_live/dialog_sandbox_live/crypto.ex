@@ -84,9 +84,10 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
 
   def decrypt_single_message(msg, keys_cache) do
     sender = msg["sender_hash"]
+    key = keys_cache[sender]
 
     content =
-      case {keys_cache[sender], msg["content_b64"]} do
+      case {key, msg["content_b64"]} do
         {nil, _} ->
           "[no key]"
 
@@ -105,7 +106,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
       sender_hash: sender,
       content: content,
       owner_timestamp: msg["owner_timestamp"],
-      sign_hash: msg["sign_hash"]
+      sign_hash: msg["sign_hash"],
+      refs_map: decrypt_refs_map(msg["refs_map_b64"], key)
     }
   end
 

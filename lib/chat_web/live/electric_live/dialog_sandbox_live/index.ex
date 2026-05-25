@@ -21,6 +21,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
       |> assign(:request_log, [])
       |> assign(:reactions, %{})
       |> assign(:receipts, %{})
+      |> assign(:editing_message_id, nil)
       |> assign(:show_docs, true)
       |> assign(:expanded_docs, MapSet.new(["dialog_keys"]))
       |> assign(:operation_in_progress, false)
@@ -69,6 +70,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
               sync_status={@sync_status}
               reactions={@reactions}
               receipts={@receipts}
+              editing_message_id={@editing_message_id}
             />
           <% end %>
         </main>
@@ -225,6 +227,86 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
 
   def handle_event("send_message", _params, socket), do: {:noreply, socket}
 
+  def handle_event("start_edit", %{"message_id" => msg_id}, socket) do
+    {:noreply, assign(socket, :editing_message_id, msg_id)}
+  end
+
+  def handle_event("cancel_edit", _params, socket) do
+    {:noreply, assign(socket, :editing_message_id, nil)}
+  end
+
+  def handle_event("save_edit", %{"text" => text, "message_id" => msg_id}, socket)
+      when text != "" do
+    %{user: user, selected_dialog: dialog_hash} = socket.assigns
+    dialog = Enum.find(socket.assigns.dialogs, &(&1.dialog_hash == dialog_hash))
+    base_url = get_base_url(socket)
+    refs_tails = %{peer_hash: dialog.peer_hash, tails: socket.assigns.refs_tails}
+
+    socket = assign(socket, :operation_in_progress, true)
+
+    with {:ok, %{sign_hash: current_sign_hash}} <-
+           find_own_message(socket.assigns.messages, msg_id, user.user_hash),
+         {:ok, %{sign_hash: new_sign_hash, log_entries: logs}} <-
+           ApiClient.publish_edit_message(
+             user,
+             dialog_hash,
+             msg_id,
+             current_sign_hash,
+             text,
+             refs_tails,
+             base_url
+           ) do
+      {:noreply,
+       socket
+       |> assign(:editing_message_id, nil)
+       |> assign(:operation_in_progress, false)
+       |> assign(:refs_tails, %{msg_id => new_sign_hash})
+       |> update(:request_log, &(&1 ++ logs))}
+    else
+      {:error, %{reason: reason, log_entries: logs}} ->
+        {:noreply,
+         socket
+         |> assign(:error_message, reason)
+         |> assign(:operation_in_progress, false)
+         |> update(:request_log, &(&1 ++ logs))}
+    end
+  end
+
+  def handle_event("save_edit", _params, socket), do: {:noreply, socket}
+
+  def handle_event("delete_message", %{"message_id" => msg_id}, socket) do
+    %{user: user, selected_dialog: dialog_hash} = socket.assigns
+    dialog = Enum.find(socket.assigns.dialogs, &(&1.dialog_hash == dialog_hash))
+    base_url = get_base_url(socket)
+    refs_tails = %{peer_hash: dialog.peer_hash, tails: socket.assigns.refs_tails}
+
+    socket = assign(socket, :operation_in_progress, true)
+
+    with {:ok, %{sign_hash: current_sign_hash}} <-
+           find_own_message(socket.assigns.messages, msg_id, user.user_hash),
+         {:ok, %{log_entries: logs}} <-
+           ApiClient.publish_delete_message(
+             user,
+             dialog_hash,
+             msg_id,
+             current_sign_hash,
+             refs_tails,
+             base_url
+           ) do
+      {:noreply,
+       socket
+       |> assign(:operation_in_progress, false)
+       |> update(:request_log, &(&1 ++ logs))}
+    else
+      {:error, %{reason: reason, log_entries: logs}} ->
+        {:noreply,
+         socket
+         |> assign(:error_message, reason)
+         |> assign(:operation_in_progress, false)
+         |> update(:request_log, &(&1 ++ logs))}
+    end
+  end
+
   def handle_event(
         "react",
         %{"message_id" => msg_id, "sign_hash" => sign_hash, "emoji" => emoji},
@@ -328,6 +410,16 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
        |> update(:messages, &(&1 ++ [msg]))
        |> assign(:refs_tails, %{raw_msg["message_id"] => raw_msg["sign_hash"]})}
     end
+  end
+
+  def handle_info({:dialog_msg_updated, raw_msg}, socket) do
+    msg_id = raw_msg["message_id"]
+    decrypted = Crypto.decrypt_single_message(raw_msg, socket.assigns.msg_keys_cache)
+
+    {:noreply,
+     socket
+     |> update(:messages, &upsert_message(&1, msg_id, decrypted))
+     |> update(:refs_tails, &Map.put(&1, msg_id, raw_msg["sign_hash"]))}
   end
 
   def handle_info({:dialog_msg_live}, socket) do
@@ -448,6 +540,24 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
       {:error, %{log_entries: logs}} ->
         {%{}, logs}
     end
+  end
+
+  defp find_own_message(messages, msg_id, user_hash) do
+    case Enum.find(messages, &(&1.message_id == msg_id)) do
+      %{sender_hash: ^user_hash} = msg -> {:ok, msg}
+      %{} -> {:error, %{reason: "Can only modify own messages", log_entries: []}}
+      nil -> {:error, %{reason: "Message not found", log_entries: []}}
+    end
+  end
+
+  defp upsert_message(messages, msg_id, new_msg) do
+    {result, replaced?} =
+      Enum.map_reduce(messages, false, fn
+        %{message_id: ^msg_id}, _ -> {new_msg, true}
+        other, acc -> {other, acc}
+      end)
+
+    if replaced?, do: result, else: result ++ [new_msg]
   end
 
   defp get_base_url(socket) do

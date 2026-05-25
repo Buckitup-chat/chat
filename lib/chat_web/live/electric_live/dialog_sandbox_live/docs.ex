@@ -49,6 +49,11 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Docs do
             type: "bytea",
             description: "nonce(12) || AES-256-GCM ciphertext"
           },
+          %{
+            name: "deleted_flag",
+            type: "boolean",
+            description: "Signed tombstone; true = message retracted, content is empty"
+          },
           %{name: "refs_map_b64", type: "bytea", description: "Encrypted DAG tail references"},
           %{
             name: "parent_sign_hash",
@@ -134,6 +139,61 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Docs do
           },
           %{name: "owner_timestamp", type: "integer", description: "Monotonic per receipt_hash"},
           %{name: "sign_b64", type: "bytea", description: "ML-DSA-87 signature by peer_hash"}
+        ]
+      },
+      "message_edit" => %{
+        title: "Message Edit Flow",
+        description:
+          "Edit = new tip with same message_id, higher owner_timestamp, parent_sign_hash pointing to current tip's sign_hash. Sent as type=\"insert\" — server detects conflict and archives old version.",
+        fields: [
+          %{
+            name: "message_id",
+            type: "text",
+            description: "Same as original message (reuse existing)"
+          },
+          %{
+            name: "parent_sign_hash",
+            type: "text",
+            description: "Current tip's sign_hash (version chain link)"
+          },
+          %{
+            name: "content_b64",
+            type: "bytea",
+            description: "Newly encrypted content under same sender_msg_key"
+          },
+          %{
+            name: "refs_map_b64",
+            type: "bytea",
+            description: "Recomputed from current viewport tails"
+          },
+          %{
+            name: "owner_timestamp",
+            type: "integer",
+            description: "Must be > current tip's owner_timestamp"
+          }
+        ]
+      },
+      "message_delete" => %{
+        title: "Message Delete Flow",
+        description:
+          "Delete = new tip with deleted_flag: true, empty content_b64. Same chain rules as edit. No unsigned server-side delete — client sends signed tombstone.",
+        fields: [
+          %{name: "deleted_flag", type: "boolean", description: "Set to true for deletion"},
+          %{
+            name: "content_b64",
+            type: "bytea",
+            description: "Empty binary (no content in tombstone)"
+          },
+          %{
+            name: "parent_sign_hash",
+            type: "text",
+            description: "Current tip's sign_hash"
+          },
+          %{
+            name: "refs_map_b64",
+            type: "bytea",
+            description: "Recomputed from current viewport tails at deletion time"
+          }
         ]
       },
       "key_wrapping" => %{

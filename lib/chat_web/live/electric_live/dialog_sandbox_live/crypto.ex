@@ -103,16 +103,20 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
   def decrypt_single_message(msg, keys_cache) do
     sender = msg["sender_hash"]
     key = keys_cache[sender]
+    deleted = msg["deleted_flag"] in [true, "true", "t"]
 
     content =
-      case {key, msg["content_b64"]} do
-        {nil, _} ->
+      case {deleted, key, msg["content_b64"]} do
+        {true, _, _} ->
+          "[deleted]"
+
+        {_, nil, _} ->
           "[no key]"
 
-        {_, v} when v in [nil, ""] ->
+        {_, _, v} when v in [nil, ""] ->
           "[empty]"
 
-        {k, blob} ->
+        {_, k, blob} ->
           case decrypt_content(decode_binary_field(blob), k) do
             :error -> "[decrypt failed]"
             plaintext -> plaintext
@@ -125,7 +129,9 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
       content: content,
       owner_timestamp: msg["owner_timestamp"],
       sign_hash: msg["sign_hash"],
-      refs_map: decrypt_refs_map(msg["refs_map_b64"], key)
+      refs_map: decrypt_refs_map(msg["refs_map_b64"], key),
+      deleted: deleted,
+      parent_sign_hash: msg["parent_sign_hash"]
     }
   end
 

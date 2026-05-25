@@ -137,22 +137,42 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
                   </span>
                 </span>
               </div>
-              <div class="text-sm">{msg.content}</div>
-              <.refs_list refs_map={msg.refs_map} />
-              <.reaction_display reactions={msg_reactions} />
-              <.emoji_buttons message_id={msg.message_id} sign_hash={msg.sign_hash} />
+              <%= if @editing_message_id == msg.message_id do %>
+                <.edit_form message_id={msg.message_id} current_content={msg.content} />
+              <% else %>
+                <div class={"text-sm #{if msg.deleted, do: "italic text-gray-400"}"}>
+                  {msg.content}
+                </div>
+              <% end %>
+              <%= unless msg.deleted do %>
+                <.refs_list refs_map={msg.refs_map} />
+                <.reaction_display reactions={msg_reactions} />
+                <.emoji_buttons message_id={msg.message_id} sign_hash={msg.sign_hash} />
+              <% end %>
               <div class="flex justify-between items-center mt-1">
-                <span class="text-xs text-gray-400">{format_timestamp(msg.owner_timestamp)}</span>
-                <%= if is_own do %>
-                  <.receipt_status receipts={msg_receipts} />
-                <% else %>
-                  <.receipt_buttons
-                    message_id={msg.message_id}
-                    sign_hash={msg.sign_hash}
-                    receipts={msg_receipts}
-                    user_hash={@user.user_hash}
-                  />
-                <% end %>
+                <span class="text-xs text-gray-400">
+                  {format_timestamp(msg.owner_timestamp)}
+                  <%= if msg.parent_sign_hash && !msg.deleted do %>
+                    <span class="italic ml-1">(edited)</span>
+                  <% end %>
+                </span>
+                <div class="flex items-center gap-2">
+                  <%= if is_own && !msg.deleted && @editing_message_id != msg.message_id do %>
+                    <.message_actions message_id={msg.message_id} />
+                  <% end %>
+                  <%= if is_own do %>
+                    <.receipt_status receipts={msg_receipts} />
+                  <% else %>
+                    <%= unless msg.deleted do %>
+                      <.receipt_buttons
+                        message_id={msg.message_id}
+                        sign_hash={msg.sign_hash}
+                        receipts={msg_receipts}
+                        user_hash={@user.user_hash}
+                      />
+                    <% end %>
+                  <% end %>
+                </div>
               </div>
             </div>
           <% end %>
@@ -216,6 +236,54 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
           {emoji}
         </button>
       <% end %>
+    </div>
+    """
+  end
+
+  defp edit_form(assigns) do
+    ~H"""
+    <form phx-submit="save_edit" class="flex gap-2">
+      <input type="hidden" name="message_id" value={@message_id} />
+      <input
+        type="text"
+        name="text"
+        value={@current_content}
+        class="flex-1 px-2 py-1 border rounded text-sm"
+        autocomplete="off"
+        autofocus
+      />
+      <button type="submit" class="px-2 py-1 bg-green-600 text-white rounded text-xs font-medium">
+        Save
+      </button>
+      <button
+        type="button"
+        phx-click="cancel_edit"
+        class="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs"
+      >
+        Cancel
+      </button>
+    </form>
+    """
+  end
+
+  defp message_actions(assigns) do
+    ~H"""
+    <div class="flex gap-1">
+      <button
+        phx-click="start_edit"
+        phx-value-message_id={@message_id}
+        class="text-[10px] px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded text-gray-600"
+      >
+        Edit
+      </button>
+      <button
+        phx-click="delete_message"
+        phx-value-message_id={@message_id}
+        class="text-[10px] px-1.5 py-0.5 bg-red-50 hover:bg-red-100 rounded text-red-600"
+        data-confirm="Delete this message?"
+      >
+        Delete
+      </button>
     </div>
     """
   end

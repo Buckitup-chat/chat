@@ -188,6 +188,125 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
     end
   end
 
+  def publish_edit_message(
+        user,
+        dialog_hash,
+        message_id,
+        current_sign_hash,
+        new_plaintext,
+        refs_tails,
+        base_url
+      ) do
+    sender_msg_key =
+      Crypto.derive_sender_msg_key(
+        user.sign_skey,
+        user.crypt_skey,
+        user.contact_skey,
+        refs_tails.peer_hash
+      )
+
+    content_b64 = Crypto.encrypt_content(new_plaintext, sender_msg_key)
+    refs_map_b64 = Crypto.encrypt_refs_map(refs_tails.tails, sender_msg_key)
+    owner_timestamp = TimeKeeper.now_unix()
+
+    msg_struct =
+      struct(DialogMessage, %{
+        message_id: message_id,
+        dialog_hash: dialog_hash,
+        sender_hash: user.user_hash,
+        content_b64: content_b64,
+        deleted_flag: false,
+        refs_map_b64: refs_map_b64,
+        parent_sign_hash: current_sign_hash,
+        owner_timestamp: owner_timestamp
+      })
+
+    sign_b64 =
+      msg_struct
+      |> Integrity.signature_payload()
+      |> then(&EnigmaPq.sign(&1, user.sign_skey))
+
+    sign_hash = Crypto.compute_sign_hash(sign_b64)
+
+    original = %{
+      "message_id" => message_id,
+      "sender_hash" => user.user_hash,
+      "dialog_hash" => dialog_hash
+    }
+
+    changes = %{
+      "content_b64" => encode_base64(content_b64),
+      "deleted_flag" => false,
+      "refs_map_b64" => encode_base64(refs_map_b64),
+      "parent_sign_hash" => current_sign_hash,
+      "owner_timestamp" => owner_timestamp,
+      "sign_b64" => encode_base64(sign_b64),
+      "sign_hash" => sign_hash
+    }
+
+    with {:ok, result} <-
+           publish_update_mutation("dialog_messages", original, changes, user.sign_skey, base_url) do
+      {:ok, Map.put(result, :sign_hash, sign_hash)}
+    end
+  end
+
+  def publish_delete_message(
+        user,
+        dialog_hash,
+        message_id,
+        current_sign_hash,
+        refs_tails,
+        base_url
+      ) do
+    sender_msg_key =
+      Crypto.derive_sender_msg_key(
+        user.sign_skey,
+        user.crypt_skey,
+        user.contact_skey,
+        refs_tails.peer_hash
+      )
+
+    refs_map_b64 = Crypto.encrypt_refs_map(refs_tails.tails, sender_msg_key)
+    owner_timestamp = TimeKeeper.now_unix()
+
+    msg_struct =
+      struct(DialogMessage, %{
+        message_id: message_id,
+        dialog_hash: dialog_hash,
+        sender_hash: user.user_hash,
+        content_b64: <<>>,
+        deleted_flag: true,
+        refs_map_b64: refs_map_b64,
+        parent_sign_hash: current_sign_hash,
+        owner_timestamp: owner_timestamp
+      })
+
+    sign_b64 =
+      msg_struct
+      |> Integrity.signature_payload()
+      |> then(&EnigmaPq.sign(&1, user.sign_skey))
+
+    sign_hash = Crypto.compute_sign_hash(sign_b64)
+
+    original = %{
+      "message_id" => message_id,
+      "sender_hash" => user.user_hash,
+      "dialog_hash" => dialog_hash
+    }
+
+    changes = %{
+      "content_b64" => encode_base64(<<>>),
+      "deleted_flag" => true,
+      "refs_map_b64" => encode_base64(refs_map_b64),
+      "parent_sign_hash" => current_sign_hash,
+      "owner_timestamp" => owner_timestamp,
+      "sign_b64" => encode_base64(sign_b64),
+      "sign_hash" => sign_hash
+    }
+
+    publish_update_mutation("dialog_messages", original, changes, user.sign_skey, base_url)
+  end
+
   def start_message_stream(dialog_hash, base_url, subscriber_pid) do
     client = Electric.Client.new!(endpoint: base_url <> "/electric/v1/shapes")
 
@@ -202,7 +321,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
       |> Stream.transform(
         fn -> {[], nil} end,
         fn
-          %Message.ChangeMessage{headers: %{operation: :insert}, value: value}, {msgs, resume} ->
+          %Message.ChangeMessage{headers: %{operation: op}, value: value}, {msgs, resume}
+          when op in [:insert, :update] ->
             {[], {[value | msgs], resume}}
 
           %Message.ResumeMessage{} = resume, {msgs, nil} ->
@@ -224,6 +344,9 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
           |> Stream.each(fn
             %Message.ChangeMessage{headers: %{operation: :insert}, value: value} ->
               send(subscriber_pid, {:dialog_msg_new, value})
+
+            %Message.ChangeMessage{headers: %{operation: :update}, value: value} ->
+              send(subscriber_pid, {:dialog_msg_updated, value})
 
             %Message.ControlMessage{control: :up_to_date} ->
               send(subscriber_pid, {:dialog_msg_live})
@@ -344,6 +467,27 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
         %{
           "type" => "insert",
           "modified" => fields,
+          "syncMetadata" => %{"relation" => relation}
+        }
+      ]
+    }
+
+    with {:ok, challenge_resp, challenge_log} <- get_challenge(base_url),
+         {:ok, _resp, ingest_log} <-
+           post_ingest(challenge_resp, payload, sign_skey, base_url) do
+      {:ok, %{log_entries: [challenge_log, ingest_log]}}
+    else
+      {:error, reason, log_entries} -> {:error, %{reason: reason, log_entries: log_entries}}
+    end
+  end
+
+  defp publish_update_mutation(relation, original, changes, sign_skey, base_url) do
+    payload = %{
+      "mutations" => [
+        %{
+          "type" => "update",
+          "original" => original,
+          "changes" => changes,
           "syncMetadata" => %{"relation" => relation}
         }
       ]

@@ -17,11 +17,11 @@ defmodule Chat.TimeKeeper do
 
   use Toolbox.OriginLog
 
-  @persist_interval :timer.minutes(3)
-  @ntp_timeout 3_000
-  @ntp_servers ["pool.ntp.org", "time.google.com", "time.cloudflare.com"]
-  @ntp_epoch_offset 2_208_988_800
+  alias Chat.Db
+  alias Chat.TimeKeeper.Source
 
+  @persist_interval :timer.minutes(3)
+  @build_timestamp System.os_time(:second)
   @pt_key {__MODULE__, :offset}
 
   # --- Public API (lock-free reads via :persistent_term) ---
@@ -46,6 +46,16 @@ defmodule Chat.TimeKeeper do
       monotonic_offset(DateTime.utc_now() |> DateTime.to_unix())
   end
 
+  @doc "Compute monotonic offset from a unix timestamp."
+  def monotonic_offset(unix_timestamp) do
+    unix_timestamp - System.monotonic_time(:second)
+  end
+
+  @doc "Convert a monotonic offset back to unix seconds."
+  def monotonic_to_unix(offset) do
+    System.monotonic_time(:second) + offset
+  end
+
   @doc "Accept a time update from a client. Updates offset only if newer."
   def update_time(unix_timestamp) when is_integer(unix_timestamp) do
     case GenServer.whereis(__MODULE__) do
@@ -54,36 +64,56 @@ defmodule Chat.TimeKeeper do
     end
   end
 
-  # --- Static functions (callable before GenServer starts) ---
+  # --- Boot-time API (callable before GenServer starts) ---
 
-  @doc "Try to get time from NTP servers. Returns `{:ok, unix}` or `:error`."
-  def try_ntp(timeout \\ @ntp_timeout) do
-    Enum.find_value(@ntp_servers, :error, fn server ->
-      case ntp_query(server, timeout) do
-        {:ok, unix} -> {:ok, unix}
-        :error -> nil
-      end
-    end)
-  end
+  @doc """
+  Set system time on first boot. Tries NTP, falls back to persisted time
+  or DB file mtimes. Only advances the clock forward.
 
-  @doc "Read persisted unix timestamp from file."
-  def read_persisted_time(path) do
-    case File.read(path) do
-      {:ok, content} ->
-        content
-        |> String.trim()
-        |> String.to_integer()
-        |> DateTime.from_unix!()
+  Ensure that your vm.args allows for timewarps:
 
-      _ ->
-        nil
+    `+C multi_time_warp`
+  """
+  def set_initial_system_time do
+    @build_timestamp
+    |> DateTime.from_unix!()
+    |> advance_system_time()
+
+    path = Source.persist_path()
+
+    case Source.try_ntp() do
+      {:ok, unix} ->
+        log("NTP time acquired", :info)
+        DateTime.from_unix!(unix)
+
+      :error ->
+        best_known_time(path)
     end
-  rescue
-    _ -> nil
+    |> advance_system_time()
   end
 
-  def persist_path do
-    Application.get_env(:chat, :timekeeper_path, "priv/timekeeper_time")
+  @doc "Accept a DateTime from a client and update the offset."
+  def set_time(%NaiveDateTime{} = time) do
+    time
+    |> DateTime.from_naive!("Etc/UTC")
+    |> DateTime.to_unix()
+    |> update_time()
+  end
+
+  def set_time(%DateTime{} = time) do
+    time
+    |> DateTime.shift_zone!("Etc/UTC")
+    |> DateTime.to_unix()
+    |> update_time()
+  end
+
+  @doc false
+  def best_local_time do
+    [db_time(), persist_file_time(), static_time()]
+    |> Enum.reject(&is_nil/1)
+    |> List.flatten()
+    |> Enum.max()
+    |> DateTime.from_unix!()
   end
 
   # --- GenServer ---
@@ -94,7 +124,7 @@ defmodule Chat.TimeKeeper do
 
   @impl true
   def init(_opts) do
-    path = persist_path()
+    path = Source.persist_path()
 
     offset =
       DateTime.utc_now()
@@ -141,6 +171,8 @@ defmodule Chat.TimeKeeper do
 
   def handle_info(_msg, state), do: {:noreply, state}
 
+  # --- Private ---
+
   defp persist_time(unix, path) do
     case File.write(path, Integer.to_string(unix)) do
       :ok -> :ok
@@ -148,46 +180,88 @@ defmodule Chat.TimeKeeper do
     end
   end
 
-  defp monotonic_offset(unix_timestamp) do
-    unix_timestamp - System.monotonic_time(:second)
+  defp best_known_time(path) do
+    persisted = Source.read_persisted_time(path)
+    decided = best_local_time()
+
+    [persisted, decided]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.max_by(&DateTime.to_unix/1, fn -> decided end)
   end
 
-  # --- NTP ---
+  defp advance_system_time(%DateTime{} = time) do
+    case DateTime.compare(time, DateTime.utc_now()) do
+      :gt ->
+        time
+        |> DateTime.shift_zone!("Etc/UTC")
+        |> DateTime.to_naive()
+        |> NaiveDateTime.truncate(:second)
+        |> NaiveDateTime.to_string()
+        |> set_system_time()
 
-  defp ntp_query(server, timeout) do
-    with {:ok, addr} <- resolve_host(server, timeout),
-         {:ok, socket} <- :gen_udp.open(0, [:binary, active: false]),
-         :ok <- :gen_udp.send(socket, addr, 123, ntp_request_packet()),
-         {:ok, {_, _, response}} <- :gen_udp.recv(socket, 0, timeout) do
-      :gen_udp.close(socket)
-      parse_ntp_response(response)
-    else
-      _ -> :error
+      _ ->
+        :ok
     end
-  rescue
-    _ -> :error
-  catch
-    :exit, _ -> :error
   end
 
-  defp resolve_host(server, timeout) do
-    case :inet.getaddr(~c"#{server}", :inet, timeout) do
-      {:ok, addr} -> {:ok, addr}
-      _ -> :error
+  defp set_system_time(string_time) do
+    case Application.get_env(:chat, :set_time, false) do
+      true ->
+        set_os_clock(string_time)
+
+      false ->
+        log(["Set clock to ", string_time, " UTC"], :debug)
+        :ok
     end
-  rescue
-    _ -> :error
   end
 
-  defp ntp_request_packet do
-    # LI=0, VN=3, Mode=3 (client)
-    <<0x1B>> <> :binary.copy(<<0>>, 47)
+  defp set_os_clock(string_time) do
+    case System.cmd("date", ["-u", "-s", string_time]) do
+      {_result, 0} ->
+        log(["system clock set to ", string_time, " UTC"], :info)
+        :ok
+
+      {message, code} ->
+        log(
+          [
+            "can't set system clock to '",
+            string_time,
+            "': ",
+            Integer.to_string(code),
+            " ",
+            inspect(message)
+          ],
+          :error
+        )
+
+        :error
+    end
   end
 
-  defp parse_ntp_response(<<_::binary-size(40), seconds::32, _fraction::32, _::binary>>)
-       when seconds > @ntp_epoch_offset do
-    {:ok, seconds - @ntp_epoch_offset}
+  defp persist_file_time do
+    Source.persist_path()
+    |> path_time()
   end
 
-  defp parse_ntp_response(_), do: :error
+  defp db_time do
+    "#{Db.file_path()}/*.cub"
+    |> path_time()
+  end
+
+  defp static_time, do: [@build_timestamp]
+
+  defp path_time(wildcard) do
+    wildcard
+    |> Path.wildcard()
+    |> Enum.map(fn file ->
+      %{atime: atime, mtime: mtime, ctime: ctime} = file |> File.lstat!(time: :posix)
+
+      [atime, mtime, ctime]
+      |> Enum.max()
+    end)
+    |> then(fn
+      [] -> nil
+      x -> x
+    end)
+  end
 end

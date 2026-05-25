@@ -231,6 +231,7 @@ defmodule Chat.Data.Dialog.Validation do
     %DialogMessageReaction{}
     |> DialogMessageReaction.create_changeset(Map.from_struct(reaction_struct))
     |> UserValidation.validate_signature()
+    |> validate_not_self_reaction(reaction_struct.message_id, reaction_struct.reactor_hash)
   end
 
   def validate_reaction_update(existing, reaction_struct) do
@@ -249,19 +250,22 @@ defmodule Chat.Data.Dialog.Validation do
   # --- Dialog Message Reactions: HTTP ingestion ---
 
   def reaction_allowed(operation, %{challenge: challenge, signature: signature}) do
-    reactor_hash =
+    {reactor_hash, message_id} =
       case operation do
         %Operation{operation: :insert, changes: changes} ->
-          changes["reactor_hash"] || changes[:reactor_hash]
+          {changes["reactor_hash"] || changes[:reactor_hash],
+           changes["message_id"] || changes[:message_id]}
 
-        %Operation{operation: :update, data: %{"reactor_hash" => hash}} ->
-          hash
+        %Operation{operation: :update, data: data} ->
+          {data["reactor_hash"], data["message_id"]}
       end
 
     with %{sign_pkey: sign_pkey} <- UserData.get_card(reactor_hash),
-         true <- EnigmaPq.verify(challenge, signature, sign_pkey) do
+         true <- EnigmaPq.verify(challenge, signature, sign_pkey),
+         :ok <- check_not_self_reaction(message_id, reactor_hash) do
       :ok
     else
+      {:error, reason} -> {:error, reason}
       _ -> {:error, "Invalid operation"}
     end
   end
@@ -287,6 +291,7 @@ defmodule Chat.Data.Dialog.Validation do
     %DialogMessageReceipt{}
     |> DialogMessageReceipt.create_changeset(Map.from_struct(receipt_struct))
     |> UserValidation.validate_signature()
+    |> validate_not_self_receipt(receipt_struct.message_id, receipt_struct.peer_hash)
   end
 
   # --- Dialog Message Receipts: HTTP ingestion ---
@@ -296,11 +301,14 @@ defmodule Chat.Data.Dialog.Validation do
         %{challenge: challenge, signature: signature}
       ) do
     peer_hash = changes["peer_hash"] || changes[:peer_hash]
+    message_id = changes["message_id"] || changes[:message_id]
 
     with %{sign_pkey: sign_pkey} <- UserData.get_card(peer_hash),
-         true <- EnigmaPq.verify(challenge, signature, sign_pkey) do
+         true <- EnigmaPq.verify(challenge, signature, sign_pkey),
+         :ok <- check_not_self_receipt(message_id, peer_hash) do
       :ok
     else
+      {:error, reason} -> {:error, reason}
       _ -> {:error, "Invalid operation"}
     end
   end
@@ -309,5 +317,38 @@ defmodule Chat.Data.Dialog.Validation do
     receipt
     |> DialogMessageReceipt.create_changeset(changes)
     |> UserValidation.validate_signature()
+  end
+
+  # --- Self-action guards ---
+
+  defp message_authored_by?(message_id, actor_hash) do
+    case message_id && Dialog.get_message(message_id) do
+      %DialogMessage{sender_hash: ^actor_hash} -> true
+      _ -> false
+    end
+  end
+
+  defp check_not_self_reaction(message_id, reactor_hash) do
+    if message_authored_by?(message_id, reactor_hash),
+      do: {:error, "cannot react to own message"},
+      else: :ok
+  end
+
+  defp check_not_self_receipt(message_id, peer_hash) do
+    if message_authored_by?(message_id, peer_hash),
+      do: {:error, "cannot receipt own message"},
+      else: :ok
+  end
+
+  defp validate_not_self_reaction(changeset, message_id, reactor_hash) do
+    if message_authored_by?(message_id, reactor_hash),
+      do: Ecto.Changeset.add_error(changeset, :reactor_hash, "cannot react to own message"),
+      else: changeset
+  end
+
+  defp validate_not_self_receipt(changeset, message_id, peer_hash) do
+    if message_authored_by?(message_id, peer_hash),
+      do: Ecto.Changeset.add_error(changeset, :peer_hash, "cannot receipt own message"),
+      else: changeset
   end
 end

@@ -11,6 +11,125 @@ defmodule ChatWeb.ElectricLive.Index do
 
   @poll_interval_ms 1_000
 
+  @shape_cards [
+    %{
+      href: "/electric/user_cards",
+      icon_color: "text-blue-600",
+      icon_path:
+        "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z",
+      label: "User Cards",
+      title: "Post-Quantum Users",
+      endpoint: "/electric/v1/user_card"
+    },
+    %{
+      href: "/electric/user_storage",
+      icon_color: "text-purple-600",
+      icon_path:
+        "M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4",
+      label: "User Storage",
+      title: "Encrypted Storage",
+      endpoint: "/electric/v1/user_storage"
+    },
+    %{
+      href: "/electric/user_storage_versions",
+      icon_color: "text-indigo-600",
+      icon_path: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+      label: "Storage Versions",
+      title: "Version History",
+      endpoint: "/electric/v1/user_storage_version"
+    },
+    %{
+      href: "/electric/files",
+      icon_color: "text-indigo-600",
+      icon_path:
+        "M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z",
+      label: "Files",
+      title: "File Manifests",
+      endpoint: "/electric/v1/file"
+    },
+    %{
+      href: "/electric/file_chunks",
+      icon_color: "text-purple-600",
+      icon_path:
+        "M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4",
+      label: "File Chunks",
+      title: "Chunk Data",
+      endpoint: "/electric/v1/file_chunk"
+    },
+    %{
+      href: "/electric/dialog_keys",
+      icon_color: "text-teal-600",
+      icon_path:
+        "M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z",
+      label: "Dialog Keys",
+      title: "Key Exchange",
+      endpoint: "/electric/v1/dialog_key"
+    },
+    %{
+      href: "/electric/dialog_messages",
+      icon_color: "text-cyan-600",
+      icon_path:
+        "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z",
+      label: "Dialog Messages",
+      title: "Message Tips",
+      endpoint: "/electric/v1/dialog_message"
+    },
+    %{
+      href: "/electric/dialog_message_versions",
+      icon_color: "text-amber-600",
+      icon_path: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+      label: "Message Versions",
+      title: "Version History",
+      endpoint: "/electric/v1/dialog_message_version"
+    },
+    %{
+      href: "/electric/dialog_message_reactions",
+      icon_color: "text-pink-600",
+      icon_path:
+        "M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+      label: "Reactions",
+      title: "Emoji Reactions",
+      endpoint: "/electric/v1/dialog_message_reaction"
+    },
+    %{
+      href: "/electric/dialog_message_receipts",
+      icon_color: "text-emerald-600",
+      icon_path: "M5 13l4 4L19 7",
+      label: "Receipts",
+      title: "Read/Delivered",
+      endpoint: "/electric/v1/dialog_message_receipt"
+    }
+  ]
+
+  @sandbox_cards [
+    %{
+      href: "/electric/user_sandbox",
+      icon_color: "text-green-600",
+      icon_path: "M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4",
+      label: "User API Sandbox",
+      title: "API Testing",
+      endpoint: "/electric/v1/ingest"
+    },
+    %{
+      href: "/file_sandbox.html",
+      icon_color: "text-orange-600",
+      icon_path:
+        "M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12",
+      label: "File Sandbox",
+      title: "Upload / Download",
+      endpoint: "/electric/v1/file, /electric/v1/file_chunk"
+    },
+    %{
+      href: "/electric/dialog_sandbox",
+      icon_color: "text-teal-600",
+      icon_path:
+        "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z",
+      label: "Dialog Sandbox",
+      title: "Encrypted Chat",
+      endpoint: "/electric/v1/dialog_key, /electric/v1/dialog_message"
+    }
+  ]
+
   @impl true
   def mount(_params, _session, socket) do
     socket = socket |> assign(:readiness, check_readiness())
@@ -41,6 +160,9 @@ defmodule ChatWeb.ElectricLive.Index do
 
   @impl true
   def render(assigns) do
+    assigns =
+      assigns |> assign(:shape_cards, @shape_cards) |> assign(:sandbox_cards, @sandbox_cards)
+
     ~H"""
     <div class="min-h-screen bg-gray-50 py-8">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -59,51 +181,7 @@ defmodule ChatWeb.ElectricLive.Index do
               Shape Lists
             </h2>
             <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
-              <.card
-                href="/electric/user_cards"
-                icon_color="text-blue-600"
-                icon_path="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                label="User Cards"
-                title="Post-Quantum Users"
-                endpoint="/electric/v1/user_card"
-                compact
-              />
-              <.card
-                href="/electric/user_storage"
-                icon_color="text-purple-600"
-                icon_path="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
-                label="User Storage"
-                title="Encrypted Storage"
-                endpoint="/electric/v1/user_storage"
-                compact
-              />
-              <.card
-                href="/electric/user_storage_versions"
-                icon_color="text-indigo-600"
-                icon_path="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                label="Storage Versions"
-                title="Version History"
-                endpoint="/electric/v1/user_storage_version"
-                compact
-              />
-              <.card
-                href="/electric/files"
-                icon_color="text-indigo-600"
-                icon_path="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                label="Files"
-                title="File Manifests"
-                endpoint="/electric/v1/file"
-                compact
-              />
-              <.card
-                href="/electric/file_chunks"
-                icon_color="text-purple-600"
-                icon_path="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
-                label="File Chunks"
-                title="Chunk Data"
-                endpoint="/electric/v1/file_chunk"
-                compact
-              />
+              <.card :for={c <- @shape_cards} {c} compact />
             </div>
           </div>
 
@@ -112,30 +190,7 @@ defmodule ChatWeb.ElectricLive.Index do
               Sandboxes
             </h2>
             <div class="flex flex-col gap-4">
-              <.card
-                href="/electric/user_sandbox"
-                icon_color="text-green-600"
-                icon_path="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-                label="User API Sandbox"
-                title="API Testing"
-                endpoint="/electric/v1/ingest"
-              />
-              <.card
-                href="/file_sandbox.html"
-                icon_color="text-orange-600"
-                icon_path="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                label="File Sandbox"
-                title="Upload / Download"
-                endpoint="/electric/v1/file, /electric/v1/file_chunk"
-              />
-              <.card
-                href="/electric/dialog_sandbox"
-                icon_color="text-teal-600"
-                icon_path="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                label="Dialog Sandbox"
-                title="Encrypted Chat"
-                endpoint="/electric/v1/dialog_key, /electric/v1/dialog_message"
-              />
+              <.card :for={c <- @sandbox_cards} {c} />
             </div>
           </div>
         </div>

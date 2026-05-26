@@ -95,6 +95,21 @@ defmodule ChatWeb.Router do
       live "/electric/user_storage_versions", ElectricLive.UserStorageVersionLive.Index, :index
       live "/electric/files", ElectricLive.FilesLive.Index, :index
       live "/electric/file_chunks", ElectricLive.FileChunksLive.Index, :index
+      live "/electric/dialog_keys", ElectricLive.DialogKeysLive.Index, :index
+      live "/electric/dialog_messages", ElectricLive.DialogMessagesLive.Index, :index
+
+      live "/electric/dialog_message_versions",
+           ElectricLive.DialogMessageVersionsLive.Index,
+           :index
+
+      live "/electric/dialog_message_reactions",
+           ElectricLive.DialogMessageReactionsLive.Index,
+           :index
+
+      live "/electric/dialog_message_receipts",
+           ElectricLive.DialogMessageReceiptsLive.Index,
+           :index
+
       live "/electric/user_sandbox", ElectricLive.UserSandboxLive.Index, :index
       live "/electric/dialog_sandbox", ElectricLive.DialogSandboxLive.Index, :index
     end
@@ -163,6 +178,9 @@ defmodule ChatWeb.Router do
       sync("/user_storage_version", Chat.Data.Schemas.UserStorageVersion)
       sync("/dialog_key", Chat.Data.Schemas.DialogKey)
       sync("/dialog_message", Chat.Data.Schemas.DialogMessage)
+      sync("/dialog_message_version", Chat.Data.Schemas.DialogMessageVersion)
+      sync("/dialog_message_reaction", Chat.Data.Schemas.DialogMessageReaction)
+      sync("/dialog_message_receipt", Chat.Data.Schemas.DialogMessageReceipt)
 
       get "/file_chunk/:file_id/:chunk_index", FileChunkController, :show
 

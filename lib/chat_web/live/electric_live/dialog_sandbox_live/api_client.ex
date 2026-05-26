@@ -15,12 +15,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
   alias Electric.Client.Message
 
   def fetch_all_user_cards(base_url) do
-    url = "#{base_url}/electric/v1/shapes?table=user_cards&offset=-1"
-
-    case fetch_shape(url) do
-      {:ok, rows, log} -> {:ok, %{cards: rows, log_entries: [log]}}
-      {:error, reason, log} -> {:error, %{reason: reason, log_entries: [log]}}
-    end
+    "#{base_url}/electric/v1/shapes?table=user_cards&offset=-1"
+    |> fetch_shape_as(:cards)
   end
 
   def fetch_user_card(user_hash, base_url) do
@@ -54,21 +50,21 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
   end
 
   def fetch_dialog_keys_by_dialog(dialog_hash, base_url) do
-    url = shapes_url(base_url, "dialog_keys", "dialog_hash='#{dialog_hash}'")
-
-    case fetch_shape(url) do
-      {:ok, rows, log} -> {:ok, %{keys: rows, log_entries: [log]}}
-      {:error, reason, log} -> {:error, %{reason: reason, log_entries: [log]}}
-    end
+    base_url
+    |> shapes_url("dialog_keys", "dialog_hash='#{dialog_hash}'")
+    |> fetch_shape_as(:keys)
   end
 
   def fetch_dialog_messages(dialog_hash, base_url) do
-    url = shapes_url(base_url, "dialog_messages", "dialog_hash='#{dialog_hash}'")
+    base_url
+    |> shapes_url("dialog_messages", "dialog_hash='#{dialog_hash}'")
+    |> fetch_shape_as(:messages)
+  end
 
-    case fetch_shape(url) do
-      {:ok, rows, log} -> {:ok, %{messages: rows, log_entries: [log]}}
-      {:error, reason, log} -> {:error, %{reason: reason, log_entries: [log]}}
-    end
+  def fetch_message_versions(message_id, base_url) do
+    base_url
+    |> shapes_url("dialog_messages_versions", "message_id='#{message_id}'")
+    |> fetch_shape_as(:versions)
   end
 
   def publish_dialog_key(user, peer_hash, peer_crypt_pkey, base_url) do
@@ -91,10 +87,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
         deleted_flag: false
       })
 
-    sign_b64 =
-      key_struct
-      |> Integrity.signature_payload()
-      |> then(&EnigmaPq.sign(&1, user.sign_skey))
+    sign_b64 = sign(key_struct, user.sign_skey)
 
     payload = %{
       "mutations" => [
@@ -150,11 +143,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
         owner_timestamp: owner_timestamp
       })
 
-    sign_b64 =
-      msg_struct
-      |> Integrity.signature_payload()
-      |> then(&EnigmaPq.sign(&1, user.sign_skey))
-
+    sign_b64 = sign(msg_struct, user.sign_skey)
     sign_hash = Crypto.compute_sign_hash(sign_b64)
 
     payload = %{
@@ -221,11 +210,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
         owner_timestamp: owner_timestamp
       })
 
-    sign_b64 =
-      msg_struct
-      |> Integrity.signature_payload()
-      |> then(&EnigmaPq.sign(&1, user.sign_skey))
-
+    sign_b64 = sign(msg_struct, user.sign_skey)
     sign_hash = Crypto.compute_sign_hash(sign_b64)
 
     original = %{
@@ -281,11 +266,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
         owner_timestamp: owner_timestamp
       })
 
-    sign_b64 =
-      msg_struct
-      |> Integrity.signature_payload()
-      |> then(&EnigmaPq.sign(&1, user.sign_skey))
-
+    sign_b64 = sign(msg_struct, user.sign_skey)
     sign_hash = Crypto.compute_sign_hash(sign_b64)
 
     original = %{
@@ -391,8 +372,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
         owner_timestamp: owner_timestamp
       })
 
-    sign_b64 =
-      reaction_struct |> Integrity.signature_payload() |> EnigmaPq.sign(user.sign_skey)
+    sign_b64 = sign(reaction_struct, user.sign_skey)
 
     fields = %{
       "reaction_hash" => reaction_hash,
@@ -426,8 +406,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
         owner_timestamp: owner_timestamp
       })
 
-    sign_b64 =
-      receipt_struct |> Integrity.signature_payload() |> EnigmaPq.sign(user.sign_skey)
+    sign_b64 = sign(receipt_struct, user.sign_skey)
 
     fields = %{
       "receipt_hash" => receipt_hash,
@@ -444,21 +423,15 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
   end
 
   def fetch_reactions(dialog_hash, base_url) do
-    url = shapes_url(base_url, "dialog_message_reactions", "dialog_hash='#{dialog_hash}'")
-
-    case fetch_shape(url) do
-      {:ok, rows, log} -> {:ok, %{reactions: rows, log_entries: [log]}}
-      {:error, reason, log} -> {:error, %{reason: reason, log_entries: [log]}}
-    end
+    base_url
+    |> shapes_url("dialog_message_reactions", "dialog_hash='#{dialog_hash}'")
+    |> fetch_shape_as(:reactions)
   end
 
   def fetch_receipts(dialog_hash, base_url) do
-    url = shapes_url(base_url, "dialog_message_receipts", "dialog_hash='#{dialog_hash}'")
-
-    case fetch_shape(url) do
-      {:ok, rows, log} -> {:ok, %{receipts: rows, log_entries: [log]}}
-      {:error, reason, log} -> {:error, %{reason: reason, log_entries: [log]}}
-    end
+    base_url
+    |> shapes_url("dialog_message_receipts", "dialog_hash='#{dialog_hash}'")
+    |> fetch_shape_as(:receipts)
   end
 
   defp publish_mutation(relation, fields, sign_skey, base_url) do
@@ -506,6 +479,19 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
 
   defp shapes_url(base_url, table, where) do
     "#{base_url}/electric/v1/shapes?table=#{table}&offset=-1&where=#{URI.encode(where)}"
+  end
+
+  defp fetch_shape_as(url, key) do
+    case fetch_shape(url) do
+      {:ok, rows, log} -> {:ok, %{key => rows, log_entries: [log]}}
+      {:error, reason, log} -> {:error, %{reason: reason, log_entries: [log]}}
+    end
+  end
+
+  defp sign(struct, sign_skey) do
+    struct
+    |> Integrity.signature_payload()
+    |> EnigmaPq.sign(sign_skey)
   end
 
   defp fetch_shape(url) do
@@ -557,8 +543,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
   defp up_to_date?(_), do: true
 
   defp next_page_url(url, resp_headers) do
-    offset = resp_headers["electric-offset"] |> List.first()
-    handle = resp_headers["electric-handle"] |> List.first()
+    [offset | _] = resp_headers["electric-offset"]
+    [handle | _] = resp_headers["electric-handle"]
 
     url
     |> URI.parse()

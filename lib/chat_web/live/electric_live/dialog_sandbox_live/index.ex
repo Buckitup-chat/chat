@@ -22,6 +22,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
       |> assign(:reactions, %{})
       |> assign(:receipts, %{})
       |> assign(:editing_message_id, nil)
+      |> assign(:expanded_versions, MapSet.new())
+      |> assign(:message_versions, %{})
       |> assign(:show_docs, true)
       |> assign(:expanded_docs, MapSet.new(["dialog_keys"]))
       |> assign(:operation_in_progress, false)
@@ -71,6 +73,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
               reactions={@reactions}
               receipts={@receipts}
               editing_message_id={@editing_message_id}
+              expanded_versions={@expanded_versions}
+              message_versions={@message_versions}
             />
           <% end %>
         </main>
@@ -235,6 +239,26 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
     {:noreply, assign(socket, :editing_message_id, nil)}
   end
 
+  def handle_event("toggle_versions", %{"message_id" => msg_id}, socket) do
+    %{expanded_versions: expanded, message_versions: cached} = socket.assigns
+
+    socket =
+      cond do
+        msg_id in expanded ->
+          assign(socket, :expanded_versions, MapSet.delete(expanded, msg_id))
+
+        Map.has_key?(cached, msg_id) ->
+          assign(socket, :expanded_versions, MapSet.put(expanded, msg_id))
+
+        true ->
+          socket
+          |> assign(:expanded_versions, MapSet.put(expanded, msg_id))
+          |> fetch_versions(msg_id)
+      end
+
+    {:noreply, socket}
+  end
+
   def handle_event("save_edit", %{"text" => text, "message_id" => msg_id}, socket)
       when text != "" do
     %{user: user, selected_dialog: dialog_hash} = socket.assigns
@@ -386,7 +410,14 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   @impl true
   def handle_info({:dialog_msgs_loaded, raw_msgs}, socket) do
     keys_cache = socket.assigns.msg_keys_cache
-    sorted = Enum.sort_by(raw_msgs, & &1["owner_timestamp"])
+
+    sorted =
+      raw_msgs
+      |> Enum.group_by(& &1["message_id"])
+      |> Map.values()
+      |> Enum.map(fn versions -> Enum.max_by(versions, & &1["owner_timestamp"]) end)
+      |> Enum.sort_by(& &1["message_id"])
+
     messages = Enum.map(sorted, &Crypto.decrypt_single_message(&1, keys_cache))
     tails = Crypto.compute_tails(sorted, keys_cache)
 
@@ -558,6 +589,28 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
       end)
 
     if replaced?, do: result, else: result ++ [new_msg]
+  end
+
+  defp fetch_versions(socket, msg_id) do
+    base_url = get_base_url(socket)
+    keys_cache = socket.assigns.msg_keys_cache
+
+    case ApiClient.fetch_message_versions(msg_id, base_url) do
+      {:ok, %{versions: raw, log_entries: logs}} ->
+        versions =
+          raw
+          |> Enum.sort_by(& &1["owner_timestamp"], :desc)
+          |> Enum.map(&Crypto.decrypt_single_message(&1, keys_cache))
+
+        socket
+        |> update(:message_versions, &Map.put(&1, msg_id, versions))
+        |> update(:request_log, &(&1 ++ logs))
+
+      {:error, %{reason: reason, log_entries: logs}} ->
+        socket
+        |> assign(:error_message, reason)
+        |> update(:request_log, &(&1 ++ logs))
+    end
   end
 
   defp get_base_url(socket) do

@@ -127,6 +127,9 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
             <% msg_reactions = Map.get(@reactions, msg.message_id, []) %>
             <% msg_receipts = Map.get(@receipts, msg.message_id, []) %>
             <% is_own = msg.sender_hash == @user.user_hash %>
+            <% has_history = msg.parent_sign_hash != nil %>
+            <% versions_expanded = msg.message_id in @expanded_versions %>
+            <% versions = Map.get(@message_versions, msg.message_id, []) %>
             <div class={"p-3 rounded-lg max-w-[80%] #{if is_own, do: "ml-auto bg-blue-100", else: "bg-white border"}"}>
               <div class="flex justify-between text-xs text-gray-500 mb-1">
                 <span>{if is_own, do: "You", else: short_hash(msg.sender_hash)}</span>
@@ -152,8 +155,14 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
               <div class="flex justify-between items-center mt-1">
                 <span class="text-xs text-gray-400">
                   {format_timestamp(msg.owner_timestamp)}
-                  <%= if msg.parent_sign_hash && !msg.deleted do %>
-                    <span class="italic ml-1">(edited)</span>
+                  <%= if has_history do %>
+                    <button
+                      phx-click="toggle_versions"
+                      phx-value-message_id={msg.message_id}
+                      class="italic ml-1 text-blue-500 hover:text-blue-700 cursor-pointer"
+                    >
+                      ({if msg.deleted, do: "deleted", else: "edited"} {if versions_expanded, do: "▲", else: "▼"})
+                    </button>
                   <% end %>
                 </span>
                 <div class="flex items-center gap-2">
@@ -174,6 +183,9 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
                   <% end %>
                 </div>
               </div>
+              <%= if has_history && versions_expanded do %>
+                <.version_history versions={versions} />
+              <% end %>
             </div>
           <% end %>
         <% end %>
@@ -214,6 +226,27 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
             <span class="text-gray-500">{count}</span>
           <% end %>
         </span>
+      <% end %>
+    </div>
+    """
+  end
+
+  defp version_history(%{versions: []} = assigns) do
+    ~H"""
+    <div class="mt-2 pl-3 border-l-2 border-gray-300 text-xs text-gray-400 italic">
+      Loading...
+    </div>
+    """
+  end
+
+  defp version_history(assigns) do
+    ~H"""
+    <div class="mt-2 pl-3 border-l-2 border-gray-300 space-y-1">
+      <%= for v <- @versions do %>
+        <div class="text-xs text-gray-500">
+          <span class="text-gray-400">{format_timestamp(v.owner_timestamp)}</span>
+          <span class="ml-1">{v.content}</span>
+        </div>
       <% end %>
     </div>
     """

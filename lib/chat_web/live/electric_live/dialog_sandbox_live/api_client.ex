@@ -274,7 +274,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
         message_id: message_id,
         dialog_hash: dialog_hash,
         sender_hash: user.user_hash,
-        content_b64: <<>>,
+        content_b64: nil,
         deleted_flag: true,
         refs_map_b64: refs_map_b64,
         parent_sign_hash: current_sign_hash,
@@ -295,7 +295,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
     }
 
     changes = %{
-      "content_b64" => encode_base64(<<>>),
+      "content_b64" => "",
       "deleted_flag" => true,
       "refs_map_b64" => encode_base64(refs_map_b64),
       "parent_sign_hash" => current_sign_hash,

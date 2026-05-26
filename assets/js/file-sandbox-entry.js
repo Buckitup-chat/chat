@@ -7,6 +7,11 @@ import {
 import { ingest, fetchShape, fetchShapeWhere } from './file-sandbox/electric-client.js';
 import { chunkFile, generateFileId, generateEncSecret } from './file-sandbox/file-chunker.js';
 import { VideoSWStreamer } from './file-sandbox/video-sw-streamer.js';
+import {
+  classifyFile, fileMime, extractImageMetadata, extractVideoMetadata,
+  buildFileContent, buildImageContent, buildVideoContent,
+  parseContentObject, thumbHashToDataURL
+} from './file-sandbox/content-types.js';
 
 const CHUNK_SIZE = 4_194_304;
 const textEncoder = new TextEncoder();
@@ -30,6 +35,8 @@ function init() {
   document.getElementById('clear-log-btn').addEventListener('click', clearLog);
   document.getElementById('toggle-docs-btn').addEventListener('click', toggleDocs);
   document.getElementById('refresh-files-btn').addEventListener('click', loadMyFiles);
+  document.getElementById('copy-content-json-btn').addEventListener('click', copyContentJson);
+  document.getElementById('extract-btn').addEventListener('click', handleExtract);
 }
 
 if (document.readyState === 'loading') {
@@ -174,7 +181,10 @@ async function handleUpload() {
     await ingest(state.baseUrl, [manifestMutation], state.keys.sign_skey, addLogEntry);
 
     const encSecretHex = uint8ToHex(encSecret);
-    addUploadedFile(fileId, file.name, file.size, encSecretHex);
+    const encSecretB64 = uint8ToBase64Unpadded(encSecret);
+    const contentJson = await buildContentJson(file, fileId, encSecretB64);
+    addUploadedFile(fileId, file.name, file.size, encSecretHex, contentJson);
+    showContentJson(contentJson);
     updateProgress(chunks.length, chunks.length, 'Complete');
     setStatus(`Uploaded ${file.name} — save the encryption secret!`, 'success');
     fileInput.value = '';
@@ -185,6 +195,162 @@ async function handleUpload() {
   } finally {
     uploadBtn.disabled = false;
   }
+}
+
+// --- Content JSON ---
+
+async function buildContentJson(file, fileId, encSecretB64) {
+  const mime = fileMime(file);
+  const category = classifyFile(file);
+  const ts = Math.floor((file.lastModified || Date.now()) / 1000);
+
+  let contentObj;
+  if (category === 'image') {
+    const meta = await extractImageMetadata(file);
+    contentObj = buildImageContent(
+      meta.widthAspect, meta.heightAspect, meta.thumbHashB64,
+      file.name, file.size, mime, ts, fileId, encSecretB64
+    );
+  } else if (category === 'video') {
+    const meta = await extractVideoMetadata(file);
+    contentObj = buildVideoContent(
+      meta.widthAspect, meta.heightAspect, meta.thumbHashB64,
+      file.name, file.size, mime, ts, fileId, encSecretB64
+    );
+  } else {
+    contentObj = buildFileContent(file.name, file.size, mime, ts, fileId, encSecretB64);
+  }
+
+  return JSON.stringify(contentObj);
+}
+
+function showContentJson(json) {
+  const textarea = document.getElementById('content-json-textarea');
+  textarea.value = json;
+  document.getElementById('content-json-output').classList.remove('hidden');
+}
+
+function copyContentJson() {
+  const textarea = document.getElementById('content-json-textarea');
+  navigator.clipboard.writeText(textarea.value).then(() => {
+    const btn = document.getElementById('copy-content-json-btn');
+    const prev = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = prev; }, 1500);
+  });
+}
+
+// --- Extract ---
+
+function handleExtract() {
+  const input = document.getElementById('extract-json-input').value.trim();
+  if (!input) return setStatus('Paste content JSON first', 'error');
+
+  const resultEl = document.getElementById('extract-result');
+  const infoEl = document.getElementById('extract-info');
+  const previewEl = document.getElementById('extract-preview');
+  const actionsEl = document.getElementById('extract-actions');
+
+  infoEl.innerHTML = '';
+  previewEl.innerHTML = '';
+  actionsEl.innerHTML = '';
+  resultEl.classList.add('hidden');
+
+  try {
+    const desc = parseContentObject(input);
+
+    if (desc.type === 'text') {
+      infoEl.innerHTML = `<strong>Type:</strong> text<br><strong>Content:</strong> ${escapeHtml(desc.content)}`;
+      resultEl.classList.remove('hidden');
+      setStatus('Parsed text content', 'success');
+      return;
+    }
+
+    if (desc.type === 'composed') {
+      infoEl.innerHTML = `<strong>Type:</strong> composed message (${desc.elements.length} elements)`;
+      resultEl.classList.remove('hidden');
+      setStatus('Parsed composed message', 'success');
+      return;
+    }
+
+    const isInline = desc.type === 'inline_file' || desc.type === 'inline_image';
+    const hasThumbHash = desc.thumbHashB64 && desc.thumbHashB64.length > 0;
+
+    let info = `<strong>Type:</strong> ${desc.type}`;
+    if (desc.name) info += `<br><strong>Name:</strong> ${escapeHtml(desc.name)}`;
+    if (desc.size != null) info += `<br><strong>Size:</strong> ${formatBytes(desc.size)}`;
+    if (desc.mimeType) info += `<br><strong>MIME:</strong> ${desc.mimeType}`;
+    if (desc.fileId) info += `<br><strong>File ID:</strong> <code>${desc.fileId}</code>`;
+    if (desc.widthAspect != null) info += `<br><strong>Aspect:</strong> ${desc.widthAspect}:${desc.heightAspect}`;
+    infoEl.innerHTML = info;
+
+    if (hasThumbHash) {
+      try {
+        const dataUrl = thumbHashToDataURL(base64ToUint8(desc.thumbHashB64));
+        previewEl.innerHTML = `<img src="${dataUrl}" style="max-width:200px;border-radius:0.375rem;border:1px solid #e5e7eb" alt="ThumbHash preview">`;
+      } catch { /* skip preview on failure */ }
+    }
+
+    if (isInline) {
+      const downloadBtn = document.createElement('button');
+      downloadBtn.className = 'px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm';
+      downloadBtn.textContent = 'Download';
+      downloadBtn.addEventListener('click', () => downloadInlineContent(desc));
+      actionsEl.appendChild(downloadBtn);
+
+      if (desc.type === 'inline_image') {
+        const viewBtn = document.createElement('button');
+        viewBtn.className = 'px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm';
+        viewBtn.textContent = 'Preview';
+        viewBtn.addEventListener('click', () => previewInlineImage(desc));
+        actionsEl.appendChild(viewBtn);
+      }
+    } else {
+      const goBtn = document.createElement('button');
+      goBtn.className = 'px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm';
+      goBtn.textContent = 'Fill Download Form';
+      goBtn.addEventListener('click', () => {
+        const secretHex = uint8ToHex(base64ToUint8(desc.encSecretB64));
+        document.getElementById('download-file-id').value = desc.fileId;
+        document.getElementById('download-enc-secret').value = secretHex;
+        document.getElementById('download-section').scrollIntoView({ behavior: 'smooth' });
+      });
+      actionsEl.appendChild(goBtn);
+    }
+
+    resultEl.classList.remove('hidden');
+    setStatus(`Parsed ${desc.type} content`, 'success');
+  } catch (e) {
+    setStatus(`Parse failed: ${e.message}`, 'error');
+  }
+}
+
+function downloadInlineContent(desc) {
+  const bytes = base64ToUint8(desc.dataB64);
+  const blob = new Blob([bytes], { type: desc.mimeType || 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = desc.name || 'download';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function previewInlineImage(desc) {
+  const bytes = base64ToUint8(desc.dataB64);
+  const blob = new Blob([bytes], { type: desc.mimeType || 'image/png' });
+  if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
+  previewBlobUrl = URL.createObjectURL(blob);
+  document.getElementById('preview-img').src = previewBlobUrl;
+  document.getElementById('image-preview').classList.remove('hidden');
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
 }
 
 // --- Download ---
@@ -577,8 +743,8 @@ function toggleDocs() {
   docs.classList.toggle('hidden');
 }
 
-function addUploadedFile(fileId, fileName, size, encSecretHex) {
-  state.uploadedFiles.push({ fileId, fileName, size, encSecretHex });
+function addUploadedFile(fileId, fileName, size, encSecretHex, contentJson) {
+  state.uploadedFiles.push({ fileId, fileName, size, encSecretHex, contentJson });
   renderUploadedFiles();
 }
 
@@ -589,6 +755,13 @@ function renderUploadedFiles() {
       <div><strong>${f.fileName}</strong> (${formatBytes(f.size)})</div>
       <div class="file-id">file_id: <code>${f.fileId}</code></div>
       <div class="enc-secret">enc_secret: <code>${f.encSecretHex}</code></div>
+      ${f.contentJson ? `
+        <details class="mt-2">
+          <summary class="text-xs text-gray-600 cursor-pointer">Content JSON</summary>
+          <pre class="mt-1 text-xs bg-gray-100 p-2 rounded overflow-x-auto whitespace-pre-wrap break-all">${escapeHtml(f.contentJson)}</pre>
+          <button class="x-copy-content-json mt-1 px-2 py-0.5 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300" data-index="${i}">Copy</button>
+        </details>
+      ` : ''}
       <button class="x-download-uploaded" data-index="${i}"
         style="margin-top:0.5rem;padding:0.25rem 0.75rem;background:#16a34a;color:white;border:none;border-radius:0.25rem;cursor:pointer;font-size:0.875rem">
         Download this file
@@ -602,6 +775,17 @@ function renderUploadedFiles() {
       document.getElementById('download-file-id').value = f.fileId;
       document.getElementById('download-enc-secret').value = f.encSecretHex;
       handleDownload();
+    });
+  });
+
+  list.querySelectorAll('.x-copy-content-json').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const f = state.uploadedFiles[parseInt(btn.dataset.index)];
+      navigator.clipboard.writeText(f.contentJson).then(() => {
+        const prev = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = prev; }, 1500);
+      });
     });
   });
 }

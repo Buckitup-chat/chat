@@ -126,6 +126,17 @@ sign_b64          BYTEA     ML-DSA-87 signature</pre>
       </div>
 
       <div class="doc-section">
+        <h4>Content Types</h4>
+        <div class="doc-content">
+          <p>After upload, a JSON content object is produced per <code>07_content_polymorphism.md</code>:</p>
+          <pre>{"file":  [name, size, mime, ts, file_id, enc_secret_b64]}
+{"image": [w, h, thumbhash, name, size, mime, ts, file_id, enc_secret_b64]}
+{"video": [w, h, thumbhash, name, size, mime, ts, file_id, enc_secret_b64]}</pre>
+          <p class="mt-1">Copy the JSON into the dialog sandbox as message content. To extract, paste it in the Extract section.</p>
+        </div>
+      </div>
+
+      <div class="doc-section">
         <h4>Challenge-Response Auth</h4>
         <div class="doc-content">
           <ol class="list-decimal list-inside space-y-1 text-sm">
@@ -175,6 +186,16 @@ sign_b64          BYTEA     ML-DSA-87 signature</pre>
         </div>
         <!-- Uploaded Files -->
         <div id="uploaded-files"></div>
+        <!-- Content JSON Output -->
+        <div id="content-json-output" class="hidden mt-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Content JSON <span class="font-normal text-gray-500">(copy to dialog sandbox)</span></label>
+          <textarea id="content-json-textarea" readonly rows="4"
+            class="w-full px-3 py-2 border rounded text-sm font-mono bg-gray-50"></textarea>
+          <button id="copy-content-json-btn"
+            class="mt-2 px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm">
+            Copy to Clipboard
+          </button>
+        </div>
       </section>
 
       <!-- My Files -->
@@ -187,6 +208,31 @@ sign_b64          BYTEA     ML-DSA-87 signature</pre>
         </div>
         <div id="files-list">
           <p class="text-sm text-gray-500 italic">Loading...</p>
+        </div>
+      </section>
+
+      <!-- Extract Content -->
+      <section id="extract-section" class="bg-white shadow rounded-lg p-6 mb-6">
+        <h3 class="text-lg font-bold mb-4">Extract Content</h3>
+        <p class="text-sm text-gray-600 mb-3">
+          Paste a content JSON object from a dialog message to extract/download the referenced file.
+        </p>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Content JSON</label>
+            <textarea id="extract-json-input" rows="4"
+              placeholder='{"file": ["doc.pdf", 1048576, "application/pdf", 1715000000, "f_01964...", "base64..."]}'
+              class="w-full px-3 py-2 border rounded text-sm font-mono"></textarea>
+          </div>
+          <button id="extract-btn"
+            class="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 text-sm font-medium">
+            Parse &amp; Extract
+          </button>
+          <div id="extract-result" class="hidden mt-3">
+            <div id="extract-info" class="text-sm text-gray-700 mb-2"></div>
+            <div id="extract-preview" class="mb-2"></div>
+            <div id="extract-actions" class="flex gap-2"></div>
+          </div>
         </div>
       </section>
 

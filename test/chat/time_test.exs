@@ -17,9 +17,18 @@ defmodule Chat.TimeTest do
     test "best_local_time uses build timestamp, not stale file mtimes" do
       result = TimeKeeper.best_local_time()
 
+      beam_path =
+        case :code.which(Chat.TimeKeeper) do
+          :cover_compiled ->
+            Application.app_dir(:chat, "ebin")
+            |> Path.join("Elixir.Chat.TimeKeeper.beam")
+
+          path ->
+            to_string(path)
+        end
+
       compile_time =
-        :code.which(Chat.TimeKeeper)
-        |> to_string()
+        beam_path
         |> File.stat!(time: :posix)
         |> Map.get(:mtime)
 

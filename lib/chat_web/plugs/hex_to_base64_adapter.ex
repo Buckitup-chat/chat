@@ -36,7 +36,7 @@ defmodule ChatWeb.Plugs.HexToBase64Adapter do
 
   @impl true
   def send_resp({adapter, payload}, status, headers, body) do
-    {:ok, sent, new_payload} = adapter.send_resp(payload, status, headers, body)
+    {:ok, sent, new_payload} = adapter.send_resp(payload, status, headers, convert_resp(status, headers, body))
     {:ok, sent, {adapter, new_payload}}
   end
 
@@ -86,6 +86,27 @@ defmodule ChatWeb.Plugs.HexToBase64Adapter do
   end
 
   defp convert_chunk(data), do: data
+
+  defp convert_resp(status, _headers, body) when status >= 400, do: body
+  defp convert_resp(_status, _headers, nil), do: nil
+
+  defp convert_resp(_status, headers, body) when is_binary(body) do
+    if json_resp?(headers) and String.contains?(body, "\\x") do
+      body |> Jason.decode!() |> walk() |> Jason.encode!()
+    else
+      body
+    end
+  rescue
+    _ -> body
+  end
+
+  defp convert_resp(_status, _headers, body), do: body
+
+  defp json_resp?(headers) do
+    Enum.any?(headers, fn {k, v} ->
+      String.downcase(k) == "content-type" and String.contains?(v, "application/json")
+    end)
+  end
 
   # --- JSON tree walk ---
 

@@ -4,7 +4,7 @@ defmodule ChatWeb.Plugs.HexToBase64Test do
   import Plug.Conn
   import Plug.Test
 
-  alias ChatWeb.Plugs.HexToBase64
+  alias ChatWeb.Plugs.HexToBase64Adapter, as: HexToBase64
 
   defp call_plug(body, content_type \\ "application/json") do
     :get

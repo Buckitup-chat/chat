@@ -9,6 +9,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
   alias Chat.Data.Types.DialogMessageReceiptHash
   alias Chat.Data.Types.DialogMessageSignHash
   alias Chat.Data.Types.UserHash
+  alias ChatWeb.ElectricLive.DialogSandboxLive.Content
 
   def compute_dialog_hash(user_hash_a, user_hash_b) do
     [a, b] = Enum.sort([user_hash_a, user_hash_b])
@@ -105,21 +106,21 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
     key = keys_cache[sender]
     deleted = msg["deleted_flag"] in [true, "true", "t"]
 
-    content =
+    {content, content_json} =
       case {deleted, key, msg["content_b64"]} do
         {true, _, _} ->
-          "[deleted]"
+          {{:text, "[deleted]"}, nil}
 
         {_, nil, _} ->
-          "[no key]"
+          {{:text, "[no key]"}, nil}
 
         {_, _, v} when v in [nil, ""] ->
-          "[empty]"
+          {{:text, "[empty]"}, nil}
 
         {_, k, blob} ->
           case decrypt_content(decode_binary_field(blob), k) do
-            :error -> "[decrypt failed]"
-            plaintext -> plaintext
+            :error -> {{:text, "[decrypt failed]"}, nil}
+            plaintext -> {Content.parse(plaintext), plaintext}
           end
       end
 
@@ -127,6 +128,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
       message_id: msg["message_id"],
       sender_hash: sender,
       content: content,
+      content_json: content_json,
       owner_timestamp: msg["owner_timestamp"],
       sign_hash: msg["sign_hash"],
       refs_map: decrypt_refs_map(msg["refs_map_b64"], key),

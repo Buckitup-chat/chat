@@ -11,6 +11,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
   alias Chat.Data.Schemas.DialogMessageReceipt
   alias Chat.Data.Types.DialogMessageId
   alias Chat.TimeKeeper
+  alias ChatWeb.ElectricLive.DialogSandboxLive.Content
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
   alias Electric.Client.Message
 
@@ -127,7 +128,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
       )
 
     message_id = DialogMessageId.generate()
-    content_b64 = Crypto.encrypt_content(plaintext, sender_msg_key)
+    prepared = Content.prepare_for_send(plaintext)
+    content_b64 = Crypto.encrypt_content(prepared, sender_msg_key)
     refs_map_b64 = Crypto.encrypt_refs_map(refs_tails.tails, sender_msg_key)
     owner_timestamp = TimeKeeper.now_unix()
 
@@ -194,7 +196,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
         refs_tails.peer_hash
       )
 
-    content_b64 = Crypto.encrypt_content(new_plaintext, sender_msg_key)
+    prepared = Content.prepare_for_send(new_plaintext)
+    content_b64 = Crypto.encrypt_content(prepared, sender_msg_key)
     refs_map_b64 = Crypto.encrypt_refs_map(refs_tails.tails, sender_msg_key)
     owner_timestamp = TimeKeeper.now_unix()
 

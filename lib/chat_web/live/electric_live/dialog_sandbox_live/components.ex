@@ -3,6 +3,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
 
   use Phoenix.Component
 
+  alias ChatWeb.ElectricLive.DialogSandboxLive.ContentComponents
   alias ChatWeb.ElectricLive.DialogSandboxLive.Docs
 
   def render_error(assigns) do
@@ -141,11 +142,13 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
                 </span>
               </div>
               <%= if @editing_message_id == msg.message_id do %>
-                <.edit_form message_id={msg.message_id} current_content={msg.content} />
+                <.edit_form message_id={msg.message_id} current_content={msg.content_json || ""} />
               <% else %>
-                <div class={"text-sm #{if msg.deleted, do: "italic text-gray-400"}"}>
-                  {msg.content}
-                </div>
+                <ContentComponents.render_content
+                  content={msg.content}
+                  message_id={msg.message_id}
+                  deleted={msg.deleted}
+                />
               <% end %>
               <%= unless msg.deleted do %>
                 <.refs_list refs_map={msg.refs_map} />
@@ -161,7 +164,9 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
                       phx-value-message_id={msg.message_id}
                       class="italic ml-1 text-blue-500 hover:text-blue-700 cursor-pointer"
                     >
-                      ({if msg.deleted, do: "deleted", else: "edited"} {if versions_expanded, do: "▲", else: "▼"})
+                      ({if msg.deleted, do: "deleted", else: "edited"} {if versions_expanded,
+                        do: "▲",
+                        else: "▼"})
                     </button>
                   <% end %>
                 </span>
@@ -192,14 +197,13 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
       </div>
 
       <form phx-submit="send_message" class="flex gap-2">
-        <input
-          type="text"
+        <textarea
           name="text"
-          value={@compose_text}
-          placeholder="Type a message..."
-          class="flex-1 px-3 py-2 border rounded text-sm"
+          rows="2"
+          placeholder="Type a message or paste content JSON..."
+          class="flex-1 px-3 py-2 border rounded text-sm resize-y"
           autocomplete="off"
-        />
+        >{@compose_text}</textarea>
         <button
           type="submit"
           disabled={@operation_in_progress}
@@ -245,7 +249,13 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
       <%= for v <- @versions do %>
         <div class="text-xs text-gray-500">
           <span class="text-gray-400">{format_timestamp(v.owner_timestamp)}</span>
-          <span class="ml-1">{v.content}</span>
+          <span class="ml-1">
+            <ContentComponents.render_content
+              content={v.content}
+              message_id={"#{v.message_id}-v#{v.sign_hash}"}
+              deleted={v.deleted}
+            />
+          </span>
         </div>
       <% end %>
     </div>

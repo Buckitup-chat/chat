@@ -9,5 +9,5 @@
 19. ~~Dialog sandbox: encrypted emoji reactions (HMAC hash, AES-GCM encrypted type)~~ ✅
 20. ~~Dialog sandbox: delivered/read receipts (unencrypted, signed)~~ ✅
 21. ~~Dialog sandbox: message deletion (signed tombstone with deleted_flag)~~ ✅
-22. Dialog sandbox: non-text content types (media, attachments via content polymorphism)
-23. File sandbox: bake content polymorphism types into file_sandbox.html — upload file/image/video, produce JSON content objects per [07_content_polymorphism.md](electric/pq_data_layer/07_content_polymorphism.md), copy-paste into dialog sandbox; extract content from dialog and download via file_sandbox
+~~22. Dialog sandbox: non-text content types (media, attachments via content polymorphism)~~ ✅
+~~23. File sandbox: bake content polymorphism types into file_sandbox.html — upload file/image/video, produce JSON content objects per [07_content_polymorphism.md](electric/pq_data_layer/07_content_polymorphism.md), copy-paste into dialog sandbox; extract content from dialog and download via file_sandbox~~ ✅

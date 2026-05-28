@@ -15,8 +15,16 @@ defmodule Chat.TimeTest do
 
   describe "first boot time protection (reported: certificate expired due to stale clock)" do
     test "best_local_time uses build timestamp, not stale file mtimes" do
-      TimeKeeper.best_local_time()
-      |> assert_within_last_day()
+      result = TimeKeeper.best_local_time()
+
+      compile_time =
+        :code.which(Chat.TimeKeeper)
+        |> to_string()
+        |> File.stat!(time: :posix)
+        |> Map.get(:mtime)
+
+      assert DateTime.to_unix(result) >= compile_time - 2
+      assert DateTime.compare(result, DateTime.utc_now()) != :gt
     end
 
     test "best_local_time includes persist file mtime" do
@@ -49,9 +57,6 @@ defmodule Chat.TimeTest do
       rewire(Chat.TimeKeeper, [{Chat.TimeKeeper.Source, Chat.TimeTest.FutureSource}])
     end
 
-    defp assert_within_last_day(datetime) do
-      assert DateTime.diff(DateTime.utc_now(), datetime) < 86_400
-    end
   end
 
   defmodule FakeSource do

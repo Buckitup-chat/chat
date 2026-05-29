@@ -9,8 +9,8 @@ defmodule Chat.KeyShareTest do
   describe "key share" do
     setup do
       me = "Root" |> User.login()
-      User.register(me)
-      User.await_saved(me)
+      pub_key = User.register(me)
+      User.await_saved(pub_key)
       users = ["Kevin", "John", "Mike", "Liza"]
       user_cards = Enum.map(users, &User.login/1) |> Enum.map(&Card.from_identity/1)
       shares = KeyShare.generate_key_shares({me, user_cards})

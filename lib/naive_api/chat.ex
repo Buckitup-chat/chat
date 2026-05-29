@@ -41,23 +41,21 @@ defmodule NaiveApi.Chat do
         },
         _
       ) do
-    peer = User.by_id(peer_public_key)
-    me = Identity.from_keys(my_keypair)
-    dialog = Dialogs.find_or_open(me, peer)
+    with {:peer, peer} when not is_nil(peer) <- {:peer, User.by_id(peer_public_key)},
+         {:text, content} when content != "" <- {:text, String.trim(text)},
+         me <- Identity.from_keys(my_keypair),
+         dialog <- Dialogs.find_or_open(me, peer) do
+      {index, %{id: id}} =
+        content
+        |> Messages.Text.new(timestamp)
+        |> Dialogs.add_new_message(me, dialog)
+        |> MemoIndex.add(dialog, me)
 
-    case String.trim(text) do
-      "" ->
-        ["Can't write empty text"] |> error()
-
-      content ->
-        {index, %{id: id}} =
-          content
-          |> Messages.Text.new(timestamp)
-          |> Dialogs.add_new_message(me, dialog)
-          |> MemoIndex.add(dialog, me)
-
-        %{id: id, index: index}
-        |> ok()
+      %{id: id, index: index}
+      |> ok()
+    else
+      {:peer, nil} -> ["Peer not found"] |> error()
+      {:text, ""} -> ["Can't write empty text"] |> error()
     end
   end
 

@@ -107,7 +107,7 @@ defmodule Chat.Data.DialogValidationTest do
 
       operation = message_operation(:insert, ctx.alice_hash, ctx.dialog_hash)
 
-      assert {:error, "dialog_key required before sending messages"} =
+      assert {:error, "dialog_key required before posting to dialog"} =
                Validation.message_allowed(operation, %{challenge: challenge, signature: signature})
     end
 
@@ -125,12 +125,25 @@ defmodule Chat.Data.DialogValidationTest do
   # --- reaction_allowed/2 ---
 
   describe "reaction_allowed/2" do
-    test "valid PoP returns :ok", ctx do
+    test "valid PoP with existing dialog_key returns :ok", ctx do
+      insert_dialog_key(ctx.alice, ctx.dialog_hash, ctx.alice_hash, ctx.bob_hash)
       {challenge, signature} = sign_challenge(ctx.alice)
 
-      operation = %Operation{operation: :insert, changes: %{"reactor_hash" => ctx.alice_hash}}
+      operation = reaction_operation(ctx.alice_hash, ctx.dialog_hash)
 
       assert :ok =
+               Validation.reaction_allowed(operation, %{
+                 challenge: challenge,
+                 signature: signature
+               })
+    end
+
+    test "missing dialog_key returns error", ctx do
+      {challenge, signature} = sign_challenge(ctx.alice)
+
+      operation = reaction_operation(ctx.alice_hash, ctx.dialog_hash)
+
+      assert {:error, "dialog_key required before posting to dialog"} =
                Validation.reaction_allowed(operation, %{
                  challenge: challenge,
                  signature: signature
@@ -141,7 +154,7 @@ defmodule Chat.Data.DialogValidationTest do
       {challenge, _} = sign_challenge(ctx.alice)
       {_, wrong_sig} = sign_challenge(ctx.bob)
 
-      operation = %Operation{operation: :insert, changes: %{"reactor_hash" => ctx.alice_hash}}
+      operation = reaction_operation(ctx.alice_hash, ctx.dialog_hash)
 
       assert {:error, _} =
                Validation.reaction_allowed(operation, %{
@@ -154,10 +167,7 @@ defmodule Chat.Data.DialogValidationTest do
       msg = insert_persisted_message(ctx)
       {challenge, signature} = sign_challenge(ctx.alice)
 
-      operation = %Operation{
-        operation: :insert,
-        changes: %{"reactor_hash" => ctx.alice_hash, "message_id" => msg.message_id}
-      }
+      operation = reaction_operation(ctx.alice_hash, ctx.dialog_hash, message_id: msg.message_id)
 
       assert {:error, "cannot react to own message"} =
                Validation.reaction_allowed(operation, %{
@@ -168,12 +178,10 @@ defmodule Chat.Data.DialogValidationTest do
 
     test "allows peer reaction — peer can react to author's message", ctx do
       msg = insert_persisted_message(ctx)
+      insert_dialog_key(ctx.bob, ctx.dialog_hash, ctx.bob_hash, ctx.alice_hash)
       {challenge, signature} = sign_challenge(ctx.bob)
 
-      operation = %Operation{
-        operation: :insert,
-        changes: %{"reactor_hash" => ctx.bob_hash, "message_id" => msg.message_id}
-      }
+      operation = reaction_operation(ctx.bob_hash, ctx.dialog_hash, message_id: msg.message_id)
 
       assert :ok =
                Validation.reaction_allowed(operation, %{
@@ -638,4 +646,15 @@ defmodule Chat.Data.DialogValidationTest do
       changes: %{"sender_hash" => sender_hash, "dialog_hash" => dialog_hash}
     }
   end
+
+  defp reaction_operation(reactor_hash, dialog_hash, attrs \\ []) do
+    changes =
+      %{"reactor_hash" => reactor_hash, "dialog_hash" => dialog_hash}
+      |> maybe_put("message_id", Keyword.get(attrs, :message_id))
+
+    %Operation{operation: :insert, changes: changes}
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 end

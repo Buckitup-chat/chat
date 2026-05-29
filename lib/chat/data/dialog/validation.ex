@@ -119,10 +119,10 @@ defmodule Chat.Data.Dialog.Validation do
 
     with %{sign_pkey: sign_pkey} <- UserData.get_card(sender_hash),
          true <- EnigmaPq.verify(challenge, signature, sign_pkey),
-         %DialogKey{} <- Dialog.get_dialog_key(dialog_hash, sender_hash) do
+         :ok <- check_dialog_key_published(dialog_hash, sender_hash) do
       :ok
     else
-      nil -> {:error, "dialog_key required before sending messages"}
+      {:error, reason} -> {:error, reason}
       _ -> {:error, "Invalid operation"}
     end
   end
@@ -250,18 +250,20 @@ defmodule Chat.Data.Dialog.Validation do
   # --- Dialog Message Reactions: HTTP ingestion ---
 
   def reaction_allowed(operation, %{challenge: challenge, signature: signature}) do
-    {reactor_hash, message_id} =
+    {reactor_hash, dialog_hash, message_id} =
       case operation do
         %Operation{operation: :insert, changes: changes} ->
           {changes["reactor_hash"] || changes[:reactor_hash],
+           changes["dialog_hash"] || changes[:dialog_hash],
            changes["message_id"] || changes[:message_id]}
 
         %Operation{operation: :update, data: data} ->
-          {data["reactor_hash"], data["message_id"]}
+          {data["reactor_hash"], data["dialog_hash"], data["message_id"]}
       end
 
     with %{sign_pkey: sign_pkey} <- UserData.get_card(reactor_hash),
          true <- EnigmaPq.verify(challenge, signature, sign_pkey),
+         :ok <- check_dialog_key_published(dialog_hash, reactor_hash),
          :ok <- check_not_self_reaction(message_id, reactor_hash) do
       :ok
     else
@@ -317,6 +319,17 @@ defmodule Chat.Data.Dialog.Validation do
     receipt
     |> DialogMessageReceipt.create_changeset(changes)
     |> UserValidation.validate_signature()
+  end
+
+  # --- Dialog establishment guard ---
+
+  # The poster must have published their own dialog_key first, otherwise the peer
+  # has no way to unwrap the poster's sender_msg_key and decrypt what they post.
+  defp check_dialog_key_published(dialog_hash, sender_hash) do
+    case Dialog.get_dialog_key(dialog_hash, sender_hash) do
+      %DialogKey{} -> :ok
+      _ -> {:error, "dialog_key required before posting to dialog"}
+    end
   end
 
   # --- Self-action guards ---

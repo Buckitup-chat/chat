@@ -30,8 +30,12 @@ defmodule Chat.Data.ShapesIntegrityTest do
     test "signable_fields excludes sign_b64 and __meta__ for all shapes" do
       for struct <- all_shape_structs() do
         fields = Signable.signable_fields(struct)
-        refute Map.has_key?(fields, :sign_b64), "#{inspect(struct.__struct__)} must exclude :sign_b64"
-        refute Map.has_key?(fields, :__meta__), "#{inspect(struct.__struct__)} must exclude :__meta__"
+
+        refute Map.has_key?(fields, :sign_b64),
+               "#{inspect(struct.__struct__)} must exclude :sign_b64"
+
+        refute Map.has_key?(fields, :__meta__),
+               "#{inspect(struct.__struct__)} must exclude :__meta__"
       end
     end
 

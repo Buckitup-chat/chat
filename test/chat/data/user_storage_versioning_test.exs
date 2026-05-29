@@ -169,11 +169,19 @@ defmodule Chat.Data.UserStorageVersioningTest do
       timestamp = System.system_time(:second) + 100
 
       insert_storage_via_context!(
-        signed_storage(identity, user_hash, %{uuid: uuid, value_b64: "newer", owner_timestamp: timestamp})
+        signed_storage(identity, user_hash, %{
+          uuid: uuid,
+          value_b64: "newer",
+          owner_timestamp: timestamp
+        })
       )
 
       insert_storage_via_context!(
-        signed_storage(identity, user_hash, %{uuid: uuid, value_b64: "older", owner_timestamp: timestamp - 50})
+        signed_storage(identity, user_hash, %{
+          uuid: uuid,
+          value_b64: "older",
+          owner_timestamp: timestamp - 50
+        })
       )
 
       stored = Repo.get_by(UserStorage, user_hash: user_hash, uuid: uuid)
@@ -213,12 +221,20 @@ defmodule Chat.Data.UserStorageVersioningTest do
       timestamp = System.system_time(:second) + 100
 
       storage1 =
-        signed_storage(identity, user_hash, %{uuid: uuid, value_b64: "newer", owner_timestamp: timestamp})
+        signed_storage(identity, user_hash, %{
+          uuid: uuid,
+          value_b64: "newer",
+          owner_timestamp: timestamp
+        })
 
       inserted = insert_raw!(storage1)
 
       storage2 =
-        signed_storage(identity, user_hash, %{uuid: uuid, value_b64: "older", owner_timestamp: timestamp - 50})
+        signed_storage(identity, user_hash, %{
+          uuid: uuid,
+          value_b64: "older",
+          owner_timestamp: timestamp - 50
+        })
 
       {:ok, _} = User.insert_storage_with_conflict(inserted, storage2)
 
@@ -279,11 +295,19 @@ defmodule Chat.Data.UserStorageVersioningTest do
       timestamp = System.system_time(:second) + 100
 
       insert_storage!(
-        signed_storage(identity, user_hash, %{uuid: uuid, value_b64: "newer", owner_timestamp: timestamp})
+        signed_storage(identity, user_hash, %{
+          uuid: uuid,
+          value_b64: "newer",
+          owner_timestamp: timestamp
+        })
       )
 
       older =
-        signed_storage(identity, user_hash, %{uuid: uuid, value_b64: "older", owner_timestamp: timestamp - 50})
+        signed_storage(identity, user_hash, %{
+          uuid: uuid,
+          value_b64: "older",
+          owner_timestamp: timestamp - 50
+        })
 
       archive_storage_from_signed!(older)
 
@@ -351,7 +375,9 @@ defmodule Chat.Data.UserStorageVersioningTest do
       update_attrs =
         new_storage
         |> Map.from_struct()
-        |> Map.take(~w(value_b64 deleted_flag parent_sign_hash owner_timestamp sign_b64 sign_hash)a)
+        |> Map.take(
+          ~w(value_b64 deleted_flag parent_sign_hash owner_timestamp sign_b64 sign_hash)a
+        )
 
       existing
       |> UserStorage.update_changeset(update_attrs)

@@ -105,7 +105,11 @@ defmodule Chat.Data.UserDataTest do
       identity = User.generate_pq_identity("SwappedCerts")
       card = User.extract_pq_card(identity)
 
-      refute User.valid_card?(%{card | crypt_cert: card.contact_cert, contact_cert: card.crypt_cert})
+      refute User.valid_card?(%{
+               card
+               | crypt_cert: card.contact_cert,
+                 contact_cert: card.crypt_cert
+             })
     end
 
     test "rejects card with crypt_cert signed by wrong key" do

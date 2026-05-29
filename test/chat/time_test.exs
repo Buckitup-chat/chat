@@ -65,7 +65,6 @@ defmodule Chat.TimeTest do
     defp keeper_with_future_ntp do
       rewire(Chat.TimeKeeper, [{Chat.TimeKeeper.Source, Chat.TimeTest.FutureSource}])
     end
-
   end
 
   defmodule FakeSource do

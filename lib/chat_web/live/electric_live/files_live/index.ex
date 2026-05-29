@@ -124,7 +124,12 @@ defmodule ChatWeb.ElectricLive.FilesLive.Index do
                   <div class="flex items-center min-w-0 flex-1">
                     <div class="flex-shrink-0">
                       <div class="h-12 w-12 rounded-full bg-indigo-600 flex items-center justify-center">
-                        <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg
+                          class="h-6 w-6 text-white"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
                           <path
                             stroke-linecap="round"
                             stroke-linejoin="round"
@@ -144,7 +149,9 @@ defmodule ChatWeb.ElectricLive.FilesLive.Index do
                         <% end %>
                       </p>
                       <p class="mt-1 text-sm text-gray-500">
-                        {format_size(file.total_size)} &middot; {file.chunk_count} chunks &middot; chunk size {format_size(file.chunk_size)}
+                        {format_size(file.total_size)} &middot; {file.chunk_count} chunks &middot; chunk size {format_size(
+                          file.chunk_size
+                        )}
                       </p>
                       <p class="mt-1 text-xs text-gray-400">
                         Timestamp: {file.owner_timestamp}

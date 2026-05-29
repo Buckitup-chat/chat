@@ -60,12 +60,16 @@ defmodule Chat.Data.File.GC do
       {uc_count, _} = FileData.delete_upload_chunks_for_file(file_id)
       fc_count = delete_chunks_in_batches(file_id)
 
-      log("GC: pruned #{uc_count} upload_chunks and #{fc_count} orphan file_chunks from stale upload #{file_id}", :debug)
+      log(
+        "GC: pruned #{uc_count} upload_chunks and #{fc_count} orphan file_chunks from stale upload #{file_id}",
+        :debug
+      )
     end)
   end
 
   defp delete_chunks_in_batches(file_id, total \\ 0) do
-    {count, _} = FileData.delete_file_chunks_batch(file_id, @chunk_batch_size, timeout: @delete_timeout)
+    {count, _} =
+      FileData.delete_file_chunks_batch(file_id, @chunk_batch_size, timeout: @delete_timeout)
 
     case count do
       @chunk_batch_size -> delete_chunks_in_batches(file_id, total + count)

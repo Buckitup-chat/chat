@@ -121,12 +121,22 @@ defmodule ChatWeb.ElectricControllerFileTest do
       assert Repo.get(FileSchema, file_id).deleted_flag == false
 
       delete_file = build_signed_delete(identity, file_id, file.owner_timestamp)
-      delete_conn = post_ingest(conn, file_delete_payload(delete_file, file_id, user_hash), identity.sign_skey)
+
+      delete_conn =
+        post_ingest(
+          conn,
+          file_delete_payload(delete_file, file_id, user_hash),
+          identity.sign_skey
+        )
+
       assert delete_conn.status == 200, delete_conn.resp_body
 
       assert Repo.get(FileSchema, file_id).deleted_flag == true
 
-      assert from(f in FileSchema, where: f.file_id == ^file_id and f.deleted_flag == false, select: count())
+      assert from(f in FileSchema,
+               where: f.file_id == ^file_id and f.deleted_flag == false,
+               select: count()
+             )
              |> Repo.one() == 0
     end
   end

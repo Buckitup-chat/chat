@@ -36,7 +36,9 @@ defmodule ChatWeb.Plugs.HexToBase64Adapter do
 
   @impl true
   def send_resp({adapter, payload}, status, headers, body) do
-    {:ok, sent, new_payload} = adapter.send_resp(payload, status, headers, convert_resp(status, headers, body))
+    {:ok, sent, new_payload} =
+      adapter.send_resp(payload, status, headers, convert_resp(status, headers, body))
+
     {:ok, sent, {adapter, new_payload}}
   end
 

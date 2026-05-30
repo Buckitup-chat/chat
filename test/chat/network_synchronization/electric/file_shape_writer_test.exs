@@ -78,6 +78,20 @@ defmodule Chat.NetworkSynchronization.Electric.FileShapeWriterTest do
       assert stored.chunk_sign_hashes == []
     end
 
+    test "insert decodes double-escaped bytea[] chunk_sign_hashes from peer", %{
+      identity: identity,
+      user_hash: user_hash
+    } do
+      file = signed_file(identity, user_hash)
+      as_streamed = as_received_from_peer(file)
+
+      assert {:ok, _} = ShapeWriter.write(:file, :insert, as_streamed)
+
+      stored = Repo.get(FileSchema, file.file_id)
+      assert stored != nil
+      assert stored.chunk_sign_hashes == file.chunk_sign_hashes
+    end
+
     test "insert without parent user_card is deferred", %{identity: identity} do
       other_identity = User.generate_pq_identity("Ghost")
       other_card = User.extract_pq_card(other_identity)
@@ -203,6 +217,16 @@ defmodule Chat.NetworkSynchronization.Electric.FileShapeWriterTest do
 
     sign_b64 = file |> Integrity.signature_payload() |> EnigmaPq.sign(identity.sign_skey)
     %{file | sign_b64: sign_b64}
+  end
+
+  defp as_received_from_peer(file) do
+    %{file | chunk_sign_hashes: Enum.map(file.chunk_sign_hashes, &peer_encoded_bytea/1)}
+  end
+
+  # Mirrors how Electric's array decoder leaves a bytea[] element: the raw binary
+  # rendered as double-escaped Postgres array-literal hex ("\\x<hex>").
+  defp peer_encoded_bytea(binary) do
+    "\\\\x" <> Base.encode16(binary, case: :lower)
   end
 
   defp signed_file_from(file, sign_skey, attrs) do

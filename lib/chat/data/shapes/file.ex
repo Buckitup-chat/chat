@@ -18,6 +18,29 @@ defmodule Chat.Data.Shapes.File do
   @impl true
   def sync_required_parents(_op, %{uploader_hash: hash}), do: [{:user_card, hash}]
 
+  @doc """
+  Decodes `chunk_sign_hashes` (`bytea[]`) elements back to raw binaries before
+  signature validation in `sync_persist/2`.
+
+  The Electric client's array decoder (`Electric.Client.EctoAdapter.ArrayDecoder`)
+  only hex-decodes scalar bytea, not array elements: each element arrives as the
+  double-escaped Postgres array-literal text (`\\x<hex>`) instead of the raw binary
+  the uploader signed.
+  """
+  @impl true
+  def sync_derive_fields(%File{chunk_sign_hashes: hashes} = file) do
+    %{file | chunk_sign_hashes: Enum.map(hashes, &decode_bytea_element/1)}
+  end
+
+  defp decode_bytea_element("\\\\x" <> hex) do
+    case Base.decode16(hex, case: :mixed) do
+      {:ok, binary} -> binary
+      :error -> "\\\\x" <> hex
+    end
+  end
+
+  defp decode_bytea_element(binary), do: binary
+
   @impl true
   def sync_persist(operation, file) do
     case operation do

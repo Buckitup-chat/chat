@@ -2,8 +2,8 @@
 
 9. Integrate external frontend ([external_frontend_integration.md](proposal/external_frontend_integration.md))
 
-10. Editing only one version
-11. Reactions should be tied to reacted version
+10. ~~Editing only one version~~
+11. ~~Reactions should be tied to reacted version~~
 
 12. Reviews planning: to_public / to_owner / to_contacts. SaaS. Pre/moderation on public?
 

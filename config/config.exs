@@ -56,6 +56,13 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+# Keep multi-megabyte file-chunk blobs out of request-parameter logging.
+# Phoenix scrubs these keys at any nesting depth (they arrive nested inside
+# ingest mutations); without this, logging a single chunk serializes ~5.5 MB
+# of base64 through the Logger. Pairs with `log: false` on the chunk inserts
+# in Chat.Data.File.
+config :phoenix, :filter_parameters, ["password", "data_b64"]
+
 # Timezone config
 config :tzdata, :autoupdate, :disabled
 config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase

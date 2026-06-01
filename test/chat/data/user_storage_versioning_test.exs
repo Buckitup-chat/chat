@@ -10,36 +10,8 @@ defmodule Chat.Data.UserStorageVersioningTest do
   alias Chat.Data.User.Validation
   alias Chat.Repo
 
-  defp compute_sign_hash(sign_b64) do
-    sign_b64
-    |> EnigmaPq.hash()
-    |> UserStorageSignHash.from_binary()
-  end
-
-  defp signed_storage(identity, user_hash, attrs \\ %{}) do
-    storage =
-      %UserStorage{
-        user_hash: user_hash,
-        uuid: Ecto.UUID.generate(),
-        value_b64: "test value",
-        deleted_flag: false,
-        parent_sign_hash: nil,
-        owner_timestamp: System.system_time(:second)
-      }
-      |> struct(attrs)
-
-    sign_b64 =
-      storage
-      |> Integrity.signature_payload()
-      |> EnigmaPq.sign(identity.sign_skey)
-
-    sign_hash = compute_sign_hash(sign_b64)
-    %{storage | sign_b64: sign_b64, sign_hash: sign_hash}
-  end
-
   describe "user_storage versioning" do
     setup do
-      # Create a test user card
       identity = EnigmaPq.generate_identity()
 
       user_hash =
@@ -59,7 +31,6 @@ defmodule Chat.Data.UserStorageVersioningTest do
         owner_timestamp: System.system_time(:second)
       }
 
-      # Sign the card
       sign_payload = Integrity.signature_payload(%UserCard{} |> struct(card_attrs))
       sign_b64 = EnigmaPq.sign(sign_payload, identity.sign_skey)
 
@@ -430,5 +401,32 @@ defmodule Chat.Data.UserStorageVersioningTest do
       |> then(&UserStorage.create_changeset(%UserStorage{}, &1))
       |> User.insert_storage()
     end
+  end
+
+  defp compute_sign_hash(sign_b64) do
+    sign_b64
+    |> EnigmaPq.hash()
+    |> UserStorageSignHash.from_binary()
+  end
+
+  defp signed_storage(identity, user_hash, attrs \\ %{}) do
+    storage =
+      %UserStorage{
+        user_hash: user_hash,
+        uuid: Ecto.UUID.generate(),
+        value_b64: "test value",
+        deleted_flag: false,
+        parent_sign_hash: nil,
+        owner_timestamp: System.system_time(:second)
+      }
+      |> struct(attrs)
+
+    sign_b64 =
+      storage
+      |> Integrity.signature_payload()
+      |> EnigmaPq.sign(identity.sign_skey)
+
+    sign_hash = compute_sign_hash(sign_b64)
+    %{storage | sign_b64: sign_b64, sign_hash: sign_hash}
   end
 end

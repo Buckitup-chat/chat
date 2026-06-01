@@ -9,16 +9,6 @@ defmodule Chat.Data.UserDataTest do
   alias Chat.Repo
   alias EnigmaPq
 
-  defp signed_user_card(identity, attrs \\ %{}) do
-    card =
-      identity
-      |> User.extract_pq_card()
-      |> struct(Map.merge(%{deleted_flag: false, owner_timestamp: 1}, attrs))
-
-    sign_b64 = Integrity.signature_payload(card) |> EnigmaPq.sign(identity.sign_skey)
-    %{card | sign_b64: sign_b64}
-  end
-
   describe "UserCard" do
     test "creates user card with valid hash" do
       identity = User.generate_pq_identity("Alice")
@@ -213,6 +203,16 @@ defmodule Chat.Data.UserDataTest do
       crypt_cert: EnigmaPq.sign(crypt_pkey, sign_skey),
       name: "Bob"
     }
+  end
+
+  defp signed_user_card(identity, attrs \\ %{}) do
+    card =
+      identity
+      |> User.extract_pq_card()
+      |> struct(Map.merge(%{deleted_flag: false, owner_timestamp: 1}, attrs))
+
+    sign_b64 = Integrity.signature_payload(card) |> EnigmaPq.sign(identity.sign_skey)
+    %{card | sign_b64: sign_b64}
   end
 
   defp resign_card(card, identity, attrs) do

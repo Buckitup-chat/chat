@@ -31,6 +31,7 @@ defmodule Chat.Application do
         Chat.AdminDb,
         # Application Services
         Chat.Challenge,
+        Chat.Upload.IngestThrottle,
         Chat.KeyRingTokens,
         Chat.Broker,
         Chat.ChunkedFilesBroker,

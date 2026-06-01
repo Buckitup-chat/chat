@@ -187,6 +187,7 @@ defmodule ChatWeb.Router do
       get "/system_identifier", SystemIdentifierController, :show
 
       scope "/" do
+        pipe_through ChatWeb.Plugs.ElectricIngestThrottle
         pipe_through ChatWeb.Plugs.ElectricChallengeInjector
 
         options "/ingest", ElectricController, :options

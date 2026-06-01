@@ -181,7 +181,6 @@ defmodule NaiveApi.ChatTest do
 
       ChangeTracker.await()
 
-      # Create upload key with DIALOG destination
       {:ok, %{data: %{"uploadKey" => upload_key}}} =
         Absinthe.run(@upload_key_mutation, @schema,
           variables: %{
@@ -252,13 +251,10 @@ defmodule NaiveApi.ChatTest do
           }
         )
 
-      # Wait for database writes to complete
       ChangeTracker.await()
 
-      # Decode upload_key from hex string to binary for FileIndex lookup
       {:ok, upload_key_binary} = Base.decode16(upload_key, case: :lower)
 
-      # Verify secrets are saved for both participants
       secret_a = FileIndex.get(dialog.a_key, upload_key_binary)
       secret_b = FileIndex.get(dialog.b_key, upload_key_binary)
 
@@ -289,7 +285,6 @@ defmodule NaiveApi.ChatTest do
       peer: peer,
       upload_key: upload_key
     } do
-      # Send file
       Absinthe.run(@send_file_mutation, @schema,
         variables: %{
           "peerPublicKey" => Bitstring.serialize_33(peer.public_key),
@@ -301,7 +296,6 @@ defmodule NaiveApi.ChatTest do
         }
       )
 
-      # Read it back
       {:ok, %{data: %{"chatRead" => [file_message]}}} =
         Absinthe.run(@chat_read_query, @schema,
           variables: %{

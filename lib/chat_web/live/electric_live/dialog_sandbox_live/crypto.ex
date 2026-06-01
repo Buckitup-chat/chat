@@ -170,7 +170,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
     raw_reactions
     |> Enum.map(&decrypt_single_reaction(&1, keys_cache))
     |> Enum.reject(& &1.deleted_flag)
-    |> Enum.group_by(& &1.message_id)
+    |> Enum.group_by(& &1.message_sign_hash)
   end
 
   def group_receipts_by_message(raw_receipts) do

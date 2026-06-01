@@ -125,7 +125,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
           <p class="text-sm text-gray-500 italic text-center">No messages yet</p>
         <% else %>
           <%= for msg <- @messages do %>
-            <% msg_reactions = Map.get(@reactions, msg.message_id, []) %>
+            <% msg_reactions = Map.get(@reactions, msg.sign_hash, []) %>
             <% msg_receipts = Map.get(@receipts, msg.message_id, []) %>
             <% is_own = msg.sender_hash == @user.user_hash %>
             <% has_history = msg.parent_sign_hash != nil %>
@@ -153,7 +153,9 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
               <%= unless msg.deleted do %>
                 <.refs_list refs_map={msg.refs_map} />
                 <.reaction_display reactions={msg_reactions} />
-                <.emoji_buttons message_id={msg.message_id} sign_hash={msg.sign_hash} />
+                <%= unless is_own do %>
+                  <.emoji_buttons message_id={msg.message_id} sign_hash={msg.sign_hash} />
+                <% end %>
               <% end %>
               <div class="flex justify-between items-center mt-1">
                 <span class="text-xs text-gray-400">
@@ -189,7 +191,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
                 </div>
               </div>
               <%= if has_history && versions_expanded do %>
-                <.version_history versions={versions} />
+                <.version_history versions={versions} reactions={@reactions} />
               <% end %>
             </div>
           <% end %>
@@ -256,6 +258,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
               deleted={v.deleted}
             />
           </span>
+          <.reaction_display reactions={Map.get(@reactions, v.sign_hash, [])} />
         </div>
       <% end %>
     </div>

@@ -409,8 +409,6 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
 
   @impl true
   def handle_info({:dialog_msgs_loaded, raw_msgs}, socket) do
-    keys_cache = socket.assigns.msg_keys_cache
-
     sorted =
       raw_msgs
       |> Enum.group_by(& &1["message_id"])
@@ -418,6 +416,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
       |> Enum.map(fn versions -> Enum.max_by(versions, & &1["owner_timestamp"]) end)
       |> Enum.sort_by(& &1["message_id"])
 
+    socket = ensure_sender_keys(socket, sorted)
+    keys_cache = socket.assigns.msg_keys_cache
     messages = Enum.map(sorted, &Crypto.decrypt_single_message(&1, keys_cache))
     tails = Crypto.compute_tails(sorted, keys_cache)
 
@@ -434,6 +434,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
     if already_exists do
       {:noreply, socket}
     else
+      socket = ensure_sender_keys(socket, [raw_msg])
       msg = Crypto.decrypt_single_message(raw_msg, socket.assigns.msg_keys_cache)
 
       {:noreply,
@@ -445,12 +446,14 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
 
   def handle_info({:dialog_msg_updated, raw_msg}, socket) do
     msg_id = raw_msg["message_id"]
+    socket = ensure_sender_keys(socket, [raw_msg])
     decrypted = Crypto.decrypt_single_message(raw_msg, socket.assigns.msg_keys_cache)
 
     {:noreply,
      socket
      |> update(:messages, &upsert_message(&1, msg_id, decrypted))
-     |> update(:refs_tails, &Map.put(&1, msg_id, raw_msg["sign_hash"]))}
+     |> update(:refs_tails, &Map.put(&1, msg_id, raw_msg["sign_hash"]))
+     |> refresh_versions_if_expanded(msg_id)}
   end
 
   def handle_info({:dialog_msg_live}, socket) do
@@ -523,6 +526,20 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
     end
   end
 
+  defp ensure_sender_keys(socket, raw_msgs) do
+    %{user: user} = socket.assigns
+    base_url = get_base_url(socket)
+
+    raw_msgs
+    |> Enum.map(& &1["sender_hash"])
+    |> Enum.uniq()
+    |> Enum.reject(&Map.has_key?(socket.assigns.msg_keys_cache, &1))
+    |> Enum.reduce(socket, fn sender_hash, socket ->
+      keys_cache = maybe_unwrap_peer_key(socket.assigns.msg_keys_cache, sender_hash, user, base_url)
+      assign(socket, :msg_keys_cache, keys_cache)
+    end)
+  end
+
   defp maybe_unwrap_peer_key(keys_cache, peer_hash, user, base_url) do
     if Map.has_key?(keys_cache, peer_hash) do
       keys_cache
@@ -542,10 +559,10 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   end
 
   defp fetch_reactions_and_receipts(socket) do
-    %{selected_dialog: dialog_hash, msg_keys_cache: keys_cache} = socket.assigns
+    %{selected_dialog: dialog_hash, msg_keys_cache: keys_cache, user: user} = socket.assigns
     base_url = get_base_url(socket)
 
-    {reactions, logs1} = fetch_and_decrypt_reactions(dialog_hash, keys_cache, base_url)
+    {reactions, logs1} = fetch_and_decrypt_reactions(dialog_hash, keys_cache, user, base_url)
     {receipts, logs2} = fetch_and_parse_receipts(dialog_hash, base_url)
 
     socket
@@ -553,9 +570,16 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
     |> update(:request_log, &(&1 ++ logs1 ++ logs2))
   end
 
-  defp fetch_and_decrypt_reactions(dialog_hash, keys_cache, base_url) do
+  defp fetch_and_decrypt_reactions(dialog_hash, keys_cache, user, base_url) do
     case ApiClient.fetch_reactions(dialog_hash, base_url) do
       {:ok, %{reactions: raw, log_entries: logs}} ->
+        keys_cache =
+          raw
+          |> Enum.map(& &1["reactor_hash"])
+          |> Enum.uniq()
+          |> Enum.reject(&Map.has_key?(keys_cache, &1))
+          |> Enum.reduce(keys_cache, &maybe_unwrap_peer_key(&2, &1, user, base_url))
+
         {Crypto.group_reactions_by_message(raw, keys_cache), logs}
 
       {:error, %{log_entries: logs}} ->
@@ -589,6 +613,14 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
       end)
 
     if replaced?, do: result, else: result ++ [new_msg]
+  end
+
+  defp refresh_versions_if_expanded(socket, msg_id) do
+    if msg_id in socket.assigns.expanded_versions do
+      fetch_versions(socket, msg_id)
+    else
+      update(socket, :message_versions, &Map.delete(&1, msg_id))
+    end
   end
 
   defp fetch_versions(socket, msg_id) do

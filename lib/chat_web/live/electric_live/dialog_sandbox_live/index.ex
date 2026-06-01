@@ -218,7 +218,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
        |> assign(:compose_text, "")
        |> assign(:refs_tails, %{msg_id => sign_hash})
        |> assign(:operation_in_progress, false)
-       |> update(:request_log, &(&1 ++ logs))}
+       |> update(:request_log, &(&1 ++ logs))
+       |> maybe_start_stream(dialog_hash)}
     else
       {:error, %{reason: reason, log_entries: logs}} ->
         {:noreply,
@@ -462,6 +463,13 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
 
   # --- Private ---
 
+  defp maybe_start_stream(socket, dialog_hash) do
+    case socket.assigns.sync_status do
+      :idle -> start_dialog_stream(socket, dialog_hash)
+      _ -> socket
+    end
+  end
+
   defp start_dialog_stream(socket, dialog_hash) do
     socket = stop_dialog_stream(socket)
     base_url = get_base_url(socket)
@@ -527,15 +535,30 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   end
 
   defp ensure_sender_keys(socket, raw_msgs) do
-    %{user: user} = socket.assigns
+    %{user: user, dialogs: dialogs, selected_dialog: selected_dialog} = socket.assigns
     base_url = get_base_url(socket)
+    dialog = Enum.find(dialogs, &(&1.dialog_hash == selected_dialog))
 
     raw_msgs
     |> Enum.map(& &1["sender_hash"])
     |> Enum.uniq()
     |> Enum.reject(&Map.has_key?(socket.assigns.msg_keys_cache, &1))
     |> Enum.reduce(socket, fn sender_hash, socket ->
-      keys_cache = maybe_unwrap_peer_key(socket.assigns.msg_keys_cache, sender_hash, user, base_url)
+      keys_cache =
+        if sender_hash == user.user_hash && dialog do
+          my_key =
+            Crypto.derive_sender_msg_key(
+              user.sign_skey,
+              user.crypt_skey,
+              user.contact_skey,
+              dialog.peer_hash
+            )
+
+          Map.put(socket.assigns.msg_keys_cache, user.user_hash, my_key)
+        else
+          maybe_unwrap_peer_key(socket.assigns.msg_keys_cache, sender_hash, user, base_url)
+        end
+
       assign(socket, :msg_keys_cache, keys_cache)
     end)
   end

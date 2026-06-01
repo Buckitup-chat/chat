@@ -12,11 +12,28 @@ straightforward as possible.
 
 ### Added
 
-- Post-quantum dialog sandbox: synced dialog with encryption and API client
-
 ### Changed
 
 ### Fixed
+
+## 2026-06-01_6347b55\_\_\_2026-06-01_ce41f61e
+
+### Added
+
+- Post-quantum dialog sandbox: message history, editing, deletion, receipts, reactions, and self-key management
+- Post-quantum dialog: content support, shape lists, and reaction keys
+- Post-quantum file sandbox: content type rendering
+
+### Changed
+
+- Post-quantum files: queued chunks upload
+- Electric LiveView index refactoring
+- Time keeper refactoring
+
+### Fixed
+
+- Post-quantum files: network sync bytea[] handling
+- [platform] Electric: retry on SD card start issues
 
 ## 2026-05-21_ea9a53e\_\_\_2026-05-23_2166c7d4
 

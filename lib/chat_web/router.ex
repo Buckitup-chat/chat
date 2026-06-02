@@ -40,6 +40,12 @@ defmodule ChatWeb.Router do
     plug ChatWeb.Plugs.PreferSSL
   end
 
+  scope "/", ChatWeb, host: "www." do
+    pipe_through :browser
+    get "/", FrontendController, :app
+    get "/*path", FrontendController, :app
+  end
+
   scope "/", ChatWeb do
     pipe_through :browser
 

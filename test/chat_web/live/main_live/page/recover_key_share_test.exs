@@ -15,7 +15,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShareTest do
 
   describe "user recover the key" do
     test "render component", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/")
+      {:ok, view, _html} = live(conn, "/trusted")
 
       render_hook(view, "restoreAuth")
 
@@ -76,7 +76,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShareTest do
   end
 
   defp render_form(conn) do
-    {:ok, view, _html} = live(conn, "/")
+    {:ok, view, _html} = live(conn, "/trusted")
 
     render_hook(view, "restoreAuth")
 

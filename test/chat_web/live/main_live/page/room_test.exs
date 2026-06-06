@@ -35,9 +35,9 @@ defmodule ChatWeb.MainLive.Page.RoomTest do
       %{view: _view} = close_sharelink_modal(%{view: view})
 
       %{view: view, socket: %{assigns: new_assigns}} =
-        login_by_key(%{conn: conn}, "/room/" <> link_hash)
+        login_by_key(%{conn: conn}, "/trusted/room/" <> link_hash)
 
-      assert "/" = assert_patch(view)
+      assert "/trusted" = assert_patch(view)
       assert room_pub_key == new_assigns.room.pub_key
       assert [_room] = new_assigns.joined_rooms
       assert true = new_assigns.is_room_linked?
@@ -51,7 +51,7 @@ defmodule ChatWeb.MainLive.Page.RoomTest do
       link_hash = "randomULTRAMEGAPWERLINK12345"
 
       %{view: view, socket: %{assigns: assigns}} =
-        login_by_key(%{conn: conn}, "/room/" <> link_hash)
+        login_by_key(%{conn: conn}, "/trusted/room/" <> link_hash)
 
       assert link_hash == assigns.room_message_link_hash
       assert [] = assigns.joined_rooms

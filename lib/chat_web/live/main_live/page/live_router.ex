@@ -12,13 +12,13 @@ defmodule ChatWeb.MainLive.Page.LiveRouter do
         socket |> Page.Room.init_with_linked_message(hash)
 
       %{live_action: :chats} ->
-        Process.send_after(self(), {:push_patch, "/"}, 250)
+        Process.send_after(self(), {:push_patch, "/trusted"}, 250)
 
         socket
         |> Page.Lobby.switch_lobby_mode("chats")
 
       %{live_action: :rooms} ->
-        Process.send_after(self(), {:push_patch, "/"}, 250)
+        Process.send_after(self(), {:push_patch, "/trusted"}, 250)
 
         socket
         |> Page.Lobby.switch_lobby_mode("rooms")

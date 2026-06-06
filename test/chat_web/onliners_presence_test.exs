@@ -26,7 +26,7 @@ defmodule ChatWeb.OnlinersPresenceTest do
   end
 
   test "doesn't list users that are not logged in", %{conn: conn} do
-    {:ok, _view, _html} = live(conn, "/")
+    {:ok, _view, _html} = live(conn, "/trusted")
 
     assert Presence.list("onliners_sync") |> Enum.empty?()
   end

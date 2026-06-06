@@ -82,15 +82,17 @@ defmodule ChatWeb.Router do
     get "/get/device_log/:key", TempSyncController, :device_log
     # coveralls-ignore-stop
 
-    live_session :default, on_mount: {ChatWeb.Hooks.SafariSessionHook, :default} do
-      live "/", MainLive.Index, :index
-      live "/chats", MainLive.Index, :chats
-      live "/rooms", MainLive.Index, :rooms
-      live "/room/:hash", MainLive.Index, :room_message_link
-      live "/chat/:hash", MainLive.Index, :chat_link
-      live "/export-key-ring/:id", MainLive.Index, :export
+    scope "/trusted" do
+      live_session :default, on_mount: {ChatWeb.Hooks.SafariSessionHook, :default} do
+        live "/", MainLive.Index, :index
+        live "/chats", MainLive.Index, :chats
+        live "/rooms", MainLive.Index, :rooms
+        live "/room/:hash", MainLive.Index, :room_message_link
+        live "/chat/:hash", MainLive.Index, :chat_link
+        live "/export-key-ring/:id", MainLive.Index, :export
 
-      live "/proxy/:address/", ProxyLive.Index, :proxy
+        live "/proxy/:address/", ProxyLive.Index, :proxy
+      end
     end
 
     # Electric-synced LiveViews (read-only, real-time via PostgreSQL logical replication)
@@ -120,12 +122,12 @@ defmodule ChatWeb.Router do
       live "/electric/dialog_sandbox", ElectricLive.DialogSandboxLive.Index, :index
     end
 
-    get "/login", FrontendController, :index
-    get "/account", FrontendController, :index
-    get "/account/:action", FrontendController, :index
-    get "/backup", FrontendController, :index
-    get "/backup/:action", FrontendController, :index
-    get "/contact/:id", FrontendController, :index
+    # get "/login", FrontendController, :index
+    # get "/account", FrontendController, :index
+    # get "/account/:action", FrontendController, :index
+    # get "/backup", FrontendController, :index
+    # get "/backup/:action", FrontendController, :index
+    # get "/contact/:id", FrontendController, :index
   end
 
   scope "/", ChatWeb do

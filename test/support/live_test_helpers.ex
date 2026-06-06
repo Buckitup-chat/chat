@@ -14,7 +14,7 @@ defmodule ChatWeb.LiveTestHelpers do
 
   @spec prepare_view(%{conn: Plug.Conn.t()}) :: %{socket: Socket.t(), view: view()}
   def prepare_view(%{conn: conn}, name \\ "User") do
-    {:ok, view, _html} = live(conn, "/")
+    {:ok, view, _html} = live(conn, "/trusted")
 
     render_hook(view, "restoreAuth")
 
@@ -372,7 +372,7 @@ defmodule ChatWeb.LiveTestHelpers do
   end
 
   @spec login_by_key(%{conn: Plug.Conn.t()}, String.t()) :: %{socket: Socket.t(), view: view()}
-  def login_by_key(%{conn: conn}, path \\ "/") do
+  def login_by_key(%{conn: conn}, path \\ "/trusted") do
     {:ok, view, _html} = live(conn, path)
 
     render_hook(view, "restoreAuth")

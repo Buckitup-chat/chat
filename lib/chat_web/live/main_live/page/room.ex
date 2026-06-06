@@ -100,7 +100,7 @@ defmodule ChatWeb.MainLive.Page.Room do
       |> init({identity, room})
       |> load_messages_to({msg_index, msg_id})
       |> send_js(open_content())
-      |> push_patch(to: "/")
+      |> push_patch(to: "/trusted")
     else
       _ ->
         socket
@@ -526,7 +526,8 @@ defmodule ChatWeb.MainLive.Page.Room do
 
   def share_message_link_modal(%{assigns: %{}} = socket, msg_id, component) do
     message_url =
-      [ChatWeb.Endpoint.url(), "room", RoomMessageLinks.link_hash(msg_id)] |> Path.join()
+      [ChatWeb.Endpoint.url(), "trusted", "room", RoomMessageLinks.link_hash(msg_id)]
+      |> Path.join()
 
     socket
     |> open_modal(component, %{

@@ -60,10 +60,10 @@ defmodule ChatWeb.MainLive.Page.Dialog do
     |> assign(:message_update_mode, :replace)
     |> assign_messages()
     |> send_js(open_content())
-    |> push_patch(to: "/")
+    |> push_patch(to: "/trusted")
   rescue
     _ ->
-      socket |> push_patch(to: "/")
+      socket |> push_patch(to: "/trusted")
   end
 
   def load_more_messages(%{assigns: %{page: page}} = socket) do
@@ -395,7 +395,7 @@ defmodule ChatWeb.MainLive.Page.Dialog do
   end
 
   def show_link_modal(%{assigns: %{}} = socket, hash, component) do
-    chat_url = [ChatWeb.Endpoint.url(), "chat", hash] |> Path.join()
+    chat_url = [ChatWeb.Endpoint.url(), "trusted", "chat", hash] |> Path.join()
 
     socket
     |> open_modal(component, %{url: chat_url, encoded_qr_code: Utils.qr_base64_from_url(chat_url)})

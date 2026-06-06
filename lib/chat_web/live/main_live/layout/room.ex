@@ -131,7 +131,7 @@ defmodule ChatWeb.MainLive.Layout.Room do
         <span class="text-white text-6xl block"><span>4  0  4</span></span>
         <span class="text-white text-xl">Not found</span>
         <.link
-          patch={~p"/"}
+          patch={~p"/trusted"}
           class="mt-5 flex flex-row items-center justify-center border rounded-lg border-white h-11 z-10"
         >
           <.icon id="arrowBack" class="pl-1 mr-1 w-4 h-4 flex fill-white" />

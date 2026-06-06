@@ -8,7 +8,7 @@ defmodule ChatWeb.Hooks.UploaderHookTest do
 
   describe "on_mount/4" do
     test "allows file upload", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/")
+      {:ok, view, _html} = live(conn, "/trusted")
 
       state = :sys.get_state(view.pid)
       assert state.socket.assigns.uploads.file

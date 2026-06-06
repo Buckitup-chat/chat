@@ -355,15 +355,15 @@ onMounted(async () => {
 
 const navigateToHome = () => {
 	// Change the browser location to `/` and reload the page
-	window.location.href = '/';
+	window.location.href = '/trusted';
 };
 
 const navigateToRooms = () => {
-	window.location.href = 'https://buckitup.xyz/rooms';
+	window.location.href = 'https://buckitup.xyz/trusted/rooms';
 };
 
 const navigateToChats = () => {
-	window.location.href = 'https://buckitup.xyz/chats';
+	window.location.href = 'https://buckitup.xyz/trusted/chats';
 };
 
 watch(

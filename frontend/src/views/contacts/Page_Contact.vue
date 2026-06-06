@@ -84,7 +84,7 @@ onMounted(async () => {
 });
 
 const goToChat = async () => {
-	window.location.href = `https://buckitup.xyz/chat/${contact.value.publicKey}`;
+	window.location.href = `https://buckitup.xyz/trusted/chat/${contact.value.publicKey}`;
 };
 
 const contact = computed(() => {

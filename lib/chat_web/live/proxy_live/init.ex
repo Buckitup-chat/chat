@@ -37,13 +37,13 @@ defmodule ChatWeb.ProxyLive.Init do
        |> RoomMapState.derive()}
     end)
   rescue
-    _ -> {:halt, socket |> push_navigate(to: ~p"/")}
+    _ -> {:halt, socket |> push_navigate(to: ~p"/trusted")}
   end
 
   def extract_address(socket, params) do
     case params do
       %{"address" => address} -> {:cont, socket |> set_private(:server, address)}
-      _ -> {:halt, socket |> push_navigate(to: ~p"/")}
+      _ -> {:halt, socket |> push_navigate(to: ~p"/trusted")}
     end
   end
 

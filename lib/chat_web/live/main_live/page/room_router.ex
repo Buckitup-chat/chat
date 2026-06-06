@@ -12,7 +12,7 @@ defmodule ChatWeb.MainLive.Page.RoomRouter do
   #
 
   def event(%{assigns: %{need_login: true}} = socket, _event) do
-    socket |> push_navigate(to: "/")
+    socket |> push_navigate(to: "/trusted")
   end
 
   def event(socket, event) do

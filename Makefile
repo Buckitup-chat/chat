@@ -75,6 +75,14 @@ frontend:
 	mix assets.setup
 	mix assets.build
 
+CHAT_FRONTEND_DIR ?= ../chat-frontend
+DOMAIN ?= localhost:4444
+frontend-build:
+	cd $(CHAT_FRONTEND_DIR) && npm install --legacy-peer-deps && DOMAIN=$(DOMAIN) npm run build
+	rm -rf priv/static/app
+	cp -r $(CHAT_FRONTEND_DIR)/dist priv/static/app
+frontend-update: frontend-build
+
 deploy:
 	git push gigalixir 
 

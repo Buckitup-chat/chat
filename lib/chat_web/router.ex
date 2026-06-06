@@ -40,12 +40,6 @@ defmodule ChatWeb.Router do
     plug ChatWeb.Plugs.PreferSSL
   end
 
-  scope "/", ChatWeb, host: "www." do
-    pipe_through :browser
-    get "/", FrontendController, :app
-    get "/*path", FrontendController, :app
-  end
-
   scope "/", ChatWeb do
     pipe_through :browser
 
@@ -214,6 +208,12 @@ defmodule ChatWeb.Router do
     pipe_through ChatWeb.Plugs.ElectricTableGuard
 
     forward "/", ChatWeb.Plugs.HexToBase64Electric
+  end
+
+  scope "/", ChatWeb do
+    pipe_through :browser
+    get "/", FrontendController, :app
+    get "/*path", FrontendController, :app
   end
 
   # Other scopes may use custom stacks.

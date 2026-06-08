@@ -138,7 +138,7 @@ async function handleUpload() {
         syncMetadata: { relation: 'file_chunks' }
       };
 
-      await ingest(state.baseUrl, [mutation], state.keys.sign_skey, addLogEntry);
+      await ingest(state.baseUrl, [mutation], state.keys.sign_skey, addLogEntry, { duplicateIsSuccess: true });
       chunkSignatures.push(signB64);
     }
 

@@ -1,4 +1,4 @@
-import { signMlDsa87, uint8ToBase64Unpadded, base64ToUint8 } from './crypto.js';
+import { signMlDsa87, uint8ToBase64Unpadded } from './crypto.js';
 
 const textEncoder = new TextEncoder();
 
@@ -24,6 +24,8 @@ export async function getChallenge(baseUrl) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const INGEST_TIMEOUT_MS = 50_000;
+
 // Statuses worth retrying: backpressure (429/503 from the ingest throttle),
 // expired challenge (401 — a fresh one is fetched on the next attempt), and
 // transient server/proxy errors. 4xx like 400/403/409/422 are permanent.
@@ -31,6 +33,12 @@ function isRetryableStatus(status) {
   return status === 401 || status === 408 || status === 425 ||
     status === 429 || status === 500 || status === 502 ||
     status === 503 || status === 504;
+}
+
+function isDuplicateKeyError(body) {
+  return body?.error === 'validation_failed' &&
+    Array.isArray(body?.details?.file_id) &&
+    body.details.file_id.some(msg => /already been taken/i.test(msg));
 }
 
 // Honor a server Retry-After header (seconds) when present; otherwise use
@@ -51,12 +59,13 @@ function backoffMs(attempt) {
  * POST mutations to the ingest endpoint, fetching a fresh single-use challenge
  * for each attempt. Retries on backpressure (429/503), challenge expiry (401),
  * transient 5xx, and network errors with exponential backoff (honoring
- * Retry-After). Throws on permanent errors or once `maxAttempts` is exhausted —
- * so a transient failure no longer abandons the whole upload (which previously
- * left orphaned chunks and never-finalized files).
+ * Retry-After). Aborts the POST after 50s so a slow upload doesn't outlive the
+ * server-side challenge TTL (60s). Throws on permanent errors or once
+ * `maxAttempts` is exhausted.
  */
 export async function ingest(baseUrl, mutations, signSkey, logger, opts = {}) {
   const maxAttempts = opts.maxAttempts ?? 6;
+  const duplicateIsOk = opts.duplicateIsSuccess ?? false;
   let lastError;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -76,16 +85,23 @@ export async function ingest(baseUrl, mutations, signSkey, logger, opts = {}) {
         }
       };
 
+      const abort = new AbortController();
+      const timer = setTimeout(() => abort.abort(), INGEST_TIMEOUT_MS);
+
       const resp = await fetch(`${baseUrl}/electric/v1/ingest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: abort.signal
       });
+      clearTimeout(timer);
 
       const body = await resp.json().catch(() => ({ error: 'unparseable response' }));
       if (logger) logger('POST', `${baseUrl}/electric/v1/ingest`, payload, body, resp.status);
 
       if (resp.ok) return body;
+
+      if (resp.status === 422 && duplicateIsOk && isDuplicateKeyError(body)) return body;
 
       const httpError = new Error(`Ingest failed (${resp.status}): ${JSON.stringify(body)}`);
       if (!isRetryableStatus(resp.status)) {
@@ -97,8 +113,6 @@ export async function ingest(baseUrl, mutations, signSkey, logger, opts = {}) {
       if (attempt === maxAttempts) throw httpError;
       await sleep(retryDelayMs(resp, attempt));
     } catch (e) {
-      // Non-retryable HTTP errors give up immediately; network/fetch
-      // rejections fall through to a backoff retry.
       if (e.permanent || attempt === maxAttempts) throw e;
       lastError = e;
       await sleep(backoffMs(attempt));

@@ -24,6 +24,7 @@ chat-*.tar
 
 # Ignore assets that are produced by build tools.
 /priv/static/assets/
+/priv/static/app/
 /priv/static/frontend/
 /priv/static/*.gz
 /priv/certs/

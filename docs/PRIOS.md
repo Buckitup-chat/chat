@@ -12,4 +12,4 @@
 14. Fix bugs
 15. Update SQL structure
 1. Deal with upload speed
-
+2. Update .xyz (+ BE -> /trusted)

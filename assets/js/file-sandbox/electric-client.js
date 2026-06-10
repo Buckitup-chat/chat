@@ -63,19 +63,38 @@ function backoffMs(attempt) {
  * server-side challenge TTL (60s). Throws on permanent errors or once
  * `maxAttempts` is exhausted.
  */
+function extractChallenge(resp) {
+  const id = resp.headers.get('x-challenge-id');
+  const challenge = resp.headers.get('x-challenge');
+  if (id && challenge) return { challenge_id: id, challenge };
+  return null;
+}
+
 export async function ingest(baseUrl, mutations, signSkey, logger, opts = {}) {
   const maxAttempts = opts.maxAttempts ?? 6;
   const duplicateIsOk = opts.duplicateIsSuccess ?? false;
+  const timing = { challenge_ms: 0, challenge_sign_ms: 0, post_ms: 0, attempts: 0 };
+  let prefetched = opts.challenge ?? null;
   let lastError;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    timing.attempts = attempt;
     try {
-      const challengeResp = await getChallenge(baseUrl);
-      if (logger) logger('GET', `${baseUrl}/electric/v1/challenge`, null, challengeResp, 200);
+      let challengeResp;
+      const t0 = performance.now();
+      if (prefetched) {
+        challengeResp = prefetched;
+        prefetched = null;
+      } else {
+        challengeResp = await getChallenge(baseUrl);
+        if (logger) logger('GET', `${baseUrl}/electric/v1/challenge`, null, challengeResp, 200);
+      }
+      const t1 = performance.now();
 
       const challengeBytes = textEncoder.encode(challengeResp.challenge);
       const signature = signMlDsa87(challengeBytes, signSkey);
       const signatureB64 = uint8ToBase64Unpadded(signature);
+      const t2 = performance.now();
 
       const payload = {
         mutations,
@@ -95,13 +114,20 @@ export async function ingest(baseUrl, mutations, signSkey, logger, opts = {}) {
         signal: abort.signal
       });
       clearTimeout(timer);
+      const t3 = performance.now();
 
+      timing.challenge_ms = t1 - t0;
+      timing.challenge_sign_ms = t2 - t1;
+      timing.post_ms = t3 - t2;
+
+      const nextChallenge = extractChallenge(resp);
       const body = await resp.json().catch(() => ({ error: 'unparseable response' }));
       if (logger) logger('POST', `${baseUrl}/electric/v1/ingest`, payload, body, resp.status);
 
-      if (resp.ok) return body;
+      if (resp.ok) return { ...body, _timing: timing, _nextChallenge: nextChallenge };
 
-      if (resp.status === 422 && duplicateIsOk && isDuplicateKeyError(body)) return body;
+      if (resp.status === 422 && duplicateIsOk && isDuplicateKeyError(body))
+        return { ...body, _timing: timing, _nextChallenge: nextChallenge };
 
       const httpError = new Error(`Ingest failed (${resp.status}): ${JSON.stringify(body)}`);
       if (!isRetryableStatus(resp.status)) {

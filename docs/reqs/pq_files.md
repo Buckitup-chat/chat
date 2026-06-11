@@ -2,6 +2,8 @@
 
 Constraints, design, and schema for storing large files on BuckitUp platform devices. All chunk data lives in PostgreSQL — no filesystem storage. See also [PostgreSQL Constraints](pg_constraints.md) for TOAST, WAL amplification, and VACUUM considerations affecting large-value columns.
 
+> **Migration planned (protocol v2)**: chunk blobs are moving out of PostgreSQL into filesystem storage as raw bytes — base64 leaves the chunk protocol entirely; manifests stay in PG/Electric. See [§14 Migration Plan](#14-migration-plan-chunk-blobs--filesystem-protocol-v2-raw-bytes). Sections 1-13 describe the current (all-in-PG, base64) design.
+
 ## 1. Tables
 
 ### 1.1 `files` (Electric-synced)
@@ -297,3 +299,112 @@ ALTER TABLE file_chunks SET (
 - **WAL sizing**: `max_wal_size = 512 MB` to accommodate concurrent 4 MB chunk uploads with write amplification.
 - **Hash algorithm**: SHA3-512 — matches `EnigmaPq.hash/1`, same Keccak family as ML-DSA-87's internal SHAKE-256. 64-byte output is acceptable at 4 MB chunk size (1 TB = 256K entries = 16 MB manifest).
 - **Electric chunk re-delivery**: when `file_chunks` arrive before the `files` manifest, the device skips them. On `files` manifest arrival, if any chunks are missing, fetch them via a targeted Electric shape with a WHERE filter (`file_id = $1 AND chunk_index IN (...)`) — no full re-sync needed.
+
+## 14. Migration Plan: Chunk Blobs → Filesystem (Protocol v2, raw bytes)
+
+Move chunk payloads out of PostgreSQL onto the filesystem **and drop base64 from the chunk protocol end-to-end**. Manifests (`files`, `file_chunks` minus the blob, `upload_chunks`) stay in PG and in the Electric publication — coordination remains Electric's job; bytes move at filesystem speed, written once, raw.
+
+Clients are at PoC stage, so this is a deliberate breaking protocol change (v2). Going raw eliminates a standing hazard: base64 is not canonical (padding, alphabets), and today the signature hashes one base64 representation while Electric/JSON transport may re-encode another. With raw bytes there is exactly one representation to hash, sign, store, and serve.
+
+### 14.1 Motivation (measured on device)
+
+Benchmark on RPi4 (50 × 4 MiB incompressible blob inserts through `Chat.Repo`, `STORAGE EXTERNAL`, one commit per insert):
+
+| Metric | Logged table | Unlogged table |
+|---|---|---|
+| Time per 4 MiB insert | 1100 ms (~3.6 MB/s) | 754 ms (~5.4 MB/s) |
+| WAL generated | 214 MB per 208 MB data (1:1) | ~0 |
+
+Findings that drive this plan:
+
+- **WAL costs +46% time and 2x flash wear** per chunk — and since the platform runs PG with `fsync=off`, `synchronous_commit=off`, `full_page_writes=off` (`platform/lib/platform/tools/postgres/lifecycle.ex`), WAL buys **no power-loss durability** in exchange. Its only remaining value for blobs is logical replication transport.
+- **`wal_compression=on` is a no-op** for our payloads: encrypted chunks are high-entropy; measured WAL ratio is exactly 1:1.
+- **Base64 adds +33% on top of everything**: a 4 MB encrypted chunk is ~5.3 MB as `data_b64`, paid on disk, in WAL, in replication, and on the wire — in both directions.
+- **Total write amplification today**: ~5.3 MB heap+TOAST + ~5.3 MB WAL per 4 MB chunk ≈ 2.7x, before any replication re-write. A 100 MB upload causes a ~270 MB device write burst against `max_wal_size`, forcing continuous checkpoints that stall all other writers.
+- Existing workarounds are symptoms of this design: `ElectricIngestThrottle` (multi-MB JSON ingest payloads), aggressive autovacuum overrides on `file_chunks` (§9.2), batched GC deletes, doubled `max_wal_size` (§9.3).
+
+What does **not** change: client-side encryption (§2), the manifest trust model (`files` binds chunks via `chunk_sign_hashes`, §1.1), upload resume semantics, GC triggers (§8).
+
+### 14.2 Protocol v2 Changes
+
+| Aspect | v1 (current, §1-13) | v2 |
+|---|---|---|
+| Chunk payload at rest | `data_b64` BYTEA in PG (base64 text) | Raw encrypted bytes in FS file |
+| Signed hash | `SHA3-512(data_b64)` (over base64) | `SHA3-512(raw encrypted bytes)` |
+| Chunk upload | JSON ingest, base64 in payload | `PUT /electric/v1/file_chunk/:file_id/:chunk_index`, raw `application/octet-stream` body |
+| Chunk download | base64 bytes as octet-stream | raw bytes as octet-stream (-25% wire) |
+| `files` manifest upload | JSON ingest | unchanged (JSON ingest) |
+| `file_chunks` schema | includes `data_b64` | manifest-only + new `data_hash` column |
+
+**v2 `file_chunks` (manifest)**: `file_id`, `chunk_index`, `data_hash` (BYTEA, `SHA3-512(raw)` — stored explicitly so fetch/read verification never parses signatures), `size`, `uploader_hash`, `owner_timestamp`, `sign_b64`. PK `(file_id, chunk_index)`. Rows shrink from ~5.3 MB to ~5 KB (dominated by the ML-DSA-87 signature), so the table stays in the Electric publication for free. Signature payload becomes `(file_id, chunk_index, data_hash, size, uploader_hash, owner_timestamp)` — same shape as v1, hash now over raw bytes. `files.chunk_sign_hashes` binding (`SHA3-512(chunk.sign_b64)`) is untouched.
+
+**Chunk upload endpoint** (replaces §4's "no dedicated file upload endpoints" for chunks): raw body, metadata + signature + PoP challenge in headers. Server: verify signature → `ChunkStore.put` → insert `file_chunks` manifest + `upload_chunks` rows in one transaction. No multi-MB JSON parsing, no base64 decode, no Writer overhead on the hot path — `ElectricIngestThrottle` becomes unnecessary. FS write happens before the PG transaction commits; if the transaction rolls back, the orphan file is reclaimed by GC (§14.5).
+
+### 14.3 Target Architecture
+
+```
+  PUT chunk (raw) ──verify sig──> ChunkStore (FS, raw bytes)
+                       └────────> file_chunks manifest + upload_chunks ─┐
+  ingest (JSON) ──verify────────> files manifest ───────────────────────┤
+                                                                        ▼
+                                                            PG / Electric publication
+                                                                        │
+  GET /file_chunk ◄── send_file ── ChunkStore ◄── ChunkFetcher ◄── manifest sync (peers)
+```
+
+**`Chat.Data.File.ChunkStore`** (new, `Chat.FileFs`-style):
+
+- Path layout: `<data_dir>/pq_files/<file_id[0..1]>/<file_id>/<chunk_index>` (two-char shard keeps directories small for FAT/exFAT drives).
+- Content: raw encrypted bytes, exactly what `data_hash` covers — one representation everywhere.
+- Writes: temp file + `rename/2`; free-space check before write (reject upload with 413).
+- API mirrors usage sites: `put(file_id, idx, bin)`, `fetch(file_id, idx)`, `exists?/2`, `delete_file(file_id)`, `stream/3` for ranged reads (video seeking, pq_video_streaming.md §6, becomes `send_file` offset/length).
+
+**Download path**: `FileChunkController.show/2` serves from `ChunkStore` via `send_file` (zero-copy: no TOAST reassembly, no BEAM blob copy, no base64). Client verifies `SHA3-512(raw)` against the manifest and decrypts directly.
+
+**Device-to-device sync**: manifest rows arrive via Electric/`ShapeWriter` with the same §5 filtering. Since rows no longer carry bytes, a new **`ChunkFetcher`** worker fills the gap: when a verified manifest row is written and `ChunkStore.exists?/2` is false, it queues `GET /electric/v1/file_chunk/...` against the peer that served the shape, verifies the body against `data_hash`, and stores the file. Fetches are sequential with bounded retry — bulk bytes stop competing with Electric's WAL pipeline. "File available" (§5.3) becomes: manifest complete **and** all chunk files present.
+
+### 14.4 Migration Steps (PoC cutover — no backfill)
+
+Existing chunk data is PoC-stage and disposable; v1 signatures hash base64 bytes and cannot be re-signed server-side, so legacy rows are dropped rather than converted.
+
+| Step | Change |
+|---|---|
+| M1 | Ship `ChunkStore`, v2 validation (`data_hash` over raw), `PUT`/`GET` chunk endpoints, `ChunkFetcher` |
+| M2 | Migration: add `data_hash`, drop `data_b64`, `TRUNCATE file_chunks, upload_chunks`; mark or clear orphaned `files` rows (re-upload as needed) |
+| M3 | Switch SPA upload/download to v2 (raw PUT, raw GET, raw hashing) |
+| M4 | Revert PG accommodations: `max_wal_size` back to 256 MB, drop autovacuum overrides on `file_chunks` (§9.2 obsolete — rows are small now), remove `ElectricIngestThrottle` |
+
+If some deployment turns out to need its v1 data: one-off script decodes `data_b64` → ChunkStore, sets `data_hash = SHA3-512(raw)`, and re-verification of those rows uses the legacy rule (`SHA3-512(base64(raw))` against `sign_b64`). Kept out of the main plan deliberately.
+
+### 14.5 Failure Modes
+
+| Failure | Mitigation |
+|---|---|
+| Crash mid-FS-write | Temp-file + rename; GC sweeps `*.tmp` older than 1 h |
+| PG txn rolls back after FS write | Orphan file with no manifest row; GC sweep deletes FS entries with no `file_chunks` row after a 2-day grace (mirrors §8 trigger 2) |
+| FS file lost/corrupt (SD bitrot) | `data_hash` check on read/fetch; on mismatch delete + re-fetch via `ChunkFetcher` if a peer has it; else surface file as incomplete. Today's PG path has **no** integrity check on read — strict improvement |
+| Power loss | At parity or better: PG with `fsync=off` risks whole-cluster corruption; FS loses at most in-flight chunk files, which are re-fetchable |
+| FAT/exFAT semantics (weak rename atomicity, no dir fsync) | Accepted — equivalent risk class to current `fsync=off` PG. §10.2's "FAT limitations are irrelevant" no longer holds; the 2-level shard keeps per-directory entry counts low |
+| Disk full | `ChunkStore.put` checks free space and fails the upload cleanly (413); GC unaffected |
+| Peer unavailable during `ChunkFetcher` pull | Bounded retry with backoff; missing chunks re-queued when the peer's shape reconnects |
+
+### 14.6 Expected Gains
+
+Per 100 MB upload (26 chunks):
+
+| | v1 (PG + base64) | v2 (FS, raw) |
+|---|---|---|
+| Bytes on the wire (up + down) | ~133 MB each way | 100 MB each way |
+| Device bytes written | ~270 MB (heap+TOAST + WAL, base64) | 100 MB (raw file, written once) |
+| WAL burst | ~133 MB → checkpoint storm | ~130 KB (manifest rows) |
+| Ingest write speed (measured class) | ~3.6 MB/s | raw storage speed (≥2x) |
+| Dead-tuple bloat per deleted file | ~133 MB TOAST awaiting vacuum | `rm -r` of one directory |
+
+Secondary effects: Electric stops parsing multi-MB WAL records; recovery time shrinks (WAL stays small — the stated goal of `recovery_optimized_settings`); `pg_dump`/healing of the chunk DB becomes proportional to metadata, not content; one hash representation kills the base64-canonicalization bug class; browser saves a base64 decode per chunk.
+
+### 14.7 Open Questions
+
+- **Peer addressing for `ChunkFetcher`**: single-peer topologies can reuse the shape source address; multi-peer needs a chunk-availability hint (possibly a column on `files` or probing peers in order).
+- **Backup story**: drive backup tooling must now include `<data_dir>/pq_files` alongside the PG data dir.
+- **PoP on the binary endpoint**: reuse the challenge flow from ingest via headers, or accept the chunk signature itself as proof (it covers uploader + monotonic timestamp). Needs a decision before M1.
+- **`upload_chunks` and budget queries (§1.3)**: unchanged — sizes live in manifest rows; only the blob moved.

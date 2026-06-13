@@ -10,6 +10,7 @@ defmodule ChatWeb.FileChunkController do
   alias EnigmaPq
 
   @max_chunk_body 5_242_880
+  @min_free_bytes 50_000_000
 
   def show(conn, %{"file_id" => file_id, "chunk_index" => chunk_index_str}) do
     with {chunk_index, ""} <- Integer.parse(chunk_index_str),
@@ -32,6 +33,7 @@ defmodule ChatWeb.FileChunkController do
          :ok <- check_file_not_deleted(file_id, headers.uploader_hash),
          chunk = build_chunk(file_id, chunk_index, headers),
          :ok <- Integrity.verify_signature(chunk),
+         :ok <- check_free_space(headers.size),
          {:ok, body, conn} <- read_chunk_body(conn),
          :ok <- verify_body_hash(body, headers.data_hash),
          :ok <- verify_body_size(body, headers.size),
@@ -53,6 +55,9 @@ defmodule ChatWeb.FileChunkController do
 
       {:error, :size_mismatch} ->
         send_resp(conn, 422, Jason.encode!(%{error: "body size mismatch"}))
+
+      {:error, :insufficient_space} ->
+        send_resp(conn, 413, Jason.encode!(%{error: "insufficient disk space"}))
 
       {:error, :body_too_large} ->
         send_resp(conn, 413, Jason.encode!(%{error: "chunk too large"}))
@@ -99,6 +104,14 @@ defmodule ChatWeb.FileChunkController do
       owner_timestamp: headers.owner_timestamp,
       sign_b64: headers.sign_b64
     }
+  end
+
+  defp check_free_space(chunk_size) do
+    case ChunkStore.available_space() do
+      {:ok, free} when free > chunk_size + @min_free_bytes -> :ok
+      {:ok, _} -> {:error, :insufficient_space}
+      {:error, _} -> :ok
+    end
   end
 
   defp check_file_not_deleted(file_id, uploader_hash) do

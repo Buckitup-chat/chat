@@ -32,6 +32,11 @@ defmodule Chat.Data.Shapes.Shape do
       +--------v---------+
       | sync_persist/2   |---> {:ok, _} | {:error, _}
       +------------------+
+               |
+      +--------v---------+
+      | sync_after_      |     (default: :ok)
+      |   persist/3      |---> opts include peer_url when from peer sync
+      +------------------+
 
       +------------------+     HTTP ingestion pipeline
       | ingest_configure_|     (ElectricController)
@@ -56,6 +61,8 @@ defmodule Chat.Data.Shapes.Shape do
 
   @callback sync_persist(operation(), struct()) :: {:ok, term()} | {:error, term()}
 
+  @callback sync_after_persist(operation(), struct(), keyword()) :: :ok
+
   @callback ingest_configure_writer(Phoenix.Sync.Writer.t(), map()) :: Phoenix.Sync.Writer.t()
 
   defmacro __using__(_opts) do
@@ -71,7 +78,13 @@ defmodule Chat.Data.Shapes.Shape do
       @impl true
       def sync_derive_fields(value), do: value
 
-      defoverridable versions_schema: 0, sync_validate_parent: 2, sync_derive_fields: 1
+      @impl true
+      def sync_after_persist(_operation, _struct, _opts), do: :ok
+
+      defoverridable versions_schema: 0,
+                     sync_validate_parent: 2,
+                     sync_derive_fields: 1,
+                     sync_after_persist: 3
     end
   end
 end

@@ -91,7 +91,8 @@ defmodule Chat.Application do
   if Application.compile_env(:chat, :env) == :test do
     defp more_children, do: []
   else
-    defp more_children, do: [Chat.Data.File.GC, Chat.Upload.StaleUploadsPruner]
+    defp more_children,
+      do: [Chat.Data.File.GC, Chat.Data.File.ChunkFetcher, Chat.Upload.StaleUploadsPruner]
   end
 
   # Tell Phoenix to update the endpoint configuration

@@ -43,7 +43,10 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriter do
         value
         |> shape_mod.sync_derive_fields()
         |> then(&shape_mod.sync_persist(operation, &1))
-        |> tap_ok(&notify_deferred_children(shape_name, &1))
+        |> tap_ok(fn result ->
+          shape_mod.sync_after_persist(operation, result, opts)
+          notify_deferred_children(shape_name, result)
+        end)
 
       {:skip, missing_parents} ->
         maybe_defer(shape_name, operation, value, missing_parents, opts)

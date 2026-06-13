@@ -16,20 +16,50 @@ defmodule Chat.Data.File.ChunkStore do
     end
   end
 
-  def exists?(file_id, chunk_index) do
-    file_id |> chunk_path(chunk_index) |> File.exists?()
-  end
-
   def fetch(file_id, chunk_index) do
     file_id |> chunk_path(chunk_index) |> File.read()
   end
 
   def delete_file(file_id) do
-    file_id |> file_dir() |> File.rm_rf!()
+    file_id |> file_dir() |> File.rm_rf()
     :ok
   end
 
-  def chunk_path(file_id, chunk_index) do
+  def sweep_tmp_files(max_age_ms) do
+    cutoff = System.os_time(:millisecond) - max_age_ms
+
+    base_dir()
+    |> Path.join("**/*.tmp")
+    |> Path.wildcard()
+    |> Enum.each(fn path ->
+      case File.stat(path, time: :posix) do
+        {:ok, %{mtime: mtime}} when mtime * 1000 < cutoff -> File.rm(path)
+        _ -> :ok
+      end
+    end)
+  end
+
+  def available_space do
+    path = base_dir()
+
+    case System.cmd("df", ["-B1", "--output=avail", path], stderr_to_stdout: true) do
+      {output, 0} ->
+        output
+        |> String.split("\n", trim: true)
+        |> List.last()
+        |> String.trim()
+        |> Integer.parse()
+        |> case do
+          {bytes, _} -> {:ok, bytes}
+          :error -> {:error, :parse_error}
+        end
+
+      _ ->
+        {:error, :df_failed}
+    end
+  end
+
+  defp chunk_path(file_id, chunk_index) do
     pad_index = chunk_index |> to_string() |> String.pad_leading(@index_padding, "0")
 
     Path.join(file_dir(file_id), pad_index)

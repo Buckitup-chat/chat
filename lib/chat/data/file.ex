@@ -6,6 +6,7 @@ defmodule Chat.Data.File do
 
   alias Chat.Data.Schemas.File
   alias Chat.Data.Schemas.FileChunk
+  alias Chat.Data.Schemas.MissingChunk
   alias Chat.Data.Schemas.UploadChunk
 
   def get_file(file_id) do
@@ -34,7 +35,26 @@ defmodule Chat.Data.File do
     )
   end
 
-  def update_file(existing, new_file) do
+  defp file_upsert_query do
+    from(f in File,
+      update: [
+        set: [
+          total_size: fragment("EXCLUDED.total_size"),
+          chunk_size: fragment("EXCLUDED.chunk_size"),
+          chunk_count: fragment("EXCLUDED.chunk_count"),
+          chunk_sign_hashes: fragment("EXCLUDED.chunk_sign_hashes"),
+          deleted_flag: fragment("EXCLUDED.deleted_flag"),
+          owner_timestamp: fragment("EXCLUDED.owner_timestamp"),
+          sign_b64: fragment("EXCLUDED.sign_b64")
+        ]
+      ],
+      where:
+        is_nil(f.owner_timestamp) or
+          f.owner_timestamp < fragment("EXCLUDED.owner_timestamp")
+    )
+  end
+
+  def update_file(%File{} = existing, %File{} = new_file) do
     existing
     |> File.delete_changeset(Map.from_struct(new_file))
     |> repo().update()
@@ -109,22 +129,62 @@ defmodule Chat.Data.File do
     |> repo().delete_all()
   end
 
-  defp file_upsert_query do
-    from(f in File,
-      update: [
-        set: [
-          total_size: fragment("EXCLUDED.total_size"),
-          chunk_size: fragment("EXCLUDED.chunk_size"),
-          chunk_count: fragment("EXCLUDED.chunk_count"),
-          chunk_sign_hashes: fragment("EXCLUDED.chunk_sign_hashes"),
-          deleted_flag: fragment("EXCLUDED.deleted_flag"),
-          owner_timestamp: fragment("EXCLUDED.owner_timestamp"),
-          sign_b64: fragment("EXCLUDED.sign_b64")
-        ]
-      ],
-      where:
-        is_nil(f.owner_timestamp) or
-          f.owner_timestamp < fragment("EXCLUDED.owner_timestamp")
+  # --- MissingChunks ---
+
+  def insert_missing_chunks_placeholders(file_id, chunk_count, peer_url, now_unix) do
+    rows =
+      for idx <- 0..(chunk_count - 1) do
+        %{
+          file_id: file_id,
+          chunk_index: idx,
+          data_hash: nil,
+          size: nil,
+          peer_url: peer_url,
+          attempts: 0,
+          updated_at: now_unix
+        }
+      end
+
+    repo().insert_all(MissingChunk, rows, on_conflict: :nothing)
+  end
+
+  def fill_missing_chunk(file_id, chunk_index, data_hash, size) do
+    from(m in MissingChunk,
+      where: m.file_id == ^file_id and m.chunk_index == ^chunk_index
     )
+    |> repo().update_all(set: [data_hash: data_hash, size: size])
+  end
+
+  def delete_missing_chunk(file_id, chunk_index) do
+    from(m in MissingChunk,
+      where: m.file_id == ^file_id and m.chunk_index == ^chunk_index
+    )
+    |> repo().delete_all()
+  end
+
+  def delete_missing_chunks_for_file(file_id) do
+    from(m in MissingChunk, where: m.file_id == ^file_id)
+    |> repo().delete_all()
+  end
+
+  def fetchable_missing_chunks(limit, max_attempts \\ 10) do
+    from(m in MissingChunk,
+      where: not is_nil(m.data_hash) and m.attempts < ^max_attempts,
+      order_by: [asc: m.attempts, asc: m.updated_at],
+      limit: ^limit
+    )
+    |> repo().all()
+  end
+
+  def increment_missing_chunk_attempts(file_id, chunk_index, now_unix) do
+    from(m in MissingChunk,
+      where: m.file_id == ^file_id and m.chunk_index == ^chunk_index
+    )
+    |> repo().update_all(inc: [attempts: 1], set: [updated_at: now_unix])
+  end
+
+  def missing_chunk_count(file_id) do
+    from(m in MissingChunk, where: m.file_id == ^file_id, select: count())
+    |> repo().one()
   end
 end

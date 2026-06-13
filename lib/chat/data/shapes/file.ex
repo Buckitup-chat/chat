@@ -7,6 +7,7 @@ defmodule Chat.Data.Shapes.File do
   alias Chat.Data.File, as: FileData
   alias Chat.Data.File.Validation
   alias Chat.Data.Schemas.File
+  alias Chat.TimeKeeper
   alias Phoenix.Sync.Writer
 
   @impl true
@@ -66,17 +67,48 @@ defmodule Chat.Data.Shapes.File do
   end
 
   defp persist_update(file) do
-    with existing when not is_nil(existing) <- FileData.get_file(file.file_id),
-         %{valid?: true} <- Validation.validate_file_update(existing, file) do
-      FileData.update_file(existing, file)
-    else
+    case FileData.get_file(file.file_id) do
       nil ->
         {:ok, file}
+
+      existing ->
+        existing
+        |> Validation.validate_file_update(file)
+        |> apply_update(existing, file)
+    end
+  end
+
+  defp apply_update(changeset, existing, file) do
+    case changeset do
+      %{valid?: true} ->
+        FileData.update_file(existing, file)
 
       %{valid?: false} = cs ->
         log("Invalid file update signature: #{inspect(cs.errors)}", :warning)
         {:ok, file}
     end
+  end
+
+  @impl true
+  def sync_after_persist(operation, struct, opts) do
+    case {operation, struct, Keyword.get(opts, :peer_url)} do
+      {:insert, %File{} = file, peer_url} when is_binary(peer_url) ->
+        preseed_missing_chunks(file, peer_url)
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp preseed_missing_chunks(%File{file_id: file_id, chunk_count: chunk_count}, peer_url) do
+    FileData.insert_missing_chunks_placeholders(
+      file_id,
+      chunk_count,
+      peer_url,
+      TimeKeeper.now_unix()
+    )
+
+    :ok
   end
 
   @impl true

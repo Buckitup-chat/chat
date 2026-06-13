@@ -34,7 +34,7 @@
   <header class="bg-white border-b px-6 py-4 flex items-center justify-between">
     <div>
       <h1 class="text-2xl font-bold text-gray-900">File Sandbox</h1>
-      <p class="text-sm text-gray-600 mt-1">Client-side file upload/download with AES-256-GCM encryption + ML-DSA-87 signing</p>
+      <p class="text-sm text-gray-600 mt-1">Client-side file upload/download with AES-256-GCM encryption + ML-DSA-87 signing (binary PUT)</p>
     </div>
     <a href="/electric" class="text-sm text-blue-600 hover:text-blue-800">← Electric Index</a>
   </header>
@@ -54,8 +54,8 @@
           <ol class="list-decimal list-inside space-y-1 text-sm">
             <li>Import ML-DSA-87 keys (from user sandbox export)</li>
             <li>Select file → chunk into 4 MB pieces</li>
-            <li>For each chunk: encrypt (AES-256-GCM), sign (ML-DSA-87)</li>
-            <li>GET challenge, sign it, POST chunk mutation with auth to ingest</li>
+            <li>For each chunk: encrypt (AES-256-GCM), hash (SHA3-512), sign (ML-DSA-87)</li>
+            <li>PUT binary chunk to <code>/electric/v1/file_chunk/:file_id/:chunk_index</code> with metadata in headers</li>
             <li>Build manifest with chunk_sign_hashes, sign, POST to ingest</li>
             <li>Save the encryption secret for later download</li>
           </ol>
@@ -81,7 +81,7 @@
         <div class="doc-content">
           <pre>file_id        TEXT        "f_" + UUID
 chunk_index    INTEGER     0-based position
-data_b64       BYTEA       nonce(12)||ciphertext||tag(16)
+data_hash      TEXT        "fd_" + hex(SHA3-512(encrypted))
 size           INTEGER     encrypted chunk byte size
 uploader_hash  TEXT        "u_" + hex(SHA3-512(sign_pkey))
 owner_timestamp BIGINT     monotonic counter
@@ -137,12 +137,26 @@ sign_b64          BYTEA     ML-DSA-87 signature</pre>
       </div>
 
       <div class="doc-section">
-        <h4>Challenge-Response Auth</h4>
+        <h4>Chunk Upload (Binary PUT)</h4>
+        <div class="doc-content">
+          <p class="text-sm">PUT raw encrypted bytes to <code>/electric/v1/file_chunk/:file_id/:chunk_index</code></p>
+          <p class="text-sm mt-1">Headers:</p>
+          <pre>X-Data-Hash        "fd_" + hex(SHA3-512(body))
+X-Size             byte_size(body)
+X-Uploader-Hash    "u_" + hex(SHA3-512(sign_pkey))
+X-Owner-Timestamp  monotonic counter
+X-Signature        Base64(ML-DSA-87 signature)</pre>
+          <p class="text-sm mt-1">Server verifies signature, body hash, and size before storing.</p>
+        </div>
+      </div>
+
+      <div class="doc-section">
+        <h4>Challenge-Response Auth (Manifest)</h4>
         <div class="doc-content">
           <ol class="list-decimal list-inside space-y-1 text-sm">
             <li>GET <code>/electric/v1/challenge</code> → <code>{challenge, challenge_id}</code></li>
             <li>Sign challenge string with ML-DSA-87</li>
-            <li>POST to <code>/electric/v1/ingest</code> with mutations + auth payload</li>
+            <li>POST to <code>/electric/v1/ingest</code> with manifest mutation + auth payload</li>
           </ol>
         </div>
       </div>

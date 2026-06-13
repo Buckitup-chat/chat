@@ -1,10 +1,10 @@
 import {
-  base64ToUint8, uint8ToBase64Unpadded, uint8ToBase64Padded,
+  base64ToUint8, uint8ToBase64Unpadded,
   uint8ToHex, hexToUint8,
   signMlDsa87, hash, encryptChunk, decryptChunk,
   buildSignaturePayload
 } from './file-sandbox/crypto.js';
-import { ingest, getChallenge, fetchShape, fetchShapeWhere } from './file-sandbox/electric-client.js';
+import { ingest, putChunk, fetchShape, fetchShapeWhere } from './file-sandbox/electric-client.js';
 import { chunkFile, generateFileId, generateEncSecret } from './file-sandbox/file-chunker.js';
 import { VideoSWStreamer } from './file-sandbox/video-sw-streamer.js';
 import {
@@ -104,87 +104,72 @@ async function handleUpload() {
     let baseTimestamp = Math.floor(Date.now() / 1000);
 
     const chunkSignatures = [];
-    const uploadTiming = { encrypt: 0, sign_payload: 0, sign: 0, base64: 0, challenge: 0, challenge_sign: 0, post: 0, retries: 0 };
+    const uploadTiming = { encrypt: 0, hash: 0, sign_payload: 0, sign: 0, put: 0, retries: 0 };
     const uploadStart = performance.now();
 
-    function prepareMutation(i) {
+    async function prepareChunk(i) {
       let t0 = performance.now();
-      const encrypted = encryptChunk(chunks[i], encSecret);
-      return encrypted.then(enc => {
-        uploadTiming.encrypt += performance.now() - t0;
+      const enc = await encryptChunk(chunks[i], encSecret);
+      uploadTiming.encrypt += performance.now() - t0;
 
-        const ownerTimestamp = baseTimestamp + i;
+      const ownerTimestamp = baseTimestamp + i;
 
-        t0 = performance.now();
-        const signableFields = {
-          chunk_index: i,
-          data_b64: enc,
-          file_id: fileId,
-          owner_timestamp: ownerTimestamp,
-          size: enc.length,
-          uploader_hash: userHash
-        };
-        const payloadStr = buildSignaturePayload(signableFields);
-        const payloadBytes = textEncoder.encode(payloadStr);
-        uploadTiming.sign_payload += performance.now() - t0;
+      t0 = performance.now();
+      const dataHashBytes = hash(enc);
+      const dataHash = 'fd_' + uint8ToHex(dataHashBytes);
+      uploadTiming.hash += performance.now() - t0;
 
-        t0 = performance.now();
-        const signB64 = signMlDsa87(payloadBytes, state.keys.sign_skey);
-        uploadTiming.sign += performance.now() - t0;
+      t0 = performance.now();
+      const signableFields = {
+        chunk_index: i,
+        data_hash: dataHash,
+        file_id: fileId,
+        owner_timestamp: ownerTimestamp,
+        size: enc.length,
+        uploader_hash: userHash
+      };
+      const payloadStr = buildSignaturePayload(signableFields);
+      const payloadBytes = textEncoder.encode(payloadStr);
+      uploadTiming.sign_payload += performance.now() - t0;
 
-        t0 = performance.now();
-        const mutation = {
-          type: 'insert',
-          modified: {
-            file_id: fileId,
-            chunk_index: i,
-            data_b64: uint8ToBase64Unpadded(enc),
-            size: enc.length,
-            uploader_hash: userHash,
-            owner_timestamp: ownerTimestamp,
-            sign_b64: uint8ToBase64Unpadded(signB64)
-          },
-          syncMetadata: { relation: 'file_chunks' }
-        };
-        uploadTiming.base64 += performance.now() - t0;
+      t0 = performance.now();
+      const signB64 = signMlDsa87(payloadBytes, state.keys.sign_skey);
+      uploadTiming.sign += performance.now() - t0;
 
-        return { mutation, signB64 };
-      });
+      return { enc, dataHash, ownerTimestamp, signB64 };
     }
 
-    let challenge = await getChallenge(state.baseUrl);
     let pendingUpload = null;
 
     for (let i = 0; i < chunks.length; i++) {
       updateProgress(i, chunks.length, 'Encrypting & uploading');
 
-      const { mutation, signB64 } = await prepareMutation(i);
+      const { enc, dataHash, ownerTimestamp, signB64 } = await prepareChunk(i);
 
       if (pendingUpload) {
         const result = await pendingUpload;
         if (result._timing) {
-          uploadTiming.challenge += result._timing.challenge_ms;
-          uploadTiming.challenge_sign += result._timing.challenge_sign_ms;
-          uploadTiming.post += result._timing.post_ms;
+          uploadTiming.put += result._timing.put_ms;
           if (result._timing.attempts > 1) uploadTiming.retries += result._timing.attempts - 1;
         }
-        if (result._nextChallenge) challenge = result._nextChallenge;
       }
 
-      pendingUpload = ingest(state.baseUrl, [mutation], state.keys.sign_skey, addLogEntry, {
-        duplicateIsSuccess: true,
-        challenge
-      });
+      const headers = {
+        'X-Data-Hash': dataHash,
+        'X-Size': String(enc.length),
+        'X-Uploader-Hash': userHash,
+        'X-Owner-Timestamp': String(ownerTimestamp),
+        'X-Signature': uint8ToBase64Unpadded(signB64)
+      };
 
+      pendingUpload = putChunk(state.baseUrl, fileId, i, enc, headers, addLogEntry);
       chunkSignatures.push(signB64);
     }
 
     if (pendingUpload) {
       const result = await pendingUpload;
       if (result._timing) {
-        uploadTiming.challenge += result._timing.challenge_ms;
-        uploadTiming.challenge_sign += result._timing.challenge_sign_ms;
-        uploadTiming.post += result._timing.post_ms;
+        uploadTiming.put += result._timing.put_ms;
         if (result._timing.attempts > 1) uploadTiming.retries += result._timing.attempts - 1;
       }
     }
@@ -239,12 +224,10 @@ async function handleUpload() {
       `Upload timing for ${file.name} (${formatBytes(file.size)}, ${chunks.length} chunks):`,
       `  Total:            ${r(totalMs)}ms (${(totalMs / 1000).toFixed(1)}s)`,
       `  Encrypt:          ${r(uploadTiming.encrypt)}ms (${pct(uploadTiming.encrypt)}%)`,
+      `  Hash:             ${r(uploadTiming.hash)}ms (${pct(uploadTiming.hash)}%)`,
       `  Sign payload:     ${r(uploadTiming.sign_payload)}ms (${pct(uploadTiming.sign_payload)}%)`,
       `  Chunk sign:       ${r(uploadTiming.sign)}ms (${pct(uploadTiming.sign)}%)`,
-      `  Base64 encode:    ${r(uploadTiming.base64)}ms (${pct(uploadTiming.base64)}%)`,
-      `  Challenge fetch:  ${r(uploadTiming.challenge)}ms (${pct(uploadTiming.challenge)}%)`,
-      `  Challenge sign:   ${r(uploadTiming.challenge_sign)}ms (${pct(uploadTiming.challenge_sign)}%)`,
-      `  Ingest POST:      ${r(uploadTiming.post)}ms (${pct(uploadTiming.post)}%)`,
+      `  PUT chunk:        ${r(uploadTiming.put)}ms (${pct(uploadTiming.put)}%)`,
       `  Manifest:         ${r(manifestMs)}ms (${pct(manifestMs)}%)`,
       `  Retries:          ${uploadTiming.retries}`,
       `  Avg per chunk:    ${r(totalMs / chunks.length)}ms`,
@@ -253,12 +236,10 @@ async function handleUpload() {
     console.log(timingReport);
     console.table({
       'Encrypt': { ms: r(uploadTiming.encrypt), '%': pct(uploadTiming.encrypt) },
+      'Hash (SHA3-512)': { ms: r(uploadTiming.hash), '%': pct(uploadTiming.hash) },
       'Sign payload build': { ms: r(uploadTiming.sign_payload), '%': pct(uploadTiming.sign_payload) },
       'Chunk sign (ML-DSA87)': { ms: r(uploadTiming.sign), '%': pct(uploadTiming.sign) },
-      'Base64 encode': { ms: r(uploadTiming.base64), '%': pct(uploadTiming.base64) },
-      'Challenge fetch': { ms: r(uploadTiming.challenge), '%': pct(uploadTiming.challenge) },
-      'Challenge sign (ML-DSA87)': { ms: r(uploadTiming.challenge_sign), '%': pct(uploadTiming.challenge_sign) },
-      'Ingest POST': { ms: r(uploadTiming.post), '%': pct(uploadTiming.post) },
+      'PUT chunk': { ms: r(uploadTiming.put), '%': pct(uploadTiming.put) },
       'Manifest': { ms: r(manifestMs), '%': pct(manifestMs) },
     });
 

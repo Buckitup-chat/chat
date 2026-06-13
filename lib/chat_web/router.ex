@@ -35,6 +35,19 @@ defmodule ChatWeb.Router do
     plug :accepts, ["json", "event-stream"]
   end
 
+  pipeline :chunk_upload do
+    plug CORSPlug,
+      origin: "*",
+      headers: [
+        "content-type",
+        "x-data-hash",
+        "x-size",
+        "x-uploader-hash",
+        "x-owner-timestamp",
+        "x-signature"
+      ]
+  end
+
   pipeline :upload do
     plug CORSPlug, origin: "*"
     plug ChatWeb.Plugs.PreferSSL
@@ -160,6 +173,14 @@ defmodule ChatWeb.Router do
     post "/put", StorageApiController, :put
     post "/put-many", StorageApiController, :put_many
     get "/dump", StorageApiController, :dump
+  end
+
+  scope "/electric/v1", ChatWeb do
+    pipe_through :chunk_upload
+    pipe_through ChatWeb.Plugs.ElectricReadiness
+
+    options "/file_chunk/:file_id/:chunk_index", FileChunkController, :options
+    put "/file_chunk/:file_id/:chunk_index", FileChunkController, :create
   end
 
   scope "/electric/v1", ChatWeb do

@@ -41,25 +41,18 @@ defmodule Chat.Data.File do
   end
 
   def insert_file_chunk(changeset) do
-    # log: false — the changeset carries the ~4 MB base64 chunk blob; logging
-    # the query serializes that payload through the Logger and holds the DB
-    # connection for seconds under concurrent uploads.
     repo().insert(changeset,
       on_conflict: :nothing,
-      conflict_target: [:file_id, :chunk_index],
-      log: false
+      conflict_target: [:file_id, :chunk_index]
     )
   end
 
   def insert_upload_chunk(attrs) do
-    # log: false — same upload path as insert_file_chunk/1; keep the ingest
-    # request out of the synchronous-logging hot path.
     %UploadChunk{}
     |> UploadChunk.create_changeset(attrs)
     |> repo().insert(
       on_conflict: :nothing,
-      conflict_target: [:file_id, :chunk_index],
-      log: false
+      conflict_target: [:file_id, :chunk_index]
     )
   end
 

@@ -4,6 +4,7 @@ defmodule Chat.Data.Schemas.FileChunk do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias Chat.Data.Types.FileChunkDataHash
   alias Chat.Data.Types.FileId
   alias Chat.Data.Types.UserHash
 
@@ -12,7 +13,7 @@ defmodule Chat.Data.Schemas.FileChunk do
   @create_fields [
     :file_id,
     :chunk_index,
-    :data_b64,
+    :data_hash,
     :size,
     :uploader_hash,
     :owner_timestamp,
@@ -23,7 +24,7 @@ defmodule Chat.Data.Schemas.FileChunk do
   schema "file_chunks" do
     field(:file_id, FileId, primary_key: true)
     field(:chunk_index, :integer, primary_key: true)
-    field(:data_b64, :binary)
+    field(:data_hash, FileChunkDataHash)
     field(:size, :integer)
     field(:uploader_hash, UserHash)
     field(:owner_timestamp, :integer)

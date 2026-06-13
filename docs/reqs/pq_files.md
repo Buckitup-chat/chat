@@ -365,21 +365,27 @@ What does **not** change: client-side encryption (§2), the manifest trust model
 
 **Device-to-device sync**: manifest rows arrive via Electric/`ShapeWriter` with the same §5 filtering. Since rows no longer carry bytes, the gap is tracked explicitly in a local table and drained by a new **`ChunkFetcher`** worker.
 
-**`missing_chunks` (local only, NOT Electric-synced)**: ShapeWriter inserts a row when it accepts a verified chunk manifest row whose bytes are absent (`ChunkStore.exists?/2` false); the row is deleted when the bytes are admitted to the store, or when the file is deleted.
+**`missing_chunks` (local only, NOT Electric-synced)**: tracks every chunk that does not yet have bytes in `ChunkStore`. Rows enter the table at two points and leave when bytes are admitted or the file is deleted.
+
+**Population (two-stage pre-seed):**
+1. **`files` manifest arrives from a remote peer** → ShapeWriter inserts `chunk_count` rows (indices `0..chunk_count-1`) with `data_hash = NULL`, `size = NULL`. These are **placeholders** — they mark expected chunks whose manifest metadata hasn't arrived yet. The file immediately has a non-zero `missing_chunks` count, preventing the false-availability window (§14.7.1).
+2. **`file_chunks` manifest row arrives** → ShapeWriter updates the matching `missing_chunks` row: fills in `data_hash` and `size`. The row is now **fetchable** by ChunkFetcher.
+
+The uploading device does not populate `missing_chunks` — it writes bytes to `ChunkStore` during upload, so all chunks are present locally when the `files` manifest is committed.
 
 | Column | Type | Description |
 |---|---|---|
 | `file_id` | TEXT | Parent file |
 | `chunk_index` | INTEGER | Position in file |
-| `data_hash` | TEXT | `fd_`-prefixed hash — verifies the fetched body |
-| `size` | INTEGER | Expected byte size |
-| `attempts` | INTEGER | Retry bookkeeping |
-| `updated_at` | BIGINT | Last attempt (TimeKeeper) |
+| `data_hash` | TEXT, NULL | `fd_`-prefixed hash — NULL while `file_chunks` manifest row hasn't arrived; non-NULL = fetchable |
+| `size` | INTEGER, NULL | Expected byte size — NULL until manifest row arrives |
+| `attempts` | INTEGER, DEFAULT 0 | Retry bookkeeping (ChunkFetcher) |
+| `updated_at` | BIGINT | Last attempt or creation time (TimeKeeper) |
 | | PK | `(file_id, chunk_index)` |
 
-One table, three consumers: it is the **`ChunkFetcher` queue** (request missing chunks from the source peer), the **UI signal** (per-file "missing n of chunk_count" so users see which visible files are not yet fully local), and the **availability check** ("file available", §5.3, = `files` manifest present and zero `missing_chunks` rows for the `file_id`). It is rebuildable at any time by anti-joining chunk manifest rows against the store — corruption-safe.
+One table, three consumers: it is the **`ChunkFetcher` queue** (fetch chunks where `data_hash IS NOT NULL`), the **UI signal** (per-file `COUNT(missing_chunks)` of `chunk_count` — counts both placeholder and fetchable rows, giving an honest "not yet available" from the moment the manifest arrives), and the **availability check** (`files` manifest present AND zero `missing_chunks` rows for the `file_id`). It is rebuildable at any time by anti-joining expected indices (`0..chunk_count-1`) against the store — corruption-safe.
 
-`ChunkFetcher` drains the table: `GET /electric/v1/file_chunk/...` against the peer that served the shape, verify the body against `data_hash`, admit to `ChunkStore`, delete the row. Fetches are sequential with bounded retry (`attempts`/`updated_at`) — bulk bytes stop competing with Electric's WAL pipeline. The table also supports prioritization (e.g., promote chunks a client just requested, fetch in `chunk_index` order for streamability).
+`ChunkFetcher` drains the table: selects rows where `data_hash IS NOT NULL`, fetches `GET /electric/v1/file_chunk/...` against the peer that served the shape, verifies the body against `data_hash`, admits to `ChunkStore`, deletes the row. Rows with `data_hash = NULL` are skipped — they become fetchable when the corresponding `file_chunks` manifest row arrives via Electric. Fetches are sequential with bounded retry (`attempts`/`updated_at`) — bulk bytes stop competing with Electric's WAL pipeline. The table also supports prioritization (e.g., promote chunks a client just requested, fetch in `chunk_index` order for streamability).
 
 **Receiver integrity (any byte source)**: the bytes channel is untrusted by design — integrity is enforced at admission, not in transport. The trust chain: `user_cards.sign_pkey` verifies `files.sign_b64` → trusts `chunk_sign_hashes[]`; a chunk manifest row's `sign_b64` verifies against the uploader key and `SHA3-512(sign_b64)` matches `chunk_sign_hashes[chunk_index]` → trusts that row's `data_hash`; `SHA3-512(chunk file bytes)` matches `data_hash` → trusts the bytes. Chunks may therefore arrive over peer HTTP, drive-to-drive copy (SD ↔ USB), or any other path: `ChunkStore` admits bytes only through a hash-checked `put` — unverified bytes exist only as `*.tmp`, renamed into place after the hash matches. **Presence in the store implies verified.** A chunk file without a verified manifest row is an orphan: never served, reclaimed by GC. Drive imports admit files the same way; verification may run as a background scrub rather than blocking the copy. Behind the device sits the client's own end-to-end check — it re-verifies `data_hash` on download and AES-GCM authentication fails on any corruption — so device-side checks exist for self-healing (bitrot → delete → re-fetch), not as the client's last line of defense.
 
@@ -422,9 +428,87 @@ Per 100 MB upload (26 chunks):
 
 Secondary effects: Electric stops parsing multi-MB WAL records; recovery time shrinks (WAL stays small — the stated goal of `recovery_optimized_settings`); `pg_dump`/healing of the chunk DB becomes proportional to metadata, not content; one hash representation kills the base64-canonicalization bug class; browser saves a base64 decode per chunk.
 
-### 14.7 Open Questions
+### 14.7 File Lifecycle (v2)
+
+```
+Uploading Device                             Receiving Device
+────────────────                             ────────────────
+
+┌──────────────────┐
+│    UPLOADING     │
+│                  │
+│  chunks in       │
+│  upload_chunks   │
+│  + ChunkStore    │
+│  no files row    │
+└────────┬─────────┘
+         │ all chunks uploaded,
+         │ manifest signed & ingested,
+         │ upload_chunks deleted
+         ▼
+┌──────────────────┐
+│    COMMITTED     │
+│                  │                         ┌──────────────────┐
+│  files row       │ ── Electric sync ─────> │  MANIFEST ONLY   │
+│  file_chunks     │    (files row)          │                  │
+│  manifest rows   │                         │  files row       │
+│  bytes in        │                         │  chunk_count     │
+│  ChunkStore      │                         │  placeholder rows│
+│                  │                         │  in missing_chunks│
+└──────────────────┘                         │  (data_hash=NULL)│
+                                             └────────┬─────────┘
+                                                      │ file_chunks manifest
+                                                      │ rows arrive via Electric
+                                                      │ → fill data_hash on
+                                                      │   matching missing_chunks
+                                                      ▼
+                                             ┌──────────────────┐
+                                             │    SYNCING       │
+                                             │                  │
+                                             │  missing_chunks: │
+                                             │   some fetchable │
+                                             │   (data_hash set)│
+                                             │   some pending   │
+                                             │   (data_hash=NULL│
+                                             │  ChunkFetcher    │
+                                             │  pulling bytes   │
+                                             └────────┬─────────┘
+                                                      │ all missing_chunks
+                                                      │ drained (bytes in
+                                                      │ ChunkStore)
+                                                      ▼
+                                             ┌──────────────────┐
+                                             │    AVAILABLE     │
+                                             │                  │
+                                             │  all chunks in   │
+                                             │  ChunkStore      │
+                                             │  0 missing_chunks│
+                                             └──────────────────┘
+```
+
+**Deletion** overlays on any state: client sets `deleted_flag = true` on `files`, GC reclaims chunks (§7, §8).
+
+#### 14.7.1 False-availability window
+
+The §14.3 availability check is: `files` manifest present AND zero `missing_chunks` rows. But `missing_chunks` rows are created by ShapeWriter *as `file_chunks` manifest rows arrive* — not when the `files` manifest arrives. This creates a window where the file appears available:
+
+```
+  files manifest arrives ──> 0 file_chunks manifest rows locally ──> 0 missing_chunks
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                             file looks AVAILABLE here — false positive
+```
+
+The same partial-truth applies while `file_chunks` rows are still arriving: if 10 of 25 manifest rows synced, `missing_chunks` has 10 entries, but 15 chunks aren't tracked yet. A UI showing "15 of 25 synced" would be wrong — it's "0 of 25 synced, 10 known-missing, 15 not-yet-tracked."
+
+The uploading device does not have this problem — it wrote the chunks and the manifest locally in one flow, so all chunks are present before any availability check.
+
+**Resolution: pre-seed `missing_chunks` from `files` manifest (Option B).** When ShapeWriter accepts a `files` row from a remote peer, it immediately inserts `chunk_count` placeholder rows into `missing_chunks` (indices `0..chunk_count-1`, `data_hash = NULL`). The file has a non-zero `missing_chunks` count from the moment its manifest arrives — the false-availability window is eliminated. See updated `missing_chunks` definition in §14.3.
+
+**UI progress**: `missing_chunks` count gives an honest signal at every stage. With `chunk_count` from the `files` row: "available" = 0 missing, "syncing" = N missing. The count includes both placeholder rows (manifest metadata not yet arrived) and fetchable rows (metadata arrived, bytes not yet fetched) — the distinction doesn't matter for the user-facing "X of Y" display.
+
+### 14.8 Open Questions
 
 - **Peer addressing for `ChunkFetcher`**: single-peer topologies can reuse the shape source address; multi-peer needs a chunk-availability hint (possibly a column on `files` or probing peers in order).
-- **Backup story**: drive backup tooling must now include `<data_dir>/pq_files` alongside the PG data dir.
-- ~~**PoP on the binary endpoint**~~: **resolved** — the chunk signature is the proof; no challenge flow on the PUT endpoint (see §14.2 "Upload authentication").
 - **`upload_chunks` and budget queries (§1.3)**: unchanged — sizes live in manifest rows; only the blob moved.
+- ~~**PoP on the binary endpoint**~~: **resolved** — the chunk signature is the proof; no challenge flow on the PUT endpoint (see §14.2 "Upload authentication").
+- ~~**False-availability resolution (§14.7.1)**~~: **resolved** — pre-seed `missing_chunks` with placeholder rows when `files` manifest arrives (Option B). See §14.3 and §14.7.1.

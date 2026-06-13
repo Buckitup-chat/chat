@@ -103,6 +103,15 @@ defmodule Chat.NetworkSynchronization.Electric.FileShapeWriterTest do
       assert [record] = DeferredStore.check_children(:user_card, other_card.user_hash)
       assert record.shape == :file
     end
+
+    defp as_received_from_peer(file) do
+      %{file | chunk_sign_hashes: Enum.map(file.chunk_sign_hashes, &peer_encoded_bytea/1)}
+    end
+
+    # Mirrors how Electric's array decoder double-escapes bytea[] as "\\x<hex>"
+    defp peer_encoded_bytea(binary) do
+      "\\\\x" <> Base.encode16(binary, case: :lower)
+    end
   end
 
   describe "file_chunk" do
@@ -190,7 +199,7 @@ defmodule Chat.NetworkSynchronization.Electric.FileShapeWriterTest do
     end
   end
 
-  # --- Helpers ---
+  # Helpers
 
   defp signed_user_card(identity, attrs \\ %{}) do
     card = identity |> User.extract_pq_card() |> struct(attrs)
@@ -219,16 +228,6 @@ defmodule Chat.NetworkSynchronization.Electric.FileShapeWriterTest do
     %{file | sign_b64: sign_b64}
   end
 
-  defp as_received_from_peer(file) do
-    %{file | chunk_sign_hashes: Enum.map(file.chunk_sign_hashes, &peer_encoded_bytea/1)}
-  end
-
-  # Mirrors how Electric's array decoder leaves a bytea[] element: the raw binary
-  # rendered as double-escaped Postgres array-literal hex ("\\x<hex>").
-  defp peer_encoded_bytea(binary) do
-    "\\\\x" <> Base.encode16(binary, case: :lower)
-  end
-
   defp signed_file_from(file, sign_skey, attrs) do
     updated = struct(file, attrs)
     sign_b64 = updated |> Integrity.signature_payload() |> EnigmaPq.sign(sign_skey)
@@ -236,13 +235,14 @@ defmodule Chat.NetworkSynchronization.Electric.FileShapeWriterTest do
   end
 
   defp signed_file_chunk(identity, user_hash, file_id, index) do
-    data_b64 = :crypto.strong_rand_bytes(100)
+    raw_data = :crypto.strong_rand_bytes(100)
+    data_hash = raw_data |> EnigmaPq.hash() |> Chat.Data.Types.FileChunkDataHash.from_binary()
 
     chunk = %FileChunk{
       file_id: file_id,
       chunk_index: index,
-      data_b64: data_b64,
-      size: byte_size(data_b64),
+      data_hash: data_hash,
+      size: byte_size(raw_data),
       uploader_hash: user_hash,
       owner_timestamp: System.os_time(:millisecond)
     }

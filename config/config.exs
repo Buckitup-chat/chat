@@ -75,7 +75,8 @@ config :chat,
   flags: [],
   writable: :yes,
   env: config_env(),
-  file_chunk_size: 10 * 1024 * 1024
+  file_chunk_size: 10 * 1024 * 1024,
+  ipfs_api_url: "http://127.0.0.1:5001"
 
 config :chat, Chat.Db.ChangeTracker, expire_seconds: 31
 

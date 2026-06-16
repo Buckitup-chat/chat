@@ -6,6 +6,7 @@ defmodule Chat.Data.File.GC do
 
   alias Chat.Data.File, as: FileData
   alias Chat.Data.File.ChunkStore
+  alias Chat.Data.File.IpfsStore
   alias Chat.TimeKeeper
 
   @gc_interval :timer.hours(1)
@@ -45,6 +46,7 @@ defmodule Chat.Data.File.GC do
   end
 
   defp purge_deleted_file(file_id) do
+    delete_ipfs_blocks(file_id)
     count = delete_chunks_in_batches(file_id)
     FileData.delete_missing_chunks_for_file(file_id)
     ChunkStore.delete_file(file_id)
@@ -58,6 +60,7 @@ defmodule Chat.Data.File.GC do
   end
 
   defp purge_stale_upload(file_id) do
+    delete_ipfs_blocks(file_id)
     {uc_count, _} = FileData.delete_upload_chunks_for_file(file_id)
     fc_count = delete_chunks_in_batches(file_id)
     FileData.delete_missing_chunks_for_file(file_id)
@@ -77,6 +80,14 @@ defmodule Chat.Data.File.GC do
 
   defp schedule_gc do
     Process.send_after(self(), :gc, @gc_interval)
+  end
+
+  defp delete_ipfs_blocks(file_id) do
+    FileData.get_file_chunks(file_id)
+    |> Enum.each(fn
+      %{cid: cid} when is_binary(cid) -> IpfsStore.delete(cid)
+      _ -> :ok
+    end)
   end
 
   defp delete_chunks_in_batches(file_id, total \\ 0) do

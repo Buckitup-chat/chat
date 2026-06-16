@@ -3,6 +3,7 @@ defmodule ChatWeb.FileChunkController do
 
   alias Chat.Data.File, as: FileData
   alias Chat.Data.File.ChunkStore
+  alias Chat.Data.File.IpfsStore
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.FileChunk
   alias Chat.Data.Types.FileChunkDataHash
@@ -15,7 +16,7 @@ defmodule ChatWeb.FileChunkController do
   def show(conn, %{"file_id" => file_id, "chunk_index" => chunk_index_str}) do
     with {chunk_index, ""} <- Integer.parse(chunk_index_str),
          %{} = chunk <- FileData.get_file_chunk(file_id, chunk_index),
-         {:ok, data} <- ChunkStore.fetch(file_id, chunk_index) do
+         {:ok, data} <- fetch_chunk_data(chunk, file_id, chunk_index) do
       conn
       |> put_resp_content_type("application/octet-stream")
       |> put_resp_header("x-chunk-size", to_string(chunk.size))
@@ -37,8 +38,8 @@ defmodule ChatWeb.FileChunkController do
          {:ok, body, conn} <- read_chunk_body(conn),
          :ok <- verify_body_hash(body, headers.data_hash),
          :ok <- verify_body_size(body, headers.size),
-         :ok <- ChunkStore.put(file_id, chunk_index, body),
-         {:ok, _} <- persist_chunk(chunk) do
+         {:ok, cid} <- IpfsStore.put(body),
+         {:ok, _} <- persist_chunk(%{chunk | cid: cid}) do
       json(conn, %{status: "ok"})
     else
       {:error, :invalid_signature} ->
@@ -143,6 +144,17 @@ defmodule ChatWeb.FileChunkController do
     if byte_size(body) == expected_size,
       do: :ok,
       else: {:error, :size_mismatch}
+  end
+
+  defp fetch_chunk_data(%{cid: cid}, _file_id, _chunk_index) when is_binary(cid) do
+    case IpfsStore.get(cid) do
+      {:ok, _data} = ok -> ok
+      {:error, _} -> {:error, :enoent}
+    end
+  end
+
+  defp fetch_chunk_data(_chunk, file_id, chunk_index) do
+    ChunkStore.fetch(file_id, chunk_index)
   end
 
   defp persist_chunk(chunk) do

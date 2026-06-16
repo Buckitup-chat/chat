@@ -5,7 +5,7 @@ defmodule Chat.Data.File.ChunkFetcher do
   use Toolbox.OriginLog
 
   alias Chat.Data.File, as: FileData
-  alias Chat.Data.File.ChunkStore
+  alias Chat.Data.File.IpfsStore
   alias Chat.Data.Types.FileChunkDataHash
   alias Chat.TimeKeeper
 
@@ -86,8 +86,9 @@ defmodule Chat.Data.File.ChunkFetcher do
   end
 
   defp store_chunk(missing, body) do
-    case ChunkStore.put(missing.file_id, missing.chunk_index, body) do
-      :ok ->
+    case IpfsStore.put(body) do
+      {:ok, cid} ->
+        FileData.update_file_chunk_cid(missing.file_id, missing.chunk_index, cid)
         FileData.delete_missing_chunk(missing.file_id, missing.chunk_index)
         log("ChunkFetcher: admitted #{missing.file_id}:#{missing.chunk_index}", :debug)
 

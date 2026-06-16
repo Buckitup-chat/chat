@@ -67,6 +67,13 @@ defmodule Chat.Data.File do
     )
   end
 
+  def update_file_chunk_cid(file_id, chunk_index, cid) do
+    from(c in FileChunk,
+      where: c.file_id == ^file_id and c.chunk_index == ^chunk_index
+    )
+    |> repo().update_all(set: [cid: cid])
+  end
+
   def insert_upload_chunk(attrs) do
     %UploadChunk{}
     |> UploadChunk.create_changeset(attrs)

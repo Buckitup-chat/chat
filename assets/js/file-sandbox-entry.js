@@ -13,7 +13,7 @@ import {
   parseContentObject, thumbHashToDataURL
 } from './file-sandbox/content-types.js';
 
-const CHUNK_SIZE = 4_194_304;
+const CHUNK_SIZE = 1_048_576;
 const textEncoder = new TextEncoder();
 
 let state = {

@@ -11,3 +11,4 @@
 
 22. Update .xyz (+ BE -> /trusted)
 23. File on FS: sync from  USB? to USB? 
+24. IPFS: cid generated after sign_b64. cid replacement attack

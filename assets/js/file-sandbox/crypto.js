@@ -77,10 +77,40 @@ export async function decryptChunk(blob, encSecret) {
   return new Uint8Array(plaintext);
 }
 
+// --- CIDv1 (raw codec, SHA-256) ---
+
+const BASE32_LOWER = 'abcdefghijklmnopqrstuvwxyz234567';
+
+function base32lower(bytes) {
+  let bits = 0;
+  let value = 0;
+  let output = '';
+  for (let i = 0; i < bytes.length; i++) {
+    value = (value << 8) | bytes[i];
+    bits += 8;
+    while (bits >= 5) {
+      output += BASE32_LOWER[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) {
+    output += BASE32_LOWER[(value << (5 - bits)) & 31];
+  }
+  return output;
+}
+
+export async function computeCid(data) {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
+  const cidBytes = new Uint8Array(4 + 32);
+  cidBytes[0] = 0x01; // CID version 1
+  cidBytes[1] = 0x55; // raw codec
+  cidBytes[2] = 0x12; // sha2-256 multihash
+  cidBytes[3] = 0x20; // 32 bytes digest length
+  cidBytes.set(digest, 4);
+  return 'b' + base32lower(cidBytes);
+}
+
 // --- Integrity signature payload ---
-// Replicates Chat.Data.Integrity.signature_payload/1 exactly.
-// Fields are sorted alphabetically by key name, each encoded per suffix rules,
-// then concatenated into a single string that gets signed.
 
 export function buildSignaturePayload(fields) {
   const sorted = Object.entries(fields).sort(([a], [b]) => a.localeCompare(b));

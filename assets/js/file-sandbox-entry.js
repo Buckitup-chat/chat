@@ -2,7 +2,7 @@ import {
   base64ToUint8, uint8ToBase64Unpadded,
   uint8ToHex, hexToUint8,
   signMlDsa87, hash, encryptChunk, decryptChunk,
-  buildSignaturePayload
+  buildSignaturePayload, computeCid
 } from './file-sandbox/crypto.js';
 import { ingest, putChunk, fetchShape, fetchShapeWhere } from './file-sandbox/electric-client.js';
 import { chunkFile, generateFileId, generateEncSecret } from './file-sandbox/file-chunker.js';
@@ -104,7 +104,7 @@ async function handleUpload() {
     let baseTimestamp = Math.floor(Date.now() / 1000);
 
     const chunkSignatures = [];
-    const uploadTiming = { encrypt: 0, hash: 0, sign_payload: 0, sign: 0, put: 0, retries: 0 };
+    const uploadTiming = { encrypt: 0, hash: 0, cid: 0, sign_payload: 0, sign: 0, put: 0, retries: 0 };
     const uploadStart = performance.now();
 
     async function prepareChunk(i) {
@@ -120,8 +120,13 @@ async function handleUpload() {
       uploadTiming.hash += performance.now() - t0;
 
       t0 = performance.now();
+      const cid = await computeCid(enc);
+      uploadTiming.cid += performance.now() - t0;
+
+      t0 = performance.now();
       const signableFields = {
         chunk_index: i,
+        cid: cid,
         data_hash: dataHash,
         file_id: fileId,
         owner_timestamp: ownerTimestamp,
@@ -136,7 +141,7 @@ async function handleUpload() {
       const signB64 = signMlDsa87(payloadBytes, state.keys.sign_skey);
       uploadTiming.sign += performance.now() - t0;
 
-      return { enc, dataHash, ownerTimestamp, signB64 };
+      return { enc, cid, dataHash, ownerTimestamp, signB64 };
     }
 
     let pendingUpload = null;
@@ -144,7 +149,7 @@ async function handleUpload() {
     for (let i = 0; i < chunks.length; i++) {
       updateProgress(i, chunks.length, 'Encrypting & uploading');
 
-      const { enc, dataHash, ownerTimestamp, signB64 } = await prepareChunk(i);
+      const { enc, cid, dataHash, ownerTimestamp, signB64 } = await prepareChunk(i);
 
       if (pendingUpload) {
         const result = await pendingUpload;
@@ -155,6 +160,7 @@ async function handleUpload() {
       }
 
       const headers = {
+        'X-Cid': cid,
         'X-Data-Hash': dataHash,
         'X-Size': String(enc.length),
         'X-Uploader-Hash': userHash,
@@ -225,6 +231,7 @@ async function handleUpload() {
       `  Total:            ${r(totalMs)}ms (${(totalMs / 1000).toFixed(1)}s)`,
       `  Encrypt:          ${r(uploadTiming.encrypt)}ms (${pct(uploadTiming.encrypt)}%)`,
       `  Hash:             ${r(uploadTiming.hash)}ms (${pct(uploadTiming.hash)}%)`,
+      `  CID:              ${r(uploadTiming.cid)}ms (${pct(uploadTiming.cid)}%)`,
       `  Sign payload:     ${r(uploadTiming.sign_payload)}ms (${pct(uploadTiming.sign_payload)}%)`,
       `  Chunk sign:       ${r(uploadTiming.sign)}ms (${pct(uploadTiming.sign)}%)`,
       `  PUT chunk:        ${r(uploadTiming.put)}ms (${pct(uploadTiming.put)}%)`,
@@ -237,6 +244,7 @@ async function handleUpload() {
     console.table({
       'Encrypt': { ms: r(uploadTiming.encrypt), '%': pct(uploadTiming.encrypt) },
       'Hash (SHA3-512)': { ms: r(uploadTiming.hash), '%': pct(uploadTiming.hash) },
+      'CID (SHA-256)': { ms: r(uploadTiming.cid), '%': pct(uploadTiming.cid) },
       'Sign payload build': { ms: r(uploadTiming.sign_payload), '%': pct(uploadTiming.sign_payload) },
       'Chunk sign (ML-DSA87)': { ms: r(uploadTiming.sign), '%': pct(uploadTiming.sign) },
       'PUT chunk': { ms: r(uploadTiming.put), '%': pct(uploadTiming.put) },

@@ -1,6 +1,8 @@
 # File Storage — IPFS Chunk Sync
 
-> **DRAFT** — feasibility analysis, not yet implemented. Describes using IPFS as the chunk byte layer for [File Storage](pq_files.md) protocol v2. Prerequisite reading: [pq_files.md §14](pq_files.md#14-migration-plan-chunk-blobs--filesystem-protocol-v2-raw-bytes) (v2 migration plan).
+> Describes using IPFS as the chunk byte layer for [File Storage](pq_files.md) protocol v2. Prerequisite reading: [pq_files.md §14](pq_files.md#14-migration-plan-chunk-blobs--filesystem-protocol-v2-raw-bytes) (v2 migration plan).
+>
+> **Stage 1 implemented** (2026-06-16): upload/download via IPFS + device daemon. See [§16](#16-implementation-status).
 
 ## 1. Motivation
 
@@ -39,12 +41,12 @@ Same as [pq_files.md §14.2](pq_files.md#142-protocol-v2-changes) with `cid` add
 |---|---|---|
 | `file_id` | TEXT, NOT NULL | Parent file reference |
 | `chunk_index` | INTEGER, NOT NULL | 0-based position |
-| `cid` | TEXT, NOT NULL | IPFS CIDv1 (SHA2-256 multihash) — block lookup key |
+| `cid` | TEXT, NOT NULL | IPFS CIDv1 (SHA2-256 multihash) — computed client-side, included in signature |
 | `data_hash` | TEXT, NOT NULL | `"fd_" + lowercase hex SHA3-512(raw)` — trust chain verification |
 | `size` | INTEGER, NOT NULL | Encrypted chunk byte size |
 | `uploader_hash` | TEXT, NOT NULL | FK-like -> user_cards |
 | `owner_timestamp` | BIGINT, NOT NULL | Monotonic counter |
-| `sign_b64` | BYTEA, NOT NULL | Signature over `(file_id, chunk_index, data_hash, size, uploader_hash, owner_timestamp)` |
+| `sign_b64` | BYTEA, NOT NULL | Signature over `(chunk_index, cid, data_hash, file_id, owner_timestamp, size, uploader_hash)` — alphabetical |
 | | PK | `(file_id, chunk_index)` |
 
 Rows are ~5 KB (dominated by ML-DSA-87 signature) — the table stays in the Electric publication.
@@ -85,7 +87,9 @@ Two independent hash functions, clean separation of concerns:
 | `data_hash` | SHA3-512 | Trust chain — bound to ML-DSA-87 signature, verified on admission | `"fd_" + hex` in `file_chunks` |
 | CID | SHA2-256 (multihash) | IPFS block routing — Bitswap exchange, blockstore lookup | CIDv1 string in `file_chunks.cid` |
 
-On chunk admission (any source): compute `SHA3-512(raw bytes)`, verify against `data_hash` from the signed manifest. IPFS independently computes SHA2-256 for the CID. The trust chain ([pq_files.md §14.3](pq_files.md#143-target-architecture) "Receiver integrity") is unchanged — the bytes channel is untrusted by design; integrity is enforced at admission, not in transport.
+**CID is computed client-side** using the Web Crypto API (`crypto.subtle.digest('SHA-256', encrypted_chunk)`) and encoded as a CIDv1 multibase string (base32lower, raw codec). The CID is included in the ML-DSA-87 signature payload alongside other chunk fields, cryptographically binding the IPFS block address to the signed metadata. The server verifies the client-provided CID matches the CID returned by `ipfs block put`.
+
+On chunk admission (any source): compute `SHA3-512(raw bytes)`, verify against `data_hash` from the signed manifest. The trust chain ([pq_files.md §14.3](pq_files.md#143-target-architecture) "Receiver integrity") is unchanged — the bytes channel is untrusted by design; integrity is enforced at admission, not in transport.
 
 ## 5. Upload Protocol
 
@@ -94,13 +98,16 @@ Same as [pq_files.md §14.2](pq_files.md#142-protocol-v2-changes) chunk upload e
 ```
 Client                              Device
   │                                    │
-  │  encrypt chunk, sign metadata      │
-  │─── PUT /electric/v1/file_chunk ───>│  raw body, sig in headers
+  │  encrypt chunk                     │
+  │  SHA2-256(enc) → CID (client)     │
+  │  sign metadata (incl. CID)        │
+  │─── PUT /electric/v1/file_chunk ───>│  raw body, CID + sig in headers
   │       /:file_id/:chunk_index       │
-  │    verify signature (headers)      │
+  │    verify signature (incl. CID)   │
   │    stream body → temp file         │
   │    SHA3-512(body) == data_hash?    │
-  │    ipfs block put → CID            │
+  │    ipfs block put → server CID     │
+  │    client CID == server CID?       │
   │    insert file_chunks (with CID)   │
   │      + upload_chunks in one txn    │
   │<── 200 {txid} ─────────────────────│
@@ -243,29 +250,29 @@ Peer discovery reuses the existing infrastructure: LAN detection (`Chat.NetworkS
 
 ### 9.3 Daemon Management
 
-Follows `Platform.Storage.Pg.Daemon` pattern: `GracefulGenServer` + `MuonTrap.Daemon`, staged readiness polling.
+GenServer + `MuonTrap.Daemon` under a `DynamicSupervisor`, readiness polling via `ipfs id`.
 
 ```
 Platform.Supervisor
-├── Platform.Storage.Ipfs.Daemon   ← starts on boot, repo on SD card
-│     MuonTrap.Daemon: /usr/bin/ipfs daemon --routing=none --migrate
+├── Platform.IpfsDaemonSupervisor  ← DynamicSupervisor for MuonTrap.Daemon
+├── Platform.Storage.Ipfs.Daemon   ← GenServer: init repo, configure, start daemon, poll ready
+│     repo: /root/.ipfs (writable partition)
+│     MuonTrap.Daemon: /bin/ipfs daemon --routing=none --migrate
+│     env: IPFS_PATH=/root/.ipfs LIBP2P_FORCE_PNET=1
 │     readiness: poll `ipfs id` until it returns
 │
 ├── Platform.Drives (DynamicSupervisor)
 │   ├── BootSupervisor (per USB)
 │   │   ├── ... existing stages ...
-│   │   ├── IpfsImporter           ← imports USB blocks into the daemon
+│   │   ├── IpfsImporter           ← imports USB blocks into the daemon (not yet implemented)
 │   │   └── Decider
 ```
 
-The IPFS daemon is device-scoped (not per-drive), so it starts under the main supervisor, not inside the per-drive BootSupervisor.
+The IPFS daemon is device-scoped (not per-drive), so it starts under the main supervisor, not inside the per-drive BootSupervisor. The repo lives on `/root` (writable partition), not on the USB drive.
 
 ### 9.4 Kubo Deployment
 
-| Option | Mechanism | Trade-off |
-|---|---|---|
-| **Pre-built binary** | aarch64 Kubo binary in `bktp_rpi4/configs/rootfs_overlay/usr/bin/ipfs` | Simple; matches ZeroTier pattern; must manually update |
-| **Buildroot package** | Custom `.mk` file using Go toolchain (available in `bktp_rpi4/buildroot-2025.11/package/go/`) | Proper; reproducible; +10-30 min build time |
+Pre-built aarch64 Kubo binary in `platform/rootfs_overlay/bin/ipfs`. Matches the ZeroTier deployment pattern.
 
 ## 10. Garbage Collection
 
@@ -308,48 +315,91 @@ Write performance for chunks is comparable between v2 filesystem and IPFS — bo
 
 ### New modules
 
-| Module | Location | Purpose |
-|---|---|---|
-| `Platform.Storage.Ipfs.Daemon` | `platform/lib/platform/storage/ipfs/daemon.ex` | MuonTrap.Daemon for Kubo |
-| `Platform.Storage.Ipfs.Config` | `platform/lib/platform/storage/ipfs/config.ex` | Private network config, swarm key, resource limits |
-| `Platform.Storage.Ipfs.Swarm` | `platform/lib/platform/storage/ipfs/swarm.ex` | Feed LAN/ZeroTier addresses as IPFS multiaddrs |
-| `Platform.Storage.Ipfs.Importer` | `platform/lib/platform/storage/ipfs/importer.ex` | USB insertion → scan + import blocks |
-| `Platform.Emulator.Drive.IpfsDaemon` | `platform/lib/platform/emulator/drive/ipfs_daemon.ex` | Host-mode bypass |
-| `Chat.Data.File.IpfsStore` | `chat/lib/chat/data/file/ipfs_store.ex` | Elixir HTTP client for IPFS API |
+| Module | Location | Purpose | Status |
+|---|---|---|---|
+| `Platform.Storage.Ipfs.Daemon` | `platform/lib/platform/storage/ipfs/daemon.ex` | GenServer + MuonTrap.Daemon for Kubo on `/root/.ipfs` | **Done** |
+| `Chat.Data.File.IpfsStore` | `chat/lib/chat/data/file/ipfs_store.ex` | Elixir HTTP client for IPFS block API (put/get/delete) | **Done** |
+| `Platform.Storage.Ipfs.Swarm` | `platform/lib/platform/storage/ipfs/swarm.ex` | Feed LAN/ZeroTier addresses as IPFS multiaddrs | Planned |
+| `Platform.Storage.Ipfs.Importer` | `platform/lib/platform/storage/ipfs/importer.ex` | USB insertion → scan + import blocks | Planned |
 
 ### Modified modules
 
-| Module | Change |
-|---|---|
-| `Chat.Data.Schemas.FileChunk` | Add `cid` TEXT; drop `data_b64` |
-| `ChatWeb.FileChunkController` | Serve from IPFS (`ipfs block get`) |
-| Chunk upload endpoint | `ipfs block put` after signature verification |
-| `Chat.Data.File.GC` | Also `ipfs block rm` on deletion |
-| `Chat.Data.Shapes.FileChunk` | Handle `cid` in sync; bridge to IPFS want-list |
-| `Platform.App.Drive.BootSupervisor` | Add `IpfsImporter` stage |
-| `bktp_rpi4` defconfig | Add Kubo binary |
+| Module | Change | Status |
+|---|---|---|
+| `Chat.Data.Schemas.FileChunk` | Add `cid` TEXT field; exclude from `Signable` protocol | **Done** |
+| `ChatWeb.FileChunkController` | Upload: `IpfsStore.put` → CID; download: `IpfsStore.get` by CID, filesystem fallback | **Done** |
+| `Chat.Data.File.ChunkFetcher` | Store fetched chunks via `IpfsStore.put`, update `file_chunks.cid` | **Done** |
+| `Chat.Data.File.GC` | `IpfsStore.delete` per CID before DB row cleanup | **Done** |
+| `Chat.Data.File` | Add `update_file_chunk_cid/3` | **Done** |
+| `Platform.Application` | Add `IpfsDaemonSupervisor` + `Ipfs.Daemon` to target children | **Done** |
+| `chat/config/config.exs` | Add `ipfs_api_url` config | **Done** |
+| `Chat.Data.Shapes.FileChunk` | Fill `missing_chunks.cid` on sync; bridge to IPFS want-list | Planned |
+| `Platform.App.Drive.BootSupervisor` | Add `IpfsImporter` stage | Planned |
 
-### Eliminated (vs v2 filesystem)
+### Migrations
 
-| Component | Replaced by |
-|---|---|
-| `ChunkStore` (filesystem sharding) | IPFS blockstore |
-| `ChunkFetcher` worker | IPFS Bitswap |
-| Multi-peer addressing (open question) | Bitswap (native) |
+| Migration | Description | Status |
+|---|---|---|
+| `20260616120000_add_cid_to_file_chunks` | Add nullable `cid` TEXT column to `file_chunks` | **Done** |
+
+### Eliminated (vs v2 filesystem) — target state
+
+| Component | Replaced by | Status |
+|---|---|---|
+| `ChunkStore` (filesystem sharding) | IPFS blockstore | Transitional: IPFS for new uploads, filesystem fallback for old chunks |
+| `ChunkFetcher` worker | IPFS Bitswap | Transitional: ChunkFetcher uses IpfsStore, Bitswap bridge not yet wired |
+| Multi-peer addressing (open question) | Bitswap (native) | Planned |
 
 ## 14. Open Questions
 
 - **USB block serving strategy**: background import (copies, reliable) vs filestore `--nocopy` (zero-copy, fragile on eject) vs custom datastore plugin. Needs prototyping on real hardware.
 - **GC coordination**: pin/unpin workflow between BuckitUp GC and IPFS repo GC. Must prevent IPFS from collecting referenced blocks or retaining deleted ones.
-- **Kubo deployment**: Buildroot Go package vs pre-built aarch64 binary in rootfs overlay.
 - **Resource budget**: Kubo + PG + BEAM on 4GB RPi4 under concurrent uploads + Electric sync + chat. Needs benchmarking.
-- **Swarm key distribution**: baked into firmware? Shared during device pairing? Per-deployment key?
+- **Swarm key distribution**: baked into firmware? Shared during device pairing? Per-deployment key? Currently auto-generated on first boot per device.
 - **CargoSync adaptation**: existing CargoSync copies CubDB data for offline portable transfers. With IPFS, cargo drives carry blocks — Decider/scenario model may need updating. Does CargoSync remain for CubDB, with IPFS handling chunk bytes separately?
 
-## 15. Recommended Next Steps
+## 15. Next Steps
 
-1. **Prototype Kubo on RPi4**: pre-built aarch64 binary + MuonTrap.Daemon, private network mode, measure idle/active RAM and CPU
+1. ~~**Prototype Kubo on RPi4**: pre-built aarch64 binary + MuonTrap.Daemon, private network mode~~ — **Done** (§16)
 2. **Benchmark `ipfs block put`**: 4MB encrypted blocks on USB/SD storage, compare throughput vs raw `File.write`
 3. **Test USB block import**: measure import speed for a USB with 100 chunk files, try filestore `--nocopy` vs full import
-4. **Spike the bridge**: Electric manifest arrival → IPFS want-list, verify Bitswap fetches blocks between two RPi4s on LAN
-5. **Design migration**: from v1 (PG+base64) to v2+IPFS — schema changes, data truncation (PoC stage), client updates
+4. **Wire Bitswap bridge**: Electric `file_chunks` sync → fill `missing_chunks.cid` → add to IPFS want-list → Bitswap fetches between devices
+5. **Add `IpfsImporter` boot stage**: scan USB drive blocks on insertion, import into device IPFS repo
+6. **Wire swarm peer discovery**: feed LAN/ZeroTier addresses to `ipfs swarm connect`
+
+## 16. Implementation Status
+
+### Stage 1: Upload/Download via IPFS (2026-06-16) — Done
+
+Single-device upload and download through IPFS blockstore. No peer-to-peer sync yet.
+
+**What works:**
+- Kubo daemon starts on device boot, repo at `/root/.ipfs`, private network configured
+- Chunk upload: client → `PUT /electric/v1/file_chunk` → verify sig + hash → `ipfs block put` → CID stored in `file_chunks.cid`
+- Chunk download: `GET /electric/v1/file_chunk` → resolve CID from DB → `ipfs block get` → serve bytes
+- Backward compatibility: chunks without CID (pre-IPFS) still served from filesystem via `ChunkStore`
+- GC: deletes IPFS blocks by CID before removing DB rows; also cleans filesystem (transition period)
+- ChunkFetcher: fetched chunks stored via IPFS, CID written back to `file_chunks`
+
+**Files changed:**
+
+| Project | File | Change |
+|---|---|---|
+| chat | `lib/chat/data/file/ipfs_store.ex` | New — IPFS block API client (put/get/delete via Req) |
+| chat | `lib/chat/data/schemas/file_chunk.ex` | Added `cid` field, excluded from signature |
+| chat | `lib/chat_web/controllers/file_chunk_controller.ex` | Upload → IPFS, download → CID-first with filesystem fallback |
+| chat | `lib/chat/data/file/chunk_fetcher.ex` | Stores via IpfsStore, updates CID |
+| chat | `lib/chat/data/file/gc.ex` | Deletes IPFS blocks on file/upload GC |
+| chat | `lib/chat/data/file.ex` | Added `update_file_chunk_cid/3` |
+| chat | `config/config.exs` | Added `ipfs_api_url` |
+| chat | `priv/repo/migrations/20260616120000_add_cid_to_file_chunks.exs` | Nullable `cid` column |
+| platform | `lib/platform/storage/ipfs/daemon.ex` | New — GenServer: repo init, swarm key, private network config, MuonTrap.Daemon |
+| platform | `lib/platform/application.ex` | Added IpfsDaemonSupervisor + Ipfs.Daemon to target children |
+
+### Stage 2: Bitswap Sync — Planned
+
+Wire `missing_chunks.cid` → IPFS want-list so Bitswap fetches chunks between devices. Replaces ChunkFetcher's HTTP polling with native multi-peer block exchange.
+
+### Stage 3: USB Block Import — Planned
+
+`IpfsImporter` boot stage: scan USB drive for chunk blocks on insertion, import into device IPFS repo. Peer swarm wiring via LAN/ZeroTier discovery.

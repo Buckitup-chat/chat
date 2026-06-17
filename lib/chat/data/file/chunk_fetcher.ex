@@ -86,11 +86,18 @@ defmodule Chat.Data.File.ChunkFetcher do
   end
 
   defp store_chunk(missing, body) do
-    case IpfsStore.put(body) do
-      {:ok, cid} ->
-        FileData.update_file_chunk_cid(missing.file_id, missing.chunk_index, cid)
-        FileData.delete_missing_chunk(missing.file_id, missing.chunk_index)
-        log("ChunkFetcher: admitted #{missing.file_id}:#{missing.chunk_index}", :debug)
+    with {:ok, ipfs_cid} <- IpfsStore.put(body),
+         :ok <- verify_cid(missing, ipfs_cid) do
+      FileData.delete_missing_chunk(missing.file_id, missing.chunk_index)
+      log("ChunkFetcher: admitted #{missing.file_id}:#{missing.chunk_index}", :debug)
+    else
+      {:error, :cid_mismatch} ->
+        log(
+          "ChunkFetcher: CID mismatch for #{missing.file_id}:#{missing.chunk_index}",
+          :warning
+        )
+
+        bump_attempts(missing)
 
       error ->
         log(
@@ -101,6 +108,12 @@ defmodule Chat.Data.File.ChunkFetcher do
         bump_attempts(missing)
     end
   end
+
+  defp verify_cid(%{cid: expected_cid}, ipfs_cid) when is_binary(expected_cid) do
+    if expected_cid == ipfs_cid, do: :ok, else: {:error, :cid_mismatch}
+  end
+
+  defp verify_cid(_missing, _ipfs_cid), do: :ok
 
   defp bump_attempts(missing) do
     FileData.increment_missing_chunk_attempts(

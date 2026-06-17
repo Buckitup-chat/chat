@@ -58,7 +58,7 @@ defmodule Chat.Data.Shapes.FileChunk do
   end
 
   defp fill_missing_chunk(%FileChunk{} = chunk) do
-    FileData.fill_missing_chunk(chunk.file_id, chunk.chunk_index, chunk.data_hash, chunk.size)
+    FileData.fill_missing_chunk(chunk.file_id, chunk.chunk_index, chunk.data_hash, chunk.size, chunk.cid)
     :ok
   end
 

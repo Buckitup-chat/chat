@@ -241,6 +241,7 @@ defmodule Chat.NetworkSynchronization.Electric.FileShapeWriterTest do
     chunk = %FileChunk{
       file_id: file_id,
       chunk_index: index,
+      cid: cidv1_raw(raw_data),
       data_hash: data_hash,
       size: byte_size(raw_data),
       uploader_hash: user_hash,
@@ -249,5 +250,10 @@ defmodule Chat.NetworkSynchronization.Electric.FileShapeWriterTest do
 
     sign_b64 = chunk |> Integrity.signature_payload() |> EnigmaPq.sign(identity.sign_skey)
     %{chunk | sign_b64: sign_b64}
+  end
+
+  defp cidv1_raw(data) do
+    digest = :crypto.hash(:sha256, data)
+    "b" <> Base.encode32(<<1, 0x55, 0x12, 0x20>> <> digest, case: :lower, padding: false)
   end
 end

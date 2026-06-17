@@ -20,7 +20,7 @@ defmodule Chat.Data.Schemas.FileChunk do
     :owner_timestamp,
     :sign_b64
   ]
-  @create_required @create_fields -- [:cid]
+  @create_required @create_fields
 
   schema "file_chunks" do
     field(:file_id, FileId, primary_key: true)
@@ -50,7 +50,7 @@ defmodule Chat.Data.Schemas.FileChunk do
     def signable_fields(chunk) do
       chunk
       |> Map.from_struct()
-      |> Map.drop([:cid, :sign_b64, :__meta__])
+      |> Map.drop([:sign_b64, :__meta__])
     end
 
     def signing_key(chunk), do: User.get_card(chunk.uploader_hash).sign_pkey

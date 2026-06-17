@@ -114,6 +114,7 @@ defmodule ChatWeb.ElectricShapesTest do
     |> FileChunk.create_changeset(%{
       file_id: file_id,
       chunk_index: index,
+      cid: random_cidv1(),
       data_hash: "fd_" <> String.duplicate("ab", 64),
       size: 100,
       uploader_hash: uploader_hash,
@@ -121,5 +122,10 @@ defmodule ChatWeb.ElectricShapesTest do
       sign_b64: :crypto.strong_rand_bytes(64)
     })
     |> Repo.insert!()
+  end
+
+  defp random_cidv1 do
+    digest = :crypto.strong_rand_bytes(32)
+    "b" <> Base.encode32(<<1, 0x55, 0x12, 0x20>> <> digest, case: :lower, padding: false)
   end
 end

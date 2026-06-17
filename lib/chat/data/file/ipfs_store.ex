@@ -10,7 +10,7 @@ defmodule Chat.Data.File.IpfsStore do
       "--#{boundary}\r\nContent-Disposition: form-data; name=\"data\"\r\nContent-Type: application/octet-stream\r\n\r\n" <>
         binary <> "\r\n--#{boundary}--\r\n"
 
-    case Req.post(api_url("/api/v0/block/put"),
+    case Req.post(api_url("/api/v0/block/put?cid-codec=raw&mhtype=sha2-256"),
            body: body,
            headers: [{"content-type", "multipart/form-data; boundary=#{boundary}"}]
          ) do

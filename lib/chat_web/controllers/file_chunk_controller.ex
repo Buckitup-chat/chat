@@ -38,8 +38,9 @@ defmodule ChatWeb.FileChunkController do
          {:ok, body, conn} <- read_chunk_body(conn),
          :ok <- verify_body_hash(body, headers.data_hash),
          :ok <- verify_body_size(body, headers.size),
-         {:ok, cid} <- IpfsStore.put(body),
-         {:ok, _} <- persist_chunk(%{chunk | cid: cid}) do
+         {:ok, ipfs_cid} <- IpfsStore.put(body),
+         :ok <- verify_cid(chunk.cid, ipfs_cid),
+         {:ok, _} <- persist_chunk(chunk) do
       json(conn, %{status: "ok"})
     else
       {:error, :invalid_signature} ->
@@ -50,6 +51,9 @@ defmodule ChatWeb.FileChunkController do
 
       {:error, :uploader_mismatch} ->
         send_resp(conn, 403, Jason.encode!(%{error: "uploader mismatch"}))
+
+      {:error, :cid_mismatch} ->
+        send_resp(conn, 422, Jason.encode!(%{error: "CID mismatch"}))
 
       {:error, :hash_mismatch} ->
         send_resp(conn, 422, Jason.encode!(%{error: "body hash mismatch"}))
@@ -74,7 +78,8 @@ defmodule ChatWeb.FileChunkController do
   def options(conn, _params), do: send_resp(conn, 204, "")
 
   defp parse_chunk_headers(conn) do
-    with [data_hash] <- get_req_header(conn, "x-data-hash"),
+    with [cid] <- get_req_header(conn, "x-cid"),
+         [data_hash] <- get_req_header(conn, "x-data-hash"),
          [size_str] <- get_req_header(conn, "x-size"),
          [uploader_hash] <- get_req_header(conn, "x-uploader-hash"),
          [timestamp_str] <- get_req_header(conn, "x-owner-timestamp"),
@@ -84,6 +89,7 @@ defmodule ChatWeb.FileChunkController do
          {:ok, sign_b64} <- Base.decode64(signature_b64, padding: false) do
       {:ok,
        %{
+         cid: cid,
          data_hash: data_hash,
          size: size,
          uploader_hash: uploader_hash,
@@ -99,6 +105,7 @@ defmodule ChatWeb.FileChunkController do
     %FileChunk{
       file_id: file_id,
       chunk_index: chunk_index,
+      cid: headers.cid,
       data_hash: headers.data_hash,
       size: headers.size,
       uploader_hash: headers.uploader_hash,
@@ -155,6 +162,12 @@ defmodule ChatWeb.FileChunkController do
 
   defp fetch_chunk_data(_chunk, file_id, chunk_index) do
     ChunkStore.fetch(file_id, chunk_index)
+  end
+
+  defp verify_cid(client_cid, ipfs_cid) do
+    if client_cid == ipfs_cid,
+      do: :ok,
+      else: {:error, :cid_mismatch}
   end
 
   defp persist_chunk(chunk) do

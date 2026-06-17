@@ -54,8 +54,8 @@
           <ol class="list-decimal list-inside space-y-1 text-sm">
             <li>Import ML-DSA-87 keys (from user sandbox export)</li>
             <li>Select file → chunk into 4 MB pieces</li>
-            <li>For each chunk: encrypt (AES-256-GCM), hash (SHA3-512), sign (ML-DSA-87)</li>
-            <li>PUT binary chunk to <code>/electric/v1/file_chunk/:file_id/:chunk_index</code> with metadata in headers</li>
+            <li>For each chunk: encrypt (AES-256-GCM), hash (SHA3-512), compute CID (SHA-256), sign all fields (ML-DSA-87)</li>
+            <li>PUT binary chunk to <code>/electric/v1/file_chunk/:file_id/:chunk_index</code> with CID + metadata in headers</li>
             <li>Build manifest with chunk_sign_hashes, sign, POST to ingest</li>
             <li>Save the encryption secret for later download</li>
           </ol>
@@ -81,11 +81,12 @@
         <div class="doc-content">
           <pre>file_id        TEXT        "f_" + UUID
 chunk_index    INTEGER     0-based position
+cid            TEXT        CIDv1 (SHA2-256, raw codec, base32lower)
 data_hash      TEXT        "fd_" + hex(SHA3-512(encrypted))
 size           INTEGER     encrypted chunk byte size
 uploader_hash  TEXT        "u_" + hex(SHA3-512(sign_pkey))
 owner_timestamp BIGINT     monotonic counter
-sign_b64       BYTEA       ML-DSA-87 signature</pre>
+sign_b64       BYTEA       ML-DSA-87 signature (covers all above)</pre>
         </div>
       </div>
 
@@ -141,12 +142,13 @@ sign_b64          BYTEA     ML-DSA-87 signature</pre>
         <div class="doc-content">
           <p class="text-sm">PUT raw encrypted bytes to <code>/electric/v1/file_chunk/:file_id/:chunk_index</code></p>
           <p class="text-sm mt-1">Headers:</p>
-          <pre>X-Data-Hash        "fd_" + hex(SHA3-512(body))
+          <pre>X-Cid              CIDv1 (client-computed, included in sig)
+X-Data-Hash        "fd_" + hex(SHA3-512(body))
 X-Size             byte_size(body)
 X-Uploader-Hash    "u_" + hex(SHA3-512(sign_pkey))
 X-Owner-Timestamp  monotonic counter
 X-Signature        Base64(ML-DSA-87 signature)</pre>
-          <p class="text-sm mt-1">Server verifies signature, body hash, and size before storing.</p>
+          <p class="text-sm mt-1">Server verifies signature (incl. CID), body hash, size, and CID match after IPFS storage.</p>
         </div>
       </div>
 

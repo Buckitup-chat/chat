@@ -155,11 +155,11 @@ defmodule Chat.Data.File do
     repo().insert_all(MissingChunk, rows, on_conflict: :nothing)
   end
 
-  def fill_missing_chunk(file_id, chunk_index, data_hash, size) do
+  def fill_missing_chunk(file_id, chunk_index, data_hash, size, cid) do
     from(m in MissingChunk,
       where: m.file_id == ^file_id and m.chunk_index == ^chunk_index
     )
-    |> repo().update_all(set: [data_hash: data_hash, size: size])
+    |> repo().update_all(set: [data_hash: data_hash, size: size, cid: cid])
   end
 
   def delete_missing_chunk(file_id, chunk_index) do

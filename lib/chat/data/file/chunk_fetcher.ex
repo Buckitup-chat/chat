@@ -11,7 +11,6 @@ defmodule Chat.Data.File.ChunkFetcher do
 
   @poll_interval :timer.seconds(30)
   @batch_size 10
-  @max_attempts 10
   @fetch_timeout :timer.seconds(60)
 
   def start_link(opts \\ []) do
@@ -48,7 +47,7 @@ defmodule Chat.Data.File.ChunkFetcher do
 
   defp fetch_missing_chunks do
     if Chat.Db.repo_ready?() do
-      FileData.fetchable_missing_chunks(@batch_size, @max_attempts)
+      FileData.fetchable_missing_chunks(@batch_size)
       |> Enum.each(&fetch_one/1)
     end
   end

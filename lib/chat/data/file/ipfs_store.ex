@@ -20,11 +20,12 @@ defmodule Chat.Data.File.IpfsStore do
     end
   end
 
-  def get(cid) when is_binary(cid) do
-    case Req.post(api_url("/api/v0/block/get"),
-           params: [arg: cid],
-           decode_body: false
-         ) do
+  def get(cid, opts \\ []) when is_binary(cid) do
+    req_opts =
+      [params: [arg: cid], decode_body: false]
+      |> maybe_add_timeout(opts)
+
+    case Req.post(api_url("/api/v0/block/get"), req_opts) do
       {:ok, %{status: 200, body: body}} -> {:ok, body}
       {:ok, resp} -> {:error, resp.body}
       {:error, reason} -> {:error, reason}
@@ -36,6 +37,42 @@ defmodule Chat.Data.File.IpfsStore do
       {:ok, %{status: 200}} -> :ok
       {:ok, resp} -> {:error, resp.body}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def peer_id do
+    case Req.post(api_url("/api/v0/id")) do
+      {:ok, %{status: 200, body: %{"ID" => id, "Addresses" => addrs}}} ->
+        {:ok, %{peer_id: id, multiaddrs: addrs || []}}
+
+      {:ok, resp} ->
+        {:error, resp.body}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  def swarm_connect(multiaddr) when is_binary(multiaddr) do
+    case Req.post(api_url("/api/v0/swarm/connect"), params: [arg: multiaddr]) do
+      {:ok, %{status: 200}} -> :ok
+      {:ok, resp} -> {:error, resp.body}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def swarm_peers do
+    case Req.post(api_url("/api/v0/swarm/peers")) do
+      {:ok, %{status: 200, body: %{"Peers" => peers}}} -> {:ok, peers || []}
+      {:ok, resp} -> {:error, resp.body}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp maybe_add_timeout(req_opts, opts) do
+    case Keyword.get(opts, :receive_timeout) do
+      nil -> req_opts
+      timeout -> Keyword.put(req_opts, :receive_timeout, timeout)
     end
   end
 

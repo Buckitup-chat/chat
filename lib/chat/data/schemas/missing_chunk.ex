@@ -11,11 +11,12 @@ defmodule Chat.Data.Schemas.MissingChunk do
 
   @create_fields [:file_id, :chunk_index, :peer_url, :updated_at]
   @create_required @create_fields
-  @fill_fields [:data_hash, :size]
+  @fill_fields [:data_hash, :size, :cid]
 
   schema "missing_chunks" do
     field(:file_id, FileId, primary_key: true)
     field(:chunk_index, :integer, primary_key: true)
+    field(:cid, :string)
     field(:data_hash, FileChunkDataHash)
     field(:size, :integer)
     field(:peer_url, :string)

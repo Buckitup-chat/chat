@@ -148,11 +148,16 @@ defmodule Chat.NetworkSynchronization do
       @electric_dynamic,
       {PeerSync, peer_url: peer_url, name: electric_via(peer_url)}
     )
+    |> tap(fn
+      {:ok, _} -> Chat.Data.File.IpfsSwarm.connect_peer(peer_url)
+      _ -> :ok
+    end)
   end
 
   def remove_electric_peer(peer_url) do
     case Registry.lookup(@electric_registry, peer_url) do
       [{pid, _}] ->
+        Chat.Data.File.IpfsSwarm.disconnect_peer(peer_url)
         DeferredStore.purge_peer(peer_url)
         DynamicSupervisor.terminate_child(@electric_dynamic, pid)
 

@@ -174,13 +174,30 @@ defmodule Chat.Data.File do
     |> repo().delete_all()
   end
 
-  def fetchable_missing_chunks(limit, max_attempts \\ 10) do
+  def fetchable_missing_chunks(limit) do
     from(m in MissingChunk,
-      where: not is_nil(m.data_hash) and m.attempts < ^max_attempts,
-      order_by: [asc: m.attempts, asc: m.updated_at],
+      where: not is_nil(m.data_hash),
+      order_by: [
+        asc: fragment("CASE WHEN ? IS NULL THEN 0 ELSE 1 END", m.cid),
+        asc: m.attempts,
+        asc: fragment("RANDOM()")
+      ],
       limit: ^limit
     )
     |> repo().all()
+  end
+
+  def bitswap_fetchable_missing_chunks(limit) do
+    from(m in MissingChunk,
+      where: not is_nil(m.cid) and not is_nil(m.data_hash),
+      order_by: [asc: m.attempts, asc: fragment("RANDOM()")],
+      limit: ^limit
+    )
+    |> repo().all()
+  end
+
+  def get_missing_chunk(file_id, chunk_index) do
+    repo().get_by(MissingChunk, file_id: file_id, chunk_index: chunk_index)
   end
 
   def increment_missing_chunk_attempts(file_id, chunk_index, now_unix) do

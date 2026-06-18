@@ -3,6 +3,7 @@
 > Describes using IPFS as the chunk byte layer for [File Storage](pq_files.md) protocol v2. Prerequisite reading: [pq_files.md §14](pq_files.md#14-migration-plan-chunk-blobs--filesystem-protocol-v2-raw-bytes) (v2 migration plan).
 >
 > **Stage 1 implemented** (2026-06-16): upload/download via IPFS + device daemon. See [§16](#16-implementation-status).
+> **Stage 2 implemented** (2026-06-17): Bitswap sync between devices + swarm peer wiring. See [§16](#16-implementation-status).
 
 ## 1. Motivation
 
@@ -319,7 +320,9 @@ Write performance for chunks is comparable between v2 filesystem and IPFS — bo
 |---|---|---|---|
 | `Platform.Storage.Ipfs.Daemon` | `platform/lib/platform/storage/ipfs/daemon.ex` | GenServer + MuonTrap.Daemon for Kubo on `/root/.ipfs` | **Done** |
 | `Chat.Data.File.IpfsStore` | `chat/lib/chat/data/file/ipfs_store.ex` | Elixir HTTP client for IPFS block API (put/get/delete) | **Done** |
-| `Platform.Storage.Ipfs.Swarm` | `platform/lib/platform/storage/ipfs/swarm.ex` | Feed LAN/ZeroTier addresses as IPFS multiaddrs | Planned |
+| `Chat.Data.File.IpfsSwarm` | `chat/lib/chat/data/file/ipfs_swarm.ex` | Probe peers for IPFS ID, maintain swarm connections | **Done** |
+| `Chat.Data.File.BitswapFetcher` | `chat/lib/chat/data/file/bitswap_fetcher.ex` | Event-driven chunk fetch via IPFS Bitswap | **Done** |
+| `ChatWeb.IpfsIdController` | `chat/lib/chat_web/controllers/ipfs_id_controller.ex` | `GET /electric/v1/ipfs/id` — expose IPFS peer ID to peers | **Done** |
 | `Platform.Storage.Ipfs.Importer` | `platform/lib/platform/storage/ipfs/importer.ex` | USB insertion → scan + import blocks | Planned |
 
 ### Modified modules
@@ -333,7 +336,11 @@ Write performance for chunks is comparable between v2 filesystem and IPFS — bo
 | `Chat.Data.File` | Add `update_file_chunk_cid/3` | **Done** |
 | `Platform.Application` | Add `IpfsDaemonSupervisor` + `Ipfs.Daemon` to target children | **Done** |
 | `chat/config/config.exs` | Add `ipfs_api_url` config | **Done** |
-| `Chat.Data.Shapes.FileChunk` | Fill `missing_chunks.cid` on sync; bridge to IPFS want-list | Planned |
+| `Chat.Data.Shapes.FileChunk` | Fill `missing_chunks.cid` on sync; trigger BitswapFetcher | **Done** |
+| `Chat.Data.File` | Add `get_missing_chunk/2`, `bitswap_fetchable_missing_chunks/1`; prioritize HTTP-only in `fetchable_missing_chunks` | **Done** |
+| `Chat.Data.Schemas.MissingChunk` | Add `cid` field to schema and fill_fields | **Done** |
+| `Chat.NetworkSynchronization` | Wire `IpfsSwarm.connect_peer` on Electric peer add/remove | **Done** |
+| `Chat.Application` | Add `BitswapTaskSupervisor`, `IpfsSwarm`, `BitswapFetcher` to supervision tree | **Done** |
 | `Platform.App.Drive.BootSupervisor` | Add `IpfsImporter` stage | Planned |
 
 ### Migrations
@@ -341,14 +348,15 @@ Write performance for chunks is comparable between v2 filesystem and IPFS — bo
 | Migration | Description | Status |
 |---|---|---|
 | `20260616120000_add_cid_to_file_chunks` | Add nullable `cid` TEXT column to `file_chunks` | **Done** |
+| `20260617120000_add_cid_to_missing_chunks` | Add nullable `cid` TEXT column + bitswap index to `missing_chunks` | **Done** |
 
 ### Eliminated (vs v2 filesystem) — target state
 
 | Component | Replaced by | Status |
 |---|---|---|
 | `ChunkStore` (filesystem sharding) | IPFS blockstore | Transitional: IPFS for new uploads, filesystem fallback for old chunks |
-| `ChunkFetcher` worker | IPFS Bitswap | Transitional: ChunkFetcher uses IpfsStore, Bitswap bridge not yet wired |
-| Multi-peer addressing (open question) | Bitswap (native) | Planned |
+| `ChunkFetcher` worker | IPFS Bitswap | Transitional: BitswapFetcher is primary for CID chunks; ChunkFetcher is HTTP fallback |
+| Multi-peer addressing (open question) | Bitswap (native) | **Done** — IpfsSwarm wires peers on discovery |
 
 ## 14. Open Questions
 
@@ -363,9 +371,9 @@ Write performance for chunks is comparable between v2 filesystem and IPFS — bo
 1. ~~**Prototype Kubo on RPi4**: pre-built aarch64 binary + MuonTrap.Daemon, private network mode~~ — **Done** (§16)
 2. **Benchmark `ipfs block put`**: 4MB encrypted blocks on USB/SD storage, compare throughput vs raw `File.write`
 3. **Test USB block import**: measure import speed for a USB with 100 chunk files, try filestore `--nocopy` vs full import
-4. **Wire Bitswap bridge**: Electric `file_chunks` sync → fill `missing_chunks.cid` → add to IPFS want-list → Bitswap fetches between devices
+4. ~~**Wire Bitswap bridge**: Electric `file_chunks` sync → fill `missing_chunks.cid` → add to IPFS want-list → Bitswap fetches between devices~~ — **Done** (§16)
 5. **Add `IpfsImporter` boot stage**: scan USB drive blocks on insertion, import into device IPFS repo
-6. **Wire swarm peer discovery**: feed LAN/ZeroTier addresses to `ipfs swarm connect`
+6. ~~**Wire swarm peer discovery**: feed LAN/ZeroTier addresses to `ipfs swarm connect`~~ — **Done** (§16)
 
 ## 16. Implementation Status
 
@@ -396,9 +404,41 @@ Single-device upload and download through IPFS blockstore. No peer-to-peer sync 
 | platform | `lib/platform/storage/ipfs/daemon.ex` | New — GenServer: repo init, swarm key, private network config, MuonTrap.Daemon |
 | platform | `lib/platform/application.ex` | Added IpfsDaemonSupervisor + Ipfs.Daemon to target children |
 
-### Stage 2: Bitswap Sync — Planned
+### Stage 2: Bitswap Sync (2026-06-17) — Done
 
-Wire `missing_chunks.cid` → IPFS want-list so Bitswap fetches chunks between devices. Replaces ChunkFetcher's HTTP polling with native multi-peer block exchange.
+Event-driven chunk fetching via IPFS Bitswap. Peer swarm wiring via LAN/Electric peer discovery.
+
+**What works:**
+- `BitswapFetcher` GenServer: when Electric delivers a `file_chunks` manifest row with a CID, `sync_after_persist` triggers an async `ipfs block get` via Task.Supervisor (up to 5 concurrent)
+- Block verification: SHA3-512(bytes) checked against signed `data_hash` before admission; `missing_chunks` row deleted on success
+- Bootstrap: on startup, re-queues existing `missing_chunks` rows that have CIDs but haven't been fetched
+- `IpfsSwarm` GenServer: on Electric peer discovery, probes `GET /electric/v1/ipfs/id` to learn the peer's IPFS peer ID, then calls `ipfs swarm connect` to establish Bitswap connectivity
+- Periodic reconnect (5 min): re-establishes dropped swarm connections
+- `GET /electric/v1/ipfs/id` endpoint: exposes local IPFS peer ID + multiaddrs for peer probing
+- `IpfsStore` extended with `peer_id/0`, `swarm_connect/1`, `swarm_peers/0`
+- `ChunkFetcher` HTTP fallback: deprioritizes CID-bearing chunks (Bitswap handles those); still fetches chunks without CIDs
+- Migration: `missing_chunks.cid` column + bitswap index
+
+**Design decisions:**
+- Chat-side only: `IpfsSwarm` calls Kubo HTTP API directly (same host), no PubSub bridge to platform needed
+- Event-driven, not polling: `BitswapFetcher` receives cast from `sync_after_persist`, dispatches immediately
+- HTTP probe for peer ID exchange: mirrors existing `system_identifier` endpoint pattern
+
+**Files changed:**
+
+| Project | File | Change |
+|---|---|---|
+| chat | `lib/chat/data/file/bitswap_fetcher.ex` | New — event-driven Bitswap fetch coordinator |
+| chat | `lib/chat/data/file/ipfs_swarm.ex` | New — peer probe + swarm connection manager |
+| chat | `lib/chat_web/controllers/ipfs_id_controller.ex` | New — IPFS peer ID endpoint |
+| chat | `lib/chat/data/file/ipfs_store.ex` | Added `peer_id/0`, `swarm_connect/1`, `swarm_peers/0`; `get/2` accepts timeout |
+| chat | `lib/chat/data/schemas/missing_chunk.ex` | Added `cid` field |
+| chat | `lib/chat/data/shapes/file_chunk.ex` | Triggers BitswapFetcher on CID fill |
+| chat | `lib/chat/data/file.ex` | Added `get_missing_chunk/2`, `bitswap_fetchable_missing_chunks/1`; HTTP-first ordering in `fetchable_missing_chunks` |
+| chat | `lib/chat/network_synchronization/network_synchronization.ex` | Wire IpfsSwarm on peer add/remove |
+| chat | `lib/chat/application.ex` | Added BitswapTaskSupervisor, IpfsSwarm, BitswapFetcher to supervision tree |
+| chat | `lib/chat_web/router.ex` | Added `/electric/v1/ipfs/id` route |
+| chat | `priv/repo/migrations/20260617120000_add_cid_to_missing_chunks.exs` | Add `cid` column + bitswap index |
 
 ### Stage 3: USB Block Import — Planned
 

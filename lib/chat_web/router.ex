@@ -208,6 +208,7 @@ defmodule ChatWeb.Router do
       get "/file_chunk/:file_id/:chunk_index", FileChunkController, :show
 
       get "/system_identifier", SystemIdentifierController, :show
+      get "/ipfs/id", IpfsIdController, :show
 
       scope "/" do
         pipe_through ChatWeb.Plugs.ElectricIngestThrottle

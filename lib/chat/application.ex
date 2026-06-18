@@ -91,8 +91,16 @@ defmodule Chat.Application do
   if Application.compile_env(:chat, :env) == :test do
     defp more_children, do: []
   else
-    defp more_children,
-      do: [Chat.Data.File.GC, Chat.Data.File.ChunkFetcher, Chat.Upload.StaleUploadsPruner]
+    defp more_children do
+      [
+        {Task.Supervisor, name: Chat.BitswapTaskSupervisor},
+        Chat.Data.File.IpfsSwarm,
+        Chat.Data.File.BitswapFetcher,
+        Chat.Data.File.GC,
+        Chat.Data.File.ChunkFetcher,
+        Chat.Upload.StaleUploadsPruner
+      ]
+    end
   end
 
   # Tell Phoenix to update the endpoint configuration

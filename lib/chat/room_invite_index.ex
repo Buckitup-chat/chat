@@ -49,7 +49,7 @@ defmodule Chat.RoomInviteIndex do
           |> max(1)
           |> min(32)
 
-    <<room_hash_bits::bits-size(bit_length), _::bitstring>> = room_pub_key |> Enigma.hash()
+    <<room_hash_bits::bits-size(^bit_length), _::bitstring>> = room_pub_key |> Enigma.hash()
     msg_hash = msg_id |> Enigma.hash()
     {bit_length, room_hash_bits, msg_hash}
   end

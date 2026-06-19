@@ -4,7 +4,6 @@ defmodule Chat.Db.WriteQueue.Buffer do
   """
   import Chat.Db.WriteQueue.ReadStream
 
-  require Logger
   require Record
 
   Record.defrecord(:buffer,

@@ -1,5 +1,5 @@
 defmodule Chat.Data.Shapes do
-  @moduledoc "Registry of Electric-synced shape behaviour modules"
+  @moduledoc "Registry of Replication and Electric synced shape behaviour modules"
 
   @shapes [
     Chat.Data.Shapes.DialogKeys,
@@ -19,4 +19,16 @@ defmodule Chat.Data.Shapes do
   def by_schema(mod), do: Enum.find(@shapes, &(&1.schema_module() == mod))
 
   def shape_names, do: Enum.map(@shapes, & &1.shape_name())
+
+  def sync_schemas do
+    @shapes
+    |> Enum.flat_map(fn shape ->
+      [shape.schema_module() | List.wrap(shape.versions_schema())]
+    end)
+  end
+
+  def sync_tables do
+    sync_schemas()
+    |> Enum.map(& &1.__schema__(:source))
+  end
 end

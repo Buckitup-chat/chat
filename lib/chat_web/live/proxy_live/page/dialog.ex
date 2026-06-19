@@ -2,8 +2,6 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   @moduledoc "Dialog page"
   use ChatWeb, :component
 
-  require Logger
-
   import ChatWeb.MainLive.Page.Shared
   import Tools.SocketPrivate
   import Phoenix.Component, only: [assign: 3]

@@ -5,8 +5,6 @@ defmodule ChatWeb.Hooks.LocalTimeHook do
 
   alias Chat.Upload.StaleUploadsPruner
 
-  require Logger
-
   def on_mount(:default, _params, _session, socket) do
     {:cont,
      socket

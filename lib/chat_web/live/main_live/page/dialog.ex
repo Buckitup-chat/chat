@@ -1,8 +1,6 @@
 defmodule ChatWeb.MainLive.Page.Dialog do
   @moduledoc "Dialog page"
 
-  require Logger
-
   import ChatWeb.MainLive.Page.Shared
   import Phoenix.Component, only: [assign: 3]
 

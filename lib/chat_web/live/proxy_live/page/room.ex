@@ -18,11 +18,6 @@ defmodule ChatWeb.ProxyLive.Page.Room do
 
   import Phoenix.Component, only: [assign: 3]
 
-  # import Phoenix.LiveView,
-  #   only: [consume_uploaded_entry: 3, push_event: 3, send_update: 2, push_patch: 2]
-  #
-  require Logger
-
   alias ChatWeb.MainLive.Page.Login, as: MainLoginPage
   alias ChatWeb.ProxyLive.Page
   alias ChatWeb.State.ActorState

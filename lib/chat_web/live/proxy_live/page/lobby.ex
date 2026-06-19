@@ -1,8 +1,6 @@
 defmodule ChatWeb.ProxyLive.Page.Lobby do
   @moduledoc "Lobby part of chat. User list and room list"
 
-  require Logger
-
   alias Chat.Broadcast
   alias Chat.Proto
   alias Chat.Rooms

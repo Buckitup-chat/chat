@@ -139,8 +139,6 @@ defmodule ChatWeb.MainLive.Admin.CargoWeightSensorForm do
   end
 
   defp test_weight_sensor_connection(type, name, opts) do
-    require Logger
-
     opts =
       if is_binary(opts[:parity]) do
         opts

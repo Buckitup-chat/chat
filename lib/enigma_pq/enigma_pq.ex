@@ -106,7 +106,7 @@ defmodule EnigmaPq do
   """
   def aes_gcm_decrypt(<<nonce::binary-12, ciphertext_and_tag::binary>>, <<key::binary-32>>) do
     ct_size = byte_size(ciphertext_and_tag) - @aes_gcm_tag_size
-    <<ciphertext::binary-size(ct_size), tag::binary-16>> = ciphertext_and_tag
+    <<ciphertext::binary-size(^ct_size), tag::binary-16>> = ciphertext_and_tag
     :crypto.crypto_one_time_aead(:aes_256_gcm, key, nonce, ciphertext, <<>>, tag, false)
   end
 

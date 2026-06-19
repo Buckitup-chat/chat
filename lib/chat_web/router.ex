@@ -231,17 +231,6 @@ defmodule ChatWeb.Router do
     forward "/", ChatWeb.Plugs.HexToBase64Electric
   end
 
-  scope "/", ChatWeb do
-    pipe_through :browser
-    get "/", FrontendController, :app
-    get "/*path", FrontendController, :app
-  end
-
-  # Other scopes may use custom stacks.
-  # scope "/api", ChatWeb do
-  #   pipe_through :api
-  # end
-
   # Enables LiveDashboard only for development
   #
   # If you want to use the LiveDashboard in production, you should put
@@ -261,5 +250,11 @@ defmodule ChatWeb.Router do
       additional_pages: [
         # flame_on: FlameOn.DashboardPage
       ]
+  end
+
+  scope "/", ChatWeb do
+    pipe_through :browser
+    get "/", FrontendController, :app
+    get "/*path", FrontendController, :app
   end
 end

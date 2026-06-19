@@ -2,8 +2,6 @@ defmodule ChatWeb.MainLive.Index do
   @moduledoc "Main Liveview"
   use ChatWeb, :live_view
 
-  require Logger
-
   alias Chat.Admin.CargoSettings
   alias Chat.{AdminRoom, Dialogs, Identity, Messages, RoomInviteIndex}
   alias Chat.Rooms.Room

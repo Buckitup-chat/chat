@@ -3,7 +3,6 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   import ChatWeb.LiveHelpers, only: [process: 2]
   import Phoenix.Component, only: [assign: 3]
-  require Logger
 
   alias Chat.Broadcast
   alias Chat.Db.ChangeTracker

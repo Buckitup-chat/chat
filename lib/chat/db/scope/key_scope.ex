@@ -231,7 +231,7 @@ defmodule Chat.Db.Scope.KeyScope do
     case invite_keypair do
       {{:room_invite_index, _, _}, {bit_length, bits, _}} ->
         match?(
-          <<^bits::bitstring-size(bit_length), _::bitstring>>,
+          <<^bits::bitstring-size(^bit_length), _::bitstring>>,
           room_key_hash
         )
 

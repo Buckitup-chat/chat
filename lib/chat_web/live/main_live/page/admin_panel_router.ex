@@ -1,8 +1,6 @@
 defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
   @moduledoc "Route admin panel events"
 
-  require Logger
-
   alias ChatWeb.MainLive.Modals
   alias ChatWeb.MainLive.Page.AdminPanel
 

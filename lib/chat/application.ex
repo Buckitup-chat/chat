@@ -51,7 +51,7 @@ defmodule Chat.Application do
         {Task.Supervisor, name: Chat.TaskSupervisor},
         {Task,
          fn ->
-           {:ok, _pid} = AdminLogger |> Logger.add_backend()
+           {:ok, _pid} = AdminLogger |> LoggerBackends.add()
 
            Task.Supervisor.start_child(
              Chat.TaskSupervisor,

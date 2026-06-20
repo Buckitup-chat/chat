@@ -27,6 +27,10 @@ defmodule Chat.Data.Shapes do
     end)
   end
 
+  def primary_key(schema_module) do
+    schema_module.__schema__(:primary_key)
+  end
+
   def sync_tables do
     sync_schemas()
     |> Enum.map(& &1.__schema__(:source))

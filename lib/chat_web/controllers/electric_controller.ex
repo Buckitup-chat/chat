@@ -24,6 +24,8 @@ defmodule ChatWeb.ElectricController do
 
   def options(conn, _params), do: send_resp(conn, 204, "")
 
+  @ingest_timeout 60_000
+
   def ingest(conn, params) do
     with {_, %{"mutations" => mutations}} <- {:correct_params, params},
          {_, true} <- {:is_mutation_list, is_list(mutations)},
@@ -33,11 +35,17 @@ defmodule ChatWeb.ElectricController do
          {:ok, txid, _changes} <-
            Writer.new()
            |> config_writer(user_pop_context)
-           |> Writer.apply(mutations, repo(), format: Format.TanstackDB) do
+           |> Writer.apply(mutations, repo(),
+             format: Format.TanstackDB,
+             timeout: @ingest_timeout
+           ) do
       json(conn, %{txid: txid})
     else
       error -> handle_ingest_error(conn, error)
     end
+  rescue
+    e in [DBConnection.ConnectionError, Postgrex.Error] ->
+      handle_ingest_error(conn, {:error, {:service_unavailable, Exception.message(e)}})
   end
 
   def ingest_each(conn, params) do
@@ -56,12 +64,18 @@ defmodule ChatWeb.ElectricController do
     else
       error -> handle_ingest_error(conn, error)
     end
+  rescue
+    e in [DBConnection.ConnectionError, Postgrex.Error] ->
+      handle_ingest_error(conn, {:error, {:service_unavailable, Exception.message(e)}})
   end
 
   defp apply_single_mutation(writer, {index, decode_result}) do
     with {:ok, mutation} <- decode_result,
          {:ok, txid, _changes} <-
-           Writer.apply(writer, [mutation], repo(), format: Format.TanstackDB) do
+           Writer.apply(writer, [mutation], repo(),
+             format: Format.TanstackDB,
+             timeout: @ingest_timeout
+           ) do
       %{index: index, status: "ok", txid: txid}
     else
       {:error, reason} when is_binary(reason) ->
@@ -130,6 +144,12 @@ defmodule ChatWeb.ElectricController do
 
   defp handle_ingest_error(conn, error) do
     case error do
+      {:error, {:service_unavailable, msg}} when is_binary(msg) ->
+        conn
+        |> put_resp_header("retry-after", "5")
+        |> put_status(:service_unavailable)
+        |> json(%{error: "database_timeout", message: msg})
+
       {:error, {:unauthorized, msg}} when is_binary(msg) ->
         conn
         |> put_status(:unauthorized)

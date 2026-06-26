@@ -22,6 +22,7 @@ A service owner should be able to:
 
 - rating
 - passwords vs reviews
+- ingest via review_candidates
 
 ## Three entities
 

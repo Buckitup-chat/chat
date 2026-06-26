@@ -20,7 +20,8 @@ A service owner should be able to:
 
 ## Assumptions / Open questions
 
-- 
+- rating
+- passwords vs reviews
 
 ## Three entities
 

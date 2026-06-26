@@ -16,6 +16,28 @@ straightforward as possible.
 
 ### Fixed
 
+## 2026-06-20_93536ec\_\_\_2026-06-20_909384d4
+
+### Added
+
+- Electric: sync shapes with primary key support
+
+### Changed
+
+- LiveView chat routes moved to `/trusted` path
+- Frontend SPA served on `/` path
+- User sandbox LiveView refactored into components, router, and modals modules
+- Elixir 1.20 upgrade
+- Post-quantum files: client optimization for single-thread and highload scenarios
+- Video streaming: IndexedDB session persistence and retry logic
+- [platform] Electric: device sync for shapes
+
+### Fixed
+
+- Electric: ingest error handling with DB connection timeouts
+- [platform] Electric: PostgreSQL transaction timeouts and cleanup
+- [platform] Electric: retry on PostgreSQL start
+
 ## 2026-06-01_6347b55\_\_\_2026-06-01_ce41f61e
 
 ### Added

@@ -1,10 +1,10 @@
-# External Frontend Integration Proposal
+# External Frontend Integration
 
-**Status: Draft**
+**Status: Implemented (SPA at `/`, LiveView at `/trusted`)**
 
 ## Context
 
-The current `chat/frontend/` is obsolete. The main client has moved to a separate repository: [Buckitup-chat/chat-frontend](https://github.com/Buckitup-chat/chat-frontend) — a Vue 3 application with:
+The `chat/frontend/` predecessor is obsolete. The main client lives in a separate repository: [Buckitup-chat/chat-frontend](https://github.com/Buckitup-chat/chat-frontend) — a Vue 3 application with:
 
 - Electric SQL (PGLite in-browser) with real-time sync
 - End-to-end encryption (enigma, Lit Protocol, post-quantum)
@@ -12,221 +12,139 @@ The current `chat/frontend/` is obsolete. The main client has moved to a separat
 - Web3 / Ethereum integration
 - Pinia state management
 
-This proposal covers how to integrate the new external frontend into the chat application.
+## Implemented approach
 
-## Goal
+The Vue SPA is served at `/` on all hosts. LiveView routes were moved under `/trusted`. This differs from the original proposal (Option A: `www.` subdomain) — the simpler path-based split was chosen instead.
 
-Serve `chat-frontend` build artifacts via Phoenix. The LiveView (CubDB) UI and the new Vue SPA coexist, served by the same Phoenix Endpoint on different hostnames.
+### Routing layout
 
-## Options considered
+| Path | Serves | Controller/Live |
+|---|---|---|
+| `/` and `/*path` | Vue SPA (chat-frontend) | `FrontendController, :app` |
+| `/trusted/` | LiveView (CubDB UI) | `MainLive.Index` |
+| `/frontend` | Old frontend (deprecated) | `FrontendController, :index` |
+| `/electric/v1/*`, `/naive_api` | API routes | unchanged |
 
-### Option A: `www.` subdomain (recommended)
-
-Serve the Vue SPA at `/` on `www.buckitup.app`. LiveView stays at `/` on `buckitup.app`. API routes are host-agnostic — available on both.
-
-| Host | Serves |
-|---|---|
-| `buckitup.app` | LiveView (CubDB UI) |
-| `www.buckitup.app` | Vue SPA (chat-frontend) |
-| both | `/electric/v1/*`, `/naive_api`, file serving |
-
-**Why this wins:**
-- Current TLS cert already covers `DNS:buckitup.app, DNS:www.buckitup.app` — no cert changes
-- SPA gets a clean `/` — no Vite `base` rewriting, no Vue Router base path
-- Same origin for API — no CORS changes
-- Single Phoenix process — works on Nerves exactly like today
-- LiveView routes completely untouched — zero migration risk
-- Dev: `www.localhost:4444` resolves to `127.0.0.1` in modern browsers
-
-**Phoenix changes required:**
-- Router: add `host: "www."` scoped SPA catch-all
-- `check_origin` in prod.exs: add `"//www.#{hostname}"`
-
-**chat-frontend changes required:**
-- `vite.config.js`: relative API URLs for embedded mode (`.env.embedded` or `--mode embedded`)
-- No base path changes — already `/`
-- No router changes — already `createWebHistory()` with no prefix
-
-### Option B: SPA under `/frontend` path
-
-Keep current approach — serve SPA at `/frontend`, LiveView at `/`.
-
-**Pros:** Zero Phoenix changes, existing `FrontendController` + `Plug.Static` work as-is.
-
-**Cons:** Requires `base: '/frontend/'` in Vite config, `createWebHistory('/frontend/')` in Vue Router, and all internal links must be prefix-aware. Awkward URL if this becomes the primary UI.
-
-### Option C: SPA at `/`, LiveView moved to `/old`
-
-**Rejected.** Heavy router surgery, bookmark breakage, catch-all ordering complexity, and ongoing maintenance of two frontends at `/old`.
-
-### Option D: Separate subdomain (e.g. `app.buckitup.app`)
-
-**Rejected.** Current Sectigo cert only covers `buckitup.app` + `www.buckitup.app`. Would require purchasing a wildcard cert (~$50-100/yr) or switching to Let's Encrypt with DNS-01 automation.
-
-## Chosen approach: Option A (`www.` subdomain)
-
-### Phoenix router changes
+### Router structure (`router.ex`)
 
 ```elixir
-# router.ex — add before existing "/" scope
+# Old frontend — kept for backward compat
+get "/frontend", FrontendController, :index
+get "/frontend/*path", FrontendController, :index
 
-# Vue SPA — only on www.* subdomain
-scope "/", ChatWeb, host: "www." do
-  pipe_through :browser
-  get "/", FrontendController, :index
-  get "/*path", FrontendController, :index
-end
-
-# Existing LiveView — unchanged, matches bare domain
-scope "/", ChatWeb do
-  pipe_through :browser
+# LiveView — moved under /trusted
+scope "/trusted" do
   live_session :default, on_mount: {ChatWeb.Hooks.SafariSessionHook, :default} do
     live "/", MainLive.Index, :index
-    # ... all existing routes unchanged
+    # ... all LiveView routes
   end
 end
 
-# API routes — no host constraint, available on both hostnames
-scope "/electric/v1", ChatWeb do
-  # ... unchanged
+# Vue SPA catch-all — last scope in router
+scope "/", ChatWeb do
+  pipe_through :browser
+  get "/", FrontendController, :app
+  get "/*path", FrontendController, :app
 end
 ```
 
-### Endpoint config changes
-
-```elixir
-# prod.exs — add www. to check_origin
-check_origin: ["//#{hostname}", "//www.#{hostname}"]
-```
-
-Dev (`check_origin: false`) needs no changes.
-
 ### FrontendController
 
-Unchanged. Already serves `priv/static/frontend/index.html`:
+Serves both old and new frontends via `serve_spa/2`:
 
 ```elixir
-defp render_frontend(conn) do
-  frontend_path = Path.join(:code.priv_dir(:chat), "static/frontend/index.html")
-  conn
-  |> put_resp_content_type("text/html")
-  |> send_file(200, frontend_path)
+def index(conn, _params), do: serve_spa(conn, "frontend")
+def app(conn, _params), do: serve_spa(conn, "app")
+
+defp serve_spa(conn, dir) do
+  path = Path.join(:code.priv_dir(:chat), "static/#{dir}/index.html")
+  # ...
 end
 ```
 
 ### Static file serving
 
-Unchanged. `Plug.Static` already serves `priv/static/frontend/*` (JS, CSS, images) because `static_paths` includes `"frontend"`.
-
-### chat-frontend changes
-
-Only API URL configuration. Add `.env.embedded` to chat-frontend repo:
-
-```bash
-# .env.embedded — used with: npm run build -- --mode embedded
-VITE_ELECTRIC_API_URL=/electric/v1
-VITE_API_URL=
-VITE_API_SURL=
-VITE_API_SPATH=/naive_api
-VITE_CONNECTOR_URL=wss://buckitupss.appdev.pp.ua/connector
+`static_paths` includes both `"app"` and `"frontend"`:
+```elixir
+~w(app assets fonts frontend images favicon.ico robots.txt ...)
 ```
 
-No changes to:
-- `base` in `vite.config.js` — stays `/`
-- Vue Router — stays `createWebHistory()` with no prefix
-- `index.html` — no path rewriting needed
-
-### Build output mapping
-
-chat-frontend builds to `dist/`:
-```
-dist/
-  index.html
-  assets/
-    *.js
-    *.css
-```
-
-This lands in:
-```
-priv/static/frontend/
-  index.html
-  assets/
-    *.js
-    *.css
-```
-
-### GraphQL path mismatch
-
-chat-frontend uses `API_SPATH: '/api'` but Phoenix serves GraphQL at `/naive_api`. Two options:
-1. Set `API_SPATH: '/naive_api'` in embedded mode (simplest)
-2. Add a Phoenix route alias: `forward "/api", Absinthe.Plug, schema: NaiveApi.Schema`
-
-Option 1 is preferred — no Phoenix changes.
-
-## Removing the old frontend
-
-Once the new frontend is integrated:
-
-1. Delete `chat/frontend/` directory
-2. Remove `frontend` targets from `mix assets.setup` and `mix assets.build`
-3. Keep `FrontendController`, `static_paths`, and routing unchanged
-4. Update `Makefile` — `make frontend` should document the new build/copy workflow
+Build artifacts land in `priv/static/app/` (not `priv/static/frontend/`).
 
 ## Build workflow
 
-### Manual / local development
+### Local development
 
 ```bash
 # In chat-frontend repo
-npm run build -- --mode embedded
+yarn dev                          # Vite dev server, proxies API to localhost:4444
 
-# Copy to chat
-cp -r dist/* /path/to/chat/priv/static/frontend/
+# Build and deploy into chat
+cd chat && make frontend-update   # npm install + build + copy dist/ to priv/static/app/
 ```
 
-Dev server: run `chat-frontend` dev server separately, access at `localhost:5173`, with Vite proxy forwarding API calls to `localhost:4444`.
+### Firmware build
 
-### CI / release
+The `firmware` target in `chat/Makefile` depends on `frontend-build`, so the SPA is always fresh:
 
-```yaml
-# Pseudocode
-- checkout chat-frontend at pinned version/tag
-- npm ci && npm run build -- --mode embedded
-- cp -r dist/* chat/priv/static/frontend/
-- cd chat && mix phx.digest
-- mix release
+```makefile
+firmware: empty_db frontend-build
+	rm -rf _build/prod
+	MIX_TARGET=host mix do compile, assets.deploy
 ```
+
+Platform's `prepare_frontend` target tracks `chat-frontend` git commit hash in `.frontend_compiled` to skip unnecessary rebuilds (mirrors `prepare_chat` / `.chat_compiled` for the chat repo).
 
 ### Version tracking
 
-Pin a `chat-frontend` version/tag in `.frontend-version` file checked into the chat repo. CI checks it out at that ref. Simple, explicit, auditable.
+The platform firmware version string includes a 3rd segment for chat-frontend:
+
+```
+{platform_date}_{platform_hash}___{chat_date}_{chat_hash}___{frontend_date}_{frontend_hash}.{domain}
+```
+
+Example: `2026-06-20_93536ec___2026-06-20_cdee4e1c___2026-06-09_6d37c80.buckitup.app`
+
+Each segment is `YYYY-MM-DD_<7-char-git-hash>` from the respective repo's latest commit. Generated by `platform/frontend_version.sh` (mirrors `chat_version.sh`).
 
 ## Dev experience
 
 | URL | What you see |
 |---|---|
-| `localhost:4444` | LiveView (CubDB UI) |
-| `www.localhost:4444` | Vue SPA (chat-frontend build) |
+| `localhost:4444` | Vue SPA (chat-frontend build) |
+| `localhost:4444/trusted` | LiveView (CubDB UI) |
 | `localhost:5173` | Vue SPA dev server (hot reload, proxies API to :4444) |
+
+## Options originally considered
+
+### Option A: `www.` subdomain (originally recommended, not implemented)
+
+Serve Vue SPA at `/` on `www.buckitup.app`, LiveView at `/` on bare `buckitup.app`.
+
+**Why it was not chosen:** The path-based split (`/` for SPA, `/trusted` for LiveView) was simpler — no subdomain routing, no `check_origin` changes, and the SPA becoming the primary UI made `/` the natural home for it.
+
+### Option B: SPA under `/frontend` path
+
+Keep SPA at `/frontend`, LiveView at `/`. Rejected — awkward URLs for the primary UI, requires Vite `base` rewriting.
+
+### Option C: SPA at `/`, LiveView moved to `/old`
+
+Rejected — `/old` implies deprecation. `/trusted` was chosen as the LiveView path instead.
+
+### Option D: Separate subdomain (`app.buckitup.app`)
+
+Rejected — requires wildcard cert changes.
 
 ## Open questions
 
 ### 1. WebSocket connector
 
-The new frontend uses a separate WebSocket connector service (`wss://buckitupss.appdev.pp.ua/connector`). Should Phoenix proxy this, or should it remain a separate service?
+The frontend uses a separate WebSocket connector service (`wss://buckitupss.appdev.pp.ua/connector`). Should Phoenix proxy this, or should it remain a separate service?
 
 ### 2. Legacy `/frontend` routes
 
-Keep as redirect to `www.` host? Or drop entirely? Current routes:
-```elixir
-get "/frontend", FrontendController, :index
-get "/frontend/*path", FrontendController, :index
-get "/login", FrontendController, :index
-get "/account", FrontendController, :index
-# etc.
-```
+Still served at `/frontend` via `FrontendController, :index` pointing to `priv/static/frontend/`. Consider removing once no devices reference it.
 
 ### 3. GraphQL endpoint naming
 
-Align on `/naive_api` (current Phoenix) vs `/api` (current frontend convention). A rename in either direction is low-effort.
+chat-frontend uses `API_SPATH: '/api'` but Phoenix serves GraphQL at `/naive_api`. Embedded mode sets `API_SPATH: '/naive_api'`.

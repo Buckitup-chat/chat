@@ -96,7 +96,7 @@ empty_db:
 	rm -rf priv/test_db
 	rm -rf persistent
 
-firmware: empty_db
+firmware: empty_db frontend-build
 	rm -rf _build/prod
 	MIX_TARGET=host mix do compile, assets.deploy
 

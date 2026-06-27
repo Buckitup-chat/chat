@@ -40,7 +40,7 @@ Each drive is an independent storage domain with its own PG instance (port 5432 
 
 **ChunkWriter** is a GenServer, one per drive. It owns all `ChunkStore.put` calls for that drive — no other code writes to that drive's ChunkStore directly.
 
-Each **source** is a permanent GenServer (always running, see §8) that acts as a sink — other code pushes chunks into the source, or the source polls for work. Sources submit to their drive's ChunkWriter.
+Each **source** is a permanent GenServer (always running, see §9) that acts as a sink — work arrives via events, not polling. Sources submit to their drive's ChunkWriter. See §5 for metadata arrival paths and how each source is activated.
 
 ### 2.1 Mechanism: GenServer + Deferred Reply + `:queue` + Task
 
@@ -170,9 +170,84 @@ each round:
 
 ## 5. Sources
 
-Each source is a permanent GenServer (one per drive) that acts as a **sink** — other code pushes chunks into it, or the source polls for work. The source is responsible for its own validation and post-write bookkeeping.
+Each source is a permanent GenServer (one per drive) that acts as a **sink** — work arrives via events, not polling. The source is responsible for its own validation and post-write bookkeeping.
 
-All three sources per drive are always running. They accept work when it arrives and are idle otherwise.
+All three sources per drive are always running. They react to events when work arrives and are idle otherwise. `missing_chunks` table polling is a **fallback only** — on source start and once per hour — not the primary activation path.
+
+### 5.0 Metadata Arrival Paths
+
+Three independent paths deliver file/chunk metadata to a drive. Each path has its own mechanism for activating the appropriate source:
+
+| Path | Metadata delivery | Signal | Activates |
+|---|---|---|---|
+| **Client upload** | `FileChunkController.create` inserts `file_chunks` row directly | Controller calls `UploadSource.submit` | UploadSource |
+| **Network sync** | Electric shapes via `ShapeConsumer` → `ShapeWriter` | `sync_after_persist` → PubSub broadcast | SyncSource |
+| **Drive-to-drive** | PG logical replication delivers `files`/`file_chunks` rows | PG replica trigger → `pg_notify` → listener | DriveCopySource |
+
+#### 5.0.1 Network Sync Activation
+
+When `ShapeWriter` persists a `file_chunks` row via Electric sync, `FileChunk.sync_after_persist` calls `FileData.fill_missing_chunk` — populating `data_hash` and `size` on the `missing_chunks` placeholder (preseeded when the `files` manifest arrived). At this point the chunk is fetchable. `fill_missing_chunk` casts directly to the drive's SyncSource:
+
+```elixir
+SyncSource.chunk_fetchable(drive_id, file_id, chunk_index, peer_url)
+# → GenServer.cast({:via, Registry, {ChunkRegistry, {:sync_source, drive_id}}}, ...)
+```
+
+SyncSource receives the cast and immediately begins fetching.
+
+#### 5.0.2 Drive-to-Drive Activation (PG Replica Triggers)
+
+Logical replication delivers `files` and `file_chunks` rows at the PG wire protocol level — no Elixir callbacks fire. To bridge this gap, **PG triggers** on the subscriber database call `pg_notify`:
+
+```sql
+-- On files INSERT: notify so listener can preseed missing_chunks placeholders
+CREATE FUNCTION notify_file_replicated() RETURNS trigger AS $$
+BEGIN
+  PERFORM pg_notify('file_replicated',
+    json_build_object('file_id', NEW.file_id, 'chunk_count', NEW.chunk_count)::text);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER file_replicated_trigger
+  AFTER INSERT ON files FOR EACH ROW
+  EXECUTE FUNCTION notify_file_replicated();
+ALTER TABLE files ENABLE REPLICA TRIGGER file_replicated_trigger;
+
+-- On file_chunks INSERT: notify so listener can fill missing_chunk hash/size
+CREATE FUNCTION notify_file_chunk_replicated() RETURNS trigger AS $$
+BEGIN
+  PERFORM pg_notify('file_chunk_replicated',
+    json_build_object('file_id', NEW.file_id, 'chunk_index', NEW.chunk_index,
+                      'data_hash', NEW.data_hash, 'size', NEW.size)::text);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER file_chunk_replicated_trigger
+  AFTER INSERT ON file_chunks FOR EACH ROW
+  EXECUTE FUNCTION notify_file_chunk_replicated();
+ALTER TABLE file_chunks ENABLE REPLICA TRIGGER file_chunk_replicated_trigger;
+```
+
+**`ENABLE REPLICA TRIGGER`**: the logical replication apply worker runs with `session_replication_role = 'replica'`. A replica trigger fires **only** for replicated rows — not for direct inserts from `ShapeWriter` or `FileChunkController`. This prevents doubling with the Electric `sync_after_persist` callbacks:
+
+| Insert source | `sync_after_persist` fires? | PG replica trigger fires? |
+|---|---|---|
+| Electric shape (`ShapeWriter`) | Yes | No |
+| Logical replication (drive-to-drive) | No | Yes |
+| Local upload (`FileChunkController`) | No | No |
+
+No doubling. Each path has exactly one callback. Local upload correctly fires neither — that drive already has the bytes.
+
+A **`Postgrex.Notifications` listener** (one per drive, in the pipeline supervisor) subscribes to both channels and:
+
+1. On `file_replicated` → calls `FileData.insert_missing_chunks_placeholders` (same logic as `File.sync_after_persist`). The `source_drive_id` is the drive that published the replication — the listener sets it as provenance for DriveCopySource (see §6).
+2. On `file_chunk_replicated` → calls `FileData.fill_missing_chunk` (same logic as `FileChunk.sync_after_persist`) → casts to `DriveCopySource.chunk_fetchable(drive_id, ...)` directly.
+
+#### 5.0.3 Fallback Poll
+
+On source start and once per hour, DriveCopySource and SyncSource scan `missing_chunks` for any fetchable rows that events may have missed (crash recovery, race conditions, delayed replication). This is a safety net, not the primary work driver.
 
 ### 5.1 UploadSource (`:upload` lane)
 
@@ -180,21 +255,22 @@ All three sources per drive are always running. They accept work when it arrives
 - **Receives from**: `FileChunkController.create` — the controller validates signature/hash, then calls `UploadSource.submit(chunk_data, meta)` on the **active drive's** UploadSource (see §8.2 for main DB switching).
 - **Submit flow**: `UploadSource` forwards to its drive's ChunkWriter via `GenServer.call` (deferred reply). The Plug process blocks until the chunk is written.
 - **On reply (`:ok`)**: controller inserts `file_chunks` manifest row + `upload_chunks` bookkeeping row into PG, returns HTTP 200 to client.
-- **Backpressure**: when 2 uploads are already queued in ChunkWriter, `UploadSource.submit` returns `{:busy, retry_after}` immediately — the controller responds with **429 + `Retry-After` header**. The client must not block indefinitely: its PoP challenge has a TTL, and a stalled request would expire it. This replaces `ElectricIngestThrottle` (§7).
+- **Backpressure**: when 2 uploads are already queued in ChunkWriter, `UploadSource.submit` returns `{:busy, retry_after}` immediately — the controller responds with **429 + `Retry-After` header**. The client must not block indefinitely: its PoP challenge has a TTL, and a stalled request would expire it. This replaces `ElectricIngestThrottle` (§8).
 
 ### 5.2 DriveCopySource (`:drive_copy` lane)
 
 - **Always running**: one per drive, started in the drive's pipeline supervisor. Idle until other drives are available.
-- **Maintains**: a list of **other drives' `{repo, chunk_store_path}` pairs** — updated when drives mount/unmount. Does not include its own drive.
-- **Polls**: periodically scans its own drive's `missing_chunks` table for work.
+- **Maintains**: a list of **other drives' `{drive_id, chunk_store_path}` pairs** — updated when drives mount/unmount. Does not include its own drive.
+- **Activated by**:
+  1. **`DriveCopySource.chunk_fetchable/4` cast** — when `fill_missing_chunk` fires (from PG replica trigger listener, see §5.0.2), the listener casts directly to DriveCopySource, which checks if any local drive has the bytes.
+  2. **Drive mount** — when a new drive becomes available, scans existing `missing_chunks` for locally resolvable chunks.
+  3. **Fallback poll** — on start and hourly (§5.0.3).
 
-**Chunk selection**: selects missing chunks with **least `attempts`, randomized** among ties. Randomization prevents DriveCopySource and SyncSource from picking the same chunk on concurrent polls.
-
-**`missing_chunks` provenance**: during drive-to-drive Electric sync, `missing_chunks` rows are populated with a `source_repo_path` field — the `{repo, chunk_store_path}` of the drive that advertised this chunk. This gives DriveCopySource a direct hint for where to read bytes.
+**`missing_chunks` provenance**: when `missing_chunks` rows are created via the PG replica trigger listener (§5.0.2), the `source_drive_id` column is set to the drive that published the replication. This gives DriveCopySource a direct hint for where to read bytes.
 
 **Fetch strategy**:
 
-1. If the missing chunk has a `source_repo_path` → check that drive's ChunkStore first
+1. If the missing chunk has a `source_drive_id` → check that drive's ChunkStore first
 2. If not found (or no hint) → try other known drives in order
 3. If no drive has it → skip (leave for SyncSource to fetch over network)
 4. If found but hash mismatch → increment `attempts`, skip
@@ -205,9 +281,9 @@ On successful write reply from ChunkWriter → delete `missing_chunks` row.
 
 - **Always running**: one per drive, replaces current `ChunkFetcher`'s direct `ChunkStore.put` calls.
 - **Maintains**: a list of **known network peer URLs** — updated as peers connect/disconnect.
-- **Polls**: periodically scans its own drive's `missing_chunks` table for work (existing ChunkFetcher logic).
-
-**Chunk selection**: selects missing chunks with **least `attempts`, randomized** among ties — same strategy as DriveCopySource to spread work and avoid collisions.
+- **Activated by**:
+  1. **`SyncSource.chunk_fetchable/4` cast** — when `fill_missing_chunk` fires (from `FileChunk.sync_after_persist` during Electric sync, see §5.0.1), `sync_after_persist` casts directly to SyncSource with the `peer_url`. SyncSource immediately begins fetching.
+  2. **Fallback poll** — on start and hourly (§5.0.3).
 
 **Fetch strategy**:
 
@@ -220,15 +296,15 @@ On successful write reply from ChunkWriter → delete `missing_chunks` row.
 
 ### 5.4 Collision Avoidance Between DriveCopySource and SyncSource
 
-Both sources poll the same `missing_chunks` table on the same drive. To prevent both from fetching the same chunk simultaneously:
+Each source is activated by a different caller — no shared event bus:
 
-- **Randomized selection**: both select from the "least attempts" pool with random ordering — they are unlikely to pick the same chunk in the same poll cycle.
-- **No hard lock**: if both do pick the same chunk, the second `ChunkStore.put` for an already-written chunk is idempotent (file exists, no-op or overwrite with identical bytes). The second `missing_chunks` delete is also idempotent (row already gone). Wasted work, not data corruption.
-- **Natural separation**: DriveCopySource checks local drives first (fast) and skips chunks it can't find locally. SyncSource fetches over the network (slow). In practice, drive copy resolves first for chunks available locally.
+- **Natural separation by path**: Electric sync casts to SyncSource; PG replica trigger listener casts to DriveCopySource. Each source handles its natural path without overlap.
+- **Fallback poll overlap**: during hourly polls, both scan the same `missing_chunks` table. They select from the "least attempts" pool with random ordering — unlikely to pick the same chunk.
+- **No hard lock**: if both do fetch the same chunk, the second `ChunkStore.put` for an already-written chunk is idempotent (file exists, no-op or overwrite with identical bytes). The second `missing_chunks` delete is also idempotent (row already gone). Wasted work, not data corruption.
 
 ## 6. `missing_chunks` Schema Update
 
-The `missing_chunks` table (defined in [pq_files.md §14.3](pq_files.md#14-migration-plan-chunk-blobs--filesystem-protocol-v2-raw-bytes)) gains a `source_repo_path` column for drive copy provenance:
+The `missing_chunks` table (defined in [pq_files.md §14.3](pq_files.md#14-migration-plan-chunk-blobs--filesystem-protocol-v2-raw-bytes)) gains a `source_drive_id` column for drive copy provenance:
 
 | Column | Type | Description |
 |---|---|---|
@@ -236,13 +312,13 @@ The `missing_chunks` table (defined in [pq_files.md §14.3](pq_files.md#14-migra
 | `chunk_index` | INTEGER | Position in file |
 | `data_hash` | TEXT, NULL | `fd_`-prefixed hash — NULL until `file_chunks` manifest row arrives |
 | `size` | INTEGER, NULL | Expected byte size — NULL until manifest row arrives |
-| `peer_url` | TEXT, NULL | Network peer that advertised this chunk (for SyncSource) |
-| `source_repo_path` | TEXT, NULL | `repo_module:chunk_store_path` of the drive that has this chunk (for DriveCopySource). Set during drive-to-drive Electric sync when the source drive is known. NULL for network-only chunks. |
+| `peer_url` | TEXT, NULL | Network peer that advertised this chunk (for SyncSource). Set by `File.sync_after_persist` during Electric sync. |
+| `source_drive_id` | TEXT, NULL | Drive ID of the replication source that has this chunk (for DriveCopySource). Set by the PG replica trigger listener (§5.0.2) when `missing_chunks` rows are created from replicated data. NULL for network-only chunks. |
 | `attempts` | INTEGER, DEFAULT 0 | Retry bookkeeping — incremented by whichever source fails |
 | `updated_at` | BIGINT | Last attempt or creation time (TimeKeeper) |
 | | PK | `(file_id, chunk_index)` |
 
-Index: `(attempts, updated_at)` WHERE `data_hash IS NOT NULL` — supports "least attempts, randomized" selection for both DriveCopySource and SyncSource.
+Index: `(attempts, updated_at)` WHERE `data_hash IS NOT NULL` — supports fallback poll selection for both DriveCopySource and SyncSource.
 
 ## 7. Interaction with PostgreSQL I/O
 
@@ -281,6 +357,7 @@ Chat.Application supervisor
   └─ ... (Repo, PubSub, Endpoint, ...)
   └─ ChunkPipelineSupervisor (internal drive)
        ├─ ChunkWriter          (GenServer, permanent)
+       ├─ ReplicationListener   (Postgrex.Notifications, permanent)
        ├─ UploadSource          (GenServer, permanent)
        ├─ DriveCopySource       (GenServer, permanent)
        └─ SyncSource            (GenServer, permanent)
@@ -297,6 +374,7 @@ Platform.App.Drive.BootSupervisor (per USB drive)
   └─ ... (Healer, Mounter, PG, Repo, Migrations)
   └─ ChunkPipelineSupervisor
        ├─ ChunkWriter          (GenServer, permanent)
+       ├─ ReplicationListener   (Postgrex.Notifications, permanent)
        ├─ UploadSource          (GenServer, permanent)
        ├─ DriveCopySource       (GenServer, permanent)
        └─ SyncSource            (GenServer, permanent)
@@ -306,11 +384,11 @@ Platform.App.Drive.BootSupervisor (per USB drive)
 
 Process names are scoped per drive (e.g. via `{:via, Registry, {ChunkRegistry, {:writer, drive_id}}}`).
 
-**Sources are always running.** They are sinks — idle until work arrives:
+**Sources are always running.** They are event-driven sinks — idle until work arrives:
 
 - **UploadSource**: receives chunks from `FileChunkController`. Idle when no uploads target this drive.
-- **DriveCopySource**: polls `missing_chunks`, checks other mounted drives. Idle when no other drives are mounted or no missing chunks have local sources.
-- **SyncSource**: polls `missing_chunks`, fetches from network peers. Idle when no fetchable missing chunks exist.
+- **DriveCopySource**: activated by direct cast from ReplicationListener and drive mount events. Checks other mounted drives for bytes. Idle when no other drives are mounted or no casts arrive. Hourly fallback poll.
+- **SyncSource**: activated by direct cast from `sync_after_persist`. Fetches from network peers. Idle when no casts arrive. Hourly fallback poll.
 
 Crash recovery: supervisor restarts the crashed process. ChunkWriter's `:queue` state is lost on restart — deferred callers receive `{:EXIT, ...}` and retry. If the in-flight write Task crashes, `handle_info({:DOWN, ref, ...})` clears `writing`, replies `{:error, :write_failed}` to the caller, and triggers the next round — the writer does not restart.
 

@@ -245,9 +245,11 @@ A **`Postgrex.Notifications` listener** (one per drive, in the pipeline supervis
 1. On `file_replicated` → calls `FileData.insert_missing_chunks_placeholders` (same logic as `File.sync_after_persist`). The `source_drive_id` is the drive that published the replication — the listener sets it as provenance for DriveCopySource (see §6).
 2. On `file_chunk_replicated` → calls `FileData.fill_missing_chunk` (same logic as `FileChunk.sync_after_persist`) → casts to `DriveCopySource.chunk_fetchable(drive_id, ...)` directly.
 
-#### 5.0.3 Fallback Poll
+#### 5.0.3 Fallback Poll and Reconnect Sweep
 
 On source start and once per hour, DriveCopySource and SyncSource scan `missing_chunks` for any fetchable rows that events may have missed (crash recovery, race conditions, delayed replication). This is a safety net, not the primary work driver.
+
+Additionally, when a source becomes available again (peer reconnects or drive remounts) and stays up for 5 seconds, the corresponding source scans `missing_chunks` for chunks whose preferred source matches — but only if its writer lane is idle (see §5.6). This is the fast path for recovering from temporary source unavailability without competing with already-queued work.
 
 ### 5.1 UploadSource (`:upload` lane)
 
@@ -268,11 +270,13 @@ On source start and once per hour, DriveCopySource and SyncSource scan `missing_
 
 **`missing_chunks` provenance**: when `missing_chunks` rows are created via the PG replica trigger listener (§5.0.2), the `source_drive_id` column is set to the drive that published the replication. This gives DriveCopySource a direct hint for where to read bytes.
 
-**Fetch strategy**:
+**Batch selection**: each turn, DriveCopySource selects up to **5 chunks** from `missing_chunks` (see §5.5 for the shared selection query). Chunks with `source_drive_id` set (same-domain) are prioritized over chunks with only `peer_url` (cross-domain). Randomization within each priority group ensures DriveCopySource and SyncSource diverge in selection order.
 
-1. If the missing chunk has a `source_drive_id` → check that drive's ChunkStore first
-2. If not found (or no hint) → try other known drives in order
-3. If no drive has it → skip (leave for SyncSource to fetch over network)
+**Fetch strategy** (drives only — never touches network, one source per attempt):
+
+1. If the chunk has a `source_drive_id` (same domain) and that drive is mounted → read from it
+2. Otherwise (drive not mounted, or no `source_drive_id`) → pick **one** random mounted drive → read from it
+3. If the chosen drive doesn't have it → increment `attempts`, skip (next attempt may pick a different random drive)
 4. If found but hash mismatch → increment `attempts`, skip
 
 On successful write reply from ChunkWriter → delete `missing_chunks` row.
@@ -285,11 +289,13 @@ On successful write reply from ChunkWriter → delete `missing_chunks` row.
   1. **`SyncSource.chunk_fetchable/4` cast** — when `fill_missing_chunk` fires (from `FileChunk.sync_after_persist` during Electric sync, see §5.0.1), `sync_after_persist` casts directly to SyncSource with the `peer_url`. SyncSource immediately begins fetching.
   2. **Fallback poll** — on start and hourly (§5.0.3).
 
-**Fetch strategy**:
+**Batch selection**: each turn, SyncSource selects up to **5 chunks** from `missing_chunks` (see §5.5 for the shared selection query). Chunks with `peer_url` set (same-domain) are prioritized over chunks with only `source_drive_id` (cross-domain). Randomization within each priority group ensures SyncSource and DriveCopySource diverge in selection order.
 
-1. Try the chunk's `peer_url` from `missing_chunks` (the peer that advertised this file via Electric shape)
-2. If that fails → try other known peer URLs
-3. If all fail → increment `attempts`
+**Fetch strategy** (network peers only — never touches local drives, one source per attempt):
+
+1. If the chunk has a `peer_url` (same domain) and that peer is online → fetch from it
+2. Otherwise (peer offline, or no `peer_url`) → pick **one** random online peer → fetch from it
+3. If the chosen peer doesn't have it or fetch fails → increment `attempts`, skip (next attempt may pick a different random peer, or retry when a peer reconnects — see §5.6)
 
 - **Validation**: hash check against `data_hash` (unchanged from current `ChunkFetcher.admit_chunk`).
 - **On reply (`:ok`)**: deletes `missing_chunks` row.
@@ -301,6 +307,88 @@ Each source is activated by a different caller — no shared event bus:
 - **Natural separation by path**: Electric sync casts to SyncSource; PG replica trigger listener casts to DriveCopySource. Each source handles its natural path without overlap.
 - **Fallback poll overlap**: during hourly polls, both scan the same `missing_chunks` table. They select from the "least attempts" pool with random ordering — unlikely to pick the same chunk.
 - **No hard lock**: if both do fetch the same chunk, the second `ChunkStore.put` for an already-written chunk is idempotent (file exists, no-op or overwrite with identical bytes). The second `missing_chunks` delete is also idempotent (row already gone). Wasted work, not data corruption.
+
+### 5.5 Batch Selection from `missing_chunks`
+
+Both DriveCopySource and SyncSource select chunks in small batches — **up to 5 per turn**. The selection prioritizes low-attempt chunks first, prefers same-domain chunks within the same attempt level, and randomizes within each group.
+
+#### 5.5.1 Selection Query
+
+**DriveCopySource** (same-domain = has `source_drive_id`):
+
+```sql
+SELECT file_id, chunk_index, source_drive_id, peer_url FROM missing_chunks
+WHERE data_hash IS NOT NULL
+ORDER BY attempts,
+  CASE WHEN source_drive_id IS NOT NULL THEN 0 ELSE 1 END,
+  random()
+LIMIT 5
+```
+
+**SyncSource** (same-domain = has `peer_url`):
+
+```sql
+SELECT file_id, chunk_index, peer_url, source_drive_id FROM missing_chunks
+WHERE data_hash IS NOT NULL
+ORDER BY attempts,
+  CASE WHEN peer_url IS NOT NULL THEN 0 ELSE 1 END,
+  random()
+LIMIT 5
+```
+
+#### 5.5.2 Selection Semantics
+
+The three-level ordering — `attempts`, `source_type`, `random()` — produces this behavior:
+
+1. **Lowest attempts first**: fresh chunks before retried ones. A chunk at attempt 0 always beats attempt 1, regardless of source type.
+2. **Same-domain before cross-domain** (within same attempt level): DriveCopySource prefers chunks that have a `source_drive_id` hint — it can check the specific drive first. Cross-domain chunks (originally network, no `source_drive_id`) are still eligible but come after same-domain ones at the same attempt count.
+3. **Random within group**: prevents DriveCopySource and SyncSource from selecting the same 5 chunks when both poll simultaneously. Also distributes work across different files/chunks rather than always picking the same deterministic order.
+
+**Cross-domain chunks are normal, not exceptional.** A DriveCopySource getting a chunk with only `peer_url` set simply skips the initial-source check (no drive hint to try) and goes straight to picking a random mounted drive. The chunk may or may not be on a local drive — if not, it gets skipped and `attempts` increments.
+
+### 5.6 Source Reconnect Sweep
+
+When a source becomes available again, chunks that were skipped because their preferred source was offline get another chance — but only when the source's lane is idle and the source has been stable for at least 5 seconds.
+
+**Two conditions must be met before a sweep fires:**
+
+1. **Lane idle**: the source's `:queue` in ChunkWriter is empty — no work already in flight or buffered for this lane. If the lane has pending items, the source is already busy and the sweep would just compete with existing work.
+2. **Source stable for 5 seconds**: a `Process.send_after(self(), {:sweep, source_id}, 5_000)` is scheduled when the source appears. If the source disconnects before the timer fires, the message is ignored (source no longer in known list). This filters out flapping sources — a drive that mounts and unmounts in 2 seconds never triggers a sweep.
+
+#### 5.6.1 Peer Reconnect → SyncSource
+
+When a network peer reconnects, SyncSource schedules a 5-second timer for that peer. When the timer fires — if the peer is still online and the `:network_sync` lane is idle — SyncSource queries:
+
+```sql
+SELECT file_id, chunk_index FROM missing_chunks
+WHERE peer_url = $1 AND data_hash IS NOT NULL
+ORDER BY attempts, updated_at
+```
+
+Each matched chunk is re-triggered for fetching. If the lane is not idle when the timer fires, the sweep is skipped — existing work will drain naturally, and the hourly poll catches anything left.
+
+#### 5.6.2 Drive Remount → DriveCopySource
+
+When a USB drive remounts, DriveCopySource schedules a 5-second timer for that drive. When the timer fires — if the drive is still mounted and the `:drive_copy` lane is idle — DriveCopySource queries:
+
+```sql
+SELECT file_id, chunk_index FROM missing_chunks
+WHERE source_drive_id = $1 AND data_hash IS NOT NULL
+ORDER BY attempts, updated_at
+```
+
+Each matched chunk is re-triggered. Same skip-if-busy rule as §5.6.1.
+
+#### 5.6.3 Lane Idle Check
+
+Sources need to know if their lane in ChunkWriter is idle. ChunkWriter exposes this via:
+
+```elixir
+ChunkWriter.lane_idle?(drive_id, :network_sync)
+# → true if the lane's :queue is empty and no write is in flight for this lane
+```
+
+This is a synchronous `GenServer.call` — lightweight (no I/O, just a map lookup on the writer's state).
 
 ## 6. `missing_chunks` Schema Update
 
@@ -318,7 +406,11 @@ The `missing_chunks` table (defined in [pq_files.md §14.3](pq_files.md#14-migra
 | `updated_at` | BIGINT | Last attempt or creation time (TimeKeeper) |
 | | PK | `(file_id, chunk_index)` |
 
-Index: `(attempts, updated_at)` WHERE `data_hash IS NOT NULL` — supports fallback poll selection for both DriveCopySource and SyncSource.
+Indexes:
+
+- `(attempts, updated_at)` WHERE `data_hash IS NOT NULL` — supports fallback poll selection for both DriveCopySource and SyncSource.
+- `(peer_url)` WHERE `data_hash IS NOT NULL AND peer_url IS NOT NULL` — supports SyncSource reconnect sweep (§5.6.1).
+- `(source_drive_id)` WHERE `data_hash IS NOT NULL AND source_drive_id IS NOT NULL` — supports DriveCopySource reconnect sweep (§5.6.2).
 
 ## 7. Interaction with PostgreSQL I/O
 
@@ -387,8 +479,8 @@ Process names are scoped per drive (e.g. via `{:via, Registry, {ChunkRegistry, {
 **Sources are always running.** They are event-driven sinks — idle until work arrives:
 
 - **UploadSource**: receives chunks from `FileChunkController`. Idle when no uploads target this drive.
-- **DriveCopySource**: activated by direct cast from ReplicationListener and drive mount events. Checks other mounted drives for bytes. Idle when no other drives are mounted or no casts arrive. Hourly fallback poll.
-- **SyncSource**: activated by direct cast from `sync_after_persist`. Fetches from network peers. Idle when no casts arrive. Hourly fallback poll.
+- **DriveCopySource**: activated by direct cast from ReplicationListener and drive mount events. Checks other mounted drives for bytes. Idle when no other drives are mounted or no casts arrive. Hourly fallback poll. Reconnect sweep on drive remount (§5.6.2).
+- **SyncSource**: activated by direct cast from `sync_after_persist`. Fetches from network peers. Idle when no casts arrive. Hourly fallback poll. Reconnect sweep when a peer comes back online (§5.6.1).
 
 Crash recovery: supervisor restarts the crashed process. ChunkWriter's `:queue` state is lost on restart — deferred callers receive `{:EXIT, ...}` and retry. If the in-flight write Task crashes, `handle_info({:DOWN, ref, ...})` clears `writing`, replies `{:error, :write_failed}` to the caller, and triggers the next round — the writer does not restart.
 
@@ -402,9 +494,9 @@ The HTTP endpoint (`FileChunkController`) serves one active drive at a time — 
 
 ### 9.5 Drive Mount/Unmount
 
-**Mount**: Platform starts the drive's `ChunkPipelineSupervisor`. DriveCopySources on *other* drives are notified of the new drive's `{repo, chunk_store_path}` (added to their source lists).
+**Mount**: Platform starts the drive's `ChunkPipelineSupervisor`. DriveCopySources on *other* drives are notified of the new drive's `{repo, chunk_store_path}` (added to their source lists) and schedule a reconnect sweep (§5.6.2) — fires after 5 seconds if the drive is still mounted and the `:drive_copy` lane is idle.
 
-**Unmount**: Platform stops the drive's pipeline group. DriveCopySources on other drives remove this drive from their source lists. In-flight `GenServer.call`s to the stopped ChunkWriter receive `{:EXIT, ...}` — sources retry or skip.
+**Unmount**: Platform stops the drive's pipeline group. DriveCopySources on other drives remove this drive from their source lists. In-flight `GenServer.call`s to the stopped ChunkWriter receive `{:EXIT, ...}` — sources retry or skip. Chunks whose `source_drive_id` pointed to the unmounted drive remain in `missing_chunks` — subsequent fetches fall back to a random available drive (§5.2) or wait for remount.
 
 ## 10. Observability
 

@@ -42,13 +42,14 @@ Each drive is an independent storage domain with its own PG instance (port 5432 
 
 Each **source** is a permanent GenServer (always running, see §8) that acts as a sink — other code pushes chunks into the source, or the source polls for work. Sources submit to their drive's ChunkWriter.
 
-### 2.1 Mechanism: GenServer + Deferred Reply + `:queue`
+### 2.1 Mechanism: GenServer + Deferred Reply + `:queue` + Task
 
 No external dependencies — the pipeline uses OTP/stdlib primitives:
 
 - **Deferred reply**: sources call `GenServer.call(writer, {:submit, lane, chunk_data, meta})`. The writer does **not** reply immediately — it holds the caller's `from` reference (`{:noreply, state}` from `handle_call`) and buffers the request. The caller blocks until the writer selects and writes the chunk, then receives the result via `GenServer.reply(from, result)`.
 - **`:queue`**: Erlang's double-ended queue (O(1) push/pop) backs each source lane's buffer inside ChunkWriter's state. Three queues: `:upload`, `:drive_copy`, `:network_sync`.
-- **`handle_continue`**: after each write completes, the writer returns `{:noreply, state, {:continue, :next_round}}`. The `handle_continue(:next_round, state)` callback runs the selection algorithm and writes the next chunk — no `send(self(), ...)` needed, no extra message in the mailbox.
+- **`handle_continue`**: after lane selection, the writer spawns a `Task` for the FS write and returns immediately — the GenServer stays responsive for accepting new submissions while I/O is in flight. When the Task completes, `handle_info` receives the result, replies to the original caller, and triggers the next round.
+- **Delegated I/O**: `ChunkStore.put` runs inside a `Task` (one at a time per drive), not in the GenServer process. This separates queue management (microseconds) from filesystem I/O (~200–400 ms for 4 MB on SD/USB). Without delegation, incoming `handle_call({:submit, ...})` messages would pile up unprocessed in the mailbox for the full duration of each write.
 
 ```elixir
 # ChunkWriter state (conceptual)
@@ -59,19 +60,23 @@ No external dependencies — the pipeline uses OTP/stdlib primitives:
     drive_copy:   :queue.new(),
     network_sync: :queue.new()
   },
-  wait_counters: %{drive_copy: 0, network_sync: 0}
+  wait_counters: %{drive_copy: 0, network_sync: 0},
+  writing: nil  # nil | {task_ref, from, lane} — tracks the in-flight write
 }
 ```
 
 **Flow for one round**:
 
-1. `handle_continue(:next_round, state)` — select source lane per §4
+1. `handle_continue(:next_round, state)` — if `writing` is non-nil, return (write already in flight). Select source lane per §4.
 2. Pop head from selected lane's `:queue` → `{from, chunk_data, meta}`
-3. `ChunkStore.put(meta.file_id, meta.chunk_index, chunk_data)` (synchronous FS write)
-4. `GenServer.reply(from, result)` — unblocks the source's caller
-5. Update wait counters per §4.3
-6. Return `{:noreply, state, {:continue, :next_round}}` — loop continues
-7. If all queues are empty → `{:noreply, state}` — loop pauses until next `handle_call` submit triggers `{:continue, :next_round}`
+3. Spawn `Task`: `ChunkStore.put(meta.file_id, meta.chunk_index, chunk_data)` (FS write — see §7.1). Store `{task_ref, from, lane}` in `writing`.
+4. Return `{:noreply, state}` — GenServer is free to accept new submissions via `handle_call`.
+5. `handle_info({ref, result})` — Task completed. `GenServer.reply(from, result)` unblocks the source's caller.
+6. Set `writing` to `nil`. Update wait counters per §4.3.
+7. Return `{:noreply, state, {:continue, :next_round}}` — loop continues.
+8. If all queues are empty → `{:noreply, state}` — loop pauses until next `handle_call` submit triggers `{:continue, :next_round}`.
+
+**Single-writer guarantee**: only one Task is alive at a time per ChunkWriter — the `writing` field gates step 1. This preserves the one-write-at-a-time-per-drive invariant while keeping the GenServer responsive.
 
 ## 3. Source Prefetch and Backpressure
 
@@ -241,6 +246,15 @@ Index: `(attempts, updated_at)` WHERE `data_hash IS NOT NULL` — supports "leas
 
 ## 7. Interaction with PostgreSQL I/O
 
+### 7.1 `ChunkStore.put` Write Flags
+
+`ChunkStore.put` writes chunk bytes via `File.write(tmp_path, binary, [:raw, :sync])` + `File.rename`:
+
+- **`:raw`** — bypasses the Erlang file server (a single process that serializes all non-raw file I/O across the VM). Without `:raw`, every 4 MB write queues behind all other file operations in the node — including cross-drive writes and PG's file I/O routed through the same file server. `:raw` talks directly to the OS, eliminating that bottleneck.
+- **`:sync`** — flushes data to the storage device before returning. Without it, `File.write` returns when data reaches the OS page cache — on sudden power loss the `.tmp` file could be zero-length or partial, and `File.rename` would have already promoted it. `:sync` guarantees the bytes are on disk before the rename.
+
+### 7.2 PG I/O Contention
+
 ChunkWriter does not gate PostgreSQL writes — each drive's PG manages its own WAL/heap I/O. But serializing chunk writes to one-at-a-time per drive means PG never competes with multiple simultaneous 4 MB `File.write` calls on the same storage device. The net effect:
 
 - **Upload path**: chunk FS write (ChunkWriter) happens first, then PG manifest insert (small row, ~5 KB). Sequential within one round — no overlap.
@@ -298,7 +312,7 @@ Process names are scoped per drive (e.g. via `{:via, Registry, {ChunkRegistry, {
 - **DriveCopySource**: polls `missing_chunks`, checks other mounted drives. Idle when no other drives are mounted or no missing chunks have local sources.
 - **SyncSource**: polls `missing_chunks`, fetches from network peers. Idle when no fetchable missing chunks exist.
 
-Crash recovery: supervisor restarts the crashed process. ChunkWriter's `:queue` state is lost on restart — deferred callers receive `{:EXIT, ...}` and retry.
+Crash recovery: supervisor restarts the crashed process. ChunkWriter's `:queue` state is lost on restart — deferred callers receive `{:EXIT, ...}` and retry. If the in-flight write Task crashes, `handle_info({:DOWN, ref, ...})` clears `writing`, replies `{:error, :write_failed}` to the caller, and triggers the next round — the writer does not restart.
 
 ### 9.4 Main DB Switch and Upload Routing
 

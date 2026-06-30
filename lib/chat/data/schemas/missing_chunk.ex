@@ -9,8 +9,8 @@ defmodule Chat.Data.Schemas.MissingChunk do
 
   @primary_key false
 
-  @create_fields [:file_id, :chunk_index, :peer_url, :updated_at]
-  @create_required @create_fields
+  @create_fields [:file_id, :chunk_index, :peer_url, :source_drive_id, :updated_at]
+  @create_required [:file_id, :chunk_index, :updated_at]
   @fill_fields [:data_hash, :size]
 
   schema "missing_chunks" do
@@ -19,6 +19,7 @@ defmodule Chat.Data.Schemas.MissingChunk do
     field(:data_hash, FileChunkDataHash)
     field(:size, :integer)
     field(:peer_url, :string)
+    field(:source_drive_id, :string)
     field(:attempts, :integer, default: 0)
     field(:updated_at, :integer)
   end

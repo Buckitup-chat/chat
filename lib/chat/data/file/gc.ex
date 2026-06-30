@@ -29,7 +29,6 @@ defmodule Chat.Data.File.GC do
   def handle_info(:gc, state) do
     gc_deleted_files()
     gc_stale_uploads()
-    gc_temp_files()
     schedule_gc()
     {:noreply, state}
   end
@@ -67,10 +66,6 @@ defmodule Chat.Data.File.GC do
       "GC: pruned #{uc_count} upload_chunks and #{fc_count} orphan file_chunks + store from stale upload #{file_id}",
       :debug
     )
-  end
-
-  defp gc_temp_files do
-    ChunkStore.sweep_tmp_files(@gc_interval)
   end
 
   # Shared helpers

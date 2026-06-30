@@ -5,30 +5,30 @@ defmodule Chat.Data.File.ChunkStore do
 
   @index_padding 10
 
-  def put(file_id, chunk_index, binary) do
-    path = chunk_path(file_id, chunk_index)
+  def put(file_id, chunk_index, binary, base_dir \\ nil) do
+    path = chunk_path(file_id, chunk_index, base_dir)
     dir = Path.dirname(path)
     tmp = path <> ".tmp"
 
     with :ok <- File.mkdir_p(dir),
-         :ok <- File.write(tmp, binary) do
+         :ok <- File.write(tmp, binary, [:raw, :sync]) do
       File.rename(tmp, path)
     end
   end
 
-  def fetch(file_id, chunk_index) do
-    file_id |> chunk_path(chunk_index) |> File.read()
+  def fetch(file_id, chunk_index, base_dir \\ nil) do
+    file_id |> chunk_path(chunk_index, base_dir) |> File.read()
   end
 
   def delete_file(file_id) do
-    file_id |> file_dir() |> File.rm_rf()
+    file_id |> file_dir(nil) |> File.rm_rf()
     :ok
   end
 
-  def sweep_tmp_files(max_age_ms) do
+  def sweep_tmp_files(max_age_ms, base_dir \\ nil) do
     cutoff = System.os_time(:millisecond) - max_age_ms
 
-    base_dir()
+    pq_dir(base_dir)
     |> Path.join("**/*.tmp")
     |> Path.wildcard()
     |> Enum.each(fn path ->
@@ -40,7 +40,7 @@ defmodule Chat.Data.File.ChunkStore do
   end
 
   def available_space do
-    path = base_dir()
+    path = pq_dir(nil)
 
     case System.cmd("df", ["-B1", "--output=avail", path], stderr_to_stdout: true) do
       {output, 0} ->
@@ -59,21 +59,23 @@ defmodule Chat.Data.File.ChunkStore do
     end
   end
 
-  defp chunk_path(file_id, chunk_index) do
+  defp chunk_path(file_id, chunk_index, override_base_dir) do
     pad_index = chunk_index |> to_string() |> String.pad_leading(@index_padding, "0")
 
-    Path.join(file_dir(file_id), pad_index)
+    Path.join(file_dir(file_id, override_base_dir), pad_index)
   end
 
-  defp file_dir(file_id) do
+  defp file_dir(file_id, override_base_dir) do
     "f_" <> hex = file_id
-    # Last 2 hex chars of file_id — falls in UUIDv7 random bits, uniform 256-way split.
     shard = String.slice(hex, -2, 2)
 
-    Path.join([base_dir(), shard, file_id])
+    Path.join([pq_dir(override_base_dir), shard, file_id])
   end
 
-  defp base_dir do
-    Path.join(Common.get_chat_db_env(:files_base_dir), "pq_files")
+  defp pq_dir(base_dir) do
+    case base_dir do
+      nil -> Path.join(Common.get_chat_db_env(:files_base_dir), "pq_files")
+      dir -> Path.join(dir, "pq_files")
+    end
   end
 end

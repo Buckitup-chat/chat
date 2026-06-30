@@ -2,7 +2,9 @@ defmodule ChatWeb.FileChunkController do
   use ChatWeb, :controller
 
   alias Chat.Data.File, as: FileData
+  alias Chat.Data.File.ChunkPipeline
   alias Chat.Data.File.ChunkStore
+  alias Chat.Data.File.UploadSource
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.FileChunk
   alias Chat.Data.Types.FileChunkDataHash
@@ -37,10 +39,16 @@ defmodule ChatWeb.FileChunkController do
          {:ok, body, conn} <- read_chunk_body(conn),
          :ok <- verify_body_hash(body, headers.data_hash),
          :ok <- verify_body_size(body, headers.size),
-         :ok <- ChunkStore.put(file_id, chunk_index, body),
+         meta = %{file_id: file_id, chunk_index: chunk_index},
+         :ok <- UploadSource.submit(ChunkPipeline.active_drive_id(), body, meta),
          {:ok, _} <- persist_chunk(chunk) do
       json(conn, %{status: "ok"})
     else
+      {:busy, retry_after} ->
+        conn
+        |> put_resp_header("retry-after", to_string(retry_after))
+        |> send_resp(429, Jason.encode!(%{error: "too many requests"}))
+
       {:error, :invalid_signature} ->
         send_resp(conn, 401, Jason.encode!(%{error: "invalid signature"}))
 

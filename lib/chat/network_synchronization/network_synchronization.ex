@@ -148,12 +148,16 @@ defmodule Chat.NetworkSynchronization do
       @electric_dynamic,
       {PeerSync, peer_url: peer_url, name: electric_via(peer_url)}
     )
+    |> tap(fn _ ->
+      notify_sync_source_peer_connected(peer_url)
+    end)
   end
 
   def remove_electric_peer(peer_url) do
     case Registry.lookup(@electric_registry, peer_url) do
       [{pid, _}] ->
         DeferredStore.purge_peer(peer_url)
+        notify_sync_source_peer_disconnected(peer_url)
         DynamicSupervisor.terminate_child(@electric_dynamic, pid)
 
       [] ->
@@ -164,6 +168,29 @@ defmodule Chat.NetworkSynchronization do
   def list_electric_peers do
     Registry.select(@electric_registry, [{{:"$1", :_, :_}, [], [:"$1"]}])
   end
+
+  defp notify_sync_source_peer_connected(peer_url) do
+    alias Chat.Data.File.SyncSource
+
+    if drive_id = safe_active_drive_id() do
+      SyncSource.peer_connected(drive_id, peer_url)
+    end
+  end
+
+  defp notify_sync_source_peer_disconnected(peer_url) do
+    alias Chat.Data.File.SyncSource
+
+    if drive_id = safe_active_drive_id() do
+      SyncSource.peer_disconnected(drive_id, peer_url)
+    end
+  end
+
+  defp safe_active_drive_id do
+    Chat.Data.File.ChunkPipeline.active_drive_id()
+  rescue
+    _ -> nil
+  end
+
 
   defp electric_via(peer_url) do
     {:via, Registry, {@electric_registry, peer_url}}

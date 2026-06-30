@@ -131,7 +131,9 @@ defmodule Chat.Data.File do
 
   # --- MissingChunks ---
 
-  def insert_missing_chunks_placeholders(file_id, chunk_count, peer_url, now_unix) do
+  def insert_missing_chunks_placeholders(file_id, chunk_count, peer_url, now_unix, opts \\ []) do
+    source_drive_id = Keyword.get(opts, :source_drive_id)
+
     rows =
       for idx <- 0..(chunk_count - 1) do
         %{
@@ -140,26 +142,27 @@ defmodule Chat.Data.File do
           data_hash: nil,
           size: nil,
           peer_url: peer_url,
+          source_drive_id: source_drive_id,
           attempts: 0,
           updated_at: now_unix
         }
       end
 
-    repo().insert_all(MissingChunk, rows, on_conflict: :nothing)
+    use_repo(opts).insert_all(MissingChunk, rows, on_conflict: :nothing)
   end
 
-  def fill_missing_chunk(file_id, chunk_index, data_hash, size) do
+  def fill_missing_chunk(file_id, chunk_index, data_hash, size, opts \\ []) do
     from(m in MissingChunk,
       where: m.file_id == ^file_id and m.chunk_index == ^chunk_index
     )
-    |> repo().update_all(set: [data_hash: data_hash, size: size])
+    |> use_repo(opts).update_all(set: [data_hash: data_hash, size: size])
   end
 
-  def delete_missing_chunk(file_id, chunk_index) do
+  def delete_missing_chunk(file_id, chunk_index, opts \\ []) do
     from(m in MissingChunk,
       where: m.file_id == ^file_id and m.chunk_index == ^chunk_index
     )
-    |> repo().delete_all()
+    |> use_repo(opts).delete_all()
   end
 
   def delete_missing_chunks_for_file(file_id) do
@@ -176,15 +179,76 @@ defmodule Chat.Data.File do
     |> repo().all()
   end
 
-  def increment_missing_chunk_attempts(file_id, chunk_index, now_unix) do
+  def increment_missing_chunk_attempts(file_id, chunk_index, now_unix, opts \\ []) do
     from(m in MissingChunk,
       where: m.file_id == ^file_id and m.chunk_index == ^chunk_index
     )
-    |> repo().update_all(inc: [attempts: 1], set: [updated_at: now_unix])
+    |> use_repo(opts).update_all(inc: [attempts: 1], set: [updated_at: now_unix])
   end
 
   def missing_chunk_count(file_id) do
     from(m in MissingChunk, where: m.file_id == ^file_id, select: count())
     |> repo().one()
+  end
+
+  def get_missing_chunk_hash(file_id, chunk_index, opts \\ []) do
+    from(m in MissingChunk,
+      where: m.file_id == ^file_id and m.chunk_index == ^chunk_index,
+      select: m.data_hash
+    )
+    |> use_repo(opts).one()
+  end
+
+  def fetchable_missing_chunks_for_sync(limit, max_attempts, opts \\ []) do
+    from(m in MissingChunk,
+      where: not is_nil(m.data_hash),
+      order_by: [
+        asc: m.attempts,
+        asc: fragment("CASE WHEN ? IS NOT NULL THEN 0 ELSE 1 END", m.peer_url),
+        asc: fragment("random()")
+      ],
+      limit: ^limit
+    )
+    |> maybe_cap_attempts(max_attempts)
+    |> use_repo(opts).all()
+  end
+
+  defp maybe_cap_attempts(query, nil), do: query
+  defp maybe_cap_attempts(query, max), do: where(query, [m], m.attempts < ^max)
+
+  def fetchable_missing_chunks_for_copy(limit, max_attempts, opts \\ []) do
+    from(m in MissingChunk,
+      where: not is_nil(m.data_hash) and m.attempts < ^max_attempts,
+      order_by: [
+        asc: m.attempts,
+        asc: fragment("CASE WHEN ? IS NOT NULL THEN 0 ELSE 1 END", m.source_drive_id),
+        asc: fragment("random()")
+      ],
+      limit: ^limit
+    )
+    |> use_repo(opts).all()
+  end
+
+  def missing_chunks_for_peer(peer_url, opts \\ []) do
+    from(m in MissingChunk,
+      where: m.peer_url == ^peer_url and not is_nil(m.data_hash),
+      order_by: [asc: m.attempts, asc: m.updated_at]
+    )
+    |> use_repo(opts).all()
+  end
+
+  def missing_chunks_for_drive(source_drive_id, opts \\ []) do
+    from(m in MissingChunk,
+      where: m.source_drive_id == ^source_drive_id and not is_nil(m.data_hash),
+      order_by: [asc: m.attempts, asc: m.updated_at]
+    )
+    |> use_repo(opts).all()
+  end
+
+  defp use_repo(opts) do
+    case Keyword.get(opts, :repo) do
+      nil -> repo()
+      repo -> repo
+    end
   end
 end

@@ -5,6 +5,8 @@ defmodule Chat.Data.Shapes.FileChunk do
   use Toolbox.OriginLog
 
   alias Chat.Data.File, as: FileData
+  alias Chat.Data.File.ChunkPipeline
+  alias Chat.Data.File.SyncSource
   alias Chat.Data.File.Validation
   alias Chat.Data.Schemas.FileChunk
   alias Phoenix.Sync.Writer
@@ -50,15 +52,23 @@ defmodule Chat.Data.Shapes.FileChunk do
   def sync_after_persist(operation, struct, opts) do
     case {operation, struct, Keyword.get(opts, :peer_url)} do
       {:insert, %FileChunk{} = chunk, peer_url} when is_binary(peer_url) ->
-        fill_missing_chunk(chunk)
+        fill_missing_chunk(chunk, peer_url)
 
       _ ->
         :ok
     end
   end
 
-  defp fill_missing_chunk(%FileChunk{} = chunk) do
+  defp fill_missing_chunk(%FileChunk{} = chunk, peer_url) do
     FileData.fill_missing_chunk(chunk.file_id, chunk.chunk_index, chunk.data_hash, chunk.size)
+
+    SyncSource.chunk_fetchable(
+      ChunkPipeline.active_drive_id(),
+      chunk.file_id,
+      chunk.chunk_index,
+      peer_url
+    )
+
     :ok
   end
 

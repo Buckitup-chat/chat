@@ -2,9 +2,11 @@ defmodule Chat.Data.File.GCTest do
   use ChatWeb.DataCase, async: true, group: :ets_deferred
 
   alias Chat.Data.File, as: FileData
+  alias Chat.Data.File.ChunkStore
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.File, as: FileSchema
   alias Chat.Data.Schemas.FileChunk
+  alias Chat.Data.Schemas.MissingChunk
   alias Chat.Data.Schemas.UploadChunk
   alias Chat.Data.Types.FileId
   alias Chat.Data.User
@@ -30,6 +32,48 @@ defmodule Chat.Data.File.GCTest do
       |> Enum.each(&FileData.delete_file_chunks_batch(&1, 50))
 
       assert Repo.get_by(FileChunk, file_id: file.file_id, chunk_index: 0) == nil
+    end
+
+    test "deletes missing_chunks for deleted files", %{identity: identity, user_hash: user_hash} do
+      file = insert_file_with_chunk(identity, user_hash)
+      FileData.insert_missing_chunks_placeholders(file.file_id, 3, nil, 1_000_000)
+
+      soft_delete_file(file, identity.sign_skey)
+
+      assert Repo.aggregate(
+               from(m in MissingChunk, where: m.file_id == ^file.file_id),
+               :count
+             ) == 3
+
+      FileData.deleted_file_ids_with_chunks()
+      |> Enum.each(fn file_id ->
+        FileData.delete_file_chunks_batch(file_id, 50)
+        FileData.delete_missing_chunks_for_file(file_id)
+      end)
+
+      assert Repo.aggregate(
+               from(m in MissingChunk, where: m.file_id == ^file.file_id),
+               :count
+             ) == 0
+    end
+
+    test "deletes ChunkStore files for deleted files", %{identity: identity, user_hash: user_hash} do
+      file = insert_file_with_chunk(identity, user_hash)
+      tmp_dir = System.tmp_dir!() |> Path.join("gc_test_#{System.unique_integer([:positive])}")
+
+      :ok = ChunkStore.put(file.file_id, 0, "chunk data", tmp_dir)
+      assert {:ok, "chunk data"} = ChunkStore.fetch(file.file_id, 0, tmp_dir)
+
+      soft_delete_file(file, identity.sign_skey)
+
+      "f_" <> hex = file.file_id
+      shard = String.slice(hex, -2, 2)
+      file_dir = Path.join([tmp_dir, "pq_files", shard, file.file_id])
+      File.rm_rf!(file_dir)
+
+      assert {:error, :enoent} = ChunkStore.fetch(file.file_id, 0, tmp_dir)
+
+      on_exit(fn -> File.rm_rf!(tmp_dir) end)
     end
 
     defp insert_file_with_chunk(identity, user_hash) do
@@ -71,6 +115,30 @@ defmodule Chat.Data.File.GCTest do
 
       assert Repo.get_by(UploadChunk, file_id: file_id, chunk_index: 0) == nil
       assert Repo.get_by(FileChunk, file_id: file_id, chunk_index: 0) == nil
+    end
+
+    test "deletes missing_chunks for stale uploads", %{
+      identity: identity,
+      user_hash: user_hash
+    } do
+      file_id = FileId.generate()
+      chunk = insert_orphan_chunk(identity, user_hash, file_id)
+      insert_upload_chunk_record(file_id, 0, chunk, user_hash, _stale_timestamp = 1_000_000)
+      FileData.insert_missing_chunks_placeholders(file_id, 2, nil, 1_000_000)
+
+      stale_ids = FileData.stale_upload_chunk_file_ids(2_000_000)
+      assert file_id in stale_ids
+
+      Enum.each(stale_ids, fn fid ->
+        FileData.delete_upload_chunks_for_file(fid)
+        FileData.delete_file_chunks_batch(fid, 50)
+        FileData.delete_missing_chunks_for_file(fid)
+      end)
+
+      assert Repo.aggregate(
+               from(m in MissingChunk, where: m.file_id == ^file_id),
+               :count
+             ) == 0
     end
 
     test "does not delete upload_chunks for committed files", %{

@@ -22,6 +22,7 @@ defmodule Chat.Application do
         ChatWeb.Telemetry,
         # Start the PubSub system
         {Phoenix.PubSub, name: Chat.PubSub},
+        {Registry, name: Chat.Data.File.ChunkPipelineRegistry, keys: :unique},
         Chat.TimeKeeper |> if_on_host(),
         # Start Ecto repository with retry mechanism
         Chat.RepoSupervisor |> if_on_host(),
@@ -31,7 +32,6 @@ defmodule Chat.Application do
         Chat.AdminDb,
         # Application Services
         Chat.Challenge,
-        Chat.Upload.IngestThrottle,
         Chat.KeyRingTokens,
         Chat.Broker,
         Chat.ChunkedFilesBroker,
@@ -49,32 +49,7 @@ defmodule Chat.Application do
         NetworkSynchronization.Supervisor,
         # Supervised tasks caller
         {Task.Supervisor, name: Chat.TaskSupervisor},
-        {Task,
-         fn ->
-           {:ok, _pid} = AdminLogger |> LoggerBackends.add()
-
-           Task.Supervisor.start_child(
-             Chat.TaskSupervisor,
-             fn ->
-               log_version()
-               Process.sleep(:timer.minutes(5))
-
-               AdminLogger.get_current_generation()
-               |> AdminLogger.remove_old_generations()
-             end,
-             shutdown: :brutal_kill
-           )
-
-           Task.Supervisor.start_child(
-             Chat.TaskSupervisor,
-             fn ->
-               Retrieval.load_all_chat_modules()
-               NetworkSynchronization.init_workers()
-               maybe_init_electric_peers()
-             end,
-             shutdown: :brutal_kill
-           )
-         end}
+        {Task, &post_start/0}
         # Start a worker by calling: Chat.Worker.start_link(arg)
         # {Chat.Worker, arg}
       ]
@@ -91,8 +66,20 @@ defmodule Chat.Application do
   if Application.compile_env(:chat, :env) == :test do
     defp more_children, do: []
   else
-    defp more_children,
-      do: [Chat.Data.File.GC, Chat.Data.File.ChunkFetcher, Chat.Upload.StaleUploadsPruner]
+    defp more_children do
+      [
+        Chat.Data.File.GC,
+        Chat.Upload.StaleUploadsPruner
+      ] ++ pipeline_children()
+    end
+  end
+
+  if Mix.target() == :host do
+    defp pipeline_children do
+      [{Chat.Data.File.ChunkPipelineSupervisor, drive_id: :internal, repo: Chat.Repo}]
+    end
+  else
+    defp pipeline_children, do: []
   end
 
   # Tell Phoenix to update the endpoint configuration
@@ -112,6 +99,36 @@ defmodule Chat.Application do
   end
 
   # coveralls-ignore-end
+
+  defp post_start do
+    {:ok, _pid} = AdminLogger |> LoggerBackends.add()
+
+    Task.Supervisor.start_child(
+      Chat.TaskSupervisor,
+      &cleanup_old_admin_generations/0,
+      shutdown: :brutal_kill
+    )
+
+    Task.Supervisor.start_child(
+      Chat.TaskSupervisor,
+      &init_network/0,
+      shutdown: :brutal_kill
+    )
+  end
+
+  defp cleanup_old_admin_generations do
+    log_version()
+    Process.sleep(:timer.minutes(5))
+
+    AdminLogger.get_current_generation()
+    |> AdminLogger.remove_old_generations()
+  end
+
+  defp init_network do
+    Retrieval.load_all_chat_modules()
+    NetworkSynchronization.init_workers()
+    maybe_init_electric_peers()
+  end
 
   defp log_version do
     Logger.info(["[chat] ", get_version()])

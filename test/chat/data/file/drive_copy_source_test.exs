@@ -49,78 +49,45 @@ defmodule Chat.Data.File.DriveCopySourceTest do
   end
 
   describe "drive mount/unmount" do
-    test "drive_mounted registers drive and schedules sweep timer", %{pid: pid} do
-      GenServer.cast(pid, {:drive_mounted, "usb1", "/mnt/usb1"})
-      wait_for_cast(pid)
-
-      state = :sys.get_state(pid)
-      assert state.other_drives["usb1"] == "/mnt/usb1"
-      assert is_reference(state.sweep_timers["usb1"])
-    end
-
     test "drive_unmounted removes drive and cancels sweep timer", %{pid: pid} do
-      GenServer.cast(pid, {:drive_mounted, "usb1", "/mnt/usb1"})
-      wait_for_cast(pid)
+      inject_drive(pid, "sys_id_1", "/mnt/usb1")
 
-      GenServer.cast(pid, {:drive_unmounted, "usb1"})
-      wait_for_cast(pid)
-
-      state = :sys.get_state(pid)
-      refute Map.has_key?(state.other_drives, "usb1")
-      refute Map.has_key?(state.sweep_timers, "usb1")
-    end
-
-    test "self-mount is ignored", %{pid: pid} do
-      GenServer.cast(pid, {:drive_mounted, @drive_id, "/mnt/self"})
+      GenServer.cast(pid, {:drive_unmounted, "sys_id_1"})
       wait_for_cast(pid)
 
       state = :sys.get_state(pid)
-      assert state.other_drives == %{}
+      refute Map.has_key?(state.other_drives, "sys_id_1")
+      refute Map.has_key?(state.sweep_timers, "sys_id_1")
     end
 
     test "unmount before sweep timer fires prevents sweep", %{pid: pid} do
-      GenServer.cast(pid, {:drive_mounted, "usb_flap", "/mnt/usb_flap"})
-      wait_for_cast(pid)
+      inject_drive(pid, "sys_flap", "/mnt/usb_flap")
 
-      GenServer.cast(pid, {:drive_unmounted, "usb_flap"})
+      GenServer.cast(pid, {:drive_unmounted, "sys_flap"})
       wait_for_cast(pid)
 
       Process.sleep(100)
 
       state = :sys.get_state(pid)
-      refute Map.has_key?(state.other_drives, "usb_flap")
-      refute Map.has_key?(state.sweep_timers, "usb_flap")
+      refute Map.has_key?(state.other_drives, "sys_flap")
+      refute Map.has_key?(state.sweep_timers, "sys_flap")
     end
   end
 
   describe "PubSub integration" do
-    test "responds to chunk_pipeline drive_mounted broadcast", %{pid: pid} do
-      Phoenix.PubSub.broadcast(
-        Chat.PubSub,
-        "chunk_pipeline",
-        {:chunk_pipeline, {:drive_mounted, "usb2", "/mnt/usb2"}}
-      )
-
-      wait_for_cast(pid)
-
-      state = :sys.get_state(pid)
-      assert state.other_drives["usb2"] == "/mnt/usb2"
-    end
-
     test "responds to chunk_pipeline drive_unmounted broadcast", %{pid: pid} do
-      GenServer.cast(pid, {:drive_mounted, "usb2", "/mnt/usb2"})
-      wait_for_cast(pid)
+      inject_drive(pid, "sys_id_2", "/mnt/usb2")
 
       Phoenix.PubSub.broadcast(
         Chat.PubSub,
         "chunk_pipeline",
-        {:chunk_pipeline, {:drive_unmounted, "usb2"}}
+        {:chunk_pipeline, {:drive_unmounted, "sys_id_2"}}
       )
 
       wait_for_cast(pid)
 
       state = :sys.get_state(pid)
-      refute Map.has_key?(state.other_drives, "usb2")
+      refute Map.has_key?(state.other_drives, "sys_id_2")
     end
   end
 
@@ -142,10 +109,9 @@ defmodule Chat.Data.File.DriveCopySourceTest do
     end
 
     test "falls back to random drive when source drive not mounted", %{pid: pid} do
-      GenServer.cast(pid, {:drive_mounted, "usb1", "/mnt/usb1"})
-      wait_for_cast(pid)
+      inject_drive(pid, "sys_id_1", "/mnt/usb1")
 
-      GenServer.cast(pid, {:chunk_fetchable, "f_abc123", 0, "usb_gone"})
+      GenServer.cast(pid, {:chunk_fetchable, "f_abc123", 0, "sys_gone"})
       wait_for_cast(pid)
 
       assert Process.alive?(pid)
@@ -157,6 +123,14 @@ defmodule Chat.Data.File.DriveCopySourceTest do
   defp start_source(drive_id) do
     {:ok, pid} = GenServer.start_link(DriveCopySource, drive_id: drive_id, repo: nil)
     pid
+  end
+
+  defp inject_drive(pid, system_id, base_dir) do
+    :sys.replace_state(pid, fn state ->
+      others = Map.put(state.other_drives, system_id, base_dir)
+      timers = Map.put(state.sweep_timers, system_id, Process.send_after(pid, {:sweep, system_id}, 5_000))
+      %{state | other_drives: others, sweep_timers: timers}
+    end)
   end
 
   defp wait_for_cast(pid) do

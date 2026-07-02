@@ -7,6 +7,7 @@ defmodule Chat.Data.File.ReplicationListener do
   alias Chat.Data.File, as: FileData
   alias Chat.Data.File.DriveCopySource
   alias Chat.TimeKeeper
+  alias Ecto.Adapters.SQL
 
   @registry Chat.Data.File.ChunkPipelineRegistry
 
@@ -20,7 +21,8 @@ defmodule Chat.Data.File.ReplicationListener do
     drive_id = Keyword.fetch!(opts, :drive_id)
     repo = Keyword.get(opts, :repo)
 
-    state = %{drive_id: drive_id, repo: repo, conn: nil, refs: %{}}
+    system_id = query_system_id(repo)
+    state = %{drive_id: drive_id, repo: repo, system_id: system_id, conn: nil, refs: %{}}
 
     case connect_and_listen(repo) do
       {:ok, conn, refs} ->
@@ -41,7 +43,7 @@ defmodule Chat.Data.File.ReplicationListener do
           chunk_count,
           nil,
           TimeKeeper.now_unix(),
-          source_drive_id: state.drive_id,
+          source_drive_id: state.system_id,
           repo: state.repo
         )
 
@@ -56,7 +58,7 @@ defmodule Chat.Data.File.ReplicationListener do
     case Jason.decode(payload) do
       {:ok, %{"file_id" => fid, "chunk_index" => ci, "data_hash" => dh, "size" => s}} ->
         FileData.fill_missing_chunk(fid, ci, dh, s, repo: state.repo)
-        DriveCopySource.chunk_fetchable(state.drive_id, fid, ci, state.drive_id)
+        DriveCopySource.chunk_fetchable(state.drive_id, fid, ci, state.system_id)
 
       _ ->
         log("ReplicationListener: bad file_chunk_replicated payload", :warning)
@@ -80,6 +82,15 @@ defmodule Chat.Data.File.ReplicationListener do
          {:ok, ref1} <- Postgrex.Notifications.listen(conn, "file_replicated"),
          {:ok, ref2} <- Postgrex.Notifications.listen(conn, "file_chunk_replicated") do
       {:ok, conn, %{file_replicated: ref1, file_chunk_replicated: ref2}}
+    end
+  end
+
+  defp query_system_id(nil), do: nil
+
+  defp query_system_id(repo) do
+    case SQL.query(repo, "SELECT system_identifier FROM pg_control_system()", []) do
+      {:ok, %{rows: [[identifier]]}} -> to_string(identifier)
+      _ -> nil
     end
   end
 

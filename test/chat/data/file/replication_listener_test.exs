@@ -89,7 +89,7 @@ defmodule Chat.Data.File.ReplicationListenerTest do
       wait_for_cast(pid)
 
       assert_received {:chunk_filled, "f_abc123", 2, "fd_deadbeef", 4096}
-      assert_received {:chunk_fetchable_cast, @drive_id, "f_abc123", 2, @drive_id}
+      assert_received {:chunk_fetchable_cast, @drive_id, "f_abc123", 2, nil}
     end
 
     test "malformed payload does not crash", %{pid: pid} do

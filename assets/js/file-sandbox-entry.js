@@ -425,6 +425,18 @@ async function fetchManifest(fileId) {
   return files[0];
 }
 
+async function fetchChunkMeta(fileId) {
+  setStatus('Fetching chunk metadata...', 'info');
+  const rows = await fetchShapeWhere(state.baseUrl, 'file_chunks', `file_id = '${fileId}'`);
+  return new Map(rows.map(r => [parseInt(r.chunk_index), r]));
+}
+
+function verifyChunkHash(encBytes, expectedDataHash) {
+  const actual = 'fd_' + uint8ToHex(hash(encBytes));
+  if (actual !== expectedDataHash)
+    throw new Error(`Chunk hash mismatch: expected ${expectedDataHash.slice(0, 20)}…, got ${actual.slice(0, 20)}…`);
+}
+
 async function fetchChunk(fileId, index) {
   const resp = await fetch(`${state.baseUrl}/electric/v1/file_chunk/${fileId}/${index}`);
   if (resp.status === 404) throw new Error(`Chunk ${index} not found`);
@@ -446,6 +458,7 @@ async function handleDownload() {
     const encSecret = hexToUint8(encSecretHex);
     const manifest = await fetchManifest(fileId);
     const chunkCount = parseInt(manifest.chunk_count);
+    const chunkMeta = await fetchChunkMeta(fileId);
 
     let fileHandle = null;
     if (window.showSaveFilePicker) {
@@ -467,6 +480,8 @@ async function handleDownload() {
         for (let i = 0; i < chunkCount; i++) {
           updateProgress(i, chunkCount, 'Downloading');
           const chunk = await fetchChunk(fileId, i);
+          const meta = chunkMeta.get(i);
+          if (meta) verifyChunkHash(chunk, meta.data_hash);
           const decrypted = await decryptChunk(chunk, encSecret);
           await writable.write(decrypted);
         }
@@ -478,6 +493,8 @@ async function handleDownload() {
       for (let i = 0; i < chunkCount; i++) {
         updateProgress(i, chunkCount, 'Downloading');
         const chunk = await fetchChunk(fileId, i);
+        const meta = chunkMeta.get(i);
+        if (meta) verifyChunkHash(chunk, meta.data_hash);
         decryptedChunks.push(
           await decryptChunk(chunk, encSecret)
         );
@@ -523,11 +540,14 @@ async function handleView() {
     const encSecret = hexToUint8(encSecretHex);
     const manifest = await fetchManifest(fileId);
     const chunkCount = parseInt(manifest.chunk_count);
+    const chunkMeta = await fetchChunkMeta(fileId);
 
     const decryptedChunks = [];
     for (let i = 0; i < chunkCount; i++) {
       updateProgress(i, chunkCount, 'Downloading');
       const chunk = await fetchChunk(fileId, i);
+      const meta = chunkMeta.get(i);
+      if (meta) verifyChunkHash(chunk, meta.data_hash);
       decryptedChunks.push(
         await decryptChunk(chunk, encSecret)
       );

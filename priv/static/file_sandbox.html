@@ -68,7 +68,8 @@
           <ol class="list-decimal list-inside space-y-1 text-sm">
             <li>Enter file_id and encryption secret (hex)</li>
             <li>Fetch file manifest via Electric Shape API</li>
-            <li>Fetch all chunks, validate count matches manifest</li>
+            <li>Fetch file_chunks metadata (data_hash per chunk)</li>
+            <li>Fetch each chunk, verify SHA3-512(body) matches data_hash</li>
             <li>Decrypt each chunk with AES-256-GCM using enc_secret</li>
             <li>Reassemble and trigger browser download</li>
           </ol>

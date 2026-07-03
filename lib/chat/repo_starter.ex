@@ -5,6 +5,8 @@ defmodule Chat.RepoStarter do
   use GenServer
   require Logger
 
+  alias Chat.Data.File.ChunkPipelineSupervisor
+
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(args) do
     opts =
@@ -24,6 +26,7 @@ defmodule Chat.RepoStarter do
       # Start repo with proper name registration for test environment
       {:ok, _pid} = DynamicSupervisor.start_child(supervisor, {Chat.Repo, [name: Chat.Repo]})
       run_migrations()
+      start_chunk_pipeline(supervisor)
 
       {:ok, %{supervisor: supervisor}}
     end
@@ -49,8 +52,18 @@ defmodule Chat.RepoStarter do
       {:ok, _pid} =
         DynamicSupervisor.start_child(state.supervisor, {Chat.Repo, [name: Chat.InternalRepo]})
 
+      start_chunk_pipeline(state.supervisor)
+
       {:noreply, state}
     end
+  end
+
+  defp start_chunk_pipeline(supervisor) do
+    {:ok, _pid} =
+      DynamicSupervisor.start_child(
+        supervisor,
+        {ChunkPipelineSupervisor, drive_id: :internal, repo: Chat.Repo}
+      )
   end
 
   @doc """

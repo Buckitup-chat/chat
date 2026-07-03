@@ -70,16 +70,8 @@ defmodule Chat.Application do
       [
         Chat.Data.File.GC,
         Chat.Upload.StaleUploadsPruner
-      ] ++ pipeline_children()
+      ]
     end
-  end
-
-  if Mix.target() == :host do
-    defp pipeline_children do
-      [{Chat.Data.File.ChunkPipelineSupervisor, drive_id: :internal, repo: Chat.Repo}]
-    end
-  else
-    defp pipeline_children, do: []
   end
 
   # Tell Phoenix to update the endpoint configuration

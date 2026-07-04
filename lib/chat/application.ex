@@ -24,8 +24,7 @@ defmodule Chat.Application do
         {Phoenix.PubSub, name: Chat.PubSub},
         {Registry, name: Chat.Data.File.ChunkPipelineRegistry, keys: :unique},
         Chat.TimeKeeper |> if_on_host(),
-        # Start Ecto repository with retry mechanism
-        Chat.RepoSupervisor |> if_on_host(),
+        {DynamicSupervisor, name: Chat.RepoDynamicSupervisor, strategy: :one_for_one},
         # Start DB
         Chat.Ordering.Counters,
         Chat.Db.Supervisor,
@@ -46,6 +45,8 @@ defmodule Chat.Application do
         ChatWeb.Presence,
         # Start the Endpoint (http/https)
         {ChatWeb.Endpoint, phoenix_sync: Phoenix.Sync.plug_opts()},
+        # Staged boot: Repo → Electric check → ChunkPipeline (host only)
+        Chat.DbBootSupervisor |> if_on_host(),
         NetworkSynchronization.Supervisor,
         # Supervised tasks caller
         {Task.Supervisor, name: Chat.TaskSupervisor},

@@ -1,6 +1,8 @@
 defmodule ChatWeb.FileChunkController do
   use ChatWeb, :controller
 
+  use Toolbox.OriginLog
+
   alias Chat.Data.File, as: FileData
   alias Chat.Data.File.ChunkPipeline
   alias Chat.Data.File.ChunkStore
@@ -39,8 +41,8 @@ defmodule ChatWeb.FileChunkController do
          {:ok, body, conn} <- read_chunk_body(conn),
          :ok <- verify_body_hash(body, headers.data_hash),
          :ok <- verify_body_size(body, headers.size),
-         meta = %{file_id: file_id, chunk_index: chunk_index},
-         :ok <- UploadSource.submit(ChunkPipeline.active_drive_id(), body, meta),
+         {:ok, drive_id} <- fetch_active_drive_id(),
+         :ok <- submit_chunk(drive_id, body, file_id, chunk_index),
          {:ok, _} <- persist_chunk(chunk) do
       json(conn, %{status: "ok"})
     else
@@ -72,6 +74,15 @@ defmodule ChatWeb.FileChunkController do
 
       {:error, :missing_headers} ->
         send_resp(conn, 400, Jason.encode!(%{error: "missing required headers"}))
+
+      {:error, :no_active_drive} ->
+        send_resp(conn, 503, Jason.encode!(%{error: "storage not ready"}))
+
+      {:error, :writer_unavailable} ->
+        send_resp(conn, 503, Jason.encode!(%{error: "chunk writer unavailable"}))
+
+      {:error, :write_failed} ->
+        send_resp(conn, 500, Jason.encode!(%{error: "chunk write failed"}))
 
       _ ->
         send_resp(conn, 400, Jason.encode!(%{error: "bad request"}))
@@ -112,6 +123,20 @@ defmodule ChatWeb.FileChunkController do
       owner_timestamp: headers.owner_timestamp,
       sign_b64: headers.sign_b64
     }
+  end
+
+  defp fetch_active_drive_id do
+    {:ok, ChunkPipeline.active_drive_id()}
+  rescue
+    _ -> {:error, :no_active_drive}
+  end
+
+  defp submit_chunk(drive_id, body, file_id, chunk_index) do
+    UploadSource.submit(drive_id, body, %{file_id: file_id, chunk_index: chunk_index})
+  catch
+    :exit, reason ->
+      log("chunk submit exit: #{inspect(reason)}", :error)
+      {:error, :writer_unavailable}
   end
 
   defp check_free_space(chunk_size) do

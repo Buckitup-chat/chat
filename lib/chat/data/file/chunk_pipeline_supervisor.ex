@@ -23,7 +23,6 @@ defmodule Chat.Data.File.ChunkPipelineSupervisor do
     children = [
       {ChunkWriter, drive_id: drive_id, base_dir: base_dir},
       {ReplicationListener, drive_id: drive_id, repo: repo},
-
       {DriveCopySource, drive_id: drive_id, base_dir: base_dir, repo: repo},
       {SyncSource, drive_id: drive_id, repo: repo},
       {TmpSweeper, drive_id: drive_id, base_dir: base_dir},

@@ -11,7 +11,9 @@ defmodule Chat.Data.File.MissingChunksTest do
 
       FileData.insert_missing_chunks_placeholders(file_id, 3, "http://peer:4444", 1_000_000)
 
-      chunks = Repo.all(from(m in MissingChunk, where: m.file_id == ^file_id, order_by: m.chunk_index))
+      chunks =
+        Repo.all(from(m in MissingChunk, where: m.file_id == ^file_id, order_by: m.chunk_index))
+
       assert length(chunks) == 3
       assert Enum.map(chunks, & &1.chunk_index) == [0, 1, 2]
       assert Enum.all?(chunks, &is_nil(&1.data_hash))

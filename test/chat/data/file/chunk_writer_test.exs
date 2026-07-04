@@ -10,7 +10,10 @@ defmodule Chat.Data.File.ChunkWriterTest do
     Registry.start_link(keys: :unique, name: registry)
 
     writer_name = {:via, Registry, {registry, {:writer, @drive_id}}}
-    tmp_dir = System.tmp_dir!() |> Path.join("chunk_writer_test_#{System.unique_integer([:positive])}")
+
+    tmp_dir =
+      System.tmp_dir!() |> Path.join("chunk_writer_test_#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(tmp_dir)
 
     {:ok, pid} =
@@ -62,7 +65,11 @@ defmodule Chat.Data.File.ChunkWriterTest do
 
     for i <- 0..1 do
       Task.async(fn ->
-        GenServer.call(pid, {:submit, :drive_copy, "dc_#{i}", %{file_id: file_id, chunk_index: i}}, 10_000)
+        GenServer.call(
+          pid,
+          {:submit, :drive_copy, "dc_#{i}", %{file_id: file_id, chunk_index: i}},
+          10_000
+        )
       end)
     end
 
@@ -70,7 +77,11 @@ defmodule Chat.Data.File.ChunkWriterTest do
 
     blocked_task =
       Task.async(fn ->
-        GenServer.call(pid, {:submit, :drive_copy, "dc_2", %{file_id: file_id, chunk_index: 2}}, 10_000)
+        GenServer.call(
+          pid,
+          {:submit, :drive_copy, "dc_2", %{file_id: file_id, chunk_index: 2}},
+          10_000
+        )
       end)
 
     Process.sleep(50)
@@ -84,14 +95,22 @@ defmodule Chat.Data.File.ChunkWriterTest do
 
     sync_task =
       Task.async(fn ->
-        GenServer.call(writer, {:submit, :network_sync, "sync data", %{file_id: file_id, chunk_index: 100}}, 10_000)
+        GenServer.call(
+          writer,
+          {:submit, :network_sync, "sync data", %{file_id: file_id, chunk_index: 100}},
+          10_000
+        )
       end)
 
     Process.sleep(10)
 
     upload_task =
       Task.async(fn ->
-        GenServer.call(writer, {:submit, :upload, "upload data", %{file_id: file_id, chunk_index: 200}}, 10_000)
+        GenServer.call(
+          writer,
+          {:submit, :upload, "upload data", %{file_id: file_id, chunk_index: 200}},
+          10_000
+        )
       end)
 
     assert Task.await(upload_task, 10_000) == :ok
@@ -132,14 +151,22 @@ defmodule Chat.Data.File.ChunkWriterTest do
 
     drive_copy_task =
       Task.async(fn ->
-        GenServer.call(pid, {:submit, :drive_copy, "dc", %{file_id: file_id, chunk_index: 900}}, 10_000)
+        GenServer.call(
+          pid,
+          {:submit, :drive_copy, "dc", %{file_id: file_id, chunk_index: 900}},
+          10_000
+        )
       end)
 
     Process.sleep(10)
 
     upload_task =
       Task.async(fn ->
-        GenServer.call(pid, {:submit, :upload, "u_after", %{file_id: file_id, chunk_index: 901}}, 10_000)
+        GenServer.call(
+          pid,
+          {:submit, :upload, "u_after", %{file_id: file_id, chunk_index: 901}},
+          10_000
+        )
       end)
 
     assert Task.await(drive_copy_task, 10_000) == :ok
@@ -151,13 +178,23 @@ defmodule Chat.Data.File.ChunkWriterTest do
 
     :sys.suspend(pid)
 
-    dc_task = Task.async(fn ->
-      GenServer.call(pid, {:submit, :drive_copy, "dc", %{file_id: file_id, chunk_index: 0}}, 10_000)
-    end)
+    dc_task =
+      Task.async(fn ->
+        GenServer.call(
+          pid,
+          {:submit, :drive_copy, "dc", %{file_id: file_id, chunk_index: 0}},
+          10_000
+        )
+      end)
 
-    sync_task = Task.async(fn ->
-      GenServer.call(pid, {:submit, :network_sync, "ns", %{file_id: file_id, chunk_index: 1}}, 10_000)
-    end)
+    sync_task =
+      Task.async(fn ->
+        GenServer.call(
+          pid,
+          {:submit, :network_sync, "ns", %{file_id: file_id, chunk_index: 1}},
+          10_000
+        )
+      end)
 
     Process.sleep(50)
     :sys.resume(pid)
@@ -174,7 +211,12 @@ defmodule Chat.Data.File.ChunkWriterTest do
 
     # Submit only uploads — drive_copy and network_sync queues stay empty
     for i <- 0..3 do
-      assert :ok = GenServer.call(pid, {:submit, :upload, "u#{i}", %{file_id: file_id, chunk_index: i}}, 5_000)
+      assert :ok =
+               GenServer.call(
+                 pid,
+                 {:submit, :upload, "u#{i}", %{file_id: file_id, chunk_index: i}},
+                 5_000
+               )
     end
 
     state = :sys.get_state(pid)
@@ -189,7 +231,11 @@ defmodule Chat.Data.File.ChunkWriterTest do
     :sys.suspend(pid)
 
     Task.async(fn ->
-      GenServer.call(pid, {:submit, :drive_copy, "dc", %{file_id: file_id, chunk_index: 0}}, 10_000)
+      GenServer.call(
+        pid,
+        {:submit, :drive_copy, "dc", %{file_id: file_id, chunk_index: 0}},
+        10_000
+      )
     end)
 
     Task.async(fn ->
@@ -211,26 +257,43 @@ defmodule Chat.Data.File.ChunkWriterTest do
     File.rm_rf!(tmp_dir)
     File.write!(tmp_dir, "not a directory")
 
-    result = GenServer.call(pid, {:submit, :upload, "data", %{file_id: file_id, chunk_index: 0}}, 5_000)
+    result =
+      GenServer.call(pid, {:submit, :upload, "data", %{file_id: file_id, chunk_index: 0}}, 5_000)
+
     assert {:error, _} = result
 
     # Writer should still be alive and accept new work
     File.rm!(tmp_dir)
     File.mkdir_p!(tmp_dir)
 
-    assert :ok = GenServer.call(pid, {:submit, :upload, "data2", %{file_id: random_file_id(), chunk_index: 0}}, 5_000)
+    assert :ok =
+             GenServer.call(
+               pid,
+               {:submit, :upload, "data2", %{file_id: random_file_id(), chunk_index: 0}},
+               5_000
+             )
   end
 
   test "all queues empty pauses loop, next submit restarts it", %{pid: pid} do
     file_id = random_file_id()
 
-    assert :ok = GenServer.call(pid, {:submit, :upload, "data", %{file_id: file_id, chunk_index: 0}}, 5_000)
+    assert :ok =
+             GenServer.call(
+               pid,
+               {:submit, :upload, "data", %{file_id: file_id, chunk_index: 0}},
+               5_000
+             )
 
     state = :sys.get_state(pid)
     assert state.writing == nil
     assert Enum.all?(state.queues, fn {_, q} -> :queue.is_empty(q) end)
 
-    assert :ok = GenServer.call(pid, {:submit, :upload, "data2", %{file_id: random_file_id(), chunk_index: 0}}, 5_000)
+    assert :ok =
+             GenServer.call(
+               pid,
+               {:submit, :upload, "data2", %{file_id: random_file_id(), chunk_index: 0}},
+               5_000
+             )
   end
 
   test "concurrent submits from all three lanes complete without loss", %{pid: pid} do
@@ -260,7 +323,11 @@ defmodule Chat.Data.File.ChunkWriterTest do
 
     for i <- 0..1 do
       Task.async(fn ->
-        GenServer.call(pid, {:submit, :upload, "data_#{i}", %{file_id: file_id, chunk_index: i}}, 10_000)
+        GenServer.call(
+          pid,
+          {:submit, :upload, "data_#{i}", %{file_id: file_id, chunk_index: i}},
+          10_000
+        )
       end)
     end
 

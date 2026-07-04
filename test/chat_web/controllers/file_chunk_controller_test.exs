@@ -24,7 +24,9 @@ defmodule ChatWeb.FileChunkControllerTest do
     signed_card = sign_card(card, identity)
     {:ok, _} = ShapeWriter.write(:user_card, :insert, signed_card)
 
-    tmp_dir = System.tmp_dir!() |> Path.join("chunk_ctrl_test_#{System.unique_integer([:positive])}")
+    tmp_dir =
+      System.tmp_dir!() |> Path.join("chunk_ctrl_test_#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(tmp_dir)
 
     prev_base = Common.get_chat_db_env(:files_base_dir)
@@ -43,12 +45,7 @@ defmodule ChatWeb.FileChunkControllerTest do
       File.rm_rf!(tmp_dir)
     end)
 
-    {:ok,
-     identity: identity,
-     card: card,
-     user_hash: card.user_hash,
-     conn: conn,
-     tmp_dir: tmp_dir}
+    {:ok, identity: identity, card: card, user_hash: card.user_hash, conn: conn, tmp_dir: tmp_dir}
   end
 
   describe "GET /electric/v1/file_chunk/:file_id/:chunk_index (show)" do
@@ -209,7 +206,9 @@ defmodule ChatWeb.FileChunkControllerTest do
     sign_b64 = chunk |> Integrity.signature_payload() |> EnigmaPq.sign(identity.sign_skey)
     signed = %{chunk | sign_b64: sign_b64}
 
-    changeset = FileChunk.create_changeset(%FileChunk{}, Map.from_struct(signed) |> Map.drop([:__meta__]))
+    changeset =
+      FileChunk.create_changeset(%FileChunk{}, Map.from_struct(signed) |> Map.drop([:__meta__]))
+
     {:ok, _} = Repo.insert(changeset)
     signed
   end

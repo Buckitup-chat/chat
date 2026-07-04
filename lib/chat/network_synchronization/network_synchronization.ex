@@ -191,7 +191,6 @@ defmodule Chat.NetworkSynchronization do
     _ -> nil
   end
 
-
   defp electric_via(peer_url) do
     {:via, Registry, {@electric_registry, peer_url}}
   end

@@ -128,7 +128,14 @@ defmodule Chat.Data.File.DriveCopySourceTest do
   defp inject_drive(pid, system_id, base_dir) do
     :sys.replace_state(pid, fn state ->
       others = Map.put(state.other_drives, system_id, base_dir)
-      timers = Map.put(state.sweep_timers, system_id, Process.send_after(pid, {:sweep, system_id}, 5_000))
+
+      timers =
+        Map.put(
+          state.sweep_timers,
+          system_id,
+          Process.send_after(pid, {:sweep, system_id}, 5_000)
+        )
+
       %{state | other_drives: others, sweep_timers: timers}
     end)
   end

@@ -4,7 +4,9 @@ defmodule Chat.Data.File.ChunkStoreTest do
   alias Chat.Data.File.ChunkStore
 
   setup do
-    tmp_dir = System.tmp_dir!() |> Path.join("chunk_store_test_#{System.unique_integer([:positive])}")
+    tmp_dir =
+      System.tmp_dir!() |> Path.join("chunk_store_test_#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(tmp_dir)
 
     on_exit(fn -> File.rm_rf!(tmp_dir) end)
@@ -38,7 +40,6 @@ defmodule Chat.Data.File.ChunkStoreTest do
     shard_dir = Path.join([base_dir, "pq_files", "90", file_id])
     assert File.dir?(shard_dir)
   end
-
 
   test "sweep_tmp_files removes old tmp files and keeps recent", %{base_dir: base_dir} do
     file_id = random_file_id()

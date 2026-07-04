@@ -10,7 +10,10 @@ defmodule Chat.Data.File.UploadSourceTest do
     Registry.start_link(keys: :unique, name: registry)
 
     writer_name = {:via, Registry, {registry, {:writer, @drive_id}}}
-    tmp_dir = System.tmp_dir!() |> Path.join("upload_source_test_#{System.unique_integer([:positive])}")
+
+    tmp_dir =
+      System.tmp_dir!() |> Path.join("upload_source_test_#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(tmp_dir)
 
     {:ok, writer_pid} =
@@ -33,7 +36,10 @@ defmodule Chat.Data.File.UploadSourceTest do
     assert :ok = ChunkWriter.submit(writer, :upload, "data", meta)
   end
 
-  test "returns {:busy, 2} when ChunkWriter upload lane is full", %{writer_pid: pid, writer: writer} do
+  test "returns {:busy, 2} when ChunkWriter upload lane is full", %{
+    writer_pid: pid,
+    writer: writer
+  } do
     file_id = random_file_id()
 
     :sys.suspend(pid)

@@ -139,15 +139,16 @@ async function handleUpload() {
       return { enc, dataHash, ownerTimestamp, signB64 };
     }
 
-    let pendingUpload = null;
+    const MAX_IN_FLIGHT = 2;
+    const inFlight = [];
 
     for (let i = 0; i < chunks.length; i++) {
       updateProgress(i, chunks.length, 'Encrypting & uploading');
 
       const { enc, dataHash, ownerTimestamp, signB64 } = await prepareChunk(i);
 
-      if (pendingUpload) {
-        const result = await pendingUpload;
+      while (inFlight.length >= MAX_IN_FLIGHT) {
+        const result = await inFlight.shift();
         if (result._timing) {
           uploadTiming.put += result._timing.put_ms;
           if (result._timing.attempts > 1) uploadTiming.retries += result._timing.attempts - 1;
@@ -162,12 +163,12 @@ async function handleUpload() {
         'X-Signature': uint8ToBase64Unpadded(signB64)
       };
 
-      pendingUpload = putChunk(state.baseUrl, fileId, i, enc, headers, addLogEntry);
+      inFlight.push(putChunk(state.baseUrl, fileId, i, enc, headers, addLogEntry));
       chunkSignatures.push(signB64);
     }
 
-    if (pendingUpload) {
-      const result = await pendingUpload;
+    for (const pending of inFlight) {
+      const result = await pending;
       if (result._timing) {
         uploadTiming.put += result._timing.put_ms;
         if (result._timing.attempts > 1) uploadTiming.retries += result._timing.attempts - 1;

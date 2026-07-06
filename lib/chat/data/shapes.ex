@@ -1,15 +1,16 @@
 defmodule Chat.Data.Shapes do
   @moduledoc "Registry of Replication and Electric synced shape behaviour modules"
 
+  # UserCard first — it is the FK parent for DialogKeys, File, FileChunk, UserStorage
   @shapes [
+    Chat.Data.Shapes.UserCard,
+    Chat.Data.Shapes.UserStorage,
     Chat.Data.Shapes.DialogKeys,
     Chat.Data.Shapes.DialogMessageReactions,
     Chat.Data.Shapes.DialogMessageReceipts,
     Chat.Data.Shapes.DialogMessages,
     Chat.Data.Shapes.File,
-    Chat.Data.Shapes.FileChunk,
-    Chat.Data.Shapes.UserCard,
-    Chat.Data.Shapes.UserStorage
+    Chat.Data.Shapes.FileChunk
   ]
 
   def all, do: @shapes
@@ -23,7 +24,7 @@ defmodule Chat.Data.Shapes do
   def sync_schemas do
     @shapes
     |> Enum.flat_map(fn shape ->
-      [shape.schema_module() | List.wrap(shape.versions_schema())]
+      List.wrap(shape.versions_schema()) ++ [shape.schema_module()]
     end)
   end
 

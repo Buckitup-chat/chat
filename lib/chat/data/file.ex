@@ -8,6 +8,7 @@ defmodule Chat.Data.File do
   alias Chat.Data.Schemas.FileChunk
   alias Chat.Data.Schemas.MissingChunk
   alias Chat.Data.Schemas.UploadChunk
+  alias Chat.TimeKeeper
 
   def get_file(file_id) do
     repo().get(File, file_id)
@@ -199,9 +200,16 @@ defmodule Chat.Data.File do
     |> use_repo(opts).one()
   end
 
+  @cooldown_attempts 5
+  @cooldown_seconds 900
+
   def fetchable_missing_chunks_for_sync(limit, max_attempts, opts \\ []) do
+    cooldown_threshold = TimeKeeper.now_unix() - @cooldown_seconds
+
     from(m in MissingChunk,
-      where: not is_nil(m.data_hash),
+      where:
+        not is_nil(m.data_hash) and
+          (m.attempts < ^@cooldown_attempts or m.updated_at < ^cooldown_threshold),
       order_by: [
         asc: m.attempts,
         asc: fragment("CASE WHEN ? IS NOT NULL THEN 0 ELSE 1 END", m.peer_url),

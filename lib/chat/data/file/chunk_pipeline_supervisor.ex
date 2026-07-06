@@ -6,6 +6,7 @@ defmodule Chat.Data.File.ChunkPipelineSupervisor do
   alias Chat.Data.File.ChunkWriter
   alias Chat.Data.File.DriveAnnouncer
   alias Chat.Data.File.DriveCopySource
+  alias Chat.Data.File.MissingChunksBackfill
   alias Chat.Data.File.ReplicationListener
   alias Chat.Data.File.SyncSource
   alias Chat.Data.File.TmpSweeper
@@ -22,6 +23,7 @@ defmodule Chat.Data.File.ChunkPipelineSupervisor do
 
     children = [
       {ChunkWriter, drive_id: drive_id, base_dir: base_dir},
+      {MissingChunksBackfill, base_dir: base_dir, repo: repo},
       {ReplicationListener, drive_id: drive_id, repo: repo},
       {DriveCopySource, drive_id: drive_id, base_dir: base_dir, repo: repo},
       {SyncSource, drive_id: drive_id, repo: repo},

@@ -23,24 +23,30 @@ defmodule Chat.Data.Shapes.File do
   Decodes `chunk_sign_hashes` (`bytea[]`) elements back to raw binaries before
   signature validation in `sync_persist/2`.
 
-  The Electric client's array decoder (`Electric.Client.EctoAdapter.ArrayDecoder`)
-  only hex-decodes scalar bytea, not array elements: each element arrives as the
-  double-escaped Postgres array-literal text (`\\x<hex>`) instead of the raw binary
-  the uploader signed.
+  Handles two wire formats:
+  - PG text-array: double-escaped hex (`\\\\x<hex>`) from text-format responses
+  - JSON array: base64-encoded strings from JSON-format responses
   """
   @impl true
-  def sync_derive_fields(%File{chunk_sign_hashes: hashes} = file) do
-    %{file | chunk_sign_hashes: Enum.map(hashes, &decode_bytea_element/1)}
+  def sync_derive_fields(%File{chunk_sign_hashes: hashes, sign_b64: sign_b64} = file) do
+    %{file | chunk_sign_hashes: Enum.map(hashes, &decode_bytea/1), sign_b64: decode_bytea(sign_b64)}
   end
 
-  defp decode_bytea_element("\\\\x" <> hex) do
+  defp decode_bytea("\\\\x" <> hex) do
     case Base.decode16(hex, case: :mixed) do
       {:ok, binary} -> binary
       :error -> "\\\\x" <> hex
     end
   end
 
-  defp decode_bytea_element(binary), do: binary
+  defp decode_bytea(binary) when is_binary(binary) do
+    case Base.decode64(binary, padding: false) do
+      {:ok, decoded} -> decoded
+      :error -> binary
+    end
+  end
+
+  defp decode_bytea(other), do: other
 
   @impl true
   def sync_persist(operation, file) do

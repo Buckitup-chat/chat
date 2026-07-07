@@ -10,7 +10,6 @@ defmodule Chat.DbBootSupervisor do
 
   import Toolbox.StagedSupervisor
 
-  alias Chat.Db.Boot.ChunkPipelineReady
   alias Chat.Db.Boot.ElectricReady
   alias Chat.Db.Boot.RepoReady
 
@@ -46,9 +45,7 @@ defmodule Chat.DbBootSupervisor do
         {:step, ElectricVerified,
          {ElectricReady, task_in: task_supervisor}
          |> exit_takes(15_000)},
-        {:step, ChunkPipelineStarted,
-         {ChunkPipelineReady, task_in: task_supervisor}
-         |> exit_takes(15_000)}
+        {Chat.Data.File.ChunkPipelineSupervisor, drive_id: :internal, repo: Chat.Repo}
       ]
       |> prepare_stages(Chat.Db.BootStages)
       |> Supervisor.init(strategy: :rest_for_one, max_restarts: 10, max_seconds: 30)

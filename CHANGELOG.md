@@ -14,10 +14,17 @@ straightforward as possible.
 
 ### Changed
 
+### Fixed
+
+## 2026-07-07_e346d72\_\_\_2026-07-07_af5e1507\_\_\_2026-07-03_19f1df9
+
+### Changed
+
 - Post-quantum files: two-thread upload
 
 ### Fixed
 
+- Post-quantum files: chunk pipeline supervision cleanup
 - [platform] Post-quantum files: chunk writer supervision fix
 
 ## 2026-07-06_f65e088\_\_\_2026-07-06_98b06a3a\_\_\_2026-07-03_19f1df9

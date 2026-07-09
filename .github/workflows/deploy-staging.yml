@@ -26,8 +26,8 @@ jobs:
             exec 9>/tmp/staging-deploy.lock
             flock 9
 
-            source ~/.bashrc 2>/dev/null || true
-            source ~/.profile 2>/dev/null || true
+            source ~/.bashrc 2>/dev/null 
+            source ~/.profile 2>/dev/null 
 
             export MIX_ENV=prod
             export PORT=4402

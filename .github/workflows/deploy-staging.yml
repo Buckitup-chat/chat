@@ -27,6 +27,7 @@ jobs:
             flock 9
 
             source ~/.bashrc 2>/dev/null || true
+            export PATH="${ASDF_DATA_DIR:-$HOME/.asdf}/shims:$PATH"
 
             export MIX_ENV=prod
             export PORT=4402

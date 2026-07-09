@@ -35,6 +35,7 @@ jobs:
             export DOMAIN=buckitup.xyz
             export RELEASE_NAME=staging_chat
             export SECRET_KEY_BASE="${{ secrets.SECRET_KEY_BASE }}"
+            export DATABASE_URL="${{ secrets.DATABASE_URL }}"
 
             cd ~/chat
             git checkout main

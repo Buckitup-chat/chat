@@ -26,7 +26,9 @@ jobs:
             exec 9>/tmp/staging-deploy.lock
             flock 9
 
-            . ~/.asdf/asdf.sh 2>/dev/null || true
+            source ~/.bashrc 2>/dev/null || true
+            source ~/.asdf/asdf.sh
+            source ~/.asdf/completions/asdf.bash 2>/dev/null || true
 
             export MIX_ENV=prod
             export PORT=4402

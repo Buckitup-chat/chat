@@ -1,4 +1,4 @@
-.PHONY: check test ci-check empty_db help assets frontend
+.PHONY: check test ci-check empty_db help assets
 
 help:
 	@clear
@@ -70,10 +70,6 @@ iex_like_prod:
 assets:
 	cp assets/node_modules/@lo-fi/webauthn-local-client/dist/bundlers/walc-external-bundle.js priv/static/
 	mix assets.deploy
-
-frontend:
-	mix assets.setup
-	mix assets.build
 
 CHAT_FRONTEND_DIR ?= ../chat-frontend
 DOMAIN ?= localhost:4444

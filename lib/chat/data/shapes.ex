@@ -1,15 +1,16 @@
 defmodule Chat.Data.Shapes do
   @moduledoc "Registry of Replication and Electric synced shape behaviour modules"
 
+  # order matters
   @shapes [
+    Chat.Data.Shapes.UserCard,
+    Chat.Data.Shapes.UserStorage,
     Chat.Data.Shapes.DialogKeys,
+    Chat.Data.Shapes.DialogMessages,
     Chat.Data.Shapes.DialogMessageReactions,
     Chat.Data.Shapes.DialogMessageReceipts,
-    Chat.Data.Shapes.DialogMessages,
     Chat.Data.Shapes.File,
-    Chat.Data.Shapes.FileChunk,
-    Chat.Data.Shapes.UserCard,
-    Chat.Data.Shapes.UserStorage
+    Chat.Data.Shapes.FileChunk
   ]
 
   def all, do: @shapes

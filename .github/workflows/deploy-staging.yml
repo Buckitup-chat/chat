@@ -1,0 +1,51 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: Staging
+    steps:
+      - name: Deploy to staging
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          command_timeout: 15m
+          script: |
+            set -e
+            exec 9>/tmp/staging-deploy.lock
+            flock 9
+
+            source ~/.bashrc 2>/dev/null 
+            source ~/.profile 2>/dev/null 
+
+            export MIX_ENV=prod
+            export PORT=4402
+            export PHX_SERVER=true
+            export DOMAIN=buckitup.xyz
+            export RELEASE_NAME=staging_chat
+            export SECRET_KEY_BASE="${{ secrets.SECRET_KEY_BASE }}"
+            export DATABASE_URL="${{ secrets.DATABASE_URL }}"
+
+            cd ~/chat
+            git checkout main
+            git pull origin main
+
+            mix deps.get --only prod
+            mix do compile, assets.setup, assets.deploy, ecto.create, ecto.migrate
+            mix phx.gen.release
+            MIX_ENV=prod mix release --overwrite
+            sudo systemctl restart staging.service
+
+            sleep 3
+            sudo systemctl status staging.service

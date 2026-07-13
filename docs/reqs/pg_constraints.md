@@ -91,7 +91,21 @@ SELECT
 | `pg_wal` directory | > 1 GB | Replication consumers may be lagging |
 | Dead tuple ratio | > 20% of live tuples | Autovacuum can't keep up |
 
-## 5. Practical Limits for BuckitUp
+## 5. Row Deletion Prevention
+
+For append-only tables (e.g. `review`, `review_passwords`, `review_list`), revoke DELETE from the application role to prevent row removal:
+
+```sql
+REVOKE DELETE ON target_table FROM app_role;
+```
+
+This ensures that even if application code or a rogue origin attempts deletion, PostgreSQL rejects it. Replication will not propagate a DELETE that never succeeded.
+
+Combined with Electric sync, this means: if the table forbids DELETE at the PostgreSQL permission level, no node can produce a deletion WAL entry for replication to carry.
+
+Note: a superuser can still bypass this. On multi-server deployments, restrict superuser access to infrastructure operators only — origin owners should connect via a limited role.
+
+## 6. Practical Limits for BuckitUp
 
 | Constraint | Limit | Impact |
 |---|---|---|

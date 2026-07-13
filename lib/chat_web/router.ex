@@ -66,10 +66,6 @@ defmodule ChatWeb.Router do
     get "/privacy-policy.html", PlainController, :privacy_policy
     get "/dev/device_webrtc", PlainController, :device_webrtc
 
-    # Frontend SPA routes
-    get "/frontend", FrontendController, :index
-    get "/frontend/*path", FrontendController, :index
-
     # prod debug
     # coveralls-ignore-start
     get "/log", DeviceLogController, :log
@@ -129,12 +125,6 @@ defmodule ChatWeb.Router do
       live "/electric/dialog_sandbox", ElectricLive.DialogSandboxLive.Index, :index
     end
 
-    # get "/login", FrontendController, :index
-    # get "/account", FrontendController, :index
-    # get "/account/:action", FrontendController, :index
-    # get "/backup", FrontendController, :index
-    # get "/backup/:action", FrontendController, :index
-    # get "/contact/:id", FrontendController, :index
   end
 
   scope "/", ChatWeb do

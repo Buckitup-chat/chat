@@ -1,14 +1,15 @@
 defmodule Chat.Data.Shapes do
   @moduledoc "Registry of Replication and Electric synced shape behaviour modules"
 
+  # order matters
   # UserCard first — it is the FK parent for DialogKeys, File, FileChunk, UserStorage
   @shapes [
     Chat.Data.Shapes.UserCard,
     Chat.Data.Shapes.UserStorage,
     Chat.Data.Shapes.DialogKeys,
+    Chat.Data.Shapes.DialogMessages,
     Chat.Data.Shapes.DialogMessageReactions,
     Chat.Data.Shapes.DialogMessageReceipts,
-    Chat.Data.Shapes.DialogMessages,
     Chat.Data.Shapes.File,
     Chat.Data.Shapes.FileChunk
   ]

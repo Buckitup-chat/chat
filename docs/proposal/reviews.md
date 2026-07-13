@@ -20,8 +20,8 @@ An origin owner should be able to:
 
 ## Assumptions / Open questions
 
-- rating
-- passwords vs reviews
+- rating -> incorporate into a content model [rating, placeholder, content] // fillinf placeholder with random strimg to meke undinstinguishible
+- passwords vs reviews -> passwords as access layer. prevent deletion as much as possible.
 - ingest via review_candidates
 
 ## Three entities
@@ -42,7 +42,7 @@ Origin (the coffee shop)
 
 ## Origin
 
-An origin is modeled as a **subaccount** — it gets its own `user_cards` row with a separate PQ identity. 
+An origin is modeled as a **subaccount** — it gets its own `user_cards` row with a separate PQ identity.
 
 An origin has:
 
@@ -68,7 +68,6 @@ Rooms are conversation spaces. Origins are entities people review. They share cr
 - the review/comment hierarchy doesn't map to room message threading
 
 Keeping them separate avoids overloading the room model and allows independent evolution.
-
 
 ## Contacts
 
@@ -116,7 +115,6 @@ Public visibility of a review is controlled server-side via the `review_password
 
 The public frontend checks whether a decryption password exists in `review_passwords` for a given review. The author cannot bypass moderation because the server controls the table, not the author. The author can only submit the password — the server decides whether and when to make it available.
 
-
 Review is created by author. Encrypted with a password.
 
 review_passwords table will hold the password to public.
@@ -126,6 +124,7 @@ if origin moderation level is post-moderation. Author is able to send a password
 if origin moderation level is pre-moderation. Author sends password and password=null versions. Server do not populate review_passwords. Server envelopes both versioninto review_post_right and review_revoke_right
 
 review_post_right and review_revoke_right should have
+
 - review_id
 - origin_id
 - envelope version
@@ -209,7 +208,7 @@ sequenceDiagram
 ```
 
 ## Review visibility tiers
- 
+
 ### to_public
 
 Content encrypted with a per-review `review_password` and signed by the author (ML-DSA-87 over plaintext before encryption). Public visibility is determined by whether `review_password` is available in the `review_passwords` table — see the Moderation section.
@@ -217,6 +216,7 @@ Content encrypted with a per-review `review_password` and signed by the author (
 Moderation controls only **public** visibility. Even when a review is hidden or not yet approved, the author's contacts can still see it via `review_list_password` (see Contacts section). The contacts channel is the author's property and cannot be affected by the origin owner's moderation decisions.
 
 This means:
+
 - **Password published**: visible to everyone (public + contacts)
 - **Password withheld / revoked**: invisible to the general public, still visible to author's contacts
 - The author's signature covers plaintext, verifiable after decryption
@@ -228,6 +228,7 @@ Because the origin is a subaccount with its own `user_cards` identity, `to_origi
 The author and origin identity each derive a `sender_msg_key` per the dialog key derivation spec. Messages (reviews, comments, follow-ups) are encrypted exactly like dialog messages: AES-256-GCM under the sender's `sender_msg_key`, with the key wrapped for the peer via ML-KEM-1024.
 
 This means:
+
 - No new crypto machinery needed — reuses dialog encryption, key wrapping, and versioning
 - The origin owner reads `to_origin` reviews by decapsulating with the origin identity's `kem_skey`
 - Multi-device works: any owner device re-derives the origin's keys from the owner's private material

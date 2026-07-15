@@ -261,17 +261,19 @@ Comments on `to_origin` reviews are dialog messages in the author↔origin dialo
 The origin identity lives in `user_cards` (its own `user_hash`, `sign_pkey`, `crypt_pkey`). The `origin` table holds origin-specific metadata that doesn't belong in `user_cards`.
 
 ```
-origin
-├── origin_hash           — the origin's user_hash (from its user_cards row)
-├── owner_hash            — user_hash of the owner
-├── owner_cert            — ML-DSA-87.sign(origin_sign_pkey, owner_sign_skey) — proves owner created this origin
-├── name_b64              — origin name (signed by origin identity)
-├── moderation_mode       — :pre / :post / :none
-├── deleted_flag           — soft delete by owner
-├── owner_timestamp       — causal ordering
-├── sign_b64              — origin identity's ML-DSA-87 signature over all fields
-└── sign_hash             — SHA3-512 of sign_b64
+origins                                              — DB table name
+├── origin_hash           — TEXT PK, FK → user_cards(user_hash), the origin's user_hash
+├── owner_hash            — TEXT NOT NULL, FK → user_cards(user_hash), user_hash of the owner
+├── owner_cert            — BYTEA NOT NULL, ML-DSA-87.sign(origin_sign_pkey, owner_sign_skey)
+├── name                  — TEXT NOT NULL, origin name (signed by origin identity)
+├── moderation_mode       — TEXT NOT NULL DEFAULT 'none', enum: none / post / pre
+├── deleted_flag          — BOOLEAN NOT NULL DEFAULT false, soft delete by owner
+├── owner_timestamp       — BIGINT NOT NULL, causal ordering (LWW)
+├── sign_b64              — BYTEA NOT NULL, origin identity's ML-DSA-87 signature over all fields
+└── sign_hash             — TEXT NOT NULL, prefix "ors_" + hex(SHA3-512 of sign_b64)
 ```
+
+Constraints: `origin_hash` and `owner_hash` match `^u_[a-f0-9]{128}$`, `sign_hash` matches `^ors_[a-f0-9]{128}$`, `moderation_mode` IN (`none`, `post`, `pre`). Index on `owner_hash`.
 
 Note: `sign_pkey` and `crypt_pkey` are on the origin's `user_cards` row, not duplicated here. The origin's `user_cards` row is self-signed (origin signs its own card with `origin_sign_skey`). The `owner_cert` on the `origin` row binds the origin identity to the owner.
 
@@ -407,7 +409,7 @@ Will be designed with the comment schema.
 
 ### Origin
 
-Origin identity signs: `origin_hash || owner_hash || owner_cert || name_b64 || moderation_mode || deleted_flag || owner_timestamp`
+Origin identity signs: `origin_hash || owner_hash || owner_cert || name || moderation_mode || deleted_flag || owner_timestamp`
 
 (The origin's `sign_pkey` and `crypt_pkey` live on its `user_cards` row, signed there. The `owner_cert` itself is `ML-DSA-87.sign(origin_sign_pkey, owner_sign_skey)` — created by the owner, included in the origin's self-signature to bind the ownership proof into the signed record.)
 
@@ -513,31 +515,42 @@ This is a separate concern involving the broader contacts/trust model and will b
 
 ## Implementation phases
 
-### Phase 1 — Origin entity
+### Phase 1 — Origin entity ✓ (in progress)
 
-- `origin` Ecto schema and migration
-- `origin` Electric shape with owner access control
-- origin creation UI (name, moderation mode)
-- origin directory / listing
+- [x] `origins` Ecto schema and migration (`Chat.Data.Schemas.Origin`, `20260715144320_create_origins`)
+- [x] Electric publication (`20260715144321_add_origins_to_electric_publication`)
+- [x] `origin` Electric shape with owner access control (`Chat.Data.Shapes.Origin`)
+  - sync validation: signature verification, owner cert verification, timestamp ordering
+  - HTTP ingest: challenge-based auth, insert + update operations
+- [x] Origin data context with upsert (LWW by `owner_timestamp`) (`Chat.Data.Origin`)
+- [x] Origin validation module — signature, owner cert, peer sync + HTTP ingest paths (`Chat.Data.Origin.Validation`)
+- [x] `OriginSignHash` type with `ors_` prefix (`Chat.Data.Types.OriginSignHash`)
+- [x] `PrefixedHash` macro — extracted common hash type logic, refactored `UserHash` and all dialog hash types to use it (`Chat.Data.Types.PrefixedHash`)
+- [x] Origin sandbox LiveView — interactive testing of create/update via Electric API (`OriginSandboxLive`)
+- [x] Origins directory LiveView — real-time Electric stream listing (`OriginsLive`)
+- [ ] Origin creation in main app UI (name, moderation mode)
+- [ ] Origin directory / listing in main app UI
 
 ### Phase 2 — Public reviews
 
-- `review` Ecto schema and migration
-- `review_passwords`, `review_list` schemas and migrations
-- `review` Electric shape
-- public review submission and display
-- ML-DSA-87 signing and verification
+- [ ] `review` Ecto schema and migration
+- [ ] `review_passwords`, `review_password_candidate` schemas and migrations
+- [ ] `review_list` schema and migration
+- [ ] `review` Electric shape
+- [ ] public review submission and display
+- [ ] ML-DSA-87 signing and verification
 
 ### Phase 3 — To-origin reviews and moderation
 
-- to_origin as dialog: origin subaccount identity + dialog key derivation
-- pre-moderation flow (submit, approve/reject, publish)
-- post-moderation flow (hide/unhide)
-- moderation UI for origin owners
-- contacts-visible hidden reviews (author's contacts see moderation-hidden reviews)
+- [ ] to_origin as dialog: origin subaccount identity + dialog key derivation
+- [ ] `review_post_right`, `review_revoke_right` schemas and migrations
+- [ ] pre-moderation flow (submit, approve/reject, publish)
+- [ ] post-moderation flow (hide/unhide)
+- [ ] moderation UI for origin owners
+- [ ] contacts-visible hidden reviews (author's contacts see moderation-hidden reviews)
 
 ### Phase 4 — Contacts visibility (future)
 
-- contacts key infrastructure
-- contacts-only review encryption/decryption
-- depends on broader contacts/trust model design
+- [ ] contacts key infrastructure
+- [ ] contacts-only review encryption/decryption
+- [ ] depends on broader contacts/trust model design

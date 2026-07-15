@@ -110,8 +110,9 @@ defmodule ChatWeb.Router do
 
       live "/electric/user_sandbox", ElectricLive.UserSandboxLive.Index, :index
       live "/electric/dialog_sandbox", ElectricLive.DialogSandboxLive.Index, :index
+      live "/electric/origins", ElectricLive.OriginsLive.Index, :index
+      live "/electric/origin_sandbox", ElectricLive.OriginSandboxLive.Index, :index
     end
-
   end
 
   scope "/", ChatWeb do
@@ -162,7 +163,7 @@ defmodule ChatWeb.Router do
     scope "/" do
       pipe_through ChatWeb.Plugs.ElectricReadiness
 
-      # Phoenix.Sync endpoint for LiveView real-time sync
+      # Phoenix.Sync endpoint for LiveView real-time sync. Deprecated in favor to v1/shapes
       sync("/file", Chat.Data.Schemas.File)
       sync("/file_chunk", Chat.Data.Schemas.FileChunk)
       sync("/user_card", Chat.Data.Schemas.UserCard)

@@ -10,7 +10,8 @@ defmodule Chat.Data.Shapes do
     Chat.Data.Shapes.DialogMessageReactions,
     Chat.Data.Shapes.DialogMessageReceipts,
     Chat.Data.Shapes.File,
-    Chat.Data.Shapes.FileChunk
+    Chat.Data.Shapes.FileChunk,
+    Chat.Data.Shapes.Origin
   ]
 
   def all, do: @shapes

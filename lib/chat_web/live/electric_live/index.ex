@@ -98,6 +98,15 @@ defmodule ChatWeb.ElectricLive.Index do
       label: "Receipts",
       title: "Read/Delivered",
       endpoint: "/electric/v1/dialog_message_receipt"
+    },
+    %{
+      href: "/electric/origins",
+      icon_color: "text-orange-600",
+      icon_path:
+        "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
+      label: "Origins",
+      title: "Business Entities",
+      endpoint: "/electric/v1/shapes?table=origins"
     }
   ]
 
@@ -127,6 +136,15 @@ defmodule ChatWeb.ElectricLive.Index do
       label: "Dialog Sandbox",
       title: "Encrypted Chat",
       endpoint: "/electric/v1/dialog_key, /electric/v1/dialog_message"
+    },
+    %{
+      href: "/electric/origin_sandbox",
+      icon_color: "text-orange-600",
+      icon_path:
+        "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
+      label: "Origin Sandbox",
+      title: "Business Entities",
+      endpoint: "/electric/v1/shapes?table=origins"
     }
   ]
 

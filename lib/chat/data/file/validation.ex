@@ -2,6 +2,7 @@ defmodule Chat.Data.File.Validation do
   @moduledoc "Signature and integrity validation for file storage operations."
 
   alias Chat.Data.File, as: FileData
+  alias Chat.Data.File.ChunkStore
   alias Chat.Data.Schemas.File
   alias Chat.Data.Schemas.FileChunk
   alias Chat.Data.User, as: UserData
@@ -53,6 +54,10 @@ defmodule Chat.Data.File.Validation do
         multi
         |> Ecto.Multi.run(:verify_chunks, fn _repo, _changes ->
           verify_file_chunks(file)
+        end)
+        |> Ecto.Multi.run(:sync_chunks, fn _repo, _changes ->
+          ChunkStore.sync_dir(file.file_id)
+          {:ok, :synced}
         end)
         |> Ecto.Multi.run(:cleanup_upload_chunks, fn _repo, _changes ->
           FileData.delete_upload_chunks_for_file(file.file_id)

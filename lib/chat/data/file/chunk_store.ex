@@ -11,7 +11,7 @@ defmodule Chat.Data.File.ChunkStore do
     tmp = path <> ".tmp"
 
     with :ok <- File.mkdir_p(dir),
-         :ok <- File.write(tmp, binary, [:raw, :sync]) do
+         :ok <- File.write(tmp, binary, [:raw]) do
       File.rename(tmp, path)
     end
   end
@@ -63,6 +63,19 @@ defmodule Chat.Data.File.ChunkStore do
     pad_index = chunk_index |> to_string() |> String.pad_leading(@index_padding, "0")
 
     Path.join(file_dir(file_id, override_base_dir), pad_index)
+  end
+
+  def sync_dir(file_id, base_dir \\ nil) do
+    dir = file_dir(file_id, base_dir)
+
+    case :file.open(String.to_charlist(dir), [:read]) do
+      {:ok, fd} ->
+        :file.datasync(fd)
+        :file.close(fd)
+
+      _ ->
+        :ok
+    end
   end
 
   defp file_dir(file_id, override_base_dir) do

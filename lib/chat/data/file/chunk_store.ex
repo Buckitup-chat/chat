@@ -11,7 +11,7 @@ defmodule Chat.Data.File.ChunkStore do
     tmp = path <> ".tmp"
 
     with :ok <- File.mkdir_p(dir),
-         :ok <- File.write(tmp, binary, [:raw]) do
+         :ok <- File.write(tmp, binary) do
       File.rename(tmp, path)
     end
   end

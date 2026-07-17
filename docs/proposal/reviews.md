@@ -370,11 +370,16 @@ review_revoke_right
 
 Per-user encrypted list of `(review_hash, review_password)` pairs. Own table. Contacts decrypt this with `review_list_password` to access the author's reviews regardless of moderation state.
 
+Includes moderation pipeline proof fields — the author must demonstrate that the review was submitted through the origin's moderation pipeline before sharing it with contacts. The server validates these references on ingest, preventing contacts-only reviews that bypass moderation.
+
 ```
 review_list
 ├── user_hash             — whose review list (PK part 1)
 ├── review_hash           — which review (PK part 2)
 ├── password_b64          — review_password, AES-256-GCM encrypted with review_list_password
+├── password_sign_hash    — TEXT, sign_hash of the review_passwords row (proof of promotion)
+├── post_right_sign_hash  — TEXT, sign_hash of review_post_right row
+├── revoke_right_sign_hash — TEXT, sign_hash of review_revoke_right row
 ├── deleted_flag           — integrity triad
 ├── owner_timestamp       — LWW
 ├── sign_b64              — user's ML-DSA-87 signature
@@ -382,6 +387,25 @@ review_list
 ```
 
 One row per review. New review = new row (no need to re-encrypt an entire blob).
+
+#### Moderation proof requirements by mode
+
+| Mode | `password_sign_hash` | `post_right_sign_hash` | `revoke_right_sign_hash` |
+|------|---------------------|----------------------|------------------------|
+| **none** | required | null | null |
+| **post** | required | null | required |
+| **pre** | null (until approved) | required | required |
+
+- **none** — `password_sign_hash` proves the candidate was promoted to `review_passwords` (auto-promotion). No rights exist.
+- **post** — `password_sign_hash` proves promotion happened. `revoke_right_sign_hash` proves the author gave the origin revoke capability before promotion.
+- **pre** — `password_sign_hash` is null at submission time because the review is not yet promoted. Both rights must exist, proving the author gave the origin the ability to post or revoke. When the origin approves and the password row appears, the author updates their `review_list` row to fill in `password_sign_hash`.
+
+#### Server validation on review_list ingest
+
+1. Look up the review's origin → get `moderation_mode`
+2. For each non-null proof field: verify a matching row exists in the corresponding table with the same `review_hash`
+3. Reject if a field that must be non-null per mode is null
+4. Reject if a referenced row does not exist
 
 ### comment (deferred)
 
@@ -435,6 +459,12 @@ Author signs: `review_hash || origin_hash || password_b64 || author_hash || dele
 
 Author signs: `review_hash || origin_hash || kem_ciphertext_b64 || wrapped_row_b64 || deleted_flag || owner_timestamp`
 
+### Review list entry
+
+Author signs: `user_hash || review_hash || password_b64 || password_sign_hash || post_right_sign_hash || revoke_right_sign_hash || deleted_flag || owner_timestamp`
+
+The proof fields are covered by the signature, preventing the author from stripping or forging moderation pipeline references after signing.
+
 ### Comment (deferred)
 
 Will be designed with the comment schema.
@@ -456,6 +486,10 @@ All reviews and comments are ML-DSA-87 signed. Authors cannot deny having writte
 - **to_origin**: fully cryptographic — server stores ciphertext and cannot read content
 - **to_public**: content is encrypted; the server controls public visibility via the `review_passwords` table (whether the decryption password is available), but cannot read the content itself
 - **contacts**: cryptographic — contacts access `review_password` via the author's encrypted `review_list`, independent of server-controlled `review_passwords`
+
+### Moderation bypass prevention
+
+The `review_list` requires proof that the review was submitted through the origin's moderation pipeline (sign_hash references to `review_passwords`, `review_post_right`, `review_revoke_right` — per moderation mode). The server validates these references on ingest, preventing authors from creating contacts-only reviews that bypass the origin's moderation entirely.
 
 ### Moderation transparency
 

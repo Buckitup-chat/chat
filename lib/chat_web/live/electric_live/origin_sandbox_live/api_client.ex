@@ -8,26 +8,6 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
   alias Chat.TimeKeeper
   alias EnigmaPq
 
-  def create_user(name, base_url) do
-    identity = User.generate_pq_identity(name)
-    card = User.extract_pq_card(identity)
-
-    with {:ok, challenge_resp, challenge_log} <- get_challenge(base_url),
-         {:ok, _resp, ingest_log} <-
-           ingest_user_card(challenge_resp, card, identity.sign_skey, base_url) do
-      user_data =
-        card
-        |> Map.from_struct()
-        |> Map.put(:sign_skey, identity.sign_skey)
-        |> Map.put(:crypt_skey, identity.crypt_skey)
-        |> Map.put(:contact_skey, identity.contact_skey)
-
-      {:ok, %{user: user_data, log_entries: [challenge_log, ingest_log]}}
-    else
-      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
-    end
-  end
-
   def create_origin(owner, origin_name, moderation_mode, base_url) do
     origin_identity = User.generate_pq_identity(origin_name)
     origin_card = User.extract_pq_card(origin_identity)
@@ -48,6 +28,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
              origin_identity.sign_skey,
              base_url
            ) do
+      origin_data = Map.put(origin_data, :origin_crypt_skey, origin_identity.crypt_skey)
       {:ok, %{origin: origin_data, log_entries: [log1, log2, log3, log4]}}
     else
       {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
@@ -102,6 +83,61 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
         origin
         |> Map.put(:name, new_name)
         |> Map.put(:moderation_mode, new_mode)
+        |> Map.put(:owner_timestamp, new_timestamp)
+
+      {:ok, %{origin: updated, log_entries: [log1, log2]}}
+    else
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
+    end
+  end
+
+  def delete_origin(origin, base_url) do
+    new_timestamp = origin.owner_timestamp + 1
+
+    origin_struct = %Origin{
+      origin_hash: origin.origin_hash,
+      owner_hash: origin.owner_hash,
+      owner_cert: origin.owner_cert,
+      name: origin.name,
+      moderation_mode: String.to_existing_atom(origin.moderation_mode),
+      deleted_flag: true,
+      owner_timestamp: new_timestamp
+    }
+
+    sign_b64 =
+      origin_struct
+      |> Integrity.signature_payload()
+      |> EnigmaPq.sign(origin.origin_sign_skey)
+
+    sign_hash =
+      sign_b64
+      |> EnigmaPq.hash()
+      |> OriginSignHash.from_binary()
+
+    payload = %{
+      "mutations" => [
+        %{
+          "type" => "update",
+          "original" => %{"origin_hash" => origin.origin_hash},
+          "changes" => %{
+            "name" => origin.name,
+            "moderation_mode" => origin.moderation_mode,
+            "deleted_flag" => true,
+            "owner_timestamp" => new_timestamp,
+            "sign_b64" => encode_base64(sign_b64),
+            "sign_hash" => sign_hash
+          },
+          "syncMetadata" => %{"relation" => "origins"}
+        }
+      ]
+    }
+
+    with {:ok, challenge_resp, log1} <- get_challenge(base_url),
+         {:ok, _resp, log2} <-
+           post_ingest(challenge_resp, payload, origin.origin_sign_skey, base_url) do
+      updated =
+        origin
+        |> Map.put(:deleted_flag, true)
         |> Map.put(:owner_timestamp, new_timestamp)
 
       {:ok, %{origin: updated, log_entries: [log1, log2]}}
@@ -170,6 +206,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
           owner_cert: owner_cert,
           name: name,
           moderation_mode: moderation_mode,
+          deleted_flag: false,
           owner_timestamp: origin_struct.owner_timestamp,
           origin_sign_skey: origin_sign_skey
         }
@@ -208,18 +245,20 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
 
   defp get_challenge(base_url) do
     url = base_url <> "/electric/v1/challenge"
+    req_headers = [{"accept", "application/json"}]
     timestamp = TimeKeeper.now()
 
-    case Req.get(url, headers: [{"accept", "application/json"}]) do
+    case Req.get(url, headers: req_headers) do
       {:ok, %{status: 200, body: body} = resp} ->
-        {:ok, body, log_entry("GET", url, "", resp, timestamp)}
+        {:ok, body, log_entry("GET", url, req_headers, "", resp, timestamp)}
 
       {:ok, %{status: status} = resp} ->
-        {:error, "Challenge failed: #{status}", [log_entry("GET", url, "", resp, timestamp)]}
+        {:error, "Challenge failed: #{status}",
+         [log_entry("GET", url, req_headers, "", resp, timestamp)]}
 
       {:error, error} ->
         {:error, "Challenge failed: #{inspect(error)}",
-         [log_entry("GET", url, "", error, timestamp)]}
+         [log_entry("GET", url, req_headers, "", error, timestamp)]}
     end
   end
 
@@ -234,52 +273,60 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
       })
 
     url = base_url <> "/electric/v1/ingest"
+    req_headers = [{"accept", "application/json"}, {"content-type", "application/json"}]
     timestamp = TimeKeeper.now()
     body_json = Jason.encode!(payload_with_auth, pretty: true)
 
-    case Req.post(url,
-           json: payload_with_auth,
-           headers: [{"accept", "application/json"}, {"content-type", "application/json"}]
-         ) do
+    case Req.post(url, json: payload_with_auth, headers: req_headers) do
       {:ok, %{status: status} = resp} when status in 200..299 ->
-        {:ok, resp.body, log_entry("POST", url, body_json, resp, timestamp)}
+        {:ok, resp.body, log_entry("POST", url, req_headers, body_json, resp, timestamp)}
 
       {:ok, %{status: status} = resp} ->
-        {:error, "Ingest failed: #{status}", [log_entry("POST", url, body_json, resp, timestamp)]}
+        {:error, "Ingest failed: #{status}",
+         [log_entry("POST", url, req_headers, body_json, resp, timestamp)]}
 
       {:error, error} ->
         {:error, "Ingest failed: #{inspect(error)}",
-         [log_entry("POST", url, body_json, error, timestamp)]}
+         [log_entry("POST", url, req_headers, body_json, error, timestamp)]}
     end
   end
 
-  defp log_entry(method, url, req_body, %{status: status, body: body, headers: headers}, ts) do
+  defp log_entry(method, url, req_headers, req_body, %{status: status, body: body, headers: headers}, ts) do
     resp_body = if is_map(body), do: Jason.encode!(body, pretty: true), else: inspect(body)
 
     %{
       timestamp: ts,
       method: method,
       url: url,
-      request_headers: [],
+      request_headers: req_headers,
       request_body: req_body,
       response_status: status,
-      response_headers: headers,
+      response_headers: format_headers(headers),
       response_body: resp_body
     }
   end
 
-  defp log_entry(method, url, req_body, error, ts) do
+  defp log_entry(method, url, req_headers, req_body, error, ts) do
     %{
       timestamp: ts,
       method: method,
       url: url,
-      request_headers: [],
+      request_headers: req_headers,
       request_body: req_body,
       response_status: 0,
       response_headers: [],
       response_body: "Error: #{inspect(error)}"
     }
   end
+
+  defp format_headers(%Req.Response{} = _resp), do: []
+
+  defp format_headers(headers) when is_map(headers) do
+    Enum.map(headers, fn {k, v} -> {k, Enum.join(v, ", ")} end)
+  end
+
+  defp format_headers(headers) when is_list(headers), do: headers
+  defp format_headers(_), do: []
 
   defp encode_base64(bin) when is_binary(bin), do: Base.encode64(bin, padding: false)
 end

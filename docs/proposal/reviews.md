@@ -69,7 +69,7 @@ Origin secret keys (`sign_skey`, `crypt_skey`) are generated independently (not 
 
 Two levels of control:
 
-- **Owner** (the creating user) — performs dangerous/irreversible operations: create origin, delete, transfer ownership, change moderation mode. Owner identity is never exposed to the public.
+- **Owner** (the creating user) — performs dangerous/irreversible operations: create origin, delete, change moderation mode. Ownership is immutable after creation. Owner identity is never exposed to the public.
 - **Origin identity** — handles day-to-day operations: receive `to_origin` reviews, moderate public reviews. Can be delegated to an employee without exposing the owner's personal identity or granting irreversible powers.
 
 ### Why not a room
@@ -546,6 +546,41 @@ How does the SaaS aspect work? Possible angles:
 Crypto approach: author generates a symmetric `contacts_key`, wraps it for each dialog partner using existing dialog `sender_msg_key`. All contacts-only reviews use this key. Key rotates when contacts change.
 
 This is a separate concern involving the broader contacts/trust model and will be designed independently.
+
+## Sandboxes
+
+Three sandboxes, split by persona — each operates under a distinct identity context:
+
+### Origin owner sandbox
+
+The user who creates and owns the origin. Exercises:
+
+- generate origin ML-DSA-87 + ML-KEM-1024 keypairs (independent of owner keys)
+- insert origin `user_cards` row (self-signed)
+- create `origin` row with `owner_cert` (owner signs origin's `sign_pkey`)
+- set/change moderation mode
+- delete (soft delete via `deleted_flag`)
+- export origin identity (for admin/moderator sandbox)
+
+### Origin admin/moderator sandbox
+
+Authenticates as the origin identity (not the owner's personal identity). Exercises:
+
+- receive `to_origin` reviews (dialog decryption via origin's `kem_skey`)
+- pre-moderation: decrypt `review_post_right` (KEM decapsulate), publish password to `review_passwords`
+- post-moderation: decrypt `review_revoke_right` (KEM decapsulate), publish null to `review_passwords`
+- moderation round-trip with the author sandbox
+
+### Review visitor/author sandbox
+
+A regular user browsing and writing reviews. Exercises:
+
+- browse origins (public directory)
+- view public reviews (decrypt with `review_password` from `review_passwords`)
+- view contacts' reviews (decrypt via `review_list_password` from `review_list`)
+- write `to_public` review: generate `review_password`, AES-256-GCM encrypt, ML-DSA-87 sign plaintext, submit password candidate
+- write `to_origin` review: dialog message to origin identity
+- moderation pipeline participation: submit candidates, receive KEM shared_secret, verify wrapping, sign rights
 
 ## Implementation phases
 

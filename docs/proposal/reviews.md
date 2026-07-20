@@ -22,7 +22,7 @@ An origin owner should be able to:
 
 - **Rating**: incorporate into a content model `[rating, placeholder, content]` — fill placeholder with random string to make rating-only and text reviews indistinguishable in ciphertext size.
 - **Passwords vs reviews**: passwords as access layer. Prevent deletion as much as possible.
-- **Ingest via candidates**: all `review_passwords` entries flow through `review_password_candidate` — the server validates and promotes. Direct ingest into `review_passwords` is not allowed (see Moderation section).
+- **Ingest via candidates**: all `review_public_passwords` entries flow through `review_password_candidate` — the server validates and promotes. Direct ingest into `review_public_passwords` is not allowed (see Moderation section).
 - **Origin key management**: origin keypairs are independently generated on the client (not derived from owner keys), stored client-side in the owner's identity, same pattern as regular user keys (see `pq_user.md`). Multi-device access via User Storage (encrypted skeys stored server-side, decryptable by the owner).
 - **Origin creation**: three-step flow — create owner `user_cards` (if not exists) → generate and insert origin `user_cards` row → insert `origin` row with `owner_cert` linking the two (see Origin creation section).
 
@@ -34,7 +34,7 @@ Origin (the coffee shop)
 │
 └── Review (by any user)
     ├── to_public   — encrypted with review_password, signed by author
-    │                 public when password in review_passwords table
+    │                 public when password in review_public_passwords table
     │                 contacts see via review_list_password (bypasses moderation)
     ├── to_origin  — dialog between author and origin identity (see pq_dialogs)
     │
@@ -118,23 +118,29 @@ sequenceDiagram
 
 ## Moderation
 
-Public visibility of a review is controlled server-side via the `review_passwords` table — not by the author. The origin sets a moderation level that determines how review passwords flow into this table:
+Public visibility of a review is controlled server-side via the `review_public_passwords` table — not by the author. The origin sets a moderation level that determines how review passwords flow into this table:
 
-- **none** — server auto-promotes password from candidate to `review_passwords`; review is immediately public
-- **post-moderation** — server auto-promotes password and creates `review_revoke_right`; origin owner can revoke
-- **pre-moderation** — server withholds password; origin owner receives both post and revoke rights
+- **none** — server auto-promotes password from candidate to `review_public_passwords`; review is immediately public
+- **post-moderation** — the author first grants a revoke right; the server then promotes the password; the origin owner can revoke later
+- **pre-moderation** — the author grants both post and revoke rights; the server withholds the password until the origin owner posts
 
-The public frontend checks whether a decryption password exists in `review_passwords` for a given review. The author cannot bypass moderation because the server controls the table, not the author.
+The public frontend checks whether a decryption password exists in `review_public_passwords` for a given review. The author cannot bypass moderation because the server controls the table, not the author.
 
 ### Candidate-only ingest
 
-All moderation modes route through `review_password_candidate`. Direct ingest into `review_passwords` is not allowed. The server validates candidates (timestamps, signatures, matching review exists) and promotes them based on the origin's moderation mode:
+All moderation modes route through `review_password_candidate`. Direct ingest into `review_public_passwords` is not allowed — the shape refuses writes to that table, so a password can only become public through server-side promotion.
 
-- **none** — author submits password candidate → server validates → auto-promotes to `review_passwords`
-- **post** — author submits password candidate + null candidate (timestamp+1) → server validates → wraps null version in `review_revoke_right` (KEM-encrypt to origin) → author signs revoke right → server promotes password to `review_passwords` only after revoke right is fully signed
-- **pre** — author submits password candidate + null candidate → server validates → stores both in candidates, does NOT promote → wraps password version in `review_post_right` + null version in `review_revoke_right` (KEM-encrypt to origin)
+Promotion is a **two-phase handshake** (`Chat.Data.ReviewPasswordCandidate.Promotion`) so the author signs each right *after* verifying the server wrapped it correctly.
 
-For post and pre modes: server stores the right without author signature, returns KEM shared_secret in HTTP headers. Author verifies wrapping, signs the right entry, updates row.
+**Phase 1 — `promote_candidate`.** The server looks up the review's origin and its `moderation_mode`, then:
+
+- **none** — promotes the password candidate straight into `review_public_passwords`. Single-phase; no rights, no phase 2.
+- **post** — requires a null candidate (timestamp+1); wraps it (KEM-encrypt to the origin) into `review_revoke_right_candidate` and returns the KEM `shared_secret`.
+- **pre** — requires both a password candidate and a null candidate; wraps the password version into `review_post_right_candidate` and the null version into `review_revoke_right_candidate`, returning both `shared_secret`s.
+
+The right *candidates* are server-internal staging tables (not Electric-synced) holding the wrapped, **unsigned** envelope. The server returns the KEM `shared_secret`(s); the author unwraps, verifies the wrapping matches what they submitted, and signs each right candidate in place.
+
+**Phase 2 — `complete_promotion`.** After the author has signed the right candidate(s), the server verifies those signatures and, in one transaction, promotes each signed candidate into its real table (`review_post_right` / `review_revoke_right`) and — for **post** mode — promotes the password candidate into `review_public_passwords`. In **pre** mode nothing is promoted to `review_public_passwords`; the review stays private until the origin owner posts. The staging candidates are then cleared.
 
 ### No moderation flow
 
@@ -143,12 +149,12 @@ sequenceDiagram
     participant A as Author
     participant S as Server
     participant C as review_password_candidate
-    participant P as review_passwords
+    participant P as review_public_passwords
 
     A->>S: submit review (encrypted with review_password)
     A->>C: submit review_password candidate
     S->>S: validate candidate (signature, timestamp, review exists)
-    S->>P: auto-promote to review_passwords
+    S->>P: auto-promote to review_public_passwords
     Note over P: Review immediately decryptable by public
 ```
 
@@ -158,18 +164,23 @@ sequenceDiagram
 sequenceDiagram
     participant A as Author
     participant S as Server
-    participant C as review_password_candidate
-    participant P as review_passwords
+    participant C as candidates<br/>(password + revoke-right)
+    participant P as review_public_passwords
     participant O as Origin Owner
 
     A->>S: submit review (encrypted with review_password)
     A->>C: submit password candidate + null candidate (timestamp+1)
+    Note over S: Phase 1 — promote_candidate
     S->>S: validate candidates
-    S->>S: wrap null candidate in review_revoke_right<br/>(KEM-encrypt to origin)
-    S-->>A: return KEM password in headers
-    A->>S: update review_revoke_right with author signature
-    S->>S: verify revoke right is fully signed
-    S->>P: promote password candidate to review_passwords
+    S->>C: wrap null candidate → review_revoke_right_candidate<br/>(KEM-encrypt to origin)
+    S-->>A: return KEM shared_secret
+    A->>A: unwrap, verify wrapping
+    A->>C: sign review_revoke_right_candidate
+    Note over S: Phase 2 — complete_promotion
+    A->>S: complete_promotion
+    S->>S: verify revoke-right signature
+    S->>S: promote candidate → review_revoke_right
+    S->>P: promote password candidate → review_public_passwords
 
     Note over P: Review is public (revoke right already available to origin)
 
@@ -186,20 +197,25 @@ sequenceDiagram
 sequenceDiagram
     participant A as Author
     participant S as Server
-    participant P as review_passwords
+    participant C as candidates<br/>(password + post/revoke-right)
+    participant P as review_public_passwords
     participant O as Origin Owner
-    participant C as review_password_candidate
 
     A->>S: submit review (encrypted with review_password)
-    A->>S: submit review_password version + password=null version
-    S->>C: store both versions in candidate table
-    S->>S: wrap password version in review_post_right<br/>(KEM-encrypt to origin owner)
-    S->>S: wrap null version in review_revoke_right<br/>(KEM-encrypt to origin owner)
-    S-->>A: return KEM passwords in headers
-    A->>S: update review_post_right with author signature
-    A->>S: update review_revoke_right with author signature
+    A->>C: submit password candidate + null candidate
+    Note over S: Phase 1 — promote_candidate
+    S->>S: validate candidates
+    S->>C: wrap password → review_post_right_candidate<br/>(KEM-encrypt to origin)
+    S->>C: wrap null → review_revoke_right_candidate<br/>(KEM-encrypt to origin)
+    S-->>A: return KEM shared_secrets
+    A->>A: unwrap, verify both wrappings
+    A->>C: sign post-right + revoke-right candidates
+    Note over S: Phase 2 — complete_promotion
+    A->>S: complete_promotion
+    S->>S: verify both signatures
+    S->>S: promote candidates → review_post_right + review_revoke_right
 
-    Note over P: review_passwords empty — review NOT public
+    Note over P: review_public_passwords empty — review NOT public
 
     alt Owner approves
         O->>S: decrypt review_post_right (KEM decapsulate)
@@ -218,7 +234,7 @@ sequenceDiagram
 
 ### to_public
 
-Content AES-256-GCM encrypted with a per-review `review_password` (random 32-byte key) and signed by the author (ML-DSA-87 over plaintext before encryption). Public visibility is determined by whether `review_password` is available in the `review_passwords` table — see the Moderation section.
+Content AES-256-GCM encrypted with a per-review `review_password` (random 32-byte key) and signed by the author (ML-DSA-87 over plaintext before encryption). Public visibility is determined by whether `review_password` is available in the `review_public_passwords` table — see the Moderation section.
 
 Moderation controls only **public** visibility. Even when a review is hidden or not yet approved, the author's contacts can still see it via `review_list_password` (see Contacts section). The contacts channel is the author's property and cannot be affected by the origin owner's moderation decisions.
 
@@ -294,14 +310,14 @@ review
 └── sign_hash             — SHA3-512 of sign_b64 (version identifier)
 ```
 
-Public visibility is controlled by the `review_passwords` table, not by fields on the review row — see the Moderation section. Author's contacts see the review via `review_list_password` regardless of moderation state.
+Public visibility is controlled by the `review_public_passwords` table, not by fields on the review row — see the Moderation section. Author's contacts see the review via `review_list_password` regardless of moderation state.
 
-### review_passwords
+### review_public_passwords
 
 Controls public visibility. Append-only (DELETE revoked). Latest entry by `owner_timestamp` determines whether the review is publicly decryptable.
 
 ```
-review_passwords
+review_public_passwords
 ├── review_hash           — which review (PK part 1)
 ├── sign_hash             — SHA3-512 of sign_b64 (PK part 2)
 ├── origin_hash           — which origin (for shape sync)
@@ -312,7 +328,9 @@ review_passwords
 └── sign_b64              — author's ML-DSA-87 signature
 ```
 
-Author pre-signs both password and null versions. In moderation flows, the origin decrypts a right and inserts the pre-signed row — the origin never signs `review_passwords` entries.
+Author pre-signs both password and null versions. In moderation flows, the origin decrypts a right and inserts the pre-signed row — the origin never signs `review_public_passwords` entries.
+
+On ingest the server verifies the row's signature and that its `author_hash` and `origin_hash` match the referenced review. A promotion record can only be minted for one's own review, so it is a trustworthy "proof of promotion" for `review_list`. (`sign_hash` is derived from `sign_b64` on ingest and is not part of the signed payload.)
 
 
 ### review_password_candidate
@@ -332,37 +350,57 @@ review_password_candidate
 └── sign_b64              — author's ML-DSA-87 signature
 ```
 
+### review_post_right_candidate / review_revoke_right_candidate
+
+Server-internal staging tables (not Electric-synced) that hold the **unsigned** wrapped right during the promotion handshake. Same shape as their `review_post_right` / `review_revoke_right` targets, plus an `inserted_at` used to garbage-collect candidates that were never signed.
+
+```
+review_{post,revoke}_right_candidate
+├── review_hash           — which review (PK)
+├── origin_hash           — which origin (KEM recipient = origin's crypt_pkey)
+├── author_hash           — who submitted
+├── kem_ciphertext_b64    — ML-KEM-1024 ciphertext (encapsulated to origin's crypt_pkey)
+├── wrapped_row_b64       — wrapped review_public_passwords row, AES-256-GCM under KEM-derived key
+├── deleted_flag
+├── owner_timestamp
+├── inserted_at           — for stale-candidate GC (ReviewRightCandidate.delete_stale_candidates/1)
+├── sign_b64              — author's ML-DSA-87 signature (added between phase 1 and phase 2)
+└── sign_hash             — SHA3-512 of sign_b64
+```
+
+`complete_promotion` copies a fully-signed candidate into its real table and deletes the staging rows.
+
 ### review_post_right
 
-KEM-encrypted envelope containing a complete, author-signed `review_passwords` row with the password. The origin decrypts and inserts the row as-is. Created during pre-moderation. Append-only (DELETE revoked).
+KEM-encrypted envelope containing a complete, author-signed `review_public_passwords` row with the password. The origin decrypts and inserts the row as-is. Created during pre-moderation. Append-only (DELETE revoked).
 
 ```
 review_post_right
 ├── review_hash           — which review (PK)
 ├── origin_hash           — which origin (KEM recipient = origin's crypt_pkey)
 ├── kem_ciphertext_b64    — ML-KEM-1024 ciphertext (encapsulated to origin's crypt_pkey)
-├── wrapped_row_b64       — complete author-signed review_passwords row, AES-256-GCM encrypted with KEM-derived key
+├── wrapped_row_b64       — complete author-signed review_public_passwords row, AES-256-GCM encrypted with KEM-derived key
 ├── deleted_flag           — integrity triad
 ├── owner_timestamp
-├── sign_b64              — author's ML-DSA-87 signature (added after server stores)
+├── sign_b64              — author's ML-DSA-87 signature (carried over from the signed candidate)
 └── sign_hash             — SHA3-512 of sign_b64
 ```
 
-Flow: author creates and signs a `review_passwords` row (with password). Server encapsulates to origin's `crypt_pkey`, wraps the complete signed row, stores the right without author signature, returns KEM shared_secret in HTTP headers. Author verifies wrapping, signs the right entry, updates row.
+Flow: created via the two-phase handshake — the server wraps the author's password candidate into `review_post_right_candidate` (unsigned) and returns the KEM `shared_secret`; the author verifies the wrapping and signs the candidate; `complete_promotion` verifies the signature and promotes the candidate into this table. On ingest the server binds the right to an existing review with matching `author_hash` and `origin_hash` (the insert is unsigned, so the cross-table binding is the guard; the same applies to `review_revoke_right`).
 
 ### review_revoke_right
 
-KEM-encrypted envelope containing a complete, author-signed `review_passwords` row with null password. The origin decrypts and inserts the row to revoke public visibility. Created during post-moderation and pre-moderation. Append-only (DELETE revoked).
+KEM-encrypted envelope containing a complete, author-signed `review_public_passwords` row with null password. The origin decrypts and inserts the row to revoke public visibility. Created during post-moderation and pre-moderation. Append-only (DELETE revoked).
 
 ```
 review_revoke_right
 ├── review_hash           — which review (PK)
 ├── origin_hash           — which origin (KEM recipient = origin's crypt_pkey)
 ├── kem_ciphertext_b64    — ML-KEM-1024 ciphertext (encapsulated to origin's crypt_pkey)
-├── wrapped_row_b64       — complete author-signed review_passwords row (password=null), AES-256-GCM encrypted with KEM-derived key
+├── wrapped_row_b64       — complete author-signed review_public_passwords row (password=null), AES-256-GCM encrypted with KEM-derived key
 ├── deleted_flag           — integrity triad
 ├── owner_timestamp
-├── sign_b64              — author's ML-DSA-87 signature (added after server stores)
+├── sign_b64              — author's ML-DSA-87 signature (carried over from the signed candidate)
 └── sign_hash             — SHA3-512 of sign_b64
 ```
 
@@ -377,7 +415,7 @@ review_list
 ├── user_hash             — whose review list (PK part 1)
 ├── review_hash           — which review (PK part 2)
 ├── password_b64          — review_password, AES-256-GCM encrypted with review_list_password
-├── password_sign_hash    — TEXT, sign_hash of the review_passwords row (proof of promotion)
+├── review_password_sign_hash    — TEXT, sign_hash of the review_public_passwords row (proof of promotion)
 ├── post_right_sign_hash  — TEXT, sign_hash of review_post_right row
 ├── revoke_right_sign_hash — TEXT, sign_hash of review_revoke_right row
 ├── deleted_flag           — integrity triad
@@ -390,22 +428,26 @@ One row per review. New review = new row (no need to re-encrypt an entire blob).
 
 #### Moderation proof requirements by mode
 
-| Mode | `password_sign_hash` | `post_right_sign_hash` | `revoke_right_sign_hash` |
+| Mode | `review_password_sign_hash` | `post_right_sign_hash` | `revoke_right_sign_hash` |
 |------|---------------------|----------------------|------------------------|
 | **none** | required | null | null |
 | **post** | required | null | required |
 | **pre** | null (until approved) | required | required |
 
-- **none** — `password_sign_hash` proves the candidate was promoted to `review_passwords` (auto-promotion). No rights exist.
-- **post** — `password_sign_hash` proves promotion happened. `revoke_right_sign_hash` proves the author gave the origin revoke capability before promotion.
-- **pre** — `password_sign_hash` is null at submission time because the review is not yet promoted. Both rights must exist, proving the author gave the origin the ability to post or revoke. When the origin approves and the password row appears, the author updates their `review_list` row to fill in `password_sign_hash`.
+- **none** — `review_password_sign_hash` proves the candidate was promoted to `review_public_passwords` (auto-promotion). No rights exist.
+- **post** — `review_password_sign_hash` proves promotion happened. `revoke_right_sign_hash` proves the author gave the origin revoke capability before promotion.
+- **pre** — `review_password_sign_hash` is null at submission time because the review is not yet promoted. Both rights must exist, proving the author gave the origin the ability to post or revoke. When the origin approves and the password row appears, the author updates their `review_list` row to fill in `review_password_sign_hash`.
 
 #### Server validation on review_list ingest
 
-1. Look up the review's origin → get `moderation_mode`
-2. For each non-null proof field: verify a matching row exists in the corresponding table with the same `review_hash`
-3. Reject if a field that must be non-null per mode is null
-4. Reject if a referenced row does not exist
+1. Reject if the referenced review — or its origin — does not exist (a `review_list` entry cannot prove a pipeline it never entered).
+2. Look up the origin's `moderation_mode`.
+3. Enforce the proof matrix above for that mode: every `required` field must be present, and every `null` field must be absent.
+4. For each present proof field, verify the referenced row exists **and its `sign_hash` matches the supplied value**:
+   - `review_password_sign_hash` → a `review_public_passwords` row keyed by `(review_hash, sign_hash)`
+   - `post_right_sign_hash` → the `review_post_right` row's `sign_hash`
+   - `revoke_right_sign_hash` → the `review_revoke_right` row's `sign_hash`
+5. The same checks run on **update**, so proof fields cannot be forged or blanked after the initial insert (the update path re-validates the effective post-merge values).
 
 ### comment (deferred)
 
@@ -461,7 +503,7 @@ Author signs: `review_hash || origin_hash || kem_ciphertext_b64 || wrapped_row_b
 
 ### Review list entry
 
-Author signs: `user_hash || review_hash || password_b64 || password_sign_hash || post_right_sign_hash || revoke_right_sign_hash || deleted_flag || owner_timestamp`
+Author signs: `user_hash || review_hash || password_b64 || review_password_sign_hash || post_right_sign_hash || revoke_right_sign_hash || deleted_flag || owner_timestamp`
 
 The proof fields are covered by the signature, preventing the author from stripping or forging moderation pipeline references after signing.
 
@@ -471,9 +513,9 @@ Will be designed with the comment schema.
 
 ## Row immutability
 
-Content tables (`review`, `review_passwords`, `review_post_right`, `review_revoke_right`, `review_list`) are append-only — DELETE is revoked at the PostgreSQL role level (see `pg_constraints.md` §5). This prevents a rogue origin from removing reviews or moderation records from the database, and prevents the server from deleting a user's review list.
+Content tables (`review`, `review_public_passwords`, `review_post_right`, `review_revoke_right`, `review_list`) are append-only — DELETE is revoked at the PostgreSQL role level (see `pg_constraints.md` §5). This prevents a rogue origin from removing reviews or moderation records from the database, and prevents the server from deleting a user's review list.
 
-Visibility is controlled exclusively through the `review_passwords` versioning mechanism (publish / revoke via timestamps), not through row deletion.
+Visibility is controlled exclusively through the `review_public_passwords` versioning mechanism (publish / revoke via timestamps), not through row deletion.
 
 ## Security properties
 
@@ -484,16 +526,20 @@ All reviews and comments are ML-DSA-87 signed. Authors cannot deny having writte
 ### Visibility guarantees
 
 - **to_origin**: fully cryptographic — server stores ciphertext and cannot read content
-- **to_public**: content is encrypted; the server controls public visibility via the `review_passwords` table (whether the decryption password is available), but cannot read the content itself
-- **contacts**: cryptographic — contacts access `review_password` via the author's encrypted `review_list`, independent of server-controlled `review_passwords`
+- **to_public**: content is encrypted; the server controls public visibility via the `review_public_passwords` table (whether the decryption password is available), but cannot read the content itself
+- **contacts**: cryptographic — contacts access `review_password` via the author's encrypted `review_list`, independent of server-controlled `review_public_passwords`
 
 ### Moderation bypass prevention
 
-The `review_list` requires proof that the review was submitted through the origin's moderation pipeline (sign_hash references to `review_passwords`, `review_post_right`, `review_revoke_right` — per moderation mode). The server validates these references on ingest, preventing authors from creating contacts-only reviews that bypass the origin's moderation entirely.
+The `review_list` requires proof that the review was submitted through the origin's moderation pipeline (sign_hash references to `review_public_passwords`, `review_post_right`, `review_revoke_right` — per moderation mode). The server validates these references on ingest — the referenced review and origin must exist, the per-mode proof matrix must hold exactly (required present, forbidden absent), and each referenced `sign_hash` must match the stored row — preventing authors from creating contacts-only reviews that bypass the origin's moderation. The same validation runs on update, so proofs cannot be forged after insert.
+
+### Ownership binding
+
+An origin's `owner_cert` is `ML-DSA-87.sign(origin_sign_pkey, owner_sign_skey)`. On ingest the server verifies the cert against the owner's current signing key, so a forged cert cannot claim ownership of an origin.
 
 ### Moderation transparency
 
-Moderation rights (`review_post_right`, `review_revoke_right`) carry the author's ML-DSA-87 signature, creating an auditable trail. The `review_passwords` table provides a public record of publication and revocation.
+Moderation rights (`review_post_right`, `review_revoke_right`) carry the author's ML-DSA-87 signature, creating an auditable trail. The `review_public_passwords` table provides a public record of publication and revocation.
 
 ### Forward secrecy
 
@@ -567,8 +613,8 @@ The user who creates and owns the origin. Exercises:
 Authenticates as the origin identity (not the owner's personal identity). Exercises:
 
 - receive `to_origin` reviews (dialog decryption via origin's `kem_skey`)
-- pre-moderation: decrypt `review_post_right` (KEM decapsulate), publish password to `review_passwords`
-- post-moderation: decrypt `review_revoke_right` (KEM decapsulate), publish null to `review_passwords`
+- pre-moderation: decrypt `review_post_right` (KEM decapsulate), publish password to `review_public_passwords`
+- post-moderation: decrypt `review_revoke_right` (KEM decapsulate), publish null to `review_public_passwords`
 - moderation round-trip with the author sandbox
 
 ### Review visitor/author sandbox
@@ -576,7 +622,7 @@ Authenticates as the origin identity (not the owner's personal identity). Exerci
 A regular user browsing and writing reviews. Exercises:
 
 - browse origins (public directory)
-- view public reviews (decrypt with `review_password` from `review_passwords`)
+- view public reviews (decrypt with `review_password` from `review_public_passwords`)
 - view contacts' reviews (decrypt via `review_list_password` from `review_list`)
 - write `to_public` review: generate `review_password`, AES-256-GCM encrypt, ML-DSA-87 sign plaintext, submit password candidate
 - write `to_origin` review: dialog message to origin identity
@@ -584,7 +630,7 @@ A regular user browsing and writing reviews. Exercises:
 
 ## Implementation phases
 
-### Phase 1 — Origin entity ✓ (in progress)
+### Phase 1 — Origin entity ✓
 
 - [x] `origins` Ecto schema and migration (`Chat.Data.Schemas.Origin`, `20260715144320_create_origins`)
 - [x] Electric publication (`20260715144321_add_origins_to_electric_publication`)
@@ -600,21 +646,32 @@ A regular user browsing and writing reviews. Exercises:
 - [ ] Origin creation in main app UI (name, moderation mode)
 - [ ] Origin directory / listing in main app UI
 
-### Phase 2 — Public reviews
+### Phase 2 — Public reviews and moderation pipeline ✓ (in progress)
 
-- [ ] `review` Ecto schema and migration
-- [ ] `review_passwords`, `review_password_candidate` schemas and migrations
-- [ ] `review_list` schema and migration
-- [ ] `review` Electric shape
-- [ ] public review submission and display
-- [ ] ML-DSA-87 signing and verification
+- [x] Hash types: `ReviewHash`, `ReviewSignHash`, `ReviewPasswordSignHash`, `ReviewPostRightSignHash`, `ReviewRevokeRightSignHash`, `ReviewListSignHash` with prefixes in `Consts`
+- [x] `review` Ecto schema and migration (`Chat.Data.Schemas.Review`, `20260718100000_create_review`)
+- [x] `review_public_passwords` schema and migration (`Chat.Data.Schemas.ReviewPublicPassword`, `20260718100001_create_review_public_passwords`)
+- [x] `review_password_candidate` schema and migration — server-internal, not Electric-published (`20260718100002`)
+- [x] `review_post_right` schema and migration (`20260718100003`)
+- [x] `review_revoke_right` schema and migration (`20260718100004`)
+- [x] `review_list` schema and migration (`20260718100005`)
+- [x] `review_post_right_candidate` / `review_revoke_right_candidate` staging schemas and migration (`20260718100007`)
+- [x] Electric publication for review, review_public_passwords, review_post_right, review_revoke_right, review_list (`20260718100006`)
+- [x] Data contexts with LWW upsert: `Chat.Data.Review`, `ReviewPublicPassword`, `ReviewPasswordCandidate`, `ReviewRightCandidate`, `ReviewPostRight`, `ReviewRevokeRight`, `ReviewList`
+- [x] Validation modules — peer sync + HTTP ingestion, enforcing moderation-proof, author/origin binding, owner-cert, and right cross-table binding: `Review.Validation`, `ReviewPublicPassword.Validation`, `ReviewPostRight.Validation`, `ReviewRevokeRight.Validation`, `ReviewList.Validation`, `Origin.Validation`
+- [x] Electric shapes: `Review`, `ReviewPublicPasswords`, `ReviewPostRight`, `ReviewRevokeRight`, `ReviewList` — registered in `Chat.Data.Shapes`
+- [x] Two-phase candidate promotion for all moderation modes (`ReviewPasswordCandidate.Promotion`: `promote_candidate` + `complete_promotion`)
+- [x] Tests: `review_moderation_test`, `review_list_validation_test`, `review_public_password_validation_test`, `origin_validation_test`, `review_right_validation_test`, `review_shapes_test`, `electric_controller_review_test`
+- [x] Review sandbox LiveView — interactive testing (`ReviewSandboxLive`)
+- [x] Reviews directory LiveView — real-time Electric stream listing (`ReviewsLive`)
+- [ ] HTTP entrypoint for candidate ingest + promotion (pipeline currently reachable only from tests)
+- [ ] Review creation in main app UI
+- [ ] Review listing in main app UI
+- [ ] Moderation UI for origin owners (approve/reject/revoke)
 
-### Phase 3 — To-origin reviews and moderation
+### Phase 3 — To-origin reviews
 
 - [ ] to_origin as dialog: origin subaccount identity + dialog key derivation
-- [ ] `review_post_right`, `review_revoke_right` schemas and migrations
-- [ ] pre-moderation flow (submit, approve/reject, publish)
-- [ ] post-moderation flow (hide/unhide)
 - [ ] moderation UI for origin owners
 - [ ] contacts-visible hidden reviews (author's contacts see moderation-hidden reviews)
 

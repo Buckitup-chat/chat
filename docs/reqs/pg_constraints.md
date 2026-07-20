@@ -93,7 +93,7 @@ SELECT
 
 ## 5. Row Deletion Prevention
 
-For append-only tables (e.g. `review`, `review_passwords`, `review_list`), revoke DELETE from the application role to prevent row removal:
+For append-only tables (e.g. `review`, `review_public_passwords`, `review_list`), revoke DELETE from the application role to prevent row removal:
 
 ```sql
 REVOKE DELETE ON target_table FROM app_role;

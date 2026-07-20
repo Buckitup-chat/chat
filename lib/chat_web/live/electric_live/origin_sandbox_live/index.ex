@@ -317,5 +317,4 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
   end
 
   defp format_headers(_), do: ""
-
 end

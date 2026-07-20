@@ -112,6 +112,8 @@ defmodule ChatWeb.Router do
       live "/electric/dialog_sandbox", ElectricLive.DialogSandboxLive.Index, :index
       live "/electric/origins", ElectricLive.OriginsLive.Index, :index
       live "/electric/origin_sandbox", ElectricLive.OriginSandboxLive.Index, :index
+      live "/electric/reviews", ElectricLive.ReviewsLive.Index, :index
+      live "/electric/review_sandbox", ElectricLive.ReviewSandboxLive.Index, :index
     end
   end
 

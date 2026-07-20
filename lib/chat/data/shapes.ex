@@ -11,7 +11,12 @@ defmodule Chat.Data.Shapes do
     Chat.Data.Shapes.DialogMessageReceipts,
     Chat.Data.Shapes.File,
     Chat.Data.Shapes.FileChunk,
-    Chat.Data.Shapes.Origin
+    Chat.Data.Shapes.Origin,
+    Chat.Data.Shapes.Review,
+    Chat.Data.Shapes.ReviewPublicPasswords,
+    Chat.Data.Shapes.ReviewPostRight,
+    Chat.Data.Shapes.ReviewRevokeRight,
+    Chat.Data.Shapes.ReviewList
   ]
 
   def all, do: @shapes

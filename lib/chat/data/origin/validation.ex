@@ -94,21 +94,25 @@ defmodule Chat.Data.Origin.Validation do
 
   defp verify_owner_cert(changeset, origin_hash, owner_hash, owner_cert)
        when is_binary(origin_hash) and is_binary(owner_hash) and is_binary(owner_cert) do
-    with true <- changeset.valid?,
-         %{sign_pkey: origin_sign_pkey} <- UserData.get_card(origin_hash),
-         %{sign_pkey: owner_sign_pkey} <- UserData.get_card(owner_hash),
-         true <- EnigmaPq.verify(origin_sign_pkey, owner_cert, owner_sign_pkey) do
-      changeset
-    else
-      false ->
-        changeset
-
-      _ ->
-        Ecto.Changeset.add_error(changeset, :owner_cert, "invalid owner certificate")
-    end
+    # Skip only when the changeset is already invalid — do NOT let a `false`
+    # returned by EnigmaPq.verify/3 collapse into that same branch, or a forged
+    # owner_cert would be accepted whenever both user_cards exist.
+    if changeset.valid?,
+      do: check_owner_cert(changeset, origin_hash, owner_hash, owner_cert),
+      else: changeset
   end
 
   defp verify_owner_cert(changeset, _origin_hash, _owner_hash, _owner_cert) do
     Ecto.Changeset.add_error(changeset, :owner_cert, "invalid owner certificate")
+  end
+
+  defp check_owner_cert(changeset, origin_hash, owner_hash, owner_cert) do
+    with %{sign_pkey: origin_sign_pkey} <- UserData.get_card(origin_hash),
+         %{sign_pkey: owner_sign_pkey} <- UserData.get_card(owner_hash),
+         true <- EnigmaPq.verify(origin_sign_pkey, owner_cert, owner_sign_pkey) do
+      changeset
+    else
+      _ -> Ecto.Changeset.add_error(changeset, :owner_cert, "invalid owner certificate")
+    end
   end
 end

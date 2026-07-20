@@ -291,7 +291,14 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
     end
   end
 
-  defp log_entry(method, url, req_headers, req_body, %{status: status, body: body, headers: headers}, ts) do
+  defp log_entry(
+         method,
+         url,
+         req_headers,
+         req_body,
+         %{status: status, body: body, headers: headers},
+         ts
+       ) do
     resp_body = if is_map(body), do: Jason.encode!(body, pretty: true), else: inspect(body)
 
     %{

@@ -107,6 +107,9 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
     ~H"""
     <div class="min-h-screen bg-gray-50 py-8" id="origin-owner-sandbox" phx-hook="DownloadFile">
       <div class="max-w-4xl mx-auto px-4">
+        <a href="/electric" class="text-sm text-blue-600 hover:text-blue-800 mb-2 inline-block">
+          &larr; Electric Index
+        </a>
         <h1 class="text-2xl font-bold text-gray-900 mb-2">Origin Owner Sandbox</h1>
         <p class="text-sm text-gray-600 mb-6">
           Test origin creation, management, and ownership operations via Electric API

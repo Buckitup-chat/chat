@@ -28,6 +28,9 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
     ~H"""
     <div class="min-h-screen bg-gray-50 py-8">
       <div class="max-w-4xl mx-auto px-4">
+        <a href="/electric" class="text-sm text-blue-600 hover:text-blue-800 mb-2 inline-block">
+          &larr; Electric Index
+        </a>
         <h1 class="text-2xl font-bold text-gray-900 mb-2">Review Author Sandbox</h1>
         <p class="text-sm text-gray-600 mb-6">
           Test review submission, password publication, and review list via Electric API

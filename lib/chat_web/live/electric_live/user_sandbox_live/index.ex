@@ -71,7 +71,10 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
   defp header(assigns) do
     ~H"""
     <div class="bg-white border-b px-6 py-4">
-      <h1 class="text-2xl font-bold text-gray-900">Electric API Sandbox</h1>
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-900">Electric API Sandbox</h1>
+        <a href="/electric" class="text-sm text-blue-600 hover:text-blue-800">&larr; Electric Index</a>
+      </div>
       <p class="text-sm text-gray-600 mt-1">
         Interactive test client for user_card and user_storage Electric API operations
       </p>

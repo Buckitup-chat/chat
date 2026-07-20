@@ -54,6 +54,9 @@ defmodule ChatWeb.ElectricLive.OriginsLive.Index do
     <div class="min-h-screen bg-gray-50 py-8">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="mb-8">
+          <a href="/electric" class="text-sm text-blue-600 hover:text-blue-800 mb-2 inline-block">
+            &larr; Electric Index
+          </a>
           <div class="flex items-center justify-between">
             <div>
               <h1 class="text-3xl font-bold text-gray-900">Origins (Electric)</h1>
@@ -97,8 +100,10 @@ defmodule ChatWeb.ElectricLive.OriginsLive.Index do
                 <div class="flex items-center justify-between">
                   <div class="min-w-0 flex-1">
                     <p class="text-sm font-medium text-gray-900 truncate">
-                      Origin:
-                      <span class="font-mono text-xs">{truncate_hash(origin.origin_hash)}</span>
+                      {origin.name}
+                      <span class="ml-2 font-mono text-xs text-gray-500">
+                        {truncate_hash(origin.origin_hash)}
+                      </span>
                       <%= if origin.deleted_flag do %>
                         <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
                           Deleted

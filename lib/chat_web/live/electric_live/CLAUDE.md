@@ -13,3 +13,9 @@ Every sub-page must include a back link to the Electric index at the top of its 
   &larr; Electric Index
 </a>
 ```
+
+## Sandbox UI conventions
+
+- **Shortcodes for hashes**: Display truncated hashes using `Chat.Proto.Shortcode.short_code/1` protocol. Implementations exist for `BitString` (raw hash strings), `Atom` (nil), and Ecto schemas like `UserCard`.
+- **Request log**: Always show full details — request headers, request body, response headers, and response body — each in a collapsible `<details>` block.
+- **Form state preservation**: Forms with interactive controls (e.g. star rating buttons via `phx-click`) must use `phx-change` to capture all field values into assigns, and bind those assigns back to the inputs (e.g. `selected={... == @assign}` on `<option>`, `value={@assign}` on `<input>`). Otherwise, re-renders from non-form events reset untracked fields.

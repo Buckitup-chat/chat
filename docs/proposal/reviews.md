@@ -135,33 +135,37 @@ The public frontend checks whether a decryption password exists in `review_publi
 
 All moderation modes route through `review_password_candidate`. Direct ingest into `review_public_passwords` is not allowed — the shape refuses writes to that table, so a password can only become public through server-side promotion.
 
-Promotion is a **two-phase handshake** (`Chat.Data.ReviewPasswordCandidate.Promotion`) so the author signs each right *after* verifying the server wrapped it correctly.
+Promotion is a **two-phase handshake** driven entirely through the normal `/ingest` endpoint — no separate HTTP routes. The server triggers each phase automatically when candidates arrive or are updated via ingest.
 
-**Phase 1 — `promote_candidate`.** The server looks up the review's origin and its `moderation_mode`, then:
+**Phase 1 — `promote_candidate` (triggered by candidate ingest).** When the server ingests `review_password_candidate` rows, it checks whether both the password and null candidates are present for the review. Once both arrive, the server looks up the review's origin and its `moderation_mode`, then:
 
 - **none** — promotes the password candidate straight into `review_public_passwords`. Single-phase; no rights, no phase 2.
-- **post** — requires both a password candidate and a null candidate; wraps the null version (KEM-encrypt to the origin) into `review_revoke_right_candidate` and returns the KEM `shared_secret`.
-- **pre** — requires both a password candidate and a null candidate; wraps the password version into `review_post_right_candidate` and the null version into `review_revoke_right_candidate`, returning both `shared_secret`s.
+- **post** — wraps the null version (KEM-encrypt to the origin) into `review_revoke_right_candidate`.
+- **pre** — wraps the password version into `review_post_right_candidate` and the null version into `review_revoke_right_candidate`.
 
 **Revoke-ordering invariant (enforced).** Because public visibility is Last-Write-Wins by `owner_timestamp` (latest row wins; `password_b64 = null` means revoked), the null (revoke) version's `owner_timestamp` must be **strictly greater** than the password version's — otherwise publishing the revoke would not supersede the password. `promote_candidate` enforces `null.ts > password.ts` in **post** and **pre** modes and rejects the promotion otherwise (it is not merely a client convention). In **pre** mode this also means the `review_revoke_right` can always override a posted `review_post_right`. In every mode the server also validates each submitted candidate's author signature and author/origin binding before minting or wrapping it.
 
-The right *candidates* are server-internal staging tables (not Electric-synced) holding the wrapped, **unsigned** envelope. The server returns the KEM `shared_secret`(s); the author unwraps, verifies the wrapping matches what they submitted, and signs each right candidate in place.
+The right *candidates* are Electric-synced staging tables. After phase 1 creates them, the author's client reads the unsigned right candidates via their Electric shape, verifies the KEM wrapping matches what they submitted, and ingests a signature update (`sign_b64` + `sign_hash`) on each right candidate.
 
-**Phase 2 — `complete_promotion`.** After the author has signed the right candidate(s), the server verifies those signatures and, in one transaction, promotes each signed candidate into its real table (`review_post_right` / `review_revoke_right`) and — for **post** mode — promotes the password candidate into `review_public_passwords`. In **pre** mode nothing is promoted to `review_public_passwords`; the review stays private until the origin owner posts. The staging candidates are then cleared.
+**Phase 2 — `complete_promotion` (triggered by right candidate signature ingest).** When the server ingests a signature update on a right candidate, it checks whether all required right candidates for the review are now signed. Once the last signature arrives, the server verifies all signatures and, in one transaction, promotes each signed candidate into its real table (`review_post_right` / `review_revoke_right`) and — for **post** mode — promotes the password candidate into `review_public_passwords`. In **pre** mode nothing is promoted to `review_public_passwords`; the review stays private until the origin owner posts. The staging candidates are then cleared.
 
 ### No moderation flow
 
 ```mermaid
 sequenceDiagram
     participant A as Author
-    participant S as Server
+    participant S as Server (ingest)
     participant C as review_password_candidate
     participant P as review_public_passwords
 
-    A->>S: submit review (encrypted with review_password)
-    A->>C: submit review_password candidate
-    S->>S: validate candidate (signature, timestamp, review exists)
-    S->>P: auto-promote to review_public_passwords
+    A->>S: ingest review (encrypted with review_password)
+    A->>S: ingest password candidate
+    S->>C: insert candidate
+    A->>S: ingest null candidate
+    S->>C: insert candidate
+    S->>S: both candidates present → promote_candidate
+    S->>S: mode=none → auto-promote
+    S->>P: insert into review_public_passwords
     Note over P: Review immediately decryptable by public
 ```
 
@@ -170,23 +174,24 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant A as Author
-    participant S as Server
-    participant C as candidates<br/>(password + revoke-right)
+    participant S as Server (ingest)
+    participant C as candidates
+    participant RC as review_revoke_right_candidate
     participant P as review_public_passwords
     participant O as Origin Owner
 
-    A->>S: submit review (encrypted with review_password)
-    A->>C: submit password candidate + null candidate (null.ts > password.ts)
-    Note over S: Phase 1 — promote_candidate
-    S->>S: validate candidates
-    S->>C: wrap null candidate → review_revoke_right_candidate<br/>(KEM-encrypt to origin)
-    S-->>A: return KEM shared_secret
-    A->>A: unwrap, verify wrapping
-    A->>C: sign review_revoke_right_candidate
-    Note over S: Phase 2 — complete_promotion
-    A->>S: complete_promotion
+    A->>S: ingest review (encrypted with review_password)
+    A->>S: ingest password candidate + null candidate (null.ts > password.ts)
+    Note over S: both candidates present → promote_candidate
+    S->>S: mode=post → wrap null candidate
+    S->>RC: create review_revoke_right_candidate (KEM-encrypt to origin, unsigned)
+
+    Note over A: client reads RC via Electric shape
+    A->>A: verify KEM wrapping matches submitted candidate
+    A->>S: ingest signature update on revoke_right_candidate (sign_b64 + sign_hash)
+    Note over S: last required signature arrived → complete_promotion
     S->>S: verify revoke-right signature
-    S->>S: promote candidate → review_revoke_right
+    S->>S: promote revoke_right_candidate → review_revoke_right
     S->>P: promote password candidate → review_public_passwords
 
     Note over P: Review is public (revoke right already available to origin)
@@ -203,22 +208,23 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant A as Author
-    participant S as Server
-    participant C as candidates<br/>(password + post/revoke-right)
+    participant S as Server (ingest)
+    participant C as candidates
+    participant RC as right_candidates (post + revoke)
     participant P as review_public_passwords
     participant O as Origin Owner
 
-    A->>S: submit review (encrypted with review_password)
-    A->>C: submit password candidate + null candidate
-    Note over S: Phase 1 — promote_candidate
-    S->>S: validate candidates
-    S->>C: wrap password → review_post_right_candidate<br/>(KEM-encrypt to origin)
-    S->>C: wrap null → review_revoke_right_candidate<br/>(KEM-encrypt to origin)
-    S-->>A: return KEM shared_secrets
-    A->>A: unwrap, verify both wrappings
-    A->>C: sign post-right + revoke-right candidates
-    Note over S: Phase 2 — complete_promotion
-    A->>S: complete_promotion
+    A->>S: ingest review (encrypted with review_password)
+    A->>S: ingest password candidate + null candidate
+    Note over S: both candidates present → promote_candidate
+    S->>S: mode=pre → wrap both candidates
+    S->>RC: create review_post_right_candidate (KEM-encrypt to origin, unsigned)
+    S->>RC: create review_revoke_right_candidate (KEM-encrypt to origin, unsigned)
+
+    Note over A: client reads RCs via Electric shape
+    A->>A: verify both KEM wrappings
+    A->>S: ingest signature updates on both right_candidates
+    Note over S: last required signature arrived → complete_promotion
     S->>S: verify both signatures
     S->>S: promote candidates → review_post_right + review_revoke_right
 
@@ -359,7 +365,7 @@ review_password_candidate
 
 ### review_post_right_candidate / review_revoke_right_candidate
 
-Server-internal staging tables (not Electric-synced) that hold the **unsigned** wrapped right during the promotion handshake. Same shape as their `review_post_right` / `review_revoke_right` targets, plus an `inserted_at` used to garbage-collect candidates that were never signed.
+Electric-synced staging tables that hold the wrapped right during the promotion handshake. The server creates them unsigned after phase 1; the client reads them via Electric shape, verifies the KEM wrapping, and ingests a signature update. Same shape as their `review_post_right` / `review_revoke_right` targets, plus an `inserted_at` used to garbage-collect candidates that were never signed.
 
 ```
 review_{post,revoke}_right_candidate
@@ -680,7 +686,7 @@ A regular user browsing and writing reviews. Exercises:
 - [x] Tests: `review_moderation_test`, `review_list_validation_test`, `review_public_password_validation_test`, `origin_validation_test`, `review_right_validation_test`, `review_shapes_test`, `electric_controller_review_test`
 - [x] Review sandbox LiveView — interactive testing (`ReviewSandboxLive`)
 - [x] Reviews directory LiveView — real-time Electric stream listing (`ReviewsLive`)
-- [ ] HTTP entrypoint for candidate ingest + promotion (pipeline currently reachable only from tests)
+- [ ] Server-side promotion trigger — promotion should be triggered by the server when ingesting the last of rights or password (not via separate HTTP routes)
 - [ ] Review creation in main app UI
 - [ ] Review listing in main app UI
 - [ ] Moderation UI for origin owners (approve/reject/revoke)

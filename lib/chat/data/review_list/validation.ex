@@ -159,7 +159,7 @@ defmodule Chat.Data.ReviewList.Validation do
 
   defp verify_proof_by_mode(cs, :pre, review_hash, pwd_sh, post_sh, revoke_sh) do
     cs
-    |> require_null(:review_password_sign_hash, pwd_sh)
+    |> optional_password_proof(review_hash, pwd_sh)
     |> require_post_right_proof(review_hash, post_sh)
     |> require_revoke_right_proof(review_hash, revoke_sh)
   end
@@ -186,6 +186,15 @@ defmodule Chat.Data.ReviewList.Validation do
         cs
     end
   end
+
+  # Pre mode: the review is not public at submission, so `review_password_sign_hash`
+  # is absent then. Once the origin approves and the review_public_passwords row
+  # appears, the author updates the review_list row to fill it in (docs §439). So a
+  # nil value is allowed, and a present value must reference an existing promotion row.
+  defp optional_password_proof(cs, _review_hash, nil), do: cs
+
+  defp optional_password_proof(cs, review_hash, sign_hash),
+    do: require_password_proof(cs, review_hash, sign_hash)
 
   defp require_post_right_proof(cs, _review_hash, nil),
     do: Ecto.Changeset.add_error(cs, :post_right_sign_hash, "required for this moderation mode")

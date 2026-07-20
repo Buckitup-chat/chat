@@ -276,7 +276,120 @@ defmodule Chat.Data.ReviewModerationTest do
     end
   end
 
+  # --- Negative / integrity paths ---
+
+  describe "promotion rejects invalid candidates and rights" do
+    test "none: rejects a password candidate whose author is not the review author", ctx do
+      insert_origin(ctx.origin_identity, ctx.owner, :none)
+      review = insert_review(ctx.author, ctx.origin_hash)
+
+      attacker = User.generate_pq_identity("Attacker")
+      _card = insert_user_card(attacker)
+      attacker_hash = User.extract_pq_card(attacker).user_hash
+
+      candidate =
+        build_candidate(ctx.author, review, ctx.origin_hash, review.review_password,
+          author_hash: attacker_hash,
+          signer: attacker
+        )
+
+      assert {:error, _} = Promotion.promote_candidate(candidate)
+      assert PublicPasswordData.get_latest_for_review(review.review_hash) == nil
+    end
+
+    test "none: rejects a password candidate with a forged signature", ctx do
+      insert_origin(ctx.origin_identity, ctx.owner, :none)
+      review = insert_review(ctx.author, ctx.origin_hash)
+
+      attacker = User.generate_pq_identity("Attacker")
+
+      candidate =
+        build_candidate(ctx.author, review, ctx.origin_hash, review.review_password,
+          signer: attacker
+        )
+
+      assert {:error, _} = Promotion.promote_candidate(candidate)
+      assert PublicPasswordData.get_latest_for_review(review.review_hash) == nil
+    end
+
+    test "post: rejects when the revoke timestamp does not exceed the password timestamp", ctx do
+      insert_origin(ctx.origin_identity, ctx.owner, :post)
+      review = insert_review(ctx.author, ctx.origin_hash)
+
+      pwd = insert_password_candidate(ctx.author, review, ctx.origin_hash)
+      _null = build_candidate(ctx.author, review, ctx.origin_hash, nil, timestamp_offset: -10_000)
+
+      assert {:error, "revoke timestamp must exceed password timestamp"} =
+               Promotion.promote_candidate(pwd)
+    end
+
+    test "pre: rejects when the revoke timestamp does not exceed the password timestamp", ctx do
+      insert_origin(ctx.origin_identity, ctx.owner, :pre)
+      review = insert_review(ctx.author, ctx.origin_hash)
+
+      pwd = insert_password_candidate(ctx.author, review, ctx.origin_hash)
+      _null = build_candidate(ctx.author, review, ctx.origin_hash, nil, timestamp_offset: -10_000)
+
+      assert {:error, "revoke timestamp must exceed password timestamp"} =
+               Promotion.promote_candidate(pwd)
+    end
+
+    test "post: complete_promotion rejects a forged revoke-right signature", ctx do
+      insert_origin(ctx.origin_identity, ctx.owner, :post)
+      review = insert_review(ctx.author, ctx.origin_hash)
+      ctx = Map.put(ctx, :review, review)
+      {_secrets, _pwd} = phase1_post(ctx)
+
+      attacker = User.generate_pq_identity("Attacker")
+      sign_right_candidate(:revoke, review.review_hash, attacker)
+
+      assert {:error, :invalid_signature} = Promotion.complete_promotion(review.review_hash)
+      assert RevokeRightData.get_revoke_right(review.review_hash) == nil
+    end
+
+    test "pre: complete_promotion rejects a forged post-right signature", ctx do
+      insert_origin(ctx.origin_identity, ctx.owner, :pre)
+      review = insert_review(ctx.author, ctx.origin_hash)
+      ctx = Map.put(ctx, :review, review)
+      {_secrets, _pwd, _null} = phase1_pre(ctx)
+
+      attacker = User.generate_pq_identity("Attacker")
+      sign_right_candidate(:post, review.review_hash, attacker)
+      sign_right_candidate(:revoke, review.review_hash, ctx.author)
+
+      assert {:error, :invalid_signature} = Promotion.complete_promotion(review.review_hash)
+      assert PostRightData.get_post_right(review.review_hash) == nil
+    end
+
+    test "post: a tampered wrapped row fails authenticated decryption", ctx do
+      insert_origin(ctx.origin_identity, ctx.owner, :post)
+      review = insert_review(ctx.author, ctx.origin_hash)
+      ctx = Map.put(ctx, :review, review)
+      {secrets, _pwd} = phase1_post(ctx)
+
+      rc = RightCandidateData.get_revoke_candidate(review.review_hash)
+      tampered = %{rc | wrapped_row_b64: flip_last_byte(rc.wrapped_row_b64)}
+
+      assert :failed == try_unwrap(tampered, secrets.revoke_shared_secret)
+    end
+  end
+
   # --- Helpers ---
+
+  defp try_unwrap(right, shared_secret) do
+    unwrap_with_secret(right, shared_secret)
+    :decrypted
+  rescue
+    _ -> :failed
+  catch
+    _, _ -> :failed
+  end
+
+  defp flip_last_byte(bin) do
+    size = byte_size(bin)
+    <<head::binary-size(size - 1), last>> = bin
+    <<head::binary, rem(last + 1, 256)>>
+  end
 
   defp phase1_post(ctx) do
     pwd = insert_password_candidate(ctx.author, ctx.review, ctx.origin_hash)
@@ -296,14 +409,18 @@ defmodule Chat.Data.ReviewModerationTest do
     candidate = RightCandidateData.get_post_candidate(review_hash)
     sign_b64 = candidate |> Integrity.signature_payload() |> EnigmaPq.sign(author.sign_skey)
     sign_hash = sign_b64 |> EnigmaPq.hash() |> ReviewPostRightSignHash.from_binary()
-    {:ok, _} = RightCandidateData.update_candidate(candidate, %{sign_b64: sign_b64, sign_hash: sign_hash})
+
+    {:ok, _} =
+      RightCandidateData.update_candidate(candidate, %{sign_b64: sign_b64, sign_hash: sign_hash})
   end
 
   defp sign_right_candidate(:revoke, review_hash, author) do
     candidate = RightCandidateData.get_revoke_candidate(review_hash)
     sign_b64 = candidate |> Integrity.signature_payload() |> EnigmaPq.sign(author.sign_skey)
     sign_hash = sign_b64 |> EnigmaPq.hash() |> ReviewRevokeRightSignHash.from_binary()
-    {:ok, _} = RightCandidateData.update_candidate(candidate, %{sign_b64: sign_b64, sign_hash: sign_hash})
+
+    {:ok, _} =
+      RightCandidateData.update_candidate(candidate, %{sign_b64: sign_b64, sign_hash: sign_hash})
   end
 
   defp insert_user_card(identity) do
@@ -362,7 +479,8 @@ defmodule Chat.Data.ReviewModerationTest do
 
   defp build_candidate(author, review, origin_hash, password_b64, opts \\ []) do
     offset = Keyword.get(opts, :timestamp_offset, 0)
-    author_hash = User.extract_pq_card(author).user_hash
+    author_hash = Keyword.get(opts, :author_hash) || User.extract_pq_card(author).user_hash
+    signer = Keyword.get(opts, :signer, author)
     timestamp = System.os_time(:millisecond) + offset
 
     signable = %Chat.Data.Schemas.ReviewPublicPassword{
@@ -375,7 +493,7 @@ defmodule Chat.Data.ReviewModerationTest do
       owner_timestamp: timestamp
     }
 
-    sign_b64 = signable |> Integrity.signature_payload() |> EnigmaPq.sign(author.sign_skey)
+    sign_b64 = signable |> Integrity.signature_payload() |> EnigmaPq.sign(signer.sign_skey)
     sign_hash = sign_b64 |> EnigmaPq.hash() |> ReviewPasswordSignHash.from_binary()
 
     changeset =

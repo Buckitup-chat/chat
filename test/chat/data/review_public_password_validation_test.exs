@@ -10,6 +10,7 @@ defmodule Chat.Data.ReviewPublicPasswordValidationTest do
   use ChatWeb.DataCase, async: true, group: :ets_deferred
 
   alias Chat.Data.Integrity
+  alias Chat.Data.ReviewPublicPassword, as: PublicPasswordData
   alias Chat.Data.ReviewPublicPassword.Validation
   alias Chat.Data.Schemas.Origin
   alias Chat.Data.Schemas.Review
@@ -106,7 +107,51 @@ defmodule Chat.Data.ReviewPublicPasswordValidationTest do
     assert Keyword.has_key?(cs.errors, :sign_b64)
   end
 
+  describe "visibility is last-write-wins by owner_timestamp" do
+    test "a later null (revoke) row supersedes an earlier password row", ctx do
+      persist(build_password_at(ctx, ctx.author_hash, :crypto.strong_rand_bytes(32), 1000))
+      persist(build_password_at(ctx, ctx.author_hash, nil, 2000))
+
+      latest = PublicPasswordData.get_latest_for_review(ctx.review.review_hash)
+
+      assert latest.owner_timestamp == 2000
+      assert latest.password_b64 == nil
+    end
+
+    test "a stale (older) row does not become the current version", ctx do
+      persist(build_password_at(ctx, ctx.author_hash, :crypto.strong_rand_bytes(32), 2000))
+      persist(build_password_at(ctx, ctx.author_hash, nil, 1000))
+
+      latest = PublicPasswordData.get_latest_for_review(ctx.review.review_hash)
+
+      assert latest.owner_timestamp == 2000
+      refute is_nil(latest.password_b64)
+    end
+  end
+
   # --- Helpers ---
+
+  defp build_password_at(ctx, author_hash, password_b64, owner_timestamp) do
+    rp = %ReviewPublicPassword{
+      review_hash: ctx.review.review_hash,
+      origin_hash: ctx.origin_hash,
+      password_b64: password_b64,
+      author_hash: author_hash,
+      deleted_flag: false,
+      owner_timestamp: owner_timestamp
+    }
+
+    sign_b64 = rp |> Integrity.signature_payload() |> EnigmaPq.sign(ctx.author.sign_skey)
+    sign_hash = sign_b64 |> EnigmaPq.hash() |> ReviewPasswordSignHash.from_binary()
+    %{rp | sign_b64: sign_b64, sign_hash: sign_hash}
+  end
+
+  defp persist(rp) do
+    {:ok, _} =
+      %ReviewPublicPassword{}
+      |> ReviewPublicPassword.create_changeset(Map.from_struct(rp))
+      |> PublicPasswordData.upsert_review_public_password()
+  end
 
   defp build_password(signer, review, author_hash, origin_hash) do
     rp = %ReviewPublicPassword{

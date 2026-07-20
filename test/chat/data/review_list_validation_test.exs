@@ -175,7 +175,7 @@ defmodule Chat.Data.ReviewListValidationTest do
       assert cs.valid?, inspect(cs.errors)
     end
 
-    test "rejects when password proof is present (must be null until approval)", ctx do
+    test "rejects a dangling password proof (references no promoted row)", ctx do
       cs =
         validate_insert(ctx,
           review_password_sign_hash: random_password_sign_hash(),
@@ -185,6 +185,42 @@ defmodule Chat.Data.ReviewListValidationTest do
 
       refute cs.valid?
       assert error_on?(cs, :review_password_sign_hash)
+    end
+
+    test "accepts a promoted password proof after approval (fill-in, docs §439)", ctx do
+      pwd_sh = insert_public_password(ctx.author, ctx.review, ctx.origin_hash)
+
+      cs =
+        validate_insert(ctx,
+          review_password_sign_hash: pwd_sh,
+          post_right_sign_hash: ctx.post_sh,
+          revoke_right_sign_hash: ctx.revoke_sh
+        )
+
+      assert cs.valid?, inspect(cs.errors)
+    end
+
+    test "accepts an update that fills the password proof after approval", ctx do
+      existing =
+        build_review_list(ctx.author, ctx.review,
+          post_right_sign_hash: ctx.post_sh,
+          revoke_right_sign_hash: ctx.revoke_sh,
+          ts: 1000
+        )
+
+      pwd_sh = insert_public_password(ctx.author, ctx.review, ctx.origin_hash)
+
+      update =
+        build_review_list(ctx.author, ctx.review,
+          review_password_sign_hash: pwd_sh,
+          post_right_sign_hash: ctx.post_sh,
+          revoke_right_sign_hash: ctx.revoke_sh,
+          ts: 2000
+        )
+
+      cs = Validation.validate_review_list_update(existing, update)
+
+      assert cs.valid?, inspect(cs.errors)
     end
 
     test "rejects when post-right proof is missing", ctx do
@@ -256,6 +292,41 @@ defmodule Chat.Data.ReviewListValidationTest do
       cs = Validation.validate_review_list_update(ctx.existing, update)
 
       assert cs.valid?, inspect(cs.errors)
+    end
+  end
+
+  # --- signature + timestamp integrity ---
+
+  describe "signature and timestamp integrity" do
+    setup ctx do
+      insert_origin(ctx.origin_identity, ctx.owner, :none)
+      review = insert_review(ctx.author, ctx.origin_hash)
+      pwd_sh = insert_public_password(ctx.author, review, ctx.origin_hash)
+      {:ok, review: review, pwd_sh: pwd_sh}
+    end
+
+    test "rejects a row with a forged signature", ctx do
+      rl =
+        ctx.author
+        |> build_review_list(ctx.review, review_password_sign_hash: ctx.pwd_sh)
+        |> Map.put(:sign_b64, :crypto.strong_rand_bytes(64))
+
+      cs = Validation.validate_review_list_insert(rl)
+
+      refute cs.valid?
+      assert error_on?(cs, :sign_b64)
+    end
+
+    test "rejects a stale update (timestamp not newer than existing)", ctx do
+      existing =
+        build_review_list(ctx.author, ctx.review, review_password_sign_hash: ctx.pwd_sh, ts: 2000)
+
+      update =
+        build_review_list(ctx.author, ctx.review, review_password_sign_hash: ctx.pwd_sh, ts: 1000)
+
+      cs = Validation.validate_review_list_update(existing, update)
+
+      refute cs.valid?
     end
   end
 

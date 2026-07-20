@@ -72,6 +72,11 @@ Two levels of control:
 - **Owner** (the creating user) — performs dangerous/irreversible operations: create origin, delete, change moderation mode. Ownership is immutable after creation. Owner identity is never exposed to the public.
 - **Origin identity** — handles day-to-day operations: receive `to_origin` reviews, moderate public reviews. Can be delegated to an employee without exposing the owner's personal identity or granting irreversible powers.
 
+> **Status (deferred to Phase 3).** The two-tier split is not yet enforced. Origin `update` operations — including
+> `moderation_mode` changes and soft delete (`deleted_flag`) — are currently authorized by the **origin identity's**
+> signature, so a delegated origin-identity holder could perform them. Requiring the **owner's** signature for these
+> dangerous ops lands with the Phase 3 owner/moderation UI. `owner_cert` is still verified on origin creation.
+
 ### Why not a room
 
 Rooms are conversation spaces. Origins are entities people review. They share crypto infrastructure but have different semantics:
@@ -135,8 +140,10 @@ Promotion is a **two-phase handshake** (`Chat.Data.ReviewPasswordCandidate.Promo
 **Phase 1 — `promote_candidate`.** The server looks up the review's origin and its `moderation_mode`, then:
 
 - **none** — promotes the password candidate straight into `review_public_passwords`. Single-phase; no rights, no phase 2.
-- **post** — requires a null candidate (timestamp+1); wraps it (KEM-encrypt to the origin) into `review_revoke_right_candidate` and returns the KEM `shared_secret`.
+- **post** — requires both a password candidate and a null candidate; wraps the null version (KEM-encrypt to the origin) into `review_revoke_right_candidate` and returns the KEM `shared_secret`.
 - **pre** — requires both a password candidate and a null candidate; wraps the password version into `review_post_right_candidate` and the null version into `review_revoke_right_candidate`, returning both `shared_secret`s.
+
+**Revoke-ordering invariant (enforced).** Because public visibility is Last-Write-Wins by `owner_timestamp` (latest row wins; `password_b64 = null` means revoked), the null (revoke) version's `owner_timestamp` must be **strictly greater** than the password version's — otherwise publishing the revoke would not supersede the password. `promote_candidate` enforces `null.ts > password.ts` in **post** and **pre** modes and rejects the promotion otherwise (it is not merely a client convention). In **pre** mode this also means the `review_revoke_right` can always override a posted `review_post_right`. In every mode the server also validates each submitted candidate's author signature and author/origin binding before minting or wrapping it.
 
 The right *candidates* are server-internal staging tables (not Electric-synced) holding the wrapped, **unsigned** envelope. The server returns the KEM `shared_secret`(s); the author unwraps, verifies the wrapping matches what they submitted, and signs each right candidate in place.
 
@@ -169,7 +176,7 @@ sequenceDiagram
     participant O as Origin Owner
 
     A->>S: submit review (encrypted with review_password)
-    A->>C: submit password candidate + null candidate (timestamp+1)
+    A->>C: submit password candidate + null candidate (null.ts > password.ts)
     Note over S: Phase 1 — promote_candidate
     S->>S: validate candidates
     S->>C: wrap null candidate → review_revoke_right_candidate<br/>(KEM-encrypt to origin)
@@ -234,7 +241,7 @@ sequenceDiagram
 
 ### to_public
 
-Content AES-256-GCM encrypted with a per-review `review_password` (random 32-byte key) and signed by the author (ML-DSA-87 over plaintext before encryption). Public visibility is determined by whether `review_password` is available in the `review_public_passwords` table — see the Moderation section.
+Content AES-256-GCM encrypted with a per-review `review_password` (random 32-byte key) and signed by the author (ML-DSA-87 over the `content_b64` ciphertext). Public visibility is determined by whether `review_password` is available in the `review_public_passwords` table — see the Moderation section.
 
 Moderation controls only **public** visibility. Even when a review is hidden or not yet approved, the author's contacts can still see it via `review_list_password` (see Contacts section). The contacts channel is the author's property and cannot be affected by the origin owner's moderation decisions.
 
@@ -242,7 +249,7 @@ This means:
 
 - **Password published**: visible to everyone (public + contacts)
 - **Password withheld / revoked**: invisible to the general public, still visible to author's contacts
-- The author's signature covers plaintext, verifiable after decryption
+- The author's signature covers `content_b64` (ciphertext), verifiable by anyone holding the row
 
 ### to_origin
 
@@ -306,7 +313,7 @@ review
 ├── deleted_flag           — soft delete by author
 ├── parent_sign_hash      — for edits (version chain, nil for first version)
 ├── owner_timestamp
-├── sign_b64              — author's ML-DSA-87 signature (over plaintext)
+├── sign_b64              — author's ML-DSA-87 signature (over content_b64 ciphertext)
 └── sign_hash             — SHA3-512 of sign_b64 (version identifier)
 ```
 
@@ -432,7 +439,7 @@ One row per review. New review = new row (no need to re-encrypt an entire blob).
 |------|---------------------|----------------------|------------------------|
 | **none** | required | null | null |
 | **post** | required | null | required |
-| **pre** | null (until approved) | required | required |
+| **pre** | optional (null until approved, then the promotion row) | required | required |
 
 - **none** — `review_password_sign_hash` proves the candidate was promoted to `review_public_passwords` (auto-promotion). No rights exist.
 - **post** — `review_password_sign_hash` proves promotion happened. `revoke_right_sign_hash` proves the author gave the origin revoke capability before promotion.
@@ -473,6 +480,11 @@ Will be designed with the comment schema.
 
 ## Signature coverage
 
+> **Note on encoding.** The `a || b || c` sequences below list *which fields* are covered, not the byte order.
+> `Chat.Data.Integrity.signature_payload/1` sorts the signable fields **alphabetically by key** and joins them,
+> so the actual signed payload order is derived from the field names, not the order shown here. Client and server
+> both use the same `Signable` implementation, so they agree regardless.
+
 ### Origin
 
 Origin identity signs: `origin_hash || owner_hash || owner_cert || name || moderation_mode || deleted_flag || owner_timestamp`
@@ -481,13 +493,15 @@ Origin identity signs: `origin_hash || owner_hash || owner_cert || name || moder
 
 ### Review
 
-Author signs: `review_hash || origin_hash || author_hash || content_plaintext || deleted_flag || owner_timestamp`
+Author signs: `review_hash || origin_hash || author_hash || content_b64 || deleted_flag || parent_sign_hash || owner_timestamp`
 
-The signature covers plaintext content, not the encrypted blob. This allows:
+The signature covers the encrypted `content_b64` (the AES-256-GCM ciphertext), **not** the plaintext. This is deliberate: the server never holds the plaintext, so signing the ciphertext is what lets it verify authorship at ingest, and anyone holding the row (public reader, contact, or origin owner) can verify the signature over `content_b64` directly — before or after decrypting. The `parent_sign_hash` (edit-chain link) is covered too.
 
-- public reviews: after decrypting with `review_password`, anyone can verify authorship
-- contacts: after decrypting via `review_list_password`, contacts verify authorship
-- to_origin: origin owner decrypts via dialog, then verifies
+This allows:
+
+- public reviews: anyone who fetches the row can verify authorship over `content_b64`
+- contacts: same signature verifies after fetching via `review_list_password`
+- to_origin: origin owner verifies the same way after dialog decryption
 
 ### Moderation action
 
@@ -499,7 +513,9 @@ Author signs: `review_hash || origin_hash || password_b64 || author_hash || dele
 
 ### Review post/revoke right
 
-Author signs: `review_hash || origin_hash || kem_ciphertext_b64 || wrapped_row_b64 || deleted_flag || owner_timestamp`
+Author signs: `review_hash || origin_hash || author_hash || kem_ciphertext_b64 || wrapped_row_b64 || deleted_flag || owner_timestamp`
+
+(`author_hash` is covered so the unsigned-insert cross-table binding is also signed by the author once the candidate is signed.)
 
 ### Review list entry
 
@@ -624,7 +640,7 @@ A regular user browsing and writing reviews. Exercises:
 - browse origins (public directory)
 - view public reviews (decrypt with `review_password` from `review_public_passwords`)
 - view contacts' reviews (decrypt via `review_list_password` from `review_list`)
-- write `to_public` review: generate `review_password`, AES-256-GCM encrypt, ML-DSA-87 sign plaintext, submit password candidate
+- write `to_public` review: generate `review_password`, AES-256-GCM encrypt, ML-DSA-87 sign `content_b64`, submit password candidate
 - write `to_origin` review: dialog message to origin identity
 - moderation pipeline participation: submit candidates, receive KEM shared_secret, verify wrapping, sign rights
 

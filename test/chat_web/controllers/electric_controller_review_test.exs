@@ -69,6 +69,21 @@ defmodule ChatWeb.ElectricControllerReviewTest do
     end
   end
 
+  describe "review update" do
+    test "persists a newer signed version (soft delete) via HTTP ingest", ctx do
+      {review_hash, insert_mutation, _} = build_review_mutation(ctx)
+
+      assert post_ingest(ctx.conn, %{"mutations" => [insert_mutation]}, ctx.author.sign_skey).status ==
+               200
+
+      update_mutation = build_review_update_mutation(ctx, review_hash)
+      conn = post_ingest(ctx.conn, %{"mutations" => [update_mutation]}, ctx.author.sign_skey)
+
+      assert conn.status == 200, conn.resp_body
+      assert ReviewData.get_review(review_hash).deleted_flag == true
+    end
+  end
+
   describe "review_list insert (moderation proof gate)" do
     test "persists a list entry that references a promoted password", ctx do
       {review_hash, review_mutation, _} = build_review_mutation(ctx)
@@ -97,6 +112,22 @@ defmodule ChatWeb.ElectricControllerReviewTest do
       conn = post_ingest(ctx.conn, %{"mutations" => [mutation]}, ctx.author.sign_skey)
 
       assert conn.status in [400, 422], conn.resp_body
+      assert ReviewListData.get_review_list_entry(ctx.author_hash, review_hash) == nil
+    end
+
+    test "rejects a list entry whose PoP is signed by someone other than the list owner", ctx do
+      {review_hash, review_mutation, _} = build_review_mutation(ctx)
+
+      assert post_ingest(ctx.conn, %{"mutations" => [review_mutation]}, ctx.author.sign_skey).status ==
+               200
+
+      pwd_sign_hash = promote_password(ctx, review_hash)
+      mutation = build_review_list_mutation(ctx, review_hash, pwd_sign_hash)
+
+      wrong_signer = UserData.generate_pq_identity("Impostor")
+      conn = post_ingest(ctx.conn, %{"mutations" => [mutation]}, wrong_signer.sign_skey)
+
+      assert conn.status in [400, 401, 422], conn.resp_body
       assert ReviewListData.get_review_list_entry(ctx.author_hash, review_hash) == nil
     end
   end
@@ -151,6 +182,36 @@ defmodule ChatWeb.ElectricControllerReviewTest do
     }
 
     {review_hash, mutation, sign_hash}
+  end
+
+  defp build_review_update_mutation(ctx, review_hash) do
+    ts = System.os_time(:millisecond) + 1000
+    content = :crypto.strong_rand_bytes(48)
+
+    review = %Review{
+      review_hash: review_hash,
+      origin_hash: ctx.origin_hash,
+      author_hash: ctx.author_hash,
+      content_b64: content,
+      deleted_flag: true,
+      parent_sign_hash: nil,
+      owner_timestamp: ts
+    }
+
+    {sign_b64, sign_hash} = sign(review, ctx.author.sign_skey, &ReviewSignHash.from_binary/1)
+
+    %{
+      "type" => "update",
+      "original" => %{"review_hash" => review_hash, "author_hash" => ctx.author_hash},
+      "changes" => %{
+        "content_b64" => to_base64(content),
+        "deleted_flag" => true,
+        "owner_timestamp" => ts,
+        "sign_b64" => to_base64(sign_b64),
+        "sign_hash" => sign_hash
+      },
+      "syncMetadata" => %{"relation" => "review"}
+    }
   end
 
   defp build_review_list_mutation(ctx, review_hash, pwd_sign_hash) do

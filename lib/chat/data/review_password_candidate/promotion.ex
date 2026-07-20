@@ -17,6 +17,7 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion do
   alias Chat.Data.Origin, as: OriginData
   alias Chat.Data.Review, as: ReviewData
   alias Chat.Data.ReviewPasswordCandidate, as: CandidateData
+  alias Chat.Data.ReviewPasswordCandidate.Promotion.Candidates
   alias Chat.Data.ReviewPostRight, as: PostRightData
   alias Chat.Data.ReviewPublicPassword, as: PublicPasswordData
   alias Chat.Data.ReviewRevokeRight, as: RevokeRightData
@@ -27,7 +28,6 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion do
   alias Chat.Data.Schemas.ReviewPasswordCandidate
   alias Chat.Data.Schemas.ReviewRevokeRight
   alias Chat.Data.Schemas.ReviewRevokeRightCandidate
-  alias EnigmaPq
 
   # --- Phase 1: Server wraps candidates into unsigned right candidates ---
 
@@ -66,29 +66,40 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion do
   end
 
   defp promote_none(candidate) do
-    %ReviewPublicPassword{}
-    |> ReviewPublicPassword.create_changeset(%{
-      review_hash: candidate.review_hash,
-      sign_hash: candidate.sign_hash,
-      origin_hash: candidate.origin_hash,
-      password_b64: candidate.password_b64,
-      author_hash: candidate.author_hash,
-      deleted_flag: false,
-      owner_timestamp: candidate.owner_timestamp,
-      sign_b64: candidate.sign_b64
-    })
-    |> repo().insert(
-      on_conflict: :nothing,
-      conflict_target: [:review_hash, :sign_hash],
-      allow_stale: true
-    )
+    case Candidates.validate_candidate(candidate) do
+      :ok ->
+        %ReviewPublicPassword{}
+        |> ReviewPublicPassword.create_changeset(%{
+          review_hash: candidate.review_hash,
+          sign_hash: candidate.sign_hash,
+          origin_hash: candidate.origin_hash,
+          password_b64: candidate.password_b64,
+          author_hash: candidate.author_hash,
+          deleted_flag: false,
+          owner_timestamp: candidate.owner_timestamp,
+          sign_b64: candidate.sign_b64
+        })
+        |> repo().insert(
+          on_conflict: :nothing,
+          conflict_target: [:review_hash, :sign_hash],
+          allow_stale: true
+        )
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   defp promote_post(candidate, origin_hash) do
     with {:card, %{crypt_pkey: pkey}} <- {:card, user_card(origin_hash)},
+         {:pwd, %{} = pwd_c} <-
+           {:pwd, find_password_candidate(candidate.review_hash, candidate.author_hash)},
          {:null, %{} = null_c} <-
-           {:null, find_null_candidate(candidate.review_hash, candidate.author_hash)} do
-      {shared_secret, kem_ct, wrapped} = wrap_candidate_for_origin(null_c, pkey)
+           {:null, find_null_candidate(candidate.review_hash, candidate.author_hash)},
+         {:valid_pwd, :ok} <- {:valid_pwd, Candidates.validate_candidate(pwd_c)},
+         {:valid_null, :ok} <- {:valid_null, Candidates.validate_candidate(null_c)},
+         {:order, true} <- {:order, Candidates.revoke_supersedes?(null_c, pwd_c)} do
+      {shared_secret, kem_ct, wrapped} = Candidates.wrap_candidate_for_origin(null_c, pkey)
 
       %ReviewRevokeRightCandidate{}
       |> ReviewRevokeRightCandidate.create_changeset(
@@ -101,7 +112,11 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion do
       end)
     else
       {:card, _} -> {:error, "origin card not found"}
+      {:pwd, nil} -> {:error, "password candidate required for post mode"}
       {:null, nil} -> {:error, "null candidate required for post mode"}
+      {:valid_pwd, {:error, reason}} -> {:error, reason}
+      {:valid_null, {:error, reason}} -> {:error, reason}
+      {:order, false} -> {:error, "revoke timestamp must exceed password timestamp"}
     end
   end
 
@@ -110,9 +125,14 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion do
          {:pwd, %{} = pwd_c} <-
            {:pwd, find_password_candidate(candidate.review_hash, candidate.author_hash)},
          {:null, %{} = null_c} <-
-           {:null, find_null_candidate(candidate.review_hash, candidate.author_hash)} do
-      {post_secret, post_kem, post_wrapped} = wrap_candidate_for_origin(pwd_c, pkey)
-      {revoke_secret, revoke_kem, revoke_wrapped} = wrap_candidate_for_origin(null_c, pkey)
+           {:null, find_null_candidate(candidate.review_hash, candidate.author_hash)},
+         {:valid_pwd, :ok} <- {:valid_pwd, Candidates.validate_candidate(pwd_c)},
+         {:valid_null, :ok} <- {:valid_null, Candidates.validate_candidate(null_c)},
+         {:order, true} <- {:order, Candidates.revoke_supersedes?(null_c, pwd_c)} do
+      {post_secret, post_kem, post_wrapped} = Candidates.wrap_candidate_for_origin(pwd_c, pkey)
+
+      {revoke_secret, revoke_kem, revoke_wrapped} =
+        Candidates.wrap_candidate_for_origin(null_c, pkey)
 
       post_result =
         %ReviewPostRightCandidate{}
@@ -136,6 +156,9 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion do
       {:card, _} -> {:error, "origin card not found"}
       {:pwd, nil} -> {:error, "password candidate required for pre mode"}
       {:null, nil} -> {:error, "null candidate required for pre mode"}
+      {:valid_pwd, {:error, reason}} -> {:error, reason}
+      {:valid_null, {:error, reason}} -> {:error, reason}
+      {:order, false} -> {:error, "revoke timestamp must exceed password timestamp"}
     end
   end
 
@@ -258,27 +281,6 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion do
     Chat.Data.Schemas.ReviewPasswordCandidate
     |> where([c], c.review_hash == ^review_hash)
     |> repo().delete_all()
-  end
-
-  defp wrap_candidate_for_origin(candidate, origin_crypt_pkey) do
-    row_data =
-      Jason.encode!(%{
-        review_hash: candidate.review_hash,
-        sign_hash: candidate.sign_hash,
-        origin_hash: candidate.origin_hash,
-        password_b64:
-          if(candidate.password_b64, do: Base.encode64(candidate.password_b64, padding: false)),
-        author_hash: candidate.author_hash,
-        deleted_flag: false,
-        owner_timestamp: candidate.owner_timestamp,
-        sign_b64: Base.encode64(candidate.sign_b64, padding: false)
-      })
-
-    {shared_secret, kem_ct} = EnigmaPq.encapsulate_secret(origin_crypt_pkey)
-    wrap_key = EnigmaPq.hkdf_derive(shared_secret, "buckitup/review-right/v1", "wrap")
-    wrapped = EnigmaPq.aes_gcm_encrypt(row_data, wrap_key)
-
-    {shared_secret, kem_ct, wrapped}
   end
 
   defp user_card(hash) do

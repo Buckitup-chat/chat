@@ -16,6 +16,11 @@ defmodule Chat.Data.Origin.Validation do
     |> validate_owner_cert(origin_struct)
   end
 
+  # KNOWN GAP (deferred to Phase 3): updates — including `moderation_mode` changes
+  # and soft delete (`deleted_flag`) — are authorized by the origin identity's own
+  # signature, not the owner's. Spec §70-73 reserves those dangerous/irreversible
+  # ops for the owner (a delegated origin-identity holder should not get them). The
+  # owner-signed two-tier check lands with the Phase 3 owner/moderation UI.
   def validate_origin_update(existing, origin_struct) do
     attrs =
       origin_struct

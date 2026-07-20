@@ -59,6 +59,30 @@ defmodule Chat.Data.OriginValidationTest do
     assert Keyword.has_key?(cs.errors, :owner_cert)
   end
 
+  test "rejects an origin with a forged self-signature", ctx do
+    owner_cert = EnigmaPq.sign(ctx.origin_pkey, ctx.owner.sign_skey)
+
+    forged =
+      ctx
+      |> signed_origin(owner_cert, System.os_time(:millisecond))
+      |> Map.put(:sign_b64, :crypto.strong_rand_bytes(64))
+
+    cs = Validation.validate_origin_insert(forged)
+
+    refute cs.valid?
+    assert Keyword.has_key?(cs.errors, :sign_b64)
+  end
+
+  test "rejects a stale origin update (timestamp not newer than existing)", ctx do
+    owner_cert = EnigmaPq.sign(ctx.origin_pkey, ctx.owner.sign_skey)
+    existing = signed_origin(ctx, owner_cert, 2000)
+    update = signed_origin(ctx, owner_cert, 1000)
+
+    cs = Validation.validate_origin_update(existing, update)
+
+    refute cs.valid?
+  end
+
   # --- Helpers ---
 
   defp validate(ctx, owner_cert) do
@@ -81,6 +105,24 @@ defmodule Chat.Data.OriginValidationTest do
 
     %{origin | sign_b64: sign_b64, sign_hash: sign_hash}
     |> Validation.validate_origin_insert()
+  end
+
+  defp signed_origin(ctx, owner_cert, owner_timestamp) do
+    origin = %Origin{
+      origin_hash: User.extract_pq_card(ctx.origin_identity).user_hash,
+      owner_hash: ctx.owner_hash,
+      owner_cert: owner_cert,
+      name: "Test Origin",
+      moderation_mode: :none,
+      deleted_flag: false,
+      owner_timestamp: owner_timestamp
+    }
+
+    sign_b64 =
+      origin |> Integrity.signature_payload() |> EnigmaPq.sign(ctx.origin_identity.sign_skey)
+
+    sign_hash = sign_b64 |> EnigmaPq.hash() |> OriginSignHash.from_binary()
+    %{origin | sign_b64: sign_b64, sign_hash: sign_hash}
   end
 
   defp insert_user_card(identity) do

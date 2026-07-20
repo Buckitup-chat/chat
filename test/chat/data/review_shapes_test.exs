@@ -174,5 +174,17 @@ defmodule Chat.Data.ReviewShapesTest do
         assert name in names
       end
     end
+
+    test "server-internal candidate tables are not registered shapes" do
+      names = Shapes.shape_names()
+
+      for name <- [
+            :review_password_candidate,
+            :review_post_right_candidate,
+            :review_revoke_right_candidate
+          ] do
+        refute name in names
+      end
+    end
   end
 end

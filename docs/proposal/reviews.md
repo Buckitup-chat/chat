@@ -399,7 +399,7 @@ review_post_right
 └── sign_hash             — SHA3-512 of sign_b64
 ```
 
-Flow: created via the two-phase handshake — the server wraps the author's password candidate into `review_post_right_candidate` (unsigned) and returns the KEM `shared_secret`; the author verifies the wrapping and signs the candidate; `complete_promotion` verifies the signature and promotes the candidate into this table. On ingest the server binds the right to an existing review with matching `author_hash` and `origin_hash` (the insert is unsigned, so the cross-table binding is the guard; the same applies to `review_revoke_right`).
+Flow: created via the two-phase ingest handshake — when password candidates are ingested, the server wraps the author's password candidate into `review_post_right_candidate` (unsigned); the author reads it via Electric shape, verifies the KEM wrapping, and ingests a signature update; when the last required signature arrives, `complete_promotion` verifies the signatures and promotes the candidate into this table. On ingest the server binds the right to an existing review with matching `author_hash` and `origin_hash` (the insert is unsigned, so the cross-table binding is the guard; the same applies to `review_revoke_right`).
 
 ### review_revoke_right
 
@@ -648,7 +648,7 @@ A regular user browsing and writing reviews. Exercises:
 - view contacts' reviews (decrypt via `review_list_password` from `review_list`)
 - write `to_public` review: generate `review_password`, AES-256-GCM encrypt, ML-DSA-87 sign `content_b64`, submit password candidate
 - write `to_origin` review: dialog message to origin identity
-- moderation pipeline participation: submit candidates, receive KEM shared_secret, verify wrapping, sign rights
+- moderation pipeline participation: ingest candidates (server triggers promotion), read right candidates via Electric shape, verify KEM wrapping, ingest signature updates (server triggers completion)
 
 ## Implementation phases
 
@@ -686,7 +686,8 @@ A regular user browsing and writing reviews. Exercises:
 - [x] Tests: `review_moderation_test`, `review_list_validation_test`, `review_public_password_validation_test`, `origin_validation_test`, `review_right_validation_test`, `review_shapes_test`, `electric_controller_review_test`
 - [x] Review sandbox LiveView — interactive testing (`ReviewSandboxLive`)
 - [x] Reviews directory LiveView — real-time Electric stream listing (`ReviewsLive`)
-- [ ] Server-side promotion trigger — promotion should be triggered by the server when ingesting the last of rights or password (not via separate HTTP routes)
+- [ ] Ingest-triggered promotion — `promote_candidate` fires on candidate ingest when both password+null arrive; `complete_promotion` fires on right candidate signature ingest when all required signatures are present
+- [ ] Electric shapes for right candidates — `review_post_right_candidate` / `review_revoke_right_candidate` synced to author so client can read, verify, and sign
 - [ ] Review creation in main app UI
 - [ ] Review listing in main app UI
 - [ ] Moderation UI for origin owners (approve/reject/revoke)

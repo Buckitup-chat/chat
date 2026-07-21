@@ -16,8 +16,19 @@ defmodule Chat.Data.Shapes do
     Chat.Data.Shapes.ReviewPublicPasswords,
     Chat.Data.Shapes.ReviewPostRight,
     Chat.Data.Shapes.ReviewRevokeRight,
+    Chat.Data.Shapes.ReviewPasswordCandidate,
+    Chat.Data.Shapes.ReviewPostRightCandidate,
+    Chat.Data.Shapes.ReviewRevokeRightCandidate,
     Chat.Data.Shapes.ReviewList
   ]
+
+  @not_syncable [
+    Chat.Data.Shapes.ReviewPasswordCandidate,
+    Chat.Data.Shapes.ReviewPostRightCandidate,
+    Chat.Data.Shapes.ReviewRevokeRightCandidate
+  ]
+
+  @syncable @shapes -- @not_syncable
 
   def all, do: @shapes
 
@@ -27,8 +38,10 @@ defmodule Chat.Data.Shapes do
 
   def shape_names, do: Enum.map(@shapes, & &1.shape_name())
 
+  def sync_shape_names, do: Enum.map(@syncable, & &1.shape_name())
+
   def sync_schemas do
-    @shapes
+    @syncable
     |> Enum.flat_map(fn shape ->
       [shape.schema_module() | List.wrap(shape.versions_schema())]
     end)

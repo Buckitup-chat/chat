@@ -1,16 +1,16 @@
 defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
-  @moduledoc "API client for review Electric ingest operations."
+  @moduledoc "API client for review sandbox: all operations via HTTP."
 
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.Review
   alias Chat.Data.Schemas.ReviewList
-  alias Chat.Data.Schemas.ReviewPublicPassword
   alias Chat.Data.Types.ReviewHash
   alias Chat.Data.Types.ReviewListSignHash
-  alias Chat.Data.Types.ReviewPasswordSignHash
   alias Chat.Data.Types.ReviewSignHash
   alias Chat.TimeKeeper
   alias EnigmaPq
+
+  # --- HTTP ingest operations ---
 
   def submit_review(author, origin_hash, content, base_url) do
     review_hash = :crypto.strong_rand_bytes(64) |> ReviewHash.from_binary()
@@ -28,12 +28,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
       owner_timestamp: timestamp
     }
 
-    sign_b64 =
-      review_struct
-      |> Integrity.signature_payload()
-      |> EnigmaPq.sign(author.sign_skey)
-
-    sign_hash = sign_b64 |> EnigmaPq.hash() |> ReviewSignHash.from_binary()
+    {sign_b64, sign_hash} = sign_struct(review_struct, author.sign_skey, ReviewSignHash)
 
     payload = %{
       "mutations" => [
@@ -70,53 +65,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
     end
   end
 
-  def submit_password_candidate(author, review, origin_hash, base_url) do
-    timestamp = TimeKeeper.now_unix()
-
-    pwd_struct = %ReviewPublicPassword{
-      review_hash: review.review_hash,
-      origin_hash: origin_hash,
-      password_b64: review.review_password,
-      author_hash: author.user_hash,
-      deleted_flag: false,
-      owner_timestamp: timestamp
-    }
-
-    sign_b64 =
-      pwd_struct
-      |> Integrity.signature_payload()
-      |> EnigmaPq.sign(author.sign_skey)
-
-    sign_hash = sign_b64 |> EnigmaPq.hash() |> ReviewPasswordSignHash.from_binary()
-
-    payload = %{
-      "mutations" => [
-        %{
-          "type" => "insert",
-          "modified" => %{
-            "review_hash" => review.review_hash,
-            "sign_hash" => sign_hash,
-            "origin_hash" => origin_hash,
-            "password_b64" => encode_base64(review.review_password),
-            "author_hash" => author.user_hash,
-            "deleted_flag" => false,
-            "owner_timestamp" => timestamp,
-            "sign_b64" => encode_base64(sign_b64)
-          },
-          "syncMetadata" => %{"relation" => "review_public_passwords"}
-        }
-      ]
-    }
-
-    with {:ok, ch, log1} <- get_challenge(base_url),
-         {:ok, _resp, log2} <- post_ingest(ch, payload, author.sign_skey, base_url) do
-      {:ok, %{sign_hash: sign_hash, log_entries: [log1, log2]}}
-    else
-      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
-    end
-  end
-
-  def submit_review_list_entry(author, review, review_password_sign_hash, base_url) do
+  def submit_review_list_entry(author, review, proof_fields, base_url) do
     timestamp = TimeKeeper.now_unix()
     encrypted_pwd = EnigmaPq.aes_gcm_encrypt(review.review_password, author.review_list_password)
 
@@ -124,34 +73,34 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
       user_hash: author.user_hash,
       review_hash: review.review_hash,
       password_b64: encrypted_pwd,
-      review_password_sign_hash: review_password_sign_hash,
-      post_right_sign_hash: nil,
-      revoke_right_sign_hash: nil,
+      review_password_sign_hash: proof_fields[:review_password_sign_hash],
+      post_right_sign_hash: proof_fields[:post_right_sign_hash],
+      revoke_right_sign_hash: proof_fields[:revoke_right_sign_hash],
       deleted_flag: false,
       owner_timestamp: timestamp
     }
 
-    sign_b64 =
-      rl_struct
-      |> Integrity.signature_payload()
-      |> EnigmaPq.sign(author.sign_skey)
+    {sign_b64, sign_hash} = sign_struct(rl_struct, author.sign_skey, ReviewListSignHash)
 
-    sign_hash = sign_b64 |> EnigmaPq.hash() |> ReviewListSignHash.from_binary()
+    modified =
+      %{
+        "user_hash" => author.user_hash,
+        "review_hash" => review.review_hash,
+        "password_b64" => encode_base64(encrypted_pwd),
+        "deleted_flag" => false,
+        "owner_timestamp" => timestamp,
+        "sign_b64" => encode_base64(sign_b64),
+        "sign_hash" => sign_hash
+      }
+      |> put_if("review_password_sign_hash", proof_fields[:review_password_sign_hash])
+      |> put_if("post_right_sign_hash", proof_fields[:post_right_sign_hash])
+      |> put_if("revoke_right_sign_hash", proof_fields[:revoke_right_sign_hash])
 
     payload = %{
       "mutations" => [
         %{
           "type" => "insert",
-          "modified" => %{
-            "user_hash" => author.user_hash,
-            "review_hash" => review.review_hash,
-            "password_b64" => encode_base64(encrypted_pwd),
-            "review_password_sign_hash" => review_password_sign_hash,
-            "deleted_flag" => false,
-            "owner_timestamp" => timestamp,
-            "sign_b64" => encode_base64(sign_b64),
-            "sign_hash" => sign_hash
-          },
+          "modified" => modified,
           "syncMetadata" => %{"relation" => "review_list"}
         }
       ]
@@ -165,7 +114,16 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
     end
   end
 
-  # --- Private ---
+  defp put_if(map, _key, nil), do: map
+  defp put_if(map, key, value), do: Map.put(map, key, value)
+
+  # --- Private helpers ---
+
+  defp sign_struct(struct, sign_skey, hash_module) do
+    sign_b64 = struct |> Integrity.signature_payload() |> EnigmaPq.sign(sign_skey)
+    sign_hash = sign_b64 |> EnigmaPq.hash() |> hash_module.from_binary()
+    {sign_b64, sign_hash}
+  end
 
   defp get_challenge(base_url) do
     url = base_url <> "/electric/v1/challenge"
@@ -187,7 +145,16 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
   end
 
   defp post_ingest(challenge_resp, payload, sign_skey, base_url) do
-    %{"challenge" => challenge, "challenge_id" => challenge_id} = challenge_resp
+    post_with_auth(challenge_resp, payload, sign_skey, base_url, "/ingest")
+  end
+
+  defp post_with_auth(
+         %{"challenge" => challenge, "challenge_id" => challenge_id},
+         payload,
+         sign_skey,
+         base_url,
+         path
+       ) do
     signature = :crypto.sign(:mldsa87, :none, challenge, sign_skey)
 
     payload_with_auth =
@@ -196,7 +163,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
         "signature" => Base.encode64(signature, padding: false)
       })
 
-    url = base_url <> "/electric/v1/ingest"
+    url = base_url <> "/electric/v1" <> path
     req_headers = [{"accept", "application/json"}, {"content-type", "application/json"}]
     timestamp = TimeKeeper.now()
     body_json = Jason.encode!(payload_with_auth, pretty: true)
@@ -206,11 +173,11 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
         {:ok, resp.body, log_entry("POST", url, req_headers, body_json, resp, timestamp)}
 
       {:ok, %{status: status} = resp} ->
-        {:error, "Ingest failed: #{status}",
+        {:error, "Request failed: #{status}",
          [log_entry("POST", url, req_headers, body_json, resp, timestamp)]}
 
       {:error, error} ->
-        {:error, "Ingest failed: #{inspect(error)}",
+        {:error, "Request failed: #{inspect(error)}",
          [log_entry("POST", url, req_headers, body_json, error, timestamp)]}
     end
   end
@@ -238,13 +205,11 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
     }
   end
 
-  defp format_headers(%Req.Response{}), do: []
-
   defp format_headers(headers) when is_map(headers),
     do: Enum.map(headers, fn {k, v} -> {k, Enum.join(v, ", ")} end)
 
   defp format_headers(headers) when is_list(headers), do: headers
-  defp format_headers(_), do: []
 
-  defp encode_base64(bin) when is_binary(bin), do: Base.encode64(bin, padding: false)
+  defp encode_base64(bin), do: Base.encode64(bin, padding: false)
+
 end

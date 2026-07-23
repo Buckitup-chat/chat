@@ -23,7 +23,7 @@ The origin identity (not the owner) should be able to:
 
 ## Design decisions
 
-- **Rating**: incorporate into a content model `[rating, placeholder, content]` — fill placeholder with random string to make rating-only and text reviews indistinguishable in ciphertext size.
+- **Rating**: incorporate into a content model `[rating, placeholder, content]` — fill placeholder with random string to make rating-only and text reviews indistinguishable in ciphertext size. See [Content model](#content-model) for the full spec.
 - **Passwords vs reviews**: passwords as access layer. Prevent deletion as much as possible.
 - **Ingest via candidates**: all `review_public_passwords` entries flow through `review_password_candidate` — the server validates and promotes. Direct *insert* into `review_public_passwords` is not allowed. The origin identity can *update* existing rows (to publish or revoke via decrypted rights) — see Moderation section.
 - **Origin key management**: origin keypairs are independently generated on the client (not derived from owner keys), stored client-side in the owner's identity, same pattern as regular user keys (see `pq_user.md`). Multi-device access via User Storage (encrypted skeys stored server-side, decryptable by the owner).
@@ -269,6 +269,33 @@ This means:
 - The owner reads `to_origin` reviews by decapsulating with the origin identity's `kem_skey` (which the owner holds)
 - Multi-device works: any owner device re-derives the origin's keys from the owner's private material
 - Not subject to moderation (private feedback between author and origin)
+
+## Content model
+
+Review content follows the [content polymorphism spec](../electric/pq_data_layer/07_content_polymorphism.md) — the plaintext inside `content_b64` is a JSON array (composed message):
+
+```json
+[rating, placeholder, content]
+```
+
+| Position | Type   | Description |
+|----------|--------|-------------|
+| 0        | number | Rating (1–5) |
+| 1        | string | Random padding — makes rating-only reviews indistinguishable from text reviews in ciphertext size |
+| 2        | string | Review text (empty string when rating-only) |
+
+When the review has text, the placeholder is empty. When the review is rating-only, the placeholder is a random string of random length (suggested range: 20–200 chars). This ensures the encrypted blob size does not reveal whether the author wrote text.
+
+Examples:
+
+```json
+[4, "", "great coffee, friendly staff"]
+[5, "kQ9xLm2pR7vN4wBtY8jD3sF6hA0cE5gI1oU", ""]
+[2, "", "waited 30 minutes for a latte"]
+[1, "aB3cD5eF7gH9iJ1kL3mN5oP7qR9sT1uV3wX5yZ7", ""]
+```
+
+Because the type lives inside the ciphertext, the database cannot distinguish review content from any other content type — only its size class is visible.
 
 ## Comments
 

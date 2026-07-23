@@ -119,6 +119,10 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
             <p><span class="font-medium">Text:</span> {@review.text}</p>
           <% end %>
           <p><span class="font-medium">Timestamp:</span> {@review.owner_timestamp}</p>
+          <details class="mt-2">
+            <summary class="cursor-pointer text-xs text-gray-500">Content JSON (plaintext before encryption)</summary>
+            <pre class="mt-1 text-xs font-mono bg-gray-50 p-2 rounded overflow-x-auto">{@review.content_json}</pre>
+          </details>
         </div>
       <% else %>
         <form phx-submit="submit_review" phx-change="form_changed" class="space-y-3">
@@ -274,14 +278,15 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
       ) do
     text = Map.get(params, "content", "")
     rating = String.to_integer(raw_rating)
-    content = Jason.encode!(%{rating: rating, text: text})
+    {placeholder, review_text} = review_content_parts(text)
+    content = Jason.encode!([rating, placeholder, review_text])
 
     case ApiClient.submit_review(socket.assigns.author, origin_hash, content, ChatWeb.Endpoint.url()) do
       {:ok, %{review: review, log_entries: logs}} ->
         {:noreply,
          socket
          |> assign(
-           review: Map.merge(review, %{rating: rating, text: text}),
+           review: Map.merge(review, %{rating: rating, text: text, content_json: content}),
            origin_hash: origin_hash
          )
          |> append_logs(logs)}
@@ -296,6 +301,14 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
   end
 
   # --- Private ---
+
+  defp review_content_parts("") do
+    length = Enum.random(20..200)
+    placeholder = length |> :crypto.strong_rand_bytes() |> Base.url_encode64(padding: false)
+    {placeholder, ""}
+  end
+
+  defp review_content_parts(text), do: {"", text}
 
   defp append_logs(socket, logs), do: update(socket, :request_log, &(logs ++ &1))
 

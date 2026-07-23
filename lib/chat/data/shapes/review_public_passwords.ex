@@ -9,6 +9,8 @@ defmodule Chat.Data.Shapes.ReviewPublicPasswords do
   alias Chat.Data.Schemas.ReviewPublicPassword
   alias Chat.Data.Types.ReviewPasswordSignHash
   alias EnigmaPq
+  alias Phoenix.Sync.Writer
+
   @impl true
   def shape_name, do: :review_public_passwords
 
@@ -34,28 +36,28 @@ defmodule Chat.Data.Shapes.ReviewPublicPasswords do
   def sync_derive_fields(rp), do: rp
 
   @impl true
-  def sync_persist(operation, rp) do
-    case operation do
-      :insert ->
-        rp
-        |> Validation.validate_review_public_password_insert()
-        |> persist_insert(rp)
-
-      :update ->
-        {:ok, rp}
-    end
+  def sync_persist(_operation, rp) do
+    rp
+    |> Validation.validate_review_public_password_insert()
+    |> persist(rp)
   end
 
   @impl true
-  def ingest_configure_writer(writer, _user_pop_context), do: writer
+  def ingest_configure_writer(writer, user_pop_context) do
+    Writer.allow(writer, ReviewPublicPassword,
+      accept: [:insert],
+      check: &Validation.moderate_check(&1, user_pop_context),
+      validate: &Validation.validate_origin_moderate/3
+    )
+  end
 
-  defp persist_insert(changeset, rp) do
+  defp persist(changeset, rp) do
     case changeset do
       %{valid?: true} ->
         ReviewPublicPasswordData.upsert_review_public_password(changeset)
 
       %{valid?: false} = cs ->
-        log("Invalid review_public_password insert: #{inspect(cs.errors)}", :warning)
+        log("Invalid review_public_password: #{inspect(cs.errors)}", :warning)
         {:ok, rp}
     end
   end

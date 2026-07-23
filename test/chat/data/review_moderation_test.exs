@@ -10,6 +10,7 @@ defmodule Chat.Data.ReviewModerationTest do
   alias Chat.Data.ReviewRightCandidate, as: RightCandidateData
   alias Chat.Data.Schemas.Origin
   alias Chat.Data.Schemas.Review
+  alias Chat.Data.ReviewPublicPassword.Validation, as: PublicPasswordValidation
   alias Chat.Data.Schemas.ReviewPasswordCandidate
   alias Chat.Data.Types.OriginSignHash
   alias Chat.Data.Types.ReviewHash
@@ -530,8 +531,7 @@ defmodule Chat.Data.ReviewModerationTest do
     sign_hash = sign_b64 |> EnigmaPq.hash() |> ReviewPasswordSignHash.from_binary()
     password_b64 = row["password_b64"] && Base.decode64!(row["password_b64"], padding: false)
 
-    %Chat.Data.Schemas.ReviewPublicPassword{}
-    |> Chat.Data.Schemas.ReviewPublicPassword.create_changeset(%{
+    changes = %{
       review_hash: row["review_hash"],
       sign_hash: sign_hash,
       origin_hash: row["origin_hash"],
@@ -540,8 +540,16 @@ defmodule Chat.Data.ReviewModerationTest do
       deleted_flag: false,
       owner_timestamp: row["owner_timestamp"],
       sign_b64: sign_b64
-    })
-    |> PublicPasswordData.upsert_review_public_password()
+    }
+
+    changeset =
+      PublicPasswordValidation.validate_origin_moderate(
+        %Chat.Data.Schemas.ReviewPublicPassword{},
+        changes,
+        :insert
+      )
+
+    {:ok, _} = PublicPasswordData.upsert_review_public_password(changeset)
   end
 
   defp sign_with_key(struct, sign_skey) do

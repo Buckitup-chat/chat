@@ -164,6 +164,21 @@ defmodule ChatWeb.ElectricControllerCandidateIngestTest do
       assert conn.status == 200
       assert RightCandidateData.get_revoke_candidate(ctx.review.review_hash) != nil
     end
+
+    test "rejects promotion when null timestamp does not exceed password timestamp", ctx do
+      base_ts = ctx.review.owner_timestamp + 100_000
+
+      pwd_mutation = build_candidate_mutation(ctx, ctx.review, :password)
+      null_mutation = build_candidate_mutation(ctx, ctx.review, :null, timestamp: base_ts)
+
+      assert post_ingest(ctx.conn, %{"mutations" => [pwd_mutation]}, ctx.author.sign_skey).status ==
+               200
+
+      conn = post_ingest(ctx.conn, %{"mutations" => [null_mutation]}, ctx.author.sign_skey)
+
+      refute conn.status == 200
+      assert RightCandidateData.get_revoke_candidate(ctx.review.review_hash) == nil
+    end
   end
 
   # --- :pre mode: two-phase ---
@@ -225,6 +240,22 @@ defmodule ChatWeb.ElectricControllerCandidateIngestTest do
 
       refute conn.status == 200
     end
+
+    test "rejects promotion when null timestamp does not exceed password timestamp", ctx do
+      base_ts = ctx.review.owner_timestamp + 100_000
+
+      pwd_mutation = build_candidate_mutation(ctx, ctx.review, :password)
+      null_mutation = build_candidate_mutation(ctx, ctx.review, :null, timestamp: base_ts)
+
+      assert post_ingest(ctx.conn, %{"mutations" => [pwd_mutation]}, ctx.author.sign_skey).status ==
+               200
+
+      conn = post_ingest(ctx.conn, %{"mutations" => [null_mutation]}, ctx.author.sign_skey)
+
+      refute conn.status == 200
+      assert RightCandidateData.get_post_candidate(ctx.review.review_hash) == nil
+      assert RightCandidateData.get_revoke_candidate(ctx.review.review_hash) == nil
+    end
   end
 
   # --- Helpers ---
@@ -249,14 +280,15 @@ defmodule ChatWeb.ElectricControllerCandidateIngestTest do
     {revoke, post}
   end
 
-  defp build_candidate_mutation(ctx, review, type) do
-    build_candidate_mutation_for(ctx.author, ctx.author_hash, review, ctx.origin_hash, type)
+  defp build_candidate_mutation(ctx, review, type, opts \\ []) do
+    build_candidate_mutation_for(ctx.author, ctx.author_hash, review, ctx.origin_hash, type, opts)
   end
 
-  defp build_candidate_mutation_for(author, author_hash, review, origin_hash, type) do
+  defp build_candidate_mutation_for(author, author_hash, review, origin_hash, type, opts \\ []) do
     password_b64 = if type == :password, do: review.review_password
     base_ts = review.owner_timestamp + 100_000
-    ts = if type == :null, do: base_ts + 1, else: base_ts
+    default_ts = if type == :null, do: base_ts + 1, else: base_ts
+    ts = Keyword.get(opts, :timestamp, default_ts)
 
     signable = %ReviewPublicPassword{
       review_hash: review.review_hash,

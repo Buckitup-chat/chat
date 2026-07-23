@@ -9,6 +9,8 @@ defmodule ChatWeb.ElectricControllerCandidateIngestTest do
   use ChatWeb.ConnCase, async: true
   use ChatWeb.DataCase
 
+  import Chat.Test.ReviewFixtures
+
   alias Chat.Challenge
   alias Chat.Data.Integrity
   alias Chat.Data.ReviewPasswordCandidate, as: CandidateData
@@ -16,17 +18,11 @@ defmodule ChatWeb.ElectricControllerCandidateIngestTest do
   alias Chat.Data.ReviewPublicPassword, as: PublicPasswordData
   alias Chat.Data.ReviewRevokeRight, as: RevokeRightData
   alias Chat.Data.ReviewRightCandidate, as: RightCandidateData
-  alias Chat.Data.Schemas.Origin
-  alias Chat.Data.Schemas.Review
   alias Chat.Data.Schemas.ReviewPublicPassword
-  alias Chat.Data.Types.OriginSignHash
-  alias Chat.Data.Types.ReviewHash
   alias Chat.Data.Types.ReviewPasswordSignHash
   alias Chat.Data.Types.ReviewPostRightSignHash
   alias Chat.Data.Types.ReviewRevokeRightSignHash
-  alias Chat.Data.Types.ReviewSignHash
   alias Chat.Data.User, as: UserData
-  alias Chat.NetworkSynchronization.Electric.ShapeWriter
   alias EnigmaPq
 
   setup %{conn: conn} do
@@ -34,9 +30,9 @@ defmodule ChatWeb.ElectricControllerCandidateIngestTest do
     owner = UserData.generate_pq_identity("Owner")
     origin_identity = UserData.generate_pq_identity("CoffeeShop")
 
-    author_card = insert_signed_user_card(author)
-    _owner_card = insert_signed_user_card(owner)
-    _origin_card = insert_signed_user_card(origin_identity)
+    author_card = insert_user_card(author)
+    _owner_card = insert_user_card(owner)
+    _origin_card = insert_user_card(origin_identity)
 
     %{
       conn: conn,
@@ -78,7 +74,7 @@ defmodule ChatWeb.ElectricControllerCandidateIngestTest do
 
     test "rejects candidate whose author doesn't match review", ctx do
       other = UserData.generate_pq_identity("Other")
-      other_card = insert_signed_user_card(other)
+      other_card = insert_user_card(other)
       other_review = insert_review(other, ctx.origin_hash)
 
       mutation =
@@ -552,64 +548,6 @@ defmodule ChatWeb.ElectricControllerCandidateIngestTest do
       },
       "syncMetadata" => %{"relation" => relation}
     }
-  end
-
-  defp insert_review(author, origin_hash) do
-    review_hash = :crypto.strong_rand_bytes(64) |> ReviewHash.from_binary()
-    review_password = :crypto.strong_rand_bytes(32)
-    author_hash = UserData.extract_pq_card(author).user_hash
-
-    review = %Review{
-      review_hash: review_hash,
-      origin_hash: origin_hash,
-      author_hash: author_hash,
-      content_b64: EnigmaPq.aes_gcm_encrypt("Great coffee!", review_password),
-      deleted_flag: false,
-      parent_sign_hash: nil,
-      owner_timestamp: System.os_time(:millisecond)
-    }
-
-    signed = sign_with_hash(review, author.sign_skey, &ReviewSignHash.from_binary/1)
-    {:ok, _} = ShapeWriter.write(:review, :insert, signed)
-    Map.put(signed, :review_password, review_password)
-  end
-
-  defp insert_origin(origin_identity, owner, moderation_mode) do
-    origin_card = UserData.extract_pq_card(origin_identity)
-    owner_card = UserData.extract_pq_card(owner)
-    owner_cert = EnigmaPq.sign(origin_card.sign_pkey, owner.sign_skey)
-
-    origin = %Origin{
-      origin_hash: origin_card.user_hash,
-      owner_hash: owner_card.user_hash,
-      owner_cert: owner_cert,
-      name: "Test Origin",
-      moderation_mode: moderation_mode,
-      deleted_flag: false,
-      owner_timestamp: System.os_time(:millisecond)
-    }
-
-    signed = sign_with_hash(origin, origin_identity.sign_skey, &OriginSignHash.from_binary/1)
-    {:ok, _} = ShapeWriter.write(:origin, :insert, signed)
-  end
-
-  defp insert_signed_user_card(identity) do
-    card =
-      identity
-      |> UserData.extract_pq_card()
-      |> then(fn card ->
-        sign_b64 = card |> Integrity.signature_payload() |> EnigmaPq.sign(identity.sign_skey)
-        %{card | sign_b64: sign_b64}
-      end)
-
-    {:ok, _} = ShapeWriter.write(:user_card, :insert, card)
-    card
-  end
-
-  defp sign_with_hash(struct, sign_skey, hash_fn) do
-    sign_b64 = struct |> Integrity.signature_payload() |> EnigmaPq.sign(sign_skey)
-    sign_hash = sign_b64 |> EnigmaPq.hash() |> hash_fn.()
-    %{struct | sign_b64: sign_b64, sign_hash: sign_hash}
   end
 
   defp to_base64(bin) when is_binary(bin), do: Base.encode64(bin, padding: false)

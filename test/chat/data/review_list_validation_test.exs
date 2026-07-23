@@ -10,27 +10,12 @@ defmodule Chat.Data.ReviewListValidationTest do
   """
   use ChatWeb.DataCase, async: true, group: :ets_deferred
 
-  alias Chat.Data.Integrity
+  import Chat.Test.ReviewFixtures
+
   alias Chat.Data.ReviewList.Validation
-  alias Chat.Data.ReviewPostRight, as: PostRightData
-  alias Chat.Data.ReviewPublicPassword, as: PublicPasswordData
-  alias Chat.Data.ReviewRevokeRight, as: RevokeRightData
-  alias Chat.Data.Schemas.Origin
-  alias Chat.Data.Schemas.Review
   alias Chat.Data.Schemas.ReviewList
-  alias Chat.Data.Schemas.ReviewPostRight
-  alias Chat.Data.Schemas.ReviewPublicPassword
-  alias Chat.Data.Schemas.ReviewRevokeRight
-  alias Chat.Data.Types.OriginSignHash
-  alias Chat.Data.Types.ReviewHash
   alias Chat.Data.Types.ReviewListSignHash
-  alias Chat.Data.Types.ReviewPasswordSignHash
-  alias Chat.Data.Types.ReviewPostRightSignHash
-  alias Chat.Data.Types.ReviewRevokeRightSignHash
-  alias Chat.Data.Types.ReviewSignHash
   alias Chat.Data.User
-  alias Chat.NetworkSynchronization.Electric.ShapeWriter
-  alias EnigmaPq
 
   setup do
     :ets.delete_all_objects(:buckitup_deferred_records)
@@ -57,8 +42,8 @@ defmodule Chat.Data.ReviewListValidationTest do
     setup ctx do
       insert_origin(ctx.origin_identity, ctx.owner, :none)
       review = insert_review(ctx.author, ctx.origin_hash)
-      pwd_sh = insert_public_password(ctx.author, review, ctx.origin_hash)
-      {:ok, review: review, pwd_sh: pwd_sh}
+      pwd = insert_public_password(ctx.author, review, ctx.origin_hash)
+      {:ok, review: review, pwd_sh: pwd.sign_hash}
     end
 
     test "accepts a row proving promotion", ctx do
@@ -107,9 +92,9 @@ defmodule Chat.Data.ReviewListValidationTest do
     setup ctx do
       insert_origin(ctx.origin_identity, ctx.owner, :post)
       review = insert_review(ctx.author, ctx.origin_hash)
-      pwd_sh = insert_public_password(ctx.author, review, ctx.origin_hash)
-      revoke_sh = insert_revoke_right(ctx.author, review, ctx.origin_hash)
-      {:ok, review: review, pwd_sh: pwd_sh, revoke_sh: revoke_sh}
+      pwd = insert_public_password(ctx.author, review, ctx.origin_hash)
+      revoke = insert_revoke_right(ctx.author, review, ctx.origin_hash)
+      {:ok, review: review, pwd_sh: pwd.sign_hash, revoke_sh: revoke.sign_hash}
     end
 
     test "accepts password + revoke-right proofs", ctx do
@@ -160,9 +145,9 @@ defmodule Chat.Data.ReviewListValidationTest do
     setup ctx do
       insert_origin(ctx.origin_identity, ctx.owner, :pre)
       review = insert_review(ctx.author, ctx.origin_hash)
-      post_sh = insert_post_right(ctx.author, review, ctx.origin_hash)
-      revoke_sh = insert_revoke_right(ctx.author, review, ctx.origin_hash)
-      {:ok, review: review, post_sh: post_sh, revoke_sh: revoke_sh}
+      post = insert_post_right(ctx.author, review, ctx.origin_hash)
+      revoke = insert_revoke_right(ctx.author, review, ctx.origin_hash)
+      {:ok, review: review, post_sh: post.sign_hash, revoke_sh: revoke.sign_hash}
     end
 
     test "accepts post + revoke right proofs with null password", ctx do
@@ -188,7 +173,7 @@ defmodule Chat.Data.ReviewListValidationTest do
     end
 
     test "accepts a promoted password proof after approval (fill-in, docs §439)", ctx do
-      pwd_sh = insert_public_password(ctx.author, ctx.review, ctx.origin_hash)
+      pwd_sh = insert_public_password(ctx.author, ctx.review, ctx.origin_hash).sign_hash
 
       cs =
         validate_insert(ctx,
@@ -208,7 +193,7 @@ defmodule Chat.Data.ReviewListValidationTest do
           ts: 1000
         )
 
-      pwd_sh = insert_public_password(ctx.author, ctx.review, ctx.origin_hash)
+      pwd_sh = insert_public_password(ctx.author, ctx.review, ctx.origin_hash).sign_hash
 
       update =
         build_review_list(ctx.author, ctx.review,
@@ -263,7 +248,7 @@ defmodule Chat.Data.ReviewListValidationTest do
     setup ctx do
       insert_origin(ctx.origin_identity, ctx.owner, :none)
       review = insert_review(ctx.author, ctx.origin_hash)
-      pwd_sh = insert_public_password(ctx.author, review, ctx.origin_hash)
+      pwd_sh = insert_public_password(ctx.author, review, ctx.origin_hash).sign_hash
 
       existing =
         build_review_list(ctx.author, review, review_password_sign_hash: pwd_sh, ts: 1000)
@@ -301,7 +286,7 @@ defmodule Chat.Data.ReviewListValidationTest do
     setup ctx do
       insert_origin(ctx.origin_identity, ctx.owner, :none)
       review = insert_review(ctx.author, ctx.origin_hash)
-      pwd_sh = insert_public_password(ctx.author, review, ctx.origin_hash)
+      pwd_sh = insert_public_password(ctx.author, review, ctx.origin_hash).sign_hash
       {:ok, review: review, pwd_sh: pwd_sh}
     end
 
@@ -353,140 +338,5 @@ defmodule Chat.Data.ReviewListValidationTest do
     sign_with_hash(rl, author.sign_skey, &ReviewListSignHash.from_binary/1)
   end
 
-  defp insert_public_password(author, review, origin_hash) do
-    author_hash = User.extract_pq_card(author).user_hash
-
-    rp = %ReviewPublicPassword{
-      review_hash: review.review_hash,
-      origin_hash: origin_hash,
-      password_b64: :crypto.strong_rand_bytes(32),
-      author_hash: author_hash,
-      deleted_flag: false,
-      owner_timestamp: System.os_time(:millisecond)
-    }
-
-    signed = sign_with_hash(rp, author.sign_skey, &ReviewPasswordSignHash.from_binary/1)
-
-    {:ok, _} =
-      %ReviewPublicPassword{}
-      |> ReviewPublicPassword.create_changeset(Map.from_struct(signed))
-      |> PublicPasswordData.upsert_review_public_password()
-
-    signed.sign_hash
-  end
-
-  defp insert_post_right(author, review, origin_hash) do
-    author
-    |> build_right(review, origin_hash, ReviewPostRight, &ReviewPostRightSignHash.from_binary/1)
-    |> then(fn signed ->
-      {:ok, _} =
-        %ReviewPostRight{}
-        |> ReviewPostRight.create_changeset(Map.from_struct(signed))
-        |> PostRightData.upsert_post_right()
-
-      signed.sign_hash
-    end)
-  end
-
-  defp insert_revoke_right(author, review, origin_hash) do
-    author
-    |> build_right(
-      review,
-      origin_hash,
-      ReviewRevokeRight,
-      &ReviewRevokeRightSignHash.from_binary/1
-    )
-    |> then(fn signed ->
-      {:ok, _} =
-        %ReviewRevokeRight{}
-        |> ReviewRevokeRight.create_changeset(Map.from_struct(signed))
-        |> RevokeRightData.upsert_revoke_right()
-
-      signed.sign_hash
-    end)
-  end
-
-  defp build_right(author, review, origin_hash, schema, hash_fn) do
-    right =
-      struct(schema, %{
-        review_hash: review.review_hash,
-        origin_hash: origin_hash,
-        author_hash: User.extract_pq_card(author).user_hash,
-        kem_ciphertext_b64: :crypto.strong_rand_bytes(32),
-        wrapped_row_b64: :crypto.strong_rand_bytes(64),
-        deleted_flag: false,
-        owner_timestamp: System.os_time(:millisecond)
-      })
-
-    sign_with_hash(right, author.sign_skey, hash_fn)
-  end
-
-  defp insert_user_card(identity) do
-    card = identity |> User.extract_pq_card() |> sign_with_key(identity.sign_skey)
-    {:ok, _} = ShapeWriter.write(:user_card, :insert, card)
-    card
-  end
-
-  defp insert_origin(origin_identity, owner, moderation_mode) do
-    origin_card = User.extract_pq_card(origin_identity)
-    owner_card = User.extract_pq_card(owner)
-    owner_cert = EnigmaPq.sign(origin_card.sign_pkey, owner.sign_skey)
-
-    origin = %Origin{
-      origin_hash: origin_card.user_hash,
-      owner_hash: owner_card.user_hash,
-      owner_cert: owner_cert,
-      name: "Test Origin",
-      moderation_mode: moderation_mode,
-      deleted_flag: false,
-      owner_timestamp: System.os_time(:millisecond)
-    }
-
-    signed = sign_with_hash(origin, origin_identity.sign_skey, &OriginSignHash.from_binary/1)
-    {:ok, _} = ShapeWriter.write(:origin, :insert, signed)
-    signed
-  end
-
-  defp insert_review(author, origin_hash) do
-    review_hash = random_review_hash()
-    author_hash = User.extract_pq_card(author).user_hash
-
-    review = %Review{
-      review_hash: review_hash,
-      origin_hash: origin_hash,
-      author_hash: author_hash,
-      content_b64: :crypto.strong_rand_bytes(48),
-      deleted_flag: false,
-      parent_sign_hash: nil,
-      owner_timestamp: System.os_time(:millisecond)
-    }
-
-    signed = sign_with_hash(review, author.sign_skey, &ReviewSignHash.from_binary/1)
-    {:ok, _} = ShapeWriter.write(:review, :insert, signed)
-    signed
-  end
-
-  defp random_review_hash, do: :crypto.strong_rand_bytes(64) |> ReviewHash.from_binary()
-
-  defp random_password_sign_hash,
-    do: :crypto.strong_rand_bytes(64) |> ReviewPasswordSignHash.from_binary()
-
-  defp random_post_sign_hash,
-    do: :crypto.strong_rand_bytes(64) |> ReviewPostRightSignHash.from_binary()
-
-  defp random_revoke_sign_hash,
-    do: :crypto.strong_rand_bytes(64) |> ReviewRevokeRightSignHash.from_binary()
-
   defp error_on?(changeset, field), do: Keyword.has_key?(changeset.errors, field)
-
-  defp sign_with_key(struct, sign_skey) do
-    sign_b64 = struct |> Integrity.signature_payload() |> EnigmaPq.sign(sign_skey)
-    %{struct | sign_b64: sign_b64}
-  end
-
-  defp sign_with_hash(struct, sign_skey, hash_fn) do
-    sign_b64 = struct |> Integrity.signature_payload() |> EnigmaPq.sign(sign_skey)
-    sign_hash = sign_b64 |> EnigmaPq.hash() |> hash_fn.()
-    %{struct | sign_b64: sign_b64, sign_hash: sign_hash}
-  end
 end

@@ -8,16 +8,13 @@ defmodule Chat.Data.ReviewValidationTest do
   """
   use ChatWeb.DataCase, async: true, group: :ets_deferred
 
-  alias Chat.Data.Integrity
+  import Chat.Test.ReviewFixtures
+
   alias Chat.Data.Review.Validation
-  alias Chat.Data.Schemas.Origin
   alias Chat.Data.Schemas.Review
-  alias Chat.Data.Types.OriginSignHash
   alias Chat.Data.Types.ReviewHash
   alias Chat.Data.Types.ReviewSignHash
   alias Chat.Data.User
-  alias Chat.NetworkSynchronization.Electric.ShapeWriter
-  alias EnigmaPq
 
   setup do
     :ets.delete_all_objects(:buckitup_deferred_records)
@@ -92,44 +89,5 @@ defmodule Chat.Data.ReviewValidationTest do
     }
 
     sign_with_hash(review, author.sign_skey, &ReviewSignHash.from_binary/1)
-  end
-
-  defp random_review_hash, do: :crypto.strong_rand_bytes(64) |> ReviewHash.from_binary()
-
-  defp insert_user_card(identity) do
-    card = identity |> User.extract_pq_card() |> sign_with_key(identity.sign_skey)
-    {:ok, _} = ShapeWriter.write(:user_card, :insert, card)
-    card
-  end
-
-  defp insert_origin(origin_identity, owner) do
-    origin_card = User.extract_pq_card(origin_identity)
-    owner_card = User.extract_pq_card(owner)
-    owner_cert = EnigmaPq.sign(origin_card.sign_pkey, owner.sign_skey)
-
-    origin = %Origin{
-      origin_hash: origin_card.user_hash,
-      owner_hash: owner_card.user_hash,
-      owner_cert: owner_cert,
-      name: "Test Origin",
-      moderation_mode: :none,
-      deleted_flag: false,
-      owner_timestamp: System.os_time(:millisecond)
-    }
-
-    signed = sign_with_hash(origin, origin_identity.sign_skey, &OriginSignHash.from_binary/1)
-    {:ok, _} = ShapeWriter.write(:origin, :insert, signed)
-    signed
-  end
-
-  defp sign_with_key(struct, sign_skey) do
-    sign_b64 = struct |> Integrity.signature_payload() |> EnigmaPq.sign(sign_skey)
-    %{struct | sign_b64: sign_b64}
-  end
-
-  defp sign_with_hash(struct, sign_skey, hash_fn) do
-    sign_b64 = struct |> Integrity.signature_payload() |> EnigmaPq.sign(sign_skey)
-    sign_hash = sign_b64 |> EnigmaPq.hash() |> hash_fn.()
-    %{struct | sign_b64: sign_b64, sign_hash: sign_hash}
   end
 end

@@ -4,36 +4,30 @@ defmodule ChatWeb.ElectricControllerReviewTest do
 
   - review insert with proof-of-possession auth
   - review_list insert gated by the origin's moderation proof
-  - review_public_passwords moderation by origin identity (publish/revoke via HTTP)
-  - author cannot directly ingest review_public_passwords (only origin identity can)
+  - review_public_passwords moderation by origin identity, not owner (publish/revoke via HTTP)
+  - author cannot directly ingest review_public_passwords (only origin identity can, owner cannot)
   """
   use ChatWeb.ConnCase, async: true
   use ChatWeb.DataCase
+
+  import Chat.Test.ReviewFixtures
 
   alias Chat.Challenge
   alias Chat.Data.Integrity
   alias Chat.Data.Review, as: ReviewData
   alias Chat.Data.ReviewList, as: ReviewListData
-  alias Chat.Data.ReviewPasswordCandidate, as: CandidateData
   alias Chat.Data.ReviewPasswordCandidate.Promotion
   alias Chat.Data.ReviewPostRight, as: PostRightData
   alias Chat.Data.ReviewPublicPassword, as: PublicPasswordData
   alias Chat.Data.ReviewRevokeRight, as: RevokeRightData
-  alias Chat.Data.ReviewRightCandidate, as: RightCandidateData
-  alias Chat.Data.Schemas.Origin
   alias Chat.Data.Schemas.Review
   alias Chat.Data.Schemas.ReviewList
-  alias Chat.Data.Schemas.ReviewPasswordCandidate
   alias Chat.Data.Schemas.ReviewPublicPassword
-  alias Chat.Data.Types.OriginSignHash
   alias Chat.Data.Types.ReviewHash
   alias Chat.Data.Types.ReviewListSignHash
   alias Chat.Data.Types.ReviewPasswordSignHash
-  alias Chat.Data.Types.ReviewPostRightSignHash
-  alias Chat.Data.Types.ReviewRevokeRightSignHash
   alias Chat.Data.Types.ReviewSignHash
   alias Chat.Data.User, as: UserData
-  alias Chat.NetworkSynchronization.Electric.ShapeWriter
   alias EnigmaPq
 
   setup %{conn: conn} do
@@ -41,11 +35,12 @@ defmodule ChatWeb.ElectricControllerReviewTest do
     owner = UserData.generate_pq_identity("Owner")
     origin_identity = UserData.generate_pq_identity("CoffeeShop")
 
-    author_card = insert_signed_user_card(author)
-    _owner_card = insert_signed_user_card(owner)
-    _origin_card = insert_signed_user_card(origin_identity)
+    author_card = insert_user_card(author)
+    _owner_card = insert_user_card(owner)
+    _origin_card = insert_user_card(origin_identity)
 
-    origin_hash = insert_origin(origin_identity, owner, :none)
+    insert_origin(origin_identity, owner, :none)
+    origin_hash = UserData.extract_pq_card(origin_identity).user_hash
 
     %{
       conn: conn,
@@ -176,11 +171,12 @@ defmodule ChatWeb.ElectricControllerReviewTest do
       owner = UserData.generate_pq_identity("Owner")
       origin_identity = UserData.generate_pq_identity("CoffeeShop")
 
-      author_card = insert_signed_user_card(author)
-      _owner_card = insert_signed_user_card(owner)
-      _origin_card = insert_signed_user_card(origin_identity)
+      author_card = insert_user_card(author)
+      _owner_card = insert_user_card(owner)
+      _origin_card = insert_user_card(origin_identity)
 
-      origin_hash = insert_origin(origin_identity, owner, :pre)
+      insert_origin(origin_identity, owner, :pre)
+      origin_hash = UserData.extract_pq_card(origin_identity).user_hash
 
       %{
         conn: conn,
@@ -244,11 +240,12 @@ defmodule ChatWeb.ElectricControllerReviewTest do
       owner = UserData.generate_pq_identity("Owner")
       origin_identity = UserData.generate_pq_identity("CoffeeShop")
 
-      author_card = insert_signed_user_card(author)
-      _owner_card = insert_signed_user_card(owner)
-      _origin_card = insert_signed_user_card(origin_identity)
+      author_card = insert_user_card(author)
+      _owner_card = insert_user_card(owner)
+      _origin_card = insert_user_card(origin_identity)
 
-      origin_hash = insert_origin(origin_identity, owner, :post)
+      insert_origin(origin_identity, owner, :post)
+      origin_hash = UserData.extract_pq_card(origin_identity).user_hash
 
       %{
         conn: conn,
@@ -445,28 +442,12 @@ defmodule ChatWeb.ElectricControllerReviewTest do
   end
 
   defp insert_review_for_moderation(ctx) do
-    review_hash = :crypto.strong_rand_bytes(64) |> ReviewHash.from_binary()
-    review_password = :crypto.strong_rand_bytes(32)
-
-    review = %Review{
-      review_hash: review_hash,
-      origin_hash: ctx.origin_hash,
-      author_hash: ctx.author_hash,
-      content_b64: EnigmaPq.aes_gcm_encrypt("Great coffee!", review_password),
-      deleted_flag: false,
-      parent_sign_hash: nil,
-      owner_timestamp: System.os_time(:millisecond)
-    }
-
-    {sign_b64, sign_hash} = sign(review, ctx.author.sign_skey, &ReviewSignHash.from_binary/1)
-    signed = %{review | sign_b64: sign_b64, sign_hash: sign_hash}
-    {:ok, _} = ShapeWriter.write(:review, :insert, signed)
-    Map.put(signed, :review_password, review_password)
+    insert_review(ctx.author, ctx.origin_hash)
   end
 
   defp run_full_promotion(ctx, review, mode) do
-    pwd = insert_candidate(ctx.author, review, ctx.origin_hash, review.review_password)
-    _null = insert_candidate(ctx.author, review, ctx.origin_hash, nil, timestamp_offset: 1)
+    pwd = insert_password_candidate(ctx.author, review, ctx.origin_hash)
+    _null = insert_null_candidate(ctx.author, review, ctx.origin_hash)
     {:ok, _secrets} = Promotion.promote_candidate(pwd)
 
     case mode do
@@ -479,101 +460,6 @@ defmodule ChatWeb.ElectricControllerReviewTest do
     end
 
     {:ok, _} = Promotion.complete_promotion(review.review_hash)
-  end
-
-  defp insert_candidate(author, review, origin_hash, password_b64, opts \\ []) do
-    offset = Keyword.get(opts, :timestamp_offset, 0)
-    author_hash = UserData.extract_pq_card(author).user_hash
-    timestamp = System.os_time(:millisecond) + offset
-
-    signable = %ReviewPublicPassword{
-      review_hash: review.review_hash,
-      sign_hash: nil,
-      origin_hash: origin_hash,
-      password_b64: password_b64,
-      author_hash: author_hash,
-      deleted_flag: false,
-      owner_timestamp: timestamp
-    }
-
-    sign_b64 = signable |> Integrity.signature_payload() |> EnigmaPq.sign(author.sign_skey)
-    sign_hash = sign_b64 |> EnigmaPq.hash() |> ReviewPasswordSignHash.from_binary()
-
-    changeset =
-      %ReviewPasswordCandidate{}
-      |> ReviewPasswordCandidate.create_changeset(%{
-        review_hash: review.review_hash,
-        sign_hash: sign_hash,
-        origin_hash: origin_hash,
-        password_b64: password_b64,
-        author_hash: author_hash,
-        owner_timestamp: timestamp,
-        sign_b64: sign_b64
-      })
-
-    {:ok, inserted} = CandidateData.insert_candidate(changeset)
-    inserted
-  end
-
-  defp sign_right_candidate(:post, review_hash, author) do
-    candidate = RightCandidateData.get_post_candidate(review_hash)
-    sign_b64 = candidate |> Integrity.signature_payload() |> EnigmaPq.sign(author.sign_skey)
-    sign_hash = sign_b64 |> EnigmaPq.hash() |> ReviewPostRightSignHash.from_binary()
-
-    {:ok, _} =
-      RightCandidateData.update_candidate(candidate, %{sign_b64: sign_b64, sign_hash: sign_hash})
-  end
-
-  defp sign_right_candidate(:revoke, review_hash, author) do
-    candidate = RightCandidateData.get_revoke_candidate(review_hash)
-    sign_b64 = candidate |> Integrity.signature_payload() |> EnigmaPq.sign(author.sign_skey)
-    sign_hash = sign_b64 |> EnigmaPq.hash() |> ReviewRevokeRightSignHash.from_binary()
-
-    {:ok, _} =
-      RightCandidateData.update_candidate(candidate, %{sign_b64: sign_b64, sign_hash: sign_hash})
-  end
-
-  defp unwrap_right(right, origin_identity) do
-    shared_secret =
-      EnigmaPq.decapsulate_secret(right.kem_ciphertext_b64, origin_identity.crypt_skey)
-
-    wrap_key = EnigmaPq.hkdf_derive(shared_secret, "buckitup/review-right/v1", "wrap")
-    row_json = EnigmaPq.aes_gcm_decrypt(right.wrapped_row_b64, wrap_key)
-    Jason.decode!(row_json)
-  end
-
-  defp insert_origin(origin_identity, owner, moderation_mode) do
-    origin_card = UserData.extract_pq_card(origin_identity)
-    owner_card = UserData.extract_pq_card(owner)
-    owner_cert = EnigmaPq.sign(origin_card.sign_pkey, owner.sign_skey)
-
-    origin = %Origin{
-      origin_hash: origin_card.user_hash,
-      owner_hash: owner_card.user_hash,
-      owner_cert: owner_cert,
-      name: "Test Origin",
-      moderation_mode: moderation_mode,
-      deleted_flag: false,
-      owner_timestamp: System.os_time(:millisecond)
-    }
-
-    {sign_b64, sign_hash} = sign(origin, origin_identity.sign_skey, &OriginSignHash.from_binary/1)
-    signed = %{origin | sign_b64: sign_b64, sign_hash: sign_hash}
-    {:ok, _} = ShapeWriter.write(:origin, :insert, signed)
-    origin_card.user_hash
-  end
-
-  defp insert_signed_user_card(identity) do
-    card =
-      identity
-      |> UserData.extract_pq_card()
-      |> then(fn card ->
-        sign_b64 = card |> Integrity.signature_payload() |> EnigmaPq.sign(identity.sign_skey)
-        %{card | sign_b64: sign_b64}
-      end)
-
-    {:ok, _} = ShapeWriter.write(:user_card, :insert, card)
-    card
   end
 
   defp sign(struct, sign_skey, hash_fn) do

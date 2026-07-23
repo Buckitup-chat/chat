@@ -636,8 +636,8 @@ A regular user browsing and writing reviews. Exercises:
 - [x] Tests: `review_moderation_test`, `review_list_validation_test`, `review_public_password_validation_test`, `origin_validation_test`, `review_right_validation_test`, `review_shapes_test`, `electric_controller_review_test`
 - [x] Review sandbox LiveView — interactive testing (`ReviewSandboxLive`)
 - [x] Reviews directory LiveView — real-time Electric stream listing (`ReviewsLive`)
-- [ ] Ingest-triggered promotion — `promote_candidate` fires on candidate ingest when both password+null arrive; `complete_promotion` fires on right candidate signature ingest when all required signatures are present
-- [ ] Electric shapes for right candidates — `review_post_right_candidate` / `review_revoke_right_candidate` synced to author so client can read, verify, and sign
+- [x] Ingest-triggered promotion — `promote_candidate` fires on candidate ingest when both password+null arrive; `complete_promotion` fires on right candidate signature ingest when all required signatures are present
+- [x] Electric shapes for right candidates — `review_post_right_candidate` / `review_revoke_right_candidate` synced to author so client can read, verify, and sign
 - [ ] Review creation in main app UI
 - [ ] Review listing in main app UI
 - [ ] Moderation UI for origin owners (approve/reject/revoke)

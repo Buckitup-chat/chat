@@ -8,19 +8,14 @@ defmodule Chat.Data.ReviewRightValidationTest do
   """
   use ChatWeb.DataCase, async: true, group: :ets_deferred
 
-  alias Chat.Data.Integrity
+  import Chat.Test.ReviewFixtures
+
   alias Chat.Data.ReviewPostRight.Validation, as: PostRightValidation
   alias Chat.Data.ReviewRevokeRight.Validation, as: RevokeRightValidation
-  alias Chat.Data.Schemas.Origin
-  alias Chat.Data.Schemas.Review
   alias Chat.Data.Schemas.ReviewPostRight
   alias Chat.Data.Schemas.ReviewRevokeRight
-  alias Chat.Data.Types.OriginSignHash
   alias Chat.Data.Types.ReviewHash
-  alias Chat.Data.Types.ReviewSignHash
   alias Chat.Data.User
-  alias Chat.NetworkSynchronization.Electric.ShapeWriter
-  alias EnigmaPq
 
   setup do
     :ets.delete_all_objects(:buckitup_deferred_records)
@@ -33,7 +28,7 @@ defmodule Chat.Data.ReviewRightValidationTest do
     _owner_card = insert_user_card(owner)
     origin_card = insert_user_card(origin_identity)
 
-    insert_origin(origin_identity, owner)
+    insert_origin(origin_identity, owner, :pre)
     review = insert_review(author, origin_card.user_hash)
 
     {:ok, author_hash: author_card.user_hash, origin_hash: origin_card.user_hash, review: review}
@@ -106,60 +101,5 @@ defmodule Chat.Data.ReviewRightValidationTest do
       deleted_flag: false,
       owner_timestamp: System.os_time(:millisecond)
     })
-  end
-
-  defp insert_user_card(identity) do
-    card =
-      identity
-      |> User.extract_pq_card()
-      |> then(fn card ->
-        sign_b64 = card |> Integrity.signature_payload() |> EnigmaPq.sign(identity.sign_skey)
-        %{card | sign_b64: sign_b64}
-      end)
-
-    {:ok, _} = ShapeWriter.write(:user_card, :insert, card)
-    card
-  end
-
-  defp insert_origin(origin_identity, owner) do
-    origin_card = User.extract_pq_card(origin_identity)
-    owner_card = User.extract_pq_card(owner)
-    owner_cert = EnigmaPq.sign(origin_card.sign_pkey, owner.sign_skey)
-
-    origin = %Origin{
-      origin_hash: origin_card.user_hash,
-      owner_hash: owner_card.user_hash,
-      owner_cert: owner_cert,
-      name: "Test Origin",
-      moderation_mode: :pre,
-      deleted_flag: false,
-      owner_timestamp: System.os_time(:millisecond)
-    }
-
-    signed = sign_with_hash(origin, origin_identity.sign_skey, &OriginSignHash.from_binary/1)
-    {:ok, _} = ShapeWriter.write(:origin, :insert, signed)
-    signed
-  end
-
-  defp insert_review(author, origin_hash) do
-    review = %Review{
-      review_hash: :crypto.strong_rand_bytes(64) |> ReviewHash.from_binary(),
-      origin_hash: origin_hash,
-      author_hash: User.extract_pq_card(author).user_hash,
-      content_b64: :crypto.strong_rand_bytes(48),
-      deleted_flag: false,
-      parent_sign_hash: nil,
-      owner_timestamp: System.os_time(:millisecond)
-    }
-
-    signed = sign_with_hash(review, author.sign_skey, &ReviewSignHash.from_binary/1)
-    {:ok, _} = ShapeWriter.write(:review, :insert, signed)
-    signed
-  end
-
-  defp sign_with_hash(struct, sign_skey, hash_fn) do
-    sign_b64 = struct |> Integrity.signature_payload() |> EnigmaPq.sign(sign_skey)
-    sign_hash = sign_b64 |> EnigmaPq.hash() |> hash_fn.()
-    %{struct | sign_b64: sign_b64, sign_hash: sign_hash}
   end
 end

@@ -43,7 +43,7 @@ defmodule Chat.Data.ReviewPasswordCandidate.Validation do
     Ecto.Multi.run(multi, Writer.operation_name(context, :promote), fn _repo, _changes ->
       case Ecto.Changeset.apply_action(changeset, :insert) do
         {:ok, candidate} -> try_promote(candidate)
-        {:error, _} -> {:ok, :invalid}
+        {:error, _} -> {:error, "candidate changeset invalid after insert"}
       end
     end)
   end
@@ -72,7 +72,7 @@ defmodule Chat.Data.ReviewPasswordCandidate.Validation do
         {_, pwd, _null} -> Promotion.promote_candidate(pwd)
       end
     else
-      _ -> {:ok, :pending}
+      _ -> {:error, "review or origin not found"}
     end
   end
 

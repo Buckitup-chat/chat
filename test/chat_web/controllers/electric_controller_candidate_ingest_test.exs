@@ -11,6 +11,7 @@ defmodule ChatWeb.ElectricControllerCandidateIngestTest do
 
   alias Chat.Challenge
   alias Chat.Data.Integrity
+  alias Chat.Data.ReviewPasswordCandidate, as: CandidateData
   alias Chat.Data.ReviewPostRight, as: PostRightData
   alias Chat.Data.ReviewPublicPassword, as: PublicPasswordData
   alias Chat.Data.ReviewRevokeRight, as: RevokeRightData
@@ -112,6 +113,22 @@ defmodule ChatWeb.ElectricControllerCandidateIngestTest do
 
       assert conn.status == 200
       assert RightCandidateData.get_revoke_candidate(ctx.review.review_hash) == nil
+    end
+
+    test "pending candidate returns 200 with txid, stores candidate, no promotion", ctx do
+      pwd_mutation = build_candidate_mutation(ctx, ctx.review, :password)
+
+      conn = post_ingest(ctx.conn, %{"mutations" => [pwd_mutation]}, ctx.author.sign_skey)
+
+      assert %{"txid" => _} = Jason.decode!(conn.resp_body)
+      assert conn.status == 200
+
+      candidates = CandidateData.get_candidates_for_review(ctx.review.review_hash)
+      assert length(candidates) == 1
+      assert hd(candidates).author_hash == ctx.author_hash
+
+      assert RightCandidateData.get_revoke_candidate(ctx.review.review_hash) == nil
+      assert PublicPasswordData.get_latest_for_review(ctx.review.review_hash) == nil
     end
 
     test "both candidates trigger revoke right candidate creation", ctx do

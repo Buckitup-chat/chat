@@ -15,7 +15,10 @@ An origin owner should be able to:
 
 - register an origin with its own PQ identity
 - choose a moderation mode for public reviews (pre, post, or none)
-- moderate public reviews (approve, reject, hide)
+
+The origin identity (not the owner) should be able to:
+
+- moderate public reviews (approve, reject, hide) — delegatable without exposing owner identity
 - receive private feedback (to_origin reviews)
 
 ## Design decisions
@@ -126,8 +129,8 @@ sequenceDiagram
 Public visibility of a review is controlled server-side via the `review_public_passwords` table — not by the author. The origin sets a moderation level that determines how review passwords flow into this table:
 
 - **none** — server auto-promotes password from candidate to `review_public_passwords`; review is immediately public
-- **post-moderation** — the author first grants a revoke right; the server then promotes the password; the origin owner can revoke later
-- **pre-moderation** — the author grants both post and revoke rights; the server withholds the password until the origin owner posts
+- **post-moderation** — the author first grants a revoke right; the server then promotes the password; the origin identity can revoke later
+- **pre-moderation** — the author grants both post and revoke rights; the server withholds the password until the origin identity posts
 
 The public frontend checks whether a decryption password exists in `review_public_passwords` for a given review. The author cannot bypass moderation because the server controls the table, not the author.
 
@@ -147,7 +150,7 @@ Promotion is a **two-phase handshake** driven entirely through the normal `/inge
 
 The right *candidates* are Electric-synced staging tables. After phase 1 creates them, the author's client reads the unsigned right candidates via their Electric shape, verifies the KEM wrapping matches what they submitted, and ingests a signature update (`sign_b64` + `sign_hash`) on each right candidate.
 
-**Phase 2 — `complete_promotion` (triggered by right candidate signature ingest).** When the server ingests a signature update on a right candidate, it checks whether all required right candidates for the review are now signed. Once the last signature arrives, the server verifies all signatures and, in one transaction, promotes each signed candidate into its real table (`review_post_right` / `review_revoke_right`) and — for **post** mode — promotes the password candidate into `review_public_passwords`. In **pre** mode nothing is promoted to `review_public_passwords`; the review stays private until the origin owner posts. The staging candidates are then cleared.
+**Phase 2 — `complete_promotion` (triggered by right candidate signature ingest).** When the server ingests a signature update on a right candidate, it checks whether all required right candidates for the review are now signed. Once the last signature arrives, the server verifies all signatures and, in one transaction, promotes each signed candidate into its real table (`review_post_right` / `review_revoke_right`) and — for **post** mode — promotes the password candidate into `review_public_passwords`. In **pre** mode nothing is promoted to `review_public_passwords`; the review stays private until the origin identity posts. The staging candidates are then cleared.
 
 ### No moderation flow
 
@@ -246,7 +249,7 @@ sequenceDiagram
 
 Content AES-256-GCM encrypted with a per-review `review_password` (random 32-byte key) and signed by the author (ML-DSA-87 over the `content_b64` ciphertext). Public visibility is determined by whether `review_password` is available in the `review_public_passwords` table — see the Moderation section.
 
-Moderation controls only **public** visibility. Even when a review is hidden or not yet approved, the author's contacts can still see it via `review_list_password` (see Contacts section). The contacts channel is the author's property and cannot be affected by the origin owner's moderation decisions.
+Moderation controls only **public** visibility. Even when a review is hidden or not yet approved, the author's contacts can still see it via `review_list_password` (see Contacts section). The contacts channel is the author's property and cannot be affected by the origin identity's moderation decisions.
 
 This means:
 
@@ -263,7 +266,7 @@ The author and origin identity each derive a `sender_msg_key` per the dialog key
 This means:
 
 - No new crypto machinery needed — reuses dialog encryption, key wrapping, and versioning
-- The origin owner reads `to_origin` reviews by decapsulating with the origin identity's `kem_skey`
+- The owner reads `to_origin` reviews by decapsulating with the origin identity's `kem_skey` (which the owner holds)
 - Multi-device works: any owner device re-derives the origin's keys from the owner's private material
 - Not subject to moderation (private feedback between author and origin)
 
@@ -640,12 +643,12 @@ A regular user browsing and writing reviews. Exercises:
 - [x] Electric shapes for right candidates — `review_post_right_candidate` / `review_revoke_right_candidate` synced to author so client can read, verify, and sign
 - [ ] Review creation in main app UI
 - [ ] Review listing in main app UI
-- [ ] Moderation UI for origin owners (approve/reject/revoke)
+- [ ] Moderation UI for origin identity (approve/reject/revoke)
 
 ### Phase 3 — To-origin reviews
 
 - [ ] to_origin as dialog: origin subaccount identity + dialog key derivation
-- [ ] moderation UI for origin owners
+- [ ] moderation UI for origin identity
 - [ ] contacts-visible hidden reviews (author's contacts see moderation-hidden reviews)
 
 ### Phase 4 — Contacts visibility (future)

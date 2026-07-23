@@ -1,16 +1,23 @@
 defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
   @moduledoc "API client for review sandbox: all operations via HTTP."
 
+  import ChatWeb.ElectricLive.ReviewSandboxLive.Http
+
   alias Chat.Data.Integrity
+  alias Chat.Data.ReviewRightCandidate, as: RightCandidateData
   alias Chat.Data.Schemas.Review
   alias Chat.Data.Schemas.ReviewList
+  alias Chat.Data.Schemas.ReviewPostRightCandidate
+  alias Chat.Data.Schemas.ReviewPublicPassword
+  alias Chat.Data.Schemas.ReviewRevokeRightCandidate
   alias Chat.Data.Types.ReviewHash
   alias Chat.Data.Types.ReviewListSignHash
+  alias Chat.Data.Types.ReviewPasswordSignHash
+  alias Chat.Data.Types.ReviewPostRightSignHash
+  alias Chat.Data.Types.ReviewRevokeRightSignHash
   alias Chat.Data.Types.ReviewSignHash
   alias Chat.TimeKeeper
   alias EnigmaPq
-
-  # --- HTTP ingest operations ---
 
   def submit_review(author, origin_hash, content, base_url) do
     review_hash = :crypto.strong_rand_bytes(64) |> ReviewHash.from_binary()
@@ -114,102 +121,102 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
     end
   end
 
+  def submit_password_candidates(author, review, base_url) do
+    origin_hash = review.origin_hash
+    base_ts = review.owner_timestamp + 100_000
+    pwd_mutation = build_candidate_mutation(author, origin_hash, review, :password, base_ts)
+    null_mutation = build_candidate_mutation(author, origin_hash, review, :null, base_ts + 1)
+    payload = %{"mutations" => [pwd_mutation, null_mutation]}
+
+    with {:ok, ch, log1} <- get_challenge(base_url),
+         {:ok, _resp, log2} <- post_ingest(ch, payload, author.sign_skey, base_url) do
+      candidates = read_right_candidates(review.review_hash)
+      {:ok, %{candidates: candidates, log_entries: [log1, log2]}}
+    else
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
+    end
+  end
+
+  def sign_right_candidates(author, candidates, base_url) do
+    mutations =
+      [candidates.post, candidates.revoke]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(&build_right_sign_mutation(&1, author))
+
+    with {:ok, ch, log1} <- get_challenge(base_url),
+         {:ok, _resp, log2} <-
+           post_ingest(ch, %{"mutations" => mutations}, author.sign_skey, base_url) do
+      {:ok, %{log_entries: [log1, log2]}}
+    else
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
+    end
+  end
+
   defp put_if(map, _key, nil), do: map
   defp put_if(map, key, value), do: Map.put(map, key, value)
 
-  # --- Private helpers ---
-
-  defp sign_struct(struct, sign_skey, hash_module) do
-    sign_b64 = struct |> Integrity.signature_payload() |> EnigmaPq.sign(sign_skey)
-    sign_hash = sign_b64 |> EnigmaPq.hash() |> hash_module.from_binary()
-    {sign_b64, sign_hash}
-  end
-
-  defp get_challenge(base_url) do
-    url = base_url <> "/electric/v1/challenge"
-    req_headers = [{"accept", "application/json"}]
-    timestamp = TimeKeeper.now()
-
-    case Req.get(url, headers: req_headers) do
-      {:ok, %{status: 200, body: body} = resp} ->
-        {:ok, body, log_entry("GET", url, req_headers, "", resp, timestamp)}
-
-      {:ok, %{status: status} = resp} ->
-        {:error, "Challenge failed: #{status}",
-         [log_entry("GET", url, req_headers, "", resp, timestamp)]}
-
-      {:error, error} ->
-        {:error, "Challenge failed: #{inspect(error)}",
-         [log_entry("GET", url, req_headers, "", error, timestamp)]}
-    end
-  end
-
-  defp post_ingest(challenge_resp, payload, sign_skey, base_url) do
-    post_with_auth(challenge_resp, payload, sign_skey, base_url, "/ingest")
-  end
-
-  defp post_with_auth(
-         %{"challenge" => challenge, "challenge_id" => challenge_id},
-         payload,
-         sign_skey,
-         base_url,
-         path
-       ) do
-    signature = :crypto.sign(:mldsa87, :none, challenge, sign_skey)
-
-    payload_with_auth =
-      Map.put(payload, "auth", %{
-        "challenge_id" => challenge_id,
-        "signature" => Base.encode64(signature, padding: false)
-      })
-
-    url = base_url <> "/electric/v1" <> path
-    req_headers = [{"accept", "application/json"}, {"content-type", "application/json"}]
-    timestamp = TimeKeeper.now()
-    body_json = Jason.encode!(payload_with_auth, pretty: true)
-
-    case Req.post(url, json: payload_with_auth, headers: req_headers) do
-      {:ok, %{status: status} = resp} when status in 200..299 ->
-        {:ok, resp.body, log_entry("POST", url, req_headers, body_json, resp, timestamp)}
-
-      {:ok, %{status: status} = resp} ->
-        {:error, "Request failed: #{status}",
-         [log_entry("POST", url, req_headers, body_json, resp, timestamp)]}
-
-      {:error, error} ->
-        {:error, "Request failed: #{inspect(error)}",
-         [log_entry("POST", url, req_headers, body_json, error, timestamp)]}
-    end
-  end
-
-  defp log_entry(method, url, req_headers, req_body, response_or_error, ts) do
-    {status, resp_headers, resp_body} =
-      case response_or_error do
-        %{status: status, body: body, headers: headers} ->
-          formatted = if is_map(body), do: Jason.encode!(body, pretty: true), else: inspect(body)
-          {status, format_headers(headers), formatted}
-
-        error ->
-          {0, [], "Error: #{inspect(error)}"}
-      end
-
+  defp read_right_candidates(review_hash) do
     %{
-      timestamp: ts,
-      method: method,
-      url: url,
-      request_headers: req_headers,
-      request_body: req_body,
-      response_status: status,
-      response_headers: resp_headers,
-      response_body: resp_body
+      post: RightCandidateData.get_post_candidate(review_hash),
+      revoke: RightCandidateData.get_revoke_candidate(review_hash)
     }
   end
 
-  defp format_headers(headers) when is_map(headers),
-    do: Enum.map(headers, fn {k, v} -> {k, Enum.join(v, ", ")} end)
+  defp build_candidate_mutation(author, origin_hash, review, type, timestamp) do
+    password_b64 = if type == :password, do: review.review_password
 
-  defp format_headers(headers) when is_list(headers), do: headers
+    signable = %ReviewPublicPassword{
+      review_hash: review.review_hash,
+      sign_hash: nil,
+      origin_hash: origin_hash,
+      password_b64: password_b64,
+      author_hash: author.user_hash,
+      deleted_flag: false,
+      owner_timestamp: timestamp
+    }
 
-  defp encode_base64(bin), do: Base.encode64(bin, padding: false)
+    {sign_b64, sign_hash} = sign_struct(signable, author.sign_skey, ReviewPasswordSignHash)
 
+    modified =
+      %{
+        "review_hash" => review.review_hash,
+        "sign_hash" => sign_hash,
+        "origin_hash" => origin_hash,
+        "author_hash" => author.user_hash,
+        "owner_timestamp" => timestamp,
+        "sign_b64" => encode_base64(sign_b64)
+      }
+      |> put_if("password_b64", if(password_b64, do: encode_base64(password_b64)))
+
+    %{
+      "type" => "insert",
+      "modified" => modified,
+      "syncMetadata" => %{"relation" => "review_password_candidate"}
+    }
+  end
+
+  defp build_right_sign_mutation(candidate, author) do
+    sign_b64 = candidate |> Integrity.signature_payload() |> EnigmaPq.sign(author.sign_skey)
+    {sign_hash, relation} = right_candidate_meta(candidate, sign_b64)
+
+    %{
+      "type" => "update",
+      "original" => %{"review_hash" => candidate.review_hash},
+      "changes" => %{
+        "sign_b64" => encode_base64(sign_b64),
+        "sign_hash" => sign_hash
+      },
+      "syncMetadata" => %{"relation" => relation}
+    }
+  end
+
+  defp right_candidate_meta(%ReviewPostRightCandidate{}, sign_b64) do
+    {sign_b64 |> EnigmaPq.hash() |> ReviewPostRightSignHash.from_binary(),
+     "review_post_right_candidate"}
+  end
+
+  defp right_candidate_meta(%ReviewRevokeRightCandidate{}, sign_b64) do
+    {sign_b64 |> EnigmaPq.hash() |> ReviewRevokeRightSignHash.from_binary(),
+     "review_revoke_right_candidate"}
+  end
 end

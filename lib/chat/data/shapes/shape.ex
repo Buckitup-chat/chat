@@ -71,7 +71,13 @@ defmodule Chat.Data.Shapes.Shape do
       @impl true
       def sync_derive_fields(value), do: value
 
-      defoverridable versions_schema: 0, sync_validate_parent: 2, sync_derive_fields: 1
+      @impl true
+      def ingest_configure_writer(writer, _user_pop_context), do: writer
+
+      defoverridable versions_schema: 0,
+                     sync_validate_parent: 2,
+                     sync_derive_fields: 1,
+                     ingest_configure_writer: 2
     end
   end
 end

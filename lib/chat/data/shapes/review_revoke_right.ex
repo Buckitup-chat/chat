@@ -9,7 +9,6 @@ defmodule Chat.Data.Shapes.ReviewRevokeRight do
   alias Chat.Data.Schemas.ReviewRevokeRight
   alias Chat.Data.Types.ReviewRevokeRightSignHash
   alias EnigmaPq
-  alias Phoenix.Sync.Writer
 
   @impl true
   def shape_name, do: :review_revoke_right
@@ -46,15 +45,6 @@ defmodule Chat.Data.Shapes.ReviewRevokeRight do
       :update ->
         persist_update(right)
     end
-  end
-
-  @impl true
-  def ingest_configure_writer(writer, user_pop_context) do
-    Writer.allow(writer, ReviewRevokeRight,
-      accept: [:insert, :update],
-      check: &Validation.revoke_right_allowed(&1, user_pop_context),
-      validate: &Validation.revoke_right_validate/3
-    )
   end
 
   defp persist_insert(changeset, right) do

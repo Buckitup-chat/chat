@@ -3,10 +3,7 @@ defmodule Chat.Data.ReviewPostRight.Validation do
 
   alias Chat.Data.Review, as: ReviewData
   alias Chat.Data.Schemas.ReviewPostRight
-  alias Chat.Data.User, as: UserData
   alias Chat.Data.User.Validation, as: UserValidation
-  alias EnigmaPq
-  alias Phoenix.Sync.Writer.Operation
 
   # --- Peer sync validation ---
 
@@ -35,45 +32,6 @@ defmodule Chat.Data.ReviewPostRight.Validation do
     |> ReviewPostRight.update_changeset(attrs)
     |> UserValidation.validate_signature()
     |> UserValidation.validate_timestamp_newer_than_existing()
-  end
-
-  # --- HTTP ingestion ---
-
-  def post_right_allowed(operation, %{challenge: challenge, signature: signature}) do
-    author_hash =
-      case operation do
-        %Operation{operation: :insert, changes: changes} ->
-          changes["author_hash"] || changes[:author_hash]
-
-        %Operation{operation: :update, data: %{"author_hash" => hash}} ->
-          hash
-      end
-
-    with %{sign_pkey: sign_pkey} <- UserData.get_card(author_hash),
-         true <- EnigmaPq.verify(challenge, signature, sign_pkey) do
-      :ok
-    else
-      _ -> {:error, "Invalid operation"}
-    end
-  end
-
-  def post_right_validate(right, changes, op) do
-    case op do
-      :insert ->
-        right
-        |> ReviewPostRight.create_changeset(changes)
-        |> validate_matches_review(
-          changes["review_hash"] || changes[:review_hash],
-          changes["author_hash"] || changes[:author_hash],
-          changes["origin_hash"] || changes[:origin_hash]
-        )
-
-      :update ->
-        right
-        |> ReviewPostRight.update_changeset(changes)
-        |> UserValidation.validate_signature()
-        |> UserValidation.validate_timestamp_newer_than_existing()
-    end
   end
 
   # --- Cross-table binding ---

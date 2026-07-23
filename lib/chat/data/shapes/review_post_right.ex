@@ -9,7 +9,6 @@ defmodule Chat.Data.Shapes.ReviewPostRight do
   alias Chat.Data.Schemas.ReviewPostRight
   alias Chat.Data.Types.ReviewPostRightSignHash
   alias EnigmaPq
-  alias Phoenix.Sync.Writer
 
   @impl true
   def shape_name, do: :review_post_right
@@ -46,15 +45,6 @@ defmodule Chat.Data.Shapes.ReviewPostRight do
       :update ->
         persist_update(right)
     end
-  end
-
-  @impl true
-  def ingest_configure_writer(writer, user_pop_context) do
-    Writer.allow(writer, ReviewPostRight,
-      accept: [:insert, :update],
-      check: &Validation.post_right_allowed(&1, user_pop_context),
-      validate: &Validation.post_right_validate/3
-    )
   end
 
   defp persist_insert(changeset, right) do

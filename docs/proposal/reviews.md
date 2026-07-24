@@ -597,7 +597,7 @@ This is a separate concern involving the broader contacts/trust model and will b
 
 ## Sandboxes
 
-Three sandboxes, split by persona — each operates under a distinct identity context:
+Three sandboxes plus a public viewer, split by persona — each operates under a distinct identity context:
 
 ### Origin owner sandbox
 
@@ -629,6 +629,16 @@ A regular user browsing and writing reviews. Exercises:
 - write `to_public` review: generate `review_password`, AES-256-GCM encrypt, ML-DSA-87 sign `content_b64`, submit password candidate
 - write `to_origin` review: dialog message to origin identity
 - moderation pipeline participation: ingest candidates (server triggers promotion), read right candidates via Electric shape, verify KEM wrapping, ingest signature updates (server triggers completion)
+
+### Public reviews viewer
+
+No identity required — a read-only view simulating the public frontend. Exercises:
+
+- browse origin directory (list all origins with moderation mode)
+- select an origin to view its public reviews
+- decrypt `content_b64` using `password_b64` from `review_public_passwords` (AES-256-GCM)
+- render decoded content model: star rating (1–5), review text
+- display reviews pending moderation or hidden by moderation as distinct states
 
 ## Implementation phases
 
@@ -666,6 +676,7 @@ A regular user browsing and writing reviews. Exercises:
 - [x] Tests: `review_moderation_test`, `review_list_validation_test`, `review_public_password_validation_test`, `origin_validation_test`, `review_right_validation_test`, `review_shapes_test`, `electric_controller_review_test`
 - [x] Review sandbox LiveView — interactive testing (`ReviewSandboxLive`)
 - [x] Reviews directory LiveView — real-time Electric stream listing (`ReviewsLive`)
+- [x] Origin reviews public viewer — browse origins and read decrypted public reviews (`OriginReviewsLive`)
 - [x] Ingest-triggered promotion — `promote_candidate` fires on candidate ingest when both password+null arrive; `complete_promotion` fires on right candidate signature ingest when all required signatures are present
 - [x] Electric shapes for right candidates — `review_post_right_candidate` / `review_revoke_right_candidate` synced to author so client can read, verify, and sign
 - [ ] Review creation in main app UI

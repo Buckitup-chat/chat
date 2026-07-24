@@ -58,7 +58,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Http do
 
     case Req.post(url, json: payload_with_auth, headers: req_headers) do
       {:ok, %{status: status} = resp} when status in 200..299 ->
-        {:ok, resp.body, log_entry("POST", url, req_headers, body_json, resp, timestamp)}
+        {:ok, resp, log_entry("POST", url, req_headers, body_json, resp, timestamp)}
 
       {:ok, %{status: status} = resp} ->
         {:error, "Request failed: #{status}",

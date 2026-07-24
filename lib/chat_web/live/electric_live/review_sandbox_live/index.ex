@@ -21,6 +21,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
         review: nil,
         rights_submitted: false,
         right_candidates: nil,
+        shared_secrets: %{},
         rights_signed: false,
         request_log: [],
         error_message: nil,
@@ -122,7 +123,12 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
     {placeholder, review_text} = review_content_parts(text)
     content = Jason.encode!([rating, placeholder, review_text])
 
-    case ApiClient.submit_review(socket.assigns.author, origin_hash, content, ChatWeb.Endpoint.url()) do
+    case ApiClient.submit_review(
+           socket.assigns.author,
+           origin_hash,
+           content,
+           ChatWeb.Endpoint.url()
+         ) do
       {:ok, %{review: review, log_entries: logs}} ->
         {:noreply,
          socket
@@ -141,10 +147,14 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
     %{author: author, review: review} = socket.assigns
 
     case ApiClient.submit_password_candidates(author, review, ChatWeb.Endpoint.url()) do
-      {:ok, %{candidates: candidates, log_entries: logs}} ->
+      {:ok, %{candidates: candidates, shared_secrets: shared_secrets, log_entries: logs}} ->
         {:noreply,
          socket
-         |> assign(rights_submitted: true, right_candidates: candidates)
+         |> assign(
+           rights_submitted: true,
+           right_candidates: candidates,
+           shared_secrets: shared_secrets
+         )
          |> append_logs(logs)}
 
       {:error, %{reason: reason, log_entries: logs}} ->
@@ -153,9 +163,21 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
   end
 
   def handle_event("sign_rights", _params, socket) do
-    %{author: author, right_candidates: candidates} = socket.assigns
+    %{
+      author: author,
+      right_candidates: candidates,
+      shared_secrets: shared_secrets,
+      review: review
+    } =
+      socket.assigns
 
-    case ApiClient.sign_right_candidates(author, candidates, ChatWeb.Endpoint.url()) do
+    case ApiClient.sign_right_candidates(
+           author,
+           candidates,
+           shared_secrets,
+           review,
+           ChatWeb.Endpoint.url()
+         ) do
       {:ok, %{log_entries: logs}} ->
         {:noreply, socket |> assign(rights_signed: true) |> append_logs(logs)}
 

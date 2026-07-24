@@ -15,6 +15,7 @@ defmodule ChatWeb.ElectricLive.UserStorageVersionLive.Index do
   import ChatWeb.PhoenixSyncPatch
 
   alias Chat.Data.Schemas.UserStorageVersion
+  alias Chat.Proto.Shortcode
 
   @impl true
   def mount(_params, _session, socket) do
@@ -200,7 +201,7 @@ defmodule ChatWeb.ElectricLive.UserStorageVersionLive.Index do
               Key: {version.uuid}
             </span>
             <span class="text-xs text-gray-400 font-mono">
-              {version.user_hash |> String.slice(0..15)}...
+              {Shortcode.short_code(version.user_hash)}
             </span>
           </div>
           {render_version_item(assigns, version)}
@@ -261,7 +262,7 @@ defmodule ChatWeb.ElectricLive.UserStorageVersionLive.Index do
                 <% end %>
               </div>
               <p class="mt-1 text-xs text-gray-500 font-mono truncate">
-                User Hash: {@version.user_hash |> String.slice(0..31)}...
+                User Hash: {Shortcode.short_code(@version.user_hash)}
               </p>
               <div class="mt-1 flex items-center space-x-4 text-xs text-gray-600">
                 <span>Value: {format_bytes(byte_size(@version.value_b64))}</span>
@@ -269,14 +270,13 @@ defmodule ChatWeb.ElectricLive.UserStorageVersionLive.Index do
               </div>
               <%= if @version.parent_sign_hash do %>
                 <p class="mt-1 text-xs text-purple-600 font-mono truncate">
-                  Parent: {@version.parent_sign_hash
-                  |> String.slice(0..15)}...
+                  Parent: {Shortcode.short_code(@version.parent_sign_hash)}
                 </p>
               <% else %>
                 <p class="mt-1 text-xs text-gray-400 italic">Initial version (no parent)</p>
               <% end %>
               <p class="mt-1 text-xs text-gray-400 font-mono truncate">
-                Sign Hash: {@version.sign_hash |> String.slice(0..15)}...
+                Sign Hash: {Shortcode.short_code(@version.sign_hash)}
               </p>
             </div>
           </div>

@@ -32,14 +32,16 @@ defmodule ChatWeb.ElectricController do
          {:ok, mutations} <-
            IngestUtil.decode_mutation_fields(mutations, @hex_suffixes, @base64_suffixes),
          {:ok, user_pop_context} <- user_pop_context(params),
-         {:ok, txid, _changes} <-
+         {:ok, txid, changes} <-
            Writer.new()
            |> config_writer(user_pop_context)
            |> Writer.apply(mutations, repo(),
              format: Format.TanstackDB,
              timeout: @ingest_timeout
            ) do
-      json(conn, %{txid: txid})
+      conn
+      |> put_promotion_headers(changes)
+      |> json(%{txid: txid})
     else
       error -> handle_ingest_error(conn, error)
     end
@@ -102,6 +104,25 @@ defmodule ChatWeb.ElectricController do
       _ ->
         %{error: "unknown_error"}
     end
+  end
+
+  defp put_promotion_headers(conn, changes) do
+    Enum.reduce(changes, conn, fn
+      {_key, %{post_shared_secret: post, revoke_shared_secret: revoke}}, conn ->
+        conn
+        |> put_resp_header("x-review-post-shared-secret", Base.encode64(post, padding: false))
+        |> put_resp_header("x-review-revoke-shared-secret", Base.encode64(revoke, padding: false))
+
+      {_key, %{revoke_shared_secret: secret}}, conn ->
+        put_resp_header(
+          conn,
+          "x-review-revoke-shared-secret",
+          Base.encode64(secret, padding: false)
+        )
+
+      _, conn ->
+        conn
+    end)
   end
 
   defp config_writer(writer, user_pop_context) do

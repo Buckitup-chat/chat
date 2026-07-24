@@ -19,7 +19,7 @@ defmodule ChatWeb.ElectricLive.Index do
         "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z",
       label: "User Cards",
       title: "Post-Quantum Users",
-      endpoint: "/electric/v1/user_card"
+      shapes: "user_card"
     },
     %{
       href: "/electric/user_storage",
@@ -28,7 +28,7 @@ defmodule ChatWeb.ElectricLive.Index do
         "M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4",
       label: "User Storage",
       title: "Encrypted Storage",
-      endpoint: "/electric/v1/user_storage"
+      shapes: "user_storage"
     },
     %{
       href: "/electric/user_storage_versions",
@@ -36,7 +36,7 @@ defmodule ChatWeb.ElectricLive.Index do
       icon_path: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
       label: "Storage Versions",
       title: "Version History",
-      endpoint: "/electric/v1/user_storage_version"
+      shapes: "user_storage (versions)"
     },
     %{
       href: "/electric/files",
@@ -45,7 +45,7 @@ defmodule ChatWeb.ElectricLive.Index do
         "M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z",
       label: "Files",
       title: "File Manifests",
-      endpoint: "/electric/v1/file"
+      shapes: "file"
     },
     %{
       href: "/electric/file_chunks",
@@ -54,7 +54,7 @@ defmodule ChatWeb.ElectricLive.Index do
         "M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4",
       label: "File Chunks",
       title: "Chunk Data",
-      endpoint: "/electric/v1/file_chunk"
+      shapes: "file_chunk"
     },
     %{
       href: "/electric/dialog_keys",
@@ -63,7 +63,7 @@ defmodule ChatWeb.ElectricLive.Index do
         "M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z",
       label: "Dialog Keys",
       title: "Key Exchange",
-      endpoint: "/electric/v1/dialog_key"
+      shapes: "dialog_keys"
     },
     %{
       href: "/electric/dialog_messages",
@@ -72,7 +72,7 @@ defmodule ChatWeb.ElectricLive.Index do
         "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z",
       label: "Dialog Messages",
       title: "Message Tips",
-      endpoint: "/electric/v1/dialog_message"
+      shapes: "dialog_messages"
     },
     %{
       href: "/electric/dialog_message_versions",
@@ -80,7 +80,7 @@ defmodule ChatWeb.ElectricLive.Index do
       icon_path: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
       label: "Message Versions",
       title: "Version History",
-      endpoint: "/electric/v1/dialog_message_version"
+      shapes: "dialog_messages (versions)"
     },
     %{
       href: "/electric/dialog_message_reactions",
@@ -89,7 +89,7 @@ defmodule ChatWeb.ElectricLive.Index do
         "M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
       label: "Reactions",
       title: "Emoji Reactions",
-      endpoint: "/electric/v1/dialog_message_reaction"
+      shapes: "dialog_message_reactions"
     },
     %{
       href: "/electric/dialog_message_receipts",
@@ -97,7 +97,7 @@ defmodule ChatWeb.ElectricLive.Index do
       icon_path: "M5 13l4 4L19 7",
       label: "Receipts",
       title: "Read/Delivered",
-      endpoint: "/electric/v1/dialog_message_receipt"
+      shapes: "dialog_message_receipts"
     },
     %{
       href: "/electric/origins",
@@ -106,7 +106,52 @@ defmodule ChatWeb.ElectricLive.Index do
         "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
       label: "Origins",
       title: "Business Entities",
-      endpoint: "/electric/v1/shapes?table=origins"
+      shapes: "origin"
+    },
+    %{
+      href: "/electric/reviews",
+      icon_color: "text-yellow-600",
+      icon_path:
+        "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z",
+      label: "Reviews",
+      title: "Review Records",
+      shapes: "review"
+    },
+    %{
+      href: "/electric/review_public_passwords",
+      icon_color: "text-yellow-500",
+      icon_path:
+        "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z",
+      label: "Public Passwords",
+      title: "Public Visibility",
+      shapes: "review_public_passwords"
+    },
+    %{
+      href: "/electric/review_post_rights",
+      icon_color: "text-green-600",
+      icon_path:
+        "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+      label: "Post Rights",
+      title: "Publish Envelopes",
+      shapes: "review_post_right"
+    },
+    %{
+      href: "/electric/review_revoke_rights",
+      icon_color: "text-red-600",
+      icon_path:
+        "M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636",
+      label: "Revoke Rights",
+      title: "Revoke Envelopes",
+      shapes: "review_revoke_right"
+    },
+    %{
+      href: "/electric/review_lists",
+      icon_color: "text-violet-600",
+      icon_path:
+        "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01",
+      label: "Review Lists",
+      title: "Password Lists",
+      shapes: "review_list"
     }
   ]
 
@@ -117,7 +162,7 @@ defmodule ChatWeb.ElectricLive.Index do
       icon_path: "M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4",
       label: "User API Sandbox",
       title: "API Testing",
-      endpoint: "/electric/v1/ingest"
+      shapes: "user_card, user_storage"
     },
     %{
       href: "/file_sandbox.html",
@@ -126,7 +171,7 @@ defmodule ChatWeb.ElectricLive.Index do
         "M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12",
       label: "File Sandbox",
       title: "Upload / Download",
-      endpoint: "/electric/v1/file, /electric/v1/file_chunk"
+      shapes: "file, file_chunk"
     },
     %{
       href: "/electric/dialog_sandbox",
@@ -135,7 +180,7 @@ defmodule ChatWeb.ElectricLive.Index do
         "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z",
       label: "Dialog Sandbox",
       title: "Encrypted Chat",
-      endpoint: "/electric/v1/dialog_key, /electric/v1/dialog_message"
+      shapes: "dialog_keys, dialog_messages"
     },
     %{
       href: "/electric/origin_sandbox",
@@ -144,7 +189,7 @@ defmodule ChatWeb.ElectricLive.Index do
         "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
       label: "Origin Sandbox",
       title: "Business Entities",
-      endpoint: "/electric/v1/shapes?table=origins"
+      shapes: "user_card, origin"
     },
     %{
       href: "/electric/review_sandbox",
@@ -153,7 +198,7 @@ defmodule ChatWeb.ElectricLive.Index do
         "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z",
       label: "Review Sandbox",
       title: "Review Pipeline",
-      endpoint: "/electric/v1/ingest (review, review_list)"
+      shapes: "review, review_list"
     },
     %{
       href: "/electric/origin_reviews",
@@ -162,7 +207,7 @@ defmodule ChatWeb.ElectricLive.Index do
         "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z",
       label: "Origin Reviews",
       title: "Public Viewer",
-      endpoint: "/electric/v1/shapes (review, review_public_passwords)"
+      shapes: "origin, review, review_public_passwords"
     }
   ]
 
@@ -211,8 +256,8 @@ defmodule ChatWeb.ElectricLive.Index do
 
         <.init_status :if={@readiness != :ready} readiness={@readiness} />
 
-        <div :if={@readiness == :ready} class="flex gap-6 items-start">
-          <div class="flex-1 min-w-0">
+        <div :if={@readiness == :ready} class="grid grid-cols-5 gap-6 items-start">
+          <div class="col-span-3 min-w-0">
             <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
               Shape Lists
             </h2>
@@ -221,11 +266,11 @@ defmodule ChatWeb.ElectricLive.Index do
             </div>
           </div>
 
-          <div class="w-72 flex-shrink-0">
+          <div class="col-span-2">
             <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
               Sandboxes
             </h2>
-            <div class="flex flex-col gap-4">
+            <div class="grid grid-cols-2 gap-4">
               <.card :for={c <- @sandbox_cards} {c} />
             </div>
           </div>
@@ -263,7 +308,7 @@ defmodule ChatWeb.ElectricLive.Index do
   attr :label, :string, required: true
   attr :title, :string, required: true
   attr :description, :string, default: nil
-  attr :endpoint, :string, required: true
+  attr :shapes, :string, required: true
   attr :compact, :boolean, default: false
 
   defp card(assigns) do
@@ -291,10 +336,7 @@ defmodule ChatWeb.ElectricLive.Index do
           ]}>
             {@label}
           </p>
-          <p class={[
-            "font-semibold text-gray-900",
-            if(@compact, do: "text-sm", else: "text-lg mt-1")
-          ]}>
+          <p :if={!@compact} class="font-semibold text-gray-900 text-lg mt-1">
             {@title}
           </p>
         </div>
@@ -306,7 +348,7 @@ defmodule ChatWeb.ElectricLive.Index do
         "text-gray-500 font-mono",
         if(@compact, do: "mt-2 text-[10px]", else: "mt-3 text-xs")
       ]}>
-        {@endpoint}
+        {@shapes}
       </p>
     </a>
     """

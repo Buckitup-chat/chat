@@ -8,6 +8,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
   alias Chat.Data.Schemas.Origin
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
   alias ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient
+  alias ChatWeb.ElectricLive.ReviewSandboxLive.Verification
   alias Electric.Client.Message
 
   @impl true
@@ -22,6 +23,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
         rights_submitted: false,
         right_candidates: nil,
         shared_secrets: %{},
+        verification: nil,
         rights_signed: false,
         request_log: [],
         error_message: nil,
@@ -160,6 +162,18 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
       {:error, %{reason: reason, log_entries: logs}} ->
         {:noreply, socket |> assign(error_message: reason) |> append_logs(logs)}
     end
+  end
+
+  def handle_event("verify_wrapping", _params, socket) do
+    %{
+      author: author,
+      right_candidates: candidates,
+      shared_secrets: shared_secrets,
+      review: review
+    } = socket.assigns
+
+    verification = Verification.verify_candidates(candidates, shared_secrets, review, author)
+    {:noreply, assign(socket, verification: verification)}
   end
 
   def handle_event("sign_rights", _params, socket) do

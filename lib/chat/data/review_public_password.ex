@@ -18,6 +18,14 @@ defmodule Chat.Data.ReviewPublicPassword do
     |> repo().one()
   end
 
+  def get_password_version(review_hash) do
+    ReviewPublicPassword
+    |> where([rp], rp.review_hash == ^review_hash and not is_nil(rp.password_b64))
+    |> order_by([rp], desc: rp.owner_timestamp)
+    |> limit(1)
+    |> repo().one()
+  end
+
   def upsert_review_public_password(changeset) do
     repo().insert(changeset,
       on_conflict: review_public_password_upsert_query(),

@@ -37,10 +37,14 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
 
   @impl true
   def handle_event("select_origin", %{"hash" => origin_hash}, socket) do
-    origin = Enum.find(socket.assigns.origins, &(&1.origin_hash == origin_hash))
-    fetch_reviews_async(origin_hash)
+    case Enum.find(socket.assigns.origins, &(&1.origin_hash == origin_hash)) do
+      nil ->
+        {:noreply, socket}
 
-    {:noreply, assign(socket, selected_origin: origin, reviews: [], loading_reviews: true)}
+      origin ->
+        fetch_reviews_async(origin_hash)
+        {:noreply, assign(socket, selected_origin: origin, reviews: [], loading_reviews: true)}
+    end
   end
 
   def handle_event("back_to_origins", _params, socket) do
@@ -206,13 +210,15 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
 
     review_shape =
       Electric.Client.ShapeDefinition.new!("review",
-        where: "origin_hash = '#{origin_hash}'",
+        where: "origin_hash = $1",
+        params: [origin_hash],
         parser: {Electric.Client.EctoAdapter, Review}
       )
 
     password_shape =
       Electric.Client.ShapeDefinition.new!("review_public_passwords",
-        where: "origin_hash = '#{origin_hash}'",
+        where: "origin_hash = $1",
+        params: [origin_hash],
         parser: {Electric.Client.EctoAdapter, ReviewPublicPassword}
       )
 

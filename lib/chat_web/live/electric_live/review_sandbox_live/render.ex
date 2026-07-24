@@ -3,6 +3,8 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Render do
 
   use Phoenix.Component
 
+  import ChatWeb.ElectricLive.ReviewSandboxLive.RenderVerification
+
   alias Chat.Proto.Shortcode
 
   def render_author_section(assigns) do
@@ -61,7 +63,9 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Render do
           <% end %>
           <p><span class="font-medium">Timestamp:</span> {@review.owner_timestamp}</p>
           <details class="mt-2">
-            <summary class="cursor-pointer text-xs text-gray-500">Content JSON (plaintext before encryption)</summary>
+            <summary class="cursor-pointer text-xs text-gray-500">
+              Content JSON (plaintext before encryption)
+            </summary>
             <pre class="mt-1 text-xs font-mono bg-gray-50 p-2 rounded overflow-x-auto">{@review.content_json}</pre>
           </details>
         </div>
@@ -190,12 +194,30 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Render do
             </div>
           <% end %>
         </div>
-        <button
-          phx-click="sign_rights"
-          class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700"
-        >
-          Sign & Submit
-        </button>
+
+        <%= if @verification do %>
+          {render_verification_results(assigns)}
+
+          <%= if @verification.all_ok do %>
+            <button
+              phx-click="sign_rights"
+              class="mt-3 bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700"
+            >
+              Sign & Submit
+            </button>
+          <% else %>
+            <p class="mt-3 text-sm font-medium text-red-700">
+              Verification failed — signing blocked.
+            </p>
+          <% end %>
+        <% else %>
+          <button
+            phx-click="verify_wrapping"
+            class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
+          >
+            Verify Wrapping
+          </button>
+        <% end %>
       <% end %>
     </div>
     """

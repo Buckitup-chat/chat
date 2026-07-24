@@ -17,6 +17,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
   alias Chat.Data.Types.ReviewRevokeRightSignHash
   alias Chat.Data.Types.ReviewSignHash
   alias Chat.TimeKeeper
+  alias ChatWeb.ElectricLive.ReviewSandboxLive.Verification
   alias EnigmaPq
 
   def submit_review(author, origin_hash, content, base_url) do
@@ -131,7 +132,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
     with {:ok, ch, log1} <- get_challenge(base_url),
          {:ok, resp, log2} <- post_ingest(ch, payload, author.sign_skey, base_url) do
       candidates = read_right_candidates(review.review_hash)
-      shared_secrets = extract_shared_secrets(resp)
+      shared_secrets = Verification.extract_shared_secrets(resp)
       {:ok, %{candidates: candidates, shared_secrets: shared_secrets, log_entries: [log1, log2]}}
     else
       {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
@@ -139,7 +140,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
   end
 
   def sign_right_candidates(author, candidates, shared_secrets, review, base_url) do
-    with :ok <- verify_wrapping(candidates, shared_secrets, review, author) do
+    with :ok <- Verification.verify_wrapping(candidates, shared_secrets, review, author) do
       mutations =
         [candidates.post, candidates.revoke]
         |> Enum.reject(&is_nil/1)
@@ -223,78 +224,5 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
   defp right_candidate_meta(%ReviewRevokeRightCandidate{}, sign_b64) do
     {sign_b64 |> EnigmaPq.hash() |> ReviewRevokeRightSignHash.from_binary(),
      "review_revoke_right_candidate"}
-  end
-
-  defp extract_shared_secrets(%{headers: headers}) do
-    %{}
-    |> put_decoded_header(headers, "x-review-post-shared-secret", :post_shared_secret)
-    |> put_decoded_header(headers, "x-review-revoke-shared-secret", :revoke_shared_secret)
-  end
-
-  defp put_decoded_header(acc, headers, name, key) do
-    case headers do
-      %{^name => [value | _]} -> Map.put(acc, key, Base.decode64!(value, padding: false))
-      _ -> acc
-    end
-  end
-
-  @wrap_context "buckitup/review-right/v1"
-  @wrap_label "wrap"
-
-  defp verify_wrapping(candidates, shared_secrets, review, author) do
-    with :ok <-
-           verify_candidate(
-             candidates.post,
-             shared_secrets[:post_shared_secret],
-             review,
-             author,
-             :post
-           ),
-         :ok <-
-           verify_candidate(
-             candidates.revoke,
-             shared_secrets[:revoke_shared_secret],
-             review,
-             author,
-             :revoke
-           ) do
-      :ok
-    end
-  end
-
-  defp verify_candidate(nil, _secret, _review, _author, _type), do: :ok
-
-  defp verify_candidate(_candidate, nil, _review, _author, _type),
-    do: {:error, "missing shared secret for right candidate verification"}
-
-  defp verify_candidate(candidate, shared_secret, review, author, type) do
-    wrap_key = EnigmaPq.hkdf_derive(shared_secret, @wrap_context, @wrap_label)
-
-    case EnigmaPq.aes_gcm_decrypt(candidate.wrapped_row_b64, wrap_key) do
-      :error ->
-        {:error, "wrapped content decryption failed — server may have tampered"}
-
-      row_json ->
-        row_json |> Jason.decode!() |> verify_row_fields(review, author, type)
-    end
-  end
-
-  defp verify_row_fields(row, review, author, type) do
-    cond do
-      row["review_hash"] != review.review_hash ->
-        {:error, "wrapped review_hash does not match submitted review"}
-
-      row["author_hash"] != author.user_hash ->
-        {:error, "wrapped author_hash does not match author identity"}
-
-      type == :revoke and row["password_b64"] != nil ->
-        {:error, "revoke right wraps non-null password"}
-
-      type == :post and row["password_b64"] != encode_base64(review.review_password) ->
-        {:error, "post right password does not match review password"}
-
-      true ->
-        :ok
-    end
   end
 end

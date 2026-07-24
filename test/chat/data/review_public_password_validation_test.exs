@@ -126,6 +126,51 @@ defmodule Chat.Data.ReviewPublicPasswordValidationTest do
     end
   end
 
+  describe "revoke-timestamp invariant is enforced at the validation layer" do
+    test "accepts a revoke row whose timestamp exceeds the persisted password's", ctx do
+      persist(build_password_at(ctx, ctx.author_hash, :crypto.strong_rand_bytes(32), 1000))
+
+      cs =
+        ctx
+        |> build_password_at(ctx.author_hash, nil, 2000)
+        |> Validation.validate_review_public_password_insert()
+
+      assert cs.valid?, inspect(cs.errors)
+    end
+
+    test "rejects a revoke row whose timestamp does not exceed the persisted password's", ctx do
+      persist(build_password_at(ctx, ctx.author_hash, :crypto.strong_rand_bytes(32), 2000))
+
+      cs =
+        ctx
+        |> build_password_at(ctx.author_hash, nil, 1000)
+        |> Validation.validate_review_public_password_insert()
+
+      refute cs.valid?
+      assert Keyword.has_key?(cs.errors, :owner_timestamp)
+    end
+
+    test "accepts a revoke row when no password version has been persisted yet", ctx do
+      cs =
+        ctx
+        |> build_password_at(ctx.author_hash, nil, 1000)
+        |> Validation.validate_review_public_password_insert()
+
+      assert cs.valid?, inspect(cs.errors)
+    end
+
+    test "does not constrain a password (non-revoke) row's timestamp", ctx do
+      persist(build_password_at(ctx, ctx.author_hash, nil, 2000))
+
+      cs =
+        ctx
+        |> build_password_at(ctx.author_hash, :crypto.strong_rand_bytes(32), 1000)
+        |> Validation.validate_review_public_password_insert()
+
+      assert cs.valid?, inspect(cs.errors)
+    end
+  end
+
   # --- Helpers ---
 
   defp build_password_at(ctx, author_hash, password_b64, owner_timestamp) do

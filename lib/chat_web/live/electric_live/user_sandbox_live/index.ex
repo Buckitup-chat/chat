@@ -7,23 +7,21 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
-    socket =
-      socket
-      |> assign(
-        user: nil,
-        storage_items: [],
-        show_storage_form: false,
-        editing_storage_uuid: nil,
-        viewing_storage_uuid: nil,
-        request_log: [],
-        show_docs: true,
-        expanded_docs: MapSet.new(["user_card"]),
-        operation_in_progress: false,
-        error_message: nil
-      )
-      |> allow_upload(:key_file, accept: ~w(.json), max_entries: 1, max_file_size: 100_000)
-
-    {:ok, socket}
+    socket
+    |> assign(
+      user: nil,
+      storage_items: [],
+      show_storage_form: false,
+      editing_storage_uuid: nil,
+      viewing_storage_uuid: nil,
+      request_log: [],
+      show_docs: true,
+      expanded_docs: MapSet.new(["user_card"]),
+      operation_in_progress: false,
+      error_message: nil
+    )
+    |> allow_upload(:key_file, accept: ~w(.json), max_entries: 1, max_file_size: 100_000)
+    |> then(&{:ok, &1})
   end
 
   @impl true
@@ -34,17 +32,15 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
       <div class="flex-1 flex overflow-hidden">
         {Components.docs_sidebar(assigns)}
         <main class="flex-1 overflow-y-auto p-6">
-          <%= if @error_message do %>
-            <div class="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
-              <div class="flex justify-between items-start">
-                <div>
-                  <strong class="font-semibold">Error:</strong>
-                  <span class="block mt-1">{@error_message}</span>
-                </div>
-                <button phx-click="clear_error" class="text-red-600 hover:text-red-800">✕</button>
+          <div :if={@error_message} class="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
+            <div class="flex justify-between items-start">
+              <div>
+                <strong class="font-semibold">Error:</strong>
+                <span class="block mt-1">{@error_message}</span>
               </div>
+              <button phx-click="clear_error" class="text-red-600 hover:text-red-800">✕</button>
             </div>
-          <% end %>
+          </div>
           <%= if @user do %>
             {Components.user_loaded(assigns)}
           <% else %>
@@ -71,7 +67,12 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
   defp header(assigns) do
     ~H"""
     <div class="bg-white border-b px-6 py-4">
-      <h1 class="text-2xl font-bold text-gray-900">Electric API Sandbox</h1>
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-900">Electric API Sandbox</h1>
+        <a href="/electric" class="text-sm text-blue-600 hover:text-blue-800">
+          &larr; Electric Index
+        </a>
+      </div>
       <p class="text-sm text-gray-600 mt-1">
         Interactive test client for user_card and user_storage Electric API operations
       </p>

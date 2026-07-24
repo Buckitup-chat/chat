@@ -113,6 +113,7 @@ defmodule ChatWeb.Utils.IngestUtil do
     end
   end
 
+  defp decode_field_value(nil, _decoder), do: {:ok, nil}
   defp decode_field_value(value, decoder), do: decoder.(value)
 
   @doc """

@@ -142,7 +142,10 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
                 </span>
               </div>
               <%= if @editing_message_id == msg.message_id do %>
-                <.edit_form message_id={msg.message_id} current_content={unwrap_for_edit(msg.content_json)} />
+                <.edit_form
+                  message_id={msg.message_id}
+                  current_content={unwrap_for_edit(msg.content_json)}
+                />
               <% else %>
                 <ContentComponents.render_content
                   content={msg.content}

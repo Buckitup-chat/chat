@@ -20,35 +20,9 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
         loading_reviews: false
       )
 
-    if connected?(socket), do: fetch_origins_async()
+    if connected?(socket), do: fetch_origins_async(base_url(socket))
 
     {:ok, socket}
-  end
-
-  @impl true
-  def handle_info({:origins_loaded, origins}, socket) do
-    {:noreply, assign(socket, origins: origins, loading_origins: false)}
-  end
-
-  @impl true
-  def handle_info({:reviews_loaded, reviews}, socket) do
-    {:noreply, assign(socket, reviews: reviews, loading_reviews: false)}
-  end
-
-  @impl true
-  def handle_event("select_origin", %{"hash" => origin_hash}, socket) do
-    case Enum.find(socket.assigns.origins, &(&1.origin_hash == origin_hash)) do
-      nil ->
-        {:noreply, socket}
-
-      origin ->
-        fetch_reviews_async(origin_hash)
-        {:noreply, assign(socket, selected_origin: origin, reviews: [], loading_reviews: true)}
-    end
-  end
-
-  def handle_event("back_to_origins", _params, socket) do
-    {:noreply, assign(socket, selected_origin: nil, reviews: [])}
   end
 
   @impl true
@@ -74,6 +48,33 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
       </div>
     </div>
     """
+  end
+
+  @impl true
+  def handle_info({:origins_loaded, origins}, socket) do
+    {:noreply, assign(socket, origins: origins, loading_origins: false)}
+  end
+
+  @impl true
+  def handle_info({:reviews_loaded, reviews}, socket) do
+    {:noreply, assign(socket, reviews: reviews, loading_reviews: false)}
+  end
+
+  @impl true
+  def handle_event("select_origin", %{"hash" => origin_hash}, socket) do
+    case Enum.find(socket.assigns.origins, &(&1.origin_hash == origin_hash)) do
+      nil ->
+        {:noreply, socket}
+
+      origin ->
+        fetch_reviews_async(origin_hash, base_url(socket))
+        {:noreply, assign(socket, selected_origin: origin, reviews: [], loading_reviews: true)}
+    end
+  end
+
+  @impl true
+  def handle_event("back_to_origins", _params, socket) do
+    {:noreply, assign(socket, selected_origin: nil, reviews: [])}
   end
 
   # --- Components ---
@@ -183,9 +184,9 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
 
   # --- Private ---
 
-  defp fetch_origins_async do
+  defp fetch_origins_async(endpoint_base) do
     pid = self()
-    client = Electric.Client.new!(endpoint: ChatWeb.Endpoint.url() <> "/electric/v1/shapes")
+    client = Electric.Client.new!(endpoint: endpoint_base <> "/electric/v1/shapes")
 
     shape =
       Electric.Client.ShapeDefinition.new!("origins",
@@ -204,9 +205,9 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
     end)
   end
 
-  defp fetch_reviews_async(origin_hash) do
+  defp fetch_reviews_async(origin_hash, endpoint_base) do
     pid = self()
-    client = Electric.Client.new!(endpoint: ChatWeb.Endpoint.url() <> "/electric/v1/shapes")
+    client = Electric.Client.new!(endpoint: endpoint_base <> "/electric/v1/shapes")
 
     review_shape =
       Electric.Client.ShapeDefinition.new!("review",
@@ -244,13 +245,18 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
     password_map = latest_passwords(passwords)
 
     reviews
-    |> Enum.map(fn review ->
+    |> Enum.flat_map(fn review ->
       case Map.get(password_map, review.review_hash) do
-        %{password_b64: pwd} when is_binary(pwd) -> decrypt_review(review, pwd)
-        _ -> nil
+        %{password_b64: pwd} when is_binary(pwd) ->
+          case decrypt_review(review, pwd) do
+            nil -> []
+            decrypted -> [decrypted]
+          end
+
+        _ ->
+          []
       end
     end)
-    |> Enum.reject(&is_nil/1)
     |> Enum.sort_by(& &1.owner_timestamp, :desc)
   end
 
@@ -265,7 +271,7 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
     key = decode_binary(password)
 
     with plaintext when is_binary(plaintext) <- EnigmaPq.aes_gcm_decrypt(content, key),
-         [rating, _placeholder, text] <- Jason.decode!(plaintext) do
+         {:ok, [rating, _placeholder, text]} <- Jason.decode(plaintext) do
       %{
         review_hash: review.review_hash,
         rating: rating,
@@ -283,6 +289,11 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
       {:ok, decoded} -> decoded
       :error -> value
     end
+  end
+
+  defp base_url(socket) do
+    uri = socket.host_uri
+    "#{uri.scheme}://#{uri.host}:#{uri.port}"
   end
 
   defp collect_inserts(stream) do

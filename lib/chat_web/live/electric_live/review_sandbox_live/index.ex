@@ -13,28 +13,25 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
-    socket =
-      socket
-      |> assign(
-        author: nil,
-        origin_hash: nil,
-        moderation_mode: nil,
-        review: nil,
-        rights_submitted: false,
-        right_candidates: nil,
-        shared_secrets: %{},
-        verification: nil,
-        rights_signed: false,
-        request_log: [],
-        error_message: nil,
-        origins: [],
-        selected_rating: 0
-      )
-      |> allow_upload(:key_file, accept: ~w(.json), max_entries: 1, max_file_size: 100_000)
-
-    if connected?(socket), do: fetch_origins_async()
-
-    {:ok, socket}
+    socket
+    |> assign(
+      author: nil,
+      origin_hash: nil,
+      moderation_mode: nil,
+      review: nil,
+      rights_submitted: false,
+      right_candidates: nil,
+      shared_secrets: %{},
+      verification: nil,
+      rights_signed: false,
+      request_log: [],
+      error_message: nil,
+      origins: [],
+      selected_rating: 0
+    )
+    |> allow_upload(:key_file, accept: ~w(.json), max_entries: 1, max_file_size: 100_000)
+    |> tap(fn s -> if connected?(s), do: fetch_origins_async(base_url(s)) end)
+    |> then(&{:ok, &1})
   end
 
   @impl true
@@ -223,15 +220,23 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
     end
   end
 
-  defp rights_complete?(%{rights_submitted: false}), do: false
-  defp rights_complete?(%{moderation_mode: :none, rights_submitted: true}), do: true
-  defp rights_complete?(%{rights_signed: true}), do: true
-  defp rights_complete?(_), do: false
+  defp rights_complete?(assigns) do
+    cond do
+      not assigns.rights_submitted -> false
+      assigns.moderation_mode == :none -> true
+      assigns.rights_signed -> true
+      true -> false
+    end
+  end
 
-  defp fetch_origins_async do
+  defp base_url(socket) do
+    uri = socket.host_uri
+    "#{uri.scheme}://#{uri.host}:#{uri.port}"
+  end
+
+  defp fetch_origins_async(endpoint_base) do
     pid = self()
-    endpoint_url = ChatWeb.Endpoint.url() <> "/electric/v1/shapes"
-    client = Electric.Client.new!(endpoint: endpoint_url)
+    client = Electric.Client.new!(endpoint: endpoint_base <> "/electric/v1/shapes")
 
     shape =
       Electric.Client.ShapeDefinition.new!("origins",

@@ -126,7 +126,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
            socket.assigns.author,
            origin_hash,
            content,
-           ChatWeb.Endpoint.url()
+           base_url(socket)
          ) do
       {:ok, %{review: review, log_entries: logs}} ->
         {:noreply,
@@ -145,7 +145,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
   def handle_event("submit_rights", _params, socket) do
     %{author: author, review: review} = socket.assigns
 
-    case ApiClient.submit_password_candidates(author, review, ChatWeb.Endpoint.url()) do
+    case ApiClient.submit_password_candidates(author, review, base_url(socket)) do
       {:ok, %{candidates: candidates, shared_secrets: shared_secrets, log_entries: logs}} ->
         {:noreply,
          socket
@@ -187,7 +187,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
            candidates,
            shared_secrets,
            review,
-           ChatWeb.Endpoint.url()
+           base_url(socket)
          ) do
       {:ok, %{log_entries: logs}} ->
         {:noreply, socket |> assign(rights_signed: true) |> append_logs(logs)}

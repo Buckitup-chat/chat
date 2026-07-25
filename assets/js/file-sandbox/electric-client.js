@@ -148,6 +148,43 @@ export async function ingest(baseUrl, mutations, signSkey, logger, opts = {}) {
   throw lastError;
 }
 
+export async function putChunk(baseUrl, fileId, chunkIndex, body, headers, logger, opts = {}) {
+  const maxAttempts = opts.maxAttempts ?? 4;
+  const url = `${baseUrl}/electric/v1/file_chunk/${fileId}/${chunkIndex}`;
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const t0 = performance.now();
+      const resp = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/octet-stream', ...headers },
+        body
+      });
+      const elapsed = performance.now() - t0;
+      const respBody = await resp.json().catch(() => ({ error: 'unparseable' }));
+
+      if (logger) logger('PUT', url, null, respBody, resp.status);
+
+      if (resp.ok) return { ...respBody, _timing: { put_ms: elapsed, attempts: attempt } };
+
+      const err = new Error(`PUT chunk failed (${resp.status}): ${JSON.stringify(respBody)}`);
+      if (resp.status < 500 && resp.status !== 408 && resp.status !== 429) {
+        err.permanent = true;
+        throw err;
+      }
+      lastError = err;
+      if (attempt === maxAttempts) throw err;
+      await sleep(backoffMs(attempt));
+    } catch (e) {
+      if (e.permanent || attempt === maxAttempts) throw e;
+      lastError = e;
+      await sleep(backoffMs(attempt));
+    }
+  }
+  throw lastError;
+}
+
 export async function fetchShape(baseUrl, table, filterFn) {
   const rowMap = new Map();
   let offset = '-1';

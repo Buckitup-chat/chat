@@ -114,7 +114,7 @@ defmodule ChatWeb.ElectricShapesTest do
     |> FileChunk.create_changeset(%{
       file_id: file_id,
       chunk_index: index,
-      data_b64: :crypto.strong_rand_bytes(100),
+      data_hash: "fd_" <> String.duplicate("ab", 64),
       size: 100,
       uploader_hash: uploader_hash,
       owner_timestamp: 1,

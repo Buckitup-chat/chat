@@ -119,7 +119,7 @@ defmodule Chat.NetworkSynchronization.PeerDetection.LanDetection do
   end
 
   defp probe_electric_peer(base_url) do
-    probe_url = "#{base_url}/electric/v1/user_card?offset=-1"
+    probe_url = "#{base_url}/electric/v1/shapes?table=user_cards&offset=-1"
 
     case Req.get(probe_url, receive_timeout: 3_000, retry: false) do
       {:ok, %Req.Response{status: 200, headers: headers}} ->

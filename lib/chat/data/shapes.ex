@@ -2,6 +2,7 @@ defmodule Chat.Data.Shapes do
   @moduledoc "Registry of Replication and Electric synced shape behaviour modules"
 
   # order matters
+  # UserCard first — it is the FK parent for DialogKeys, File, FileChunk, UserStorage
   @shapes [
     Chat.Data.Shapes.UserCard,
     Chat.Data.Shapes.UserStorage,
@@ -43,7 +44,7 @@ defmodule Chat.Data.Shapes do
   def sync_schemas do
     @syncable
     |> Enum.flat_map(fn shape ->
-      [shape.schema_module() | List.wrap(shape.versions_schema())]
+      List.wrap(shape.versions_schema()) ++ [shape.schema_module()]
     end)
   end
 

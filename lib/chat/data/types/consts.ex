@@ -15,6 +15,7 @@ defmodule Chat.Data.Types.Consts do
   def dialog_message_reaction_prefix, do: "dmr_"
   def dialog_message_receipt_prefix, do: "dmrc_"
   def file_prefix, do: "f_"
+  def file_chunk_data_prefix, do: "fd_"
   def origin_sign_prefix, do: "ors_"
   def review_prefix, do: "rv_"
   def review_sign_prefix, do: "rvs_"

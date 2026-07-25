@@ -7,6 +7,7 @@ defmodule ChatWeb.ElectricControllerFileTest do
   alias Chat.Data.Schemas.File, as: FileSchema
   alias Chat.Data.Schemas.FileChunk
   alias Chat.Data.Schemas.UploadChunk
+  alias Chat.Data.Types.FileChunkDataHash
   alias Chat.Data.Types.FileId
   alias Chat.Data.User, as: UserData
   alias Chat.Repo
@@ -139,19 +140,96 @@ defmodule ChatWeb.ElectricControllerFileTest do
              )
              |> Repo.one() == 0
     end
+
+    defp upload_file(conn, identity, user_hash, file_id) do
+      {chunk, _} = build_signed_chunk(identity, user_hash, file_id, 0)
+      assert post_ingest(conn, file_chunk_insert_payload(chunk), identity.sign_skey).status == 200
+
+      file = build_signed_file(identity, user_hash, file_id, [chunk])
+      assert post_ingest(conn, file_insert_payload(file), identity.sign_skey).status == 200
+
+      file
+    end
+
+    defp file_insert_payload(file) do
+      %{
+        "mutations" => [
+          %{
+            "type" => "insert",
+            "modified" => %{
+              "file_id" => file.file_id,
+              "uploader_hash" => file.uploader_hash,
+              "total_size" => file.total_size,
+              "chunk_size" => file.chunk_size,
+              "chunk_count" => file.chunk_count,
+              "chunk_sign_hashes" => Enum.map(file.chunk_sign_hashes, &to_base64/1),
+              "owner_timestamp" => file.owner_timestamp,
+              "deleted_flag" => file.deleted_flag,
+              "sign_b64" => to_base64(file.sign_b64)
+            },
+            "syncMetadata" => %{"relation" => "files"}
+          }
+        ]
+      }
+    end
+
+    defp build_signed_file(identity, user_hash, file_id, chunks) do
+      chunk_sign_hashes = Enum.map(chunks, &EnigmaPq.hash(&1.sign_b64))
+      chunk_size = 4_194_304
+      total_size = length(chunks) * chunk_size
+
+      file = %FileSchema{
+        file_id: file_id,
+        uploader_hash: user_hash,
+        total_size: total_size,
+        chunk_size: chunk_size,
+        chunk_count: length(chunks),
+        chunk_sign_hashes: chunk_sign_hashes,
+        owner_timestamp: System.os_time(:millisecond),
+        deleted_flag: false
+      }
+
+      sign_b64 = file |> Integrity.signature_payload() |> EnigmaPq.sign(identity.sign_skey)
+      %{file | sign_b64: sign_b64}
+    end
+
+    defp build_signed_delete(identity, file_id, prev_timestamp) do
+      existing = Repo.get(FileSchema, file_id)
+
+      updated = %{
+        existing
+        | deleted_flag: true,
+          chunk_sign_hashes: [],
+          owner_timestamp: prev_timestamp + 1
+      }
+
+      sign_b64 = updated |> Integrity.signature_payload() |> EnigmaPq.sign(identity.sign_skey)
+      %{updated | sign_b64: sign_b64}
+    end
+
+    defp file_delete_payload(file, file_id, user_hash) do
+      %{
+        "mutations" => [
+          %{
+            "type" => "update",
+            "original" => %{
+              "file_id" => file_id,
+              "uploader_hash" => user_hash
+            },
+            "changes" => %{
+              "deleted_flag" => true,
+              "chunk_sign_hashes" => [],
+              "owner_timestamp" => file.owner_timestamp,
+              "sign_b64" => to_base64(file.sign_b64)
+            },
+            "syncMetadata" => %{"relation" => "files"}
+          }
+        ]
+      }
+    end
   end
 
-  defp upload_file(conn, identity, user_hash, file_id) do
-    {chunk, _} = build_signed_chunk(identity, user_hash, file_id, 0)
-    assert post_ingest(conn, file_chunk_insert_payload(chunk), identity.sign_skey).status == 200
-
-    file = build_signed_file(identity, user_hash, file_id, [chunk])
-    assert post_ingest(conn, file_insert_payload(file), identity.sign_skey).status == 200
-
-    file
-  end
-
-  # --- Payload builders ---
+  # Helpers
 
   defp file_chunk_insert_payload(chunk) do
     %{
@@ -161,7 +239,7 @@ defmodule ChatWeb.ElectricControllerFileTest do
           "modified" => %{
             "file_id" => chunk.file_id,
             "chunk_index" => chunk.chunk_index,
-            "data_b64" => to_base64(chunk.data_b64),
+            "data_hash" => chunk.data_hash,
             "size" => chunk.size,
             "uploader_hash" => chunk.uploader_hash,
             "owner_timestamp" => chunk.owner_timestamp,
@@ -173,102 +251,22 @@ defmodule ChatWeb.ElectricControllerFileTest do
     }
   end
 
-  defp file_insert_payload(file) do
-    %{
-      "mutations" => [
-        %{
-          "type" => "insert",
-          "modified" => %{
-            "file_id" => file.file_id,
-            "uploader_hash" => file.uploader_hash,
-            "total_size" => file.total_size,
-            "chunk_size" => file.chunk_size,
-            "chunk_count" => file.chunk_count,
-            "chunk_sign_hashes" => Enum.map(file.chunk_sign_hashes, &to_base64/1),
-            "owner_timestamp" => file.owner_timestamp,
-            "deleted_flag" => file.deleted_flag,
-            "sign_b64" => to_base64(file.sign_b64)
-          },
-          "syncMetadata" => %{"relation" => "files"}
-        }
-      ]
-    }
-  end
-
-  # --- Signed struct builders ---
-
   defp build_signed_chunk(identity, user_hash, file_id, index) do
-    data_b64 = :crypto.strong_rand_bytes(100)
+    raw_data = :crypto.strong_rand_bytes(100)
+    data_hash = raw_data |> EnigmaPq.hash() |> FileChunkDataHash.from_binary()
 
     chunk = %FileChunk{
       file_id: file_id,
       chunk_index: index,
-      data_b64: data_b64,
-      size: byte_size(data_b64),
+      data_hash: data_hash,
+      size: byte_size(raw_data),
       uploader_hash: user_hash,
       owner_timestamp: System.os_time(:millisecond)
     }
 
     sign_b64 = chunk |> Integrity.signature_payload() |> EnigmaPq.sign(identity.sign_skey)
-    {%{chunk | sign_b64: sign_b64}, data_b64}
+    {%{chunk | sign_b64: sign_b64}, raw_data}
   end
-
-  defp build_signed_file(identity, user_hash, file_id, chunks) do
-    chunk_sign_hashes = Enum.map(chunks, &EnigmaPq.hash(&1.sign_b64))
-    chunk_size = 4_194_304
-    total_size = length(chunks) * chunk_size
-
-    file = %FileSchema{
-      file_id: file_id,
-      uploader_hash: user_hash,
-      total_size: total_size,
-      chunk_size: chunk_size,
-      chunk_count: length(chunks),
-      chunk_sign_hashes: chunk_sign_hashes,
-      owner_timestamp: System.os_time(:millisecond),
-      deleted_flag: false
-    }
-
-    sign_b64 = file |> Integrity.signature_payload() |> EnigmaPq.sign(identity.sign_skey)
-    %{file | sign_b64: sign_b64}
-  end
-
-  defp build_signed_delete(identity, file_id, prev_timestamp) do
-    existing = Repo.get(FileSchema, file_id)
-
-    updated = %{
-      existing
-      | deleted_flag: true,
-        chunk_sign_hashes: [],
-        owner_timestamp: prev_timestamp + 1
-    }
-
-    sign_b64 = updated |> Integrity.signature_payload() |> EnigmaPq.sign(identity.sign_skey)
-    %{updated | sign_b64: sign_b64}
-  end
-
-  defp file_delete_payload(file, file_id, user_hash) do
-    %{
-      "mutations" => [
-        %{
-          "type" => "update",
-          "original" => %{
-            "file_id" => file_id,
-            "uploader_hash" => user_hash
-          },
-          "changes" => %{
-            "deleted_flag" => true,
-            "chunk_sign_hashes" => [],
-            "owner_timestamp" => file.owner_timestamp,
-            "sign_b64" => to_base64(file.sign_b64)
-          },
-          "syncMetadata" => %{"relation" => "files"}
-        }
-      ]
-    }
-  end
-
-  # --- Shared helpers ---
 
   defp insert_card(conn, card, sign_skey) do
     payload = %{

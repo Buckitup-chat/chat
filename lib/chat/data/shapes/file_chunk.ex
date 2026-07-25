@@ -5,6 +5,8 @@ defmodule Chat.Data.Shapes.FileChunk do
   use Toolbox.OriginLog
 
   alias Chat.Data.File, as: FileData
+  alias Chat.Data.File.ChunkPipeline
+  alias Chat.Data.File.SyncSource
   alias Chat.Data.File.Validation
   alias Chat.Data.Schemas.FileChunk
   alias Phoenix.Sync.Writer
@@ -21,9 +23,10 @@ defmodule Chat.Data.Shapes.FileChunk do
   @impl true
   def sync_validate_parent({:file, _file_id}, chunk) do
     case FileData.get_file(chunk.file_id) do
+      nil -> {:reject, :file_not_found}
       %{deleted_flag: true} -> {:reject, :file_deleted}
       %{uploader_hash: hash} when hash != chunk.uploader_hash -> {:reject, :uploader_mismatch}
-      _ -> :ok
+      %{} -> :ok
     end
   end
 
@@ -43,6 +46,30 @@ defmodule Chat.Data.Shapes.FileChunk do
         log("Invalid file_chunk insert signature: #{inspect(cs.errors)}", :warning)
         {:ok, chunk}
     end
+  end
+
+  @impl true
+  def sync_after_persist(operation, struct, opts) do
+    case {operation, struct, Keyword.get(opts, :peer_url)} do
+      {:insert, %FileChunk{} = chunk, peer_url} when is_binary(peer_url) ->
+        fill_missing_chunk(chunk, peer_url)
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp fill_missing_chunk(%FileChunk{} = chunk, peer_url) do
+    FileData.fill_missing_chunk(chunk.file_id, chunk.chunk_index, chunk.data_hash, chunk.size)
+
+    SyncSource.chunk_fetchable(
+      ChunkPipeline.active_drive_id(),
+      chunk.file_id,
+      chunk.chunk_index,
+      peer_url
+    )
+
+    :ok
   end
 
   @impl true

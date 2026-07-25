@@ -111,7 +111,7 @@ defmodule Chat.NetworkSynchronization.Electric.DeferredStore do
     peer_url
     |> shapes_client()
     |> Electric.Client.stream(build_refetch_query(shape, pk), live: false, replica: :full)
-    |> Stream.each(&replay_change(shape, &1))
+    |> Stream.each(&replay_change(shape, &1, peer_url))
     |> Stream.run()
   catch
     kind, reason ->
@@ -127,11 +127,15 @@ defmodule Chat.NetworkSynchronization.Electric.DeferredStore do
     )
   end
 
-  defp replay_change(shape, %Message.ChangeMessage{headers: %{operation: op}, value: value}) do
-    ShapeWriter.write(shape, op, value)
+  defp replay_change(
+         shape,
+         %Message.ChangeMessage{headers: %{operation: op}, value: value},
+         peer_url
+       ) do
+    ShapeWriter.write(shape, op, value, peer_url: peer_url)
   end
 
-  defp replay_change(_shape, _msg), do: :ok
+  defp replay_change(_shape, _msg, _peer_url), do: :ok
 
   defp build_refetch_query(shape, primary_key_kw) do
     schema_mod = Shapes.by_name(shape).schema_module()

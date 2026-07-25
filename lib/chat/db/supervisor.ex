@@ -21,7 +21,7 @@ defmodule Chat.Db.Supervisor do
       Chat.Db.InternalDbSupervisor,
       {Task,
        fn ->
-         Chat.Db.InternalDb |> Switching.set_default()
+         Chat.Db.InternalDb |> Switching.set_default(drive_id: :internal)
 
          ["[db] ", "Started database"] |> Logger.notice()
        end},

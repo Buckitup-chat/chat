@@ -244,13 +244,14 @@ defmodule Chat.Data.ShapesIntegrityTest do
   end
 
   defp build_file_chunk(user_hash, file_id, index) do
-    data_b64 = :crypto.strong_rand_bytes(100)
+    raw_data = :crypto.strong_rand_bytes(100)
+    data_hash = raw_data |> EnigmaPq.hash() |> Chat.Data.Types.FileChunkDataHash.from_binary()
 
     %FileChunk{
       file_id: file_id,
       chunk_index: index,
-      data_b64: data_b64,
-      size: byte_size(data_b64),
+      data_hash: data_hash,
+      size: byte_size(raw_data),
       uploader_hash: user_hash,
       owner_timestamp: System.os_time(:millisecond)
     }

@@ -5,4 +5,3 @@
 
 2. Deprecate `sync` routes in favor of `v1/shapes`
 
-3. Ensure review content follows the spec

@@ -24,7 +24,7 @@ defmodule Chat.Db.Switching do
     WriteQueue.set_mirrors(nil, to_queue)
   end
 
-  def set_default(name) do
+  def set_default(name, opts \\ []) do
     queue_name = Common.names(name, :queue)
     status_relay_name = Common.names(name, :status)
 
@@ -32,6 +32,10 @@ defmodule Chat.Db.Switching do
     Common.put_chat_db_env(:data_pid, name)
     Common.put_chat_db_env(:files_base_dir, CubDB.data_dir(name) <> "_files")
     Common.put_chat_db_env(:data_dry, status_relay_name)
+
+    if drive_id = opts[:drive_id] do
+      Common.put_chat_db_env(:active_drive_id, drive_id)
+    end
 
     Chat.Ordering.reset()
   end

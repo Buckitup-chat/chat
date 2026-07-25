@@ -175,7 +175,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
     {:ok, pid} =
       Task.start(fn ->
         Electric.Client.new!(
-          endpoint: "#{peer_url}/electric/v1/#{shape}",
+          endpoint: "#{peer_url}/electric/v1/shapes",
           fetch:
             {Electric.Client.Fetch.HTTP,
              request: [

@@ -16,6 +16,38 @@ straightforward as possible.
 
 ### Fixed
 
+## 2026-07-07_e346d72\_\_\_2026-07-07_af5e1507\_\_\_2026-07-03_19f1df9
+
+### Changed
+
+- Post-quantum files: two-thread upload
+
+### Fixed
+
+- Post-quantum files: chunk pipeline supervision cleanup
+- [platform] Post-quantum files: chunk writer supervision fix
+
+## 2026-07-06_f65e088\_\_\_2026-07-06_98b06a3a\_\_\_2026-07-03_19f1df9
+
+### Added
+
+- Post-quantum files: server-side filesystem storage with REST endpoints and migrations
+- Post-quantum files: sync pipeline with drive discovery, staged supervision, network sync, and backfill
+- [platform] Post-quantum files: chunk writer pipeline with supervision
+- [frontend] Backup and key recovery: dashboard, local export/import, Shamir secret sharing create and restore
+- [frontend] P2P WebRTC connectivity test and QR-based DeRec key recovery
+- [frontend] Encrypted dialog messaging: dialog crypto, message history, and reactions
+
+### Changed
+
+- Post-quantum dialogs: switched to shapes endpoint
+- [frontend] Menu and routing refactoring with composables
+- [frontend] Backend integration: API proxy configuration and menu links
+
+### Fixed
+
+- [frontend] QR handshake scanner fixes
+
 ## 2026-06-20_93536ec\_\_\_2026-06-20_909384d4
 
 ### Added

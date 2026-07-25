@@ -35,6 +35,19 @@ defmodule ChatWeb.Router do
     plug :accepts, ["json", "event-stream"]
   end
 
+  pipeline :chunk_upload do
+    plug CORSPlug,
+      origin: "*",
+      headers: [
+        "content-type",
+        "x-data-hash",
+        "x-size",
+        "x-uploader-hash",
+        "x-owner-timestamp",
+        "x-signature"
+      ]
+  end
+
   pipeline :upload do
     plug CORSPlug, origin: "*"
     plug ChatWeb.Plugs.PreferSSL
@@ -161,6 +174,14 @@ defmodule ChatWeb.Router do
   end
 
   scope "/electric/v1", ChatWeb do
+    pipe_through :chunk_upload
+    pipe_through ChatWeb.Plugs.ElectricReadiness
+
+    options "/file_chunk/:file_id/:chunk_index", FileChunkController, :options
+    put "/file_chunk/:file_id/:chunk_index", FileChunkController, :create
+  end
+
+  scope "/electric/v1", ChatWeb do
     pipe_through :electric
 
     # Always accessible — status probe and challenge generation don't need Electric
@@ -187,7 +208,6 @@ defmodule ChatWeb.Router do
       get "/system_identifier", SystemIdentifierController, :show
 
       scope "/" do
-        pipe_through ChatWeb.Plugs.ElectricIngestThrottle
         pipe_through ChatWeb.Plugs.ElectricChallengeInjector
 
         options "/ingest", ElectricController, :options

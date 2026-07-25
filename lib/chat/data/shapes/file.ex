@@ -7,6 +7,7 @@ defmodule Chat.Data.Shapes.File do
   alias Chat.Data.File, as: FileData
   alias Chat.Data.File.Validation
   alias Chat.Data.Schemas.File
+  alias Chat.TimeKeeper
   alias Phoenix.Sync.Writer
 
   @impl true
@@ -22,24 +23,30 @@ defmodule Chat.Data.Shapes.File do
   Decodes `chunk_sign_hashes` (`bytea[]`) elements back to raw binaries before
   signature validation in `sync_persist/2`.
 
-  The Electric client's array decoder (`Electric.Client.EctoAdapter.ArrayDecoder`)
-  only hex-decodes scalar bytea, not array elements: each element arrives as the
-  double-escaped Postgres array-literal text (`\\x<hex>`) instead of the raw binary
-  the uploader signed.
+  Handles two wire formats:
+  - PG text-array: double-escaped hex (`\\\\x<hex>`) from text-format responses
+  - JSON array: base64-encoded strings from JSON-format responses
   """
   @impl true
-  def sync_derive_fields(%File{chunk_sign_hashes: hashes} = file) do
-    %{file | chunk_sign_hashes: Enum.map(hashes, &decode_bytea_element/1)}
+  def sync_derive_fields(%File{chunk_sign_hashes: hashes, sign_b64: sign_b64} = file) do
+    %{file | chunk_sign_hashes: Enum.map(hashes, &decode_bytea/1), sign_b64: decode_bytea(sign_b64)}
   end
 
-  defp decode_bytea_element("\\\\x" <> hex) do
+  defp decode_bytea("\\\\x" <> hex) do
     case Base.decode16(hex, case: :mixed) do
       {:ok, binary} -> binary
       :error -> "\\\\x" <> hex
     end
   end
 
-  defp decode_bytea_element(binary), do: binary
+  defp decode_bytea(binary) when is_binary(binary) do
+    case Base.decode64(binary, padding: false) do
+      {:ok, decoded} -> decoded
+      :error -> binary
+    end
+  end
+
+  defp decode_bytea(other), do: other
 
   @impl true
   def sync_persist(operation, file) do
@@ -66,17 +73,48 @@ defmodule Chat.Data.Shapes.File do
   end
 
   defp persist_update(file) do
-    with existing when not is_nil(existing) <- FileData.get_file(file.file_id),
-         %{valid?: true} <- Validation.validate_file_update(existing, file) do
-      FileData.update_file(existing, file)
-    else
+    case FileData.get_file(file.file_id) do
       nil ->
         {:ok, file}
+
+      existing ->
+        existing
+        |> Validation.validate_file_update(file)
+        |> apply_update(existing, file)
+    end
+  end
+
+  defp apply_update(changeset, existing, file) do
+    case changeset do
+      %{valid?: true} ->
+        FileData.update_file(existing, file)
 
       %{valid?: false} = cs ->
         log("Invalid file update signature: #{inspect(cs.errors)}", :warning)
         {:ok, file}
     end
+  end
+
+  @impl true
+  def sync_after_persist(operation, struct, opts) do
+    case {operation, struct, Keyword.get(opts, :peer_url)} do
+      {:insert, %File{} = file, peer_url} when is_binary(peer_url) ->
+        preseed_missing_chunks(file, peer_url)
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp preseed_missing_chunks(%File{file_id: file_id, chunk_count: chunk_count}, peer_url) do
+    FileData.insert_missing_chunks_placeholders(
+      file_id,
+      chunk_count,
+      peer_url,
+      TimeKeeper.now_unix()
+    )
+
+    :ok
   end
 
   @impl true

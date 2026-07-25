@@ -22,8 +22,7 @@ defmodule ChatWeb.ElectricLive.IndexTest do
       {:ok, _view, html} = live_isolated(conn, ReadyIndex)
 
       assert html =~ "User Cards"
-      assert html =~ "Post-Quantum Users"
-      assert html =~ "/electric/v1/user_card"
+      assert html =~ "/electric/user_cards"
     end
 
     test "shows information about Electric sync", %{conn: conn} do

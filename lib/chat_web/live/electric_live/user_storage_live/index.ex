@@ -15,6 +15,7 @@ defmodule ChatWeb.ElectricLive.UserStorageLive.Index do
   import ChatWeb.PhoenixSyncPatch
 
   alias Chat.Data.Schemas.UserStorage
+  alias Chat.Proto.Shortcode
 
   @impl true
   def mount(_params, _session, socket) do
@@ -73,6 +74,9 @@ defmodule ChatWeb.ElectricLive.UserStorageLive.Index do
     <div class="min-h-screen bg-gray-50 py-8">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="mb-8">
+          <a href="/electric" class="text-sm text-blue-600 hover:text-blue-800 mb-2 inline-block">
+            &larr; Electric Index
+          </a>
           <div class="flex items-center justify-between">
             <div>
               <h1 class="text-3xl font-bold text-gray-900">
@@ -186,8 +190,7 @@ defmodule ChatWeb.ElectricLive.UserStorageLive.Index do
                             <% end %>
                           </div>
                           <p class="mt-1 text-xs text-gray-500 font-mono truncate">
-                            User Hash: {storage.user_hash
-                            |> String.slice(0..31)}...
+                            User Hash: {Shortcode.short_code(storage.user_hash)}
                           </p>
                           <div class="mt-1 flex items-center space-x-4 text-xs text-gray-600">
                             <span>Value: {format_bytes(byte_size(storage.value_b64))}</span>
@@ -195,13 +198,11 @@ defmodule ChatWeb.ElectricLive.UserStorageLive.Index do
                           </div>
                           <%= if storage.parent_sign_hash do %>
                             <p class="mt-1 text-xs text-purple-600 font-mono truncate">
-                              Parent: {storage.parent_sign_hash
-                              |> String.slice(0..15)}...
+                              Parent: {Shortcode.short_code(storage.parent_sign_hash)}
                             </p>
                           <% end %>
                           <p class="mt-1 text-xs text-gray-400 font-mono truncate">
-                            Sign Hash: {storage.sign_hash
-                            |> String.slice(0..15)}...
+                            Sign Hash: {Shortcode.short_code(storage.sign_hash)}
                           </p>
                         </div>
                       </div>

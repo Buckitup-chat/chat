@@ -21,7 +21,7 @@ defmodule Chat.NetworkSynchronization.Electric.OffsetStore do
   def delete(system_identifier) do
     db = Chat.AdminDb.db()
 
-    Shapes.shape_names()
+    Shapes.sync_shape_names()
     |> Enum.each(&CubDB.delete(db, {@electric_sync_offset, system_identifier, &1}))
   end
 

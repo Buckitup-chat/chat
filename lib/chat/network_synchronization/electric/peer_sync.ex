@@ -27,7 +27,7 @@ defmodule Chat.NetworkSynchronization.Electric.PeerSync do
     case PeerIdentifier.fetch_system_identifier(peer_url) do
       {:ok, system_identifier} ->
         children =
-          Enum.map(Shapes.shape_names(), fn shape ->
+          Enum.map(Shapes.sync_shape_names(), fn shape ->
             Supervisor.child_spec(
               {ShapeConsumer,
                peer_url: peer_url, system_identifier: system_identifier, shape: shape},

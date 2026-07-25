@@ -1,23 +1,35 @@
 defprotocol Chat.Proto.Shortcode do
   @moduledoc """
-  Protocol for extracting a short code from entities with user_hash.
+  Protocol for extracting a short code from entities or hash strings.
 
-  Takes first 6 hex characters after the "u_" prefix.
-  Example: user_hash "u_aabbccdddddddd..." => shortcode "aabbcc"
+  Preserves the prefix and takes the first 6 hex characters after it.
+  Example: "u_aabbccdddddddd..." => "u_aabbcc"
   """
 
   @doc """
-  Returns a 6-character hex string from the user_hash.
+  Returns a shortened hash with prefix and 6 hex characters.
   """
   def short_code(entity)
 end
 
 defimpl Chat.Proto.Shortcode, for: Chat.Data.Schemas.UserCard do
   def short_code(%Chat.Data.Schemas.UserCard{user_hash: user_hash}) do
-    short_code_from_hash(user_hash)
+    Chat.Proto.Shortcode.short_code(user_hash)
   end
+end
 
-  defp short_code_from_hash(<<"u_", code::binary-size(6), _rest::binary>>) do
-    String.downcase(code)
+defimpl Chat.Proto.Shortcode, for: Atom do
+  def short_code(nil), do: ""
+end
+
+defimpl Chat.Proto.Shortcode, for: BitString do
+  def short_code(hash) when is_binary(hash) do
+    case String.split(hash, "_", parts: 2) do
+      [prefix, <<code::binary-size(6), _rest::binary>>] ->
+        prefix <> "_" <> String.downcase(code)
+
+      _ ->
+        hash
+    end
   end
 end

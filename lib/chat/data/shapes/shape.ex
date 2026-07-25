@@ -81,10 +81,14 @@ defmodule Chat.Data.Shapes.Shape do
       @impl true
       def sync_after_persist(_operation, _struct, _opts), do: :ok
 
+      @impl true
+      def ingest_configure_writer(writer, _user_pop_context), do: writer
+
       defoverridable versions_schema: 0,
                      sync_validate_parent: 2,
                      sync_derive_fields: 1,
-                     sync_after_persist: 3
+                     sync_after_persist: 3,
+                     ingest_configure_writer: 2
     end
   end
 end

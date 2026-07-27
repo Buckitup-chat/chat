@@ -126,11 +126,16 @@ defmodule ChatWeb.Router do
       live "/electric/origins", ElectricLive.OriginsLive.Index, :index
       live "/electric/origin_sandbox", ElectricLive.OriginSandboxLive.Index, :index
       live "/electric/reviews", ElectricLive.ReviewsLive.Index, :index
-      live "/electric/review_public_passwords", ElectricLive.ReviewPublicPasswordsLive.Index, :index
+
+      live "/electric/review_public_passwords",
+           ElectricLive.ReviewPublicPasswordsLive.Index,
+           :index
+
       live "/electric/review_post_rights", ElectricLive.ReviewPostRightsLive.Index, :index
       live "/electric/review_revoke_rights", ElectricLive.ReviewRevokeRightsLive.Index, :index
       live "/electric/review_lists", ElectricLive.ReviewListsLive.Index, :index
       live "/electric/review_sandbox", ElectricLive.ReviewSandboxLive.Index, :index
+      live "/electric/moderation_sandbox", ElectricLive.ModerationSandboxLive.Index, :index
       live "/electric/origin_reviews", ElectricLive.OriginReviewsLive.Index, :index
     end
   end

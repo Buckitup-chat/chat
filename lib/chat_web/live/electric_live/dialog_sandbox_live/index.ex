@@ -115,7 +115,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   end
 
   def handle_event("fetch_dialogs", _params, socket) do
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
     user_hash = socket.assigns.user.user_hash
 
     socket =
@@ -142,7 +142,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
 
   def handle_event("create_dialog", %{"peer_hash" => peer_hash}, socket) do
     %{user: user} = socket.assigns
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
 
     socket = assign(socket, :operation_in_progress, true)
 
@@ -172,7 +172,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
 
   def handle_event("select_dialog", %{"dialog_hash" => hash, "peer_hash" => peer_hash}, socket) do
     %{user: user} = socket.assigns
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
 
     my_key =
       Crypto.derive_sender_msg_key(user.sign_skey, user.crypt_skey, user.contact_skey, peer_hash)
@@ -205,7 +205,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   def handle_event("send_message", %{"text" => text}, socket) when text != "" do
     %{user: user, selected_dialog: dialog_hash} = socket.assigns
     dialog = Enum.find(socket.assigns.dialogs, &(&1.dialog_hash == dialog_hash))
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
     refs_tails = %{peer_hash: dialog.peer_hash, tails: socket.assigns.refs_tails}
 
     socket = assign(socket, :operation_in_progress, true)
@@ -264,7 +264,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
       when text != "" do
     %{user: user, selected_dialog: dialog_hash} = socket.assigns
     dialog = Enum.find(socket.assigns.dialogs, &(&1.dialog_hash == dialog_hash))
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
     refs_tails = %{peer_hash: dialog.peer_hash, tails: socket.assigns.refs_tails}
 
     socket = assign(socket, :operation_in_progress, true)
@@ -302,7 +302,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   def handle_event("delete_message", %{"message_id" => msg_id}, socket) do
     %{user: user, selected_dialog: dialog_hash} = socket.assigns
     dialog = Enum.find(socket.assigns.dialogs, &(&1.dialog_hash == dialog_hash))
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
     refs_tails = %{peer_hash: dialog.peer_hash, tails: socket.assigns.refs_tails}
 
     socket = assign(socket, :operation_in_progress, true)
@@ -339,7 +339,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
       ) do
     %{user: user, selected_dialog: dialog_hash} = socket.assigns
     dialog = Enum.find(socket.assigns.dialogs, &(&1.dialog_hash == dialog_hash))
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
 
     case ApiClient.publish_reaction(
            user,
@@ -370,7 +370,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
         socket
       ) do
     %{user: user, selected_dialog: dialog_hash} = socket.assigns
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
 
     case ApiClient.publish_receipt(user, dialog_hash, msg_id, sign_hash, type, base_url) do
       {:ok, %{log_entries: logs}} ->
@@ -472,7 +472,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
 
   defp start_dialog_stream(socket, dialog_hash) do
     socket = stop_dialog_stream(socket)
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
     stream_pid = ApiClient.start_message_stream(dialog_hash, base_url, self())
     assign(socket, stream_pid: stream_pid, sync_status: :loading)
   end
@@ -489,7 +489,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   end
 
   defp fetch_available_peers(socket, my_hash) do
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
 
     case ApiClient.fetch_all_user_cards(base_url) do
       {:ok, %{cards: cards, log_entries: logs}} ->
@@ -536,7 +536,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
 
   defp ensure_sender_keys(socket, raw_msgs) do
     %{user: user, dialogs: dialogs, selected_dialog: selected_dialog} = socket.assigns
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
     dialog = Enum.find(dialogs, &(&1.dialog_hash == selected_dialog))
 
     raw_msgs
@@ -583,7 +583,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
 
   defp fetch_reactions_and_receipts(socket) do
     %{selected_dialog: dialog_hash, msg_keys_cache: keys_cache, user: user} = socket.assigns
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
 
     {reactions, logs1} = fetch_and_decrypt_reactions(dialog_hash, keys_cache, user, base_url)
     {receipts, logs2} = fetch_and_parse_receipts(dialog_hash, base_url)
@@ -647,7 +647,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   end
 
   defp fetch_versions(socket, msg_id) do
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
     keys_cache = socket.assigns.msg_keys_cache
 
     case ApiClient.fetch_message_versions(msg_id, base_url) do
@@ -666,10 +666,5 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
         |> assign(:error_message, reason)
         |> update(:request_log, &(&1 ++ logs))
     end
-  end
-
-  defp get_base_url(socket) do
-    uri = socket.host_uri
-    "#{uri.scheme}://#{uri.host}:#{uri.port}"
   end
 end

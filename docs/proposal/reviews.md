@@ -25,7 +25,7 @@ The origin identity (not the owner) should be able to:
 
 - **Rating**: incorporate into a content model `[rating, placeholder, content]` — fill placeholder with random string to make rating-only and text reviews indistinguishable in ciphertext size. See [Content model](#content-model) for the full spec.
 - **Passwords vs reviews**: passwords as access layer. Prevent deletion as much as possible.
-- **Ingest via candidates**: all `review_public_passwords` entries flow through `review_password_candidate` — the server validates and promotes. Direct *insert* into `review_public_passwords` is not allowed. The origin identity can *update* existing rows (to publish or revoke via decrypted rights) — see Moderation section.
+- **Ingest via candidates**: all *author-submitted* `review_public_passwords` entries flow through `review_password_candidate` — the server validates and promotes. The author cannot ingest into `review_public_passwords` directly. The origin identity can insert a row it decrypted from a right envelope (to publish or revoke) — see Moderation section.
 - **Origin key management**: origin keypairs are independently generated on the client (not derived from owner keys), stored client-side in the owner's identity, same pattern as regular user keys (see `pq_user.md`). Multi-device access via User Storage (encrypted skeys stored server-side, decryptable by the owner).
 - **Origin creation**: three-step flow — create owner `user_cards` (if not exists) → generate and insert origin `user_cards` row → insert `origin` row with `owner_cert` linking the two (see Origin creation section).
 
@@ -136,7 +136,7 @@ The public frontend checks whether a decryption password exists in `review_publi
 
 ### Candidate-only ingest
 
-All moderation modes route through `review_password_candidate`. Direct *insert* into `review_public_passwords` is not allowed — the shape refuses inserts, so a password can only enter the table through server-side promotion. However, the origin identity (authenticated via its `sign_pkey` from `user_cards`) can *update* existing `review_public_passwords` rows — this is how the origin publishes a decrypted post right or revokes via a decrypted revoke right. The update path validates that the submitted row carries the author's pre-signed signature (the origin never signs these entries itself).
+All author-submitted passwords route through `review_password_candidate` — the author's own identity cannot ingest into `review_public_passwords`, so a password can only enter the table through server-side promotion or through a moderation action. The origin identity (authenticated via its `sign_pkey` from `user_cards`) is the one exception: it may insert a row it decrypted from a right envelope — this is how the origin publishes a post right or revokes via a revoke right. Each such row is a new version keyed by `(review_hash, sign_hash)`; the ingest path validates that it carries the author's pre-signed signature (the origin never signs these entries itself) and that its timestamp ordering still holds.
 
 Promotion is a **two-phase handshake** driven entirely through the normal `/ingest` endpoint — no separate HTTP routes. The server triggers each phase automatically when candidates arrive or are updated via ingest.
 
@@ -198,7 +198,7 @@ sequenceDiagram
 
     alt Origin hides review
         O->>S: decrypt review_revoke_right (KEM decapsulate)
-        O->>P: update with null version (supersedes password version by timestamp)
+        O->>P: insert null version (supersedes password version by timestamp)
         Note over P: Review no longer decryptable by public
     end
 ```
@@ -232,13 +232,13 @@ sequenceDiagram
 
     alt Origin approves
         O->>S: decrypt review_post_right (KEM decapsulate)
-        O->>P: update with password version
+        O->>P: insert password version
         Note over P: Review now decryptable by public
     end
 
     alt Origin rejects (or later revokes)
         O->>S: decrypt review_revoke_right (KEM decapsulate)
-        O->>P: update with null version (supersedes password if posted)
+        O->>P: insert null version (supersedes password if posted)
         Note over P: Review not decryptable / no longer decryptable
     end
 ```
@@ -370,7 +370,7 @@ review_public_passwords
 └── sign_b64              — author's ML-DSA-87 signature
 ```
 
-Author pre-signs both password and null versions. In moderation flows, the origin identity decrypts a right and updates the existing `review_public_passwords` row with the pre-signed content — the origin never signs these entries itself. The shape allows update (not insert) by the origin identity, authenticated via its `sign_pkey`.
+Author pre-signs both password and null versions. In moderation flows, the origin identity decrypts a right and ingests the pre-signed row as a new version — the origin never signs these entries itself. The shape accepts this insert only from the origin identity, authenticated via its `sign_pkey`; the author cannot ingest here at all.
 
 On ingest the server verifies the row's signature and that its `author_hash` and `origin_hash` match the referenced review. A promotion record can only be minted for one's own review, so it is a trustworthy "proof of promotion" for `review_list`. (`sign_hash` is derived from `sign_b64` on ingest and is not part of the signed payload.)
 
@@ -414,7 +414,7 @@ review_{post,revoke}_right_candidate
 
 ### review_post_right
 
-KEM-encrypted envelope containing a complete, author-signed `review_public_passwords` row with the password. The origin identity decrypts and updates the existing `review_public_passwords` row with the pre-signed content. Created during pre-moderation. Append-only (DELETE revoked).
+KEM-encrypted envelope containing a complete, author-signed `review_public_passwords` row with the password. The origin identity decrypts it and ingests the pre-signed row, making the review publicly decryptable. Created during pre-moderation. Append-only (DELETE revoked).
 
 ```
 review_post_right
@@ -432,7 +432,7 @@ Flow: created via the two-phase ingest handshake — when password candidates ar
 
 ### review_revoke_right
 
-KEM-encrypted envelope containing a complete, author-signed `review_public_passwords` row with null password. The origin identity decrypts and updates the existing `review_public_passwords` row with the pre-signed null content to revoke public visibility. Created during post-moderation and pre-moderation. Append-only (DELETE revoked).
+KEM-encrypted envelope containing a complete, author-signed `review_public_passwords` row with null password. The origin identity decrypts it and ingests the pre-signed null row, revoking public visibility. Created during post-moderation and pre-moderation. Append-only (DELETE revoked).
 
 ```
 review_revoke_right
@@ -614,10 +614,12 @@ The user who creates and owns the origin. Exercises:
 
 Authenticates as the origin identity (not the owner's personal identity). Exercises:
 
-- receive `to_origin` reviews (dialog decryption via origin's `kem_skey`)
-- pre-moderation: decrypt `review_post_right` (KEM decapsulate), update `review_public_passwords` with password
-- post-moderation: decrypt `review_revoke_right` (KEM decapsulate), update `review_public_passwords` with null
+- import the origin identity export and prove it against the origin's `user_cards` row (signature + KEM round-trip)
+- read the origin's reviews, password rows and right envelopes via Electric shapes
+- pre-moderation: decrypt `review_post_right` (KEM decapsulate) — this is also how the moderator reads a review *before* approving it — then ingest the pre-signed password row
+- post-moderation: decrypt `review_revoke_right` (KEM decapsulate), ingest the pre-signed null row
 - moderation round-trip with the author sandbox
+- receive `to_origin` reviews (dialog decryption via origin's `kem_skey`) — Phase 3
 
 ### Review visitor/author sandbox
 
@@ -679,14 +681,19 @@ No identity required — a read-only view simulating the public frontend. Exerci
 - [x] Origin reviews public viewer — browse origins and read decrypted public reviews (`OriginReviewsLive`)
 - [x] Ingest-triggered promotion — `promote_candidate` fires on candidate ingest when both password+null arrive; `complete_promotion` fires on right candidate signature ingest when all required signatures are present
 - [x] Electric shapes for right candidates — `review_post_right_candidate` / `review_revoke_right_candidate` synced to author so client can read, verify, and sign
+- [x] Origin moderation sandbox — origin-identity import + verification, moderation queue, approve/reject/revoke (`ModerationSandboxLive`: `Index`, `Identity`, `Queue`, `Entries`, `ApiClient`, `Render`)
+  - identity import proves the exported keys against the origin's `user_cards` row (signature + KEM round-trip) before any action
+  - queue classifies each review as pending / public / hidden, and marks an action unavailable when its envelope timestamp would not supersede the current row (LWW no-op)
+  - moderator reads pending reviews through the unpublished post right, and keeps reading revoked ones through the superseded password row
+  - verified end-to-end against a live server in all three modes (none / post / pre)
 - [ ] Review creation in main app UI
 - [ ] Review listing in main app UI
-- [ ] Moderation UI for origin identity (approve/reject/revoke)
+- [ ] Moderation UI for origin identity in main app UI (approve/reject/revoke)
 
 ### Phase 3 — To-origin reviews
 
 - [ ] to_origin as dialog: origin subaccount identity + dialog key derivation
-- [ ] moderation UI for origin identity
+- [ ] owner-signed authorization for dangerous origin ops (moderation mode, soft delete) — see the Status note under Origin creation
 - [ ] contacts-visible hidden reviews (author's contacts see moderation-hidden reviews)
 
 ### Phase 4 — Contacts visibility (future)

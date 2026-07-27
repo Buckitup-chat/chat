@@ -3,10 +3,8 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Verification do
 
   import ChatWeb.ElectricLive.ReviewSandboxLive.Http, only: [encode_base64: 1]
 
+  alias Chat.Data.ReviewRightEnvelope
   alias EnigmaPq
-
-  @wrap_context "buckitup/review-right/v1"
-  @wrap_label "wrap"
 
   def extract_shared_secrets(%{headers: headers}) do
     %{}
@@ -98,7 +96,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Verification do
   end
 
   defp decrypt_wrapped(wrapped_b64, shared_secret) do
-    wrap_key = EnigmaPq.hkdf_derive(shared_secret, @wrap_context, @wrap_label)
+    wrap_key = ReviewRightEnvelope.wrap_key(shared_secret)
 
     case EnigmaPq.aes_gcm_decrypt(wrapped_b64, wrap_key) do
       :error -> :error

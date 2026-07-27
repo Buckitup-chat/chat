@@ -6,6 +6,7 @@ defmodule Chat.Test.ReviewFixtures do
   alias Chat.Data.ReviewPostRight, as: PostRightData
   alias Chat.Data.ReviewRevokeRight, as: RevokeRightData
   alias Chat.Data.ReviewRightCandidate, as: RightCandidateData
+  alias Chat.Data.ReviewRightEnvelope
   alias Chat.Data.ReviewPublicPassword, as: PublicPasswordData
   alias Chat.Data.ReviewPublicPassword.Validation, as: PublicPasswordValidation
   alias Chat.Data.Schemas.Origin
@@ -143,7 +144,7 @@ defmodule Chat.Test.ReviewFixtures do
   end
 
   def unwrap_with_secret(right, shared_secret) do
-    wrap_key = EnigmaPq.hkdf_derive(shared_secret, "buckitup/review-right/v1", "wrap")
+    wrap_key = ReviewRightEnvelope.wrap_key(shared_secret)
     row_json = EnigmaPq.aes_gcm_decrypt(right.wrapped_row_b64, wrap_key)
     Jason.decode!(row_json)
   end

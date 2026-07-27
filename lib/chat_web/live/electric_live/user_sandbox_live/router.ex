@@ -1,13 +1,14 @@
 defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
   @moduledoc "Event handlers for the User Sandbox LiveView."
 
+  import ChatWeb.LiveHelpers, only: [public_url: 1]
   import Phoenix.Component
   import Phoenix.LiveView, only: [consume_uploaded_entries: 3, push_event: 3]
 
   alias ChatWeb.ElectricLive.UserSandboxLive.{ApiClient, Components, Identity}
 
   def handle_event("create_user", %{"name" => name}, socket) do
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
     socket = assign(socket, :operation_in_progress, true)
 
     case ApiClient.create_user(name, base_url) do
@@ -34,7 +35,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
   end
 
   def handle_event("update_name", %{"new_name" => new_name}, socket) do
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
     user = socket.assigns.user
     socket = assign(socket, :operation_in_progress, true)
 
@@ -64,7 +65,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
   end
 
   def handle_event("delete_user", _params, socket) do
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
     user = socket.assigns.user
     socket = assign(socket, :operation_in_progress, true)
 
@@ -114,7 +115,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
   def handle_event("create_storage", params, socket) do
     %{"size" => size_str, "label" => label} = params
     uuid = Map.get(params, "uuid", "")
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
     user = socket.assigns.user
 
     uuid = if uuid == "", do: Ecto.UUID.generate(), else: uuid
@@ -160,7 +161,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
         %{"uuid" => uuid, "size" => size_str, "label" => label},
         socket
       ) do
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
     user = socket.assigns.user
     size = String.to_integer(size_str)
     value_b64 = generate_storage_value(size)
@@ -198,7 +199,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
   end
 
   def handle_event("delete_storage", %{"uuid" => uuid}, socket) do
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
     user = socket.assigns.user
     socket = assign(socket, :operation_in_progress, true)
 
@@ -274,11 +275,6 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
       end
 
     {:noreply, socket}
-  end
-
-  defp get_base_url(socket) do
-    uri = socket.host_uri
-    "#{uri.scheme}://#{uri.host}:#{uri.port}"
   end
 
   defp update_storage_item(items, uuid, value_b64, size, label) do

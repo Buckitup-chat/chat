@@ -33,6 +33,13 @@ defmodule ChatWeb.ElectricLive.IndexTest do
       assert html =~ "real-time"
     end
 
+    test "lists the moderation sandbox", %{conn: conn} do
+      {:ok, _view, html} = live_isolated(conn, ReadyIndex)
+
+      assert html =~ "Moderation Sandbox"
+      assert html =~ "/electric/moderation_sandbox"
+    end
+
     test "user cards link navigates to correct page", %{conn: conn} do
       {:ok, view, _html} = live_isolated(conn, ReadyIndex)
 

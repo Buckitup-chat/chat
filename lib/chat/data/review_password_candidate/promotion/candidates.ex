@@ -7,6 +7,7 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion.Candidates do
   """
 
   alias Chat.Data.ReviewPublicPassword.Validation, as: PublicPasswordValidation
+  alias Chat.Data.ReviewRightEnvelope
   alias Chat.Data.Schemas.ReviewPublicPassword
   alias EnigmaPq
 
@@ -66,7 +67,7 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion.Candidates do
       })
 
     {shared_secret, kem_ct} = EnigmaPq.encapsulate_secret(origin_crypt_pkey)
-    wrap_key = EnigmaPq.hkdf_derive(shared_secret, "buckitup/review-right/v1", "wrap")
+    wrap_key = ReviewRightEnvelope.wrap_key(shared_secret)
     wrapped = EnigmaPq.aes_gcm_encrypt(row_data, wrap_key)
 
     {shared_secret, kem_ct, wrapped}

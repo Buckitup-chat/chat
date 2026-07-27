@@ -9,6 +9,17 @@ defmodule ChatWeb.LiveHelpers.Shared do
 
   @type js() :: %JS{ops: list()}
 
+  @doc """
+  Base URL the browser used to reach this LiveView, taken from `socket.host_uri`.
+
+  This is the publicly reachable address rather than a configured endpoint, so
+  it is what a client-side reference implementation must call back into.
+  """
+  @spec public_url(Socket.t()) :: String.t()
+  def public_url(%Socket{host_uri: uri}) do
+    "#{uri.scheme}://#{uri.host}:#{uri.port}"
+  end
+
   @spec send_js(Socket.t(), js()) :: Socket.t()
   def send_js(%Socket{} = socket, %JS{ops: ops}) do
     LiveView.push_event(socket, "js-event", %{data: Jason.encode!(ops)})

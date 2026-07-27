@@ -35,7 +35,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
   end
 
   def handle_event("create_origin", %{"name" => name, "moderation" => mode}, socket) do
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
     owner = socket.assigns.owner
 
     case ApiClient.create_origin(owner, name, mode, base_url) do
@@ -48,7 +48,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
   end
 
   def handle_event("update_origin", %{"name" => name, "moderation" => mode}, socket) do
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
     %{origin: origin} = socket.assigns
 
     case ApiClient.update_origin(origin, name, mode, base_url) do
@@ -61,7 +61,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
   end
 
   def handle_event("delete_origin", _params, socket) do
-    base_url = get_base_url(socket)
+    base_url = public_url(socket)
     %{origin: origin} = socket.assigns
 
     case ApiClient.delete_origin(origin, base_url) do
@@ -100,11 +100,6 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
 
   defp append_logs(socket, logs) do
     update(socket, :request_log, &(logs ++ &1))
-  end
-
-  defp get_base_url(socket) do
-    uri = socket.host_uri
-    "#{uri.scheme}://#{uri.host}:#{uri.port}"
   end
 
   @impl true

@@ -30,7 +30,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
       selected_rating: 0
     )
     |> allow_upload(:key_file, accept: ~w(.json), max_entries: 1, max_file_size: 100_000)
-    |> tap(fn s -> if connected?(s), do: fetch_origins_async(base_url(s)) end)
+    |> tap(fn s -> if connected?(s), do: fetch_origins_async(public_url(s)) end)
     |> then(&{:ok, &1})
   end
 
@@ -126,7 +126,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
            socket.assigns.author,
            origin_hash,
            content,
-           base_url(socket)
+           public_url(socket)
          ) do
       {:ok, %{review: review, log_entries: logs}} ->
         {:noreply,
@@ -145,7 +145,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
   def handle_event("submit_rights", _params, socket) do
     %{author: author, review: review} = socket.assigns
 
-    case ApiClient.submit_password_candidates(author, review, base_url(socket)) do
+    case ApiClient.submit_password_candidates(author, review, public_url(socket)) do
       {:ok, %{candidates: candidates, shared_secrets: shared_secrets, log_entries: logs}} ->
         {:noreply,
          socket
@@ -187,7 +187,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
            candidates,
            shared_secrets,
            review,
-           base_url(socket)
+           public_url(socket)
          ) do
       {:ok, %{log_entries: logs}} ->
         {:noreply, socket |> assign(rights_signed: true) |> append_logs(logs)}
@@ -227,11 +227,6 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
       assigns.rights_signed -> true
       true -> false
     end
-  end
-
-  defp base_url(socket) do
-    uri = socket.host_uri
-    "#{uri.scheme}://#{uri.host}:#{uri.port}"
   end
 
   defp fetch_origins_async(endpoint_base) do

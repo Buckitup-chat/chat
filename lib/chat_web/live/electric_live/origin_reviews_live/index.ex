@@ -20,7 +20,7 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
         loading_reviews: false
       )
 
-    if connected?(socket), do: fetch_origins_async(base_url(socket))
+    if connected?(socket), do: fetch_origins_async(public_url(socket))
 
     {:ok, socket}
   end
@@ -67,7 +67,7 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
         {:noreply, socket}
 
       origin ->
-        fetch_reviews_async(origin_hash, base_url(socket))
+        fetch_reviews_async(origin_hash, public_url(socket))
         {:noreply, assign(socket, selected_origin: origin, reviews: [], loading_reviews: true)}
     end
   end
@@ -289,11 +289,6 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
       {:ok, decoded} -> decoded
       :error -> value
     end
-  end
-
-  defp base_url(socket) do
-    uri = socket.host_uri
-    "#{uri.scheme}://#{uri.host}:#{uri.port}"
   end
 
   defp collect_inserts(stream) do

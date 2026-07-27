@@ -1,5 +1,10 @@
 defmodule Chat.Data.Schemas.ReviewList do
-  @moduledoc "Ecto schema for review_list. Per-user encrypted list of review passwords for contacts."
+  @moduledoc """
+  Ecto schema for review_list. Per-user encrypted list of review passwords for contacts.
+
+  `origin_hash` mirrors the referenced review's origin: it is set on create and never
+  changes, hence its absence from the update changeset.
+  """
 
   use Ecto.Schema
   import Ecto.Changeset
@@ -17,6 +22,7 @@ defmodule Chat.Data.Schemas.ReviewList do
   @create_fields [
     :user_hash,
     :review_hash,
+    :origin_hash,
     :password_b64,
     :review_password_sign_hash,
     :post_right_sign_hash,
@@ -29,6 +35,7 @@ defmodule Chat.Data.Schemas.ReviewList do
   @create_required [
     :user_hash,
     :review_hash,
+    :origin_hash,
     :password_b64,
     :deleted_flag,
     :owner_timestamp,
@@ -57,6 +64,7 @@ defmodule Chat.Data.Schemas.ReviewList do
   schema "review_list" do
     field(:user_hash, UserHash, primary_key: true)
     field(:review_hash, ReviewHash, primary_key: true)
+    field(:origin_hash, UserHash)
     field(:password_b64, :binary)
     field(:review_password_sign_hash, ReviewPasswordSignHash)
     field(:post_right_sign_hash, ReviewPostRightSignHash)

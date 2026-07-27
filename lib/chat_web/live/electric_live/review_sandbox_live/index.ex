@@ -8,6 +8,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
   alias Chat.Data.Schemas.Origin
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
   alias ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient
+  alias ChatWeb.ElectricLive.ReviewSandboxLive.ListPassword
   alias ChatWeb.ElectricLive.ReviewSandboxLive.Verification
   alias Electric.Client.Message
 
@@ -95,8 +96,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
 
     case Crypto.parse_and_validate_identity(result) do
       {:ok, user_data} ->
-        author = Map.put(user_data, :review_list_password, :crypto.strong_rand_bytes(32))
-        {:noreply, assign(socket, author: author, error_message: nil)}
+        {:noreply, load_author(socket, user_data)}
 
       {:error, reason} ->
         {:noreply, assign(socket, error_message: "Import failed: #{reason}")}
@@ -212,6 +212,25 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
   defp review_content_parts(text), do: {"", text}
 
   defp append_logs(socket, logs), do: update(socket, :request_log, &(logs ++ &1))
+
+  # The review_list_password lives in user_storage, so re-importing the same identity
+  # (or opening a second tab) reuses the key its contacts already hold.
+  defp load_author(socket, user_data) do
+    case ListPassword.load_or_create(user_data, public_url(socket)) do
+      {:ok, password, logs} ->
+        socket
+        |> assign(
+          author: Map.put(user_data, :review_list_password, password),
+          error_message: nil
+        )
+        |> append_logs(logs)
+
+      {:error, %{reason: reason, log_entries: logs}} ->
+        socket
+        |> assign(error_message: "Review list password unavailable: #{reason}")
+        |> append_logs(logs)
+    end
+  end
 
   defp find_moderation_mode(origins, origin_hash) do
     case Enum.find(origins, &(&1.origin_hash == origin_hash)) do

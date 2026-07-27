@@ -126,7 +126,9 @@ defmodule Chat.Data.ReviewList.Validation do
     with true <- changeset.valid?,
          %{origin_hash: origin_hash} <- ReviewData.get_review(review_hash),
          %{moderation_mode: mode} <- OriginData.get_origin(origin_hash) do
-      verify_proof_by_mode(changeset, mode, review_hash, pwd_sh, post_sh, revoke_sh)
+      changeset
+      |> validate_origin_binding(origin_hash)
+      |> verify_proof_by_mode(mode, review_hash, pwd_sh, post_sh, revoke_sh)
     else
       false ->
         # Changeset already invalid (bad signature / stale timestamp); leave as-is.
@@ -137,6 +139,19 @@ defmodule Chat.Data.ReviewList.Validation do
         # entry whose review (or origin) does not exist cannot prove it went
         # through the moderation pipeline — reject rather than silently accept.
         Ecto.Changeset.add_error(changeset, :review_hash, "review or origin not found")
+    end
+  end
+
+  # origin_hash is signed and immutable: it must mirror the review's origin (docs "Contacts").
+  # get_field/2, not get_change/2 — the update changeset does not cast the field, so the
+  # stored value is the one that has to match.
+  defp validate_origin_binding(changeset, review_origin_hash) do
+    case Ecto.Changeset.get_field(changeset, :origin_hash) do
+      ^review_origin_hash ->
+        changeset
+
+      _other ->
+        Ecto.Changeset.add_error(changeset, :origin_hash, "does not match the review's origin")
     end
   end
 

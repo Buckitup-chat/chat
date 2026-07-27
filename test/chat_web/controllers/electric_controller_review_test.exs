@@ -349,6 +349,7 @@ defmodule ChatWeb.ElectricControllerReviewTest do
     rl = %ReviewList{
       user_hash: ctx.author_hash,
       review_hash: review_hash,
+      origin_hash: ctx.origin_hash,
       password_b64: password_b64,
       review_password_sign_hash: pwd_sign_hash,
       post_right_sign_hash: nil,
@@ -364,6 +365,7 @@ defmodule ChatWeb.ElectricControllerReviewTest do
       "modified" => %{
         "user_hash" => ctx.author_hash,
         "review_hash" => review_hash,
+        "origin_hash" => ctx.origin_hash,
         "password_b64" => to_base64(password_b64),
         "review_password_sign_hash" => pwd_sign_hash,
         "deleted_flag" => false,

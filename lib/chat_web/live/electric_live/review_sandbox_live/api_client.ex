@@ -80,6 +80,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
     rl_struct = %ReviewList{
       user_hash: author.user_hash,
       review_hash: review.review_hash,
+      origin_hash: review.origin_hash,
       password_b64: encrypted_pwd,
       review_password_sign_hash: proof_fields[:review_password_sign_hash],
       post_right_sign_hash: proof_fields[:post_right_sign_hash],
@@ -94,6 +95,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
       %{
         "user_hash" => author.user_hash,
         "review_hash" => review.review_hash,
+        "origin_hash" => review.origin_hash,
         "password_b64" => encode_base64(encrypted_pwd),
         "deleted_flag" => false,
         "owner_timestamp" => timestamp,

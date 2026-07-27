@@ -84,6 +84,24 @@ defmodule Chat.Data.ReviewListValidationTest do
       refute cs.valid?
       assert error_on?(cs, :revoke_right_sign_hash)
     end
+
+    test "rejects a row whose origin_hash is not the review's origin", ctx do
+      cs =
+        validate_insert(ctx,
+          review_password_sign_hash: ctx.pwd_sh,
+          origin_hash: unrelated_origin_hash()
+        )
+
+      refute cs.valid?
+      assert error_on?(cs, :origin_hash)
+    end
+  end
+
+  defp unrelated_origin_hash do
+    "OtherShop"
+    |> User.generate_pq_identity()
+    |> User.extract_pq_card()
+    |> Map.fetch!(:user_hash)
   end
 
   # --- post mode ---
@@ -317,9 +335,9 @@ defmodule Chat.Data.ReviewListValidationTest do
 
   # --- Helpers ---
 
-  defp validate_insert(ctx, proof_opts) do
+  defp validate_insert(ctx, row_opts) do
     ctx.author
-    |> build_review_list(ctx.review, proof_opts)
+    |> build_review_list(ctx.review, row_opts)
     |> Validation.validate_review_list_insert()
   end
 
@@ -327,6 +345,7 @@ defmodule Chat.Data.ReviewListValidationTest do
     rl = %ReviewList{
       user_hash: User.extract_pq_card(author).user_hash,
       review_hash: review.review_hash,
+      origin_hash: Keyword.get(opts, :origin_hash, review.origin_hash),
       password_b64: :crypto.strong_rand_bytes(32),
       review_password_sign_hash: Keyword.get(opts, :review_password_sign_hash),
       post_right_sign_hash: Keyword.get(opts, :post_right_sign_hash),

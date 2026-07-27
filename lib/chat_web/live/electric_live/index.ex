@@ -217,28 +217,32 @@ defmodule ChatWeb.ElectricLive.Index do
       label: "Origin Reviews",
       title: "Public Viewer",
       shapes: "origin, review, review_public_passwords"
+    },
+    %{
+      href: "/electric/contacts_reader",
+      icon_color: "text-violet-600",
+      icon_path:
+        "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z",
+      label: "Contacts Reader",
+      title: "Contact Reviews",
+      shapes: "review_list, review, dialog_keys, dialog_messages"
     }
   ]
 
   @impl true
   def mount(_params, _session, socket) do
-    socket = socket |> assign(:readiness, check_readiness())
-
-    if connected?(socket) do
-      Process.send_after(self(), :poll_readiness, @poll_interval_ms)
-    end
-
-    {:ok, socket}
+    socket
+    |> assign(readiness: check_readiness())
+    |> tap(fn s -> if connected?(s), do: schedule_poll() end)
+    |> ok()
   end
 
   @impl true
   def handle_info(:poll_readiness, socket) do
-    readiness = check_readiness()
-    socket = assign(socket, :readiness, readiness)
-
-    Process.send_after(self(), :poll_readiness, @poll_interval_ms)
-
-    {:noreply, socket}
+    socket
+    |> assign(readiness: check_readiness())
+    |> tap(fn _ -> schedule_poll() end)
+    |> noreply()
   end
 
   defp check_readiness do
@@ -248,10 +252,11 @@ defmodule ChatWeb.ElectricLive.Index do
     end
   end
 
+  defp schedule_poll, do: Process.send_after(self(), :poll_readiness, @poll_interval_ms)
+
   @impl true
   def render(assigns) do
-    assigns =
-      assigns |> assign(:shape_cards, @shape_cards) |> assign(:sandbox_cards, @sandbox_cards)
+    assigns = assign(assigns, shape_cards: @shape_cards, sandbox_cards: @sandbox_cards)
 
     ~H"""
     <div class="min-h-screen bg-gray-50 py-8">
@@ -380,20 +385,17 @@ defmodule ChatWeb.ElectricLive.Index do
   end
 
   defp step_class(current_step, step) do
-    case current_step >= step do
-      true -> "flex items-center text-sm font-medium text-blue-600"
-      _ -> "flex items-center text-sm font-medium text-gray-400"
-    end
+    if current_step >= step,
+      do: "flex items-center text-sm font-medium text-blue-600",
+      else: "flex items-center text-sm font-medium text-gray-400"
   end
 
   defp step_badge_class(current_step, step) do
-    case current_step >= step do
-      true ->
-        "mr-3 flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs border-blue-600 bg-blue-600 text-white"
-
-      _ ->
+    if current_step >= step,
+      do:
+        "mr-3 flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs border-blue-600 bg-blue-600 text-white",
+      else:
         "mr-3 flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs border-gray-300 text-gray-400"
-    end
   end
 
   attr :readiness, :string, required: true

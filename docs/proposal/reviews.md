@@ -790,7 +790,8 @@ accepted (see [Contacts](#contacts)).
 - [x] `{"review_list_key": [...]}` dialog content type in `07_content_polymorphism.md` + send from the author sandbox to chosen peers (`ReviewSandboxLive.Contacts`); the sandbox has no contact list of its own, so "contacts" is whoever the author picks out of the `user_cards` directory
 - [ ] send automatically on first review (to all contacts) and on adding a contact — needs a real client-side contact list
 - [ ] receive side — store `peer_user_hash → review_list_password` in the client's contact record (the dialog sandbox decodes and displays the key, but does not persist it)
-- [ ] contacts reader — per-contact / per-origin `review_list` shape with `columns=` trimmed, decrypt `password_b64`, match into the origin's review stream
+- [x] contacts reader sandbox — import identity, scan dialogs for `review_list_key`, read own + contacts' `review_list` with `columns=` trimmed, decrypt `password_b64`, fetch per-origin reviews, decrypt content, cross-reference `review_public_passwords` for public/hidden/contacts-only badges (`ContactsReaderLive`: `Index`, `KeyScanner`, `ReviewReader`, `Render`)
+- [ ] contacts reader in main app UI
 - [ ] contacts-visible hidden reviews in the UI (author's contacts see moderation-hidden reviews, marked as such)
 - [ ] "message this origin" entry point in the origin UI — opens a standard dialog with the origin's `user_hash`
 - [ ] owner-signed authorization for dangerous origin ops (moderation mode, soft delete) — see the Status note under Origin creation

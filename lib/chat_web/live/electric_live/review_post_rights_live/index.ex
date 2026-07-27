@@ -36,10 +36,17 @@ defmodule ChatWeb.ElectricLive.ReviewPostRightsLive.Index do
   @impl true
   def handle_info({:sync, event}, socket) do
     case event do
-      {:records, :loaded} -> {:noreply, assign(socket, loading: false, error: nil)}
-      {:records, :live} -> {:noreply, assign(socket, live: true, error: nil)}
-      {:records, {:error, reason}} -> {:noreply, assign(socket, loading: false, live: false, error: reason)}
-      _ -> {:noreply, sync_stream_update(socket, event)}
+      {:records, :loaded} ->
+        socket |> assign(loading: false, error: nil) |> noreply()
+
+      {:records, :live} ->
+        socket |> assign(live: true, error: nil) |> noreply()
+
+      {:records, {:error, reason}} ->
+        socket |> assign(loading: false, live: false, error: reason) |> noreply()
+
+      _ ->
+        socket |> sync_stream_update(event) |> noreply()
     end
   end
 
@@ -93,7 +100,10 @@ defmodule ChatWeb.ElectricLive.ReviewPostRightsLive.Index do
                 <div class="flex items-center justify-between">
                   <div class="min-w-0 flex-1">
                     <p class="text-sm font-medium text-gray-900 truncate">
-                      Review: <span class="font-mono text-xs">{Shortcode.short_code(record.review_hash)}</span>
+                      Review:
+                      <span class="font-mono text-xs">
+                        {Shortcode.short_code(record.review_hash)}
+                      </span>
                       <%= if record.deleted_flag do %>
                         <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
                           Deleted
@@ -101,8 +111,10 @@ defmodule ChatWeb.ElectricLive.ReviewPostRightsLive.Index do
                       <% end %>
                     </p>
                     <p class="mt-1 text-xs text-gray-500">
-                      Origin: <span class="font-mono">{Shortcode.short_code(record.origin_hash)}</span>
-                      | Author: <span class="font-mono">{Shortcode.short_code(record.author_hash)}</span>
+                      Origin:
+                      <span class="font-mono">{Shortcode.short_code(record.origin_hash)}</span>
+                      | Author:
+                      <span class="font-mono">{Shortcode.short_code(record.author_hash)}</span>
                     </p>
                     <p class="mt-1 text-xs text-gray-500">
                       Sign: <span class="font-mono">{Shortcode.short_code(record.sign_hash)}</span>

@@ -53,10 +53,15 @@ defmodule Chat.Test.ReviewFixtures do
 
   def insert_review(author, origin_hash, opts \\ []) do
     review_hash = Keyword.get_lazy(opts, :review_hash, fn -> random_review_hash() end)
-    review_password = Keyword.get_lazy(opts, :review_password, fn -> :crypto.strong_rand_bytes(32) end)
-    content_b64 = Keyword.get_lazy(opts, :content_b64, fn ->
-      EnigmaPq.aes_gcm_encrypt("Great coffee!", review_password)
-    end)
+
+    review_password =
+      Keyword.get_lazy(opts, :review_password, fn -> :crypto.strong_rand_bytes(32) end)
+
+    content_b64 =
+      Keyword.get_lazy(opts, :content_b64, fn ->
+        EnigmaPq.aes_gcm_encrypt("Great coffee!", review_password)
+      end)
+
     ts = Keyword.get(opts, :ts, System.os_time(:millisecond))
     author_hash = User.extract_pq_card(author).user_hash
 
@@ -214,7 +219,12 @@ defmodule Chat.Test.ReviewFixtures do
 
   def insert_revoke_right(author, review, origin_hash) do
     author
-    |> build_right(review, origin_hash, ReviewRevokeRight, &ReviewRevokeRightSignHash.from_binary/1)
+    |> build_right(
+      review,
+      origin_hash,
+      ReviewRevokeRight,
+      &ReviewRevokeRightSignHash.from_binary/1
+    )
     |> then(fn signed ->
       {:ok, _} =
         %ReviewRevokeRight{}

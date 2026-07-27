@@ -11,7 +11,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Index do
   use ChatWeb, :live_view
 
   import ChatWeb.ElectricLive.ModerationSandboxLive.Render
-  import ChatWeb.ElectricLive.ReviewSandboxLive.Render, only: [render_log_section: 1]
+  import ChatWeb.ElectricLive.RequestLog, only: [render_log_section: 1]
 
   alias ChatWeb.ElectricLive.ModerationSandboxLive.ApiClient
   alias ChatWeb.ElectricLive.ModerationSandboxLive.Identity

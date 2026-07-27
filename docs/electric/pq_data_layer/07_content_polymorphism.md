@@ -36,6 +36,7 @@ Because the type lives inside the ciphertext, the database (and any peer without
 - [`"file"`](#file) — large file, out-of-band encrypted chunks in PostgreSQL
 - [`"image"`](#image) — large image, out-of-band with aspect ratio and thumbhash
 - [`"video"`](#video) — video, out-of-band with aspect ratio and thumbhash
+- [`"review_list_key"`](#review_list_key) — the sender's `review_list_password`, shared with a contact
 
 ### `"inline_file"`
 
@@ -134,6 +135,28 @@ Out-of-band video stored as encrypted chunks in PostgreSQL. Carries aspect ratio
 | 8 | enc_secret_b64 | AES-256 key for chunk decryption (base64) |
 
 Videos are always out-of-band — there is no inline variant.
+
+### `"review_list_key"`
+
+The sender's `review_list_password` — one symmetric key per author that decrypts the `password_b64`
+column of every `review_list` row they write, and so opens every review they have written or will
+write, regardless of moderation state. See [reviews.md § Contacts](../../proposal/reviews.md).
+
+```json
+{"review_list_key": [key_b64]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | key_b64 | AES-256 key in unpadded base64 |
+
+Nothing new cryptographically: `pq_dialogs` already wraps every message with `sender_msg_key` +
+ML-KEM-1024, so the key is protected exactly as any other content. The receiving client stores it as
+`peer_user_hash → review_list_password`.
+
+The key never rotates — sending it is irreversible, since a contact who has it keeps access to
+everything the sender writes afterwards. Delivery is therefore per-recipient and deliberate, not a
+broadcast.
 
 --- 
 

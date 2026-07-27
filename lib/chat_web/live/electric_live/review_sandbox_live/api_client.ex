@@ -6,12 +6,10 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
   alias Chat.Data.Integrity
   alias Chat.Data.ReviewRightCandidate, as: RightCandidateData
   alias Chat.Data.Schemas.Review
-  alias Chat.Data.Schemas.ReviewList
   alias Chat.Data.Schemas.ReviewPostRightCandidate
   alias Chat.Data.Schemas.ReviewPublicPassword
   alias Chat.Data.Schemas.ReviewRevokeRightCandidate
   alias Chat.Data.Types.ReviewHash
-  alias Chat.Data.Types.ReviewListSignHash
   alias Chat.Data.Types.ReviewPasswordSignHash
   alias Chat.Data.Types.ReviewPostRightSignHash
   alias Chat.Data.Types.ReviewRevokeRightSignHash
@@ -20,7 +18,8 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
   alias ChatWeb.ElectricLive.ReviewSandboxLive.Verification
   alias EnigmaPq
 
-  def submit_review(author, origin_hash, content, base_url) do
+  def submit_review(author, origin_hash, rating, text, base_url) do
+    content = review_content(rating, text)
     review_hash = :crypto.strong_rand_bytes(64) |> ReviewHash.from_binary()
     review_password = :crypto.strong_rand_bytes(32)
     content_b64 = EnigmaPq.aes_gcm_encrypt(content, review_password)
@@ -63,7 +62,10 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
         review_hash: review_hash,
         origin_hash: origin_hash,
         review_password: review_password,
-        content: content,
+        #AI: see 2 lines bellow. arent' this a part of content ? where this is used ?
+        rating: rating,
+        text: text,
+        content_json: content,
         owner_timestamp: timestamp
       }
 
@@ -73,90 +75,71 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
     end
   end
 
-  def submit_review_list_entry(author, review, proof_fields, base_url) do
-    timestamp = TimeKeeper.now_unix()
-    encrypted_pwd = EnigmaPq.aes_gcm_encrypt(review.review_password, author.review_list_password)
-
-    rl_struct = %ReviewList{
-      user_hash: author.user_hash,
-      review_hash: review.review_hash,
-      origin_hash: review.origin_hash,
-      password_b64: encrypted_pwd,
-      review_password_sign_hash: proof_fields[:review_password_sign_hash],
-      post_right_sign_hash: proof_fields[:post_right_sign_hash],
-      revoke_right_sign_hash: proof_fields[:revoke_right_sign_hash],
-      deleted_flag: false,
-      owner_timestamp: timestamp
-    }
-
-    {sign_b64, sign_hash} = sign_struct(rl_struct, author.sign_skey, ReviewListSignHash)
-
-    modified =
-      %{
-        "user_hash" => author.user_hash,
-        "review_hash" => review.review_hash,
-        "origin_hash" => review.origin_hash,
-        "password_b64" => encode_base64(encrypted_pwd),
-        "deleted_flag" => false,
-        "owner_timestamp" => timestamp,
-        "sign_b64" => encode_base64(sign_b64),
-        "sign_hash" => sign_hash
-      }
-      |> put_if("review_password_sign_hash", proof_fields[:review_password_sign_hash])
-      |> put_if("post_right_sign_hash", proof_fields[:post_right_sign_hash])
-      |> put_if("revoke_right_sign_hash", proof_fields[:revoke_right_sign_hash])
-
-    payload = %{
-      "mutations" => [
-        %{
-          "type" => "insert",
-          "modified" => modified,
-          "syncMetadata" => %{"relation" => "review_list"}
-        }
-      ]
-    }
-
-    with {:ok, ch, log1} <- get_challenge(base_url),
-         {:ok, _resp, log2} <- post_ingest(ch, payload, author.sign_skey, base_url) do
-      {:ok, %{log_entries: [log1, log2]}}
-    else
-      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
-    end
+  # `[rating, placeholder, content]` — the placeholder pads a rating-only review
+  # so its ciphertext size does not give away that no text was written.
+  defp review_content(rating, "") do
+    placeholder = 20..200 |> Enum.random() |> :crypto.strong_rand_bytes()
+    Jason.encode!([rating, Base.url_encode64(placeholder, padding: false), ""])
   end
 
+  defp review_content(rating, text), do: Jason.encode!([rating, "", text])
+
+  # The candidate's own sign_hash is what the server copies verbatim into
+  # review_public_passwords on promotion, so capturing it here is the author's
+  # only durable handle on the promotion proof: pre mode deletes the candidate
+  # once the rights are signed, and ML-DSA-87 signing is randomized, so it cannot
+  # be recomputed later.
   def submit_password_candidates(author, review, base_url) do
     origin_hash = review.origin_hash
     base_ts = review.owner_timestamp + 100_000
-    pwd_mutation = build_candidate_mutation(author, origin_hash, review, :password, base_ts)
-    null_mutation = build_candidate_mutation(author, origin_hash, review, :null, base_ts + 1)
+
+    {pwd_mutation, pwd_sign_hash} =
+      candidate_mutation(author, origin_hash, review, :password, base_ts)
+
+    {null_mutation, _null_sign_hash} =
+      candidate_mutation(author, origin_hash, review, :null, base_ts + 1)
+
     payload = %{"mutations" => [pwd_mutation, null_mutation]}
 
     with {:ok, ch, log1} <- get_challenge(base_url),
          {:ok, resp, log2} <- post_ingest(ch, payload, author.sign_skey, base_url) do
       candidates = read_right_candidates(review.review_hash)
       shared_secrets = Verification.extract_shared_secrets(resp)
-      {:ok, %{candidates: candidates, shared_secrets: shared_secrets, log_entries: [log1, log2]}}
+
+      {:ok,
+       %{
+         candidates: candidates,
+         shared_secrets: shared_secrets,
+         review_password_sign_hash: pwd_sign_hash,
+         log_entries: [log1, log2]
+       }}
     else
       {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end
   end
 
   def sign_right_candidates(author, candidates, shared_secrets, review, base_url) do
-    with :ok <- Verification.verify_wrapping(candidates, shared_secrets, review, author) do
-      mutations =
-        [candidates.post, candidates.revoke]
-        |> Enum.reject(&is_nil/1)
-        |> Enum.map(&build_right_sign_mutation(&1, author))
-
-      with {:ok, ch, log1} <- get_challenge(base_url),
-           {:ok, _resp, log2} <-
-             post_ingest(ch, %{"mutations" => mutations}, author.sign_skey, base_url) do
-        {:ok, %{log_entries: [log1, log2]}}
-      else
-        {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
-      end
-    else
+    case Verification.verify_wrapping(candidates, shared_secrets, review, author) do
+      :ok -> post_right_signatures(author, candidates, base_url)
       {:error, reason} -> {:error, %{reason: reason, log_entries: []}}
+    end
+  end
+
+  defp post_right_signatures(author, candidates, base_url) do
+    signed =
+      [candidates.post, candidates.revoke]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(&right_sign_mutation(&1, author))
+
+    mutations = Enum.map(signed, &elem(&1, 0))
+    hashes = signed |> Enum.map(&elem(&1, 1)) |> Map.new()
+
+    with {:ok, ch, log1} <- get_challenge(base_url),
+         {:ok, _resp, log2} <-
+           post_ingest(ch, %{"mutations" => mutations}, author.sign_skey, base_url) do
+      {:ok, Map.merge(hashes, %{log_entries: [log1, log2]})}
+    else
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end
   end
 
@@ -170,7 +153,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
     }
   end
 
-  defp build_candidate_mutation(author, origin_hash, review, type, timestamp) do
+  defp candidate_mutation(author, origin_hash, review, type, timestamp) do
     password_b64 = if type == :password, do: review.review_password
 
     signable = %ReviewPublicPassword{
@@ -196,18 +179,23 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
       }
       |> put_if("password_b64", if(password_b64, do: encode_base64(password_b64)))
 
-    %{
+    mutation = %{
       "type" => "insert",
       "modified" => modified,
       "syncMetadata" => %{"relation" => "review_password_candidate"}
     }
+
+    {mutation, sign_hash}
   end
 
-  defp build_right_sign_mutation(candidate, author) do
+  # Returns the mutation plus `{slot, sign_hash}` — the same sign_hash the server
+  # carries over into review_post_right / review_revoke_right on promotion, and
+  # therefore the value review_list must reference as its moderation proof.
+  defp right_sign_mutation(candidate, author) do
     sign_b64 = candidate |> Integrity.signature_payload() |> EnigmaPq.sign(author.sign_skey)
-    {sign_hash, relation} = right_candidate_meta(candidate, sign_b64)
+    {sign_hash, relation, slot} = right_candidate_meta(candidate, sign_b64)
 
-    %{
+    mutation = %{
       "type" => "update",
       "original" => %{"review_hash" => candidate.review_hash},
       "changes" => %{
@@ -216,15 +204,17 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
       },
       "syncMetadata" => %{"relation" => relation}
     }
+
+    {mutation, {slot, sign_hash}}
   end
 
   defp right_candidate_meta(%ReviewPostRightCandidate{}, sign_b64) do
     {sign_b64 |> EnigmaPq.hash() |> ReviewPostRightSignHash.from_binary(),
-     "review_post_right_candidate"}
+     "review_post_right_candidate", :post_right_sign_hash}
   end
 
   defp right_candidate_meta(%ReviewRevokeRightCandidate{}, sign_b64) do
     {sign_b64 |> EnigmaPq.hash() |> ReviewRevokeRightSignHash.from_binary(),
-     "review_revoke_right_candidate"}
+     "review_revoke_right_candidate", :revoke_right_sign_hash}
   end
 end

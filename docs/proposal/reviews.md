@@ -770,6 +770,10 @@ No identity required — a read-only view simulating the public frontend. Exerci
   - moderator reads pending reviews through the unpublished post right, and keeps reading revoked ones through the superseded password row
   - verified end-to-end against a live server in all three modes (none / post / pre)
 - [x] `origin_hash` on `review_list` — immutable, signed, bound to the review's origin on ingest (`20260727100000_add_origin_hash_to_review_list`); makes the contacts reader reuse the per-origin review shape
+- [x] Review author sandbox step 5 — assemble the moderation proofs, ingest the `review_list` row, and (pre mode) fill `review_password_sign_hash` in by update after the origin publishes (`ReviewSandboxLive.ReviewList` + `.ReviewList.Proofs`, `RenderReviewList`)
+  - the author's own sign_hashes are the source of truth: the server copies a candidate's `sign_hash` verbatim on promotion, pre mode deletes the candidates, and ML-DSA-87 signing is randomized, so they are captured at steps 3-4 and cannot be recomputed
+  - shape reads of `review_public_passwords` / `review_post_right` / `review_revoke_right` are a probe, not a gate — Electric lags the Postgres commit the server validates against, so absence never blocks; only a promoted row that differs from what the author signed does
+- [x] Shared `ElectricLive.ShapeReader` and `ElectricLive.RequestLog` — one shape-read implementation and one request-log component instead of per-sandbox copies
 - [ ] Review creation in main app UI
 - [ ] Review listing in main app UI
 - [ ] Moderation UI for origin identity in main app UI (approve/reject/revoke)
@@ -782,9 +786,10 @@ The contacts channel is a client-side feature — the server half (`review_list`
 shape) shipped in Phase 2. Design decisions are settled: no key rotation, no retraction, public metadata
 accepted (see [Contacts](#contacts)).
 
-- [ ] `review_list_password` — generate once per author, store in User Storage under a fixed key so every device shares it
-- [ ] `{"review_list_key": [...]}` dialog content type in `07_content_polymorphism.md` + send on first review (to all contacts) and on adding a contact
-- [ ] receive side — store `peer_user_hash → review_list_password` in the client's contact record
+- [x] `review_list_password` — generate once per author, store in User Storage under a fixed key so every device shares it (`ReviewSandboxLive.ListPassword`, write-once slot)
+- [x] `{"review_list_key": [...]}` dialog content type in `07_content_polymorphism.md` + send from the author sandbox to chosen peers (`ReviewSandboxLive.Contacts`); the sandbox has no contact list of its own, so "contacts" is whoever the author picks out of the `user_cards` directory
+- [ ] send automatically on first review (to all contacts) and on adding a contact — needs a real client-side contact list
+- [ ] receive side — store `peer_user_hash → review_list_password` in the client's contact record (the dialog sandbox decodes and displays the key, but does not persist it)
 - [ ] contacts reader — per-contact / per-origin `review_list` shape with `columns=` trimmed, decrypt `password_b64`, match into the origin's review stream
 - [ ] contacts-visible hidden reviews in the UI (author's contacts see moderation-hidden reviews, marked as such)
 - [ ] "message this origin" entry point in the origin UI — opens a standard dialog with the origin's `user_hash`

@@ -209,14 +209,20 @@ alias Chat.Sync.UsbDriveDumpFile
 
 #### Socket Pipelines
 
-Chain socket transformations:
+Chain socket transformations and terminate with `ok()`/`noreply()` helpers (defined in `ChatWeb`):
 
 ```elixir
+# mount
 socket
 |> assign(:messages, messages)
-|> assign(:message_update_mode, :append)
 |> assign(:page, 0)
+|> ok()
+
+# handle_event / handle_info
+socket
+|> assign(:messages, messages)
 |> push_event("chat:scroll-down", %{})
+|> noreply()
 ```
 
 #### Component Attributes

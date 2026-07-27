@@ -8,9 +8,11 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
   alias Chat.Data.Schemas.Origin
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
   alias ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient
+  alias ChatWeb.ElectricLive.ReviewSandboxLive.Contacts
   alias ChatWeb.ElectricLive.ReviewSandboxLive.ListPassword
+  alias ChatWeb.ElectricLive.ReviewSandboxLive.ReviewList
   alias ChatWeb.ElectricLive.ReviewSandboxLive.Verification
-  alias Electric.Client.Message
+  alias ChatWeb.ElectricLive.ShapeReader
 
   @impl true
   def mount(_params, _session, socket) do
@@ -28,59 +30,27 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
       request_log: [],
       error_message: nil,
       origins: [],
-      selected_rating: 0
+      selected_rating: 0,
+      proof_hashes: %{},
+      observed_proofs: nil,
+      review_list: %{entry: nil},
+      peers: [],
+      selected_contacts: [],
+      key_sent_to: []
     )
     |> allow_upload(:key_file, accept: ~w(.json), max_entries: 1, max_file_size: 100_000)
     |> tap(fn s -> if connected?(s), do: fetch_origins_async(public_url(s)) end)
-    |> then(&{:ok, &1})
+    |> ok()
   end
 
   @impl true
-  def render(assigns) do
-    ~H"""
-    <div class="min-h-screen bg-gray-50 py-8">
-      <div class="max-w-4xl mx-auto px-4">
-        <a href="/electric" class="text-sm text-blue-600 hover:text-blue-800 mb-2 inline-block">
-          &larr; Electric Index
-        </a>
-        <h1 class="text-2xl font-bold text-gray-900 mb-2">Review Author Sandbox</h1>
-        <p class="text-sm text-gray-600 mb-6">
-          Test review submission, moderation pipeline, and review list via Electric API
-        </p>
-
-        <%= if @error_message do %>
-          <div class="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded flex justify-between">
-            <span>{@error_message}</span>
-            <button phx-click="clear_error" class="text-red-600 hover:text-red-800">x</button>
-          </div>
-        <% end %>
-
-        <div class="space-y-6">
-          {render_author_section(assigns)}
-          <%= if @author do %>
-            {render_review_section(assigns)}
-          <% end %>
-          <%= if @review do %>
-            {render_rights_section(assigns)}
-          <% end %>
-          <%= if @rights_submitted and @moderation_mode not in [:none, nil] do %>
-            {render_sign_section(assigns)}
-          <% end %>
-          <%= if rights_complete?(assigns) do %>
-            {render_review_list_section(assigns)}
-          <% end %>
-          {render_log_section(assigns)}
-        </div>
-      </div>
-    </div>
-    """
-  end
+  def render(assigns), do: render_page(assigns)
 
   # --- Info ---
 
   @impl true
   def handle_info({:origins_loaded, origins}, socket) do
-    {:noreply, assign(socket, origins: origins)}
+    socket |> assign(origins: origins) |> noreply()
   end
 
   # --- Events ---
@@ -99,17 +69,17 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
         {:noreply, load_author(socket, user_data)}
 
       {:error, reason} ->
-        {:noreply, assign(socket, error_message: "Import failed: #{reason}")}
+        socket |> assign(error_message: "Import failed: #{reason}") |> noreply()
     end
   end
 
   def handle_event("form_changed", %{"origin_hash" => origin_hash}, socket) do
     mode = find_moderation_mode(socket.assigns.origins, origin_hash)
-    {:noreply, assign(socket, origin_hash: origin_hash, moderation_mode: mode)}
+    socket |> assign(origin_hash: origin_hash, moderation_mode: mode) |> noreply()
   end
 
   def handle_event("set_rating", %{"rating" => rating}, socket) do
-    {:noreply, assign(socket, selected_rating: String.to_integer(rating))}
+    socket |> assign(selected_rating: String.to_integer(rating)) |> noreply()
   end
 
   def handle_event(
@@ -119,26 +89,22 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
       ) do
     text = Map.get(params, "content", "")
     rating = String.to_integer(raw_rating)
-    {placeholder, review_text} = review_content_parts(text)
-    content = Jason.encode!([rating, placeholder, review_text])
 
     case ApiClient.submit_review(
            socket.assigns.author,
            origin_hash,
-           content,
+           rating,
+           text,
            public_url(socket)
          ) do
       {:ok, %{review: review, log_entries: logs}} ->
-        {:noreply,
-         socket
-         |> assign(
-           review: Map.merge(review, %{rating: rating, text: text, content_json: content}),
-           origin_hash: origin_hash
-         )
-         |> append_logs(logs)}
+        socket
+        |> assign(review: review, origin_hash: origin_hash)
+        |> append_logs(logs)
+        |> noreply()
 
       {:error, %{reason: reason, log_entries: logs}} ->
-        {:noreply, socket |> assign(error_message: reason) |> append_logs(logs)}
+        socket |> assign(error_message: reason) |> append_logs(logs) |> noreply()
     end
   end
 
@@ -146,18 +112,19 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
     %{author: author, review: review} = socket.assigns
 
     case ApiClient.submit_password_candidates(author, review, public_url(socket)) do
-      {:ok, %{candidates: candidates, shared_secrets: shared_secrets, log_entries: logs}} ->
-        {:noreply,
-         socket
-         |> assign(
-           rights_submitted: true,
-           right_candidates: candidates,
-           shared_secrets: shared_secrets
-         )
-         |> append_logs(logs)}
+      {:ok, %{candidates: candidates, shared_secrets: shared_secrets} = result} ->
+        socket
+        |> assign(
+          rights_submitted: true,
+          right_candidates: candidates,
+          shared_secrets: shared_secrets
+        )
+        |> capture_proof_hashes(result)
+        |> append_logs(result.log_entries)
+        |> noreply()
 
       {:error, %{reason: reason, log_entries: logs}} ->
-        {:noreply, socket |> assign(error_message: reason) |> append_logs(logs)}
+        socket |> assign(error_message: reason) |> append_logs(logs) |> noreply()
     end
   end
 
@@ -170,7 +137,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
     } = socket.assigns
 
     verification = Verification.verify_candidates(candidates, shared_secrets, review, author)
-    {:noreply, assign(socket, verification: verification)}
+    socket |> assign(verification: verification) |> noreply()
   end
 
   def handle_event("sign_rights", _params, socket) do
@@ -189,27 +156,102 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
            review,
            public_url(socket)
          ) do
-      {:ok, %{log_entries: logs}} ->
-        {:noreply, socket |> assign(rights_signed: true) |> append_logs(logs)}
+      {:ok, result} ->
+        socket
+        |> assign(rights_signed: true)
+        |> capture_proof_hashes(result)
+        |> append_logs(result.log_entries)
+        |> noreply()
 
       {:error, %{reason: reason, log_entries: logs}} ->
-        {:noreply, socket |> assign(error_message: reason) |> append_logs(logs)}
+        socket |> assign(error_message: reason) |> append_logs(logs) |> noreply()
     end
   end
 
+  def handle_event("load_review_list_proofs", _params, socket) do
+    observed = ReviewList.load_proofs(socket.assigns.review, public_url(socket))
+    socket |> assign(observed_proofs: observed) |> noreply()
+  end
+
+  def handle_event("submit_review_list", _params, socket) do
+    %{author: author, review: review, moderation_mode: mode, proof_hashes: local} = socket.assigns
+    status = ReviewList.proof_status(mode, socket.assigns.observed_proofs, local)
+    fields = ReviewList.proof_fields(mode, local, status)
+
+    case ReviewList.submit_entry(author, review, local, fields, public_url(socket)) do
+      {:ok, %{entry: entry, log_entries: logs}} ->
+        socket
+        |> assign(review_list: %{entry: entry})
+        |> load_peers()
+        |> append_logs(logs)
+        |> noreply()
+
+      {:error, %{reason: reason, log_entries: logs}} ->
+        socket |> assign(error_message: reason) |> append_logs(logs) |> noreply()
+    end
+  end
+
+  def handle_event("fill_password_proof", _params, socket) do
+    %{author: author, review_list: %{entry: entry}, proof_hashes: local} = socket.assigns
+
+    case ReviewList.fill_password_proof(
+           author,
+           entry,
+           local[:review_password_sign_hash],
+           public_url(socket)
+         ) do
+      {:ok, %{entry: filled, log_entries: logs}} ->
+        socket
+        |> assign(review_list: %{entry: filled})
+        |> append_logs(logs)
+        |> noreply()
+
+      {:error, %{reason: reason, log_entries: logs}} ->
+        socket |> assign(error_message: reason) |> append_logs(logs) |> noreply()
+    end
+  end
+
+  def handle_event("select_contacts", params, socket) do
+    socket |> assign(selected_contacts: Map.get(params, "contacts", [])) |> noreply()
+  end
+
+  def handle_event("send_list_key", params, socket) do
+    selected = Map.get(params, "contacts", [])
+    result = Contacts.send_key(socket.assigns.author, selected, public_url(socket))
+
+    socket
+    |> update(:key_sent_to, &Enum.uniq(&1 ++ result.sent))
+    |> assign(selected_contacts: [], error_message: result.error_message)
+    |> append_logs(result.log_entries)
+    |> noreply()
+  end
+
   def handle_event("clear_error", _params, socket) do
-    {:noreply, assign(socket, error_message: nil)}
+    socket |> assign(error_message: nil) |> noreply()
   end
 
   # --- Private ---
 
-  defp review_content_parts("") do
-    length = Enum.random(20..200)
-    placeholder = length |> :crypto.strong_rand_bytes() |> Base.url_encode64(padding: false)
-    {placeholder, ""}
+  # The server copies these hashes verbatim when it promotes, so they are what
+  # review_list must reference. Pre mode deletes the candidates once the rights
+  # are signed and ML-DSA-87 signing is randomized, so they cannot be recomputed.
+  defp capture_proof_hashes(socket, result) do
+    captured =
+      result
+      |> Map.take([:review_password_sign_hash, :post_right_sign_hash, :revoke_right_sign_hash])
+
+    update(socket, :proof_hashes, &Map.merge(&1, captured))
   end
 
-  defp review_content_parts(text), do: {"", text}
+  defp load_peers(socket) do
+    case Contacts.list_peers(socket.assigns.author, public_url(socket)) do
+      {:ok, %{peers: peers, log_entries: logs}} ->
+        socket |> assign(peers: peers) |> append_logs(logs)
+
+      {:error, %{reason: reason, log_entries: logs}} ->
+        socket |> assign(error_message: reason) |> append_logs(logs)
+    end
+  end
 
   defp append_logs(socket, logs), do: update(socket, :request_log, &(logs ++ &1))
 
@@ -239,38 +281,13 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
     end
   end
 
-  defp rights_complete?(assigns) do
-    cond do
-      not assigns.rights_submitted -> false
-      assigns.moderation_mode == :none -> true
-      assigns.rights_signed -> true
-      true -> false
-    end
-  end
-
-  defp fetch_origins_async(endpoint_base) do
+  defp fetch_origins_async(base_url) do
     pid = self()
-    client = Electric.Client.new!(endpoint: endpoint_base <> "/electric/v1/shapes")
-
-    shape =
-      Electric.Client.ShapeDefinition.new!("origins",
-        parser: {Electric.Client.EctoAdapter, Origin}
-      )
 
     Task.start_link(fn ->
       origins =
-        client
-        |> Electric.Client.stream(shape, live: false, replica: :full)
-        |> Enum.reduce_while([], fn
-          %Message.ChangeMessage{headers: %{operation: :insert}, value: value}, acc ->
-            {:cont, [value | acc]}
-
-          %Message.ControlMessage{control: :up_to_date}, acc ->
-            {:halt, acc}
-
-          _, acc ->
-            {:cont, acc}
-        end)
+        base_url
+        |> ShapeReader.rows("origins", Origin)
         |> Enum.reject(& &1.deleted_flag)
         |> Enum.sort_by(& &1.name)
 

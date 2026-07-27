@@ -15,8 +15,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ListPassword do
   alias Chat.Data.Schemas.UserStorage
   alias Chat.Data.Types.UserStorageSignHash
   alias Chat.TimeKeeper
-  alias Electric.Client
-  alias Electric.Client.Message
+  alias ChatWeb.ElectricLive.ShapeReader
   alias EnigmaPq
 
   # Well-known slot for the review_list_password. `user_storage.uuid` is a real
@@ -47,38 +46,16 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ListPassword do
   # --- Read ---
 
   defp fetch(author, base_url) do
-    shape =
-      Client.ShapeDefinition.new!("user_storage",
-        where: "user_hash = $1 AND uuid = $2",
-        params: [author.user_hash, @slot_uuid],
-        parser: {Client.EctoAdapter, UserStorage}
-      )
-
     base_url
-    |> shapes_client()
-    |> Client.stream(shape, live: false, replica: :full)
-    |> collect_inserts()
+    |> ShapeReader.rows("user_storage", UserStorage, "user_hash = $1 AND uuid = $2", [
+      author.user_hash,
+      @slot_uuid
+    ])
     |> Enum.reject(& &1.deleted_flag)
     |> case do
       [] -> :empty
       entries -> decrypt_latest(entries, author)
     end
-  end
-
-  defp shapes_client(base_url),
-    do: Client.new!(endpoint: base_url <> "/electric/v1/shapes")
-
-  defp collect_inserts(stream) do
-    Enum.reduce_while(stream, [], fn
-      %Message.ChangeMessage{headers: %{operation: :insert}, value: value}, acc ->
-        {:cont, [value | acc]}
-
-      %Message.ControlMessage{control: :up_to_date}, acc ->
-        {:halt, acc}
-
-      _message, acc ->
-        {:cont, acc}
-    end)
   end
 
   defp decrypt_latest(entries, author) do

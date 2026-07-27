@@ -29,7 +29,11 @@ defmodule Chat.Data.Shapes.File do
   """
   @impl true
   def sync_derive_fields(%File{chunk_sign_hashes: hashes, sign_b64: sign_b64} = file) do
-    %{file | chunk_sign_hashes: Enum.map(hashes, &decode_bytea/1), sign_b64: decode_bytea(sign_b64)}
+    %{
+      file
+      | chunk_sign_hashes: Enum.map(hashes, &decode_bytea/1),
+        sign_b64: decode_bytea(sign_b64)
+    }
   end
 
   defp decode_bytea("\\\\x" <> hex) do

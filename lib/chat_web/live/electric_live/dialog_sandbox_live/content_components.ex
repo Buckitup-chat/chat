@@ -151,6 +151,21 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ContentComponents do
     """
   end
 
+  def render_content(%{content: {:review_list_key, meta}} = assigns) do
+    assigns = assign(assigns, :meta, meta)
+
+    ~H"""
+    <div class="space-y-1">
+      <div class="text-xs text-indigo-600 font-medium">Review list key</div>
+      <p class="text-xs text-gray-600">
+        Opens every review this sender writes, whatever its moderation state.
+      </p>
+      <pre class="text-xs bg-gray-100 p-2 rounded overflow-x-auto">{@meta.key_b64}</pre>
+      <.copy_json_button content={@content} message_id={@message_id} />
+    </div>
+    """
+  end
+
   def render_content(%{content: {:unknown, json}} = assigns) do
     assigns = assign(assigns, :json, json)
 

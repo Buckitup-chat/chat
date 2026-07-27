@@ -1,7 +1,7 @@
 defmodule ChatWeb.ElectricLive.DialogSandboxLive.Content do
   @moduledoc false
 
-  @known_types ~w(inline_file inline_image file image video)
+  @known_types ~w(inline_file inline_image file image video review_list_key)
 
   def parse(plaintext) do
     case Jason.decode(plaintext) do
@@ -89,6 +89,10 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Content do
      }}
   end
 
+  defp parse_typed("review_list_key", [key_b64]) do
+    {:review_list_key, %{key_b64: key_b64}}
+  end
+
   defp parse_typed(key, value), do: {:unknown, Jason.encode!(%{key => value})}
 
   def prepare_for_send(text_input) do
@@ -156,6 +160,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Content do
       ]
     })
   end
+
+  def to_json({:review_list_key, m}), do: Jason.encode!(%{"review_list_key" => [m.key_b64]})
 
   def to_json({:composed, elements}), do: Jason.encode!(Enum.map(elements, &to_raw/1))
   def to_json({:unknown, json}), do: json

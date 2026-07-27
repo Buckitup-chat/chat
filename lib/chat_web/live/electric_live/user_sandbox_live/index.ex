@@ -21,7 +21,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
       error_message: nil
     )
     |> allow_upload(:key_file, accept: ~w(.json), max_entries: 1, max_file_size: 100_000)
-    |> then(&{:ok, &1})
+    |> ok()
   end
 
   @impl true
@@ -32,7 +32,10 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
       <div class="flex-1 flex overflow-hidden">
         {Components.docs_sidebar(assigns)}
         <main class="flex-1 overflow-y-auto p-6">
-          <div :if={@error_message} class="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
+          <div
+            :if={@error_message}
+            class="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded"
+          >
             <div class="flex justify-between items-start">
               <div>
                 <strong class="font-semibold">Error:</strong>

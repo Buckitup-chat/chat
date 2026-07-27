@@ -79,7 +79,9 @@ defmodule ChatWeb.ElectricLive.ReviewsLive.Index do
                   <div class="min-w-0 flex-1">
                     <p class="text-sm font-medium text-gray-900 truncate">
                       Review:
-                      <span class="font-mono text-xs">{Shortcode.short_code(review.review_hash)}</span>
+                      <span class="font-mono text-xs">
+                        {Shortcode.short_code(review.review_hash)}
+                      </span>
                       <%= if review.deleted_flag do %>
                         <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
                           Deleted
@@ -87,10 +89,12 @@ defmodule ChatWeb.ElectricLive.ReviewsLive.Index do
                       <% end %>
                     </p>
                     <p class="mt-1 text-xs text-gray-500">
-                      Origin: <span class="font-mono">{Shortcode.short_code(review.origin_hash)}</span>
+                      Origin:
+                      <span class="font-mono">{Shortcode.short_code(review.origin_hash)}</span>
                     </p>
                     <p class="mt-1 text-xs text-gray-500">
-                      Author: <span class="font-mono">{Shortcode.short_code(review.author_hash)}</span>
+                      Author:
+                      <span class="font-mono">{Shortcode.short_code(review.author_hash)}</span>
                       | Timestamp: {review.owner_timestamp}
                     </p>
                   </div>

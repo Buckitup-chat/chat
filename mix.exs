@@ -125,7 +125,11 @@ defmodule Chat.MixProject do
       # ElectricSQL / Phoenix.Sync
       {:electric, "~> 1.1"},
       {:phoenix_sync, "~> 0.6.1"},
-      {:electric_client, github: "salseeg/electric", sparse: "packages/elixir-client", branch: "buckitup-patches", override: true},
+      {:electric_client,
+       github: "salseeg/electric",
+       sparse: "packages/elixir-client",
+       branch: "buckitup-patches",
+       override: true},
 
       # Internal
       {:toolbox, github: "Buckitup-chat/toolbox"}

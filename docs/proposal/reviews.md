@@ -24,6 +24,7 @@ The origin identity (not the owner) should be able to:
 ## Design decisions
 
 - **Rating**: incorporate into a content model `[rating, placeholder, content]` — fill placeholder with random string to make rating-only and text reviews indistinguishable in ciphertext size. See [Content model](#content-model) for the full spec.
+- **`to_origin` is not a feature**: because the origin is a `user_cards` identity, a `to_origin` review is a plain dialog message to the origin's `user_hash`. No schema, no shape, no validation, no moderation path — nothing to build beyond a UI entry point. See [to_origin](#to_origin).
 - **Passwords vs reviews**: passwords as access layer. Prevent deletion as much as possible.
 - **Ingest via candidates**: all *author-submitted* `review_public_passwords` entries flow through `review_password_candidate` — the server validates and promotes. The author cannot ingest into `review_public_passwords` directly. The origin identity can insert a row it decrypted from a right envelope (to publish or revoke) — see Moderation section.
 - **Origin key management**: origin keypairs are independently generated on the client (not derived from owner keys), stored client-side in the owner's identity, same pattern as regular user keys (see `pq_user.md`). Multi-device access via User Storage (encrypted skeys stored server-side, decryptable by the owner).
@@ -39,7 +40,8 @@ Origin (the coffee shop)
     ├── to_public   — encrypted with review_password, signed by author
     │                 public when password in review_public_passwords table
     │                 contacts see via review_list_password (bypasses moderation)
-    ├── to_origin  — dialog between author and origin identity (see pq_dialogs)
+    ├── to_origin  — plain dialog between author and origin identity (see pq_dialogs),
+    │                 no review-specific machinery
     │
     └── Comment (by anyone who can see the parent review)
         └── inherits parent review's visibility envelope
@@ -259,16 +261,16 @@ This means:
 
 ### to_origin
 
-Because the origin is a subaccount with its own `user_cards` identity, `to_origin` is simply a **dialog** between the review author and the origin identity — using the standard `pq_dialogs` infrastructure.
+Because the origin is a subaccount with its own `user_cards` identity, `to_origin` is **nothing more than a regular dialog** between the review author and the origin identity — the standard `pq_dialogs` infrastructure, used as-is.
 
-The author and origin identity each derive a `sender_msg_key` per the dialog key derivation spec. Messages (reviews, comments, follow-ups) are encrypted exactly like dialog messages: AES-256-GCM under the sender's `sender_msg_key`, with the key wrapped for the peer via ML-KEM-1024.
+**There is nothing to build.** No table, no Electric shape, no validation module, no ingest path, no moderation. A `to_origin` review is a dialog message addressed to the origin's `user_hash`, encrypted and versioned exactly like any other dialog message. The only work is product-level: an entry point ("message this origin") that opens a dialog with the origin's `user_hash`.
 
-This means:
+Everything else follows for free from `pq_dialogs`:
 
-- No new crypto machinery needed — reuses dialog encryption, key wrapping, and versioning
-- The owner reads `to_origin` reviews by decapsulating with the origin identity's `kem_skey` (which the owner holds)
-- Multi-device works: any owner device re-derives the origin's keys from the owner's private material
-- Not subject to moderation (private feedback between author and origin)
+- dialog encryption, key wrapping, edits and multi-device sync apply unchanged — including the `sender_msg_key` derivation and ML-KEM-1024 wrapping
+- the owner reads `to_origin` reviews by decapsulating with the origin identity's `kem_skey` (which the owner holds)
+- comments and follow-ups are just further messages in that dialog
+- not subject to moderation — private feedback between author and origin, never touches `review_public_passwords`
 
 ## Content model
 
@@ -308,7 +310,7 @@ Encrypted with the parent review's `review_password` + ML-DSA-87 signed by comme
 
 ### On a to_origin review
 
-Comments on `to_origin` reviews are dialog messages in the author↔origin dialog. They use the standard `pq_dialogs` infrastructure — no separate comment schema needed for this case.
+Comments on `to_origin` reviews are just later messages in the author↔origin dialog. Standard `pq_dialogs` infrastructure — no separate comment schema, and nothing to build for this case.
 
 ## Data model
 
@@ -337,7 +339,7 @@ Note: `sign_pkey` and `crypt_pkey` are on the origin's `user_cards` row, not dup
 
 ### review
 
-Only `to_public` reviews live in this table. `to_origin` reviews are standard dialog messages (see `pq_dialogs`) between the author and the origin identity — no separate schema needed.
+Only `to_public` reviews live in this table. `to_origin` reviews never enter the review data model at all — they are ordinary dialog messages (see `pq_dialogs`) between the author and the origin identity.
 
 ```
 review
@@ -619,7 +621,8 @@ Authenticates as the origin identity (not the owner's personal identity). Exerci
 - pre-moderation: decrypt `review_post_right` (KEM decapsulate) — this is also how the moderator reads a review *before* approving it — then ingest the pre-signed password row
 - post-moderation: decrypt `review_revoke_right` (KEM decapsulate), ingest the pre-signed null row
 - moderation round-trip with the author sandbox
-- receive `to_origin` reviews (dialog decryption via origin's `kem_skey`) — Phase 3
+
+`to_origin` reviews are not exercised here — they are plain dialogs with the origin identity, covered by the existing dialog infrastructure and its own sandbox.
 
 ### Review visitor/author sandbox
 
@@ -629,7 +632,7 @@ A regular user browsing and writing reviews. Exercises:
 - view public reviews (decrypt with `review_password` from `review_public_passwords`)
 - view contacts' reviews (decrypt via `review_list_password` from `review_list`)
 - write `to_public` review: generate `review_password`, AES-256-GCM encrypt, ML-DSA-87 sign `content_b64`, submit password candidate
-- write `to_origin` review: dialog message to origin identity
+- write `to_origin` review: plain dialog message to the origin's `user_hash` — no review-specific path
 - moderation pipeline participation: ingest candidates (server triggers promotion), read right candidates via Electric shape, verify KEM wrapping, ingest signature updates (server triggers completion)
 
 ### Public reviews viewer
@@ -690,9 +693,11 @@ No identity required — a read-only view simulating the public frontend. Exerci
 - [ ] Review listing in main app UI
 - [ ] Moderation UI for origin identity in main app UI (approve/reject/revoke)
 
-### Phase 3 — To-origin reviews
+### Phase 3 — Owner controls
 
-- [ ] to_origin as dialog: origin subaccount identity + dialog key derivation
+`to_origin` carries no implementation work: it is a plain dialog with the origin identity, already fully supported by `pq_dialogs` (see the [to_origin](#to_origin) section). All that remains is the UI entry point.
+
+- [ ] "message this origin" entry point in the origin UI — opens a standard dialog with the origin's `user_hash`
 - [ ] owner-signed authorization for dangerous origin ops (moderation mode, soft delete) — see the Status note under Origin creation
 - [ ] contacts-visible hidden reviews (author's contacts see moderation-hidden reviews)
 

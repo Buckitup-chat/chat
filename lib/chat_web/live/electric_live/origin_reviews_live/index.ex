@@ -7,7 +7,9 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
   alias Chat.Data.Schemas.Review
   alias Chat.Data.Schemas.ReviewPublicPassword
   alias Chat.Proto.Shortcode
-  alias Electric.Client.Message
+  alias ChatWeb.ElectricLive.ContactsReaderLive.ReviewReader
+  alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
+  alias ChatWeb.ElectricLive.ShapeReader
 
   @impl true
   def mount(_params, _session, socket) do
@@ -184,20 +186,13 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
 
   # --- Private ---
 
-  defp fetch_origins_async(endpoint_base) do
+  defp fetch_origins_async(base_url) do
     pid = self()
-    client = Electric.Client.new!(endpoint: endpoint_base <> "/electric/v1/shapes")
-
-    shape =
-      Electric.Client.ShapeDefinition.new!("origins",
-        parser: {Electric.Client.EctoAdapter, Origin}
-      )
 
     Task.start_link(fn ->
       origins =
-        client
-        |> Electric.Client.stream(shape, live: false, replica: :full)
-        |> collect_inserts()
+        base_url
+        |> ShapeReader.rows("origins", Origin)
         |> Enum.reject(& &1.deleted_flag)
         |> Enum.sort_by(& &1.name)
 
@@ -205,35 +200,22 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
     end)
   end
 
-  defp fetch_reviews_async(origin_hash, endpoint_base) do
+  defp fetch_reviews_async(origin_hash, base_url) do
     pid = self()
-    client = Electric.Client.new!(endpoint: endpoint_base <> "/electric/v1/shapes")
-
-    review_shape =
-      Electric.Client.ShapeDefinition.new!("review",
-        where: "origin_hash = $1",
-        params: [origin_hash],
-        parser: {Electric.Client.EctoAdapter, Review}
-      )
-
-    password_shape =
-      Electric.Client.ShapeDefinition.new!("review_public_passwords",
-        where: "origin_hash = $1",
-        params: [origin_hash],
-        parser: {Electric.Client.EctoAdapter, ReviewPublicPassword}
-      )
 
     Task.start_link(fn ->
       reviews =
-        client
-        |> Electric.Client.stream(review_shape, live: false, replica: :full)
-        |> collect_inserts()
+        ShapeReader.rows(base_url, "review", Review,
+          where: "origin_hash = $1",
+          params: [origin_hash]
+        )
         |> Enum.reject(& &1.deleted_flag)
 
       passwords =
-        client
-        |> Electric.Client.stream(password_shape, live: false, replica: :full)
-        |> collect_inserts()
+        ShapeReader.rows(base_url, "review_public_passwords", ReviewPublicPassword,
+          where: "origin_hash = $1",
+          params: [origin_hash]
+        )
         |> Enum.reject(& &1.deleted_flag)
 
       decrypted = join_and_decrypt(reviews, passwords)
@@ -248,10 +230,7 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
     |> Enum.flat_map(fn review ->
       case Map.get(password_map, review.review_hash) do
         %{password_b64: pwd} when is_binary(pwd) ->
-          case decrypt_review(review, pwd) do
-            nil -> []
-            decrypted -> [decrypted]
-          end
+          List.wrap(ReviewReader.decrypt_review_content(review, Crypto.decode_binary_field(pwd)))
 
         _ ->
           []
@@ -264,43 +243,5 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
     passwords
     |> Enum.group_by(& &1.review_hash)
     |> Map.new(fn {hash, entries} -> {hash, Enum.max_by(entries, & &1.owner_timestamp)} end)
-  end
-
-  defp decrypt_review(review, password) do
-    content = decode_binary(review.content_b64)
-    key = decode_binary(password)
-
-    with plaintext when is_binary(plaintext) <- EnigmaPq.aes_gcm_decrypt(content, key),
-         {:ok, [rating, _placeholder, text]} <- Jason.decode(plaintext) do
-      %{
-        review_hash: review.review_hash,
-        rating: rating,
-        text: text,
-        author_hash: review.author_hash,
-        owner_timestamp: review.owner_timestamp
-      }
-    else
-      _ -> nil
-    end
-  end
-
-  defp decode_binary(value) when is_binary(value) do
-    case Base.decode64(value, padding: false) do
-      {:ok, decoded} -> decoded
-      :error -> value
-    end
-  end
-
-  defp collect_inserts(stream) do
-    Enum.reduce_while(stream, [], fn
-      %Message.ChangeMessage{headers: %{operation: :insert}, value: value}, acc ->
-        {:cont, [value | acc]}
-
-      %Message.ControlMessage{control: :up_to_date}, acc ->
-        {:halt, acc}
-
-      _, acc ->
-        {:cont, acc}
-    end)
   end
 end

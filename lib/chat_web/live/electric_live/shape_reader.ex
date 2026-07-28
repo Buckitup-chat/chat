@@ -14,32 +14,29 @@ defmodule ChatWeb.ElectricLive.ShapeReader do
   alias Electric.Client.Message
 
   @doc "All rows of `table`."
-  def rows(base_url, table, schema) do
-    base_url |> client() |> collect(shape(table, schema, nil, []))
-  end
+  def rows(base_url, table, schema), do: rows(base_url, table, schema, [])
 
   @doc ~S"""
-  Rows of `table` matching `where`, e.g. `rows(url, "review", Review, "origin_hash = $1", [hash])`.
+  Rows of `table` with options: `:where`, `:params`, `:columns`.
 
-  Keep `where` a literal with positional params — a shape definition is shared
-  across every client that asks for it, so a per-reader clause re-materializes it.
+      rows(url, "review", Review, where: "origin_hash = $1", params: [hash])
+      rows(url, "review_list", ReviewList, columns: ~w(user_hash review_hash))
   """
+  def rows(base_url, table, schema, opts) when is_list(opts) do
+    base_url |> client() |> collect(shape(table, schema, opts))
+  end
+
   def rows(base_url, table, schema, where, params) do
-    base_url |> client() |> collect(shape(table, schema, where, params))
+    rows(base_url, table, schema, where: where, params: params)
   end
 
   defp client(base_url), do: Client.new!(endpoint: base_url <> "/electric/v1/shapes")
 
-  defp shape(table, schema, nil, _params) do
-    Client.ShapeDefinition.new!(table, parser: {Client.EctoAdapter, schema})
-  end
-
-  defp shape(table, schema, where, params) do
-    Client.ShapeDefinition.new!(table,
-      where: where,
-      params: params,
-      parser: {Client.EctoAdapter, schema}
-    )
+  defp shape(table, schema, opts) do
+    opts
+    |> Keyword.take([:where, :params, :columns])
+    |> Keyword.put(:parser, {Client.EctoAdapter, schema})
+    |> then(&Client.ShapeDefinition.new!(table, &1))
   end
 
   defp collect(client, shape) do

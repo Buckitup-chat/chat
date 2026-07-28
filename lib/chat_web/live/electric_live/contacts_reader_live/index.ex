@@ -74,10 +74,8 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.Index do
       end
 
     Task.start_link(fn ->
-      case ReviewReader.read(user_hash, list_password, base_url) do
-        {:ok, result} -> send(pid, {:reviews_loaded, result})
-        {:error, reason} -> send(pid, {:reviews_error, reason})
-      end
+      {:ok, result} = ReviewReader.read(user_hash, list_password, base_url)
+      send(pid, {:reviews_loaded, result})
     end)
 
     socket |> assign(selected_source: source, loading: true) |> noreply()
@@ -100,10 +98,6 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.Index do
     )
     |> append_logs(result.log_entries)
     |> noreply()
-  end
-
-  def handle_info({:reviews_error, reason}, socket) do
-    socket |> assign(error_message: reason, loading: false) |> noreply()
   end
 
   # --- Private ---

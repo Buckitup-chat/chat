@@ -2,8 +2,9 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.ReviewReader do
   @moduledoc """
   Reads a user's review_list, decrypts review passwords, fetches and decrypts reviews.
 
-  Uses trimmed columns (`user_hash,review_hash,origin_hash,password_b64`) on the
-  review_list shape to drop the ~4.6 KB `sign_b64` per row.
+  Uses trimmed columns (`user_hash,review_hash,origin_hash,password_b64,deleted_flag`) on the
+  review_list shape to drop the ~4.6 KB `sign_b64` per row. Entries with `deleted_flag` set
+  are retracted and excluded.
   """
 
   alias Chat.Data.Schemas.Review
@@ -12,7 +13,7 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.ReviewReader do
   alias ChatWeb.ElectricLive.ShapeReader
   alias EnigmaPq
 
-  @list_columns "user_hash,review_hash,origin_hash,password_b64"
+  @list_columns "user_hash,review_hash,origin_hash,password_b64,deleted_flag"
 
   @doc """
   Reads a user's reviews via their review_list. Returns decrypted reviews grouped
@@ -23,7 +24,14 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.ReviewReader do
       passwords = decrypt_list_entries(entries, list_password)
       origin_hashes = entries |> Enum.map(& &1["origin_hash"]) |> Enum.uniq()
       reviews = fetch_active_rows(origin_hashes, base_url, "review", Review)
-      pub_passwords = fetch_active_rows(origin_hashes, base_url, "review_public_passwords", ReviewPublicPassword)
+
+      pub_passwords =
+        fetch_active_rows(
+          origin_hashes,
+          base_url,
+          "review_public_passwords",
+          ReviewPublicPassword
+        )
 
       {:ok,
        %{
@@ -60,6 +68,7 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.ReviewReader do
     body
     |> Enum.filter(&match?(%{"headers" => %{"operation" => "insert"}}, &1))
     |> Enum.map(& &1["value"])
+    |> Enum.reject(& &1["deleted_flag"])
   end
 
   defp parse_shape_rows(_), do: []

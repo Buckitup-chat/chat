@@ -172,8 +172,13 @@ endpoint. Two rules keep it cheap:
 **Trim the columns.** `sign_b64` is an ML-DSA-87 signature — ~4.6 KB per row, ~6.2 KB base64 on the
 wire, against ~700 B for everything else. Sync with
 `columns=user_hash,review_hash,origin_hash,password_b64` and a 50-contacts × 50-reviews list drops from
-~17 MB to ~1.7 MB. Nothing is lost: the review's own signature over `content_b64` is the
-non-repudiation anchor, and a forged list row only yields a password that fails the AES-GCM tag.
+~17 MB to ~1.7 MB. Nothing is lost: every `review_list` row's signature is verified on ingestion
+(both peer sync and HTTP paths call `UserValidation.validate_signature/1`), together with the
+moderation-proof matrix — the server rejects any row whose author signature is invalid or whose
+proof fields do not match promoted pipeline rows. This is the real guard: contact sharing cannot
+happen until the review has entered the origin's moderation pipeline. Readers do not need to
+re-verify `sign_b64` because the server has already enforced it, and a forged list row only yields a
+password that fails the AES-GCM tag.
 
 **Filter on an indexed column, not on a per-reader set.** `where user_hash = $1` (one shape per contact)
 and `where origin_hash = $1` (one shape per origin) both produce a shape definition shared by every
@@ -585,7 +590,8 @@ Access control: author authenticated via `sign_pkey`.
 
 Synced by `user_hash` (one contact's list) or by `origin_hash` (all list entries for one origin) — both
 are indexed and both yield a shape definition shared across clients. Readers should request
-`columns=user_hash,review_hash,origin_hash,password_b64` and leave `sign_b64` behind; see
+`columns=user_hash,review_hash,origin_hash,password_b64,deleted_flag`, reject rows where
+`deleted_flag` is set, and leave `sign_b64` behind; see
 [Reading a contact's reviews](#reading-a-contacts-reviews).
 
 Access control: list owner authenticated via `sign_pkey`, and the row must pass the moderation-proof
@@ -602,6 +608,18 @@ Content tables (`review`, `review_public_passwords`, `review_post_right`, `revie
 Visibility is controlled exclusively through the `review_public_passwords` versioning mechanism (publish / revoke via timestamps), not through row deletion.
 
 ## Security properties
+
+### Signature verification model
+
+All signatures are verified **on ingestion** — every peer-sync and HTTP ingest path calls
+`UserValidation.validate_signature/1` (→ `Integrity.verify_signature/1`) before the row enters the
+database. Readers do not re-verify signatures because the database contains only server-validated
+rows. This is why `sign_b64` can be safely trimmed from read-path shapes (see
+[Reading a contact's reviews](#reading-a-contacts-reviews)): the ingestion guard has already run.
+
+For `review_list` specifically, ingestion-time verification enforces that contact sharing can only
+happen **after** the review has entered the origin's moderation pipeline — the moderation-proof
+matrix is validated alongside the signature (see [Moderation bypass prevention](#moderation-bypass-prevention)).
 
 ### Non-repudiation
 
@@ -679,7 +697,7 @@ This is a separate concern involving the broader contacts/trust model and will b
 
 ## Sandboxes
 
-Three sandboxes plus a public viewer, split by persona — each operates under a distinct identity context:
+Four sandboxes plus a public viewer, split by persona — each operates under a distinct identity context:
 
 ### Origin owner sandbox
 
@@ -724,6 +742,18 @@ No identity required — a read-only view simulating the public frontend. Exerci
 - decrypt `content_b64` using `password_b64` from `review_public_passwords` (AES-256-GCM)
 - render decoded content model: star rating (1–5), review text
 - display reviews pending moderation or hidden by moderation as distinct states
+
+### Contacts reader sandbox
+
+A user reading their contacts' reviews. Imports an identity, then derives the contact set from dialogs rather than a persisted contact list. Exercises:
+
+- import identity and verify against `user_cards`
+- scan dialogs for `review_list_key` messages to discover contacts who shared their list password
+- read own and contacts' `review_list` rows (trimmed `columns=`), decrypt `password_b64`
+- fetch per-origin reviews for each discovered contact, decrypt content
+- cross-reference `review_public_passwords` to badge each review as public, hidden, or contacts-only
+
+(`ContactsReaderLive`: `Index`, `KeyScanner`, `ReviewReader`, `Render`)
 
 ## Implementation phases
 

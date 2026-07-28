@@ -62,7 +62,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
         review_hash: review_hash,
         origin_hash: origin_hash,
         review_password: review_password,
-        #AI: see 2 lines bellow. arent' this a part of content ? where this is used ?
+        # rating/text are here for render
         rating: rating,
         text: text,
         content_json: content,

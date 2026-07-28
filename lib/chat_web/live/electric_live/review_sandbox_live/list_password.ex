@@ -45,7 +45,14 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ListPassword do
 
   # --- Read ---
 
-  defp fetch(author, base_url) do
+  @doc """
+  Reads the author's `review_list_password` without creating one.
+
+  For read-only callers (e.g. browsing a contact's reviews) that must not mint a
+  password as a side effect of import. Returns `{:ok, password}`, `:empty`, or
+  `{:error, reason}`.
+  """
+  def fetch(author, base_url) do
     base_url
     |> ShapeReader.rows("user_storage", UserStorage, "user_hash = $1 AND uuid = $2", [
       author.user_hash,

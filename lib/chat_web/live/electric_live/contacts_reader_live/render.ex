@@ -19,7 +19,10 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.Render do
           Read your own reviews and contacts' reviews via review_list + review_list_password
         </p>
 
-        <div :if={@error_message} class="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded flex justify-between">
+        <div
+          :if={@error_message}
+          class="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded flex justify-between"
+        >
           <span>{@error_message}</span>
           <button phx-click="clear_error" class="text-red-600 hover:text-red-800">x</button>
         </div>
@@ -137,13 +140,6 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.Render do
         </span>
       </h2>
 
-      <button
-        phx-click="load_reviews"
-        class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 mb-4"
-      >
-        Load Reviews
-      </button>
-
       <%= if @loading do %>
         <div class="flex items-center gap-2 text-sm text-gray-600">
           <div class="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full">
@@ -180,7 +176,7 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.Render do
           review_list entries found but no reviews could be decrypted.
         </p>
         <p :if={@decrypted_reviews == [] and @review_list_entries == []} class="text-sm text-gray-500">
-          No reviews found. Press "Load Reviews" to fetch.
+          No reviews found.
         </p>
       <% end %>
     </div>

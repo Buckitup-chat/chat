@@ -63,11 +63,7 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.Index do
   end
 
   def handle_event("select_source", %{"source" => source}, socket) do
-    socket |> assign(selected_source: source, loading: true) |> noreply()
-  end
-
-  def handle_event("load_reviews", _params, socket) do
-    %{selected_source: source, user: user, own_key: own_key, contacts: contacts} = socket.assigns
+    %{user: user, own_key: own_key, contacts: contacts} = socket.assigns
     base_url = public_url(socket)
     pid = self()
 
@@ -84,7 +80,7 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.Index do
       end
     end)
 
-    noreply(socket)
+    socket |> assign(selected_source: source, loading: true) |> noreply()
   end
 
   def handle_event("clear_error", _params, socket) do
@@ -113,16 +109,17 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.Index do
   # --- Private ---
 
   defp load_user(socket, user_data) do
-    case ListPassword.load_or_create(user_data, public_url(socket)) do
-      {:ok, password, logs} ->
-        socket
-        |> assign(user: user_data, own_key: password, error_message: nil)
-        |> append_logs(logs)
+    case ListPassword.fetch(user_data, public_url(socket)) do
+      {:ok, password} ->
+        socket |> assign(user: user_data, own_key: password, error_message: nil)
 
-      {:error, %{reason: reason, log_entries: logs}} ->
+      :empty ->
+        socket
+        |> assign(user: user_data, error_message: "No own review_list_password: not created yet")
+
+      {:error, reason} ->
         socket
         |> assign(user: user_data, error_message: "No own review_list_password: #{reason}")
-        |> append_logs(logs)
     end
   end
 

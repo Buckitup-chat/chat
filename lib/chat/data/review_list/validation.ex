@@ -124,9 +124,11 @@ defmodule Chat.Data.ReviewList.Validation do
 
   defp validate_moderation_proof_fields(changeset, review_hash, pwd_sh, post_sh, revoke_sh) do
     with true <- changeset.valid?,
-         %{origin_hash: origin_hash} <- ReviewData.get_review(review_hash),
+         %{author_hash: author_hash, origin_hash: origin_hash} <-
+           ReviewData.get_review(review_hash),
          %{moderation_mode: mode} <- OriginData.get_origin(origin_hash) do
       changeset
+      |> validate_author_binding(author_hash)
       |> validate_origin_binding(origin_hash)
       |> verify_proof_by_mode(mode, review_hash, pwd_sh, post_sh, revoke_sh)
     else
@@ -139,6 +141,16 @@ defmodule Chat.Data.ReviewList.Validation do
         # entry whose review (or origin) does not exist cannot prove it went
         # through the moderation pipeline — reject rather than silently accept.
         Ecto.Changeset.add_error(changeset, :review_hash, "review or origin not found")
+    end
+  end
+
+  defp validate_author_binding(changeset, review_author_hash) do
+    case Ecto.Changeset.get_field(changeset, :user_hash) do
+      ^review_author_hash ->
+        changeset
+
+      _other ->
+        Ecto.Changeset.add_error(changeset, :user_hash, "does not match the review's author")
     end
   end
 

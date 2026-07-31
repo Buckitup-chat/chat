@@ -86,9 +86,6 @@ defmodule Chat.Data.Shapes.ReviewList do
         |> ReviewList.create_changeset(rl |> Map.from_struct())
         |> ReviewListData.upsert_review_list_entry()
 
-      %{valid?: false, action: :ignore} ->
-        {:ok, rl}
-
       %{valid?: false} = cs ->
         log("Invalid review_list update: #{inspect(cs.errors)}", :warning)
         {:ok, rl}

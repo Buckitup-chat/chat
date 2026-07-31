@@ -64,9 +64,6 @@ defmodule Chat.Data.Shapes.DialogMessageReactions do
           )
         )
 
-      %{valid?: false, action: :ignore} ->
-        {:ok, reaction}
-
       %{valid?: false} = cs ->
         log("Invalid dialog_message_reaction update signature: #{inspect(cs.errors)}", :warning)
         {:ok, reaction}

@@ -47,15 +47,28 @@ defmodule Chat.Data.ReviewRightCandidate do
     |> repo().delete_all()
   end
 
-  def delete_stale_candidates(max_age_ms) do
-    cutoff = System.os_time(:millisecond) - max_age_ms
+  def delete_stale_candidates(max_age_seconds) do
+    delete_stale(ReviewPostRightCandidate, max_age_seconds)
+    delete_stale(ReviewRevokeRightCandidate, max_age_seconds)
+  end
 
-    ReviewPostRightCandidate
-    |> where([c], c.inserted_at < ^cutoff)
-    |> repo().delete_all()
+  defp delete_stale(schema, max_age_seconds) do
+    max_per_user =
+      from(c in schema,
+        group_by: c.author_hash,
+        select: {c.author_hash, max(c.owner_timestamp)}
+      )
+      |> repo().all()
 
-    ReviewRevokeRightCandidate
-    |> where([c], c.inserted_at < ^cutoff)
-    |> repo().delete_all()
+    Enum.reduce(max_per_user, {0, nil}, fn {author_hash, max_ts}, {total, _} ->
+      cutoff = max_ts - max_age_seconds
+
+      {deleted, _} =
+        schema
+        |> where([c], c.author_hash == ^author_hash and c.owner_timestamp < ^cutoff)
+        |> repo().delete_all()
+
+      {total + deleted, nil}
+    end)
   end
 end

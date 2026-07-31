@@ -61,9 +61,6 @@ defmodule Chat.Data.Shapes.DialogKeys do
           DialogKey.create_changeset(%DialogKey{}, Map.from_struct(dialog_key))
         )
 
-      %{valid?: false, action: :ignore} ->
-        {:ok, dialog_key}
-
       %{valid?: false} = cs ->
         log("Invalid dialog_key update signature: #{inspect(cs.errors)}", :warning)
         {:ok, dialog_key}

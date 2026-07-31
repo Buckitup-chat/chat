@@ -72,9 +72,6 @@ defmodule Chat.Data.Shapes.UserCard do
       %{valid?: true} ->
         User.update_card(changeset)
 
-      %{valid?: false, action: :ignore} ->
-        {:ok, card}
-
       %{valid?: false} ->
         log(
           "Invalid user_card signature for #{card.user_hash}: #{inspect(changeset.errors)}",

@@ -184,22 +184,17 @@ defmodule Chat.Data.User.Validation do
 
   defp handle_insert_with_versioning(changeset, existing, new_storage) do
     if new_storage.owner_timestamp > existing.owner_timestamp do
-      # New version is newer - return changeset with on_conflict to replace
-      # The existing will be archived in pre_apply
       Ecto.Changeset.put_change(changeset, :parent_sign_hash, existing.sign_hash)
     else
-      # New version is older - mark changeset as ignored and archive new version
-      %{changeset | action: :ignore}
+      Ecto.Changeset.add_error(changeset, :owner_timestamp, "timestamp not newer")
     end
   end
 
   defp handle_update_with_versioning(changeset, existing, new_storage) do
     if new_storage.owner_timestamp > existing.owner_timestamp do
-      # New version is newer - update with parent_sign_hash
       Ecto.Changeset.put_change(changeset, :parent_sign_hash, existing.sign_hash)
     else
-      # New version is older - mark as ignored
-      %{changeset | action: :ignore}
+      Ecto.Changeset.add_error(changeset, :owner_timestamp, "timestamp not newer")
     end
   end
 
@@ -210,15 +205,19 @@ defmodule Chat.Data.User.Validation do
   """
   def user_storage_pre_apply_versioning(multi, changeset, _context) do
     cond do
-      changeset.valid? and changeset.action != :ignore ->
+      changeset.valid? ->
         archive_if_newer(multi, changeset)
 
-      changeset.action == :ignore ->
+      timestamp_not_newer?(changeset) ->
         archive_old_version(multi, changeset)
 
       true ->
         multi
     end
+  end
+
+  defp timestamp_not_newer?(changeset) do
+    Keyword.has_key?(changeset.errors, :owner_timestamp)
   end
 
   defp archive_if_newer(multi, changeset) do
@@ -316,15 +315,14 @@ defmodule Chat.Data.User.Validation do
   @doc """
   Validates that the new timestamp in the changeset is newer than the existing timestamp.
   Uses a protocol to extract the timestamp field from the schema.
-  Returns changeset with action: :ignore if timestamp is not newer.
   """
   def validate_timestamp_newer_than_existing(changeset) do
     with existing_timestamp when not is_nil(existing_timestamp) <-
            TimestampedData.existing_timestamp(changeset.data),
          new_timestamp when not is_nil(new_timestamp) <-
-           Ecto.Changeset.get_change(changeset, :owner_timestamp),
+           Ecto.Changeset.get_field(changeset, :owner_timestamp),
          true <- new_timestamp <= existing_timestamp do
-      %{changeset | valid?: false, action: :ignore}
+      Ecto.Changeset.add_error(changeset, :owner_timestamp, "timestamp not newer")
     else
       _ -> changeset
     end

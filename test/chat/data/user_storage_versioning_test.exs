@@ -282,7 +282,7 @@ defmodule Chat.Data.UserStorageVersioningTest do
 
       archive_storage_from_signed!(older)
 
-      assert {:ok, _} = run_pre_apply(ignored_changeset(older))
+      assert {:ok, _} = run_pre_apply(rejected_timestamp_changeset(older))
       assert count_versions(user_hash, uuid) == 1
     end
 
@@ -365,10 +365,10 @@ defmodule Chat.Data.UserStorageVersioningTest do
       UserStorage.update_changeset(existing, attrs)
     end
 
-    defp ignored_changeset(storage) do
+    defp rejected_timestamp_changeset(storage) do
       %UserStorage{}
       |> UserStorage.create_changeset(Map.from_struct(storage))
-      |> then(&%{&1 | action: :ignore})
+      |> Ecto.Changeset.add_error(:owner_timestamp, "timestamp not newer")
     end
 
     defp run_pre_apply(changeset) do

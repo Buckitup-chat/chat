@@ -259,10 +259,20 @@ defmodule Chat.Data.ReviewModerationTest do
 
       assert RightCandidateData.get_post_candidate(ctx.review.review_hash) != nil
 
-      RightCandidateData.delete_stale_candidates(0)
+      old_ts = RightCandidateData.get_post_candidate(ctx.review.review_hash).owner_timestamp
+
+      review2 = insert_review(ctx.author, ctx.origin_hash)
+      pwd2 = build_candidate(ctx.author, review2, ctx.origin_hash, review2.review_password, timestamp: old_ts + 100)
+      _null2 = build_candidate(ctx.author, review2, ctx.origin_hash, nil, timestamp: old_ts + 101)
+      {:ok, _} = Promotion.promote_candidate(pwd2)
+
+      assert RightCandidateData.get_post_candidate(review2.review_hash) != nil
+
+      RightCandidateData.delete_stale_candidates(50)
 
       assert RightCandidateData.get_post_candidate(ctx.review.review_hash) == nil
       assert RightCandidateData.get_revoke_candidate(ctx.review.review_hash) == nil
+      assert RightCandidateData.get_post_candidate(review2.review_hash) != nil
     end
   end
 

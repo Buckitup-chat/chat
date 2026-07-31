@@ -86,9 +86,6 @@ defmodule Chat.Data.Shapes.Origin do
         |> Origin.create_changeset(origin |> Map.from_struct())
         |> OriginData.upsert_origin()
 
-      %{valid?: false, action: :ignore} ->
-        {:ok, origin}
-
       %{valid?: false} = cs ->
         log("Invalid origin update signature: #{inspect(cs.errors)}", :warning)
         {:ok, origin}

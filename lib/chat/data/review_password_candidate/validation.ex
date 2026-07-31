@@ -7,6 +7,7 @@ defmodule Chat.Data.ReviewPasswordCandidate.Validation do
   alias Chat.Data.ReviewPasswordCandidate.Promotion
   alias Chat.Data.Schemas.ReviewPasswordCandidate
   alias Chat.Data.User, as: UserData
+  alias Chat.Data.User.Validation, as: UserValidation
   alias EnigmaPq
   alias Phoenix.Sync.Writer
   alias Phoenix.Sync.Writer.Operation
@@ -32,6 +33,7 @@ defmodule Chat.Data.ReviewPasswordCandidate.Validation do
   def candidate_validate(candidate, changes, :insert) do
     candidate
     |> ReviewPasswordCandidate.create_changeset(changes)
+    |> UserValidation.validate_signature()
     |> validate_review_and_author(changes)
   end
 

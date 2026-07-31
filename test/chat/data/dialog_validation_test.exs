@@ -338,7 +338,7 @@ defmodule Chat.Data.DialogValidationTest do
       assert Ecto.Changeset.get_change(changeset, :parent_sign_hash) == msg1.sign_hash
     end
 
-    test "insert with existing newer message sets action to ignore", ctx do
+    test "insert with existing newer message is rejected", ctx do
       message_id = DialogMessageId.generate()
 
       msg1 =
@@ -358,7 +358,8 @@ defmodule Chat.Data.DialogValidationTest do
       changeset =
         Validation.message_validate_with_versioning(%DialogMessage{}, to_changes(msg2), :insert)
 
-      assert changeset.action == :ignore
+      refute changeset.valid?
+      assert {:owner_timestamp, {"timestamp not newer", []}} in changeset.errors
     end
 
     test "update with newer timestamp sets parent_sign_hash", ctx do
@@ -386,7 +387,7 @@ defmodule Chat.Data.DialogValidationTest do
       assert Ecto.Changeset.get_change(changeset, :parent_sign_hash) == msg1.sign_hash
     end
 
-    test "update with older timestamp sets action to ignore", ctx do
+    test "update with older timestamp is rejected", ctx do
       message_id = DialogMessageId.generate()
 
       msg1 =
@@ -407,7 +408,8 @@ defmodule Chat.Data.DialogValidationTest do
       changeset =
         Validation.message_validate_with_versioning(existing, to_update_changes(msg2), :update)
 
-      assert changeset.action == :ignore
+      refute changeset.valid?
+      assert {:owner_timestamp, {"timestamp not newer", []}} in changeset.errors
     end
   end
 

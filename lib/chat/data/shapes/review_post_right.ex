@@ -77,9 +77,6 @@ defmodule Chat.Data.Shapes.ReviewPostRight do
         |> ReviewPostRight.create_changeset(right |> Map.from_struct())
         |> PostRightData.upsert_post_right()
 
-      %{valid?: false, action: :ignore} ->
-        {:ok, right}
-
       %{valid?: false} = cs ->
         log("Invalid review_post_right update: #{inspect(cs.errors)}", :warning)
         {:ok, right}

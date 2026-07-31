@@ -168,7 +168,7 @@ defmodule Chat.Data.Dialog.Validation do
     if new_message.owner_timestamp > existing.owner_timestamp do
       Ecto.Changeset.put_change(changeset, :parent_sign_hash, existing.sign_hash)
     else
-      %{changeset | action: :ignore}
+      Ecto.Changeset.add_error(changeset, :owner_timestamp, "timestamp not newer")
     end
   end
 
@@ -176,21 +176,25 @@ defmodule Chat.Data.Dialog.Validation do
     if new_message.owner_timestamp > existing.owner_timestamp do
       Ecto.Changeset.put_change(changeset, :parent_sign_hash, existing.sign_hash)
     else
-      %{changeset | action: :ignore}
+      Ecto.Changeset.add_error(changeset, :owner_timestamp, "timestamp not newer")
     end
   end
 
   def message_pre_apply_versioning(multi, changeset, _context) do
     cond do
-      changeset.valid? and changeset.action != :ignore ->
+      changeset.valid? ->
         archive_message_if_newer(multi, changeset)
 
-      changeset.action == :ignore ->
+      timestamp_not_newer?(changeset) ->
         archive_old_message_version(multi, changeset)
 
       true ->
         multi
     end
+  end
+
+  defp timestamp_not_newer?(changeset) do
+    Keyword.has_key?(changeset.errors, :owner_timestamp)
   end
 
   defp archive_message_if_newer(multi, changeset) do

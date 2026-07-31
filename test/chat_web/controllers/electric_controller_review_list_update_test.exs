@@ -110,40 +110,24 @@ defmodule ChatWeb.ElectricControllerReviewListUpdateTest do
       assert stored.review_password_sign_hash == nil
     end
 
-    # Known defect, and not specific to review_list: every ingest validator that
-    # runs UserValidation.validate_timestamp_newer_than_existing/1 marks a stale
-    # update `action: :ignore`, and Phoenix.Sync.Writer then feeds that changeset
-    # to Ecto.Multi.update/4, which refuses it — so the caller gets a 500 instead
-    # of a clean rejection. The peer-sync path handles `:ignore` explicitly
-    # (Shapes.ReviewList.apply_changeset/2); the HTTP path does not. Same for
-    # user_card, user_storage, origin, dialog_key, message, reaction, review and
-    # file. Pinned here so the fix has a failing assertion to flip.
-    test "a backwards timestamp raises instead of being ignored (known defect)", ctx do
+    test "rejects an update with a backwards timestamp", ctx do
       pwd_sign_hash = publish_password(ctx)
       mutation = fill_mutation(ctx, pwd_sign_hash, owner_timestamp: ctx.entry.owner_timestamp - 1)
 
-      assert_raise ArgumentError, ~r/action already set to :ignore/, fn ->
-        post_ingest(ctx.conn, %{"mutations" => [mutation]}, ctx.author.sign_skey)
-      end
+      conn = post_ingest(ctx.conn, %{"mutations" => [mutation]}, ctx.author.sign_skey)
+
+      assert conn.status in [400, 422], conn.resp_body
     end
 
-    # Characterizes a real divergence hazard rather than endorsing it.
-    # validate_timestamp_newer_than_existing/1 reads get_change/2, which is nil
-    # when the cast value equals the stored one, so an equal timestamp slips
-    # through and applies *here* — while review_list_upsert_query/0's
-    # `owner_timestamp < EXCLUDED` guard makes every peer reject it. Since
-    # owner_timestamp is unix seconds, two clicks in the same second reach this.
-    # Hence ReviewList.fill_password_proof/4 uses max(previous + 1, now).
-    test "applies an equal-timestamp update locally, which peers would reject", ctx do
+    test "rejects an update with an equal timestamp", ctx do
       pwd_sign_hash = publish_password(ctx)
       mutation = fill_mutation(ctx, pwd_sign_hash, owner_timestamp: ctx.entry.owner_timestamp)
 
       conn = post_ingest(ctx.conn, %{"mutations" => [mutation]}, ctx.author.sign_skey)
 
-      assert conn.status == 200, conn.resp_body
+      assert conn.status in [400, 422], conn.resp_body
       stored = ReviewListData.get_review_list_entry(ctx.author_hash, ctx.review.review_hash)
-      assert stored.review_password_sign_hash == pwd_sign_hash
-      assert stored.owner_timestamp == ctx.entry.owner_timestamp
+      assert stored.review_password_sign_hash == nil
     end
 
     test "rejects an update whose PoP is not the list owner's", ctx do

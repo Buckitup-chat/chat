@@ -44,18 +44,17 @@ defmodule ChatWeb.FileController do
          true <- type |> String.contains?("/") do
       size = ChunkedFiles.size(chunk_key)
       range = get_req_header(conn, "range")
-      proto = get_http_protocol(conn)
-
-      case {proto, range, type} do
-        {_, [], _} ->
+      case range do
+        [] ->
           conn
           |> set_disposition(name, opts[:disposition])
           |> put_resp_header("content-length", "#{size}")
+          |> put_resp_header("accept-ranges", "bytes")
           |> set_content_type(type, opts[:content_type])
           |> send_chunked(200)
           |> passthrou_whole_file(size, chunk_key, chunk_secret)
 
-        {_, ["bytes=0-" <> _] = range, "video/" <> _} ->
+        range ->
           {first, last, data} = handle_chunking(range, size, chunk_key, chunk_secret)
 
           conn
@@ -63,27 +62,7 @@ defmodule ChatWeb.FileController do
           |> set_content_type(type, opts[:content_type])
           |> put_resp_header("accept-ranges", "bytes")
           |> put_resp_header("content-range", "bytes #{first}-#{last}/#{size}")
-          |> put_resp_header("content-length", "#{size}")
-          |> resp(:partial_content, data)
-          |> send_resp()
-
-        {_, _range, "video/" <> _} ->
-          conn
-          |> set_disposition(name, opts[:disposition])
-          |> put_resp_header("content-length", "#{size}")
-          |> set_content_type(type, opts[:content_type])
-          |> send_chunked(200)
-          |> passthrou_whole_file(size, chunk_key, chunk_secret)
-
-        {_, range, type} ->
-          {first, last, data} = handle_chunking(range, size, chunk_key, chunk_secret)
-
-          conn
-          |> set_disposition(name, opts[:disposition])
-          |> set_content_type(type, opts[:content_type])
-          |> put_resp_header("accept-ranges", "bytes")
-          |> put_resp_header("content-range", "bytes #{first}-#{last}/#{size}")
-          |> put_resp_header("content-length", "#{size}")
+          |> put_resp_header("content-length", "#{byte_size(data)}")
           |> resp(:partial_content, data)
           |> send_resp()
       end

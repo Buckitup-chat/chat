@@ -3,6 +3,7 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.Render do
 
   use Phoenix.Component
 
+  import ChatWeb.ElectricLive.Components
   import ChatWeb.ElectricLive.RequestLog
 
   alias Chat.Proto.Shortcode
@@ -214,18 +215,6 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.Render do
     <span class={"inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium #{@color}"}>
       {@text}
     </span>
-    """
-  end
-
-  attr :rating, :integer, required: true
-
-  defp stars(assigns) do
-    ~H"""
-    <div class="flex gap-0.5">
-      <span :for={i <- 1..5} class={if i <= @rating, do: "text-yellow-400", else: "text-gray-300"}>
-        &#9733;
-      </span>
-    </div>
     """
   end
 end

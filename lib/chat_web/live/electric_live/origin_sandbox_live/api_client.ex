@@ -6,6 +6,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
   alias Chat.Data.Types.OriginSignHash
   alias Chat.Data.User
   alias Chat.TimeKeeper
+  alias ChatWeb.ElectricLive.OriginSandboxLive.Http
   alias EnigmaPq
 
   def create_origin(owner, origin_name, moderation_mode, base_url) do
@@ -13,10 +14,10 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
     origin_card = User.extract_pq_card(origin_identity)
     owner_cert = EnigmaPq.sign(origin_card.sign_pkey, owner.sign_skey)
 
-    with {:ok, ch1, log1} <- get_challenge(base_url),
+    with {:ok, ch1, log1} <- Http.get_challenge(base_url),
          {:ok, _resp, log2} <-
            ingest_user_card(ch1, origin_card, origin_identity.sign_skey, base_url),
-         {:ok, ch2, log3} <- get_challenge(base_url),
+         {:ok, ch2, log3} <- Http.get_challenge(base_url),
          {:ok, origin_data, log4} <-
            ingest_origin(
              ch2,
@@ -48,15 +49,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
       owner_timestamp: new_timestamp
     }
 
-    sign_b64 =
-      origin_struct
-      |> Integrity.signature_payload()
-      |> EnigmaPq.sign(origin.origin_sign_skey)
-
-    sign_hash =
-      sign_b64
-      |> EnigmaPq.hash()
-      |> OriginSignHash.from_binary()
+    {sign_b64, sign_hash} = sign_origin(origin_struct, origin.origin_sign_skey)
 
     payload = %{
       "mutations" => [
@@ -68,7 +61,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
             "moderation_mode" => new_mode,
             "deleted_flag" => false,
             "owner_timestamp" => new_timestamp,
-            "sign_b64" => encode_base64(sign_b64),
+            "sign_b64" => Http.encode_base64(sign_b64),
             "sign_hash" => sign_hash
           },
           "syncMetadata" => %{"relation" => "origins"}
@@ -76,9 +69,9 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
       ]
     }
 
-    with {:ok, challenge_resp, log1} <- get_challenge(base_url),
+    with {:ok, challenge_resp, log1} <- Http.get_challenge(base_url),
          {:ok, _resp, log2} <-
-           post_ingest(challenge_resp, payload, origin.origin_sign_skey, base_url) do
+           Http.post_ingest(challenge_resp, payload, origin.origin_sign_skey, base_url) do
       updated =
         origin
         |> Map.put(:name, new_name)
@@ -104,15 +97,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
       owner_timestamp: new_timestamp
     }
 
-    sign_b64 =
-      origin_struct
-      |> Integrity.signature_payload()
-      |> EnigmaPq.sign(origin.origin_sign_skey)
-
-    sign_hash =
-      sign_b64
-      |> EnigmaPq.hash()
-      |> OriginSignHash.from_binary()
+    {sign_b64, sign_hash} = sign_origin(origin_struct, origin.origin_sign_skey)
 
     payload = %{
       "mutations" => [
@@ -124,7 +109,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
             "moderation_mode" => origin.moderation_mode,
             "deleted_flag" => true,
             "owner_timestamp" => new_timestamp,
-            "sign_b64" => encode_base64(sign_b64),
+            "sign_b64" => Http.encode_base64(sign_b64),
             "sign_hash" => sign_hash
           },
           "syncMetadata" => %{"relation" => "origins"}
@@ -132,9 +117,9 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
       ]
     }
 
-    with {:ok, challenge_resp, log1} <- get_challenge(base_url),
+    with {:ok, challenge_resp, log1} <- Http.get_challenge(base_url),
          {:ok, _resp, log2} <-
-           post_ingest(challenge_resp, payload, origin.origin_sign_skey, base_url) do
+           Http.post_ingest(challenge_resp, payload, origin.origin_sign_skey, base_url) do
       updated =
         origin
         |> Map.put(:deleted_flag, true)
@@ -147,6 +132,20 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
   end
 
   # --- Private ---
+
+  defp sign_origin(origin_struct, sign_skey) do
+    sign_b64 =
+      origin_struct
+      |> Integrity.signature_payload()
+      |> EnigmaPq.sign(sign_skey)
+
+    sign_hash =
+      sign_b64
+      |> EnigmaPq.hash()
+      |> OriginSignHash.from_binary()
+
+    {sign_b64, sign_hash}
+  end
 
   defp ingest_origin(
          challenge_resp,
@@ -168,15 +167,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
       owner_timestamp: TimeKeeper.now_unix()
     }
 
-    sign_b64 =
-      origin_struct
-      |> Integrity.signature_payload()
-      |> EnigmaPq.sign(origin_sign_skey)
-
-    sign_hash =
-      sign_b64
-      |> EnigmaPq.hash()
-      |> OriginSignHash.from_binary()
+    {sign_b64, sign_hash} = sign_origin(origin_struct, origin_sign_skey)
 
     payload = %{
       "mutations" => [
@@ -185,12 +176,12 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
           "modified" => %{
             "origin_hash" => origin_card.user_hash,
             "owner_hash" => owner.user_hash,
-            "owner_cert" => encode_base64(owner_cert),
+            "owner_cert" => Http.encode_base64(owner_cert),
             "name" => name,
             "moderation_mode" => moderation_mode,
             "deleted_flag" => false,
             "owner_timestamp" => origin_struct.owner_timestamp,
-            "sign_b64" => encode_base64(sign_b64),
+            "sign_b64" => Http.encode_base64(sign_b64),
             "sign_hash" => sign_hash
           },
           "syncMetadata" => %{"relation" => "origins"}
@@ -198,7 +189,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
       ]
     }
 
-    case post_ingest(challenge_resp, payload, origin_sign_skey, base_url) do
+    case Http.post_ingest(challenge_resp, payload, origin_sign_skey, base_url) do
       {:ok, _resp, log} ->
         origin_data = %{
           origin_hash: origin_card.user_hash,
@@ -225,115 +216,21 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
           "type" => "insert",
           "modified" => %{
             "user_hash" => card.user_hash,
-            "sign_pkey" => encode_base64(card.sign_pkey),
-            "contact_pkey" => encode_base64(card.contact_pkey),
-            "contact_cert" => encode_base64(card.contact_cert),
-            "crypt_pkey" => encode_base64(card.crypt_pkey),
-            "crypt_cert" => encode_base64(card.crypt_cert),
+            "sign_pkey" => Http.encode_base64(card.sign_pkey),
+            "contact_pkey" => Http.encode_base64(card.contact_pkey),
+            "contact_cert" => Http.encode_base64(card.contact_cert),
+            "crypt_pkey" => Http.encode_base64(card.crypt_pkey),
+            "crypt_cert" => Http.encode_base64(card.crypt_cert),
             "name" => card.name,
             "deleted_flag" => card.deleted_flag,
             "owner_timestamp" => card.owner_timestamp,
-            "sign_b64" => encode_base64(card.sign_b64)
+            "sign_b64" => Http.encode_base64(card.sign_b64)
           },
           "syncMetadata" => %{"relation" => "user_cards"}
         }
       ]
     }
 
-    post_ingest(challenge_resp, payload, sign_skey, base_url)
+    Http.post_ingest(challenge_resp, payload, sign_skey, base_url)
   end
-
-  defp get_challenge(base_url) do
-    url = base_url <> "/electric/v1/challenge"
-    req_headers = [{"accept", "application/json"}]
-    timestamp = TimeKeeper.now()
-
-    case Req.get(url, headers: req_headers) do
-      {:ok, %{status: 200, body: body} = resp} ->
-        {:ok, body, log_entry("GET", url, req_headers, "", resp, timestamp)}
-
-      {:ok, %{status: status} = resp} ->
-        {:error, "Challenge failed: #{status}",
-         [log_entry("GET", url, req_headers, "", resp, timestamp)]}
-
-      {:error, error} ->
-        {:error, "Challenge failed: #{inspect(error)}",
-         [log_entry("GET", url, req_headers, "", error, timestamp)]}
-    end
-  end
-
-  defp post_ingest(challenge_resp, payload, sign_skey, base_url) do
-    %{"challenge" => challenge, "challenge_id" => challenge_id} = challenge_resp
-    signature = :crypto.sign(:mldsa87, :none, challenge, sign_skey)
-
-    payload_with_auth =
-      Map.put(payload, "auth", %{
-        "challenge_id" => challenge_id,
-        "signature" => Base.encode64(signature, padding: false)
-      })
-
-    url = base_url <> "/electric/v1/ingest"
-    req_headers = [{"accept", "application/json"}, {"content-type", "application/json"}]
-    timestamp = TimeKeeper.now()
-    body_json = Jason.encode!(payload_with_auth, pretty: true)
-
-    case Req.post(url, json: payload_with_auth, headers: req_headers) do
-      {:ok, %{status: status} = resp} when status in 200..299 ->
-        {:ok, resp.body, log_entry("POST", url, req_headers, body_json, resp, timestamp)}
-
-      {:ok, %{status: status} = resp} ->
-        {:error, "Ingest failed: #{status}",
-         [log_entry("POST", url, req_headers, body_json, resp, timestamp)]}
-
-      {:error, error} ->
-        {:error, "Ingest failed: #{inspect(error)}",
-         [log_entry("POST", url, req_headers, body_json, error, timestamp)]}
-    end
-  end
-
-  defp log_entry(
-         method,
-         url,
-         req_headers,
-         req_body,
-         %{status: status, body: body, headers: headers},
-         ts
-       ) do
-    resp_body = if is_map(body), do: Jason.encode!(body, pretty: true), else: inspect(body)
-
-    %{
-      timestamp: ts,
-      method: method,
-      url: url,
-      request_headers: req_headers,
-      request_body: req_body,
-      response_status: status,
-      response_headers: format_headers(headers),
-      response_body: resp_body
-    }
-  end
-
-  defp log_entry(method, url, req_headers, req_body, error, ts) do
-    %{
-      timestamp: ts,
-      method: method,
-      url: url,
-      request_headers: req_headers,
-      request_body: req_body,
-      response_status: 0,
-      response_headers: [],
-      response_body: "Error: #{inspect(error)}"
-    }
-  end
-
-  defp format_headers(%Req.Response{} = _resp), do: []
-
-  defp format_headers(headers) when is_map(headers) do
-    Enum.map(headers, fn {k, v} -> {k, Enum.join(v, ", ")} end)
-  end
-
-  defp format_headers(headers) when is_list(headers), do: headers
-  defp format_headers(_), do: []
-
-  defp encode_base64(bin) when is_binary(bin), do: Base.encode64(bin, padding: false)
 end

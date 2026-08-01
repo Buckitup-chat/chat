@@ -3,6 +3,8 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Render do
 
   use Phoenix.Component
 
+  import ChatWeb.ElectricLive.Components
+
   alias Chat.Proto.Shortcode
 
   def render_identity_section(assigns) do
@@ -182,18 +184,6 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Render do
         {if @entry.state == :pending, do: "Reject", else: "Revoke"}
       </button>
       <span :if={blocked_note(@entry)} class="text-xs text-amber-700">{blocked_note(@entry)}</span>
-    </div>
-    """
-  end
-
-  attr :rating, :integer, required: true
-
-  defp stars(assigns) do
-    ~H"""
-    <div class="flex gap-0.5">
-      <span :for={i <- 1..5} class={if i <= @rating, do: "text-yellow-400", else: "text-gray-300"}>
-        &#9733;
-      </span>
     </div>
     """
   end

@@ -10,6 +10,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Entries do
 
   alias Chat.Data.ReviewRightEnvelope
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
+  alias ChatWeb.ElectricLive.ReviewContent
   alias EnigmaPq
 
   def build(reviews, passwords, post_rights, revoke_rights, crypt_skey) do
@@ -127,12 +128,9 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Entries do
   defp decrypt_content(_review, nil), do: %{rating: nil, text: nil, error: :no_password}
 
   defp decrypt_content(review, password) do
-    review.content_b64
-    |> Crypto.decode_binary_field()
-    |> EnigmaPq.aes_gcm_decrypt(password)
-    |> Jason.decode!()
-    |> then(fn [rating, _placeholder, text] -> %{rating: rating, text: text, error: nil} end)
-  rescue
-    _ -> %{rating: nil, text: nil, error: :undecryptable}
+    case ReviewContent.decode(review.content_b64, password) do
+      {:ok, decoded} -> Map.put(decoded, :error, nil)
+      :error -> %{rating: nil, text: nil, error: :undecryptable}
+    end
   end
 end

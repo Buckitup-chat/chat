@@ -10,6 +10,7 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.ReviewReader do
   alias Chat.Data.Schemas.ReviewList
   alias Chat.Data.Schemas.ReviewPublicPassword
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
+  alias ChatWeb.ElectricLive.ReviewContent
   alias ChatWeb.ElectricLive.ShapeReader
 
   @list_columns ~w(user_hash review_hash origin_hash password_b64 deleted_flag)
@@ -38,19 +39,19 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.ReviewReader do
 
   @doc "Decrypts a review's content with the given key. Returns a map or nil."
   def decrypt_review_content(review, review_password) do
-    with content when is_binary(content) <- Crypto.decode_binary_field(review.content_b64),
-         plaintext when is_binary(plaintext) <- EnigmaPq.aes_gcm_decrypt(content, review_password),
-         {:ok, [rating, _placeholder, text]} <- Jason.decode(plaintext) do
-      %{
-        review_hash: review.review_hash,
-        origin_hash: review.origin_hash,
-        author_hash: review.author_hash,
-        rating: rating,
-        text: text,
-        owner_timestamp: review.owner_timestamp
-      }
-    else
-      _ -> nil
+    case ReviewContent.decode(review.content_b64, review_password) do
+      {:ok, %{rating: rating, text: text}} ->
+        %{
+          review_hash: review.review_hash,
+          origin_hash: review.origin_hash,
+          author_hash: review.author_hash,
+          rating: rating,
+          text: text,
+          owner_timestamp: review.owner_timestamp
+        }
+
+      :error ->
+        nil
     end
   end
 

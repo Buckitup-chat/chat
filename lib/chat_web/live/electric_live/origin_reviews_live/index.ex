@@ -3,6 +3,8 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
 
   use ChatWeb, :live_view
 
+  import ChatWeb.ElectricLive.Components
+
   alias Chat.Data.Schemas.Origin
   alias Chat.Data.Schemas.Review
   alias Chat.Data.Schemas.ReviewPublicPassword
@@ -157,18 +159,6 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
           No reviews yet for this origin.
         </p>
       <% end %>
-    </div>
-    """
-  end
-
-  attr :rating, :integer, required: true
-
-  defp stars(assigns) do
-    ~H"""
-    <div class="flex gap-0.5">
-      <span :for={i <- 1..5} class={if i <= @rating, do: "text-yellow-400", else: "text-gray-300"}>
-        &#9733;
-      </span>
     </div>
     """
   end

@@ -57,12 +57,8 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion do
     promote_none(candidate)
   end
 
-  defp promote_by_mode(:post, candidate, origin_hash) do
-    promote_post(candidate, origin_hash)
-  end
-
-  defp promote_by_mode(:pre, candidate, origin_hash) do
-    promote_pre(candidate, origin_hash)
+  defp promote_by_mode(mode, candidate, origin_hash) do
+    promote_moderated(candidate, origin_hash, mode)
   end
 
   defp promote_none(candidate) do
@@ -90,7 +86,7 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion do
     end
   end
 
-  defp promote_post(candidate, origin_hash) do
+  defp promote_moderated(candidate, origin_hash, mode) do
     with {:card, %{crypt_pkey: pkey}} <- {:card, user_card(origin_hash)},
          {:pwd, %{} = pwd_c} <-
            {:pwd, find_password_candidate(candidate.review_hash, candidate.author_hash)},
@@ -99,47 +95,8 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion do
          {:valid_pwd, :ok} <- {:valid_pwd, Candidates.validate_candidate(pwd_c)},
          {:valid_null, :ok} <- {:valid_null, Candidates.validate_candidate(null_c)},
          {:order, true} <- {:order, Candidates.revoke_supersedes?(null_c, pwd_c)} do
-      {shared_secret, kem_ct, wrapped} = Candidates.wrap_candidate_for_origin(null_c, pkey)
-
-      %ReviewRevokeRightCandidate{}
-      |> ReviewRevokeRightCandidate.create_changeset(
-        right_candidate_attrs(candidate, origin_hash, kem_ct, wrapped)
-      )
-      |> RightCandidateData.insert_revoke_candidate()
-      |> then(fn
-        {:ok, _} -> {:ok, %{revoke_shared_secret: shared_secret}}
-        error -> error
-      end)
-    else
-      {:card, _} -> {:error, "origin card not found"}
-      {:pwd, nil} -> {:error, "password candidate required for post mode"}
-      {:null, nil} -> {:error, "null candidate required for post mode"}
-      {:valid_pwd, {:error, reason}} -> {:error, reason}
-      {:valid_null, {:error, reason}} -> {:error, reason}
-      {:order, false} -> {:error, "revoke timestamp must exceed password timestamp"}
-    end
-  end
-
-  defp promote_pre(candidate, origin_hash) do
-    with {:card, %{crypt_pkey: pkey}} <- {:card, user_card(origin_hash)},
-         {:pwd, %{} = pwd_c} <-
-           {:pwd, find_password_candidate(candidate.review_hash, candidate.author_hash)},
-         {:null, %{} = null_c} <-
-           {:null, find_null_candidate(candidate.review_hash, candidate.author_hash)},
-         {:valid_pwd, :ok} <- {:valid_pwd, Candidates.validate_candidate(pwd_c)},
-         {:valid_null, :ok} <- {:valid_null, Candidates.validate_candidate(null_c)},
-         {:order, true} <- {:order, Candidates.revoke_supersedes?(null_c, pwd_c)} do
-      {post_secret, post_kem, post_wrapped} = Candidates.wrap_candidate_for_origin(pwd_c, pkey)
-
       {revoke_secret, revoke_kem, revoke_wrapped} =
         Candidates.wrap_candidate_for_origin(null_c, pkey)
-
-      post_result =
-        %ReviewPostRightCandidate{}
-        |> ReviewPostRightCandidate.create_changeset(
-          right_candidate_attrs(candidate, origin_hash, post_kem, post_wrapped)
-        )
-        |> RightCandidateData.insert_post_candidate()
 
       revoke_result =
         %ReviewRevokeRightCandidate{}
@@ -148,14 +105,32 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion do
         )
         |> RightCandidateData.insert_revoke_candidate()
 
-      with {:ok, _} <- post_result,
-           {:ok, _} <- revoke_result do
-        {:ok, %{post_shared_secret: post_secret, revoke_shared_secret: revoke_secret}}
+      case mode do
+        :post ->
+          with {:ok, _} <- revoke_result do
+            {:ok, %{revoke_shared_secret: revoke_secret}}
+          end
+
+        :pre ->
+          {post_secret, post_kem, post_wrapped} =
+            Candidates.wrap_candidate_for_origin(pwd_c, pkey)
+
+          post_result =
+            %ReviewPostRightCandidate{}
+            |> ReviewPostRightCandidate.create_changeset(
+              right_candidate_attrs(candidate, origin_hash, post_kem, post_wrapped)
+            )
+            |> RightCandidateData.insert_post_candidate()
+
+          with {:ok, _} <- post_result,
+               {:ok, _} <- revoke_result do
+            {:ok, %{post_shared_secret: post_secret, revoke_shared_secret: revoke_secret}}
+          end
       end
     else
       {:card, _} -> {:error, "origin card not found"}
-      {:pwd, nil} -> {:error, "password candidate required for pre mode"}
-      {:null, nil} -> {:error, "null candidate required for pre mode"}
+      {:pwd, nil} -> {:error, "password candidate required for #{mode} mode"}
+      {:null, nil} -> {:error, "null candidate required for #{mode} mode"}
       {:valid_pwd, {:error, reason}} -> {:error, reason}
       {:valid_null, {:error, reason}} -> {:error, reason}
       {:order, false} -> {:error, "revoke timestamp must exceed password timestamp"}

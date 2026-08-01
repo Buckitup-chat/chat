@@ -262,7 +262,12 @@ defmodule Chat.Data.ReviewModerationTest do
       old_ts = RightCandidateData.get_post_candidate(ctx.review.review_hash).owner_timestamp
 
       review2 = insert_review(ctx.author, ctx.origin_hash)
-      pwd2 = build_candidate(ctx.author, review2, ctx.origin_hash, review2.review_password, timestamp: old_ts + 100)
+
+      pwd2 =
+        build_candidate(ctx.author, review2, ctx.origin_hash, review2.review_password,
+          timestamp: old_ts + 100
+        )
+
       _null2 = build_candidate(ctx.author, review2, ctx.origin_hash, nil, timestamp: old_ts + 101)
       {:ok, _} = Promotion.promote_candidate(pwd2)
 

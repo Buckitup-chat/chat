@@ -1,14 +1,22 @@
 defmodule Chat.Data.Shapes.ReviewPostRight do
   @moduledoc "Shape behaviour implementation for review_post_right."
 
-  use Chat.Data.Shapes.Shape
-  use Toolbox.OriginLog
-
   alias Chat.Data.ReviewPostRight, as: PostRightData
   alias Chat.Data.ReviewPostRight.Validation
   alias Chat.Data.Schemas.ReviewPostRight
   alias Chat.Data.Types.ReviewPostRightSignHash
   alias EnigmaPq
+
+  use Chat.Data.Shapes.Shape,
+    persist: [
+      upsert: &PostRightData.upsert_post_right/1,
+      get: &PostRightData.get_post_right/1,
+      lookup_key: :review_hash,
+      validate_insert: &Validation.validate_post_right_insert/1,
+      validate_update: &Validation.validate_post_right_update/2
+    ]
+
+  use Toolbox.OriginLog
 
   @impl true
   def shape_name, do: :review_post_right
@@ -33,53 +41,4 @@ defmodule Chat.Data.Shapes.ReviewPostRight do
   end
 
   def sync_derive_fields(right), do: right
-
-  @impl true
-  def sync_persist(operation, right) do
-    case operation do
-      :insert ->
-        right
-        |> Validation.validate_post_right_insert()
-        |> persist_insert(right)
-
-      :update ->
-        persist_update(right)
-    end
-  end
-
-  defp persist_insert(changeset, right) do
-    case changeset do
-      %{valid?: true} ->
-        PostRightData.upsert_post_right(changeset)
-
-      %{valid?: false} = cs ->
-        log("Invalid review_post_right insert: #{inspect(cs.errors)}", :warning)
-        {:ok, right}
-    end
-  end
-
-  defp persist_update(right) do
-    case PostRightData.get_post_right(right.review_hash) do
-      nil ->
-        {:ok, right}
-
-      existing ->
-        existing
-        |> Validation.validate_post_right_update(right)
-        |> apply_changeset(right)
-    end
-  end
-
-  defp apply_changeset(changeset, right) do
-    case changeset do
-      %{valid?: true} ->
-        %ReviewPostRight{}
-        |> ReviewPostRight.create_changeset(right |> Map.from_struct())
-        |> PostRightData.upsert_post_right()
-
-      %{valid?: false} = cs ->
-        log("Invalid review_post_right update: #{inspect(cs.errors)}", :warning)
-        {:ok, right}
-    end
-  end
 end

@@ -42,6 +42,20 @@ defmodule Chat.Data.Shapes.Shape do
       | ingest_configure_|     (ElectricController)
       |   writer/2       |---> Writer.allow(writer, schema, ...)
       +------------------+
+
+  ## Persist helpers
+
+  Pass `persist:` to `use Shape` to generate the standard
+  persist_insert/persist_update/apply_changeset triad:
+
+      use Chat.Data.Shapes.Shape,
+        persist: [
+          upsert: &ReviewData.upsert_review/1,
+          get: &ReviewData.get_review/1,
+          lookup_key: :review_hash,
+          validate_insert: &Validation.validate_review_insert/1,
+          validate_update: &Validation.validate_review_update/2
+        ]
   """
 
   @type operation :: :insert | :update
@@ -65,7 +79,16 @@ defmodule Chat.Data.Shapes.Shape do
 
   @callback ingest_configure_writer(Phoenix.Sync.Writer.t(), map()) :: Phoenix.Sync.Writer.t()
 
-  defmacro __using__(_opts) do
+  defmacro __using__(opts) do
+    persist_opts = Keyword.get(opts, :persist)
+
+    persist_ast =
+      if persist_opts do
+        build_persist_helpers(persist_opts)
+      else
+        nil
+      end
+
     quote do
       @behaviour Chat.Data.Shapes.Shape
 
@@ -89,6 +112,78 @@ defmodule Chat.Data.Shapes.Shape do
                      sync_derive_fields: 1,
                      sync_after_persist: 3,
                      ingest_configure_writer: 2
+
+      unquote(persist_ast)
     end
+  end
+
+  defp build_persist_helpers(opts) do
+    upsert_fn = Keyword.fetch!(opts, :upsert)
+    get_fn = Keyword.fetch!(opts, :get)
+    lookup_key = Keyword.fetch!(opts, :lookup_key)
+    validate_insert_fn = Keyword.fetch!(opts, :validate_insert)
+    validate_update_fn = Keyword.fetch!(opts, :validate_update)
+
+    lookup_call = build_lookup_call(get_fn, lookup_key)
+
+    quote do
+      @impl true
+      def sync_persist(operation, record) do
+        case operation do
+          :insert ->
+            changeset = unquote(validate_insert_fn).(record)
+            persist_insert(changeset, record)
+
+          :update ->
+            persist_update(record)
+        end
+      end
+
+      defp persist_insert(changeset, record) do
+        case changeset do
+          %{valid?: true} ->
+            unquote(upsert_fn).(changeset)
+
+          %{valid?: false} = cs ->
+            log("Invalid #{shape_name()} insert: #{inspect(cs.errors)}", :warning)
+            {:ok, record}
+        end
+      end
+
+      defp persist_update(record) do
+        case unquote(lookup_call) do
+          nil ->
+            {:ok, record}
+
+          existing ->
+            changeset = unquote(validate_update_fn).(existing, record)
+            apply_changeset(changeset, record)
+        end
+      end
+
+      defp apply_changeset(changeset, record) do
+        schema = schema_module()
+
+        case changeset do
+          %{valid?: true} ->
+            struct(schema)
+            |> schema.create_changeset(Map.from_struct(record))
+            |> unquote(upsert_fn).()
+
+          %{valid?: false} = cs ->
+            log("Invalid #{shape_name()} update: #{inspect(cs.errors)}", :warning)
+            {:ok, record}
+        end
+      end
+    end
+  end
+
+  defp build_lookup_call(get_fn, lookup_keys) when is_list(lookup_keys) do
+    args = for key <- lookup_keys, do: quote(do: Map.get(record, unquote(key)))
+    quote do: unquote(get_fn).(unquote_splicing(args))
+  end
+
+  defp build_lookup_call(get_fn, lookup_key) do
+    quote do: unquote(get_fn).(Map.get(record, unquote(lookup_key)))
   end
 end

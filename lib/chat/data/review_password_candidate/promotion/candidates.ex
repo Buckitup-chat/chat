@@ -8,7 +8,7 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion.Candidates do
 
   alias Chat.Data.ReviewPublicPassword.Validation, as: PublicPasswordValidation
   alias Chat.Data.ReviewRightEnvelope
-  alias Chat.Data.Schemas.ReviewPublicPassword
+  alias Chat.Data.Schemas.ReviewPasswordCandidate
   alias EnigmaPq
 
   @doc """
@@ -22,16 +22,8 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion.Candidates do
   so we reconstruct that row and reuse its validation verbatim.
   """
   def validate_candidate(candidate) do
-    %ReviewPublicPassword{
-      review_hash: candidate.review_hash,
-      sign_hash: candidate.sign_hash,
-      origin_hash: candidate.origin_hash,
-      password_b64: candidate.password_b64,
-      author_hash: candidate.author_hash,
-      deleted_flag: false,
-      owner_timestamp: candidate.owner_timestamp,
-      sign_b64: candidate.sign_b64
-    }
+    candidate
+    |> ReviewPasswordCandidate.to_public_password()
     |> PublicPasswordValidation.validate_review_public_password_insert()
     |> case do
       %{valid?: true} -> :ok

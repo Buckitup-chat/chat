@@ -1,7 +1,10 @@
 # Priorities
 
 
-13. Discover industrial / high-endurance SD cards. Consumer cards wear out under PostgreSQL write load (WAL + ~4MB file-chunk inserts) and fail with `mmc_erase` / "Card stuck being busy" errors, which crashes PostgreSQL init and leaves Electric unable to start. Evaluate industrial (pSLC/SLC) cards and/or moving the PG data directory to a USB SSD.
-
 2. Deprecate `sync` routes in favor of `v1/shapes`
 
+3. remove/edit origin by owner when no reviews left for moderation(for now)
+
+4. oldchat  chunk range download
+
+5. partial backup from user + dialogs with response/reaction

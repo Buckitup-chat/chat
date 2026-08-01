@@ -662,9 +662,12 @@ How are origins discovered? Options:
 
 What metadata should an origin carry beyond name? Address, hours, category, images — these are product decisions that don't affect the crypto architecture but need schema space.
 
-### 3. Rating system
+### 3. Rating system — resolved
 
-Should reviews include a structured rating (1-5 stars, thumbs up/down) separate from free-text content? If so, is the rating always public (aggregatable) or follows the review's visibility?
+Settled by the [Content model](#content-model): the rating is position 0 of the encrypted content
+array, so it follows the review's visibility and is not separately aggregatable. Implemented in
+`ReviewSandboxLive.ApiClient` (write) and read back by `OriginReviewsLive`,
+`ContactsReaderLive.ReviewReader`, and `ModerationSandboxLive.Entries`.
 
 ### 4. Comment threading
 
@@ -757,7 +760,23 @@ A user reading their contacts' reviews. Imports an identity, then derives the co
 
 ## Implementation phases
 
-### Phase 1 — Origin entity ✓
+> **Status snapshot — 2026-07-31 (branch `review_contact_side`).**
+>
+> | Layer | State |
+> |-------|-------|
+> | Data model (schemas, migrations, publication) | complete — 11 migrations, 8 shapes registered |
+> | Validation + moderation pipeline (all three modes) | complete and green |
+> | Electric shapes + HTTP ingest | complete |
+> | Sandbox LiveViews (5 personas + 6 directory views) | complete |
+> | **Main-app UI (`MainLive`, `chat-frontend`)** | **not started — zero references to origins or reviews** |
+> | Comments | not started (deferred by design) |
+>
+> 210 review/origin tests pass — 111 in `test/chat/data/{review*,origin_validation_test}`, 99 in
+> `test/chat_web/controllers/electric_controller_{review,candidate_ingest,review_list_update}*` and
+> the review/moderation sandbox tests. Server-side line coverage 55–98 %; the sandbox LiveViews are
+> mostly 0 % (see [Known gaps and defects](#known-gaps-and-defects)).
+
+### Phase 1 — Origin entity — data layer ✓, UI ✗
 
 - [x] `origins` Ecto schema and migration (`Chat.Data.Schemas.Origin`, `20260715144320_create_origins`)
 - [x] Electric publication (`20260715144321_add_origins_to_electric_publication`)
@@ -772,23 +791,32 @@ A user reading their contacts' reviews. Imports an identity, then derives the co
 - [x] Origins directory LiveView — real-time Electric stream listing (`OriginsLive`)
 - [ ] Origin creation in main app UI (name, moderation mode)
 - [ ] Origin directory / listing in main app UI
+- [ ] Origin metadata beyond `name` (open question 2) — the `origins` table carries only `name`
+- [ ] Origin discovery beyond "list everything" (open question 1)
 
-### Phase 2 — Public reviews and moderation pipeline ✓ (in progress)
+### Phase 2 — Public reviews and moderation pipeline — data layer ✓, UI ✗
 
 - [x] Hash types: `ReviewHash`, `ReviewSignHash`, `ReviewPasswordSignHash`, `ReviewPostRightSignHash`, `ReviewRevokeRightSignHash`, `ReviewListSignHash` with prefixes in `Consts`
 - [x] `review` Ecto schema and migration (`Chat.Data.Schemas.Review`, `20260718100000_create_review`)
-- [x] `review_public_passwords` schema and migration (`Chat.Data.Schemas.ReviewPublicPassword`, `20260718100001_create_review_public_passwords`)
+- [x] `review_public_passwords` schema and migration (`Chat.Data.Schemas.ReviewPublicPassword`, `20260718100001_create_review_passwords`)
 - [x] `review_password_candidate` schema and migration — server-internal, not Electric-published (`20260718100002`)
 - [x] `review_post_right` schema and migration (`20260718100003`)
 - [x] `review_revoke_right` schema and migration (`20260718100004`)
 - [x] `review_list` schema and migration (`20260718100005`)
 - [x] `review_post_right_candidate` / `review_revoke_right_candidate` staging schemas and migration (`20260718100007`)
 - [x] Electric publication for review, review_public_passwords, review_post_right, review_revoke_right, review_list (`20260718100006`)
+- [x] `REVOKE DELETE` on the five content tables (`20260718100008_revoke_delete_on_review_tables`) — see the caveat in [Known gaps](#known-gaps-and-defects)
+- [x] Right-envelope HKDF context shared by wrapper and every unwrapper (`Chat.Data.ReviewRightEnvelope`)
 - [x] Data contexts with LWW upsert: `Chat.Data.Review`, `ReviewPublicPassword`, `ReviewPasswordCandidate`, `ReviewRightCandidate`, `ReviewPostRight`, `ReviewRevokeRight`, `ReviewList`
 - [x] Validation modules — peer sync + HTTP ingestion, enforcing moderation-proof, author/origin binding, owner-cert, and right cross-table binding: `Review.Validation`, `ReviewPublicPassword.Validation`, `ReviewPostRight.Validation`, `ReviewRevokeRight.Validation`, `ReviewList.Validation`, `Origin.Validation`
 - [x] Electric shapes: `Review`, `ReviewPublicPasswords`, `ReviewPostRight`, `ReviewRevokeRight`, `ReviewList` — registered in `Chat.Data.Shapes`
 - [x] Two-phase candidate promotion for all moderation modes (`ReviewPasswordCandidate.Promotion`: `promote_candidate` + `complete_promotion`)
-- [x] Tests: `review_moderation_test`, `review_list_validation_test`, `review_public_password_validation_test`, `origin_validation_test`, `review_right_validation_test`, `review_shapes_test`, `electric_controller_review_test`
+- [x] Tests (241 passing): `review_moderation_test`, `review_moderation_concurrency_test`,
+      `review_list_validation_test`, `review_list_access_test`, `review_public_password_validation_test`,
+      `review_validation_test`, `origin_validation_test`, `review_right_validation_test`,
+      `review_shapes_test`, `electric_controller_review_test`, `electric_controller_candidate_ingest_test`,
+      `electric_controller_review_list_update_test`, plus sandbox unit tests
+      (`review_sandbox_live/{proofs,render_review_list}_test`, `moderation_sandbox_live/{entries,identity,render}_test`)
 - [x] Review sandbox LiveView — interactive testing (`ReviewSandboxLive`)
 - [x] Reviews directory LiveView — real-time Electric stream listing (`ReviewsLive`)
 - [x] Origin reviews public viewer — browse origins and read decrypted public reviews (`OriginReviewsLive`)
@@ -804,9 +832,13 @@ A user reading their contacts' reviews. Imports an identity, then derives the co
   - the author's own sign_hashes are the source of truth: the server copies a candidate's `sign_hash` verbatim on promotion, pre mode deletes the candidates, and ML-DSA-87 signing is randomized, so they are captured at steps 3-4 and cannot be recomputed
   - shape reads of `review_public_passwords` / `review_post_right` / `review_revoke_right` are a probe, not a gate — Electric lags the Postgres commit the server validates against, so absence never blocks; only a promoted row that differs from what the author signed does
 - [x] Shared `ElectricLive.ShapeReader` and `ElectricLive.RequestLog` — one shape-read implementation and one request-log component instead of per-sandbox copies
+- [x] Author-side KEM-wrapping verification before signing a right candidate (`ReviewSandboxLive.Verification`, `.RenderVerification`)
 - [ ] Review creation in main app UI
 - [ ] Review listing in main app UI
 - [ ] Moderation UI for origin identity in main app UI (approve/reject/revoke)
+- [ ] Review edit chain semantics (open question 5) — `parent_sign_hash` is stored and the
+      update path works, but nothing validates that a version chain is well-formed, and no
+      client writes edits
 
 ### Phase 3 — Contacts channel and owner controls
 
@@ -825,6 +857,9 @@ accepted (see [Contacts](#contacts)).
 - [ ] contacts-visible hidden reviews in the UI (author's contacts see moderation-hidden reviews, marked as such)
 - [ ] "message this origin" entry point in the origin UI — opens a standard dialog with the origin's `user_hash`
 - [ ] owner-signed authorization for dangerous origin ops (moderation mode, soft delete) — see the Status note under Origin creation
+- [ ] origin keys in User Storage for multi-device access — the Origin creation section specifies it,
+      but `OriginSandboxLive` only exports/imports a key file. `ReviewSandboxLive.ListPassword` is the
+      pattern to copy (write-once slot, AES-GCM under a key derived from the owner's `crypt_skey`)
 
 ### Phase 4 — `to_contacts` visibility tier (future)
 
@@ -838,3 +873,47 @@ is a review tier that never enters public moderation at all (see [Future: to_con
 ### Phase 5 — Operational hardening
 
 - [ ] Stale-candidate GC — schedule periodic cleanup via `ReviewRightCandidate.delete_stale_candidates/1` (exists but never called; unsigned right candidates accumulate indefinitely without it)
+- [ ] Stale *password* candidate GC — `review_password_candidate` has no cleanup at all.
+      `Promotion.delete_password_candidates/1` runs only inside `complete_promotion`, so a
+      post/pre-mode review whose author never signs leaves its candidates forever, as does any
+      candidate rejected at promotion time
+- [ ] Clean rejection instead of a 500 for stale HTTP updates — see [Known gaps](#known-gaps-and-defects)
+- [ ] Connect the app as a limited (non-superuser) Postgres role so `REVOKE DELETE` takes effect
+
+## Known gaps and defects
+
+Behaviour that diverges from this document, pinned by tests where a failing assertion exists.
+
+### Stale HTTP updates raise instead of being rejected
+
+`validate_timestamp_newer_than_existing/1` marks the changeset `action: :ignore`, which
+`Phoenix.Sync.Writer` then hands to `Ecto.Multi.update/4` — which refuses it, so the client gets a
+500 rather than a clean 4xx. The peer-sync path handles `:ignore` explicitly
+(`Shapes.ReviewList.apply_changeset/2`); the HTTP path does not. Affects `review_list`, `review`,
+`origin`, and every other ingestable table. Pinned by
+`electric_controller_review_list_update_test.exs` ("a backwards timestamp raises instead of being
+ignored (known defect)").
+
+### Equal-timestamp updates diverge between node and peers
+
+`validate_timestamp_newer_than_existing/1` reads `get_change/2`, which is `nil` when the cast value
+equals the stored one — so an equal timestamp passes locally, while the upsert query's
+`owner_timestamp < EXCLUDED` guard makes every peer reject it. `owner_timestamp` is unix seconds, so
+two clicks in the same second reach this. `ReviewSandboxLive.ReviewList.fill_password_proof/4` works
+around it with `max(previous + 1, now)`. Pinned by the same test file.
+
+### Password candidates are not signature-checked at ingest
+
+`ReviewPasswordCandidate.Validation.candidate_validate/3` checks the changeset and the
+review/author binding, but not `sign_b64`. The signature *is* verified before anything is minted or
+wrapped (`Promotion.Candidates.validate_candidate/1`), so nothing forged ever reaches
+`review_public_passwords` — but in post/pre mode a lone badly-signed candidate is stored and returns
+`{:ok, :pending}`, and nothing ever removes it. Ingest-time verification would reject it at the door
+and is cheaper than the GC job it currently requires.
+
+### Two-tier owner/origin split is not enforced
+
+Origin `update` — including `moderation_mode` and `deleted_flag` — is authorized by the *origin
+identity's* signature, so a delegated moderator can change moderation mode or soft-delete the
+origin. See the Status note under [Origin creation](#origin-creation).
+

@@ -55,6 +55,7 @@ defmodule Chat.Data.File do
     )
   end
 
+  @doc "Updates a file record; the only change this ever applies is marking it deleted."
   def update_file(%File{} = existing, %File{} = new_file) do
     existing
     |> File.delete_changeset(Map.from_struct(new_file))
@@ -204,6 +205,17 @@ defmodule Chat.Data.File do
   @cooldown_seconds 900
 
   def fetchable_missing_chunks_for_sync(limit, max_attempts, opts \\ []) do
+    fetchable_missing_chunks_prioritized(limit, max_attempts, :peer_url, opts)
+  end
+
+  def fetchable_missing_chunks_for_copy(limit, max_attempts, opts \\ []) do
+    fetchable_missing_chunks_prioritized(limit, max_attempts, :source_drive_id, opts)
+  end
+
+  defp maybe_cap_attempts(query, nil), do: query
+  defp maybe_cap_attempts(query, max), do: where(query, [m], m.attempts < ^max)
+
+  defp fetchable_missing_chunks_prioritized(limit, max_attempts, priority_field, opts) do
     cooldown_threshold = TimeKeeper.now_unix() - @cooldown_seconds
 
     from(m in MissingChunk,
@@ -212,28 +224,12 @@ defmodule Chat.Data.File do
           (m.attempts < ^@cooldown_attempts or m.updated_at < ^cooldown_threshold),
       order_by: [
         asc: m.attempts,
-        asc: fragment("CASE WHEN ? IS NOT NULL THEN 0 ELSE 1 END", m.peer_url),
+        asc: fragment("CASE WHEN ? IS NOT NULL THEN 0 ELSE 1 END", field(m, ^priority_field)),
         asc: fragment("random()")
       ],
       limit: ^limit
     )
     |> maybe_cap_attempts(max_attempts)
-    |> use_repo(opts).all()
-  end
-
-  defp maybe_cap_attempts(query, nil), do: query
-  defp maybe_cap_attempts(query, max), do: where(query, [m], m.attempts < ^max)
-
-  def fetchable_missing_chunks_for_copy(limit, max_attempts, opts \\ []) do
-    from(m in MissingChunk,
-      where: not is_nil(m.data_hash) and m.attempts < ^max_attempts,
-      order_by: [
-        asc: m.attempts,
-        asc: fragment("CASE WHEN ? IS NOT NULL THEN 0 ELSE 1 END", m.source_drive_id),
-        asc: fragment("random()")
-      ],
-      limit: ^limit
-    )
     |> use_repo(opts).all()
   end
 

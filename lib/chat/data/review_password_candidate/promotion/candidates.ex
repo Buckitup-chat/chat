@@ -46,17 +46,13 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion.Candidates do
   """
   def wrap_candidate_for_origin(candidate, origin_crypt_pkey) do
     row_data =
-      Jason.encode!(%{
-        review_hash: candidate.review_hash,
-        sign_hash: candidate.sign_hash,
-        origin_hash: candidate.origin_hash,
-        password_b64:
-          if(candidate.password_b64, do: Base.encode64(candidate.password_b64, padding: false)),
-        author_hash: candidate.author_hash,
-        deleted_flag: false,
-        owner_timestamp: candidate.owner_timestamp,
-        sign_b64: Base.encode64(candidate.sign_b64, padding: false)
-      })
+      candidate
+      |> ReviewPasswordCandidate.to_public_password()
+      |> Map.from_struct()
+      |> Map.drop([:__meta__])
+      |> Map.update!(:password_b64, &(&1 && Base.encode64(&1, padding: false)))
+      |> Map.update!(:sign_b64, &Base.encode64(&1, padding: false))
+      |> Jason.encode!()
 
     {shared_secret, kem_ct} = EnigmaPq.encapsulate_secret(origin_crypt_pkey)
     wrap_key = ReviewRightEnvelope.wrap_key(shared_secret)

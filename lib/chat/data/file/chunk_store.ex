@@ -78,7 +78,7 @@ defmodule Chat.Data.File.ChunkStore do
     end
   end
 
-  defp file_dir(file_id, override_base_dir) do
+  def file_dir(file_id, override_base_dir \\ nil) do
     "f_" <> hex = file_id
     shard = String.slice(hex, -2, 2)
 

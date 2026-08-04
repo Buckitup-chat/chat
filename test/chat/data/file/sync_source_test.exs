@@ -23,10 +23,24 @@ defmodule Chat.Data.File.SyncSourceTest do
     def lane_idle?(_, _), do: true
   end
 
+  defmodule ReqMock do
+    def get(url, _opts) do
+      Agent.update(:ss_test_calls, &[url | &1])
+      fail_prefix = Agent.get(:ss_test_fail_peer, & &1)
+
+      if fail_prefix && String.starts_with?(url, fail_prefix) do
+        {:error, :econnrefused}
+      else
+        {:ok, %{status: 200, body: "mock_body"}}
+      end
+    end
+  end
+
   rewire(SyncSource, [
     {Chat.Db, DbMock},
     {Chat.Data.File, FileDataMock},
-    {Chat.Data.File.ChunkWriter, WriterMock}
+    {Chat.Data.File.ChunkWriter, WriterMock},
+    {Req, ReqMock}
   ])
 
   @drive_id "test_sync_drive_#{System.unique_integer([:positive])}"
@@ -34,6 +48,16 @@ defmodule Chat.Data.File.SyncSourceTest do
   setup do
     unless Process.whereis(Chat.TaskSupervisor),
       do: start_supervised!({Task.Supervisor, name: Chat.TaskSupervisor})
+
+    start_supervised!(%{
+      id: :ss_test_calls,
+      start: {Agent, :start_link, [fn -> [] end, [name: :ss_test_calls]]}
+    })
+
+    start_supervised!(%{
+      id: :ss_test_fail_peer,
+      start: {Agent, :start_link, [fn -> nil end, [name: :ss_test_fail_peer]]}
+    })
 
     pid = start_source(@drive_id)
 
@@ -101,8 +125,27 @@ defmodule Chat.Data.File.SyncSourceTest do
     test "does not crash when no peers available", %{pid: pid} do
       GenServer.cast(pid, {:chunk_fetchable, "f_abc123", 0, "http://gone:4444"})
       wait_for_cast(pid)
+      Process.sleep(200)
 
       assert Process.alive?(pid)
+    end
+
+    test "falls back to a different peer when the assigned peer's fetch fails", %{pid: pid} do
+      GenServer.cast(pid, {:peer_connected, "http://primary:4444"})
+      wait_for_cast(pid)
+      GenServer.cast(pid, {:peer_connected, "http://fallback:4444"})
+      wait_for_cast(pid)
+
+      Agent.update(:ss_test_fail_peer, fn _ -> "http://primary:4444" end)
+
+      GenServer.cast(pid, {:chunk_fetchable, "f_abc123", 0, "http://primary:4444"})
+      wait_for_cast(pid)
+      Process.sleep(200)
+
+      urls = Agent.get(:ss_test_calls, &Enum.reverse(&1))
+
+      assert Enum.any?(urls, &String.starts_with?(&1, "http://primary:4444"))
+      assert Enum.any?(urls, &String.starts_with?(&1, "http://fallback:4444"))
     end
   end
 

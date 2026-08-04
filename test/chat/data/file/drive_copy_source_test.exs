@@ -23,7 +23,15 @@ defmodule Chat.Data.File.DriveCopySourceTest do
   end
 
   defmodule ChunkStoreMock do
-    def fetch(_file_id, _chunk_index, _base_dir), do: {:ok, "mock_body"}
+    def fetch(_file_id, _chunk_index, base_dir) do
+      Agent.update(:dcs_test_calls, &[base_dir | &1])
+
+      if base_dir == Agent.get(:dcs_test_fail_dir, & &1) do
+        {:error, :enoent}
+      else
+        {:ok, "mock_body"}
+      end
+    end
   end
 
   rewire(DriveCopySource, [
@@ -38,6 +46,16 @@ defmodule Chat.Data.File.DriveCopySourceTest do
   setup do
     unless Process.whereis(Chat.TaskSupervisor),
       do: start_supervised!({Task.Supervisor, name: Chat.TaskSupervisor})
+
+    start_supervised!(%{
+      id: :dcs_test_calls,
+      start: {Agent, :start_link, [fn -> [] end, [name: :dcs_test_calls]]}
+    })
+
+    start_supervised!(%{
+      id: :dcs_test_fail_dir,
+      start: {Agent, :start_link, [fn -> nil end, [name: :dcs_test_fail_dir]]}
+    })
 
     pid = start_source(@drive_id)
 
@@ -113,8 +131,24 @@ defmodule Chat.Data.File.DriveCopySourceTest do
 
       GenServer.cast(pid, {:chunk_fetchable, "f_abc123", 0, "sys_gone"})
       wait_for_cast(pid)
+      Process.sleep(200)
 
-      assert Process.alive?(pid)
+      assert Agent.get(:dcs_test_calls, & &1) == ["/mnt/usb1"]
+    end
+
+    test "falls back to a different source when the assigned source's fetch fails", %{pid: pid} do
+      inject_drive(pid, "sys_primary", "/mnt/primary")
+      inject_drive(pid, "sys_fallback", "/mnt/fallback")
+      Agent.update(:dcs_test_fail_dir, fn _ -> "/mnt/primary" end)
+
+      GenServer.cast(pid, {:chunk_fetchable, "f_abc123", 0, "sys_primary"})
+      wait_for_cast(pid)
+      Process.sleep(200)
+
+      assert Agent.get(:dcs_test_calls, &Enum.reverse(&1)) == [
+               "/mnt/primary",
+               "/mnt/fallback"
+             ]
     end
   end
 

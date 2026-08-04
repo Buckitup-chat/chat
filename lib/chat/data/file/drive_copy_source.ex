@@ -63,8 +63,17 @@ defmodule Chat.Data.File.DriveCopySource do
 
   @impl Chat.Data.File.ChunkSource
   def fetch_chunk(state, file_id, chunk_index, source_drive_id) do
-    source_dir = resolve_source_dir(state.other_drives, source_drive_id)
-    ChunkStore.fetch(file_id, chunk_index, source_dir)
+    source_try_result =
+      state.other_drives
+      |> Map.get(source_drive_id)
+      |> try_fetch(file_id, chunk_index)
+
+    with {:error, _reason} <- source_try_result do
+      state.other_drives
+      |> Map.delete(source_drive_id)
+      |> pick_random_drive()
+      |> try_fetch(file_id, chunk_index)
+    end
   end
 
   @impl Chat.Data.File.ChunkSource
@@ -151,11 +160,10 @@ defmodule Chat.Data.File.DriveCopySource do
 
   # Helpers
 
-  defp resolve_source_dir(other_drives, source_drive_id) when is_binary(source_drive_id) do
-    Map.get(other_drives, source_drive_id) || pick_random_drive(other_drives)
-  end
+  defp try_fetch(nil, _file_id, _chunk_index), do: {:error, :no_source}
 
-  defp resolve_source_dir(other_drives, _), do: pick_random_drive(other_drives)
+  defp try_fetch(source_dir, file_id, chunk_index),
+    do: ChunkStore.fetch(file_id, chunk_index, source_dir)
 
   defp pick_random_drive(drives) when map_size(drives) == 0, do: nil
   defp pick_random_drive(drives), do: drives |> Map.values() |> Enum.random()

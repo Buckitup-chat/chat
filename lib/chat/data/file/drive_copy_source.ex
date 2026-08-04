@@ -1,8 +1,6 @@
 defmodule Chat.Data.File.DriveCopySource do
   @moduledoc "Event-driven sink for drive-to-drive chunk copy. Reads from other drives' ChunkStores."
 
-  @internal_files_base_dir Application.compile_env(:chat, :files_base_dir)
-
   use Chat.Data.File.ChunkSource
 
   alias Chat.Data.File.ChunkStore
@@ -121,7 +119,7 @@ defmodule Chat.Data.File.DriveCopySource do
     internal_drive =
       case query_system_id(Chat.Repo) do
         {:ok, system_id} ->
-          [{system_id, @internal_files_base_dir}]
+          [{system_id, Chat.Db.internal_files_dir()}]
 
         _ ->
           []

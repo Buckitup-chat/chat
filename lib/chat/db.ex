@@ -12,6 +12,7 @@ defmodule Chat.Db do
   alias Chat.Db.WriteQueue.FileReader
 
   @db_version "v.10.1"
+  @db_location Application.compile_env(:chat, :cub_db_file, "priv/data")
 
   def list(range, transform), do: Queries.list(db(), range, transform)
   def list({_min, _max} = range), do: Queries.list(db(), range)
@@ -92,9 +93,12 @@ defmodule Chat.Db do
   end
 
   def file_path do
-    data_dir = Application.get_env(:chat, :cub_db_file, "priv/data")
+    data_dir = Application.get_env(:chat, :cub_db_file, @db_location)
     "#{data_dir}/#{@db_version}"
   end
+
+  @doc "Internal drive's own chunk-file directory, independent of which drive is currently active for writes."
+  def internal_files_dir, do: file_path() <> "_files"
 
   def version_path, do: @db_version
 

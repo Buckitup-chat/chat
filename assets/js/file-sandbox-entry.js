@@ -4,7 +4,7 @@ import {
   signMlDsa87, hash, encryptChunk, decryptChunk,
   buildSignaturePayload
 } from './file-sandbox/crypto.js';
-import { ingest, putChunk, fetchShape, fetchShapeWhere } from './file-sandbox/electric-client.js';
+import { ingest, putChunk, fetchShape, fetchShapeWhere, fetchChunkStatuses } from './file-sandbox/electric-client.js';
 import { chunkFile, generateFileId, generateEncSecret } from './file-sandbox/file-chunker.js';
 import { VideoSWStreamer } from './file-sandbox/video-sw-streamer.js';
 import {
@@ -643,6 +643,15 @@ function setVideoStatus(msg) {
 
 // --- My Files ---
 
+function isDeletedFile(f) {
+  return f.deleted_flag === 'true' || f.deleted_flag === true || f.deleted_flag === 't';
+}
+
+function formatChunkStatus(status, total) {
+  if (!status) return `?/?/${total}`;
+  return `${status.on_disk}/${status.missing}/${total}`;
+}
+
 async function loadMyFiles() {
   if (!state.keys) return;
 
@@ -655,13 +664,22 @@ async function loadMyFiles() {
       `uploader_hash = '${state.keys.user_hash}'`
     );
     console.log('[My Files] fetched', files.length, 'files:', files);
-    renderFilesList(files);
+
+    const activeIds = files.filter(f => !isDeletedFile(f)).map(f => f.file_id);
+    let statuses = {};
+    try {
+      statuses = await fetchChunkStatuses(state.baseUrl, activeIds);
+    } catch (e) {
+      console.warn('[My Files] chunk status fetch failed:', e);
+    }
+
+    renderFilesList(files, statuses);
   } catch (e) {
     listEl.innerHTML = `<p class="text-sm status-error">Failed to load files: ${e.message}</p>`;
   }
 }
 
-function renderFilesList(files) {
+function renderFilesList(files, statuses = {}) {
   const listEl = document.getElementById('files-list');
 
   if (files.length === 0) {
@@ -672,14 +690,15 @@ function renderFilesList(files) {
   const rows = files.map(f => {
     const size = formatBytes(parseInt(f.total_size));
     const shortId = f.file_id;
-    const deleted = f.deleted_flag === 'true' || f.deleted_flag === true || f.deleted_flag === 't';
+    const deleted = isDeletedFile(f);
     const rowClass = deleted ? 'border-b opacity-50' : 'border-b';
     const nameStyle = deleted ? 'line-through' : '';
+    const chunksLabel = deleted ? f.chunk_count : formatChunkStatus(statuses[f.file_id], f.chunk_count);
     return `
       <tr class="${rowClass}">
         <td class="py-2 pr-3 font-mono text-xs" style="text-decoration:${nameStyle}">${shortId}</td>
         <td class="py-2 pr-3 text-sm">${size}</td>
-        <td class="py-2 pr-3 text-sm">${f.chunk_count}</td>
+        <td class="py-2 pr-3 text-sm" title="chunks on disk / missing / total">${chunksLabel}</td>
         <td class="py-2 text-sm space-x-2">${deleted
           ? '<span class="px-2 py-1 bg-gray-200 text-gray-500 rounded text-xs">Deleted</span>'
           : `<button class="x-use-file px-2 py-1 bg-green-100 text-green-800 rounded text-xs hover:bg-green-200"
@@ -696,7 +715,7 @@ function renderFilesList(files) {
         <tr class="border-b text-xs text-gray-500 uppercase">
           <th class="py-2 pr-3">File ID</th>
           <th class="py-2 pr-3">Size</th>
-          <th class="py-2 pr-3">Chunks</th>
+          <th class="py-2 pr-3" title="chunks on disk / missing / total">Chunks (disk/missing/total)</th>
           <th class="py-2">Actions</th>
         </tr>
       </thead>

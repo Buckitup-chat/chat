@@ -193,6 +193,16 @@ defmodule Chat.Data.File do
     |> repo().one()
   end
 
+  def missing_chunk_counts(file_ids) do
+    from(m in MissingChunk,
+      where: m.file_id in ^file_ids,
+      group_by: m.file_id,
+      select: {m.file_id, count()}
+    )
+    |> repo().all()
+    |> Map.new()
+  end
+
   def get_missing_chunk_hash(file_id, chunk_index, opts \\ []) do
     from(m in MissingChunk,
       where: m.file_id == ^file_id and m.chunk_index == ^chunk_index,
@@ -212,9 +222,6 @@ defmodule Chat.Data.File do
     fetchable_missing_chunks_prioritized(limit, max_attempts, :source_drive_id, opts)
   end
 
-  defp maybe_cap_attempts(query, nil), do: query
-  defp maybe_cap_attempts(query, max), do: where(query, [m], m.attempts < ^max)
-
   defp fetchable_missing_chunks_prioritized(limit, max_attempts, priority_field, opts) do
     cooldown_threshold = TimeKeeper.now_unix() - @cooldown_seconds
 
@@ -232,6 +239,9 @@ defmodule Chat.Data.File do
     |> maybe_cap_attempts(max_attempts)
     |> use_repo(opts).all()
   end
+
+  defp maybe_cap_attempts(query, nil), do: query
+  defp maybe_cap_attempts(query, max), do: where(query, [m], m.attempts < ^max)
 
   def missing_chunks_for_peer(peer_url, opts \\ []) do
     from(m in MissingChunk,

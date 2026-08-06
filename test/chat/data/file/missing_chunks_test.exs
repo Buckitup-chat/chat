@@ -116,6 +116,37 @@ defmodule Chat.Data.File.MissingChunksTest do
     end
   end
 
+  describe "missing_chunk_counts/1" do
+    test "returns a map keyed by file_id with correct counts" do
+      file_id_a = FileId.generate()
+      file_id_b = FileId.generate()
+
+      FileData.insert_missing_chunks_placeholders(file_id_a, 3, nil, 1_000_000)
+      FileData.insert_missing_chunks_placeholders(file_id_b, 1, nil, 1_000_000)
+
+      counts = FileData.missing_chunk_counts([file_id_a, file_id_b])
+
+      assert counts[file_id_a] == 3
+      assert counts[file_id_b] == 1
+    end
+
+    test "omits a file_id with zero missing rows" do
+      file_id_missing = FileId.generate()
+      file_id_clean = FileId.generate()
+
+      FileData.insert_missing_chunks_placeholders(file_id_missing, 2, nil, 1_000_000)
+
+      counts = FileData.missing_chunk_counts([file_id_missing, file_id_clean])
+
+      assert counts[file_id_missing] == 2
+      refute Map.has_key?(counts, file_id_clean)
+    end
+
+    test "returns an empty map for an empty file_ids list" do
+      assert FileData.missing_chunk_counts([]) == %{}
+    end
+  end
+
   describe "get_missing_chunk_hash/3" do
     test "returns data_hash for a specific chunk" do
       file_id = FileId.generate()

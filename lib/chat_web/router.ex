@@ -210,6 +210,7 @@ defmodule ChatWeb.Router do
       sync("/dialog_message_receipt", Chat.Data.Schemas.DialogMessageReceipt)
 
       get "/file_chunk/:file_id/:chunk_index", FileChunkController, :show
+      get "/file_chunk_status", FileChunkStatusController, :index
 
       get "/system_identifier", SystemIdentifierController, :show
 

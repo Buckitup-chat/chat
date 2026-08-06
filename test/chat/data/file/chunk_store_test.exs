@@ -46,15 +46,11 @@ defmodule Chat.Data.File.ChunkStoreTest do
 
     assert :ok = ChunkStore.put(file_id, 0, "real", base_dir)
 
-    # Create a stale .tmp file manually
-    "f_" <> hex = file_id
-    shard = String.slice(hex, -2, 2)
-    stale_tmp = Path.join([base_dir, "pq_files", shard, file_id, "stale.tmp"])
+    stale_tmp = Path.join(file_dir(file_id, base_dir), "stale.tmp")
     File.write!(stale_tmp, "stale")
     File.touch!(stale_tmp, System.os_time(:second) - 3600)
 
-    # Create a recent .tmp file
-    recent_tmp = Path.join([base_dir, "pq_files", shard, file_id, "recent.tmp"])
+    recent_tmp = Path.join(file_dir(file_id, base_dir), "recent.tmp")
     File.write!(recent_tmp, "recent")
 
     ChunkStore.sweep_tmp_files(:timer.minutes(30), base_dir)
@@ -69,13 +65,9 @@ defmodule Chat.Data.File.ChunkStoreTest do
     for i <- 0..2, do: ChunkStore.put(file_id, i, "chunk_#{i}", base_dir)
 
     assert {:ok, _} = ChunkStore.fetch(file_id, 0, base_dir)
+    assert File.dir?(file_dir(file_id, base_dir))
 
-    "f_" <> hex = file_id
-    shard = String.slice(hex, -2, 2)
-    file_dir = Path.join([base_dir, "pq_files", shard, file_id])
-    assert File.dir?(file_dir)
-
-    File.rm_rf!(file_dir)
+    File.rm_rf!(file_dir(file_id, base_dir))
     assert {:error, :enoent} = ChunkStore.fetch(file_id, 0, base_dir)
   end
 
@@ -95,9 +87,38 @@ defmodule Chat.Data.File.ChunkStoreTest do
     assert {:ok, "second"} = ChunkStore.fetch(file_id, 0, base_dir)
   end
 
+  test "count_on_disk returns 0 when no directory exists", %{base_dir: base_dir} do
+    assert ChunkStore.count_on_disk(random_file_id(), base_dir) == 0
+  end
+
+  test "count_on_disk counts chunks written for a file", %{base_dir: base_dir} do
+    file_id = random_file_id()
+
+    for i <- 0..2, do: ChunkStore.put(file_id, i, "chunk_#{i}", base_dir)
+
+    assert ChunkStore.count_on_disk(file_id, base_dir) == 3
+  end
+
+  test "count_on_disk excludes stray .tmp files", %{base_dir: base_dir} do
+    file_id = random_file_id()
+
+    :ok = ChunkStore.put(file_id, 0, "data", base_dir)
+
+    stray_tmp = Path.join(file_dir(file_id, base_dir), "0000000001.tmp")
+    File.write!(stray_tmp, "partial")
+
+    assert ChunkStore.count_on_disk(file_id, base_dir) == 1
+  end
+
   # Helpers
 
   defp random_file_id do
     "f_" <> Base.encode16(:crypto.strong_rand_bytes(16), case: :lower)
+  end
+
+  defp file_dir(file_id, base_dir) do
+    "f_" <> hex = file_id
+    shard = String.slice(hex, -2, 2)
+    Path.join([base_dir, "pq_files", shard, file_id])
   end
 end

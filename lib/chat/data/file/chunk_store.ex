@@ -20,6 +20,16 @@ defmodule Chat.Data.File.ChunkStore do
     file_id |> chunk_path(chunk_index, base_dir) |> File.read()
   end
 
+  def count_on_disk(file_id, base_dir \\ nil) do
+    file_id
+    |> file_dir(base_dir)
+    |> File.ls()
+    |> case do
+      {:ok, entries} -> entries |> Enum.reject(&String.ends_with?(&1, ".tmp")) |> length()
+      {:error, _reason} -> 0
+    end
+  end
+
   def delete_file(file_id) do
     file_id |> file_dir(nil) |> File.rm_rf()
     :ok
@@ -59,12 +69,6 @@ defmodule Chat.Data.File.ChunkStore do
     end
   end
 
-  defp chunk_path(file_id, chunk_index, override_base_dir) do
-    pad_index = chunk_index |> to_string() |> String.pad_leading(@index_padding, "0")
-
-    Path.join(file_dir(file_id, override_base_dir), pad_index)
-  end
-
   def sync_dir(file_id, base_dir \\ nil) do
     dir = file_dir(file_id, base_dir)
 
@@ -78,11 +82,16 @@ defmodule Chat.Data.File.ChunkStore do
     end
   end
 
-  def file_dir(file_id, override_base_dir \\ nil) do
-    "f_" <> hex = file_id
+  def file_dir("f_" <> hex = file_id, override_base_dir \\ nil) do
     shard = String.slice(hex, -2, 2)
 
     Path.join([pq_dir(override_base_dir), shard, file_id])
+  end
+
+  defp chunk_path(file_id, chunk_index, override_base_dir) do
+    pad_index = chunk_index |> to_string() |> String.pad_leading(@index_padding, "0")
+
+    Path.join(file_dir(file_id, override_base_dir), pad_index)
   end
 
   defp pq_dir(base_dir) do

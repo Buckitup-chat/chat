@@ -22,6 +22,15 @@ export async function getChallenge(baseUrl) {
   return resp.json();
 }
 
+export async function fetchChunkStatuses(baseUrl, fileIds) {
+  if (fileIds.length === 0) return {};
+  const url = new URL(`${baseUrl}/electric/v1/file_chunk_status`);
+  url.searchParams.set('file_ids', fileIds.join(','));
+  const resp = await fetch(url, { cache: 'no-store' });
+  if (!resp.ok) throw new Error(`Chunk status fetch failed: ${resp.status}`);
+  return (await resp.json()).statuses;
+}
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const INGEST_TIMEOUT_MS = 50_000;

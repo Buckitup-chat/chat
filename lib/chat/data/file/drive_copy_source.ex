@@ -30,9 +30,7 @@ defmodule Chat.Data.File.DriveCopySource do
 
   @impl Chat.Data.File.ChunkSource
   def handle_source_cast({:drive_mounted, system_id}, state) do
-    own_system_id = query_own_system_id(state)
-
-    if system_id == own_system_id do
+    if system_id == own_system_id(state) do
       {:source_disconnected, system_id, state}
     else
       state = scan_drives(state)
@@ -61,16 +59,13 @@ defmodule Chat.Data.File.DriveCopySource do
 
   @impl Chat.Data.File.ChunkSource
   def fetch_chunk(state, file_id, chunk_index, source_drive_id) do
-    source_try_result =
-      state.other_drives
-      |> Map.get(source_drive_id)
-      |> try_fetch(file_id, chunk_index)
+    source_dir = Map.get(state.other_drives, source_drive_id)
 
-    with {:error, _reason} <- source_try_result do
-      state.other_drives
-      |> Map.delete(source_drive_id)
-      |> pick_random_drive()
-      |> try_fetch(file_id, chunk_index)
+    with {:error, reason} <- try_fetch(source_dir, file_id, chunk_index) do
+      fallback_dir = state.other_drives |> Map.delete(source_drive_id) |> pick_random_drive()
+
+      try_fetch(fallback_dir, file_id, chunk_index)
+      |> tap(&log_fetch_result(&1, file_id, chunk_index, reason, source_dir, fallback_dir))
     end
   end
 
@@ -83,12 +78,10 @@ defmodule Chat.Data.File.DriveCopySource do
   defp scan_drives(%{base_dir: nil} = state), do: state
 
   defp scan_drives(state) do
-    own_system_id = query_own_system_id(state)
-
     state.base_dir
     |> media_root()
     |> discover_drives()
-    |> Enum.reject(fn {sys_id, _} -> sys_id == own_system_id end)
+    |> Enum.reject(fn {sys_id, _} -> sys_id == own_system_id(state) end)
     |> Map.new()
     |> then(&%{state | other_drives: &1})
   end
@@ -132,7 +125,12 @@ defmodule Chat.Data.File.DriveCopySource do
     Path.join([device_path, "main_db", Chat.Db.version_path() <> "_files"])
   end
 
-  defp query_own_system_id(%{repo: repo}), do: query_system_id(repo)
+  defp own_system_id(%{repo: repo}) do
+    case query_system_id(repo) do
+      {:ok, id} -> id
+      :error -> nil
+    end
+  end
 
   defp query_system_id(repo) when is_atom(repo) do
     case SQL.query(repo, "SELECT system_identifier FROM pg_control_system()", []) do
@@ -157,6 +155,12 @@ defmodule Chat.Data.File.DriveCopySource do
   end
 
   # Helpers
+
+  defp log_fetch_result({:ok, _}, file_id, chunk_index, reason, source_dir, _fallback_dir),
+    do: log("#{file_id}:#{chunk_index} primary failed (#{inspect(reason)}, dir: #{inspect(source_dir)}), fallback ok", :info)
+
+  defp log_fetch_result({:error, fallback_reason}, file_id, chunk_index, reason, source_dir, fallback_dir),
+    do: log("#{file_id}:#{chunk_index} both failed — primary: #{inspect(reason)} (#{inspect(source_dir)}), fallback: #{inspect(fallback_reason)} (#{inspect(fallback_dir)})", :warning)
 
   defp try_fetch(nil, _file_id, _chunk_index), do: {:error, :no_source}
 

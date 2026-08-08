@@ -1,6 +1,6 @@
 # File Storage — IPFS Chunk Sync
 
-> **DRAFT** — feasibility analysis, not yet implemented. Describes using IPFS as the chunk byte layer for [File Storage](pq_files.md) protocol v2. Prerequisite reading: [pq_files.md §14](pq_files.md#14-migration-plan-chunk-blobs--filesystem-protocol-v2-raw-bytes) (v2 migration plan).
+> **OBSOLETE — rejected alternative, kept for the record.** This was a feasibility analysis of using IPFS as the chunk byte layer. It was **not** adopted: plain filesystem storage with the per-drive pipeline proved substantially faster, and the two problems this doc set out to solve were resolved directly (multi-peer routing via `missing_chunks.peer_url` + fallback to all connected peers; drive portability via `MissingChunksBackfill` + `DriveCopySource`). The shipped design is [File Storage](pq_files.md) (raw bytes on the filesystem) with the [Chunk Pipeline](pq_chunk_writer.md). References below to a "v2 migration plan", `ChunkFetcher`, and "open question §14.8" describe an earlier framing that no longer matches the code.
 
 ## 1. Motivation
 

@@ -4,7 +4,7 @@ Zero-knowledge video playback via a Service Worker that intercepts native `<vide
 
 ## 1. Problem
 
-Videos in the PQ system are encrypted as 4 MB AES-256-GCM chunks stored in PostgreSQL (see [pq_files.md](pq_files.md)). The file sandbox can download all chunks, decrypt them client-side, and reassemble into a Blob — but this requires downloading the **entire** video before playback starts. A 200 MB video means a multi-minute wait with no playback.
+Videos in the PQ system are encrypted as 4 MB AES-256-GCM chunks stored as raw bytes on the filesystem, with signed manifests in PostgreSQL/Electric (see [pq_files.md](pq_files.md)). The file sandbox can download all chunks, decrypt them client-side, and reassemble into a Blob — but this requires downloading the **entire** video before playback starts. A 200 MB video means a multi-minute wait with no playback.
 
 The old server-side decryption path (Blowfish via `FileController` with HTTP Range requests) enables progressive playback but violates the zero-knowledge goal: the server decrypts chunks and sees plaintext.
 

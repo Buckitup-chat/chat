@@ -1,5 +1,5 @@
 defmodule Chat.Data.Schemas.FileChunk do
-  @moduledoc "Ecto schema for file chunks. Contains encrypted blob data (~4 MB each)."
+  @moduledoc "Ecto schema for file chunk manifests — metadata only (data_hash, size, signature); the encrypted bytes live on the filesystem in ChunkStore."
 
   use Ecto.Schema
   import Ecto.Changeset

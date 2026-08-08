@@ -60,9 +60,10 @@ Tracks uploaded chunks before the signed `files` manifest arrives. Populated as 
 Indexes: `uploader_hash` (budget queries), `updated_at` (GC queries).
 
 **Queries this table supports**:
-- **Resume**: `WHERE file_id = ?` — client queries which indexes are already uploaded
 - **Unsigned budget**: `SUM(size) WHERE uploader_hash = ? AND file_id NOT IN (SELECT file_id FROM files)` — uncommitted bytes per user
 - **GC**: `WHERE updated_at < threshold AND file_id NOT IN (SELECT file_id FROM files)` — delete stale rows + orphan chunks (§8)
+
+**Not used for resume**, despite the name: a row here is deleted once the file's manifest commits (§4), so a resume query against it would wrongly report zero progress for an already-finished upload. The client-facing resume query reads `file_chunks` instead — see §4.1.
 
 ### 1.4 `missing_chunks` (local only, NOT Electric-synced)
 
@@ -97,16 +98,18 @@ All encryption/decryption happens client-side (browser, Web Crypto API).
 
 - **Algorithm**: AES-256-GCM
 - **Key**: `enc_secret` — random 32 bytes, unique per file
-- **Nonce**: 12 bytes — `chunk_index` zero-padded to 12 bytes (deterministic)
+- **Nonce**: 12 random bytes (`crypto.getRandomValues`), prepended to ciphertext
 - **Auth tag**: 16 bytes, appended to ciphertext (standard GCM output)
+- **Chunk wire format**: `nonce(12) || ciphertext || tag(16)`
 
 ```
-encrypted_chunk = AES-256-GCM(enc_secret, nonce=pad(chunk_index, 12), plaintext_chunk)
+nonce = crypto.getRandomValues(12)
+encrypted_chunk = nonce || AES-256-GCM(enc_secret, nonce, plaintext_chunk)
 ```
 
-Nonce safety: `enc_secret` is unique per file (no reuse across files), `chunk_index` is unique within file (no reuse within file). The 2^32 nonce space supports files up to ~16 TB per key.
+Nonce safety: `enc_secret` is unique per file (no reuse across files), random 96-bit nonces have negligible collision probability at file-scale chunk counts (birthday bound ~2^32 encryptions per key ≈ 16 TB at 4 MB chunks).
 
-The device stores and serves the raw encrypted bytes and never sees plaintext.
+The device stores and serves the raw encrypted bytes (including the prepended nonce) and never sees plaintext.
 
 ## 3. Content Type
 
@@ -143,8 +146,9 @@ Client                                    Device
   │<─ 200 | 429 | 401 | 410 | 413 ───────────│
   │─ ... progressive encrypt + upload ...    │
   │                                          │
-  │  resume: query which chunk_indexes       │
-  │  already exist (upload_chunks / shape)   │
+  │  resume: shape read on file_chunks       │
+  │  by file_id → existing chunk_indexes     │
+  │  (§4.1)                                  │
   │                                          │
   │  all chunks uploaded                     │
   │  build + sign files manifest with        │
@@ -155,6 +159,26 @@ Client                                    Device
   │                                          │  delete upload_chunks for file_id
   │<─ 200 {txid} ────────────────────────────│  committed to Electric
 ```
+
+### 4.1 Resume
+
+**Client-side persistence (prerequisite)**: the device has no "list my in-progress uploads" endpoint — resume is entirely client-initiated, keyed by `file_id`. Before the first chunk `PUT`, the client must durably persist, per started upload: `file_id`, `enc_secret` (§2), `chunk_size`, and `total_size`/`chunk_count`. `file_id` alone is not sufficient — `enc_secret` is a single random value per file (§2), so a resumed session that generated a fresh secret couldn't produce chunks decryptable together with the ones already uploaded under the original secret, even though the server-side chunks themselves are intact. The client removes the record once the manifest commits (§4) or the upload is abandoned.
+
+An interrupted upload resumes with the persisted `file_id`: the client diffs `0..chunk_count-1` against the chunk indexes the device already has, then re-`PUT`s just the missing ones (re-encrypted from the source file with the persisted `enc_secret`).
+
+**Discovery: direct shape read** — `file_chunks` rows are the device's evidence that a chunk was received and hash-verified (§1.2), and the table is already exposed via the unauthenticated Electric shape endpoint (§5):
+
+```
+GET /electric/v1/shapes?table=file_chunks&where=file_id='<file_id>'
+```
+
+This is safe without proving anything about `uploader_hash`: before a file's manifest commits, `file_chunks` rows for a given `file_id` exist only on the device the client uploaded directly to — a peer device defers/rejects incoming `file_chunks` rows until it has the matching `files` parent (§1.2), so no other device could have replicated them yet. `file_id` is therefore already a sufficient capability to read its own chunk list, the same way it's already sufficient for downloads (§6) — no separate proof of identity is needed.
+
+Client re-`PUT`s the chunk indexes absent from the response (§4 chunk upload).
+
+> There was previously a `POST /upload_chunks` (PoP-gated) alternative for clients that didn't want to implement the Electric shape protocol. It has been removed — the shape read above is the only supported resume path now. `uploader_hash`-scoped querying (enumerating a user's uploads without a known `file_id`) is intentionally not offered.
+
+**Why `file_chunks`, not `upload_chunks`, despite the name?** `upload_chunks` rows are written alongside `file_chunks` on every chunk `PUT` (§4) but are deleted once the manifest commits (§4, §8) — querying it for an upload that already finished would wrongly report zero progress. `file_chunks` is written first, is Electric-synced (so it reflects chunks accepted on any app node, not just the one the resume request happens to hit), and persists until the file itself is deleted (§7). It is a superset of `upload_chunks` at every point in an upload's lifecycle.
 
 ## 5. Sync Protocol
 
@@ -270,9 +294,9 @@ Multi-MB blob INSERTs no longer hit WAL or logical replication — only small ma
 - **Auth tag**: 16 bytes per chunk
 
 ### 11.2 Nonce Exhaustion
-- With **random 96-bit nonces**, collision probability becomes meaningful after ~2^32 messages per key (birthday bound)
-- At 4 MB chunks, 2^32 messages = ~16 TB per key before nonce collision risk
-- **Deterministic nonce scheme** (chunk index) eliminates collision risk but requires careful design to avoid reuse across different files under the same key
+- With **random 96-bit nonces**, collision probability becomes meaningful after ~2^48 encryptions per key (birthday bound on 96-bit space)
+- At 4 MB chunks, practical file sizes (even 1 TB = 256K chunks) are far below the collision threshold
+- Each `enc_secret` is unique per file, so nonce reuse across files is impossible
 
 ### 11.3 Client-Side Encryption
 - All encryption/decryption happens **exclusively in the browser** (Web Crypto API / SubtleCrypto)

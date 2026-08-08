@@ -1,8 +1,10 @@
 # Priorities
 
+1. Drive sync errors ?
 2. Deprecate `sync` routes in favor of `v1/shapes`
 
 3. remove/edit origin by owner when no reviews left for moderation(for now)
 
-5. partial backup from user + dialogs with response/reaction
+4. partial backup from user + dialogs with response/reaction
 
+5. Frontend

@@ -24,7 +24,10 @@ defmodule Chat.Data.File.MissingChunksBackfill do
     file_ids = active_file_ids(repo)
     count = backfill_files(file_ids, base_dir, now, repo)
 
-    if count > 0, do: log("Backfilled #{count} missing_chunks entries", :info)
+    if count > 0 do
+      log("Backfilled #{count} missing_chunks entries", :info)
+      Phoenix.PubSub.broadcast(Chat.PubSub, "chunk_pipeline", {:chunk_pipeline, :backfill_done})
+    end
   end
 
   defp active_file_ids(repo) do

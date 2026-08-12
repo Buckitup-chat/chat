@@ -36,102 +36,139 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
     end
   end
 
-  def update_origin(origin, new_name, new_mode, base_url) do
-    new_timestamp = origin.owner_timestamp + 1
-
-    origin_struct = %Origin{
-      origin_hash: origin.origin_hash,
-      owner_hash: origin.owner_hash,
-      owner_cert: origin.owner_cert,
-      name: new_name,
-      moderation_mode: String.to_existing_atom(new_mode),
-      deleted_flag: false,
-      owner_timestamp: new_timestamp
-    }
-
-    {sign_b64, sign_hash} = sign_origin(origin_struct, origin.origin_sign_skey)
-
-    payload = %{
-      "mutations" => [
-        %{
-          "type" => "update",
-          "original" => %{"origin_hash" => origin.origin_hash},
-          "changes" => %{
-            "name" => new_name,
-            "moderation_mode" => new_mode,
-            "deleted_flag" => false,
-            "owner_timestamp" => new_timestamp,
-            "sign_b64" => Http.encode_base64(sign_b64),
-            "sign_hash" => sign_hash
-          },
-          "syncMetadata" => %{"relation" => "origins"}
-        }
-      ]
-    }
-
-    with {:ok, challenge_resp, log1} <- Http.get_challenge(base_url),
-         {:ok, _resp, log2} <-
-           Http.post_ingest(challenge_resp, payload, origin.origin_sign_skey, base_url) do
-      updated =
-        origin
-        |> Map.put(:name, new_name)
-        |> Map.put(:moderation_mode, new_mode)
-        |> Map.put(:owner_timestamp, new_timestamp)
-
-      {:ok, %{origin: updated, log_entries: [log1, log2]}}
-    else
-      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
-    end
+  def update_origin(origin, owner, new_name, new_mode, base_url) do
+    changes = %{name: new_name, moderation_mode: new_mode, deleted_flag: false}
+    do_mutate_origin(origin, changes, owner.sign_skey, base_url)
   end
 
-  def delete_origin(origin, base_url) do
-    new_timestamp = origin.owner_timestamp + 1
+  def delete_origin(origin, owner, base_url) do
+    changes = %{name: origin.name, moderation_mode: origin.moderation_mode, deleted_flag: true}
+    do_mutate_origin(origin, changes, owner.sign_skey, base_url)
+  end
 
-    origin_struct = %Origin{
-      origin_hash: origin.origin_hash,
-      owner_hash: origin.owner_hash,
-      owner_cert: origin.owner_cert,
-      name: origin.name,
-      moderation_mode: String.to_existing_atom(origin.moderation_mode),
-      deleted_flag: true,
-      owner_timestamp: new_timestamp
-    }
+  def list_owner_origins(owner_hash, base_url) do
+    client = Electric.Client.new!(endpoint: base_url <> "/electric/v1/shapes")
 
-    {sign_b64, sign_hash} = sign_origin(origin_struct, origin.origin_sign_skey)
+    shape =
+      Electric.Client.ShapeDefinition.new!("origins",
+        where: "owner_hash = $1",
+        params: [owner_hash]
+      )
 
-    payload = %{
-      "mutations" => [
-        %{
-          "type" => "update",
-          "original" => %{"origin_hash" => origin.origin_hash},
-          "changes" => %{
-            "name" => origin.name,
-            "moderation_mode" => origin.moderation_mode,
-            "deleted_flag" => true,
-            "owner_timestamp" => new_timestamp,
-            "sign_b64" => Http.encode_base64(sign_b64),
-            "sign_hash" => sign_hash
-          },
-          "syncMetadata" => %{"relation" => "origins"}
-        }
-      ]
-    }
+    shape_rows(client, shape)
+    |> Enum.map(&parse_origin_row/1)
+  end
 
-    with {:ok, challenge_resp, log1} <- Http.get_challenge(base_url),
-         {:ok, _resp, log2} <-
-           Http.post_ingest(challenge_resp, payload, origin.origin_sign_skey, base_url) do
-      updated =
-        origin
-        |> Map.put(:deleted_flag, true)
-        |> Map.put(:owner_timestamp, new_timestamp)
+  def has_pending_reviews?(origin_hash, base_url) do
+    client = Electric.Client.new!(endpoint: base_url <> "/electric/v1/shapes")
 
-      {:ok, %{origin: updated, log_entries: [log1, log2]}}
-    else
-      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
-    end
+    review_shape =
+      Electric.Client.ShapeDefinition.new!("review",
+        where: "origin_hash = $1",
+        params: [origin_hash]
+      )
+
+    password_shape =
+      Electric.Client.ShapeDefinition.new!("review_public_passwords",
+        where: "origin_hash = $1",
+        params: [origin_hash]
+      )
+
+    reviews = shape_rows(client, review_shape)
+    passwords = shape_rows(client, password_shape)
+    password_hashes = MapSet.new(passwords, & &1["review_hash"])
+
+    reviews
+    |> Enum.reject(&(&1["deleted_flag"] == true or &1["deleted_flag"] == "true"))
+    |> Enum.any?(fn r -> r["review_hash"] not in password_hashes end)
   end
 
   # --- Private ---
+
+  defp do_mutate_origin(origin, changes, sign_skey, base_url) do
+    new_timestamp = origin.owner_timestamp + 1
+    mode_str = to_string(changes.moderation_mode)
+
+    origin_struct = %Origin{
+      origin_hash: origin.origin_hash,
+      owner_hash: origin.owner_hash,
+      owner_cert: origin.owner_cert,
+      name: changes.name,
+      moderation_mode: String.to_existing_atom(mode_str),
+      deleted_flag: changes.deleted_flag,
+      owner_timestamp: new_timestamp
+    }
+
+    {sign_b64, sign_hash} = sign_origin(origin_struct, sign_skey)
+
+    payload = %{
+      "mutations" => [
+        %{
+          "type" => "update",
+          "original" => %{"origin_hash" => origin.origin_hash},
+          "changes" => %{
+            "name" => changes.name,
+            "moderation_mode" => mode_str,
+            "deleted_flag" => changes.deleted_flag,
+            "owner_timestamp" => new_timestamp,
+            "sign_b64" => Http.encode_base64(sign_b64),
+            "sign_hash" => sign_hash
+          },
+          "syncMetadata" => %{"relation" => "origins"}
+        }
+      ]
+    }
+
+    with {:ok, challenge_resp, log1} <- Http.get_challenge(base_url),
+         {:ok, _resp, log2} <- Http.post_ingest(challenge_resp, payload, sign_skey, base_url) do
+      updated =
+        origin
+        |> Map.merge(%{
+          name: changes.name,
+          moderation_mode: mode_str,
+          deleted_flag: changes.deleted_flag,
+          owner_timestamp: new_timestamp
+        })
+
+      {:ok, %{origin: updated, log_entries: [log1, log2]}}
+    else
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
+    end
+  end
+
+  defp parse_origin_row(row) do
+    %{
+      origin_hash: row["origin_hash"],
+      owner_hash: row["owner_hash"],
+      owner_cert: Base.decode64!(row["owner_cert"], padding: false),
+      name: row["name"],
+      moderation_mode: row["moderation_mode"],
+      deleted_flag: row["deleted_flag"] == true or row["deleted_flag"] == "true",
+      owner_timestamp: parse_int(row["owner_timestamp"])
+    }
+  end
+
+  defp parse_int(v) when is_integer(v), do: v
+  defp parse_int(v) when is_binary(v), do: String.to_integer(v)
+
+  defp shape_rows(client, shape) do
+    client
+    |> Electric.Client.stream(shape, live: false, replica: :full)
+    |> Enum.reduce_while([], fn
+      %Electric.Client.Message.ChangeMessage{
+        headers: %{operation: :insert},
+        value: value
+      },
+      acc ->
+        {:cont, [value | acc]}
+
+      %Electric.Client.Message.ControlMessage{control: :up_to_date}, acc ->
+        {:halt, acc}
+
+      _message, acc ->
+        {:cont, acc}
+    end)
+  end
 
   defp sign_origin(origin_struct, sign_skey) do
     sign_b64 =

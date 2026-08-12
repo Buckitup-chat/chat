@@ -1,6 +1,5 @@
 # Priorities
 
-1. Drive sync errors ?
 2. Deprecate `sync` routes in favor of `v1/shapes`
 
 3. remove/edit origin by owner when no reviews left for moderation(for now)

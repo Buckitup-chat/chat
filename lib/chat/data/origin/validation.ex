@@ -1,7 +1,14 @@
 defmodule Chat.Data.Origin.Validation do
   @moduledoc "Signature and integrity validation for origin operations."
 
+  import Chat.Db, only: [repo: 0]
+  import Ecto.Query
+
+  alias Chat.Data.Integrity
+  alias Chat.Data.Origin, as: OriginData
   alias Chat.Data.Schemas.Origin
+  alias Chat.Data.Schemas.Review
+  alias Chat.Data.Schemas.ReviewPublicPassword
   alias Chat.Data.User, as: UserData
   alias Chat.Data.User.Validation, as: UserValidation
   alias EnigmaPq
@@ -16,11 +23,6 @@ defmodule Chat.Data.Origin.Validation do
     |> validate_owner_cert(origin_struct)
   end
 
-  # KNOWN GAP (deferred to Phase 3): updates — including `moderation_mode` changes
-  # and soft delete (`deleted_flag`) — are authorized by the origin identity's own
-  # signature, not the owner's. Spec §70-73 reserves those dangerous/irreversible
-  # ops for the owner (a delegated origin-identity holder should not get them). The
-  # owner-signed two-tier check lands with the Phase 3 owner/moderation UI.
   def validate_origin_update(existing, origin_struct) do
     attrs =
       origin_struct
@@ -37,28 +39,30 @@ defmodule Chat.Data.Origin.Validation do
 
     existing
     |> Origin.update_changeset(attrs)
-    |> UserValidation.validate_signature()
+    |> validate_origin_update_signature()
     |> UserValidation.validate_timestamp_newer_than_existing()
   end
 
   # --- HTTP ingestion ---
 
-  def origin_allowed(operation, %{challenge: challenge, signature: signature}) do
-    origin_hash =
-      case operation do
-        %Operation{operation: :insert, changes: changes} ->
-          changes["origin_hash"] || changes[:origin_hash]
+  def origin_allowed(%Operation{operation: :insert} = operation, pop_context) do
+    origin_identity_auth(operation, pop_context)
+  end
 
-        %Operation{operation: :update, data: %{"origin_hash" => hash}} ->
-          hash
-      end
+  def origin_allowed(%Operation{operation: :update} = operation, pop_context) do
+    owner_auth(operation, pop_context)
+  end
 
-    with %{sign_pkey: sign_pkey} <- UserData.get_card(origin_hash),
-         true <- EnigmaPq.verify(challenge, signature, sign_pkey) do
-      :ok
-    else
-      _ -> {:error, "Invalid operation"}
-    end
+  def has_pending_reviews?(origin_hash) do
+    from(r in Review,
+      left_join: p in ReviewPublicPassword,
+      on: p.review_hash == r.review_hash,
+      where: r.origin_hash == ^origin_hash and r.deleted_flag == false,
+      where: is_nil(p.sign_hash),
+      limit: 1,
+      select: r.review_hash
+    )
+    |> repo().exists?()
   end
 
   def origin_validate(origin, changes, op) do
@@ -72,9 +76,68 @@ defmodule Chat.Data.Origin.Validation do
       :update ->
         origin
         |> Origin.update_changeset(changes)
-        |> UserValidation.validate_signature()
+        |> validate_origin_update_signature()
         |> UserValidation.validate_timestamp_newer_than_existing()
     end
+  end
+
+  # --- Signature helpers ---
+
+  defp validate_origin_update_signature(changeset) do
+    with {:ok, data} <- Ecto.Changeset.apply_action(changeset, :validate),
+         {:error, _} <- Integrity.verify_signature(data),
+         {:error, _} <- verify_owner_signature(data) do
+      Ecto.Changeset.add_error(changeset, :sign_b64, "invalid signature")
+    else
+      _ -> changeset
+    end
+  end
+
+  defp verify_owner_signature(data) do
+    payload = Integrity.signature_payload(data)
+
+    with %Origin{owner_hash: owner_hash} <- OriginData.get_origin(data.origin_hash),
+         %{sign_pkey: owner_pkey} <- UserData.get_card(owner_hash),
+         true <- EnigmaPq.verify(payload, data.sign_b64, owner_pkey) do
+      :ok
+    else
+      _ -> {:error, :invalid_signature}
+    end
+  end
+
+  # --- Auth helpers ---
+
+  defp origin_identity_auth(operation, %{challenge: challenge, signature: signature}) do
+    origin_hash = extract_origin_hash(operation)
+
+    with %{sign_pkey: sign_pkey} <- UserData.get_card(origin_hash),
+         true <- EnigmaPq.verify(challenge, signature, sign_pkey) do
+      :ok
+    else
+      _ -> {:error, "Invalid operation"}
+    end
+  end
+
+  defp owner_auth(operation, %{challenge: challenge, signature: signature}) do
+    origin_hash = extract_origin_hash(operation)
+
+    with %Origin{owner_hash: owner_hash} <- OriginData.get_origin(origin_hash),
+         %{sign_pkey: owner_sign_pkey} <- UserData.get_card(owner_hash),
+         true <- EnigmaPq.verify(challenge, signature, owner_sign_pkey),
+         false <- has_pending_reviews?(origin_hash) do
+      :ok
+    else
+      true -> {:error, "Cannot modify origin while reviews are pending moderation"}
+      _ -> {:error, "Invalid operation"}
+    end
+  end
+
+  defp extract_origin_hash(%Operation{operation: :insert, changes: changes}) do
+    changes["origin_hash"] || changes[:origin_hash]
+  end
+
+  defp extract_origin_hash(%Operation{operation: :update, data: %{"origin_hash" => hash}}) do
+    hash
   end
 
   # --- Owner cert validation ---

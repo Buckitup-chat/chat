@@ -12,7 +12,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
         </a>
         <h1 class="text-2xl font-bold text-gray-900 mb-2">Origin Owner Sandbox</h1>
         <p class="text-sm text-gray-600 mb-6">
-          Test origin creation, management, and ownership operations via Electric API
+          Test origin ownership operations via Electric API
         </p>
 
         <%= if @error_message do %>
@@ -25,7 +25,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
         <div class="space-y-6">
           {render_owner_section(assigns)}
           <%= if @owner do %>
-            {render_origin_section(assigns)}
+            {render_origins_section(assigns)}
           <% end %>
           <%= if @origin do %>
             {render_operations_section(assigns)}
@@ -67,24 +67,48 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
     """
   end
 
-  defp render_origin_section(assigns) do
+  defp render_origins_section(assigns) do
     ~H"""
     <div class="bg-white shadow rounded-lg p-6">
-      <h2 class="text-lg font-semibold text-gray-900 mb-4">Step 2: Origin</h2>
-      <%= if @origin do %>
-        <div class="text-sm space-y-1 mb-4">
-          <p><span class="font-medium">Name:</span> {@origin.name}</p>
-          <p class="font-mono text-xs text-gray-500 truncate">
-            <span class="font-medium font-sans">Origin hash:</span> {@origin.origin_hash}
-          </p>
-          <p><span class="font-medium">Owner:</span> {@origin.owner_hash}</p>
-          <p><span class="font-medium">Moderation:</span> {@origin.moderation_mode}</p>
-          <p><span class="font-medium">Deleted:</span> {to_string(@origin.deleted_flag)}</p>
-          <p><span class="font-medium">Timestamp:</span> {@origin.owner_timestamp}</p>
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-semibold text-gray-900">Step 2: Origins</h2>
+        <button
+          phx-click="refresh_origins"
+          class="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
+        >
+          Refresh
+        </button>
+      </div>
+      <%= if @origins != [] do %>
+        <div class="space-y-2 mb-4">
+          <div
+            :for={o <- @origins}
+            class={"flex items-center justify-between p-3 rounded border #{if @origin && @origin.origin_hash == o.origin_hash, do: "border-blue-500 bg-blue-50", else: "border-gray-200"}"}
+          >
+            <div class="text-sm">
+              <span class="font-medium">{o.name}</span>
+              <span class="text-gray-500 ml-2">({o.moderation_mode})</span>
+              <%= if o.deleted_flag do %>
+                <span class="text-red-500 ml-2">[deleted]</span>
+              <% end %>
+            </div>
+            <button
+              phx-click="select_origin"
+              phx-value-hash={o.origin_hash}
+              class={"px-3 py-1 rounded text-sm text-white #{if @origin && @origin.origin_hash == o.origin_hash, do: "bg-blue-400", else: "bg-blue-600 hover:bg-blue-700"}"}
+            >
+              {if @origin && @origin.origin_hash == o.origin_hash, do: "Selected", else: "Select"}
+            </button>
+          </div>
         </div>
-        {render_identity_export(assigns)}
       <% else %>
-        <form phx-submit="create_origin" class="flex gap-3 items-end">
+        <p class="text-sm text-gray-500 mb-4">No origins found for this owner.</p>
+      <% end %>
+      <details class="mt-2">
+        <summary class="cursor-pointer text-sm font-medium text-gray-700">
+          Create New Origin
+        </summary>
+        <form phx-submit="create_origin" class="flex gap-3 items-end mt-3">
           <div class="flex-1">
             <label class="block text-xs font-medium text-gray-700 mb-1">Origin name</label>
             <input
@@ -107,30 +131,44 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
             type="submit"
             class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm"
           >
-            Create Origin
+            Create
           </button>
         </form>
-      <% end %>
+      </details>
     </div>
-    """
-  end
-
-  defp render_identity_export(assigns) do
-    ~H"""
-    <button
-      phx-click="export_origin_identity"
-      class="mt-3 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
-    >
-      Export Origin Identity
-    </button>
     """
   end
 
   defp render_operations_section(assigns) do
     ~H"""
     <div class="bg-white shadow rounded-lg p-6">
-      <h2 class="text-lg font-semibold text-gray-900 mb-4">Step 3: Owner Operations</h2>
-
+      <h2 class="text-lg font-semibold text-gray-900 mb-2">Step 3: Owner Operations</h2>
+      <div class="text-sm mb-3 space-y-1">
+        <p><span class="font-medium">Name:</span> {@origin.name}</p>
+        <p class="font-mono text-xs text-gray-500 truncate">
+          <span class="font-medium font-sans">Hash:</span> {@origin.origin_hash}
+        </p>
+        <p><span class="font-medium">Moderation:</span> {@origin.moderation_mode}</p>
+        <p><span class="font-medium">Deleted:</span> {to_string(@origin.deleted_flag)}</p>
+        <p><span class="font-medium">Timestamp:</span> {@origin.owner_timestamp}</p>
+      </div>
+      <%= if @origin[:origin_sign_skey] do %>
+        <button
+          phx-click="export_origin_identity"
+          class="mb-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+        >
+          Export Origin Identity
+        </button>
+      <% end %>
+      <div class="mb-4 flex items-center gap-3">
+        <button
+          phx-click="refresh_pending_reviews"
+          class="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
+        >
+          Check queue
+        </button>
+        {render_pending_status(assigns)}
+      </div>
       <div class="space-y-4">
         <div class="border-b pb-4">
           <h3 class="text-sm font-semibold text-gray-700 mb-2">Update</h3>
@@ -142,12 +180,17 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
                 name="name"
                 value={@origin.name}
                 required
-                class="w-full px-3 py-2 border rounded-lg text-sm"
+                disabled={@pending_reviews != false}
+                class="w-full px-3 py-2 border rounded-lg text-sm disabled:bg-gray-100"
               />
             </div>
             <div>
               <label class="block text-xs font-medium text-gray-700 mb-1">Moderation</label>
-              <select name="moderation" class="px-3 py-2 border rounded-lg text-sm">
+              <select
+                name="moderation"
+                disabled={@pending_reviews != false}
+                class="px-3 py-2 border rounded-lg text-sm disabled:bg-gray-100"
+              >
                 <option value="none" selected={@origin.moderation_mode == "none"}>none</option>
                 <option value="post" selected={@origin.moderation_mode == "post"}>post</option>
                 <option value="pre" selected={@origin.moderation_mode == "pre"}>pre</option>
@@ -155,25 +198,44 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
             </div>
             <button
               type="submit"
-              class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 text-sm"
+              disabled={@pending_reviews != false}
+              class={"px-4 py-2 rounded-lg text-sm text-white #{if @pending_reviews != false, do: "bg-gray-400 cursor-not-allowed", else: "bg-yellow-600 hover:bg-yellow-700"}"}
             >
               Update
             </button>
           </form>
         </div>
-
         <div>
           <h3 class="text-sm font-semibold text-gray-700 mb-2">Delete</h3>
           <button
             phx-click="delete_origin"
-            disabled={@origin.deleted_flag}
-            class={"px-4 py-2 rounded-lg text-sm text-white #{if @origin.deleted_flag, do: "bg-gray-400 cursor-not-allowed", else: "bg-red-600 hover:bg-red-700"}"}
+            disabled={@pending_reviews != false or @origin.deleted_flag}
+            class={"px-4 py-2 rounded-lg text-sm text-white #{if @pending_reviews != false or @origin.deleted_flag, do: "bg-gray-400 cursor-not-allowed", else: "bg-red-600 hover:bg-red-700"}"}
           >
-            {if @origin.deleted_flag, do: "Deleted", else: "Delete Origin"}
+            {cond do
+              @origin.deleted_flag -> "Deleted"
+              @pending_reviews != false -> "Delete (blocked)"
+              true -> "Delete Origin"
+            end}
           </button>
         </div>
       </div>
     </div>
+    """
+  end
+
+  defp render_pending_status(assigns) do
+    ~H"""
+    <%= case @pending_reviews do %>
+      <% nil -> %>
+        <span class="text-sm text-gray-500">Queue not checked yet</span>
+      <% true -> %>
+        <span class="text-sm text-amber-700 font-medium">
+          Reviews pending — operations blocked
+        </span>
+      <% false -> %>
+        <span class="text-sm text-green-700 font-medium">No pending reviews</span>
+    <% end %>
     """
   end
 

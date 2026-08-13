@@ -92,7 +92,7 @@ defmodule Chat.MixProject do
       {:cors_plug, "~> 3.0"},
 
       # Build tooling
-      {:live_vue, "~> 0.5"},
+      {:live_vue, "~> 1.0"},
       # {:esbuild, "~> 0.3", runtime: Mix.env() == :dev && Mix.target() == :host},
       # {:tailwind, "~> 0.1", runtime: Mix.env() == :dev},
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},

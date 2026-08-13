@@ -203,6 +203,9 @@ defmodule ChatWeb.Router do
       sync("/user_card", Chat.Data.Schemas.UserCard)
       sync("/user_storage", Chat.Data.Schemas.UserStorage)
       sync("/user_storage_version", Chat.Data.Schemas.UserStorageVersion)
+      # Still consumed directly by chat-frontend's main branch (src/utils/db/localDBv2.js).
+      # Remove only after that branch's PGlite sync layer migrates to /electric/v1/shapes
+      # (already done on feat/tanstack-remove-pglite, not yet merged to main).
       sync("/dialog_key", Chat.Data.Schemas.DialogKey)
       sync("/dialog_message", Chat.Data.Schemas.DialogMessage)
       sync("/dialog_message_version", Chat.Data.Schemas.DialogMessageVersion)

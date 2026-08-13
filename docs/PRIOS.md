@@ -1,9 +1,5 @@
 # Priorities
 
-2. Deprecate `sync` routes in favor of `v1/shapes`
+3. partial backup from user + dialogs with response/reaction
 
-3. remove/edit origin by owner when no reviews left for moderation(for now)
-
-4. partial backup from user + dialogs with response/reaction
-
-5. Frontend
+4. Frontend

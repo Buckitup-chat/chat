@@ -25,7 +25,7 @@ defmodule Chat.Data.File.ChunkPipelineSupervisor do
       {ChunkWriter, drive_id: drive_id, base_dir: base_dir},
       {MissingChunksBackfill, base_dir: base_dir, repo: repo},
       {ReplicationListener, drive_id: drive_id, repo: repo},
-      {DriveCopySource, drive_id: drive_id, base_dir: base_dir, repo: repo},
+      {DriveCopySource, drive_id: drive_id, repo: repo},
       {SyncSource, drive_id: drive_id, repo: repo},
       {TmpSweeper, drive_id: drive_id, base_dir: base_dir},
       {DriveAnnouncer, repo: repo}

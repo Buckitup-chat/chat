@@ -97,9 +97,6 @@ defmodule Chat.Db do
     "#{data_dir}/#{@db_version}"
   end
 
-  @doc "Internal drive's own chunk-file directory, independent of which drive is currently active for writes."
-  def internal_files_dir, do: file_path() <> "_files"
-
   def version_path, do: @db_version
 
   def repo do

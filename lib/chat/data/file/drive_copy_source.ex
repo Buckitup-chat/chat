@@ -4,6 +4,7 @@ defmodule Chat.Data.File.DriveCopySource do
   use Chat.Data.File.ChunkSource
 
   alias Chat.Data.File.ChunkStore
+  alias Chat.Data.File.DriveDirs
   alias Ecto.Adapters.SQL
 
   def chunk_fetchable(drive_id, file_id, chunk_index, source_drive_id) do
@@ -17,7 +18,7 @@ defmodule Chat.Data.File.DriveCopySource do
   def writer_tag, do: :drive_copy
 
   @impl Chat.Data.File.ChunkSource
-  def init_extra(opts), do: %{other_drives: %{}, base_dir: Keyword.get(opts, :base_dir)}
+  def init_extra(_opts), do: %{other_drives: %{}}
 
   @impl Chat.Data.File.ChunkSource
   def on_init(state) do
@@ -78,54 +79,33 @@ defmodule Chat.Data.File.DriveCopySource do
 
   # Scanning
 
-  defp scan_drives(%{base_dir: nil} = state), do: state
-
   defp scan_drives(state) do
-    state.base_dir
-    |> media_root()
-    |> discover_drives()
+    discover_drives()
     |> Enum.reject(fn {sys_id, _} -> sys_id == own_system_id(state) end)
     |> Map.new()
     |> then(&%{state | other_drives: &1})
   end
 
-  defp media_root(base_dir) do
-    base_dir
-    |> Path.join("../../..")
-    |> Path.expand()
-  end
-
-  defp discover_drives(media_root) do
+  defp discover_drives do
     usb_drives =
-      Path.wildcard(Path.join(media_root, "sd*"))
-      |> Enum.flat_map(fn device_path ->
-        device = Path.basename(device_path)
-        base_dir = drive_base_dir(device_path)
-
-        if File.dir?(Path.join(base_dir, "pq_files")) do
-          case query_system_id(device) do
-            {:ok, system_id} -> [{system_id, base_dir}]
-            _ -> []
-          end
-        else
-          []
+      DriveDirs.list_usb_drive_dirs()
+      |> Enum.flat_map(fn {device, base_dir} ->
+        case query_system_id(device) do
+          {:ok, system_id} -> [{system_id, base_dir}]
+          _ -> []
         end
       end)
 
     internal_drive =
       case query_system_id(Chat.Repo) do
         {:ok, system_id} ->
-          [{system_id, Chat.Db.internal_files_dir()}]
+          [{system_id, DriveDirs.internal_files_dir()}]
 
         _ ->
           []
       end
 
     usb_drives ++ internal_drive
-  end
-
-  defp drive_base_dir(device_path) do
-    Path.join([device_path, "main_db", Chat.Db.version_path() <> "_files"])
   end
 
   defp own_system_id(%{repo: repo}) do
@@ -135,11 +115,17 @@ defmodule Chat.Data.File.DriveCopySource do
     end
   end
 
+  defp query_system_id(nil), do: :error
+
   defp query_system_id(repo) when is_atom(repo) do
     case SQL.query(repo, "SELECT system_identifier FROM pg_control_system()", []) do
       {:ok, %{rows: [[identifier]]}} -> {:ok, to_string(identifier)}
       _ -> :error
     end
+  rescue
+    _ -> :error
+  catch
+    :exit, _ -> :error
   end
 
   defp query_system_id(device) when is_binary(device) do

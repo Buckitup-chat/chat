@@ -71,8 +71,8 @@ defmodule Chat.Data.File.DriveCopySource do
   end
 
   @impl Chat.Data.File.ChunkSource
-  def handle_extra_info({:chunk_pipeline, :backfill_done}, state),
-    do: {:noreply, state |> enqueue_poll() |> drain()}
+  def handle_extra_info({:chunk_pipeline, :pg_diff_copied}, state),
+    do: {:noreply, state |> scan_drives() |> enqueue_poll() |> drain()}
 
   def handle_extra_info({:chunk_pipeline, event}, state), do: handle_cast(event, state)
   def handle_extra_info(_msg, state), do: {:noreply, state}

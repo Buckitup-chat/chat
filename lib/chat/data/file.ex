@@ -253,8 +253,18 @@ defmodule Chat.Data.File do
 
   def missing_chunks_for_drive(source_drive_id, opts \\ []) do
     from(m in MissingChunk,
-      where: m.source_drive_id == ^source_drive_id and not is_nil(m.data_hash),
-      order_by: [asc: m.attempts, asc: m.updated_at]
+      where: not is_nil(m.data_hash),
+      order_by: [
+        asc:
+          fragment(
+            "CASE WHEN ? = ? THEN 0 WHEN ? IS NULL THEN 1 ELSE 2 END",
+            m.source_drive_id,
+            ^source_drive_id,
+            m.source_drive_id
+          ),
+        asc: m.attempts,
+        asc: m.updated_at
+      ]
     )
     |> use_repo(opts).all()
   end

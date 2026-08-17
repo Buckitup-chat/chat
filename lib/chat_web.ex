@@ -112,6 +112,10 @@ defmodule ChatWeb do
       # Add support to Vue components
       use LiveVue
 
+      # Generate component for each vue file, so you can omit v-component="name".
+      # You can configure path to your components by using optional :vue_root param
+      use LiveVue.Components, vue_root: ["./assets/vue", "./lib/chat_web"]
+
       # Import LiveView and .heex helpers (live_render, live_patch, <.form>, etc)
       import Phoenix.Component
       import ChatWeb.LiveHelpers

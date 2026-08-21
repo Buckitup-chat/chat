@@ -13,6 +13,7 @@ straightforward as possible.
 ### Added
 
 - Reviews: owner can change origin
+- [platform] Backup scenario: enable post-quantum data
 - [platform] Post-quantum files: USB sync fill missing chunks
 - [frontend] TypeScript support with dialog crypto types and tests
 - [frontend] User domain migration from PGlite to TanStack DB

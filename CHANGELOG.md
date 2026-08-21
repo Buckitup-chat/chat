@@ -12,9 +12,60 @@ straightforward as possible.
 
 ### Added
 
+- Reviews: owner can change origin
+- [platform] Post-quantum files: USB sync fill missing chunks
+- [frontend] TypeScript support with dialog crypto types and tests
+- [frontend] User domain migration from PGlite to TanStack DB
+
 ### Changed
 
+- Sync routes: deprecated legacy dialog sync LiveViews
+- Dependencies updated (LiveVue, etc.)
+
 ### Fixed
+
+- Drive sync: folder path corrections
+- [platform] Post-quantum files: USB sync trigger and drive path fixes
+
+## 2026-08-01_07cb5aa\_\_\_2026-08-09_d4c22b66\_\_\_2026-07-30_84adba8
+
+### Added
+
+- Reviews: moderation sandbox with queue, entries, identity, and render modules
+- Reviews: contacts password sharing with improved security
+- Post-quantum files: drive-to-drive copy with per-file progress
+
+### Changed
+
+- Reviews: simplified rights logic, shapes, and shape lists
+
+### Fixed
+
+- File serving: partial content response handling for trusted and proxied files
+- Reviews: error handling gaps
+- [platform] Post-quantum files: USB sync drive directory fix
+- [frontend] Ingest: prevent one rejected row from poisoning the whole queue
+
+## 2026-07-16_6baa87c\_\_\_2026-07-25_8be594f4\_\_\_2026-07-21_e2a207a
+
+### Added
+
+- Reviews: full review lifecycle — origin creation, review creation with rights management, viewer sandbox, passwords moderation, rating decisions, and deletion
+- Autodeploy pipeline
+- [platform] Post-quantum files: USB drive sync
+
+### Changed
+
+- Removed deprecated frontend directory (`chat/frontend/`)
+- Post-quantum files: whole-file sync mode
+- [frontend] Removed legacy Lit Protocol and IPFS backup flow
+- [frontend] Repository hygiene: lint, format, test tooling, and CI
+
+### Fixed
+
+- Electric: shape sync ordering
+- Reviews: candidate replay correctness and rights timestamp enforcement
+- [platform] Post-quantum files: USB sync fix
 
 ## 2026-07-07_e346d72\_\_\_2026-07-07_af5e1507\_\_\_2026-07-03_19f1df9
 

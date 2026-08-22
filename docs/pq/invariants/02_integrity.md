@@ -8,15 +8,26 @@ Because writes propagate between peers without central arbitration (see [electri
 
 ## Approach
 
-**Integrity is achieved by three fields — `deleted_flag`, `owner_timestamp`, `sign_b64` — carried by every signable PQ row.** Together they form the universal integrity triad; nothing else is required to make a row self-authenticating, replay-resistant, and deletion-safe.
+**Integrity is achieved by up to three fields — `deleted_flag`, `owner_timestamp`, `sign_b64` — carried by every signable PQ row.** Together they form the integrity triad; nothing else is required to make a row self-authenticating, replay-resistant, and (where deletion applies) deletion-safe. `owner_timestamp` and `sign_b64` are non-negotiable on every signable row. `deleted_flag` is included wherever the row can be tombstoned; it is deliberately omitted on rows that are structurally immutable or append-only, since there is nothing to tombstone — see [Exceptions](#exceptions-to-deleted_flag) below.
 
 | Field | Role |
 |---|---|
-| `deleted_flag` | Boolean under the signature — makes *deletion* a first-class, signed claim rather than an unauthenticated server-side op. A soft-delete is a newer signed row with `deleted_flag: true` and a higher `owner_timestamp`. |
+| `deleted_flag` | Boolean under the signature — makes *deletion* a first-class, signed claim rather than an unauthenticated server-side op. A soft-delete is a newer signed row with `deleted_flag: true` and a higher `owner_timestamp`. Omitted on rows with no delete semantics (see Exceptions). |
 | `owner_timestamp` | Monotonic counter chosen by the owner. Included in `sign_b64`, so it cannot be rewritten; used to reject replays and to order supersessions (a newer signed row with a higher `owner_timestamp` overrides an older one). |
-| `sign_b64` | ML-DSA-87 signature over a canonical serialization of every other field in the row (including `deleted_flag` and `owner_timestamp`). Any mutation to any signed field invalidates it. |
+| `sign_b64` | ML-DSA-87 signature over a canonical serialization of every other field in the row (including `deleted_flag` and `owner_timestamp` when present). Any mutation to any signed field invalidates it. |
 
-These three fields are the universal contract — every signable PQ row includes them, and they are added together as one migration (`priv/repo/migrations/20260317071358_add_integrity_fields_to_user_cards.exs`). The signing key is the row owner's `sign_skey`; the verifying key (`sign_pkey`) is discoverable via the owner's `user_cards` row, which itself is self-signed.
+`owner_timestamp` + `sign_b64` are the non-negotiable pair. `deleted_flag` joined them as the pattern's origin case on `user_cards` (`priv/repo/migrations/20260317071358_add_integrity_fields_to_user_cards.exs`); `user_storage`, `files`, and later signable tables each adopted the same triad in their own creation migrations, not through that one migration. The signing key is the row owner's `sign_skey`; the verifying key (`sign_pkey`) is discoverable via the owner's `user_cards` row, which itself is self-signed.
+
+### Exceptions to `deleted_flag`
+
+A signable row omits `deleted_flag` only when it is structurally immutable or append-only — no operation could ever need to tombstone it:
+
+| Table | Why no `deleted_flag` |
+|---|---|
+| `file_chunks` | Content-addressed and immutable once written; a file is retracted by tombstoning its parent `files` row, not the individual chunk. |
+| `dialog_message_receipts` | Delivery/read receipts are irreversible facts about the past — nothing to retract. |
+
+Any new signable schema that omits `deleted_flag` must document its reason here.
 
 ### Canonical serialization
 
@@ -38,6 +49,8 @@ Per-type encoding:
 
 See `Chat.Data.Integrity.signature_payload/1` for the reference implementation.
 
+The `_hash` encoding is enforced, not just conventional: every `_hash`-suffixed signable field must hold an already-prefixed string. The custom `Chat.Data.Types.PrefixedHash`-based Ecto types produce this on `cast`/`load`, and `Chat.Data.Integrity`'s `_hash` branch raises at signing time if a field holds anything else — a raw `:binary` `_hash` field can no longer silently sign unprefixed bytes.
+
 Trust bootstrap:
 
 1. A `user_cards` row binds `sign_pkey` to `user_hash` (where `user_hash = "u_" + hex(SHA3-512(sign_pkey))`). Anyone can re-hash `sign_pkey` and confirm the binding with zero external state.
@@ -48,10 +61,10 @@ Trust bootstrap:
 
 - **Field-level schema + algorithms**: [pq_user.md](../reqs/pq_user.md)
 - **Storage row integrity**: [pq_user_storage.md §3.1 / §5.2](../reqs/pq_user_storage.md) (`sign_hash`, `sign_b64`)
-- **Table layout**: [SCHEMAS.md](./SCHEMAS.md) — `user_cards` is the canonical example; `sign_b64`, `owner_timestamp`, `deleted_flag` all listed as `NOT NULL`.
+- **Table layout**: [SCHEMAS.md](../dev/SCHEMAS.md) — `user_cards` is the canonical example; `sign_b64`, `owner_timestamp`, `deleted_flag` all listed as `NOT NULL`.
 - **Reference schema modules**: `Chat.Data.Schemas.UserCard`, `Chat.Data.Schemas.File`, `Chat.Data.Schemas.FileChunk` — `Signable` impl drops only `sign_b64` (and derived fields like `sign_hash`) and `__meta__`, so every other field is covered by the signature.
 - **Verification primitive**: `Chat.Data.Integrity.verify_signature/1` (protocol-driven, same for every signable schema).
-- **Where verification runs**: `validate/3` per-model ingestion callback — see [Electric_Abstraction_Layer.md](../electric/Electric_Abstraction_Layer.md)
+- **Where verification runs**: each shape module's `ingest_configure_writer/2` (the `Chat.Data.Shapes.Shape` behaviour, `lib/chat/data/shapes/shape.ex`) passes a model-specific 3-arity `validate` function — e.g. `Chat.Data.User.Validation.user_card_validate/3`, `Chat.Data.File.Validation.file_chunk_validate/3` — as the `:validate` option to `Phoenix.Sync.Writer.allow/4`; that function calls `Integrity.verify_signature/1` (via the shared `validate_signature/1` helper) plus timestamp-monotonicity checks. [Electric_Abstraction_Layer.md](../electric/Electric_Abstraction_Layer.md) records the original design intent behind this layering (its `authorize/2`/`validate/3`/`apply/3` sketch was never implemented verbatim — see that doc's "Current Implementation" section for what was actually built).
 
 ## Invariants
 

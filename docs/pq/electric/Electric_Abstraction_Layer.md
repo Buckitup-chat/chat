@@ -1,5 +1,7 @@
 # Electric Abstraction Layer
 
+> **Status: historical design intent.** Everything below through "Rule of Thumb" is the original proposal that motivated the layering — schema/validation/ingestion/transport separation. The naming it sketches (`authorize/2`, `validate/3`, `apply/3` as a formal behaviour) was not implemented verbatim. See [Current Implementation](#current-implementation) at the bottom for what was actually built and how it maps back to these principles.
+
 ## Goal
 
 Keep **schemas simple** while still giving each model a **clear, explicit ingestion policy**.
@@ -167,4 +169,32 @@ If the logic answers:
 - "What is this data?" -> put it near the schema or in a protocol
 - "How should this model be ingested?" -> put it in a per-model ingestion module
 - "How is this payload decoded?" -> put it in a shared utility
+
+## Current Implementation
+
+What actually shipped keeps the four-layer split above but with different names and one added pipeline (peer sync), since Electric rows arrive two ways — through the HTTP ingest endpoint and by direct replication between peers.
+
+### Behaviour: `Chat.Data.Shapes.Shape`
+
+`lib/chat/data/shapes/shape.ex` is the one behaviour every model implements (one module per model, e.g. `Chat.Data.Shapes.UserCard`, `Chat.Data.Shapes.FileChunk`) — this is the "Ingestion Policy Layer" from the design above, concretized:
+
+| Callback | Pipeline | Purpose |
+|---|---|---|
+| `shape_name/0`, `schema_module/0`, `versions_schema/0` | both | identity |
+| `sync_required_parents/2`, `sync_validate_parent/2` | peer sync | dependency/parent checks |
+| `sync_derive_fields/1` | peer sync | normalization |
+| `sync_persist/2`, `sync_after_persist/3` | peer sync | write policy |
+| `ingest_configure_writer/2` | HTTP ingest | wires the model into `Phoenix.Sync.Writer.allow/4` |
+
+### HTTP ingest: `ingest_configure_writer/2`
+
+Each model's `ingest_configure_writer/2` calls `Phoenix.Sync.Writer.allow(writer, SchemaModule, accept: ..., check: ..., validate: ...)`. `ChatWeb.ElectricController.ingest/2` (`lib/chat_web/controllers/electric_controller.ex`) folds every shape's writer config together and hands the batch to `Phoenix.Sync.Writer.apply/4`.
+
+- `check:` is PoP — verifies the request's challenge signature (e.g. `Chat.Data.User.Validation.user_card_allowed/2`).
+- `validate:` is signature + business-rule validation, always a 3-arity function `(struct_or_changeset, changes, operation) -> Ecto.Changeset` — this is the closest thing to the sketched `validate/3`, but it is not a formal behaviour callback, just a convention. Every shape module supplies its own, differently named: `user_card_validate/3`, `file_chunk_validate/3`, `receipt_validate/3`, `origin_validate/3`, `message_validate_with_versioning/3`, etc. (two review-right-candidate shapes inline an anonymous 3-arity `fn` instead of naming a function). All of them funnel through `Chat.Data.Integrity.verify_signature/1`, most via the shared `Chat.Data.User.Validation.validate_signature/1` helper (despite living in the `User` namespace, it's used by File, Dialog, Origin, and Review validation modules too).
+- Two models — `review_post_right` and `review_revoke_right` — don't override `ingest_configure_writer/2` at all (they inherit `Shape`'s no-op default), so they aren't directly HTTP-ingestible; they're only ever written server-side via promotion from their `_candidate` tables (`lib/chat/data/review_right_candidate/validation.ex`, `lib/chat/data/review_password_candidate/promotion.ex`), which call `Integrity.verify_signature/1` directly rather than through a shape's `validate:` callback.
+
+### Shared validation layer
+
+`Chat.Data.Integrity` (signature primitives) and the various `Chat.Data.<Model>.Validation` modules (per-model rules, calling the shared `validate_signature/1` / `validate_timestamp_newer_than_existing/1` helpers) fill the "Shared Validation Layer" role — this part matches the design doc closely.
 

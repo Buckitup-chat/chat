@@ -10,7 +10,7 @@ A dialog is a two-party conversation between users identified by `user_hash` (se
 
 ## Accepted trade-off
 
-Deterministic derivation means **no forward secrecy at the dialog level**. If any of an author's long-term private keys (`sign_skey`, `kem_skey`, `contact_skey`) leak, every dialog that user authored becomes decryptable retroactively. Rotating these keys means rotating identity.
+Deterministic derivation means **no forward secrecy at the dialog level**. If any of an author's long-term private keys (`sign_skey`, `crypt_skey`) leak, every dialog that user authored becomes decryptable retroactively. Rotating these keys means rotating identity.
 
 ---
 
@@ -120,7 +120,7 @@ Key relationships in words:
 
 ## Identifiers
 
-**Notation:** `||` throughout this document denotes raw binary concatenation. String-typed fields (e.g. `user_hash`, `message_id`) are encoded as UTF-8 bytes before concatenation. Private key material (`sign_skey`, `kem_skey`, `contact_skey`) is concatenated as raw bytes in its native algorithm-specific encoding.
+**Notation:** `||` throughout this document denotes raw binary concatenation. String-typed fields (e.g. `user_hash`, `message_id`) are encoded as UTF-8 bytes before concatenation. Private key material (`sign_skey`, `crypt_skey`) is concatenated as raw bytes in its native algorithm-specific encoding.
 
 ### `dialog_hash`
 
@@ -148,7 +148,7 @@ CREATE DOMAIN dialog_hash_type AS TEXT
 Each author derives one `sender_msg_key` per peer. It is the symmetric key for every message that author writes in that dialog. Derivation uses HKDF (RFC 5869) with HMAC-SHA3-256 as the underlying PRF — see [09_symmetric_keys.md](../invariants/09_symmetric_keys.md) for the full rationale. Implementation: `EnigmaPq.hkdf_derive/3` (`lib/enigma_pq/enigma_pq.ex`).
 
 ```
-IKM  = sign_skey || kem_skey || contact_skey || peer_user_hash
+IKM  = sign_skey || crypt_skey || peer_user_hash
 salt = "buckitup/dialog-mk/v1"
 
 PRK            = HMAC-SHA3-256(key = salt, data = IKM)                    # Extract
@@ -161,8 +161,8 @@ Rationale:
 
 - **Formal KDF** — HKDF has a security proof in the standard model (Krawczyk, 2010). Raw `SHA3(secrets)` does not.
 - **Explicit output length** — `L=32` means exactly 256 bits. No ambiguous truncation of a 512-bit hash.
-- **Hybrid posture** (per `HYBRID.md`): `kem_skey` is ML-KEM-1024, `contact_skey` is secp256k1. A break in either family alone does not compromise the secret.
-- **`sign_skey` is folded in** to bind derivation to the full identity. `sign_skey` never leaves the frontend, same as the other skeys.
+- **PQ-only material** — `crypt_skey` (ML-KEM-1024) is the sole KEM-family input. `contact_skey` (legacy secp256k1, used for classical key exchange elsewhere) is deliberately excluded: it adds no security margin here and would tie a post-quantum derivation to a classical secret.
+- **`sign_skey` is folded in** to bind derivation to the full identity. `sign_skey` never leaves the frontend, same as `crypt_skey`.
 - **Domain separation salt** `"buckitup/dialog-mk/v1"` prevents collisions with future derivations (rooms, groups, subchannels).
 - **Peer binding by `peer_user_hash`** — itself `SHA3-512(peer_sign_pkey)`, so transitively bound to peer's signing identity.
 
@@ -607,7 +607,7 @@ Self-authenticating per [02_integrity.md](../invariants/02_integrity.md): `sign_
 
 ### Author on a new device
 
-1. Device has the author's `sign_skey`, `kem_skey`, `contact_skey` (from User Identity, per `pq_user.md`).
+1. Device has the author's `sign_skey`, `crypt_skey` (from User Identity, per `pq_user.md`).
 2. Re-derive `sender_msg_key` — same value as on any other device.
 3. Can read own past messages by re-deriving `sender_msg_key` from private keys (deterministic derivation).
 4. To write: no new `dialog_keys` row needed (one already exists for `(dialog_hash, sender_hash)`); proceed to insert `dialog_messages`.

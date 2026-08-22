@@ -2,7 +2,7 @@ defmodule Chat.Data.Schemas.DialogMessage do
   @moduledoc """
   Ecto schema for dialog message tips. Current version of each message.
 
-  Spec: `docs/reqs/pq_dialogs.md` §2 `dialog_messages`.
+  Spec: `docs/pq/reqs/pq_dialogs.md` §2 `dialog_messages`.
   """
 
   use Ecto.Schema

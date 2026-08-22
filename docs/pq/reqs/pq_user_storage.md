@@ -223,9 +223,9 @@ For complete schema definition, see [pq_user.md](./pq_user.md).
 The User Storage implementation follows the existing UserCard system pattern:
 
 **Key Reference Files**:
-1. **Ingest Endpoint**: [lib/chat_web/controllers/electric_controller.ex](../../lib/chat_web/controllers/electric_controller.ex)
-2. **Shape Sync Route**: [lib/chat_web/router.ex:145](../../lib/chat_web/router.ex#L145)
-3. **PoP Protocol**: [docs/reqs/electric-proof-of-possesion.md](./electric-proof-of-possesion.md)
+1. **Ingest Endpoint**: [lib/chat_web/controllers/electric_controller.ex](../../../lib/chat_web/controllers/electric_controller.ex)
+2. **Shape Sync Route**: [lib/chat_web/router.ex:145](../../../lib/chat_web/router.ex#L145)
+3. **PoP Protocol**: [docs/pq/reqs/electric-proof-of-possesion.md](./electric-proof-of-possesion.md)
 
 ### 7.2 PostgreSQL Configuration
 

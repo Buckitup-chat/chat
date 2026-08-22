@@ -19,15 +19,15 @@ Challenges are fetched from `GET /api/v1/challenge` or reused from the previous 
 
 ## Where this lives
 
-- **Protocol spec**: [electric-proof-of-possesion.md](../../reqs/electric-proof-of-possesion.md)
-- **User-side application of PoP**: [pq_user_storage.md §4.2](../../reqs/pq_user_storage.md)
+- **Protocol spec**: [electric-proof-of-possesion.md](../reqs/electric-proof-of-possesion.md)
+- **User-side application of PoP**: [pq_user_storage.md §4.2](../reqs/pq_user_storage.md)
 - **Ingest controller**: `lib/chat_web/controllers/electric_controller.ex`
-- **Abstraction layer context**: [Electric_Abstraction_Layer.md](../Electric_Abstraction_Layer.md) — PoP runs *before* per-model `authorize/2`
+- **Abstraction layer context**: [Electric_Abstraction_Layer.md](../electric/Electric_Abstraction_Layer.md) — PoP runs *before* per-model `authorize/2`
 
 ## Invariants
 
 - Reads are public — no PoP needed.
-- Peer-to-peer replication (`Electric.ShapeWriter`) **bypasses** PoP: sync is a trusted internal operation between already-verified rows (see [electric_network_sync.md](../../reqs/electric_network_sync.md)). Integrity is re-checked per-row from signatures.
+- Peer-to-peer replication (`Electric.ShapeWriter`) **bypasses** PoP: sync is a trusted internal operation between already-verified rows (see [electric_network_sync.md](../reqs/electric_network_sync.md)). Integrity is re-checked per-row from signatures.
 - Challenge reuse across requests is disallowed — replay prevention.
 
 ## Open extensions

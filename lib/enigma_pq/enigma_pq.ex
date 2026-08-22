@@ -8,8 +8,8 @@ defmodule EnigmaPq do
 
     - `docs/pq/reqs/pq_user.md` — user identity, key generation, certificates
     - `docs/pq/reqs/pq_dialogs.md` — dialog key derivation, wrapping, message encryption
-    - `docs/pq/electric/pq_data_layer/09_symmetric_keys.md` — HKDF construction and rationale
-    - `docs/pq/electric/pq_data_layer/07_content_polymorphism.md` — content blob format
+    - `docs/pq/invariants/09_symmetric_keys.md` — HKDF construction and rationale
+    - `docs/pq/invariants/07_content_polymorphism.md` — content blob format
   """
 
   @aes_gcm_nonce_size 12

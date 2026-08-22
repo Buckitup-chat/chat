@@ -1,6 +1,6 @@
 # Content Polymorphism
 
-> Status: **partial design** — JSON envelope shape defined; out-of-band files use encrypted chunks in PostgreSQL ([pq_files.md](../../reqs/pq_files.md)).
+> Status: **partial design** — JSON envelope shape defined; out-of-band files use encrypted chunks in PostgreSQL ([pq_files.md](../reqs/pq_files.md)).
 
 ## Problem
 
@@ -8,7 +8,7 @@ A message's payload can be text, image, video, audio, or file. These differ in s
 
 ## Approach
 
-**Single encrypted content blob.** The carrier row (e.g. `dialog_messages.content_b64` — see [pq_dialogs.md §dialog_messages](../../reqs/pq_dialogs.md)) stores `12-byte AES-GCM nonce ‖ ciphertext`. The plaintext is JSON, shaped by convention:
+**Single encrypted content blob.** The carrier row (e.g. `dialog_messages.content_b64` — see [pq_dialogs.md §dialog_messages](../reqs/pq_dialogs.md)) stores `12-byte AES-GCM nonce ‖ ciphertext`. The plaintext is JSON, shaped by convention:
 
 | Plaintext shape                    | Meaning                                                                                                                        |
 | ---------------------------------- |--------------------------------------------------------------------------------------------------------------------------------|
@@ -75,7 +75,7 @@ Small image embedded directly in the message content (base64-encoded). Includes 
 
 ### `"file"`
 
-Out-of-band file stored as encrypted chunks in PostgreSQL. See [pq_files.md](../../reqs/pq_files.md) for chunk encryption, tables, upload/sync protocols, and GC.
+Out-of-band file stored as encrypted chunks in PostgreSQL. See [pq_files.md](../reqs/pq_files.md) for chunk encryption, tables, upload/sync protocols, and GC.
 
 ```json
 {"file": [name, size, mime_type, creation_unixtime, file_id, enc_secret_b64]}
@@ -94,7 +94,7 @@ Because this lives inside ciphertext, the database cannot tell whether a row is 
 
 ### `"image"`
 
-Out-of-band image stored as encrypted chunks in PostgreSQL. Extends the `"file"` type with aspect ratio and thumbhash for preview rendering before chunk download. See [pq_files.md](../../reqs/pq_files.md) for chunk encryption.
+Out-of-band image stored as encrypted chunks in PostgreSQL. Extends the `"file"` type with aspect ratio and thumbhash for preview rendering before chunk download. See [pq_files.md](../reqs/pq_files.md) for chunk encryption.
 
 ```json
 {"image": [width_aspect, height_aspect, thumb_hash_b64, name, size, mime_type, creation_unixtime, file_id, enc_secret_b64]}
@@ -116,7 +116,7 @@ Small images (under the inline size limit) should use [`"inline_image"`](#inline
 
 ### `"video"`
 
-Out-of-band video stored as encrypted chunks in PostgreSQL. Carries aspect ratio and thumbhash (from a representative frame) for preview rendering before chunk download. See [pq_files.md](../../reqs/pq_files.md) for chunk encryption.
+Out-of-band video stored as encrypted chunks in PostgreSQL. Carries aspect ratio and thumbhash (from a representative frame) for preview rendering before chunk download. See [pq_files.md](../reqs/pq_files.md) for chunk encryption.
 
 ```json
 {"video": [width_aspect, height_aspect, thumb_hash_b64, name, size, mime_type, creation_unixtime, file_id, enc_secret_b64]}
@@ -140,7 +140,7 @@ Videos are always out-of-band — there is no inline variant.
 
 The sender's `review_list_password` — one symmetric key per author that decrypts the `password_b64`
 column of every `review_list` row they write, and so opens every review they have written or will
-write, regardless of moderation state. See [reviews.md § Contacts](../../proposal/reviews.md).
+write, regardless of moderation state. See [reviews.md § Contacts](../proposal/reviews.md).
 
 ```json
 {"review_list_key": [key_b64]}
@@ -164,7 +164,7 @@ broadcast.
 
 For small payloads, the bytes sit inside the JSON value directly (base64-encoded). **Soft limit: 500 KB** for inline objects. **Hard limit: the top-level `content_b64` field must not exceed 1 MB** after encryption.
 
-For large payloads, use an out-of-band content type (`"file"`, `"image"`, or `"video"`) — the JSON value carries a reference (`file_id` + `enc_secret_b64`) and the actual bytes live in encrypted chunks in PostgreSQL (see [pq_files.md](../../reqs/pq_files.md)). The `"image"` and `"video"` types add visual metadata (aspect ratio, thumbhash) so the client can render a placeholder before downloading chunks.
+For large payloads, use an out-of-band content type (`"file"`, `"image"`, or `"video"`) — the JSON value carries a reference (`file_id` + `enc_secret_b64`) and the actual bytes live in encrypted chunks in PostgreSQL (see [pq_files.md](../reqs/pq_files.md)). The `"image"` and `"video"` types add visual metadata (aspect ratio, thumbhash) so the client can render a placeholder before downloading chunks.
 
 The carrier row's `sign_b64` covers the whole `content_b64` (nonce + ciphertext), so any tampering with the envelope — including embedded references — is detected.
 
@@ -174,9 +174,9 @@ A signed deletion is `deleted_flag = true` plus an empty `content_b64`. The empt
 
 ## Where this touches existing work
 
-- **Carrier row**: [pq_dialogs.md §dialog_messages](../../reqs/pq_dialogs.md) — `content_b64` is the single-blob field.
+- **Carrier row**: [pq_dialogs.md §dialog_messages](../reqs/pq_dialogs.md) — `content_b64` is the single-blob field.
 - **Encryption**: `EnigmaPq.aes_gcm_encrypt/2` and `EnigmaPq.aes_gcm_decrypt/2` (`lib/enigma_pq/enigma_pq.ex`) — produce and consume the `nonce(12) || ciphertext || tag(16)` blob format.
-- **Out-of-band file storage**: [pq_files.md](../../reqs/pq_files.md) — encrypted chunk storage in PostgreSQL for large files; inline content for small payloads.
+- **Out-of-band file storage**: [pq_files.md](../reqs/pq_files.md) — encrypted chunk storage in PostgreSQL for large files; inline content for small payloads.
 - **Integrity primitive**: [02_integrity.md](./02_integrity.md) — `content_b64` is one of the signed fields like any other.
 
 ## Invariants
@@ -184,7 +184,7 @@ A signed deletion is `deleted_flag = true` plus an empty `content_b64`. The empt
 - The plaintext JSON object has at most one key — it names the content type. Bare strings are text by convention.
 - Content type is never a column on the carrier row; it is only visible after decryption.
 - A new content type is a new JSON key, not a schema migration.
-- Out-of-band file references (`file_id`, `enc_secret_b64`) inside the envelope are integrity-bound by the carrier row's `sign_b64`; chunk integrity is ensured by `files.chunk_sign_hashes` (see [pq_files.md](../../reqs/pq_files.md)).
+- Out-of-band file references (`file_id`, `enc_secret_b64`) inside the envelope are integrity-bound by the carrier row's `sign_b64`; chunk integrity is ensured by `files.chunk_sign_hashes` (see [pq_files.md](../reqs/pq_files.md)).
 - An empty `content_b64` is only valid alongside `deleted_flag = true`.
 
 ## Resolved questions
@@ -194,4 +194,4 @@ A signed deletion is `deleted_flag = true` plus an empty `content_b64`. The empt
 
 ## Open questions
 
-- Out-of-band file GC: when can chunk data be reclaimed? See [pq_files.md §8](../../reqs/pq_files.md) for the current GC design.
+- Out-of-band file GC: when can chunk data be reclaimed? See [pq_files.md §8](../reqs/pq_files.md) for the current GC design.

@@ -40,7 +40,7 @@ Design sketches — may or may not be implemented.
 Real-time sync layer built on Phoenix.Sync + ElectricSQL.
 
 - [Electric abstraction layer](./pq/electric/Electric_Abstraction_Layer.md)
-- [PQ data layer](./pq/electric/pq_data_layer/README.md) · [schemas](./pq/electric/pq_data_layer/SCHEMAS.md)
+- [PQ invariants](./pq/invariants/README.md)
 
 ### Flows
 - [PQ optical handshake](./pq/flows/pq_optical-handshake.livemd)

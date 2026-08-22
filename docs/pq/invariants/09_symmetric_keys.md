@@ -4,7 +4,7 @@
 
 ## Problem
 
-The PQ data layer encrypts content with AES-256-GCM under keys derived from the author's private material. The current derivation in [pq_dialogs.md](../../reqs/pq_dialogs.md) is a single SHA3-512 hash:
+The PQ data layer encrypts content with AES-256-GCM under keys derived from the author's private material. The current derivation in [pq_dialogs.md](../reqs/pq_dialogs.md) is a single SHA3-512 hash:
 
 ```
 sender_msg_key = SHA3-512(
@@ -165,8 +165,8 @@ end
 
 ## Where this applies
 
-- **Dialog key derivation**: [pq_dialogs.md §Key derivation](../../reqs/pq_dialogs.md) — replaces raw SHA3-512 with HKDF-SHA3-256, same single-key-per-side model
-- **Dialog key wrapping**: [pq_dialogs.md §Key wrapping](../../reqs/pq_dialogs.md) — resolves problem #13
+- **Dialog key derivation**: [pq_dialogs.md §Key derivation](../reqs/pq_dialogs.md) — replaces raw SHA3-512 with HKDF-SHA3-256, same single-key-per-side model
+- **Dialog key wrapping**: [pq_dialogs.md §Key wrapping](../reqs/pq_dialogs.md) — resolves problem #13
 - **User storage encryption** (frontend) — same HKDF-SHA3-256 (implemented via HMAC-SHA3-256 over WebCrypto)
 - **Future room keys**: same HKDF pattern with a different salt (e.g., `"buckitup/room-mk/v1"`)
 

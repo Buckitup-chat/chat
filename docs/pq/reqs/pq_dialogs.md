@@ -16,7 +16,7 @@ Deterministic derivation means **no forward secrecy at the dialog level**. If an
 
 ## Schema at a glance
 
-All five dialog tables are self-authenticating via the integrity triad (`sign_b64`, `owner_timestamp`, `deleted_flag`) defined in [02_integrity.md](../electric/pq_data_layer/02_integrity.md), with one exception: `dialog_message_receipts` omits `deleted_flag` because delivery and read events are irreversible. `user_cards` is shown because every verification path starts there — fetch the author's `sign_pkey` / `crypt_pkey` from `user_cards`, then check the dialog row's signature. No database-level foreign keys to `user_cards` exist (PQ rows are self-verifying), but the logical dependency is real.
+All five dialog tables are self-authenticating via the integrity triad (`sign_b64`, `owner_timestamp`, `deleted_flag`) defined in [02_integrity.md](../invariants/02_integrity.md), with one exception: `dialog_message_receipts` omits `deleted_flag` because delivery and read events are irreversible. `user_cards` is shown because every verification path starts there — fetch the author's `sign_pkey` / `crypt_pkey` from `user_cards`, then check the dialog row's signature. No database-level foreign keys to `user_cards` exist (PQ rows are self-verifying), but the logical dependency is real.
 
 ```mermaid
 erDiagram
@@ -145,7 +145,7 @@ CREATE DOMAIN dialog_hash_type AS TEXT
 
 ## Key derivation
 
-Each author derives one `sender_msg_key` per peer. It is the symmetric key for every message that author writes in that dialog. Derivation uses HKDF (RFC 5869) with HMAC-SHA3-256 as the underlying PRF — see [09_symmetric_keys.md](../electric/pq_data_layer/09_symmetric_keys.md) for the full rationale. Implementation: `EnigmaPq.hkdf_derive/3` (`lib/enigma_pq/enigma_pq.ex`).
+Each author derives one `sender_msg_key` per peer. It is the symmetric key for every message that author writes in that dialog. Derivation uses HKDF (RFC 5869) with HMAC-SHA3-256 as the underlying PRF — see [09_symmetric_keys.md](../invariants/09_symmetric_keys.md) for the full rationale. Implementation: `EnigmaPq.hkdf_derive/3` (`lib/enigma_pq/enigma_pq.ex`).
 
 ```
 IKM  = sign_skey || kem_skey || contact_skey || peer_user_hash
@@ -440,7 +440,7 @@ There is no `dialogs` table. Participation is derived from `dialog_keys` via `se
 
 > **Implementation:** `Chat.Data.Schemas.DialogKey` (`lib/chat/data/schemas/dialog_key.ex`)
 
-Wrapped `sender_msg_key` published by one author for one dialog. Two rows per dialog in the common case (one per direction). An author republishes the same row idempotently from any of their devices (deterministic `sender_msg_key` ⇒ same plaintext, different KEM randomness ⇒ compatible). Concurrent publishes from multiple devices are resolved by LWW on `owner_timestamp` per the integrity triad in [02_integrity.md](../electric/pq_data_layer/02_integrity.md).
+Wrapped `sender_msg_key` published by one author for one dialog. Two rows per dialog in the common case (one per direction). An author republishes the same row idempotently from any of their devices (deterministic `sender_msg_key` ⇒ same plaintext, different KEM randomness ⇒ compatible). Concurrent publishes from multiple devices are resolved by LWW on `owner_timestamp` per the integrity triad in [02_integrity.md](../invariants/02_integrity.md).
 
 | Column                     | Type               | Notes                                                                                           |
 | -------------------------- | ------------------ | ----------------------------------------------------------------------------------------------- |
@@ -455,7 +455,7 @@ Wrapped `sender_msg_key` published by one author for one dialog. Two rows per di
 
 PK: `(dialog_hash, sender_hash)`.
 
-Self-authenticating per [02_integrity.md](../electric/pq_data_layer/02_integrity.md), same bootstrap as `user_cards`: fetch `user_cards` for `sender_hash`, verify its self-signature, then verify this row's `sign_b64` under that `sign_pkey`. A row with invalid `sign_b64` is rejected on ingest and re-verified on peer-sync receive. Because `dialog_hash`, `peer_hash`, and both KEM ciphertexts are all covered by the signature, no field can be rewritten, retargeted to a different peer, or lifted into a different dialog without detection.
+Self-authenticating per [02_integrity.md](../invariants/02_integrity.md), same bootstrap as `user_cards`: fetch `user_cards` for `sender_hash`, verify its self-signature, then verify this row's `sign_b64` under that `sign_pkey`. A row with invalid `sign_b64` is rejected on ingest and re-verified on peer-sync receive. Because `dialog_hash`, `peer_hash`, and both KEM ciphertexts are all covered by the signature, no field can be rewritten, retargeted to a different peer, or lifted into a different dialog without detection.
 
 Flooding: an attacker can still publish a row naming an uninvolved `peer_hash` (PoP proves submitter identity, not peer consent). There is no server-side spam filtering — accepting or ignoring unsolicited dialogs is the receiver's decision. Clients mitigate by hiding a dialog until the local user has either authored a message in it or the peer has published their own `dialog_keys` row for the same `dialog_hash`.
 
@@ -463,9 +463,9 @@ Flooding: an attacker can still publish a row naming an uninvolved `peer_hash` (
 
 > **Implementation:** `Chat.Data.Schemas.DialogMessage` (`lib/chat/data/schemas/dialog_message.ex`)
 
-Current tip of each message's version chain. Each message is identified by `message_id = "dmsg_" + UUID v7` — globally unique and time-ordered within a dialog. Messages follow the integrity triad in [02_integrity.md](../electric/pq_data_layer/02_integrity.md) (`sign_b64`, `owner_timestamp`, `deleted_flag`) and the hash-linked versioning model in [03_data_versioning.md](../electric/pq_data_layer/03_data_versioning.md), mirroring `user_storage` / `user_storage_versions` (see `Chat.Data.Schemas.UserStorage`).
+Current tip of each message's version chain. Each message is identified by `message_id = "dmsg_" + UUID v7` — globally unique and time-ordered within a dialog. Messages follow the integrity triad in [02_integrity.md](../invariants/02_integrity.md) (`sign_b64`, `owner_timestamp`, `deleted_flag`) and the hash-linked versioning model in [03_data_versioning.md](../invariants/03_data_versioning.md), mirroring `user_storage` / `user_storage_versions` (see `Chat.Data.Schemas.UserStorage`).
 
-Content is a single opaque blob: the first 12 bytes are the per-message AES-GCM nonce, the remainder is AES-256-GCM ciphertext under `sender_msg_key`. Plaintext shape — bare-string text vs. `{"<type>": <value>}` envelopes for media, plus inline-vs-out-of-band rules — lives in [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md). Keeping the type *inside* the ciphertext means the database never reveals whether a message is text, image, or attachment.
+Content is a single opaque blob: the first 12 bytes are the per-message AES-GCM nonce, the remainder is AES-256-GCM ciphertext under `sender_msg_key`. Plaintext shape — bare-string text vs. `{"<type>": <value>}` envelopes for media, plus inline-vs-out-of-band rules — lives in [07_content_polymorphism.md](../invariants/07_content_polymorphism.md). Keeping the type *inside* the ciphertext means the database never reveals whether a message is text, image, or attachment.
 
 `refs_map_b64` carries the **causal context** a message was authored against — a map of every DAG tail the sender observed at send time, encrypted under `sender_msg_key` (see §References). Required because Electric sync offers no delivery-order guarantee and `parent_sign_hash` only chains revisions *by the same author*. The map is opaque to the server; causal validation is a frontend responsibility.
 
@@ -474,13 +474,13 @@ Content is a single opaque blob: the first 12 bytes are the per-message AES-GCM 
 | `message_id`       | `dialog_message_id_type`        | PK; `dmsg_<UUID7>`                                                                                          |
 | `dialog_hash`      | `dialog_hash_type`              | dialog this message belongs to                                                                              |
 | `sender_hash`      | `user_hash_type`                | author                                                                                                      |
-| `content_b64`          | `bytea`                         | 12-byte AES-GCM nonce ‖ AES-256-GCM ciphertext of the JSON payload — see [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md). Empty when `deleted_flag = true`. Max 1 MB |
+| `content_b64`          | `bytea`                         | 12-byte AES-GCM nonce ‖ AES-256-GCM ciphertext of the JSON payload — see [07_content_polymorphism.md](../invariants/07_content_polymorphism.md). Empty when `deleted_flag = true`. Max 1 MB |
 | `deleted_flag`     | `boolean`                       | Signed tombstone marker; retractions are a new tip with empty `content_b64`, recomputed `refs_map_b64` (current viewport tails at deletion time), and `deleted_flag: true` |
 | `refs_map_b64`     | `bytea`                         | Encrypted causal-context map — see §References. 12-byte AES-GCM nonce ‖ AES-256-GCM ciphertext under `sender_msg_key`. Plaintext is a JSON map `{message_id: sign_hash}` of all DAG tails the sender observed. Empty map `{}` for the genesis message. Updated on edit (may reference new tails observed since original authoring). Max 1 MB |
 | `parent_sign_hash` | `dialog_message_sign_hash_type` | FK → `dialog_messages_versions.sign_hash`; NULL for the first version                                       |
 | `owner_timestamp`  | `integer`                       | Monotonic per `message_id`; strictly increases on edit; prevents replay                                     |
 | `sign_b64`         | `bytea`                         | ML-DSA-87 signature by `sender_hash` over the signable fields (everything except `sign_b64` / `sign_hash`)  |
-| `sign_hash`        | `dialog_message_sign_hash_type` | `dms_` + hex(SHA3-512(`sign_b64`)) — identity of this tip version. Denormalized convenience copy per [03_data_versioning.md](../electric/pq_data_layer/03_data_versioning.md): derivable from `sign_b64`, not itself covered by the signature; kept on the master to avoid recomputing the hash when archiving the outgoing tip and when populating the next edit's `parent_sign_hash`. Referenced logically (not via database FK) by `dialog_messages_versions.parent_sign_hash`, `dialog_message_reactions.message_sign_hash`, and `dialog_message_receipts.message_sign_hash`. |
+| `sign_hash`        | `dialog_message_sign_hash_type` | `dms_` + hex(SHA3-512(`sign_b64`)) — identity of this tip version. Denormalized convenience copy per [03_data_versioning.md](../invariants/03_data_versioning.md): derivable from `sign_b64`, not itself covered by the signature; kept on the master to avoid recomputing the hash when archiving the outgoing tip and when populating the next edit's `parent_sign_hash`. Referenced logically (not via database FK) by `dialog_messages_versions.parent_sign_hash`, `dialog_message_reactions.message_sign_hash`, and `dialog_message_receipts.message_sign_hash`. |
 
 PK: `(message_id)`. UNIQUE: `(dialog_hash, message_id)` — supports dialog-scoped sync filtering and inbox listings without a separate `dialogs` table.
 
@@ -494,7 +494,7 @@ CREATE DOMAIN dialog_message_sign_hash_type AS TEXT
   CHECK (VALUE ~ '^dms_[a-f0-9]{128}$');
 ```
 
-Self-authenticating per [02_integrity.md](../electric/pq_data_layer/02_integrity.md): verify `sign_b64` under `sender_hash`'s `sign_pkey` (from `user_cards`). An incoming update with `owner_timestamp <= existing` is rejected as a replay even if the signature verifies. Deletes are a new signed tip with `deleted_flag: true` and a higher `owner_timestamp` — there is no unsigned server-side delete.
+Self-authenticating per [02_integrity.md](../invariants/02_integrity.md): verify `sign_b64` under `sender_hash`'s `sign_pkey` (from `user_cards`). An incoming update with `owner_timestamp <= existing` is rejected as a replay even if the signature verifies. Deletes are a new signed tip with `deleted_flag: true` and a higher `owner_timestamp` — there is no unsigned server-side delete.
 
 ### 2a. `dialog_messages_versions`
 
@@ -548,7 +548,7 @@ CREATE DOMAIN dialog_message_reaction_hash_type AS TEXT
   CHECK (VALUE ~ '^dmr_[a-f0-9]{128}$');
 ```
 
-Carries the full integrity triad per [02_integrity.md](../electric/pq_data_layer/02_integrity.md): `sign_b64` over all other fields, `owner_timestamp` strictly monotonic per `reaction_hash`, `deleted_flag` as a signed un-react. Reactions are not versioned (no chain) — the row is overwritten on each new signed update. Because `reaction_hash` is a MAC over the `(message_id, reactor_hash, type)` tuple, an attacker cannot forge a `reaction_hash` pointing at a different tuple without the key; and because `type_b64` is covered by `sign_b64`, it cannot be swapped independently of the hash.
+Carries the full integrity triad per [02_integrity.md](../invariants/02_integrity.md): `sign_b64` over all other fields, `owner_timestamp` strictly monotonic per `reaction_hash`, `deleted_flag` as a signed un-react. Reactions are not versioned (no chain) — the row is overwritten on each new signed update. Because `reaction_hash` is a MAC over the `(message_id, reactor_hash, type)` tuple, an attacker cannot forge a `reaction_hash` pointing at a different tuple without the key; and because `type_b64` is covered by `sign_b64`, it cannot be swapped independently of the hash.
 
 ### 4. `dialog_message_receipts`
 
@@ -578,7 +578,7 @@ CREATE DOMAIN dialog_message_receipt_hash_type AS TEXT
   CHECK (VALUE ~ '^dmrc_[a-f0-9]{128}$');
 ```
 
-Self-authenticating per [02_integrity.md](../electric/pq_data_layer/02_integrity.md): `sign_b64` over all other fields, `owner_timestamp` strictly monotonic per `receipt_hash`. No `deleted_flag` — delivery and read events are append-only facts. Receipts are not versioned (no chain) — the row is overwritten on each new signed update.
+Self-authenticating per [02_integrity.md](../invariants/02_integrity.md): `sign_b64` over all other fields, `owner_timestamp` strictly monotonic per `receipt_hash`. No `deleted_flag` — delivery and read events are append-only facts. Receipts are not versioned (no chain) — the row is overwritten on each new signed update.
 
 **`type` values:**
 
@@ -621,8 +621,8 @@ Both sides compute the same `dialog_hash`. Each inserts its own `dialog_keys` ro
 ## Out of scope
 
 - **Group conversations** — covered by `pq_rooms.md` (TBD); this doc covers two-party dialogs only.
-- **Cross-author message ordering rendering** — `refs_map_b64` (column present on `dialog_messages` / `dialog_messages_versions`) provides the encrypted DAG-aware causal context per dialog, but the rendering semantics (ingest rules, pending-queue behavior, fork surfacing, catch-up) are owned by [04_ordering.md](../electric/pq_data_layer/04_ordering.md). Until that spec lands, clients may linearize by UUIDv7 timestamp as a best-effort display order.
-- **Replies and concurrent forks** — reply targeting will be handled via the `{"quote": ...}` content envelope in [07_content_polymorphism.md](../electric/pq_data_layer/07_content_polymorphism.md). Concurrent forks (two peers sending without seeing each other's messages) are captured naturally by `refs_map_b64` and resolved at the UI level.
+- **Cross-author message ordering rendering** — `refs_map_b64` (column present on `dialog_messages` / `dialog_messages_versions`) provides the encrypted DAG-aware causal context per dialog, but the rendering semantics (ingest rules, pending-queue behavior, fork surfacing, catch-up) are owned by [04_ordering.md](../invariants/04_ordering.md). Until that spec lands, clients may linearize by UUIDv7 timestamp as a best-effort display order.
+- **Replies and concurrent forks** — reply targeting will be handled via the `{"quote": ...}` content envelope in [07_content_polymorphism.md](../invariants/07_content_polymorphism.md). Concurrent forks (two peers sending without seeing each other's messages) are captured naturally by `refs_map_b64` and resolved at the UI level.
 - **Sync filtering** — which rows propagate to which peer is a frontend / sync-layer choice, not part of the dialog data contract.
 - **Typing indicators and presence** — BuckitUp is not an online-first chat; real-time presence is out of scope for the dialog data layer.
 

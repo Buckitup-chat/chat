@@ -4,7 +4,7 @@
 
 ## Problem
 
-Because writes propagate between peers without central arbitration (see [electric_network_sync.md](../../reqs/electric_network_sync.md)), a row's authenticity cannot depend on the server that served it. The row itself must prove it came from the legitimate owner, and any tampering with stored fields must be detectable by any consumer at any time.
+Because writes propagate between peers without central arbitration (see [electric_network_sync.md](../reqs/electric_network_sync.md)), a row's authenticity cannot depend on the server that served it. The row itself must prove it came from the legitimate owner, and any tampering with stored fields must be detectable by any consumer at any time.
 
 ## Approach
 
@@ -46,12 +46,12 @@ Trust bootstrap:
 
 ## Where this lives
 
-- **Field-level schema + algorithms**: [pq_user.md](../../reqs/pq_user.md)
-- **Storage row integrity**: [pq_user_storage.md §3.1 / §5.2](../../reqs/pq_user_storage.md) (`sign_hash`, `sign_b64`)
+- **Field-level schema + algorithms**: [pq_user.md](../reqs/pq_user.md)
+- **Storage row integrity**: [pq_user_storage.md §3.1 / §5.2](../reqs/pq_user_storage.md) (`sign_hash`, `sign_b64`)
 - **Table layout**: [SCHEMAS.md](./SCHEMAS.md) — `user_cards` is the canonical example; `sign_b64`, `owner_timestamp`, `deleted_flag` all listed as `NOT NULL`.
 - **Reference schema modules**: `Chat.Data.Schemas.UserCard`, `Chat.Data.Schemas.File`, `Chat.Data.Schemas.FileChunk` — `Signable` impl drops only `sign_b64` (and derived fields like `sign_hash`) and `__meta__`, so every other field is covered by the signature.
 - **Verification primitive**: `Chat.Data.Integrity.verify_signature/1` (protocol-driven, same for every signable schema).
-- **Where verification runs**: `validate/3` per-model ingestion callback — see [Electric_Abstraction_Layer.md](../Electric_Abstraction_Layer.md)
+- **Where verification runs**: `validate/3` per-model ingestion callback — see [Electric_Abstraction_Layer.md](../electric/Electric_Abstraction_Layer.md)
 
 ## Invariants
 

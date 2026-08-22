@@ -10,7 +10,7 @@ Two pipelines consume the same shapes with different trust models:
 
 2. **Peer sync** — another server streams shapes via `Electric.Client`. The receiving server validates signatures and writes to its own PostgreSQL. No PoP — peer sync is a trusted internal operation, but cryptographic integrity (signatures, timestamps) is still verified.
 
-Both pipelines share the integrity triad ([02_integrity.md](../electric/pq_data_layer/02_integrity.md)) and, for versioned shapes, the two-table archiving pattern ([03_data_versioning.md](../electric/pq_data_layer/03_data_versioning.md)). But the shape-specific logic — whose key to check, what preconditions to enforce, how to write — is spread across multiple modules with no unifying contract.
+Both pipelines share the integrity triad ([02_integrity.md](../invariants/02_integrity.md)) and, for versioned shapes, the two-table archiving pattern ([03_data_versioning.md](../invariants/03_data_versioning.md)). But the shape-specific logic — whose key to check, what preconditions to enforce, how to write — is spread across multiple modules with no unifying contract.
 
 As the shape inventory grows (dialog tables, file storage tables), this scatter becomes a maintenance problem. Each new shape requires touching 4-5 files with no compile-time guarantee that all callbacks are wired up.
 

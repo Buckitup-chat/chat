@@ -337,19 +337,31 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
         %{"message_id" => msg_id, "sign_hash" => sign_hash, "emoji" => emoji},
         socket
       ) do
-    %{user: user, selected_dialog: dialog_hash} = socket.assigns
+    %{user: user, selected_dialog: dialog_hash, reactions: reactions} = socket.assigns
     dialog = Enum.find(socket.assigns.dialogs, &(&1.dialog_hash == dialog_hash))
     base_url = public_url(socket)
 
-    case ApiClient.publish_reaction(
-           user,
-           dialog_hash,
-           msg_id,
-           sign_hash,
-           emoji,
-           dialog.peer_hash,
-           base_url
-         ) do
+    existing =
+      reactions
+      |> Map.get(sign_hash, [])
+      |> Enum.find(&(&1.emoji == emoji and &1.reactor_hash == user.user_hash))
+
+    result =
+      if existing do
+        ApiClient.delete_reaction(user, existing, dialog.peer_hash, base_url)
+      else
+        ApiClient.publish_reaction(
+          user,
+          dialog_hash,
+          msg_id,
+          sign_hash,
+          emoji,
+          dialog.peer_hash,
+          base_url
+        )
+      end
+
+    case result do
       {:ok, %{log_entries: logs}} ->
         {:noreply,
          socket

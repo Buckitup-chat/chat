@@ -10,8 +10,7 @@ The PQ data layer encrypts content with AES-256-GCM under keys derived from the 
 sender_msg_key = SHA3-512(
     "buckitup/dialog-mk/v1"
  || sign_skey
- || kem_skey
- || contact_skey
+ || crypt_skey
  || peer_user_hash
 )
 ```
@@ -57,7 +56,7 @@ SHA3-512 remains the correct choice for identity hashes, where 256-bit collision
 Concentrate the multi-source input keying material (IKM) into a fixed-length pseudorandom key (PRK):
 
 ```
-IKM  = sign_skey || kem_skey || contact_skey || peer_user_hash
+IKM  = sign_skey || crypt_skey || peer_user_hash
 salt = "buckitup/dialog-mk/v1"
 
 PRK  = HMAC-SHA3-256(key = salt, data = IKM)              # 32 bytes

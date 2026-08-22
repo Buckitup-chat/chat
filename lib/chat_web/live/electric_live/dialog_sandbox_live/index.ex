@@ -337,24 +337,56 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
         %{"message_id" => msg_id, "sign_hash" => sign_hash, "emoji" => emoji},
         socket
       ) do
-    %{user: user, selected_dialog: dialog_hash} = socket.assigns
+    %{user: user, selected_dialog: dialog_hash, reactions: reactions} = socket.assigns
     dialog = Enum.find(socket.assigns.dialogs, &(&1.dialog_hash == dialog_hash))
     base_url = public_url(socket)
 
-    case ApiClient.publish_reaction(
-           user,
-           dialog_hash,
-           msg_id,
-           sign_hash,
-           emoji,
-           dialog.peer_hash,
-           base_url
-         ) do
+    existing =
+      reactions
+      |> Map.get(sign_hash, [])
+      |> Enum.find(&(&1.emoji == emoji and &1.reactor_hash == user.user_hash))
+
+    result =
+      if existing do
+        ApiClient.delete_reaction(user, existing, dialog.peer_hash, base_url)
+      else
+        ApiClient.publish_reaction(
+          user,
+          dialog_hash,
+          msg_id,
+          sign_hash,
+          emoji,
+          dialog.peer_hash,
+          base_url
+        )
+      end
+
+    case result do
       {:ok, %{log_entries: logs}} ->
-        {:noreply,
-         socket
-         |> update(:request_log, &(&1 ++ logs))
-         |> fetch_reactions_and_receipts()}
+        socket =
+          if existing do
+            update(socket, :reactions, fn rxns ->
+              Map.update(rxns, sign_hash, [], fn list ->
+                Enum.reject(list, &(&1.reaction_hash == existing.reaction_hash))
+              end)
+            end)
+          else
+            new_reaction = %{
+              reaction_hash: reaction_hash_for(user, dialog.peer_hash, msg_id, emoji),
+              dialog_hash: dialog_hash,
+              message_id: msg_id,
+              message_sign_hash: sign_hash,
+              reactor_hash: user.user_hash,
+              emoji: emoji,
+              deleted_flag: false
+            }
+
+            update(socket, :reactions, fn rxns ->
+              Map.update(rxns, sign_hash, [new_reaction], &(&1 ++ [new_reaction]))
+            end)
+          end
+
+        {:noreply, socket |> update(:request_log, &(&1 ++ logs))}
 
       {:error, %{reason: reason, log_entries: logs}} ->
         {:noreply,
@@ -579,6 +611,13 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
         _ -> keys_cache
       end
     end
+  end
+
+  defp reaction_hash_for(user, peer_hash, message_id, emoji) do
+    sender_msg_key =
+      Crypto.derive_sender_msg_key(user.sign_skey, user.crypt_skey, user.contact_skey, peer_hash)
+
+    Crypto.compute_reaction_hash(sender_msg_key, message_id, user.user_hash, emoji)
   end
 
   defp fetch_reactions_and_receipts(socket) do

@@ -158,6 +158,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
 
     %{
       reaction_hash: raw["reaction_hash"],
+      dialog_hash: raw["dialog_hash"],
       message_id: raw["message_id"],
       message_sign_hash: raw["message_sign_hash"],
       reactor_hash: reactor,

@@ -176,6 +176,27 @@ defmodule Chat.Data.DialogReactionTest do
       assert Dialog.get_reaction(reaction.reaction_hash) == nil
     end
 
+    test "delete via update sets deleted_flag", ctx do
+      reaction_hash = generate_reaction_hash()
+      shared = [reaction_hash: reaction_hash, message_id: DialogMessageId.generate()]
+
+      r1 = signed_reaction(ctx.alice, ctx.alice_hash, shared ++ [owner_timestamp: 100])
+      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, r1)
+
+      r2 =
+        signed_reaction(
+          ctx.alice,
+          ctx.alice_hash,
+          shared ++ [owner_timestamp: 200, deleted_flag: true]
+        )
+
+      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :update, r2)
+
+      persisted = Dialog.get_reaction(reaction_hash)
+      assert persisted.deleted_flag == true
+      assert persisted.owner_timestamp == 200
+    end
+
     test "update with invalid signature is rejected", ctx do
       bob = User.generate_pq_identity("Bob")
       shared = [reaction_hash: generate_reaction_hash(), message_id: DialogMessageId.generate()]
@@ -235,7 +256,7 @@ defmodule Chat.Data.DialogReactionTest do
       message_sign_hash: "dms_" <> String.duplicate("cd", 64),
       reactor_hash: reactor_hash,
       type_b64: :crypto.strong_rand_bytes(24),
-      deleted_flag: false,
+      deleted_flag: Keyword.get(attrs, :deleted_flag, false),
       owner_timestamp: Keyword.get(attrs, :owner_timestamp, System.os_time(:millisecond))
     }
   end

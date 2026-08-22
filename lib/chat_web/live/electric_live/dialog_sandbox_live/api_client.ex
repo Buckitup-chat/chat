@@ -392,6 +392,44 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
     publish_mutation("dialog_message_reactions", fields, user.sign_skey, base_url)
   end
 
+  def delete_reaction(user, existing_reaction, peer_hash, base_url) do
+    sender_msg_key =
+      Crypto.derive_sender_msg_key(user.sign_skey, user.crypt_skey, user.contact_skey, peer_hash)
+
+    type_b64 = Crypto.encrypt_emoji("", sender_msg_key)
+    owner_timestamp = TimeKeeper.now_unix()
+
+    reaction_struct =
+      struct(DialogMessageReaction, %{
+        reaction_hash: existing_reaction.reaction_hash,
+        dialog_hash: existing_reaction.dialog_hash,
+        message_id: existing_reaction.message_id,
+        message_sign_hash: existing_reaction.message_sign_hash,
+        reactor_hash: user.user_hash,
+        type_b64: type_b64,
+        deleted_flag: true,
+        owner_timestamp: owner_timestamp
+      })
+
+    sign_b64 = sign(reaction_struct, user.sign_skey)
+
+    original = %{
+      "reaction_hash" => existing_reaction.reaction_hash,
+      "reactor_hash" => user.user_hash,
+      "dialog_hash" => existing_reaction.dialog_hash,
+      "message_id" => existing_reaction.message_id
+    }
+
+    changes = %{
+      "type_b64" => encode_base64(type_b64),
+      "deleted_flag" => true,
+      "owner_timestamp" => owner_timestamp,
+      "sign_b64" => encode_base64(sign_b64)
+    }
+
+    publish_update_mutation("dialog_message_reactions", original, changes, user.sign_skey, base_url)
+  end
+
   def publish_receipt(user, dialog_hash, message_id, message_sign_hash, type, base_url) do
     receipt_hash =
       Crypto.compute_receipt_hash(message_id, message_sign_hash, user.user_hash, type)

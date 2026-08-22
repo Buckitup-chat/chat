@@ -5,4 +5,5 @@
 4. Frontend
 5. doc: FE to have known files on onliners sync
 6. reviews: editing = versioning
+7. dialogs: reactive reactions and receipts
 

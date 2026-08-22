@@ -26,8 +26,8 @@ Encoding: `sign_hash` is an "uss_"-prefixed hex string for user-storage entities
 
 ## Where this lives
 
-- **Tables**: `user_storage`, `user_storage_versions` — [SCHEMAS.md](./SCHEMAS.md)
-- **Version semantics**: [SCHEMAS.md §Version History Model](./SCHEMAS.md)
+- **Tables**: `user_storage`, `user_storage_versions` — [SCHEMAS.md](../dev/SCHEMAS.md)
+- **Version semantics**: [SCHEMAS.md §Version History Model](../dev/SCHEMAS.md)
 - **Write path**: [pq_user_storage.md §5.2](../reqs/pq_user_storage.md)
 - **Ingestion model ownership**: [Electric_Abstraction_Layer.md](../electric/Electric_Abstraction_Layer.md) (`UserStorage` has parent-existence checks)
 

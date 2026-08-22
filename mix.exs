@@ -56,8 +56,8 @@ defmodule Chat.MixProject do
   defp deps do
     [
       {:logger_backends, "~> 1.0"},
-      {:tidewave, "~> 0.8", only: [:dev]},
-      {:igniter, "~> 0.8", only: [:dev, :test]},
+      {:tidewave, "~> 0.1", only: [:dev]},
+      {:igniter, "~> 0.5", only: [:dev, :test]},
       # Chat deps
       {:qr_code, "~> 2.2.1"},
       # Using electric_cubdb instead of cubdb to avoid conflicts with Electric
@@ -85,14 +85,14 @@ defmodule Chat.MixProject do
       {:ecto, "~> 3.7"},
       {:ecto_sql, "~> 3.7"},
       {:postgrex, "~> 0.16"},
-      {:plug_cowboy, "~> 2.9"},
+      {:plug_cowboy, "~> 2.5"},
       {:phoenix_live_dashboard, "~> 0.7"},
       # {:gettext, "~> 0.18"},
       {:jason, "~> 1.2"},
       {:cors_plug, "~> 3.0"},
 
       # Build tooling
-      {:live_vue, "~> 1.0"},
+      {:live_vue, "~> 0.5"},
       # {:esbuild, "~> 0.3", runtime: Mix.env() == :dev && Mix.target() == :host},
       # {:tailwind, "~> 0.1", runtime: Mix.env() == :dev},
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
@@ -105,22 +105,22 @@ defmodule Chat.MixProject do
       # {:live_isolated_component, git: "https://github.com/geofflane/live_isolated_component.git", branch: "chore/phoenix_18", only: [:dev, :test]},
       {:live_isolated_component,
        github: "sergey-lukianov/live_isolated_component", only: [:dev, :test]},
-      {:lazy_html, "~> 0.1.12", only: :test},
+      {:lazy_html, ">= 0.1.0", only: :test},
 
       # other
-      {:absinthe, "~> 1.11"},
+      {:absinthe, "~> 1.7"},
       {:absinthe_plug, "~> 1.5"},
       {:neuron, "~> 5.1"},
       {:temp, "~> 0.4.7"},
-      {:floki, "~> 0.38.4", only: :test},
-      {:telemetry_metrics, "~> 1.1"},
+      {:floki, ">= 0.30.0", only: :test},
+      {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:mock, "~> 0.3.0", only: :test},
       {:zstream, "~> 0.6"},
       {:ua_parser, github: "beam-community/ua_parser"},
       {:httpoison, "~> 2.0"},
       {:req, "~> 0.5"},
-      {:tesla, "~> 1.20"},
+      {:tesla, "~> 1.7"},
 
       # ElectricSQL / Phoenix.Sync
       {:electric, "~> 1.1"},

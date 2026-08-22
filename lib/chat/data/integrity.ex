@@ -26,6 +26,8 @@ defmodule Chat.Data.Integrity do
     def signature(data)
   end
 
+  @prefixed_hash_pattern ~r/^[a-z][a-z0-9]*_[0-9a-f]+$/
+
   @doc """
   Generates signature payload from any signable data structure.
   """
@@ -59,6 +61,7 @@ defmodule Chat.Data.Integrity do
       String.ends_with?(key_str, "_b64") -> encode_base64(value)
       String.ends_with?(key_str, "_cert") -> encode_base64(value)
       String.ends_with?(key_str, "_pkey") -> encode_base64(value)
+      String.ends_with?(key_str, "_hash") -> encode_prefixed_hash(key_str, value)
       is_list(value) -> Enum.map_join(value, "", &encode_list_element/1)
       value == true -> "true"
       value == false -> "false"
@@ -66,6 +69,20 @@ defmodule Chat.Data.Integrity do
       is_integer(value) -> Integer.to_string(value)
       is_binary(value) -> value
       true -> to_string(value)
+    end
+  end
+
+  defp encode_prefixed_hash(_key, nil), do: "null"
+
+  defp encode_prefixed_hash(key, value) when is_binary(value) do
+    if Regex.match?(@prefixed_hash_pattern, value) do
+      value
+    else
+      raise ArgumentError,
+            "signable field #{key} ends in \"_hash\" but holds #{inspect(value)}, not a " <>
+              "prefixed-hex string — back it with a Chat.Data.Types.PrefixedHash-based Ecto " <>
+              "type so cast/load already produce the \"prefix_hexhex...\" form the signature " <>
+              "payload requires"
     end
   end
 

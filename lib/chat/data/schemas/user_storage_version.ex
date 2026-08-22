@@ -53,5 +53,8 @@ defmodule Chat.Data.Schemas.UserStorageVersion do
     |> unique_constraint([:user_hash, :uuid, :sign_hash],
       name: :user_storage_versions_pkey
     )
+    |> foreign_key_constraint(:parent_sign_hash,
+      name: :user_storage_versions_parent_sign_hash_fkey
+    )
   end
 end

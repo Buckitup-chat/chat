@@ -6,7 +6,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ListPassword do
   "Key lifetime") — so this is write-once: read the slot, and generate + insert only
   when it is empty. No version chain, no update path.
 
-  `user_storage` reads are public (docs/reqs/pq_user_storage.md §4.1), so the row holds
+  `user_storage` reads are public (docs/pq/reqs/pq_user_storage.md §4.1), so the row holds
   ciphertext only: AES-256-GCM under a key derived from the author's own `crypt_skey`.
   """
 
@@ -136,7 +136,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ListPassword do
   # --- Shared ---
 
   # Mirrors the frontend's deriveKeyFromCryptSkey: HKDF-SHA3-256 over the author's own
-  # crypt_skey, domain-separated per slot (docs/electric/pq_data_layer/09_symmetric_keys.md).
+  # crypt_skey, domain-separated per slot (docs/pq/invariants/09_symmetric_keys.md).
   defp storage_key(%{crypt_skey: crypt_skey}),
     do: EnigmaPq.hkdf_derive(crypt_skey, @hkdf_salt, @hkdf_info, 32)
 end

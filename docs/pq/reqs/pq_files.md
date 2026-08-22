@@ -113,7 +113,7 @@ The device stores and serves the raw encrypted bytes (including the prepended no
 
 ## 3. Content Type
 
-The `"file"` content type and its positional array schema are defined in [07_content_polymorphism.md § `"file"`](../electric/pq_data_layer/07_content_polymorphism.md#file).
+The `"file"` content type and its positional array schema are defined in [07_content_polymorphism.md § `"file"`](../invariants/07_content_polymorphism.md#file).
 
 ## 4. Upload Protocol
 

@@ -4,14 +4,13 @@
 
 ## Problem
 
-The PQ data layer encrypts content with AES-256-GCM under keys derived from the author's private material. The current derivation in [pq_dialogs.md](../../reqs/pq_dialogs.md) is a single SHA3-512 hash:
+The PQ data layer encrypts content with AES-256-GCM under keys derived from the author's private material. The current derivation in [pq_dialogs.md](../reqs/pq_dialogs.md) is a single SHA3-512 hash:
 
 ```
 sender_msg_key = SHA3-512(
     "buckitup/dialog-mk/v1"
  || sign_skey
- || kem_skey
- || contact_skey
+ || crypt_skey
  || peer_user_hash
 )
 ```
@@ -57,7 +56,7 @@ SHA3-512 remains the correct choice for identity hashes, where 256-bit collision
 Concentrate the multi-source input keying material (IKM) into a fixed-length pseudorandom key (PRK):
 
 ```
-IKM  = sign_skey || kem_skey || contact_skey || peer_user_hash
+IKM  = sign_skey || crypt_skey || peer_user_hash
 salt = "buckitup/dialog-mk/v1"
 
 PRK  = HMAC-SHA3-256(key = salt, data = IKM)              # 32 bytes
@@ -165,8 +164,8 @@ end
 
 ## Where this applies
 
-- **Dialog key derivation**: [pq_dialogs.md §Key derivation](../../reqs/pq_dialogs.md) — replaces raw SHA3-512 with HKDF-SHA3-256, same single-key-per-side model
-- **Dialog key wrapping**: [pq_dialogs.md §Key wrapping](../../reqs/pq_dialogs.md) — resolves problem #13
+- **Dialog key derivation**: [pq_dialogs.md §Key derivation](../reqs/pq_dialogs.md) — replaces raw SHA3-512 with HKDF-SHA3-256, same single-key-per-side model
+- **Dialog key wrapping**: [pq_dialogs.md §Key wrapping](../reqs/pq_dialogs.md) — resolves problem #13
 - **User storage encryption** (frontend) — same HKDF-SHA3-256 (implemented via HMAC-SHA3-256 over WebCrypto)
 - **Future room keys**: same HKDF pattern with a different salt (e.g., `"buckitup/room-mk/v1"`)
 

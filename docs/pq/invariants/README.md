@@ -8,4 +8,3 @@ Here is the problems we are solving:
 - [Snapshoting](./08_snapshots.md) — snapshot of conversation state signed by peer `[full graph of message_uuids and sign_hashes]`
 - [Symmetric Key Derivation](./09_symmetric_keys.md) — HKDF-based subkey derivation for AES-256-GCM encryption and HMAC
 
-See also: [SCHEMAS.md](./SCHEMAS.md) for the tables backing the solved problems.

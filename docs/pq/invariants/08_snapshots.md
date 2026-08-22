@@ -1,6 +1,6 @@
 # Snapshots
 
-> Status: **partially resolved** — everyday causal-state tracking is handled inline by `refs_map_b64` (see [pq_dialogs.md §References](../../reqs/pq_dialogs.md)). This doc covers the remaining use case: standalone, portable, Merkle-rooted attestations for export and dispute resolution.
+> Status: **partially resolved** — everyday causal-state tracking is handled inline by `refs_map_b64` (see [pq_dialogs.md §References](../reqs/pq_dialogs.md)). This doc covers the remaining use case: standalone, portable, Merkle-rooted attestations for export and dispute resolution.
 
 ## What `refs_map_b64` already solves
 
@@ -11,6 +11,8 @@ Every dialog message carries an encrypted `refs_map_b64` — a `{message_id: sig
 - **Fork detection** — multiple tails in a refs_map surface concurrent sends; a merge is any message that references both fork tips.
 
 For most operational needs (sync, ordering, state recovery), `refs_map_b64` is sufficient. No additional table or artifact is required.
+
+> **TODO (chat-frontend)**: the tail-computation algorithm above is only implemented in the `dialog_sandbox_live` reference/POC (`ChatWeb.ElectricLive.DialogSandboxLive.Crypto.compute_tails/2`). The shipped client, `chat-frontend/src/store/dialogs.store.js` (`sendMessage`, `editMessage`), currently hardcodes `refs_map_b64` to an encrypted empty map `{}` on every send and every edit — not just the genesis message. Until `chat-frontend` ports `compute_tails/2` (walk loaded messages' `refs_map`, union referenced pairs, keep tails not in that union), catch-up, causal-state, and fork detection do not actually work against real traffic — every message looks like a genesis message.
 
 ## Remaining problem: portable attestations
 
@@ -59,14 +61,14 @@ A standalone snapshot can be **reconstructed** from the `refs_map_b64` chain by 
 
 ## Relationship to other problems
 
-- **Built on**: `sign_hash` from [integrity](./02_integrity.md), `refs_map_b64` from [pq_dialogs.md](../../reqs/pq_dialogs.md).
+- **Built on**: `sign_hash` from [integrity](./02_integrity.md), `refs_map_b64` from [pq_dialogs.md](../reqs/pq_dialogs.md).
 - **Storage channel**: `graph_payload` is always inlined — the snapshot must be self-contained and portable without depending on external blob storage.
 - **Not a consensus mechanism**: snapshots are per-author attestations, not a shared agreement. Two peers can produce divergent snapshots if they observed different tips; comparing them is how divergence is detected.
 
 ## Where this touches existing work
 
 - **Existing mention**: [README](./README.md) — "snapshot of conversation state signed by peer [full graph of message_uuids and sign_hashes]".
-- **Inline snapshots**: [pq_dialogs.md §References](../../reqs/pq_dialogs.md) — `refs_map_b64` provides per-message frontier snapshots that handle everyday catch-up and ordering.
+- **Inline snapshots**: [pq_dialogs.md §References](../reqs/pq_dialogs.md) — `refs_map_b64` provides per-message frontier snapshots that handle everyday catch-up and ordering.
 
 ## Invariants
 

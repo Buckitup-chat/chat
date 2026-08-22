@@ -105,6 +105,22 @@ defmodule Chat.Data.UserStorageVersioningTest do
       end
     end
 
+    test "foreign key constraint prevents invalid parent_sign_hash in user_storage_versions", %{
+      user_hash: user_hash,
+      identity: identity
+    } do
+      invalid_parent_hash =
+        :crypto.strong_rand_bytes(64)
+        |> UserStorageSignHash.from_binary()
+
+      version =
+        signed_storage(identity, user_hash, %{parent_sign_hash: invalid_parent_hash})
+
+      assert_raise Ecto.InvalidChangesetError, fn ->
+        archive_storage_from_signed!(version)
+      end
+    end
+
     test "signature verification works", %{user_hash: user_hash, identity: identity} do
       storage = signed_storage(identity, user_hash)
       assert Integrity.verify_signature(storage) == :ok

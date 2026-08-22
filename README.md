@@ -23,16 +23,4 @@ Using IO data as arguments to the logging function will give a little performanc
 
 # Technical info
 
-See [docs/README.md](./docs/README.md) for the full documentation index.
-
-**Architecture**
-  * [Encryption](./docs/architecture/encryption.livemd)
-  * [DB structure](./docs/architecture/db_structures.livemd)
-  * [AdminDB structure](./docs/architecture/admin_db_structures.livemd)
-  * [DB Prioritization](./docs/architecture/prioritization.livemd)
-  * [DB and Device Supervision](./docs/architecture/supervision.livemd)
-
-**Flows**
-  * [Room approval flow](./docs/flows/approve_flow.livemd)
-  * [Naive API File upload](./docs/flows/upload_files.livemd)
-  * [Cargo scenario](./docs/flows/cargo_scenario.livemd)
+See [docs/README.md](./docs/README.md) for the full documentation index — split into [`docs/trusted/`](./docs/trusted/) (server ECC + CubDB) and [`docs/pq/`](./docs/pq/) (frontend post-quantum + Electric/Postgres).

@@ -49,7 +49,7 @@ We need progressive video playback where the browser fetches, decrypts, and play
 
 Each encrypted chunk is independently decryptable — the 12-byte nonce is prepended to the ciphertext (see [§2 Chunk Encryption in pq_files.md](pq_files.md#2-chunk-encryption)). The browser's native `<video>` media stack handles all buffering, codec detection, and seeking via standard HTTP range requests.
 
-**Metadata source:** the [`"video"` content type](../electric/pq_data_layer/07_content_polymorphism.md#video) provides `file_id`, `enc_secret_b64`, `mime_type`, `size`, and visual preview data (`width_aspect`, `height_aspect`, `thumb_hash_b64`).
+**Metadata source:** the [`"video"` content type](../invariants/07_content_polymorphism.md#video) provides `file_id`, `enc_secret_b64`, `mime_type`, `size`, and visual preview data (`width_aspect`, `height_aspect`, `thumb_hash_b64`).
 
 ## 4. Why Not MSE
 
@@ -132,7 +132,7 @@ The SW contains an inline copy of `decryptChunk()` — identical logic to `asset
 
 ### 7.2 Video Content Type Metadata
 
-The [`"video"` content type](../electric/pq_data_layer/07_content_polymorphism.md#video) provides all fields needed:
+The [`"video"` content type](../invariants/07_content_polymorphism.md#video) provides all fields needed:
 
 | Position | Field | Used for |
 |---|---|---|

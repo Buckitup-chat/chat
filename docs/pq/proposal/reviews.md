@@ -154,7 +154,7 @@ no recovery path: it was delivered as an ordinary dialog message, which a reinst
 ### Key delivery
 
 The `review_list_password` travels as a dialog message to each contact — a new compound content type in
-the [content polymorphism spec](../electric/pq_data_layer/07_content_polymorphism.md):
+the [content polymorphism spec](../invariants/07_content_polymorphism.md):
 
 ```json
 {"review_list_key": ["<key_b64>"]}
@@ -343,7 +343,7 @@ Everything else follows for free from `pq_dialogs`:
 
 ## Content model
 
-Review content follows the [content polymorphism spec](../electric/pq_data_layer/07_content_polymorphism.md) — the plaintext inside `content_b64` is a JSON array (composed message):
+Review content follows the [content polymorphism spec](../invariants/07_content_polymorphism.md) — the plaintext inside `content_b64` is a JSON array (composed message):
 
 ```json
 [rating, placeholder, content]

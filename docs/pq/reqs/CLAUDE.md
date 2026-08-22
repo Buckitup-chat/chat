@@ -1,4 +1,4 @@
-# pq_reqs — PostgreSQL Requirements
+# pq/reqs — PostgreSQL Requirements
 
 Semantically grouped requirements for PostgreSQL-related features.
 
@@ -7,10 +7,12 @@ Semantically grouped requirements for PostgreSQL-related features.
 Each document lives in a subfolder by topic and carries a status suffix:
 
 ```
-pq_reqs/
+pq/reqs/
   <topic>/
     <name>.<status>.md
 ```
+
+Existing files here predate this convention and haven't been moved into `<topic>/` subfolders yet.
 
 ## Status Lifecycle
 

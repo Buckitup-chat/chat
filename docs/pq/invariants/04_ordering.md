@@ -8,7 +8,7 @@ This is distinct from [data versioning](./03_data_versioning.md): versioning ord
 
 ## Solution: `refs_map_b64` + UUIDv7
 
-The dialog schema in [pq_dialogs.md](../../reqs/pq_dialogs.md) solves ordering with two mechanisms:
+The dialog schema in [pq_dialogs.md](../reqs/pq_dialogs.md) solves ordering with two mechanisms:
 
 ### 1. `refs_map_b64` — full DAG frontier (causality)
 
@@ -43,6 +43,10 @@ Causal validation is a frontend responsibility — the server sees only opaque c
 2. **Signature check.** Verify `sign_b64` under `sender_hash`'s `sign_pkey`. Covers `refs_map_b64` ciphertext, so post-hoc reparenting fails.
 3. **Genesis uniqueness.** At most one message per `dialog_hash` should have an empty `refs_map`. A second empty-map message is a protocol violation; clients surface it as a fork at the root.
 4. **No self-reference.** A message's own `(message_id, sign_hash)` must not appear in its `refs_map`.
+
+## TODO
+
+- **`chat-frontend` does not implement this yet.** `chat-frontend/src/store/dialogs.store.js` hardcodes `refsMap = {}` on every send (`sendMessage`) and edit (`editMessage`), instead of computing the current DAG tails. There is no tail-resolution queue, no genesis-uniqueness check, and no self-reference check anywhere in `chat-frontend/src` — none of the four ingest rules above are implemented. The only working implementation of tail computation (`compute_tails/2`) lives in the demo sandbox `chat/lib/chat_web/live/electric_live/dialog_sandbox_live/crypto.ex`, which proves the Electric shape endpoints work but is not wired into the real frontend. Until this is ported, every message in every dialog is sent as if it were a genesis message, so the causal DAG this document describes is not actually being built for real users.
 
 ## Remaining open questions
 

@@ -10,9 +10,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
+## 2026-08-21_89d5031\_\_\_2026-08-22_5db0a84b\_\_\_2026-08-14_6dc11df
+
 ### Added
 
 - Reviews: owner can change origin
+- Post-quantum dialogs: reactions removal
+- Drive sync: pg diff chunk creation
 - [platform] Backup scenario: enable post-quantum data
 - [platform] Post-quantum files: USB sync fill missing chunks
 - [frontend] TypeScript support with dialog crypto types and tests
@@ -22,10 +26,11 @@ straightforward as possible.
 
 - Sync routes: deprecated legacy dialog sync LiveViews
 - Dependencies updated (LiveVue, etc.)
+- Documentation refresh: encryption, snapshots, versioning, integrity
 
 ### Fixed
 
-- Drive sync: folder path corrections
+- Drive sync: folder path corrections and trigger fixes
 - [platform] Post-quantum files: USB sync trigger and drive path fixes
 
 ## 2026-08-01_07cb5aa\_\_\_2026-08-09_d4c22b66\_\_\_2026-07-30_84adba8

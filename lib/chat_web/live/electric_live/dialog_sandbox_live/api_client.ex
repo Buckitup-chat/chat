@@ -539,7 +539,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
     timestamp = TimeKeeper.now()
     headers = [{"accept", "application/json"}]
 
-    case fetch_shape_pages(url, headers, []) do
+    case fetch_shape_pages(url, headers, %{}) do
       {:ok, rows} ->
         {:ok, rows,
          build_log("GET", url, headers, "", 200, [], Jason.encode!(rows, pretty: true), timestamp)}
@@ -557,17 +557,17 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
   defp fetch_shape_pages(url, headers, acc) do
     case Req.get(url, headers: headers) do
       {:ok, %{status: 200, body: body, headers: rh}} ->
-        rows = acc ++ parse_shape_response(body)
+        rows = apply_shape_operations(acc, body)
 
         if up_to_date?(body) do
-          {:ok, rows}
+          {:ok, Map.values(rows)}
         else
           next_url = next_page_url(url, rh)
           fetch_shape_pages(next_url, headers, rows)
         end
 
       {:ok, %{status: 204}} ->
-        {:ok, acc}
+        {:ok, Map.values(acc)}
 
       {:ok, %{status: s, body: b, headers: rh}} ->
         {:error, {s, b, rh}}
@@ -600,13 +600,23 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
     |> URI.to_string()
   end
 
-  defp parse_shape_response(body) when is_list(body) do
-    body
-    |> Enum.filter(&match?(%{"headers" => %{"operation" => "insert"}, "value" => _}, &1))
-    |> Enum.map(& &1["value"])
+  defp apply_shape_operations(acc, body) when is_list(body) do
+    Enum.reduce(body, acc, fn
+      %{"headers" => %{"operation" => "insert"}, "key" => key, "value" => value}, acc ->
+        Map.put(acc, key, value)
+
+      %{"headers" => %{"operation" => "update"}, "key" => key, "value" => value}, acc ->
+        Map.update(acc, key, value, &Map.merge(&1, value))
+
+      %{"headers" => %{"operation" => "delete"}, "key" => key}, acc ->
+        Map.delete(acc, key)
+
+      _, acc ->
+        acc
+    end)
   end
 
-  defp parse_shape_response(_), do: []
+  defp apply_shape_operations(acc, _), do: acc
 
   defp get_challenge(base_url) do
     url = base_url <> "/electric/v1/challenge"

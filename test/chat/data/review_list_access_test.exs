@@ -2,7 +2,7 @@ defmodule Chat.Data.ReviewListAccessTest do
   @moduledoc """
   A review awaiting pre-moderation has no `review_public_passwords` row, so its
   `review_password` is reachable only through `review_list` — the path the author's
-  other devices and their contacts read (docs/proposal/reviews.md "Contacts").
+  other devices and their contacts read (docs/pq/reqs/pq_reviews.in_progress.md "Contacts").
   """
   use ChatWeb.DataCase, async: true, group: :ets_deferred
 

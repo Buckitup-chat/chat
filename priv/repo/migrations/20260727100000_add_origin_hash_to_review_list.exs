@@ -1,7 +1,7 @@
 defmodule Chat.Repo.Migrations.AddOriginHashToReviewList do
   use Ecto.Migration
 
-  # docs/proposal/reviews.md "Contacts": a reader walks a contact's review_list and
+  # docs/pq/reqs/pq_reviews.in_progress.md "Contacts": a reader walks a contact's review_list and
   # then needs the review rows themselves. Without origin_hash the only way back is
   # a `review_hash = ANY(...)` filter, which is unique per contact and re-materializes
   # on every new review. With it, the reader reuses the shared

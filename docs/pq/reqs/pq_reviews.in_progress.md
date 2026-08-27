@@ -1,4 +1,4 @@
-# Reviews Proposal
+# PQ Reviews
 
 ## Goal
 
@@ -27,7 +27,7 @@ The origin identity (not the owner) should be able to:
 - **`to_origin` is not a feature**: because the origin is a `user_cards` identity, a `to_origin` review is a plain dialog message to the origin's `user_hash`. No schema, no shape, no validation, no moderation path — nothing to build beyond a UI entry point. See [to_origin](#to_origin).
 - **Passwords vs reviews**: passwords as access layer. Prevent deletion as much as possible.
 - **Ingest via candidates**: all *author-submitted* `review_public_passwords` entries flow through `review_password_candidate` — the server validates and promotes. The author cannot ingest into `review_public_passwords` directly. The origin identity can insert a row it decrypted from a right envelope (to publish or revoke) — see Moderation section.
-- **Origin key management**: origin keypairs are independently generated on the client (not derived from owner keys), stored client-side in the owner's identity, same pattern as regular user keys (see `pq_user.done.md`). Multi-device access via User Storage (encrypted skeys stored server-side, decryptable by the owner).
+- **Origin key management**: origin keypairs are independently generated on the client (not derived from owner keys), stored client-side in the owner's identity, same pattern as regular user keys (see [pq_user.done.md](pq_user.done.md)). Multi-device access via User Storage (encrypted skeys stored server-side, decryptable by the owner).
 - **Origin creation**: three-step flow — create owner `user_cards` (if not exists) → generate and insert origin `user_cards` row → insert `origin` row with `owner_cert` linking the two (see Origin creation section).
 
 ## Three entities
@@ -58,11 +58,11 @@ An origin has:
 - a moderation policy for public reviews
 - public metadata (name, description — signed by origin identity)
 
-The origin identity is separate from the owner's personal identity. One user can own multiple origins. Because it is a `user_cards` entry, the existing dialog infrastructure (see `pq_dialogs.done.md`) works directly for `to_origin` communication.
+The origin identity is separate from the owner's personal identity. One user can own multiple origins. Because it is a `user_cards` entry, the existing dialog infrastructure (see [pq_dialogs.done.md](pq_dialogs.done.md)) works directly for `to_origin` communication.
 
 ### Origin creation
 
-Three-step flow following the same pattern as user creation (see `pq_user.done.md`):
+Three-step flow following the same pattern as user creation (see [pq_user.done.md](pq_user.done.md)):
 
 1. **Owner exists** — the creating user already has their own `user_cards` row
 2. **Generate origin identity** — client generates independent ML-DSA-87 + ML-KEM-1024 keypairs for the origin, inserts a new `user_cards` row (self-signed by the origin's own `sign_skey`)
@@ -77,10 +77,16 @@ Two levels of control:
 - **Owner** (the creating user) — performs dangerous/irreversible operations: create origin, delete, change moderation mode. Ownership is immutable after creation. Owner identity is never exposed to the public.
 - **Origin identity** — handles day-to-day operations: receive `to_origin` reviews, moderate public reviews. Can be delegated to an employee without exposing the owner's personal identity or granting irreversible powers.
 
-> **Status (deferred to Phase 3).** The two-tier split is not yet enforced. Origin `update` operations — including
-> `moderation_mode` changes and soft delete (`deleted_flag`) — are currently authorized by the **origin identity's**
-> signature, so a delegated origin-identity holder could perform them. Requiring the **owner's** signature for these
-> dangerous ops lands with the Phase 3 owner/moderation UI. `owner_cert` is still verified on origin creation.
+> **Status (deferred to Phase 3).** The two-tier split is not fully enforced. Origin `update` operations — including
+> `moderation_mode` changes and soft delete (`deleted_flag`) — currently accept **either** the origin identity's
+> **or** the owner's signature ([`Origin.Validation.validate_origin_update_signature/1`](../../../lib/chat/data/origin/validation.ex):87).
+> A delegated origin-identity holder can therefore perform dangerous ops. Requiring the **owner's** signature
+> exclusively for these operations lands with the Phase 3 owner/moderation UI. `owner_cert` is still verified on
+> origin creation.
+
+### Pending-review guard on origin modification
+
+[`Origin.Validation.owner_auth/2`](../../../lib/chat/data/origin/validation.ex) rejects HTTP origin updates when reviews are pending moderation — [`has_pending_reviews?/1`](../../../lib/chat/data/origin/validation.ex):56 checks for reviews that have no `review_public_passwords` entry. This prevents moderation-mode changes while reviews are mid-pipeline (e.g. switching from `pre` to `none` while a review awaits approval).
 
 ### Why not a room
 
@@ -207,9 +213,9 @@ The public frontend checks whether a decryption password exists in `review_publi
 
 ### Candidate-only ingest
 
-All author-submitted passwords route through `review_password_candidate` — the author's own identity cannot ingest into `review_public_passwords`, so a password can only enter the table through server-side promotion or through a moderation action. The origin identity (authenticated via its `sign_pkey` from `user_cards`) is the one exception: it may insert a row it decrypted from a right envelope — this is how the origin publishes a post right or revokes via a revoke right. Each such row is a new version keyed by `(review_hash, sign_hash)`; the ingest path validates that it carries the author's pre-signed signature (the origin never signs these entries itself) and that its timestamp ordering still holds.
+All author-submitted passwords route through [`review_password_candidate`](../../../lib/chat/data/schemas/review_password_candidate.ex) — the author's own identity cannot ingest into `review_public_passwords`, so a password can only enter the table through server-side promotion or through a moderation action. The origin identity (authenticated via its `sign_pkey` from `user_cards`) is the one exception: it may insert a row it decrypted from a right envelope — this is how the origin publishes a post right or revokes via a revoke right. Each such row is a new version keyed by `(review_hash, sign_hash)`; the ingest path validates that it carries the author's pre-signed signature (the origin never signs these entries itself) and that its timestamp ordering still holds.
 
-Promotion is a **two-phase handshake** driven entirely through the normal `/ingest` endpoint — no separate HTTP routes. The server triggers each phase automatically when candidates arrive or are updated via ingest.
+Promotion is a **two-phase handshake** driven entirely through the normal `/ingest` endpoint — no separate HTTP routes. The server triggers each phase automatically when candidates arrive or are updated via ingest. Implementation: [`ReviewPasswordCandidate.Promotion`](../../../lib/chat/data/review_password_candidate/promotion.ex) (`promote_candidate` + `complete_promotion`), with candidate preparation in [`Promotion.Candidates`](../../../lib/chat/data/review_password_candidate/promotion/candidates.ex).
 
 **Phase 1 — `promote_candidate` (triggered by candidate ingest).** When the server ingests `review_password_candidate` rows, it attempts promotion based on the origin's `moderation_mode`:
 
@@ -217,11 +223,15 @@ Promotion is a **two-phase handshake** driven entirely through the normal `/inge
 - **post** — waits until both password and null candidates are present, then wraps the null version (KEM-encrypt to the origin) into `review_revoke_right_candidate`.
 - **pre** — waits until both password and null candidates are present, then wraps the password version into `review_post_right_candidate` and the null version into `review_revoke_right_candidate`.
 
-**Revoke-ordering invariant (enforced, post and pre only).** Because public visibility is Last-Write-Wins by `owner_timestamp` (latest row wins; `password_b64 = null` means revoked), the null (revoke) version's `owner_timestamp` must be **strictly greater** than the password version's — otherwise publishing the revoke would not supersede the password. `promote_candidate` enforces `null.ts > password.ts` in **post** and **pre** modes and rejects the promotion otherwise (it is not merely a client convention). In **pre** mode this also means the `review_revoke_right` can always override a posted `review_post_right`. This invariant does not apply to **none** mode (no null candidate, no revoke right). In all modes the server validates each submitted candidate's author signature and author/origin binding before minting or wrapping it.
+**Revoke-ordering invariant (enforced, post and pre only).** Because public visibility is Last-Write-Wins by `owner_timestamp` (latest row wins; `password_b64 = null` means revoked), the null (revoke) version's `owner_timestamp` must be **strictly greater** than the password version's — otherwise publishing the revoke would not supersede the password. [`Promotion.Candidates.revoke_supersedes?/2`](../../../lib/chat/data/review_password_candidate/promotion/candidates.ex) enforces `null.ts > password.ts` in **post** and **pre** modes and rejects the promotion otherwise (it is not merely a client convention). In **pre** mode this also means the `review_revoke_right` can always override a posted `review_post_right`. This invariant does not apply to **none** mode (no null candidate, no revoke right). In all modes the server validates each submitted candidate's author signature and author/origin binding before minting or wrapping it.
 
 The right *candidates* are Electric-synced staging tables. After phase 1 creates them, the author's client reads the unsigned right candidates via their Electric shape, verifies the KEM wrapping matches what they submitted, and ingests a signature update (`sign_b64` + `sign_hash`) on each right candidate.
 
 **Phase 2 — `complete_promotion` (triggered by right candidate signature ingest).** When the server ingests a signature update on a right candidate, it checks whether all required right candidates for the review are now signed. Once the last signature arrives, the server verifies all signatures and, in one transaction, promotes each signed candidate into its real table (`review_post_right` / `review_revoke_right`) and — for **post** mode — promotes the password candidate into `review_public_passwords`. In **pre** mode nothing is promoted to `review_public_passwords`; the review stays private until the origin identity posts. The staging candidates are then cleared.
+
+### Right-envelope key derivation
+
+KEM wrapping of right candidates uses [`Chat.Data.ReviewRightEnvelope`](../../../lib/chat/data/review_right_envelope.ex) — the shared HKDF context `"buckitup/review-right/v1"` with label `"wrap"` ensures the wrapping side (promotion) and every unwrapping side (author verification, origin moderation, test fixtures) derive the same AES-GCM key from the KEM shared secret.
 
 ### No moderation flow
 
@@ -383,11 +393,13 @@ Comments on `to_origin` reviews are just later messages in the author↔origin d
 
 ## Data model
 
-> **Signature field ordering.** `Chat.Data.Integrity.signature_payload/1` sorts signable fields **alphabetically by key** — client and server both use the same `Signable` implementation. The per-schema `Signable` impl is the canonical source for which fields are signed.
+> **Signature field ordering.** [`Chat.Data.Integrity.signature_payload/1`](../../../lib/chat/data/integrity.ex) sorts signable fields **alphabetically by key** — client and server both use the same `Signable` implementation. The per-schema `Signable` impl is the canonical source for which fields are signed.
+
+> **Schema macros.** The `review_post_right` and `review_revoke_right` schemas are generated by [`Chat.Data.Schemas.ReviewRight`](../../../lib/chat/data/schemas/review_right.ex) (`use Chat.Data.Schemas.ReviewRight, kind: :post`). Similarly, their validation modules use [`Chat.Data.ReviewRight.Validation`](../../../lib/chat/data/review_right/validation.ex) macro. This avoids duplicating identical field lists across the two right types.
 
 ### origin
 
-The origin identity lives in `user_cards` (its own `user_hash`, `sign_pkey`, `crypt_pkey`). The `origin` table holds origin-specific metadata that doesn't belong in `user_cards`.
+The origin identity lives in `user_cards` (its own `user_hash`, `sign_pkey`, `crypt_pkey`). The [`origin`](../../../lib/chat/data/schemas/origin.ex) table holds origin-specific metadata that doesn't belong in `user_cards`.
 
 ```
 origins                                              — DB table name
@@ -404,11 +416,15 @@ origins                                              — DB table name
 
 Constraints: `origin_hash` and `owner_hash` match `^u_[a-f0-9]{128}$`, `sign_hash` matches `^ors_[a-f0-9]{128}$`, `moderation_mode` IN (`none`, `post`, `pre`). Index on `owner_hash`.
 
+Migration: [`20260715144320_create_origins`](../../../priv/repo/migrations/20260715144320_create_origins.exs), Electric publication: [`20260715144321`](../../../priv/repo/migrations/20260715144321_add_origins_to_electric_publication.exs).
+
 Note: `sign_pkey` and `crypt_pkey` are on the origin's `user_cards` row, not duplicated here. The origin's `user_cards` row is self-signed (origin signs its own card with `origin_sign_skey`). The `owner_cert` on the `origin` row binds the origin identity to the owner.
 
 ### review
 
-Only `to_public` reviews live in this table. `to_origin` reviews never enter the review data model at all — they are ordinary dialog messages (see `pq_dialogs`) between the author and the origin identity.
+Only `to_public` reviews live in this table. `to_origin` reviews never enter the review data model at all — they are ordinary dialog messages (see [pq_dialogs.done.md](pq_dialogs.done.md)) between the author and the origin identity.
+
+Schema: [`Chat.Data.Schemas.Review`](../../../lib/chat/data/schemas/review.ex). Migration: [`20260718100000_create_review`](../../../priv/repo/migrations/20260718100000_create_review.exs).
 
 ```
 review
@@ -429,6 +445,8 @@ Public visibility is controlled by the `review_public_passwords` table, not by f
 
 Controls public visibility. Append-only (DELETE revoked). Latest entry by `owner_timestamp` determines whether the review is publicly decryptable.
 
+Schema: [`Chat.Data.Schemas.ReviewPublicPassword`](../../../lib/chat/data/schemas/review_public_password.ex). Migration: [`20260718100001`](../../../priv/repo/migrations/20260718100001_create_review_passwords.exs).
+
 ```
 review_public_passwords
 ├── review_hash           — which review (PK part 1)
@@ -448,9 +466,11 @@ On ingest the server verifies the row's signature and that its `author_hash` and
 
 ### review_password_candidate
 
-Server-internal table holding the author's submitted password versions before moderation decision. Not synced via Electric.
+Server-internal table holding the author's submitted password versions before moderation decision. Not synced via Electric (in [`@not_syncable`](../../../lib/chat/data/shapes.ex):26); HTTP-ingest-only via [`Shapes.ReviewPasswordCandidate`](../../../lib/chat/data/shapes/review_password_candidate.ex).
 
-The only entrypoint for password ingest. review_password do not accept on ingest
+The only entrypoint for password ingest — `review_public_passwords` does not accept direct author ingest.
+
+Schema: [`Chat.Data.Schemas.ReviewPasswordCandidate`](../../../lib/chat/data/schemas/review_password_candidate.ex). Migration: [`20260718100002`](../../../priv/repo/migrations/20260718100002_create_review_password_candidate.exs).
 
 ```
 review_password_candidate
@@ -463,9 +483,13 @@ review_password_candidate
 └── sign_b64              — author's ML-DSA-87 signature
 ```
 
+**Signature projection.** Candidates sign over the target `review_public_passwords` payload (with `deleted_flag: false`), not the candidate row itself. [`ReviewPasswordCandidate.to_public_password/1`](../../../lib/chat/data/schemas/review_password_candidate.ex):57 performs this projection; it is used for signature verification both at promotion time ([`Promotion.Candidates.validate_candidate/1`](../../../lib/chat/data/review_password_candidate/promotion/candidates.ex)) and via the `Signable` protocol implementation on the candidate schema.
+
 ### review_post_right_candidate / review_revoke_right_candidate
 
-Electric-synced staging tables that hold the wrapped right during the promotion handshake. The server creates them unsigned after phase 1; the client reads them via Electric shape, verifies the KEM wrapping, and ingests a signature update. Same shape as their `review_post_right` / `review_revoke_right` targets, plus an `inserted_at` used to garbage-collect candidates that were never signed.
+Electric-synced staging tables that hold the wrapped right during the promotion handshake. The server creates them unsigned after phase 1; the client reads them via Electric shape, verifies the KEM wrapping, and ingests a signature update. Same fields as their `review_post_right` / `review_revoke_right` targets, plus an `inserted_at` used to garbage-collect candidates that were never signed.
+
+Schemas: [`Chat.Data.Schemas.ReviewPostRightCandidate`](../../../lib/chat/data/schemas/review_right_candidate.ex):1 and [`ReviewRevokeRightCandidate`](../../../lib/chat/data/schemas/review_right_candidate.ex):66. Migration: [`20260718100007`](../../../priv/repo/migrations/20260718100007_create_review_right_candidate.exs). Shapes: [`ReviewPostRightCandidate`](../../../lib/chat/data/shapes/review_post_right_candidate.ex), [`ReviewRevokeRightCandidate`](../../../lib/chat/data/shapes/review_revoke_right_candidate.ex) — HTTP-ingest-only (in [`@not_syncable`](../../../lib/chat/data/shapes.ex):26), accept `:update` only (signature update).
 
 ```
 review_{post,revoke}_right_candidate
@@ -477,8 +501,8 @@ review_{post,revoke}_right_candidate
 ├── deleted_flag
 ├── owner_timestamp
 ├── inserted_at           — for stale-candidate GC (ReviewRightCandidate.delete_stale_candidates/1)
-├── sign_b64              — author's ML-DSA-87 signature (added between phase 1 and phase 2)
-└── sign_hash             — SHA3-512 of sign_b64
+├── sign_b64              — author's ML-DSA-87 signature (NULL until phase 2 signature update)
+└── sign_hash             — SHA3-512 of sign_b64 (NULL until phase 2 signature update)
 ```
 
 `complete_promotion` copies a fully-signed candidate into its real table and deletes the staging rows.
@@ -487,16 +511,19 @@ review_{post,revoke}_right_candidate
 
 KEM-encrypted envelope containing a complete, author-signed `review_public_passwords` row with the password. The origin identity decrypts it and ingests the pre-signed row, making the review publicly decryptable. Created during pre-moderation. Append-only (DELETE revoked).
 
+Schema: generated by [`Chat.Data.Schemas.ReviewRight`](../../../lib/chat/data/schemas/review_right.ex) macro — [`ReviewPostRight`](../../../lib/chat/data/schemas/review_post_right.ex) is `use Chat.Data.Schemas.ReviewRight, kind: :post`. Migration: [`20260718100003`](../../../priv/repo/migrations/20260718100003_create_review_post_right.exs).
+
 ```
 review_post_right
 ├── review_hash           — which review (PK)
 ├── origin_hash           — which origin (KEM recipient = origin's crypt_pkey)
+├── author_hash           — TEXT NOT NULL, FK → user_cards(user_hash), review author
 ├── kem_ciphertext_b64    — ML-KEM-1024 ciphertext (encapsulated to origin's crypt_pkey)
 ├── wrapped_row_b64       — complete author-signed review_public_passwords row, AES-256-GCM encrypted with KEM-derived key
 ├── deleted_flag           — integrity triad
 ├── owner_timestamp
-├── sign_b64              — author's ML-DSA-87 signature (carried over from the signed candidate)
-└── sign_hash             — SHA3-512 of sign_b64
+├── sign_b64              — author's ML-DSA-87 signature (nullable — NULL when created via promotion before author signs)
+└── sign_hash             — SHA3-512 of sign_b64 (nullable — NULL when created via promotion before author signs)
 ```
 
 Flow: created via the two-phase ingest handshake — when password candidates are ingested, the server wraps the author's password candidate into `review_post_right_candidate` (unsigned); the author reads it via Electric shape, verifies the KEM wrapping, and ingests a signature update; when the last required signature arrives, `complete_promotion` verifies the signatures and promotes the candidate into this table. On ingest the server binds the right to an existing review with matching `author_hash` and `origin_hash` (the insert is unsigned, so the cross-table binding is the guard; the same applies to `review_revoke_right`).
@@ -505,16 +532,19 @@ Flow: created via the two-phase ingest handshake — when password candidates ar
 
 KEM-encrypted envelope containing a complete, author-signed `review_public_passwords` row with null password. The origin identity decrypts it and ingests the pre-signed null row, revoking public visibility. Created during post-moderation and pre-moderation. Append-only (DELETE revoked).
 
+Schema: generated by [`Chat.Data.Schemas.ReviewRight`](../../../lib/chat/data/schemas/review_right.ex) macro — [`ReviewRevokeRight`](../../../lib/chat/data/schemas/review_revoke_right.ex) is `use Chat.Data.Schemas.ReviewRight, kind: :revoke`. Migration: [`20260718100004`](../../../priv/repo/migrations/20260718100004_create_review_revoke_right.exs).
+
 ```
 review_revoke_right
 ├── review_hash           — which review (PK)
 ├── origin_hash           — which origin (KEM recipient = origin's crypt_pkey)
+├── author_hash           — TEXT NOT NULL, FK → user_cards(user_hash), review author
 ├── kem_ciphertext_b64    — ML-KEM-1024 ciphertext (encapsulated to origin's crypt_pkey)
 ├── wrapped_row_b64       — complete author-signed review_public_passwords row (password=null), AES-256-GCM encrypted with KEM-derived key
 ├── deleted_flag           — integrity triad
 ├── owner_timestamp
-├── sign_b64              — author's ML-DSA-87 signature (carried over from the signed candidate)
-└── sign_hash             — SHA3-512 of sign_b64
+├── sign_b64              — author's ML-DSA-87 signature (nullable — NULL when created via promotion before author signs)
+└── sign_hash             — SHA3-512 of sign_b64 (nullable — NULL when created via promotion before author signs)
 ```
 
 ### review_list
@@ -522,6 +552,8 @@ review_revoke_right
 Per-user encrypted list of `(review_hash, review_password)` pairs. Own table. Contacts decrypt this with `review_list_password` to access the author's reviews regardless of moderation state.
 
 Includes moderation pipeline proof fields — the author must demonstrate that the review was submitted through the origin's moderation pipeline before sharing it with contacts. The server validates these references on ingest, preventing contacts-only reviews that bypass moderation.
+
+Schema: [`Chat.Data.Schemas.ReviewList`](../../../lib/chat/data/schemas/review_list.ex). Migration: [`20260718100005`](../../../priv/repo/migrations/20260718100005_create_review_list.exs), origin_hash addition: [`20260727100000`](../../../priv/repo/migrations/20260727100000_add_origin_hash_to_review_list.exs).
 
 ```
 review_list
@@ -558,6 +590,8 @@ filter.
 
 #### Server validation on review_list ingest
 
+Implemented in [`Chat.Data.ReviewList.Validation`](../../../lib/chat/data/review_list/validation.ex).
+
 1. Reject if the referenced review — or its origin — does not exist (a `review_list` entry cannot prove a pipeline it never entered).
 2. Look up the origin's `moderation_mode`.
 3. Reject if the row's `origin_hash` is not the referenced review's `origin_hash`, so a reader can trust the field it navigates by.
@@ -574,21 +608,41 @@ Comments will be designed separately — likely as a room-like structure (own ro
 
 ## Electric shapes
 
+All shapes are registered in [`Chat.Data.Shapes`](../../../lib/chat/data/shapes.ex). Candidate shapes (`ReviewPasswordCandidate`, `ReviewPostRightCandidate`, `ReviewRevokeRightCandidate`) are in `@not_syncable` — they are HTTP-ingest-only and are not replicated via peer sync.
+
 ### origin shape
 
-Synced to everyone — public directory of origins.
+Shape: [`Chat.Data.Shapes.Origin`](../../../lib/chat/data/shapes/origin.ex). Synced to everyone — public directory of origins.
 
-Access control: only the origin identity (authenticated via its `sign_pkey` from `user_cards`) can write or update.
+Access control: insert requires origin identity auth; update requires owner auth (with [`has_pending_reviews?/1`](../../../lib/chat/data/origin/validation.ex) guard).
 
 ### review shape
 
-Synced by `origin_hash` — client requests reviews for a specific origin. Client decrypts what it can based on visibility and available keys.
+Shape: [`Chat.Data.Shapes.Review`](../../../lib/chat/data/shapes/review.ex). Synced by `origin_hash` — client requests reviews for a specific origin. Client decrypts what it can based on visibility and available keys.
 
 Access control: author authenticated via `sign_pkey`.
 
+### review_public_passwords shape
+
+Shape: [`Chat.Data.Shapes.ReviewPublicPasswords`](../../../lib/chat/data/shapes/review_public_passwords.ex). `sign_hash` is derived from `sign_b64` on ingest via `sync_derive_fields/1`.
+
+Access control: insert by origin identity only (moderation action).
+
+### review_post_right / review_revoke_right shapes
+
+Shapes: [`ReviewPostRight`](../../../lib/chat/data/shapes/review_post_right.ex), [`ReviewRevokeRight`](../../../lib/chat/data/shapes/review_revoke_right.ex). Cross-table binding validation on insert (author/origin must match review).
+
+### review_password_candidate shape
+
+Shape: [`ReviewPasswordCandidate`](../../../lib/chat/data/shapes/review_password_candidate.ex). HTTP-ingest-only (`@not_syncable`), accepts `:insert` only. Post-apply triggers [`candidate_post_apply_promote`](../../../lib/chat/data/review_password_candidate/validation.ex) which fires `promote_candidate`.
+
+### review_post_right_candidate / review_revoke_right_candidate shapes
+
+Shapes: [`ReviewPostRightCandidate`](../../../lib/chat/data/shapes/review_post_right_candidate.ex), [`ReviewRevokeRightCandidate`](../../../lib/chat/data/shapes/review_revoke_right_candidate.ex). HTTP-ingest-only (`@not_syncable`), accept `:update` only (signature update). Post-apply triggers [`right_candidate_post_apply_complete`](../../../lib/chat/data/review_right_candidate/validation.ex) which fires `complete_promotion`.
+
 ### review_list shape
 
-Synced by `user_hash` (one contact's list) or by `origin_hash` (all list entries for one origin) — both
+Shape: [`Chat.Data.Shapes.ReviewList`](../../../lib/chat/data/shapes/review_list.ex). Synced by `user_hash` (one contact's list) or by `origin_hash` (all list entries for one origin) — both
 are indexed and both yield a shape definition shared across clients. Readers should request
 `columns=user_hash,review_hash,origin_hash,password_b64,deleted_flag`, reject rows where
 `deleted_flag` is set, and leave `sign_b64` behind; see
@@ -603,7 +657,7 @@ Will be designed with the comment schema.
 
 ## Row immutability
 
-Content tables (`review`, `review_public_passwords`, `review_post_right`, `review_revoke_right`, `review_list`) are append-only — DELETE is revoked at the PostgreSQL role level (see `pg_constraints.md` §5). This prevents a rogue origin from removing reviews or moderation records from the database, and prevents the server from deleting a user's review list.
+Content tables (`review`, `review_public_passwords`, `review_post_right`, `review_revoke_right`, `review_list`) are append-only — DELETE is revoked at the PostgreSQL role level (see [pg_constraints.md](pg_constraints.md) §5). Migration: [`20260718100008_revoke_delete_on_review_tables`](../../../priv/repo/migrations/20260718100008_revoke_delete_on_review_tables.exs). This prevents a rogue origin from removing reviews or moderation records from the database, and prevents the server from deleting a user's review list.
 
 Visibility is controlled exclusively through the `review_public_passwords` versioning mechanism (publish / revoke via timestamps), not through row deletion.
 
@@ -666,8 +720,8 @@ What metadata should an origin carry beyond name? Address, hours, category, imag
 
 Settled by the [Content model](#content-model): the rating is position 0 of the encrypted content
 array, so it follows the review's visibility and is not separately aggregatable. Implemented in
-`ReviewSandboxLive.ApiClient` (write) and read back by `OriginReviewsLive`,
-`ContactsReaderLive.ReviewReader`, and `ModerationSandboxLive.Entries`.
+[`ReviewSandboxLive.ApiClient`](../../../lib/chat_web/live/electric_live/review_sandbox_live/api_client.ex) (write) and read back by [`OriginReviewsLive`](../../../lib/chat_web/live/electric_live/origin_reviews_live/index.ex),
+[`ContactsReaderLive.ReviewReader`](../../../lib/chat_web/live/electric_live/contacts_reader_live/review_reader.ex), and [`ModerationSandboxLive.Entries`](../../../lib/chat_web/live/electric_live/moderation_sandbox_live/entries.ex).
 
 ### 4. Comment threading
 
@@ -704,7 +758,7 @@ Four sandboxes plus a public viewer, split by persona — each operates under a 
 
 ### Origin owner sandbox
 
-The user who creates and owns the origin. Exercises:
+[`OriginSandboxLive`](../../../lib/chat_web/live/electric_live/origin_sandbox_live/index.ex): the user who creates and owns the origin. Exercises:
 
 - generate origin ML-DSA-87 + ML-KEM-1024 keypairs (independent of owner keys)
 - insert origin `user_cards` row (self-signed)
@@ -715,7 +769,7 @@ The user who creates and owns the origin. Exercises:
 
 ### Origin admin/moderator sandbox
 
-Authenticates as the origin identity (not the owner's personal identity). Exercises:
+[`ModerationSandboxLive`](../../../lib/chat_web/live/electric_live/moderation_sandbox_live/index.ex): authenticates as the origin identity (not the owner's personal identity). Modules: [`Identity`](../../../lib/chat_web/live/electric_live/moderation_sandbox_live/identity.ex), [`Queue`](../../../lib/chat_web/live/electric_live/moderation_sandbox_live/queue.ex), [`Entries`](../../../lib/chat_web/live/electric_live/moderation_sandbox_live/entries.ex), [`ApiClient`](../../../lib/chat_web/live/electric_live/moderation_sandbox_live/api_client.ex), [`Render`](../../../lib/chat_web/live/electric_live/moderation_sandbox_live/render.ex). Exercises:
 
 - import the origin identity export and prove it against the origin's `user_cards` row (signature + KEM round-trip)
 - read the origin's reviews, password rows and right envelopes via Electric shapes
@@ -727,7 +781,7 @@ Authenticates as the origin identity (not the owner's personal identity). Exerci
 
 ### Review visitor/author sandbox
 
-A regular user browsing and writing reviews. Exercises:
+[`ReviewSandboxLive`](../../../lib/chat_web/live/electric_live/review_sandbox_live/index.ex): a regular user browsing and writing reviews. Modules: [`ApiClient`](../../../lib/chat_web/live/electric_live/review_sandbox_live/api_client.ex), [`Http`](../../../lib/chat_web/live/electric_live/review_sandbox_live/http.ex), [`ReviewList`](../../../lib/chat_web/live/electric_live/review_sandbox_live/review_list.ex), [`ReviewList.Proofs`](../../../lib/chat_web/live/electric_live/review_sandbox_live/review_list/proofs.ex), [`Verification`](../../../lib/chat_web/live/electric_live/review_sandbox_live/verification.ex), [`Contacts`](../../../lib/chat_web/live/electric_live/review_sandbox_live/contacts.ex), [`ListPassword`](../../../lib/chat_web/live/electric_live/review_sandbox_live/list_password.ex), [`Render`](../../../lib/chat_web/live/electric_live/review_sandbox_live/render.ex), [`RenderReviewList`](../../../lib/chat_web/live/electric_live/review_sandbox_live/render_review_list.ex), [`RenderVerification`](../../../lib/chat_web/live/electric_live/review_sandbox_live/render_verification.ex). Exercises:
 
 - browse origins (public directory)
 - view public reviews (decrypt with `review_password` from `review_public_passwords`)
@@ -738,7 +792,7 @@ A regular user browsing and writing reviews. Exercises:
 
 ### Public reviews viewer
 
-No identity required — a read-only view simulating the public frontend. Exercises:
+[`OriginReviewsLive`](../../../lib/chat_web/live/electric_live/origin_reviews_live/index.ex): no identity required — a read-only view simulating the public frontend. Exercises:
 
 - browse origin directory (list all origins with moderation mode)
 - select an origin to view its public reviews
@@ -748,7 +802,7 @@ No identity required — a read-only view simulating the public frontend. Exerci
 
 ### Contacts reader sandbox
 
-A user reading their contacts' reviews. Imports an identity, then derives the contact set from dialogs rather than a persisted contact list. Exercises:
+[`ContactsReaderLive`](../../../lib/chat_web/live/electric_live/contacts_reader_live/index.ex): a user reading their contacts' reviews. Imports an identity, then derives the contact set from dialogs rather than a persisted contact list. Modules: [`KeyScanner`](../../../lib/chat_web/live/electric_live/contacts_reader_live/key_scanner.ex), [`ReviewReader`](../../../lib/chat_web/live/electric_live/contacts_reader_live/review_reader.ex), [`Render`](../../../lib/chat_web/live/electric_live/contacts_reader_live/render.ex). Exercises:
 
 - import identity and verify against `user_cards`
 - scan dialogs for `review_list_key` messages to discover contacts who shared their list password
@@ -756,106 +810,87 @@ A user reading their contacts' reviews. Imports an identity, then derives the co
 - fetch per-origin reviews for each discovered contact, decrypt content
 - cross-reference `review_public_passwords` to badge each review as public, hidden, or contacts-only
 
-(`ContactsReaderLive`: `Index`, `KeyScanner`, `ReviewReader`, `Render`)
+### Directory views
+
+- [`OriginsLive`](../../../lib/chat_web/live/electric_live/origins_live/index.ex) — real-time Electric stream listing of all origins
+- [`ReviewsLive`](../../../lib/chat_web/live/electric_live/reviews_live/index.ex) — real-time Electric stream listing of all reviews
+- [`ReviewPublicPasswordsLive`](../../../lib/chat_web/live/electric_live/review_public_passwords_live/index.ex) — public passwords directory
+- [`ReviewPostRightsLive`](../../../lib/chat_web/live/electric_live/review_post_rights_live/index.ex) — post rights directory
+- [`ReviewRevokeRightsLive`](../../../lib/chat_web/live/electric_live/review_revoke_rights_live/index.ex) — revoke rights directory
+- [`ReviewListsLive`](../../../lib/chat_web/live/electric_live/review_lists_live/index.ex) — review lists directory
+
+Shared components: [`ElectricLive.ShapeReader`](../../../lib/chat_web/live/electric_live/shape_reader.ex), [`ElectricLive.StreamIndex`](../../../lib/chat_web/live/electric_live/stream_index.ex).
 
 ## Implementation phases
 
-> **Status snapshot — 2026-07-31 (branch `review_contact_side`).**
->
-> | Layer | State |
-> |-------|-------|
-> | Data model (schemas, migrations, publication) | complete — 11 migrations, 8 shapes registered |
-> | Validation + moderation pipeline (all three modes) | complete and green |
-> | Electric shapes + HTTP ingest | complete |
-> | Sandbox LiveViews (5 personas + 6 directory views) | complete |
-> | **Main-app UI (`MainLive`, `chat-frontend`)** | **not started — zero references to origins or reviews** |
-> | Comments | not started (deferred by design) |
->
-> 210 review/origin tests pass — 111 in `test/chat/data/{review*,origin_validation_test}`, 99 in
-> `test/chat_web/controllers/electric_controller_{review,candidate_ingest,review_list_update}*` and
-> the review/moderation sandbox tests. Server-side line coverage 55–98 %; the sandbox LiveViews are
-> mostly 0 % (see [Known gaps and defects](#known-gaps-and-defects)).
+### Phase 1 — Origin entity ✓
 
-### Phase 1 — Origin entity — data layer ✓, UI ✗
-
-- [x] `origins` Ecto schema and migration (`Chat.Data.Schemas.Origin`, `20260715144320_create_origins`)
-- [x] Electric publication (`20260715144321_add_origins_to_electric_publication`)
-- [x] `origin` Electric shape with owner access control (`Chat.Data.Shapes.Origin`)
+- [x] `origins` Ecto schema and migration ([`Chat.Data.Schemas.Origin`](../../../lib/chat/data/schemas/origin.ex), [`20260715144320_create_origins`](../../../priv/repo/migrations/20260715144320_create_origins.exs))
+- [x] Electric publication ([`20260715144321_add_origins_to_electric_publication`](../../../priv/repo/migrations/20260715144321_add_origins_to_electric_publication.exs))
+- [x] `origin` Electric shape with owner access control ([`Chat.Data.Shapes.Origin`](../../../lib/chat/data/shapes/origin.ex))
   - sync validation: signature verification, owner cert verification, timestamp ordering
   - HTTP ingest: challenge-based auth, insert + update operations
-- [x] Origin data context with upsert (LWW by `owner_timestamp`) (`Chat.Data.Origin`)
-- [x] Origin validation module — signature, owner cert, peer sync + HTTP ingest paths (`Chat.Data.Origin.Validation`)
-- [x] `OriginSignHash` type with `ors_` prefix (`Chat.Data.Types.OriginSignHash`)
+- [x] Origin data context with upsert (LWW by `owner_timestamp`) ([`Chat.Data.Origin`](../../../lib/chat/data/origin.ex))
+- [x] Origin validation module — signature, owner cert, peer sync + HTTP ingest paths ([`Chat.Data.Origin.Validation`](../../../lib/chat/data/origin/validation.ex))
+- [x] `OriginSignHash` type with `ors_` prefix ([`Chat.Data.Types.OriginSignHash`](../../../lib/chat/data/types/origin_sign_hash.ex))
 - [x] `PrefixedHash` macro — extracted common hash type logic, refactored `UserHash` and all dialog hash types to use it (`Chat.Data.Types.PrefixedHash`)
-- [x] Origin sandbox LiveView — interactive testing of create/update via Electric API (`OriginSandboxLive`)
-- [x] Origins directory LiveView — real-time Electric stream listing (`OriginsLive`)
-- [ ] Origin creation in main app UI (name, moderation mode)
-- [ ] Origin directory / listing in main app UI
-- [ ] Origin metadata beyond `name` (open question 2) — the `origins` table carries only `name`
-- [ ] Origin discovery beyond "list everything" (open question 1)
+- [x] Origin sandbox LiveView — interactive testing of create/update via Electric API ([`OriginSandboxLive`](../../../lib/chat_web/live/electric_live/origin_sandbox_live/index.ex))
+- [x] Origins directory LiveView — real-time Electric stream listing ([`OriginsLive`](../../../lib/chat_web/live/electric_live/origins_live/index.ex))
 
-### Phase 2 — Public reviews and moderation pipeline — data layer ✓, UI ✗
+### Phase 2 — Public reviews and moderation pipeline ✓
 
-- [x] Hash types: `ReviewHash`, `ReviewSignHash`, `ReviewPasswordSignHash`, `ReviewPostRightSignHash`, `ReviewRevokeRightSignHash`, `ReviewListSignHash` with prefixes in `Consts`
-- [x] `review` Ecto schema and migration (`Chat.Data.Schemas.Review`, `20260718100000_create_review`)
-- [x] `review_public_passwords` schema and migration (`Chat.Data.Schemas.ReviewPublicPassword`, `20260718100001_create_review_passwords`)
-- [x] `review_password_candidate` schema and migration — server-internal, not Electric-published (`20260718100002`)
-- [x] `review_post_right` schema and migration (`20260718100003`)
-- [x] `review_revoke_right` schema and migration (`20260718100004`)
-- [x] `review_list` schema and migration (`20260718100005`)
-- [x] `review_post_right_candidate` / `review_revoke_right_candidate` staging schemas and migration (`20260718100007`)
-- [x] Electric publication for review, review_public_passwords, review_post_right, review_revoke_right, review_list (`20260718100006`)
-- [x] `REVOKE DELETE` on the five content tables (`20260718100008_revoke_delete_on_review_tables`) — see the caveat in [Known gaps](#known-gaps-and-defects)
-- [x] Right-envelope HKDF context shared by wrapper and every unwrapper (`Chat.Data.ReviewRightEnvelope`)
-- [x] Data contexts with LWW upsert: `Chat.Data.Review`, `ReviewPublicPassword`, `ReviewPasswordCandidate`, `ReviewRightCandidate`, `ReviewPostRight`, `ReviewRevokeRight`, `ReviewList`
-- [x] Validation modules — peer sync + HTTP ingestion, enforcing moderation-proof, author/origin binding, owner-cert, and right cross-table binding: `Review.Validation`, `ReviewPublicPassword.Validation`, `ReviewPostRight.Validation`, `ReviewRevokeRight.Validation`, `ReviewList.Validation`, `Origin.Validation`
-- [x] Electric shapes: `Review`, `ReviewPublicPasswords`, `ReviewPostRight`, `ReviewRevokeRight`, `ReviewList` — registered in `Chat.Data.Shapes`
-- [x] Two-phase candidate promotion for all moderation modes (`ReviewPasswordCandidate.Promotion`: `promote_candidate` + `complete_promotion`)
-- [x] Tests (241 passing): `review_moderation_test`, `review_moderation_concurrency_test`,
-      `review_list_validation_test`, `review_list_access_test`, `review_public_password_validation_test`,
-      `review_validation_test`, `origin_validation_test`, `review_right_validation_test`,
-      `review_shapes_test`, `electric_controller_review_test`, `electric_controller_candidate_ingest_test`,
-      `electric_controller_review_list_update_test`, plus sandbox unit tests
-      (`review_sandbox_live/{proofs,render_review_list}_test`, `moderation_sandbox_live/{entries,identity,render}_test`)
-- [x] Review sandbox LiveView — interactive testing (`ReviewSandboxLive`)
-- [x] Reviews directory LiveView — real-time Electric stream listing (`ReviewsLive`)
-- [x] Origin reviews public viewer — browse origins and read decrypted public reviews (`OriginReviewsLive`)
+- [x] Hash types: [`ReviewHash`](../../../lib/chat/data/types/review_hash.ex), [`ReviewSignHash`](../../../lib/chat/data/types/review_sign_hash.ex), [`ReviewPasswordSignHash`](../../../lib/chat/data/types/review_password_sign_hash.ex), [`ReviewPostRightSignHash`](../../../lib/chat/data/types/review_post_right_sign_hash.ex), [`ReviewRevokeRightSignHash`](../../../lib/chat/data/types/review_revoke_right_sign_hash.ex), [`ReviewListSignHash`](../../../lib/chat/data/types/review_list_sign_hash.ex) with prefixes in [`Consts`](../../../lib/chat/data/types/consts.ex)
+- [x] `review` Ecto schema and migration ([`Chat.Data.Schemas.Review`](../../../lib/chat/data/schemas/review.ex), [`20260718100000_create_review`](../../../priv/repo/migrations/20260718100000_create_review.exs))
+- [x] `review_public_passwords` schema and migration ([`Chat.Data.Schemas.ReviewPublicPassword`](../../../lib/chat/data/schemas/review_public_password.ex), [`20260718100001_create_review_passwords`](../../../priv/repo/migrations/20260718100001_create_review_passwords.exs))
+- [x] `review_password_candidate` schema and migration — server-internal, not Electric-published ([`20260718100002`](../../../priv/repo/migrations/20260718100002_create_review_password_candidate.exs))
+- [x] `review_post_right` schema and migration ([`20260718100003`](../../../priv/repo/migrations/20260718100003_create_review_post_right.exs))
+- [x] `review_revoke_right` schema and migration ([`20260718100004`](../../../priv/repo/migrations/20260718100004_create_review_revoke_right.exs))
+- [x] `review_list` schema and migration ([`20260718100005`](../../../priv/repo/migrations/20260718100005_create_review_list.exs))
+- [x] `review_post_right_candidate` / `review_revoke_right_candidate` staging schemas and migration ([`20260718100007`](../../../priv/repo/migrations/20260718100007_create_review_right_candidate.exs))
+- [x] Electric publication for review, review_public_passwords, review_post_right, review_revoke_right, review_list ([`20260718100006`](../../../priv/repo/migrations/20260718100006_add_reviews_to_electric_publication.exs))
+- [x] `REVOKE DELETE` on the five content tables ([`20260718100008_revoke_delete_on_review_tables`](../../../priv/repo/migrations/20260718100008_revoke_delete_on_review_tables.exs)) — see the caveat in [Known gaps](#known-gaps-and-defects)
+- [x] Right-envelope HKDF context shared by wrapper and every unwrapper ([`Chat.Data.ReviewRightEnvelope`](../../../lib/chat/data/review_right_envelope.ex))
+- [x] Data contexts with LWW upsert: [`Chat.Data.Review`](../../../lib/chat/data/review.ex), [`ReviewPublicPassword`](../../../lib/chat/data/review_public_password.ex), [`ReviewPasswordCandidate`](../../../lib/chat/data/review_password_candidate.ex), [`ReviewRightCandidate`](../../../lib/chat/data/review_right_candidate.ex), [`ReviewPostRight`](../../../lib/chat/data/review_post_right.ex), [`ReviewRevokeRight`](../../../lib/chat/data/review_revoke_right.ex), [`ReviewList`](../../../lib/chat/data/review_list.ex)
+- [x] Validation modules — peer sync + HTTP ingestion, enforcing moderation-proof, author/origin binding, owner-cert, and right cross-table binding: [`Review.Validation`](../../../lib/chat/data/review/validation.ex), [`ReviewPublicPassword.Validation`](../../../lib/chat/data/review_public_password/validation.ex), [`ReviewPostRight.Validation`](../../../lib/chat/data/review_post_right/validation.ex), [`ReviewRevokeRight.Validation`](../../../lib/chat/data/review_revoke_right/validation.ex), [`ReviewList.Validation`](../../../lib/chat/data/review_list/validation.ex), [`Origin.Validation`](../../../lib/chat/data/origin/validation.ex)
+- [x] Electric shapes: [`Review`](../../../lib/chat/data/shapes/review.ex), [`ReviewPublicPasswords`](../../../lib/chat/data/shapes/review_public_passwords.ex), [`ReviewPostRight`](../../../lib/chat/data/shapes/review_post_right.ex), [`ReviewRevokeRight`](../../../lib/chat/data/shapes/review_revoke_right.ex), [`ReviewList`](../../../lib/chat/data/shapes/review_list.ex) — registered in [`Chat.Data.Shapes`](../../../lib/chat/data/shapes.ex)
+- [x] Two-phase candidate promotion for all moderation modes ([`ReviewPasswordCandidate.Promotion`](../../../lib/chat/data/review_password_candidate/promotion.ex): `promote_candidate` + `complete_promotion`)
+- [x] Tests (241 passing): [`review_moderation_test`](../../../test/chat/data/review_moderation_test.exs), [`review_moderation_concurrency_test`](../../../test/chat/data/review_moderation_concurrency_test.exs),
+      [`review_list_validation_test`](../../../test/chat/data/review_list_validation_test.exs), [`review_list_access_test`](../../../test/chat/data/review_list_access_test.exs), [`review_public_password_validation_test`](../../../test/chat/data/review_public_password_validation_test.exs),
+      [`review_validation_test`](../../../test/chat/data/review_validation_test.exs), [`origin_validation_test`](../../../test/chat/data/origin_validation_test.exs), [`origin_owner_auth_test`](../../../test/chat/data/origin_owner_auth_test.exs), [`review_right_validation_test`](../../../test/chat/data/review_right_validation_test.exs),
+      [`review_shapes_test`](../../../test/chat/data/review_shapes_test.exs), [`electric_controller_review_test`](../../../test/chat_web/controllers/electric_controller_review_test.exs), [`electric_controller_candidate_ingest_test`](../../../test/chat_web/controllers/electric_controller_candidate_ingest_test.exs),
+      [`electric_controller_review_list_update_test`](../../../test/chat_web/controllers/electric_controller_review_list_update_test.exs), plus sandbox unit tests
+      ([`review_sandbox_live/{proofs,render_review_list}_test`](../../../test/chat_web/live/electric_live/review_sandbox_live/), [`moderation_sandbox_live/{entries,identity,render}_test`](../../../test/chat_web/live/electric_live/))
+- [x] Review sandbox LiveView — interactive testing ([`ReviewSandboxLive`](../../../lib/chat_web/live/electric_live/review_sandbox_live/index.ex))
+- [x] Reviews directory LiveView — real-time Electric stream listing ([`ReviewsLive`](../../../lib/chat_web/live/electric_live/reviews_live/index.ex))
+- [x] Origin reviews public viewer — browse origins and read decrypted public reviews ([`OriginReviewsLive`](../../../lib/chat_web/live/electric_live/origin_reviews_live/index.ex))
 - [x] Ingest-triggered promotion — `promote_candidate` fires on candidate ingest when both password+null arrive; `complete_promotion` fires on right candidate signature ingest when all required signatures are present
-- [x] Electric shapes for right candidates — `review_post_right_candidate` / `review_revoke_right_candidate` synced to author so client can read, verify, and sign
-- [x] Origin moderation sandbox — origin-identity import + verification, moderation queue, approve/reject/revoke (`ModerationSandboxLive`: `Index`, `Identity`, `Queue`, `Entries`, `ApiClient`, `Render`)
+- [x] Electric shapes for right candidates — [`review_post_right_candidate`](../../../lib/chat/data/shapes/review_post_right_candidate.ex) / [`review_revoke_right_candidate`](../../../lib/chat/data/shapes/review_revoke_right_candidate.ex) synced to author so client can read, verify, and sign
+- [x] Origin moderation sandbox — origin-identity import + verification, moderation queue, approve/reject/revoke ([`ModerationSandboxLive`](../../../lib/chat_web/live/electric_live/moderation_sandbox_live/index.ex): `Index`, `Identity`, `Queue`, `Entries`, `ApiClient`, `Render`)
   - identity import proves the exported keys against the origin's `user_cards` row (signature + KEM round-trip) before any action
   - queue classifies each review as pending / public / hidden, and marks an action unavailable when its envelope timestamp would not supersede the current row (LWW no-op)
   - moderator reads pending reviews through the unpublished post right, and keeps reading revoked ones through the superseded password row
   - verified end-to-end against a live server in all three modes (none / post / pre)
-- [x] `origin_hash` on `review_list` — immutable, signed, bound to the review's origin on ingest (`20260727100000_add_origin_hash_to_review_list`); makes the contacts reader reuse the per-origin review shape
-- [x] Review author sandbox step 5 — assemble the moderation proofs, ingest the `review_list` row, and (pre mode) fill `review_password_sign_hash` in by update after the origin publishes (`ReviewSandboxLive.ReviewList` + `.ReviewList.Proofs`, `RenderReviewList`)
+- [x] `origin_hash` on `review_list` — immutable, signed, bound to the review's origin on ingest ([`20260727100000_add_origin_hash_to_review_list`](../../../priv/repo/migrations/20260727100000_add_origin_hash_to_review_list.exs)); makes the contacts reader reuse the per-origin review shape
+- [x] Review author sandbox step 5 — assemble the moderation proofs, ingest the `review_list` row, and (pre mode) fill `review_password_sign_hash` in by update after the origin publishes ([`ReviewSandboxLive.ReviewList`](../../../lib/chat_web/live/electric_live/review_sandbox_live/review_list.ex) + [`.ReviewList.Proofs`](../../../lib/chat_web/live/electric_live/review_sandbox_live/review_list/proofs.ex), [`RenderReviewList`](../../../lib/chat_web/live/electric_live/review_sandbox_live/render_review_list.ex))
   - the author's own sign_hashes are the source of truth: the server copies a candidate's `sign_hash` verbatim on promotion, pre mode deletes the candidates, and ML-DSA-87 signing is randomized, so they are captured at steps 3-4 and cannot be recomputed
   - shape reads of `review_public_passwords` / `review_post_right` / `review_revoke_right` are a probe, not a gate — Electric lags the Postgres commit the server validates against, so absence never blocks; only a promoted row that differs from what the author signed does
-- [x] Shared `ElectricLive.ShapeReader` and `ElectricLive.RequestLog` — one shape-read implementation and one request-log component instead of per-sandbox copies
-- [x] Author-side KEM-wrapping verification before signing a right candidate (`ReviewSandboxLive.Verification`, `.RenderVerification`)
-- [ ] Review creation in main app UI
-- [ ] Review listing in main app UI
-- [ ] Moderation UI for origin identity in main app UI (approve/reject/revoke)
+- [x] Shared [`ElectricLive.ShapeReader`](../../../lib/chat_web/live/electric_live/shape_reader.ex) and `ElectricLive.RequestLog` — one shape-read implementation and one request-log component instead of per-sandbox copies
+- [x] Author-side KEM-wrapping verification before signing a right candidate ([`ReviewSandboxLive.Verification`](../../../lib/chat_web/live/electric_live/review_sandbox_live/verification.ex), [`.RenderVerification`](../../../lib/chat_web/live/electric_live/review_sandbox_live/render_verification.ex))
 - [ ] Review edit chain semantics (open question 5) — `parent_sign_hash` is stored and the
       update path works, but nothing validates that a version chain is well-formed, and no
       client writes edits
 
 ### Phase 3 — Contacts channel and owner controls
 
-`to_origin` carries no implementation work: it is a plain dialog with the origin identity, already fully supported by `pq_dialogs` (see the [to_origin](#to_origin) section). All that remains is the UI entry point.
+`to_origin` carries no implementation work: it is a plain dialog with the origin identity, already fully supported by `pq_dialogs` (see the [to_origin](#to_origin) section).
 
 The contacts channel is a client-side feature — the server half (`review_list`, its proof gate, its
 shape) shipped in Phase 2. Design decisions are settled: no key rotation, no retraction, public metadata
 accepted (see [Contacts](#contacts)).
 
-- [x] `review_list_password` — generate once per author, store in User Storage under a fixed key so every device shares it (`ReviewSandboxLive.ListPassword`, write-once slot)
-- [x] `{"review_list_key": [...]}` dialog content type in `07_content_polymorphism.md` + send from the author sandbox to chosen peers (`ReviewSandboxLive.Contacts`); the sandbox has no contact list of its own, so "contacts" is whoever the author picks out of the `user_cards` directory
-- [ ] send automatically on first review (to all contacts) and on adding a contact — needs a real client-side contact list
-- [ ] receive side — store `peer_user_hash → review_list_password` in the client's contact record (the dialog sandbox decodes and displays the key, but does not persist it)
-- [x] contacts reader sandbox — import identity, scan dialogs for `review_list_key`, read own + contacts' `review_list` with `columns=` trimmed, decrypt `password_b64`, fetch per-origin reviews, decrypt content, cross-reference `review_public_passwords` for public/hidden/contacts-only badges (`ContactsReaderLive`: `Index`, `KeyScanner`, `ReviewReader`, `Render`)
-- [ ] contacts reader in main app UI
-- [ ] contacts-visible hidden reviews in the UI (author's contacts see moderation-hidden reviews, marked as such)
-- [ ] "message this origin" entry point in the origin UI — opens a standard dialog with the origin's `user_hash`
+- [x] `review_list_password` — generate once per author, store in User Storage under a fixed key so every device shares it ([`ReviewSandboxLive.ListPassword`](../../../lib/chat_web/live/electric_live/review_sandbox_live/list_password.ex), write-once slot)
+- [x] `{"review_list_key": [...]}` dialog content type in [`07_content_polymorphism.md`](../invariants/07_content_polymorphism.md) + send from the author sandbox to chosen peers ([`ReviewSandboxLive.Contacts`](../../../lib/chat_web/live/electric_live/review_sandbox_live/contacts.ex)); the sandbox has no contact list of its own, so "contacts" is whoever the author picks out of the `user_cards` directory
+- [x] contacts reader sandbox — import identity, scan dialogs for `review_list_key`, read own + contacts' `review_list` with `columns=` trimmed, decrypt `password_b64`, fetch per-origin reviews, decrypt content, cross-reference `review_public_passwords` for public/hidden/contacts-only badges ([`ContactsReaderLive`](../../../lib/chat_web/live/electric_live/contacts_reader_live/index.ex): `Index`, [`KeyScanner`](../../../lib/chat_web/live/electric_live/contacts_reader_live/key_scanner.ex), [`ReviewReader`](../../../lib/chat_web/live/electric_live/contacts_reader_live/review_reader.ex), [`Render`](../../../lib/chat_web/live/electric_live/contacts_reader_live/render.ex))
 - [ ] owner-signed authorization for dangerous origin ops (moderation mode, soft delete) — see the Status note under Origin creation
 - [ ] origin keys in User Storage for multi-device access — the Origin creation section specifies it,
       but `OriginSandboxLive` only exports/imports a key file. `ReviewSandboxLive.ListPassword` is the
@@ -872,7 +907,7 @@ is a review tier that never enters public moderation at all (see [Future: to_con
 
 ### Phase 5 — Operational hardening
 
-- [ ] Stale-candidate GC — schedule periodic cleanup via `ReviewRightCandidate.delete_stale_candidates/1` (exists but never called; unsigned right candidates accumulate indefinitely without it)
+- [ ] Stale-candidate GC — schedule periodic cleanup via [`ReviewRightCandidate.delete_stale_candidates/1`](../../../lib/chat/data/review_right_candidate.ex):50 (exists but never called; unsigned right candidates accumulate indefinitely without it)
 - [ ] Stale *password* candidate GC — `review_password_candidate` has no cleanup at all.
       `Promotion.delete_password_candidates/1` runs only inside `complete_promotion`, so a
       post/pre-mode review whose author never signs leaves its candidates forever, as does any
@@ -891,7 +926,7 @@ Behaviour that diverges from this document, pinned by tests where a failing asse
 500 rather than a clean 4xx. The peer-sync path handles `:ignore` explicitly
 (`Shapes.ReviewList.apply_changeset/2`); the HTTP path does not. Affects `review_list`, `review`,
 `origin`, and every other ingestable table. Pinned by
-`electric_controller_review_list_update_test.exs` ("a backwards timestamp raises instead of being
+[`electric_controller_review_list_update_test.exs`](../../../test/chat_web/controllers/electric_controller_review_list_update_test.exs) ("a backwards timestamp raises instead of being
 ignored (known defect)").
 
 ### Equal-timestamp updates diverge between node and peers
@@ -904,16 +939,50 @@ around it with `max(previous + 1, now)`. Pinned by the same test file.
 
 ### Password candidates are not signature-checked at ingest
 
-`ReviewPasswordCandidate.Validation.candidate_validate/3` checks the changeset and the
+[`ReviewPasswordCandidate.Validation.candidate_validate/3`](../../../lib/chat/data/review_password_candidate/validation.ex) checks the changeset and the
 review/author binding, but not `sign_b64`. The signature *is* verified before anything is minted or
-wrapped (`Promotion.Candidates.validate_candidate/1`), so nothing forged ever reaches
+wrapped ([`Promotion.Candidates.validate_candidate/1`](../../../lib/chat/data/review_password_candidate/promotion/candidates.ex)), so nothing forged ever reaches
 `review_public_passwords` — but in post/pre mode a lone badly-signed candidate is stored and returns
 `{:ok, :pending}`, and nothing ever removes it. Ingest-time verification would reject it at the door
 and is cheaper than the GC job it currently requires.
 
 ### Two-tier owner/origin split is not enforced
 
-Origin `update` — including `moderation_mode` and `deleted_flag` — is authorized by the *origin
-identity's* signature, so a delegated moderator can change moderation mode or soft-delete the
+Origin `update` — including `moderation_mode` and `deleted_flag` — is authorized by either the origin
+identity's or the owner's signature (see [`validate_origin_update_signature/1`](../../../lib/chat/data/origin/validation.ex)), so a delegated moderator can change moderation mode or soft-delete the
 origin. See the Status note under [Origin creation](#origin-creation).
 
+## Source modules
+
+| Layer | Module | Source |
+|-------|--------|--------|
+| Schema | `Chat.Data.Schemas.Origin` | [`schemas/origin.ex`](../../../lib/chat/data/schemas/origin.ex) |
+| Schema | `Chat.Data.Schemas.Review` | [`schemas/review.ex`](../../../lib/chat/data/schemas/review.ex) |
+| Schema | `Chat.Data.Schemas.ReviewPublicPassword` | [`schemas/review_public_password.ex`](../../../lib/chat/data/schemas/review_public_password.ex) |
+| Schema | `Chat.Data.Schemas.ReviewPasswordCandidate` | [`schemas/review_password_candidate.ex`](../../../lib/chat/data/schemas/review_password_candidate.ex) |
+| Schema | `Chat.Data.Schemas.ReviewList` | [`schemas/review_list.ex`](../../../lib/chat/data/schemas/review_list.ex) |
+| Schema (macro) | `Chat.Data.Schemas.ReviewRight` | [`schemas/review_right.ex`](../../../lib/chat/data/schemas/review_right.ex) |
+| Schema | `Chat.Data.Schemas.ReviewPostRight` | [`schemas/review_post_right.ex`](../../../lib/chat/data/schemas/review_post_right.ex) |
+| Schema | `Chat.Data.Schemas.ReviewRevokeRight` | [`schemas/review_revoke_right.ex`](../../../lib/chat/data/schemas/review_revoke_right.ex) |
+| Schema | `ReviewPostRightCandidate` / `ReviewRevokeRightCandidate` | [`schemas/review_right_candidate.ex`](../../../lib/chat/data/schemas/review_right_candidate.ex) |
+| Validation | `Chat.Data.Origin.Validation` | [`origin/validation.ex`](../../../lib/chat/data/origin/validation.ex) |
+| Validation | `Chat.Data.Review.Validation` | [`review/validation.ex`](../../../lib/chat/data/review/validation.ex) |
+| Validation | `Chat.Data.ReviewPublicPassword.Validation` | [`review_public_password/validation.ex`](../../../lib/chat/data/review_public_password/validation.ex) |
+| Validation | `Chat.Data.ReviewPasswordCandidate.Validation` | [`review_password_candidate/validation.ex`](../../../lib/chat/data/review_password_candidate/validation.ex) |
+| Validation | `Chat.Data.ReviewList.Validation` | [`review_list/validation.ex`](../../../lib/chat/data/review_list/validation.ex) |
+| Validation (macro) | `Chat.Data.ReviewRight.Validation` | [`review_right/validation.ex`](../../../lib/chat/data/review_right/validation.ex) |
+| Validation | `Chat.Data.ReviewRightCandidate.Validation` | [`review_right_candidate/validation.ex`](../../../lib/chat/data/review_right_candidate/validation.ex) |
+| Data context | `Chat.Data.Origin` | [`origin.ex`](../../../lib/chat/data/origin.ex) |
+| Data context | `Chat.Data.Review` | [`review.ex`](../../../lib/chat/data/review.ex) |
+| Data context | `Chat.Data.ReviewPublicPassword` | [`review_public_password.ex`](../../../lib/chat/data/review_public_password.ex) |
+| Data context | `Chat.Data.ReviewPasswordCandidate` | [`review_password_candidate.ex`](../../../lib/chat/data/review_password_candidate.ex) |
+| Data context | `Chat.Data.ReviewRightCandidate` | [`review_right_candidate.ex`](../../../lib/chat/data/review_right_candidate.ex) |
+| Data context | `Chat.Data.ReviewPostRight` | [`review_post_right.ex`](../../../lib/chat/data/review_post_right.ex) |
+| Data context | `Chat.Data.ReviewRevokeRight` | [`review_revoke_right.ex`](../../../lib/chat/data/review_revoke_right.ex) |
+| Data context | `Chat.Data.ReviewList` | [`review_list.ex`](../../../lib/chat/data/review_list.ex) |
+| Promotion | `Chat.Data.ReviewPasswordCandidate.Promotion` | [`promotion.ex`](../../../lib/chat/data/review_password_candidate/promotion.ex) |
+| Promotion | `Promotion.Candidates` | [`promotion/candidates.ex`](../../../lib/chat/data/review_password_candidate/promotion/candidates.ex) |
+| Crypto | `Chat.Data.ReviewRightEnvelope` | [`review_right_envelope.ex`](../../../lib/chat/data/review_right_envelope.ex) |
+| Shape registry | `Chat.Data.Shapes` | [`shapes.ex`](../../../lib/chat/data/shapes.ex) |
+| Types | `Consts` (prefixes) | [`types/consts.ex`](../../../lib/chat/data/types/consts.ex) |
+| Test fixtures | `Chat.Test.ReviewFixtures` | [`test/support/review_fixtures.ex`](../../../test/support/review_fixtures.ex) |

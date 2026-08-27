@@ -47,7 +47,6 @@ Real-time sync layer built on Phoenix.Sync + ElectricSQL.
 
 ### Proposals
 - [External frontend integration](./pq/proposal/external_frontend_integration.md)
-- [Reviews](./pq/proposal/reviews.md)
 
 ### Requirements
 Hard requirements and specs. See [`pq/reqs/CLAUDE.md`](./pq/reqs/CLAUDE.md) for the folder's topic/status convention.
@@ -59,6 +58,7 @@ Hard requirements and specs. See [`pq/reqs/CLAUDE.md`](./pq/reqs/CLAUDE.md) for 
 - [Electric shape behaviours](./pq/reqs/electric_shape_behaviours.md)
 - [PostgreSQL constraints](./pq/reqs/pg_constraints.md)
 - [PQ dialogs](./pq/reqs/pq_dialogs.done.md)
+- [PQ reviews](./pq/reqs/pq_reviews.in_progress.md)
 - [PQ user](./pq/reqs/pq_user.md)
 - [PQ user storage](./pq/reqs/pq_user_storage.md)
 - [PQ files](./pq/reqs/pq_files.md)

@@ -1,10 +1,10 @@
 # Symmetric Key Derivation
 
-> Status: **solved** — `pq_dialogs.md` specifies HKDF-SHA3-256 for all symmetric key derivation.
+> Status: **solved** — `pq_dialogs.done.md` specifies HKDF-SHA3-256 for all symmetric key derivation.
 
 ## Problem
 
-The PQ data layer encrypts content with AES-256-GCM under keys derived from the author's private material. The current derivation in [pq_dialogs.md](../reqs/pq_dialogs.md) is a single SHA3-512 hash:
+The PQ data layer encrypts content with AES-256-GCM under keys derived from the author's private material. The current derivation in [pq_dialogs.done.md](../reqs/pq_dialogs.done.md) is a single SHA3-512 hash:
 
 ```
 sender_msg_key = SHA3-512(
@@ -22,7 +22,7 @@ Two issues:
 | **Output size ambiguity** — SHA3-512 produces 64 bytes; AES-256-GCM expects exactly 32. The spec does not state how the 512-bit output maps to a 256-bit key (truncation? first half?). | Low — but underspecified |
 | **No formal KDF** — a raw hash is not a key derivation function. HKDF has a security proof; ad-hoc `SHA3(secrets)` does not. | Moderate — no provable security reduction |
 
-The same gap exists in the KEM wrap step (acknowledged as problem #13 in `pq_dialogs.md`): `ML-KEM-1024`'s shared secret is used directly as the AES-256-GCM `wrap_key` without KDF separation.
+The same gap exists in the KEM wrap step (acknowledged as problem #13 in `pq_dialogs.done.md`): `ML-KEM-1024`'s shared secret is used directly as the AES-256-GCM `wrap_key` without KDF separation.
 
 ## Approach
 
@@ -107,7 +107,7 @@ wrap_key                           = HKDF(IKM = shared_secret,
 peer_wrapped_msg_key               = AES-256-GCM.encrypt(wrap_key, sender_msg_key)
 ```
 
-This resolves problem #13 from `pq_dialogs.md` (no KDF separation in the wrap step).
+This resolves problem #13 from `pq_dialogs.done.md` (no KDF separation in the wrap step).
 
 ### Affected tables
 
@@ -164,8 +164,8 @@ end
 
 ## Where this applies
 
-- **Dialog key derivation**: [pq_dialogs.md §Key derivation](../reqs/pq_dialogs.md) — replaces raw SHA3-512 with HKDF-SHA3-256, same single-key-per-side model
-- **Dialog key wrapping**: [pq_dialogs.md §Key wrapping](../reqs/pq_dialogs.md) — resolves problem #13
+- **Dialog key derivation**: [pq_dialogs.done.md §Key derivation](../reqs/pq_dialogs.done.md) — replaces raw SHA3-512 with HKDF-SHA3-256, same single-key-per-side model
+- **Dialog key wrapping**: [pq_dialogs.done.md §Key wrapping](../reqs/pq_dialogs.done.md) — resolves problem #13
 - **User storage encryption** (frontend) — same HKDF-SHA3-256 (implemented via HMAC-SHA3-256 over WebCrypto)
 - **Future room keys**: same HKDF pattern with a different salt (e.g., `"buckitup/room-mk/v1"`)
 

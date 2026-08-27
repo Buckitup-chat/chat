@@ -4,7 +4,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Contacts do
 
   The sandbox has no contact list of its own, so "contacts" here is whoever the
   author picks out of the `user_cards` directory. Delivery is an ordinary dialog
-  message carrying the `review_list_key` content type — `pq_dialogs` already
+  message carrying the `review_list_key` content type — `pq_dialogs.done` already
   wraps every message with `sender_msg_key` + ML-KEM-1024, so the key is
   protected exactly as any other content and nothing new is needed
   cryptographically.

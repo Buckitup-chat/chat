@@ -40,7 +40,7 @@ Origin (the coffee shop)
     ├── to_public   — encrypted with review_password, signed by author
     │                 public when password in review_public_passwords table
     │                 contacts see via review_list_password (bypasses moderation)
-    ├── to_origin  — plain dialog between author and origin identity (see pq_dialogs),
+    ├── to_origin  — plain dialog between author and origin identity (see pq_dialogs.done),
     │                 no review-specific machinery
     │
     └── Comment (by anyone who can see the parent review)
@@ -58,7 +58,7 @@ An origin has:
 - a moderation policy for public reviews
 - public metadata (name, description — signed by origin identity)
 
-The origin identity is separate from the owner's personal identity. One user can own multiple origins. Because it is a `user_cards` entry, the existing dialog infrastructure (see `pq_dialogs.md`) works directly for `to_origin` communication.
+The origin identity is separate from the owner's personal identity. One user can own multiple origins. Because it is a `user_cards` entry, the existing dialog infrastructure (see `pq_dialogs.done.md`) works directly for `to_origin` communication.
 
 ### Origin creation
 

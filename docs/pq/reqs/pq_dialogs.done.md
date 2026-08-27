@@ -16,7 +16,7 @@ Deterministic derivation means **no forward secrecy at the dialog level**. If an
 
 ## Schema at a glance
 
-All five dialog tables are self-authenticating via the integrity triad (`sign_b64`, `owner_timestamp`, `deleted_flag`) defined in [02_integrity.md](../invariants/02_integrity.md), with one exception: `dialog_message_receipts` omits `deleted_flag` because delivery and read events are irreversible. `user_cards` is shown because every verification path starts there — fetch the author's `sign_pkey` / `crypt_pkey` from `user_cards`, then check the dialog row's signature. No database-level foreign keys to `user_cards` exist (PQ rows are self-verifying), but the logical dependency is real.
+All five dialog tables are self-authenticating via the integrity triad (`sign_b64`, `owner_timestamp`, `deleted_flag`) defined in [02_integrity.md](../invariants/02_integrity.md), with one exception: `dialog_message_receipts` omits `deleted_flag` because delivery and read events are irreversible. `user_cards` is shown because every verification path starts there — fetch the author's `sign_pkey` / `crypt_pkey` from `user_cards`, then check the dialog row's signature. `dialog_keys` has database-level foreign keys to `user_cards` (`sender_hash`, `peer_hash`, both `ON DELETE CASCADE`); the remaining four tables have no FK constraints — rows are self-verifying via signatures, and the logical dependency on `user_cards` is resolved at validation time.
 
 ```mermaid
 erDiagram
@@ -134,12 +134,13 @@ dialog_hash  = "di_" + hex(SHA3-512(sorted[0] || sorted[1]))
 
 Same on both sides ⇒ independent initiation converges.
 
-PostgreSQL domain:
+PostgreSQL constraint (enforced as inline CHECK on `TEXT` columns, not a standalone domain):
 
 ```sql
-CREATE DOMAIN dialog_hash_type AS TEXT
-  CHECK (VALUE ~ '^di_[a-f0-9]{128}$');
+CHECK (dialog_hash ~ '^di_[a-f0-9]{128}$')
 ```
+
+Ecto type: [`Chat.Data.Types.DialogHash`](../../../lib/chat/data/types/dialog_hash.ex).
 
 ---
 
@@ -455,7 +456,7 @@ Wrapped `sender_msg_key` published by one author for one dialog. Two rows per di
 
 PK: `(dialog_hash, sender_hash)`.
 
-Self-authenticating per [02_integrity.md](../invariants/02_integrity.md), same bootstrap as `user_cards`: fetch `user_cards` for `sender_hash`, verify its self-signature, then verify this row's `sign_b64` under that `sign_pkey`. A row with invalid `sign_b64` is rejected on ingest and re-verified on peer-sync receive. Because `dialog_hash`, `peer_hash`, and both KEM ciphertexts are all covered by the signature, no field can be rewritten, retargeted to a different peer, or lifted into a different dialog without detection.
+Self-authenticating per [02_integrity.md](../invariants/02_integrity.md), same bootstrap as `user_cards`: fetch `user_cards` for `sender_hash`, verify its self-signature, then verify this row's `sign_b64` under that `sign_pkey`. A row with invalid `sign_b64` is rejected on ingest and re-verified on peer-sync receive. Because `dialog_hash`, `peer_hash`, and both KEM ciphertexts are all covered by the signature, no field can be rewritten, retargeted to a different peer, or lifted into a different dialog without detection. Database-level FK constraints on `sender_hash` and `peer_hash` (`REFERENCES user_cards ON DELETE CASCADE`) provide an additional server-side guard — this is the only dialog table with FKs.
 
 Flooding: an attacker can still publish a row naming an uninvolved `peer_hash` (PoP proves submitter identity, not peer consent). There is no server-side spam filtering — accepting or ignoring unsolicited dialogs is the receiver's decision. Clients mitigate by hiding a dialog until the local user has either authored a message in it or the peer has published their own `dialog_keys` row for the same `dialog_hash`.
 
@@ -484,15 +485,14 @@ Content is a single opaque blob: the first 12 bytes are the per-message AES-GCM 
 
 PK: `(message_id)`. UNIQUE: `(dialog_hash, message_id)` — supports dialog-scoped sync filtering and inbox listings without a separate `dialogs` table.
 
-Postgres domains:
+Postgres constraints (enforced as inline CHECK on `TEXT` columns, not standalone domains):
 
 ```sql
-CREATE DOMAIN dialog_message_id_type AS TEXT
-  CHECK (VALUE ~ '^dmsg_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$');
-
-CREATE DOMAIN dialog_message_sign_hash_type AS TEXT
-  CHECK (VALUE ~ '^dms_[a-f0-9]{128}$');
+CHECK (message_id ~ '^dmsg_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
+CHECK (sign_hash ~ '^dms_[a-f0-9]{128}$')
 ```
+
+Ecto types: [`Chat.Data.Types.DialogMessageId`](../../../lib/chat/data/types/dialog_message_id.ex), [`Chat.Data.Types.DialogMessageSignHash`](../../../lib/chat/data/types/dialog_message_sign_hash.ex).
 
 Self-authenticating per [02_integrity.md](../invariants/02_integrity.md): verify `sign_b64` under `sender_hash`'s `sign_pkey` (from `user_cards`). An incoming update with `owner_timestamp <= existing` is rejected as a replay even if the signature verifies. Deletes are a new signed tip with `deleted_flag: true` and a higher `owner_timestamp` — there is no unsigned server-side delete.
 
@@ -541,12 +541,13 @@ The reaction emoji (`type`) is **encrypted** under `sender_msg_key` (see §Key d
 
 PK: `(reaction_hash)`. Uniqueness of "one reaction per `(message, reactor, emoji)`" is enforced by `reaction_hash` alone — the MAC is deterministic given the key, so two signed rows for the same `(message_id, reactor_hash, type_plaintext)` collide on PK regardless of which random AES-GCM nonce each encryption used. No separate plaintext UNIQUE constraint is needed (the database cannot see `type` plaintext and has no key to recompute the MAC).
 
-Postgres domain:
+Postgres constraint (inline CHECK, not a standalone domain):
 
 ```sql
-CREATE DOMAIN dialog_message_reaction_hash_type AS TEXT
-  CHECK (VALUE ~ '^dmr_[a-f0-9]{128}$');
+CHECK (reaction_hash ~ '^dmr_[a-f0-9]{128}$')
 ```
+
+Ecto type: [`Chat.Data.Types.DialogMessageReactionHash`](../../../lib/chat/data/types/dialog_message_reaction_hash.ex).
 
 Carries the full integrity triad per [02_integrity.md](../invariants/02_integrity.md): `sign_b64` over all other fields, `owner_timestamp` strictly monotonic per `reaction_hash`, `deleted_flag` as a signed un-react. Reactions are not versioned (no chain) — the row is overwritten on each new signed update. Because `reaction_hash` is a MAC over the `(message_id, reactor_hash, type)` tuple, an attacker cannot forge a `reaction_hash` pointing at a different tuple without the key; and because `type_b64` is covered by `sign_b64`, it cannot be swapped independently of the hash.
 
@@ -571,12 +572,13 @@ The `type` column is plaintext, enabling server-side queries for unread counts, 
 
 PK: `(receipt_hash)`. Uniqueness of "one receipt per `(message version, peer, type)`" is enforced by `receipt_hash` alone — the hash is deterministic, so two signed rows for the same `(message_id, message_sign_hash, peer_hash, type)` collide on PK. An edited message (new `sign_hash`) can receive its own independent receipt.
 
-Postgres domains:
+Postgres constraint (inline CHECK, not a standalone domain):
 
 ```sql
-CREATE DOMAIN dialog_message_receipt_hash_type AS TEXT
-  CHECK (VALUE ~ '^dmrc_[a-f0-9]{128}$');
+CHECK (receipt_hash ~ '^dmrc_[a-f0-9]{128}$')
 ```
+
+Ecto type: [`Chat.Data.Types.DialogMessageReceiptHash`](../../../lib/chat/data/types/dialog_message_receipt_hash.ex).
 
 Self-authenticating per [02_integrity.md](../invariants/02_integrity.md): `sign_b64` over all other fields, `owner_timestamp` strictly monotonic per `receipt_hash`. No `deleted_flag` — delivery and read events are append-only facts. Receipts are not versioned (no chain) — the row is overwritten on each new signed update.
 

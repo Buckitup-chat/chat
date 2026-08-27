@@ -8,7 +8,7 @@ This is distinct from [data versioning](./03_data_versioning.md): versioning ord
 
 ## Solution: `refs_map_b64` + UUIDv7
 
-The dialog schema in [pq_dialogs.md](../reqs/pq_dialogs.md) solves ordering with two mechanisms:
+The dialog schema in [pq_dialogs.done.md](../reqs/pq_dialogs.done.md) solves ordering with two mechanisms:
 
 ### 1. `refs_map_b64` — full DAG frontier (causality)
 

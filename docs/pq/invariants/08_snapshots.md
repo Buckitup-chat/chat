@@ -1,6 +1,6 @@
 # Snapshots
 
-> Status: **partially resolved** — everyday causal-state tracking is handled inline by `refs_map_b64` (see [pq_dialogs.md §References](../reqs/pq_dialogs.md)). This doc covers the remaining use case: standalone, portable, Merkle-rooted attestations for export and dispute resolution.
+> Status: **partially resolved** — everyday causal-state tracking is handled inline by `refs_map_b64` (see [pq_dialogs.done.md §References](../reqs/pq_dialogs.done.md)). This doc covers the remaining use case: standalone, portable, Merkle-rooted attestations for export and dispute resolution.
 
 ## What `refs_map_b64` already solves
 
@@ -61,14 +61,14 @@ A standalone snapshot can be **reconstructed** from the `refs_map_b64` chain by 
 
 ## Relationship to other problems
 
-- **Built on**: `sign_hash` from [integrity](./02_integrity.md), `refs_map_b64` from [pq_dialogs.md](../reqs/pq_dialogs.md).
+- **Built on**: `sign_hash` from [integrity](./02_integrity.md), `refs_map_b64` from [pq_dialogs.done.md](../reqs/pq_dialogs.done.md).
 - **Storage channel**: `graph_payload` is always inlined — the snapshot must be self-contained and portable without depending on external blob storage.
 - **Not a consensus mechanism**: snapshots are per-author attestations, not a shared agreement. Two peers can produce divergent snapshots if they observed different tips; comparing them is how divergence is detected.
 
 ## Where this touches existing work
 
 - **Existing mention**: [README](./README.md) — "snapshot of conversation state signed by peer [full graph of message_uuids and sign_hashes]".
-- **Inline snapshots**: [pq_dialogs.md §References](../reqs/pq_dialogs.md) — `refs_map_b64` provides per-message frontier snapshots that handle everyday catch-up and ordering.
+- **Inline snapshots**: [pq_dialogs.done.md §References](../reqs/pq_dialogs.done.md) — `refs_map_b64` provides per-message frontier snapshots that handle everyday catch-up and ordering.
 
 ## Invariants
 

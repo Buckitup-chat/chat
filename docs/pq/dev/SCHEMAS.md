@@ -120,7 +120,7 @@ Stores the complete version history of user storage items, enabling version trac
 
 ## dialog_keys
 
-> **Requirement:** [pq_dialogs.md — §1. dialog_keys](../../reqs/pq_dialogs.md#1-dialog_keys)
+> **Requirement:** [pq_dialogs.done.md — §1. dialog_keys](../../reqs/pq_dialogs.done.md#1-dialog_keys)
 
 Stores dialog key exchange rows. One row per participant per dialog — two rows per dialog in the common case (one per direction). The wrapped `sender_msg_key` lets the peer decrypt all messages authored by this sender.
 
@@ -149,7 +149,7 @@ Stores dialog key exchange rows. One row per participant per dialog — two rows
 
 ## dialog_messages
 
-> **Requirement:** [pq_dialogs.md — §2. dialog_messages](../../reqs/pq_dialogs.md#2-dialog_messages)
+> **Requirement:** [pq_dialogs.done.md — §2. dialog_messages](../../reqs/pq_dialogs.done.md#2-dialog_messages)
 
 Current tip of each dialog message's version chain. Each message is identified by a UUID v7-based `message_id`. Content is a single opaque blob: 12-byte AES-GCM nonce followed by AES-256-GCM ciphertext under `sender_msg_key`.
 
@@ -181,7 +181,7 @@ Current tip of each dialog message's version chain. Each message is identified b
 
 ## dialog_messages_versions
 
-> **Requirement:** [pq_dialogs.md — §2a. dialog_messages_versions](../../reqs/pq_dialogs.md#2a-dialog_messages_versions)
+> **Requirement:** [pq_dialogs.done.md — §2a. dialog_messages_versions](../../reqs/pq_dialogs.done.md#2a-dialog_messages_versions)
 
 Append-only history for `dialog_messages`. On each edit, the superseded tip row is inserted here verbatim; the new tip's `parent_sign_hash` points at this row's `sign_hash`.
 
@@ -212,7 +212,7 @@ Append-only history for `dialog_messages`. On each edit, the superseded tip row 
 
 ## dialog_message_reactions
 
-> **Requirement:** [pq_dialogs.md — §3. dialog_message_reactions](../../reqs/pq_dialogs.md#3-dialog_message_reactions)
+> **Requirement:** [pq_dialogs.done.md — §3. dialog_message_reactions](../../reqs/pq_dialogs.done.md#3-dialog_message_reactions)
 
 Encrypted emoji reactions. Each reaction binds to a specific message version via `message_sign_hash`. The emoji is encrypted under `sender_msg_key`; the `reaction_hash` is a keyed HMAC so observers cannot brute-force the emoji space.
 
@@ -242,7 +242,7 @@ Encrypted emoji reactions. Each reaction binds to a specific message version via
 
 ## dialog_message_receipts
 
-> **Requirement:** [pq_dialogs.md — §4. dialog_message_receipts](../../reqs/pq_dialogs.md#4-dialog_message_receipts)
+> **Requirement:** [pq_dialogs.done.md — §4. dialog_message_receipts](../../reqs/pq_dialogs.done.md#4-dialog_message_receipts)
 
 Plaintext delivery and read receipts. Each receipt binds to a specific message version via `message_sign_hash`. Receipts are irreversible — no `deleted_flag`.
 

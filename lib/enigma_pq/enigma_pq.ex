@@ -7,7 +7,7 @@ defmodule EnigmaPq do
   ## Spec references
 
     - `docs/pq/reqs/pq_user.done.md` — user identity, key generation, certificates
-    - `docs/pq/reqs/pq_dialogs.md` — dialog key derivation, wrapping, message encryption
+    - `docs/pq/reqs/pq_dialogs.done.md` — dialog key derivation, wrapping, message encryption
     - `docs/pq/invariants/09_symmetric_keys.md` — HKDF construction and rationale
     - `docs/pq/invariants/07_content_polymorphism.md` — content blob format
   """
@@ -19,7 +19,7 @@ defmodule EnigmaPq do
 
   # --- Hashing ---
   # Spec: pq_user.done.md §Algorithms — SHA3-512 for user_hash, crypt_cert, contact_cert
-  # Spec: pq_dialogs.md §Identifiers — SHA3-512 for dialog_hash, sign_hash, receipt_hash
+  # Spec: pq_dialogs.done.md §Identifiers — SHA3-512 for dialog_hash, sign_hash, receipt_hash
 
   def hash(data) do
     :crypto.hash(:sha3_512, data)
@@ -63,7 +63,7 @@ defmodule EnigmaPq do
   end
 
   # --- KEM ---
-  # Spec: pq_dialogs.md §Key wrapping — ML-KEM-1024 (FIPS 203)
+  # Spec: pq_dialogs.done.md §Key wrapping — ML-KEM-1024 (FIPS 203)
   # Used for: wrapping sender_msg_key to peer in dialog_keys
 
   def encapsulate_secret(recipient_crypt_pkey) do
@@ -75,7 +75,7 @@ defmodule EnigmaPq do
   end
 
   # --- AES-256-GCM ---
-  # Spec: pq_dialogs.md §Key derivation — AES-256-GCM (NIST SP 800-38D)
+  # Spec: pq_dialogs.done.md §Key derivation — AES-256-GCM (NIST SP 800-38D)
   # Spec: 07_content_polymorphism.md — blob format: nonce(12) || ciphertext || tag(16)
   # Used for: content_b64, refs_map_b64, type_b64, peer_wrapped_msg_key_b64
 
@@ -112,7 +112,7 @@ defmodule EnigmaPq do
 
   # --- HMAC ---
   # Spec: 09_symmetric_keys.md §Construction — HMAC-SHA3-256 as PRF inside HKDF
-  # Spec: pq_dialogs.md §Reaction encryption — HMAC-SHA3-512 for reaction_hash
+  # Spec: pq_dialogs.done.md §Reaction encryption — HMAC-SHA3-512 for reaction_hash
 
   def hmac_sha3_256(key, data) do
     :crypto.mac(:hmac, :sha3_256, key, data)
@@ -124,8 +124,8 @@ defmodule EnigmaPq do
 
   # --- HKDF-SHA3-256 (RFC 5869) ---
   # Spec: 09_symmetric_keys.md — full construction, rationale, and invariants
-  # Spec: pq_dialogs.md §Key derivation — sender_msg_key
-  # Spec: pq_dialogs.md §Key wrapping — wrap_key from KEM shared secret
+  # Spec: pq_dialogs.done.md §Key derivation — sender_msg_key
+  # Spec: pq_dialogs.done.md §Key wrapping — wrap_key from KEM shared secret
 
   @doc """
   HKDF Extract phase: concentrates input keying material into a fixed-length PRK.
@@ -164,7 +164,7 @@ defmodule EnigmaPq do
     - `info`   — context label distinguishing derived keys
     - `length` — output length in bytes (default 32)
 
-  ## Dialog message key (pq_dialogs.md §Key derivation)
+  ## Dialog message key (pq_dialogs.done.md §Key derivation)
 
       ikm  = sign_skey <> crypt_skey <> peer_user_hash
       salt = "buckitup/dialog-mk/v1"
@@ -173,7 +173,7 @@ defmodule EnigmaPq do
       sender_msg_key = EnigmaPq.hkdf_derive(ikm, salt, info)
       # => <<32 bytes>> — used for AES-256-GCM and HMAC in this dialog direction
 
-  ## Dialog wrap key (pq_dialogs.md §Key wrapping)
+  ## Dialog wrap key (pq_dialogs.done.md §Key wrapping)
 
       {shared_secret, kem_ciphertext} = EnigmaPq.encapsulate_secret(peer_crypt_pkey)
 

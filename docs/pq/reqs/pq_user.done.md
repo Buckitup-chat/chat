@@ -3,7 +3,7 @@
 Users are identified by a post-quantum keypair they generate locally. There is no registration — a user proves identity by signing a challenge with their `sign_skey`. The server only stores public keys.
 
 Once registered, users can:
-- Store arbitrary encrypted data — see [pq_user_storage.md](./pq_user_storage.md)
+- Store arbitrary encrypted data — see [pq_user_storage.done.md](./pq_user_storage.done.md)
 - Communicate with other users — see [pq_dialogs.md](./pq_dialogs.md)
 
 Secret keys never leave the Frontend. If the server is compromised, it holds no private keys and no plaintext data.

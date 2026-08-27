@@ -22,13 +22,13 @@ Under multi-peer sync with last-write-wins, a single row cannot preserve authors
 
 Because `sign_b64` signs `parent_sign_hash`, the chain is tamper-evident: rewriting any historical version breaks all descendants' signatures. The master row always points into the versions table via a foreign key on `parent_sign_hash`.
 
-Encoding: `sign_hash` is an "uss_"-prefixed hex string for user-storage entities (see [pq_user_storage.md §7.3](../reqs/pq_user_storage.md)).
+Encoding: `sign_hash` is an "uss_"-prefixed hex string for user-storage entities (see [pq_user_storage.done.md §7.3](../reqs/pq_user_storage.done.md)).
 
 ## Where this lives
 
 - **Tables**: `user_storage`, `user_storage_versions` — [SCHEMAS.md](../dev/SCHEMAS.md)
 - **Version semantics**: [SCHEMAS.md §Version History Model](../dev/SCHEMAS.md)
-- **Write path**: [pq_user_storage.md §5.2](../reqs/pq_user_storage.md)
+- **Write path**: [pq_user_storage.done.md §5.2](../reqs/pq_user_storage.done.md)
 - **Ingestion model ownership**: [Electric_Abstraction_Layer.md](../electric/Electric_Abstraction_Layer.md) (`UserStorage` has parent-existence checks)
 
 ## Invariants

@@ -25,7 +25,7 @@ The PoP context is resolved once per request and shared across all mutations in 
 ## Where this lives
 
 - **Protocol spec**: [electric-proof-of-possesion.md](../reqs/electric-proof-of-possesion.md)
-- **User-side application of PoP**: [pq_user_storage.md §4.2](../reqs/pq_user_storage.md)
+- **User-side application of PoP**: [pq_user_storage.done.md §4.2](../reqs/pq_user_storage.done.md)
 - **Ingest controller**: `lib/chat_web/controllers/electric_controller.ex` (`ingest/2` — batched; `ingest_each/2` — per-mutation transactions, same PoP context)
 - **Abstraction layer context**: [Electric_Abstraction_Layer.md](../electric/Electric_Abstraction_Layer.md) — PoP runs *before* per-model `authorize/2`
 

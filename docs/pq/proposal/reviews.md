@@ -27,7 +27,7 @@ The origin identity (not the owner) should be able to:
 - **`to_origin` is not a feature**: because the origin is a `user_cards` identity, a `to_origin` review is a plain dialog message to the origin's `user_hash`. No schema, no shape, no validation, no moderation path — nothing to build beyond a UI entry point. See [to_origin](#to_origin).
 - **Passwords vs reviews**: passwords as access layer. Prevent deletion as much as possible.
 - **Ingest via candidates**: all *author-submitted* `review_public_passwords` entries flow through `review_password_candidate` — the server validates and promotes. The author cannot ingest into `review_public_passwords` directly. The origin identity can insert a row it decrypted from a right envelope (to publish or revoke) — see Moderation section.
-- **Origin key management**: origin keypairs are independently generated on the client (not derived from owner keys), stored client-side in the owner's identity, same pattern as regular user keys (see `pq_user.md`). Multi-device access via User Storage (encrypted skeys stored server-side, decryptable by the owner).
+- **Origin key management**: origin keypairs are independently generated on the client (not derived from owner keys), stored client-side in the owner's identity, same pattern as regular user keys (see `pq_user.done.md`). Multi-device access via User Storage (encrypted skeys stored server-side, decryptable by the owner).
 - **Origin creation**: three-step flow — create owner `user_cards` (if not exists) → generate and insert origin `user_cards` row → insert `origin` row with `owner_cert` linking the two (see Origin creation section).
 
 ## Three entities
@@ -62,7 +62,7 @@ The origin identity is separate from the owner's personal identity. One user can
 
 ### Origin creation
 
-Three-step flow following the same pattern as user creation (see `pq_user.md`):
+Three-step flow following the same pattern as user creation (see `pq_user.done.md`):
 
 1. **Owner exists** — the creating user already has their own `user_cards` row
 2. **Generate origin identity** — client generates independent ML-DSA-87 + ML-KEM-1024 keypairs for the origin, inserts a new `user_cards` row (self-signed by the origin's own `sign_skey`)

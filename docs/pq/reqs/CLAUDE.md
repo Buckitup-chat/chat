@@ -4,15 +4,20 @@ Semantically grouped requirements for PostgreSQL-related features.
 
 ## Structure
 
-Each document lives in a subfolder by topic and carries a status suffix:
+Every requirement file **must** carry a status suffix:
+
+```
+<name>.<status>.md
+```
+
+Files **may** be organized into `<topic>/` subfolders, but this is optional:
 
 ```
 pq/reqs/
+  <name>.<status>.md          # flat — fine
   <topic>/
-    <name>.<status>.md
+    <name>.<status>.md         # grouped — also fine
 ```
-
-Existing files here predate this convention and haven't been moved into `<topic>/` subfolders yet.
 
 ## Status Lifecycle
 

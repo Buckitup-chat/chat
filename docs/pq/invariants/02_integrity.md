@@ -59,7 +59,7 @@ Trust bootstrap:
 
 ## Where this lives
 
-- **Field-level schema + algorithms**: [pq_user.md](../reqs/pq_user.md)
+- **Field-level schema + algorithms**: [pq_user.done.md](../reqs/pq_user.done.md)
 - **Storage row integrity**: [pq_user_storage.md §3.1 / §5.2](../reqs/pq_user_storage.md) (`sign_hash`, `sign_b64`)
 - **Table layout**: [SCHEMAS.md](../dev/SCHEMAS.md) — `user_cards` is the canonical example; `sign_b64`, `owner_timestamp`, `deleted_flag` all listed as `NOT NULL`.
 - **Reference schema modules**: `Chat.Data.Schemas.UserCard`, `Chat.Data.Schemas.File`, `Chat.Data.Schemas.FileChunk` — `Signable` impl drops only `sign_b64` (and derived fields like `sign_hash`) and `__meta__`, so every other field is covered by the signature.

@@ -1,6 +1,6 @@
 # Post-Quantum Dialog
 
-A dialog is a two-party conversation between users identified by `user_hash` (see `pq_user.md`). Each side independently authors messages encrypted under a per-author message key. The key is derived deterministically from the author's private material plus the peer's identity, so any of the author's devices can re-derive it without a device registry and without re-running a handshake.
+A dialog is a two-party conversation between users identified by `user_hash` (see `pq_user.done.md`). Each side independently authors messages encrypted under a per-author message key. The key is derived deterministically from the author's private material plus the peer's identity, so any of the author's devices can re-derive it without a device registry and without re-running a handshake.
 
 ## Goals
 
@@ -607,7 +607,7 @@ Self-authenticating per [02_integrity.md](../invariants/02_integrity.md): `sign_
 
 ### Author on a new device
 
-1. Device has the author's `sign_skey`, `crypt_skey` (from User Identity, per `pq_user.md`).
+1. Device has the author's `sign_skey`, `crypt_skey` (from User Identity, per `pq_user.done.md`).
 2. Re-derive `sender_msg_key` — same value as on any other device.
 3. Can read own past messages by re-deriving `sender_msg_key` from private keys (deterministic derivation).
 4. To write: no new `dialog_keys` row needed (one already exists for `(dialog_hash, sender_hash)`); proceed to insert `dialog_messages`.

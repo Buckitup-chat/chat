@@ -6,7 +6,7 @@ defmodule EnigmaPq do
 
   ## Spec references
 
-    - `docs/pq/reqs/pq_user.md` — user identity, key generation, certificates
+    - `docs/pq/reqs/pq_user.done.md` — user identity, key generation, certificates
     - `docs/pq/reqs/pq_dialogs.md` — dialog key derivation, wrapping, message encryption
     - `docs/pq/invariants/09_symmetric_keys.md` — HKDF construction and rationale
     - `docs/pq/invariants/07_content_polymorphism.md` — content blob format
@@ -18,7 +18,7 @@ defmodule EnigmaPq do
   @hkdf_hash_len 32
 
   # --- Hashing ---
-  # Spec: pq_user.md §Algorithms — SHA3-512 for user_hash, crypt_cert, contact_cert
+  # Spec: pq_user.done.md §Algorithms — SHA3-512 for user_hash, crypt_cert, contact_cert
   # Spec: pq_dialogs.md §Identifiers — SHA3-512 for dialog_hash, sign_hash, receipt_hash
 
   def hash(data) do
@@ -26,7 +26,7 @@ defmodule EnigmaPq do
   end
 
   # --- Identity & key generation ---
-  # Spec: pq_user.md §User creation
+  # Spec: pq_user.done.md §User creation
 
   def generate_identity do
     {sign_pkey, sign_skey} = generate_sign_keypair()
@@ -40,18 +40,18 @@ defmodule EnigmaPq do
     }
   end
 
-  # Spec: pq_user.md §Algorithms — ML-DSA-87 (FIPS 204)
+  # Spec: pq_user.done.md §Algorithms — ML-DSA-87 (FIPS 204)
   def generate_sign_keypair do
     :crypto.generate_key(:mldsa87, [])
   end
 
-  # Spec: pq_user.md §Algorithms — ML-KEM-1024 (FIPS 203)
+  # Spec: pq_user.done.md §Algorithms — ML-KEM-1024 (FIPS 203)
   def generate_crypt_keypair do
     :crypto.generate_key(:mlkem1024, [])
   end
 
   # --- Signing ---
-  # Spec: pq_user.md §Algorithms — ML-DSA-87 (FIPS 204)
+  # Spec: pq_user.done.md §Algorithms — ML-DSA-87 (FIPS 204)
   # Used for: crypt_cert, contact_cert, sign_b64 on all PQ tables
 
   def sign(data, sign_skey) do

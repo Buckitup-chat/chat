@@ -4,7 +4,7 @@
 
 User Storage is a user-scoped key-value storage system that provides encrypted, per-user data persistence synchronized via Electric shapes. The system enables authenticated users to store arbitrary encrypted data accessible through a public read, authenticated write model.
 
-**Schema Definition**: See [pq_user.md](./pq_user.md) for complete schema details.
+**Schema Definition**: See [pq_user.done.md](./pq_user.done.md) for complete schema details.
 
 ## 2. Core Concepts
 
@@ -214,7 +214,7 @@ All write operations (create, update, delete) use the centralized ingest endpoin
 - Table must be added to `electric_publication_default`
 - Enables Electric replication
 
-For complete schema definition, see [pq_user.md](./pq_user.md).
+For complete schema definition, see [pq_user.done.md](./pq_user.done.md).
 
 ## 7. Implementation Details
 
@@ -286,7 +286,7 @@ Add `user_storage` table to Electric publication following the pattern from migr
 - [Phoenix Integration Guide](https://electric-sql.com/docs/integrations/phoenix) - Electric + Phoenix setup
 
 ### 9.2 Related Specifications
-- [pq_user.md](./pq_user.md) - User Storage schema definition
+- [pq_user.done.md](./pq_user.done.md) - User Storage schema definition
 - [electric-proof-of-possesion.md](./electric-proof-of-possesion.md) - PoP authentication protocol
 - UserCard implementation - Reference pattern for this feature
 

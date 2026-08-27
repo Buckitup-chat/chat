@@ -17,7 +17,7 @@ This document describes the current database schema for the Chat application.
 
 ## user_cards
 
-> **Requirement:** [pq_user.md — User Card](../../reqs/pq_user.md#user-card)
+> **Requirement:** [pq_user.done.md — User Card](../../reqs/pq_user.done.md#user-card)
 
 Stores user identity cards with cryptographic keys and contact information.
 
@@ -49,7 +49,7 @@ Stores user identity cards with cryptographic keys and contact information.
 
 ## user_storage
 
-> **Requirement:** [pq_user.md — User Storage](../../reqs/pq_user.md#user-storage)
+> **Requirement:** [pq_user.done.md — User Storage](../../reqs/pq_user.done.md#user-storage)
 
 Stores the current/latest version of user storage items (key-value pairs).
 
@@ -85,7 +85,7 @@ Stores the current/latest version of user storage items (key-value pairs).
 
 ## user_storage_versions
 
-> **Requirement:** [pq_user.md — User Storage](../../reqs/pq_user.md#user-storage)
+> **Requirement:** [pq_user.done.md — User Storage](../../reqs/pq_user.done.md#user-storage)
 
 Stores the complete version history of user storage items, enabling version tracking and conflict resolution.
 

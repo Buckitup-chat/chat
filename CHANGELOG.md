@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
+### Changed
+
+- Post-quantum specs: status tracking for user, user storage, dialogs (done), and reviews (in progress)
+
+### Fixed
+
+- Post-quantum dialogs: sandbox reaction removal
+
 ## 2026-08-21_89d5031\_\_\_2026-08-22_5db0a84b\_\_\_2026-08-14_6dc11df
 
 ### Added

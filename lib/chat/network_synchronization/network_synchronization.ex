@@ -2,7 +2,7 @@ defmodule Chat.NetworkSynchronization do
   @moduledoc "Network synchronisation"
 
   alias Chat.NetworkSynchronization.Electric.DeferredStore
-  alias Chat.NetworkSynchronization.Electric.PeerSync
+  alias Chat.NetworkSynchronization.Electric.PeerConnector
   alias Chat.NetworkSynchronization.Source
   alias Chat.NetworkSynchronization.Store
   alias Chat.NetworkSynchronization.Worker
@@ -20,9 +20,30 @@ defmodule Chat.NetworkSynchronization do
   def remove_source(id), do: id |> cast_source() |> Store.delete_source()
 
   def update_source(id, fields) do
-    cast_source(id)
+    id
+    |> cast_source()
     |> merge_sanitised_fields(fields)
     |> Store.update_source()
+  end
+
+  defp merge_sanitised_fields(source, fields) do
+    fields
+    |> Keyword.take([:url, :cooldown_hours])
+    |> Enum.map(fn
+      {:url, string} when is_binary(string) ->
+        if String.valid?(string), do: {:url, string}, else: nil
+
+      {:cooldown_hours, string} ->
+        case Integer.parse(string) do
+          {int, ""} -> {:cooldown_hours, max(1, int)}
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> then(&struct(source, &1))
   end
 
   def update_status(source, status) do
@@ -32,6 +53,18 @@ defmodule Chat.NetworkSynchronization do
     broadcast_status_update(id, status)
   end
 
+  defp get_id(id) when is_integer(id), do: id
+  defp get_id(source), do: source.id
+
+  defp broadcast_status_update(id, status) do
+    :ok =
+      PubSub.broadcast!(
+        Chat.PubSub,
+        notification_topic(),
+        {:admin, {:network_source_status, id, status}}
+      )
+  end
+
   def notification_topic, do: "chat::NetworkSynchronization"
 
   def monotonic_ms, do: System.monotonic_time(:millisecond)
@@ -39,6 +72,12 @@ defmodule Chat.NetworkSynchronization do
   def init_workers do
     synchronisation()
     |> started_workers_for_started_sources()
+  end
+
+  defp started_workers_for_started_sources(list) do
+    list
+    |> Enum.filter(&match?({%{started?: true}, nil}, &1))
+    |> Enum.each(fn {source, _} -> start_worker(source, true) end)
   end
 
   def init_electric_peers do
@@ -92,26 +131,6 @@ defmodule Chat.NetworkSynchronization do
 
   defp cast_source(id), do: Source.new(id)
 
-  defp merge_sanitised_fields(source, fields) do
-    fields
-    |> Keyword.take([:url, :cooldown_hours])
-    |> Enum.map(fn
-      {:url, string} when is_binary(string) ->
-        if String.valid?(string), do: {:url, string}, else: nil
-
-      {:cooldown_hours, string} ->
-        case Integer.parse(string) do
-          {int, ""} -> {:cooldown_hours, max(1, int)}
-          _ -> nil
-        end
-
-      _ ->
-        nil
-    end)
-    |> Enum.reject(&is_nil/1)
-    |> then(&struct(source, &1))
-  end
-
   defp find_source_by_id(id) do
     {source, _} =
       synchronisation()
@@ -120,37 +139,17 @@ defmodule Chat.NetworkSynchronization do
     source
   end
 
-  defp get_id(source) do
-    if is_integer(source),
-      do: source,
-      else: source.id
-  end
-
-  defp broadcast_status_update(id, status) do
-    :ok =
-      PubSub.broadcast!(
-        Chat.PubSub,
-        notification_topic(),
-        {:admin, {:network_source_status, id, status}}
-      )
-  end
-
-  defp started_workers_for_started_sources(list) do
-    list
-    |> Enum.filter(&match?({%{started?: true}, nil}, &1))
-    |> Enum.each(fn {source, _} -> start_worker(source, true) end)
-  end
-
   # Electric peer management
 
   def add_electric_peer(peer_url) do
     DynamicSupervisor.start_child(
       @electric_dynamic,
-      {PeerSync, peer_url: peer_url, name: electric_via(peer_url)}
+      {PeerConnector, peer_url: peer_url, name: electric_via(peer_url)}
     )
-    |> tap(fn _ ->
-      notify_sync_source_peer_connected(peer_url)
-    end)
+  end
+
+  defp electric_via(peer_url) do
+    {:via, Registry, {@electric_registry, peer_url}}
   end
 
   def remove_electric_peer(peer_url) do
@@ -158,7 +157,7 @@ defmodule Chat.NetworkSynchronization do
       [{pid, _}] ->
         DeferredStore.purge_peer(peer_url)
         notify_sync_source_peer_disconnected(peer_url)
-        DynamicSupervisor.terminate_child(@electric_dynamic, pid)
+        PeerConnector.disconnect(pid)
 
       [] ->
         {:error, :not_found}
@@ -169,7 +168,8 @@ defmodule Chat.NetworkSynchronization do
     Registry.select(@electric_registry, [{{:"$1", :_, :_}, [], [:"$1"]}])
   end
 
-  defp notify_sync_source_peer_connected(peer_url) do
+  @doc false
+  def notify_sync_source_peer_connected(peer_url) do
     alias Chat.Data.File.SyncSource
 
     if drive_id = safe_active_drive_id() do
@@ -191,10 +191,6 @@ defmodule Chat.NetworkSynchronization do
     _ -> nil
   end
 
-  defp electric_via(peer_url) do
-    {:via, Registry, {@electric_registry, peer_url}}
-  end
-
   # Supervision
 
   defp start_worker(source, deferred? \\ false) do
@@ -205,12 +201,12 @@ defmodule Chat.NetworkSynchronization do
       )
   end
 
+  defp via_name(id) do
+    {:via, Registry, {@registry, id}}
+  end
+
   defp stop_worker(id) do
     [{pid, _}] = Registry.lookup(@registry, id)
     DynamicSupervisor.terminate_child(@dynamic_supervisor, pid)
-  end
-
-  defp via_name(id) do
-    {:via, Registry, {@registry, id}}
   end
 end

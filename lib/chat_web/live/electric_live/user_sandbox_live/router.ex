@@ -13,24 +13,12 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
 
     case ApiClient.create_user(name, base_url) do
       {:ok, %{user: user_data, log_entries: log_entries}} ->
-        socket =
-          socket
-          |> assign(user: user_data, storage_items: [])
-          |> update(:request_log, &(&1 ++ log_entries))
-          |> assign(operation_in_progress: false, error_message: nil)
-
-        {:noreply, socket}
+        socket
+        |> assign(user: user_data, storage_items: [])
+        |> finish_operation(log_entries)
 
       {:error, %{reason: reason, log_entries: log_entries}} ->
-        socket =
-          socket
-          |> update(:request_log, &(&1 ++ log_entries))
-          |> assign(
-            operation_in_progress: false,
-            error_message: "Failed to create user: #{reason}"
-          )
-
-        {:noreply, socket}
+        fail_operation(socket, log_entries, "Failed to create user: #{reason}")
     end
   end
 
@@ -43,24 +31,12 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
       {:ok, %{log_entries: log_entries}} ->
         updated_user = %{user | name: new_name, owner_timestamp: user.owner_timestamp + 1}
 
-        socket =
-          socket
-          |> assign(:user, updated_user)
-          |> update(:request_log, &(&1 ++ log_entries))
-          |> assign(operation_in_progress: false, error_message: nil)
-
-        {:noreply, socket}
+        socket
+        |> assign(:user, updated_user)
+        |> finish_operation(log_entries)
 
       {:error, %{reason: reason, log_entries: log_entries}} ->
-        socket =
-          socket
-          |> update(:request_log, &(&1 ++ log_entries))
-          |> assign(
-            operation_in_progress: false,
-            error_message: "Failed to update name: #{reason}"
-          )
-
-        {:noreply, socket}
+        fail_operation(socket, log_entries, "Failed to update name: #{reason}")
     end
   end
 
@@ -71,24 +47,12 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
 
     case ApiClient.delete_user(user.user_hash, user.sign_skey, base_url) do
       {:ok, %{log_entries: log_entries}} ->
-        socket =
-          socket
-          |> assign(user: nil, storage_items: [])
-          |> update(:request_log, &(&1 ++ log_entries))
-          |> assign(operation_in_progress: false, error_message: nil)
-
-        {:noreply, socket}
+        socket
+        |> assign(user: nil, storage_items: [])
+        |> finish_operation(log_entries)
 
       {:error, %{reason: reason, log_entries: log_entries}} ->
-        socket =
-          socket
-          |> update(:request_log, &(&1 ++ log_entries))
-          |> assign(
-            operation_in_progress: false,
-            error_message: "Failed to delete user: #{reason}"
-          )
-
-        {:noreply, socket}
+        fail_operation(socket, log_entries, "Failed to delete user: #{reason}")
     end
   end
 
@@ -112,13 +76,11 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
     {:noreply, assign(socket, viewing_storage_uuid: nil)}
   end
 
-  def handle_event("create_storage", params, socket) do
-    %{"size" => size_str, "label" => label} = params
-    uuid = Map.get(params, "uuid", "")
+  def handle_event("create_storage", %{"size" => size_str, "label" => label} = params, socket) do
     base_url = public_url(socket)
     user = socket.assigns.user
 
-    uuid = if uuid == "", do: Ecto.UUID.generate(), else: uuid
+    uuid = params |> Map.get("uuid", "") |> then(&if(&1 == "", do: Ecto.UUID.generate(), else: &1))
     size = String.to_integer(size_str)
     value_b64 = generate_storage_value(size)
     value_binary = Base.decode64!(value_b64)
@@ -134,25 +96,13 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
           label: if(label == "", do: nil, else: label)
         }
 
-        socket =
-          socket
-          |> update(:storage_items, &[new_item | &1])
-          |> assign(:show_storage_form, false)
-          |> update(:request_log, &(&1 ++ log_entries))
-          |> assign(operation_in_progress: false, error_message: nil)
-
-        {:noreply, socket}
+        socket
+        |> update(:storage_items, &[new_item | &1])
+        |> assign(:show_storage_form, false)
+        |> finish_operation(log_entries)
 
       {:error, %{reason: reason, log_entries: log_entries}} ->
-        socket =
-          socket
-          |> update(:request_log, &(&1 ++ log_entries))
-          |> assign(
-            operation_in_progress: false,
-            error_message: "Failed to create storage: #{reason}"
-          )
-
-        {:noreply, socket}
+        fail_operation(socket, log_entries, "Failed to create storage: #{reason}")
     end
   end
 
@@ -173,28 +123,16 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
       {:ok, %{log_entries: log_entries}} ->
         updated_label = if(label == "", do: nil, else: label)
 
-        socket =
-          socket
-          |> update(
-            :storage_items,
-            &update_storage_item(&1, uuid, value_b64, size, updated_label)
-          )
-          |> assign(show_storage_form: false, editing_storage_uuid: nil)
-          |> update(:request_log, &(&1 ++ log_entries))
-          |> assign(operation_in_progress: false, error_message: nil)
-
-        {:noreply, socket}
+        socket
+        |> update(
+          :storage_items,
+          &update_storage_item(&1, uuid, value_b64, size, updated_label)
+        )
+        |> assign(show_storage_form: false, editing_storage_uuid: nil)
+        |> finish_operation(log_entries)
 
       {:error, %{reason: reason, log_entries: log_entries}} ->
-        socket =
-          socket
-          |> update(:request_log, &(&1 ++ log_entries))
-          |> assign(
-            operation_in_progress: false,
-            error_message: "Failed to update storage: #{reason}"
-          )
-
-        {:noreply, socket}
+        fail_operation(socket, log_entries, "Failed to update storage: #{reason}")
     end
   end
 
@@ -205,24 +143,12 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
 
     case ApiClient.delete_storage(user.user_hash, user.sign_skey, uuid, base_url) do
       {:ok, %{log_entries: log_entries}} ->
-        socket =
-          socket
-          |> update(:storage_items, &Enum.reject(&1, fn item -> item.uuid == uuid end))
-          |> update(:request_log, &(&1 ++ log_entries))
-          |> assign(operation_in_progress: false, error_message: nil)
-
-        {:noreply, socket}
+        socket
+        |> update(:storage_items, &Enum.reject(&1, fn item -> item.uuid == uuid end))
+        |> finish_operation(log_entries)
 
       {:error, %{reason: reason, log_entries: log_entries}} ->
-        socket =
-          socket
-          |> update(:request_log, &(&1 ++ log_entries))
-          |> assign(
-            operation_in_progress: false,
-            error_message: "Failed to delete storage: #{reason}"
-          )
-
-        {:noreply, socket}
+        fail_operation(socket, log_entries, "Failed to delete storage: #{reason}")
     end
   end
 
@@ -260,6 +186,8 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
   def handle_event("validate_key_file", _params, socket), do: {:noreply, socket}
 
   def handle_event("import_keys", _params, socket) do
+    base_url = public_url(socket)
+
     [result] =
       consume_uploaded_entries(socket, :key_file, fn %{path: path}, _entry ->
         {:ok, File.read!(path)}
@@ -268,13 +196,38 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
     socket =
       case Identity.parse_and_validate(result) do
         {:ok, user_data} ->
-          assign(socket, user: user_data, storage_items: [], error_message: nil)
+          socket = assign(socket, user: user_data, storage_items: [], error_message: nil)
+          try_ingest_imported_user(socket, user_data, base_url)
 
         {:error, reason} ->
           assign(socket, :error_message, "Import failed: #{reason}")
       end
 
     {:noreply, socket}
+  end
+
+  defp finish_operation(socket, log_entries) do
+    socket
+    |> update(:request_log, &(&1 ++ log_entries))
+    |> assign(operation_in_progress: false, error_message: nil)
+    |> then(&{:noreply, &1})
+  end
+
+  defp fail_operation(socket, log_entries, message) do
+    socket
+    |> update(:request_log, &(&1 ++ log_entries))
+    |> assign(operation_in_progress: false, error_message: message)
+    |> then(&{:noreply, &1})
+  end
+
+  defp try_ingest_imported_user(socket, user_data, base_url) do
+    log_entries =
+      case ApiClient.ingest_imported_user(user_data, base_url) do
+        {:ok, %{log_entries: entries}} -> entries
+        {:error, %{log_entries: entries}} -> entries
+      end
+
+    update(socket, :request_log, &(&1 ++ log_entries))
   end
 
   defp update_storage_item(items, uuid, value_b64, size, label) do

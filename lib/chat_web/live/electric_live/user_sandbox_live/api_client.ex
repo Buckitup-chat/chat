@@ -19,11 +19,8 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   - `{:error, %{reason: reason, log_entries: [log_entry, ...]}}`
   """
   def create_user(name, base_url) do
-    # Generate PQ identity and extract card
     identity = User.generate_pq_identity(name)
     card = User.extract_pq_card(identity)
-
-    # Step 1: Get challenge
     challenge_url = base_url <> "/electric/v1/challenge"
 
     with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
@@ -106,21 +103,18 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   def delete_user(user_hash, sign_skey, base_url) do
     challenge_url = base_url <> "/electric/v1/challenge"
 
-    # Fetch current user card to get current timestamp
-    repo = Db.repo()
-    existing_card = repo.get(UserCard, user_hash)
+    case Db.repo().get(UserCard, user_hash) do
+      nil ->
+        {:error, %{reason: "User not found", log_entries: []}}
 
-    if is_nil(existing_card) do
-      {:error, %{reason: "User not found", log_entries: []}}
-    else
-      delete_user_with_card(existing_card, user_hash, sign_skey, base_url, challenge_url)
+      existing_card ->
+        delete_user_with_card(existing_card, user_hash, sign_skey, base_url, challenge_url)
     end
   end
 
   defp delete_user_with_card(existing_card, user_hash, sign_skey, base_url, challenge_url) do
     new_timestamp = existing_card.owner_timestamp + 1
 
-    # Create updated card with deleted_flag=true for signing
     updated_card_struct =
       existing_card
       |> Map.put(:deleted_flag, true)
@@ -173,7 +167,6 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
     challenge_url = base_url <> "/electric/v1/challenge"
     owner_timestamp = Chat.TimeKeeper.now_unix()
 
-    # Create storage struct for signing
     storage_attrs = %{
       user_hash: user_hash,
       uuid: uuid,
@@ -235,66 +228,69 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   def update_storage(user_hash, sign_skey, uuid, value_binary, base_url) do
     challenge_url = base_url <> "/electric/v1/challenge"
 
-    # Fetch existing storage to get current timestamp and sign_hash for parent reference
-    repo = Db.repo()
-    existing = repo.get_by(UserStorage, user_hash: user_hash, uuid: uuid)
+    case Db.repo().get_by(UserStorage, user_hash: user_hash, uuid: uuid) do
+      nil ->
+        {:error, %{reason: "Storage entry not found", log_entries: []}}
 
-    if is_nil(existing) do
-      {:error, %{reason: "Storage entry not found", log_entries: []}}
-    else
-      owner_timestamp = existing.owner_timestamp + 1
-      parent_sign_hash = existing.sign_hash
+      existing ->
+        update_existing_storage(
+          existing, user_hash, sign_skey, uuid, value_binary, base_url, challenge_url
+        )
+    end
+  end
 
-      # Create storage struct for signing
-      storage_attrs = %{
-        user_hash: user_hash,
-        uuid: uuid,
-        value_b64: value_binary,
-        deleted_flag: false,
-        parent_sign_hash: parent_sign_hash,
-        owner_timestamp: owner_timestamp
-      }
+  defp update_existing_storage(existing, user_hash, sign_skey, uuid, value_binary, base_url, challenge_url) do
+    owner_timestamp = existing.owner_timestamp + 1
+    parent_sign_hash = existing.sign_hash
 
-      storage_struct = struct(UserStorage, storage_attrs)
-      sign_payload = Integrity.signature_payload(storage_struct)
-      sign_b64 = :crypto.sign(:mldsa87, :none, sign_payload, sign_skey)
+    storage_attrs = %{
+      user_hash: user_hash,
+      uuid: uuid,
+      value_b64: value_binary,
+      deleted_flag: false,
+      parent_sign_hash: parent_sign_hash,
+      owner_timestamp: owner_timestamp
+    }
 
-      sign_hash =
-        sign_b64
-        |> EnigmaPq.hash()
-        |> UserStorageSignHash.from_binary()
+    storage_struct = struct(UserStorage, storage_attrs)
+    sign_payload = Integrity.signature_payload(storage_struct)
+    sign_b64 = :crypto.sign(:mldsa87, :none, sign_payload, sign_skey)
 
-      payload = %{
-        "mutations" => [
-          %{
-            "type" => "update",
-            "original" => %{
-              "user_hash" => user_hash,
-              "uuid" => uuid
-            },
-            "changes" => %{
-              "value_b64" => encode_base64(value_binary),
-              "deleted_flag" => false,
-              "parent_sign_hash" => parent_sign_hash,
-              "owner_timestamp" => owner_timestamp,
-              "sign_b64" => encode_base64(sign_b64),
-              "sign_hash" => sign_hash
-            },
-            "syncMetadata" => %{
-              "relation" => "user_storage"
-            }
+    sign_hash =
+      sign_b64
+      |> EnigmaPq.hash()
+      |> UserStorageSignHash.from_binary()
+
+    payload = %{
+      "mutations" => [
+        %{
+          "type" => "update",
+          "original" => %{
+            "user_hash" => user_hash,
+            "uuid" => uuid
+          },
+          "changes" => %{
+            "value_b64" => encode_base64(value_binary),
+            "deleted_flag" => false,
+            "parent_sign_hash" => parent_sign_hash,
+            "owner_timestamp" => owner_timestamp,
+            "sign_b64" => encode_base64(sign_b64),
+            "sign_hash" => sign_hash
+          },
+          "syncMetadata" => %{
+            "relation" => "user_storage"
           }
-        ]
-      }
+        }
+      ]
+    }
 
-      with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
-           {:ok, ingest_resp, ingest_log} <-
-             post_ingest(challenge_resp, payload, sign_skey, base_url) do
-        {:ok, %{txid: ingest_resp["txid"], log_entries: [challenge_log, ingest_log]}}
-      else
-        {:error, reason, log_entries} ->
-          {:error, %{reason: reason, log_entries: log_entries}}
-      end
+    with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
+         {:ok, ingest_resp, ingest_log} <-
+           post_ingest(challenge_resp, payload, sign_skey, base_url) do
+      {:ok, %{txid: ingest_resp["txid"], log_entries: [challenge_log, ingest_log]}}
+    else
+      {:error, reason, log_entries} ->
+        {:error, %{reason: reason, log_entries: log_entries}}
     end
   end
 
@@ -308,65 +304,108 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   def delete_storage(user_hash, sign_skey, uuid, base_url) do
     challenge_url = base_url <> "/electric/v1/challenge"
 
-    # Fetch existing storage to get current timestamp and sign_hash for parent reference
-    repo = Db.repo()
-    existing = repo.get_by(UserStorage, user_hash: user_hash, uuid: uuid)
+    case Db.repo().get_by(UserStorage, user_hash: user_hash, uuid: uuid) do
+      nil ->
+        {:error, %{reason: "Storage entry not found", log_entries: []}}
 
-    if is_nil(existing) do
-      {:error, %{reason: "Storage entry not found", log_entries: []}}
-    else
-      owner_timestamp = existing.owner_timestamp + 1
-      parent_sign_hash = existing.sign_hash
+      existing ->
+        delete_existing_storage(existing, user_hash, sign_skey, uuid, base_url, challenge_url)
+    end
+  end
 
-      # Create storage struct for signing with deleted_flag=true
-      storage_attrs = %{
-        user_hash: user_hash,
-        uuid: uuid,
-        value_b64: existing.value_b64,
-        deleted_flag: true,
-        parent_sign_hash: parent_sign_hash,
-        owner_timestamp: owner_timestamp
-      }
+  defp delete_existing_storage(existing, user_hash, sign_skey, uuid, base_url, challenge_url) do
+    owner_timestamp = existing.owner_timestamp + 1
+    parent_sign_hash = existing.sign_hash
 
-      storage_struct = struct(UserStorage, storage_attrs)
-      sign_payload = Integrity.signature_payload(storage_struct)
-      sign_b64 = :crypto.sign(:mldsa87, :none, sign_payload, sign_skey)
+    storage_attrs = %{
+      user_hash: user_hash,
+      uuid: uuid,
+      value_b64: existing.value_b64,
+      deleted_flag: true,
+      parent_sign_hash: parent_sign_hash,
+      owner_timestamp: owner_timestamp
+    }
 
-      sign_hash =
-        sign_b64
-        |> EnigmaPq.hash()
-        |> UserStorageSignHash.from_binary()
+    storage_struct = struct(UserStorage, storage_attrs)
+    sign_payload = Integrity.signature_payload(storage_struct)
+    sign_b64 = :crypto.sign(:mldsa87, :none, sign_payload, sign_skey)
 
-      payload = %{
-        "mutations" => [
-          %{
-            "type" => "update",
-            "original" => %{
-              "user_hash" => user_hash,
-              "uuid" => uuid
-            },
-            "changes" => %{
-              "deleted_flag" => true,
-              "parent_sign_hash" => parent_sign_hash,
-              "owner_timestamp" => owner_timestamp,
-              "sign_b64" => encode_base64(sign_b64),
-              "sign_hash" => sign_hash
-            },
-            "syncMetadata" => %{
-              "relation" => "user_storage"
-            }
+    sign_hash =
+      sign_b64
+      |> EnigmaPq.hash()
+      |> UserStorageSignHash.from_binary()
+
+    payload = %{
+      "mutations" => [
+        %{
+          "type" => "update",
+          "original" => %{
+            "user_hash" => user_hash,
+            "uuid" => uuid
+          },
+          "changes" => %{
+            "deleted_flag" => true,
+            "parent_sign_hash" => parent_sign_hash,
+            "owner_timestamp" => owner_timestamp,
+            "sign_b64" => encode_base64(sign_b64),
+            "sign_hash" => sign_hash
+          },
+          "syncMetadata" => %{
+            "relation" => "user_storage"
           }
-        ]
-      }
+        }
+      ]
+    }
 
-      with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
-           {:ok, _ingest_resp, ingest_log} <-
-             post_ingest(challenge_resp, payload, sign_skey, base_url) do
-        {:ok, %{log_entries: [challenge_log, ingest_log]}}
-      else
-        {:error, reason, log_entries} ->
-          {:error, %{reason: reason, log_entries: log_entries}}
-      end
+    with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
+         {:ok, _ingest_resp, ingest_log} <-
+           post_ingest(challenge_resp, payload, sign_skey, base_url) do
+      {:ok, %{log_entries: [challenge_log, ingest_log]}}
+    else
+      {:error, reason, log_entries} ->
+        {:error, %{reason: reason, log_entries: log_entries}}
+    end
+  end
+
+  @doc """
+  Ingests an imported user's card into the Electric shape.
+
+  Builds a UserCard from the imported identity data, signs it, and sends
+  an insert mutation. If the card already exists, the ingest will fail —
+  callers should treat that as success.
+
+  Returns:
+  - `{:ok, %{log_entries: [log_entry1, log_entry2]}}`
+  - `{:error, %{reason: reason, log_entries: [log_entry, ...]}}`
+  """
+  def ingest_imported_user(user_data, base_url) do
+    card_struct = %UserCard{
+      user_hash: user_data.user_hash,
+      sign_pkey: user_data.sign_pkey,
+      contact_pkey: user_data.contact_pkey,
+      contact_cert: user_data.contact_cert,
+      crypt_pkey: user_data.crypt_pkey,
+      crypt_cert: user_data.crypt_cert,
+      name: user_data.name,
+      deleted_flag: false,
+      owner_timestamp: user_data.owner_timestamp
+    }
+
+    sign_b64 =
+      card_struct
+      |> Integrity.signature_payload()
+      |> then(&:crypto.sign(:mldsa87, :none, &1, user_data.sign_skey))
+
+    card = %{card_struct | sign_b64: sign_b64}
+    challenge_url = base_url <> "/electric/v1/challenge"
+
+    with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
+         {:ok, _ingest_resp, ingest_log} <-
+           ingest_user_card(challenge_resp, card, user_data.sign_skey, base_url) do
+      {:ok, %{log_entries: [challenge_log, ingest_log]}}
+    else
+      {:error, reason, log_entries} ->
+        {:error, %{reason: reason, log_entries: log_entries}}
     end
   end
 
@@ -423,7 +462,6 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   defp ingest_user_card(challenge_resp, card, sign_skey, base_url) do
     %{"challenge" => challenge, "challenge_id" => challenge_id} = challenge_resp
 
-    # Sign the challenge
     signature = :crypto.sign(:mldsa87, :none, challenge, sign_skey)
     signature_b64 = Base.encode64(signature, padding: false)
 
@@ -460,11 +498,9 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   defp post_ingest(challenge_resp, payload, sign_skey, base_url) do
     %{"challenge" => challenge, "challenge_id" => challenge_id} = challenge_resp
 
-    # Sign the challenge
     signature = :crypto.sign(:mldsa87, :none, challenge, sign_skey)
     signature_b64 = Base.encode64(signature, padding: false)
 
-    # Add auth to payload
     payload_with_auth =
       Map.put(payload, "auth", %{
         "challenge_id" => challenge_id,

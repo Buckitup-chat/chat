@@ -67,6 +67,9 @@ defmodule ChatWeb.MainLive.Page.AdminPanelRouter do
       {:device_log, log} ->
         socket |> AdminPanel.render_device_log(log)
 
+      {:internal_db_unavailable, status} ->
+        socket |> AdminPanel.show_internal_db_unavailable(status)
+
       {:unmounted_main, _} ->
         socket
 

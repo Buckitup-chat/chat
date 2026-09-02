@@ -95,6 +95,20 @@ defmodule ChatWeb.MainLive.Page.AdminPanel do
     socket
   end
 
+  # Platform gave up waiting for the internal DB, so USB drives are mounted but
+  # never classified - without this the admin only sees a drive that does nothing.
+  def show_internal_db_unavailable(socket, %{cubdb: cubdb?, pg: pg?}) do
+    socket
+    |> put_flash(
+      :error,
+      "Internal database did not start (CubDB #{db_state(cubdb?)}, PostgreSQL #{db_state(pg?)}). " <>
+        "USB drives are not recognized until it does."
+    )
+  end
+
+  defp db_state(true), do: "ready"
+  defp db_state(false), do: "down"
+
   def show_wifi_settings(%{assigns: %{room_map: rooms}} = socket, %{
         ssid: ssid,
         password: password

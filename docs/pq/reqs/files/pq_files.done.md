@@ -1,6 +1,6 @@
 # File Storage
 
-Constraints, design, and schema for storing large files on BuckitUp platform devices. **Chunk bytes live on the filesystem as raw encrypted bytes** — one file per chunk. Manifests and bookkeeping live in PostgreSQL, with the manifest tables (`files`, `file_chunks`) in the Electric publication for device-to-device sync. See [Chunk Pipeline](pq_chunk_writer.md) for the per-drive admission pipeline and [PostgreSQL Constraints](pg_constraints.md) for TOAST/WAL/VACUUM background.
+Constraints, design, and schema for storing large files on BuckitUp platform devices. **Chunk bytes live on the filesystem as raw encrypted bytes** — one file per chunk. Manifests and bookkeeping live in PostgreSQL, with the manifest tables (`files`, `file_chunks`) in the Electric publication for device-to-device sync. See [Chunk Pipeline](pq_chunk_writer.done.md) for the per-drive admission pipeline and [PostgreSQL Constraints](../pg_constraints.md) for TOAST/WAL/VACUUM background.
 
 > **History**: chunk blobs originally lived in PostgreSQL as base64 `BYTEA`. That design was replaced (protocol v2) by filesystem storage of raw bytes — base64 left the chunk protocol end-to-end. See [§14 Implementation History](#14-implementation-history) for what changed and why.
 
@@ -22,6 +22,8 @@ One row per completed file. Created only after all chunks are uploaded and verif
 | `deleted_flag` | BOOLEAN, NOT NULL, DEFAULT false | Soft delete |
 | `sign_b64` | BYTEA, NOT NULL | ML-DSA-87 signature over all other fields |
 
+Schema: [`Chat.Data.Schemas.File`](../../../lib/chat/data/schemas/file.ex). Custom types: [`FileId`](../../../lib/chat/data/types/file_id.ex), [`UserHash`](../../../lib/chat/data/types/user_hash.ex).
+
 **Verification**: for each chunk, compute `SHA3-512(chunk.sign_b64)` and compare against `chunk_sign_hashes[chunk_index]`. Since each chunk's `sign_b64` covers the chunk's `data_hash` (SHA3-512 over the raw encrypted bytes), this transitively binds chunk data integrity to the `files` manifest signature.
 
 ### 1.2 `file_chunks` (Electric-synced, manifest only)
@@ -39,9 +41,11 @@ One row per chunk — **metadata only, no blob**. The chunk's encrypted bytes li
 | `sign_b64` | BYTEA, NOT NULL | Signature over `(file_id, chunk_index, data_hash, size, uploader_hash, owner_timestamp)` |
 | | PK | `(file_id, chunk_index)` |
 
-`data_hash` (Ecto type `Chat.Data.Types.FileChunkDataHash`) is the single canonical representation used everywhere — stored in this row, carried on the wire (`x-data-hash` header), and included in the signed payload. There is exactly one form to hash, sign, store, and serve; no re-encoding. `files.chunk_sign_hashes[chunk_index]` binds to `SHA3-512(sign_b64)`, which in turn covers `data_hash`, transitively binding the on-disk bytes to the manifest signature.
+Schema: [`Chat.Data.Schemas.FileChunk`](../../../lib/chat/data/schemas/file_chunk.ex). `data_hash` uses Ecto type [`Chat.Data.Types.FileChunkDataHash`](../../../lib/chat/data/types/file_chunk_data_hash.ex) — the single canonical representation used everywhere: stored in this row, carried on the wire (`x-data-hash` header), and included in the signed payload. There is exactly one form to hash, sign, store, and serve; no re-encoding. `files.chunk_sign_hashes[chunk_index]` binds to `SHA3-512(sign_b64)`, which in turn covers `data_hash`, transitively binding the on-disk bytes to the manifest signature.
 
 **Sync filtering**: a `file_chunks` row is accepted from a peer only when a matching `files` row exists, is not deleted, and its `uploader_hash` matches the chunk's. Chunk manifest rows that arrive before their `files` parent are deferred (not dropped). See §5.
+
+Sync filtering is implemented in [`Chat.Data.Shapes.FileChunk.sync_validate_parent/2`](../../../lib/chat/data/shapes/file_chunk.ex).
 
 ### 1.3 `upload_chunks` (local only, NOT Electric-synced)
 
@@ -56,6 +60,8 @@ Tracks uploaded chunks before the signed `files` manifest arrives. Populated as 
 | `size` | INTEGER, NOT NULL | Blob byte size                   |
 | `updated_at` | BIGINT, NOT NULL | Unix seconds (from TimeKeeper)   |
 | | PK | `(file_id, chunk_index)`         |
+
+Schema: [`Chat.Data.Schemas.UploadChunk`](../../../lib/chat/data/schemas/upload_chunk.ex).
 
 Indexes: `uploader_hash` (budget queries), `updated_at` (GC queries).
 
@@ -81,6 +87,8 @@ Tracks chunks whose bytes are not yet in the local `ChunkStore`. It is the queue
 | `updated_at` | BIGINT, NOT NULL | Last attempt or creation time (TimeKeeper) |
 | | PK | `(file_id, chunk_index)` |
 
+Schema: [`Chat.Data.Schemas.MissingChunk`](../../../lib/chat/data/schemas/missing_chunk.ex).
+
 **Two-stage population** (avoids a false-availability window — a file must never look complete before its chunks are even tracked):
 
 1. **`files` manifest arrives from a peer** → pre-seed `chunk_count` placeholder rows (indices `0..chunk_count-1`, `data_hash = NULL`). The file has a non-zero missing count from the moment its manifest lands.
@@ -88,9 +96,14 @@ Tracks chunks whose bytes are not yet in the local `ChunkStore`. It is the queue
 
 The uploading device never populates this table — it wrote the bytes to `ChunkStore` during upload, so all chunks are present locally when it commits the manifest.
 
-One table, three consumers: the **fetch queue** (rows where `data_hash IS NOT NULL`), the **UI signal** (per-file count vs `chunk_count`), and the **availability check** (`files` present AND zero `missing_chunks` rows). It is rebuildable at any time by anti-joining expected indices against the store (`MissingChunksBackfill`), so it is corruption-safe.
+One table, three consumers: the **fetch queue** (rows where `data_hash IS NOT NULL`), the **UI signal** (per-file count vs `chunk_count`), and the **availability check** (`files` present AND zero `missing_chunks` rows). It is rebuildable at any time by anti-joining expected indices against the store ([`MissingChunksBackfill`](../../../lib/chat/data/file/missing_chunks_backfill.ex)), so it is corruption-safe.
 
-Indexes: partial indexes on `(attempts, updated_at)`, `(peer_url)`, and `(source_drive_id)`, each `WHERE data_hash IS NOT NULL`. See [pq_chunk_writer.md §4.1](pq_chunk_writer.md) for how the fetch sources consume them.
+Indexes (from migrations [`20260613120002`](../../../priv/repo/migrations/20260613120002_create_missing_chunks.exs) and [`20260627120000`](../../../priv/repo/migrations/20260627120000_add_source_drive_id_to_missing_chunks.exs)):
+- `missing_chunks_fetchable_idx` on `(attempts, updated_at) WHERE data_hash IS NOT NULL`
+- `missing_chunks_peer_url_fetchable_idx` on `(peer_url) WHERE data_hash IS NOT NULL AND peer_url IS NOT NULL`
+- `missing_chunks_source_drive_id_fetchable_idx` on `(source_drive_id) WHERE data_hash IS NOT NULL AND source_drive_id IS NOT NULL`
+
+See [pq_chunk_writer.done.md §4.1](pq_chunk_writer.done.md) for how the fetch sources consume them.
 
 ## 2. Chunk Encryption
 
@@ -113,7 +126,7 @@ The device stores and serves the raw encrypted bytes (including the prepended no
 
 ## 3. Content Type
 
-The `"file"` content type and its positional array schema are defined in [07_content_polymorphism.md § `"file"`](../invariants/07_content_polymorphism.md#file).
+The `"file"` content type and its positional array schema are defined in [07_content_polymorphism.md § `"file"`](../../invariants/07_content_polymorphism.md#file).
 
 ## 4. Upload Protocol
 
@@ -121,13 +134,15 @@ Chunks upload via a **dedicated raw binary endpoint**; the `files` manifest uses
 
 **Chunk upload** — `PUT /electric/v1/file_chunk/:file_id/:chunk_index`:
 
+Implementation: [`ChatWeb.FileChunkController.create/2`](../../../lib/chat_web/controllers/file_chunk_controller.ex).
+
 - Raw encrypted bytes in the body; metadata + signature in headers: `x-data-hash` (`fd_`-prefixed), `x-size`, `x-uploader-hash`, `x-owner-timestamp`, `x-signature`.
 - The server verifies the ML-DSA-87 signature (against the uploader's `sign_pkey` from `user_cards`) and the deleted-file / uploader-match checks **before reading the body** — an unknown user or bad signature costs one verify, not a 4 MB read.
-- Then: free-space check → read body → hash the body and compare to the signed `data_hash` → write to `ChunkStore` via the per-drive `ChunkWriter` (`:upload` lane) → insert `file_chunks` + `upload_chunks` rows in one transaction.
+- Then: free-space check → read body → hash the body and compare to the signed `data_hash` → submit to [`ChunkWriter`](../../../lib/chat/data/file/chunk_writer.ex) via [`UploadSource`](../../../lib/chat/data/file/upload_source.ex) (`:upload` lane) → insert `file_chunks` row → insert `upload_chunks` row (separate idempotent inserts with `on_conflict: :nothing`).
 - **No challenge/PoP** on this endpoint — the chunk signature binds the uploader key to the exact bytes, position, and `owner_timestamp`, which is strictly stronger than the ingest challenge. A replayed PUT is an idempotent no-op (same PK, hash-identical body).
-- Statuses: **200** ok; **429** upload lane busy (`Retry-After`); **401** bad signature; **410** file deleted; **403** uploader mismatch; **422** hash/size mismatch; **413** disk full / body too large; **400** missing headers; **503** storage not ready.
+- Statuses: **200** ok; **429** upload lane busy (`Retry-After`); **401** bad signature; **410** file deleted; **403** uploader mismatch; **422** hash/size mismatch; **413** disk full / body too large; **400** missing headers; **500** chunk write failed; **503** storage not ready / writer unavailable.
 
-**Manifest commit** — `POST /electric/v1/ingest` (JSON): after all chunks are on the device, the client builds the `files` row with `chunk_sign_hashes` (computed locally from its own `sign_b64` values), signs it, and ingests it. The device verifies the manifest signature, that all `chunk_count` chunks are present, and that each `chunk_sign_hashes[i]` matches the stored chunk's `SHA3-512(sign_b64)`, then deletes the `upload_chunks` rows.
+**Manifest commit** — `POST /electric/v1/ingest` (JSON): after all chunks are on the device, the client builds the `files` row with `chunk_sign_hashes` (computed locally from its own `sign_b64` values), signs it, and ingests it. The device verifies the manifest signature (via [`Chat.Data.File.Validation.file_pre_apply_insert/3`](../../../lib/chat/data/file/validation.ex)), that all `chunk_count` chunks are present, and that each `chunk_sign_hashes[i]` matches the stored chunk's `SHA3-512(sign_b64)`, then syncs the ChunkStore directory and deletes the `upload_chunks` rows.
 
 ```
 Client                                    Device
@@ -141,9 +156,9 @@ Client                                    Device
   │                                          │    x-signature
   │                                          │  verify signature (before body read)
   │                                          │  read body → hash → compare data_hash
-  │                                          │  ChunkStore.put (raw bytes → FS)
+  │                                          │  ChunkWriter ← UploadSource (raw bytes → FS)
   │                                          │  insert file_chunks + upload_chunks
-  │<─ 200 | 429 | 401 | 410 | 413 ───────────│
+  │<─ 200 | 429 | 401 | 410 | 413 | 500 ────│
   │─ ... progressive encrypt + upload ...    │
   │                                          │
   │  resume: shape read on file_chunks       │
@@ -156,6 +171,7 @@ Client                                    Device
   │─ POST /electric/v1/ingest (JSON) ───────>│  files insert
   │                                          │  verify: sign_b64; all chunks present;
   │                                          │    each chunk_sign_hash matches
+  │                                          │  sync ChunkStore dir
   │                                          │  delete upload_chunks for file_id
   │<─ 200 {txid} ────────────────────────────│  committed to Electric
 ```
@@ -184,12 +200,12 @@ Client re-`PUT`s the chunk indexes absent from the response (§4 chunk upload).
 
 Manifest rows sync via Electric / logical replication; **bytes never travel through Electric** — they are fetched separately and admitted only after a hash check.
 
-Manifest sync (`files`, `file_chunks`) flows through Electric shapes, filtered as in §1.2: the parent `files` row must be present, not deleted, and `uploader_hash` must match; orphan chunk rows are deferred until their parent arrives.
+Manifest sync (`files`, `file_chunks`) flows through Electric shapes, filtered as in §1.2: the parent `files` row must be present, not deleted, and `uploader_hash` must match; orphan chunk rows are deferred until their parent arrives. Shape behaviour implementations: [`Chat.Data.Shapes.File`](../../../lib/chat/data/shapes/file.ex) and [`Chat.Data.Shapes.FileChunk`](../../../lib/chat/data/shapes/file_chunk.ex).
 
-Byte acquisition follows two paths (full pipeline in [pq_chunk_writer.md](pq_chunk_writer.md)):
+Byte acquisition follows two paths (full pipeline in [pq_chunk_writer.done.md](pq_chunk_writer.done.md)):
 
-1. **Network sync (`SyncSource`)** — when a `files` manifest arrives from a peer, `ShapeWriter` pre-seeds `missing_chunks` placeholders (§1.4). As each `file_chunks` manifest row arrives, the matching row is filled and becomes fetchable; `SyncSource` issues `GET /electric/v1/file_chunk/:file_id/:chunk_index` to the peer, verifies the body against `data_hash`, admits it to `ChunkStore`, and deletes the row.
-2. **Drive-to-drive copy (`DriveCopySource`)** — PG logical replication delivers manifest rows between per-drive databases; a replica trigger fires `pg_notify`, `ReplicationListener` fills `missing_chunks` (stamping `source_drive_id`), and `DriveCopySource` reads the bytes directly from the other drive's on-disk `ChunkStore`.
+1. **Network sync ([`SyncSource`](../../../lib/chat/data/file/sync_source.ex))** — when a `files` manifest arrives from a peer, [`Shapes.File.sync_after_persist/3`](../../../lib/chat/data/shapes/file.ex) pre-seeds `missing_chunks` placeholders (§1.4). As each `file_chunks` manifest row arrives, [`Shapes.FileChunk.sync_after_persist/3`](../../../lib/chat/data/shapes/file_chunk.ex) fills the matching row and notifies `SyncSource`; `SyncSource` issues `GET /electric/v1/file_chunk/:file_id/:chunk_index` to the peer, verifies the body against `data_hash`, admits it to `ChunkStore` via `ChunkWriter`, and deletes the `missing_chunks` row.
+2. **Drive-to-drive copy ([`DriveCopySource`](../../../lib/chat/data/file/drive_copy_source.ex))** — PG logical replication delivers manifest rows between per-drive databases; a replica trigger fires `pg_notify`, [`ReplicationListener`](../../../lib/chat/data/file/replication_listener.ex) fills `missing_chunks` (stamping `source_drive_id`), and `DriveCopySource` reads the bytes directly from the other drive's on-disk `ChunkStore`.
 
 **Availability**: a file is available once its `files` manifest is present AND it has zero `missing_chunks` rows. The per-file `missing_chunks` count (against `chunk_count`) is the honest "X of Y synced" signal at every stage — including the placeholder stage, where metadata has not yet arrived.
 
@@ -205,11 +221,21 @@ GET /electric/v1/file_chunk/:file_id/:chunk_index
 
 Returns the raw encrypted chunk bytes as `application/octet-stream`, read from `ChunkStore` on the filesystem. Response header `x-chunk-size` carries the chunk's `size` value.
 
-**Implementation**: `ChatWeb.FileChunkController.show/2` → `Chat.Data.File.ChunkStore.fetch/2` (single on-disk file read; the chunk metadata row supplies `size`).
+**Implementation**: [`ChatWeb.FileChunkController.show/2`](../../../lib/chat_web/controllers/file_chunk_controller.ex) → [`Chat.Data.File.ChunkStore.fetch/2`](../../../lib/chat/data/file/chunk_store.ex) (single on-disk file read; the chunk metadata row supplies `size`).
 
-**Why not Electric shapes?** Each unique `(table, where)` combination creates a persistent Electric shape: a Consumer GenServer, a PG snapshot transaction, disk-backed shape log, and ongoing WAL filtering. Fetching N chunks via shapes creates N long-lived server-side resources for what is a simple point read. The direct endpoint performs one file read with no persistent overhead. This matters especially for video streaming (see [pq_video_streaming.md §6](pq_video_streaming.md#6-chunk-fetch-strategy)), where seeking triggers many single-chunk fetches.
+**Why not Electric shapes?** Each unique `(table, where)` combination creates a persistent Electric shape: a Consumer GenServer, a PG snapshot transaction, disk-backed shape log, and ongoing WAL filtering. Fetching N chunks via shapes creates N long-lived server-side resources for what is a simple point read. The direct endpoint performs one file read with no persistent overhead. This matters especially for video streaming (see [pq_video_streaming.done.md §6](pq_video_streaming.done.md#6-chunk-fetch-strategy)), where seeking triggers many single-chunk fetches.
 
-### 6.2 Download Flow
+### 6.2 Chunk Status Endpoint
+
+```
+GET /electric/v1/file_chunk_status?file_ids=<id1>,<id2>,...
+```
+
+Returns per-file `on_disk` count (from `ChunkStore`) and `missing` count (from `missing_chunks`). Used by the UI to show sync progress without polling individual chunk rows.
+
+**Implementation**: [`ChatWeb.FileChunkStatusController.index/2`](../../../lib/chat_web/controllers/file_chunk_status_controller.ex).
+
+### 6.3 Download Flow
 
 ```
 Client                              Device
@@ -240,29 +266,27 @@ Emptying `chunk_sign_hashes` ensures receiving devices cannot verify any chunks 
 
 ## 8. Garbage Collection
 
-Runs hourly (`Chat.Data.File.GC`). Two triggers reclaim chunk bytes and bookkeeping:
+[`Chat.Data.File.GC`](../../../lib/chat/data/file/gc.ex) runs hourly. Two triggers reclaim chunk bytes and bookkeeping:
 
-1. **Deleted files** (`files.deleted_flag = true`): delete the `file_chunks` rows, the `missing_chunks` rows, and the file's `ChunkStore` directory. The `files` row is retained as a deletion tombstone.
-2. **Stale uploads** (`upload_chunks.updated_at` older than 48 h AND `file_id NOT IN files` — upload never completed): delete `upload_chunks`, orphan `file_chunks`, `missing_chunks`, and the `ChunkStore` directory.
+1. **Deleted files** (`files.deleted_flag = true`): delete the `file_chunks` rows (in batches of 50), the `missing_chunks` rows, and the file's `ChunkStore` directory. The `files` row is retained as a deletion tombstone.
+2. **Stale uploads** (`upload_chunks.updated_at` older than 48 h AND `file_id NOT IN files` — upload never completed): delete `upload_chunks`, orphan `file_chunks` (batched), `missing_chunks`, and the `ChunkStore` directory.
 
-Separately, `TmpSweeper` (per drive, hourly) removes `*.tmp` files older than 1 h — residue from writes interrupted by a crash.
+Separately, [`TmpSweeper`](../../../lib/chat/data/file/tmp_sweeper.ex) (per drive, hourly, `gen_statem`) removes `*.tmp` files older than 1 h — residue from writes interrupted by a crash.
 
 ## 9. Storage Layout
 
 ### 9.1 ChunkStore (filesystem)
 
-Raw encrypted bytes, one file per chunk:
+[`Chat.Data.File.ChunkStore`](../../../lib/chat/data/file/chunk_store.ex) — raw encrypted bytes, one file per chunk:
 
 ```
 <files_base_dir>/pq_files/<last-2-hex-of-file_id>/<file_id>/<10-digit-zero-padded-chunk_index>
 ```
 
 - **Sharding**: the last two hex chars of `file_id` (from UUIDv7's random tail → uniform 256-way split) keep per-directory entry counts low for FAT/exFAT drives. The front of the ID is not used — it is the `f_` prefix followed by the UUIDv7 timestamp, whose leading hex chars are effectively constant.
-- **Writes**: temp file + `rename` (with `:sync`/`datasync`) so a crash leaves at most a stale `*.tmp`, never a torn chunk.
+- **Writes**: temp file + `rename`. Sync (`datasync`) is deferred to manifest commit time ([`Validation.file_pre_apply_insert`](../../../lib/chat/data/file/validation.ex) calls `ChunkStore.sync_dir/1`), not per-chunk — a crash leaves at most a stale `*.tmp`, never a torn chunk.
 - **Per drive**: each storage device (SD, USB) has its own `ChunkStore` path and its own `missing_chunks` table; a drive is identified by its PostgreSQL `system_identifier`.
-- API: `put/4`, `fetch/3`, `count_on_disk/3`, `delete_file/1`, `sweep_tmp_files/3`, `available_space/0`, `sync_dir/3`.
-
-See [pq_chunk_writer.md §4.2](pq_chunk_writer.md) for the write pipeline and drive identity.
+- API: `put/4`, `fetch/2`, `count_on_disk/1`, `delete_file/1`, `sweep_tmp_files/1`, `available_space/0`, `sync_dir/1`, `file_dir/1` (all accept an optional `base_dir` override, raising max arity by 1).
 
 ### 9.2 PostgreSQL
 
@@ -356,10 +380,15 @@ Realized gains per 100 MB upload (26 chunks):
 
 **Migrations** (PoC cutover — no backfill; v1 signatures hash base64 and cannot be re-signed server-side, so legacy chunk rows were truncated):
 
-- `20260613120000_v2_file_chunks_to_filesystem` — add `data_hash`, drop `data_b64`, `TRUNCATE files, file_chunks, upload_chunks`
-- `20260613120001_file_chunks_reset_autovacuum` — reset autovacuum overrides to defaults
-- `20260613120002_create_missing_chunks`
-- `20260627120000_add_source_drive_id_to_missing_chunks` — add `source_drive_id`, make `peer_url` nullable, add partial indexes
-- `20260627120001_create_replica_triggers` — `pg_notify` on `files`/`file_chunks` replica inserts (drives drive-copy sync)
+- [`20260512080650_create_files`](../../../priv/repo/migrations/20260512080650_create_files.exs)
+- [`20260512080651_create_file_chunks`](../../../priv/repo/migrations/20260512080651_create_file_chunks.exs)
+- [`20260512080652_create_upload_chunks`](../../../priv/repo/migrations/20260512080652_create_upload_chunks.exs)
+- [`20260512080653_add_files_and_file_chunks_to_electric_publication`](../../../priv/repo/migrations/20260512080653_add_files_and_file_chunks_to_electric_publication.exs)
+- [`20260613120000_v2_file_chunks_to_filesystem`](../../../priv/repo/migrations/20260613120000_v2_file_chunks_to_filesystem.exs) — add `data_hash`, drop `data_b64`, `TRUNCATE files, file_chunks, upload_chunks`
+- [`20260613120001_file_chunks_reset_autovacuum`](../../../priv/repo/migrations/20260613120001_file_chunks_reset_autovacuum.exs) — reset autovacuum overrides to defaults
+- [`20260613120002_create_missing_chunks`](../../../priv/repo/migrations/20260613120002_create_missing_chunks.exs)
+- [`20260627120000_add_source_drive_id_to_missing_chunks`](../../../priv/repo/migrations/20260627120000_add_source_drive_id_to_missing_chunks.exs) — add `source_drive_id`, make `peer_url` nullable, add partial indexes
+- [`20260627120001_create_replica_triggers`](../../../priv/repo/migrations/20260627120001_create_replica_triggers.exs) — `pg_notify` on `files`/`file_chunks` replica inserts (drives drive-copy sync)
+- [`20260807100000_drop_duplicate_missing_chunks_index`](../../../priv/repo/migrations/20260807100000_drop_duplicate_missing_chunks_index.exs) — drop redundant `missing_chunks_attempts_updated_at_index`
 
-**Pipeline**: the per-drive chunk admission pipeline — a serialized `ChunkWriter` fed by `UploadSource`, `SyncSource`, and `DriveCopySource` over a shared `ChunkSource` behaviour — is documented in [pq_chunk_writer.md](pq_chunk_writer.md). It replaced the single `ChunkFetcher` worker sketched in early drafts (never shipped) and the removed `ElectricIngestThrottle`.
+**Pipeline**: the per-drive chunk admission pipeline — a serialized [`ChunkWriter`](../../../lib/chat/data/file/chunk_writer.ex) fed by [`UploadSource`](../../../lib/chat/data/file/upload_source.ex), [`SyncSource`](../../../lib/chat/data/file/sync_source.ex), and [`DriveCopySource`](../../../lib/chat/data/file/drive_copy_source.ex) over a shared [`ChunkSource`](../../../lib/chat/data/file/chunk_source.ex) behaviour — is documented in [pq_chunk_writer.done.md](pq_chunk_writer.done.md). It replaced the single `ChunkFetcher` worker sketched in early drafts (never shipped) and the removed `ElectricIngestThrottle`. The pipeline is supervised by [`ChunkPipelineSupervisor`](../../../lib/chat/data/file/chunk_pipeline_supervisor.ex), which also starts [`ReplicationListener`](../../../lib/chat/data/file/replication_listener.ex), [`TmpSweeper`](../../../lib/chat/data/file/tmp_sweeper.ex), [`MissingChunksBackfill`](../../../lib/chat/data/file/missing_chunks_backfill.ex), and [`DriveAnnouncer`](../../../lib/chat/data/file/drive_announcer.ex).

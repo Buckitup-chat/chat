@@ -1,6 +1,6 @@
 # File Storage
 
-Constraints, design, and schema for storing large files on BuckitUp platform devices. **Chunk bytes live on the filesystem as raw encrypted bytes** — one file per chunk. Manifests and bookkeeping live in PostgreSQL, with the manifest tables (`files`, `file_chunks`) in the Electric publication for device-to-device sync. See [Chunk Pipeline](../pq_chunk_writer.md) for the per-drive admission pipeline and [PostgreSQL Constraints](../pg_constraints.md) for TOAST/WAL/VACUUM background.
+Constraints, design, and schema for storing large files on BuckitUp platform devices. **Chunk bytes live on the filesystem as raw encrypted bytes** — one file per chunk. Manifests and bookkeeping live in PostgreSQL, with the manifest tables (`files`, `file_chunks`) in the Electric publication for device-to-device sync. See [Chunk Pipeline](pq_chunk_writer.done.md) for the per-drive admission pipeline and [PostgreSQL Constraints](../pg_constraints.md) for TOAST/WAL/VACUUM background.
 
 > **History**: chunk blobs originally lived in PostgreSQL as base64 `BYTEA`. That design was replaced (protocol v2) by filesystem storage of raw bytes — base64 left the chunk protocol end-to-end. See [§14 Implementation History](#14-implementation-history) for what changed and why.
 
@@ -103,7 +103,7 @@ Indexes (from migrations [`20260613120002`](../../../priv/repo/migrations/202606
 - `missing_chunks_peer_url_fetchable_idx` on `(peer_url) WHERE data_hash IS NOT NULL AND peer_url IS NOT NULL`
 - `missing_chunks_source_drive_id_fetchable_idx` on `(source_drive_id) WHERE data_hash IS NOT NULL AND source_drive_id IS NOT NULL`
 
-See [pq_chunk_writer.md §4.1](../pq_chunk_writer.md) for how the fetch sources consume them.
+See [pq_chunk_writer.done.md §4.1](pq_chunk_writer.done.md) for how the fetch sources consume them.
 
 ## 2. Chunk Encryption
 
@@ -202,7 +202,7 @@ Manifest rows sync via Electric / logical replication; **bytes never travel thro
 
 Manifest sync (`files`, `file_chunks`) flows through Electric shapes, filtered as in §1.2: the parent `files` row must be present, not deleted, and `uploader_hash` must match; orphan chunk rows are deferred until their parent arrives. Shape behaviour implementations: [`Chat.Data.Shapes.File`](../../../lib/chat/data/shapes/file.ex) and [`Chat.Data.Shapes.FileChunk`](../../../lib/chat/data/shapes/file_chunk.ex).
 
-Byte acquisition follows two paths (full pipeline in [pq_chunk_writer.md](../pq_chunk_writer.md)):
+Byte acquisition follows two paths (full pipeline in [pq_chunk_writer.done.md](pq_chunk_writer.done.md)):
 
 1. **Network sync ([`SyncSource`](../../../lib/chat/data/file/sync_source.ex))** — when a `files` manifest arrives from a peer, [`Shapes.File.sync_after_persist/3`](../../../lib/chat/data/shapes/file.ex) pre-seeds `missing_chunks` placeholders (§1.4). As each `file_chunks` manifest row arrives, [`Shapes.FileChunk.sync_after_persist/3`](../../../lib/chat/data/shapes/file_chunk.ex) fills the matching row and notifies `SyncSource`; `SyncSource` issues `GET /electric/v1/file_chunk/:file_id/:chunk_index` to the peer, verifies the body against `data_hash`, admits it to `ChunkStore` via `ChunkWriter`, and deletes the `missing_chunks` row.
 2. **Drive-to-drive copy ([`DriveCopySource`](../../../lib/chat/data/file/drive_copy_source.ex))** — PG logical replication delivers manifest rows between per-drive databases; a replica trigger fires `pg_notify`, [`ReplicationListener`](../../../lib/chat/data/file/replication_listener.ex) fills `missing_chunks` (stamping `source_drive_id`), and `DriveCopySource` reads the bytes directly from the other drive's on-disk `ChunkStore`.
@@ -391,4 +391,4 @@ Realized gains per 100 MB upload (26 chunks):
 - [`20260627120001_create_replica_triggers`](../../../priv/repo/migrations/20260627120001_create_replica_triggers.exs) — `pg_notify` on `files`/`file_chunks` replica inserts (drives drive-copy sync)
 - [`20260807100000_drop_duplicate_missing_chunks_index`](../../../priv/repo/migrations/20260807100000_drop_duplicate_missing_chunks_index.exs) — drop redundant `missing_chunks_attempts_updated_at_index`
 
-**Pipeline**: the per-drive chunk admission pipeline — a serialized [`ChunkWriter`](../../../lib/chat/data/file/chunk_writer.ex) fed by [`UploadSource`](../../../lib/chat/data/file/upload_source.ex), [`SyncSource`](../../../lib/chat/data/file/sync_source.ex), and [`DriveCopySource`](../../../lib/chat/data/file/drive_copy_source.ex) over a shared [`ChunkSource`](../../../lib/chat/data/file/chunk_source.ex) behaviour — is documented in [pq_chunk_writer.md](../pq_chunk_writer.md). It replaced the single `ChunkFetcher` worker sketched in early drafts (never shipped) and the removed `ElectricIngestThrottle`. The pipeline is supervised by [`ChunkPipelineSupervisor`](../../../lib/chat/data/file/chunk_pipeline_supervisor.ex), which also starts [`ReplicationListener`](../../../lib/chat/data/file/replication_listener.ex), [`TmpSweeper`](../../../lib/chat/data/file/tmp_sweeper.ex), [`MissingChunksBackfill`](../../../lib/chat/data/file/missing_chunks_backfill.ex), and [`DriveAnnouncer`](../../../lib/chat/data/file/drive_announcer.ex).
+**Pipeline**: the per-drive chunk admission pipeline — a serialized [`ChunkWriter`](../../../lib/chat/data/file/chunk_writer.ex) fed by [`UploadSource`](../../../lib/chat/data/file/upload_source.ex), [`SyncSource`](../../../lib/chat/data/file/sync_source.ex), and [`DriveCopySource`](../../../lib/chat/data/file/drive_copy_source.ex) over a shared [`ChunkSource`](../../../lib/chat/data/file/chunk_source.ex) behaviour — is documented in [pq_chunk_writer.done.md](pq_chunk_writer.done.md). It replaced the single `ChunkFetcher` worker sketched in early drafts (never shipped) and the removed `ElectricIngestThrottle`. The pipeline is supervised by [`ChunkPipelineSupervisor`](../../../lib/chat/data/file/chunk_pipeline_supervisor.ex), which also starts [`ReplicationListener`](../../../lib/chat/data/file/replication_listener.ex), [`TmpSweeper`](../../../lib/chat/data/file/tmp_sweeper.ex), [`MissingChunksBackfill`](../../../lib/chat/data/file/missing_chunks_backfill.ex), and [`DriveAnnouncer`](../../../lib/chat/data/file/drive_announcer.ex).

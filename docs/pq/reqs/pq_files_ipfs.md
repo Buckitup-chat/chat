@@ -1,6 +1,6 @@
 # File Storage — IPFS Chunk Sync
 
-> **OBSOLETE — rejected alternative, kept for the record.** This was a feasibility analysis of using IPFS as the chunk byte layer. It was **not** adopted: plain filesystem storage with the per-drive pipeline proved substantially faster, and the two problems this doc set out to solve were resolved directly (multi-peer routing via `missing_chunks.peer_url` + fallback to all connected peers; drive portability via `MissingChunksBackfill` + `DriveCopySource`). The shipped design is [File Storage](files/pq_files.done.md) (raw bytes on the filesystem) with the [Chunk Pipeline](pq_chunk_writer.md). References below to a "v2 migration plan", `ChunkFetcher`, and "open question §14.8" describe an earlier framing that no longer matches the code.
+> **OBSOLETE — rejected alternative, kept for the record.** This was a feasibility analysis of using IPFS as the chunk byte layer. It was **not** adopted: plain filesystem storage with the per-drive pipeline proved substantially faster, and the two problems this doc set out to solve were resolved directly (multi-peer routing via `missing_chunks.peer_url` + fallback to all connected peers; drive portability via `MissingChunksBackfill` + `DriveCopySource`). The shipped design is [File Storage](files/pq_files.done.md) (raw bytes on the filesystem) with the [Chunk Pipeline](files/pq_chunk_writer.done.md). References below to a "v2 migration plan", `ChunkFetcher`, and "open question §14.8" describe an earlier framing that no longer matches the code.
 
 ## 1. Motivation
 

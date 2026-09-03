@@ -2,7 +2,7 @@
 
 Each physical storage device (SD, USB) runs its own chunk admission pipeline. All chunk bytes — from client uploads, drive-to-drive copies, and network sync — flow through a single serialized writer per drive. This eliminates filesystem write contention between chunk I/O and PostgreSQL on the same device.
 
-See [pq_files.md §14](pq_files.md#14-implementation-history) for the v2 change that moved chunk bytes out of PostgreSQL.
+See [files/pq_files.done.md §14](files/pq_files.done.md#14-implementation-history) for the v2 change that moved chunk bytes out of PostgreSQL.
 
 ## 1. Architecture Overview
 

@@ -61,8 +61,7 @@ Hard requirements and specs. See [`pq/reqs/CLAUDE.md`](./pq/reqs/CLAUDE.md) for 
 - [PQ dialogs](./pq/reqs/pq_dialogs.md)
 - [PQ user](./pq/reqs/pq_user.md)
 - [PQ user storage](./pq/reqs/pq_user_storage.md)
-- [PQ files](./pq/reqs/pq_files.md)
-- [PQ files over IPFS](./pq/reqs/pq_files_ipfs.md)
+- [PQ files](./pq/reqs/files/pq_files.done.md)
 - [PQ chunk writer](./pq/reqs/pq_chunk_writer.md)
 - [PQ video streaming](./pq/reqs/pq_video_streaming.md)
 

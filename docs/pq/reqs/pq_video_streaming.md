@@ -4,7 +4,7 @@ Zero-knowledge video playback via a Service Worker that intercepts native `<vide
 
 ## 1. Problem
 
-Videos in the PQ system are encrypted as 4 MB AES-256-GCM chunks stored as raw bytes on the filesystem, with signed manifests in PostgreSQL/Electric (see [pq_files.md](pq_files.md)). The file sandbox can download all chunks, decrypt them client-side, and reassemble into a Blob — but this requires downloading the **entire** video before playback starts. A 200 MB video means a multi-minute wait with no playback.
+Videos in the PQ system are encrypted as 4 MB AES-256-GCM chunks stored as raw bytes on the filesystem, with signed manifests in PostgreSQL/Electric (see [files/pq_files.done.md](files/pq_files.done.md)). The file sandbox can download all chunks, decrypt them client-side, and reassemble into a Blob — but this requires downloading the **entire** video before playback starts. A 200 MB video means a multi-minute wait with no playback.
 
 The old server-side decryption path (Blowfish via `FileController` with HTTP Range requests) enables progressive playback but violates the zero-knowledge goal: the server decrypts chunks and sees plaintext.
 
@@ -47,7 +47,7 @@ We need progressive video playback where the browser fetches, decrypts, and play
   REST endpoint: GET /electric/v1/file_chunk/:file_id/:chunk_index
 ```
 
-Each encrypted chunk is independently decryptable — the 12-byte nonce is prepended to the ciphertext (see [§2 Chunk Encryption in pq_files.md](pq_files.md#2-chunk-encryption)). The browser's native `<video>` media stack handles all buffering, codec detection, and seeking via standard HTTP range requests.
+Each encrypted chunk is independently decryptable — the 12-byte nonce is prepended to the ciphertext (see [§2 Chunk Encryption in files/pq_files.done.md](files/pq_files.done.md#2-chunk-encryption)). The browser's native `<video>` media stack handles all buffering, codec detection, and seeking via standard HTTP range requests.
 
 **Metadata source:** the [`"video"` content type](../invariants/07_content_polymorphism.md#video) provides `file_id`, `enc_secret_b64`, `mime_type`, `size`, and visual preview data (`width_aspect`, `height_aspect`, `thumb_hash_b64`).
 
@@ -92,7 +92,7 @@ The SW intercepts fetches to `/encrypted-video/{sessionId}`:
 1. **Parse Range header** — `bytes=start-end` (or open-ended `bytes=start-`)
 2. **Map to chunks** — `startChunk = floor(start / chunkSize)`, `endChunk = floor(end / chunkSize)`
 3. **Cap response** — max 4 chunks (16 MB) per response to avoid fetching the entire file
-4. **Fetch + decrypt** each needed chunk via REST endpoint (see [pq_files.md §6.1](pq_files.md#61-direct-chunk-endpoint))
+4. **Fetch + decrypt** each needed chunk via REST endpoint (see [files/pq_files.done.md §6.1](files/pq_files.done.md#61-direct-chunk-endpoint))
 5. **Slice** the decrypted data to the exact requested byte range
 6. **Return** `206 Partial Content` with `Content-Range: bytes start-end/totalSize`
 
@@ -116,7 +116,7 @@ On session `unregister`, all cached chunks for that session are purged.
 
 ## 6. Chunk Fetch Strategy
 
-Individual chunks are fetched via the direct REST endpoint (see [pq_files.md §6.1](pq_files.md#61-direct-chunk-endpoint)):
+Individual chunks are fetched via the direct REST endpoint (see [files/pq_files.done.md §6.1](files/pq_files.done.md#61-direct-chunk-endpoint)):
 
 ```
 GET /electric/v1/file_chunk/:file_id/:chunk_index → application/octet-stream
@@ -211,8 +211,8 @@ The SW approach has **better** iOS support than MSE — iOS has always supported
 ## 13. Resolved Questions
 
 - **MSE vs Service Worker:** Service Worker chosen — MSE was too fragile (QuotaExceeded, codec detection, buffer management complexity). SW delegates all media handling to the browser's native stack.
-- **Crypto algorithm:** AES-256-GCM per [pq_files.md §2](pq_files.md#2-chunk-encryption)
-- **Chunk size:** 4 MB per [pq_files.md §12](pq_files.md#12-chunk-size-decision)
+- **Crypto algorithm:** AES-256-GCM per [files/pq_files.done.md §2](files/pq_files.done.md#2-chunk-encryption)
+- **Chunk size:** 4 MB per [files/pq_files.done.md §12](files/pq_files.done.md#12-chunk-size-decision)
 - **Nonce handling:** each chunk carries its own random nonce prepended to the ciphertext; `decryptChunk()` extracts it transparently
 - **Seeking:** native — the browser issues range requests, SW maps bytes to chunks
 - **iOS:** native `<video>` + SW works on iOS 11.3+ (no ManagedMediaSource needed)

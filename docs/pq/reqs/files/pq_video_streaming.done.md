@@ -4,7 +4,7 @@ Zero-knowledge video playback via a Service Worker that intercepts native `<vide
 
 ## 1. Problem
 
-Videos in the PQ system are encrypted as 4 MB AES-256-GCM chunks stored as raw bytes on the filesystem, with signed manifests in PostgreSQL/Electric (see [pq_files.md](pq_files.md)). The file sandbox can download all chunks, decrypt them client-side, and reassemble into a Blob — but this requires downloading the **entire** video before playback starts. A 200 MB video means a multi-minute wait with no playback.
+Videos in the PQ system are encrypted as 4 MB AES-256-GCM chunks stored as raw bytes on the filesystem, with signed manifests in PostgreSQL/Electric (see [pq_files.done.md](pq_files.done.md)). The file sandbox can download all chunks, decrypt them client-side, and reassemble into a Blob — but this requires downloading the **entire** video before playback starts. A 200 MB video means a multi-minute wait with no playback.
 
 The old server-side decryption path (Blowfish via `FileController` with HTTP Range requests) enables progressive playback but violates the zero-knowledge goal: the server decrypts chunks and sees plaintext.
 
@@ -47,9 +47,9 @@ We need progressive video playback where the browser fetches, decrypts, and play
   REST endpoint: GET /electric/v1/file_chunk/:file_id/:chunk_index
 ```
 
-Each encrypted chunk is independently decryptable — the 12-byte nonce is prepended to the ciphertext (see [§2 Chunk Encryption in pq_files.md](pq_files.md#2-chunk-encryption)). The browser's native `<video>` media stack handles all buffering, codec detection, and seeking via standard HTTP range requests.
+Each encrypted chunk is independently decryptable — the 12-byte nonce is prepended to the ciphertext (see [§2 Chunk Encryption in pq_files.done.md](pq_files.done.md#2-chunk-encryption)). The browser's native `<video>` media stack handles all buffering, codec detection, and seeking via standard HTTP range requests.
 
-**Metadata source:** the [`"video"` content type](../invariants/07_content_polymorphism.md#video) provides `file_id`, `enc_secret_b64`, `mime_type`, `size`, and visual preview data (`width_aspect`, `height_aspect`, `thumb_hash_b64`).
+**Metadata source:** the [`"video"` content type](../../invariants/07_content_polymorphism.md#video) provides `file_id`, `enc_secret_b64`, `mime_type`, `size`, and visual preview data (`width_aspect`, `height_aspect`, `thumb_hash_b64`).
 
 ## 4. Why Not MSE
 
@@ -68,14 +68,14 @@ MSE proved too fragile: QuotaExceeded errors on longer videos, codec detection e
 
 ### 5.1 Session Registration
 
-The main page registers a video session with the SW via `postMessage`:
+The main page registers a video session with the SW via `postMessage` ([`VideoSWStreamer.start()`](../../../../assets/js/file-sandbox/video-sw-streamer.js)):
 
 ```javascript
 navigator.serviceWorker.controller.postMessage({
   type: 'register',
   sessionId,          // crypto.randomUUID()
   fileId,             // "f_" + UUID
-  encSecret,          // hex-encoded 32-byte key
+  encSecret,          // hex-encoded 32-byte key (via uint8ToHex)
   chunkCount,         // from files manifest
   totalSize,          // plaintext total size
   chunkSize,          // 4194304 (4 MB)
@@ -85,20 +85,28 @@ navigator.serviceWorker.controller.postMessage({
 videoElement.src = `/encrypted-video/${sessionId}`;
 ```
 
-### 5.2 Range Request Handling
+### 5.2 Session Persistence (IndexedDB)
 
-The SW intercepts fetches to `/encrypted-video/{sessionId}`:
+The SW stores sessions in IndexedDB (`video-sw-sessions`) so they survive SW termination and restart. On `register`, the session is written to both the in-memory `sessions` Map and IndexedDB. On fetch interception, `getSession()` checks the in-memory Map first, then falls back to IndexedDB and repopulates the Map. On `unregister`, both stores are cleared.
+
+### 5.3 Range Request Handling
+
+The SW intercepts fetches to `/encrypted-video/{sessionId}` ([`handleVideoRequest()`](../../../../priv/static/video-sw.js)):
 
 1. **Parse Range header** — `bytes=start-end` (or open-ended `bytes=start-`)
 2. **Map to chunks** — `startChunk = floor(start / chunkSize)`, `endChunk = floor(end / chunkSize)`
 3. **Cap response** — max 4 chunks (16 MB) per response to avoid fetching the entire file
-4. **Fetch + decrypt** each needed chunk via REST endpoint (see [pq_files.md §6.1](pq_files.md#61-direct-chunk-endpoint))
+4. **Fetch + decrypt** each needed chunk via REST endpoint (see [pq_files.done.md §6.1](pq_files.done.md#61-direct-chunk-endpoint))
 5. **Slice** the decrypted data to the exact requested byte range
 6. **Return** `206 Partial Content` with `Content-Range: bytes start-end/totalSize`
 
-**Initial request (no Range header):** Return `200 OK` with `Content-Length: totalSize`, `Accept-Ranges: bytes`, and the first chunk as body. The browser detects range support and switches to `206` requests.
+**Range out of bounds:** If `start >= totalSize`, the SW returns `416 Range Not Satisfiable` with `Content-Range: bytes */totalSize`.
 
-### 5.3 Byte-to-Chunk Mapping
+**Initial request (no Range header):** Returns `200 OK` with `Content-Length: totalSize`, `Accept-Ranges: bytes`, and a `ReadableStream` body that fetches and decrypts chunks on demand via `pull()`. The browser detects range support from `Accept-Ranges` and switches to `206` requests for subsequent reads.
+
+**Content-Type:** Currently hardcoded to `video/mp4`. The session registration does not include `mime_type`.
+
+### 5.4 Byte-to-Chunk Mapping
 
 ```
 startChunk = Math.floor(startByte / chunkSize)
@@ -108,15 +116,19 @@ offsetInFirstChunk = startByte - (startChunk * chunkSize)
 
 The last chunk may be smaller than `chunkSize`: its plaintext size is `totalSize - (chunkCount - 1) * chunkSize`.
 
-### 5.4 Chunk Cache (LRU)
+### 5.5 Chunk Cache (LRU)
 
 Decrypted chunks are cached in-memory (max 8 chunks = 32 MB) with LRU eviction. This avoids re-fetching when the browser re-requests overlapping ranges or the user seeks back.
 
 On session `unregister`, all cached chunks for that session are purged.
 
+### 5.6 Chunk Fetch Retry
+
+[`fetchChunkWithRetry()`](../../../../priv/static/video-sw.js) retries failed chunk fetches up to 3 attempts with linear backoff (500 ms × attempt number). A 404 (chunk not found) is not retried — it throws immediately.
+
 ## 6. Chunk Fetch Strategy
 
-Individual chunks are fetched via the direct REST endpoint (see [pq_files.md §6.1](pq_files.md#61-direct-chunk-endpoint)):
+Individual chunks are fetched via the direct REST endpoint (see [pq_files.done.md §6.1](pq_files.done.md#61-direct-chunk-endpoint)):
 
 ```
 GET /electric/v1/file_chunk/:file_id/:chunk_index → application/octet-stream
@@ -128,11 +140,11 @@ A single HTTP request returns the raw encrypted BYTEA blob. No shape creation, n
 
 ### 7.1 Existing Crypto
 
-The SW contains an inline copy of `decryptChunk()` — identical logic to `assets/js/file-sandbox/crypto.js`. It extracts the 12-byte nonce, decrypts with AES-256-GCM via `crypto.subtle`, and returns plaintext bytes. Service Workers have full access to the Web Crypto API.
+The SW contains an inline copy of `decryptChunk()` — identical logic to [`crypto.js`](../../../../assets/js/file-sandbox/crypto.js). It extracts the 12-byte nonce, decrypts with AES-256-GCM via `crypto.subtle`, and returns plaintext bytes. Service Workers have full access to the Web Crypto API.
 
 ### 7.2 Video Content Type Metadata
 
-The [`"video"` content type](../invariants/07_content_polymorphism.md#video) provides all fields needed:
+The [`"video"` content type](../../invariants/07_content_polymorphism.md#video) provides all fields needed:
 
 | Position | Field | Used for |
 |---|---|---|
@@ -143,20 +155,25 @@ The [`"video"` content type](../invariants/07_content_polymorphism.md#video) pro
 | 7 | file_id | Chunk fetch queries |
 | 8 | enc_secret_b64 | Decryption key |
 
+Content object building and parsing is in [`content-types.js`](../../../../assets/js/file-sandbox/content-types.js) — `buildVideoContent()` and `extractVideoMetadata()`.
+
 ### 7.3 ThumbHash Preview
 
 While the first chunk is being fetched and decrypted, render the [ThumbHash](https://evanw.github.io/thumbhash/) as a blurred placeholder in the video element's poster or a background `<canvas>`. This gives immediate visual feedback with the correct aspect ratio.
 
 ### 7.4 File Sandbox
 
-The "Play Video" button in the file sandbox:
+The "Play Video" button in the [file sandbox](../../../../priv/static/file_sandbox.html) ([`handlePlayVideo()`](../../../../assets/js/file-sandbox-entry.js)):
 
 1. User enters `file_id` and `enc_secret` (same as download)
 2. Click "Play Video"
-3. Register SW session with file metadata
-4. Set `video.src = /encrypted-video/{sessionId}`
-5. Browser issues range requests, SW decrypts on the fly
-6. Native seeking works immediately
+3. Fetch file manifest via Electric Shape API to get `chunk_count`, `total_size`, `chunk_size`
+4. Create `VideoSWStreamer` instance and call `start()`
+5. Streamer registers SW, registers session via `postMessage`, sets `video.src`
+6. Browser issues range requests, SW decrypts on the fly
+7. Native seeking works immediately
+
+On close, `VideoSWStreamer.destroy()` sends `unregister` to the SW and cleans up the video element.
 
 ## 8. Security
 
@@ -165,7 +182,7 @@ The "Play Video" button in the file sandbox:
 - **Never log keys.** `enc_secret` and derived `CryptoKey` objects must not appear in `console.log`, error reporters, or analytics.
 - **SecureContext only.** Web Crypto API requires HTTPS or localhost. The streaming pipeline will not function on plain HTTP.
 - **Session isolation.** Each video session uses a random UUID in its URL — other tabs/pages cannot guess it.
-- **Key lifetime.** The encryption secret lives only in the SW's `sessions` Map. On `unregister`, the session (and key reference) is deleted.
+- **Key lifetime.** The encryption secret lives in the SW's `sessions` Map and IndexedDB. On `unregister`, both stores are cleared.
 
 ### 8.2 Decryption Error Handling
 
@@ -173,12 +190,7 @@ AES-256-GCM decryption throws if the authentication tag does not verify. On decr
 
 ## 9. Fallback
 
-For browsers without Service Worker support (negligible today):
-
-1. Fall back to full-download approach: fetch all chunks, decrypt, reassemble as Blob
-2. Create blob URL: `URL.createObjectURL(blob)`
-3. Set as `<video>` source: `videoElement.src = blobURL`
-4. Show progress bar during download/decryption
+For browsers without Service Worker support (negligible today), the `VideoSWStreamer` reports an error via `onStatus('Service Workers not supported', 'error')`. Full blob-download fallback (fetch all chunks → decrypt → reassemble → `URL.createObjectURL`) is available via the existing "Download" button but is not wired as an automatic video fallback.
 
 ## 10. Browser Compatibility
 
@@ -199,21 +211,25 @@ The SW approach has **better** iOS support than MSE — iOS has always supported
 | AES-GCM full-chunk decrypt | Cannot decrypt partial chunk (auth tag covers entire chunk) | 4 MB decrypts in ~5 ms on modern hardware; capped at 4 chunks per response |
 | No ABR | Single quality level | User gets whatever quality was uploaded |
 | SW registration latency | First play may wait for SW activation | `skipWaiting()` + `clients.claim()` minimize delay |
+| Content-Type hardcoded | Always `video/mp4` regardless of actual format | Works for mp4; non-mp4 formats may need session mime_type plumbing |
 
 ## 12. Implementation Files
 
 | File | Role |
 |---|---|
-| `priv/static/video-sw.js` | Standalone Service Worker (not Vite-bundled) |
-| `assets/js/file-sandbox/video-sw-streamer.js` | Client shim — registers SW, manages sessions |
-| `assets/js/file-sandbox/crypto.js` | Reference for decryption logic (duplicated inline in SW) |
+| [`priv/static/video-sw.js`](../../../../priv/static/video-sw.js) | Standalone Service Worker (not Vite-bundled) |
+| [`assets/js/file-sandbox/video-sw-streamer.js`](../../../../assets/js/file-sandbox/video-sw-streamer.js) | Client shim — registers SW, manages sessions |
+| [`assets/js/file-sandbox/crypto.js`](../../../../assets/js/file-sandbox/crypto.js) | Reference for decryption logic (duplicated inline in SW) |
+| [`assets/js/file-sandbox/content-types.js`](../../../../assets/js/file-sandbox/content-types.js) | Video metadata extraction + content object builders/parsers |
+| [`priv/static/file_sandbox.html`](../../../../priv/static/file_sandbox.html) | File sandbox UI with "Play Video" button |
 
 ## 13. Resolved Questions
 
 - **MSE vs Service Worker:** Service Worker chosen — MSE was too fragile (QuotaExceeded, codec detection, buffer management complexity). SW delegates all media handling to the browser's native stack.
-- **Crypto algorithm:** AES-256-GCM per [pq_files.md §2](pq_files.md#2-chunk-encryption)
-- **Chunk size:** 4 MB per [pq_files.md §12](pq_files.md#12-chunk-size-decision)
+- **Crypto algorithm:** AES-256-GCM per [pq_files.done.md §2](pq_files.done.md#2-chunk-encryption)
+- **Chunk size:** 4 MB per [pq_files.done.md §12](pq_files.done.md#12-chunk-size-decision)
 - **Nonce handling:** each chunk carries its own random nonce prepended to the ciphertext; `decryptChunk()` extracts it transparently
 - **Seeking:** native — the browser issues range requests, SW maps bytes to chunks
 - **iOS:** native `<video>` + SW works on iOS 11.3+ (no ManagedMediaSource needed)
 - **Blowfish migration:** the old server-side decryption path (Blowfish CFB64 via `FileController`) remains for backward compatibility with pre-PQ files. New PQ files use client-side AES-256-GCM exclusively.
+- **SW persistence:** IndexedDB used to persist sessions across SW termination/restart — avoids broken playback when the browser kills the idle SW.

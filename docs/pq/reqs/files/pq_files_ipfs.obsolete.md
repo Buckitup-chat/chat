@@ -1,10 +1,10 @@
 # File Storage — IPFS Chunk Sync
 
-> **OBSOLETE — rejected alternative, kept for the record.** This was a feasibility analysis of using IPFS as the chunk byte layer. It was **not** adopted: plain filesystem storage with the per-drive pipeline proved substantially faster, and the two problems this doc set out to solve were resolved directly (multi-peer routing via `missing_chunks.peer_url` + fallback to all connected peers; drive portability via `MissingChunksBackfill` + `DriveCopySource`). The shipped design is [File Storage](pq_files.md) (raw bytes on the filesystem) with the [Chunk Pipeline](pq_chunk_writer.md). References below to a "v2 migration plan", `ChunkFetcher`, and "open question §14.8" describe an earlier framing that no longer matches the code.
+> **OBSOLETE — rejected alternative, kept for the record.** This was a feasibility analysis of using IPFS as the chunk byte layer. It was **not** adopted: plain filesystem storage with the per-drive pipeline proved substantially faster, and the two problems this doc set out to solve were resolved directly (multi-peer routing via `missing_chunks.peer_url` + fallback to all connected peers; drive portability via `MissingChunksBackfill` + `DriveCopySource`). The shipped design is [File Storage](pq_files.done.md) (raw bytes on the filesystem) with the [Chunk Pipeline](pq_chunk_writer.done.md). References below to a "v2 migration plan", `ChunkFetcher`, and "open question §14.8" describe an earlier framing that no longer matches the code.
 
 ## 1. Motivation
 
-The v2 migration plan ([pq_files.md §14](pq_files.md#14-migration-plan-chunk-blobs--filesystem-protocol-v2-raw-bytes)) moves chunk bytes out of PostgreSQL onto the filesystem and introduces `ChunkFetcher` for device-to-device byte transfer. Two problems remain:
+The v2 migration plan ([pq_files.done.md §14](pq_files.done.md#14-migration-plan-chunk-blobs--filesystem-protocol-v2-raw-bytes)) moves chunk bytes out of PostgreSQL onto the filesystem and introduces `ChunkFetcher` for device-to-device byte transfer. Two problems remain:
 
 1. **Multi-peer content routing** (open question in §14.8): `ChunkFetcher` must know which peer has which chunk. Single-peer topologies can reuse the Electric shape source address, but multi-peer needs a chunk-availability mechanism that v2 leaves unresolved.
 2. **USB drive portability**: when a USB drive moves between devices, its chunk bytes need to be discoverable and servable. v2's filesystem shard layout (`pq_files/<shard>/<file_id>/<chunk_index>`) requires custom import logic.
@@ -33,7 +33,7 @@ file_chunks manifest (CID, size, sig)   Bitswap (peer-to-peer transfer)
 
 ### 3.1 `file_chunks` (Electric-synced, v2+IPFS)
 
-Same as [pq_files.md §14.2](pq_files.md#142-protocol-v2-changes) with `cid` added and `data_b64` removed:
+Same as [pq_files.done.md §14.2](pq_files.done.md#142-protocol-v2-changes) with `cid` added and `data_b64` removed:
 
 | Column | Type | Description |
 |---|---|---|
@@ -51,15 +51,15 @@ Rows are ~5 KB (dominated by ML-DSA-87 signature) — the table stays in the Ele
 
 ### 3.2 `files` (unchanged)
 
-Same as [pq_files.md §1.1](pq_files.md#11-files-electric-synced). The trust chain is unmodified: `chunk_sign_hashes[i] = SHA3-512(chunk_i.sign_b64)`.
+Same as [pq_files.done.md §1.1](pq_files.done.md#11-files-electric-synced). The trust chain is unmodified: `chunk_sign_hashes[i] = SHA3-512(chunk_i.sign_b64)`.
 
 ### 3.3 `upload_chunks` (unchanged)
 
-Same as [pq_files.md §1.3](pq_files.md#13-upload_chunks-local-only-not-electric-synced). Budget accounting uses `size` from manifest rows — unaffected by IPFS.
+Same as [pq_files.done.md §1.3](pq_files.done.md#13-upload_chunks-local-only-not-electric-synced). Budget accounting uses `size` from manifest rows — unaffected by IPFS.
 
 ### 3.4 `missing_chunks` (local only, NOT Electric-synced)
 
-Same structure as [pq_files.md §14.3](pq_files.md#143-target-architecture) with `cid` added:
+Same structure as [pq_files.done.md §14.3](pq_files.done.md#143-target-architecture) with `cid` added:
 
 | Column | Type | Description |
 |---|---|---|
@@ -72,7 +72,7 @@ Same structure as [pq_files.md §14.3](pq_files.md#143-target-architecture) with
 | `updated_at` | BIGINT | Last attempt or creation time (TimeKeeper) |
 | | PK | `(file_id, chunk_index)` |
 
-Population follows the same two-stage pre-seed as v2 ([pq_files.md §14.3](pq_files.md#143-target-architecture)): `files` manifest arrival creates placeholders → `file_chunks` manifest rows fill `cid`, `data_hash`, `size`.
+Population follows the same two-stage pre-seed as v2 ([pq_files.done.md §14.3](pq_files.done.md#143-target-architecture)): `files` manifest arrival creates placeholders → `file_chunks` manifest rows fill `cid`, `data_hash`, `size`.
 
 The table serves as a **UI signal** ("X of Y synced") and a **Bitswap bridge** — when `cid` is set, the chunk is added to the IPFS want-list. Bitswap handles the actual fetching. Once bytes arrive and pass verification, the `missing_chunks` row is deleted.
 
@@ -85,11 +85,11 @@ Two independent hash functions, clean separation of concerns:
 | `data_hash` | SHA3-512 | Trust chain — bound to ML-DSA-87 signature, verified on admission | `"fd_" + hex` in `file_chunks` |
 | CID | SHA2-256 (multihash) | IPFS block routing — Bitswap exchange, blockstore lookup | CIDv1 string in `file_chunks.cid` |
 
-On chunk admission (any source): compute `SHA3-512(raw bytes)`, verify against `data_hash` from the signed manifest. IPFS independently computes SHA2-256 for the CID. The trust chain ([pq_files.md §14.3](pq_files.md#143-target-architecture) "Receiver integrity") is unchanged — the bytes channel is untrusted by design; integrity is enforced at admission, not in transport.
+On chunk admission (any source): compute `SHA3-512(raw bytes)`, verify against `data_hash` from the signed manifest. IPFS independently computes SHA2-256 for the CID. The trust chain ([pq_files.done.md §14.3](pq_files.done.md#143-target-architecture) "Receiver integrity") is unchanged — the bytes channel is untrusted by design; integrity is enforced at admission, not in transport.
 
 ## 5. Upload Protocol
 
-Same as [pq_files.md §14.2](pq_files.md#142-protocol-v2-changes) chunk upload endpoint, with IPFS replacing filesystem storage:
+Same as [pq_files.done.md §14.2](pq_files.done.md#142-protocol-v2-changes) chunk upload endpoint, with IPFS replacing filesystem storage:
 
 ```
 Client                              Device
@@ -113,7 +113,7 @@ Client                              Device
   │<── 200 {txid} ─────────────────────│
 ```
 
-Upload authentication is unchanged from v2: the chunk signature is the proof of possession — no challenge flow ([pq_files.md §14.2](pq_files.md#142-protocol-v2-changes) "Upload authentication").
+Upload authentication is unchanged from v2: the chunk signature is the proof of possession — no challenge flow ([pq_files.done.md §14.2](pq_files.done.md#142-protocol-v2-changes) "Upload authentication").
 
 ## 6. Sync Protocol
 
@@ -193,7 +193,7 @@ When a USB drive with chunk blocks is inserted:
 
 ### 8.3 Boot Sequence Integration
 
-The [BootSupervisor](pq_files.md) staged startup gains an IPFS-related step:
+The [BootSupervisor](pq_files.done.md) staged startup gains an IPFS-related step:
 
 ```
 Healer → Mounter → InternalDbAwaiter → InitPg → PgServer → DbCreated →
@@ -269,7 +269,7 @@ The IPFS daemon is device-scoped (not per-drive), so it starts under the main su
 
 ## 10. Garbage Collection
 
-BuckitUp GC ([pq_files.md §8](pq_files.md#8-garbage-collection)) must coordinate with IPFS:
+BuckitUp GC ([pq_files.done.md §8](pq_files.done.md#8-garbage-collection)) must coordinate with IPFS:
 
 1. **Deleted files**: when `files.deleted_flag = true`, GC deletes `file_chunks` manifest rows AND calls `ipfs block rm <CID>` for each chunk (or `ipfs pin rm` if using pinning)
 2. **Stale uploads**: same as v2 — `upload_chunks` older than 2 days are deleted, corresponding `file_chunks` rows removed, IPFS blocks removed

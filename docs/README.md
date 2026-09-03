@@ -63,7 +63,7 @@ Hard requirements and specs. See [`pq/reqs/CLAUDE.md`](./pq/reqs/CLAUDE.md) for 
 - [PQ user storage](./pq/reqs/pq_user_storage.md)
 - [PQ files](./pq/reqs/files/pq_files.done.md)
 - [PQ chunk writer](./pq/reqs/files/pq_chunk_writer.done.md)
-- [PQ video streaming](./pq/reqs/pq_video_streaming.md)
+- [PQ video streaming](./pq/reqs/files/pq_video_streaming.done.md)
 
 ## proposal/ — generation-agnostic
 

@@ -223,7 +223,7 @@ Returns the raw encrypted chunk bytes as `application/octet-stream`, read from `
 
 **Implementation**: [`ChatWeb.FileChunkController.show/2`](../../../lib/chat_web/controllers/file_chunk_controller.ex) → [`Chat.Data.File.ChunkStore.fetch/2`](../../../lib/chat/data/file/chunk_store.ex) (single on-disk file read; the chunk metadata row supplies `size`).
 
-**Why not Electric shapes?** Each unique `(table, where)` combination creates a persistent Electric shape: a Consumer GenServer, a PG snapshot transaction, disk-backed shape log, and ongoing WAL filtering. Fetching N chunks via shapes creates N long-lived server-side resources for what is a simple point read. The direct endpoint performs one file read with no persistent overhead. This matters especially for video streaming (see [pq_video_streaming.md §6](../pq_video_streaming.md#6-chunk-fetch-strategy)), where seeking triggers many single-chunk fetches.
+**Why not Electric shapes?** Each unique `(table, where)` combination creates a persistent Electric shape: a Consumer GenServer, a PG snapshot transaction, disk-backed shape log, and ongoing WAL filtering. Fetching N chunks via shapes creates N long-lived server-side resources for what is a simple point read. The direct endpoint performs one file read with no persistent overhead. This matters especially for video streaming (see [pq_video_streaming.done.md §6](pq_video_streaming.done.md#6-chunk-fetch-strategy)), where seeking triggers many single-chunk fetches.
 
 ### 6.2 Chunk Status Endpoint
 

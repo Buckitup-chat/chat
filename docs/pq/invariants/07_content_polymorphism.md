@@ -37,6 +37,7 @@ Because the type lives inside the ciphertext, the database (and any peer without
 - [`"image"`](#image) — large image, out-of-band with aspect ratio and thumbhash
 - [`"video"`](#video) — video, out-of-band with aspect ratio and thumbhash
 - [`"review_list_key"`](#review_list_key) — the sender's `review_list_password`, shared with a contact
+- [`"quote"`](#quote) — a snapshot of a cited message, carried inside the reply
 
 ### `"inline_file"`
 
@@ -157,6 +158,45 @@ ML-KEM-1024, so the key is protected exactly as any other content. The receiving
 The key never rotates — sending it is irreversible, since a contact who has it keeps access to
 everything the sender writes afterwards. Delivery is therefore per-recipient and deliberate, not a
 broadcast.
+
+
+### `"quote"`
+
+A snapshot of a cited message, carried inside the citing message. Used as the
+first element of a composed message to express a reply:
+
+```json
+[{"quote": ["u_ab12…", "dmsg_01990c…", "dms_4f19…", "Схему пришли до четверга"]}, "Уже в очереди, вечером будет"]
+```
+
+```json
+{"quote": [author_hash, message_id, sign_hash, snapshot]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | author_hash | `user_hash` of the quoted message's author |
+| 1 | message_id | `dmsg_<UUID7>` of the quoted message |
+| 2 | sign_hash | `dms_`-prefixed revision identity of the exact version cited |
+| 3 | snapshot | The cited content **at citation time** — any value from this document (bare string, one-key object, or composed array) |
+
+The snapshot is the load-bearing field. It is frozen when the reply is
+authored, so the quote renders even when the original row never replicated to
+this peer, was edited afterwards, or was deleted — the reply is
+self-contained, and later changes to the original are detectable (the cited
+`sign_hash` no longer matches the original's tip) rather than silently
+rewriting what the reply appeared to answer.
+
+`(message_id, sign_hash)` pin the exact revision for jump-to-original
+navigation; when the pair resolves to nothing locally, the quote still
+renders from its snapshot and the client simply offers no jump.
+
+Because the snapshot is itself canonical content, quoting a message that
+contains a quote nests with no special casing. Clients should bound how much
+of the nesting they *render* inline; the wire format itself is unbounded.
+
+A quote is context, not authorship: text inside the snapshot belongs to
+`author_hash`, not to the sender of the citing message.
 
 --- 
 

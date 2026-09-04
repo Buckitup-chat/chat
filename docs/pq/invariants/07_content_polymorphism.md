@@ -23,7 +23,7 @@ Examples:
 ["here is example of composed message", {"inline_image": [16, 9, "thumbhash...", "some.jpg", ... ]}]
 {"inline_image": [16, 9, "thumbhash...", "photo.jpg", 204800, "image/jpeg", 1715000000, "<data_b64>"]}
 {"image": [16, 9, "thumbhash...", "photo.jpg", 5242880, "image/jpeg", 1715000000, "f_01964...", "<enc_secret_b64>"]}
-{"video": [16, 9, "thumbhash...", "clip.mp4", 52428800, "video/mp4", 1715000000, "f_01964...", "<enc_secret_b64>"]}
+{"video": [16, 9, "thumbhash...", "clip.mp4", 52428800, "video/mp4", 1715000000, "f_01964...", "<enc_secret_b64>", 127]}
 {"file":  ["doc.pdf", 1048576, "application/pdf", 1715000000, "f_01964...", "<enc_secret_b64>"]}
 ```
 
@@ -116,10 +116,10 @@ Small images (under the inline size limit) should use [`"inline_image"`](#inline
 
 ### `"video"`
 
-Out-of-band video stored as encrypted chunks in PostgreSQL. Carries aspect ratio and thumbhash (from a representative frame) for preview rendering before chunk download. See [pq_files.md](../reqs/files/pq_files.done.md) for chunk encryption.
+Out-of-band video stored as encrypted chunks in PostgreSQL. Carries aspect ratio, thumbhash (from a representative frame) and duration, so a preview with a duration badge renders before any chunk download. See [pq_files.md](../reqs/files/pq_files.done.md) for chunk encryption.
 
 ```json
-{"video": [width_aspect, height_aspect, thumb_hash_b64, name, size, mime_type, creation_unixtime, file_id, enc_secret_b64]}
+{"video": [width_aspect, height_aspect, thumb_hash_b64, name, size, mime_type, creation_unixtime, file_id, enc_secret_b64, duration_seconds]}
 ```
 
 | Position | Field | Description |
@@ -133,6 +133,7 @@ Out-of-band video stored as encrypted chunks in PostgreSQL. Carries aspect ratio
 | 6 | creation_unixtime | Unix seconds of uploaded file creation |
 | 7 | file_id | References `files.file_id` |
 | 8 | enc_secret_b64 | AES-256 key for chunk decryption (base64) |
+| 9 | duration_seconds | Playback duration in seconds, rounded to the nearest integer; `0` when the sender could not determine it |
 
 Videos are always out-of-band — there is no inline variant.
 

@@ -56,7 +56,7 @@ Hard requirements and specs. See [`pq/reqs/CLAUDE.md`](./pq/reqs/CLAUDE.md) for 
 - [Electric API sandbox user](./pq/reqs/electric_api_sandbox_user.md)
 - [Electric network sync](./pq/reqs/electric_network_sync.md)
 - [Electric proof-of-possession](./pq/reqs/electric-proof-of-possesion.md)
-- [Electric shape behaviours](./pq/reqs/electric_shape_behaviours.md)
+- [Electric shape behaviours](./pq/reqs/electric_shape_behaviours.done.md)
 - [PostgreSQL constraints](./pq/reqs/pg_constraints.md)
 - [PQ dialogs](./pq/reqs/pq_dialogs.md)
 - [PQ user](./pq/reqs/pq_user.md)

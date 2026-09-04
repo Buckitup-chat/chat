@@ -51,11 +51,12 @@ Real-time sync layer built on Phoenix.Sync + ElectricSQL.
 ### Requirements
 Hard requirements and specs. See [`pq/reqs/CLAUDE.md`](./pq/reqs/CLAUDE.md) for the folder's topic/status convention.
 
-- [Cross-server data integrity](./pq/reqs/cross-server-data-integrity.livemd)
-- [Electric API sandbox user](./pq/reqs/electric_api_sandbox_user.md)
+- [Integrity](./pq/electric/pq_data_layer/02_integrity.md)
+- [Data Versioning](./pq/electric/pq_data_layer/03_data_versioning.md)
+- [Electric sandboxes](./pq/reqs/electric_sandboxes.done.md)
 - [Electric network sync](./pq/reqs/electric_network_sync.md)
-- [Electric proof-of-possession](./pq/reqs/electric-proof-of-possesion.md)
-- [Electric shape behaviours](./pq/reqs/electric_shape_behaviours.md)
+- [Proof-of-Possession](./pq/invariants/01_proof_of_possession.md)
+- [Electric shape behaviours](./pq/reqs/electric_shape_behaviours.done.md)
 - [PostgreSQL constraints](./pq/reqs/pg_constraints.md)
 - [PQ dialogs](./pq/reqs/pq_dialogs.done.md)
 - [PQ reviews](./pq/reqs/pq_reviews.in_progress.md)

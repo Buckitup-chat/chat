@@ -4,7 +4,7 @@
 
 ## Problem
 
-Because writes propagate between peers without central arbitration (see [electric_network_sync.md](../reqs/electric_network_sync.md)), a row's authenticity cannot depend on the server that served it. The row itself must prove it came from the legitimate owner, and any tampering with stored fields must be detectable by any consumer at any time.
+Because writes propagate between peers without central arbitration (see [electric_network_sync.done.md](../reqs/electric_network_sync.done.md)), a row's authenticity cannot depend on the server that served it. The row itself must prove it came from the legitimate owner, and any tampering with stored fields must be detectable by any consumer at any time.
 
 ## Approach
 

@@ -64,7 +64,7 @@ User Storage is a user-scoped key-value storage system that provides encrypted, 
 
 PoP mechanism follows the same protocol as UserCards system.
 
-**Reference**: See [electric-proof-of-possesion.md](./electric-proof-of-possesion.md) for complete PoP protocol details.
+**Reference**: See [01_proof_of_possession.md](../invariants/01_proof_of_possession.md) for complete PoP protocol details.
 
 ## 5. API Specification
 
@@ -225,7 +225,7 @@ The User Storage implementation follows the existing UserCard system pattern:
 **Key Reference Files**:
 1. **Ingest Endpoint**: [lib/chat_web/controllers/electric_controller.ex](../../../lib/chat_web/controllers/electric_controller.ex)
 2. **Shape Sync Route**: [lib/chat_web/router.ex:145](../../../lib/chat_web/router.ex#L145)
-3. **PoP Protocol**: [docs/pq/reqs/electric-proof-of-possesion.md](./electric-proof-of-possesion.md)
+3. **PoP Protocol**: [docs/pq/invariants/01_proof_of_possession.md](../invariants/01_proof_of_possession.md)
 
 ### 7.2 PostgreSQL Configuration
 
@@ -287,7 +287,7 @@ Add `user_storage` table to Electric publication following the pattern from migr
 
 ### 9.2 Related Specifications
 - [pq_user.md](./pq_user.md) - User Storage schema definition
-- [electric-proof-of-possesion.md](./electric-proof-of-possesion.md) - PoP authentication protocol
+- [01_proof_of_possession.md](../invariants/01_proof_of_possession.md) - PoP authentication protocol
 - UserCard implementation - Reference pattern for this feature
 
 

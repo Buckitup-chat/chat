@@ -1,7 +1,7 @@
 defmodule Chat.Data.Integrity do
   @moduledoc """
   Signature generation and verification for data integrity.
-  Implements the algorithm from cross-server-data-integrity.livemd
+  See docs/pq/electric/pq_data_layer/02_integrity.md
   """
 
   defprotocol Signable do

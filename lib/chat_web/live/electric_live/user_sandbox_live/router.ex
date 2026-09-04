@@ -164,6 +164,10 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
     {:noreply, assign(socket, :show_docs, !socket.assigns.show_docs)}
   end
 
+  def handle_event("toggle_log", _params, socket) do
+    {:noreply, assign(socket, :show_log, !socket.assigns.show_log)}
+  end
+
   def handle_event("toggle_doc_section", %{"section" => section}, socket) do
     expanded_docs =
       if section in socket.assigns.expanded_docs do

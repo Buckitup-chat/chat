@@ -16,6 +16,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
       viewing_storage_uuid: nil,
       request_log: [],
       show_docs: true,
+      show_log: true,
       expanded_docs: MapSet.new(["user_card"]),
       operation_in_progress: false,
       error_message: nil
@@ -27,7 +28,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="h-screen flex flex-col bg-gray-50" id="user-sandbox" phx-hook="DownloadFile">
+    <div class="x-sandbox h-screen flex flex-col bg-gray-50" id="user-sandbox" phx-hook="DownloadFile">
       <.header />
       <div class="flex-1 flex overflow-hidden">
         {Components.docs_sidebar(assigns)}

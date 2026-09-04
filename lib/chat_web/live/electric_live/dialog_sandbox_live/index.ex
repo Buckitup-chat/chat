@@ -25,6 +25,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
       |> assign(:expanded_versions, MapSet.new())
       |> assign(:message_versions, %{})
       |> assign(:show_docs, true)
+      |> assign(:show_log, true)
       |> assign(:expanded_docs, MapSet.new(["dialog_keys"]))
       |> assign(:operation_in_progress, false)
       |> assign(:error_message, nil)
@@ -38,7 +39,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="h-screen flex flex-col bg-gray-50" id="dialog-sandbox">
+    <div class="x-sandbox h-screen flex flex-col bg-gray-50" id="dialog-sandbox">
       <div class="bg-white border-b px-6 py-4">
         <div class="flex items-center justify-between">
           <div>
@@ -389,6 +390,10 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
 
   def handle_event("toggle_docs", _params, socket) do
     {:noreply, assign(socket, :show_docs, !socket.assigns.show_docs)}
+  end
+
+  def handle_event("toggle_log", _params, socket) do
+    {:noreply, assign(socket, :show_log, !socket.assigns.show_log)}
   end
 
   def handle_event("toggle_doc_section", %{"section" => section}, socket) do

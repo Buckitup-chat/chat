@@ -696,6 +696,11 @@ html {
   }
 }
 
+.container:has(.x-sandbox) {
+  max-width: none;
+  padding: 0;
+}
+
 .fill-transparent {
   fill: transparent;
   stroke-dasharray: 126;

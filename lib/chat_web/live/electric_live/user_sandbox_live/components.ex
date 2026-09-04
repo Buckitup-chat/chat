@@ -67,8 +67,18 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Components do
 
   def request_log(assigns) do
     ~H"""
-    <aside class="w-96 bg-gray-50 border-l overflow-y-auto">
-      <div class="p-4">
+    <aside class={"transition-all duration-200 #{if @show_log, do: "w-96", else: "w-12"} bg-gray-50 border-l overflow-y-auto"}>
+      <div class="p-2">
+        <button
+          phx-click="toggle_log"
+          class="w-full flex items-center justify-center p-2 hover:bg-gray-100 rounded"
+          title={if @show_log, do: "Hide log", else: "Show log"}
+        >
+          <span class="text-lg">{if @show_log, do: "►", else: "◄"}</span>
+        </button>
+      </div>
+      <%= if @show_log do %>
+      <div class="px-4 pb-4">
         <div class="flex justify-between items-center mb-4">
           <h3 class="font-bold text-gray-900">Request Log</h3>
           <%= if length(@request_log) > 0 do %>
@@ -125,6 +135,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Components do
           <% end %>
         <% end %>
       </div>
+      <% end %>
     </aside>
     """
   end

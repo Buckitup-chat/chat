@@ -54,7 +54,7 @@ Hard requirements and specs. See [`pq/reqs/CLAUDE.md`](./pq/reqs/CLAUDE.md) for 
 
 - [Integrity](./pq/electric/pq_data_layer/02_integrity.md)
 - [Data Versioning](./pq/electric/pq_data_layer/03_data_versioning.md)
-- [Electric API sandbox user](./pq/reqs/electric_api_sandbox_user.md)
+- [Electric sandboxes](./pq/reqs/electric_sandboxes.done.md)
 - [Electric network sync](./pq/reqs/electric_network_sync.md)
 - [Proof-of-Possession](./pq/invariants/01_proof_of_possession.md)
 - [Electric shape behaviours](./pq/reqs/electric_shape_behaviours.done.md)

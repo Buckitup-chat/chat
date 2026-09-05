@@ -2,7 +2,7 @@ defmodule Chat.Repo.Migrations.RevokeDeleteOnReviewTables do
   use Ecto.Migration
 
   # Enforces the append-only guarantee from docs/pq/reqs/pg_constraints.md §5 and
-  # docs/pq/reqs/pq_reviews.in_progress.md "Row immutability": content tables must never lose
+  # docs/pq/reqs/reviews/pq_review_moderation.done.md "Row immutability": content tables must never lose
   # rows, so a rogue origin — or the server — cannot delete reviews or moderation
   # records. Visibility is controlled exclusively via review_public_passwords
   # versioning (publish/revoke by timestamp), never by row deletion.

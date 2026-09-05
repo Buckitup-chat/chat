@@ -6,7 +6,7 @@ defmodule Chat.Data.ReviewListValidationTest do
   moderation modes and every proof-field state (null / valid / forged),
   mirroring the "Server validation on review_list ingest" and
   "Moderation proof requirements by mode" sections of
-  docs/pq/reqs/pq_reviews.in_progress.md.
+  docs/pq/reqs/reviews/pq_review_contacts.done.md.
   """
   use ChatWeb.DataCase, async: true, group: :ets_deferred
 

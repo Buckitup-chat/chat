@@ -2,7 +2,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ListPassword do
   @moduledoc """
   Keeps the author's `review_list_password` in `user_storage`.
 
-  The password never rotates — "shared once, shared forever" (docs/pq/reqs/pq_reviews.in_progress.md
+  The password never rotates — "shared once, shared forever" (docs/pq/reqs/reviews/pq_review_contacts.done.md
   "Key lifetime") — so this is write-once: read the slot, and generate + insert only
   when it is empty. No version chain, no update path.
 

@@ -86,6 +86,16 @@ Shape: [`Chat.Data.Shapes.Origin`](../../../../lib/chat/data/shapes/origin.ex). 
 
 Access control: insert requires origin identity auth; update requires owner auth (with [`has_pending_reviews?/1`](../../../../lib/chat/data/origin/validation.ex) guard).
 
+## Open questions
+
+### Origin discovery
+
+How are origins discovered? Options: global directory, location-based, search/category, shared via links.
+
+### Origin metadata
+
+What metadata beyond name? Address, hours, category, images — product decisions, need schema space.
+
 ## Source modules
 
 | Layer | Module | Source |

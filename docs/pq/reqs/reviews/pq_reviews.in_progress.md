@@ -225,29 +225,21 @@ origin. See the Status note under [Origin creation](pq_origin.done.md#origin-cre
 
 ## Open questions
 
-### 1. Origin discovery
-
-How are origins discovered? Options: global directory, location-based, search/category, shared via links.
-
-### 2. Origin metadata
-
-What metadata beyond name? Address, hours, category, images — product decisions, need schema space.
-
-### 3. Rating system — resolved
+### 1. Rating system — resolved
 
 Settled by the [Content model](pq_review_moderation.done.md#content-model): rating is position 0 of
 the encrypted content array.
 
-### 4. Comment threading
+### 2. Comment threading
 
 Flat comments or threaded (via `parent_comment_hash`)? Flat is simpler.
 
-### 5. Review editing — resolved
+### 3. Review editing — resolved
 
 See [Review versioning](pq_review_versioning.in_progress.md). Edits allowed in none/post modes and
 pre-mode pending; blocked once pre-mode moderation happens.
 
-### 6. SaaS model
+### 4. SaaS model
 
 How does the SaaS aspect work? Origin creation subscription, premium moderation, paid analytics, or
 the review infrastructure itself as the product.

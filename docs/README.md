@@ -59,7 +59,7 @@ Hard requirements and specs. See [`pq/reqs/CLAUDE.md`](./pq/reqs/CLAUDE.md) for 
 - [Electric shape behaviours](./pq/reqs/electric_shape_behaviours.done.md)
 - [PostgreSQL constraints](./pq/reqs/pg_constraints.md)
 - [PQ dialogs](./pq/reqs/pq_dialogs.done.md)
-- [PQ reviews](./pq/reqs/pq_reviews.in_progress.md)
+- [PQ reviews](./pq/reqs/reviews/pq_reviews.in_progress.md)
 - [PQ user](./pq/reqs/pq_user.md)
 - [PQ user storage](./pq/reqs/pq_user_storage.md)
 - [PQ files](./pq/reqs/files/pq_files.done.md)

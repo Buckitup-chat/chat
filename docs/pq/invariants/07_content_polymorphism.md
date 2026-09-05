@@ -140,7 +140,7 @@ Videos are always out-of-band — there is no inline variant.
 
 The sender's `review_list_password` — one symmetric key per author that decrypts the `password_b64`
 column of every `review_list` row they write, and so opens every review they have written or will
-write, regardless of moderation state. See [pq_reviews § Contacts](../reqs/pq_reviews.in_progress.md).
+write, regardless of moderation state. See [pq_review_contacts](../reqs/reviews/pq_review_contacts.done.md).
 
 ```json
 {"review_list_key": [key_b64]}

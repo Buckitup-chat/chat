@@ -27,7 +27,7 @@ Each sandbox operates under exactly one role. Identity is ephemeral — stored i
 
 ### P2 — Identity via key import
 
-Sandboxes that need authentication accept a `.json` key file upload (`allow_upload(:key_file, accept: ~w(.json))`). Identity is validated through `DialogSandboxLive.Crypto.parse_and_validate_identity/1`. The user sandbox also supports in-place PQ key generation.
+Sandboxes that need authentication accept a `.json` key file upload (`allow_upload(:key_file, accept: ~w(.json))`). Most sandboxes validate identity through `DialogSandboxLive.Crypto.parse_and_validate_identity/1`. The user sandbox has its own `UserSandboxLive.Identity.parse_and_validate/1` (v2 format with secret keys, `crypt_cert`/`contact_cert` verification). The user sandbox also supports in-place PQ key generation.
 
 ### P3 — Challenge-response authentication (PQ PoP)
 
@@ -45,15 +45,15 @@ Data reads go through `/electric/v1/shapes` HTTP endpoints (via `Electric.Client
 
 ### P5 — Request log accumulation
 
-Every API call returns `log_entries` alongside its result. Every sandbox accumulates these into a `request_log` assign. The shared `RequestLog` component (or inline equivalent) renders each entry with collapsible sections for request headers, request body, response headers, and response body.
+Every API call returns `log_entries` alongside its result. Write sandboxes accumulate these into a `request_log` assign. The shared `RequestLog` component (`request_log.ex`) or an inline equivalent renders each entry with collapsible sections for request headers, request body, response headers, and response body. The read-only origin reviews viewer is exempt — it makes no ingest calls and has no request log.
 
 ### P6 — Error surface without state loss
 
-All sandboxes carry an `error_message` assign. Failed operations set it; a dismiss button clears it. Errors never reset application state — the sandbox continues from where it was. Failed requests still appear in the request log.
+Write sandboxes carry an `error_message` assign. Failed operations set it; a dismiss button clears it. Errors never reset application state — the sandbox continues from where it was. Failed requests still appear in the request log. The read-only origin reviews viewer has no error surface — shape read failures are silent.
 
-### P7 — Operation-in-progress gating
+### P7 — In-flight action gating
 
-Sandboxes track `operation_in_progress` to disable action buttons during in-flight API calls. Re-enabled on response (success or failure).
+User and Dialog sandboxes track `operation_in_progress` to disable action buttons during API calls, re-enabled on response (success or failure). Other sandboxes use context-appropriate gating: Origin sandbox gates on `pending_reviews`, Moderation and Contacts reader gate on `loading` (async shape reads). Review sandbox and the read-only origin reviews viewer have no in-flight gating.
 
 ### P8 — Back link to Electric index
 
@@ -61,7 +61,7 @@ Every sub-page renders `← Electric Index` linking to `/electric`.
 
 ### P9 — Hash shortcodes
 
-Hashes displayed via `Chat.Proto.Shortcode.short_code/1` — never raw 130-char hex strings in the UI.
+Most sandboxes display hashes via `Chat.Proto.Shortcode.short_code/1` (Review, Moderation, Origin reviews, Contacts reader, and the data viewer pages). User sandbox uses `Components.short_hash/1` (16-char hex slice), Dialog sandbox uses its own `short_hash/1` (18-char slice), and Origin sandbox displays full hashes in its operations panel.
 
 ### P10 — Export/import identity round-trip
 

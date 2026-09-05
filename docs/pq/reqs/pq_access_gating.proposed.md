@@ -12,6 +12,7 @@ Control who can write data through the Electric ingest API. The first user regis
 |------|---------------------|-------------------------------|-------------|
 | `open` | Anyone | Anyone with valid PoP | Open |
 | `contacts` | Owner's optical-handshake contacts auto-approved | Approved users only | Open |
+| `trust` | Auto-approved if trust score ≥ threshold | Trust-gated (see [Trust Metrics](#trust-metrics)) | Open |
 | `invite` | Owner must explicitly approve each `user_hash` | Approved users only | Open |
 | `locked` | Rejected | Approved users only | Open |
 
@@ -50,6 +51,90 @@ In `contacts` mode, the owner's trusted contacts (established via the [optical h
 - Contact trust is directional — the *owner's* contacts are whitelisted, not every user's contacts.
 - Revoking a contact (if/when supported) removes the approval.
 - Contacts approved this way appear in the approved list alongside explicitly approved users but are tagged as `contact`-sourced so the owner can distinguish them.
+
+---
+
+## Trust Metrics
+
+In `trust` mode, access decisions are driven by a computed trust score rather than a binary approved/rejected state. The owner sets a threshold; users above the threshold can ingest, users below are rejected (or pended, see [Open Questions §2](#open-questions)).
+
+### Industry Approaches
+
+Several established models inform how trust can be computed in a decentralized, partially-offline system like BuckitUp:
+
+#### 1. PGP Web of Trust (Vouching)
+
+The classic decentralized trust model. Users vouch for each other by signing keys. Trust propagates along chains: if Alice trusts Bob and Bob trusts Carol, Alice extends partial trust to Carol. BuckitUp's optical handshake already establishes exactly this kind of directional, cryptographically-verified trust link.
+
+**Fit for BuckitUp:** Natural extension of existing contacts. Each approved user could vouch for others (not just the owner), creating a trust graph where trust attenuates with distance. Owner's direct contacts get the highest trust; contacts-of-contacts get less; and so on.
+
+#### 2. EigenTrust (Global Reputation from Local Trust)
+
+Developed for P2P networks. Each peer assigns local trust values to peers it has interacted with. The algorithm computes a global trust score via iterative matrix multiplication (power iteration over a trust matrix), where each peer's opinion is weighted by their own global trust. The eigenvector of the trust matrix gives stable global scores.
+
+**Fit for BuckitUp:** Could aggregate per-user vouches into a single global score without requiring centralized authority. Computable locally from the trust graph. Handles the "vouching for a bad actor" problem — a vouch from a low-trust user carries little weight.
+
+#### 3. NIST SP 800-207 Zero Trust / Continuous Evaluation
+
+NIST's framework evaluates trust continuously across five domains: identity, device, network, workload, and data. Access is never permanently granted — it's re-evaluated per request based on contextual signals (device posture, behavior patterns, anomaly detection).
+
+**Fit for BuckitUp:** The "continuous" aspect maps to per-ingest evaluation rather than one-time approval. Behavioral signals (ingest frequency, data volume, time-of-day patterns) can feed the trust score so it changes over time.
+
+#### 4. Vouchsafe Zero-Infrastructure Capability Graph (ZI-CG)
+
+A 2026 model designed specifically for offline and disconnected environments. Trust is represented as self-contained, signed capability tokens (Ed25519 + JWT) whose validity is determined by local, deterministic evaluation — no online authority required. Supports scoped delegation and explicit revocation.
+
+**Fit for BuckitUp:** Highly aligned with BuckitUp's offline device scenario. Trust tokens could travel with the data itself, allowing the gate to evaluate trust even when disconnected from the original trust authority. The existing PQ PoP signatures could serve as the cryptographic substrate.
+
+### Proposed Trust Score Components
+
+A composite trust score computed from weighted signals:
+
+| Signal | Description | Weight (example) |
+|--------|-------------|-------------------|
+| `verification_level` | How the user was verified: optical handshake (highest), contact-chain, manual approval, open registration | High |
+| `vouches` | Number and quality of vouches from other trusted users, weighted by voucher's own trust score (EigenTrust-style) | High |
+| `chain_distance` | Shortest path in the trust graph from the owner to this user (1 = direct contact, 2 = contact-of-contact, etc.) | Medium |
+| `tenure` | Time since first successful ingest (longer = more trusted) | Low |
+| `interaction_consistency` | Regularity and pattern of ingest activity — sudden spikes or long dormancy reduce score | Low |
+| `revocation_history` | Whether the user was ever revoked and re-approved | Negative |
+
+### Approval List Extension
+
+In `trust` mode, the approval list gains additional fields:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `trust_score` | float | Computed composite score, 0.0–1.0 |
+| `vouched_by` | list | `user_hash` values of users who vouched for this user |
+| `last_evaluated` | integer | Unix timestamp of last trust re-evaluation |
+
+### Trust Threshold
+
+The owner sets a threshold (0.0–1.0) via the admin UI. Default: **0.5**.
+
+- Users at or above the threshold can ingest.
+- Users below are rejected with `403` and body `{"error": "trust_below_threshold", "score": <score>, "threshold": <threshold>}`.
+- The owner can override: explicitly approve a user regardless of score, or explicitly revoke a user regardless of score.
+
+### Vouching Mechanics
+
+When any approved user with `trust_score ≥ vouch_threshold` (configurable, default = owner's threshold) vouches for another user:
+
+1. A signed vouch attestation is created (voucher's `sign_pkey` signs the vouchee's `user_hash`).
+2. The vouchee's `vouched_by` list is updated.
+3. Trust score is recomputed for the vouchee (and transitively affected users if using EigenTrust).
+
+Vouching is directional and non-transitive by default — Alice vouching for Bob does not mean Alice vouches for everyone Bob vouches for. Transitive trust is handled by the score computation (chain distance + EigenTrust weighting), not by the vouch itself.
+
+### Recomputation
+
+Trust scores are recomputed:
+- On new vouch or vouch withdrawal.
+- On revocation or un-revocation of any user (affects graph topology).
+- Periodically (configurable interval) for behavioral signals (tenure, interaction_consistency).
+
+Recomputation is local — no external service needed.
 
 ---
 
@@ -97,7 +182,8 @@ end
 3. **Request's `user_hash` is the owner** → pass through.
 4. **Request's `user_hash` is in the approved set and not revoked** → pass through.
 5. **Mode is `contacts`** → check if `user_hash` is an owner contact; if yes, auto-approve and pass through.
-6. **Otherwise** → reject with `403 Forbidden`, body: `{"error": "access_denied", "mode": "<current_mode>"}`.
+6. **Mode is `trust`** → compute or retrieve cached trust score for `user_hash`; if score ≥ threshold, pass through; if below, reject with `403` and `{"error": "trust_below_threshold", "score": <score>, "threshold": <threshold>}`.
+7. **Otherwise** → reject with `403 Forbidden`, body: `{"error": "access_denied", "mode": "<current_mode>"}`.
 
 ### Identifying the caller
 
@@ -156,6 +242,7 @@ Client                          Server
   |     - no owner? pass + claim   |    - no owner → pass, post-ingest claim
   |     - approved? pass           |    - approved → pass
   |     - contact? auto-approve    |    - contact in contacts mode → approve + pass
+  |     - trust? score check       |    - trust mode → score ≥ threshold → pass
   |     - else? 403                |    - else → 403
   |   [ChallengeInjector]          |
   |   [ElectricController.ingest]  |  PoP verify + writer
@@ -185,3 +272,30 @@ Proposed.
    Sub-question: should the approval list be **replicated to the backup drive**? On the platform, each USB drive gets its own PG instance with logical replication between main and internal. If the approval list is in PG, it could ride that replication for free. If it's in CubDB, backup requires explicit copy logic (AdminDB is currently single-drive).
 
    The owner `user_hash` + `sign_pkey` and the access mode setting have the same storage question.
+
+5. **Which trust score algorithm?**
+
+   | Algorithm | Pros | Cons |
+   |-----------|------|------|
+   | **Simple weighted sum** | Easy to implement, transparent to the owner, deterministic. | No transitive trust propagation — each user scored in isolation. |
+   | **EigenTrust** | Mathematically sound global reputation from local vouches. Handles sybil-adjacent attacks (low-trust vouches carry low weight). | Iterative computation; complexity grows with user count. May be overkill for small deployments. |
+   | **Graph distance only** | Trivial to compute from the trust graph. Intuitive (closer to owner = more trusted). | Ignores vouch quality — one direct contact isn't the same as another. |
+   | **Hybrid (distance + weighted vouches)** | Balances simplicity with quality signals. Distance sets the base, vouches adjust within that band. | Two parameters to tune (distance decay, vouch weight). |
+
+6. **Should trust scores be visible to users?** Transparency aids debugging ("why was I rejected?") but also reveals the scoring model, which could be gamed. Options: visible to owner only, visible to each user for their own score, or fully opaque.
+
+7. **Should `trust` mode coexist with `contacts`?** The `contacts` mode auto-approves optical-handshake contacts with implicit full trust. In `trust` mode, should optical-handshake contacts still get automatic high trust, or should all users go through the same scoring pipeline?
+
+8. **Offline trust evaluation.** The Vouchsafe ZI-CG model suggests trust tokens that are self-verifiable offline. Should vouch attestations be structured as self-contained signed tokens (similar to Vouchsafe's capability tokens) so the gate can evaluate trust without any live lookups — just the token chain?
+
+---
+
+## References
+
+- [PGP Web of Trust](https://www.geeksforgeeks.org/computer-networks/what-is-web-of-trust/) — decentralized trust via key signing chains
+- [EigenTrust Algorithm](https://dl.acm.org/doi/10.1145/775152.775242) — Kamvar, Schlosser & Garcia-Molina, WWW 2003. Global reputation scores from local trust via power iteration
+- [NIST SP 800-207 Zero Trust Architecture](https://www.paloaltonetworks.com/cyberpedia/what-is-nist-sp-800-207) — continuous trust evaluation across identity, device, network, workload, data
+- [Vouchsafe ZI-CG](https://arxiv.org/abs/2601.02254) — Kuri 2026. Zero-infrastructure capability graph for offline identity and trust using Ed25519 + signed JWTs
+- [Trust Score-Based Access Control for ZTA](https://www.researchgate.net/publication/395226702) — composite trust scoring applied to zero trust access decisions
+- [EigenTrust + Zero Trust (EDR application)](https://arxiv.org/pdf/2203.09325) — combining EigenTrust with endpoint signals for network security
+- [Dynamic Decentralized Reputation](https://cheqd.io/blog/dynamic-decentralized-reputation-for-the-web-of-trust-what-we-can-learn-from-the-world-of-sports-tinder-and-netflix/) — Elo-style per-domain reputation scores for verifiable credentials

@@ -7,5 +7,6 @@
 5. doc: FE to have known files on onliners sync
 6. reviews: editing = versioning
 7. dialogs: reactive reactions and receipts
-
+8. global gate API access 
+9. 
 10. simplify project structure. define levels ...

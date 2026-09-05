@@ -79,7 +79,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
             />
           <% end %>
         </main>
-        <.render_request_log request_log={@request_log} />
+        <.render_request_log request_log={@request_log} show_log={@show_log} />
       </div>
     </div>
     """

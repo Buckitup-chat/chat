@@ -10,13 +10,27 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
+### Added
+
+- Post-quantum user: sandbox for importing users
+- [platform] PostgreSQL: boot watchdog for daemon start and stuck databases
+- [frontend] Dialog domain: TanStack DB migration (replacing PGlite)
+
 ### Changed
 
-- Post-quantum specs: status tracking for user, user storage, dialogs (done), and reviews (in progress)
+- Electric sandboxes: collapsible log display
+- Admin panel: show stuck PostgreSQL databases
+- Documentation refresh: post-quantum specs, Electric sync, files, schemas
+- [platform] PostgreSQL: time-box every external command
+- [frontend] Dialog: remove legacy PGlite migration code
 
 ### Fixed
 
-- Post-quantum dialogs: sandbox reaction removal
+- Network sync: user storage peer connector extraction and fix
+- Post-quantum dialogs: reactions flow and sandbox reaction removal
+- [platform] PostgreSQL: handle DbCreator task crash on EPIPE
+- [frontend] Chat: disable self-like
+- [frontend] Dialog: fix queued message sending
 
 ## 2026-08-21_89d5031\_\_\_2026-08-22_5db0a84b\_\_\_2026-08-14_6dc11df
 

@@ -61,7 +61,7 @@ Every sub-page renders `← Electric Index` linking to `/electric`.
 
 ### P9 — Hash shortcodes
 
-Most sandboxes display hashes via `Chat.Proto.Shortcode.short_code/1` (Review, Moderation, Origin reviews, Contacts reader, and the data viewer pages). User sandbox uses `Components.short_hash/1` (16-char hex slice), Dialog sandbox uses its own `short_hash/1` (18-char slice), and Origin sandbox displays full hashes in its operations panel.
+Hashes displayed via `Chat.Proto.Shortcode.short_code/1` — never raw hex strings in the UI. The protocol preserves the type prefix and takes the first 6 hex characters (e.g. `u_aabbcc`, `di_112233`).
 
 ### P10 — Export/import identity round-trip
 

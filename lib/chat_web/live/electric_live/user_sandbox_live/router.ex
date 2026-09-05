@@ -5,7 +5,8 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
   import Phoenix.Component
   import Phoenix.LiveView, only: [consume_uploaded_entries: 3, push_event: 3]
 
-  alias ChatWeb.ElectricLive.UserSandboxLive.{ApiClient, Components, Identity}
+  alias Chat.Proto.Shortcode
+  alias ChatWeb.ElectricLive.UserSandboxLive.{ApiClient, Identity}
 
   def handle_event("create_user", %{"name" => name}, socket) do
     base_url = public_url(socket)
@@ -154,7 +155,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
 
   def handle_event("export_keys", _params, socket) do
     user = socket.assigns.user
-    filename = "identity_#{Components.short_hash(user.user_hash_hex)}.json"
+    filename = "identity_#{Shortcode.short_code(user.user_hash)}.json"
 
     {:noreply,
      push_event(socket, "download_file", %{data: Identity.to_json(user), filename: filename})}

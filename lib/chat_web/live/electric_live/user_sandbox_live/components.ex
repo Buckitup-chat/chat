@@ -3,6 +3,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Components do
 
   use Phoenix.Component
 
+  alias Chat.Proto.Shortcode
   alias ChatWeb.ElectricLive.UserSandboxLive.Docs
 
   def docs_sidebar(assigns) do
@@ -165,7 +166,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Components do
             Name: <span class="font-mono font-semibold">{@user.name}</span>
           </p>
           <p class="text-xs text-gray-500 font-mono">
-            Hash: {short_hash(@user.user_hash_hex)}
+            Hash: {Shortcode.short_code(@user.user_hash)}
           </p>
         </div>
 
@@ -265,5 +266,4 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Components do
     """
   end
 
-  def short_hash(hash_hex), do: String.slice(hash_hex, 0, 16) <> "..."
 end

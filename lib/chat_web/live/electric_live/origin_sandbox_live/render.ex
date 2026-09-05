@@ -3,6 +3,8 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
 
   use Phoenix.Component
 
+  alias Chat.Proto.Shortcode
+
   def render_page(assigns) do
     ~H"""
     <div class="x-sandbox min-h-screen bg-gray-50 py-8" id="origin-owner-sandbox" phx-hook="DownloadFile">
@@ -49,7 +51,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
       <%= if @owner do %>
         <div class="text-sm">
           <span class="font-medium text-green-700">Identity loaded:</span>
-          <span class="font-mono text-xs text-gray-600">{@owner.user_hash}</span>
+          <span class="font-mono text-xs text-gray-600">{Shortcode.short_code(@owner.user_hash)}</span>
           <span class="text-gray-500">({@owner.name})</span>
         </div>
       <% else %>
@@ -146,7 +148,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
       <div class="text-sm mb-3 space-y-1">
         <p><span class="font-medium">Name:</span> {@origin.name}</p>
         <p class="font-mono text-xs text-gray-500 truncate">
-          <span class="font-medium font-sans">Hash:</span> {@origin.origin_hash}
+          <span class="font-medium font-sans">Hash:</span> {Shortcode.short_code(@origin.origin_hash)}
         </p>
         <p><span class="font-medium">Moderation:</span> {@origin.moderation_mode}</p>
         <p><span class="font-medium">Deleted:</span> {to_string(@origin.deleted_flag)}</p>

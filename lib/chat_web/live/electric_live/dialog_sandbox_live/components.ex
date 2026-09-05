@@ -3,6 +3,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
 
   use Phoenix.Component
 
+  alias Chat.Proto.Shortcode
   alias ChatWeb.ElectricLive.DialogSandboxLive.ContentComponents
   alias ChatWeb.ElectricLive.DialogSandboxLive.Docs
 
@@ -40,7 +41,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
       <%= if @user do %>
         <div class="mt-3 text-sm">
           <span class="font-medium text-green-700">Identity loaded:</span>
-          <span class="font-mono text-gray-600">{short_hash(@user.user_hash)}</span>
+          <span class="font-mono text-gray-600">{Shortcode.short_code(@user.user_hash)}</span>
           <span class="text-gray-500">({@user.name})</span>
         </div>
       <% end %>
@@ -66,7 +67,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
           <option value="">Select a peer...</option>
           <%= for peer <- @available_peers do %>
             <option value={peer.user_hash} selected={peer.user_hash == @peer_hash_input}>
-              {peer.name} ({short_hash(peer.user_hash)})
+              {peer.name} ({Shortcode.short_code(peer.user_hash)})
             </option>
           <% end %>
         </select>
@@ -90,9 +91,9 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
               phx-value-peer_hash={dialog.peer_hash}
               class={"w-full text-left p-3 rounded border #{if @selected_dialog == dialog.dialog_hash, do: "border-blue-500 bg-blue-50", else: "border-gray-200 hover:bg-gray-50"}"}
             >
-              <div class="text-sm font-mono truncate">{short_hash(dialog.peer_hash)}</div>
+              <div class="text-sm font-mono truncate">{Shortcode.short_code(dialog.peer_hash)}</div>
               <div class="text-xs text-gray-500 mt-1 font-mono truncate">
-                {short_hash(dialog.dialog_hash)}
+                {Shortcode.short_code(dialog.dialog_hash)}
               </div>
             </button>
           <% end %>
@@ -133,9 +134,9 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
             <% versions = Map.get(@message_versions, msg.message_id, []) %>
             <div class={"p-3 rounded-lg max-w-[80%] #{if is_own, do: "ml-auto bg-blue-100", else: "bg-white border"}"}>
               <div class="flex justify-between text-xs text-gray-500 mb-1">
-                <span>{if is_own, do: "You", else: short_hash(msg.sender_hash)}</span>
+                <span>{if is_own, do: "You", else: Shortcode.short_code(msg.sender_hash)}</span>
                 <span class="relative group font-mono text-gray-400 cursor-default">
-                  {short_hash(msg.message_id)}
+                  {Shortcode.short_code(msg.message_id)}
                   <span class="absolute bottom-full right-0 mb-1 px-2 py-1 bg-gray-900 text-white text-[10px] font-mono rounded whitespace-nowrap invisible group-hover:visible z-10">
                     {msg.sign_hash}
                   </span>
@@ -529,7 +530,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
       <%= for {msg_id, sign_hash} <- @refs_map do %>
         <span class="relative group">
           <span class="text-[10px] font-mono text-indigo-500 cursor-default">
-            {short_hash(msg_id)}
+            {Shortcode.short_code(msg_id)}
           </span>
           <span class="absolute bottom-full left-0 mb-1 px-2 py-1 bg-gray-900 text-white text-[10px] font-mono rounded whitespace-nowrap invisible group-hover:visible z-10">
             {sign_hash}
@@ -580,9 +581,6 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
   end
 
   defp format_timestamp(ts), do: inspect(ts)
-
-  defp short_hash(nil), do: "?"
-  defp short_hash(hash), do: String.slice(hash, 0, 18) <> "..."
 
   defp format_resp_headers(headers) when is_map(headers) do
     Enum.flat_map(headers, fn {k, vs} ->

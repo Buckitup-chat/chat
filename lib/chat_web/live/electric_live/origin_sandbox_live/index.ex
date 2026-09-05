@@ -3,6 +3,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
 
   use ChatWeb, :live_view
 
+  alias Chat.Proto.Shortcode
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
   alias ChatWeb.ElectricLive.OriginSandboxLive.ApiClient
   alias ChatWeb.ElectricLive.OriginSandboxLive.Render
@@ -120,8 +121,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
 
   def handle_event("export_origin_identity", _params, socket) do
     origin = socket.assigns.origin
-    short_hash = String.slice(origin.origin_hash, 2, 8)
-    filename = "origin_identity_#{short_hash}.json"
+    filename = "origin_identity_#{Shortcode.short_code(origin.origin_hash)}.json"
 
     data =
       Jason.encode!(

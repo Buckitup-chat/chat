@@ -211,7 +211,7 @@ review
 ├── author_hash           — who wrote it
 ├── content_b64           — AES-256-GCM encrypted with review_password
 ├── deleted_flag           — soft delete by author
-├── parent_sign_hash      — FK → review_versions(sign_hash), nil for first version (see [Review versioning](pq_review_versioning.in_progress.md))
+├── parent_sign_hash      — FK → review_versions(sign_hash), nil for first version (see [Review versioning](pq_review_versioning.done.md))
 ├── owner_timestamp
 ├── sign_b64              — author's ML-DSA-87 signature (over content_b64 ciphertext)
 └── sign_hash             — SHA3-512 of sign_b64 (version identifier)

@@ -83,14 +83,14 @@ Synced by `review_hash` or `origin_hash`.
 
 ## Implementation
 
-- [ ] `review_versions` migration + Electric publication + REVOKE DELETE
-- [ ] FK `review.parent_sign_hash → review_versions.sign_hash`
-- [ ] `Chat.Data.Schemas.ReviewVersion` — same fields as `Review`, PK: `(review_hash, sign_hash)`, uses existing `ReviewSignHash`
-- [ ] `Chat.Data.Review.Versioning` — `archive_and_insert/3`, `archive_and_update/3`, `archive_changeset/1` (dedicated module, not reusing `Dialog.Versioning`)
-- [ ] `Chat.Data.Review` context — `update_review_with_versioning/2`, `insert_review_with_conflict/2`
-- [ ] `Shapes.Review` — drop `persist:` macro, implement `sync_persist/2` with versioning; add `versions_schema/0 → ReviewVersion`; wire `pre_apply` into `ingest_configure_writer`
-- [ ] `Review.Validation` — `validate_edit_allowed/1`: reject update when `moderation_mode == "pre"` AND any `review_public_passwords` row exists for the `review_hash`
-- [ ] Tests: version chain creation, pre-mode lock after moderation, none/post mode edit allowed, tamper-evident chain verification
+- [x] `review_versions` migration + Electric publication + REVOKE DELETE
+- [x] FK `review.parent_sign_hash → review_versions.sign_hash`
+- [x] `Chat.Data.Schemas.ReviewVersion` — same fields as `Review`, PK: `(review_hash, sign_hash)`, uses existing `ReviewSignHash`
+- [x] `Chat.Data.Review.Versioning` — `archive_and_insert/3`, `archive_and_update/3`, `archive_changeset/1` (dedicated module, not reusing `Dialog.Versioning`)
+- [x] `Chat.Data.Review` context — `update_review_with_versioning/2`, `insert_review_with_conflict/2`
+- [x] `Shapes.Review` — drop `persist:` macro, implement `sync_persist/2` with versioning; add `versions_schema/0 → ReviewVersion`; wire `pre_apply` into `ingest_configure_writer`
+- [x] `Review.Validation` — `validate_edit_allowed/1`: reject update when `moderation_mode == "pre"` AND any `review_public_passwords` row exists for the `review_hash`
+- [x] Tests: version chain creation, pre-mode lock after moderation, none/post mode edit allowed, tamper-evident chain verification
 
 ## Source modules
 
@@ -98,3 +98,7 @@ Synced by `review_hash` or `origin_hash`.
 |-------|--------|--------|
 | Schema | `Chat.Data.Schemas.ReviewVersion` | [`schemas/review_version.ex`](../../../../lib/chat/data/schemas/review_version.ex) |
 | Versioning | `Chat.Data.Review.Versioning` | [`review/versioning.ex`](../../../../lib/chat/data/review/versioning.ex) |
+| Validation | `Chat.Data.Review.Validation` | [`review/validation.ex`](../../../../lib/chat/data/review/validation.ex) |
+| Shape | `Chat.Data.Shapes.Review` | [`shapes/review.ex`](../../../../lib/chat/data/shapes/review.ex) |
+| Migration | `CreateReviewVersions` | [`20260908100000_create_review_versions.exs`](../../../../priv/repo/migrations/20260908100000_create_review_versions.exs) |
+| Tests | `ReviewVersioningTest` | [`review_versioning_test.exs`](../../../../test/chat/data/review_versioning_test.exs) |

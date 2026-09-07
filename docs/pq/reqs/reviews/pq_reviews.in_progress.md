@@ -54,7 +54,7 @@ Origin (the coffee shop)
 | [Origin](pq_origin.done.md) | done | Origin entity, creation, ownership, schema, shape |
 | [Moderation](pq_review_moderation.done.md) | done | Crypto pipeline, visibility tiers, content model, comments, schemas, shapes, security |
 | [Contacts](pq_review_contacts.done.md) | done | Contacts channel, review_list, key delivery, proof matrix |
-| [Versioning](pq_review_versioning.in_progress.md) | in_progress | Review editing, version chain, pre-mode lock, review_versions table |
+| [Versioning](pq_review_versioning.done.md) | done | Review editing, version chain, pre-mode lock, review_versions table |
 
 ## Sandboxes
 
@@ -142,7 +142,7 @@ See [Origin](pq_origin.done.md).
 
 ### Phase 2 — Public reviews and moderation pipeline ✓
 
-See [Moderation](pq_review_moderation.done.md) and [Versioning](pq_review_versioning.in_progress.md).
+See [Moderation](pq_review_moderation.done.md) and [Versioning](pq_review_versioning.done.md).
 
 - [x] Hash types (ReviewHash, ReviewSignHash, ReviewPasswordSignHash, etc.)
 - [x] All review schemas + migrations (review, review_public_passwords, review_password_candidate, review_post_right, review_revoke_right, review_list, right candidates)
@@ -160,7 +160,7 @@ See [Moderation](pq_review_moderation.done.md) and [Versioning](pq_review_versio
 - [x] Review author sandbox step 5 (moderation proofs, review_list ingest)
 - [x] Shared ShapeReader + RequestLog
 - [x] Author-side KEM-wrapping verification
-- [ ] Review versioning — see [Versioning](pq_review_versioning.in_progress.md)
+- [x] Review versioning — see [Versioning](pq_review_versioning.done.md)
 
 ### Phase 3 — Contacts channel and owner controls
 
@@ -236,7 +236,7 @@ Flat comments or threaded (via `parent_comment_hash`)? Flat is simpler.
 
 ### 3. Review editing — resolved
 
-See [Review versioning](pq_review_versioning.in_progress.md). Edits allowed in none/post modes and
+See [Review versioning](pq_review_versioning.done.md). Edits allowed in none/post modes and
 pre-mode pending; blocked once pre-mode moderation happens.
 
 ### 4. SaaS model

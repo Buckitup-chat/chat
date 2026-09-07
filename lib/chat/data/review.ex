@@ -4,6 +4,7 @@ defmodule Chat.Data.Review do
   import Chat.Db, only: [repo: 0]
   import Ecto.Query
 
+  alias Chat.Data.Review.Versioning
   alias Chat.Data.Schemas.Review
 
   def get_review(review_hash) do
@@ -16,6 +17,14 @@ defmodule Chat.Data.Review do
       conflict_target: :review_hash,
       allow_stale: true
     )
+  end
+
+  def insert_review_with_conflict(existing, new_review) do
+    Versioning.handle_insert_with_conflict(repo(), existing, new_review)
+  end
+
+  def update_review_with_versioning(existing, new_review) do
+    Versioning.handle_update_with_versioning(repo(), existing, new_review)
   end
 
   defp review_upsert_query do

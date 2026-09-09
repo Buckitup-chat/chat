@@ -2,10 +2,6 @@
 
 ## Now
 
-6. reviews: editing = versioning: ensure sandbox works
-7. dialogs: reactive reactions and receipts
-7. generalize versioning (user_storage, dialog_messages, reviews)
-
 8. global gate API access
 9.
 
@@ -27,3 +23,4 @@
 
 - Review Editing: pre-mode allows edit till approved, always for rest. Origin can remove from public (revoke) on pre/post
 - Review Editing: Sandbox: listing many reviews and edit them
+- Dialogs: sandbox: reactions are reactive

@@ -475,6 +475,77 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
     |> fetch_shape_as(:receipts)
   end
 
+  def start_reaction_stream(dialog_hash, base_url, subscriber_pid) do
+    start_auxiliary_stream(
+      "dialog_message_reactions",
+      dialog_hash,
+      base_url,
+      subscriber_pid,
+      :reactions_loaded,
+      :reaction_change
+    )
+  end
+
+  def start_receipt_stream(dialog_hash, base_url, subscriber_pid) do
+    start_auxiliary_stream(
+      "dialog_message_receipts",
+      dialog_hash,
+      base_url,
+      subscriber_pid,
+      :receipts_loaded,
+      :receipt_change
+    )
+  end
+
+  defp start_auxiliary_stream(table, dialog_hash, base_url, subscriber_pid, loaded_tag, change_tag) do
+    client = Electric.Client.new!(endpoint: base_url <> "/electric/v1/shapes")
+
+    shape =
+      Electric.Client.ShapeDefinition.new!(table,
+        where: "dialog_hash = '#{dialog_hash}'"
+      )
+
+    spawn(fn ->
+      client
+      |> Electric.Client.stream(shape, live: false, replica: :full, errors: :stream)
+      |> Stream.transform(
+        fn -> {[], nil} end,
+        fn
+          %Message.ChangeMessage{headers: %{operation: op}, value: value}, {rows, resume}
+          when op in [:insert, :update] ->
+            {[], {[value | rows], resume}}
+
+          %Message.ResumeMessage{} = resume, {rows, nil} ->
+            {[], {rows, resume}}
+
+          _other, acc ->
+            {[], acc}
+        end,
+        fn {rows, resume} ->
+          send(subscriber_pid, {loaded_tag, Enum.reverse(rows)})
+
+          stream_opts =
+            if resume,
+              do: [resume: resume, replica: :full, errors: :stream],
+              else: [replica: :full, errors: :stream]
+
+          client
+          |> Electric.Client.stream(shape, stream_opts)
+          |> Stream.each(fn
+            %Message.ChangeMessage{headers: %{operation: op}, value: value}
+            when op in [:insert, :update] ->
+              send(subscriber_pid, {change_tag, value})
+
+            _ ->
+              :ok
+          end)
+          |> Stream.run()
+        end
+      )
+      |> Stream.run()
+    end)
+  end
+
   defp publish_mutation(relation, fields, sign_skey, base_url) do
     payload = %{
       "mutations" => [

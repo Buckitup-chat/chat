@@ -30,6 +30,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
       |> assign(:operation_in_progress, false)
       |> assign(:error_message, nil)
       |> assign(:stream_pid, nil)
+      |> assign(:reaction_stream_pid, nil)
+      |> assign(:receipt_stream_pid, nil)
       |> assign(:sync_status, :idle)
       |> allow_upload(:key_file, accept: ~w(.json), max_entries: 1, max_file_size: 100_000)
 
@@ -342,53 +344,61 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
     dialog = Enum.find(socket.assigns.dialogs, &(&1.dialog_hash == dialog_hash))
     base_url = public_url(socket)
 
-    existing =
-      reactions
-      |> Map.get(sign_hash, [])
-      |> Enum.find(&(&1.emoji == emoji and &1.reactor_hash == user.user_hash))
+    with {:ok, socket} <- ensure_dialog_key(socket, user, dialog.peer_hash, base_url) do
+      existing =
+        reactions
+        |> Map.get(sign_hash, [])
+        |> Enum.find(&(&1.emoji == emoji and &1.reactor_hash == user.user_hash))
 
-    result =
-      if existing do
-        ApiClient.delete_reaction(user, existing, dialog.peer_hash, base_url)
-      else
-        ApiClient.publish_reaction(
-          user,
-          dialog_hash,
-          msg_id,
-          sign_hash,
-          emoji,
-          dialog.peer_hash,
-          base_url
-        )
-      end
+      result =
+        if existing do
+          ApiClient.delete_reaction(user, existing, dialog.peer_hash, base_url)
+        else
+          ApiClient.publish_reaction(
+            user,
+            dialog_hash,
+            msg_id,
+            sign_hash,
+            emoji,
+            dialog.peer_hash,
+            base_url
+          )
+        end
 
-    case result do
-      {:ok, %{log_entries: logs}} ->
-        socket =
-          if existing do
-            update(socket, :reactions, fn rxns ->
-              Map.update(rxns, sign_hash, [], fn list ->
-                Enum.reject(list, &(&1.reaction_hash == existing.reaction_hash))
+      case result do
+        {:ok, %{log_entries: logs}} ->
+          socket =
+            if existing do
+              update(socket, :reactions, fn rxns ->
+                Map.update(rxns, sign_hash, [], fn list ->
+                  Enum.reject(list, &(&1.reaction_hash == existing.reaction_hash))
+                end)
               end)
-            end)
-          else
-            new_reaction = %{
-              reaction_hash: reaction_hash_for(user, dialog.peer_hash, msg_id, emoji),
-              dialog_hash: dialog_hash,
-              message_id: msg_id,
-              message_sign_hash: sign_hash,
-              reactor_hash: user.user_hash,
-              emoji: emoji,
-              deleted_flag: false
-            }
+            else
+              new_reaction = %{
+                reaction_hash: reaction_hash_for(user, dialog.peer_hash, msg_id, emoji),
+                dialog_hash: dialog_hash,
+                message_id: msg_id,
+                message_sign_hash: sign_hash,
+                reactor_hash: user.user_hash,
+                emoji: emoji,
+                deleted_flag: false
+              }
 
-            update(socket, :reactions, fn rxns ->
-              Map.update(rxns, sign_hash, [new_reaction], &(&1 ++ [new_reaction]))
-            end)
-          end
+              update(socket, :reactions, fn rxns ->
+                Map.update(rxns, sign_hash, [new_reaction], &(&1 ++ [new_reaction]))
+              end)
+            end
 
-        {:noreply, socket |> update(:request_log, &(&1 ++ logs))}
+          {:noreply, socket |> update(:request_log, &(&1 ++ logs))}
 
+        {:error, %{reason: reason, log_entries: logs}} ->
+          {:noreply,
+           socket
+           |> assign(:error_message, reason)
+           |> update(:request_log, &(&1 ++ logs))}
+      end
+    else
       {:error, %{reason: reason, log_entries: logs}} ->
         {:noreply,
          socket
@@ -403,15 +413,14 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
         socket
       ) do
     %{user: user, selected_dialog: dialog_hash} = socket.assigns
+    dialog = Enum.find(socket.assigns.dialogs, &(&1.dialog_hash == dialog_hash))
     base_url = public_url(socket)
 
-    case ApiClient.publish_receipt(user, dialog_hash, msg_id, sign_hash, type, base_url) do
-      {:ok, %{log_entries: logs}} ->
-        {:noreply,
-         socket
-         |> update(:request_log, &(&1 ++ logs))
-         |> fetch_reactions_and_receipts()}
-
+    with {:ok, socket} <- ensure_dialog_key(socket, user, dialog.peer_hash, base_url),
+         {:ok, %{log_entries: logs}} <-
+           ApiClient.publish_receipt(user, dialog_hash, msg_id, sign_hash, type, base_url) do
+      {:noreply, update(socket, :request_log, &(&1 ++ logs))}
+    else
       {:error, %{reason: reason, log_entries: logs}} ->
         {:noreply,
          socket
@@ -459,10 +468,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
     messages = Enum.map(sorted, &Crypto.decrypt_single_message(&1, keys_cache))
     tails = Crypto.compute_tails(sorted, keys_cache)
 
-    {:noreply,
-     socket
-     |> assign(messages: messages, refs_tails: tails, sync_status: :loaded)
-     |> fetch_reactions_and_receipts()}
+    {:noreply, assign(socket, messages: messages, refs_tails: tails, sync_status: :loaded)}
   end
 
   def handle_info({:dialog_msg_new, raw_msg}, socket) do
@@ -498,6 +504,75 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
     {:noreply, assign(socket, :sync_status, :live)}
   end
 
+  def handle_info({:reactions_loaded, raw_reactions}, socket) do
+    %{msg_keys_cache: keys_cache, user: user} = socket.assigns
+    base_url = public_url(socket)
+
+    keys_cache =
+      raw_reactions
+      |> Enum.map(& &1["reactor_hash"])
+      |> Enum.uniq()
+      |> Enum.reject(&Map.has_key?(keys_cache, &1))
+      |> Enum.reduce(keys_cache, &maybe_unwrap_peer_key(&2, &1, user, base_url))
+
+    reactions = Crypto.group_reactions_by_message(raw_reactions, keys_cache)
+    {:noreply, assign(socket, reactions: reactions, msg_keys_cache: keys_cache)}
+  end
+
+  def handle_info({:reaction_change, raw}, socket) do
+    %{msg_keys_cache: keys_cache, user: user} = socket.assigns
+    base_url = public_url(socket)
+
+    keys_cache =
+      if Map.has_key?(keys_cache, raw["reactor_hash"]) do
+        keys_cache
+      else
+        maybe_unwrap_peer_key(keys_cache, raw["reactor_hash"], user, base_url)
+      end
+
+    decrypted = Crypto.decrypt_single_reaction(raw, keys_cache)
+
+    reactions =
+      if decrypted.deleted_flag do
+        Map.update(socket.assigns.reactions, decrypted.message_sign_hash, [], fn list ->
+          Enum.reject(list, &(&1.reaction_hash == decrypted.reaction_hash))
+        end)
+      else
+        Map.update(socket.assigns.reactions, decrypted.message_sign_hash, [decrypted], fn list ->
+          case Enum.find_index(list, &(&1.reaction_hash == decrypted.reaction_hash)) do
+            nil -> list ++ [decrypted]
+            idx -> List.replace_at(list, idx, decrypted)
+          end
+        end)
+      end
+
+    {:noreply, assign(socket, reactions: reactions, msg_keys_cache: keys_cache)}
+  end
+
+  def handle_info({:receipts_loaded, raw_receipts}, socket) do
+    {:noreply, assign(socket, :receipts, Crypto.group_receipts_by_message(raw_receipts))}
+  end
+
+  def handle_info({:receipt_change, raw}, socket) do
+    receipt = %{
+      message_id: raw["message_id"],
+      message_sign_hash: raw["message_sign_hash"],
+      peer_hash: raw["peer_hash"],
+      type: raw["type"]
+    }
+
+    receipts =
+      Map.update(socket.assigns.receipts, receipt.message_id, [receipt], fn list ->
+        if Enum.any?(list, &(&1.peer_hash == receipt.peer_hash and &1.type == receipt.type)) do
+          list
+        else
+          list ++ [receipt]
+        end
+      end)
+
+    {:noreply, assign(socket, :receipts, receipts)}
+  end
+
   # --- Private ---
 
   defp maybe_start_stream(socket, dialog_hash) do
@@ -510,19 +585,26 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   defp start_dialog_stream(socket, dialog_hash) do
     socket = stop_dialog_stream(socket)
     base_url = public_url(socket)
-    stream_pid = ApiClient.start_message_stream(dialog_hash, base_url, self())
-    assign(socket, stream_pid: stream_pid, sync_status: :loading)
+    me = self()
+
+    socket
+    |> assign(
+      stream_pid: ApiClient.start_message_stream(dialog_hash, base_url, me),
+      reaction_stream_pid: ApiClient.start_reaction_stream(dialog_hash, base_url, me),
+      receipt_stream_pid: ApiClient.start_receipt_stream(dialog_hash, base_url, me),
+      sync_status: :loading
+    )
   end
 
   defp stop_dialog_stream(socket) do
-    case socket.assigns[:stream_pid] do
-      pid when is_pid(pid) ->
-        Process.exit(pid, :kill)
-        assign(socket, :stream_pid, nil)
-
-      _ ->
-        socket
+    for key <- [:stream_pid, :reaction_stream_pid, :receipt_stream_pid] do
+      case socket.assigns[key] do
+        pid when is_pid(pid) -> Process.exit(pid, :kill)
+        _ -> :ok
+      end
     end
+
+    assign(socket, stream_pid: nil, reaction_stream_pid: nil, receipt_stream_pid: nil)
   end
 
   defp fetch_available_peers(socket, my_hash) do
@@ -623,45 +705,6 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
       Crypto.derive_sender_msg_key(user.sign_skey, user.crypt_skey, user.contact_skey, peer_hash)
 
     Crypto.compute_reaction_hash(sender_msg_key, message_id, user.user_hash, emoji)
-  end
-
-  defp fetch_reactions_and_receipts(socket) do
-    %{selected_dialog: dialog_hash, msg_keys_cache: keys_cache, user: user} = socket.assigns
-    base_url = public_url(socket)
-
-    {reactions, logs1} = fetch_and_decrypt_reactions(dialog_hash, keys_cache, user, base_url)
-    {receipts, logs2} = fetch_and_parse_receipts(dialog_hash, base_url)
-
-    socket
-    |> assign(reactions: reactions, receipts: receipts)
-    |> update(:request_log, &(&1 ++ logs1 ++ logs2))
-  end
-
-  defp fetch_and_decrypt_reactions(dialog_hash, keys_cache, user, base_url) do
-    case ApiClient.fetch_reactions(dialog_hash, base_url) do
-      {:ok, %{reactions: raw, log_entries: logs}} ->
-        keys_cache =
-          raw
-          |> Enum.map(& &1["reactor_hash"])
-          |> Enum.uniq()
-          |> Enum.reject(&Map.has_key?(keys_cache, &1))
-          |> Enum.reduce(keys_cache, &maybe_unwrap_peer_key(&2, &1, user, base_url))
-
-        {Crypto.group_reactions_by_message(raw, keys_cache), logs}
-
-      {:error, %{log_entries: logs}} ->
-        {%{}, logs}
-    end
-  end
-
-  defp fetch_and_parse_receipts(dialog_hash, base_url) do
-    case ApiClient.fetch_receipts(dialog_hash, base_url) do
-      {:ok, %{receipts: raw, log_entries: logs}} ->
-        {Crypto.group_receipts_by_message(raw), logs}
-
-      {:error, %{log_entries: logs}} ->
-        {%{}, logs}
-    end
   end
 
   defp find_own_message(messages, msg_id, user_hash) do

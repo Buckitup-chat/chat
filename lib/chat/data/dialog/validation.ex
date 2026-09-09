@@ -12,8 +12,6 @@ defmodule Chat.Data.Dialog.Validation do
   alias EnigmaPq
   alias Phoenix.Sync.Writer.Operation
 
-  import Chat.Db, only: [repo: 0]
-
   # --- Peer sync validation ---
 
   def validate_dialog_key_insert(dialog_key_struct) do
@@ -142,91 +140,14 @@ defmodule Chat.Data.Dialog.Validation do
       end
 
     case {op, changeset.valid?} do
-      {:insert, true} ->
-        with {:ok, new_message} <- Ecto.Changeset.apply_action(changeset, :insert),
-             %DialogMessage{} = existing <- Dialog.get_message(new_message.message_id) do
-          handle_insert_with_versioning(changeset, existing, new_message)
-        else
-          _ -> changeset
-        end
-
-      {:update, true} ->
-        case Ecto.Changeset.apply_action(changeset, :update) do
-          {:ok, new_message} ->
-            handle_update_with_versioning(changeset, changeset.data, new_message)
-
-          _ ->
-            changeset
-        end
-
-      _ ->
-        changeset
+      {:insert, true} -> Versioning.check_insert_versioning(changeset)
+      {:update, true} -> Versioning.check_update_versioning(changeset)
+      _ -> changeset
     end
   end
 
-  defp handle_insert_with_versioning(changeset, existing, new_message) do
-    if new_message.owner_timestamp > existing.owner_timestamp do
-      Ecto.Changeset.put_change(changeset, :parent_sign_hash, existing.sign_hash)
-    else
-      Ecto.Changeset.add_error(changeset, :owner_timestamp, "timestamp not newer")
-    end
-  end
-
-  defp handle_update_with_versioning(changeset, existing, new_message) do
-    if new_message.owner_timestamp > existing.owner_timestamp do
-      Ecto.Changeset.put_change(changeset, :parent_sign_hash, existing.sign_hash)
-    else
-      Ecto.Changeset.add_error(changeset, :owner_timestamp, "timestamp not newer")
-    end
-  end
-
-  def message_pre_apply_versioning(multi, changeset, _context) do
-    cond do
-      changeset.valid? ->
-        archive_message_if_newer(multi, changeset)
-
-      timestamp_not_newer?(changeset) ->
-        archive_old_message_version(multi, changeset)
-
-      true ->
-        multi
-    end
-  end
-
-  defp timestamp_not_newer?(changeset) do
-    Keyword.has_key?(changeset.errors, :owner_timestamp)
-  end
-
-  defp archive_message_if_newer(multi, changeset) do
-    case Ecto.Changeset.apply_action(changeset, changeset.action || :insert) do
-      {:ok, new_message} ->
-        existing = fetch_existing_message(changeset, new_message)
-
-        if existing && new_message.owner_timestamp > existing.owner_timestamp do
-          Versioning.archive_multi_insert(multi, :archive_existing, existing)
-        else
-          multi
-        end
-
-      _ ->
-        multi
-    end
-  end
-
-  defp fetch_existing_message(%{action: :update, data: data}, _new_message), do: data
-
-  defp fetch_existing_message(_changeset, new_message) do
-    repo().get(DialogMessage, new_message.message_id)
-  end
-
-  defp archive_old_message_version(multi, changeset) do
-    case Ecto.Changeset.apply_action(%{changeset | action: :insert}, :insert) do
-      {:ok, new_message} ->
-        Versioning.archive_multi_insert(multi, :archive_old_version, new_message)
-
-      _ ->
-        multi
-    end
+  def message_pre_apply_versioning(multi, changeset, context) do
+    Versioning.pre_apply_versioning(multi, changeset, context)
   end
 
   # --- Dialog Message Reactions: Peer sync validation ---

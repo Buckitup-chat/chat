@@ -1,8 +1,6 @@
 defmodule Chat.Data.Review.Validation do
   @moduledoc "Signature and integrity validation for review operations."
 
-  import Chat.Db, only: [repo: 0]
-
   alias Chat.Data.Origin, as: OriginData
   alias Chat.Data.Review, as: ReviewData
   alias Chat.Data.Review.Versioning
@@ -101,19 +99,14 @@ defmodule Chat.Data.Review.Validation do
 
     case {op, changeset.valid?} do
       {:insert, true} ->
-        with {:ok, new_review} <- Ecto.Changeset.apply_action(changeset, :insert),
-             %Review{} = existing <- ReviewData.get_review(new_review.review_hash) do
-          handle_insert_with_versioning(changeset, existing, new_review)
-        else
-          _ -> changeset
-        end
+        Versioning.check_insert_versioning(changeset)
 
       {:update, true} ->
         case Ecto.Changeset.apply_action(changeset, :update) do
           {:ok, new_review} ->
             changeset
             |> validate_edit_allowed(changeset.data)
-            |> handle_update_with_versioning(changeset.data, new_review)
+            |> check_review_update_versioning(changeset.data, new_review)
 
           _ ->
             changeset
@@ -124,34 +117,19 @@ defmodule Chat.Data.Review.Validation do
     end
   end
 
-  defp handle_insert_with_versioning(changeset, existing, new_review) do
-    if new_review.owner_timestamp > existing.owner_timestamp do
-      Ecto.Changeset.put_change(changeset, :parent_sign_hash, existing.sign_hash)
-    else
-      Ecto.Changeset.add_error(changeset, :owner_timestamp, "timestamp not newer")
-    end
-  end
+  defp check_review_update_versioning(%{valid?: false} = changeset, _existing, _new_review),
+    do: changeset
 
-  defp handle_update_with_versioning(changeset, existing, new_review) do
-    case changeset do
-      %{valid?: false} ->
+  defp check_review_update_versioning(changeset, existing, new_review) do
+    cond do
+      new_review.owner_timestamp <= existing.owner_timestamp ->
+        Ecto.Changeset.add_error(changeset, :owner_timestamp, "timestamp not newer")
+
+      new_review.parent_sign_hash != existing.sign_hash ->
+        Ecto.Changeset.add_error(changeset, :parent_sign_hash, "does not match current version")
+
+      true ->
         changeset
-
-      _ ->
-        cond do
-          new_review.owner_timestamp <= existing.owner_timestamp ->
-            Ecto.Changeset.add_error(changeset, :owner_timestamp, "timestamp not newer")
-
-          new_review.parent_sign_hash != existing.sign_hash ->
-            Ecto.Changeset.add_error(
-              changeset,
-              :parent_sign_hash,
-              "does not match current version"
-            )
-
-          true ->
-            changeset
-        end
     end
   end
 
@@ -164,53 +142,8 @@ defmodule Chat.Data.Review.Validation do
     end
   end
 
-  def review_pre_apply_versioning(multi, changeset, _context) do
-    cond do
-      changeset.valid? ->
-        archive_review_if_newer(multi, changeset)
-
-      timestamp_not_newer?(changeset) ->
-        archive_old_review_version(multi, changeset)
-
-      true ->
-        multi
-    end
-  end
-
-  defp timestamp_not_newer?(changeset) do
-    Keyword.has_key?(changeset.errors, :owner_timestamp)
-  end
-
-  defp archive_review_if_newer(multi, changeset) do
-    case Ecto.Changeset.apply_action(changeset, changeset.action || :insert) do
-      {:ok, %{owner_timestamp: new_ts} = new_review} ->
-        case fetch_existing_review(changeset, new_review) do
-          %Review{owner_timestamp: existing_ts} = existing when new_ts > existing_ts ->
-            Versioning.archive_multi_insert(multi, :archive_existing, existing)
-
-          _ ->
-            multi
-        end
-
-      _ ->
-        multi
-    end
-  end
-
-  defp fetch_existing_review(%{action: :update, data: data}, _new_review), do: data
-
-  defp fetch_existing_review(_changeset, new_review) do
-    repo().get(Review, new_review.review_hash)
-  end
-
-  defp archive_old_review_version(multi, changeset) do
-    case Ecto.Changeset.apply_action(%{changeset | action: :insert}, :insert) do
-      {:ok, new_review} ->
-        Versioning.archive_multi_insert(multi, :archive_old_version, new_review)
-
-      _ ->
-        multi
-    end
+  def review_pre_apply_versioning(multi, changeset, context) do
+    Versioning.pre_apply_versioning(multi, changeset, context)
   end
 
   # --- Origin existence check ---

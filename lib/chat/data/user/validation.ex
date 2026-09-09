@@ -9,8 +9,6 @@ defmodule Chat.Data.User.Validation do
   alias EnigmaPq
   alias Phoenix.Sync.Writer.Operation
 
-  import Chat.Db, only: [repo: 0]
-
   defprotocol TimestampedData do
     @moduledoc """
     Protocol for data structures that have owner timestamps.
@@ -143,113 +141,18 @@ defmodule Chat.Data.User.Validation do
     end
   end
 
-  @doc """
-  Validation function for user_storage that integrates versioning logic.
-  This is used by HTTP ingestion to handle versioning automatically.
-
-  Returns an Ecto.Multi that includes both validation and versioning operations.
-  """
   def user_storage_validate_with_versioning(storage, changes, op) do
-    # First validate the changeset
     changeset = user_storage_validate(storage, changes, op)
 
     case {op, changeset.valid?} do
-      {:insert, true} ->
-        # For inserts, check if a conflict exists and handle versioning
-        with {:ok, new_storage} <- Ecto.Changeset.apply_action(changeset, :insert),
-             existing when not is_nil(existing) <-
-               repo().get_by(UserStorage,
-                 user_hash: new_storage.user_hash,
-                 uuid: new_storage.uuid
-               ) do
-          # Conflict exists - use versioning logic
-          handle_insert_with_versioning(changeset, existing, new_storage)
-        else
-          _ -> changeset
-        end
-
-      {:update, true} ->
-        # For updates, check timestamp and handle versioning
-        with {:ok, new_storage} <- Ecto.Changeset.apply_action(changeset, :update),
-             existing <- changeset.data do
-          handle_update_with_versioning(changeset, existing, new_storage)
-        else
-          _ -> changeset
-        end
-
-      _ ->
-        changeset
+      {:insert, true} -> Versioning.check_insert_versioning(changeset)
+      {:update, true} -> Versioning.check_update_versioning(changeset)
+      _ -> changeset
     end
   end
 
-  defp handle_insert_with_versioning(changeset, existing, new_storage) do
-    if new_storage.owner_timestamp > existing.owner_timestamp do
-      Ecto.Changeset.put_change(changeset, :parent_sign_hash, existing.sign_hash)
-    else
-      Ecto.Changeset.add_error(changeset, :owner_timestamp, "timestamp not newer")
-    end
-  end
-
-  defp handle_update_with_versioning(changeset, existing, new_storage) do
-    if new_storage.owner_timestamp > existing.owner_timestamp do
-      Ecto.Changeset.put_change(changeset, :parent_sign_hash, existing.sign_hash)
-    else
-      Ecto.Changeset.add_error(changeset, :owner_timestamp, "timestamp not newer")
-    end
-  end
-
-  @doc """
-  Pre-apply callback for user_storage that handles versioning.
-  Archives the existing version when a newer version is being inserted/updated.
-  When an older version comes in, it archives the old version to the versions table.
-  """
-  def user_storage_pre_apply_versioning(multi, changeset, _context) do
-    cond do
-      changeset.valid? ->
-        archive_if_newer(multi, changeset)
-
-      timestamp_not_newer?(changeset) ->
-        archive_old_version(multi, changeset)
-
-      true ->
-        multi
-    end
-  end
-
-  defp timestamp_not_newer?(changeset) do
-    Keyword.has_key?(changeset.errors, :owner_timestamp)
-  end
-
-  defp archive_if_newer(multi, changeset) do
-    case Ecto.Changeset.apply_action(changeset, changeset.action || :insert) do
-      {:ok, new_storage} ->
-        existing = fetch_existing_storage(changeset, new_storage)
-
-        if existing && new_storage.owner_timestamp > existing.owner_timestamp do
-          Versioning.archive_multi_insert(multi, :archive_existing, existing)
-        else
-          multi
-        end
-
-      _ ->
-        multi
-    end
-  end
-
-  defp fetch_existing_storage(%{action: :update, data: data}, _new_storage), do: data
-
-  defp fetch_existing_storage(_changeset, new_storage) do
-    repo().get_by(UserStorage, user_hash: new_storage.user_hash, uuid: new_storage.uuid)
-  end
-
-  defp archive_old_version(multi, changeset) do
-    case Ecto.Changeset.apply_action(%{changeset | action: :insert}, :insert) do
-      {:ok, new_storage} ->
-        Versioning.archive_multi_insert(multi, :archive_old_version, new_storage)
-
-      _ ->
-        multi
-    end
+  def user_storage_pre_apply_versioning(multi, changeset, context) do
+    Versioning.pre_apply_versioning(multi, changeset, context)
   end
 
   @doc """

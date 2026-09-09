@@ -70,7 +70,8 @@ defmodule Chat.Application do
     defp more_children do
       [
         Chat.Data.File.GC,
-        Chat.Upload.StaleUploadsPruner
+        Chat.Upload.StaleUploadsPruner,
+        Chat.Data.ReviewCandidateCleaner
       ]
     end
   end

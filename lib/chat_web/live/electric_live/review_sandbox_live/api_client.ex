@@ -62,14 +62,71 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
         review_hash: review_hash,
         origin_hash: origin_hash,
         review_password: review_password,
-        # rating/text are here for render
         rating: rating,
         text: text,
         content_json: content,
-        owner_timestamp: timestamp
+        owner_timestamp: timestamp,
+        parent_sign_hash: nil,
+        sign_hash: sign_hash
       }
 
       {:ok, %{review: review_data, log_entries: [log1, log2]}}
+    else
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
+    end
+  end
+
+  # `owner_timestamp` is unix *seconds* and the server rejects anything not
+  # strictly newer, so an edit landing in the same second as the version it
+  # replaces has to step past it rather than restate `now`.
+  def edit_review(author, review, new_rating, new_text, base_url) do
+    content = review_content(new_rating, new_text)
+    content_b64 = EnigmaPq.aes_gcm_encrypt(content, review.review_password)
+    timestamp = max(review.owner_timestamp + 1, TimeKeeper.now_unix())
+
+    review_struct = %Review{
+      review_hash: review.review_hash,
+      origin_hash: review.origin_hash,
+      author_hash: author.user_hash,
+      content_b64: content_b64,
+      deleted_flag: false,
+      parent_sign_hash: review.sign_hash,
+      owner_timestamp: timestamp
+    }
+
+    {sign_b64, sign_hash} = sign_struct(review_struct, author.sign_skey, ReviewSignHash)
+
+    payload = %{
+      "mutations" => [
+        %{
+          "type" => "update",
+          "original" => %{"review_hash" => review.review_hash},
+          "changes" => %{
+            "content_b64" => encode_base64(content_b64),
+            "deleted_flag" => false,
+            "parent_sign_hash" => review.sign_hash,
+            "owner_timestamp" => timestamp,
+            "sign_b64" => encode_base64(sign_b64),
+            "sign_hash" => sign_hash
+          },
+          "syncMetadata" => %{"relation" => "review"}
+        }
+      ]
+    }
+
+    with {:ok, ch, log1} <- get_challenge(base_url),
+         {:ok, _resp, log2} <- post_ingest(ch, payload, author.sign_skey, base_url) do
+      updated_review =
+        Map.merge(review, %{
+          rating: new_rating,
+          text: new_text,
+          content_json: content,
+          owner_timestamp: timestamp,
+          parent_sign_hash: review.sign_hash,
+          sign_hash: sign_hash
+        })
+
+      {:ok, %{review: updated_review, log_entries: [log1, log2]}}
     else
       {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end

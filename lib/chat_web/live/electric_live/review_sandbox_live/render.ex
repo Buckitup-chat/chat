@@ -4,6 +4,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Render do
   use Phoenix.Component
 
   import ChatWeb.ElectricLive.RequestLog
+  import ChatWeb.ElectricLive.ReviewSandboxLive.RenderEdit
   import ChatWeb.ElectricLive.ReviewSandboxLive.RenderReviewList
   import ChatWeb.ElectricLive.ReviewSandboxLive.RenderVerification
 
@@ -85,7 +86,10 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Render do
     ~H"""
     <div class="bg-white shadow rounded-lg p-6">
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Step 2: Submit Review</h2>
-      <%= if @review do %>
+      <%= if @reviews != [] and not @editing do %>
+        {render_review_picker(assigns)}
+      <% end %>
+      <%= if @review && !@editing do %>
         <div class="text-sm space-y-1">
           <p>
             <span class="font-medium">Review hash:</span>
@@ -104,64 +108,73 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Render do
             <p><span class="font-medium">Text:</span> {@review.text}</p>
           <% end %>
           <p><span class="font-medium">Timestamp:</span> {@review.owner_timestamp}</p>
+          <p :if={@review.parent_sign_hash}>
+            <span class="font-medium">Parent version:</span>
+            <span class="font-mono text-xs">{Shortcode.short_code(@review.parent_sign_hash)}</span>
+          </p>
           <details class="mt-2">
             <summary class="cursor-pointer text-xs text-gray-500">
               Content JSON (plaintext before encryption)
             </summary>
             <pre class="mt-1 text-xs font-mono bg-gray-50 p-2 rounded overflow-x-auto">{@review.content_json}</pre>
           </details>
+          {render_review_actions(assigns)}
         </div>
       <% else %>
-        <form phx-submit="submit_review" phx-change="form_changed" class="space-y-3">
-          <div>
-            <label class="block text-xs font-medium text-gray-700 mb-1">Origin</label>
-            <select name="origin_hash" required class="w-full px-3 py-2 border rounded-lg text-sm">
-              <option value="">Select an origin...</option>
-              <option
-                :for={origin <- @origins}
-                value={origin.origin_hash}
-                selected={origin.origin_hash == @origin_hash}
-              >
-                {origin.name}
-              </option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-gray-700 mb-1">Rating</label>
-            <div class="flex gap-1">
-              <button
-                :for={n <- 1..5}
-                type="button"
-                phx-click="set_rating"
-                phx-value-rating={n}
-                class="text-2xl focus:outline-none"
-              >
-                <span class={if n <= @selected_rating, do: "text-yellow-400", else: "text-gray-300"}>
-                  ★
-                </span>
-              </button>
+        <%= if @editing do %>
+          {render_edit_form(assigns)}
+        <% else %>
+          <form phx-submit="submit_review" phx-change="form_changed" class="space-y-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Origin</label>
+              <select name="origin_hash" required class="w-full px-3 py-2 border rounded-lg text-sm">
+                <option value="">Select an origin...</option>
+                <option
+                  :for={origin <- @origins}
+                  value={origin.origin_hash}
+                  selected={origin.origin_hash == @origin_hash}
+                >
+                  {origin.name}
+                </option>
+              </select>
             </div>
-            <input type="hidden" name="rating" value={@selected_rating} />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-gray-700 mb-1">
-              Review text <span class="text-gray-400">(optional)</span>
-            </label>
-            <textarea
-              name="content"
-              rows="3"
-              class="w-full px-3 py-2 border rounded-lg text-sm"
-              placeholder="Write your review..."
-            ></textarea>
-          </div>
-          <button
-            type="submit"
-            disabled={@selected_rating == 0}
-            class={"bg-green-600 text-white px-4 py-2 rounded-lg text-sm #{if @selected_rating == 0, do: "opacity-50 cursor-not-allowed", else: "hover:bg-green-700"}"}
-          >
-            Submit Review
-          </button>
-        </form>
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Rating</label>
+              <div class="flex gap-1">
+                <button
+                  :for={n <- 1..5}
+                  type="button"
+                  phx-click="set_rating"
+                  phx-value-rating={n}
+                  class="text-2xl focus:outline-none"
+                >
+                  <span class={if n <= @selected_rating, do: "text-yellow-400", else: "text-gray-300"}>
+                    ★
+                  </span>
+                </button>
+              </div>
+              <input type="hidden" name="rating" value={@selected_rating} />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">
+                Review text <span class="text-gray-400">(optional)</span>
+              </label>
+              <textarea
+                name="content"
+                rows="3"
+                class="w-full px-3 py-2 border rounded-lg text-sm"
+                placeholder="Write your review..."
+              ></textarea>
+            </div>
+            <button
+              type="submit"
+              disabled={@selected_rating == 0}
+              class={"bg-green-600 text-white px-4 py-2 rounded-lg text-sm #{if @selected_rating == 0, do: "opacity-50 cursor-not-allowed", else: "hover:bg-green-700"}"}
+            >
+              Submit Review
+            </button>
+          </form>
+        <% end %>
       <% end %>
     </div>
     """

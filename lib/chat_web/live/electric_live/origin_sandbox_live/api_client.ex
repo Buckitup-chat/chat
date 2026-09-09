@@ -7,6 +7,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
   alias Chat.Data.User
   alias Chat.TimeKeeper
   alias ChatWeb.ElectricLive.OriginSandboxLive.Http
+  alias ChatWeb.ElectricLive.ShapeReader
   alias EnigmaPq
 
   def create_origin(owner, origin_name, moderation_mode, base_url) do
@@ -151,24 +152,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
   defp parse_int(v) when is_integer(v), do: v
   defp parse_int(v) when is_binary(v), do: String.to_integer(v)
 
-  defp shape_rows(client, shape) do
-    client
-    |> Electric.Client.stream(shape, live: false, replica: :full)
-    |> Enum.reduce_while([], fn
-      %Electric.Client.Message.ChangeMessage{
-        headers: %{operation: :insert},
-        value: value
-      },
-      acc ->
-        {:cont, [value | acc]}
-
-      %Electric.Client.Message.ControlMessage{control: :up_to_date}, acc ->
-        {:halt, acc}
-
-      _message, acc ->
-        {:cont, acc}
-    end)
-  end
+  defp shape_rows(client, shape), do: ShapeReader.collect(client, shape)
 
   defp sign_origin(origin_struct, sign_skey) do
     sign_b64 =

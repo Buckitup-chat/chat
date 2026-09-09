@@ -13,7 +13,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Queue do
   alias Chat.Data.Schemas.ReviewRevokeRight
   alias Chat.Data.Schemas.UserCard
   alias ChatWeb.ElectricLive.ModerationSandboxLive.Entries
-  alias Electric.Client.Message
+  alias ChatWeb.ElectricLive.ShapeReader
 
   @doc "Origin row and its user_cards row — used to verify the imported identity."
   def fetch_origin_context(origin_hash, base_url) do
@@ -57,17 +57,6 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Queue do
         parser: {Electric.Client.EctoAdapter, schema}
       )
 
-    client
-    |> Electric.Client.stream(shape, live: false, replica: :full)
-    |> Enum.reduce_while([], fn
-      %Message.ChangeMessage{headers: %{operation: :insert}, value: value}, acc ->
-        {:cont, [value | acc]}
-
-      %Message.ControlMessage{control: :up_to_date}, acc ->
-        {:halt, acc}
-
-      _message, acc ->
-        {:cont, acc}
-    end)
+    ShapeReader.collect(client, shape)
   end
 end

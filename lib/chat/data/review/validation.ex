@@ -50,8 +50,8 @@ defmodule Chat.Data.Review.Validation do
         %Operation{operation: :insert, changes: changes} ->
           changes["author_hash"] || changes[:author_hash]
 
-        %Operation{operation: :update, data: %{"author_hash" => hash}} ->
-          hash
+        %Operation{operation: :update, data: data} ->
+          data["author_hash"] || review_author_hash(data["review_hash"])
       end
 
     with %{sign_pkey: sign_pkey} <- UserData.get_card(author_hash),
@@ -138,10 +138,19 @@ defmodule Chat.Data.Review.Validation do
         changeset
 
       _ ->
-        if new_review.owner_timestamp > existing.owner_timestamp do
-          Ecto.Changeset.put_change(changeset, :parent_sign_hash, existing.sign_hash)
-        else
-          Ecto.Changeset.add_error(changeset, :owner_timestamp, "timestamp not newer")
+        cond do
+          new_review.owner_timestamp <= existing.owner_timestamp ->
+            Ecto.Changeset.add_error(changeset, :owner_timestamp, "timestamp not newer")
+
+          new_review.parent_sign_hash != existing.sign_hash ->
+            Ecto.Changeset.add_error(
+              changeset,
+              :parent_sign_hash,
+              "does not match current version"
+            )
+
+          true ->
+            changeset
         end
     end
   end
@@ -205,6 +214,13 @@ defmodule Chat.Data.Review.Validation do
   end
 
   # --- Origin existence check ---
+
+  defp review_author_hash(review_hash) do
+    case ReviewData.get_review(review_hash) do
+      %{author_hash: ah} -> ah
+      _ -> nil
+    end
+  end
 
   defp validate_origin_exists(changeset, origin_hash) when is_binary(origin_hash) do
     case OriginData.get_origin(origin_hash) do

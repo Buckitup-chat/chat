@@ -244,7 +244,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
     ~w(sign_pkey sign_skey crypt_pkey crypt_skey crypt_cert contact_pkey contact_skey contact_cert)
     |> Enum.reduce_while({:ok, %{}}, fn field, {:ok, acc} ->
       case Base.decode64(data[field], padding: false) do
-        {:ok, bin} -> {:cont, {:ok, Map.put(acc, String.to_existing_atom(field), bin)}}
+        {:ok, bin} -> {:cont, {:ok, Map.put(acc, String.to_atom(field), bin)}}
         :error -> {:halt, {:error, "invalid base64 in #{field}"}}
       end
     end)

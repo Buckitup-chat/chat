@@ -74,16 +74,30 @@ defmodule ChatWeb.ElectricControllerReviewTest do
 
   describe "review update" do
     test "persists a newer signed version (soft delete) via HTTP ingest", ctx do
-      {review_hash, insert_mutation, _} = build_review_mutation(ctx)
+      {review_hash, insert_mutation, parent_sign_hash} = build_review_mutation(ctx)
 
       assert post_ingest(ctx.conn, %{"mutations" => [insert_mutation]}, ctx.author.sign_skey).status ==
                200
 
-      update_mutation = build_review_update_mutation(ctx, review_hash)
+      update_mutation = build_review_update_mutation(ctx, review_hash, parent_sign_hash)
       conn = post_ingest(ctx.conn, %{"mutations" => [update_mutation]}, ctx.author.sign_skey)
 
       assert conn.status == 200, conn.resp_body
       assert ReviewData.get_review(review_hash).deleted_flag == true
+    end
+
+    test "rejects an update whose parent_sign_hash is not the current version", ctx do
+      {review_hash, insert_mutation, _sign_hash} = build_review_mutation(ctx)
+
+      assert post_ingest(ctx.conn, %{"mutations" => [insert_mutation]}, ctx.author.sign_skey).status ==
+               200
+
+      stale_parent = :crypto.strong_rand_bytes(64) |> ReviewSignHash.from_binary()
+      update_mutation = build_review_update_mutation(ctx, review_hash, stale_parent)
+      conn = post_ingest(ctx.conn, %{"mutations" => [update_mutation]}, ctx.author.sign_skey)
+
+      assert conn.status in [400, 422], conn.resp_body
+      assert ReviewData.get_review(review_hash).deleted_flag == false
     end
   end
 
@@ -312,7 +326,7 @@ defmodule ChatWeb.ElectricControllerReviewTest do
     {review_hash, mutation, sign_hash}
   end
 
-  defp build_review_update_mutation(ctx, review_hash) do
+  defp build_review_update_mutation(ctx, review_hash, parent_sign_hash) do
     ts = System.os_time(:millisecond) + 1000
     content = :crypto.strong_rand_bytes(48)
 
@@ -322,7 +336,7 @@ defmodule ChatWeb.ElectricControllerReviewTest do
       author_hash: ctx.author_hash,
       content_b64: content,
       deleted_flag: true,
-      parent_sign_hash: nil,
+      parent_sign_hash: parent_sign_hash,
       owner_timestamp: ts
     }
 
@@ -334,6 +348,7 @@ defmodule ChatWeb.ElectricControllerReviewTest do
       "changes" => %{
         "content_b64" => to_base64(content),
         "deleted_flag" => true,
+        "parent_sign_hash" => parent_sign_hash,
         "owner_timestamp" => ts,
         "sign_b64" => to_base64(sign_b64),
         "sign_hash" => sign_hash

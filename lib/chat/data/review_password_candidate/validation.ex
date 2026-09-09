@@ -1,6 +1,7 @@
 defmodule Chat.Data.ReviewPasswordCandidate.Validation do
   @moduledoc "Validation for review password candidate ingest and promotion trigger."
 
+  alias Chat.Data.Integrity
   alias Chat.Data.Origin, as: OriginData
   alias Chat.Data.Review, as: ReviewData
   alias Chat.Data.ReviewPasswordCandidate, as: CandidateData
@@ -35,6 +36,7 @@ defmodule Chat.Data.ReviewPasswordCandidate.Validation do
     |> ReviewPasswordCandidate.create_changeset(changes)
     |> UserValidation.validate_signature()
     |> validate_review_and_author(changes)
+    |> validate_candidate_signature()
   end
 
   def candidate_validate(_candidate, _changes, _op) do
@@ -75,6 +77,21 @@ defmodule Chat.Data.ReviewPasswordCandidate.Validation do
       end
     else
       _ -> {:error, "review or origin not found"}
+    end
+  end
+
+  defp validate_candidate_signature(%{valid?: false} = changeset), do: changeset
+
+  defp validate_candidate_signature(changeset) do
+    case Ecto.Changeset.apply_action(changeset, :validate) do
+      {:ok, candidate} ->
+        case Integrity.verify_signature(candidate) do
+          :ok -> changeset
+          {:error, _} -> Ecto.Changeset.add_error(changeset, :sign_b64, "invalid signature")
+        end
+
+      _ ->
+        changeset
     end
   end
 

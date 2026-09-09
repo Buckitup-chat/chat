@@ -40,6 +40,33 @@ stays the same.
 origin's `moderation_mode` is `pre` AND any `review_public_passwords` row exists for the review's
 `review_hash`.
 
+### Author sandbox
+
+[`/electric/review_sandbox`](../../../../lib/chat_web/live/electric_live/review_sandbox_live/index.ex)
+is the reference client for the edit path. Four things it has to get right:
+
+- **Parent chain.** The client sets `parent_sign_hash` to the tip's `sign_hash` before signing and
+  sends it in `changes`; the server validates rather than overrides it. A pre-flight read of the
+  tip turns the common concurrent-edit case into a message instead of a rejected round trip — the
+  shape lags Postgres, so the server stays the authority.
+- **Timestamp step.** `owner_timestamp` is unix *seconds* and updates must be strictly newer, so an
+  edit uses `max(tip + 1, now)`. Without it, editing in the same second as the previous version is
+  rejected — the same workaround `ReviewList.fill_password_proof/4` already uses.
+- **Nothing downstream is reset.** Per [What stays unchanged](#what-stays-unchanged) an edit
+  invalidates no other row, so the sandbox keeps its steps 3-5 state. Re-running them would mint a
+  password candidate the server will not promote a second time, leaving step 5 unable to reference
+  its own proof.
+- **Reload restores, it does not restart.** A review can only be reopened when a `review_list` row
+  exists for it — that row is where the `review_password` lives — so a reopened review has been
+  through steps 3-5 already, and the sandbox restores them as done, taking the proof hashes from
+  the shapes. Pre mode's lock is mirrored client-side by hiding the edit button once a promotion
+  proof is visible.
+- **One origin, many reviews.** Nothing constrains an author to a single review per origin —
+  `review_hash` is minted fresh each time — so the sandbox lists every review it finds for the
+  selected origin and edits whichever one is open, rather than assuming the newest is the only one.
+  A review that never reached step 5 is listed too, marked unopenable: its password is gone, and
+  silently dropping it would make a later review look as if it had replaced it.
+
 ### Versioning module
 
 `Chat.Data.Review.Versioning` — a dedicated module (not reusing `Dialog.Versioning`) following the
@@ -91,6 +118,7 @@ Synced by `review_hash` or `origin_hash`.
 - [x] `Shapes.Review` — drop `persist:` macro, implement `sync_persist/2` with versioning; add `versions_schema/0 → ReviewVersion`; wire `pre_apply` into `ingest_configure_writer`
 - [x] `Review.Validation` — `validate_edit_allowed/1`: reject update when `moderation_mode == "pre"` AND any `review_public_passwords` row exists for the `review_hash`
 - [x] Tests: version chain creation, pre-mode lock after moderation, none/post mode edit allowed, tamper-evident chain verification
+- [x] Author sandbox: edit form, parent chain, timestamp step, preserved pipeline, reload restore, client-side pre-mode lock
 
 ## Source modules
 
@@ -101,4 +129,8 @@ Synced by `review_hash` or `origin_hash`.
 | Validation | `Chat.Data.Review.Validation` | [`review/validation.ex`](../../../../lib/chat/data/review/validation.ex) |
 | Shape | `Chat.Data.Shapes.Review` | [`shapes/review.ex`](../../../../lib/chat/data/shapes/review.ex) |
 | Migration | `CreateReviewVersions` | [`20260908100000_create_review_versions.exs`](../../../../priv/repo/migrations/20260908100000_create_review_versions.exs) |
+| Sandbox client | `ReviewSandboxLive.ApiClient` | [`review_sandbox_live/api_client.ex`](../../../../lib/chat_web/live/electric_live/review_sandbox_live/api_client.ex) |
+| Sandbox events | `ReviewSandboxLive.Router` | [`review_sandbox_live/router.ex`](../../../../lib/chat_web/live/electric_live/review_sandbox_live/router.ex) |
+| Sandbox state | `ReviewSandboxLive.State` | [`review_sandbox_live/state.ex`](../../../../lib/chat_web/live/electric_live/review_sandbox_live/state.ex) |
+| Sandbox reload | `ReviewSandboxLive.ReviewLoader` | [`review_sandbox_live/review_loader.ex`](../../../../lib/chat_web/live/electric_live/review_sandbox_live/review_loader.ex) |
 | Tests | `ReviewVersioningTest` | [`review_versioning_test.exs`](../../../../test/chat/data/review_versioning_test.exs) |

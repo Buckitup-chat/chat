@@ -183,39 +183,29 @@ is a review tier that never enters public moderation at all.
 
 ### Phase 5 — Operational hardening
 
-- [ ] Stale-candidate GC — schedule periodic cleanup via [`ReviewRightCandidate.delete_stale_candidates/1`](../../../../lib/chat/data/review_right_candidate.ex):50
-- [ ] Stale *password* candidate GC
-- [ ] Clean rejection instead of a 500 for stale HTTP updates — see [Known gaps](#known-gaps-and-defects)
+- [x] Stale-candidate GC — [`ReviewCandidateCleaner`](../../../../lib/chat/data/review_candidate_cleaner.ex) runs every 10 min, cleans both right and password candidates older than 1 hour
+- [x] Clean rejection instead of a 500 for stale HTTP updates — `validate_timestamp_newer_than_existing` uses `get_field/2` (not `get_change`), tests pass asserting 4xx
 - [ ] Connect the app as a limited (non-superuser) Postgres role so `REVOKE DELETE` takes effect
 
 ## Known gaps and defects
 
 Behaviour that diverges from this document, pinned by tests where a failing assertion exists.
 
-### Stale HTTP updates raise instead of being rejected
+### ~~Stale HTTP updates raise instead of being rejected~~ — fixed
 
-`validate_timestamp_newer_than_existing/1` marks the changeset `action: :ignore`, which
-`Phoenix.Sync.Writer` then hands to `Ecto.Multi.update/4` — which refuses it, so the client gets a
-500 rather than a clean 4xx. The peer-sync path handles `:ignore` explicitly
-(`Shapes.ReviewList.apply_changeset/2`); the HTTP path does not. Affects `review_list`, `review`,
-`origin`, and every other ingestable table. Pinned by
-[`electric_controller_review_list_update_test.exs`](../../../../test/chat_web/controllers/electric_controller_review_list_update_test.exs).
+`validate_timestamp_newer_than_existing/1` now uses `get_field/2` and correctly adds a changeset error
+for stale and equal timestamps. Tests assert 4xx.
 
-### Equal-timestamp updates diverge between node and peers
+### ~~Equal-timestamp updates diverge between node and peers~~ — fixed
 
-`validate_timestamp_newer_than_existing/1` reads `get_change/2`, which is `nil` when the cast value
-equals the stored one — so an equal timestamp passes locally, while the upsert query's
-`owner_timestamp < EXCLUDED` guard makes every peer reject it. `owner_timestamp` is unix seconds, so
-two clicks in the same second reach this. `ReviewSandboxLive.ReviewList.fill_password_proof/4` works
-around it with `max(previous + 1, now)`. Pinned by the same test file.
+Same fix: `get_field/2` (not `get_change/2`) returns the field value regardless of whether Ecto
+considers it a change. Equal timestamps are now correctly rejected.
 
-### Password candidates are not signature-checked at ingest
+### ~~Password candidates are not signature-checked at ingest~~ — fixed
 
-[`ReviewPasswordCandidate.Validation.candidate_validate/3`](../../../../lib/chat/data/review_password_candidate/validation.ex) checks the changeset and the
-review/author binding, but not `sign_b64`. The signature *is* verified before anything is minted or
-wrapped ([`Promotion.Candidates.validate_candidate/1`](../../../../lib/chat/data/review_password_candidate/promotion/candidates.ex)), so nothing forged ever reaches
-`review_public_passwords` — but in post/pre mode a lone badly-signed candidate is stored and returns
-`{:ok, :pending}`, and nothing ever removes it.
+[`ReviewPasswordCandidate.Validation.candidate_validate/3`](../../../../lib/chat/data/review_password_candidate/validation.ex)
+now calls `Integrity.verify_signature/1` on the candidate (projected to its `ReviewPublicPassword`
+target via `to_public_password/1`). Badly-signed candidates are rejected at ingest.
 
 ### Two-tier owner/origin split is not enforced
 

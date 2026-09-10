@@ -56,4 +56,13 @@ defmodule Chat.Data.Shapes do
     sync_schemas()
     |> Enum.map(& &1.__schema__(:source))
   end
+
+  def module_for_table([_schema, table]), do: module_for_table(table)
+
+  def module_for_table(table) when is_binary(table) do
+    case Enum.find(@shapes, fn shape -> shape.schema_module().__schema__(:source) == table end) do
+      nil -> :error
+      shape -> {:ok, shape}
+    end
+  end
 end

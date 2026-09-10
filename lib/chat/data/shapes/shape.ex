@@ -79,15 +79,20 @@ defmodule Chat.Data.Shapes.Shape do
 
   @callback ingest_configure_writer(Phoenix.Sync.Writer.t(), map()) :: Phoenix.Sync.Writer.t()
 
+  @callback fingerprint(struct()) :: binary()
+
+  @sign_hash_hex_length 128
+
+  def sign_hash_to_binary(sign_hash) when is_binary(sign_hash) do
+    len = byte_size(sign_hash)
+    hex = binary_part(sign_hash, len - @sign_hash_hex_length, @sign_hash_hex_length)
+    Base.decode16!(hex, case: :mixed)
+  end
+
   defmacro __using__(opts) do
     persist_opts = Keyword.get(opts, :persist)
 
-    persist_ast =
-      if persist_opts do
-        build_persist_helpers(persist_opts)
-      else
-        nil
-      end
+    persist_ast = if persist_opts, do: build_persist_helpers(persist_opts)
 
     quote do
       @behaviour Chat.Data.Shapes.Shape
@@ -107,11 +112,26 @@ defmodule Chat.Data.Shapes.Shape do
       @impl true
       def ingest_configure_writer(writer, _user_pop_context), do: writer
 
+      @impl true
+      def fingerprint(record) do
+        case record do
+          %{sign_hash: hash} when is_binary(hash) ->
+            Chat.Data.Shapes.Shape.sign_hash_to_binary(hash)
+
+          %{sign_b64: sig} when is_binary(sig) ->
+            EnigmaPq.hash(sig)
+
+          _ ->
+            raise "#{__MODULE__} has no sign_hash or sign_b64 — implement fingerprint/1"
+        end
+      end
+
       defoverridable versions_schema: 0,
                      sync_validate_parent: 2,
                      sync_derive_fields: 1,
                      sync_after_persist: 3,
-                     ingest_configure_writer: 2
+                     ingest_configure_writer: 2,
+                     fingerprint: 1
 
       unquote(persist_ast)
     end

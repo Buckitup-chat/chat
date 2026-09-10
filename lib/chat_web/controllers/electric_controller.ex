@@ -1,4 +1,6 @@
 defmodule ChatWeb.ElectricController do
+  @moduledoc "Handles Electric SQL ingest endpoints for client-side mutations."
+
   use ChatWeb, :controller
 
   import Chat.Db, only: [repo: 0]
@@ -7,9 +9,13 @@ defmodule ChatWeb.ElectricController do
     {:nowarn_function, ingest: 2},
     {:nowarn_function, ingest_each: 2},
     {:nowarn_function, handle_ingest_error: 2},
+    {:nowarn_function, respond_changeset_error: 2},
     {:nowarn_function, apply_single_mutation: 2},
     {:nowarn_function, format_mutation_error: 1},
+    {:nowarn_function, detect_conflict: 1},
+    {:nowarn_function, fetch_existing: 2},
     {:nowarn_function, pub_key_unique_conflict?: 1},
+    {:nowarn_function, unique_key_conflict?: 1},
     {:nowarn_function, changeset_errors: 1}
   ]
 
@@ -61,7 +67,7 @@ defmodule ChatWeb.ElectricController do
         |> IngestUtil.decode_mutation_fields_each(@hex_suffixes, @base64_suffixes)
         |> Enum.map(&apply_single_mutation(writer, &1))
 
-      status = if Enum.all?(results, &(&1.status == "ok")), do: 200, else: 422
+      status = if Enum.all?(results, &(&1.status != "error")), do: 200, else: 422
       conn |> put_status(status) |> json(%{results: results})
     else
       error -> handle_ingest_error(conn, error)
@@ -80,6 +86,15 @@ defmodule ChatWeb.ElectricController do
            ) do
       %{index: index, status: "ok", txid: txid}
     else
+      {:error, _, %Ecto.Changeset{} = changeset, _} = error ->
+        case detect_conflict(changeset) do
+          {:exists, conflicted} ->
+            %{index: index, status: "exists", conflicted: conflicted}
+
+          :not_conflict ->
+            Map.merge(%{index: index, status: "error"}, format_mutation_error(error))
+        end
+
       {:error, reason} when is_binary(reason) ->
         %{index: index, status: "error", error: reason}
 
@@ -182,16 +197,7 @@ defmodule ChatWeb.ElectricController do
         |> json(%{error: msg})
 
       {:error, _, %Ecto.Changeset{} = changeset, _} ->
-        {status, body} =
-          if pub_key_unique_conflict?(changeset),
-            do: {:conflict, %{error: "pub_key_taken"}},
-            else:
-              {:unprocessable_entity,
-               %{error: "validation_failed", details: changeset_errors(changeset)}}
-
-        conn
-        |> put_status(status)
-        |> json(body)
+        respond_changeset_error(conn, changeset)
 
       {:error, _, %Writer.Error{message: msg}, _} when is_binary(msg) ->
         send_resp(conn, 400, msg)
@@ -202,6 +208,55 @@ defmodule ChatWeb.ElectricController do
       _ ->
         send_resp(conn, 400, "invalid_payload")
     end
+  end
+
+  defp respond_changeset_error(conn, changeset) do
+    case detect_conflict(changeset) do
+      {:exists, conflicted} ->
+        conn |> put_status(:conflict) |> json(%{status: "exists", conflicted: conflicted})
+
+      :not_conflict ->
+        {status, body} =
+          if pub_key_unique_conflict?(changeset),
+            do: {:conflict, %{error: "pub_key_taken"}},
+            else:
+              {:unprocessable_entity,
+               %{error: "validation_failed", details: changeset_errors(changeset)}}
+
+        conn |> put_status(status) |> json(body)
+    end
+  end
+
+  defp detect_conflict(%Ecto.Changeset{} = changeset) do
+    with true <- unique_key_conflict?(changeset),
+         schema_mod = changeset.data.__struct__,
+         shape_mod when not is_nil(shape_mod) <- Shapes.by_schema(schema_mod),
+         {:ok, existing} <- fetch_existing(schema_mod, changeset) do
+      attempted = Ecto.Changeset.apply_changes(changeset)
+      {:exists, shape_mod.fingerprint(attempted) != shape_mod.fingerprint(existing)}
+    else
+      _ -> :not_conflict
+    end
+  end
+
+  defp fetch_existing(schema_mod, changeset) do
+    pk_fields = schema_mod.__schema__(:primary_key)
+    pk_pairs = Enum.map(pk_fields, fn f -> {f, Ecto.Changeset.get_field(changeset, f)} end)
+
+    if Enum.all?(pk_pairs, fn {_, nil} -> false; {_, _} -> true end) do
+      case repo().get_by(schema_mod, pk_pairs) do
+        nil -> :error
+        existing -> {:ok, existing}
+      end
+    else
+      :error
+    end
+  end
+
+  defp unique_key_conflict?(%Ecto.Changeset{} = changeset) do
+    Enum.any?(changeset.errors, fn {_field, {_msg, opts}} ->
+      Keyword.get(opts, :constraint) == :unique
+    end)
   end
 
   defp pub_key_unique_conflict?(%Ecto.Changeset{} = changeset) do

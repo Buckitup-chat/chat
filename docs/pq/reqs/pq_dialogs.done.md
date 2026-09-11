@@ -393,7 +393,7 @@ Each message carries an encrypted snapshot of the dialog's DAG state at the mome
 
 ### What it is
 
-`refs_map_b64` is an AES-256-GCM-encrypted JSON map of `{message_id: sign_hash}` pairs — every **tail** (DAG leaf) the sender observed at send time. A tail is a `(message_id, sign_hash)` pair that does not appear in the `refs_map` of any other message the sender has loaded. Only leaves, not their transitive predecessors. Each entry pins both the message identity and the exact version the sender saw — an edit produces a new `sign_hash` and therefore a new tail even if an older version of the same message is already referenced.
+`refs_map_b64` is an AES-256-GCM-encrypted JSON map of `{message_id: sign_hash}` pairs — every **tail** (DAG leaf) the sender observed at send time. A tail is a `(message_id, sign_hash)` pair that does not appear in the `refs_map` of any other message the sender has loaded. Only leaves, not their transitive predecessors. Each entry pins both the message identity and the exact version the sender saw — an edit produces a new `sign_hash` and therefore a new tail even if an older version of the same message is already referenced. Deletion behaves the same way: a tombstone is a signed revision like any other, so a deleted message re-enters the tail set under its tombstone's `sign_hash`.
 
 ### Encryption
 
@@ -403,20 +403,21 @@ Same scheme as `content_b64`: 12-byte fresh-random AES-GCM nonce prepended to ci
 
 Tails are computed from the messages the user has loaded into the viewport. The unit of tracking is a `(message_id, sign_hash)` pair — a specific version of a specific message. The algorithm:
 
-1. Collect all messages the sender has loaded for this `dialog_hash`.
+1. Collect all messages the sender has loaded for this `dialog_hash`, including deleted ones — a message hidden from display is still loaded, and its tip row is the tombstone revision.
 2. For each loaded message, decrypt its `refs_map_b64` to obtain the set of `(message_id, sign_hash)` pairs it references.
 3. Build the set of all referenced pairs across every loaded message's refs_map.
 4. For each loaded message, take its current `(message_id, sign_hash)` from the tip row. If that exact pair does **not** appear in the referenced set from step 3, it is a **tail**.
 
 The resulting `{message_id: sign_hash}` map of all tails is the `refs_map` plaintext.
 
-Because matching is on the full pair, an edit (which produces a new `sign_hash`) turns the edited message into a new tail — the old `(message_id, old_sign_hash)` may be referenced elsewhere, but the new `(message_id, new_sign_hash)` is not. This is intentional: the sender's refs_map records exactly which versions they observed.
+Because matching is on the full pair, an edit (which produces a new `sign_hash`) turns the edited message into a new tail — the old `(message_id, old_sign_hash)` may be referenced elsewhere, but the new `(message_id, new_sign_hash)` is not. This is intentional: the sender's refs_map records exactly which versions they observed. Deletion is the same operation from the DAG's point of view: the tombstone's `(message_id, sign_hash)` is a new unreferenced pair, so the deleted message is a tail until a later message references its tombstone revision.
 
 ### Special cases
 
 - **Genesis message** — the first message in a dialog. `refs_map` plaintext is an empty map `{}`. Encrypted as usual (the ciphertext is non-empty even though the plaintext is `{}`).
 - **Linear conversation** — when both parties take strict turns, refs_map typically contains a single entry: the last message from the other party.
 - **Concurrent sends (fork)** — both parties send without seeing each other's message. Each message's refs_map points to the same predecessor. The next message from either party that has loaded both fork tips will carry both in its refs_map, merging the fork.
+- **Deletion** — the tombstone revision enters the tail set like any edit. A message may therefore appear in a refs_map even though neither participant displays it; the reference pins the observed tombstone, not visible content, and propagates the fact of deletion causally.
 - **Offline burst** — one party sends 50 messages while the other is offline. When the offline party reconnects and loads all 50, only the latest (the single tail) appears in their next refs_map — transitive reduction keeps the map small.
 
 ### Behavior on edit

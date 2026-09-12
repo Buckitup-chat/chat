@@ -16,21 +16,38 @@ A vouch token is a signed attestation that one user (`issuer`) trusts another us
 Scopes use a DNS-like left-to-right dot-path notation. Reading left to right narrows authority:
 
 ```
-user.trust.identity.optical-handshake
-user.trust.identity.manual-approval
-user.trust.vouch.direct
-user.trust.vouch.transitive
-user.trust.behavioral.tenure
-user.trust.behavioral.interaction-consistency
+devices.*.permissions
+devices.*.permissions.user_permissions
+devices.*.permissions.user_permissions.storage
+devices.*.permissions.user_permissions.storage.full
+devices.*.permissions.user_permissions.storage.full.read
+devices.*.permissions.user_permissions.storage.full.read.<entity>
+devices.*.permissions.user_permissions.storage.full.write
+devices.*.permissions.network_permissions
+devices.*.firmware
+devices.*.firmware.version
+devices.*.firmware.signature-valid
+devices.*.hardware
+devices.*.hardware.sensor-calibrated
+devices.*.hardware.storage-healthy
+devices.*.network
+devices.*.network.connectivity-verified
 
-device.firmware.version
-device.firmware.signature-valid
-device.hardware.sensor-calibrated
-device.hardware.storage-healthy
-device.network.connectivity-verified
+origins.*.identity
+origins.*.identity.optical-handshake
+origins.*.identity.manual-approval
+origins.*.vouch
+origins.*.vouch.direct
+origins.*.vouch.transitive
+origins.*.behavioral
+origins.*.behavioral.tenure
+origins.*.behavioral.interaction-consistency
+origins.*.reviews
+origins.*.reviews.write
+origins.*.reviews.write.<write_token>
 ```
 
-Attenuation is prefix containment — a vouch for `user.trust` covers `user.trust.vouch.direct` but not `device.firmware`.
+Attenuation is prefix containment — a vouch for `origins.<origin_hash>.reviews.write` covers `origins.<origin_hash>.reviews.write.<write_token>` but not `devices.*.firmware`. An origin grants a bot `origins.<origin_hash>.reviews.write`; the bot can then delegate `origins.<origin_hash>.reviews.write.<write_token>` to individual users — each step right narrows the scope.
 
 ### Vocabulary Layers
 
@@ -107,7 +124,7 @@ def attenuates?(parent, child) do
 end
 ```
 
-A vouch for `user.trust` attenuates to cover `user.trust.vouch.direct`. A vouch for `device.firmware` does not cover `user.trust`. Attenuation is checked at gate evaluation time, not at ingest.
+A vouch for `origins.*` attenuates to cover `origins.<origin_hash>.vouch.direct`. A vouch for `devices.*.firmware` does not cover `origins.*`. Attenuation is checked at gate evaluation time, not at ingest.
 
 ---
 

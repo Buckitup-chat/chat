@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Control who can write data through the Electric ingest API. The system starts in `open` mode. The first user to ingest a `user_card` registers unconditionally and becomes the **owner** (persisted in AdminDB). While in `open` mode, anyone can ingest. When the owner switches to `trust` mode, all subsequent users are subject to trust score evaluation. Shape reads remain open — all synced data is encrypted, so read access leaks nothing useful.
+Control who can write data through the Electric ingest API. The system starts in `open` mode. The first user to ingest a `user_card` registers unconditionally and becomes the **owner** (persisted in AdminDB). While in `open` mode, anyone can ingest. When the owner switches to `trust` mode, all subsequent users are subject to vouch-chain evaluation. Shape reads remain open — all synced data is encrypted, so read access leaks nothing useful.
 
 ---
 
@@ -11,11 +11,11 @@ Control who can write data through the Electric ingest API. The system starts in
 | Mode | New user_card ingest | Other ingest (existing users) | Shape reads |
 |------|---------------------|-------------------------------|-------------|
 | `open` | Anyone | Anyone with valid PoP | Open |
-| `trust` | Auto-approved if trust score ≥ threshold | Trust-gated (see [Trust Metrics](#trust-metrics)) | Open |
+| `trust` | Auto-approved if within chain distance | Chain-gated (see [Trust Gate](#trust-gate)) | Open |
 
 Default mode: `open` (preserves current behavior).
 
-Optical-handshake contacts and explicit owner approvals are not separate modes — they are [trust score signals](#trust-score-components) that feed the `trust` mode threshold. The owner controls effective behavior by tuning the threshold and choosing which signals carry weight.
+Optical-handshake contacts and explicit owner approvals are vouch tokens with different scopes — they place a user at chain distance 1 from the owner. The owner controls effective behavior by tuning the maximum allowed chain depth.
 
 ---
 
@@ -25,113 +25,59 @@ The system starts in `open` mode with no owner. The first `user_card` successful
 
 - Owner is always approved regardless of mode.
 - Owner can change the access mode (`open` ↔ `trust`).
-- Owner can explicitly approve or revoke any `user_hash` (manual approval is a trust signal).
-- Owner can set and adjust the trust threshold.
+- Owner can explicitly approve or revoke any `user_hash` (issues/tombstones a vouch token).
+- Owner can set the maximum chain depth.
 - There is exactly one owner. Ownership transfer is out of scope for this requirement.
 
 ---
 
 ## Contacts as Trust Signal
 
-The owner's trusted contacts (established via the [optical handshake flow](../flows/pq_optical-handshake.livemd)) are a high-weight signal in the trust score, not a separate access mode.
+The owner's trusted contacts (established via the [optical handshake flow](../flows/pq_optical-handshake.livemd)) are vouch tokens that place a user at chain distance 1.
 
 ### Flow
 
 1. Owner performs optical handshake with a peer — exchanging ECC public keys and proving key ownership via signed nonces.
 2. Owner's device stores the peer's `user_hash` + `ecc_pub` as a ContactCandidate.
 3. When the peer's UserCard appears (via shape sync), the candidate is verified (matching `user_hash` and `contact_pkey`) and promoted to a trusted Contact.
-4. A vouch token with scope `origins.<origin_hash>.identity.optical-handshake` is issued for the contact's `user_hash`, feeding the trust score.
+4. A vouch token with scope `origins.<origin_hash>.identity.optical-handshake` is issued for the contact's `user_hash`.
 
 ### Implications
 
-- Contact trust is directional — the *owner's* contacts receive a trust signal, not every user's contacts.
-- Revoking a contact revokes the vouch token (signed tombstone), which drops the trust score.
-- With the right threshold, an owner can achieve "contacts-only" behavior by setting the threshold high enough that only optical-handshake-verified users pass.
+- Contact trust is directional — the *owner's* contacts receive a vouch, not every user's contacts.
+- Revoking a contact revokes the vouch token (signed tombstone), which breaks the chain at that edge.
+- Setting max depth to **1** achieves "contacts-only" behavior — only users with a direct vouch from the owner pass.
 
 ---
 
-## Trust Metrics
+## Trust Gate
 
-In `trust` mode, access decisions are driven by a computed trust score rather than a binary approved/rejected state. The owner sets a threshold; users above the threshold can ingest, users below are rejected (or pended, see [Open Questions §2](#open-questions)).
+In `trust` mode, access decisions are driven by **chain distance** — the shortest path in the vouch token graph from the owner to the user. The owner sets a maximum depth; users reachable within that depth can ingest, users beyond it (or unreachable) are rejected.
 
-### Industry Approaches
+The chain distance is computed by the recursive CTE defined in [Vouch Tokens § Graph Traversal](pq_vouch_tokens.proposed.md#graph-traversal-via-recursive-cte). That query walks `issuer_hash → subject_hash` edges, filters by scope prefix and `deleted_flag`, and returns `MIN(distance)` per user.
 
-Several established models inform how trust can be computed in a decentralized, partially-offline system like BuckitUp:
+### Max Depth
 
-#### 1. PGP Web of Trust (Vouching)
+The owner sets a maximum chain depth (integer, ≥ 1) via the admin UI. Default: **3**.
 
-The classic decentralized trust model. Users vouch for each other by signing keys. Trust propagates along chains: if Alice trusts Bob and Bob trusts Carol, Alice extends partial trust to Carol. BuckitUp's optical handshake already establishes exactly this kind of directional, cryptographically-verified trust link.
+- Users with `chain_distance ≤ max_depth` can ingest.
+- Users beyond max depth or with no path are rejected with `403` and body `{"error": "not_in_trust_chain", "max_depth": <max_depth>}`.
+- The owner can override: explicitly approve a user regardless of distance (issues a direct vouch), or explicitly revoke a user regardless of distance (tombstones their vouches).
 
-**Fit for BuckitUp:** Natural extension of existing contacts. Each approved user could vouch for others (not just the owner), creating a trust graph where trust attenuates with distance. Owner's direct contacts get the highest trust; contacts-of-contacts get less; and so on.
+### Vouch Scope Meanings
 
-#### 2. EigenTrust (Global Reputation from Local Trust)
+All approval mechanisms are vouch tokens with different scopes (see [Vouch Tokens § Relationship to Access Gating](pq_vouch_tokens.proposed.md#relationship-to-access-gating)):
 
-Developed for P2P networks. Each peer assigns local trust values to peers it has interacted with. The algorithm computes a global trust score via iterative matrix multiplication (power iteration over a trust matrix), where each peer's opinion is weighted by their own global trust. The eigenvector of the trust matrix gives stable global scores.
-
-**Fit for BuckitUp:** Could aggregate per-user vouches into a single global score without requiring centralized authority. Computable locally from the trust graph. Handles the "vouching for a bad actor" problem — a vouch from a low-trust user carries little weight.
-
-#### 3. NIST SP 800-207 Zero Trust / Continuous Evaluation
-
-NIST's framework evaluates trust continuously across five domains: identity, device, network, workload, and data. Access is never permanently granted — it's re-evaluated per request based on contextual signals (device posture, behavior patterns, anomaly detection).
-
-**Fit for BuckitUp:** The "continuous" aspect maps to per-ingest evaluation rather than one-time approval. Behavioral signals (ingest frequency, data volume, time-of-day patterns) can feed the trust score so it changes over time.
-
-#### 4. Vouchsafe Zero-Infrastructure Capability Graph (ZI-CG)
-
-A 2026 model designed specifically for offline and disconnected environments. Trust is represented as self-contained, signed capability tokens (Ed25519 + JWT) whose validity is determined by local, deterministic evaluation — no online authority required. Supports scoped delegation and explicit revocation.
-
-**Fit for BuckitUp:** Highly aligned with BuckitUp's offline device scenario. Trust tokens could travel with the data itself, allowing the gate to evaluate trust even when disconnected from the original trust authority. The existing PQ PoP signatures could serve as the cryptographic substrate.
-
-### Trust Score Components
-
-A composite trust score computed from weighted signals:
-
-| Signal | Description | Weight (example) |
-|--------|-------------|-------------------|
-| `optical_handshake` | User verified via optical handshake with the owner or another trusted user — cryptographic proof of physical proximity | Highest |
-| `manual_approval` | Owner explicitly approved this `user_hash` via admin UI (replaces the old `invite` mode concept) | High |
-| `vouches` | Number and quality of vouches from other trusted users, weighted by voucher's own trust score (EigenTrust-style) | High |
-| `chain_distance` | Shortest path in the trust graph from the owner to this user (1 = direct contact, 2 = contact-of-contact, etc.) | Medium |
-| `tenure` | Time since first successful ingest (longer = more trusted) | Low |
-| `interaction_consistency` | Regularity and pattern of ingest activity — sudden spikes or long dormancy reduce score | Low |
-| `revocation_history` | Whether the user was ever revoked and re-approved | Negative |
-
-### Approval List Extension
-
-In `trust` mode, the approval list gains additional fields:
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `trust_score` | float | Computed composite score, 0.0–1.0 |
-| `vouched_by` | list | `user_hash` values of users who vouched for this user |
-| `last_evaluated` | integer | Unix timestamp of last trust re-evaluation |
-
-### Trust Threshold
-
-The owner sets a threshold (0.0–1.0) via the admin UI. Default: **0.5**.
-
-- Users at or above the threshold can ingest.
-- Users below are rejected with `403` and body `{"error": "trust_below_threshold", "score": <score>, "threshold": <threshold>}`.
-- The owner can override: explicitly approve a user regardless of score, or explicitly revoke a user regardless of score.
-
-### Vouching Mechanics
-
-When any approved user with `trust_score ≥ vouch_threshold` (configurable, default = owner's threshold) vouches for another user:
-
-1. A signed vouch attestation is created (voucher's `sign_pkey` signs the vouchee's `user_hash`).
-2. The vouchee's `vouched_by` list is updated.
-3. Trust score is recomputed for the vouchee (and transitively affected users if using EigenTrust).
-
-Vouching is directional and non-transitive by default — Alice vouching for Bob does not mean Alice vouches for everyone Bob vouches for. Transitive trust is handled by the score computation (chain distance + EigenTrust weighting), not by the vouch itself.
+| Mechanism | Vouch scope | Chain distance effect |
+|-----------|-------------|----------------------|
+| Optical handshake | `origins.<origin_hash>.identity.optical-handshake` | 1 (direct from owner) |
+| Manual owner approval | `origins.<origin_hash>.identity.manual-approval` | 1 (direct from owner) |
+| User-to-user vouch | `origins.<origin_hash>.vouch.direct` | +1 from voucher |
+| Transitive (chain walk) | `origins.<origin_hash>.vouch.transitive` | Computed by CTE |
 
 ### Recomputation
 
-Trust scores are recomputed:
-- On new vouch or vouch withdrawal.
-- On revocation or un-revocation of any user (affects graph topology).
-- Periodically (configurable interval) for behavioral signals (tenure, interaction_consistency).
-
-Recomputation is local — no external service needed.
+The [resolved chain cache](pq_vouch_tokens.proposed.md#optimization--resolved-chain-cache) stores distance results for up to 30 minutes. Cache invalidation happens on vouch insert/revoke within the origin prefix.
 
 ---
 
@@ -143,7 +89,7 @@ A persistent set of approved users with their signing public keys:
 |-------|------|-------|
 | `user_hash` | text | Primary key, `"u_" + hex(SHA3-512(sign_pkey))` |
 | `sign_pkey` | binary | ML-DSA-87 public key — the gate verifies PoP signatures directly against this |
-| `source` | enum | `owner` / `optical_handshake` / `manual` / `trust` |
+| `source` | enum | `owner` / `optical_handshake` / `manual` / `vouch` |
 | `approved_at` | integer | Unix timestamp |
 | `revoked` | boolean | Soft revoke; `false` by default |
 
@@ -177,7 +123,7 @@ end
 1. **No owner registered yet** → allow the ingest. If this is a `user_card` insert, register the user as owner in AdminDB (post-ingest hook or writer callback). Mode stays `open`.
 2. **Mode is `open`** → pass through (current behavior).
 3. **Request's `user_hash` is the owner** → pass through.
-4. **Mode is `trust`** → compute or retrieve cached trust score for `user_hash`; if score ≥ threshold, pass through; if below, reject with `403` and `{"error": "trust_below_threshold", "score": <score>, "threshold": <threshold>}`.
+4. **Mode is `trust`** → look up chain distance for `user_hash` (from cache or CTE); if `chain_distance ≤ max_depth`, pass through; if beyond or no path, reject with `403`.
 5. **Otherwise** → reject with `403 Forbidden`, body: `{"error": "access_denied", "mode": "<current_mode>"}`.
 
 ### Identifying the caller
@@ -187,7 +133,7 @@ The ingest request carries a PoP signature (signed challenge). The gate uses the
 1. Extract the challenge + signature from `params["auth"]`.
 2. Iterate approved (non-revoked) entries and attempt `ML-DSA-87.verify(challenge, signature, entry.sign_pkey)`.
 3. A match identifies the caller and confirms they are approved — proceed.
-4. No match among approved entries — check if this is a `user_card` create mutation. If so, extract `sign_pkey` from the mutation payload, compute `user_hash`, and verify the signature against that key. If valid: in `open` mode, allow; in `trust` mode, compute trust score and apply threshold.
+4. No match among approved entries — check if this is a `user_card` create mutation. If so, extract `sign_pkey` from the mutation payload, compute `user_hash`, and verify the signature against that key. If valid: in `open` mode, allow; in `trust` mode, check chain distance.
 
 This avoids needing any PostgreSQL lookup — the approval list (derived from vouch tokens) is the sole authority.
 
@@ -209,8 +155,8 @@ An admin endpoint or LiveView page where the owner can:
 
 1. See the current access mode (`open` / `trust`).
 2. Switch between modes.
-3. Set the trust threshold (when in `trust` mode).
-4. See users with their trust scores and signal breakdown.
+3. Set the maximum chain depth (when in `trust` mode).
+4. See users with their chain distance and vouch path.
 5. Manually approve a `user_hash` (issues a manual-approval vouch token).
 6. Revoke a user (tombstones their vouch tokens).
 
@@ -237,7 +183,7 @@ Client                          Server
   |     - no owner? pass + claim   |    - no owner → pass, register as owner in AdminDB
   |     - open? pass               |    - open → pass
   |     - owner? pass              |    - owner → always pass
-  |     - trust? score check       |    - trust mode → score ≥ threshold → pass
+  |     - trust? chain check       |    - trust mode → chain_distance ≤ max_depth → pass
   |     - else? 403                |    - else → 403
   |   [ChallengeInjector]          |
   |   [ElectricController.ingest]  |  PoP verify + writer
@@ -257,33 +203,19 @@ Proposed.
 2. Should there be a "pending" state where unapproved users' requests are queued rather than rejected?
 3. **Where to store owner identity and mode setting?**
 
-   Owner `user_hash` + `sign_pkey`, access mode, and trust threshold live in AdminDB (CubDB). The approval list itself is derived from vouch tokens (see [Vouch Tokens](pq_vouch_tokens.proposed.md)), which sync as an Electric shape and are stored in PostgreSQL.
+   Owner `user_hash` + `sign_pkey`, access mode, and max chain depth live in AdminDB (CubDB). The approval list itself is derived from vouch tokens (see [Vouch Tokens](pq_vouch_tokens.proposed.md)), which sync as an Electric shape and are stored in PostgreSQL.
 
    Sub-question: should AdminDB settings be **replicated to the backup drive**? On the platform, each USB drive gets its own PG instance with logical replication between main and internal. AdminDB is currently single-drive — backup requires explicit copy logic.
 
-4. **Which trust score algorithm?**
+4. **Should chain distance be visible to users?** Transparency aids debugging ("why was I rejected?") but also reveals the trust topology. Options: visible to owner only, visible to each user for their own distance, or fully opaque.
 
-   | Algorithm | Pros | Cons |
-   |-----------|------|------|
-   | **Simple weighted sum** | Easy to implement, transparent to the owner, deterministic. | No transitive trust propagation — each user scored in isolation. |
-   | **EigenTrust** | Mathematically sound global reputation from local vouches. Handles sybil-adjacent attacks (low-trust vouches carry low weight). | Iterative computation; complexity grows with user count. May be overkill for small deployments. |
-   | **Graph distance only** | Trivial to compute from the trust graph. Intuitive (closer to owner = more trusted). | Ignores vouch quality — one direct contact isn't the same as another. |
-   | **Hybrid (distance + weighted vouches)** | Balances simplicity with quality signals. Distance sets the base, vouches adjust within that band. | Two parameters to tune (distance decay, vouch weight). |
+5. **Offline chain evaluation.** Should vouch attestations be structured as self-contained signed tokens so the gate can evaluate trust without any live lookups — just the token chain? This would allow chain-distance computation even when disconnected from the trust authority.
 
-5. **Should trust scores be visible to users?** Transparency aids debugging ("why was I rejected?") but also reveals the scoring model, which could be gamed. Options: visible to owner only, visible to each user for their own score, or fully opaque.
-
-6. **Offline trust evaluation.** The Vouchsafe ZI-CG model suggests trust tokens that are self-verifiable offline. Should vouch attestations be structured as self-contained signed tokens (similar to Vouchsafe's capability tokens) so the gate can evaluate trust without any live lookups — just the token chain?
-
-7. **Composite trust score vs. simple chain length.** Is the full composite trust score (weighted signals, EigenTrust, behavioral metrics) worth the complexity? Chain distance from the owner — with the owner setting a maximum allowed hop count — may be sufficient for BuckitUp's use case and is trivial to compute, explain, and debug. The composite approach adds flexibility (vouch quality, tenure, behavioral signals) but also adds tuning burden and opaque failure modes. Should we start with chain-length-only gating and layer in composite scoring later if needed?
+6. **Should a future version add composite scoring?** Chain distance is sufficient as a starting point, but richer signals (vouch quality, behavioral patterns, tenure) could be layered in later if the simple model proves too coarse. Keeping this as a known extension point.
 
 ---
 
 ## References
 
-- [PGP Web of Trust](https://www.geeksforgeeks.org/computer-networks/what-is-web-of-trust/) — decentralized trust via key signing chains
-- [EigenTrust Algorithm](https://dl.acm.org/doi/10.1145/775152.775242) — Kamvar, Schlosser & Garcia-Molina, WWW 2003. Global reputation scores from local trust via power iteration
-- [NIST SP 800-207 Zero Trust Architecture](https://www.paloaltonetworks.com/cyberpedia/what-is-nist-sp-800-207) — continuous trust evaluation across identity, device, network, workload, data
-- [Vouchsafe ZI-CG](https://arxiv.org/abs/2601.02254) — Kuri 2026. Zero-infrastructure capability graph for offline identity and trust using Ed25519 + signed JWTs
-- [Trust Score-Based Access Control for ZTA](https://www.researchgate.net/publication/395226702) — composite trust scoring applied to zero trust access decisions
-- [EigenTrust + Zero Trust (EDR application)](https://arxiv.org/pdf/2203.09325) — combining EigenTrust with endpoint signals for network security
-- [Dynamic Decentralized Reputation](https://cheqd.io/blog/dynamic-decentralized-reputation-for-the-web-of-trust-what-we-can-learn-from-the-world-of-sports-tinder-and-netflix/) — Elo-style per-domain reputation scores for verifiable credentials
+- [Vouch Tokens](pq_vouch_tokens.proposed.md) — schema, graph traversal CTE, scope attenuation, cache
+- [Optical Handshake Flow](../flows/pq_optical-handshake.livemd) — contact establishment via physical proximity

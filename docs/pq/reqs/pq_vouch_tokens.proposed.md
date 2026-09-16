@@ -166,23 +166,19 @@ Walking the trust graph on every access check is unnecessary when the vouch set 
 
 ## Relationship to Access Gating
 
-This table is the approval substrate for [access gating](pq_access_gating.proposed.md). The system has two modes — `open` (no gating) and `trust` (vouch-token-driven). In `trust` mode, vouch tokens replace a separate approval list — a user is approved when their computed trust score meets the owner's threshold.
+This table is the approval substrate for [access gating](pq_access_gating.proposed.md). The system has two modes — `open` (no gating) and `trust` (vouch-token-driven). In `trust` mode, a user is approved when their chain distance from the owner is within the configured max depth.
 
 All approval mechanisms are vouch tokens with different scopes:
 
-| Mechanism | Vouch scope | Trust weight |
-|-----------|-------------|--------------|
-| Optical handshake | `origins.<origin_hash>.identity.optical-handshake` | Highest |
-| Manual owner approval | `origins.<origin_hash>.identity.manual-approval` | High |
-| User-to-user vouch | `origins.<origin_hash>.vouch.direct` | High (weighted by voucher's own score) |
-| Transitive trust | `origins.<origin_hash>.vouch.transitive` | Medium (attenuates with chain distance) |
+| Mechanism | Vouch scope | Chain distance effect |
+|-----------|-------------|----------------------|
+| Optical handshake | `origins.<origin_hash>.identity.optical-handshake` | 1 (direct from owner) |
+| Manual owner approval | `origins.<origin_hash>.identity.manual-approval` | 1 (direct from owner) |
+| User-to-user vouch | `origins.<origin_hash>.vouch.direct` | +1 from voucher |
+| Transitive (chain walk) | `origins.<origin_hash>.vouch.transitive` | Computed by CTE |
 
-Trust score computation:
-
-- **Trust score** queries vouch tokens to build the trust graph — who vouched for whom, in which scopes, and whether those vouches are still live (not tombstoned).
-- **Chain distance** is derived by walking `issuer_hash → subject_hash` links from the owner outward.
-- **EigenTrust-style weighting** uses the issuer's own trust score (itself derived from vouches received) to weight each vouch's contribution.
-- The access gate does not query this table directly — it queries a computed trust score cache. Vouch tokens are the source of truth; the cache is rebuilt on vouch insert/revoke.
+- **Chain distance** is derived by walking `issuer_hash → subject_hash` links from the owner outward via the recursive CTE below.
+- The access gate does not query this table directly — it queries the resolved chain cache. Vouch tokens are the source of truth; the cache is rebuilt on vouch insert/revoke.
 
 ### Graph Traversal via Recursive CTE
 
@@ -232,23 +228,11 @@ GROUP BY user_hash;
 
 - **`CYCLE … SET … USING path`** — prevents infinite loops in mutual-vouch or ring topologies. No manual visited-set.
 - **`$max_depth`** — caps traversal. Suggested default: **4** (owner → contact → contact-of-contact → one more hop).
-- **`MIN(distance)`** — shortest path becomes the `chain_distance` signal in the trust score.
+- **`MIN(distance)`** — shortest path becomes the `chain_distance` used by the access gate.
 - **`vouch_scopes`** — collects the distinct `kind` values along the chain, so the caller knows whether the path is `vouch.direct`, `vouch.transitive`, or a mix.
 - **Revocation** — `deleted_flag = false` excludes tombstoned vouches. A revoked vouch breaks the chain at that edge; downstream users lose the path through the revoker.
 - **Replay safety** — `owner_timestamp` monotonicity is enforced at ingest (§ Verification), so the query sees only the latest version of each `(kind, issuer_hash, subject_hash)` tuple.
-- For **EigenTrust-style weighted scores**, add a `trust_weight FLOAT` accumulator that multiplies each edge by the issuer's own score — still expressible as a single recursive CTE.
-
 If vouch tokens are cached in CubDB, the equivalent traversal runs in Elixir (BFS with a `MapSet` visited guard, filtering on `kind` prefix and `deleted_flag`).
-
----
-
-## Relationship to Trust Metric Discovery
-
-The scope vocabulary structure defined here implements the requirements from [trust_metric_discovery](trust_metric_discovery.proposed.md):
-
-- The `kind` column carries the dot-path scope from §1 (Claim Vocabulary Structure).
-- Core/device-local/discovered layers from §2 map to the three vocabulary layers above.
-- Self-describing tokens from §4 are satisfied by the row itself — `kind` is the scope path, the row is the attestation, and unknown scopes are passthrough-stored per §3.
 
 ---
 
@@ -275,7 +259,7 @@ The shape module implements `Chat.Data.Shapes.Shape` with standard `ingest_confi
 
 ## Open Questions
 
-1. **Should vouching require a minimum trust score?** The access gating doc proposes a `vouch_threshold` — only users with `trust_score ≥ vouch_threshold` can vouch. This is a gate-level policy, not a schema concern, but it affects which vouch tokens are meaningful.
+1. **Should vouching require a minimum chain distance?** Should only users within a certain distance from the owner (e.g., direct contacts only) be allowed to vouch for others? This is a gate-level policy, not a schema concern, but it affects which vouch tokens are meaningful.
 
 2. **Transitive vouch display.** When the UI shows "why is this user trusted?", should it show the full vouch chain or just the direct vouches? Chain display requires walking the graph; direct-only is a simple query.
 
@@ -291,6 +275,4 @@ Proposed.
 
 - [02_integrity.md](../invariants/02_integrity.md) — integrity triad: `sign_b64`, `owner_timestamp`, `deleted_flag`
 - [pq_access_gating](pq_access_gating.proposed.md) — open/trust modes, bootstrap, gate mechanics
-- [trust_metric_discovery](trust_metric_discovery.proposed.md) — scope vocabulary structure, discovery protocol
 - [pq_review_write_tokens](reviews/pq_review_write_tokens.proposed.md) — one-time invite links, bot delegation via `reviews.write.<nonce>` scope
-- [Vouchsafe ZI-CG](https://arxiv.org/abs/2601.02254) — zero-infrastructure capability graph, scope attenuation model

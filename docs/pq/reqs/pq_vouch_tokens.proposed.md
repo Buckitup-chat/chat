@@ -7,53 +7,62 @@ A vouch token is a signed attestation that one user (`issuer`) trusts another us
 - **Decentralized trust** — any approved user can vouch for any other user within scopes they hold authority over.
 - **Self-authenticating** — a vouch token is verifiable by any peer using only the issuer's `sign_pkey` from `user_cards`. No central authority, no online lookup.
 - **Revocable** — revoking a vouch is a signed tombstone (`deleted_flag: true`), same as every other soft-delete in the system.
-- **Scope-aware** — vouches are scoped to a dot-path capability namespace. A vouch for `user.trust` does not imply a vouch for `device.firmware`.
+- **Scope-aware** — vouches are scoped to a dot-path resource namespace. A vouch for `device.<sn>.ingest` does not imply a vouch for `origins.<hash>.reviews.write`.
 
 ---
 
-## Scope Vocabulary
+## Resource Forest
 
-Scopes use a DNS-like left-to-right dot-path notation. Reading left to right narrows authority:
+The `kind` field names the **resource** a vouch grants access to — not how trust was established. Provenance (optical handshake, manual approval, transitive vouch) is inferred from the issuer and context, never encoded into `kind`.
+
+Scopes use a left-to-right dot-path notation. Each step right narrows authority:
 
 ```
-devices.*.permissions
-devices.*.permissions.user_permissions
-devices.*.permissions.user_permissions.storage
-devices.*.permissions.user_permissions.storage.full
-devices.*.permissions.user_permissions.storage.full.read
-devices.*.permissions.user_permissions.storage.full.read.<entity>
-devices.*.permissions.user_permissions.storage.full.write
-devices.*.permissions.network_permissions
-devices.*.firmware
-devices.*.firmware.version
-devices.*.firmware.signature-valid
-devices.*.hardware
-devices.*.hardware.sensor-calibrated
-devices.*.hardware.storage-healthy
-devices.*.network
-devices.*.network.connectivity-verified
+device.<serial_or_domain>
+├── shapes                              ← read (Electric shape streaming)
+│   ├── user_cards
+│   ├── user_storage
+│   ├── dialog_keys
+│   ├── dialog_messages
+│   ├── dialog_message_reactions
+│   ├── dialog_message_receipts
+│   ├── files
+│   ├── file_chunks
+│   ├── origins
+│   ├── reviews
+│   └── ...
+├── ingest                              ← write (HTTP ingest)
+│   ├── user_cards
+│   ├── user_storage
+│   ├── dialog_keys
+│   ├── dialog_messages
+│   └── ...
+├── sync                                ← peer device replication
+│   ├── user_cards
+│   └── ...
+└── admin
+    ├── firmware
+    ├── storage
+    └── network
 
-origins.*.identity
-origins.*.identity.optical-handshake
-origins.*.identity.manual-approval
-origins.*.vouch
-origins.*.vouch.direct
-origins.*.vouch.transitive
-origins.*.behavioral
-origins.*.behavioral.tenure
-origins.*.behavioral.interaction-consistency
-origins.*.reviews
-origins.*.reviews.write
-origins.*.reviews.write.<write_token>
+origins.<origin_hash>
+├── reviews
+│   ├── write
+│   │   └── <nonce>                     ← per-invitation narrowing
+│   └── moderate
+└── admin
+
+rooms.<room_hash>                       ← future
+└── ...
 ```
 
-Attenuation is prefix containment — a vouch for `origins.<origin_hash>.reviews.write` covers `origins.<origin_hash>.reviews.write.<write_token>` but not `devices.*.firmware`. An origin grants a bot `origins.<origin_hash>.reviews.write`; the bot can then delegate `origins.<origin_hash>.reviews.write.<write_token>` to individual users — each step right narrows the scope.
+The forest has independent roots — `device`, `origins`, `rooms`. Each root is a different kind of entity with its own facility subtree. A vouch for `device.<sn>.ingest` grants full ingest access; `device.<sn>.ingest.dialogs` narrows to just dialog shapes. Prefix containment governs attenuation — wider scope covers all narrower leaves under it, but never crosses into a sibling tree.
 
 ### Vocabulary Layers
 
 | Layer | Source | Mutable? |
 |-------|--------|----------|
-| **Core** | Compiled into the application. Covers identity, vouching, revocation — the minimum for the access gate to function. | No |
+| **Core** | Compiled into the application. Covers the resource roots and their first-level facilities — the minimum for the access gate to function. | No |
 | **Device-local** | Owner defines additional scopes via admin UI (e.g., domain-specific sensor claims). Extends leaves only — cannot redefine compiled prefixes. | Yes, owner only |
 | **Discovered** | Learned from peer devices during sync. Unknown scopes are stored and forwarded but treated as **deny** (closed-world assumption) until the vocabulary is merged. | Yes, append-only |
 
@@ -124,7 +133,7 @@ def attenuates?(parent, child) do
 end
 ```
 
-A vouch for `origins.*` attenuates to cover `origins.<origin_hash>.vouch.direct`. A vouch for `devices.*.firmware` does not cover `origins.*`. Attenuation is checked at gate evaluation time, not at ingest.
+A vouch for `device.<sn>.ingest` attenuates to cover `device.<sn>.ingest.dialog_messages`. A vouch for `device.<sn>.admin` does not cover `origins.<hash>.reviews`. Attenuation is checked at gate evaluation time, not at ingest.
 
 ---
 
@@ -134,12 +143,12 @@ When the trust graph contains multiple paths or conflicting signals for a subjec
 
 1. **Shortest chain wins.** If multiple paths reach a subject, the path with the fewest edges sets `chain_distance`. This is already expressed by `MIN(distance)` in the recursive CTE — shortest path means strongest signal, highest trust weight.
 
-2. **Wider scope wins (on subject end).** When resolving a subject's permission at scope `S`, a vouch granted at a wider (parent) scope takes precedence over a narrower one. A vouch for `origins.<hash>.vouch` is stronger than one for `origins.<hash>.vouch.direct` — the broader grant already covers the narrower scope via prefix containment, and carries more authority because the issuer trusted the subject with the entire subtree.
+2. **Wider scope wins (on subject end).** When resolving a subject's permission at scope `S`, a vouch granted at a wider (parent) scope takes precedence over a narrower one. A vouch for `device.<sn>.ingest` is stronger than one for `device.<sn>.ingest.dialog_messages` — the broader grant already covers the narrower scope via prefix containment, and carries more authority because the issuer trusted the subject with the entire subtree.
 
 3. **Tombstone wins over grant.** A tombstoned vouch (`deleted_flag: true`) at any `(kind, issuer_hash, subject_hash)` tuple is authoritative — it is never overridden by a grant from a different issuer or a longer alternative path. Concretely:
    - If the **owner** tombstones a direct vouch for a subject at scope `S`, that subject loses access at `S` regardless of transitive paths through other users.
    - If **any edge** in a chain is tombstoned, that chain is broken. If no un-tombstoned chain remains, the subject has no path.
-   - A tombstone at a parent scope (e.g. `origins.<hash>.vouch`) attenuates downward — it blocks `origins.<hash>.vouch.direct` and `origins.<hash>.vouch.transitive` via the same prefix-containment rule.
+   - A tombstone at a parent scope (e.g. `device.<sn>.ingest`) attenuates downward — it blocks `device.<sn>.ingest.dialog_messages` and all other ingest sub-scopes via the same prefix-containment rule.
 
 These rules make revocation decisive: an owner can sever trust to any user with a single tombstone, even if the graph offers alternative paths. Re-granting requires a new vouch with a higher `owner_timestamp`.
 
@@ -149,12 +158,12 @@ These rules make revocation decisive: an owner can sever trust to any user with 
 
 Walking the trust graph on every access check is unnecessary when the vouch set changes infrequently. A runtime cache stores resolved chain results for up to **30 minutes**.
 
-**Cache key:** `{origin_hash, subject_hash, scope_prefix}` — the triple that identifies a single permission question.
+**Cache key:** `{scope_prefix, subject_hash}` — the pair that identifies a single permission question (e.g. "does this user have access to `device.BK-001.ingest`?").
 
 **Cache value:** `{chain_distance, vouch_scopes, resolved_at}` — the result of the recursive CTE or BFS walk. `resolved_at` is **OS monotonic time** (`:erlang.monotonic_time(:second)`) — immune to NTP jumps and wall-clock drift on embedded devices.
 
 **Invalidation:**
-- **On vouch insert/revoke** — any write to `vouch_tokens` within the origin prefix invalidates all cache entries for that origin. This is coarse but simple; the vouch table changes rarely relative to access checks.
+- **On vouch insert/revoke** — any write to `vouch_tokens` within the scope prefix invalidates all cache entries under that prefix. This is coarse but simple; the vouch table changes rarely relative to access checks.
 - **TTL expiry** — entries older than 30 minutes are evicted regardless. Guards against missed invalidation signals (e.g. sync lag from a peer device).
 - **On demand** — the owner can force a full cache flush via admin UI (useful after bulk vouch changes).
 
@@ -168,21 +177,22 @@ Walking the trust graph on every access check is unnecessary when the vouch set 
 
 This table is the approval substrate for [access gating](pq_access_gating.proposed.md). The system has two modes — `open` (no gating) and `trust` (vouch-token-driven). In `trust` mode, a user is approved when their chain distance from the owner is within the configured max depth.
 
-All approval mechanisms are vouch tokens with different scopes:
+All approval mechanisms produce vouch tokens with the same resource `kind`. What differs is the issuer and context — provenance is inferred, not encoded:
 
-| Mechanism | Vouch scope | Chain distance effect |
-|-----------|-------------|----------------------|
-| Optical handshake | `origins.<origin_hash>.identity.optical-handshake` | 1 (direct from owner) |
-| Manual owner approval | `origins.<origin_hash>.identity.manual-approval` | 1 (direct from owner) |
-| User-to-user vouch | `origins.<origin_hash>.vouch.direct` | +1 from voucher |
-| Transitive (chain walk) | `origins.<origin_hash>.vouch.transitive` | Computed by CTE |
+| Mechanism | Issuer | Typical vouch `kind` | Chain distance |
+|-----------|--------|----------------------|----------------|
+| Optical handshake | owner | `device.<sn>.ingest` | 1 |
+| Manual owner approval | owner | `device.<sn>.ingest` | 1 |
+| User-to-user vouch | non-owner user | `device.<sn>.ingest` | +1 from voucher |
+
+Provenance inference: if `issuer_hash` = owner → direct trust (optical handshake or manual, indistinguishable at the token level). If `issuer_hash` ≠ owner → transitive vouch.
 
 - **Chain distance** is derived by walking `issuer_hash → subject_hash` links from the owner outward via the recursive CTE below.
 - The access gate does not query this table directly — it queries the resolved chain cache. Vouch tokens are the source of truth; the cache is rebuilt on vouch insert/revoke.
 
 ### Graph Traversal via Recursive CTE
 
-Chain distance is computed by walking `vouch_tokens` edges (`issuer_hash → subject_hash`) with `WITH RECURSIVE` and built-in `CYCLE` detection (PG 14+). The walk filters by the composite PK prefix `(kind, issuer_hash)` and respects revocation (`deleted_flag`) and replay protection (`owner_timestamp`).
+Chain distance is computed by walking `vouch_tokens` edges (`issuer_hash → subject_hash`) with `WITH RECURSIVE` and built-in `CYCLE` detection (PG 14+). The walk filters by `kind` prefix and respects revocation (`deleted_flag`) and replay protection (`owner_timestamp`).
 
 ```sql
 WITH RECURSIVE trust_chain AS (
@@ -193,7 +203,7 @@ WITH RECURSIVE trust_chain AS (
     1                AS distance
   FROM vouch_tokens vt
   WHERE vt.issuer_hash   = $owner_hash
-    AND vt.kind          LIKE $origin_prefix || '.vouch.%'  -- e.g. 'origins.<origin_hash>.vouch.%'
+    AND vt.kind          LIKE $scope_prefix || '%'  -- e.g. 'device.BK-001.ingest%'
     AND vt.deleted_flag  = false
 
   UNION ALL
@@ -205,7 +215,7 @@ WITH RECURSIVE trust_chain AS (
     tc.distance + 1
   FROM vouch_tokens vt
   JOIN trust_chain tc ON vt.issuer_hash = tc.user_hash
-  WHERE vt.kind          LIKE $origin_prefix || '.vouch.%'
+  WHERE vt.kind          LIKE $scope_prefix || '%'
     AND vt.deleted_flag  = false
     AND tc.distance      < $max_depth
 )
@@ -220,16 +230,16 @@ WHERE NOT is_cycle
 GROUP BY user_hash;
 ```
 
-**Origin-scoped.** The `$origin_prefix` parameter (e.g. `'origins.u_a1b2c3'`) restricts the walk to vouches within a single origin — matching the scope vocabulary's `origins.<origin_hash>.vouch.direct` / `origins.<origin_hash>.vouch.transitive` paths. Cross-origin trust walks require a separate pass per origin or a broader prefix.
+**Resource-scoped.** The `$scope_prefix` parameter (e.g. `'device.BK-001.ingest'`) restricts the walk to vouches granting access to a specific resource subtree. Cross-tree walks (e.g. device + origins) require a separate pass per root or a broader prefix.
 
-**Scope attenuation alignment.** The `LIKE prefix || '.vouch.%'` filter mirrors the `attenuates?/2` containment rule — it selects all vouch sub-scopes under the origin without crossing into sibling namespaces (`identity`, `behavioral`).
+**Scope attenuation alignment.** The `LIKE prefix || '%'` filter mirrors the `attenuates?/2` containment rule — it selects all sub-scopes under the resource without crossing into sibling trees.
 
 **Notes:**
 
 - **`CYCLE … SET … USING path`** — prevents infinite loops in mutual-vouch or ring topologies. No manual visited-set.
 - **`$max_depth`** — caps traversal. Suggested default: **4** (owner → contact → contact-of-contact → one more hop).
 - **`MIN(distance)`** — shortest path becomes the `chain_distance` used by the access gate.
-- **`vouch_scopes`** — collects the distinct `kind` values along the chain, so the caller knows whether the path is `vouch.direct`, `vouch.transitive`, or a mix.
+- **`vouch_scopes`** — collects the distinct `kind` values along the chain, so the caller knows which specific resource scopes were granted along the path.
 - **Revocation** — `deleted_flag = false` excludes tombstoned vouches. A revoked vouch breaks the chain at that edge; downstream users lose the path through the revoker.
 - **Replay safety** — `owner_timestamp` monotonicity is enforced at ingest (§ Verification), so the query sees only the latest version of each `(kind, issuer_hash, subject_hash)` tuple.
 If vouch tokens are cached in CubDB, the equivalent traversal runs in Elixir (BFS with a `MapSet` visited guard, filtering on `kind` prefix and `deleted_flag`).
@@ -263,7 +273,9 @@ The shape module implements `Chat.Data.Shapes.Shape` with standard `ingest_confi
 
 2. **Transitive vouch display.** When the UI shows "why is this user trusted?", should it show the full vouch chain or just the direct vouches? Chain display requires walking the graph; direct-only is a simple query.
 
-3. **Scope vocabulary storage.** Device-local and discovered scopes need persistence. Options: a separate `scope_vocabulary` table (PG, synced), or CubDB (AdminDB, local-only). The core layer is compiled and needs no storage.
+3. **Device identifier format.** Serial number, domain name, or derived hash? Must be stable across reboots and unique across the fleet.
+
+4. **Scope vocabulary storage.** Device-local and discovered scopes need persistence. Options: a separate `scope_vocabulary` table (PG, synced), or CubDB (AdminDB, local-only). The core layer is compiled and needs no storage.
 
 ---
 

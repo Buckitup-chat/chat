@@ -15,7 +15,7 @@ Control who can write data through the Electric ingest API. The system starts in
 
 Default mode: `open` (preserves current behavior).
 
-Optical-handshake contacts and explicit owner approvals are vouch tokens with different scopes — they place a user at chain distance 1 from the owner. The owner controls effective behavior by tuning the maximum allowed chain depth.
+Optical-handshake contacts and explicit owner approvals are vouch tokens granting `device.<sn>.ingest` — they place a user at chain distance 1 from the owner. Provenance (how trust was established) is inferred from the issuer, not encoded in the scope. The owner controls effective behavior by tuning the maximum allowed chain depth.
 
 ---
 
@@ -40,7 +40,7 @@ The owner's trusted contacts (established via the [optical handshake flow](../fl
 1. Owner performs optical handshake with a peer — exchanging ECC public keys and proving key ownership via signed nonces.
 2. Owner's device stores the peer's `user_hash` + `ecc_pub` as a ContactCandidate.
 3. When the peer's UserCard appears (via shape sync), the candidate is verified (matching `user_hash` and `contact_pkey`) and promoted to a trusted Contact.
-4. A vouch token with scope `origins.<origin_hash>.identity.optical-handshake` is issued for the contact's `user_hash`.
+4. A vouch token with scope `device.<sn>.ingest` is issued for the contact's `user_hash`. The fact that it originated from an optical handshake is inferred from context (owner is issuer, timing correlates with handshake ceremony).
 
 ### Implications
 
@@ -54,7 +54,7 @@ The owner's trusted contacts (established via the [optical handshake flow](../fl
 
 In `trust` mode, access decisions are driven by **chain distance** — the shortest path in the vouch token graph from the owner to the user. The owner sets a maximum depth; users reachable within that depth can ingest, users beyond it (or unreachable) are rejected.
 
-The chain distance is computed by the recursive CTE defined in [Vouch Tokens § Graph Traversal](pq_vouch_tokens.proposed.md#graph-traversal-via-recursive-cte). That query walks `issuer_hash → subject_hash` edges, filters by scope prefix and `deleted_flag`, and returns `MIN(distance)` per user.
+The chain distance is computed by the recursive CTE defined in [Vouch Tokens § Graph Traversal](pq_vouch_tokens.proposed.md#graph-traversal-via-recursive-cte). That query walks `issuer_hash → subject_hash` edges, filters by resource scope prefix (e.g. `device.<sn>.ingest`) and `deleted_flag`, and returns `MIN(distance)` per user.
 
 ### Max Depth
 
@@ -64,20 +64,21 @@ The owner sets a maximum chain depth (integer, ≥ 1) via the admin UI. Default:
 - Users beyond max depth or with no path are rejected with `403` and body `{"error": "not_in_trust_chain", "max_depth": <max_depth>}`.
 - The owner can override: explicitly approve a user regardless of distance (issues a direct vouch), or explicitly revoke a user regardless of distance (tombstones their vouches).
 
-### Vouch Scope Meanings
+### Resource Scopes
 
-All approval mechanisms are vouch tokens with different scopes (see [Vouch Tokens § Relationship to Access Gating](pq_vouch_tokens.proposed.md#relationship-to-access-gating)):
+All approval mechanisms produce vouch tokens with the same resource `kind` — the scope names the facility being granted, not how trust was established (see [Vouch Tokens § Resource Forest](pq_vouch_tokens.proposed.md#resource-forest)):
 
-| Mechanism | Vouch scope | Chain distance effect |
-|-----------|-------------|----------------------|
-| Optical handshake | `origins.<origin_hash>.identity.optical-handshake` | 1 (direct from owner) |
-| Manual owner approval | `origins.<origin_hash>.identity.manual-approval` | 1 (direct from owner) |
-| User-to-user vouch | `origins.<origin_hash>.vouch.direct` | +1 from voucher |
-| Transitive (chain walk) | `origins.<origin_hash>.vouch.transitive` | Computed by CTE |
+| Mechanism | Issuer | Vouch `kind` | Chain distance |
+|-----------|--------|--------------|----------------|
+| Optical handshake | owner | `device.<sn>.ingest` | 1 |
+| Manual owner approval | owner | `device.<sn>.ingest` | 1 |
+| User-to-user vouch | non-owner user | `device.<sn>.ingest` | +1 from voucher |
+
+Provenance is inferred: `issuer_hash` = owner → direct trust; `issuer_hash` ≠ owner → transitive vouch. The mechanism (optical handshake vs. manual approval) is indistinguishable at the token level — both are owner-issued vouches for the same resource.
 
 ### Recomputation
 
-The [resolved chain cache](pq_vouch_tokens.proposed.md#optimization--resolved-chain-cache) stores distance results for up to 30 minutes. Cache invalidation happens on vouch insert/revoke within the origin prefix.
+The [resolved chain cache](pq_vouch_tokens.proposed.md#optimization--resolved-chain-cache) stores distance results for up to 30 minutes. Cache invalidation happens on vouch insert/revoke within the resource scope prefix.
 
 ---
 
@@ -89,7 +90,7 @@ A persistent set of approved users with their signing public keys:
 |-------|------|-------|
 | `user_hash` | text | Primary key, `"u_" + hex(SHA3-512(sign_pkey))` |
 | `sign_pkey` | binary | ML-DSA-87 public key — the gate verifies PoP signatures directly against this |
-| `source` | enum | `owner` / `optical_handshake` / `manual` / `vouch` |
+| `chain_distance` | integer | Shortest path from owner (1 = direct vouch) |
 | `approved_at` | integer | Unix timestamp |
 | `revoked` | boolean | Soft revoke; `false` by default |
 
@@ -157,7 +158,7 @@ An admin endpoint or LiveView page where the owner can:
 2. Switch between modes.
 3. Set the maximum chain depth (when in `trust` mode).
 4. See users with their chain distance and vouch path.
-5. Manually approve a `user_hash` (issues a manual-approval vouch token).
+5. Manually approve a `user_hash` (issues a `device.<sn>.ingest` vouch token).
 6. Revoke a user (tombstones their vouch tokens).
 
 ### Location
@@ -199,7 +200,7 @@ Proposed.
 
 ## Open Questions
 
-1. Should the owner be able to delegate approval rights to other approved users?
+1. **Should the owner be able to delegate vouching rights?** An approved user with `device.<sn>.ingest` can already vouch for others (that's the transitive chain). The question is whether there should be a narrower scope that grants ingest but not the ability to vouch further.
 2. Should there be a "pending" state where unapproved users' requests are queued rather than rejected?
 3. **Where to store owner identity and mode setting?**
 

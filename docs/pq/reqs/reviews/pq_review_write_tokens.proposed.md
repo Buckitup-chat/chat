@@ -46,7 +46,10 @@ Two vouches must exist before the bot can issue write tokens for an origin:
 ```
 Admin (device owner)
   │
-  │  Approval-list or broad vouch — "this bot is a trusted system entity"
+  │  Vouch token:
+  │    kind:         device.<sn>.ingest
+  │    issuer_hash:  owner_hash
+  │    subject_hash: bot_hash
   │  (one-time system setup)
   ▼
 Bot (server-side, sign_skey in bots table)
@@ -60,7 +63,7 @@ Bot (server-side, sign_skey in bots table)
 Origin owner (per-origin, via origin admin UI: "enable review invitations")
 ```
 
-**Admin → bot:** System-level trust. The admin vouches for the bot entity, or adds it to the approval list. Done once during system setup.
+**Admin → bot:** System-level trust. The device owner issues a `device.<sn>.ingest` vouch for the bot entity. Done once during system setup.
 
 **Origin → bot:** Per-origin delegation. The origin owner signs this vouch from their client using the origin's `sign_skey`. This is a deliberate step in the origin admin UI — the owner explicitly enables review invitations for their origin.
 
@@ -292,7 +295,7 @@ The write token gates entry. Once the reviewer has identity + vouch, they use th
 
 ### Vouch tokens — consumer
 
-Write tokens consume the vouch token infrastructure for trust delegation. The `origins.<origin_hash>.reviews.write.<nonce>` scope was designed for this use case (see [Scope Vocabulary](../pq_vouch_tokens.proposed.md#scope-vocabulary)).
+Write tokens consume the vouch token infrastructure for trust delegation. The `origins.<origin_hash>.reviews.write.<nonce>` scope sits in the origins subtree of the [Resource Forest](../pq_vouch_tokens.proposed.md#resource-forest).
 
 ### Review access mode — per-origin policy
 
@@ -375,7 +378,7 @@ Proposed.
 
 ## References
 
-- [pq_vouch_tokens](../pq_vouch_tokens.proposed.md) — vouch token system, scope vocabulary, attenuation
+- [pq_vouch_tokens](../pq_vouch_tokens.proposed.md) — vouch token system, resource forest, attenuation
 - [pq_reviews](pq_reviews.in_progress.md) — review system overview, pipeline, sandboxes
 - [pq_review_moderation](pq_review_moderation.done.md) — moderation pipeline, candidate promotion
 - [pq_origin](pq_origin.done.md) — origin entity, creation, ownership

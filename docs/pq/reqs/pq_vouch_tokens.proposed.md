@@ -128,14 +128,119 @@ A vouch for `origins.*` attenuates to cover `origins.<origin_hash>.vouch.direct`
 
 ---
 
+## Permission Resolution
+
+When the trust graph contains multiple paths or conflicting signals for a subject, three rules determine the outcome, applied in order:
+
+1. **Shortest chain wins.** If multiple paths reach a subject, the path with the fewest edges sets `chain_distance`. This is already expressed by `MIN(distance)` in the recursive CTE — shortest path means strongest signal, highest trust weight.
+
+2. **Wider scope wins (on subject end).** When resolving a subject's permission at scope `S`, a vouch granted at a wider (parent) scope takes precedence over a narrower one. A vouch for `origins.<hash>.vouch` is stronger than one for `origins.<hash>.vouch.direct` — the broader grant already covers the narrower scope via prefix containment, and carries more authority because the issuer trusted the subject with the entire subtree.
+
+3. **Tombstone wins over grant.** A tombstoned vouch (`deleted_flag: true`) at any `(kind, issuer_hash, subject_hash)` tuple is authoritative — it is never overridden by a grant from a different issuer or a longer alternative path. Concretely:
+   - If the **owner** tombstones a direct vouch for a subject at scope `S`, that subject loses access at `S` regardless of transitive paths through other users.
+   - If **any edge** in a chain is tombstoned, that chain is broken. If no un-tombstoned chain remains, the subject has no path.
+   - A tombstone at a parent scope (e.g. `origins.<hash>.vouch`) attenuates downward — it blocks `origins.<hash>.vouch.direct` and `origins.<hash>.vouch.transitive` via the same prefix-containment rule.
+
+These rules make revocation decisive: an owner can sever trust to any user with a single tombstone, even if the graph offers alternative paths. Re-granting requires a new vouch with a higher `owner_timestamp`.
+
+---
+
+## Optimization — Resolved Chain Cache
+
+Walking the trust graph on every access check is unnecessary when the vouch set changes infrequently. A runtime cache stores resolved chain results for up to **30 minutes**.
+
+**Cache key:** `{origin_hash, subject_hash, scope_prefix}` — the triple that identifies a single permission question.
+
+**Cache value:** `{chain_distance, vouch_scopes, resolved_at}` — the result of the recursive CTE or BFS walk. `resolved_at` is **OS monotonic time** (`:erlang.monotonic_time(:second)`) — immune to NTP jumps and wall-clock drift on embedded devices.
+
+**Invalidation:**
+- **On vouch insert/revoke** — any write to `vouch_tokens` within the origin prefix invalidates all cache entries for that origin. This is coarse but simple; the vouch table changes rarely relative to access checks.
+- **TTL expiry** — entries older than 30 minutes are evicted regardless. Guards against missed invalidation signals (e.g. sync lag from a peer device).
+- **On demand** — the owner can force a full cache flush via admin UI (useful after bulk vouch changes).
+
+**Implementation:** ETS table owned by the trust-score computation process. Reads are concurrent; writes (invalidation) are serialized through the owning process. If vouch tokens are cached in CubDB, the same cache sits in front of the BFS walk.
+
+**No negative caching.** A cache miss always triggers a fresh walk. This prevents a stale "denied" result from blocking a user who was just vouched for.
+
+---
+
 ## Relationship to Access Gating
 
-This table is the storage substrate for the `trust` mode defined in [pq_access_gating](pq_access_gating.proposed.md):
+This table is the approval substrate for [access gating](pq_access_gating.proposed.md). The system has two modes — `open` (no gating) and `trust` (vouch-token-driven). In `trust` mode, vouch tokens replace a separate approval list — a user is approved when their computed trust score meets the owner's threshold.
 
-- **Trust score computation** queries vouch tokens to build the trust graph — who vouched for whom, in which scopes, and whether those vouches are still live (not tombstoned).
+All approval mechanisms are vouch tokens with different scopes:
+
+| Mechanism | Vouch scope | Trust weight |
+|-----------|-------------|--------------|
+| Optical handshake | `origins.<origin_hash>.identity.optical-handshake` | Highest |
+| Manual owner approval | `origins.<origin_hash>.identity.manual-approval` | High |
+| User-to-user vouch | `origins.<origin_hash>.vouch.direct` | High (weighted by voucher's own score) |
+| Transitive trust | `origins.<origin_hash>.vouch.transitive` | Medium (attenuates with chain distance) |
+
+Trust score computation:
+
+- **Trust score** queries vouch tokens to build the trust graph — who vouched for whom, in which scopes, and whether those vouches are still live (not tombstoned).
 - **Chain distance** is derived by walking `issuer_hash → subject_hash` links from the owner outward.
 - **EigenTrust-style weighting** uses the issuer's own trust score (itself derived from vouches received) to weight each vouch's contribution.
 - The access gate does not query this table directly — it queries a computed trust score cache. Vouch tokens are the source of truth; the cache is rebuilt on vouch insert/revoke.
+
+### Graph Traversal via Recursive CTE
+
+Chain distance is computed by walking `vouch_tokens` edges (`issuer_hash → subject_hash`) with `WITH RECURSIVE` and built-in `CYCLE` detection (PG 14+). The walk filters by the composite PK prefix `(kind, issuer_hash)` and respects revocation (`deleted_flag`) and replay protection (`owner_timestamp`).
+
+```sql
+WITH RECURSIVE trust_chain AS (
+  -- Base: users the owner directly vouched for
+  SELECT
+    vt.subject_hash  AS user_hash,
+    vt.kind,
+    1                AS distance
+  FROM vouch_tokens vt
+  WHERE vt.issuer_hash   = $owner_hash
+    AND vt.kind          LIKE $origin_prefix || '.vouch.%'  -- e.g. 'origins.<origin_hash>.vouch.%'
+    AND vt.deleted_flag  = false
+
+  UNION ALL
+
+  -- Walk outward: each subject's own vouches
+  SELECT
+    vt.subject_hash,
+    vt.kind,
+    tc.distance + 1
+  FROM vouch_tokens vt
+  JOIN trust_chain tc ON vt.issuer_hash = tc.user_hash
+  WHERE vt.kind          LIKE $origin_prefix || '.vouch.%'
+    AND vt.deleted_flag  = false
+    AND tc.distance      < $max_depth
+)
+CYCLE user_hash SET is_cycle USING path
+
+SELECT
+  user_hash,
+  MIN(distance)                       AS chain_distance,
+  array_agg(DISTINCT kind)            AS vouch_scopes
+FROM trust_chain
+WHERE NOT is_cycle
+GROUP BY user_hash;
+```
+
+**Origin-scoped.** The `$origin_prefix` parameter (e.g. `'origins.u_a1b2c3'`) restricts the walk to vouches within a single origin — matching the scope vocabulary's `origins.<origin_hash>.vouch.direct` / `origins.<origin_hash>.vouch.transitive` paths. Cross-origin trust walks require a separate pass per origin or a broader prefix.
+
+**Scope attenuation alignment.** The `LIKE prefix || '.vouch.%'` filter mirrors the `attenuates?/2` containment rule — it selects all vouch sub-scopes under the origin without crossing into sibling namespaces (`identity`, `behavioral`).
+
+**Notes:**
+
+- **`CYCLE … SET … USING path`** — prevents infinite loops in mutual-vouch or ring topologies. No manual visited-set.
+- **`$max_depth`** — caps traversal. Suggested default: **4** (owner → contact → contact-of-contact → one more hop).
+- **`MIN(distance)`** — shortest path becomes the `chain_distance` signal in the trust score.
+- **`vouch_scopes`** — collects the distinct `kind` values along the chain, so the caller knows whether the path is `vouch.direct`, `vouch.transitive`, or a mix.
+- **Revocation** — `deleted_flag = false` excludes tombstoned vouches. A revoked vouch breaks the chain at that edge; downstream users lose the path through the revoker.
+- **Replay safety** — `owner_timestamp` monotonicity is enforced at ingest (§ Verification), so the query sees only the latest version of each `(kind, issuer_hash, subject_hash)` tuple.
+- For **EigenTrust-style weighted scores**, add a `trust_weight FLOAT` accumulator that multiplies each edge by the issuer's own score — still expressible as a single recursive CTE.
+
+If vouch tokens are cached in CubDB, the equivalent traversal runs in Elixir (BFS with a `MapSet` visited guard, filtering on `kind` prefix and `deleted_flag`).
+
+---
 
 ## Relationship to Trust Metric Discovery
 
@@ -144,6 +249,19 @@ The scope vocabulary structure defined here implements the requirements from [tr
 - The `kind` column carries the dot-path scope from §1 (Claim Vocabulary Structure).
 - Core/device-local/discovered layers from §2 map to the three vocabulary layers above.
 - Self-describing tokens from §4 are satisfied by the row itself — `kind` is the scope path, the row is the attestation, and unknown scopes are passthrough-stored per §3.
+
+---
+
+## Relationship to Review Write Tokens
+
+The `origins.<origin_hash>.reviews.write.<write_token>` scope path is consumed by the [review write tokens](reviews/pq_review_write_tokens.proposed.md) system — one-time invite links that lead a user to writing a review for an origin.
+
+The vouch delegation chain for write tokens:
+
+1. **Origin → bot:** The origin owner vouches for a server-side bot with `origins.<origin_hash>.reviews.write` — a per-origin "enable review invitations" step in the origin admin UI.
+2. **Bot → reviewer:** On invite link consumption, the bot sub-delegates `origins.<origin_hash>.reviews.write.<nonce>` to the reviewer — a narrower scope per invitation, attenuated from the origin's grant.
+
+The origin's `review_access` mode (`open` / `invite_only`) determines whether a vouch in `reviews.write.*` is required at review ingest or is recorded as provenance only.
 
 ---
 
@@ -172,6 +290,7 @@ Proposed.
 ## References
 
 - [02_integrity.md](../invariants/02_integrity.md) — integrity triad: `sign_b64`, `owner_timestamp`, `deleted_flag`
-- [pq_access_gating](pq_access_gating.proposed.md) — trust mode, approval list, gate mechanics
+- [pq_access_gating](pq_access_gating.proposed.md) — open/trust modes, bootstrap, gate mechanics
 - [trust_metric_discovery](trust_metric_discovery.proposed.md) — scope vocabulary structure, discovery protocol
+- [pq_review_write_tokens](reviews/pq_review_write_tokens.proposed.md) — one-time invite links, bot delegation via `reviews.write.<nonce>` scope
 - [Vouchsafe ZI-CG](https://arxiv.org/abs/2601.02254) — zero-infrastructure capability graph, scope attenuation model

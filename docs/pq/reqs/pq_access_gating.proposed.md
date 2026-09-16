@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Control who can write data through the Electric ingest API. The first user registers unconditionally and becomes the **owner**. All subsequent users are subject to the active access mode. Shape reads remain open — all synced data is encrypted, so read access leaks nothing useful.
+Control who can write data through the Electric ingest API. The system starts in `open` mode. The first user to ingest a `user_card` registers unconditionally and becomes the **owner** (persisted in AdminDB). While in `open` mode, anyone can ingest. When the owner switches to `trust` mode, all subsequent users are subject to trust score evaluation. Shape reads remain open — all synced data is encrypted, so read access leaks nothing useful.
 
 ---
 
@@ -11,46 +11,42 @@ Control who can write data through the Electric ingest API. The first user regis
 | Mode | New user_card ingest | Other ingest (existing users) | Shape reads |
 |------|---------------------|-------------------------------|-------------|
 | `open` | Anyone | Anyone with valid PoP | Open |
-| `contacts` | Owner's optical-handshake contacts auto-approved | Approved users only | Open |
 | `trust` | Auto-approved if trust score ≥ threshold | Trust-gated (see [Trust Metrics](#trust-metrics)) | Open |
-| `invite` | Owner must explicitly approve each `user_hash` | Approved users only | Open |
-| `locked` | Rejected | Approved users only | Open |
 
 Default mode: `open` (preserves current behavior).
 
-### Mode transitions
-
-Any mode can transition to any other mode. Changing mode does not revoke already-approved users — it only affects how *new* users get approved.
+Optical-handshake contacts and explicit owner approvals are not separate modes — they are [trust score signals](#trust-score-components) that feed the `trust` mode threshold. The owner controls effective behavior by tuning the threshold and choosing which signals carry weight.
 
 ---
 
-## Owner
+## Bootstrap and Owner
 
-The first `user_card` successfully ingested when no owner exists becomes the owner. The owner's `user_hash` is persisted in AdminDB.
+The system starts in `open` mode with no owner. The first `user_card` successfully ingested registers that user as the **owner** — their `user_hash` and `sign_pkey` are persisted in AdminDB. The mode remains `open` until the owner explicitly switches to `trust`.
 
 - Owner is always approved regardless of mode.
-- Owner can change the access mode.
-- Owner can explicitly approve or revoke any `user_hash`.
+- Owner can change the access mode (`open` ↔ `trust`).
+- Owner can explicitly approve or revoke any `user_hash` (manual approval is a trust signal).
+- Owner can set and adjust the trust threshold.
 - There is exactly one owner. Ownership transfer is out of scope for this requirement.
 
 ---
 
-## Contacts Whitelist
+## Contacts as Trust Signal
 
-In `contacts` mode, the owner's trusted contacts (established via the [optical handshake flow](../flows/pq_optical-handshake.livemd)) are automatically whitelisted.
+The owner's trusted contacts (established via the [optical handshake flow](../flows/pq_optical-handshake.livemd)) are a high-weight signal in the trust score, not a separate access mode.
 
 ### Flow
 
 1. Owner performs optical handshake with a peer — exchanging ECC public keys and proving key ownership via signed nonces.
 2. Owner's device stores the peer's `user_hash` + `ecc_pub` as a ContactCandidate.
 3. When the peer's UserCard appears (via shape sync), the candidate is verified (matching `user_hash` and `contact_pkey`) and promoted to a trusted Contact.
-4. Trusted Contact's `user_hash` is added to the approved set.
+4. A vouch token with scope `origins.<origin_hash>.identity.optical-handshake` is issued for the contact's `user_hash`, feeding the trust score.
 
 ### Implications
 
-- Contact trust is directional — the *owner's* contacts are whitelisted, not every user's contacts.
-- Revoking a contact (if/when supported) removes the approval.
-- Contacts approved this way appear in the approved list alongside explicitly approved users but are tagged as `contact`-sourced so the owner can distinguish them.
+- Contact trust is directional — the *owner's* contacts receive a trust signal, not every user's contacts.
+- Revoking a contact revokes the vouch token (signed tombstone), which drops the trust score.
+- With the right threshold, an owner can achieve "contacts-only" behavior by setting the threshold high enough that only optical-handshake-verified users pass.
 
 ---
 
@@ -86,13 +82,14 @@ A 2026 model designed specifically for offline and disconnected environments. Tr
 
 **Fit for BuckitUp:** Highly aligned with BuckitUp's offline device scenario. Trust tokens could travel with the data itself, allowing the gate to evaluate trust even when disconnected from the original trust authority. The existing PQ PoP signatures could serve as the cryptographic substrate.
 
-### Proposed Trust Score Components
+### Trust Score Components
 
 A composite trust score computed from weighted signals:
 
 | Signal | Description | Weight (example) |
 |--------|-------------|-------------------|
-| `verification_level` | How the user was verified: optical handshake (highest), contact-chain, manual approval, open registration | High |
+| `optical_handshake` | User verified via optical handshake with the owner or another trusted user — cryptographic proof of physical proximity | Highest |
+| `manual_approval` | Owner explicitly approved this `user_hash` via admin UI (replaces the old `invite` mode concept) | High |
 | `vouches` | Number and quality of vouches from other trusted users, weighted by voucher's own trust score (EigenTrust-style) | High |
 | `chain_distance` | Shortest path in the trust graph from the owner to this user (1 = direct contact, 2 = contact-of-contact, etc.) | Medium |
 | `tenure` | Time since first successful ingest (longer = more trusted) | Low |
@@ -146,11 +143,11 @@ A persistent set of approved users with their signing public keys:
 |-------|------|-------|
 | `user_hash` | text | Primary key, `"u_" + hex(SHA3-512(sign_pkey))` |
 | `sign_pkey` | binary | ML-DSA-87 public key — the gate verifies PoP signatures directly against this |
-| `source` | enum | `owner` / `contact` / `manual` |
+| `source` | enum | `owner` / `optical_handshake` / `manual` / `trust` |
 | `approved_at` | integer | Unix timestamp |
 | `revoked` | boolean | Soft revoke; `false` by default |
 
-Storage: **TBD** — see [Open Questions §4](#open-questions).
+Storage: derived from [vouch tokens](pq_vouch_tokens.proposed.md) (PostgreSQL, synced via Electric). Owner identity and mode setting live in AdminDB — see [Open Questions §3](#open-questions).
 
 Storing `sign_pkey` lets the gate verify the PoP signature against the approved key *before* the ingest reaches the writer — no DB lookup needed. It also means the gate can authenticate requests for any table, not just `user_card` mutations that carry a `user_hash` field.
 
@@ -177,13 +174,11 @@ end
 
 ### What it checks
 
-1. **Mode is `open`** → pass through (current behavior).
-2. **No owner registered yet** → allow the ingest, let the first `user_card` insert claim ownership (post-ingest hook or writer callback).
+1. **No owner registered yet** → allow the ingest. If this is a `user_card` insert, register the user as owner in AdminDB (post-ingest hook or writer callback). Mode stays `open`.
+2. **Mode is `open`** → pass through (current behavior).
 3. **Request's `user_hash` is the owner** → pass through.
-4. **Request's `user_hash` is in the approved set and not revoked** → pass through.
-5. **Mode is `contacts`** → check if `user_hash` is an owner contact; if yes, auto-approve and pass through.
-6. **Mode is `trust`** → compute or retrieve cached trust score for `user_hash`; if score ≥ threshold, pass through; if below, reject with `403` and `{"error": "trust_below_threshold", "score": <score>, "threshold": <threshold>}`.
-7. **Otherwise** → reject with `403 Forbidden`, body: `{"error": "access_denied", "mode": "<current_mode>"}`.
+4. **Mode is `trust`** → compute or retrieve cached trust score for `user_hash`; if score ≥ threshold, pass through; if below, reject with `403` and `{"error": "trust_below_threshold", "score": <score>, "threshold": <threshold>}`.
+5. **Otherwise** → reject with `403 Forbidden`, body: `{"error": "access_denied", "mode": "<current_mode>"}`.
 
 ### Identifying the caller
 
@@ -192,9 +187,9 @@ The ingest request carries a PoP signature (signed challenge). The gate uses the
 1. Extract the challenge + signature from `params["auth"]`.
 2. Iterate approved (non-revoked) entries and attempt `ML-DSA-87.verify(challenge, signature, entry.sign_pkey)`.
 3. A match identifies the caller and confirms they are approved — proceed.
-4. No match among approved entries — check if this is a `user_card` create mutation. If so, extract `sign_pkey` from the mutation payload, compute `user_hash`, and verify the signature against that key. If valid, apply the mode-dependent approval logic (auto-approve in `open`/`contacts`, reject or pend in `invite`/`locked`).
+4. No match among approved entries — check if this is a `user_card` create mutation. If so, extract `sign_pkey` from the mutation payload, compute `user_hash`, and verify the signature against that key. If valid: in `open` mode, allow; in `trust` mode, compute trust score and apply threshold.
 
-This avoids needing any PostgreSQL lookup — the approval list (wherever stored, see [§4](#open-questions)) is the sole authority.
+This avoids needing any PostgreSQL lookup — the approval list (derived from vouch tokens) is the sole authority.
 
 ---
 
@@ -212,11 +207,12 @@ No separate "API key" or "server token" concept. The PQ PoP flow is the universa
 
 An admin endpoint or LiveView page where the owner can:
 
-1. See the current access mode.
-2. Change the mode.
-3. See the approved list (with source tags).
-4. Manually approve a `user_hash`.
-5. Revoke an approved `user_hash`.
+1. See the current access mode (`open` / `trust`).
+2. Switch between modes.
+3. Set the trust threshold (when in `trust` mode).
+4. See users with their trust scores and signal breakdown.
+5. Manually approve a `user_hash` (issues a manual-approval vouch token).
+6. Revoke a user (tombstones their vouch tokens).
 
 ### Location
 
@@ -238,10 +234,9 @@ Client                          Server
   |                                |
   |   [ElectricReadiness]          |  DB + Electric up?
   |   [ElectricAccessGate]         |  Mode check:
+  |     - no owner? pass + claim   |    - no owner → pass, register as owner in AdminDB
   |     - open? pass               |    - open → pass
-  |     - no owner? pass + claim   |    - no owner → pass, post-ingest claim
-  |     - approved? pass           |    - approved → pass
-  |     - contact? auto-approve    |    - contact in contacts mode → approve + pass
+  |     - owner? pass              |    - owner → always pass
   |     - trust? score check       |    - trust mode → score ≥ threshold → pass
   |     - else? 403                |    - else → 403
   |   [ChallengeInjector]          |
@@ -260,20 +255,13 @@ Proposed.
 
 1. Should the owner be able to delegate approval rights to other approved users?
 2. Should there be a "pending" state where unapproved users' requests are queued rather than rejected?
-3. Should mode be configurable via environment variable for initial deployment, or only through the owner UI?
-4. **Where to store the approval list (and owner identity)?**
+3. **Where to store owner identity and mode setting?**
 
-   | Option | Pros | Cons |
-   |--------|------|------|
-   | **CubDB (AdminDB)** | Already exists, fast reads, no schema migration. Gate reads are local in-memory lookups. | Single-drive, no built-in replication. Lost if AdminDB drive fails. |
-   | **PostgreSQL (non-Electric table)** | Lives alongside PQ data, survives drive swaps if on main DB. Can participate in PG logical replication between main ↔ internal. | Adds a table that must not be exposed via Electric shapes. Gate now depends on PG being up (but it already does via `ElectricReadiness`). |
-   | **Both (CubDB primary, PG backup)** | CubDB for fast gate checks, PG as durable backup. Restore from PG if AdminDB is lost. | Two sources of truth to keep in sync. |
+   Owner `user_hash` + `sign_pkey`, access mode, and trust threshold live in AdminDB (CubDB). The approval list itself is derived from vouch tokens (see [Vouch Tokens](pq_vouch_tokens.proposed.md)), which sync as an Electric shape and are stored in PostgreSQL.
 
-   Sub-question: should the approval list be **replicated to the backup drive**? On the platform, each USB drive gets its own PG instance with logical replication between main and internal. If the approval list is in PG, it could ride that replication for free. If it's in CubDB, backup requires explicit copy logic (AdminDB is currently single-drive).
+   Sub-question: should AdminDB settings be **replicated to the backup drive**? On the platform, each USB drive gets its own PG instance with logical replication between main and internal. AdminDB is currently single-drive — backup requires explicit copy logic.
 
-   The owner `user_hash` + `sign_pkey` and the access mode setting have the same storage question.
-
-5. **Which trust score algorithm?**
+4. **Which trust score algorithm?**
 
    | Algorithm | Pros | Cons |
    |-----------|------|------|
@@ -282,11 +270,11 @@ Proposed.
    | **Graph distance only** | Trivial to compute from the trust graph. Intuitive (closer to owner = more trusted). | Ignores vouch quality — one direct contact isn't the same as another. |
    | **Hybrid (distance + weighted vouches)** | Balances simplicity with quality signals. Distance sets the base, vouches adjust within that band. | Two parameters to tune (distance decay, vouch weight). |
 
-6. **Should trust scores be visible to users?** Transparency aids debugging ("why was I rejected?") but also reveals the scoring model, which could be gamed. Options: visible to owner only, visible to each user for their own score, or fully opaque.
+5. **Should trust scores be visible to users?** Transparency aids debugging ("why was I rejected?") but also reveals the scoring model, which could be gamed. Options: visible to owner only, visible to each user for their own score, or fully opaque.
 
-7. **Should `trust` mode coexist with `contacts`?** The `contacts` mode auto-approves optical-handshake contacts with implicit full trust. In `trust` mode, should optical-handshake contacts still get automatic high trust, or should all users go through the same scoring pipeline?
+6. **Offline trust evaluation.** The Vouchsafe ZI-CG model suggests trust tokens that are self-verifiable offline. Should vouch attestations be structured as self-contained signed tokens (similar to Vouchsafe's capability tokens) so the gate can evaluate trust without any live lookups — just the token chain?
 
-8. **Offline trust evaluation.** The Vouchsafe ZI-CG model suggests trust tokens that are self-verifiable offline. Should vouch attestations be structured as self-contained signed tokens (similar to Vouchsafe's capability tokens) so the gate can evaluate trust without any live lookups — just the token chain?
+7. **Composite trust score vs. simple chain length.** Is the full composite trust score (weighted signals, EigenTrust, behavioral metrics) worth the complexity? Chain distance from the owner — with the owner setting a maximum allowed hop count — may be sufficient for BuckitUp's use case and is trivial to compute, explain, and debug. The composite approach adds flexibility (vouch quality, tenure, behavioral signals) but also adds tuning burden and opaque failure modes. Should we start with chain-length-only gating and layer in composite scoring later if needed?
 
 ---
 

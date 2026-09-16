@@ -29,6 +29,7 @@ The origin identity (not the owner) should be able to:
 - **Ingest via candidates**: all *author-submitted* `review_public_passwords` entries flow through `review_password_candidate` — the server validates and promotes. See [Candidate-only ingest](pq_review_moderation.done.md#candidate-only-ingest).
 - **Origin key management**: origin keypairs are independently generated on the client (not derived from owner keys), stored client-side in the owner's identity, same pattern as regular user keys (see [pq_user.done.md](../pq_user.done.md)). Multi-device access via User Storage.
 - **Origin creation**: three-step flow. See [Origin creation](pq_origin.done.md#origin-creation).
+- **Review access control**: per-origin `review_access` mode (`open` / `invite_only`) determines whether anyone can write a review or only write-token holders. See [Write Tokens](pq_review_write_tokens.proposed.md).
 
 ## Three entities
 
@@ -55,6 +56,7 @@ Origin (the coffee shop)
 | [Moderation](pq_review_moderation.done.md) | done | Crypto pipeline, visibility tiers, content model, comments, schemas, shapes, security |
 | [Contacts](pq_review_contacts.done.md) | done | Contacts channel, review_list, key delivery, proof matrix |
 | [Versioning](pq_review_versioning.done.md) | done | Review editing, version chain, pre-mode lock, review_versions table |
+| [Write Tokens](pq_review_write_tokens.proposed.md) | proposed | One-time invite links, bot delegation, review_access mode, identity gate |
 
 ## Sandboxes
 
@@ -172,7 +174,21 @@ See [Contacts](pq_review_contacts.done.md).
 - [ ] Owner-signed authorization for dangerous origin ops (moderation mode, soft delete) — see the Status note under [Origin creation](pq_origin.done.md#origin-creation)
 - [ ] Origin keys in User Storage for multi-device access
 
-### Phase 4 — `to_contacts` visibility tier (future)
+### Phase 4 — Write tokens and review access control
+
+See [Write Tokens](pq_review_write_tokens.proposed.md).
+
+- [ ] `review_access` column on `origins` (`open` / `invite_only`)
+- [ ] Review ingest vouch check when `review_access = invite_only`
+- [ ] `review_write_tokens` table + schema + CRUD controller
+- [ ] Bot identity + vouch delegation chain (admin → bot, origin → bot)
+- [ ] `/r/:nonce` route — token validation, identity gate, bind flow
+- [ ] Origin admin UI: "enable review invitations" (origin → bot vouch)
+- [ ] SPA write flow: identity creation/import, review form, pipeline orchestration
+- [ ] `ReviewWriteTokenCleaner` — GC pending tokens older than 1 month
+- [ ] Batch token creation + QR generation
+
+### Phase 5 — `to_contacts` visibility tier (future)
 
 Distinct from the Phase 3 contacts channel: that one shares `to_public` reviews with contacts, this one
 is a review tier that never enters public moderation at all.
@@ -181,7 +197,7 @@ is a review tier that never enters public moderation at all.
 - [ ] contacts-only review encryption/decryption
 - [ ] depends on broader contacts/trust model design
 
-### Phase 5 — Operational hardening
+### Phase 6 — Operational hardening
 
 - [x] Stale-candidate GC — [`ReviewCandidateCleaner`](../../../../lib/chat/data/review_candidate_cleaner.ex) runs every 10 min, cleans both right and password candidates older than 1 hour
 - [x] Clean rejection instead of a 500 for stale HTTP updates — `validate_timestamp_newer_than_existing` uses `get_field/2` (not `get_change`), tests pass asserting 4xx

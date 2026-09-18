@@ -36,6 +36,7 @@ Because the type lives inside the ciphertext, the database (and any peer without
 - [`"file"`](#file) — large file, out-of-band encrypted chunks in PostgreSQL
 - [`"image"`](#image) — large image, out-of-band with aspect ratio and thumbhash
 - [`"video"`](#video) — video, out-of-band with aspect ratio and thumbhash
+- [`"checkpoint"`](#checkpoint) — signed commitment to the dialog's causal history and materialized view
 - [`"review_list_key"`](#review_list_key) — the sender's `review_list_password`, shared with a contact
 
 ### `"inline_file"`
@@ -135,6 +136,35 @@ Out-of-band video stored as encrypted chunks in PostgreSQL. Carries aspect ratio
 | 8 | enc_secret_b64 | AES-256 key for chunk decryption (base64) |
 
 Videos are always out-of-band — there is no inline variant.
+
+### `"checkpoint"`
+
+A signed DAG checkpoint: the author attests "my device held this causally complete local
+state of the dialog, and under the named reducer it materialized to this view". It rides an
+ordinary `dialog_messages` row, so the commitments stay inside the ciphertext (the server
+sees a normal message), the row's ML-DSA signature covers them, and the row's `refs_map`
+makes the checkpoint a merge event over the attested tails. A checkpoint never claims
+global completeness — only what was locally present at signing time.
+
+```json
+{"checkpoint": [1, "dialog-state-v1", "dialog-view-tree-v1", "dfr_<hex>", "dvr_<hex>", {"dmsg_...": "dms_...", "...": "..."}, 1788470000]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | checkpoint_version | Integer; `1` = SHA3-512 commitments, domains below |
+| 1 | reducer_version | Rules that turned events into the view; `dialog-state-v1` = gate-admitted current revisions, tombstones included |
+| 2 | tree_version | View-commitment structure; `dialog-view-tree-v1` = compressed binary Merkle trie keyed by `message_id` bytes |
+| 3 | frontier_root | `dfr_` + hex SHA3-512 over `"BUCKITUP_DIALOG_FRONTIER_V1"` and the sorted `message_id\|sign_hash` pairs |
+| 4 | view_root | `dvr_` + hex root of the view trie; leaves hash `"BUCKITUP_DIALOG_VIEW_LEAF_V1"`, `message_id`, the current revision's `sign_hash` and the deleted flag; inner nodes hash `"BUCKITUP_DIALOG_VIEW_NODE_V1"`, the branching bit index and both children |
+| 5 | frontier | Object `{message_id: sign_hash}` — the DAG tails observed at checkpoint time; source of truth, position 3 is its fingerprint |
+| 6 | created_at | Unix seconds, informational |
+
+`sign_hash` already commits to a revision's full signed content, so the frontier commits to
+the causal history transitively and the view leaf needs no separate content hash. History
+and view are separate commitments on purpose: "history grew but the view is identical" is
+distinguishable from "the visible conversation changed". Unknown `reducer_version` /
+`tree_version` make the view unverifiable for the reader, not the checkpoint invalid.
 
 ### `"review_list_key"`
 

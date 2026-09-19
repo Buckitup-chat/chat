@@ -72,9 +72,11 @@ export async function extractVideoMetadata(file) {
       thumbHashB64 = canvasThumbHash(video, video.videoWidth, video.videoHeight);
     } catch { /* thumbhash is best-effort */ }
 
-    return { widthAspect, heightAspect, thumbHashB64 };
+    // duration is NaN while unknown and +Infinity for unbounded streams
+    const durationSeconds = Number.isFinite(video.duration) ? Math.round(video.duration) : 0;
+    return { widthAspect, heightAspect, thumbHashB64, durationSeconds };
   } catch {
-    return { widthAspect: 16, heightAspect: 9, thumbHashB64: '' };
+    return { widthAspect: 16, heightAspect: 9, thumbHashB64: '', durationSeconds: 0 };
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -127,8 +129,8 @@ export function buildImageContent(wAspect, hAspect, thumbHashB64, name, size, mi
   return { image: [wAspect, hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, fileId, encSecretB64] };
 }
 
-export function buildVideoContent(wAspect, hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, fileId, encSecretB64) {
-  return { video: [wAspect, hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, fileId, encSecretB64] };
+export function buildVideoContent(wAspect, hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, durationSeconds, fileId, encSecretB64) {
+  return { video: [wAspect, hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, durationSeconds, fileId, encSecretB64] };
 }
 
 // --- Content object parser ---
@@ -140,8 +142,13 @@ const PARSERS = {
   image([wAspect, hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, fileId, encSecretB64]) {
     return { type: 'image', widthAspect: wAspect, heightAspect: hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, fileId, encSecretB64 };
   },
-  video([wAspect, hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, fileId, encSecretB64]) {
-    return { type: 'video', widthAspect: wAspect, heightAspect: hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, fileId, encSecretB64 };
+  video(arr) {
+    // legacy layouts (9-element pre-duration, or 10-element with duration
+    // trailing the refs) must fail loudly, not shift the transport refs
+    // into the wrong fields — a number at 7 pins the registry order
+    if (!Array.isArray(arr) || arr.length !== 10 || typeof arr[7] !== 'number') throw new Error(`Malformed video envelope: ${JSON.stringify(arr).slice(0, 80)}`);
+    const [wAspect, hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, durationSeconds, fileId, encSecretB64] = arr;
+    return { type: 'video', widthAspect: wAspect, heightAspect: hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, durationSeconds, fileId, encSecretB64 };
   },
   inline_file([name, size, mimeType, creationUnixtime, dataB64]) {
     return { type: 'inline_file', name, size, mimeType, creationUnixtime, dataB64 };

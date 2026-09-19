@@ -23,7 +23,7 @@ Examples:
 ["here is example of composed message", {"inline_image": [16, 9, "thumbhash...", "some.jpg", ... ]}]
 {"inline_image": [16, 9, "thumbhash...", "photo.jpg", 204800, "image/jpeg", 1715000000, "<data_b64>"]}
 {"image": [16, 9, "thumbhash...", "photo.jpg", 5242880, "image/jpeg", 1715000000, "f_01964...", "<enc_secret_b64>"]}
-{"video": [16, 9, "thumbhash...", "clip.mp4", 52428800, "video/mp4", 1715000000, "f_01964...", "<enc_secret_b64>", 127]}
+{"video": [16, 9, "thumbhash...", "clip.mp4", 52428800, "video/mp4", 1715000000, 127, "f_01964...", "<enc_secret_b64>"]}
 {"file":  ["doc.pdf", 1048576, "application/pdf", 1715000000, "f_01964...", "<enc_secret_b64>"]}
 ```
 

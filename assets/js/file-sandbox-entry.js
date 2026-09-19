@@ -279,7 +279,7 @@ async function buildContentJson(file, fileId, encSecretB64) {
     const meta = await extractVideoMetadata(file);
     contentObj = buildVideoContent(
       meta.widthAspect, meta.heightAspect, meta.thumbHashB64,
-      file.name, file.size, mime, ts, fileId, encSecretB64
+      file.name, file.size, mime, ts, meta.durationSeconds, fileId, encSecretB64
     );
   } else {
     contentObj = buildFileContent(file.name, file.size, mime, ts, fileId, encSecretB64);

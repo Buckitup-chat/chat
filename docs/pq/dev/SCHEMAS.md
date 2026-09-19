@@ -701,3 +701,19 @@ This design enables:
 - Conflict detection and resolution through version chains
 - Complete audit trail of all changes
 - Distributed synchronization with causal ordering
+
+---
+
+## Conformance Vectors
+
+[`test/fixtures/pq_conformance_vectors.json`](../../../test/fixtures/pq_conformance_vectors.json)
+pins the byte-exact signature payloads and hash constructions that both the
+Elixir backend and the TypeScript frontend must agree on.
+
+**Payload cases** build real schema structs and assert `Integrity.signature_payload/1`,
+pinning each relation's signable field set and canonical field ordering.
+
+**Hash cases** pin `sign_hash`, `dialog_hash`, `receipt_hash`, `reaction_hash`,
+HKDF-SHA3-256 and HMAC-SHA3-512 constructions.
+
+Regenerate with `WRITE_VECTORS=1` from `chat-frontend tests/pqConformance.test.ts`.

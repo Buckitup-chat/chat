@@ -119,7 +119,7 @@ Small images (under the inline size limit) should use [`"inline_image"`](#inline
 Out-of-band video stored as encrypted chunks in PostgreSQL. Carries aspect ratio, thumbhash (from a representative frame) and duration, so a preview with a duration badge renders before any chunk download. See [pq_files.md](../reqs/files/pq_files.done.md) for chunk encryption.
 
 ```json
-{"video": [width_aspect, height_aspect, thumb_hash_b64, name, size, mime_type, creation_unixtime, file_id, enc_secret_b64, duration_seconds]}
+{"video": [width_aspect, height_aspect, thumb_hash_b64, name, size, mime_type, creation_unixtime, duration_seconds, file_id, enc_secret_b64]}
 ```
 
 | Position | Field | Description |
@@ -131,9 +131,9 @@ Out-of-band video stored as encrypted chunks in PostgreSQL. Carries aspect ratio
 | 4 | size | Plaintext byte size |
 | 5 | mime_type | MIME type |
 | 6 | creation_unixtime | Unix seconds of uploaded file creation |
-| 7 | file_id | References `files.file_id` |
-| 8 | enc_secret_b64 | AES-256 key for chunk decryption (base64) |
-| 9 | duration_seconds | Playback duration in seconds, rounded to the nearest integer; `0` when the sender could not determine it |
+| 7 | duration_seconds | Playback duration in seconds, rounded to the nearest integer; `0` when the sender could not determine it |
+| 8 | file_id | References `files.file_id` |
+| 9 | enc_secret_b64 | AES-256 key for chunk decryption (base64) |
 
 Videos are always out-of-band — there is no inline variant.
 

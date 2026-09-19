@@ -25,7 +25,21 @@ defmodule ChatWeb.Router do
   end
 
   pipeline :electric do
-    plug CORSPlug, origin: "*"
+    # Browsers only let cross-origin JS read response headers listed in
+    # access-control-expose-headers. The Electric sync protocol is driven by
+    # its response headers, so without this a browser client on another origin
+    # gets the body but cannot see the handle/offset — every shape silently
+    # breaks. Same reason web clients currently cannot talk to the backend
+    # directly over HTTP/2 and must proxy through their own origin.
+    plug CORSPlug,
+      origin: "*",
+      expose: [
+        "electric-handle",
+        "electric-offset",
+        "electric-schema",
+        "electric-cursor",
+        "electric-up-to-date"
+      ]
 
     plug Plug.Parsers,
       parsers: [:urlencoded, :multipart, :json],
@@ -45,7 +59,10 @@ defmodule ChatWeb.Router do
         "x-uploader-hash",
         "x-owner-timestamp",
         "x-signature"
-      ]
+      ],
+      # retry-after drives the client's 429 backoff, x-chunk-size the download
+      # progress — both unreadable cross-origin unless exposed.
+      expose: ["retry-after", "x-chunk-size"]
   end
 
   pipeline :upload do

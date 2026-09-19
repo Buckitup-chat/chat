@@ -191,6 +191,12 @@ rewriting what the reply appeared to answer.
 navigation; when the pair resolves to nothing locally, the quote still
 renders from its snapshot and the client simply offers no jump.
 
+The quoted message's authoring time needs no field of its own:
+`message_id` is a UUIDv7 whose first 48 bits are the authoring unix
+milliseconds (04_ordering.md), so a client that wants to show "when was
+this said" derives it from position 1. A separate timestamp field would
+be a second source of truth that could disagree with the id.
+
 Because the snapshot is itself canonical content, quoting a message that
 contains a quote nests with no special casing. Clients should bound how much
 of the nesting they *render* inline; the wire format itself is unbounded.

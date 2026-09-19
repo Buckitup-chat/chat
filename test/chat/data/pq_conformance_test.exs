@@ -2,7 +2,7 @@ defmodule Chat.Data.PqConformanceTest do
   @moduledoc """
   Cross-implementation conformance vectors, shared with the reference client.
 
-  `docs/pq/conformance/vectors.json` pins the byte-exact derivations both sides
+  `test/fixtures/pq_conformance_vectors.json` pins the byte-exact derivations both sides
   must agree on: the canonical signature payload per relation and the prefixed
   hash / HKDF constructions. The same file is asserted by the frontend
   (`chat-frontend tests/pqConformance.test.ts`, which also generates it under
@@ -19,7 +19,7 @@ defmodule Chat.Data.PqConformanceTest do
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas
 
-  @vectors "docs/pq/conformance/vectors.json"
+  @vectors "test/fixtures/pq_conformance_vectors.json"
            |> File.read!()
            |> Jason.decode!()
 

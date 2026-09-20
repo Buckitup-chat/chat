@@ -12,8 +12,8 @@ defmodule Chat.Data.IntegrityTest do
       file = build_file(chunk_sign_hashes: [hash_a, hash_b], chunk_count: 2)
       payload = Integrity.signature_payload(file)
 
-      assert String.contains?(payload, Base.encode64(hash_a))
-      assert String.contains?(payload, Base.encode64(hash_b))
+      expected_list = Base.encode64(hash_a) <> Base.encode64(hash_b)
+      assert :binary.match(payload, expected_list) != :nomatch
     end
 
     test "empty chunk_sign_hashes produces shorter payload" do

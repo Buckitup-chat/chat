@@ -30,12 +30,23 @@ defmodule Chat.Data.Integrity do
 
   @doc """
   Generates signature payload from any signable data structure.
+
+  Each field is length-framed: `u32be(byte_length) || encoded_value`.
+  Fields are sorted lexicographically by key name. This framing makes
+  the serialization injective — distinct field values always produce
+  distinct payloads.
   """
   def signature_payload(data) do
     data
     |> Signable.signable_fields()
     |> Enum.sort_by(fn {key, _value} -> to_string(key) end)
-    |> Enum.map_join("", &encode_field/1)
+    |> Enum.map(&length_frame_field/1)
+    |> IO.iodata_to_binary()
+  end
+
+  defp length_frame_field(field) do
+    encoded = encode_field(field)
+    [<<byte_size(encoded)::unsigned-big-32>>, encoded]
   end
 
   @doc """

@@ -131,7 +131,7 @@ Out-of-band video stored as encrypted chunks in PostgreSQL. Carries aspect ratio
 | 4 | size | Plaintext byte size |
 | 5 | mime_type | MIME type |
 | 6 | creation_unixtime | Unix seconds of uploaded file creation |
-| 7 | duration_seconds | Playback duration in seconds, rounded to the nearest integer; `0` when the sender could not determine it |
+| 7 | duration_seconds | Playback duration in seconds, rounded to the nearest integer but never below `1` for a measured clip; `0` is reserved for "the sender could not determine it" |
 | 8 | file_id | References `files.file_id` |
 | 9 | enc_secret_b64 | AES-256 key for chunk decryption (base64) |
 

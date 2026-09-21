@@ -72,8 +72,12 @@ export async function extractVideoMetadata(file) {
       thumbHashB64 = canvasThumbHash(video, video.videoWidth, video.videoHeight);
     } catch { /* thumbhash is best-effort */ }
 
-    // duration is NaN while unknown and +Infinity for unbounded streams
-    const durationSeconds = Number.isFinite(video.duration) ? Math.round(video.duration) : 0;
+    // duration is NaN while unknown and +Infinity for unbounded streams, and
+    // 0 is the registry's "unknown" sentinel — so a real clip shorter than
+    // half a second rounds to 1 rather than claiming it could not be measured
+    const durationSeconds = Number.isFinite(video.duration) && video.duration > 0
+      ? Math.max(1, Math.round(video.duration))
+      : 0;
     return { widthAspect, heightAspect, thumbHashB64, durationSeconds };
   } catch {
     return { widthAspect: 16, heightAspect: 9, thumbHashB64: '', durationSeconds: 0 };

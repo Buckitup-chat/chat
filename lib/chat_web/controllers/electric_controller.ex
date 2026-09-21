@@ -20,7 +20,9 @@ defmodule ChatWeb.ElectricController do
   ]
 
   alias Chat.Challenge
+  alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Shapes
+  alias Chat.Pq.OwnerBootstrap
   alias ChatWeb.Utils.IngestUtil
   alias Phoenix.Sync.Writer
   alias Phoenix.Sync.Writer.Format
@@ -45,6 +47,8 @@ defmodule ChatWeb.ElectricController do
              format: Format.TanstackDB,
              timeout: @ingest_timeout
            ) do
+      maybe_capture_owner(changes)
+
       conn
       |> put_promotion_headers(changes)
       |> json(%{txid: txid})
@@ -79,11 +83,12 @@ defmodule ChatWeb.ElectricController do
 
   defp apply_single_mutation(writer, {index, decode_result}) do
     with {:ok, mutation} <- decode_result,
-         {:ok, txid, _changes} <-
+         {:ok, txid, changes} <-
            Writer.apply(writer, [mutation], repo(),
              format: Format.TanstackDB,
              timeout: @ingest_timeout
            ) do
+      maybe_capture_owner(changes)
       %{index: index, status: "ok", txid: txid}
     else
       {:error, _, %Ecto.Changeset{} = changeset, _} = error ->
@@ -137,6 +142,16 @@ defmodule ChatWeb.ElectricController do
 
       _, conn ->
         conn
+    end)
+  end
+
+  defp maybe_capture_owner(changes) do
+    Enum.each(changes, fn
+      {_key, %UserCard{user_hash: user_hash, sign_pkey: sign_pkey}} ->
+        OwnerBootstrap.maybe_register_owner(user_hash, sign_pkey)
+
+      _ ->
+        :ok
     end)
   end
 
@@ -240,18 +255,18 @@ defmodule ChatWeb.ElectricController do
   end
 
   defp fetch_existing(schema_mod, changeset) do
-    pk_fields = schema_mod.__schema__(:primary_key)
-    pk_pairs = Enum.map(pk_fields, fn f -> {f, Ecto.Changeset.get_field(changeset, f)} end)
+    pk_pairs =
+      schema_mod.__schema__(:primary_key)
+      |> Enum.map(fn f -> {f, Ecto.Changeset.get_field(changeset, f)} end)
 
-    if Enum.all?(pk_pairs, fn {_, nil} -> false; {_, _} -> true end) do
-      case repo().get_by(schema_mod, pk_pairs) do
-        nil -> :error
-        existing -> {:ok, existing}
-      end
-    else
-      :error
+    case Enum.find(pk_pairs, fn {_, v} -> is_nil(v) end) do
+      nil -> repo().get_by(schema_mod, pk_pairs) |> ok_or_error()
+      _ -> :error
     end
   end
+
+  defp ok_or_error(nil), do: :error
+  defp ok_or_error(value), do: {:ok, value}
 
   defp unique_key_conflict?(%Ecto.Changeset{} = changeset) do
     Enum.any?(changeset.errors, fn {_field, {_msg, opts}} ->

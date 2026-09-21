@@ -72,9 +72,15 @@ export async function extractVideoMetadata(file) {
       thumbHashB64 = canvasThumbHash(video, video.videoWidth, video.videoHeight);
     } catch { /* thumbhash is best-effort */ }
 
-    return { widthAspect, heightAspect, thumbHashB64 };
+    // duration is NaN while unknown and +Infinity for unbounded streams, and
+    // 0 is the registry's "unknown" sentinel — so a real clip shorter than
+    // half a second rounds to 1 rather than claiming it could not be measured
+    const durationSeconds = Number.isFinite(video.duration) && video.duration > 0
+      ? Math.max(1, Math.round(video.duration))
+      : 0;
+    return { widthAspect, heightAspect, thumbHashB64, durationSeconds };
   } catch {
-    return { widthAspect: 16, heightAspect: 9, thumbHashB64: '' };
+    return { widthAspect: 16, heightAspect: 9, thumbHashB64: '', durationSeconds: 0 };
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -127,8 +133,8 @@ export function buildImageContent(wAspect, hAspect, thumbHashB64, name, size, mi
   return { image: [wAspect, hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, fileId, encSecretB64] };
 }
 
-export function buildVideoContent(wAspect, hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, fileId, encSecretB64) {
-  return { video: [wAspect, hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, fileId, encSecretB64] };
+export function buildVideoContent(wAspect, hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, durationSeconds, fileId, encSecretB64) {
+  return { video: [wAspect, hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, durationSeconds, fileId, encSecretB64] };
 }
 
 // --- Content object parser ---
@@ -140,8 +146,16 @@ const PARSERS = {
   image([wAspect, hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, fileId, encSecretB64]) {
     return { type: 'image', widthAspect: wAspect, heightAspect: hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, fileId, encSecretB64 };
   },
-  video([wAspect, hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, fileId, encSecretB64]) {
-    return { type: 'video', widthAspect: wAspect, heightAspect: hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, fileId, encSecretB64 };
+  video(arr) {
+    // Legacy layouts (9-element pre-duration, or 10-element with duration
+    // trailing the refs) must fail loudly rather than shift the transport
+    // refs into the wrong fields; a number at 7 is what pins the registry
+    // order. The length test is a minimum, not an equality: per 07
+    // §Invariants a decoder ignores elements appended after the layout it
+    // knows instead of rejecting them.
+    if (!Array.isArray(arr) || arr.length < 10 || typeof arr[7] !== 'number') throw new Error(`Malformed video envelope: ${JSON.stringify(arr).slice(0, 80)}`);
+    const [wAspect, hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, durationSeconds, fileId, encSecretB64] = arr;
+    return { type: 'video', widthAspect: wAspect, heightAspect: hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, durationSeconds, fileId, encSecretB64 };
   },
   inline_file([name, size, mimeType, creationUnixtime, dataB64]) {
     return { type: 'inline_file', name, size, mimeType, creationUnixtime, dataB64 };

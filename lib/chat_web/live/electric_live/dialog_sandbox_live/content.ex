@@ -74,7 +74,10 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Content do
      }}
   end
 
-  defp parse_typed("video", [w, h, thumbhash, name, size, mime, ts, file_id, enc_secret]) do
+  defp parse_typed(
+         "video",
+         [w, h, thumbhash, name, size, mime, ts, duration, file_id, enc_secret]
+       ) do
     {:video,
      %{
        w_aspect: w,
@@ -84,6 +87,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Content do
        size: size,
        mime: mime,
        timestamp: ts,
+       duration_seconds: duration,
        file_id: file_id,
        enc_secret_b64: enc_secret
      }}
@@ -155,6 +159,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Content do
         m.size,
         m.mime,
         m.timestamp,
+        m.duration_seconds,
         m.file_id,
         m.enc_secret_b64
       ]

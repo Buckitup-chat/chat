@@ -152,8 +152,8 @@ The [`"video"` content type](../../invariants/07_content_polymorphism.md#video) 
 | 2 | thumb_hash_b64 | Preview placeholder while loading |
 | 4 | size | `totalSize` for Content-Length / Content-Range |
 | 5 | mime_type | Content-Type header in SW response |
-| 7 | file_id | Chunk fetch queries |
-| 8 | enc_secret_b64 | Decryption key |
+| 8 | file_id | Chunk fetch queries |
+| 9 | enc_secret_b64 | Decryption key |
 
 Content object building and parsing is in [`content-types.js`](../../../../assets/js/file-sandbox/content-types.js) — `buildVideoContent()` and `extractVideoMetadata()`.
 

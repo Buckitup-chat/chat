@@ -132,7 +132,7 @@ sign_b64          BYTEA     ML-DSA-87 signature</pre>
           <p>After upload, a JSON content object is produced per <code>07_content_polymorphism.md</code>:</p>
           <pre>{"file":  [name, size, mime, ts, file_id, enc_secret_b64]}
 {"image": [w, h, thumbhash, name, size, mime, ts, file_id, enc_secret_b64]}
-{"video": [w, h, thumbhash, name, size, mime, ts, file_id, enc_secret_b64]}</pre>
+{"video": [w, h, thumbhash, name, size, mime, ts, duration_seconds, file_id, enc_secret_b64]}</pre>
           <p class="mt-1">Copy the JSON into the dialog sandbox as message content. To extract, paste it in the Extract section.</p>
         </div>
       </div>

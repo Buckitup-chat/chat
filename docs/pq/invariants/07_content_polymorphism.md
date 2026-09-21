@@ -185,8 +185,8 @@ A signed deletion is `deleted_flag = true` plus an empty `content_b64`. The empt
 - The plaintext JSON object has at most one key — it names the content type. Bare strings are text by convention.
 - Content type is never a column on the carrier row; it is only visible after decryption.
 - A new content type is a new JSON key, not a schema migration.
-- **Positional fields are append-only.** A new field for an existing type goes at the end of that type's array; existing positions keep their meaning forever. An insertion silently rebinds every field after it, and two codecs that disagree by one position do not fail — they hand back plausible, wrong values (a duration read as a `file_id`, an AES key rendered as a filename).
-- **If a position's meaning has to change anyway, the type key changes with it** — `"video"` becomes a new key rather than a second layout under the old one. Decoders then tell the layouts apart by key, which is unambiguous, instead of by counting elements, which is not: the same element count can be two different layouts.
+- **Positional fields are append-only**, and the positions of every type in § Known types are frozen as of this document: a new field goes at the end of its type's array, a layout that must change gets a new type key, and layouts are told apart by key rather than by element count. An insertion rebinds every field after it, and codecs that disagree by one position do not fail — they hand back plausible, wrong values.
+- **A decoder accepts arrays longer than the layout it knows** and ignores the trailing elements, rather than keying on an exact element count. Without this the rule above buys nothing: an appended field would break every older reader just as loudly as an insertion, only later.
 - Out-of-band file references (`file_id`, `enc_secret_b64`) inside the envelope are integrity-bound by the carrier row's `sign_b64`; chunk integrity is ensured by `files.chunk_sign_hashes` (see [pq_files.md](../reqs/files/pq_files.done.md)).
 - An empty `content_b64` is only valid alongside `deleted_flag = true`.
 

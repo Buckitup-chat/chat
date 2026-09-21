@@ -143,10 +143,13 @@ const PARSERS = {
     return { type: 'image', widthAspect: wAspect, heightAspect: hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, fileId, encSecretB64 };
   },
   video(arr) {
-    // legacy layouts (9-element pre-duration, or 10-element with duration
-    // trailing the refs) must fail loudly, not shift the transport refs
-    // into the wrong fields — a number at 7 pins the registry order
-    if (!Array.isArray(arr) || arr.length !== 10 || typeof arr[7] !== 'number') throw new Error(`Malformed video envelope: ${JSON.stringify(arr).slice(0, 80)}`);
+    // Legacy layouts (9-element pre-duration, or 10-element with duration
+    // trailing the refs) must fail loudly rather than shift the transport
+    // refs into the wrong fields; a number at 7 is what pins the registry
+    // order. The length test is a minimum, not an equality: per 07
+    // §Invariants a decoder ignores elements appended after the layout it
+    // knows instead of rejecting them.
+    if (!Array.isArray(arr) || arr.length < 10 || typeof arr[7] !== 'number') throw new Error(`Malformed video envelope: ${JSON.stringify(arr).slice(0, 80)}`);
     const [wAspect, hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, durationSeconds, fileId, encSecretB64] = arr;
     return { type: 'video', widthAspect: wAspect, heightAspect: hAspect, thumbHashB64, name, size, mimeType, creationUnixtime, durationSeconds, fileId, encSecretB64 };
   },

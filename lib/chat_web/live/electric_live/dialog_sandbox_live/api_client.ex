@@ -427,7 +427,13 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
       "sign_b64" => encode_base64(sign_b64)
     }
 
-    publish_update_mutation("dialog_message_reactions", original, changes, user.sign_skey, base_url)
+    publish_update_mutation(
+      "dialog_message_reactions",
+      original,
+      changes,
+      user.sign_skey,
+      base_url
+    )
   end
 
   def publish_receipt(user, dialog_hash, message_id, message_sign_hash, type, base_url) do
@@ -497,7 +503,14 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
     )
   end
 
-  defp start_auxiliary_stream(table, dialog_hash, base_url, subscriber_pid, loaded_tag, change_tag) do
+  defp start_auxiliary_stream(
+         table,
+         dialog_hash,
+         base_url,
+         subscriber_pid,
+         loaded_tag,
+         change_tag
+       ) do
     client = Electric.Client.new!(endpoint: base_url <> "/electric/v1/shapes")
 
     shape =

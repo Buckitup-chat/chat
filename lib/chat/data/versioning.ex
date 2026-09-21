@@ -61,7 +61,9 @@ defmodule Chat.Data.Versioning do
         end
       else
         quote do
-          clauses = Enum.map(unquote(main_conflict_target), fn key -> {key, Map.get(record, key)} end)
+          clauses =
+            Enum.map(unquote(main_conflict_target), fn key -> {key, Map.get(record, key)} end)
+
           Chat.Db.repo().get_by(unquote(main_schema), clauses)
         end
       end

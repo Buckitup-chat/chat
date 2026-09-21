@@ -44,6 +44,7 @@ defmodule ChatWeb.FileController do
          true <- type |> String.contains?("/") do
       size = ChunkedFiles.size(chunk_key)
       range = get_req_header(conn, "range")
+
       case range do
         [] ->
           conn

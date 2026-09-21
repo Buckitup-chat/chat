@@ -104,7 +104,9 @@ defmodule Chat.LiveServer.BuckitupXyzIngestEachTest do
     }
 
     {:ok, challenge_resp} = get_challenge()
-    {:ok, %{status: status, body: body}} = post_ingest_each(challenge_resp, payload, bob.sign_skey)
+
+    {:ok, %{status: status, body: body}} =
+      post_ingest_each(challenge_resp, payload, bob.sign_skey)
 
     assert status == 200, "ingest_each failed: #{inspect(body)}"
     assert %{"results" => results} = body
@@ -117,7 +119,10 @@ defmodule Chat.LiveServer.BuckitupXyzIngestEachTest do
 
   defp publish_reaction!(user, dialog_hash, message_id, message_sign_hash, emoji, peer_hash) do
     sender_msg_key = sender_msg_key(user, peer_hash)
-    reaction_hash = Crypto.compute_reaction_hash(sender_msg_key, message_id, user.user_hash, emoji)
+
+    reaction_hash =
+      Crypto.compute_reaction_hash(sender_msg_key, message_id, user.user_hash, emoji)
+
     type_b64 = Crypto.encrypt_emoji(emoji, sender_msg_key)
     owner_timestamp = TimeKeeper.now_unix()
 
@@ -135,7 +140,15 @@ defmodule Chat.LiveServer.BuckitupXyzIngestEachTest do
     reaction = %{reaction | sign_b64: sign(reaction, user.sign_skey)}
 
     {:ok, _} =
-      DialogSandbox.publish_reaction(user, dialog_hash, message_id, message_sign_hash, emoji, peer_hash, @base_url)
+      DialogSandbox.publish_reaction(
+        user,
+        dialog_hash,
+        message_id,
+        message_sign_hash,
+        emoji,
+        peer_hash,
+        @base_url
+      )
 
     reaction
   end
@@ -160,7 +173,13 @@ defmodule Chat.LiveServer.BuckitupXyzIngestEachTest do
 
   defp build_signed_message(user, dialog_hash, peer_hash, suffix) do
     sender_msg_key = sender_msg_key(user, peer_hash)
-    content_b64 = Crypto.encrypt_content(Content.prepare_for_send("hi from ingest_each #{suffix}"), sender_msg_key)
+
+    content_b64 =
+      Crypto.encrypt_content(
+        Content.prepare_for_send("hi from ingest_each #{suffix}"),
+        sender_msg_key
+      )
+
     refs_map_b64 = Crypto.encrypt_refs_map(%{}, sender_msg_key)
     owner_timestamp = TimeKeeper.now_unix()
 
@@ -265,7 +284,11 @@ defmodule Chat.LiveServer.BuckitupXyzIngestEachTest do
     end
   end
 
-  defp post_ingest_each(%{"challenge" => challenge, "challenge_id" => challenge_id}, payload, sign_skey) do
+  defp post_ingest_each(
+         %{"challenge" => challenge, "challenge_id" => challenge_id},
+         payload,
+         sign_skey
+       ) do
     signature_b64 = challenge |> EnigmaPq.sign(sign_skey) |> Base.encode64(padding: false)
 
     payload_with_auth =

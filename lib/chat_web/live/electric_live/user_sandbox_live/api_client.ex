@@ -234,12 +234,26 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
 
       existing ->
         update_existing_storage(
-          existing, user_hash, sign_skey, uuid, value_binary, base_url, challenge_url
+          existing,
+          user_hash,
+          sign_skey,
+          uuid,
+          value_binary,
+          base_url,
+          challenge_url
         )
     end
   end
 
-  defp update_existing_storage(existing, user_hash, sign_skey, uuid, value_binary, base_url, challenge_url) do
+  defp update_existing_storage(
+         existing,
+         user_hash,
+         sign_skey,
+         uuid,
+         value_binary,
+         base_url,
+         challenge_url
+       ) do
     owner_timestamp = existing.owner_timestamp + 1
     parent_sign_hash = existing.sign_hash
 

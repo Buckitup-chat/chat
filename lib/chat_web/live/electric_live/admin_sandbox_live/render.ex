@@ -50,7 +50,9 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Render do
             Server PQ User Hash
           </dt>
           <dd class="mt-1 font-mono text-sm text-gray-900">
-            {if @server_user_hash, do: Shortcode.short_code(@server_user_hash), else: "not initialized"}
+            {if @server_user_hash,
+              do: Shortcode.short_code(@server_user_hash),
+              else: "not initialized"}
           </dd>
         </div>
         <div>
@@ -71,8 +73,10 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Render do
     <div class="bg-white shadow rounded-lg p-6">
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Admin Authentication</h2>
       <p class="text-sm text-gray-600 mb-3">
-        Import admin keys to manage the access gate. Export from
-        <a href="/electric/user_sandbox" class="text-blue-600 hover:underline">User Sandbox</a>.
+        Import admin keys to manage the access gate. Export from <a
+          href="/electric/user_sandbox"
+          class="text-blue-600 hover:underline"
+        >User Sandbox</a>.
       </p>
       <%= if @identity do %>
         <div class="text-sm space-y-1">
@@ -161,6 +165,9 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Render do
   end
 
   defp mode_description(:open), do: "Anyone with valid PoP can read and write. No chain checks."
-  defp mode_description(:guarded), do: "Writes are chain-gated; reads open to anyone with valid PoP."
+
+  defp mode_description(:guarded),
+    do: "Writes are chain-gated; reads open to anyone with valid PoP."
+
   defp mode_description(:trust), do: "All access — reads and writes — gated by PoP + vouch chain."
 end

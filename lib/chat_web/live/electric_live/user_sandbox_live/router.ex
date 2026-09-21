@@ -82,7 +82,9 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
     base_url = public_url(socket)
     user = socket.assigns.user
 
-    uuid = params |> Map.get("uuid", "") |> then(&if(&1 == "", do: Ecto.UUID.generate(), else: &1))
+    uuid =
+      params |> Map.get("uuid", "") |> then(&if(&1 == "", do: Ecto.UUID.generate(), else: &1))
+
     size = String.to_integer(size_str)
     value_b64 = generate_storage_value(size)
     value_binary = Base.decode64!(value_b64)

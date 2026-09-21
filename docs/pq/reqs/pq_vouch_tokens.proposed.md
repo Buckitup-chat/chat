@@ -7,7 +7,7 @@ A vouch token is a signed attestation that one user (`issuer`) trusts another us
 - **Decentralized trust** — any approved user can vouch for any other user within scopes they hold authority over.
 - **Self-authenticating** — a vouch token is verifiable by any peer using only the issuer's `sign_pkey` from `user_cards`. No central authority, no online lookup.
 - **Revocable** — revoking a vouch is a signed tombstone (`deleted_flag: true`), same as every other soft-delete in the system.
-- **Scope-aware** — vouches are scoped to a dot-path resource namespace. A vouch for `device.<sn>.ingest` does not imply a vouch for `origins.<hash>.reviews.write`.
+- **Scope-aware** — vouches are scoped to a dot-path resource namespace. A vouch for `device.<sn>.storage.write` does not imply a vouch for `origins.<hash>.reviews.write`.
 
 ---
 
@@ -19,30 +19,31 @@ Scopes use a left-to-right dot-path notation. Each step right narrows authority:
 
 ```
 device.<serial_or_domain>
-├── shapes                              ← read (Electric shape streaming)
-│   ├── user_cards
-│   ├── user_storage
-│   ├── dialog_keys
-│   ├── dialog_messages
-│   ├── dialog_message_reactions
-│   ├── dialog_message_receipts
-│   ├── files
-│   ├── file_chunks
-│   ├── origins
-│   ├── reviews
-│   └── ...
-├── ingest                              ← write (HTTP ingest)
-│   ├── user_cards
-│   ├── user_storage
-│   ├── dialog_keys
-│   ├── dialog_messages
-│   └── ...
+├── storage
+│   ├── read                            ← Electric shape streaming
+│   │   ├── user_cards
+│   │   ├── user_storage
+│   │   ├── dialog_keys
+│   │   ├── dialog_messages
+│   │   ├── dialog_message_reactions
+│   │   ├── dialog_message_receipts
+│   │   ├── files
+│   │   ├── file_chunks
+│   │   ├── origins
+│   │   ├── reviews
+│   │   └── ...
+│   └── write                           ← HTTP ingest
+│       ├── user_cards
+│       ├── user_storage
+│       ├── dialog_keys
+│       ├── dialog_messages
+│       └── ...
 ├── sync                                ← peer device replication
 │   ├── user_cards
 │   └── ...
 └── admin
     ├── firmware
-    ├── storage
+    ├── settings
     └── network
 
 origins.<origin_hash>
@@ -56,7 +57,7 @@ rooms.<room_hash>                       ← future
 └── ...
 ```
 
-The forest has independent roots — `device`, `origins`, `rooms`. Each root is a different kind of entity with its own facility subtree. A vouch for `device.<sn>.ingest` grants full ingest access; `device.<sn>.ingest.dialogs` narrows to just dialog shapes. Prefix containment governs attenuation — wider scope covers all narrower leaves under it, but never crosses into a sibling tree.
+The forest has independent roots — `device`, `origins`, `rooms`. Each root is a different kind of entity with its own facility subtree. A vouch for `device.<sn>.storage.write` grants full write access to all shapes; `device.<sn>.storage.write.dialog_messages` narrows to just that shape. Likewise `device.<sn>.storage.read` grants read access to all shapes; `device.<sn>.storage.read.user_cards` narrows to one. Prefix containment governs attenuation — wider scope covers all narrower leaves under it, but never crosses into a sibling tree.
 
 ### Vocabulary Layers
 
@@ -133,7 +134,7 @@ def attenuates?(parent, child) do
 end
 ```
 
-A vouch for `device.<sn>.ingest` attenuates to cover `device.<sn>.ingest.dialog_messages`. A vouch for `device.<sn>.admin` does not cover `origins.<hash>.reviews`. Attenuation is checked at gate evaluation time, not at ingest.
+A vouch for `device.<sn>.storage.write` attenuates to cover `device.<sn>.storage.write.dialog_messages`. A vouch for `device.<sn>.admin` does not cover `origins.<hash>.reviews`. Attenuation is checked at gate evaluation time, not at ingest.
 
 ---
 
@@ -143,12 +144,12 @@ When the trust graph contains multiple paths or conflicting signals for a subjec
 
 1. **Shortest chain wins.** If multiple paths reach a subject, the path with the fewest edges sets `chain_distance`. This is already expressed by `MIN(distance)` in the recursive CTE — shortest path means strongest signal, highest trust weight.
 
-2. **Wider scope wins (on subject end).** When resolving a subject's permission at scope `S`, a vouch granted at a wider (parent) scope takes precedence over a narrower one. A vouch for `device.<sn>.ingest` is stronger than one for `device.<sn>.ingest.dialog_messages` — the broader grant already covers the narrower scope via prefix containment, and carries more authority because the issuer trusted the subject with the entire subtree.
+2. **Wider scope wins (on subject end).** When resolving a subject's permission at scope `S`, a vouch granted at a wider (parent) scope takes precedence over a narrower one. A vouch for `device.<sn>.storage.write` is stronger than one for `device.<sn>.storage.write.dialog_messages` — the broader grant already covers the narrower scope via prefix containment, and carries more authority because the issuer trusted the subject with the entire subtree.
 
 3. **Tombstone wins over grant.** A tombstoned vouch (`deleted_flag: true`) at any `(kind, issuer_hash, subject_hash)` tuple is authoritative — it is never overridden by a grant from a different issuer or a longer alternative path. Concretely:
    - If the **owner** tombstones a direct vouch for a subject at scope `S`, that subject loses access at `S` regardless of transitive paths through other users.
    - If **any edge** in a chain is tombstoned, that chain is broken. If no un-tombstoned chain remains, the subject has no path.
-   - A tombstone at a parent scope (e.g. `device.<sn>.ingest`) attenuates downward — it blocks `device.<sn>.ingest.dialog_messages` and all other ingest sub-scopes via the same prefix-containment rule.
+   - A tombstone at a parent scope (e.g. `device.<sn>.storage.write`) attenuates downward — it blocks `device.<sn>.storage.write.dialog_messages` and all other write sub-scopes via the same prefix-containment rule.
 
 These rules make revocation decisive: an owner can sever trust to any user with a single tombstone, even if the graph offers alternative paths. Re-granting requires a new vouch with a higher `owner_timestamp`.
 
@@ -158,7 +159,7 @@ These rules make revocation decisive: an owner can sever trust to any user with 
 
 Walking the trust graph on every access check is unnecessary when the vouch set changes infrequently. A runtime cache stores resolved chain results for up to **30 minutes**.
 
-**Cache key:** `{scope_prefix, subject_hash}` — the pair that identifies a single permission question (e.g. "does this user have access to `device.BK-001.ingest`?").
+**Cache key:** `{scope_prefix, subject_hash}` — the pair that identifies a single permission question (e.g. "does this user have access to `device.BK-001.storage.write`?").
 
 **Cache value:** `{chain_distance, vouch_scopes, resolved_at}` — the result of the recursive CTE or BFS walk. `resolved_at` is **OS monotonic time** (`:erlang.monotonic_time(:second)`) — immune to NTP jumps and wall-clock drift on embedded devices.
 
@@ -175,15 +176,15 @@ Walking the trust graph on every access check is unnecessary when the vouch set 
 
 ## Relationship to Access Gating
 
-This table is the approval substrate for [access gating](pq_access_gating.proposed.md). The system has two modes — `open` (no gating) and `trust` (vouch-token-driven). In `trust` mode, a user is approved when their chain distance from the owner is within the configured max depth.
+This table is the approval substrate for [access gating](pq_access_gating.proposed.md). The system has three modes — `open` (no gating), `guarded` (writes chain-gated, reads open), and `trust` (all access chain-gated). In `guarded` and `trust` modes, a user is allowed through when their chain distance from the owner is within the configured max depth.
 
 All approval mechanisms produce vouch tokens with the same resource `kind`. What differs is the issuer and context — provenance is inferred, not encoded:
 
 | Mechanism | Issuer | Typical vouch `kind` | Chain distance |
 |-----------|--------|----------------------|----------------|
-| Optical handshake | owner | `device.<sn>.ingest` | 1 |
-| Manual owner approval | owner | `device.<sn>.ingest` | 1 |
-| User-to-user vouch | non-owner user | `device.<sn>.ingest` | +1 from voucher |
+| Optical handshake | owner | `device.<sn>.storage.write` + `device.<sn>.storage.read` | 1 |
+| Manual owner approval | owner | configurable: `storage.write`, `storage.read`, or both | 1 |
+| User-to-user vouch | non-owner user | attenuated from voucher's own scope | +1 from voucher |
 
 Provenance inference: if `issuer_hash` = owner → direct trust (optical handshake or manual, indistinguishable at the token level). If `issuer_hash` ≠ owner → transitive vouch.
 
@@ -203,7 +204,7 @@ WITH RECURSIVE trust_chain AS (
     1                AS distance
   FROM vouch_tokens vt
   WHERE vt.issuer_hash   = $owner_hash
-    AND vt.kind          LIKE $scope_prefix || '%'  -- e.g. 'device.BK-001.ingest%'
+    AND vt.kind          LIKE $scope_prefix || '%'  -- e.g. 'device.BK-001.storage.write%'
     AND vt.deleted_flag  = false
 
   UNION ALL
@@ -230,7 +231,7 @@ WHERE NOT is_cycle
 GROUP BY user_hash;
 ```
 
-**Resource-scoped.** The `$scope_prefix` parameter (e.g. `'device.BK-001.ingest'`) restricts the walk to vouches granting access to a specific resource subtree. Cross-tree walks (e.g. device + origins) require a separate pass per root or a broader prefix.
+**Resource-scoped.** The `$scope_prefix` parameter (e.g. `'device.BK-001.storage.write'`) restricts the walk to vouches granting access to a specific resource subtree. Cross-tree walks (e.g. device + origins) require a separate pass per root or a broader prefix.
 
 **Scope attenuation alignment.** The `LIKE prefix || '%'` filter mirrors the `attenuates?/2` containment rule — it selects all sub-scopes under the resource without crossing into sibling trees.
 
@@ -286,5 +287,5 @@ Proposed.
 ## References
 
 - [02_integrity.md](../invariants/02_integrity.md) — integrity triad: `sign_b64`, `owner_timestamp`, `deleted_flag`
-- [pq_access_gating](pq_access_gating.proposed.md) — open/trust modes, bootstrap, gate mechanics
+- [pq_access_gating](pq_access_gating.proposed.md) — open/guarded/trust modes, bootstrap, gate mechanics
 - [pq_review_write_tokens](reviews/pq_review_write_tokens.proposed.md) — one-time invite links, bot delegation via `reviews.write.<nonce>` scope

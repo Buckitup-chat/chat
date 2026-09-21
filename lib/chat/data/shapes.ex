@@ -4,6 +4,7 @@ defmodule Chat.Data.Shapes do
   # order matters
   # UserCard first — it is the FK parent for DialogKeys, File, FileChunk, UserStorage
   @shapes [
+    Chat.Data.Shapes.VouchToken,
     Chat.Data.Shapes.UserCard,
     Chat.Data.Shapes.UserStorage,
     Chat.Data.Shapes.DialogKeys,

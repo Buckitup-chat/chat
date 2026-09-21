@@ -29,6 +29,7 @@ defmodule Chat.Application do
         Chat.Ordering.Counters,
         Chat.Db.Supervisor,
         Chat.AdminDb,
+        Chat.Pq.ServerIdentity,
         # Application Services
         Chat.Challenge,
         Chat.KeyRingTokens,

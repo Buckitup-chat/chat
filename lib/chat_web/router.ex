@@ -156,6 +156,7 @@ defmodule ChatWeb.Router do
       live "/electric/origin_reviews", ElectricLive.OriginReviewsLive.Index, :index
       live "/electric/contacts_reader", ElectricLive.ContactsReaderLive.Index, :index
       live "/electric/admin_sandbox", ElectricLive.AdminSandboxLive.Index, :index
+      live "/electric/vouch_sandbox", ElectricLive.VouchSandboxLive.Index, :index
     end
   end
 

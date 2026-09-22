@@ -15,6 +15,7 @@ Interactive web-based testing clients for the Electric ingest API. Each sandbox 
 | `/electric/moderation_sandbox` | Origin moderator | `review_post_right`, `review_revoke_right`, `review_public_passwords` | `ModerationSandboxLive` |
 | `/electric/origin_reviews` | Public (no identity) | `origin`, `review`, `review_public_passwords` | read-only viewer |
 | `/electric/contacts_reader` | Contact reader | `review_list`, `review`, `dialog_keys`, `dialog_messages` | `ContactsReaderLive` |
+| `/electric/vouch_sandbox` | Any user | `vouch_tokens` | `VouchSandboxLive` |
 | `/file_sandbox.html` | Any user | `file`, `file_chunk` | static HTML + JS |
 
 All LiveView sandboxes live under `lib/chat_web/live/electric_live/`.
@@ -131,6 +132,15 @@ Forms with interactive controls (e.g. star ratings via `phx-click`) use `phx-cha
 - **Read reviews**: fetch per-origin reviews for each contact, decrypt content
 - **Badge reviews**: cross-reference `review_public_passwords` — public / hidden / contacts-only
 
+### Vouch sandbox
+
+- **Import identity**: key file upload, same as other sandboxes
+- **View "by me"**: shape read filtered by `issuer_hash` — vouches this user issued
+- **View "for me"**: shape read filtered by `subject_hash` — vouches received
+- **Create vouch**: free-text scope (kind), any subject user hash, challenge-response ingest
+- **Revoke vouch**: signed update with `deleted_flag: true` and incremented timestamp
+- **Layout**: single-column with request log
+
 ### File sandbox
 
 - **Static HTML**: separate from LiveView sandboxes (`/file_sandbox.html`)
@@ -152,4 +162,4 @@ All sandbox source lives under [`lib/chat_web/live/electric_live/`](../../lib/ch
 
 ## Status
 
-All seven sandboxes and the file sandbox are implemented and functional. The `/electric` landing page links to all of them with icon cards showing the tables each exercises.
+All eight sandboxes and the file sandbox are implemented and functional. The `/electric` landing page links to all of them with icon cards showing the tables each exercises.

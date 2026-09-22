@@ -18,46 +18,23 @@ The `kind` field names the **resource** a vouch grants access to — not how tru
 Scopes use a left-to-right dot-path notation. Each step right narrows authority:
 
 ```
-device.<serial_or_domain>
+device.<device_id>
 ├── storage
 │   ├── read                            ← Electric shape streaming
-│   │   ├── user_cards
-│   │   ├── user_storage
-│   │   ├── dialog_keys
-│   │   ├── dialog_messages
-│   │   ├── dialog_message_reactions
-│   │   ├── dialog_message_receipts
-│   │   ├── files
-│   │   ├── file_chunks
-│   │   ├── origins
-│   │   ├── reviews
-│   │   └── ...
 │   └── write                           ← HTTP ingest
-│       ├── user_cards
-│       ├── user_storage
-│       ├── dialog_keys
-│       ├── dialog_messages
-│       └── ...
-├── sync                                ← peer device replication
-│   ├── user_cards
-│   └── ...
-└── admin
-    ├── firmware
-    ├── settings
-    └── network
+└── admin                               ← device management
 
 origins.<origin_hash>
-├── reviews
-│   ├── write
-│   │   └── <nonce>                     ← per-invitation narrowing
-│   └── moderate
-└── admin
-
-rooms.<room_hash>                       ← future
-└── ...
+└── reviews
+    └── write                           ← review write tokens
+        └── <nonce>                     ← per-invitation narrowing
 ```
 
-The forest has independent roots — `device`, `origins`, `rooms`. Each root is a different kind of entity with its own facility subtree. A vouch for `device.<sn>.storage.write` grants full write access to all shapes; `device.<sn>.storage.write.dialog_messages` narrows to just that shape. Likewise `device.<sn>.storage.read` grants read access to all shapes; `device.<sn>.storage.read.user_cards` narrows to one. Prefix containment governs attenuation — wider scope covers all narrower leaves under it, but never crosses into a sibling tree.
+The core forest is defined in `Chat.Data.VouchToken.resource_forest/0`. It has two independent roots — `device` and `origins`. Each root is a different kind of entity with its own facility subtree. Parametric segments (`:device_id`, `:origin_hash`) are filled at runtime. Leaf markers indicate the subsystem that consumes the scope: `:shape` for `storage.read`/`storage.write`, `:review_token` for `origins.*.reviews.write`.
+
+A vouch for `device.<id>.storage.write` grants full write access to all shapes; `device.<id>.storage.write.dialog_messages` narrows to just that shape. Likewise `device.<id>.storage.read` grants read access to all shapes; `device.<id>.storage.read.user_cards` narrows to one. Prefix containment governs attenuation — wider scope covers all narrower leaves under it, but never crosses into a sibling tree.
+
+Future extensions (`device.*.sync`, `device.*.admin.firmware/settings/network`, `origins.*.admin`, `rooms.*`) will be added to `resource_forest/0` when their consuming subsystems are implemented.
 
 ### Vocabulary Layers
 

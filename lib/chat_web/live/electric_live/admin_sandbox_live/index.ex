@@ -4,6 +4,7 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Index do
   use ChatWeb, :live_view
 
   alias Chat.AdminDb
+  alias Chat.Data.VouchToken
   alias Chat.DeviceId
   alias Chat.Pq.OwnerBootstrap
   alias Chat.Pq.ServerIdentity
@@ -22,6 +23,7 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Index do
       gate_mode: gate_mode(),
       identity: nil,
       is_admin: false,
+      admin_role: nil,
       error_message: nil
     )
     |> allow_upload(:key_file, accept: ~w(.json), max_entries: 1, max_file_size: 100_000)
@@ -39,10 +41,10 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Index do
 
     case Crypto.parse_and_validate_identity(result) do
       {:ok, user_data} ->
-        is_admin = OwnerBootstrap.owner?(user_data.user_hash)
+        {is_admin, admin_role} = resolve_admin_role(user_data.user_hash)
 
         socket
-        |> assign(identity: user_data, is_admin: is_admin, error_message: nil)
+        |> assign(identity: user_data, is_admin: is_admin, admin_role: admin_role, error_message: nil)
         |> noreply()
 
       {:error, reason} ->
@@ -53,26 +55,57 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Index do
   end
 
   def handle_event("set_gate_mode", %{"mode" => mode_str}, socket) do
-    if socket.assigns.is_admin do
-      mode = String.to_existing_atom(mode_str)
+    mode = String.to_existing_atom(mode_str)
 
-      if mode in @valid_gate_modes do
+    cond do
+      not socket.assigns.is_admin ->
+        socket |> assign(error_message: "Only admin can change gate mode") |> noreply()
+
+      mode not in @valid_gate_modes ->
+        socket |> assign(error_message: "Invalid mode: #{mode_str}") |> noreply()
+
+      true ->
         AdminDb.put(:pq_gate_mode, mode)
-        {:noreply, assign(socket, gate_mode: mode)}
-      else
-        {:noreply, assign(socket, error_message: "Invalid mode: #{mode_str}")}
-      end
-    else
-      {:noreply, assign(socket, error_message: "Only admin can change gate mode")}
+        socket |> assign(gate_mode: mode) |> noreply()
     end
   end
 
   def handle_event("clear_error", _params, socket) do
-    {:noreply, assign(socket, :error_message, nil)}
+    socket |> assign(:error_message, nil) |> noreply()
   end
 
   @impl true
   def render(assigns), do: Render.render_page(assigns)
+
+  defp resolve_admin_role(user_hash) do
+    cond do
+      OwnerBootstrap.owner?(user_hash) ->
+        {true, :owner}
+
+      has_admin_vouch?(user_hash) ->
+        {true, :vouch}
+
+      true ->
+        {false, nil}
+    end
+  end
+
+  defp has_admin_vouch?(user_hash) do
+    case OwnerBootstrap.owner() do
+      %{user_hash: owner_hash} ->
+        admin_scopes(DeviceId.id())
+        |> Enum.any?(fn scope ->
+          match?({:ok, _}, VouchToken.chain_distance(owner_hash, user_hash, scope))
+        end)
+
+      _ ->
+        false
+    end
+  end
+
+  defp admin_scopes(device_id) do
+    ["device.#{device_id}.admin", "device.*.admin"]
+  end
 
   defp gate_mode, do: AdminDb.get(:pq_gate_mode) || :open
 

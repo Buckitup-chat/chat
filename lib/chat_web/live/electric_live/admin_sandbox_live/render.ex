@@ -87,7 +87,12 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Render do
             </span>
             <span class="text-gray-500">({@identity.name})</span>
           </p>
-          <p :if={@is_admin} class="text-green-700 font-medium">Admin verified</p>
+          <p :if={@admin_role == :owner} class="text-green-700 font-medium">
+            Admin verified (owner)
+          </p>
+          <p :if={@admin_role == :vouch} class="text-green-700 font-medium">
+            Admin verified (vouch token)
+          </p>
           <p :if={!@is_admin} class="text-amber-700 font-medium">
             Not admin — gate controls are read-only
           </p>

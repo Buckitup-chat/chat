@@ -31,7 +31,7 @@ Tokens that remain **pending** for longer than 1 month are garbage-collected. Bo
 
 ## Trust Delegation
 
-Write tokens are authorized through a two-level vouch chain rooted in the [vouch tokens](../pq_vouch_tokens.proposed.md) system.
+Write tokens are authorized through a two-level vouch chain rooted in the [vouch tokens](../pq_vouch_tokens.in_progress.md) system.
 
 ### Bot identity
 
@@ -78,7 +78,7 @@ subject_hash: reviewer_hash
 sign_b64:     signed with bot's sign_skey
 ```
 
-Attenuation holds: `reviews.write.<nonce>` is prefix-contained by `reviews.write` (see [Scope Attenuation](../pq_vouch_tokens.proposed.md#scope-attenuation)).
+Attenuation holds: `reviews.write.<nonce>` is prefix-contained by `reviews.write` (see [Scope Attenuation](../pq_vouch_tokens.in_progress.md#scope-attenuation)).
 
 The full verifiable chain: origin trusted bot → bot delegated to reviewer → reviewer wrote the review (ML-DSA-87 signed). Any peer can walk this chain using only public keys from `user_cards` and the vouch token rows.
 
@@ -295,7 +295,7 @@ The write token gates entry. Once the reviewer has identity + vouch, they use th
 
 ### Vouch tokens — consumer
 
-Write tokens consume the vouch token infrastructure for trust delegation. The `origins.<origin_hash>.reviews.write.<nonce>` scope sits in the origins subtree of the [Resource Forest](../pq_vouch_tokens.proposed.md#resource-forest).
+Write tokens consume the vouch token infrastructure for trust delegation. The `origins.<origin_hash>.reviews.write.<nonce>` scope sits in the origins subtree of the [Resource Forest](../pq_vouch_tokens.in_progress.md#resource-forest).
 
 ### Review access mode — per-origin policy
 
@@ -378,7 +378,7 @@ Proposed.
 
 ## References
 
-- [pq_vouch_tokens](../pq_vouch_tokens.proposed.md) — vouch token system, resource forest, attenuation
+- [pq_vouch_tokens](../pq_vouch_tokens.in_progress.md) — vouch token system, resource forest, attenuation
 - [pq_reviews](pq_reviews.in_progress.md) — review system overview, pipeline, sandboxes
 - [pq_review_moderation](pq_review_moderation.done.md) — moderation pipeline, candidate promotion
 - [pq_origin](pq_origin.done.md) — origin entity, creation, ownership

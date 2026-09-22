@@ -176,7 +176,7 @@ Walking the trust graph on every access check is unnecessary when the vouch set 
 
 ## Relationship to Access Gating
 
-This table is the approval substrate for [access gating](pq_access_gating.proposed.md). The system has three modes — `open` (no gating), `guarded` (writes chain-gated, reads open), and `trust` (all access chain-gated). In `guarded` and `trust` modes, a user is allowed through when their chain distance from the owner is within the configured max depth.
+This table is the approval substrate for [access gating](pq_access_gating.in_progress.md). The system has three modes — `open` (no gating), `guarded` (writes chain-gated, reads open), and `trust` (all access chain-gated). In `guarded` and `trust` modes, a user is allowed through when their chain distance from the owner is within the configured max depth.
 
 All approval mechanisms produce vouch tokens with the same resource `kind`. What differs is the issuer and context — provenance is inferred, not encoded:
 
@@ -199,49 +199,66 @@ Chain distance is computed by walking `vouch_tokens` edges (`issuer_hash → sub
 WITH RECURSIVE trust_chain AS (
   -- Base: users the owner directly vouched for
   SELECT
-    vt.subject_hash  AS user_hash,
-    vt.kind,
-    1                AS distance
+    vt.subject_hash AS user_hash,
+    1               AS distance
   FROM vouch_tokens vt
-  WHERE vt.issuer_hash   = $owner_hash
-    AND vt.kind          LIKE $scope_prefix || '%'  -- e.g. 'device.BK-001.storage.write%'
-    AND vt.deleted_flag  = false
+  WHERE vt.issuer_hash  = $owner_hash
+    AND (vt.kind LIKE $scope_prefix || '%' OR $scope_prefix LIKE vt.kind || '.%')
+    AND vt.deleted_flag = false
+    AND NOT EXISTS (
+      SELECT 1 FROM vouch_tokens t
+      WHERE t.issuer_hash  = vt.issuer_hash
+        AND t.subject_hash = vt.subject_hash
+        AND t.deleted_flag = true
+        AND vt.kind LIKE t.kind || '%'
+    )
 
   UNION ALL
 
   -- Walk outward: each subject's own vouches
   SELECT
     vt.subject_hash,
-    vt.kind,
     tc.distance + 1
   FROM vouch_tokens vt
   JOIN trust_chain tc ON vt.issuer_hash = tc.user_hash
-  WHERE vt.kind          LIKE $scope_prefix || '%'
-    AND vt.deleted_flag  = false
-    AND tc.distance      < $max_depth
+  WHERE (vt.kind LIKE $scope_prefix || '%' OR $scope_prefix LIKE vt.kind || '.%')
+    AND vt.deleted_flag = false
+    AND tc.distance     < $max_depth
+    AND NOT EXISTS (
+      SELECT 1 FROM vouch_tokens t
+      WHERE t.issuer_hash  = vt.issuer_hash
+        AND t.subject_hash = vt.subject_hash
+        AND t.deleted_flag = true
+        AND vt.kind LIKE t.kind || '%'
+    )
 )
 CYCLE user_hash SET is_cycle USING path
 
-SELECT
-  user_hash,
-  MIN(distance)                       AS chain_distance,
-  array_agg(DISTINCT kind)            AS vouch_scopes
+SELECT MIN(distance) AS chain_distance
 FROM trust_chain
 WHERE NOT is_cycle
-GROUP BY user_hash;
+  AND user_hash = $subject_hash
+  AND NOT EXISTS (
+    SELECT 1 FROM vouch_tokens t
+    WHERE t.issuer_hash  = $owner_hash
+      AND t.subject_hash = $subject_hash
+      AND t.deleted_flag = true
+      AND ($scope_prefix LIKE t.kind || '%')
+  )
 ```
 
 **Resource-scoped.** The `$scope_prefix` parameter (e.g. `'device.BK-001.storage.write'`) restricts the walk to vouches granting access to a specific resource subtree. Cross-tree walks (e.g. device + origins) require a separate pass per root or a broader prefix.
 
-**Scope attenuation alignment.** The `LIKE prefix || '%'` filter mirrors the `attenuates?/2` containment rule — it selects all sub-scopes under the resource without crossing into sibling trees.
+**Bidirectional scope matching.** The condition `(vt.kind LIKE $scope_prefix || '%' OR $scope_prefix LIKE vt.kind || '.%')` implements attenuation in both directions: a vouch at a narrower scope (e.g. `storage.write.dialog_messages`) matches a query for its parent (`storage.write`), and a vouch at a wider scope (e.g. `storage`) covers a query for a child (`storage.write`). This mirrors the `attenuates?/2` containment rule without requiring a separate check.
+
+**Tombstone sub-selects.** Each CTE leg includes `NOT EXISTS` to exclude rows where a tombstoned vouch at a parent scope blocks the grant for the same `(issuer_hash, subject_hash)` pair. The final `SELECT` adds a direct-tombstone check: if the owner has tombstoned the subject at the queried scope (or a parent), the result is empty regardless of transitive paths.
 
 **Notes:**
 
 - **`CYCLE … SET … USING path`** — prevents infinite loops in mutual-vouch or ring topologies. No manual visited-set.
-- **`$max_depth`** — caps traversal. Suggested default: **4** (owner → contact → contact-of-contact → one more hop).
-- **`MIN(distance)`** — shortest path becomes the `chain_distance` used by the access gate.
-- **`vouch_scopes`** — collects the distinct `kind` values along the chain, so the caller knows which specific resource scopes were granted along the path.
-- **Revocation** — `deleted_flag = false` excludes tombstoned vouches. A revoked vouch breaks the chain at that edge; downstream users lose the path through the revoker.
+- **`$max_depth`** — caps traversal. Default: **7**.
+- **Single-user lookup** — the query targets a specific `$subject_hash` and returns `MIN(distance)` for that user only. A full-graph dump (all reachable users) uses the same CTE but groups by `user_hash` without the final `WHERE user_hash = $subject_hash` filter.
+- **Revocation** — `deleted_flag = false` plus the `NOT EXISTS` tombstone checks exclude revoked vouches and their attenuated children. A tombstoned vouch at a parent scope blocks all sub-scopes for that edge.
 - **Replay safety** — `owner_timestamp` monotonicity is enforced at ingest (§ Verification), so the query sees only the latest version of each `(kind, issuer_hash, subject_hash)` tuple.
 If vouch tokens are cached in CubDB, the equivalent traversal runs in Elixir (BFS with a `MapSet` visited guard, filtering on `kind` prefix and `deleted_flag`).
 
@@ -274,7 +291,7 @@ The shape module implements `Chat.Data.Shapes.Shape` with standard `ingest_confi
 
 2. **Transitive vouch display.** When the UI shows "why is this user trusted?", should it show the full vouch chain or just the direct vouches? Chain display requires walking the graph; direct-only is a simple query.
 
-3. **Device identifier format.** Serial number, domain name, or derived hash? Must be stable across reboots and unique across the fleet.
+3. **Device identifier format.** Partially resolved. `Chat.DeviceId` behaviour with `Chat.DeviceId.Default` fallback: HTTPS domain (`Server_<host>`) when configured, otherwise localhost MAC address (`Localhost_<hex>`). Platform can supply a device-specific implementation via `:device_id_module` app env. Remaining question: should the platform target use the USB drive serial number instead?
 
 4. **Scope vocabulary storage.** Device-local and discovered scopes need persistence. Options: a separate `scope_vocabulary` table (PG, synced), or CubDB (AdminDB, local-only). The core layer is compiled and needs no storage.
 
@@ -282,10 +299,10 @@ The shape module implements `Chat.Data.Shapes.Shape` with standard `ingest_confi
 
 ## Status
 
-Proposed.
+In Progress. Schema, migration, Ecto changeset, `Signable` protocol, shape behaviour, validation (insert/update/ingest), data access with recursive CTE, and Electric sync are implemented. Resolved chain cache, `attenuates?/2` helper, and scope vocabulary storage are pending.
 
 ## References
 
 - [02_integrity.md](../invariants/02_integrity.md) — integrity triad: `sign_b64`, `owner_timestamp`, `deleted_flag`
-- [pq_access_gating](pq_access_gating.proposed.md) — open/guarded/trust modes, bootstrap, gate mechanics
+- [pq_access_gating](pq_access_gating.in_progress.md) — open/guarded/trust modes, bootstrap, gate mechanics
 - [pq_review_write_tokens](reviews/pq_review_write_tokens.proposed.md) — one-time invite links, bot delegation via `reviews.write.<nonce>` scope

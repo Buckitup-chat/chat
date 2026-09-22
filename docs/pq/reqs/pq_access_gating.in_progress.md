@@ -82,11 +82,11 @@ The owner's trusted contacts (established via the [optical handshake flow](../fl
 
 In `guarded` and `trust` modes, access decisions are driven by **chain distance** — the shortest path in the vouch token graph from the owner to the user. The owner sets a maximum depth; users reachable within that depth can ingest, users beyond it (or unreachable) are rejected.
 
-The chain distance is computed by the recursive CTE defined in [Vouch Tokens § Graph Traversal](pq_vouch_tokens.proposed.md#graph-traversal-via-recursive-cte). That query walks `issuer_hash → subject_hash` edges, filters by resource scope prefix (e.g. `device.<sn>.storage.write` or `device.<sn>.storage.read`) and `deleted_flag`, and returns `MIN(distance)` per user.
+The chain distance is computed by the recursive CTE defined in [Vouch Tokens § Graph Traversal](pq_vouch_tokens.in_progress.md#graph-traversal-via-recursive-cte). That query walks `issuer_hash → subject_hash` edges with bidirectional scope matching (a vouch at a wider scope covers narrower queries and vice versa), filters by `deleted_flag` with tombstone sub-selects, and returns `MIN(distance)` for the target user.
 
 ### Max Depth
 
-The owner sets a maximum chain depth (integer, ≥ 1) via the admin UI. Default: **3**.
+The owner sets a maximum chain depth (integer, ≥ 1) via the admin UI. Default: **7**.
 
 - Users with `chain_distance ≤ max_depth` can ingest.
 - Users beyond max depth or with no path are rejected with `403` and body `{"error": "not_in_trust_chain", "max_depth": <max_depth>}`.
@@ -94,7 +94,7 @@ The owner sets a maximum chain depth (integer, ≥ 1) via the admin UI. Default:
 
 ### Resource Scopes
 
-Resource kinds separate read and write access. The scope names the facility being granted, not how trust was established (see [Vouch Tokens § Resource Forest](pq_vouch_tokens.proposed.md#resource-forest)):
+Resource kinds separate read and write access. The scope names the facility being granted, not how trust was established (see [Vouch Tokens § Resource Forest](pq_vouch_tokens.in_progress.md#resource-forest)):
 
 | Mechanism | Issuer | Vouch `kind` | Chain distance |
 |-----------|--------|--------------|----------------|
@@ -108,7 +108,7 @@ Provenance is inferred: `issuer_hash` = owner → direct trust; `issuer_hash` �
 
 ### Recomputation
 
-The [resolved chain cache](pq_vouch_tokens.proposed.md#optimization--resolved-chain-cache) stores distance results for up to 30 minutes. Cache invalidation happens on vouch insert/revoke within the resource scope prefix.
+The [resolved chain cache](pq_vouch_tokens.in_progress.md#optimization--resolved-chain-cache) stores distance results for up to 30 minutes. Cache invalidation happens on vouch insert/revoke within the resource scope prefix.
 
 ---
 ## Caller Resolution (no separate approval list)
@@ -116,7 +116,7 @@ The [resolved chain cache](pq_vouch_tokens.proposed.md#optimization--resolved-ch
 A dedicated approval list table is unnecessary — the gate resolves callers from existing data:
 
 1. **`user_cards`** (Electric-synced) provide `sign_pkey` for each `user_hash`.
-2. **Vouch tokens** (Electric-synced) provide chain distance via the [resolved chain cache](pq_vouch_tokens.proposed.md#optimization--resolved-chain-cache).
+2. **Vouch tokens** (Electric-synced) provide chain distance via the [resolved chain cache](pq_vouch_tokens.in_progress.md#optimization--resolved-chain-cache).
 
 The gate identifies the caller by `user_hash` (provided in the auth payload), looks up `sign_pkey` from `user_cards`, verifies the PoP signature, then checks chain distance from the cache. No derived table needed.
 
@@ -247,7 +247,7 @@ Client                          Server
 
 ## Status
 
-Proposed.
+In Progress. Server identity (`Chat.Pq.ServerIdentity`), device identity (`Chat.DeviceId`), owner bootstrap (`Chat.Pq.OwnerBootstrap`), gate mode storage in AdminDB, and admin sandbox UI with gate mode switching are implemented. The `ElectricAccessGate` plug (PoP + vouch chain enforcement in the router pipeline) is pending.
 
 ## Open Questions
 
@@ -255,13 +255,13 @@ Proposed.
 2. ~~Should there be a "pending" state where unapproved users' requests are queued rather than rejected?~~ **Out of scope** — deferred to a separate feature.
 3. **Where to store owner identity and mode setting?**
 
-   Owner `user_hash` + `sign_pkey`, access mode, and max chain depth live in AdminDB (CubDB). Vouch tokens sync as an Electric shape and are stored in PostgreSQL; caller resolution uses `user_cards` + vouch token cache directly (no separate derived table).
+   Resolved. Owner identity is stored under `:pq_admin` (`%{user_hash, sign_pkey}`) in AdminDB (CubDB). Access mode is stored under `:pq_gate_mode` (`:open` / `:guarded` / `:trust`). Server identity keypair is stored under `:pq_server_identity`. On first boot `ServerIdentity` seeds `:pq_gate_mode` to `:open` via `AdminDb.put_new/2`. Owner registration happens via `OwnerBootstrap.maybe_register_owner/2` on first `user_card` ingest.
 
    Sub-question: should AdminDB settings be **replicated to the backup drive**? On the platform, each USB drive gets its own PG instance with logical replication between main and internal. AdminDB is currently single-drive — backup requires explicit copy logic.
 
 4. **Should chain distance be visible to users?** Transparency aids debugging ("why was I rejected?") but also reveals the trust topology. Options: visible to owner only, visible to each user for their own distance, or fully opaque.
 
-5. **Offline chain evaluation.** ~~Should vouch attestations be structured as self-contained signed tokens?~~ **Yes** — vouch tokens must be self-contained signed attestations so the gate can evaluate trust without live lookups. Chain-distance computation works from the token chain alone, enabling offline evaluation. See [Vouch Tokens](pq_vouch_tokens.proposed.md) for the self-contained token structure.
+5. **Offline chain evaluation.** ~~Should vouch attestations be structured as self-contained signed tokens?~~ **Yes** — vouch tokens must be self-contained signed attestations so the gate can evaluate trust without live lookups. Chain-distance computation works from the token chain alone, enabling offline evaluation. See [Vouch Tokens](pq_vouch_tokens.in_progress.md) for the self-contained token structure.
 
 6. **Should a future version add composite scoring?** Chain distance is sufficient as a starting point, but richer signals (vouch quality, behavioral patterns, tenure) could be layered in later if the simple model proves too coarse. Keeping this as a known extension point.
 
@@ -271,5 +271,5 @@ Proposed.
 
 ## References
 
-- [Vouch Tokens](pq_vouch_tokens.proposed.md) — schema, graph traversal CTE, scope attenuation, cache
+- [Vouch Tokens](pq_vouch_tokens.in_progress.md) — schema, graph traversal CTE, scope attenuation, cache
 - [Optical Handshake Flow](../flows/pq_optical-handshake.livemd) — contact establishment via physical proximity

@@ -6,6 +6,27 @@ defmodule Chat.Data.VouchToken do
 
   @default_max_depth 7
 
+  def resource_forest do
+    %{
+      "device" => %{
+        :device_id => %{
+          "storage" => %{
+            "read" => :shape,
+            "write" => :shape
+          },
+          "admin" => %{}
+        }
+      },
+      "origins" => %{
+        :origin_hash => %{
+          "reviews" => %{
+            "write" => :review_token
+          }
+        }
+      }
+    }
+  end
+
   def get_vouch_token(kind, issuer_hash, subject_hash) do
     Repo.get_by(VouchToken, kind: kind, issuer_hash: issuer_hash, subject_hash: subject_hash)
   end

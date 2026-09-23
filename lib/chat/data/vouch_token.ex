@@ -32,7 +32,11 @@ defmodule Chat.Data.VouchToken do
   end
 
   def chain_distance(owner_hash, subject_hash, scope_prefix, max_depth \\ @default_max_depth) do
-    case Repo.query(chain_distance_sql(), [owner_hash, scope_prefix, max_depth, subject_hash]) do
+    [root_segment | _] = String.split(scope_prefix, ".")
+
+    params = [owner_hash, scope_prefix, max_depth, subject_hash, root_segment]
+
+    case Repo.query(chain_distance_sql(), params) do
       {:ok, %{rows: [[distance]]}} when is_integer(distance) -> {:ok, distance}
       {:ok, _} -> :unreachable
     end
@@ -48,6 +52,7 @@ defmodule Chat.Data.VouchToken do
         false                          AS widened
       FROM vouch_tokens vt
       WHERE vt.issuer_hash  = $1
+        AND (vt.kind = $5 OR vt.kind LIKE $5 || '.%')
         AND scope_intersect($2, vt.kind) IS NOT NULL
         AND vt.deleted_flag = false
         AND NOT EXISTS (
@@ -67,7 +72,8 @@ defmodule Chat.Data.VouchToken do
         tc.widened OR NOT scope_narrower_or_eq(vt.kind, tc.effective_scope)
       FROM vouch_tokens vt
       JOIN trust_chain tc ON vt.issuer_hash = tc.user_hash
-      WHERE scope_intersect(tc.effective_scope, vt.kind) IS NOT NULL
+      WHERE (vt.kind = $5 OR vt.kind LIKE $5 || '.%')
+        AND scope_intersect(tc.effective_scope, vt.kind) IS NOT NULL
         AND vt.deleted_flag = false
         AND tc.distance     < $3
         AND NOT EXISTS (

@@ -269,6 +269,33 @@ defmodule Chat.Data.VouchToken.ChainDistanceTest do
                VouchTokenData.chain_distance(ctx.owner_hash, ctx.alice_hash, @scope)
     end
 
+    test "owner wildcard tombstone on transitive subject denies access", ctx do
+      # alice allows bob
+      insert_vouch(ctx.alice, ctx.alice_hash, ctx.bob_hash, "device.bk01.storage.write")
+      # bob allows carol
+      insert_vouch(ctx.bob, ctx.bob_hash, ctx.carol_hash, "device.bk01.storage.write")
+      # alice retracts carol with wildcard scope
+      insert_vouch(ctx.alice, ctx.alice_hash, ctx.carol_hash, "device.*.storage",
+        deleted_flag: true
+      )
+
+      # bob still reachable
+      assert {:ok, 1} =
+               VouchTokenData.chain_distance(
+                 ctx.alice_hash,
+                 ctx.bob_hash,
+                 "device.bk01.storage.write"
+               )
+
+      # carol denied by owner tombstone
+      assert :unreachable =
+               VouchTokenData.chain_distance(
+                 ctx.alice_hash,
+                 ctx.carol_hash,
+                 "device.bk01.storage.write"
+               )
+    end
+
     test "child scope tombstone does not block parent scope vouch", ctx do
       insert_vouch(ctx.owner, ctx.owner_hash, ctx.alice_hash, @scope)
 

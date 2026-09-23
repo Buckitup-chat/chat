@@ -81,7 +81,8 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.ApiClient do
     }
 
     with {:ok, challenge_resp, log1} <- Http.get_challenge(base_url),
-         {:ok, _resp, log2} <- Http.post_ingest(challenge_resp, payload, identity.sign_skey, base_url) do
+         {:ok, _resp, log2} <-
+           Http.post_ingest(challenge_resp, payload, identity.sign_skey, base_url) do
       {:ok, %{log_entries: [log1, log2]}}
     else
       {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
@@ -124,7 +125,8 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.ApiClient do
     }
 
     with {:ok, challenge_resp, log1} <- Http.get_challenge(base_url),
-         {:ok, _resp, log2} <- Http.post_ingest(challenge_resp, payload, identity.sign_skey, base_url) do
+         {:ok, _resp, log2} <-
+           Http.post_ingest(challenge_resp, payload, identity.sign_skey, base_url) do
       {:ok, %{log_entries: [log1, log2]}}
     else
       {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}

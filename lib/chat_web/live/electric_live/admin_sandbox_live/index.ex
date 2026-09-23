@@ -44,7 +44,12 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Index do
         {is_admin, admin_role} = resolve_admin_role(user_data.user_hash)
 
         socket
-        |> assign(identity: user_data, is_admin: is_admin, admin_role: admin_role, error_message: nil)
+        |> assign(
+          identity: user_data,
+          is_admin: is_admin,
+          admin_role: admin_role,
+          error_message: nil
+        )
         |> noreply()
 
       {:error, reason} ->

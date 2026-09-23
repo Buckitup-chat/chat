@@ -139,6 +139,86 @@ defmodule Chat.Data.VouchToken.ChainDistanceTest do
     end
   end
 
+  describe "scope must not widen down the chain" do
+    test "wider grant is limited to parent's narrow scope", ctx do
+      # Owner vouches Alice for narrow scope
+      insert_vouch(ctx.owner, ctx.owner_hash, ctx.alice_hash, "device.BK-001.admin")
+      # Alice grants Bob wider scope — but she only has .admin
+      insert_vouch(ctx.alice, ctx.alice_hash, ctx.bob_hash, "device")
+
+      # Bob unreachable at the wider scope Alice tried to grant
+      assert :unreachable = VouchTokenData.chain_distance(ctx.owner_hash, ctx.bob_hash, "device")
+
+      # Bob IS reachable at Alice's actual (narrow) scope
+      assert {:ok, 2} =
+               VouchTokenData.chain_distance(ctx.owner_hash, ctx.bob_hash, "device.BK-001.admin")
+    end
+
+    test "child link with same scope is reachable", ctx do
+      insert_vouch(ctx.owner, ctx.owner_hash, ctx.alice_hash, "device.BK-001.admin")
+      insert_vouch(ctx.alice, ctx.alice_hash, ctx.bob_hash, "device.BK-001.admin")
+
+      assert {:ok, 2} =
+               VouchTokenData.chain_distance(ctx.owner_hash, ctx.bob_hash, "device.BK-001.admin")
+    end
+
+    test "child link narrowing scope is reachable", ctx do
+      insert_vouch(ctx.owner, ctx.owner_hash, ctx.alice_hash, "device.BK-001")
+      insert_vouch(ctx.alice, ctx.alice_hash, ctx.bob_hash, "device.BK-001.admin")
+
+      assert {:ok, 2} =
+               VouchTokenData.chain_distance(ctx.owner_hash, ctx.bob_hash, "device.BK-001.admin")
+    end
+
+    test "three-hop chain: widening at hop 3 is blocked", ctx do
+      insert_vouch(ctx.owner, ctx.owner_hash, ctx.alice_hash, "device.BK-001.admin")
+      insert_vouch(ctx.alice, ctx.alice_hash, ctx.bob_hash, "device.BK-001.admin.settings")
+      # Bob tries to widen back — blocked by Alice's effective scope
+      insert_vouch(ctx.bob, ctx.bob_hash, ctx.carol_hash, "device.BK-001")
+
+      assert :unreachable =
+               VouchTokenData.chain_distance(ctx.owner_hash, ctx.carol_hash, "device.BK-001")
+
+      # Carol reachable at the narrowest effective scope
+      assert {:ok, 3} =
+               VouchTokenData.chain_distance(
+                 ctx.owner_hash,
+                 ctx.carol_hash,
+                 "device.BK-001.admin.settings"
+               )
+    end
+
+    test "wildcard grant limited by parent's specific scope", ctx do
+      # Alice (admin) vouches Bob for specific device read
+      insert_vouch(ctx.alice, ctx.alice_hash, ctx.bob_hash, "device.BK01.storage.read")
+      # Bob vouches Carol for wider wildcard scope
+      insert_vouch(ctx.bob, ctx.bob_hash, ctx.carol_hash, "device.*.storage")
+
+      # Carol reachable at the narrow effective scope
+      assert {:ok, 2} =
+               VouchTokenData.chain_distance(
+                 ctx.alice_hash,
+                 ctx.carol_hash,
+                 "device.BK01.storage.read"
+               )
+
+      # Carol NOT reachable at the wider wildcard scope
+      assert :unreachable =
+               VouchTokenData.chain_distance(ctx.alice_hash, ctx.carol_hash, "device.*.storage")
+    end
+
+    test "alternative non-widening path still works when widening path exists", ctx do
+      insert_vouch(ctx.owner, ctx.owner_hash, ctx.alice_hash, "device.BK-001.admin")
+      insert_vouch(ctx.alice, ctx.alice_hash, ctx.carol_hash, "device")
+
+      insert_vouch(ctx.owner, ctx.owner_hash, ctx.bob_hash, "device")
+      insert_vouch(ctx.bob, ctx.bob_hash, ctx.carol_hash, "device")
+
+      assert {:ok, 2} =
+               VouchTokenData.chain_distance(ctx.owner_hash, ctx.carol_hash, "device")
+    end
+  end
+
   describe "rule 3 — tombstone wins" do
     test "tombstoned edge breaks that chain", ctx do
       insert_vouch(ctx.owner, ctx.owner_hash, ctx.alice_hash, @scope)
@@ -191,6 +271,7 @@ defmodule Chat.Data.VouchToken.ChainDistanceTest do
 
     test "child scope tombstone does not block parent scope vouch", ctx do
       insert_vouch(ctx.owner, ctx.owner_hash, ctx.alice_hash, @scope)
+
       insert_vouch(ctx.owner, ctx.owner_hash, ctx.alice_hash, "device.BK-001.admin.settings",
         deleted_flag: true
       )

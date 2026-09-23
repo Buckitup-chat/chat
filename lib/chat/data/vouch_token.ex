@@ -42,28 +42,32 @@ defmodule Chat.Data.VouchToken do
     """
     WITH RECURSIVE trust_chain AS (
       SELECT
-        vt.subject_hash AS user_hash,
-        1               AS distance
+        vt.subject_hash                AS user_hash,
+        1                              AS distance,
+        scope_intersect($2, vt.kind)   AS effective_scope,
+        false                          AS widened
       FROM vouch_tokens vt
       WHERE vt.issuer_hash  = $1
-        AND (vt.kind LIKE $2 || '%' OR $2 LIKE vt.kind || '.%')
+        AND scope_intersect($2, vt.kind) IS NOT NULL
         AND vt.deleted_flag = false
         AND NOT EXISTS (
           SELECT 1 FROM vouch_tokens t
           WHERE t.issuer_hash  = vt.issuer_hash
             AND t.subject_hash = vt.subject_hash
             AND t.deleted_flag = true
-            AND vt.kind LIKE t.kind || '%'
+            AND scope_narrower_or_eq(vt.kind, t.kind)
         )
 
       UNION ALL
 
       SELECT
         vt.subject_hash,
-        tc.distance + 1
+        tc.distance + 1,
+        scope_intersect(tc.effective_scope, vt.kind),
+        tc.widened OR NOT scope_narrower_or_eq(vt.kind, tc.effective_scope)
       FROM vouch_tokens vt
       JOIN trust_chain tc ON vt.issuer_hash = tc.user_hash
-      WHERE (vt.kind LIKE $2 || '%' OR $2 LIKE vt.kind || '.%')
+      WHERE scope_intersect(tc.effective_scope, vt.kind) IS NOT NULL
         AND vt.deleted_flag = false
         AND tc.distance     < $3
         AND NOT EXISTS (
@@ -71,7 +75,7 @@ defmodule Chat.Data.VouchToken do
           WHERE t.issuer_hash  = vt.issuer_hash
             AND t.subject_hash = vt.subject_hash
             AND t.deleted_flag = true
-            AND vt.kind LIKE t.kind || '%'
+            AND scope_narrower_or_eq(vt.kind, t.kind)
         )
     )
     CYCLE user_hash SET is_cycle USING path
@@ -80,12 +84,18 @@ defmodule Chat.Data.VouchToken do
     FROM trust_chain
     WHERE NOT is_cycle
       AND user_hash = $4
+      AND (
+        (NOT widened AND (scope_narrower_or_eq(effective_scope, $2)
+                          OR scope_narrower_or_eq($2, effective_scope)))
+        OR
+        (widened AND scope_narrower_or_eq($2, effective_scope))
+      )
       AND NOT EXISTS (
         SELECT 1 FROM vouch_tokens t
         WHERE t.issuer_hash  = $1
           AND t.subject_hash = $4
           AND t.deleted_flag = true
-          AND ($2 LIKE t.kind || '%')
+          AND scope_narrower_or_eq($2, t.kind)
       )
     """
   end

@@ -73,15 +73,10 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.Render do
     ~H"""
     <div class="bg-white shadow rounded-lg p-6">
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Step 2: Create Vouch</h2>
-      <form phx-submit="create_vouch" class="space-y-3">
+      <form phx-submit="create_vouch" phx-change="form_change" class="space-y-3">
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Subject User</label>
-          <select
-            name="subject_hash"
-            required
-            class="w-full px-3 py-2 border rounded-lg text-sm"
-            phx-change="form_change"
-          >
+          <select name="subject_hash" required class="w-full px-3 py-2 border rounded-lg text-sm">
             <option value="" disabled selected={@form_subject == ""}>Select a user...</option>
             <option
               :for={u <- @users}
@@ -95,23 +90,53 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.Render do
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Scope (kind)</label>
-          <input
-            type="text"
-            name="kind"
-            value={@form_kind}
-            placeholder="device.BK-001.storage.write"
-            required
-            class="w-full px-3 py-2 border rounded-lg text-sm font-mono"
-            phx-change="form_change"
-          />
+          <div class="flex flex-wrap items-end gap-1">
+            <div :for={step <- @scope_steps} class="flex items-end gap-1">
+              <span :if={step.level > 0} class="text-gray-400 text-lg leading-9">.</span>
+              <%= if step.type == :select do %>
+                <select name={"scope_#{step.level}"} class="px-3 py-2 border rounded-lg text-sm">
+                  <option value="" disabled selected={step.value == ""}>
+                    select
+                  </option>
+                  <option :for={opt <- step.options} value={opt} selected={opt == step.value}>
+                    {opt}
+                  </option>
+                </select>
+              <% else %>
+                <input
+                  type="text"
+                  name={"scope_#{step.level}"}
+                  value={step.value}
+                  placeholder={step.placeholder}
+                  class="w-36 px-3 py-2 border rounded-lg text-sm font-mono"
+                  phx-debounce="300"
+                />
+              <% end %>
+            </div>
+            <div :if={@scope_at_leaf} class="flex items-end gap-1">
+              <span class="text-gray-400 text-lg leading-9">.</span>
+              <input
+                type="text"
+                name="scope_extra"
+                value={@scope_extra}
+                placeholder="narrowing (optional)"
+                class="w-44 px-3 py-2 border rounded-lg text-sm font-mono"
+                phx-debounce="300"
+              />
+            </div>
+          </div>
           <p class="text-xs text-gray-400 mt-1">
-            Dot-path resource scope. Examples: device.&lt;id&gt;.storage.write, origins.&lt;hash&gt;.reviews.write
+            <%= if @scope_preview != "" do %>
+              Kind: <span class="font-mono text-gray-600">{@scope_preview}</span>
+            <% else %>
+              Dot-path resource scope. Examples: device.&lt;id&gt;.storage.write, origins.&lt;hash&gt;.reviews.write
+            <% end %>
           </p>
         </div>
         <button
           type="submit"
-          disabled={@operation_in_progress}
-          class={"px-4 py-2 rounded-lg text-sm text-white #{if @operation_in_progress, do: "bg-gray-400 cursor-not-allowed", else: "bg-green-600 hover:bg-green-700"}"}
+          disabled={@operation_in_progress or @scope_preview == ""}
+          class={"px-4 py-2 rounded-lg text-sm text-white #{if @operation_in_progress or @scope_preview == "", do: "bg-gray-400 cursor-not-allowed", else: "bg-green-600 hover:bg-green-700"}"}
         >
           {if @operation_in_progress, do: "Creating...", else: "Create Vouch Token"}
         </button>

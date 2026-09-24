@@ -73,9 +73,9 @@ Two limits belong here rather than in a later surprise:
 
 Issuing shares to guardians, what a guardian's client does on receipt, how
 shares are superseded and revoked, what the owner can see, and how a share
-travels back during a recovery (§Returning). The two directions use the same
-transport, so the friends' half is post-quantum both ways; the node half is not
-(§Problem).
+travels back during a recovery (§Returning). Both directions use the dialog by
+default — §Returning names the one exception — so the friends' half is
+post-quantum both ways; the node half is not (§Problem).
 
 ---
 
@@ -216,7 +216,7 @@ this document owns is the guardian's side of it.
    is the step phishing attacks, and no protocol replaces it; everything below
    only makes sure the guardian's judgement is the one that counts.
 2. The owner starts a **temporary account** on a new device and gets its
-   `user_hash` to the guardian authentically (§Open questions). The guardian
+   `user_hash` to the guardian — by any channel; step 3 checks it. The guardian
    opens the dialog — a dialog can be opened with any `user_hash`
    ([pq_dialogs §Flows](pq_dialogs.done.md)) — and it is the guardian who opens
    it, because the temporary account knows nothing: not `secret_ref`, which is
@@ -230,7 +230,17 @@ this document owns is the guardian's side of it.
    row. This is the only link between an on-chain `candidate` and a chat identity
    a guardian can verify: the EVM key is independent of the account's other keys
    and published nowhere, so it cannot be derived, and recording it on-chain would
-   publish it.
+   publish it. The signature proves that the candidate's key signed *some*
+   `user_hash`; what proves that `user_hash` is the person's on the call is the
+   **word code** both screens now show — ten words the owner reads out and the
+   guardian compares with their own, which the guardian's app computes from the
+   `secret_ref` it sent, the binding's candidate and the dialog peer. A
+   `user_hash` swapped on its way to the guardian at step 2, or a candidate
+   swapped on the way back, changes the words. The code is the first 110 bits
+   of `SHA3-256("buckitup/recovery-code/v1\n" || secret_ref || "\n" || candidate || "\n" || user_hash)`
+   over the UTF-8 strings, big-endian, read as ten 11-bit indices into the
+   BIP-39 English list; 110 bits cannot be ground into a collision by minting
+   candidate keys, and the code is spoken, which is why it is words.
 4. A guardian **initiates** the round and each guardian **approves**, naming as
    `candidate` the address from the binding it verified — the contract has no
    round-level candidate; the first address to reach quorum becomes the
@@ -266,6 +276,59 @@ threshold, the voters' shares suffice.
 
 Sending on approval, before the timelock, would hand the share over while the
 owner's veto still protects the node half and nothing else.
+
+### Manual return
+
+The dialog is the default route back, not the only one. When the guardian
+cannot open the dialog, or the temporary account cannot read it, while the
+server itself is up, a guardian and an owner already talking on a call or in
+another messenger finish there, with text. This is not offline recovery: the
+round still runs on chain, and the temporary account still needs the server for
+its card and, later, for the vault. It is the one exception to the "no file
+hand-off" rule of `chat-frontend/docs/backup-recovery-overview.md` §6 (owner
+decision, 2026-09-24), and it gives up §Problem's property 2 for this leg: two
+people carry a binding, a block and two codes by hand.
+
+The same three things cross as in the dialog, as text, and the dialog's checks
+are rebuilt where it gave them for free:
+
+1. **Guardian → owner: `secret_ref`**, in the clear, in the first contact.
+2. **Owner → guardian: the binding** of §Returning step 3, in the clear, with
+   the word code read out. The guardian's app computes the words from the
+   `secret_ref` it sent and the candidate and `user_hash` in the text it was
+   handed; the `user_hash` the words confirm stands in for the dialog peer
+   ([07 § recovery_binding](../invariants/07_content_polymorphism.md#recovery_binding)).
+   With the binding verified, the app fetches the temporary account's card by
+   that `user_hash`, checks `crypt_cert` ([pq_user](pq_user.done.md)) and
+   keeps `crypt_pkey`.
+3. **Guardian → owner: the sealed block**, in a second contact, once the send
+   gate passes — after the timelock, so days after the first. The app
+   encapsulates ML-KEM-1024 to `crypt_pkey`, derives
+   `key = HKDF-SHA3-256(ss, "buckitup/recovery-return/v1", "seal|" || secret_ref, 32)`
+   ([09](../invariants/09_symmetric_keys.md)) and a six-digit code from
+   `"sas|" || secret_ref` exactly as device-link does (`chat-frontend`,
+   `src/lib/pq/deviceLink.ts`: L = 4, big-endian, mod 10⁶), and emits
+
+   `BUCKITUP-SHARE.<base64(kem_ct)>.<sealed>.<guardian user_hash>.<base64(sig)>`
+
+   where `sealed` is `vaultEnvelope.sealWithKey(key, json)` verbatim — the
+   vault row's `version || nonce || AES-256-GCM`, base64 — over the same
+   `recovery_share_return` envelope the dialog would carry, and `sig` is the
+   guardian's ML-DSA signature over the UTF-8 of the block up to the third
+   segment. The receiver strips whitespace before parsing, since messengers
+   wrap a 2.5 KB line. The guardian reads out the six digits; the owner's app
+   derives its own after decapsulating and **imports nothing until the person
+   confirms they match** — a block a relay substituted was encapsulated by
+   someone else. The signature does not replace that check: the recovering app
+   has no authenticated list of guardian `user_hash`es to test a signer against.
+   It is for afterwards, when the owner has one and the block is the record of
+   who released what.
+
+What the other channel sees: `secret_ref`, the binding and the block. The
+share is ciphertext, so property 1 holds on this route as on the dialog. The
+binding is not, and it ties two messenger accounts to `secret_ref` and a
+candidate — the link stealth addresses exist to break, and the reason to prefer
+the dialog where it is available.
 
 ---
 
@@ -350,13 +413,6 @@ copies in their `user_storage` (§Holding).
 
 ## Open questions
 
-- **Delivering the temporary account's `user_hash` authentically.** Opening the
-  dialog is not the problem; knowing it is the owner's is. The optical handshake
-  (`docs/pq/flows/pq_optical-handshake.livemd`) verifies a peer but only in
-  person. A recovery invite needs a comparison value derived from the temporary
-  account's keys and never sent over the channel being verified — the existing
-  device-sync invite (`chat-frontend/src/components/modal/views/Modal_Account_Invite.vue`)
-  is not that: its code is random, travels in-band, and then keys the payload.
 - **How giving a share back is expressed on the wire.** Refusing custody has no
   content type and no table today, and the bytes cannot actually be destroyed in
   this layer (§Dying).

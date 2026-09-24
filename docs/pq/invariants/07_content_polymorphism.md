@@ -294,7 +294,10 @@ A guardian's share sent back to the recovering owner's temporary account, after
 the guardian's own approval has been honoured on chain
 ([pq_recovery_shares § Returning](../reqs/pq_recovery_shares.proposed.md)). It
 carries the round and the recipient the guardian checked, so the release
-decision is covered by the guardian's signed row and can be audited later.
+decision is covered by the guardian's signature — the dialog row's, or the
+block's when the share returns as text
+([pq_recovery_shares § Manual return](../reqs/pq_recovery_shares.proposed.md)) —
+and can be audited later.
 
 ```json
 {"recovery_share_return": ["eip155:11155111:0xe634…/0x9f3c…", 1, "4f1c…", 3, 5, 2, 2, "0x7a1b…", "<share_b64>", 1715600000]}
@@ -313,7 +316,7 @@ decision is covered by the guardian's signed row and can be audited later.
 | 4 | total | Shares in the split |
 | 5 | share_index | As in `"recovery_share"` |
 | 6 | round | The contract's `recoveryRound` this release answers |
-| 7 | candidate | The recipient address the guardian approved and verified against the dialog peer |
+| 7 | candidate | The recipient address the guardian approved, from the binding it verified |
 | 8 | share_b64 | The Shamir share itself, unpadded base64 |
 | 9 | creation_unixtime | Unix seconds at release |
 
@@ -322,13 +325,14 @@ decision is covered by the guardian's signed row and can be audited later.
 ### `"recovery_binding"`
 
 Sent by a recovering owner's temporary account, in the dialog a guardian opened
-with it, to prove that the chat identity the guardian is talking to controls the
-address it will approve on chain
-([pq_recovery_shares § Returning](../reqs/pq_recovery_shares.proposed.md)). The
-signature is EIP-191 by the candidate's key over the UTF-8 string
+with it — or as text, when the share will return that way — to prove that the
+chat identity the guardian is talking to controls the address it will approve
+on chain ([pq_recovery_shares § Returning](../reqs/pq_recovery_shares.proposed.md)).
+The signature is EIP-191 by the candidate's key over the UTF-8 string
 `"buckitup/recovery-binding/v1\n" || secret_ref || "\n" || user_hash`; the
-`user_hash` signed is the sender's own, and the guardian checks it against the
-dialog peer.
+`user_hash` signed is the sender's own. The guardian checks it against the
+dialog peer, and against the word code the owner reads out, which is what says
+the peer is the person on the call.
 
 ```json
 {"recovery_binding": ["eip155:11155111:0xe634…/0x9f3c…", "0x7a1b…", "u_ab12…", "<signature_b64>"]}
@@ -342,7 +346,7 @@ dialog peer.
 |---|---|---|
 | 0 | secret_ref | The secret this recovery is for; supplied by the guardian's first message |
 | 1 | candidate | The address the temporary account will be elected under |
-| 2 | user_hash | The sender's own `user_hash`; must equal the dialog peer's |
+| 2 | user_hash | The sender's own `user_hash`; must equal the dialog peer's, and is covered by the word code the owner reads out |
 | 3 | signature_b64 | EIP-191 signature by `candidate`'s key over the string above, unpadded base64 |
 
 --- 

@@ -7,6 +7,7 @@ defmodule Chat.Data.Shapes.File do
   alias Chat.Data.File, as: FileData
   alias Chat.Data.File.Validation
   alias Chat.Data.Schemas.File
+  alias Chat.Pq.WriteGate
   alias Chat.TimeKeeper
   alias Phoenix.Sync.Writer
 
@@ -125,7 +126,10 @@ defmodule Chat.Data.Shapes.File do
   def ingest_configure_writer(writer, user_pop_context) do
     Writer.allow(writer, File,
       accept: [:insert, :update],
-      check: &Validation.file_allowed(&1, user_pop_context),
+      check:
+        WriteGate.and_gate(&Validation.file_allowed(&1, user_pop_context), :file,
+          owner: "uploader_hash"
+        ),
       validate: &Validation.file_validate/3,
       insert: [pre_apply: &Validation.file_pre_apply_insert/3],
       update: [pre_apply: &Validation.file_pre_apply_update/3]

@@ -4,6 +4,7 @@ defmodule Chat.Data.Shapes.VouchToken do
   alias Chat.Data.Schemas.VouchToken
   alias Chat.Data.VouchToken, as: VouchTokenData
   alias Chat.Data.VouchToken.Validation
+  alias Chat.Pq.WriteGate
   alias Phoenix.Sync.Writer
 
   use Chat.Data.Shapes.Shape,
@@ -32,7 +33,10 @@ defmodule Chat.Data.Shapes.VouchToken do
   def ingest_configure_writer(writer, user_pop_context) do
     Writer.allow(writer, VouchToken,
       accept: [:insert, :update],
-      check: &Validation.vouch_token_allowed(&1, user_pop_context),
+      check:
+        WriteGate.and_gate(&Validation.vouch_token_allowed(&1, user_pop_context), :vouch_token,
+          owner: "issuer_hash"
+        ),
       validate: &Validation.vouch_token_validate/3
     )
   end

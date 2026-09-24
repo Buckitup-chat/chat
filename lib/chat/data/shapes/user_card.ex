@@ -8,6 +8,7 @@ defmodule Chat.Data.Shapes.UserCard do
   alias Chat.Data.User
   alias Chat.Data.User.Validation
   alias Chat.Pq.OwnerBootstrap
+  alias Chat.Pq.WriteGate
   alias Phoenix.Sync.Writer
 
   @impl true
@@ -45,7 +46,7 @@ defmodule Chat.Data.Shapes.UserCard do
   def ingest_configure_writer(writer, user_pop_context) do
     Writer.allow(writer, UserCard,
       accept: [:insert, :update],
-      check: &Validation.user_card_allowed(&1, user_pop_context),
+      check: WriteGate.and_gate(&Validation.user_card_allowed(&1, user_pop_context), :user_card),
       validate: &Validation.user_card_validate/3
     )
   end

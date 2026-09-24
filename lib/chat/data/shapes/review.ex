@@ -9,6 +9,7 @@ defmodule Chat.Data.Shapes.Review do
   alias Chat.Data.Schemas.Review
   alias Chat.Data.Schemas.ReviewVersion
   alias Chat.Data.Types.ReviewSignHash
+  alias Chat.Pq.WriteGate
   alias EnigmaPq
   alias Phoenix.Sync.Writer
 
@@ -87,7 +88,10 @@ defmodule Chat.Data.Shapes.Review do
   def ingest_configure_writer(writer, user_pop_context) do
     Writer.allow(writer, Review,
       accept: [:insert, :update],
-      check: &Validation.review_allowed(&1, user_pop_context),
+      check:
+        WriteGate.and_gate(&Validation.review_allowed(&1, user_pop_context), :review,
+          owner: "author_hash"
+        ),
       validate: &Validation.review_validate_with_versioning/3,
       insert: [
         pre_apply: &Validation.review_pre_apply_versioning/3

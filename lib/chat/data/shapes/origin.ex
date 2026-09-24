@@ -5,6 +5,7 @@ defmodule Chat.Data.Shapes.Origin do
   alias Chat.Data.Origin.Validation
   alias Chat.Data.Schemas.Origin
   alias Chat.Data.Types.OriginSignHash
+  alias Chat.Pq.WriteGate
   alias EnigmaPq
   alias Phoenix.Sync.Writer
 
@@ -46,7 +47,10 @@ defmodule Chat.Data.Shapes.Origin do
   def ingest_configure_writer(writer, user_pop_context) do
     Writer.allow(writer, Origin,
       accept: [:insert, :update],
-      check: &Validation.origin_allowed(&1, user_pop_context),
+      check:
+        WriteGate.and_gate(&Validation.origin_allowed(&1, user_pop_context), :origin,
+          owner: "origin_hash"
+        ),
       validate: &Validation.origin_validate/3
     )
   end

@@ -6,6 +6,7 @@ defmodule Chat.Data.Shapes.ReviewPasswordCandidate do
   alias Chat.Data.ReviewPasswordCandidate, as: CandidateData
   alias Chat.Data.ReviewPasswordCandidate.Validation
   alias Chat.Data.Schemas.ReviewPasswordCandidate
+  alias Chat.Pq.WriteGate
   alias Phoenix.Sync.Writer
 
   @impl true
@@ -30,7 +31,10 @@ defmodule Chat.Data.Shapes.ReviewPasswordCandidate do
   def ingest_configure_writer(writer, user_pop_context) do
     Writer.allow(writer, ReviewPasswordCandidate,
       accept: [:insert],
-      check: &Validation.candidate_allowed(&1, user_pop_context),
+      check:
+        WriteGate.and_gate(
+          &Validation.candidate_allowed(&1, user_pop_context),
+          :review_password_candidate, owner: "author_hash"),
       validate: &Validation.candidate_validate/3,
       insert: [
         post_apply: &Validation.candidate_post_apply_promote/3

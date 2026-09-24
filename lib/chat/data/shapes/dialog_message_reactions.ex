@@ -7,6 +7,7 @@ defmodule Chat.Data.Shapes.DialogMessageReactions do
   alias Chat.Data.Dialog
   alias Chat.Data.Dialog.Validation
   alias Chat.Data.Schemas.DialogMessageReaction
+  alias Chat.Pq.WriteGate
   alias Phoenix.Sync.Writer
 
   @impl true
@@ -74,7 +75,10 @@ defmodule Chat.Data.Shapes.DialogMessageReactions do
   def ingest_configure_writer(writer, user_pop_context) do
     Writer.allow(writer, DialogMessageReaction,
       accept: [:insert, :update],
-      check: &Validation.reaction_allowed(&1, user_pop_context),
+      check:
+        WriteGate.and_gate(
+          &Validation.reaction_allowed(&1, user_pop_context),
+          :dialog_message_reactions, owner: "reactor_hash"),
       validate: &Validation.reaction_validate/3
     )
   end

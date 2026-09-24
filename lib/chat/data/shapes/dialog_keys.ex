@@ -7,6 +7,7 @@ defmodule Chat.Data.Shapes.DialogKeys do
   alias Chat.Data.Dialog
   alias Chat.Data.Dialog.Validation
   alias Chat.Data.Schemas.DialogKey
+  alias Chat.Pq.WriteGate
   alias Phoenix.Sync.Writer
 
   @impl true
@@ -71,7 +72,10 @@ defmodule Chat.Data.Shapes.DialogKeys do
   def ingest_configure_writer(writer, user_pop_context) do
     Writer.allow(writer, DialogKey,
       accept: [:insert, :update],
-      check: &Validation.dialog_key_allowed(&1, user_pop_context),
+      check:
+        WriteGate.and_gate(&Validation.dialog_key_allowed(&1, user_pop_context), :dialog_keys,
+          owner: "sender_hash"
+        ),
       validate: &Validation.dialog_key_validate/3
     )
   end

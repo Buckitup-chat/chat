@@ -5,6 +5,7 @@ defmodule Chat.Data.Shapes.ReviewList do
   alias Chat.Data.ReviewList.Validation
   alias Chat.Data.Schemas.ReviewList
   alias Chat.Data.Types.ReviewListSignHash
+  alias Chat.Pq.WriteGate
   alias EnigmaPq
   alias Phoenix.Sync.Writer
 
@@ -46,7 +47,8 @@ defmodule Chat.Data.Shapes.ReviewList do
   def ingest_configure_writer(writer, user_pop_context) do
     Writer.allow(writer, ReviewList,
       accept: [:insert, :update],
-      check: &Validation.review_list_allowed(&1, user_pop_context),
+      check:
+        WriteGate.and_gate(&Validation.review_list_allowed(&1, user_pop_context), :review_list),
       validate: &Validation.review_list_validate/3
     )
   end

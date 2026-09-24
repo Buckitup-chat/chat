@@ -271,6 +271,8 @@ booth or queue items, and `:force_release` is denied to everyone. Playing
 sound in someone's room is a physical act, so the default is restrictive by
 design.
 
+The work that answers this section is `pq_broadcast_rights.proposed.md`.
+
 Naming note: `Chat.Admin.MediaSettings` already means **removable drives**
 (backup / cargo / onliners). Playback must not reuse "media" in admin naming;
 this feature namespaces as `Chat.Playback.*`.
@@ -374,7 +376,8 @@ means an error.
 2. **Is unattended mode allowed at all?** It hands a node the keys for a whole
    playlist. Convenient for a party, and a larger dent in §1. Product call.
 3. **Force-release policy** — who is an operator, and is a takeover visible to
-   the person being cut off? Answered by the rights work.
+   the person being cut off? Answered by the rights work
+   (`pq_broadcast_rights.proposed.md`).
 4. **Slideshow with background audio** — deferred; revisit on demand.
 5. **Queue etiquette** — should a DJ have a maximum hold time when others are
    waiting, or is social pressure enough?

@@ -39,6 +39,7 @@ Because the type lives inside the ciphertext, the database (and any peer without
 - [`"checkpoint"`](#checkpoint) — signed commitment to the dialog's causal history and materialized view
 - [`"review_list_key"`](#review_list_key) — the sender's `review_list_password`, shared with a contact
 - [`"quote"`](#quote) — a snapshot of a cited message, carried inside the reply
+- [`"recovery_share"`](#recovery_share) — one guardian's Shamir share of a community backup
 
 ### `"inline_file"`
 
@@ -234,6 +235,48 @@ of the nesting they *render* inline; the wire format itself is unbounded.
 
 A quote is context, not authorship: text inside the snapshot belongs to
 `author_hash`, not to the sender of the citing message.
+
+--- 
+
+### `"recovery_share"`
+
+One guardian's Shamir share of the friends' half of an owner's community backup.
+The owner issues it to a confirmed contact through the dialog they already have;
+the guardian's client stores it and holds it until a recovery round asks for it.
+Post-quantum in transit for free, for the reasons in
+[pq_recovery_shares](../reqs/pq_recovery_shares.proposed.md), which also owns the
+lifecycle this envelope only names.
+
+```json
+{"recovery_share": ["eip155:11155111:0xe634…/0x9f3c…", 1, 3, 5, "<share_b64>", 1715000000]}
+```
+
+```json
+{"recovery_share": [secret_ref, version, threshold, total, share_b64, creation_unixtime]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | secret_ref | Which coordination round this share answers to: `<namespace>/<id>`, e.g. `eip155:<chainId>:<contract>/<keccak256(abi.encode(owner, label))>` |
+| 1 | version | Share epoch, the contract's own; supersession rules in [pq_recovery_shares § Dying](../reqs/pq_recovery_shares.proposed.md) |
+| 2 | threshold | Shamir shares needed to rebuild the friends' half. Not the contract's approval quorum, which counts guardians |
+| 3 | total | Shares generated at this version, issued and spare alike |
+| 4 | share_b64 | The Shamir share itself, unpadded base64 |
+| 5 | creation_unixtime | Unix seconds at issue |
+
+`secret_ref` names the deployment as well as the chain, because the id does not:
+`keccak256(abi.encode(owner, label))` is the same value on every contract, so two
+deployments on one chain produce identical ids for the same owner and label.
+Carrying the namespace *inside* the value is also what keeps a frozen position
+from assuming an EVM chain forever.
+
+The vault's address is **not** here, deliberately. It is derived from `S`
+(`chat-frontend/src/lib/pq/vaultEnvelope.ts`), and that derivation exists so the
+server cannot tell a vault row from any other `user_storage` row: reads there are
+public and unauthenticated, so an address handed to every guardian turns an
+unfindable row into a findable one. A recovering client does not need it either —
+by the time it can decrypt the row it holds `threshold` shares, and `S` yields
+the address directly.
 
 --- 
 

@@ -74,6 +74,7 @@ Hard requirements and specs. See [`pq/reqs/CLAUDE.md`](./pq/reqs/CLAUDE.md) for 
 - [PQ vouch tokens](./pq/reqs/pq_vouch_tokens.in_progress.md)
 - [PQ ingest conflict ownership](./pq/reqs/pq_ingest_conflict_ownership.done.md)
 - [PQ integrity checker](./pq/reqs/pq_integrity_checker.proposed.md)
+- [PQ recovery shares](./pq/reqs/pq_recovery_shares.proposed.md)
 
 #### Files
 - [PQ files](./pq/reqs/files/pq_files.done.md)

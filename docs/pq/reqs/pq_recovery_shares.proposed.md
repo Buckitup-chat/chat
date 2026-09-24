@@ -246,9 +246,9 @@ this document owns is the guardian's side of it.
    round-level candidate; the first address to reach quorum becomes the
    recipient. Each guardian picks the holding from their own list, which is why a
    holding has to be findable in the guardian's account (§Holding).
-5. After the timelock, each guardian's client sends its share back as a
-   `recovery_share_return` in the dialog with the temporary account, subject to
-   the gate below. The nodes release the node half to the same recipient.
+5. Once the send gate below opens, each guardian's client sends its share back
+   as a `recovery_share_return` in the dialog with the temporary account. The
+   nodes release the node half to the same recipient.
 6. The temporary client rebuilds the friends' half, combines it with the node
    half into `S`, finds and opens the vault, and the owner is back in their
    **original** account: its keys are in the vault. The temporary account was
@@ -256,23 +256,35 @@ this document owns is the guardian's side of it.
 7. The owner, from the original account, **reshares** — a new `S`, a new split,
    a new version — and the temporary account is **destroyed**, keys and vault. Its
    `crypt_skey` unwraps every returned share, its EVM key keeps `canDecrypt` true
-   until the round is cancelled, and the node half was released to it. A
-   recovery that ends without this step has moved the secret onto a device
-   nobody was told to wipe (overview §4, steps 5–6).
+   until the round is cancelled or its window closes, and the node half was
+   released to it. A recovery that ends without this step has moved the secret
+   onto a device nobody was told to wipe (overview §4, steps 5–6).
 
 **The send gate is this guardian's own vote, not the round's outcome.** The
-client releases a share only when, on chain: `recoveryActive` holds; a recipient
-is elected (`recoveryRecipient != 0`); that recipient is the candidate from the
-binding *this guardian verified* and the one it approved (`hasApproved` — which
-is also true of two zero addresses, so the elected check is not optional); the
-recipient is not the owner; `executeAfter` has passed; and the held share's
-`version` equals the contract's current one, since a guardian still waiting for
-its replacement after a reshare (§Dying) is in the new set but holds the old
-split. Gating on `canDecrypt` alone would let the quorum's judgement release a
-share its holder never voted for — and `canDecrypt` is true for the owner with
-no round at all, which would skip the timelock and the veto. A guardian who did
-not vote before quorum cannot vote after it and does not send; with quorum ≥
-threshold, the voters' shares suffice.
+client releases a share only when, on chain: `roundState(id)` is `Window`
+(`backitup-smart-contracts` SI-4) — quorum reached, the timelock passed, the
+window not yet closed; the elected `recoveryRecipient` is the candidate this
+guardian approved, from the binding it verified, and not the owner; and the
+held share's `version` equals the contract's current one, since a guardian
+still waiting for its replacement after a reshare (§Dying) is in the new set
+but holds the old split. Gating on `canDecrypt` alone would let the quorum's
+judgement release a share its holder never voted for — and `canDecrypt` is
+true for the owner with no round at all, which would skip the timelock and the
+veto. A guardian who did not vote before quorum cannot vote after it and does
+not send; with quorum ≥ threshold, the voters' shares suffice. After the window
+closes, recovery restarts from step 3 with a fresh candidate
+(`backitup-smart-contracts` SI-2).
+
+From the `executeAfter` the client learns from `RecoveryQuorumReached` (or
+its first start after it), it reads `roundState` — about once a block, backing
+off to a minute — while it says `TimeLock`: block time trails the wall clock,
+so a single read at `executeAfter` would miss the window. On `Window` it
+reads `getSecret` and `hasApproved(id, candidate, self)` and applies the gate
+once, with `recoveryRound` still the event's round — otherwise the window
+belongs to a later round, which has its own event. On any other state — `None` after a veto, `Voting` of a round opened
+since, `Expired` — or once the event's `expiresAt` passes, it stops and sends
+nothing; `RecoveryExpired` is only emitted when something next touches the
+round, so the client does not wait for it.
 
 Sending on approval, before the timelock, would hand the share over while the
 owner's veto still protects the node half and nothing else.
@@ -302,7 +314,7 @@ are rebuilt where it gave them for free:
    that `user_hash`, checks `crypt_cert` ([pq_user](pq_user.done.md)) and
    keeps `crypt_pkey`.
 3. **Guardian → owner: the sealed block**, in a second contact, once the send
-   gate passes — after the timelock, so days after the first. The app
+   gate passes — inside the window, so days after the first. The app
    encapsulates ML-KEM-1024 to `crypt_pkey`, derives
    `key = HKDF-SHA3-256(ss, "buckitup/recovery-return/v1", "seal|" || secret_ref, 32)`
    ([09](../invariants/09_symmetric_keys.md)) and a six-digit code from

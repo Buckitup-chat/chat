@@ -4,8 +4,8 @@
 
 Community backup splits the **friends' half** of a 32-byte wrap key `S` among
 people the owner already trusts, and this is how one of those shares reaches a
-guardian: as a message, in the dialog they already have. The content type is
-registered in
+guardian: as a message, in the dialog they already have — and how it comes back
+when the owner needs it. The content types are registered in
 [07_content_polymorphism](../invariants/07_content_polymorphism.md#recovery_share).
 
 The scheme it serves is described in the recovery client's own documents
@@ -51,38 +51,31 @@ Two limits belong here rather than in a later surprise:
 
 - **Dialogs buy the post-quantum property, not forward secrecy.** Per
   [pq_dialogs §Accepted trade-off](pq_dialogs.done.md), `sender_msg_key` is
-  derived deterministically from the *sender's* long-term keys and never
-  rotates. The sender here is the owner, so a leak of the owner's `crypt_skey`
-  at any future date decrypts every share they ever issued, to anyone who kept
-  the replicated dialog rows — every guardian at once, not one device. That is
-  the recording attack of property 1, arriving through the transport chosen to
-  answer it, and a later `reshare` does not help: the old ciphertext is already
-  recorded. What a reshare does answer is a *guardian* device compromise, and
-  there it is a rule rather than hygiene.
+  derived deterministically from the sender's long-term keys, never rotates, and
+  is wrapped to the recipient's `crypt_pkey` in `dialog_keys`. So a direction
+  opens to a later leak of *either* end: the sender's long-term keys re-derive
+  it, the recipient's `crypt_skey` unwraps it. At issue that is the owner and
+  each guardian; at return (§Returning) it is each guardian and the temporary
+  account — whose `crypt_skey` alone opens every returned share, which is why
+  that account is destroyed when the recovery ends. None of this is repaired by a
+  later `reshare`; the old ciphertext is already recorded. What a reshare does
+  answer is a guardian *device* compromise, and there it is a rule rather than
+  hygiene.
 - **The node plane keeps its own transport.** Node shares are deposited over
-  HTTP and released against `canDecrypt`; they never travel this way.
+  HTTP and released against `canDecrypt`; they never travel this way. What
+  bounds their secp256k1 exposure is the one-time pad: the node half alone says
+  nothing about `S`, and the friends' half it would have to be combined with
+  never leaves ML-KEM.
 
 ---
 
 ## Scope
 
-**In scope:** issuing shares to guardians, what a guardian's client does on
-receipt, how shares are superseded and revoked, and what the owner can see.
-
-**Out of scope:** *returning* a share during a recovery. Issue happens between
-two accounts that both exist — the owner has their keys, the guardian is a
-confirmed contact, the dialog is already there. Return happens after the owner
-has lost their signing key, their `user_hash` and their contact list, so the
-recovering client is a new identity no guardian has ever met and there is no
-dialog to send anything back through; a fresh optical handshake with every
-guardian is exactly the in-person ceremony remote recovery exists to avoid.
-
-The return path needs its own requirement (`pq_recovery_return.proposed.md`,
-unwritten). Its shape is already visible — the on-chain round names a
-`candidate` and the contract answers `canDecrypt`, which is precisely a way to
-authorise delivery to someone you have never met — and it must answer one thing
-this document cannot duck: that path is secp256k1-keyed, so property 1 does not
-survive it, and the requirement has to say what bounds the exposure.
+Issuing shares to guardians, what a guardian's client does on receipt, how
+shares are superseded and revoked, what the owner can see, and how a share
+travels back during a recovery (§Returning). The two directions use the same
+transport, so the friends' half is post-quantum both ways; the node half is not
+(§Problem).
 
 ---
 
@@ -95,12 +88,19 @@ The owner's client, at backup time:
    (`chat-frontend/src/lib/pq/vaultEnvelope.ts`).
 2. Shamir-splits the friends' half into `total` shares with threshold
    `threshold`, where `total` exceeds the number of guardians being used today.
-   The surplus are **spares** and stay in the owner's account.
+   The surplus are **spares** and stay in the owner's account. The whole split
+   and its `split_id` are persisted in the vault **before** the next step: a
+   client that registers and then loses the split can only comply with
+   §Re-issuing by an immediate `reshare`.
 3. Registers the secret on-chain, for the guardians being used today. This fixes
    `secret_id` and `version`, and also the guardian stealth-address set and the
    contract's approval quorum — a different quantity from the message's
    `threshold`, since the contract counts guardian approvals and the message
-   counts Shamir shares.
+   counts Shamir shares. **The quorum must not be below the threshold**, and the
+   reason is liveness: once quorum is reached, further approvals revert
+   (`QuorumAlreadyReached`), and a guardian who did not approve does not release
+   (§Returning). With quorum two and threshold three, only two shares can ever be
+   released and an honest recovery cannot complete.
 4. Sends one `recovery_share` message per guardian being used today, in the
    dialog that already exists with that contact.
 
@@ -122,11 +122,12 @@ stealth key that signs their approval.
 
 What this requirement needs from the contract is a share slot that separates
 **membership** from **delivery**: a guardian entry that records the stealth
-address and the delivery channel without pretending to carry bytes. That is a v2
-change, and it belongs with the rest of them
-(`chat-frontend/docs/backup-recovery-plan.md`, Phase 6). Until it exists, this
-transport and the on-chain one cannot both be correct at once, and the
-requirement is blocked on that rather than on anything in this repo.
+address and the delivery channel without pretending to carry bytes, plus a
+per-version commitment to the split (§Re-issuing). That is a v2 change, and it
+belongs with the rest of them (`chat-frontend/docs/backup-recovery-plan.md`,
+Phase 6). Until it exists, this transport and the on-chain one cannot both be
+correct at once, and the requirement is blocked on that rather than on anything
+in this repo.
 
 ### Spares, and what they cannot buy
 
@@ -169,10 +170,19 @@ The guardian's client, on receiving a `recovery_share`:
   and says so to the owner. Silently dropping it is the worse failure: the share
   is valid, and an owner whose roster shows a holder who holds nothing is counted
   above the threshold while being below it.
-- Refuses a second share at the same `(secret_ref, version)` that disagrees with
-  the one it holds, rather than keeping both. Shares from two different splits
-  combine without error into a wrong `S`, so a re-issue must hand out the same
-  split — see §Open questions for the case that forces one.
+- Copies the share into the guardian's own `user_storage`, as an ordinary slot
+  reachable through the root map (scheme:
+  `chat-frontend/docs/task-user-storage-slot-ids.md`). The message is not a
+  place to keep it: whoever holds the owner's keys can revoke its readability by
+  blocking the guardian — `deleted_flag` on the owner's `dialog_keys` row, or a
+  garbage KEM ciphertext in it ([pq_dialogs §1](pq_dialogs.done.md)) — and during
+  a recovery the owner's keys are exactly what may be in the wrong hands. The copy is also what makes a
+  guardian's holdings one lookup, which §Returning needs.
+- May hold several shares of one split — a spare handed to an existing guardian
+  is a second index, not a conflict. What it refuses is the same
+  `(secret_ref, version, split_id, share_index)` with different bytes, and it
+  treats a *different* `split_id` at the same `version` as a fault to report
+  rather than a share to keep (§Re-issuing).
 - Reads `secret_ref` on-chain to confirm the secret exists and to learn its
   current `version` and revocation state. The holding is displayed against the
   dialog peer's `user_cards.name`: the chain answers with the owner's address,
@@ -189,10 +199,97 @@ The guardian's client, on receiving a `recovery_share`:
   says *stored*.
 
 A guardian is told plainly what they are holding and for whom, can see it in one
-place, and can refuse: **a share may be given back**. That return is advisory —
+place, and can refuse: **a share may be given back**. Giving back is advisory —
 it removes nothing from the contract, and only a `reshare` removes a guardian —
 so it has to be visible to the owner as a prompt to reshare rather than as a
 change that already happened.
+
+---
+
+## Returning
+
+The journey through the owner's eyes is `backup-recovery-overview.md` §4. What
+this document owns is the guardian's side of it.
+
+1. The owner, locked out, reaches a guardian outside the app — a call, a
+   meeting — and the guardian satisfies themselves that it is really them. This
+   is the step phishing attacks, and no protocol replaces it; everything below
+   only makes sure the guardian's judgement is the one that counts.
+2. The owner starts a **temporary account** on a new device and gets its
+   `user_hash` to the guardian authentically (§Open questions). The guardian
+   opens the dialog — a dialog can be opened with any `user_hash`
+   ([pq_dialogs §Flows](pq_dialogs.done.md)) — and it is the guardian who opens
+   it, because the temporary account knows nothing: not `secret_ref`, which is
+   keyed by the owner's EVM address in the lost vault, and not any guardian's
+   `user_hash`, which was in the lost contact list. The guardian's first message
+   carries `secret_ref`.
+3. The temporary account answers with a
+   [`"recovery_binding"`](../invariants/07_content_polymorphism.md#recovery_binding):
+   `secret_ref`, its candidate address, and a signature by that address's key
+   over `(secret_ref, its own user_hash)`, all inside the ML-DSA-signed dialog
+   row. This is the only link between an on-chain `candidate` and a chat identity
+   a guardian can verify: the EVM key is independent of the account's other keys
+   and published nowhere, so it cannot be derived, and recording it on-chain would
+   publish it.
+4. A guardian **initiates** the round and each guardian **approves**, naming as
+   `candidate` the address from the binding it verified — the contract has no
+   round-level candidate; the first address to reach quorum becomes the
+   recipient. Each guardian picks the holding from their own list, which is why a
+   holding has to be findable in the guardian's account (§Holding).
+5. After the timelock, each guardian's client sends its share back as a
+   `recovery_share_return` in the dialog with the temporary account, subject to
+   the gate below. The nodes release the node half to the same recipient.
+6. The temporary client rebuilds the friends' half, combines it with the node
+   half into `S`, finds and opens the vault, and the owner is back in their
+   **original** account: its keys are in the vault. The temporary account was
+   only ever the return address.
+7. The owner, from the original account, **reshares** — a new `S`, a new split,
+   a new version — and the temporary account is **destroyed**, keys and vault. Its
+   `crypt_skey` unwraps every returned share, its EVM key keeps `canDecrypt` true
+   until the round is cancelled, and the node half was released to it. A
+   recovery that ends without this step has moved the secret onto a device
+   nobody was told to wipe (overview §4, steps 5–6).
+
+**The send gate is this guardian's own vote, not the round's outcome.** The
+client releases a share only when, on chain: `recoveryActive` holds; a recipient
+is elected (`recoveryRecipient != 0`); that recipient is the candidate from the
+binding *this guardian verified* and the one it approved (`hasApproved` — which
+is also true of two zero addresses, so the elected check is not optional); the
+recipient is not the owner; `executeAfter` has passed; and the held share's
+`version` equals the contract's current one, since a guardian still waiting for
+its replacement after a reshare (§Dying) is in the new set but holds the old
+split. Gating on `canDecrypt` alone would let the quorum's judgement release a
+share its holder never voted for — and `canDecrypt` is true for the owner with
+no round at all, which would skip the timelock and the veto. A guardian who did
+not vote before quorum cannot vote after it and does not send; with quorum ≥
+threshold, the voters' shares suffice.
+
+Sending on approval, before the timelock, would hand the share over while the
+owner's veto still protects the node half and nothing else.
+
+---
+
+## Re-issuing
+
+A re-issue resends the same bytes; that is harmless. A **new split** under the
+same `version` is not: `version` moves only on a `reshare`, and two splits under
+one number combine without error into a wrong `S`. So a new split happens only
+through `reshare`, and every share names its split: `split_id` is opaque, equal
+across one split's shares and different between splits, compared for equality
+only. Random per split is enough for that.
+
+What `split_id` does not do is authenticate a share. A malicious guardian copies
+the id from their own envelope and returns junk; the recovering client cannot
+tell which share was bad, only that the vault did not open. Checking a share
+needs a commitment to the split, bound on-chain per `(id, version)` in the v2
+slot (§Issuing), and each share has to travel with what checks it against that
+commitment — reserved as `split_proof`, appended to both envelopes. Before any
+VSS a Merkle root over all `total` shares is the commitment and a share's proof
+path is what travels; a root alone verifies nothing. If VSS comes, the commitment has
+to be **hiding** — Feldman's `C_0 = g^{secret}` yields the friends' half to a
+discrete-log adversary, which is the property this whole transport exists to
+deny, and the reason `backitup-smart-contracts` SI-1 chose Feldman (shares were
+ECIES-sealed) no longer holds here.
 
 ---
 
@@ -217,16 +314,18 @@ a superseded share once it has received its replacement at the new version, or
 once the owner's roster confirms it is no longer in the circle. A dropped
 guardian, who will never receive a replacement, is the case the roster covers.
 
-"Drops the share" is what a cooperating client does, and it is not a guarantee
-the transport can make. The bytes were delivered as a dialog message, so the
-revision carrying them stays in `dialog_messages_versions` on every device of
-that guardian, and a client that simply does not run the drop keeps the share.
-What revocation guarantees is on-chain: `canDecrypt` is false forever, so the
-share opens nothing even if it is kept. Re-splitting under a new `S` is what
-actually makes old bytes worthless, and `revokeSecret` does not re-split.
+There is no expiry. A share nobody revoked is still good, because the owner's
+ability to lose their keys does not expire either; a client must not age a
+holding out.
 
-There is no expiry: a share nobody revoked is still good, because the owner's
-ability to lose their keys does not expire either.
+"Drops the share" is what a cooperating client does — the message revision and
+the `user_storage` copy both — and it is not a guarantee the transport can make.
+The revision carrying the bytes stays in `dialog_messages_versions` on every
+device of that guardian, the copy's old value stays in `user_storage_versions`
+after its tombstone, and a client that simply does not run the drop keeps the
+share. What revocation guarantees is on-chain: `canDecrypt` is false forever, so
+the share opens nothing even if it is kept. Re-splitting under a new `S` is what
+actually makes old bytes worthless, and `revokeSecret` does not re-split.
 
 ---
 
@@ -244,17 +343,23 @@ has — as an ordinary slot reachable through the root map, **not** at a constan
 uuid. A slot address that is the same for every account publishes that the record
 exists, how large it is and when it last changed, which for this record is "this
 account has a community backup, with this many guardians" — the very link
-§Open questions is worried about. The guardian's own view is a projection over
-the `recovery_share` messages they received.
+§Open questions is worried about. The guardian's own view is read from the
+copies in their `user_storage` (§Holding).
 
 ---
 
 ## Open questions
 
-- **How a return is expressed on the wire.** Giving a share back has no content
-  type and no table today, and the bytes cannot actually be destroyed in this
-  layer: a deletion is a new tip, while the revision carrying the share stays in
-  `dialog_messages_versions` on every device of that guardian.
+- **Delivering the temporary account's `user_hash` authentically.** Opening the
+  dialog is not the problem; knowing it is the owner's is. The optical handshake
+  (`docs/pq/flows/pq_optical-handshake.livemd`) verifies a peer but only in
+  person. A recovery invite needs a comparison value derived from the temporary
+  account's keys and never sent over the channel being verified — the existing
+  device-sync invite (`chat-frontend/src/components/modal/views/Modal_Account_Invite.vue`)
+  is not that: its code is random, travels in-band, and then keys the payload.
+- **How giving a share back is expressed on the wire.** Refusing custody has no
+  content type and no table today, and the bytes cannot actually be destroyed in
+  this layer (§Dying).
 - **What "confirmed" means.** `delivered` and `read` are what the dialog offers;
   "I stored it" is neither, and the owner's threshold count is only honest if it
   counts the third thing.
@@ -266,14 +371,11 @@ the `recovery_share` messages they received.
   hand out the address.
 - **What binds a share to its owner.** A guardian cannot verify that the sender
   of a `recovery_share` is the secret's on-chain owner: the contract answers with
-  an address, and no published record maps an address to a chat identity. Until
-  something does, a guardian's holding is only as trustworthy as the dialog it
-  arrived in.
-- **What forces a re-issue.** If receipt confirmation stays unresolved, an owner
-  whose confirmation never arrives will re-issue — and `version` only moves on a
-  reshare, so the re-issue carries the same one. Either re-issue must be defined
-  as handing out the *same* split, or confirmation has to be reliable enough that
-  nobody re-issues blind.
+  an address, and no published record maps an address to a chat identity. The
+  same signed binding §Returning uses for the candidate would work here — the
+  owner's EVM key signing over `(secret_ref, owner's user_hash)` — and would
+  settle *did its owner send it*; *is this a real share of that secret* is the
+  commitment question in §Re-issuing.
 - **A guardian who starts their own recovery** makes the share they hold
   questionable. The owner should be told, and `chat-frontend`'s plan schedules
   it (Phase 7). What is open here is detection: an on-chain round is public, but

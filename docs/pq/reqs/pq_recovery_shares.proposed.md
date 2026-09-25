@@ -89,10 +89,11 @@ The owner's client, at backup time:
 2. Shamir-splits the friends' half into `total` shares with threshold
    `threshold`, where `total` exceeds the number of guardians being used today.
    The surplus are **spares** and stay in the owner's account. The whole split
-   and its `split_id` are persisted in the vault **before** the next step: a
-   client that registers and then loses the split can only comply with
-   §Re-issuing by an immediate `reshare`.
-3. Registers the secret on-chain, for the guardians being used today. This fixes
+   — its shares and `split_id`, from which `split_root` follows (§Re-issuing) —
+   is persisted in the vault **before** the next step: a client that registers and then loses
+   the split can only comply with §Re-issuing by an immediate `reshare`.
+3. Registers the secret on-chain, for the guardians being used today, with the
+   delivery record below in its guardians' share slots. This fixes
    `secret_id` and `version`, and also the guardian stealth-address set and the
    contract's approval quorum — a different quantity from the message's
    `threshold`, since the contract counts guardian approvals and the message
@@ -111,23 +112,34 @@ check. An unconfirmed contact is a person the owner has not finished
 identifying, and a backup is the worst place to discover that.
 
 **What the on-chain share slot carries.** `addSecret` will not accept an empty
-guardian set, and it stores `shareEncrypted` verbatim. If that field keeps the
-ECIES copy, the share is public and property 1 buys nothing.
+guardian set, and it stores `shareEncrypted` verbatim. If that field kept the
+ECIES copy, the share would be public and property 1 would buy nothing; left
+empty, it would anchor nothing. The contract stores the field as opaque bytes
+under the owner's signature — the transaction's, or EIP-712 through
+`_hashShares` when a relayer submits it — so for shares that travel in the
+dialog it carries a **delivery record** instead of a ciphertext:
 
-Leaving the field empty is not the answer either: the struct's `shareHash` is
-then `keccak256("")` for every chat-delivered guardian, so nothing distinguishes
-them from an on-chain one and the integrity anchor is gone. `ephemeralPubKey`
-must still be populated regardless — without it a guardian cannot derive the
-stealth key that signs their approval.
+```
+first guardian of the version:  shareEncrypted = 0x01 || split_root   (65 bytes)
+every other guardian:           shareEncrypted = 0x01                 (1 byte)
+```
 
-What this requirement needs from the contract is a share slot that separates
-**membership** from **delivery**: a guardian entry that records the stealth
-address and the delivery channel without pretending to carry bytes, plus a
-per-version commitment to the split (§Re-issuing). That is a v2 change, and it
-belongs with the rest of them (`chat-frontend/docs/backup-recovery-plan.md`,
-Phase 6). Until it exists, this transport and the on-chain one cannot both be
-correct at once, and the requirement is blocked on that rather than on anything
-in this repo.
+`0x01` names the channel — the share is in the dialog, not here — and versions
+the record. A slot is a record when its first byte is `0x01` and its length is
+1 or 65, which no ECIES ciphertext (97 bytes at least) is; a version's slots are
+all records or none, never dialog and on-chain delivery mixed. `split_root` is
+the commitment to the whole split (§Re-issuing), written once per version by the
+owner's `addSecret` or `reshare`, so it is bound to `(secret_id, version)` by
+that signature and the contract's storage; one copy leaves nothing to disagree
+with. A reader lists the version's guardians (`getGuardiansAt`), reads their
+slots (`getShareAt`) and takes the one 65-byte record — it need not know which
+slot is its own, and relies on no order. The per-version anchor `backitup-smart-contracts` SI-1 plans for
+the helper plane is this record: its reason for a new field — a commitment
+outside the signed struct could be substituted by whoever relays the call —
+does not apply to one inside `shareEncrypted`. `ephemeralPubKey` is populated
+as for any guardian — without it a guardian cannot derive the stealth key that
+signs their approval. Membership stays what it is on chain: the stealth-address
+set.
 
 ### Spares, and what they cannot buy
 
@@ -184,9 +196,15 @@ The guardian's client, on receiving a `recovery_share`:
   treats a *different* `split_id` at the same `version` as a fault to report
   rather than a share to keep (§Re-issuing).
 - Reads `secret_ref` on-chain to confirm the secret exists and to learn its
-  current `version` and revocation state. The holding is displayed against the
-  dialog peer's `user_cards.name`: the chain answers with the owner's address,
-  and nothing maps an address to a chat identity.
+  current `version` and revocation state, and checks the share against the
+  version's `split_root` with its `split_proof` (§Re-issuing). A version the
+  chain does not show yet — no guardians listed, or above `getSecret(id).version`
+  on the node asked — is read again later, not reported. A share that does
+  not verify is kept and reported, like one for a deployment this build cannot
+  reach: it may be the owner's client that is wrong, and the owner has to hear
+  it. The holding is displayed against the dialog peer's `user_cards.name`:
+  the chain answers with the owner's address, and nothing maps an address to a
+  chat identity.
 - Drops what it holds when the rules in §Dying fire.
 - Holds the share until it can tell which secret it belongs to. Nothing in the
   envelope binds `secret_ref` to the sender, and the chain answers with an
@@ -249,8 +267,14 @@ this document owns is the guardian's side of it.
 5. Once the send gate below opens, each guardian's client sends its share back
    as a `recovery_share_return` in the dialog with the temporary account. The
    nodes release the node half to the same recipient.
-6. The temporary client rebuilds the friends' half, combines it with the node
-   half into `S`, finds and opens the vault, and the owner is back in their
+6. The temporary client takes the version from the chain — the one the round
+   runs on — and uses only returns that name it, its own `secret_ref` and one
+   `split_id`: a share kept from an earlier version verifies against that
+   version's root and would combine into a wrong half. It checks each against
+   the version's `split_root` (§Re-issuing), sets aside any that does not
+   verify, naming its sender, and counts distinct `share_index` values — a
+   share returned twice is one point. From `threshold` of them it rebuilds the
+   friends' half, combines it with the node half into `S`, finds and opens the vault, and the owner is back in their
    **original** account: its keys are in the vault. The temporary account was
    only ever the return address.
 7. The owner, from the original account, **reshares** — a new `S`, a new split,
@@ -349,19 +373,48 @@ the dialog where it is available.
 A re-issue resends the same bytes; that is harmless. A **new split** under the
 same `version` is not: `version` moves only on a `reshare`, and two splits under
 one number combine without error into a wrong `S`. So a new split happens only
-through `reshare`, and every share names its split: `split_id` is opaque, equal
-across one split's shares and different between splits, compared for equality
-only. Random per split is enough for that.
+through `reshare`, and every share names its split: `split_id` is equal across
+one split's shares and different between splits. Random per split — 16 bytes,
+carried as hex and hashed as bytes into each leaf (below) — is enough for that.
 
-What `split_id` does not do is authenticate a share. A malicious guardian copies
-the id from their own envelope and returns junk; the recovering client cannot
-tell which share was bad, only that the vault did not open. Checking a share
-needs a commitment to the split, bound on-chain per `(id, version)` in the v2
-slot (§Issuing), and each share has to travel with what checks it against that
-commitment — reserved as `split_proof`, appended to both envelopes. Before any
-VSS a Merkle root over all `total` shares is the commitment and a share's proof
-path is what travels; a root alone verifies nothing. If VSS comes, the commitment has
-to be **hiding** — Feldman's `C_0 = g^{secret}` yields the friends' half to a
+What `split_id` does not do is authenticate a share: a malicious guardian copies
+the id from their own envelope and returns junk. What does is `split_root`, the
+commitment the delivery record carries on chain (§Issuing), and `split_proof`,
+which travels with the share in both envelopes and checks it against that root.
+With it a recovering client names the share that does not verify instead of
+learning only that the vault did not open.
+
+- **Leaf** for share `i` (1-based):
+  `SHA3-512("buckitup/recovery-share/leaf/v1\n" || split_id || u8(i) || share_i)`,
+  the tag in UTF-8, `split_id` as its 16 bytes, `share_i` as the Shamir library
+  emits it — its own x-coordinate is `i`.
+- **Root** over the split's shape and every leaf in index order, spares
+  included:
+  `split_root = SHA3-512("buckitup/recovery-share/root/v1\n" || u8(threshold) || u8(total) || leaf_1 || … || leaf_total)`.
+  `threshold` is in it because the recovering client decides by it when to
+  combine, and no other signed value carries it — the contract's quorum is a
+  different number.
+- **`split_proof`** is `[leaf_b64, …]`: all `total` leaves in index order,
+  unpadded base64. A split is a handful of shares, so the list is short, and a
+  flat list has no tree shape for two builds years apart to disagree on.
+
+**Checking a share.** Every field is fixed-length but the share, which comes
+last, and a check that skips a length lets bytes move between fields — a
+guardian could shift its share's header into `split_id` and still match its
+leaf. So: `split_id` decodes to exactly 16 bytes; `2 ≤ threshold ≤ total ≤ 255`
+and `1 ≤ share_index ≤ total`; `split_proof` holds exactly `total` leaves of
+exactly 64 bytes; the share's x-coordinate is `share_index`; its leaf equals
+`split_proof[share_index − 1]`; and `threshold`, `total` and the list hash to
+the root. A share without `split_proof`, or of a version whose slots carry no
+root, is set aside like one that does not verify.
+
+The leaves give no share away. A holder of `threshold − 1` shares and every
+leaf can test a guess at the friends' half offline, but the friends' half is 32
+uniformly random bytes — the one-time-pad complement of the node half — so a
+guess is a 2^256 search, and a split below threshold 2 is refused because with
+1 every share is the half.
+
+If VSS comes, the commitment has to be **hiding** — Feldman's `C_0 = g^{secret}` yields the friends' half to a
 discrete-log adversary, which is the property this whole transport exists to
 deny, and the reason `backitup-smart-contracts` SI-1 chose Feldman (shares were
 ECIES-sealed) no longer holds here.

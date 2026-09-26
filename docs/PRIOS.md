@@ -2,25 +2,29 @@
 
 ## Now
 
-8. global gate API access
-9.
+9. gate reads
+11. review tokens: generation
+10. gate review creation
+12. vouch resolution cache
 
 ## Next
 
+15. legal/sanity check for reviews
 5. doc: FE to have known files on onliners sync
-
-6. Frontend
+13. log access to shaper to clenup ... overflow
 
 ## Later
 
 3. partial backup from user + dialogs with response/reaction. FE to provide a list of file_id to sync -> req
 
 4. simplify project structure. define levels ...
+14. Media bot
+6. Frontend
 
 
 
 # Updates
+- length encoded signatures
+- Vouch shape and sandbox revoke
+- 
 
-- Review Editing: pre-mode allows edit till approved, always for rest. Origin can remove from public (revoke) on pre/post
-- Review Editing: Sandbox: listing many reviews and edit them
-- Dialogs: sandbox: reactions are reactive

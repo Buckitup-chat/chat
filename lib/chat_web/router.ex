@@ -1,6 +1,5 @@
 defmodule ChatWeb.Router do
   use ChatWeb, :router
-  import Phoenix.Sync.Router
 
   pipeline :browser do
     plug :accepts, ["html"]
@@ -216,21 +215,6 @@ defmodule ChatWeb.Router do
 
     scope "/" do
       pipe_through ChatWeb.Plugs.ElectricReadiness
-
-      # Phoenix.Sync endpoint for LiveView real-time sync. Deprecated in favor to v1/shapes
-      sync("/file", Chat.Data.Schemas.File)
-      sync("/file_chunk", Chat.Data.Schemas.FileChunk)
-      sync("/user_card", Chat.Data.Schemas.UserCard)
-      sync("/user_storage", Chat.Data.Schemas.UserStorage)
-      sync("/user_storage_version", Chat.Data.Schemas.UserStorageVersion)
-      # Still consumed directly by chat-frontend's main branch (src/utils/db/localDBv2.js).
-      # Remove only after that branch's PGlite sync layer migrates to /electric/v1/shapes
-      # (already done on feat/tanstack-remove-pglite, not yet merged to main).
-      sync("/dialog_key", Chat.Data.Schemas.DialogKey)
-      sync("/dialog_message", Chat.Data.Schemas.DialogMessage)
-      sync("/dialog_message_version", Chat.Data.Schemas.DialogMessageVersion)
-      sync("/dialog_message_reaction", Chat.Data.Schemas.DialogMessageReaction)
-      sync("/dialog_message_receipt", Chat.Data.Schemas.DialogMessageReceipt)
 
       get "/file_chunk/:file_id/:chunk_index", FileChunkController, :show
       get "/file_chunk_status", FileChunkStatusController, :index

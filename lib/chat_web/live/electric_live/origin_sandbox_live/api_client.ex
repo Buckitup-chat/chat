@@ -80,7 +80,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
     password_hashes = MapSet.new(passwords, & &1["review_hash"])
 
     reviews
-    |> Enum.reject(&(&1["deleted_flag"] == true or &1["deleted_flag"] == "true"))
+    |> Enum.reject(&(&1["deleted_flag"] in [true, "true", "t"]))
     |> Enum.any?(fn r -> r["review_hash"] not in password_hashes end)
   end
 
@@ -144,7 +144,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
       owner_cert: Base.decode64!(row["owner_cert"], padding: false),
       name: row["name"],
       moderation_mode: row["moderation_mode"],
-      deleted_flag: row["deleted_flag"] == true or row["deleted_flag"] == "true",
+      deleted_flag: row["deleted_flag"] in [true, "true", "t"],
       owner_timestamp: parse_int(row["owner_timestamp"])
     }
   end

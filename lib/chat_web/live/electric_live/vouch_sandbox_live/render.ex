@@ -133,13 +133,25 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.Render do
             <% end %>
           </p>
         </div>
-        <button
-          type="submit"
-          disabled={@operation_in_progress or @scope_preview == ""}
-          class={"px-4 py-2 rounded-lg text-sm text-white #{if @operation_in_progress or @scope_preview == "", do: "bg-gray-400 cursor-not-allowed", else: "bg-green-600 hover:bg-green-700"}"}
-        >
-          {if @operation_in_progress, do: "Creating...", else: "Create Vouch Token"}
-        </button>
+        <div class="flex gap-2">
+          <button
+            type="submit"
+            disabled={@operation_in_progress or @scope_preview == ""}
+            class={"px-4 py-2 rounded-lg text-sm text-white #{if @operation_in_progress or @scope_preview == "", do: "bg-gray-400 cursor-not-allowed", else: "bg-green-600 hover:bg-green-700"}"}
+          >
+            {if @operation_in_progress, do: "Creating...", else: "Create Vouch Token"}
+          </button>
+          <button
+            type="submit"
+            name="revoked"
+            value="true"
+            disabled={@operation_in_progress or @scope_preview == ""}
+            title="Publish the token already revoked (deleted_flag: true)"
+            class={"t-create-revoked px-4 py-2 rounded-lg text-sm text-white #{if @operation_in_progress or @scope_preview == "", do: "bg-gray-400 cursor-not-allowed", else: "bg-red-600 hover:bg-red-700"}"}
+          >
+            Create Revoked
+          </button>
+        </div>
       </form>
     </div>
     """
@@ -196,7 +208,9 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.Render do
         >
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0 flex-1">
-              <p class="font-mono text-xs font-medium text-gray-900 truncate">{v.kind}</p>
+              <p class={"font-mono text-xs font-medium truncate #{if v.deleted_flag, do: "text-gray-500 line-through", else: "text-gray-900"}"}>
+                {v.kind}
+              </p>
               <p class="text-xs text-gray-500 mt-1">
                 <%= if @direction == :by_me do %>
                   Subject: <span class="font-mono">{Shortcode.short_code(v.subject_hash)}</span>
@@ -207,7 +221,9 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.Render do
               <p class="text-xs text-gray-400 mt-0.5">
                 Timestamp: {v.owner_timestamp}
                 <%= if v.deleted_flag do %>
-                  <span class="text-red-500 font-medium ml-2">[revoked]</span>
+                  <span class="ml-2 px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium">
+                    revoked
+                  </span>
                 <% end %>
               </p>
             </div>

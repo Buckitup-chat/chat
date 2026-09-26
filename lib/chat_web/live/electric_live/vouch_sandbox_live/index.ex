@@ -89,6 +89,7 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.Index do
     base_url = public_url(socket)
     identity = socket.assigns.identity
     kind = build_kind_from_params(params)
+    revoked? = params["revoked"] == "true"
 
     socket = assign(socket, operation_in_progress: true)
 
@@ -96,7 +97,8 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.Index do
            identity,
            String.trim(params["subject_hash"] || ""),
            kind,
-           base_url
+           base_url,
+           revoked: revoked?
          ) do
       {:ok, %{log_entries: logs}} ->
         socket
@@ -136,10 +138,10 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.Index do
     socket = assign(socket, operation_in_progress: true)
 
     case ApiClient.revoke_vouch(identity, vouch, base_url) do
-      {:ok, %{log_entries: logs}} ->
+      {:ok, %{owner_timestamp: new_timestamp, log_entries: logs}} ->
         socket
         |> assign(operation_in_progress: false)
-        |> mark_vouch_revoked(kind, subject, vouch.owner_timestamp + 1)
+        |> mark_vouch_revoked(kind, subject, new_timestamp)
         |> append_logs(logs)
         |> noreply()
 

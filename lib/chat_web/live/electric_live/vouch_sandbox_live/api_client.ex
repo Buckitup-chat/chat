@@ -47,90 +47,114 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.ApiClient do
     |> Enum.sort_by(& &1.owner_timestamp, :desc)
   end
 
-  def create_vouch(identity, subject_hash, kind, base_url) do
-    timestamp = TimeKeeper.now_unix()
-
-    vt_struct = %VouchToken{
+  @doc """
+  Publishes a vouch token. When the `(kind, issuer, subject)` row already exists
+  the insert is rejected with 409, so the vouch is re-published as an update
+  (re-vouch after revoke, or revoke an existing one via `revoked: true`).
+  """
+  def create_vouch(identity, subject_hash, kind, base_url, opts \\ []) do
+    vouch = %{
       kind: kind,
-      issuer_hash: identity.user_hash,
       subject_hash: subject_hash,
-      owner_timestamp: timestamp,
-      deleted_flag: false
+      owner_timestamp: TimeKeeper.now_unix(),
+      deleted_flag: Keyword.get(opts, :revoked, false)
     }
 
-    sign_b64 =
-      vt_struct
-      |> Integrity.signature_payload()
-      |> EnigmaPq.sign(identity.sign_skey)
-
-    payload = %{
-      "mutations" => [
-        %{
-          "type" => "insert",
-          "modified" => %{
-            "kind" => kind,
-            "issuer_hash" => identity.user_hash,
-            "subject_hash" => subject_hash,
-            "owner_timestamp" => timestamp,
-            "deleted_flag" => false,
-            "sign_b64" => Http.encode_base64(sign_b64)
-          },
-          "syncMetadata" => %{"relation" => "vouch_tokens"}
-        }
-      ]
-    }
-
-    with {:ok, challenge_resp, log1} <- Http.get_challenge(base_url),
-         {:ok, _resp, log2} <-
-           Http.post_ingest(challenge_resp, payload, identity.sign_skey, base_url) do
-      {:ok, %{log_entries: [log1, log2]}}
-    else
+    case insert_vouch(identity, vouch, base_url) do
+      {:ok, logs} -> {:ok, %{log_entries: logs}}
+      {:error, "Ingest failed: 409", logs} -> update_existing(identity, vouch, base_url, logs)
       {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end
   end
 
   def revoke_vouch(identity, vouch, base_url) do
-    new_timestamp = vouch.owner_timestamp + 1
+    new_timestamp = max(TimeKeeper.now_unix(), vouch.owner_timestamp + 1)
 
-    vt_struct = %VouchToken{
-      kind: vouch.kind,
-      issuer_hash: identity.user_hash,
-      subject_hash: vouch.subject_hash,
-      owner_timestamp: new_timestamp,
-      deleted_flag: true
+    identity
+    |> update_vouch(
+      %{vouch | owner_timestamp: new_timestamp} |> Map.put(:deleted_flag, true),
+      base_url
+    )
+    |> case do
+      {:ok, logs} -> {:ok, %{owner_timestamp: new_timestamp, log_entries: logs}}
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
+    end
+  end
+
+  defp update_existing(identity, vouch, base_url, insert_logs) do
+    identity.user_hash
+    |> list_vouches_by_me(base_url)
+    |> Enum.find(&(&1.kind == vouch.kind and &1.subject_hash == vouch.subject_hash))
+    |> case do
+      nil ->
+        {:error,
+         %{reason: "Insert conflicted but existing vouch not found", log_entries: insert_logs}}
+
+      existing ->
+        timestamp = max(vouch.owner_timestamp, existing.owner_timestamp + 1)
+
+        case update_vouch(identity, %{vouch | owner_timestamp: timestamp}, base_url) do
+          {:ok, logs} -> {:ok, %{log_entries: insert_logs ++ logs}}
+          {:error, reason, logs} -> {:error, %{reason: reason, log_entries: insert_logs ++ logs}}
+        end
+    end
+  end
+
+  defp insert_vouch(identity, vouch, base_url) do
+    %{
+      "type" => "insert",
+      "modified" => %{
+        "kind" => vouch.kind,
+        "issuer_hash" => identity.user_hash,
+        "subject_hash" => vouch.subject_hash,
+        "owner_timestamp" => vouch.owner_timestamp,
+        "deleted_flag" => vouch.deleted_flag,
+        "sign_b64" => sign(identity, vouch)
+      },
+      "syncMetadata" => %{"relation" => "vouch_tokens"}
     }
+    |> ingest(identity, base_url)
+  end
 
-    sign_b64 =
-      vt_struct
-      |> Integrity.signature_payload()
-      |> EnigmaPq.sign(identity.sign_skey)
-
-    payload = %{
-      "mutations" => [
-        %{
-          "type" => "update",
-          "original" => %{
-            "kind" => vouch.kind,
-            "issuer_hash" => identity.user_hash,
-            "subject_hash" => vouch.subject_hash
-          },
-          "changes" => %{
-            "deleted_flag" => true,
-            "owner_timestamp" => new_timestamp,
-            "sign_b64" => Http.encode_base64(sign_b64)
-          },
-          "syncMetadata" => %{"relation" => "vouch_tokens"}
-        }
-      ]
+  defp update_vouch(identity, vouch, base_url) do
+    %{
+      "type" => "update",
+      "original" => %{
+        "kind" => vouch.kind,
+        "issuer_hash" => identity.user_hash,
+        "subject_hash" => vouch.subject_hash
+      },
+      "changes" => %{
+        "deleted_flag" => vouch.deleted_flag,
+        "owner_timestamp" => vouch.owner_timestamp,
+        "sign_b64" => sign(identity, vouch)
+      },
+      "syncMetadata" => %{"relation" => "vouch_tokens"}
     }
+    |> ingest(identity, base_url)
+  end
+
+  defp ingest(mutation, identity, base_url) do
+    payload = %{"mutations" => [mutation]}
 
     with {:ok, challenge_resp, log1} <- Http.get_challenge(base_url),
          {:ok, _resp, log2} <-
            Http.post_ingest(challenge_resp, payload, identity.sign_skey, base_url) do
-      {:ok, %{log_entries: [log1, log2]}}
-    else
-      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
+      {:ok, [log1, log2]}
     end
+  end
+
+  defp sign(identity, vouch) do
+    %VouchToken{
+      kind: vouch.kind,
+      issuer_hash: identity.user_hash,
+      subject_hash: vouch.subject_hash,
+      owner_timestamp: vouch.owner_timestamp,
+      deleted_flag: vouch.deleted_flag
+    }
+    |> Integrity.signature_payload()
+    |> EnigmaPq.sign(identity.sign_skey)
+    |> Http.encode_base64()
   end
 
   defp parse_vouch_row(row) do
@@ -139,7 +163,8 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.ApiClient do
       issuer_hash: row["issuer_hash"],
       subject_hash: row["subject_hash"],
       owner_timestamp: parse_int(row["owner_timestamp"]),
-      deleted_flag: row["deleted_flag"] == true or row["deleted_flag"] == "true"
+      # snapshot rows carry "true"/"false", change-log rows carry PG text "t"/"f"
+      deleted_flag: row["deleted_flag"] in [true, "true", "t"]
     }
   end
 

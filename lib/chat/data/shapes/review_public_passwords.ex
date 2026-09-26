@@ -8,6 +8,7 @@ defmodule Chat.Data.Shapes.ReviewPublicPasswords do
   alias Chat.Data.ReviewPublicPassword.Validation
   alias Chat.Data.Schemas.ReviewPublicPassword
   alias Chat.Data.Types.ReviewPasswordSignHash
+  alias Chat.Pq.WriteGate
   alias EnigmaPq
   alias Phoenix.Sync.Writer
 
@@ -46,7 +47,10 @@ defmodule Chat.Data.Shapes.ReviewPublicPasswords do
   def ingest_configure_writer(writer, user_pop_context) do
     Writer.allow(writer, ReviewPublicPassword,
       accept: [:insert],
-      check: &Validation.moderate_check(&1, user_pop_context),
+      check:
+        WriteGate.and_gate(
+          &Validation.moderate_check(&1, user_pop_context),
+          :review_public_passwords, owner: "origin_hash"),
       validate: &Validation.validate_origin_moderate/3
     )
   end

@@ -7,6 +7,7 @@ defmodule Chat.Data.Shapes.DialogMessageReceipts do
   alias Chat.Data.Dialog
   alias Chat.Data.Dialog.Validation
   alias Chat.Data.Schemas.DialogMessageReceipt
+  alias Chat.Pq.WriteGate
   alias Phoenix.Sync.Writer
 
   @impl true
@@ -40,7 +41,10 @@ defmodule Chat.Data.Shapes.DialogMessageReceipts do
   def ingest_configure_writer(writer, user_pop_context) do
     Writer.allow(writer, DialogMessageReceipt,
       accept: [:insert],
-      check: &Validation.receipt_allowed(&1, user_pop_context),
+      check:
+        WriteGate.and_gate(
+          &Validation.receipt_allowed(&1, user_pop_context),
+          :dialog_message_receipts, owner: "peer_hash"),
       validate: &Validation.receipt_validate/3
     )
   end

@@ -65,6 +65,11 @@ defmodule Chat.AdminDb do
     |> CubDB.put(key, value)
   end
 
+  def put_new(key, value) do
+    db()
+    |> CubDB.put_new(key, value)
+  end
+
   def file_path do
     Application.get_env(:chat, :admin_cub_db_file, @db_location)
   end

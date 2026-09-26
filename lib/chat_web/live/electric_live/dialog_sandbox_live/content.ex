@@ -29,11 +29,12 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Content do
     end
   end
 
-  defp parse_typed("inline_file", [name, size, mime, ts, data_b64]) do
-    {:inline_file, %{name: name, size: size, mime: mime, timestamp: ts, data_b64: data_b64}}
+  defp parse_typed("inline_file", [name, size, mime, ts, data_b64 | rest]) do
+    {:inline_file,
+     %{name: name, size: size, mime: mime, timestamp: ts, data_b64: data_b64, rest: rest}}
   end
 
-  defp parse_typed("inline_image", [w, h, thumbhash, name, size, mime, ts, data_b64]) do
+  defp parse_typed("inline_image", [w, h, thumbhash, name, size, mime, ts, data_b64 | rest]) do
     {:inline_image,
      %{
        w_aspect: w,
@@ -43,11 +44,12 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Content do
        size: size,
        mime: mime,
        timestamp: ts,
-       data_b64: data_b64
+       data_b64: data_b64,
+       rest: rest
      }}
   end
 
-  defp parse_typed("file", [name, size, mime, ts, file_id, enc_secret]) do
+  defp parse_typed("file", [name, size, mime, ts, file_id, enc_secret | rest]) do
     {:file,
      %{
        name: name,
@@ -55,11 +57,12 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Content do
        mime: mime,
        timestamp: ts,
        file_id: file_id,
-       enc_secret_b64: enc_secret
+       enc_secret_b64: enc_secret,
+       rest: rest
      }}
   end
 
-  defp parse_typed("image", [w, h, thumbhash, name, size, mime, ts, file_id, enc_secret]) do
+  defp parse_typed("image", [w, h, thumbhash, name, size, mime, ts, file_id, enc_secret | rest]) do
     {:image,
      %{
        w_aspect: w,
@@ -70,13 +73,14 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Content do
        mime: mime,
        timestamp: ts,
        file_id: file_id,
-       enc_secret_b64: enc_secret
+       enc_secret_b64: enc_secret,
+       rest: rest
      }}
   end
 
   defp parse_typed(
          "video",
-         [w, h, thumbhash, name, size, mime, ts, duration, file_id, enc_secret]
+         [w, h, thumbhash, name, size, mime, ts, duration, file_id, enc_secret | rest]
        ) do
     {:video,
      %{
@@ -89,12 +93,13 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Content do
        timestamp: ts,
        duration_seconds: duration,
        file_id: file_id,
-       enc_secret_b64: enc_secret
+       enc_secret_b64: enc_secret,
+       rest: rest
      }}
   end
 
-  defp parse_typed("review_list_key", [key_b64]) do
-    {:review_list_key, %{key_b64: key_b64}}
+  defp parse_typed("review_list_key", [key_b64 | rest]) do
+    {:review_list_key, %{key_b64: key_b64, rest: rest}}
   end
 
   defp parse_typed(key, value), do: {:unknown, Jason.encode!(%{key => value})}
@@ -109,7 +114,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Content do
   def to_json({:text, string}), do: Jason.encode!(string)
 
   def to_json({:inline_file, m}) do
-    Jason.encode!(%{"inline_file" => [m.name, m.size, m.mime, m.timestamp, m.data_b64]})
+    Jason.encode!(%{"inline_file" => [m.name, m.size, m.mime, m.timestamp, m.data_b64 | m.rest]})
   end
 
   def to_json({:inline_image, m}) do
@@ -123,13 +128,14 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Content do
         m.mime,
         m.timestamp,
         m.data_b64
+        | m.rest
       ]
     })
   end
 
   def to_json({:file, m}) do
     Jason.encode!(%{
-      "file" => [m.name, m.size, m.mime, m.timestamp, m.file_id, m.enc_secret_b64]
+      "file" => [m.name, m.size, m.mime, m.timestamp, m.file_id, m.enc_secret_b64 | m.rest]
     })
   end
 
@@ -145,6 +151,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Content do
         m.timestamp,
         m.file_id,
         m.enc_secret_b64
+        | m.rest
       ]
     })
   end
@@ -162,11 +169,13 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Content do
         m.duration_seconds,
         m.file_id,
         m.enc_secret_b64
+        | m.rest
       ]
     })
   end
 
-  def to_json({:review_list_key, m}), do: Jason.encode!(%{"review_list_key" => [m.key_b64]})
+  def to_json({:review_list_key, m}),
+    do: Jason.encode!(%{"review_list_key" => [m.key_b64 | m.rest]})
 
   def to_json({:composed, elements}), do: Jason.encode!(Enum.map(elements, &to_raw/1))
   def to_json({:unknown, json}), do: json

@@ -1,7 +1,7 @@
 defmodule Chat.LiveServer.BuckitupXyzIngestEachTest do
   @moduledoc """
   Fires a real request at `https://buckitup.xyz/electric/v1/ingest_each`,
-  reproducing the batch shape captured in `fresh_logs/Request.txt` — a new
+  reproducing the batch shape captured in `incoming/Request.txt` — a new
   `dialog_messages` insert bundled with two `dialog_message_reactions`
   retractions under a single Proof-of-Possession signature — but with:
 

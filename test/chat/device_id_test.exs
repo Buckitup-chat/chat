@@ -24,7 +24,14 @@ defmodule Chat.DeviceIdTest do
     test "returns Server_<domain> when endpoint host is configured" do
       set_endpoint_host("example.com")
 
-      assert "Server_example.com" = DeviceId.Default.id()
+      assert "Server_example_com" = DeviceId.Default.id()
+    end
+
+    test "domain id is a single lowercase scope segment" do
+      set_endpoint_host("Chat.BuckitUp.xyz")
+
+      assert "Server_chat_buckitup_xyz" = id = DeviceId.Default.id()
+      assert ["device", ^id, "admin"] = String.split("device.#{id}.admin", ".")
     end
 
     test "falls back to Localhost_<mac> when no domain" do

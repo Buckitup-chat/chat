@@ -14,11 +14,16 @@ defmodule Chat.DeviceId.Default do
   defp from_domain do
     case Application.get_env(:chat, ChatWeb.Endpoint)[:url][:host] do
       host when is_binary(host) and host not in ["localhost", ""] ->
-        "Server_#{host}"
+        "Server_#{scope_safe(host)}"
 
       _ ->
         :skip
     end
+  end
+
+  # Dots separate vouch scope segments; `_` is invalid in hostnames, so the mapping can't collide
+  defp scope_safe(host) do
+    host |> String.downcase() |> String.replace(".", "_")
   end
 
   defp from_mac do

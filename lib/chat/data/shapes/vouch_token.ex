@@ -33,10 +33,7 @@ defmodule Chat.Data.Shapes.VouchToken do
   def ingest_configure_writer(writer, user_pop_context) do
     Writer.allow(writer, VouchToken,
       accept: [:insert, :update],
-      check:
-        WriteGate.and_gate(&Validation.vouch_token_allowed(&1, user_pop_context), :vouch_token,
-          owner: "issuer_hash"
-        ),
+      check: &Validation.vouch_token_allowed(&1, user_pop_context),
       validate: &Validation.vouch_token_validate/3
     )
   end

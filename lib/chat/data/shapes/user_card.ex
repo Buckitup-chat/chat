@@ -46,7 +46,7 @@ defmodule Chat.Data.Shapes.UserCard do
   def ingest_configure_writer(writer, user_pop_context) do
     Writer.allow(writer, UserCard,
       accept: [:insert, :update],
-      check: WriteGate.and_gate(&Validation.user_card_allowed(&1, user_pop_context), :user_card),
+      check: &Validation.user_card_allowed(&1, user_pop_context),
       validate: &Validation.user_card_validate/3
     )
   end

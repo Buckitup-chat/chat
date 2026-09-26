@@ -5,7 +5,7 @@
 Control who can read and write data through the Electric API. Three distinct surfaces are gated:
 
 - **Write (ingest)** — vouch-chain + PoP, controlled by access mode (`open` / `guarded` / `trust`).
-- **Read / sync (shape subscriptions)** — PoP-gated; additionally chain-gated in `trust` mode.
+- **Read / sync (shape subscriptions)** — gated in `trust` mode only: a per-shape [read session](#read-gating-read-sessions) (PoP + chain check on open), then a Bearer token on every read.
 - **Network discovery** — captures the peer's sync key so clients can establish sync relationships.
 
 The system starts in `open` mode. The first user to ingest a `user_card` registers unconditionally and becomes the **owner** (persisted in AdminDB). While in `open` mode, anyone with valid PoP can read and write. The owner can escalate to `guarded` (writes chain-gated, reads open) or `trust` (all access chain-gated). The server provides nothing to clients unless they ask — a client must know the device serial number to request access.
@@ -15,11 +15,11 @@ The system starts in `open` mode. The first user to ingest a `user_card` registe
 ## Access Modes
 | Mode | `user_card` / `vouch_token` ingest | Other ingest | Shape reads / sync |
 |------|------------------------------------|--------------|--------------------|
-| `open` | Anyone with valid PoP | Anyone with valid PoP | Anyone with valid PoP |
-| `guarded` | Anyone with valid PoP (never chain-gated) | Chain-gated (see [Trust Gate](#trust-gate)) | Anyone with valid PoP |
-| `trust` | Anyone with valid PoP (never chain-gated) | Chain-gated (see [Trust Gate](#trust-gate)) | Chain-gated (same mechanism) |
+| `open` | Anyone with valid PoP | Anyone with valid PoP | Anyone (not gated) |
+| `guarded` | Anyone with valid PoP (never chain-gated) | Chain-gated (see [Trust Gate](#trust-gate)) | Anyone (not gated) |
+| `trust` | Anyone with valid PoP (never chain-gated) | Chain-gated (see [Trust Gate](#trust-gate)) | Read session + chain-gated (see [Read Gating](#read-gating-read-sessions)) |
 
-Default mode: `open` (preserves current behavior). `guarded` mode gates writes via vouch chain but leaves reads open to anyone with valid PoP. `trust` mode gates **all** access — reads, writes, and peer sync — via PoP + vouch chain. The same mechanism applies to users and peer servers alike.
+Default mode: `open` (preserves current behavior). `guarded` mode gates writes via vouch chain and leaves reads open. `trust` mode gates **all** access — reads, writes, and peer sync — via PoP + vouch chain. The same mechanism applies to users and peer servers alike.
 
 > **`user_card` and `vouch_token` are never chain-gated.** They are the inputs to chain resolution: `user_cards` supply `sign_pkey` for each `user_hash`, and vouch tokens are the graph edges. The server must accept every one it is offered, in any mode, so it can resolve chains. Gating them would be circular — a user couldn't become reachable without first being reachable, and a missing intermediate card or token would break chains for everyone downstream of it. Both still go through their shape's own PoP / signature checks. Accepting a card or token grants nothing by itself: the chain check on other shapes decides what the user can write.
 
@@ -60,7 +60,7 @@ The exact discovery protocol (mDNS, optical handshake extension, manual entry) i
 
 ### Peer-to-Peer Sync
 
-When device A syncs from device B, device A acts as a client — it authenticates to B using its own server key via PoP, and B checks A against the vouch chain (in `trust` mode). The mechanism is identical to a user reading shapes: same plug, same check, same vouch token scopes.
+When device A syncs from device B, device A acts as a client — it opens a [read session](#read-gating-read-sessions) on B with its own server key via PoP, and B checks A against the vouch chain (in `trust` mode). The mechanism is identical to a user reading shapes: same read gate, same check, same vouch token scopes.
 
 ---
 
@@ -102,7 +102,7 @@ Resource kinds separate read and write access. The scope names the facility bein
 | Manual owner approval | owner | configurable: `storage.write`, `storage.read`, or both | 1 |
 | User-to-user vouch | non-owner user | attenuated from voucher's own scope | +1 from voucher |
 
-A vouch for `device.<sn>.storage.write` grants ingest (all shapes); `device.<sn>.storage.write.<shape>` narrows to a single shape. Likewise `device.<sn>.storage.read` grants shape subscription / sync, narrowable per shape. The `guarded` mode enforces only `storage.write` scopes; `trust` mode enforces both `storage.write` and `storage.read`.
+A vouch for `device.<sn>.storage.write` grants ingest (all shapes); `device.<sn>.storage.write.<shape>` narrows to a single shape. Likewise `device.<sn>.storage.read` grants shape subscription / sync, narrowable per shape (`device.<sn>.storage.read.<shape>`, see [Read Gating](#read-gating-read-sessions)). The `guarded` mode enforces only `storage.write` scopes; `trust` mode enforces both `storage.write` and `storage.read`.
 
 Provenance is inferred: `issuer_hash` = owner → direct trust; `issuer_hash` ≠ owner → transitive vouch. The mechanism (optical handshake vs. manual approval) is indistinguishable at the token level — both are owner-issued vouches for the same resource.
 
@@ -128,35 +128,42 @@ Owner identity and mode setting live in AdminDB — see [Open Questions §3](#op
 
 ### Where
 
-A single plug `ChatWeb.Plugs.ElectricAccessGate` gates all access — reads, writes, and peer sync — using the same PoP + vouch chain mechanism:
+Writes and reads are gated by two plugs. They share the owner / mode / chain-distance decision but identify the caller differently:
+
+- **Writes** — `ChatWeb.Plugs.ElectricAccessGate` (target; today `Chat.Pq.WriteGate`, see below). The caller proves possession with a one-time signed challenge in the request body.
+- **Reads** — `ChatWeb.Plugs.ElectricReadGate`. The caller presents a Bearer token from a read session. See [Read Gating](#read-gating-read-sessions).
 
 ```
 scope "/" do
   pipe_through ChatWeb.Plugs.ElectricReadiness
-  pipe_through ChatWeb.Plugs.ElectricAccessGate   # <-- new: PoP + vouch chain for all access
-
-  get "/shape/*table", ElectricController, :shape
 
   scope "/" do
+    pipe_through ChatWeb.Plugs.ElectricAccessGate   # <-- target: PoP + vouch chain for writes
     pipe_through ChatWeb.Plugs.ElectricChallengeInjector
     post "/ingest", ElectricController, :ingest
     post "/ingest_each", ElectricController, :ingest_each
   end
 end
+
+scope "/electric/v1/shapes" do
+  pipe_through ChatWeb.Plugs.ElectricReadiness
+  pipe_through ChatWeb.Plugs.ElectricTableGuard
+  pipe_through ChatWeb.Plugs.ElectricReadGate       # <-- new: Bearer read session + vouch chain
+  forward "/", ChatWeb.Plugs.HexToBase64Electric
+end
 ```
 
-### What it checks
-
-The same logic applies to reads (shape subscriptions) and writes (ingest), and to both users and peer servers:
+### What it checks (writes)
 
 1. **No owner registered yet** → allow. If this is a `user_card` insert, register the user as owner in AdminDB (post-ingest hook or writer callback). Mode stays `open`.
 2. **Mode is `open`** → verify PoP (caller must prove key ownership), then pass through.
 3. **Caller is the owner** → pass through.
-4. **Mode is `guarded`** → verify PoP. For **writes**: look up chain distance for caller's `user_hash` (from cache or CTE); if `chain_distance ≤ max_depth`, pass through; if beyond or no path, reject with `403`. For **reads**: PoP valid → pass through.
-5. **Mode is `trust`** → verify PoP, then look up chain distance for caller's `user_hash` (from cache or CTE); if `chain_distance ≤ max_depth`, pass through; if beyond or no path, reject with `403`. Applies to both reads and writes.
-6. **Otherwise** → reject with `403 Forbidden`, body: `{"error": "access_denied", "mode": "<current_mode>"}`.
+4. **Mode is `guarded` or `trust`** → verify PoP, then look up chain distance for caller's `user_hash`; if `chain_distance ≤ max_depth`, pass through; if beyond or no path, reject with `403`.
+5. **Otherwise** → reject with `403 Forbidden`, body: `{"error": "access_denied", "mode": "<current_mode>"}`.
 
-### Identifying the caller
+Reads follow [Read Gating § What the gate checks](#what-the-gate-checks).
+
+### Identifying the caller (writes)
 
 The request carries a PoP signature (signed challenge) and the caller's `user_hash`:
 
@@ -206,8 +213,108 @@ Not wrapped (ungated in every mode):
 **Differences from the target design above:**
 
 - `max_depth` is not enforced. Any reachable path passes, and the error body carries no `max_depth`.
-- `guarded` and `trust` behave the same: only writes are gated. Shape reads / sync are not gated in any mode.
+- `guarded` and `trust` behave the same: only writes are gated. Shape reads / sync are not gated in any mode until [Read Gating](#read-gating-read-sessions) lands.
 - A rejection surfaces as a writer check error, not as a plug-level `403` before the controller.
+
+---
+
+## Read Gating (Read Sessions)
+
+Reads are gated in **`trust` mode only**. In `open` and `guarded` modes the read gate passes every request through, with or without a token.
+
+A read session is **per shape**. Opening one proves possession (PoP) **and** checks the vouch chain for `device.<sn>.storage.read.<shape>`. Each read then only checks that the token is valid for the shape of the requested table.
+
+### Why sessions instead of per-request checks
+
+Shape reads are Electric long-polls. A live collection re-requests about every 20s, and a client holds many collections (7+ per open dialog). Challenges are single-use and cost a round trip, and an ML-DSA-87 signature is ~4.6 KB. The chain check is a recursive CTE. Doing both on each poll would double the request count and put a signature and a CTE on every request. So the client proves possession and passes the chain check **once per shape per session**.
+
+### Opening a session
+
+```
+GET  /electric/v1/challenge        → {challenge_id, challenge, expires_in}
+POST /electric/v1/read_session     {user_hash, shape, challenge_id, signature}
+                                   ← 200 {token, shape, expires_in: 300}
+                                   ← 400 {"error": "unknown_shape"}
+                                   ← 401 {"error": "Invalid or expired challenge"}
+                                   ← 401 {"error": "unknown_user"}      (no user_card for user_hash)
+                                   ← 401 {"error": "invalid_signature"}
+                                   ← 403 {"error": "not_in_trust_chain", "max_depth": <max_depth>}
+```
+
+1. Resolve `shape` with `Chat.Data.Shapes.by_name/1` (shape name, e.g. `dialog_messages`, `file`). Unknown → `400`.
+2. Consume the challenge (`Chat.Challenge.get/1`, single use).
+3. Look up `sign_pkey` from `user_cards` for `user_hash`. The caller must have ingested its `user_card` first. `user_card` ingest is never chain-gated, so this works in every mode.
+4. Verify `ML-DSA-87.verify(challenge, signature, sign_pkey)`. The signature format is the same as ingest PoP, so the client reuses its existing signer.
+5. Check the chain:
+   - no owner registered → pass;
+   - `user_hash` is the owner → pass;
+   - `VouchToken.chain_distance(owner_hash, user_hash, "device.<sn>.storage.read.<shape>")` returns `{:ok, distance}` with `distance ≤ max_depth` → pass;
+   - otherwise → `403 not_in_trust_chain`.
+6. Issue `token` = 32 random bytes, base64url. Store `{token, user_hash, shape, expires_at}` in ETS.
+
+The endpoint runs the same checks in every mode. Clients open sessions **lazily**: only after a read returns `401 read_session_required`, which happens only in `trust` mode. When the owner switches to `trust`, live streams get `401`, open sessions, and resume.
+
+### Scope: `storage.read.<shape>`
+
+The scope suffix is the **shape name** (`shape_name/0` of the shape module), the same names write scopes use (`storage.write.<shape>`). A request's `?table=` maps to its shape through the `Chat.Data.Shapes` registry: the main table (`schema_module`) and the versions table (`versions_schema`) both map to the owning shape. For example, `dialog_messages` and `dialog_messages_versions` both need a `dialog_messages` session, and `files` needs a `file` session. A vouch at `device.<sn>.storage.read` covers every shape through prefix matching.
+
+This differs from write scopes, which use shape names (`storage.write.dialog_messages`, `storage.write.file`).
+
+### Session store: `Chat.Pq.ReadSession`
+
+- ETS table owned by a GenServer, with periodic cleanup of expired entries (same pattern as `Chat.Challenge`).
+- **TTL: 5 minutes**, fixed from issue time. No sliding refresh.
+- **No invalidation.** No logout, no revoke, no vouch-driven eviction. A session ends only when its TTL expires. Revoking a vouch therefore takes effect within 5 minutes, when the caller's sessions expire and the next open fails the chain check.
+- Not persisted. A restart drops all sessions, and clients get `401` and open new ones.
+- A session is bound to the device that issued it (ETS is local).
+
+### Presenting the token
+
+Every read carries `Authorization: Bearer <token>` for the session of that table's shape:
+
+- Electric's TS client sets it via `shapeOptions.headers`, and one-shot reads (`readShapeOnce`) add it to `fetch`.
+- A header, not a query param, keeps the token out of URLs, logs, and the shape cache key.
+- CORS: the `:electric` pipeline uses `CORSPlug` default request headers, which already include `Authorization`.
+
+The client keeps one session per shape. All collections of the same shape (e.g. `dialog_messages` and `dialog_messages_versions` across several dialogs) share it. The client opens a new session before the TTL expires (e.g. at 4 min) or on any `401 read_session_required`.
+
+### What the gate checks
+
+`ChatWeb.Plugs.ElectricReadGate` runs after `ElectricTableGuard`, so the table is already known. It maps the table to its shape:
+
+1. **Mode is not `trust`** → pass.
+2. **No owner registered** → pass.
+3. **Valid session** — the `Authorization: Bearer` token exists in ETS, is not expired, and its `shape` equals the requested table's shape → pass.
+4. **Otherwise** (no header, unknown or expired token, or token for another shape) → `401 {"error": "read_session_required", "shape": "<shape>"}`.
+
+The gate does no signature check and no chain lookup. Both happened when the session was opened.
+
+### Nothing is exempt
+
+Unlike writes, **no shape is exempt** from read gating in `trust` mode, including `user_card` and `vouch_token`. The write-side exemption exists because the server needs cards and tokens to resolve chains, and the server reads its own database directly. Leaving `vouch_tokens` readable would expose the trust topology (see [Open Questions §4](#open-questions)).
+
+An unvouched client can still ingest its `user_card`, but opening a read session for any shape fails with `403 not_in_trust_chain`. The frontend shows a "waiting for approval" state.
+
+### Gated surfaces
+
+Every route that serves synced data gets the read gate. Otherwise gating `/shapes` alone is bypassable:
+
+| Route | Notes |
+|-------|-------|
+| `GET /electric/v1/shapes` | Client-controlled shapes |
+| legacy `sync(...)` routes (`/electric/v1/dialog_message`, …) | Session for the schema's shape. Still used by chat-frontend `main`. Gate or remove |
+| `GET /electric/v1/file_chunk/:file_id/:chunk_index` | Session for shape `file_chunk` |
+| `GET /electric/v1/file_chunk_status` | Session for shape `file_chunk` |
+
+Not gated: `/status`, `/challenge`, `/read_session`, `/system_identifier` (needed before authenticating).
+
+### HTTP caching
+
+Electric sends `cache-control: public` on shape responses. In `trust` mode the read gate rewrites it to `private` and adds `Vary: Authorization`. Otherwise a shared cache or the frontend service worker (`sw.js` intercepts `/shapes`) could serve gated data to an unauthorized client.
+
+### Peer servers
+
+A peer server reads the same way: it opens a read session per shape, signed with its server identity key, and sends the Bearer token from its Electric client. This requires the peer's server identity to have a `user_card` on the target device. How that card gets there is not yet specified.
 
 ---
 
@@ -245,22 +352,32 @@ Client below is a user device or a peer server — both authenticate the same wa
 ```
 Client                          Server
   |                                |
+  |  --- open read session (per shape, trust mode) ---
+  |                                |
+  |-- GET /challenge ------------->|
+  |<-- {challenge_id, challenge} --|
+  |-- POST /read_session --------->|
+  |   {user_hash, shape,           |  sign_pkey from user_cards, ML-DSA verify,
+  |    challenge_id, signature}    |  chain check storage.read.<shape>,
+  |                                |  store {token, user_hash, shape} in ETS
+  |<-- {token, shape, 300} or 403 -|
+  |                                |
   |  --- shape read (sync) --------
   |                                |
-  |-- GET /shape/table ----------->|
-  |   {auth: {challenge_id, sig}} |
+  |-- GET /shapes?table=… -------->|
+  |   Authorization: Bearer <tok>  |
   |                                |
   |   [ElectricReadiness]          |  DB + Electric up?
-  |   [ElectricAccessGate]         |  PoP verify + mode check:
-  |     - no owner? pass           |    (same logic as writes,
-  |     - open? PoP ok → pass      |     except guarded skips
-  |     - guarded? PoP ok → pass   |     chain check for reads)
-  |     - owner? pass              |
-  |     - trust? chain check       |
-  |     - else? 403                |
-  |   [ElectricController.shape]   |  SSE stream begins
+  |   [ElectricTableGuard]         |  table allowed?
+  |   [ElectricReadGate]           |
+  |     - not trust? pass          |
+  |     - no owner? pass           |
+  |     - token valid for shape?   |  ETS lookup only, no sig / chain
+  |         pass                   |
+  |     - else? 401                |  read_session_required
+  |   [HexToBase64Electric]        |  long-poll
   |                                |
-  |<-- SSE: shape data ------------|
+  |<-- shape log ------------------|
   |                                |
   |  --- write (ingest) -----------
   |                                |
@@ -295,7 +412,11 @@ Pending:
 
 - The `ElectricAccessGate` plug (PoP + vouch chain enforcement in the router pipeline).
 - `max_depth` setting and enforcement.
-- Read gating in `trust` mode.
+- Read gating in `trust` mode (see [Read Gating](#read-gating-read-sessions)):
+  - `Chat.Pq.ReadSession` ETS store (per shape, 5 min TTL) and `POST /electric/v1/read_session` (PoP + `storage.read.<shape>` chain check).
+  - `ChatWeb.Plugs.ElectricReadGate` on `/shapes`, legacy `sync` routes, and file_chunk reads.
+  - `cache-control: private` + `Vary: Authorization` in `trust` mode.
+  - chat-frontend: open sessions lazily per shape on `401`, send `Authorization: Bearer` on shape reads and `readShapeOnce`, show "waiting for approval" on `403`.
 
 ## Open Questions
 

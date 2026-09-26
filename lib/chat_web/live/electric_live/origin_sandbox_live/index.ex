@@ -5,6 +5,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
 
   alias Chat.Proto.Shortcode
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
+  alias ChatWeb.ElectricLive.IdentityCheck
   alias ChatWeb.ElectricLive.OriginSandboxLive.ApiClient
   alias ChatWeb.ElectricLive.OriginSandboxLive.Render
 
@@ -37,8 +38,9 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
     case Crypto.parse_and_validate_identity(result) do
       {:ok, user_data} ->
         base_url = public_url(socket)
-        origins = ApiClient.list_owner_origins(user_data.user_hash, base_url)
-        {:noreply, assign(socket, owner: user_data, origins: origins, error_message: nil)}
+        owner = IdentityCheck.mark_on_server(user_data, base_url)
+        origins = ApiClient.list_owner_origins(owner.user_hash, base_url)
+        {:noreply, assign(socket, owner: owner, origins: origins, error_message: nil)}
 
       {:error, reason} ->
         {:noreply, assign(socket, error_message: "Import failed: #{reason}")}

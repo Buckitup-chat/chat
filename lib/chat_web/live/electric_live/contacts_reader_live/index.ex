@@ -8,6 +8,7 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.Index do
   alias ChatWeb.ElectricLive.ContactsReaderLive.KeyScanner
   alias ChatWeb.ElectricLive.ContactsReaderLive.ReviewReader
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
+  alias ChatWeb.ElectricLive.IdentityCheck
   alias ChatWeb.ElectricLive.ReviewSandboxLive.ListPassword
 
   @impl true
@@ -44,8 +45,14 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.Index do
       end)
 
     case Crypto.parse_and_validate_identity(result) do
-      {:ok, user_data} -> socket |> load_user(user_data) |> noreply()
-      {:error, reason} -> socket |> assign(error_message: "Import failed: #{reason}") |> noreply()
+      {:ok, user_data} ->
+        user_data
+        |> IdentityCheck.mark_on_server(public_url(socket))
+        |> then(&load_user(socket, &1))
+        |> noreply()
+
+      {:error, reason} ->
+        socket |> assign(error_message: "Import failed: #{reason}") |> noreply()
     end
   end
 

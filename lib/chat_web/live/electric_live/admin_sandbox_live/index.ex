@@ -10,6 +10,7 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Index do
   alias Chat.Pq.ServerIdentity
   alias ChatWeb.ElectricLive.AdminSandboxLive.Render
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
+  alias ChatWeb.ElectricLive.IdentityCheck
 
   @valid_gate_modes ~w(open guarded trust)a
 
@@ -45,7 +46,7 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Index do
 
         socket
         |> assign(
-          identity: user_data,
+          identity: IdentityCheck.mark_on_server(user_data, public_url(socket)),
           is_admin: is_admin,
           admin_role: admin_role,
           error_message: nil

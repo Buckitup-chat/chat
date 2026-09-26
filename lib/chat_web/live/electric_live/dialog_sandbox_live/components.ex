@@ -4,6 +4,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
   use Phoenix.Component
 
   alias Chat.Proto.Shortcode
+  alias ChatWeb.ElectricLive.Components
   alias ChatWeb.ElectricLive.DialogSandboxLive.ContentComponents
   alias ChatWeb.ElectricLive.DialogSandboxLive.Docs
 
@@ -44,6 +45,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Components do
           <span class="font-mono text-gray-600">{Shortcode.short_code(@user.user_hash)}</span>
           <span class="text-gray-500">({@user.name})</span>
         </div>
+        <Components.identity_not_on_server identity={@user} />
       <% end %>
     </section>
     """

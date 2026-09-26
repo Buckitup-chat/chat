@@ -61,6 +61,7 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.Render do
             </span>
             <span class="text-gray-500">({@user.name})</span>
           </p>
+          <.identity_not_on_server identity={@user} />
           <p :if={@own_key} class="text-xs text-gray-500">
             Own review_list_password available — can read own review_list
           </p>

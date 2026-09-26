@@ -4,6 +4,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   import ChatWeb.ElectricLive.DialogSandboxLive.Components
 
   alias ChatWeb.ElectricLive.DialogSandboxLive.{ApiClient, Crypto}
+  alias ChatWeb.ElectricLive.IdentityCheck
 
   @impl true
   def mount(_params, _session, socket) do
@@ -102,7 +103,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
       case Crypto.parse_and_validate_identity(result) do
         {:ok, user_data} ->
           socket
-          |> assign(:user, user_data)
+          |> assign(:user, IdentityCheck.mark_on_server(user_data, public_url(socket)))
           |> assign(:dialogs, [])
           |> assign(:selected_dialog, nil)
           |> assign(:messages, [])

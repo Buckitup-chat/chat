@@ -4,6 +4,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
   use Phoenix.Component
 
   alias Chat.Proto.Shortcode
+  alias ChatWeb.ElectricLive.Components
 
   def render_page(assigns) do
     ~H"""
@@ -60,6 +61,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
           </span>
           <span class="text-gray-500">({@owner.name})</span>
         </div>
+        <Components.identity_not_on_server identity={@owner} />
       <% else %>
         <form phx-change="validate_key_file" phx-submit="import_keys" class="flex items-center gap-4">
           <.live_file_input upload={@uploads.key_file} class="text-sm" />

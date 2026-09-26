@@ -4,6 +4,7 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Render do
   use Phoenix.Component
 
   alias Chat.Proto.Shortcode
+  alias ChatWeb.ElectricLive.Components
 
   @gate_modes [:open, :guarded, :trust]
 
@@ -87,6 +88,7 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Render do
             </span>
             <span class="text-gray-500">({@identity.name})</span>
           </p>
+          <Components.identity_not_on_server identity={@identity} />
           <p :if={@admin_role == :owner} class="text-green-700 font-medium">
             Admin verified (owner)
           </p>

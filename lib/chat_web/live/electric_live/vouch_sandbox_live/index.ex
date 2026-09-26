@@ -6,6 +6,7 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.Index do
   alias Chat.Data.VouchToken
 
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
+  alias ChatWeb.ElectricLive.IdentityCheck
   alias ChatWeb.ElectricLive.VouchSandboxLive.ApiClient
   alias ChatWeb.ElectricLive.VouchSandboxLive.Render
 
@@ -44,7 +45,11 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.Index do
         base_url = public_url(socket)
 
         socket
-        |> assign(identity: user_data, error_message: nil, users: ApiClient.list_users(base_url))
+        |> assign(
+          identity: IdentityCheck.mark_on_server(user_data, base_url),
+          error_message: nil,
+          users: ApiClient.list_users(base_url)
+        )
         |> load_vouches(base_url)
         |> noreply()
 

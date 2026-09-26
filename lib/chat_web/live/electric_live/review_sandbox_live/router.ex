@@ -7,6 +7,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Router do
   import Phoenix.LiveView, only: [consume_uploaded_entries: 3]
 
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
+  alias ChatWeb.ElectricLive.IdentityCheck
   alias ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient
   alias ChatWeb.ElectricLive.ReviewSandboxLive.Contacts
   alias ChatWeb.ElectricLive.ReviewSandboxLive.ReviewList
@@ -25,7 +26,10 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Router do
 
     case Crypto.parse_and_validate_identity(result) do
       {:ok, user_data} ->
-        socket |> load_author(user_data) |> noreply()
+        user_data
+        |> IdentityCheck.mark_on_server(public_url(socket))
+        |> then(&load_author(socket, &1))
+        |> noreply()
 
       {:error, reason} ->
         socket |> assign(error_message: "Import failed: #{reason}") |> noreply()

@@ -34,7 +34,9 @@ defmodule Chat.Data.Shapes.ReviewPasswordCandidate do
       check:
         WriteGate.and_gate(
           &Validation.candidate_allowed(&1, user_pop_context),
-          :review_password_candidate, owner: "author_hash"),
+          :review_password_candidate,
+          owner: "author_hash"
+        ),
       validate: &Validation.candidate_validate/3,
       insert: [
         post_apply: &Validation.candidate_post_apply_promote/3

@@ -8,7 +8,6 @@ defmodule Chat.Data.Shapes.UserCard do
   alias Chat.Data.User
   alias Chat.Data.User.Validation
   alias Chat.Pq.OwnerBootstrap
-  alias Chat.Pq.WriteGate
   alias Phoenix.Sync.Writer
 
   @impl true

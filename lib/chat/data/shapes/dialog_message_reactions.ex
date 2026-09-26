@@ -78,7 +78,9 @@ defmodule Chat.Data.Shapes.DialogMessageReactions do
       check:
         WriteGate.and_gate(
           &Validation.reaction_allowed(&1, user_pop_context),
-          :dialog_message_reactions, owner: "reactor_hash"),
+          :dialog_message_reactions,
+          owner: "reactor_hash"
+        ),
       validate: &Validation.reaction_validate/3
     )
   end

@@ -4,7 +4,6 @@ defmodule Chat.Data.Shapes.VouchToken do
   alias Chat.Data.Schemas.VouchToken
   alias Chat.Data.VouchToken, as: VouchTokenData
   alias Chat.Data.VouchToken.Validation
-  alias Chat.Pq.WriteGate
   alias Phoenix.Sync.Writer
 
   use Chat.Data.Shapes.Shape,

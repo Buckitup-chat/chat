@@ -44,7 +44,9 @@ defmodule Chat.Data.Shapes.DialogMessageReceipts do
       check:
         WriteGate.and_gate(
           &Validation.receipt_allowed(&1, user_pop_context),
-          :dialog_message_receipts, owner: "peer_hash"),
+          :dialog_message_receipts,
+          owner: "peer_hash"
+        ),
       validate: &Validation.receipt_validate/3
     )
   end

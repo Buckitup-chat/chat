@@ -50,7 +50,9 @@ defmodule Chat.Data.Shapes.ReviewPublicPasswords do
       check:
         WriteGate.and_gate(
           &Validation.moderate_check(&1, user_pop_context),
-          :review_public_passwords, owner: "origin_hash"),
+          :review_public_passwords,
+          owner: "origin_hash"
+        ),
       validate: &Validation.validate_origin_moderate/3
     )
   end

@@ -13,6 +13,15 @@ defmodule Chat.Pq.WriteGate do
   alias Chat.DeviceId
   alias Chat.Pq.OwnerBootstrap
 
+  @denied "not_in_trust_chain"
+
+  def max_depth, do: VouchToken.default_max_depth()
+
+  def denied?(error), do: error == @denied
+
+  @doc "Response body for a write rejected by the trust chain."
+  def denied_body, do: %{error: @denied, max_depth: max_depth()}
+
   def and_gate(check_fn, shape_name, opts \\ []) do
     field = Keyword.get(opts, :owner, "user_hash")
 
@@ -50,9 +59,9 @@ defmodule Chat.Pq.WriteGate do
   defp check_chain(owner_hash, user_hash, shape_name) do
     scope = write_scope(DeviceId.id(), shape_name)
 
-    case VouchToken.chain_distance(owner_hash, user_hash, scope) do
+    case VouchToken.chain_distance(owner_hash, user_hash, scope, max_depth()) do
       {:ok, _} -> :ok
-      _ -> {:error, "not_in_trust_chain"}
+      _ -> {:error, @denied}
     end
   end
 

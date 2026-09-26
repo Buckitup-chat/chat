@@ -191,7 +191,12 @@ Decision order (`WriteGate.check_access/2`):
 2. The owner field on the mutation is `nil` → allow.
 3. No owner registered (`OwnerBootstrap.owner/0` is `nil`) → allow.
 4. Caller is the owner → allow.
-5. Otherwise, `VouchToken.chain_distance(owner_hash, user_hash, "device.<id>.storage.write.<shape>")` must return `{:ok, _}`. If it doesn't, the mutation is rejected with `{:error, "not_in_trust_chain"}`.
+5. Otherwise, `VouchToken.chain_distance(owner_hash, user_hash, "device.<id>.storage.write.<shape>", WriteGate.max_depth())` must return `{:ok, _}`. If it doesn't, the mutation is rejected with `{:error, "not_in_trust_chain"}`.
+
+`ElectricController` turns that check error into the response:
+
+- `/ingest` → `403 {"error": "not_in_trust_chain", "max_depth": <max_depth>}`.
+- `/ingest_each` → the row result is `{"index": i, "status": "error", "error": "not_in_trust_chain", "max_depth": <max_depth>}`. The response is `403` when every failed row is `not_in_trust_chain`, and `422` when any row failed for another reason.
 
 The caller's `user_hash` comes from `changes[field]` on insert and `data[field]` on update/delete. `field` defaults to `"user_hash"` and is overridden with `owner:` per shape:
 
@@ -212,9 +217,9 @@ Not wrapped (ungated in every mode):
 
 **Differences from the target design above:**
 
-- `max_depth` is not enforced. Any reachable path passes, and the error body carries no `max_depth`.
-- `guarded` and `trust` behave the same: only writes are gated. Shape reads / sync are not gated in any mode until [Read Gating](#read-gating-read-sessions) lands.
-- A rejection surfaces as a writer check error, not as a plug-level `403` before the controller.
+- `max_depth` is fixed at `VouchToken.default_max_depth/0` (7). There is no owner setting yet.
+- `guarded` and `trust` gate writes the same way. `trust` additionally gates reads (see [Read Gating](#read-gating-read-sessions)).
+- The rejection happens inside the writer, per mutation, not in a plug before the controller. The client sees the same `403` body either way.
 
 ---
 
@@ -258,8 +263,6 @@ The endpoint runs the same checks in every mode. Clients open sessions **lazily*
 
 The scope suffix is the **shape name** (`shape_name/0` of the shape module), the same names write scopes use (`storage.write.<shape>`). A request's `?table=` maps to its shape through the `Chat.Data.Shapes` registry: the main table (`schema_module`) and the versions table (`versions_schema`) both map to the owning shape. For example, `dialog_messages` and `dialog_messages_versions` both need a `dialog_messages` session, and `files` needs a `file` session. A vouch at `device.<sn>.storage.read` covers every shape through prefix matching.
 
-This differs from write scopes, which use shape names (`storage.write.dialog_messages`, `storage.write.file`).
-
 ### Session store: `Chat.Pq.ReadSession`
 
 - ETS table owned by a GenServer, with periodic cleanup of expired entries (same pattern as `Chat.Challenge`).
@@ -276,7 +279,7 @@ Every read carries `Authorization: Bearer <token>` for the session of that table
 - A header, not a query param, keeps the token out of URLs, logs, and the shape cache key.
 - CORS: the `:electric` pipeline uses `CORSPlug` default request headers, which already include `Authorization`.
 
-The client keeps one session per shape. All collections of the same shape (e.g. `dialog_messages` and `dialog_messages_versions` across several dialogs) share it. The client opens a new session before the TTL expires (e.g. at 4 min) or on any `401 read_session_required`.
+Client rules (lazy opening, sharing, renewal, stream wiring) are in [Client Behaviour § Reads](#reads).
 
 ### What the gate checks
 
@@ -293,7 +296,7 @@ The gate does no signature check and no chain lookup. Both happened when the ses
 
 Unlike writes, **no shape is exempt** from read gating in `trust` mode, including `user_card` and `vouch_token`. The write-side exemption exists because the server needs cards and tokens to resolve chains, and the server reads its own database directly. Leaving `vouch_tokens` readable would expose the trust topology (see [Open Questions §4](#open-questions)).
 
-An unvouched client can still ingest its `user_card`, but opening a read session for any shape fails with `403 not_in_trust_chain`. The frontend shows a "waiting for approval" state.
+An unvouched client can still ingest its `user_card`, but opening a read session for any shape fails with `403 not_in_trust_chain`. The client enters [Awaiting approval](#awaiting-approval).
 
 ### Gated surfaces
 
@@ -302,7 +305,6 @@ Every route that serves synced data gets the read gate. Otherwise gating `/shape
 | Route | Notes |
 |-------|-------|
 | `GET /electric/v1/shapes` | Client-controlled shapes |
-| legacy `sync(...)` routes (`/electric/v1/dialog_message`, …) | Session for the schema's shape. Still used by chat-frontend `main`. Gate or remove |
 | `GET /electric/v1/file_chunk/:file_id/:chunk_index` | Session for shape `file_chunk` |
 | `GET /electric/v1/file_chunk_status` | Session for shape `file_chunk` |
 
@@ -310,11 +312,78 @@ Not gated: `/status`, `/challenge`, `/read_session`, `/system_identifier` (neede
 
 ### HTTP caching
 
-Electric sends `cache-control: public` on shape responses. In `trust` mode the read gate rewrites it to `private` and adds `Vary: Authorization`. Otherwise a shared cache or the frontend service worker (`sw.js` intercepts `/shapes`) could serve gated data to an unauthorized client.
+Electric sends `cache-control: public` on shape responses. In `trust` mode the read gate rewrites it to `private` and adds `Vary: Authorization`. Otherwise a shared HTTP cache could serve gated data to an unauthorized client. The frontend service worker does not cache `/api` (Electric long-polls and ingest pass through untouched) and must keep it that way.
 
 ### Peer servers
 
 A peer server reads the same way: it opens a read session per shape, signed with its server identity key, and sends the Bearer token from its Electric client. This requires the peer's server identity to have a `user_card` on the target device. How that card gets there is not yet specified.
+
+---
+
+## Client Behaviour
+
+Rules for chat-frontend and any other client. Bots and peer servers follow the [Reads](#reads) part.
+
+The client never needs to know the access mode. It reacts to responses. In `open` mode none of the gate responses below occur, so the same code runs in every mode.
+
+### Identity first
+
+1. **Ingest the `user_card` alone** before any other write: one mutation in its own request. `/ingest` is one transaction, so a card batched with a gated mutation rolls back with it. The card is the one write that must always land.
+2. **`401 unknown_user`** from `/read_session` means this device has no card for the caller (new device, wiped database). Ingest the card (rule 1), then open the session again, once.
+
+### Writes
+
+How a blocked write looks today:
+
+| Endpoint | Blocked write |
+|----------|---------------|
+| `POST /ingest` | `403 {"error": "not_in_trust_chain", "max_depth": N}` |
+| `POST /ingest_each` | row result `{"status": "error", "error": "not_in_trust_chain", "max_depth": N}`. The response is `403` if every failed row is blocked, `422` if any row failed for another reason |
+
+**Decide per row, by the `error` string.** A `422` batch can mix blocked rows with real validation failures, so the status code alone does not tell them apart.
+
+1. **Not permanent.** A blocked write is not a validation failure. Do not quarantine or drop it, and do not roll back the user's optimistic state. Keep it pending in the outbox. (`ingest.ts` currently treats any `422` as permanent and anything else, `403` included, as transient. Blocked rows must be neither.)
+2. **Not transient either.** Do not put it on the backoff retry schedule. Pause outbox draining for this identity and enter [Awaiting approval](#awaiting-approval). Resume draining when approval is detected.
+3. **Partial batches.** In an `/ingest_each` batch, rows that succeeded stay committed. Only the blocked rows stay pending.
+4. **Never blocked:** `user_card` and `vouch_token` writes, `review_post_right(_candidate)` and `review_revoke_right(_candidate)`, and any write by the owner.
+5. **File uploads.** `PUT /file_chunk/...` has no chain check of its own; the `file` row carries it. Upload chunks only after the `file` row is accepted. If the `file` row is blocked, hold the chunks with it. The server accepts chunks for a file that has no row, so uploading first would leave orphan chunks on the device.
+
+### Reads
+
+The session endpoint is described in [Opening a session](#opening-a-session).
+
+1. **Lazy.** Send no session until a read returns `401 {"error": "read_session_required", "shape": S}`. Then open a session for `S`. The body names the shape, so the client needs no table-to-shape map.
+2. **One session per shape, shared.** Keep a per-identity map `shape → {token, expires_at}` and at most one open in flight per shape. Concurrent `401`s for the same shape await the same promise. One open dialog has 5 collections over 4 shapes, and they all get `401` at once when the mode switches.
+3. **Renew** when less than 60 s remain (`expires_in` is 300), and on any `401 read_session_required` even if the local token looks valid. A server restart drops every session.
+4. **Electric streams** (`@electric-sql/client`, used by the TanStack Electric collections through `shapeOptions`):
+   - `headers: { Authorization: () => bearerFor(shape) }`. Use a function, not a string, so every long-poll picks up a renewed token. `bearerFor` returns `"Bearer <token>"`, or `""` before a session exists.
+   - `onError`: for a `FetchError` with status `401` and `json.error === "read_session_required"`, open or renew the session for `json.shape` and return `{}`. The retry re-reads the header function.
+   - If opening the session returns `403`, enter [Awaiting approval](#awaiting-approval) and return `undefined` to stop the stream. Do not keep it retrying through `onError`: the client's consecutive-retry guard would end it anyway. The approval probe restarts stopped streams.
+   - Leave all other errors to the existing handling.
+5. **One-shot reads** (`readShapeOnce`, `GET /file_chunk/:file_id/:chunk_index`, `GET /file_chunk_status`): send the same header. On `401 read_session_required`, open the session and retry once. A second `401` is an error.
+6. **Service worker video streamer.** `sw.js` fetches `/file_chunk/...` itself and holds no identity key, so it never opens sessions:
+   - The page includes the current `file_chunk` token in the video session it posts to the worker.
+   - The worker sends `Authorization: Bearer <token>` on chunk fetches.
+   - On `401` the worker asks the page for a fresh token (a `need-token` message, like the existing `need-session`), retries once, then fails the range.
+7. **Tokens are secrets.** Keep them in memory only: not in URLs, logs, IndexedDB, or the outbox. After a reload, sessions are opened lazily again.
+8. **Shape barriers.** A write that waits for its txid in a collection (`awaitTxId`) must not wait on a stream that is stopped for approval. It would only time out. While the stream's shape is blocked, treat the ingest `200` as the commit and resolve the barrier.
+
+### Awaiting approval
+
+Entered on `403 not_in_trust_chain` from `/read_session` (only in `trust` mode) or on a `not_in_trust_chain` write (`guarded` or `trust`).
+
+- **UI.** Show "Waiting for approval by the device owner" together with the user's own `user_hash`, so the owner can find and approve them. `max_depth` is not user-facing.
+- **Guarded mode:** reads still work. The app stays usable read-only, and sends queue as pending.
+- **Trust mode:** blocked shapes show no data. Locally persisted data stays visible.
+- **Per shape.** A vouch can cover a single shape (`storage.read.file`). Track blocked shapes individually. Show the banner when any shape the current screen needs is blocked.
+- **Probing.** Nothing pushes an approval, so the client polls:
+  - Probe 15 s after entering the state, then double the interval up to a 5 min cap.
+  - Also probe immediately on a "Check again" button, when the app becomes visible, and on network reconnect.
+  - Blocked read: the probe opens a session for a blocked shape. On success, restart that shape's streams.
+  - Blocked write: the probe sends the first blocked outbox entry. On success, resume draining.
+  - Each probe costs one challenge and one ML-DSA signature.
+- **Leaving.** Any successful session open or write for a shape clears that shape's blocked state.
+- **Revocation.** An approved client whose vouch is revoked gets `401` on its next read within 5 min. Renewing then returns `403`, which puts it into this state. Local data and pending writes are kept.
 
 ---
 
@@ -408,15 +477,19 @@ Client                          Server
 
 In Progress. Server identity (`Chat.Pq.ServerIdentity`), device identity (`Chat.DeviceId`), owner bootstrap (`Chat.Pq.OwnerBootstrap`), gate mode storage in AdminDB, and admin sandbox UI with gate mode switching are implemented. Write-side vouch chain enforcement is implemented per shape via `Chat.Pq.WriteGate` (see [Current implementation](#current-implementation-chatpqwritegate)).
 
+Read gating (server side) is implemented:
+
+- `Chat.Pq.ReadSession` — ETS store, per shape, 5 min fixed TTL, periodic sweep.
+- `Chat.Pq.ReadGate` — PoP + `storage.read.<shape>` chain check; `POST /electric/v1/read_session` (`ChatWeb.ReadSessionController`).
+- `ChatWeb.Plugs.ElectricReadGate` on `/shapes` (shape from `?table=`, versions tables map to the owning shape) and on `file_chunk/:file_id/:chunk_index` + `file_chunk_status` (shape `file_chunk`). Passing responses get `cache-control: private` + `vary: authorization`.
+- `max_depth` in the `403` body and in the read chain check is `VouchToken.default_max_depth/0` (7) until the setting exists.
+
 Pending:
 
 - The `ElectricAccessGate` plug (PoP + vouch chain enforcement in the router pipeline).
-- `max_depth` setting and enforcement.
-- Read gating in `trust` mode (see [Read Gating](#read-gating-read-sessions)):
-  - `Chat.Pq.ReadSession` ETS store (per shape, 5 min TTL) and `POST /electric/v1/read_session` (PoP + `storage.read.<shape>` chain check).
-  - `ChatWeb.Plugs.ElectricReadGate` on `/shapes`, legacy `sync` routes, and file_chunk reads.
-  - `cache-control: private` + `Vary: Authorization` in `trust` mode.
-  - chat-frontend: open sessions lazily per shape on `401`, send `Authorization: Bearer` on shape reads and `readShapeOnce`, show "waiting for approval" on `403`.
+- `max_depth` setting and enforcement (writes ignore it; reads use the fixed default).
+- chat-frontend: implement [Client Behaviour](#client-behaviour).
+- Peer servers: how a peer's server identity `user_card` reaches the target device.
 
 ## Open Questions
 

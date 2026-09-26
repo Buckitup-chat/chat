@@ -32,6 +32,7 @@ defmodule Chat.Application do
         Chat.Pq.ServerIdentity,
         # Application Services
         Chat.Challenge,
+        Chat.Pq.ReadSession,
         Chat.KeyRingTokens,
         Chat.Broker,
         Chat.ChunkedFilesBroker,

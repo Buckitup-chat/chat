@@ -21,10 +21,11 @@ defmodule ChatWeb.ElectricController do
     {:nowarn_function, changeset_errors: 1}
   ]
 
-  alias Chat.Challenge
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Shapes
   alias Chat.Pq.OwnerBootstrap
+  alias Chat.Pq.WriteGate
+  alias ChatWeb.Utils.IngestPop
   alias ChatWeb.Utils.IngestUtil
   alias Phoenix.Sync.Writer
   alias Phoenix.Sync.Writer.Format
@@ -41,7 +42,7 @@ defmodule ChatWeb.ElectricController do
          {_, true} <- {:is_mutation_list, is_list(mutations)},
          {:ok, mutations} <-
            IngestUtil.decode_mutation_fields(mutations, @hex_suffixes, @base64_suffixes),
-         {:ok, user_pop_context} <- user_pop_context(params),
+         {:ok, user_pop_context} <- IngestPop.context(params),
          {:ok, txid, changes} <-
            Writer.new()
            |> config_writer(user_pop_context)
@@ -65,7 +66,7 @@ defmodule ChatWeb.ElectricController do
   def ingest_each(conn, params) do
     with {_, %{"mutations" => mutations}} <- {:correct_params, params},
          {_, true} <- {:is_mutation_list, is_list(mutations)},
-         {:ok, user_pop_context} <- user_pop_context(params) do
+         {:ok, user_pop_context} <- IngestPop.context(params) do
       writer = Writer.new() |> config_writer(user_pop_context)
 
       results =
@@ -73,8 +74,7 @@ defmodule ChatWeb.ElectricController do
         |> IngestUtil.decode_mutation_fields_each(@hex_suffixes, @base64_suffixes)
         |> Enum.map(&apply_single_mutation(writer, &1))
 
-      status = if Enum.all?(results, &(&1.status != "error")), do: 200, else: 422
-      conn |> put_status(status) |> json(%{results: results})
+      conn |> put_status(ingest_each_status(results)) |> json(%{results: results})
     else
       error -> handle_ingest_error(conn, error)
     end
@@ -110,15 +110,24 @@ defmodule ChatWeb.ElectricController do
     end
   end
 
+  # 403 only when trust gating is the sole reason rows failed, so the client
+  # can hold the whole batch for approval
+  defp ingest_each_status(results) do
+    case Enum.filter(results, &(&1.status == "error")) do
+      [] -> 200
+      failed -> if Enum.all?(failed, &WriteGate.denied?(&1.error)), do: 403, else: 422
+    end
+  end
+
   defp format_mutation_error(error) do
     case error do
+      {:error, _, %Writer.Error{message: msg}, _} when is_binary(msg) ->
+        if WriteGate.denied?(msg), do: WriteGate.denied_body(), else: %{error: msg}
+
       {:error, _, %Ecto.Changeset{} = changeset, _} ->
         if pub_key_unique_conflict?(changeset),
           do: %{error: "pub_key_taken"},
           else: %{error: "validation_failed", details: changeset_errors(changeset)}
-
-      {:error, _, %Writer.Error{message: msg}, _} when is_binary(msg) ->
-        %{error: msg}
 
       {:error, reason} when is_binary(reason) ->
         %{error: reason}
@@ -164,37 +173,6 @@ defmodule ChatWeb.ElectricController do
     end)
   end
 
-  defp user_pop_context(params) do
-    {challenge_id, signature_encoded} = pop_from_body(params)
-
-    with {_, true} <- {:has_auth, is_binary(challenge_id) and is_binary(signature_encoded)},
-         {:ok, challenge} <- fetch_challenge(challenge_id),
-         {:ok, signature} <- decode_signature(signature_encoded) do
-      {:ok, %{challenge: challenge, signature: signature}}
-    else
-      {:has_auth, false} -> {:error, {:unauthorized, "Missing user PoP auth"}}
-      :error -> {:error, {:unauthorized, "Invalid or expired challenge"}}
-    end
-  end
-
-  defp pop_from_body(%{"auth" => %{"challenge_id" => challenge_id, "signature" => signature}})
-       when is_binary(challenge_id) and is_binary(signature) do
-    {challenge_id, signature}
-  end
-
-  defp pop_from_body(_params), do: {nil, nil}
-
-  defp fetch_challenge(challenge_id) do
-    case Challenge.get(challenge_id) do
-      challenge when is_binary(challenge) -> {:ok, challenge}
-      _ -> :error
-    end
-  end
-
-  defp decode_signature(signature_encoded) do
-    Base.decode64(signature_encoded, padding: false)
-  end
-
   defp handle_ingest_error(conn, error) do
     case error do
       {:error, {:service_unavailable, msg}} when is_binary(msg) ->
@@ -217,7 +195,9 @@ defmodule ChatWeb.ElectricController do
         respond_changeset_error(conn, changeset)
 
       {:error, _, %Writer.Error{message: msg}, _} when is_binary(msg) ->
-        send_resp(conn, 400, msg)
+        if WriteGate.denied?(msg),
+          do: conn |> put_status(:forbidden) |> json(WriteGate.denied_body()),
+          else: send_resp(conn, 400, msg)
 
       {:error, reason} when is_binary(reason) ->
         send_resp(conn, 400, reason)

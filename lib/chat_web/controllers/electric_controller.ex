@@ -11,6 +11,8 @@ defmodule ChatWeb.ElectricController do
     {:nowarn_function, handle_ingest_error: 2},
     {:nowarn_function, respond_changeset_error: 2},
     {:nowarn_function, apply_single_mutation: 2},
+    {:nowarn_function, maybe_capture_owner: 1},
+    {:nowarn_function, put_promotion_headers: 2},
     {:nowarn_function, format_mutation_error: 1},
     {:nowarn_function, detect_conflict: 1},
     {:nowarn_function, fetch_existing: 2},

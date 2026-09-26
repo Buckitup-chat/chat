@@ -13,15 +13,15 @@ The system starts in `open` mode. The first user to ingest a `user_card` registe
 ---
 
 ## Access Modes
-| Mode | New user_card ingest | Other ingest (existing users) | Shape reads / sync |
-|------|---------------------|-------------------------------|--------------------|
-| `open` | Anyone | Anyone with valid PoP | Anyone with valid PoP |
-| `guarded` | Allowed if within chain distance | Chain-gated (see [Trust Gate](#trust-gate)) | Anyone with valid PoP |
-| `trust` | Allowed if within chain distance | Chain-gated (see [Trust Gate](#trust-gate)) | Chain-gated (same mechanism) |
+| Mode | `user_card` / `vouch_token` ingest | Other ingest | Shape reads / sync |
+|------|------------------------------------|--------------|--------------------|
+| `open` | Anyone with valid PoP | Anyone with valid PoP | Anyone with valid PoP |
+| `guarded` | Anyone with valid PoP (never chain-gated) | Chain-gated (see [Trust Gate](#trust-gate)) | Anyone with valid PoP |
+| `trust` | Anyone with valid PoP (never chain-gated) | Chain-gated (see [Trust Gate](#trust-gate)) | Chain-gated (same mechanism) |
 
 Default mode: `open` (preserves current behavior). `guarded` mode gates writes via vouch chain but leaves reads open to anyone with valid PoP. `trust` mode gates **all** access — reads, writes, and peer sync — via PoP + vouch chain. The same mechanism applies to users and peer servers alike.
 
-> **New user_cards in gated modes:** In `guarded` and `trust` modes, a new `user_card` ingest is allowed through when the user's `user_hash` already has a vouch token chain path within `max_depth` — e.g., the owner issued a vouch via optical handshake or manual approval before the user submitted their card. The vouch edge exists first; the card ingest passes the gate because the user is already reachable.
+> **`user_card` and `vouch_token` are never chain-gated.** They are the inputs to chain resolution: `user_cards` supply `sign_pkey` for each `user_hash`, and vouch tokens are the graph edges. The server must accept every one it is offered, in any mode, so it can resolve chains. Gating them would be circular — a user couldn't become reachable without first being reachable, and a missing intermediate card or token would break chains for everyone downstream of it. Both still go through their shape's own PoP / signature checks. Accepting a card or token grants nothing by itself: the chain check on other shapes decides what the user can write.
 
 Optical-handshake contacts and explicit owner approvals are vouch tokens granting `device.<sn>.storage.write` (and optionally `device.<sn>.storage.read`) — they place a user at chain distance 1 from the owner. Provenance (how trust was established) is inferred from the issuer, not encoded in the scope. The owner controls effective behavior by tuning the maximum allowed chain depth.
 
@@ -163,9 +163,51 @@ The request carries a PoP signature (signed challenge) and the caller's `user_ha
 1. Extract `user_hash`, `challenge_id`, and `signature` from `params["auth"]`.
 2. Look up `sign_pkey` from `user_cards` for the given `user_hash`.
 3. Verify `ML-DSA-87.verify(challenge, signature, sign_pkey)`. If valid → caller is identified, proceed with mode checks.
-4. If `user_hash` is unknown (no user_card yet) — check if this is a `user_card` create mutation. If so, extract `sign_pkey` from the mutation payload, compute `user_hash`, and verify the signature against that key. If valid: in `open` mode, allow; in `guarded`/`trust` mode, check chain distance.
+4. If `user_hash` is unknown (no user_card yet) — check if this is a `user_card` create mutation. If so, extract `sign_pkey` from the mutation payload, compute `user_hash`, and verify the signature against that key. If valid, allow in every mode — `user_card` is never chain-gated (see the note under [Access Modes](#access-modes)).
 
 Caller resolution uses `user_cards` + vouch token cache — no separate derived table needed.
+
+### Current implementation: `Chat.Pq.WriteGate`
+
+Until the `ElectricAccessGate` plug lands, write gating is enforced per shape, inside the ingest writer, not in the router pipeline. `Chat.Pq.WriteGate.and_gate/3` wraps a shape's `check` callback. The chain check runs only after the shape's own PoP/ownership check returns `:ok`:
+
+```elixir
+check:
+  WriteGate.and_gate(&Validation.message_allowed(&1, user_pop_context), :dialog_messages,
+    owner: "sender_hash"
+  )
+```
+
+Decision order (`WriteGate.check_access/2`):
+
+1. `:pq_gate_mode` is `:open` (or unset) → allow.
+2. The owner field on the mutation is `nil` → allow.
+3. No owner registered (`OwnerBootstrap.owner/0` is `nil`) → allow.
+4. Caller is the owner → allow.
+5. Otherwise, `VouchToken.chain_distance(owner_hash, user_hash, "device.<id>.storage.write.<shape>")` must return `{:ok, _}`. If it doesn't, the mutation is rejected with `{:error, "not_in_trust_chain"}`.
+
+The caller's `user_hash` comes from `changes[field]` on insert and `data[field]` on update/delete. `field` defaults to `"user_hash"` and is overridden with `owner:` per shape:
+
+| Shape | Owner field |
+|-------|-------------|
+| `dialog_keys`, `dialog_messages` | `sender_hash` |
+| `dialog_message_reactions` | `reactor_hash` |
+| `dialog_message_receipts` | `peer_hash` |
+| `file`, `file_chunk` | `uploader_hash` |
+| `origin`, `review_public_passwords` | `origin_hash` |
+| `review`, `review_password_candidate` | `author_hash` |
+| `review_list`, `user_storage` | `user_hash` (default) |
+
+Not wrapped (ungated in every mode):
+
+- `user_card`, `vouch_token` — intentionally, so the server receives every card and token it is offered and can resolve chains (see the note under [Access Modes](#access-modes)).
+- `review_post_right(_candidate)`, `review_revoke_right(_candidate)`.
+
+**Differences from the target design above:**
+
+- `max_depth` is not enforced. Any reachable path passes, and the error body carries no `max_depth`.
+- `guarded` and `trust` behave the same: only writes are gated. Shape reads / sync are not gated in any mode.
+- A rejection surfaces as a writer check error, not as a plug-level `403` before the controller.
 
 ---
 
@@ -247,7 +289,13 @@ Client                          Server
 
 ## Status
 
-In Progress. Server identity (`Chat.Pq.ServerIdentity`), device identity (`Chat.DeviceId`), owner bootstrap (`Chat.Pq.OwnerBootstrap`), gate mode storage in AdminDB, and admin sandbox UI with gate mode switching are implemented. The `ElectricAccessGate` plug (PoP + vouch chain enforcement in the router pipeline) is pending.
+In Progress. Server identity (`Chat.Pq.ServerIdentity`), device identity (`Chat.DeviceId`), owner bootstrap (`Chat.Pq.OwnerBootstrap`), gate mode storage in AdminDB, and admin sandbox UI with gate mode switching are implemented. Write-side vouch chain enforcement is implemented per shape via `Chat.Pq.WriteGate` (see [Current implementation](#current-implementation-chatpqwritegate)).
+
+Pending:
+
+- The `ElectricAccessGate` plug (PoP + vouch chain enforcement in the router pipeline).
+- `max_depth` setting and enforcement.
+- Read gating in `trust` mode.
 
 ## Open Questions
 

@@ -43,7 +43,7 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
       assert conn.status == 200, conn.resp_body
     end
 
-    test "POST /electric/v1/ingest with duplicate UUID returns 422", ctx do
+    test "POST /electric/v1/ingest with duplicate UUID returns 409", ctx do
       uuid = Ecto.UUID.generate()
 
       payload =
@@ -68,8 +68,8 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
 
       conn = post_ingest(ctx.conn, duplicate_payload, ctx.identity.sign_skey)
 
-      assert conn.status == 422
-      assert %{"error" => "validation_failed"} = Jason.decode!(conn.resp_body)
+      assert conn.status == 409
+      assert %{"status" => "exists", "conflicted" => true} = Jason.decode!(conn.resp_body)
     end
 
     test "POST /electric/v1/ingest without PoP returns 401", ctx do

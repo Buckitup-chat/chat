@@ -1,5 +1,5 @@
 defmodule ChatWeb.UploadChunkControllerTest do
-  use ChatWeb.ConnCase, async: true
+  use ChatWeb.ConnCase, async: false
   import Mock
 
   alias Chat.ChunkedFiles
@@ -26,7 +26,7 @@ defmodule ChatWeb.UploadChunkControllerTest do
       file_size = File.stat!(@upload_fixture).size
 
       responses =
-        File.stream!(@upload_fixture, [], @chunk_size)
+        File.stream!(@upload_fixture, @chunk_size, [])
         |> Stream.with_index()
         |> Stream.map(fn {chunk, index} ->
           offset = index * @chunk_size

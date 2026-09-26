@@ -1,5 +1,5 @@
 defmodule Chat.NetworkSynchronization.RetrievalTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   import Rewire
 
   alias Chat.Db.Copying

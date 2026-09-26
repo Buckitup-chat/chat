@@ -1,5 +1,5 @@
 defmodule Chat.Db.DbTypeTest do
-  use ExUnit.Case, async: true, group: :cubdb
+  use ExUnit.Case, async: false
 
   alias Chat.Db
   alias Chat.Db.{DbType, InternalDb, MainDb, MainDbSupervisor, MediaDbSupervisor}

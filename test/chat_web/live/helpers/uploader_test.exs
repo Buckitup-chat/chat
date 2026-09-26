@@ -1,5 +1,5 @@
 defmodule ChatWeb.Helpers.UploaderTest do
-  use ChatWeb.ConnCase, async: true, group: :cubdb
+  use ChatWeb.ConnCase, async: false
   @moduletag :shared_sandbox
   use ChatWeb.DataCase
 

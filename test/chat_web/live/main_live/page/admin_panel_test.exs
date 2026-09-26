@@ -1,5 +1,5 @@
 defmodule ChatWeb.MainLive.Page.AdminPanelTest do
-  use ChatWeb.ConnCase, async: true, group: :cubdb
+  use ChatWeb.ConnCase, async: false
 
   import ChatWeb.LiveTestHelpers
   import Phoenix.LiveViewTest

@@ -1,5 +1,5 @@
 defmodule Chat.Rooms.RoomInputTest do
-  use ChatWeb.DataCase, async: true, group: :cubdb
+  use ChatWeb.DataCase, async: false
 
   alias Chat.Admin.MediaSettings
   alias Chat.Db.ChangeTracker

@@ -8,7 +8,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.ApiClient do
   the write as the origin identity.
   """
 
-  import ChatWeb.ElectricLive.ReviewSandboxLive.Http, only: [get_challenge: 1, post_ingest: 4]
+  import ChatWeb.ElectricLive.SandboxHttp, only: [get_challenge: 1, post_ingest: 4]
 
   @doc "Submits an unwrapped, author-signed review_public_passwords row."
   def moderate(identity, %{status: :ok, row: row}, base_url) do
@@ -23,7 +23,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.ApiClient do
     }
 
     with {:ok, challenge, log1} <- get_challenge(base_url),
-         {:ok, _resp, log2} <- post_ingest(challenge, payload, identity.sign_skey, base_url) do
+         {:ok, _body, log2} <- post_ingest(challenge, payload, identity.sign_skey, base_url) do
       {:ok, %{log_entries: [log1, log2]}}
     else
       {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}

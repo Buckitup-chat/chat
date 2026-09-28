@@ -4,6 +4,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
   All reads go through Electric shape endpoints — no direct Ecto queries.
   """
 
+  import ChatWeb.ElectricLive.SandboxHttp
+
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.DialogKey
   alias Chat.Data.Schemas.DialogMessage
@@ -16,17 +18,13 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
   alias Electric.Client.Message
 
   def fetch_all_user_cards(base_url) do
-    "#{base_url}/electric/v1/shapes?table=user_cards&offset=-1"
-    |> fetch_shape_as(:cards)
+    base_url |> fetch_shape("user_cards") |> wrap_result(:cards)
   end
 
   def fetch_user_card(user_hash, base_url) do
-    url = shapes_url(base_url, "user_cards", "user_hash='#{user_hash}'")
-
-    case fetch_shape(url) do
+    case fetch_shape(base_url, "user_cards", "user_hash='#{user_hash}'") do
       {:ok, rows, log} ->
-        card = List.first(rows)
-        {:ok, %{card: card, log_entries: [log]}}
+        {:ok, %{card: List.first(rows), log_entries: [log]}}
 
       {:error, reason, log} ->
         {:error, %{reason: reason, log_entries: [log]}}
@@ -34,12 +32,10 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
   end
 
   def fetch_dialog_keys(user_hash, base_url) do
-    # sender_hash requires ::text cast — Electric can't filter on 2nd PK column directly
-    url_sender = shapes_url(base_url, "dialog_keys", "sender_hash::text='#{user_hash}'")
-    url_peer = shapes_url(base_url, "dialog_keys", "peer_hash='#{user_hash}'")
-
-    with {:ok, sender_rows, log1} <- fetch_shape(url_sender),
-         {:ok, peer_rows, log2} <- fetch_shape(url_peer) do
+    with {:ok, sender_rows, log1} <-
+           fetch_shape(base_url, "dialog_keys", "sender_hash::text='#{user_hash}'"),
+         {:ok, peer_rows, log2} <-
+           fetch_shape(base_url, "dialog_keys", "peer_hash='#{user_hash}'") do
       all_keys =
         (sender_rows ++ peer_rows)
         |> Enum.uniq_by(&{&1["dialog_hash"], &1["sender_hash"]})
@@ -51,21 +47,19 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
   end
 
   def fetch_dialog_keys_by_dialog(dialog_hash, base_url) do
-    base_url
-    |> shapes_url("dialog_keys", "dialog_hash='#{dialog_hash}'")
-    |> fetch_shape_as(:keys)
+    base_url |> fetch_shape("dialog_keys", "dialog_hash='#{dialog_hash}'") |> wrap_result(:keys)
   end
 
   def fetch_dialog_messages(dialog_hash, base_url) do
     base_url
-    |> shapes_url("dialog_messages", "dialog_hash='#{dialog_hash}'")
-    |> fetch_shape_as(:messages)
+    |> fetch_shape("dialog_messages", "dialog_hash='#{dialog_hash}'")
+    |> wrap_result(:messages)
   end
 
   def fetch_message_versions(message_id, base_url) do
     base_url
-    |> shapes_url("dialog_messages_versions", "message_id='#{message_id}'")
-    |> fetch_shape_as(:versions)
+    |> fetch_shape("dialog_messages_versions", "message_id='#{message_id}'")
+    |> wrap_result(:versions)
   end
 
   def publish_dialog_key(user, peer_hash, peer_crypt_pkey, base_url) do
@@ -109,12 +103,9 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
       ]
     }
 
-    with {:ok, challenge_resp, challenge_log} <- get_challenge(base_url),
-         {:ok, _resp, ingest_log} <-
-           post_ingest(challenge_resp, payload, user.sign_skey, base_url) do
-      {:ok, %{dialog_hash: dialog_hash, log_entries: [challenge_log, ingest_log]}}
-    else
-      {:error, reason, log_entries} -> {:error, %{reason: reason, log_entries: log_entries}}
+    case ingest(payload, user.sign_skey, base_url) do
+      {:ok, _body, logs} -> {:ok, %{dialog_hash: dialog_hash, log_entries: logs}}
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end
   end
 
@@ -169,13 +160,12 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
       ]
     }
 
-    with {:ok, challenge_resp, challenge_log} <- get_challenge(base_url),
-         {:ok, _resp, ingest_log} <-
-           post_ingest(challenge_resp, payload, user.sign_skey, base_url) do
-      {:ok,
-       %{message_id: message_id, sign_hash: sign_hash, log_entries: [challenge_log, ingest_log]}}
-    else
-      {:error, reason, log_entries} -> {:error, %{reason: reason, log_entries: log_entries}}
+    case ingest(payload, user.sign_skey, base_url) do
+      {:ok, _body, logs} ->
+        {:ok, %{message_id: message_id, sign_hash: sign_hash, log_entries: logs}}
+
+      {:error, reason, logs} ->
+        {:error, %{reason: reason, log_entries: logs}}
     end
   end
 
@@ -216,25 +206,28 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
     sign_b64 = sign(msg_struct, user.sign_skey)
     sign_hash = Crypto.compute_sign_hash(sign_b64)
 
-    original = %{
-      "message_id" => message_id,
-      "sender_hash" => user.user_hash,
-      "dialog_hash" => dialog_hash
-    }
+    payload =
+      update_payload(
+        "dialog_messages",
+        %{
+          "message_id" => message_id,
+          "sender_hash" => user.user_hash,
+          "dialog_hash" => dialog_hash
+        },
+        %{
+          "content_b64" => encode_base64(content_b64),
+          "deleted_flag" => false,
+          "refs_map_b64" => encode_base64(refs_map_b64),
+          "parent_sign_hash" => current_sign_hash,
+          "owner_timestamp" => owner_timestamp,
+          "sign_b64" => encode_base64(sign_b64),
+          "sign_hash" => sign_hash
+        }
+      )
 
-    changes = %{
-      "content_b64" => encode_base64(content_b64),
-      "deleted_flag" => false,
-      "refs_map_b64" => encode_base64(refs_map_b64),
-      "parent_sign_hash" => current_sign_hash,
-      "owner_timestamp" => owner_timestamp,
-      "sign_b64" => encode_base64(sign_b64),
-      "sign_hash" => sign_hash
-    }
-
-    with {:ok, result} <-
-           publish_update_mutation("dialog_messages", original, changes, user.sign_skey, base_url) do
-      {:ok, Map.put(result, :sign_hash, sign_hash)}
+    case ingest(payload, user.sign_skey, base_url) do
+      {:ok, _body, logs} -> {:ok, %{sign_hash: sign_hash, log_entries: logs}}
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end
   end
 
@@ -272,23 +265,29 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
     sign_b64 = sign(msg_struct, user.sign_skey)
     sign_hash = Crypto.compute_sign_hash(sign_b64)
 
-    original = %{
-      "message_id" => message_id,
-      "sender_hash" => user.user_hash,
-      "dialog_hash" => dialog_hash
-    }
+    payload =
+      update_payload(
+        "dialog_messages",
+        %{
+          "message_id" => message_id,
+          "sender_hash" => user.user_hash,
+          "dialog_hash" => dialog_hash
+        },
+        %{
+          "content_b64" => "",
+          "deleted_flag" => true,
+          "refs_map_b64" => encode_base64(refs_map_b64),
+          "parent_sign_hash" => current_sign_hash,
+          "owner_timestamp" => owner_timestamp,
+          "sign_b64" => encode_base64(sign_b64),
+          "sign_hash" => sign_hash
+        }
+      )
 
-    changes = %{
-      "content_b64" => "",
-      "deleted_flag" => true,
-      "refs_map_b64" => encode_base64(refs_map_b64),
-      "parent_sign_hash" => current_sign_hash,
-      "owner_timestamp" => owner_timestamp,
-      "sign_b64" => encode_base64(sign_b64),
-      "sign_hash" => sign_hash
-    }
-
-    publish_update_mutation("dialog_messages", original, changes, user.sign_skey, base_url)
+    case ingest(payload, user.sign_skey, base_url) do
+      {:ok, _body, logs} -> {:ok, %{log_entries: logs}}
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
+    end
   end
 
   def start_message_stream(dialog_hash, base_url, subscriber_pid) do
@@ -389,7 +388,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
       "sign_b64" => encode_base64(sign_b64)
     }
 
-    publish_mutation("dialog_message_reactions", fields, user.sign_skey, base_url)
+    publish_insert("dialog_message_reactions", fields, user.sign_skey, base_url)
   end
 
   def delete_reaction(user, existing_reaction, peer_hash, base_url) do
@@ -413,27 +412,27 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
 
     sign_b64 = sign(reaction_struct, user.sign_skey)
 
-    original = %{
-      "reaction_hash" => existing_reaction.reaction_hash,
-      "reactor_hash" => user.user_hash,
-      "dialog_hash" => existing_reaction.dialog_hash,
-      "message_id" => existing_reaction.message_id
-    }
+    payload =
+      update_payload(
+        "dialog_message_reactions",
+        %{
+          "reaction_hash" => existing_reaction.reaction_hash,
+          "reactor_hash" => user.user_hash,
+          "dialog_hash" => existing_reaction.dialog_hash,
+          "message_id" => existing_reaction.message_id
+        },
+        %{
+          "type_b64" => encode_base64(type_b64),
+          "deleted_flag" => true,
+          "owner_timestamp" => owner_timestamp,
+          "sign_b64" => encode_base64(sign_b64)
+        }
+      )
 
-    changes = %{
-      "type_b64" => encode_base64(type_b64),
-      "deleted_flag" => true,
-      "owner_timestamp" => owner_timestamp,
-      "sign_b64" => encode_base64(sign_b64)
-    }
-
-    publish_update_mutation(
-      "dialog_message_reactions",
-      original,
-      changes,
-      user.sign_skey,
-      base_url
-    )
+    case ingest(payload, user.sign_skey, base_url) do
+      {:ok, _body, logs} -> {:ok, %{log_entries: logs}}
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
+    end
   end
 
   def publish_receipt(user, dialog_hash, message_id, message_sign_hash, type, base_url) do
@@ -466,19 +465,19 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
       "sign_b64" => encode_base64(sign_b64)
     }
 
-    publish_mutation("dialog_message_receipts", fields, user.sign_skey, base_url)
+    publish_insert("dialog_message_receipts", fields, user.sign_skey, base_url)
   end
 
   def fetch_reactions(dialog_hash, base_url) do
     base_url
-    |> shapes_url("dialog_message_reactions", "dialog_hash='#{dialog_hash}'")
-    |> fetch_shape_as(:reactions)
+    |> fetch_shape("dialog_message_reactions", "dialog_hash='#{dialog_hash}'")
+    |> wrap_result(:reactions)
   end
 
   def fetch_receipts(dialog_hash, base_url) do
     base_url
-    |> shapes_url("dialog_message_receipts", "dialog_hash='#{dialog_hash}'")
-    |> fetch_shape_as(:receipts)
+    |> fetch_shape("dialog_message_receipts", "dialog_hash='#{dialog_hash}'")
+    |> wrap_result(:receipts)
   end
 
   def start_reaction_stream(dialog_hash, base_url, subscriber_pid) do
@@ -559,7 +558,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
     end)
   end
 
-  defp publish_mutation(relation, fields, sign_skey, base_url) do
+  defp publish_insert(relation, fields, sign_skey, base_url) do
     payload = %{
       "mutations" => [
         %{
@@ -570,17 +569,14 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
       ]
     }
 
-    with {:ok, challenge_resp, challenge_log} <- get_challenge(base_url),
-         {:ok, _resp, ingest_log} <-
-           post_ingest(challenge_resp, payload, sign_skey, base_url) do
-      {:ok, %{log_entries: [challenge_log, ingest_log]}}
-    else
-      {:error, reason, log_entries} -> {:error, %{reason: reason, log_entries: log_entries}}
+    case ingest(payload, sign_skey, base_url) do
+      {:ok, _body, logs} -> {:ok, %{log_entries: logs}}
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end
   end
 
-  defp publish_update_mutation(relation, original, changes, sign_skey, base_url) do
-    payload = %{
+  defp update_payload(relation, original, changes) do
+    %{
       "mutations" => [
         %{
           "type" => "update",
@@ -590,187 +586,16 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
         }
       ]
     }
-
-    with {:ok, challenge_resp, challenge_log} <- get_challenge(base_url),
-         {:ok, _resp, ingest_log} <-
-           post_ingest(challenge_resp, payload, sign_skey, base_url) do
-      {:ok, %{log_entries: [challenge_log, ingest_log]}}
-    else
-      {:error, reason, log_entries} -> {:error, %{reason: reason, log_entries: log_entries}}
-    end
   end
 
-  # --- Private helpers ---
+  defp wrap_result({:ok, rows, log}, key), do: {:ok, %{key => rows, log_entries: [log]}}
 
-  defp shapes_url(base_url, table, where) do
-    "#{base_url}/electric/v1/shapes?table=#{table}&offset=-1&where=#{URI.encode(where)}"
-  end
-
-  defp fetch_shape_as(url, key) do
-    case fetch_shape(url) do
-      {:ok, rows, log} -> {:ok, %{key => rows, log_entries: [log]}}
-      {:error, reason, log} -> {:error, %{reason: reason, log_entries: [log]}}
-    end
-  end
+  defp wrap_result({:error, reason, log}, _key),
+    do: {:error, %{reason: reason, log_entries: [log]}}
 
   defp sign(struct, sign_skey) do
     struct
     |> Integrity.signature_payload()
     |> EnigmaPq.sign(sign_skey)
   end
-
-  defp fetch_shape(url) do
-    timestamp = TimeKeeper.now()
-    headers = [{"accept", "application/json"}]
-
-    case fetch_shape_pages(url, headers, %{}) do
-      {:ok, rows} ->
-        {:ok, rows,
-         build_log("GET", url, headers, "", 200, [], Jason.encode!(rows, pretty: true), timestamp)}
-
-      {:error, {status, body, rh}} ->
-        {:error, "Shape request failed (#{status})",
-         build_log("GET", url, headers, "", status, rh, inspect(body), timestamp)}
-
-      {:error, reason} ->
-        {:error, "Shape request failed: #{inspect(reason)}",
-         build_log("GET", url, headers, "", 0, [], inspect(reason), timestamp)}
-    end
-  end
-
-  defp fetch_shape_pages(url, headers, acc) do
-    case Req.get(url, headers: headers) do
-      {:ok, %{status: 200, body: body, headers: rh}} ->
-        rows = apply_shape_operations(acc, body)
-
-        if up_to_date?(body) do
-          {:ok, Map.values(rows)}
-        else
-          next_url = next_page_url(url, rh)
-          fetch_shape_pages(next_url, headers, rows)
-        end
-
-      {:ok, %{status: 204}} ->
-        {:ok, Map.values(acc)}
-
-      {:ok, %{status: s, body: b, headers: rh}} ->
-        {:error, {s, b, rh}}
-
-      {:error, e} ->
-        {:error, e}
-    end
-  end
-
-  defp up_to_date?(body) when is_list(body) do
-    Enum.any?(body, &match?(%{"headers" => %{"control" => "up-to-date"}}, &1))
-  end
-
-  defp up_to_date?(_), do: true
-
-  defp next_page_url(url, resp_headers) do
-    [offset | _] = resp_headers["electric-offset"]
-    [handle | _] = resp_headers["electric-handle"]
-
-    url
-    |> URI.parse()
-    |> then(fn uri ->
-      params =
-        URI.decode_query(uri.query)
-        |> Map.put("offset", offset)
-        |> Map.put("handle", handle)
-
-      %{uri | query: URI.encode_query(params)}
-    end)
-    |> URI.to_string()
-  end
-
-  defp apply_shape_operations(acc, body) when is_list(body) do
-    Enum.reduce(body, acc, fn
-      %{"headers" => %{"operation" => "insert"}, "key" => key, "value" => value}, acc ->
-        Map.put(acc, key, value)
-
-      %{"headers" => %{"operation" => "update"}, "key" => key, "value" => value}, acc ->
-        Map.update(acc, key, value, &Map.merge(&1, value))
-
-      %{"headers" => %{"operation" => "delete"}, "key" => key}, acc ->
-        Map.delete(acc, key)
-
-      _, acc ->
-        acc
-    end)
-  end
-
-  defp apply_shape_operations(acc, _), do: acc
-
-  defp get_challenge(base_url) do
-    url = base_url <> "/electric/v1/challenge"
-    timestamp = TimeKeeper.now()
-    headers = [{"accept", "application/json"}]
-
-    case Req.get(url, headers: headers) do
-      {:ok, %{status: 200, body: body, headers: rh}} ->
-        {:ok, body,
-         build_log("GET", url, headers, "", 200, rh, Jason.encode!(body, pretty: true), timestamp)}
-
-      {:ok, %{status: s, body: b, headers: rh}} ->
-        {:error, "Challenge failed (#{s})",
-         [build_log("GET", url, headers, "", s, rh, inspect(b), timestamp)]}
-
-      {:error, e} ->
-        {:error, "Challenge failed: #{inspect(e)}",
-         [build_log("GET", url, headers, "", 0, [], inspect(e), timestamp)]}
-    end
-  end
-
-  defp post_ingest(challenge_resp, payload, sign_skey, base_url) do
-    %{"challenge" => challenge, "challenge_id" => challenge_id} = challenge_resp
-    signature = EnigmaPq.sign(challenge, sign_skey)
-    signature_b64 = Base.encode64(signature, padding: false)
-
-    payload_with_auth =
-      Map.put(payload, "auth", %{"challenge_id" => challenge_id, "signature" => signature_b64})
-
-    url = base_url <> "/electric/v1/ingest"
-    timestamp = TimeKeeper.now()
-    headers = [{"accept", "application/json"}, {"content-type", "application/json"}]
-    req_body = Jason.encode!(payload_with_auth, pretty: true)
-
-    case Req.post(url, json: payload_with_auth, headers: headers) do
-      {:ok, %{status: s, body: b, headers: rh}} when s in 200..299 ->
-        {:ok, b,
-         build_log(
-           "POST",
-           url,
-           headers,
-           req_body,
-           s,
-           rh,
-           Jason.encode!(b, pretty: true),
-           timestamp
-         )}
-
-      {:ok, %{status: s, body: b, headers: rh}} ->
-        {:error, "Ingest failed (#{s})",
-         [build_log("POST", url, headers, req_body, s, rh, inspect(b), timestamp)]}
-
-      {:error, e} ->
-        {:error, "Ingest failed: #{inspect(e)}",
-         [build_log("POST", url, headers, req_body, 0, [], inspect(e), timestamp)]}
-    end
-  end
-
-  defp build_log(method, url, req_headers, req_body, status, resp_headers, resp_body, timestamp) do
-    %{
-      timestamp: timestamp,
-      method: method,
-      url: url,
-      request_headers: req_headers,
-      request_body: req_body,
-      response_status: status,
-      response_headers: resp_headers,
-      response_body: resp_body
-    }
-  end
-
-  defp encode_base64(bin) when is_binary(bin), do: Base.encode64(bin, padding: false)
 end

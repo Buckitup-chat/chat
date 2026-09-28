@@ -10,17 +10,13 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ListPassword do
   ciphertext only: AES-256-GCM under a key derived from the author's own `crypt_skey`.
   """
 
-  import ChatWeb.ElectricLive.ReviewSandboxLive.Http
+  import ChatWeb.ElectricLive.SandboxHttp
 
   alias Chat.Data.Schemas.UserStorage
   alias Chat.Data.Types.UserStorageSignHash
   alias Chat.TimeKeeper
-  alias ChatWeb.ElectricLive.ShapeReader
   alias EnigmaPq
 
-  # Well-known slot for the review_list_password. `user_storage.uuid` is a real
-  # Postgres uuid column, so the slot is a fixed UUID — not a label like the
-  # frontend's local-only "profile" / "contacts" keys.
   @slot_uuid "b7e9a1c4-3f52-4d18-9a06-2f5c8e0d7141"
 
   @hkdf_salt "buckitup/user-storage/v1"
@@ -53,22 +49,26 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ListPassword do
   `{:error, reason}`.
   """
   def fetch(author, base_url) do
-    base_url
-    |> ShapeReader.rows("user_storage", UserStorage, "user_hash = $1 AND uuid = $2", [
-      author.user_hash,
-      @slot_uuid
-    ])
-    |> Enum.reject(& &1.deleted_flag)
-    |> case do
-      [] -> :empty
-      entries -> decrypt_latest(entries, author)
+    where = "user_hash='#{author.user_hash}' AND uuid='#{@slot_uuid}'"
+
+    case fetch_shape(base_url, "user_storage", where) do
+      {:ok, rows, _log} ->
+        rows
+        |> Enum.reject(&(&1["deleted_flag"] in [true, "true", "t"]))
+        |> case do
+          [] -> :empty
+          entries -> decrypt_latest(entries, author)
+        end
+
+      {:error, reason, _log} ->
+        {:error, reason}
     end
   end
 
   defp decrypt_latest(entries, author) do
     entries
-    |> Enum.max_by(& &1.owner_timestamp)
-    |> Map.fetch!(:value_b64)
+    |> Enum.max_by(&parse_int(&1["owner_timestamp"]))
+    |> Map.fetch!("value_b64")
     |> decode_binary()
     |> EnigmaPq.aes_gcm_decrypt(storage_key(author))
     |> case do
@@ -77,14 +77,15 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ListPassword do
     end
   end
 
-  # The shapes endpoint hands back unpadded base64 for bytea; tolerate a raw binary
-  # in case a value ever arrives already decoded.
   defp decode_binary(value) do
     case Base.decode64(value, padding: false) do
       {:ok, decoded} -> decoded
       :error -> value
     end
   end
+
+  defp parse_int(v) when is_integer(v), do: v
+  defp parse_int(v) when is_binary(v), do: String.to_integer(v)
 
   # --- Write ---
 
@@ -93,10 +94,8 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ListPassword do
     entry = new_storage_entry(author, password)
     payload = %{"mutations" => [insert_mutation(entry, author.sign_skey)]}
 
-    with {:ok, ch, log1} <- get_challenge(base_url),
-         {:ok, _resp, log2} <- post_ingest(ch, payload, author.sign_skey, base_url) do
-      {:ok, password, [log1, log2]}
-    else
+    case ingest(payload, author.sign_skey, base_url) do
+      {:ok, _body, logs} -> {:ok, password, logs}
       {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end
   end
@@ -112,8 +111,6 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ListPassword do
     }
   end
 
-  # Serialized from the signed struct so the row on the wire cannot drift from what
-  # `sign_b64` covers.
   defp insert_mutation(%UserStorage{} = entry, sign_skey) do
     {sign_b64, sign_hash} = sign_struct(entry, sign_skey, UserStorageSignHash)
 
@@ -135,8 +132,6 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ListPassword do
 
   # --- Shared ---
 
-  # Mirrors the frontend's deriveKeyFromCryptSkey: HKDF-SHA3-256 over the author's own
-  # crypt_skey, domain-separated per slot (docs/pq/invariants/09_symmetric_keys.md).
   defp storage_key(%{crypt_skey: crypt_skey}),
     do: EnigmaPq.hkdf_derive(crypt_skey, @hkdf_salt, @hkdf_info, 32)
 end

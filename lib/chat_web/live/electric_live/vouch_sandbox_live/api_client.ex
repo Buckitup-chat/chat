@@ -1,50 +1,43 @@
 defmodule ChatWeb.ElectricLive.VouchSandboxLive.ApiClient do
   @moduledoc "API client for vouch token Electric ingest operations."
 
+  import ChatWeb.ElectricLive.SandboxHttp
+
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.VouchToken
   alias Chat.TimeKeeper
-  alias ChatWeb.ElectricLive.OriginSandboxLive.Http
-  alias ChatWeb.ElectricLive.ShapeReader
 
   def list_users(base_url) do
-    client = Electric.Client.new!(endpoint: base_url <> "/electric/v1/shapes")
-    shape = Electric.Client.ShapeDefinition.new!("user_cards")
+    case fetch_shape(base_url, "user_cards") do
+      {:ok, rows, _log} ->
+        rows
+        |> Enum.map(fn row -> %{user_hash: row["user_hash"], name: row["name"]} end)
+        |> Enum.reject(&(&1.name == nil or &1.name == ""))
+        |> Enum.sort_by(& &1.name)
 
-    ShapeReader.collect(client, shape)
-    |> Enum.map(fn row ->
-      %{user_hash: row["user_hash"], name: row["name"]}
-    end)
-    |> Enum.reject(&(&1.name == nil or &1.name == ""))
-    |> Enum.sort_by(& &1.name)
+      {:error, _reason, _log} ->
+        []
+    end
   end
 
   def list_vouches_by_me(issuer_hash, base_url) do
-    client = Electric.Client.new!(endpoint: base_url <> "/electric/v1/shapes")
+    case fetch_shape(base_url, "vouch_tokens", "issuer_hash='#{issuer_hash}'") do
+      {:ok, rows, _log} ->
+        rows |> Enum.map(&parse_vouch_row/1) |> Enum.sort_by(& &1.owner_timestamp, :desc)
 
-    shape =
-      Electric.Client.ShapeDefinition.new!("vouch_tokens",
-        where: "issuer_hash = $1",
-        params: [issuer_hash]
-      )
-
-    ShapeReader.collect(client, shape)
-    |> Enum.map(&parse_vouch_row/1)
-    |> Enum.sort_by(& &1.owner_timestamp, :desc)
+      {:error, _reason, _log} ->
+        []
+    end
   end
 
   def list_vouches_for_me(subject_hash, base_url) do
-    client = Electric.Client.new!(endpoint: base_url <> "/electric/v1/shapes")
+    case fetch_shape(base_url, "vouch_tokens", "subject_hash='#{subject_hash}'") do
+      {:ok, rows, _log} ->
+        rows |> Enum.map(&parse_vouch_row/1) |> Enum.sort_by(& &1.owner_timestamp, :desc)
 
-    shape =
-      Electric.Client.ShapeDefinition.new!("vouch_tokens",
-        where: "subject_hash = $1",
-        params: [subject_hash]
-      )
-
-    ShapeReader.collect(client, shape)
-    |> Enum.map(&parse_vouch_row/1)
-    |> Enum.sort_by(& &1.owner_timestamp, :desc)
+      {:error, _reason, _log} ->
+        []
+    end
   end
 
   @doc """
@@ -101,50 +94,56 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.ApiClient do
   end
 
   defp insert_vouch(identity, vouch, base_url) do
-    %{
-      "type" => "insert",
-      "modified" => %{
-        "kind" => vouch.kind,
-        "issuer_hash" => identity.user_hash,
-        "subject_hash" => vouch.subject_hash,
-        "owner_timestamp" => vouch.owner_timestamp,
-        "deleted_flag" => vouch.deleted_flag,
-        "sign_b64" => sign(identity, vouch)
-      },
-      "syncMetadata" => %{"relation" => "vouch_tokens"}
+    payload = %{
+      "mutations" => [
+        %{
+          "type" => "insert",
+          "modified" => %{
+            "kind" => vouch.kind,
+            "issuer_hash" => identity.user_hash,
+            "subject_hash" => vouch.subject_hash,
+            "owner_timestamp" => vouch.owner_timestamp,
+            "deleted_flag" => vouch.deleted_flag,
+            "sign_b64" => sign_vouch(identity, vouch)
+          },
+          "syncMetadata" => %{"relation" => "vouch_tokens"}
+        }
+      ]
     }
-    |> ingest(identity, base_url)
-  end
 
-  defp update_vouch(identity, vouch, base_url) do
-    %{
-      "type" => "update",
-      "original" => %{
-        "kind" => vouch.kind,
-        "issuer_hash" => identity.user_hash,
-        "subject_hash" => vouch.subject_hash
-      },
-      "changes" => %{
-        "deleted_flag" => vouch.deleted_flag,
-        "owner_timestamp" => vouch.owner_timestamp,
-        "sign_b64" => sign(identity, vouch)
-      },
-      "syncMetadata" => %{"relation" => "vouch_tokens"}
-    }
-    |> ingest(identity, base_url)
-  end
-
-  defp ingest(mutation, identity, base_url) do
-    payload = %{"mutations" => [mutation]}
-
-    with {:ok, challenge_resp, log1} <- Http.get_challenge(base_url),
-         {:ok, _resp, log2} <-
-           Http.post_ingest(challenge_resp, payload, identity.sign_skey, base_url) do
-      {:ok, [log1, log2]}
+    case ingest(payload, identity.sign_skey, base_url) do
+      {:ok, _body, logs} -> {:ok, logs}
+      {:error, _reason, _logs} = error -> error
     end
   end
 
-  defp sign(identity, vouch) do
+  defp update_vouch(identity, vouch, base_url) do
+    payload = %{
+      "mutations" => [
+        %{
+          "type" => "update",
+          "original" => %{
+            "kind" => vouch.kind,
+            "issuer_hash" => identity.user_hash,
+            "subject_hash" => vouch.subject_hash
+          },
+          "changes" => %{
+            "deleted_flag" => vouch.deleted_flag,
+            "owner_timestamp" => vouch.owner_timestamp,
+            "sign_b64" => sign_vouch(identity, vouch)
+          },
+          "syncMetadata" => %{"relation" => "vouch_tokens"}
+        }
+      ]
+    }
+
+    case ingest(payload, identity.sign_skey, base_url) do
+      {:ok, _body, logs} -> {:ok, logs}
+      {:error, _reason, _logs} = error -> error
+    end
+  end
+
+  defp sign_vouch(identity, vouch) do
     %VouchToken{
       kind: vouch.kind,
       issuer_hash: identity.user_hash,
@@ -154,7 +153,7 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.ApiClient do
     }
     |> Integrity.signature_payload()
     |> EnigmaPq.sign(identity.sign_skey)
-    |> Http.encode_base64()
+    |> encode_base64()
   end
 
   defp parse_vouch_row(row) do
@@ -163,7 +162,6 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.ApiClient do
       issuer_hash: row["issuer_hash"],
       subject_hash: row["subject_hash"],
       owner_timestamp: parse_int(row["owner_timestamp"]),
-      # snapshot rows carry "true"/"false", change-log rows carry PG text "t"/"f"
       deleted_flag: row["deleted_flag"] in [true, "true", "t"]
     }
   end

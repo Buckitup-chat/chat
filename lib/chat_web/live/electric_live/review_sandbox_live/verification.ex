@@ -1,15 +1,19 @@
 defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Verification do
   @moduledoc "Verifies server-wrapped right candidates before author signs them."
 
-  import ChatWeb.ElectricLive.ReviewSandboxLive.Http, only: [encode_base64: 1]
+  import ChatWeb.ElectricLive.SandboxHttp, only: [encode_base64: 1]
 
   alias Chat.Data.ReviewRightEnvelope
   alias EnigmaPq
 
-  def extract_shared_secrets(%{headers: headers}) do
+  def extract_shared_secrets(response_headers) when is_list(response_headers) do
     %{}
-    |> put_decoded_header(headers, "x-review-post-shared-secret", :post_shared_secret)
-    |> put_decoded_header(headers, "x-review-revoke-shared-secret", :revoke_shared_secret)
+    |> put_decoded_header(response_headers, "x-review-post-shared-secret", :post_shared_secret)
+    |> put_decoded_header(
+      response_headers,
+      "x-review-revoke-shared-secret",
+      :revoke_shared_secret
+    )
   end
 
   def verify_candidates(candidates, shared_secrets, review, author) do
@@ -62,9 +66,9 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Verification do
   end
 
   defp put_decoded_header(acc, headers, name, key) do
-    case headers do
-      %{^name => [value | _]} -> Map.put(acc, key, Base.decode64!(value, padding: false))
-      _ -> acc
+    case List.keyfind(headers, name, 0) do
+      {_, value} -> Map.put(acc, key, Base.decode64!(value, padding: false))
+      nil -> acc
     end
   end
 

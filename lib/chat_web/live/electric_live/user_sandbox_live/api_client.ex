@@ -3,13 +3,14 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   API client for Electric ingest operations with request/response logging.
   """
 
+  import ChatWeb.ElectricLive.SandboxHttp
+
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Schemas.UserStorage
   alias Chat.Data.Types.UserStorageSignHash
   alias Chat.Data.User
   alias Chat.Db
-  alias Chat.TimeKeeper
 
   @doc """
   Creates a new user via the Electric API.
@@ -21,23 +22,21 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   def create_user(name, base_url) do
     identity = User.generate_pq_identity(name)
     card = User.extract_pq_card(identity)
-    challenge_url = base_url <> "/electric/v1/challenge"
 
-    with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
-         {:ok, _ingest_resp, ingest_log} <-
-           ingest_user_card(challenge_resp, card, identity.sign_skey, base_url) do
-      user_data =
-        card
-        |> Map.from_struct()
-        |> Map.put(:user_hash_hex, String.slice(card.user_hash, 2..-1//1))
-        |> Map.put(:sign_skey, identity.sign_skey)
-        |> Map.put(:crypt_skey, identity.crypt_skey)
-        |> Map.put(:contact_skey, identity.contact_skey)
+    case ingest_user_card(card, identity.sign_skey, base_url) do
+      {:ok, _body, logs} ->
+        user_data =
+          card
+          |> Map.from_struct()
+          |> Map.put(:user_hash_hex, String.slice(card.user_hash, 2..-1//1))
+          |> Map.put(:sign_skey, identity.sign_skey)
+          |> Map.put(:crypt_skey, identity.crypt_skey)
+          |> Map.put(:contact_skey, identity.contact_skey)
 
-      {:ok, %{user: user_data, log_entries: [challenge_log, ingest_log]}}
-    else
-      {:error, reason, log_entries} ->
-        {:error, %{reason: reason, log_entries: log_entries}}
+        {:ok, %{user: user_data, log_entries: logs}}
+
+      {:error, reason, logs} ->
+        {:error, %{reason: reason, log_entries: logs}}
     end
   end
 
@@ -51,8 +50,6 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   - `{:error, %{reason: reason, log_entries: [log_entry, ...]}}`
   """
   def update_user_name(existing_card, sign_skey, new_name, base_url) do
-    challenge_url = base_url <> "/electric/v1/challenge"
-
     new_timestamp = existing_card.owner_timestamp + 1
 
     updated_card_struct =
@@ -83,13 +80,9 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
       ]
     }
 
-    with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
-         {:ok, ingest_resp, ingest_log} <-
-           post_ingest(challenge_resp, payload, sign_skey, base_url) do
-      {:ok, %{txid: ingest_resp["txid"], log_entries: [challenge_log, ingest_log]}}
-    else
-      {:error, reason, log_entries} ->
-        {:error, %{reason: reason, log_entries: log_entries}}
+    case ingest(payload, sign_skey, base_url) do
+      {:ok, body, logs} -> {:ok, %{txid: body["txid"], log_entries: logs}}
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end
   end
 
@@ -101,18 +94,17 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   - `{:error, %{reason: reason, log_entries: [log_entry, ...]}}`
   """
   def delete_user(user_hash, sign_skey, base_url) do
-    challenge_url = base_url <> "/electric/v1/challenge"
-
+    # TODO: replace Db.repo() with shape read to comply with HTTP-only rule
     case Db.repo().get(UserCard, user_hash) do
       nil ->
         {:error, %{reason: "User not found", log_entries: []}}
 
       existing_card ->
-        delete_user_with_card(existing_card, user_hash, sign_skey, base_url, challenge_url)
+        delete_user_with_card(existing_card, user_hash, sign_skey, base_url)
     end
   end
 
-  defp delete_user_with_card(existing_card, user_hash, sign_skey, base_url, challenge_url) do
+  defp delete_user_with_card(existing_card, user_hash, sign_skey, base_url) do
     new_timestamp = existing_card.owner_timestamp + 1
 
     updated_card_struct =
@@ -144,13 +136,9 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
       ]
     }
 
-    with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
-         {:ok, _ingest_resp, ingest_log} <-
-           post_ingest(challenge_resp, payload, sign_skey, base_url) do
-      {:ok, %{log_entries: [challenge_log, ingest_log]}}
-    else
-      {:error, reason, log_entries} ->
-        {:error, %{reason: reason, log_entries: log_entries}}
+    case ingest(payload, sign_skey, base_url) do
+      {:ok, _body, logs} -> {:ok, %{log_entries: logs}}
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end
   end
 
@@ -164,7 +152,6 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   - `{:error, %{reason: reason, log_entries: [log_entry, ...]}}`
   """
   def create_storage(user_hash, sign_skey, uuid, value_binary, base_url) do
-    challenge_url = base_url <> "/electric/v1/challenge"
     owner_timestamp = Chat.TimeKeeper.now_unix()
 
     storage_attrs = %{
@@ -206,13 +193,9 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
       ]
     }
 
-    with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
-         {:ok, ingest_resp, ingest_log} <-
-           post_ingest(challenge_resp, payload, sign_skey, base_url) do
-      {:ok, %{uuid: uuid, txid: ingest_resp["txid"], log_entries: [challenge_log, ingest_log]}}
-    else
-      {:error, reason, log_entries} ->
-        {:error, %{reason: reason, log_entries: log_entries}}
+    case ingest(payload, sign_skey, base_url) do
+      {:ok, body, logs} -> {:ok, %{uuid: uuid, txid: body["txid"], log_entries: logs}}
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end
   end
 
@@ -226,34 +209,17 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   - `{:error, %{reason: reason, log_entries: [log_entry, ...]}}`
   """
   def update_storage(user_hash, sign_skey, uuid, value_binary, base_url) do
-    challenge_url = base_url <> "/electric/v1/challenge"
-
+    # TODO: replace Db.repo() with shape read to comply with HTTP-only rule
     case Db.repo().get_by(UserStorage, user_hash: user_hash, uuid: uuid) do
       nil ->
         {:error, %{reason: "Storage entry not found", log_entries: []}}
 
       existing ->
-        update_existing_storage(
-          existing,
-          user_hash,
-          sign_skey,
-          uuid,
-          value_binary,
-          base_url,
-          challenge_url
-        )
+        update_existing_storage(existing, user_hash, sign_skey, uuid, value_binary, base_url)
     end
   end
 
-  defp update_existing_storage(
-         existing,
-         user_hash,
-         sign_skey,
-         uuid,
-         value_binary,
-         base_url,
-         challenge_url
-       ) do
+  defp update_existing_storage(existing, user_hash, sign_skey, uuid, value_binary, base_url) do
     owner_timestamp = existing.owner_timestamp + 1
     parent_sign_hash = existing.sign_hash
 
@@ -298,13 +264,9 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
       ]
     }
 
-    with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
-         {:ok, ingest_resp, ingest_log} <-
-           post_ingest(challenge_resp, payload, sign_skey, base_url) do
-      {:ok, %{txid: ingest_resp["txid"], log_entries: [challenge_log, ingest_log]}}
-    else
-      {:error, reason, log_entries} ->
-        {:error, %{reason: reason, log_entries: log_entries}}
+    case ingest(payload, sign_skey, base_url) do
+      {:ok, body, logs} -> {:ok, %{txid: body["txid"], log_entries: logs}}
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end
   end
 
@@ -316,18 +278,17 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   - `{:error, %{reason: reason, log_entries: [log_entry, ...]}}`
   """
   def delete_storage(user_hash, sign_skey, uuid, base_url) do
-    challenge_url = base_url <> "/electric/v1/challenge"
-
+    # TODO: replace Db.repo() with shape read to comply with HTTP-only rule
     case Db.repo().get_by(UserStorage, user_hash: user_hash, uuid: uuid) do
       nil ->
         {:error, %{reason: "Storage entry not found", log_entries: []}}
 
       existing ->
-        delete_existing_storage(existing, user_hash, sign_skey, uuid, base_url, challenge_url)
+        delete_existing_storage(existing, user_hash, sign_skey, uuid, base_url)
     end
   end
 
-  defp delete_existing_storage(existing, user_hash, sign_skey, uuid, base_url, challenge_url) do
+  defp delete_existing_storage(existing, user_hash, sign_skey, uuid, base_url) do
     owner_timestamp = existing.owner_timestamp + 1
     parent_sign_hash = existing.sign_hash
 
@@ -371,13 +332,9 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
       ]
     }
 
-    with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
-         {:ok, _ingest_resp, ingest_log} <-
-           post_ingest(challenge_resp, payload, sign_skey, base_url) do
-      {:ok, %{log_entries: [challenge_log, ingest_log]}}
-    else
-      {:error, reason, log_entries} ->
-        {:error, %{reason: reason, log_entries: log_entries}}
+    case ingest(payload, sign_skey, base_url) do
+      {:ok, _body, logs} -> {:ok, %{log_entries: logs}}
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end
   end
 
@@ -411,74 +368,16 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
       |> then(&:crypto.sign(:mldsa87, :none, &1, user_data.sign_skey))
 
     card = %{card_struct | sign_b64: sign_b64}
-    challenge_url = base_url <> "/electric/v1/challenge"
 
-    with {:ok, challenge_resp, challenge_log} <- get_challenge(challenge_url),
-         {:ok, _ingest_resp, ingest_log} <-
-           ingest_user_card(challenge_resp, card, user_data.sign_skey, base_url) do
-      {:ok, %{log_entries: [challenge_log, ingest_log]}}
-    else
-      {:error, reason, log_entries} ->
-        {:error, %{reason: reason, log_entries: log_entries}}
+    case ingest_user_card(card, user_data.sign_skey, base_url) do
+      {:ok, _body, logs} -> {:ok, %{log_entries: logs}}
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end
   end
 
   # Private helpers
 
-  defp get_challenge(challenge_url) do
-    timestamp = TimeKeeper.now()
-
-    case Req.get(challenge_url, headers: [{"accept", "application/json"}]) do
-      {:ok, %{status: 200, body: body, headers: headers}} ->
-        log_entry = %{
-          timestamp: timestamp,
-          method: "GET",
-          url: challenge_url,
-          request_headers: [{"accept", "application/json"}],
-          request_body: "",
-          response_status: 200,
-          response_headers: headers,
-          response_body: Jason.encode!(body, pretty: true)
-        }
-
-        {:ok, body, log_entry}
-
-      {:ok, %{status: status, body: body, headers: headers}} ->
-        log_entry = %{
-          timestamp: timestamp,
-          method: "GET",
-          url: challenge_url,
-          request_headers: [{"accept", "application/json"}],
-          request_body: "",
-          response_status: status,
-          response_headers: headers,
-          response_body: inspect(body)
-        }
-
-        {:error, "Challenge request failed with status #{status}", [log_entry]}
-
-      {:error, error} ->
-        log_entry = %{
-          timestamp: timestamp,
-          method: "GET",
-          url: challenge_url,
-          request_headers: [{"accept", "application/json"}],
-          request_body: "",
-          response_status: 0,
-          response_headers: [],
-          response_body: "Error: #{inspect(error)}"
-        }
-
-        {:error, "Challenge request failed: #{inspect(error)}", [log_entry]}
-    end
-  end
-
-  defp ingest_user_card(challenge_resp, card, sign_skey, base_url) do
-    %{"challenge" => challenge, "challenge_id" => challenge_id} = challenge_resp
-
-    signature = :crypto.sign(:mldsa87, :none, challenge, sign_skey)
-    signature_b64 = Base.encode64(signature, padding: false)
-
+  defp ingest_user_card(card, sign_skey, base_url) do
     payload = %{
       "mutations" => [
         %{
@@ -499,82 +398,9 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
             "relation" => "user_cards"
           }
         }
-      ],
-      "auth" => %{
-        "challenge_id" => challenge_id,
-        "signature" => signature_b64
-      }
+      ]
     }
 
-    post_ingest(challenge_resp, payload, sign_skey, base_url)
-  end
-
-  defp post_ingest(challenge_resp, payload, sign_skey, base_url) do
-    %{"challenge" => challenge, "challenge_id" => challenge_id} = challenge_resp
-
-    signature = :crypto.sign(:mldsa87, :none, challenge, sign_skey)
-    signature_b64 = Base.encode64(signature, padding: false)
-
-    payload_with_auth =
-      Map.put(payload, "auth", %{
-        "challenge_id" => challenge_id,
-        "signature" => signature_b64
-      })
-
-    ingest_url = base_url <> "/electric/v1/ingest"
-    timestamp = TimeKeeper.now()
-
-    headers = [
-      {"accept", "application/json"},
-      {"content-type", "application/json"}
-    ]
-
-    case Req.post(ingest_url, json: payload_with_auth, headers: headers) do
-      {:ok, %{status: status, body: body, headers: resp_headers}} when status in 200..299 ->
-        log_entry = %{
-          timestamp: timestamp,
-          method: "POST",
-          url: ingest_url,
-          request_headers: headers,
-          request_body: Jason.encode!(payload_with_auth, pretty: true),
-          response_status: status,
-          response_headers: resp_headers,
-          response_body: Jason.encode!(body, pretty: true)
-        }
-
-        {:ok, body, log_entry}
-
-      {:ok, %{status: status, body: body, headers: resp_headers}} ->
-        log_entry = %{
-          timestamp: timestamp,
-          method: "POST",
-          url: ingest_url,
-          request_headers: headers,
-          request_body: Jason.encode!(payload_with_auth, pretty: true),
-          response_status: status,
-          response_headers: resp_headers,
-          response_body: inspect(body)
-        }
-
-        {:error, "Ingest request failed with status #{status}", [log_entry]}
-
-      {:error, error} ->
-        log_entry = %{
-          timestamp: timestamp,
-          method: "POST",
-          url: ingest_url,
-          request_headers: headers,
-          request_body: Jason.encode!(payload_with_auth, pretty: true),
-          response_status: 0,
-          response_headers: [],
-          response_body: "Error: #{inspect(error)}"
-        }
-
-        {:error, "Ingest request failed: #{inspect(error)}", [log_entry]}
-    end
-  end
-
-  defp encode_base64(bin) when is_binary(bin) do
-    Base.encode64(bin, padding: false)
+    ingest(payload, sign_skey, base_url)
   end
 end

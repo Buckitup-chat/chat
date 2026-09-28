@@ -11,16 +11,11 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewList do
   by update once the origin approves.
   """
 
-  import ChatWeb.ElectricLive.ReviewSandboxLive.Http
+  import ChatWeb.ElectricLive.SandboxHttp
 
-  alias Chat.Data.Schemas.ReviewList, as: ReviewListSchema
-  alias Chat.Data.Schemas.ReviewPostRight
-  alias Chat.Data.Schemas.ReviewPublicPassword
-  alias Chat.Data.Schemas.ReviewRevokeRight
   alias Chat.Data.Types.ReviewListSignHash
   alias Chat.TimeKeeper
   alias ChatWeb.ElectricLive.ReviewSandboxLive.ReviewList.Proofs
-  alias ChatWeb.ElectricLive.ShapeReader
   alias EnigmaPq
 
   # --- Reading what the server actually promoted ---
@@ -34,39 +29,42 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewList do
   def load_proofs(review, base_url) do
     %{
       review_password_sign_hash: observed_password_hash(review, base_url),
-      post_right_sign_hash:
-        observed_right_hash(review, base_url, "review_post_right", ReviewPostRight),
-      revoke_right_sign_hash:
-        observed_right_hash(review, base_url, "review_revoke_right", ReviewRevokeRight)
+      post_right_sign_hash: observed_right_hash(review, base_url, "review_post_right"),
+      revoke_right_sign_hash: observed_right_hash(review, base_url, "review_revoke_right")
     }
   end
 
-  # `review_public_passwords` is append-only and a revoke adds a null-password
-  # version, so the promotion proof is the newest row that still carries a
-  # password — same selector as ModerationSandboxLive.Entries.newest_password_row/1.
-  # `is_binary/1`, not `not is_nil/1`: the shape hands back base64 strings.
   defp observed_password_hash(review, base_url) do
-    base_url
-    |> rows_for_review("review_public_passwords", ReviewPublicPassword, review)
-    |> Enum.filter(&is_binary(&1.password_b64))
-    |> case do
-      [] -> nil
-      rows -> rows |> Enum.max_by(& &1.owner_timestamp) |> Map.fetch!(:sign_hash)
+    case fetch_shape(base_url, "review_public_passwords", "review_hash='#{review.review_hash}'") do
+      {:ok, rows, _log} ->
+        rows
+        |> Enum.filter(&is_binary(&1["password_b64"]))
+        |> case do
+          [] ->
+            nil
+
+          rows ->
+            rows |> Enum.max_by(&parse_int(&1["owner_timestamp"])) |> Map.fetch!("sign_hash")
+        end
+
+      {:error, _reason, _log} ->
+        nil
     end
   end
 
-  defp observed_right_hash(review, base_url, table, schema) do
-    base_url
-    |> rows_for_review(table, schema, review)
-    |> Enum.reject(& &1.deleted_flag)
-    |> case do
-      [] -> nil
-      [row | _] -> row.sign_hash
-    end
-  end
+  defp observed_right_hash(review, base_url, table) do
+    case fetch_shape(base_url, table, "review_hash='#{review.review_hash}'") do
+      {:ok, rows, _log} ->
+        rows
+        |> Enum.reject(&(&1["deleted_flag"] in [true, "true", "t"]))
+        |> case do
+          [] -> nil
+          [row | _] -> row["sign_hash"]
+        end
 
-  defp rows_for_review(base_url, table, schema, review) do
-    ShapeReader.rows(base_url, table, schema, "review_hash = $1", [review.review_hash])
+      {:error, _reason, _log} ->
+        nil
+    end
   end
 
   # --- Writing ---
@@ -82,7 +80,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewList do
     owner_timestamp = TimeKeeper.now_unix()
 
     entry =
-      %ReviewListSchema{
+      %Chat.Data.Schemas.ReviewList{
         user_hash: author.user_hash,
         review_hash: review.review_hash,
         origin_hash: review.origin_hash,
@@ -115,7 +113,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewList do
       "syncMetadata" => %{"relation" => "review_list"}
     }
 
-    case ingest(mutation, author.sign_skey, base_url) do
+    case do_ingest(mutation, author.sign_skey, base_url) do
       {:ok, logs} -> {:ok, %{entry: entry, local_hashes: local_hashes, log_entries: logs}}
       {:error, failure} -> {:error, failure}
     end
@@ -141,8 +139,6 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewList do
 
     mutation = %{
       "type" => "update",
-      # Both PK columns: review_list_allowed/2 matches `data: %{"user_hash" => _}`
-      # with no fallback clause, so omitting it is a 500, not a validation error.
       "original" => %{"user_hash" => entry.user_hash, "review_hash" => entry.review_hash},
       "changes" => %{
         "review_password_sign_hash" => password_sign_hash,
@@ -153,24 +149,19 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewList do
       "syncMetadata" => %{"relation" => "review_list"}
     }
 
-    case ingest(mutation, author.sign_skey, base_url) do
+    case do_ingest(mutation, author.sign_skey, base_url) do
       {:ok, logs} -> {:ok, %{entry: merged, log_entries: logs}}
       {:error, failure} -> {:error, failure}
     end
   end
 
-  # owner_timestamp is unix *seconds*, and validate_timestamp_newer_than_existing/1
-  # reads get_change/2 — which is nil when the value is unchanged, so an equal
-  # timestamp passes here and is then rejected by every peer's `<` upsert guard.
   defp next_timestamp(previous), do: max(previous + 1, TimeKeeper.now_unix())
 
-  defp ingest(mutation, sign_skey, base_url) do
+  defp do_ingest(mutation, sign_skey, base_url) do
     payload = %{"mutations" => [mutation]}
 
-    with {:ok, challenge, log1} <- get_challenge(base_url),
-         {:ok, _resp, log2} <- post_ingest(challenge, payload, sign_skey, base_url) do
-      {:ok, [log1, log2]}
-    else
+    case ingest(payload, sign_skey, base_url) do
+      {:ok, _body, logs} -> {:ok, logs}
       {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end
   end
@@ -178,4 +169,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewList do
   @doc "Re-export so callers need only this module."
   defdelegate proof_fields(mode, local, status), to: Proofs, as: :fields
   defdelegate proof_status(mode, observed, local), to: Proofs, as: :status
+
+  defp parse_int(v) when is_integer(v), do: v
+  defp parse_int(v) when is_binary(v), do: String.to_integer(v)
 end

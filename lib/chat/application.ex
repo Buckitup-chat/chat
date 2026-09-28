@@ -33,6 +33,7 @@ defmodule Chat.Application do
         # Application Services
         Chat.Challenge,
         Chat.Pq.ReadSession,
+        Chat.NetworkSynchronization.Electric.ReadSessions,
         Chat.KeyRingTokens,
         Chat.Broker,
         Chat.ChunkedFilesBroker,

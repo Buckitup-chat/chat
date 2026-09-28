@@ -17,7 +17,9 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
 
   alias Chat.Data.Shapes
   alias Chat.NetworkSynchronization.Electric.DeferredStore
+  alias Chat.NetworkSynchronization.Electric.GatedFetch
   alias Chat.NetworkSynchronization.Electric.OffsetStore
+  alias Chat.NetworkSynchronization.Electric.ReadSessions
   alias Chat.NetworkSynchronization.Electric.ShapeWriter
   alias Chat.NetworkSynchronization.Status.ErrorStatus
   alias Chat.NetworkSynchronization.Status.LiveStatus
@@ -133,13 +135,19 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
         {:DOWN, ref, :process, _down_pid, reason},
         {peer_url, system_identifier, shape, {_task_pid, ref}, backoff, nil}
       ) do
+    {why, backoff} =
+      case ReadSessions.blocked_by(reason) do
+        nil -> {inspect(reason), backoff}
+        blocked -> {"awaiting approval: #{blocked}", max(backoff, ReadSessions.probe_after_ms())}
+      end
+
     log(
       "ShapeConsumer #{peer_url}/#{shape}: stream exited (#{inspect(reason)}), clearing offset and retrying in #{backoff}ms",
       :warning
     )
 
     OffsetStore.delete(system_identifier, shape)
-    broadcast_status(peer_url, shape, ErrorStatus.new(inspect(reason)))
+    broadcast_status(peer_url, shape, ErrorStatus.new(why))
     restart_ref = Process.send_after(self(), :restart_stream, backoff)
     next_backoff = min(backoff * 2, @max_backoff_ms)
     {peer_url, system_identifier, shape, nil, next_backoff, restart_ref} |> noreply()
@@ -177,12 +185,10 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumer do
         Electric.Client.new!(
           endpoint: "#{peer_url}/electric/v1/shapes",
           fetch:
-            {Electric.Client.Fetch.HTTP,
-             request: [
-               connect_options: [
-                 transport_opts: [{:keepalive, true}]
-               ]
-             ]}
+            {GatedFetch,
+             peer_url: peer_url,
+             shape: shape,
+             request: [connect_options: [transport_opts: [{:keepalive, true}]]]}
         )
         |> Electric.Client.stream(schema_module, stream_opts)
         |> Stream.each(&dispatch_message(&1, parent, peer_url, shape))

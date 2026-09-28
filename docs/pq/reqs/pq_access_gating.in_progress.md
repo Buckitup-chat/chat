@@ -48,6 +48,19 @@ Every participant — user or server — has its own keypair and authenticates t
 1. **Generation**: On first start (before any owner is registered), the device generates a keypair and persists it in AdminDB.
 2. **Storage**: AdminDB (CubDB) only. Not replicated via Electric — it gates Electric access itself.
 3. **Identity**: The server's `user_hash` is derived from its public key, same formula as user identities: `"u_" + hex(SHA3-512(sign_pkey))`.
+4. **Keys**: sign (ML-DSA-87), crypt (ML-KEM-1024) and contact (secp256k1) keypairs, same set as a user identity. Identities created before contact keys existed get them added on the next boot.
+5. **User card**: The server has a `user_card` named `SyncBot_<device_id>` (see [Server User Card](#server-user-card)).
+
+### Server User Card
+
+The server identity is a user like any other on the wire, so it needs a `user_card`. The `SyncBot_` prefix tells people it is an auxiliary identity that syncs data between devices, not a person.
+
+- **Name**: `SyncBot_<device_id>` (`Chat.Pq.ServerCard.name/0`, device id from `Chat.DeviceId`).
+- **Build**: `Chat.Pq.ServerIdentity` builds and signs the card at start and keeps it in AdminDB under `:pq_server_card`. It is rebuilt only when the name changes (the device id changed), so `owner_timestamp` does not move on every boot.
+- **Own card**: stored into PostgreSQL after migrations on every repo start (`Chat.Db.Boot.RepoReady.store_server_card/1`, called by `RepoReady` on host and by `Platform.Storage.Repo.MigrationRunner` for each drive repo). The upsert keeps the newer `owner_timestamp`, so repeating it is a no-op.
+- **Served**: `GET /electric/v1/server_card` returns the card as JSON with binary fields in Base64. Always accessible, no Electric readiness required.
+- **Peer cards**: on peer discovery `PeerConnector` fetches the peer's card and stores it (see [Peer servers](#peer-servers)).
+- **Owner bootstrap**: server cards are written directly, not through `ShapeWriter`, so they never trigger `OwnerBootstrap` and cannot claim device ownership.
 
 ### Network Discovery
 
@@ -316,7 +329,14 @@ Electric sends `cache-control: public` on shape responses. In `trust` mode the r
 
 ### Peer servers
 
-A peer server reads the same way: it opens a read session per shape, signed with its server identity key, and sends the Bearer token from its Electric client. This requires the peer's server identity to have a `user_card` on the target device. How that card gets there is not yet specified.
+A peer server reads the same way: it opens a read session per shape, signed with its server identity key, and sends the Bearer token from its Electric client. This requires the peer's server identity to have a `user_card` on the target device.
+
+That card arrives through peer discovery. When `PeerConnector` has resolved a peer's `system_identifier`, it calls `GET /electric/v1/server_card` on the peer and stores the result with `Chat.Pq.ServerCard.store_peer/1`, before `PeerSync` starts. Discovery runs on both devices, so each one ends up holding the other's card.
+
+- Only cards named `SyncBot_*` are accepted (`{:error, :not_a_server_card}` otherwise).
+- The card must pass the same checks as a user card insert: signature, `user_hash` against `sign_pkey`, `crypt_cert` and `contact_cert`.
+- The fetch is best effort. If the peer has no endpoint (older firmware) or fails, a warning is logged and sync starts anyway.
+- Having a card only makes the peer a known user, so it gets past `401 unknown_user`. Gated reads still need the vouch chain: in `trust` mode someone has to vouch for `SyncBot_<peer_device_id>`.
 
 ---
 
@@ -484,12 +504,26 @@ Read gating (server side) is implemented:
 - `ChatWeb.Plugs.ElectricReadGate` on `/shapes` (shape from `?table=`, versions tables map to the owning shape) and on `file_chunk/:file_id/:chunk_index` + `file_chunk_status` (shape `file_chunk`). Passing responses get `cache-control: private` + `vary: authorization`.
 - `max_depth` in the `403` body and in the read chain check is `VouchToken.default_max_depth/0` (7) until the setting exists.
 
+Read gating (network sync client — this device reading from a peer) is implemented:
+
+- `Chat.NetworkSynchronization.Electric.ReadSessionClient` — `GET /challenge`, signs with the server identity key, `POST /read_session`.
+- `Chat.NetworkSynchronization.Electric.ReadSessions` — per `{peer_url, shape}` tokens in ETS (memory only), lazy open on `401 read_session_required`, one in-flight open per key, renewal when < 60 s remain. `request/4` wraps any HTTP call: Bearer header, open on `401`, retry once.
+- `Chat.NetworkSynchronization.Electric.GatedFetch` — `Electric.Client.Fetch` wrapper used by `ShapeConsumer` and `DeferredStore` refetch. The `401` → open → retry happens inside the fetch, so the live stream keeps its offset.
+- A failed open (`not_in_trust_chain`, `unknown_user`) stops the shape stream; `ShapeConsumer` reports `awaiting approval: <reason>` and retries with backoff starting at 15 s, doubling to 5 min.
+- `SyncSource` chunk fetches (`file_chunk`) go through `ReadSessions.request/4`.
+- LAN detection treats a `401 read_session_required` probe response as a (gated) Electric peer.
+
+Server user cards are implemented (see [Server User Card](#server-user-card)):
+
+- `Chat.Pq.ServerCard` — `SyncBot_<device_id>` name, build, JSON encoding, `store_own/1`, `store_peer/1`.
+- `ChatWeb.ServerCardController` — `GET /electric/v1/server_card`.
+- `PeerConnector` stores the peer's card on discovery. `RepoReady.store_server_card/1` stores the device's own card after migrations.
+
 Pending:
 
 - The `ElectricAccessGate` plug (PoP + vouch chain enforcement in the router pipeline).
 - `max_depth` setting and enforcement (writes ignore it; reads use the fixed default).
 - chat-frontend: implement [Client Behaviour](#client-behaviour).
-- Peer servers: how a peer's server identity `user_card` reaches the target device.
 
 ## Open Questions
 
@@ -497,7 +531,7 @@ Pending:
 2. ~~Should there be a "pending" state where unapproved users' requests are queued rather than rejected?~~ **Out of scope** — deferred to a separate feature.
 3. **Where to store owner identity and mode setting?**
 
-   Resolved. Owner identity is stored under `:pq_admin` (`%{user_hash, sign_pkey}`) in AdminDB (CubDB). Access mode is stored under `:pq_gate_mode` (`:open` / `:guarded` / `:trust`). Server identity keypair is stored under `:pq_server_identity`. On first boot `ServerIdentity` seeds `:pq_gate_mode` to `:open` via `AdminDb.put_new/2`. Owner registration happens via `OwnerBootstrap.maybe_register_owner/2` on first `user_card` ingest.
+   Resolved. Owner identity is stored under `:pq_admin` (`%{user_hash, sign_pkey}`) in AdminDB (CubDB). Access mode is stored under `:pq_gate_mode` (`:open` / `:guarded` / `:trust`). Server identity keypair is stored under `:pq_server_identity`, its signed `user_card` under `:pq_server_card`. On first boot `ServerIdentity` seeds `:pq_gate_mode` to `:open` via `AdminDb.put_new/2`. Owner registration happens via `OwnerBootstrap.maybe_register_owner/2` on first `user_card` ingest.
 
    Sub-question: should AdminDB settings be **replicated to the backup drive**? On the platform, each USB drive gets its own PG instance with logical replication between main and internal. AdminDB is currently single-drive — backup requires explicit copy logic.
 

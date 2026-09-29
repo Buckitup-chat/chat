@@ -37,8 +37,8 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Identity do
   def verify_against_card(_identity, nil), do: {:error, "no user_cards row for this origin_hash"}
 
   def verify_against_card(identity, card) do
-    sign_pkey = Crypto.decode_binary_field(card.sign_pkey)
-    crypt_pkey = Crypto.decode_binary_field(card.crypt_pkey)
+    sign_pkey = Crypto.decode_binary_field(card["sign_pkey"])
+    crypt_pkey = Crypto.decode_binary_field(card["crypt_pkey"])
 
     cond do
       not signs_for?(identity.sign_skey, sign_pkey) ->

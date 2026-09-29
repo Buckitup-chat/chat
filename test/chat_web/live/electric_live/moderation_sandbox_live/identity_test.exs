@@ -5,7 +5,6 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.IdentityTest do
   """
   use ExUnit.Case, async: true
 
-  alias Chat.Data.Schemas.UserCard
   alias ChatWeb.ElectricLive.ModerationSandboxLive.Identity
   alias EnigmaPq
 
@@ -22,7 +21,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.IdentityTest do
         crypt_pkey: crypt_pkey,
         crypt_skey: crypt_skey
       },
-      card: %UserCard{sign_pkey: to_b64(sign_pkey), crypt_pkey: to_b64(crypt_pkey)}
+      card: %{"sign_pkey" => to_b64(sign_pkey), "crypt_pkey" => to_b64(crypt_pkey)}
     }
   end
 

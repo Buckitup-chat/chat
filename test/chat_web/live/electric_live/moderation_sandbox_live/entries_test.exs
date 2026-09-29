@@ -6,10 +6,6 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.EntriesTest do
   use ExUnit.Case, async: true
 
   alias Chat.Data.ReviewPasswordCandidate.Promotion.Candidates
-  alias Chat.Data.Schemas.Review
-  alias Chat.Data.Schemas.ReviewPostRight
-  alias Chat.Data.Schemas.ReviewPublicPassword
-  alias Chat.Data.Schemas.ReviewRevokeRight
   alias ChatWeb.ElectricLive.ModerationSandboxLive.Entries
   alias EnigmaPq
 
@@ -30,7 +26,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.EntriesTest do
 
   describe "build/5" do
     test "pre-moderation: post right unlocks the review before it is public", ctx do
-      post_right = wrap_right(ReviewPostRight, ctx, ctx.password, 200)
+      post_right = wrap_right(ctx, ctx.password, 200)
 
       [entry] = Entries.build([ctx.review], [], [post_right], [], ctx.crypt_skey)
 
@@ -43,7 +39,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.EntriesTest do
 
     test "published review is public and revocable", ctx do
       password_row = password_row(ctx, to_b64(ctx.password), 200)
-      revoke_right = wrap_right(ReviewRevokeRight, ctx, nil, 201)
+      revoke_right = wrap_right(ctx, nil, 201)
 
       [entry] = Entries.build([ctx.review], [password_row], [], [revoke_right], ctx.crypt_skey)
 
@@ -55,7 +51,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.EntriesTest do
 
     test "revoked review stays hidden — an older post right cannot supersede it", ctx do
       rows = [password_row(ctx, to_b64(ctx.password), 200), password_row(ctx, nil, 201)]
-      post_right = wrap_right(ReviewPostRight, ctx, ctx.password, 200)
+      post_right = wrap_right(ctx, ctx.password, 200)
 
       [entry] = Entries.build([ctx.review], rows, [post_right], [], ctx.crypt_skey)
 
@@ -78,7 +74,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.EntriesTest do
       {other_pkey, _other_skey} = EnigmaPq.generate_crypt_keypair()
 
       foreign_right =
-        wrap_right(ReviewPostRight, %{ctx | crypt_pkey: other_pkey}, ctx.password, 200)
+        wrap_right(%{ctx | crypt_pkey: other_pkey}, ctx.password, 200)
 
       [entry] = Entries.build([ctx.review], [], [foreign_right], [], ctx.crypt_skey)
 
@@ -98,8 +94,8 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.EntriesTest do
     end
 
     test "deleted reviews are dropped and the rest sorted newest first", ctx do
-      older = %{ctx.review | review_hash: review_hash(), owner_timestamp: 50}
-      deleted = %{ctx.review | review_hash: review_hash(), deleted_flag: true}
+      older = %{ctx.review | "review_hash" => review_hash(), "owner_timestamp" => 50}
+      deleted = %{ctx.review | "review_hash" => review_hash(), "deleted_flag" => true}
 
       entries = Entries.build([older, ctx.review, deleted], [], [], [], ctx.crypt_skey)
 
@@ -110,36 +106,37 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.EntriesTest do
   # Helpers
 
   defp build_review(password, content) do
-    %Review{
-      review_hash: review_hash(),
-      origin_hash: @origin_hash,
-      author_hash: @author_hash,
-      content_b64: content |> Jason.encode!() |> EnigmaPq.aes_gcm_encrypt(password) |> to_b64(),
-      deleted_flag: false,
-      owner_timestamp: 100
+    %{
+      "review_hash" => review_hash(),
+      "origin_hash" => @origin_hash,
+      "author_hash" => @author_hash,
+      "content_b64" =>
+        content |> Jason.encode!() |> EnigmaPq.aes_gcm_encrypt(password) |> to_b64(),
+      "deleted_flag" => false,
+      "owner_timestamp" => 100
     }
   end
 
-  defp wrap_right(schema, ctx, password, timestamp) do
+  defp wrap_right(ctx, password, timestamp) do
     {_shared_secret, kem_ciphertext, wrapped} =
       ctx.review
       |> candidate_row(password, timestamp)
       |> Candidates.wrap_candidate_for_origin(ctx.crypt_pkey)
 
-    struct(schema, %{
-      review_hash: ctx.review.review_hash,
-      origin_hash: @origin_hash,
-      author_hash: @author_hash,
-      kem_ciphertext_b64: to_b64(kem_ciphertext),
-      wrapped_row_b64: to_b64(wrapped),
-      deleted_flag: false,
-      owner_timestamp: timestamp
-    })
+    %{
+      "review_hash" => ctx.review["review_hash"],
+      "origin_hash" => @origin_hash,
+      "author_hash" => @author_hash,
+      "kem_ciphertext_b64" => to_b64(kem_ciphertext),
+      "wrapped_row_b64" => to_b64(wrapped),
+      "deleted_flag" => false,
+      "owner_timestamp" => timestamp
+    }
   end
 
   defp candidate_row(review, password, timestamp) do
     %{
-      review_hash: review.review_hash,
+      review_hash: review["review_hash"],
       sign_hash: sign_hash(),
       origin_hash: @origin_hash,
       password_b64: password,
@@ -150,14 +147,14 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.EntriesTest do
   end
 
   defp password_row(ctx, password_b64, timestamp) do
-    %ReviewPublicPassword{
-      review_hash: ctx.review.review_hash,
-      sign_hash: sign_hash(),
-      origin_hash: @origin_hash,
-      password_b64: password_b64,
-      author_hash: @author_hash,
-      deleted_flag: false,
-      owner_timestamp: timestamp
+    %{
+      "review_hash" => ctx.review["review_hash"],
+      "sign_hash" => sign_hash(),
+      "origin_hash" => @origin_hash,
+      "password_b64" => password_b64,
+      "author_hash" => @author_hash,
+      "deleted_flag" => false,
+      "owner_timestamp" => timestamp
     }
   end
 

@@ -9,9 +9,8 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewLoader do
   reason they cannot be opened.
   """
 
-  alias Chat.Data.Schemas.Review
-  alias Chat.Data.Schemas.ReviewList, as: ReviewListSchema
-  alias ChatWeb.ElectricLive.ShapeReader
+  import ChatWeb.ElectricLive.SandboxHttp, only: [fetch_shape: 3]
+
   alias EnigmaPq
 
   @doc """
@@ -25,21 +24,18 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewLoader do
     entries = list_entries(author, origin_hash, base_url)
 
     base_url
-    |> ShapeReader.rows("review", Review, "author_hash = $1 AND origin_hash = $2", [
-      author.user_hash,
-      origin_hash
-    ])
-    |> Enum.reject(& &1.deleted_flag)
-    |> Enum.sort_by(&{&1.owner_timestamp, &1.review_hash}, :desc)
-    |> Enum.map(&item(&1, Map.get(entries, &1.review_hash), author))
+    |> fetch_reviews("author_hash='#{author.user_hash}' AND origin_hash='#{origin_hash}'")
+    |> Enum.reject(&deleted?/1)
+    |> Enum.sort_by(&{parse_int(&1["owner_timestamp"]), &1["review_hash"]}, :desc)
+    |> Enum.map(&item(&1, Map.get(entries, &1["review_hash"]), author))
   end
 
   @doc "The `sign_hash` the shape currently shows for `review_hash`."
   def current_sign_hash(review_hash, base_url) do
     base_url
-    |> ShapeReader.rows("review", Review, "review_hash = $1", [review_hash])
+    |> fetch_reviews("review_hash='#{review_hash}'")
     |> case do
-      [review | _] -> {:ok, review.sign_hash}
+      [review | _] -> {:ok, review["sign_hash"]}
       [] -> {:error, :not_found}
     end
   end
@@ -52,8 +48,8 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewLoader do
     with {:ok, password} <- decrypt_password(entry, author),
          {:ok, rating, text, content_json} <- decrypt_content(row, password) do
       %{
-        review_hash: row.review_hash,
-        owner_timestamp: row.owner_timestamp,
+        review_hash: row["review_hash"],
+        owner_timestamp: parse_int(row["owner_timestamp"]),
         review: review(row, password, rating, text, content_json),
         entry: entry,
         error: nil
@@ -65,8 +61,8 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewLoader do
 
   defp unopenable(row, entry, reason) do
     %{
-      review_hash: row.review_hash,
-      owner_timestamp: row.owner_timestamp,
+      review_hash: row["review_hash"],
+      owner_timestamp: parse_int(row["owner_timestamp"]),
       review: nil,
       entry: entry,
       error: reason
@@ -75,33 +71,45 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewLoader do
 
   defp review(row, password, rating, text, content_json) do
     %{
-      review_hash: row.review_hash,
-      origin_hash: row.origin_hash,
+      review_hash: row["review_hash"],
+      origin_hash: row["origin_hash"],
       review_password: password,
       rating: rating,
       text: text,
       content_json: content_json,
-      owner_timestamp: row.owner_timestamp,
-      parent_sign_hash: row.parent_sign_hash,
-      sign_hash: row.sign_hash,
+      owner_timestamp: parse_int(row["owner_timestamp"]),
+      parent_sign_hash: row["parent_sign_hash"],
+      sign_hash: row["sign_hash"],
       loaded?: true
     }
   end
 
-  # One read for the whole origin: a per-review lookup would cost a shape read each.
   defp list_entries(author, origin_hash, base_url) do
-    base_url
-    |> ShapeReader.rows("review_list", ReviewListSchema, "user_hash = $1 AND origin_hash = $2", [
-      author.user_hash,
-      origin_hash
-    ])
-    |> Enum.reject(& &1.deleted_flag)
-    |> Enum.group_by(& &1.review_hash)
-    |> Map.new(fn {hash, rows} -> {hash, Enum.max_by(rows, & &1.owner_timestamp)} end)
+    where = "user_hash='#{author.user_hash}' AND origin_hash='#{origin_hash}'"
+
+    case fetch_shape(base_url, "review_list", where) do
+      {:ok, rows, _log} ->
+        rows
+        |> Enum.reject(&deleted?/1)
+        |> Enum.group_by(& &1["review_hash"])
+        |> Map.new(fn {hash, rows} ->
+          {hash, Enum.max_by(rows, &parse_int(&1["owner_timestamp"]))}
+        end)
+
+      {:error, _reason, _log} ->
+        %{}
+    end
+  end
+
+  defp fetch_reviews(base_url, where) do
+    case fetch_shape(base_url, "review", where) do
+      {:ok, rows, _log} -> rows
+      {:error, _reason, _log} -> []
+    end
   end
 
   defp decrypt_password(entry, author) do
-    entry.password_b64
+    entry["password_b64"]
     |> decode_binary()
     |> EnigmaPq.aes_gcm_decrypt(author.review_list_password)
     |> case do
@@ -111,7 +119,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewLoader do
   end
 
   defp decrypt_content(review, password) do
-    review.content_b64
+    review["content_b64"]
     |> decode_binary()
     |> EnigmaPq.aes_gcm_decrypt(password)
     |> case do
@@ -133,4 +141,9 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewLoader do
       :error -> value
     end
   end
+
+  defp deleted?(row), do: row["deleted_flag"] in [true, "true", "t"]
+
+  defp parse_int(v) when is_integer(v), do: v
+  defp parse_int(v) when is_binary(v), do: String.to_integer(v)
 end

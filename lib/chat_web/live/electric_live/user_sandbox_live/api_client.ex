@@ -10,7 +10,6 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   alias Chat.Data.Schemas.UserStorage
   alias Chat.Data.Types.UserStorageSignHash
   alias Chat.Data.User
-  alias Chat.Db
 
   @doc """
   Creates a new user via the Electric API.
@@ -94,23 +93,32 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   - `{:error, %{reason: reason, log_entries: [log_entry, ...]}}`
   """
   def delete_user(user_hash, sign_skey, base_url) do
-    # TODO: replace Db.repo() with shape read to comply with HTTP-only rule
-    case Db.repo().get(UserCard, user_hash) do
-      nil ->
+    case fetch_shape(base_url, "user_cards", "user_hash='#{user_hash}'") do
+      {:ok, [row | _], _log} ->
+        delete_user_with_row(row, user_hash, sign_skey, base_url)
+
+      {:ok, [], _log} ->
         {:error, %{reason: "User not found", log_entries: []}}
 
-      existing_card ->
-        delete_user_with_card(existing_card, user_hash, sign_skey, base_url)
+      {:error, reason, _log} ->
+        {:error, %{reason: reason, log_entries: []}}
     end
   end
 
-  defp delete_user_with_card(existing_card, user_hash, sign_skey, base_url) do
-    new_timestamp = existing_card.owner_timestamp + 1
+  defp delete_user_with_row(row, user_hash, sign_skey, base_url) do
+    new_timestamp = parse_int(row["owner_timestamp"]) + 1
 
-    updated_card_struct =
-      existing_card
-      |> Map.put(:deleted_flag, true)
-      |> Map.put(:owner_timestamp, new_timestamp)
+    updated_card_struct = %UserCard{
+      user_hash: row["user_hash"],
+      sign_pkey: decode_b64(row["sign_pkey"]),
+      contact_pkey: decode_b64(row["contact_pkey"]),
+      contact_cert: decode_b64(row["contact_cert"]),
+      crypt_pkey: decode_b64(row["crypt_pkey"]),
+      crypt_cert: decode_b64(row["crypt_cert"]),
+      name: row["name"],
+      deleted_flag: true,
+      owner_timestamp: new_timestamp
+    }
 
     sign_b64 =
       updated_card_struct
@@ -209,19 +217,18 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   - `{:error, %{reason: reason, log_entries: [log_entry, ...]}}`
   """
   def update_storage(user_hash, sign_skey, uuid, value_binary, base_url) do
-    # TODO: replace Db.repo() with shape read to comply with HTTP-only rule
-    case Db.repo().get_by(UserStorage, user_hash: user_hash, uuid: uuid) do
-      nil ->
-        {:error, %{reason: "Storage entry not found", log_entries: []}}
+    case fetch_storage_row(user_hash, uuid, base_url) do
+      {:ok, row} ->
+        update_existing_storage(row, user_hash, sign_skey, uuid, value_binary, base_url)
 
-      existing ->
-        update_existing_storage(existing, user_hash, sign_skey, uuid, value_binary, base_url)
+      :not_found ->
+        {:error, %{reason: "Storage entry not found", log_entries: []}}
     end
   end
 
-  defp update_existing_storage(existing, user_hash, sign_skey, uuid, value_binary, base_url) do
-    owner_timestamp = existing.owner_timestamp + 1
-    parent_sign_hash = existing.sign_hash
+  defp update_existing_storage(row, user_hash, sign_skey, uuid, value_binary, base_url) do
+    owner_timestamp = parse_int(row["owner_timestamp"]) + 1
+    parent_sign_hash = row["sign_hash"]
 
     storage_attrs = %{
       user_hash: user_hash,
@@ -278,24 +285,23 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   - `{:error, %{reason: reason, log_entries: [log_entry, ...]}}`
   """
   def delete_storage(user_hash, sign_skey, uuid, base_url) do
-    # TODO: replace Db.repo() with shape read to comply with HTTP-only rule
-    case Db.repo().get_by(UserStorage, user_hash: user_hash, uuid: uuid) do
-      nil ->
-        {:error, %{reason: "Storage entry not found", log_entries: []}}
+    case fetch_storage_row(user_hash, uuid, base_url) do
+      {:ok, row} ->
+        delete_existing_storage(row, user_hash, sign_skey, uuid, base_url)
 
-      existing ->
-        delete_existing_storage(existing, user_hash, sign_skey, uuid, base_url)
+      :not_found ->
+        {:error, %{reason: "Storage entry not found", log_entries: []}}
     end
   end
 
-  defp delete_existing_storage(existing, user_hash, sign_skey, uuid, base_url) do
-    owner_timestamp = existing.owner_timestamp + 1
-    parent_sign_hash = existing.sign_hash
+  defp delete_existing_storage(row, user_hash, sign_skey, uuid, base_url) do
+    owner_timestamp = parse_int(row["owner_timestamp"]) + 1
+    parent_sign_hash = row["sign_hash"]
 
     storage_attrs = %{
       user_hash: user_hash,
       uuid: uuid,
-      value_b64: existing.value_b64,
+      value_b64: decode_b64(row["value_b64"]),
       deleted_flag: true,
       parent_sign_hash: parent_sign_hash,
       owner_timestamp: owner_timestamp
@@ -403,4 +409,18 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
 
     ingest(payload, sign_skey, base_url)
   end
+
+  defp fetch_storage_row(user_hash, uuid, base_url) do
+    where = "user_hash='#{user_hash}' AND uuid='#{uuid}'"
+
+    case fetch_shape(base_url, "user_storage", where) do
+      {:ok, [row | _], _log} -> {:ok, row}
+      _ -> :not_found
+    end
+  end
+
+  defp decode_b64(value) when is_binary(value), do: Base.decode64!(value, padding: false)
+
+  defp parse_int(v) when is_integer(v), do: v
+  defp parse_int(v) when is_binary(v), do: String.to_integer(v)
 end

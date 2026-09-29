@@ -4,10 +4,9 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
   use ChatWeb, :live_view
 
   import ChatWeb.ElectricLive.ReviewSandboxLive.Render
+  import ChatWeb.ElectricLive.SandboxHttp, only: [fetch_shape: 2]
 
-  alias Chat.Data.Schemas.Origin
   alias ChatWeb.ElectricLive.ReviewSandboxLive.Router
-  alias ChatWeb.ElectricLive.ShapeReader
 
   @impl true
   def mount(_params, _session, socket) do
@@ -57,10 +56,16 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
 
     Task.start_link(fn ->
       origins =
-        base_url
-        |> ShapeReader.rows("origins", Origin)
-        |> Enum.reject(& &1.deleted_flag)
-        |> Enum.sort_by(& &1.name)
+        case fetch_shape(base_url, "origins") do
+          {:ok, rows, _log} ->
+            rows
+            |> Enum.reject(&(&1["deleted_flag"] in [true, "true", "t"]))
+            |> Enum.map(&%{origin_hash: &1["origin_hash"], name: &1["name"]})
+            |> Enum.sort_by(& &1.name)
+
+          {:error, _reason, _log} ->
+            []
+        end
 
       send(pid, {:origins_loaded, origins})
     end)

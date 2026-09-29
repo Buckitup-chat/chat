@@ -4,7 +4,7 @@ import {
   signMlDsa87, hash, encryptChunk, decryptChunk,
   buildSignaturePayload
 } from './file-sandbox/crypto.js';
-import { ingest, putChunk, fetchShape, fetchShapeWhere, fetchChunkStatuses } from './file-sandbox/electric-client.js';
+import { ingest, putChunk, fetchShapeWhere, fetchChunkStatuses } from './file-sandbox/electric-client.js';
 import { chunkFile, generateFileId, generateEncSecret } from './file-sandbox/file-chunker.js';
 import { VideoSWStreamer } from './file-sandbox/video-sw-streamer.js';
 import {
@@ -596,10 +596,7 @@ async function handlePlayVideo() {
     closePreview();
 
     const encSecret = hexToUint8(encSecretHex);
-    const files = await fetchShape(state.baseUrl, 'file', r => r.file_id === fileId);
-    if (files.length === 0) throw new Error('File manifest not found');
-
-    const manifest = files[0];
+    const manifest = await fetchManifest(fileId);
     const chunkCount = parseInt(manifest.chunk_count);
     const totalSize = parseInt(manifest.total_size);
 

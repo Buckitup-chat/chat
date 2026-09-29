@@ -14,7 +14,6 @@ import {
 } from './file-sandbox/content-types.js';
 
 const CHUNK_SIZE = 4_194_304;
-const textEncoder = new TextEncoder();
 
 let state = {
   keys: null,
@@ -128,8 +127,7 @@ async function handleUpload() {
         size: enc.length,
         uploader_hash: userHash
       };
-      const payloadStr = buildSignaturePayload(signableFields);
-      const payloadBytes = textEncoder.encode(payloadStr);
+      const payloadBytes = buildSignaturePayload(signableFields);
       uploadTiming.sign_payload += performance.now() - t0;
 
       t0 = performance.now();
@@ -193,8 +191,7 @@ async function handleUpload() {
       uploader_hash: userHash
     };
 
-    const manifestPayloadStr = buildSignaturePayload(manifestFields);
-    const manifestPayloadBytes = textEncoder.encode(manifestPayloadStr);
+    const manifestPayloadBytes = buildSignaturePayload(manifestFields);
     const manifestSignB64 = signMlDsa87(manifestPayloadBytes, state.keys.sign_skey);
 
     const manifestMutation = {
@@ -759,8 +756,7 @@ async function handleDeleteFile(fileId) {
       uploader_hash: state.keys.user_hash
     };
 
-    const payloadStr = buildSignaturePayload(signableFields);
-    const payloadBytes = textEncoder.encode(payloadStr);
+    const payloadBytes = buildSignaturePayload(signableFields);
     const signB64 = signMlDsa87(payloadBytes, state.keys.sign_skey);
 
     const mutation = {

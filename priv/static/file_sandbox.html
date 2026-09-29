@@ -115,13 +115,15 @@ sign_b64          BYTEA     ML-DSA-87 signature</pre>
       <div class="doc-section">
         <h4>Signing</h4>
         <div class="doc-content">
-          <p>ML-DSA-87 (FIPS 204). Signature payload: all fields except sign_b64, sorted alphabetically, encoded per suffix rules, concatenated.</p>
+          <p>ML-DSA-87 (FIPS 204). Signature payload: all fields except sign_b64, sorted alphabetically, each <strong>length-framed</strong>: <code>u32be(byte_length) || encoded_value</code>. Result is raw binary.</p>
           <ul class="list-disc list-inside text-sm mt-1 space-y-0.5">
             <li><code>_b64</code>, <code>_cert</code>, <code>_pkey</code> → padded Base64</li>
+            <li><code>_hash</code> → prefixed hex (e.g. <code>"u_"</code>, <code>"fd_"</code>)</li>
             <li>Arrays → elements concatenated (Base64 if binary)</li>
             <li>Booleans → <code>"true"</code> / <code>"false"</code></li>
             <li>Numbers → string representation</li>
             <li>Strings → as-is</li>
+            <li>Null → <code>"null"</code></li>
           </ul>
         </div>
       </div>

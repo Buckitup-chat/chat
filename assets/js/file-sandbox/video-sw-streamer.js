@@ -20,14 +20,16 @@ export class VideoSWStreamer {
     }
 
     this._onStatus('Registering service worker...', 'info');
+
+    const controllerReady = navigator.serviceWorker.controller
+      ? Promise.resolve()
+      : new Promise((resolve) => {
+          navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
+        });
+
     await navigator.serviceWorker.register('/video-sw.js', { scope: '/' });
     await navigator.serviceWorker.ready;
-
-    if (!navigator.serviceWorker.controller) {
-      await new Promise((resolve) => {
-        navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
-      });
-    }
+    await controllerReady;
 
     this._sessionId = crypto.randomUUID();
 

@@ -263,9 +263,15 @@ defmodule ChatWeb.Router do
       ]
   end
 
-  scope "/", ChatWeb do
+  scope "/app", ChatWeb do
     pipe_through :browser
     get "/", FrontendController, :app
     get "/*path", FrontendController, :app
+  end
+
+  scope "/", ChatWeb do
+    pipe_through :browser
+    get "/", FrontendController, :redirect_to_app
+    get "/*path", FrontendController, :redirect_to_app
   end
 end

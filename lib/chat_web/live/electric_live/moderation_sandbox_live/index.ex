@@ -169,9 +169,10 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Index do
 
   defp verify_identity_async(identity, base_url) do
     pid = self()
+    auth = %{user_hash: identity.origin_hash, sign_skey: identity.sign_skey}
 
     async(pid, fn ->
-      %{origin: origin, card: card} = Queue.fetch_origin_context(identity.origin_hash, base_url)
+      %{origin: origin, card: card} = Queue.fetch_origin_context(identity.origin_hash, base_url, auth)
       verification = Identity.verify_against_card(identity, card)
 
       send(pid, {:identity_verified, %{origin: origin, verification: verification}})
@@ -180,9 +181,10 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Index do
 
   defp load_queue_async(identity, base_url) do
     pid = self()
+    auth = %{user_hash: identity.origin_hash, sign_skey: identity.sign_skey}
 
     async(pid, fn ->
-      result = Queue.load(identity.origin_hash, identity.crypt_skey, base_url)
+      result = Queue.load(identity.origin_hash, identity.crypt_skey, base_url, auth)
 
       send(pid, {:queue_loaded, result})
     end)

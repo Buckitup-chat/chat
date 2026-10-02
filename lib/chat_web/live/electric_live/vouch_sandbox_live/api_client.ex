@@ -7,35 +7,35 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.ApiClient do
   alias Chat.Data.Schemas.VouchToken
   alias Chat.TimeKeeper
 
-  def list_users(base_url) do
-    case fetch_shape(base_url, "user_cards") do
-      {:ok, rows, _log} ->
+  def list_users(base_url, auth) do
+    case fetch_shape_gated(base_url, "user_cards", auth) do
+      {:ok, rows, _logs} ->
         rows
         |> Enum.map(fn row -> %{user_hash: row["user_hash"], name: row["name"]} end)
         |> Enum.reject(&(&1.name == nil or &1.name == ""))
         |> Enum.sort_by(& &1.name)
 
-      {:error, _reason, _log} ->
+      {:error, _reason, _logs} ->
         []
     end
   end
 
-  def list_vouches_by_me(issuer_hash, base_url) do
-    case fetch_shape(base_url, "vouch_tokens", "issuer_hash='#{issuer_hash}'") do
-      {:ok, rows, _log} ->
+  def list_vouches_by_me(issuer_hash, base_url, auth) do
+    case fetch_shape_gated(base_url, "vouch_tokens", "issuer_hash='#{issuer_hash}'", auth) do
+      {:ok, rows, _logs} ->
         rows |> Enum.map(&parse_vouch_row/1) |> Enum.sort_by(& &1.owner_timestamp, :desc)
 
-      {:error, _reason, _log} ->
+      {:error, _reason, _logs} ->
         []
     end
   end
 
-  def list_vouches_for_me(subject_hash, base_url) do
-    case fetch_shape(base_url, "vouch_tokens", "subject_hash='#{subject_hash}'") do
-      {:ok, rows, _log} ->
+  def list_vouches_for_me(subject_hash, base_url, auth) do
+    case fetch_shape_gated(base_url, "vouch_tokens", "subject_hash='#{subject_hash}'", auth) do
+      {:ok, rows, _logs} ->
         rows |> Enum.map(&parse_vouch_row/1) |> Enum.sort_by(& &1.owner_timestamp, :desc)
 
-      {:error, _reason, _log} ->
+      {:error, _reason, _logs} ->
         []
     end
   end
@@ -53,9 +53,11 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.ApiClient do
       deleted_flag: Keyword.get(opts, :revoked, false)
     }
 
+    auth = %{user_hash: identity.user_hash, sign_skey: identity.sign_skey}
+
     case insert_vouch(identity, vouch, base_url) do
       {:ok, logs} -> {:ok, %{log_entries: logs}}
-      {:error, "Ingest failed: 409", logs} -> update_existing(identity, vouch, base_url, logs)
+      {:error, "Ingest failed: 409", logs} -> update_existing(identity, vouch, base_url, logs, auth)
       {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end
   end
@@ -74,9 +76,9 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.ApiClient do
     end
   end
 
-  defp update_existing(identity, vouch, base_url, insert_logs) do
+  defp update_existing(identity, vouch, base_url, insert_logs, auth) do
     identity.user_hash
-    |> list_vouches_by_me(base_url)
+    |> list_vouches_by_me(base_url, auth)
     |> Enum.find(&(&1.kind == vouch.kind and &1.subject_hash == vouch.subject_hash))
     |> case do
       nil ->

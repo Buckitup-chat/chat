@@ -50,9 +50,10 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ListPassword do
   """
   def fetch(author, base_url) do
     where = "user_hash='#{author.user_hash}' AND uuid='#{@slot_uuid}'"
+    auth = %{user_hash: author.user_hash, sign_skey: author.sign_skey}
 
-    case fetch_shape(base_url, "user_storage", where) do
-      {:ok, rows, _log} ->
+    case fetch_shape_gated(base_url, "user_storage", where, auth) do
+      {:ok, rows, _logs} ->
         rows
         |> Enum.reject(&(&1["deleted_flag"] in [true, "true", "t"]))
         |> case do
@@ -60,7 +61,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ListPassword do
           entries -> decrypt_latest(entries, author)
         end
 
-      {:error, reason, _log} ->
+      {:error, reason, _logs} ->
         {:error, reason}
     end
   end

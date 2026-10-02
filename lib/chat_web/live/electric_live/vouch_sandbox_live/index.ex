@@ -44,11 +44,14 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.Index do
       {:ok, user_data} ->
         base_url = public_url(socket)
 
+        identity = IdentityCheck.mark_on_server(user_data, base_url)
+        auth = %{user_hash: identity.user_hash, sign_skey: identity.sign_skey}
+
         socket
         |> assign(
-          identity: IdentityCheck.mark_on_server(user_data, base_url),
+          identity: identity,
           error_message: nil,
-          users: ApiClient.list_users(base_url)
+          users: ApiClient.list_users(base_url, auth)
         )
         |> load_vouches(base_url)
         |> noreply()
@@ -245,11 +248,12 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.Index do
   end
 
   defp load_vouches(socket, base_url) do
-    hash = socket.assigns.identity.user_hash
+    identity = socket.assigns.identity
+    auth = %{user_hash: identity.user_hash, sign_skey: identity.sign_skey}
 
     assign(socket,
-      vouches_by_me: ApiClient.list_vouches_by_me(hash, base_url),
-      vouches_for_me: ApiClient.list_vouches_for_me(hash, base_url)
+      vouches_by_me: ApiClient.list_vouches_by_me(identity.user_hash, base_url, auth),
+      vouches_for_me: ApiClient.list_vouches_for_me(identity.user_hash, base_url, auth)
     )
   end
 

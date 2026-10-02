@@ -18,7 +18,9 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Contacts do
 
   @doc "Peers the author can share with — everyone else with a live card."
   def list_peers(author, base_url) do
-    case DialogApi.fetch_all_user_cards(base_url) do
+    auth = %{user_hash: author.user_hash, sign_skey: author.sign_skey}
+
+    case DialogApi.fetch_all_user_cards(base_url, auth) do
       {:ok, %{cards: cards, log_entries: logs}} ->
         peers =
           cards
@@ -81,10 +83,12 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Contacts do
   # no way to unwrap the sender_msg_key. Re-publishing is an LWW upsert on
   # (dialog_hash, sender_hash), so it is safe to send unconditionally.
   defp send_to_peer(author, peer_hash, content, base_url) do
-    with {:ok, crypt_pkey, card_logs} <- peer_crypt_pkey(peer_hash, base_url),
+    auth = %{user_hash: author.user_hash, sign_skey: author.sign_skey}
+
+    with {:ok, crypt_pkey, card_logs} <- peer_crypt_pkey(peer_hash, base_url, auth),
          {:ok, %{dialog_hash: dialog_hash, log_entries: key_logs}} <-
            DialogApi.publish_dialog_key(author, peer_hash, crypt_pkey, base_url),
-         {:ok, tails, tail_logs} <- dialog_tails(author, dialog_hash, peer_hash, base_url),
+         {:ok, tails, tail_logs} <- dialog_tails(author, dialog_hash, peer_hash, base_url, auth),
          {:ok, %{log_entries: msg_logs}} <-
            DialogApi.publish_dialog_message(
              author,
@@ -100,10 +104,8 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Contacts do
     end
   end
 
-  # fetch_user_card/2 answers {:ok, %{card: nil}} for an unknown hash, which
-  # would otherwise blow up inside EnigmaPq.encapsulate_secret/1.
-  defp peer_crypt_pkey(peer_hash, base_url) do
-    case DialogApi.fetch_user_card(peer_hash, base_url) do
+  defp peer_crypt_pkey(peer_hash, base_url, auth) do
+    case DialogApi.fetch_user_card(peer_hash, base_url, auth) do
       {:ok, %{card: nil, log_entries: logs}} ->
         {:error, "no user card for #{peer_hash}", logs}
 
@@ -115,12 +117,8 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Contacts do
     end
   end
 
-  # An empty tails map means "genesis". Sending that into a dialog that already
-  # has messages would fork the DAG, so read it first. Only the author's own
-  # messages are decryptable here; the peer's refs fall back to %{}, which
-  # over-includes tails — harmless, unlike under-including them.
-  defp dialog_tails(author, dialog_hash, peer_hash, base_url) do
-    case DialogApi.fetch_dialog_messages(dialog_hash, base_url) do
+  defp dialog_tails(author, dialog_hash, peer_hash, base_url, auth) do
+    case DialogApi.fetch_dialog_messages(dialog_hash, base_url, auth) do
       {:ok, %{messages: [], log_entries: logs}} ->
         {:ok, %{}, logs}
 

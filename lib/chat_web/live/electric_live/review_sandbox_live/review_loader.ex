@@ -9,8 +9,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewLoader do
   reason they cannot be opened.
   """
 
-  import ChatWeb.ElectricLive.SandboxHttp, only: [fetch_shape: 3]
-
+  alias ChatWeb.ElectricLive.SandboxHttp
   alias EnigmaPq
 
   @doc """
@@ -21,19 +20,20 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewLoader do
   `review_list` row (nil when step 5 never ran for it).
   """
   def list_for_origin(author, origin_hash, base_url) do
-    entries = list_entries(author, origin_hash, base_url)
+    auth = %{user_hash: author.user_hash, sign_skey: author.sign_skey}
+    entries = list_entries(author, origin_hash, base_url, auth)
 
     base_url
-    |> fetch_reviews("author_hash='#{author.user_hash}' AND origin_hash='#{origin_hash}'")
+    |> fetch_reviews("author_hash='#{author.user_hash}' AND origin_hash='#{origin_hash}'", auth)
     |> Enum.reject(&deleted?/1)
     |> Enum.sort_by(&{parse_int(&1["owner_timestamp"]), &1["review_hash"]}, :desc)
     |> Enum.map(&item(&1, Map.get(entries, &1["review_hash"]), author))
   end
 
   @doc "The `sign_hash` the shape currently shows for `review_hash`."
-  def current_sign_hash(review_hash, base_url) do
+  def current_sign_hash(review_hash, base_url, auth) do
     base_url
-    |> fetch_reviews("review_hash='#{review_hash}'")
+    |> fetch_reviews("review_hash='#{review_hash}'", auth)
     |> case do
       [review | _] -> {:ok, review["sign_hash"]}
       [] -> {:error, :not_found}
@@ -84,11 +84,11 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewLoader do
     }
   end
 
-  defp list_entries(author, origin_hash, base_url) do
+  defp list_entries(author, origin_hash, base_url, auth) do
     where = "user_hash='#{author.user_hash}' AND origin_hash='#{origin_hash}'"
 
-    case fetch_shape(base_url, "review_list", where) do
-      {:ok, rows, _log} ->
+    case SandboxHttp.fetch_shape_gated(base_url, "review_list", where, auth) do
+      {:ok, rows, _logs} ->
         rows
         |> Enum.reject(&deleted?/1)
         |> Enum.group_by(& &1["review_hash"])
@@ -96,15 +96,15 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewLoader do
           {hash, Enum.max_by(rows, &parse_int(&1["owner_timestamp"]))}
         end)
 
-      {:error, _reason, _log} ->
+      {:error, _reason, _logs} ->
         %{}
     end
   end
 
-  defp fetch_reviews(base_url, where) do
-    case fetch_shape(base_url, "review", where) do
-      {:ok, rows, _log} -> rows
-      {:error, _reason, _log} -> []
+  defp fetch_reviews(base_url, where, auth) do
+    case SandboxHttp.fetch_shape_gated(base_url, "review", where, auth) do
+      {:ok, rows, _logs} -> rows
+      {:error, _reason, _logs} -> []
     end
   end
 

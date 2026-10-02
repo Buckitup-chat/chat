@@ -87,6 +87,130 @@ defmodule ChatWeb.ElectricLive.SandboxHttp do
     end
   end
 
+  # --- Read sessions ---
+
+  @doc """
+  Opens a read session for `shape` on the peer. Returns a Bearer token.
+
+  Protocol: `GET /challenge` → sign → `POST /read_session`.
+  """
+  def open_read_session(base_url, shape, user_hash, sign_skey) do
+    with {:ok, challenge_resp, challenge_log} <- get_challenge(base_url) do
+      %{"challenge" => challenge, "challenge_id" => challenge_id} = challenge_resp
+      signature = :crypto.sign(:mldsa87, :none, challenge, sign_skey)
+
+      url = base_url <> "/electric/v1/read_session"
+      timestamp = TimeKeeper.now()
+      headers = [{"accept", "application/json"}, {"content-type", "application/json"}]
+
+      body = %{
+        "user_hash" => user_hash,
+        "shape" => shape,
+        "challenge_id" => challenge_id,
+        "signature" => Base.encode64(signature, padding: false)
+      }
+
+      body_json = Jason.encode!(body, pretty: true)
+
+      case Req.post(url, json: body, headers: headers) do
+        {:ok, %{status: 200, body: %{"token" => token, "expires_in" => expires_in}} = resp} ->
+          {:ok, token, expires_in,
+           [challenge_log, log_entry("POST", url, headers, body_json, resp, timestamp)]}
+
+        {:ok, %{status: _status} = resp} ->
+          error_msg = if is_map(resp.body), do: resp.body["error"], else: nil
+          {:error, error_msg || "Read session failed: #{resp.status}",
+           [challenge_log, log_entry("POST", url, headers, body_json, resp, timestamp)]}
+
+        {:error, error} ->
+          {:error, "Read session failed: #{inspect(error)}",
+           [challenge_log, log_entry("POST", url, headers, body_json, error, timestamp)]}
+      end
+    end
+  end
+
+  # --- Gated shape reads ---
+
+  @doc """
+  Like `fetch_shape/2,3` but opens a read session on `401 read_session_required`.
+
+  `auth` is `%{user_hash: _, sign_skey: _}`.
+  Returns `{:ok, rows, logs}` or `{:error, reason, logs}` where logs is always a list.
+  """
+  def fetch_shape_gated(base_url, table, auth), do: fetch_shape_gated(base_url, table, nil, auth)
+
+  def fetch_shape_gated(base_url, table, where, %{user_hash: _, sign_skey: _} = auth) do
+    url = shape_url(base_url, table, where)
+    timestamp = TimeKeeper.now()
+    headers = [{"accept", "application/json"}]
+
+    case fetch_pages(url, headers, %{}) do
+      {:ok, rows} ->
+        {:ok, rows, [shape_log(url, headers, rows, timestamp)]}
+
+      {:error, {401, %{"error" => "read_session_required", "shape" => shape}, rh}} ->
+        gate_log =
+          build_log(
+            "GET",
+            url,
+            headers,
+            "",
+            401,
+            format_headers(rh),
+            Jason.encode!(%{"error" => "read_session_required", "shape" => shape}),
+            timestamp
+          )
+
+        retry_with_session(base_url, url, shape, auth, [gate_log])
+
+      {:error, {status, body, rh}} ->
+        {:error, "Shape request failed (#{status})",
+         [build_log("GET", url, headers, "", status, format_headers(rh), inspect(body), timestamp)]}
+
+      {:error, reason} ->
+        {:error, "Shape request failed: #{inspect(reason)}",
+         [build_log("GET", url, headers, "", 0, [], inspect(reason), timestamp)]}
+    end
+  end
+
+  defp retry_with_session(base_url, url, shape, auth, logs) do
+    case open_read_session(base_url, shape, auth.user_hash, auth.sign_skey) do
+      {:ok, token, _expires_in, session_logs} ->
+        retry_ts = TimeKeeper.now()
+        retry_headers = [{"accept", "application/json"}, {"authorization", "Bearer #{token}"}]
+
+        case fetch_pages(url, retry_headers, %{}) do
+          {:ok, rows} ->
+            {:ok, rows, logs ++ session_logs ++ [shape_log(url, retry_headers, rows, retry_ts)]}
+
+          {:error, {status, body, rh}} ->
+            {:error, "Shape request failed (#{status})",
+             logs ++
+               session_logs ++
+               [build_log("GET", url, retry_headers, "", status, format_headers(rh), inspect(body), retry_ts)]}
+
+          {:error, reason} ->
+            {:error, "Shape request failed: #{inspect(reason)}",
+             logs ++
+               session_logs ++
+               [build_log("GET", url, retry_headers, "", 0, [], inspect(reason), retry_ts)]}
+        end
+
+      {:error, reason, session_logs} ->
+        {:error, reason, logs ++ session_logs}
+    end
+  end
+
+  defp shape_url(base_url, table, nil),
+    do: "#{base_url}/electric/v1/shapes?table=#{table}&offset=-1"
+
+  defp shape_url(base_url, table, where),
+    do: "#{base_url}/electric/v1/shapes?table=#{table}&offset=-1&where=#{URI.encode(where)}"
+
+  defp shape_log(url, headers, rows, timestamp) do
+    build_log("GET", url, headers, "", 200, [], Jason.encode!(rows, pretty: true), timestamp)
+  end
+
   # --- Utilities ---
 
   def encode_base64(bin) when is_binary(bin), do: Base.encode64(bin, padding: false)

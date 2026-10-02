@@ -39,7 +39,8 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
       {:ok, user_data} ->
         base_url = public_url(socket)
         owner = IdentityCheck.mark_on_server(user_data, base_url)
-        origins = ApiClient.list_owner_origins(owner.user_hash, base_url)
+        auth = %{user_hash: owner.user_hash, sign_skey: owner.sign_skey}
+        origins = ApiClient.list_owner_origins(owner.user_hash, base_url, auth)
         {:noreply, assign(socket, owner: owner, origins: origins, error_message: nil)}
 
       {:error, reason} ->
@@ -53,8 +54,9 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
 
     case ApiClient.create_origin(owner, name, mode, base_url) do
       {:ok, %{origin: origin, log_entries: logs}} ->
-        origins = ApiClient.list_owner_origins(owner.user_hash, base_url)
-        pending = ApiClient.has_pending_reviews?(origin.origin_hash, base_url)
+        auth = %{user_hash: owner.user_hash, sign_skey: owner.sign_skey}
+        origins = ApiClient.list_owner_origins(owner.user_hash, base_url, auth)
+        pending = ApiClient.has_pending_reviews?(origin.origin_hash, base_url, auth)
 
         {:noreply,
          socket
@@ -74,14 +76,16 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
         {:noreply, socket}
 
       found ->
-        pending = ApiClient.has_pending_reviews?(hash, base_url)
+        auth = auth(socket)
+        pending = ApiClient.has_pending_reviews?(hash, base_url, auth)
         {:noreply, assign(socket, origin: found, pending_reviews: pending)}
     end
   end
 
   def handle_event("refresh_origins", _params, socket) do
     base_url = public_url(socket)
-    origins = ApiClient.list_owner_origins(socket.assigns.owner.user_hash, base_url)
+    auth = auth(socket)
+    origins = ApiClient.list_owner_origins(socket.assigns.owner.user_hash, base_url, auth)
     origin = refresh_selected_origin(socket.assigns.origin, origins)
     {:noreply, assign(socket, origins: origins, origin: origin)}
   end
@@ -89,7 +93,8 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
   def handle_event("refresh_pending_reviews", _params, socket) do
     base_url = public_url(socket)
     %{origin: origin} = socket.assigns
-    pending = ApiClient.has_pending_reviews?(origin.origin_hash, base_url)
+    auth = auth(socket)
+    pending = ApiClient.has_pending_reviews?(origin.origin_hash, base_url, auth)
     {:noreply, assign(socket, pending_reviews: pending)}
   end
 
@@ -158,6 +163,11 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
     Enum.map(origins, fn o ->
       if o.origin_hash == updated.origin_hash, do: updated, else: o
     end)
+  end
+
+  defp auth(socket) do
+    owner = socket.assigns.owner
+    %{user_hash: owner.user_hash, sign_skey: owner.sign_skey}
   end
 
   defp append_logs(socket, logs), do: update(socket, :request_log, &(logs ++ &1))

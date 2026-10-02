@@ -94,25 +94,18 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   def handle_event("validate_key_file", _params, socket), do: {:noreply, socket}
 
   def handle_event("import_keys", _params, socket) do
-    [result] =
+    results =
       consume_uploaded_entries(socket, :key_file, fn %{path: path}, _entry ->
         {:ok, File.read!(path)}
       end)
 
     socket =
-      case Crypto.parse_and_validate_identity(result) do
-        {:ok, user_data} ->
-          socket
-          |> assign(:user, IdentityCheck.mark_on_server(user_data, public_url(socket)))
-          |> assign(:dialogs, [])
-          |> assign(:selected_dialog, nil)
-          |> assign(:messages, [])
-          |> assign(:msg_keys_cache, %{})
-          |> assign(:error_message, nil)
-          |> fetch_available_peers(user_data.user_hash)
+      case results do
+        [] ->
+          assign(socket, :error_message, "No key file selected")
 
-        {:error, reason} ->
-          assign(socket, :error_message, "Import failed: #{reason}")
+        [result] ->
+          import_key_result(socket, result)
       end
 
     {:noreply, socket}
@@ -123,7 +116,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
     user_hash = socket.assigns.user.user_hash
 
     socket =
-      case ApiClient.fetch_dialog_keys(user_hash, base_url) do
+      case ApiClient.fetch_dialog_keys(user_hash, base_url, auth(socket)) do
         {:ok, %{keys: keys, log_entries: logs}} ->
           dialogs = Crypto.build_dialog_list(keys, user_hash)
 
@@ -151,7 +144,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
     socket = assign(socket, :operation_in_progress, true)
 
     with {:ok, %{card: card, log_entries: card_logs}} <-
-           ApiClient.fetch_user_card(peer_hash, base_url),
+           ApiClient.fetch_user_card(peer_hash, base_url, auth(socket)),
          peer_crypt_pkey <- Crypto.decode_binary_field(card["crypt_pkey"]),
          {:ok, %{dialog_hash: dialog_hash, log_entries: key_logs}} <-
            ApiClient.publish_dialog_key(user, peer_hash, peer_crypt_pkey, base_url) do
@@ -183,7 +176,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
 
     keys_cache =
       %{user.user_hash => my_key}
-      |> maybe_unwrap_peer_key(peer_hash, user, base_url)
+      |> maybe_unwrap_peer_key(peer_hash, user, base_url, auth(socket))
 
     {:noreply,
      socket
@@ -508,13 +501,14 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   def handle_info({:reactions_loaded, raw_reactions}, socket) do
     %{msg_keys_cache: keys_cache, user: user} = socket.assigns
     base_url = public_url(socket)
+    auth = auth(socket)
 
     keys_cache =
       raw_reactions
       |> Enum.map(& &1["reactor_hash"])
       |> Enum.uniq()
       |> Enum.reject(&Map.has_key?(keys_cache, &1))
-      |> Enum.reduce(keys_cache, &maybe_unwrap_peer_key(&2, &1, user, base_url))
+      |> Enum.reduce(keys_cache, &maybe_unwrap_peer_key(&2, &1, user, base_url, auth))
 
     reactions = Crypto.group_reactions_by_message(raw_reactions, keys_cache)
     {:noreply, assign(socket, reactions: reactions, msg_keys_cache: keys_cache)}
@@ -523,12 +517,13 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   def handle_info({:reaction_change, raw}, socket) do
     %{msg_keys_cache: keys_cache, user: user} = socket.assigns
     base_url = public_url(socket)
+    auth = auth(socket)
 
     keys_cache =
       if Map.has_key?(keys_cache, raw["reactor_hash"]) do
         keys_cache
       else
-        maybe_unwrap_peer_key(keys_cache, raw["reactor_hash"], user, base_url)
+        maybe_unwrap_peer_key(keys_cache, raw["reactor_hash"], user, base_url, auth)
       end
 
     decrypted = Crypto.decrypt_single_reaction(raw, keys_cache)
@@ -576,6 +571,23 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
 
   # --- Private ---
 
+  defp import_key_result(socket, result) do
+    case Crypto.parse_and_validate_identity(result) do
+      {:ok, user_data} ->
+        socket
+        |> assign(:user, IdentityCheck.mark_on_server(user_data, public_url(socket)))
+        |> assign(:dialogs, [])
+        |> assign(:selected_dialog, nil)
+        |> assign(:messages, [])
+        |> assign(:msg_keys_cache, %{})
+        |> assign(:error_message, nil)
+        |> fetch_available_peers(user_data.user_hash)
+
+      {:error, reason} ->
+        assign(socket, :error_message, "Import failed: #{reason}")
+    end
+  end
+
   defp maybe_start_stream(socket, dialog_hash) do
     case socket.assigns.sync_status do
       :idle -> start_dialog_stream(socket, dialog_hash)
@@ -587,12 +599,13 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
     socket = stop_dialog_stream(socket)
     base_url = public_url(socket)
     me = self()
+    auth = auth(socket)
 
     socket
     |> assign(
-      stream_pid: ApiClient.start_message_stream(dialog_hash, base_url, me),
-      reaction_stream_pid: ApiClient.start_reaction_stream(dialog_hash, base_url, me),
-      receipt_stream_pid: ApiClient.start_receipt_stream(dialog_hash, base_url, me),
+      stream_pid: ApiClient.start_message_stream(dialog_hash, base_url, me, auth),
+      reaction_stream_pid: ApiClient.start_reaction_stream(dialog_hash, base_url, me, auth),
+      receipt_stream_pid: ApiClient.start_receipt_stream(dialog_hash, base_url, me, auth),
       sync_status: :loading
     )
   end
@@ -611,7 +624,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   defp fetch_available_peers(socket, my_hash) do
     base_url = public_url(socket)
 
-    case ApiClient.fetch_all_user_cards(base_url) do
+    case ApiClient.fetch_all_user_cards(base_url, auth(socket)) do
       {:ok, %{cards: cards, log_entries: logs}} ->
         peers =
           cards
@@ -631,8 +644,9 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
 
   defp ensure_dialog_key(socket, user, peer_hash, base_url) do
     dialog_hash = Crypto.compute_dialog_hash(user.user_hash, peer_hash)
+    auth = auth(socket)
 
-    case ApiClient.fetch_dialog_keys_by_dialog(dialog_hash, base_url) do
+    case ApiClient.fetch_dialog_keys_by_dialog(dialog_hash, base_url, auth) do
       {:ok, %{keys: keys, log_entries: logs}} ->
         socket = update(socket, :request_log, &(&1 ++ logs))
         has_own_key = Enum.any?(keys, &(&1["sender_hash"] == user.user_hash))
@@ -641,7 +655,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
           {:ok, socket}
         else
           with {:ok, %{card: card, log_entries: card_logs}} <-
-                 ApiClient.fetch_user_card(peer_hash, base_url),
+                 ApiClient.fetch_user_card(peer_hash, base_url, auth),
                peer_crypt_pkey = Crypto.decode_binary_field(card["crypt_pkey"]),
                {:ok, %{log_entries: key_logs}} <-
                  ApiClient.publish_dialog_key(user, peer_hash, peer_crypt_pkey, base_url) do
@@ -657,6 +671,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   defp ensure_sender_keys(socket, raw_msgs) do
     %{user: user, dialogs: dialogs, selected_dialog: selected_dialog} = socket.assigns
     base_url = public_url(socket)
+    auth = auth(socket)
     dialog = Enum.find(dialogs, &(&1.dialog_hash == selected_dialog))
 
     raw_msgs
@@ -676,20 +691,21 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
 
           Map.put(socket.assigns.msg_keys_cache, user.user_hash, my_key)
         else
-          maybe_unwrap_peer_key(socket.assigns.msg_keys_cache, sender_hash, user, base_url)
+          maybe_unwrap_peer_key(socket.assigns.msg_keys_cache, sender_hash, user, base_url, auth)
         end
 
       assign(socket, :msg_keys_cache, keys_cache)
     end)
   end
 
-  defp maybe_unwrap_peer_key(keys_cache, peer_hash, user, base_url) do
+  defp maybe_unwrap_peer_key(keys_cache, peer_hash, user, base_url, auth) do
     if Map.has_key?(keys_cache, peer_hash) do
       keys_cache
     else
       dialog_hash = Crypto.compute_dialog_hash(user.user_hash, peer_hash)
 
-      with {:ok, %{keys: keys}} <- ApiClient.fetch_dialog_keys_by_dialog(dialog_hash, base_url),
+      with {:ok, %{keys: keys}} <-
+             ApiClient.fetch_dialog_keys_by_dialog(dialog_hash, base_url, auth),
            %{} = row <-
              Enum.find(keys, &(&1["sender_hash"] == peer_hash)) do
         kem_wrap = Crypto.decode_binary_field(row["peer_kem_wrap_key_b64"])
@@ -738,7 +754,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
     base_url = public_url(socket)
     keys_cache = socket.assigns.msg_keys_cache
 
-    case ApiClient.fetch_message_versions(msg_id, base_url) do
+    case ApiClient.fetch_message_versions(msg_id, base_url, auth(socket)) do
       {:ok, %{versions: raw, log_entries: logs}} ->
         versions =
           raw
@@ -754,5 +770,9 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
         |> assign(:error_message, reason)
         |> update(:request_log, &(&1 ++ logs))
     end
+  end
+
+  defp auth(socket) do
+    %{user_hash: socket.assigns.user.user_hash, sign_skey: socket.assigns.user.sign_skey}
   end
 end

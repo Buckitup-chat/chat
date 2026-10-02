@@ -6,27 +6,26 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Queue do
   origin and hands them to `Entries` for decryption and classification.
   """
 
-  import ChatWeb.ElectricLive.SandboxHttp, only: [fetch_shape: 3]
-
   alias ChatWeb.ElectricLive.ModerationSandboxLive.Entries
+  alias ChatWeb.ElectricLive.SandboxHttp
 
   @doc "Origin row and its user_cards row — used to verify the imported identity."
-  def fetch_origin_context(origin_hash, base_url) do
+  def fetch_origin_context(origin_hash, base_url, auth) do
     %{
       origin:
-        case fetch_first(base_url, "origins", "origin_hash='#{origin_hash}'") do
+        case fetch_first(base_url, "origins", "origin_hash='#{origin_hash}'", auth) do
           nil -> nil
           row -> parse_origin(row)
         end,
-      card: fetch_first(base_url, "user_cards", "user_hash='#{origin_hash}'")
+      card: fetch_first(base_url, "user_cards", "user_hash='#{origin_hash}'", auth)
     }
   end
 
-  def load(origin_hash, crypt_skey, base_url) do
-    reviews = fetch_rows(base_url, "review", origin_hash)
-    passwords = fetch_rows(base_url, "review_public_passwords", origin_hash)
-    post_rights = fetch_rows(base_url, "review_post_right", origin_hash)
-    revoke_rights = fetch_rows(base_url, "review_revoke_right", origin_hash)
+  def load(origin_hash, crypt_skey, base_url, auth) do
+    reviews = fetch_rows(base_url, "review", origin_hash, auth)
+    passwords = fetch_rows(base_url, "review_public_passwords", origin_hash, auth)
+    post_rights = fetch_rows(base_url, "review_post_right", origin_hash, auth)
+    revoke_rights = fetch_rows(base_url, "review_revoke_right", origin_hash, auth)
 
     %{
       entries: Entries.build(reviews, passwords, post_rights, revoke_rights, crypt_skey),
@@ -41,16 +40,16 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Queue do
 
   # --- Private ---
 
-  defp fetch_rows(base_url, table, origin_hash) do
-    case fetch_shape(base_url, table, "origin_hash='#{origin_hash}'") do
-      {:ok, rows, _log} -> rows
-      {:error, _reason, _log} -> []
+  defp fetch_rows(base_url, table, origin_hash, auth) do
+    case SandboxHttp.fetch_shape_gated(base_url, table, "origin_hash='#{origin_hash}'", auth) do
+      {:ok, rows, _logs} -> rows
+      {:error, _reason, _logs} -> []
     end
   end
 
-  defp fetch_first(base_url, table, where) do
-    case fetch_shape(base_url, table, where) do
-      {:ok, [row | _], _log} -> row
+  defp fetch_first(base_url, table, where, auth) do
+    case SandboxHttp.fetch_shape_gated(base_url, table, where, auth) do
+      {:ok, [row | _], _logs} -> row
       _ -> nil
     end
   end

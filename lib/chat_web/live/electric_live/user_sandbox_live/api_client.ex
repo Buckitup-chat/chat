@@ -93,14 +93,16 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   - `{:error, %{reason: reason, log_entries: [log_entry, ...]}}`
   """
   def delete_user(user_hash, sign_skey, base_url) do
-    case fetch_shape(base_url, "user_cards", "user_hash='#{user_hash}'") do
-      {:ok, [row | _], _log} ->
+    auth = %{user_hash: user_hash, sign_skey: sign_skey}
+
+    case fetch_shape_gated(base_url, "user_cards", "user_hash='#{user_hash}'", auth) do
+      {:ok, [row | _], _logs} ->
         delete_user_with_row(row, user_hash, sign_skey, base_url)
 
-      {:ok, [], _log} ->
+      {:ok, [], _logs} ->
         {:error, %{reason: "User not found", log_entries: []}}
 
-      {:error, reason, _log} ->
+      {:error, reason, _logs} ->
         {:error, %{reason: reason, log_entries: []}}
     end
   end
@@ -217,7 +219,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   - `{:error, %{reason: reason, log_entries: [log_entry, ...]}}`
   """
   def update_storage(user_hash, sign_skey, uuid, value_binary, base_url) do
-    case fetch_storage_row(user_hash, uuid, base_url) do
+    case fetch_storage_row(user_hash, sign_skey, uuid, base_url) do
       {:ok, row} ->
         update_existing_storage(row, user_hash, sign_skey, uuid, value_binary, base_url)
 
@@ -285,7 +287,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
   - `{:error, %{reason: reason, log_entries: [log_entry, ...]}}`
   """
   def delete_storage(user_hash, sign_skey, uuid, base_url) do
-    case fetch_storage_row(user_hash, uuid, base_url) do
+    case fetch_storage_row(user_hash, sign_skey, uuid, base_url) do
       {:ok, row} ->
         delete_existing_storage(row, user_hash, sign_skey, uuid, base_url)
 
@@ -410,11 +412,12 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
     ingest(payload, sign_skey, base_url)
   end
 
-  defp fetch_storage_row(user_hash, uuid, base_url) do
+  defp fetch_storage_row(user_hash, sign_skey, uuid, base_url) do
     where = "user_hash='#{user_hash}' AND uuid='#{uuid}'"
+    auth = %{user_hash: user_hash, sign_skey: sign_skey}
 
-    case fetch_shape(base_url, "user_storage", where) do
-      {:ok, [row | _], _log} -> {:ok, row}
+    case fetch_shape_gated(base_url, "user_storage", where, auth) do
+      {:ok, [row | _], _logs} -> {:ok, row}
       _ -> :not_found
     end
   end

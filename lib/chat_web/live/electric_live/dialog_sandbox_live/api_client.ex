@@ -15,51 +15,72 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
   alias Chat.TimeKeeper
   alias ChatWeb.ElectricLive.DialogSandboxLive.Content
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
+  alias ChatWeb.ElectricLive.SandboxHttp
   alias Electric.Client.Message
 
-  def fetch_all_user_cards(base_url) do
-    base_url |> fetch_shape("user_cards") |> wrap_result(:cards)
+  def fetch_all_user_cards(base_url, auth) do
+    base_url |> SandboxHttp.fetch_shape_gated("user_cards", auth) |> wrap_gated_result(:cards)
   end
 
-  def fetch_user_card(user_hash, base_url) do
-    case fetch_shape(base_url, "user_cards", "user_hash='#{user_hash}'") do
-      {:ok, rows, log} ->
-        {:ok, %{card: List.first(rows), log_entries: [log]}}
+  def fetch_user_card(user_hash, base_url, auth) do
+    case SandboxHttp.fetch_shape_gated(base_url, "user_cards", "user_hash='#{user_hash}'", auth) do
+      {:ok, rows, logs} ->
+        {:ok, %{card: List.first(rows), log_entries: logs}}
 
-      {:error, reason, log} ->
-        {:error, %{reason: reason, log_entries: [log]}}
+      {:error, reason, logs} ->
+        {:error, %{reason: reason, log_entries: logs}}
     end
   end
 
-  def fetch_dialog_keys(user_hash, base_url) do
-    with {:ok, sender_rows, log1} <-
-           fetch_shape(base_url, "dialog_keys", "sender_hash::text='#{user_hash}'"),
-         {:ok, peer_rows, log2} <-
-           fetch_shape(base_url, "dialog_keys", "peer_hash='#{user_hash}'") do
+  def fetch_dialog_keys(user_hash, base_url, auth) do
+    with {:ok, sender_rows, logs1} <-
+           SandboxHttp.fetch_shape_gated(
+             base_url,
+             "dialog_keys",
+             "sender_hash::text='#{user_hash}'",
+             auth
+           ),
+         {:ok, peer_rows, logs2} <-
+           SandboxHttp.fetch_shape_gated(
+             base_url,
+             "dialog_keys",
+             "peer_hash='#{user_hash}'",
+             auth
+           ) do
       all_keys =
         (sender_rows ++ peer_rows)
         |> Enum.uniq_by(&{&1["dialog_hash"], &1["sender_hash"]})
 
-      {:ok, %{keys: all_keys, log_entries: [log1, log2]}}
+      {:ok, %{keys: all_keys, log_entries: logs1 ++ logs2}}
     else
-      {:error, reason, log} -> {:error, %{reason: reason, log_entries: [log]}}
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end
   end
 
-  def fetch_dialog_keys_by_dialog(dialog_hash, base_url) do
-    base_url |> fetch_shape("dialog_keys", "dialog_hash='#{dialog_hash}'") |> wrap_result(:keys)
+  def fetch_dialog_keys_by_dialog(dialog_hash, base_url, auth) do
+    base_url
+    |> SandboxHttp.fetch_shape_gated("dialog_keys", "dialog_hash='#{dialog_hash}'", auth)
+    |> wrap_gated_result(:keys)
   end
 
-  def fetch_dialog_messages(dialog_hash, base_url) do
+  def fetch_dialog_messages(dialog_hash, base_url, auth) do
     base_url
-    |> fetch_shape("dialog_messages", "dialog_hash='#{dialog_hash}'")
-    |> wrap_result(:messages)
+    |> SandboxHttp.fetch_shape_gated(
+      "dialog_messages",
+      "dialog_hash='#{dialog_hash}'",
+      auth
+    )
+    |> wrap_gated_result(:messages)
   end
 
-  def fetch_message_versions(message_id, base_url) do
+  def fetch_message_versions(message_id, base_url, auth) do
     base_url
-    |> fetch_shape("dialog_messages_versions", "message_id='#{message_id}'")
-    |> wrap_result(:versions)
+    |> SandboxHttp.fetch_shape_gated(
+      "dialog_messages_versions",
+      "message_id='#{message_id}'",
+      auth
+    )
+    |> wrap_gated_result(:versions)
   end
 
   def publish_dialog_key(user, peer_hash, peer_crypt_pkey, base_url) do
@@ -290,8 +311,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
     end
   end
 
-  def start_message_stream(dialog_hash, base_url, subscriber_pid) do
-    client = Electric.Client.new!(endpoint: base_url <> "/electric/v1/shapes")
+  def start_message_stream(dialog_hash, base_url, subscriber_pid, auth) do
+    client = gated_client(base_url, auth)
 
     shape =
       Electric.Client.ShapeDefinition.new!("dialog_messages",
@@ -468,37 +489,47 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
     publish_insert("dialog_message_receipts", fields, user.sign_skey, base_url)
   end
 
-  def fetch_reactions(dialog_hash, base_url) do
+  def fetch_reactions(dialog_hash, base_url, auth) do
     base_url
-    |> fetch_shape("dialog_message_reactions", "dialog_hash='#{dialog_hash}'")
-    |> wrap_result(:reactions)
+    |> SandboxHttp.fetch_shape_gated(
+      "dialog_message_reactions",
+      "dialog_hash='#{dialog_hash}'",
+      auth
+    )
+    |> wrap_gated_result(:reactions)
   end
 
-  def fetch_receipts(dialog_hash, base_url) do
+  def fetch_receipts(dialog_hash, base_url, auth) do
     base_url
-    |> fetch_shape("dialog_message_receipts", "dialog_hash='#{dialog_hash}'")
-    |> wrap_result(:receipts)
+    |> SandboxHttp.fetch_shape_gated(
+      "dialog_message_receipts",
+      "dialog_hash='#{dialog_hash}'",
+      auth
+    )
+    |> wrap_gated_result(:receipts)
   end
 
-  def start_reaction_stream(dialog_hash, base_url, subscriber_pid) do
+  def start_reaction_stream(dialog_hash, base_url, subscriber_pid, auth) do
     start_auxiliary_stream(
       "dialog_message_reactions",
       dialog_hash,
       base_url,
       subscriber_pid,
       :reactions_loaded,
-      :reaction_change
+      :reaction_change,
+      auth
     )
   end
 
-  def start_receipt_stream(dialog_hash, base_url, subscriber_pid) do
+  def start_receipt_stream(dialog_hash, base_url, subscriber_pid, auth) do
     start_auxiliary_stream(
       "dialog_message_receipts",
       dialog_hash,
       base_url,
       subscriber_pid,
       :receipts_loaded,
-      :receipt_change
+      :receipt_change,
+      auth
     )
   end
 
@@ -508,9 +539,10 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
          base_url,
          subscriber_pid,
          loaded_tag,
-         change_tag
+         change_tag,
+         auth
        ) do
-    client = Electric.Client.new!(endpoint: base_url <> "/electric/v1/shapes")
+    client = gated_client(base_url, auth)
 
     shape =
       Electric.Client.ShapeDefinition.new!(table,
@@ -588,10 +620,19 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
     }
   end
 
-  defp wrap_result({:ok, rows, log}, key), do: {:ok, %{key => rows, log_entries: [log]}}
+  defp wrap_gated_result({:ok, rows, logs}, key), do: {:ok, %{key => rows, log_entries: logs}}
 
-  defp wrap_result({:error, reason, log}, _key),
-    do: {:error, %{reason: reason, log_entries: [log]}}
+  defp wrap_gated_result({:error, reason, logs}, _key),
+    do: {:error, %{reason: reason, log_entries: logs}}
+
+  defp gated_client(base_url, %{user_hash: user_hash, sign_skey: sign_skey}) do
+    Electric.Client.new!(
+      endpoint: base_url <> "/electric/v1/shapes",
+      fetch:
+        {ChatWeb.ElectricLive.SandboxGatedFetch,
+         base_url: base_url, user_hash: user_hash, sign_skey: sign_skey}
+    )
+  end
 
   defp sign(struct, sign_skey) do
     struct

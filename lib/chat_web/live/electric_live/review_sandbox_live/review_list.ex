@@ -26,17 +26,17 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewList do
   A nil means "not observed", never "rejected" — Electric lags the commit the
   server validates against. See `Proofs`.
   """
-  def load_proofs(review, base_url) do
+  def load_proofs(review, base_url, auth) do
     %{
-      review_password_sign_hash: observed_password_hash(review, base_url),
-      post_right_sign_hash: observed_right_hash(review, base_url, "review_post_right"),
-      revoke_right_sign_hash: observed_right_hash(review, base_url, "review_revoke_right")
+      review_password_sign_hash: observed_password_hash(review, base_url, auth),
+      post_right_sign_hash: observed_right_hash(review, base_url, "review_post_right", auth),
+      revoke_right_sign_hash: observed_right_hash(review, base_url, "review_revoke_right", auth)
     }
   end
 
-  defp observed_password_hash(review, base_url) do
-    case fetch_shape(base_url, "review_public_passwords", "review_hash='#{review.review_hash}'") do
-      {:ok, rows, _log} ->
+  defp observed_password_hash(review, base_url, auth) do
+    case fetch_shape_gated(base_url, "review_public_passwords", "review_hash='#{review.review_hash}'", auth) do
+      {:ok, rows, _logs} ->
         rows
         |> Enum.filter(&is_binary(&1["password_b64"]))
         |> case do
@@ -47,14 +47,14 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewList do
             rows |> Enum.max_by(&parse_int(&1["owner_timestamp"])) |> Map.fetch!("sign_hash")
         end
 
-      {:error, _reason, _log} ->
+      {:error, _reason, _logs} ->
         nil
     end
   end
 
-  defp observed_right_hash(review, base_url, table) do
-    case fetch_shape(base_url, table, "review_hash='#{review.review_hash}'") do
-      {:ok, rows, _log} ->
+  defp observed_right_hash(review, base_url, table, auth) do
+    case fetch_shape_gated(base_url, table, "review_hash='#{review.review_hash}'", auth) do
+      {:ok, rows, _logs} ->
         rows
         |> Enum.reject(&(&1["deleted_flag"] in [true, "true", "t"]))
         |> case do
@@ -62,7 +62,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewList do
           [row | _] -> row["sign_hash"]
         end
 
-      {:error, _reason, _log} ->
+      {:error, _reason, _logs} ->
         nil
     end
   end

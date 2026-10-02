@@ -80,8 +80,10 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.Index do
         peer_hash -> {peer_hash, Map.fetch!(contacts, peer_hash)}
       end
 
+    auth = %{user_hash: user.user_hash, sign_skey: user.sign_skey}
+
     Task.start_link(fn ->
-      {:ok, result} = ReviewReader.read(user_hash, list_password, base_url)
+      {:ok, result} = ReviewReader.read(user_hash, list_password, base_url, auth)
       send(pid, {:reviews_loaded, result})
     end)
 

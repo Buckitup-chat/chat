@@ -5,13 +5,11 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
 
   import ChatWeb.ElectricLive.Components
 
-  alias Chat.Data.Schemas.Origin
-  alias Chat.Data.Schemas.Review
-  alias Chat.Data.Schemas.ReviewPublicPassword
+  import ChatWeb.ElectricLive.SandboxHttp, only: [fetch_shape: 2, fetch_shape: 3]
+
   alias Chat.Proto.Shortcode
   alias ChatWeb.ElectricLive.ContactsReaderLive.ReviewReader
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
-  alias ChatWeb.ElectricLive.ShapeReader
 
   @impl true
   def mount(_params, _session, socket) do
@@ -119,7 +117,7 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
   defp moderation_badge(:pre), do: "bg-blue-100 text-blue-800"
   defp moderation_badge(_), do: "bg-gray-100 text-gray-800"
 
-  attr :origin, Origin, required: true
+  attr :origin, :map, required: true
   attr :reviews, :list, required: true
   attr :loading, :boolean, required: true
 
@@ -181,10 +179,20 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
 
     Task.start_link(fn ->
       origins =
-        base_url
-        |> ShapeReader.rows("origins", Origin)
-        |> Enum.reject(& &1.deleted_flag)
-        |> Enum.sort_by(& &1.name)
+        case fetch_shape(base_url, "origins") do
+          {:ok, rows, _log} ->
+            rows
+            |> Enum.reject(&deleted?/1)
+            |> Enum.map(&%{
+              origin_hash: &1["origin_hash"],
+              name: &1["name"],
+              moderation_mode: &1["moderation_mode"]
+            })
+            |> Enum.sort_by(& &1.name)
+
+          {:error, _reason, _log} ->
+            []
+        end
 
       send(pid, {:origins_loaded, origins})
     end)
@@ -195,18 +203,16 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
 
     Task.start_link(fn ->
       reviews =
-        ShapeReader.rows(base_url, "review", Review,
-          where: "origin_hash = $1",
-          params: [origin_hash]
-        )
-        |> Enum.reject(& &1.deleted_flag)
+        case fetch_shape(base_url, "review", "origin_hash='#{origin_hash}'") do
+          {:ok, rows, _log} -> Enum.reject(rows, &deleted?/1)
+          {:error, _reason, _log} -> []
+        end
 
       passwords =
-        ShapeReader.rows(base_url, "review_public_passwords", ReviewPublicPassword,
-          where: "origin_hash = $1",
-          params: [origin_hash]
-        )
-        |> Enum.reject(& &1.deleted_flag)
+        case fetch_shape(base_url, "review_public_passwords", "origin_hash='#{origin_hash}'") do
+          {:ok, rows, _log} -> Enum.reject(rows, &deleted?/1)
+          {:error, _reason, _log} -> []
+        end
 
       decrypted = join_and_decrypt(reviews, passwords)
       send(pid, {:reviews_loaded, decrypted})
@@ -218,8 +224,8 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
 
     reviews
     |> Enum.flat_map(fn review ->
-      case Map.get(password_map, review.review_hash) do
-        %{password_b64: pwd} when is_binary(pwd) ->
+      case Map.get(password_map, review["review_hash"]) do
+        %{"password_b64" => pwd} when is_binary(pwd) ->
           List.wrap(ReviewReader.decrypt_review_content(review, Crypto.decode_binary_field(pwd)))
 
         _ ->
@@ -231,7 +237,14 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
 
   defp latest_passwords(passwords) do
     passwords
-    |> Enum.group_by(& &1.review_hash)
-    |> Map.new(fn {hash, entries} -> {hash, Enum.max_by(entries, & &1.owner_timestamp)} end)
+    |> Enum.group_by(& &1["review_hash"])
+    |> Map.new(fn {hash, entries} ->
+      {hash, Enum.max_by(entries, &parse_int(&1["owner_timestamp"]))}
+    end)
   end
+
+  defp deleted?(row), do: row["deleted_flag"] in [true, "true", "t"]
+
+  defp parse_int(v) when is_integer(v), do: v
+  defp parse_int(v) when is_binary(v), do: String.to_integer(v)
 end

@@ -60,7 +60,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
           {:ok, rows, _log} ->
             rows
             |> Enum.reject(&(&1["deleted_flag"] in [true, "true", "t"]))
-            |> Enum.map(&%{origin_hash: &1["origin_hash"], name: &1["name"]})
+            |> Enum.map(&%{origin_hash: &1["origin_hash"], name: &1["name"], moderation_mode: &1["moderation_mode"]})
             |> Enum.sort_by(& &1.name)
 
           {:error, _reason, _log} ->

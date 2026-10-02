@@ -43,18 +43,23 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
     do_mutate_origin(origin, changes, owner.sign_skey, base_url)
   end
 
-  def list_owner_origins(owner_hash, base_url) do
-    case fetch_shape(base_url, "origins", "owner_hash='#{owner_hash}'") do
-      {:ok, rows, _log} -> Enum.map(rows, &parse_origin_row/1)
-      {:error, _reason, _log} -> []
+  def list_owner_origins(owner_hash, base_url, auth) do
+    case fetch_shape_gated(base_url, "origins", "owner_hash='#{owner_hash}'", auth) do
+      {:ok, rows, _logs} -> Enum.map(rows, &parse_origin_row/1)
+      {:error, _reason, _logs} -> []
     end
   end
 
-  def has_pending_reviews?(origin_hash, base_url) do
+  def has_pending_reviews?(origin_hash, base_url, auth) do
     with {:ok, reviews, _} <-
-           fetch_shape(base_url, "review", "origin_hash='#{origin_hash}'"),
+           fetch_shape_gated(base_url, "review", "origin_hash='#{origin_hash}'", auth),
          {:ok, passwords, _} <-
-           fetch_shape(base_url, "review_public_passwords", "origin_hash='#{origin_hash}'") do
+           fetch_shape_gated(
+             base_url,
+             "review_public_passwords",
+             "origin_hash='#{origin_hash}'",
+             auth
+           ) do
       password_hashes = MapSet.new(passwords, & &1["review_hash"])
 
       reviews

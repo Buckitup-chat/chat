@@ -29,7 +29,8 @@ defmodule ChatWeb.PhoenixSyncPatch do
       end
 
     if Phoenix.LiveView.connected?(socket) do
-      client = Keyword.get_lazy(electric_opts, :client, &Phoenix.Sync.client!/0)
+      client =
+        Keyword.get_lazy(electric_opts, :client, &ChatWeb.ElectricLive.SandboxGatedFetch.client/0)
 
       Phoenix.LiveView.stream(
         socket,

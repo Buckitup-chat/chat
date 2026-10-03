@@ -1,16 +1,27 @@
 # electric_live/
 
-This directory exists to prove that external clients can consume the Electric shape endpoints provided by the chat application. Each LiveView here acts as a reference implementation demonstrating real-time sync via Phoenix.Sync + ElectricSQL.
+Sandboxes are **reference implementations for the future frontend**. They prove that an external HTTP client — one with no access to Elixir internals — can drive every workflow end-to-end through the Electric HTTP API alone. Every sandbox must behave as a frontend would: raw HTTP requests only.
 
-Do not use Ecto queries directly — consume data through shape endpoints only (see memory: `feedback_no_direct_db_in_electric`).
+## HTTP-only rule
 
-Read shapes through `ChatWeb.ElectricLive.ShapeReader`. A one-shot read must **fold** the shape log,
-not filter it to inserts: Electric replays a shape it already has cached as a snapshot of inserts
-followed by every change since, so keeping only the inserts returns each row as it stood before its
-first update. Callers that build their own client and shape should still fold via
-`ShapeReader.collect/2`.
+Sandbox code must interact exclusively at the HTTP level:
 
-Do not use `Phoenix.Sync.client!()` or the embedded Electric client directly. It bypasses the HTTP layer and returns PostgreSQL's raw `\x` hex encoding for bytea fields instead of base64. Instead, use the `/electric/v1/shapes` endpoint: `Electric.Client.new!(endpoint: base_url <> "/electric/v1/shapes")`. This routes through `HexToBase64Electric`, which normalizes bytea values to unpadded base64. Note: this does not apply to LiveView streams using `sync_stream_fixed` — the Ecto schema parser handles type conversion automatically.
+- **Reads**: `GET /electric/v1/shapes?table=...` via `Req` — parse the JSON response, handle pagination, fold the shape log. Do not use `ShapeReader`, `Electric.Client`, `Ecto`, `Db.repo()`, or any other Elixir-side shortcut.
+- **Writes**: `GET /electric/v1/challenge` + `POST /electric/v1/ingest` via `Req`.
+- **No direct DB access**: no `Repo.get`, no `Repo.get_by`, no Ecto queries of any kind.
+- **No Elixir Electric client**: no `Electric.Client.new!`, no `Electric.Client.stream`, no `Phoenix.Sync.client!()`, no `ShapeReader.collect/2`.
+
+If a sandbox needs data, it fetches it over HTTP the same way a JS/TS frontend would. The only Elixir-specific code allowed is crypto (signing, encryption) and struct construction for signature payloads.
+
+### Shape read folding
+
+A one-shot shape read must **fold** the response log, not filter to inserts. Electric replays a cached shape as a snapshot of inserts followed by every change since — keeping only inserts returns rows as they were before their first update. Fold by row key: inserts/updates upsert, deletes remove.
+
+### bytea encoding
+
+The `/electric/v1/shapes` endpoint routes through `HexToBase64Electric`, which normalizes bytea values to unpadded base64 (unlike `Phoenix.Sync.client!()` or `Electric.Client` which return PostgreSQL's raw `\x` hex). This is another reason to stay on the HTTP path.
+
+Note: the above does not apply to non-sandbox LiveView streams using `sync_stream_fixed` — the Ecto schema parser handles type conversion automatically.
 
 Every sub-page must include a back link to the Electric index at the top of its render:
 

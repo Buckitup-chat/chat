@@ -6,27 +6,23 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.ReviewReader do
   Entries with `deleted_flag` set are retracted and excluded.
   """
 
-  alias Chat.Data.Schemas.Review
-  alias Chat.Data.Schemas.ReviewList
-  alias Chat.Data.Schemas.ReviewPublicPassword
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
   alias ChatWeb.ElectricLive.ReviewContent
-  alias ChatWeb.ElectricLive.ShapeReader
-
-  @list_columns ~w(user_hash review_hash origin_hash password_b64 deleted_flag)
+  alias ChatWeb.ElectricLive.SandboxHttp
 
   @doc """
   Reads a user's reviews via their review_list. Returns decrypted reviews grouped
   with their public visibility status.
-  """
-  def read(user_hash, list_password, base_url) do
-    entries = fetch_review_list(user_hash, base_url)
-    passwords = decrypt_list_entries(entries, list_password)
-    origin_hashes = entries |> Enum.map(& &1.origin_hash) |> Enum.uniq()
-    reviews = fetch_active_rows(origin_hashes, base_url, "review", Review)
 
-    pub_passwords =
-      fetch_active_rows(origin_hashes, base_url, "review_public_passwords", ReviewPublicPassword)
+  `auth` is `%{user_hash: _, sign_skey: _}` for the *reader* (not necessarily the
+  target `user_hash`).
+  """
+  def read(user_hash, list_password, base_url, auth) do
+    entries = fetch_review_list(user_hash, base_url, auth)
+    passwords = decrypt_list_entries(entries, list_password)
+    origin_hashes = entries |> Enum.map(& &1["origin_hash"]) |> Enum.uniq()
+    reviews = fetch_active_rows(origin_hashes, base_url, "review", auth)
+    pub_passwords = fetch_active_rows(origin_hashes, base_url, "review_public_passwords", auth)
 
     {:ok,
      %{
@@ -39,15 +35,15 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.ReviewReader do
 
   @doc "Decrypts a review's content with the given key. Returns a map or nil."
   def decrypt_review_content(review, review_password) do
-    case ReviewContent.decode(review.content_b64, review_password) do
+    case ReviewContent.decode(review["content_b64"], review_password) do
       {:ok, %{rating: rating, text: text}} ->
         %{
-          review_hash: review.review_hash,
-          origin_hash: review.origin_hash,
-          author_hash: review.author_hash,
+          review_hash: review["review_hash"],
+          origin_hash: review["origin_hash"],
+          author_hash: review["author_hash"],
           rating: rating,
           text: text,
-          owner_timestamp: review.owner_timestamp
+          owner_timestamp: review["owner_timestamp"]
         }
 
       :error ->
@@ -58,27 +54,25 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.ReviewReader do
   @doc "Groups public passwords by review_hash, returning `%{hash => has_password?}`."
   def build_public_password_map(passwords) do
     passwords
-    |> Enum.group_by(& &1.review_hash)
+    |> Enum.group_by(& &1["review_hash"])
     |> Map.new(fn {hash, entries} ->
-      latest = Enum.max_by(entries, & &1.owner_timestamp)
-      {hash, latest.password_b64 != nil}
+      latest = Enum.max_by(entries, &parse_int(&1["owner_timestamp"]))
+      {hash, latest["password_b64"] != nil}
     end)
   end
 
-  defp fetch_review_list(user_hash, base_url) do
-    ShapeReader.rows(base_url, "review_list", ReviewList,
-      where: "user_hash = $1",
-      params: [user_hash],
-      columns: @list_columns
-    )
-    |> Enum.reject(& &1.deleted_flag)
+  defp fetch_review_list(user_hash, base_url, auth) do
+    case SandboxHttp.fetch_shape_gated(base_url, "review_list", "user_hash='#{user_hash}'", auth) do
+      {:ok, rows, _logs} -> Enum.reject(rows, &deleted?/1)
+      {:error, _reason, _logs} -> []
+    end
   end
 
   defp decrypt_list_entries(entries, list_password) do
     entries
     |> Enum.flat_map(fn entry ->
-      case decrypt_password(entry.password_b64, list_password) do
-        {:ok, password} -> [{entry.review_hash, password}]
+      case decrypt_password(entry["password_b64"], list_password) do
+        {:ok, password} -> [{entry["review_hash"], password}]
         :error -> []
       end
     end)
@@ -98,22 +92,33 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.ReviewReader do
     end
   end
 
-  defp fetch_active_rows(origin_hashes, base_url, table, schema) do
+  defp fetch_active_rows(origin_hashes, base_url, table, auth) do
     Enum.flat_map(origin_hashes, fn origin_hash ->
-      base_url
-      |> ShapeReader.rows(table, schema, where: "origin_hash = $1", params: [origin_hash])
-      |> Enum.reject(& &1.deleted_flag)
+      case SandboxHttp.fetch_shape_gated(
+             base_url,
+             table,
+             "origin_hash = '#{origin_hash}'",
+             auth
+           ) do
+        {:ok, rows, _logs} -> Enum.reject(rows, &deleted?/1)
+        {:error, _reason, _logs} -> []
+      end
     end)
   end
 
   defp decrypt_reviews(reviews, passwords) do
     reviews
     |> Enum.flat_map(fn review ->
-      case Map.get(passwords, review.review_hash) do
+      case Map.get(passwords, review["review_hash"]) do
         nil -> []
         password -> List.wrap(decrypt_review_content(review, password))
       end
     end)
     |> Enum.sort_by(& &1.owner_timestamp, :desc)
   end
+
+  defp deleted?(row), do: row["deleted_flag"] in [true, "true", "t"]
+
+  defp parse_int(v) when is_integer(v), do: v
+  defp parse_int(v) when is_binary(v), do: String.to_integer(v)
 end

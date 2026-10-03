@@ -1,17 +1,28 @@
 defmodule ChatSupport.Mocks.NetworkSynchronization.ReqMockForLanDetection do
   @moduledoc "Mocking Req for LAN Electric peer detection"
 
-  @electric_peers ["10.10.10.111", "10.10.10.20"]
+  @open_peers ["10.10.10.111", "10.10.10.20"]
+  # trust-mode peers answer shape reads with 401 read_session_required
+  @gated_peers ["10.10.10.30"]
 
-  def electric_peers_list, do: @electric_peers
+  def electric_peers_list, do: @open_peers ++ @gated_peers
 
   def get(url, _opts \\ []) do
-    host = url |> URI.parse() |> Map.get(:host)
+    %URI{host: host} = URI.parse(url)
 
-    if Enum.member?(@electric_peers, host) do
-      {:ok, %Req.Response{status: 200, headers: %{"electric-handle" => ["test-handle"]}}}
-    else
-      {:error, %Req.TransportError{reason: :timeout}}
+    cond do
+      host in @open_peers ->
+        {:ok, %Req.Response{status: 200, headers: %{"electric-handle" => ["test-handle"]}}}
+
+      host in @gated_peers ->
+        {:ok,
+         %Req.Response{
+           status: 401,
+           body: %{"error" => "read_session_required", "shape" => "user_card"}
+         }}
+
+      true ->
+        {:error, %Req.TransportError{reason: :timeout}}
     end
   end
 end

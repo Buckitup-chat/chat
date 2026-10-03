@@ -163,7 +163,9 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.State do
   end
 
   defp open(socket, %{review: review, entry: entry}) do
-    proofs = ReviewList.load_proofs(review, public_url(socket))
+    author = socket.assigns.author
+    auth = %{user_hash: author.user_hash, sign_skey: author.sign_skey}
+    proofs = ReviewList.load_proofs(review, public_url(socket), auth)
 
     socket
     |> assign(

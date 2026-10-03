@@ -229,7 +229,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
   end
 
   defp try_ingest_imported_user(socket, user_data, base_url) do
-    log_entries =
+    ingest_logs =
       case ApiClient.ingest_imported_user(user_data, base_url) do
         {:ok, %{log_entries: entries}} -> entries
         {:error, %{log_entries: entries}} -> entries
@@ -237,7 +237,15 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
 
     OwnerBootstrap.maybe_register_owner(user_data.user_hash, user_data.sign_pkey)
 
-    update(socket, :request_log, &(&1 ++ log_entries))
+    {storage_items, storage_logs} =
+      case ApiClient.fetch_user_storage(user_data.user_hash, user_data.sign_skey, base_url) do
+        {:ok, %{items: items, log_entries: entries}} -> {items, entries}
+        {:error, %{log_entries: entries}} -> {[], entries}
+      end
+
+    socket
+    |> assign(:storage_items, storage_items)
+    |> update(:request_log, &(&1 ++ ingest_logs ++ storage_logs))
   end
 
   defp update_storage_item(items, uuid, value_b64, size, label) do

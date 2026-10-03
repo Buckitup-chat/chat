@@ -48,10 +48,15 @@ defmodule ChatWeb.Router do
     plug :accepts, ["json", "event-stream"]
   end
 
+  pipeline :file_chunk_read_gate do
+    plug ChatWeb.Plugs.ElectricReadGate, shape: :file_chunk
+  end
+
   pipeline :chunk_upload do
     plug CORSPlug,
       origin: "*",
       headers: [
+        "authorization",
         "content-type",
         "x-data-hash",
         "x-size",
@@ -216,8 +221,16 @@ defmodule ChatWeb.Router do
     scope "/" do
       pipe_through ChatWeb.Plugs.ElectricReadiness
 
-      get "/file_chunk/:file_id/:chunk_index", FileChunkController, :show
-      get "/file_chunk_status", FileChunkStatusController, :index
+      options "/read_session", ReadSessionController, :options
+      post "/read_session", ReadSessionController, :create
+
+      scope "/" do
+        pipe_through :file_chunk_read_gate
+
+        get "/file_chunk/:file_id/:chunk_index", FileChunkController, :show
+        options "/file_chunk_status", FileChunkStatusController, :options
+        get "/file_chunk_status", FileChunkStatusController, :index
+      end
 
       get "/system_identifier", SystemIdentifierController, :show
 
@@ -238,6 +251,7 @@ defmodule ChatWeb.Router do
     pipe_through [:electric]
     pipe_through ChatWeb.Plugs.ElectricReadiness
     pipe_through ChatWeb.Plugs.ElectricTableGuard
+    pipe_through ChatWeb.Plugs.ElectricReadGate
 
     forward "/", ChatWeb.Plugs.HexToBase64Electric
   end

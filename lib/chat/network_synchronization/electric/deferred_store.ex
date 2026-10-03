@@ -11,6 +11,7 @@ defmodule Chat.NetworkSynchronization.Electric.DeferredStore do
 
   alias Chat.Data.Shapes
   alias Chat.NetworkSynchronization.Electric.DeferredRecord
+  alias Chat.NetworkSynchronization.Electric.GatedFetch
   alias Chat.NetworkSynchronization.Electric.ShapeWriter
   alias Electric.Client.Message
 
@@ -109,7 +110,7 @@ defmodule Chat.NetworkSynchronization.Electric.DeferredStore do
 
   defp refetch(%DeferredRecord{shape: shape, key: pk, peer_url: peer_url}) do
     peer_url
-    |> shapes_client()
+    |> shapes_client(shape)
     |> Electric.Client.stream(build_refetch_query(shape, pk), live: false, replica: :full)
     |> Stream.each(&replay_change(shape, &1, peer_url))
     |> Stream.run()
@@ -118,11 +119,13 @@ defmodule Chat.NetworkSynchronization.Electric.DeferredStore do
       log("Deferred redeliver failed for #{shape}: #{inspect({kind, reason})}", :warning)
   end
 
-  defp shapes_client(peer_url) do
+  defp shapes_client(peer_url, shape) do
     Electric.Client.new!(
       endpoint: "#{peer_url}/electric/v1/shapes",
       fetch:
-        {Electric.Client.Fetch.HTTP,
+        {GatedFetch,
+         peer_url: peer_url,
+         shape: shape,
          request: [connect_options: [transport_opts: [{:keepalive, true}]]]}
     )
   end

@@ -9,9 +9,6 @@ defmodule ChatWeb.ElectricLive.FileChunksLive.Index do
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
-      endpoint_url = ChatWeb.Endpoint.url() <> "/electric/v1/shapes"
-      client = Electric.Client.new!(endpoint: endpoint_url)
-
       shape =
         Electric.Client.ShapeDefinition.new!("file_chunks",
           columns: @columns,
@@ -21,7 +18,7 @@ defmodule ChatWeb.ElectricLive.FileChunksLive.Index do
       {:ok,
        socket
        |> Phoenix.LiveView.stream_configure(:file_chunks, dom_id: &dom_id_for_chunk/1)
-       |> sync_stream_fixed(:file_chunks, shape, client: client)
+       |> sync_stream_fixed(:file_chunks, shape)
        |> assign(:loading, false)
        |> assign(:error, nil)
        |> assign(:connected, true)

@@ -3,6 +3,8 @@ defmodule Chat.Data.File.SyncSource do
 
   use Chat.Data.File.ChunkSource
 
+  alias Chat.NetworkSynchronization.Electric.ReadSessions
+
   @fetch_timeout :timer.seconds(60)
 
   def chunk_fetchable(drive_id, file_id, chunk_index, peer_url) do
@@ -76,7 +78,12 @@ defmodule Chat.Data.File.SyncSource do
   defp try_fetch([peer_url | rest], file_id, chunk_index) do
     url = "#{peer_url}/electric/v1/file_chunk/#{file_id}/#{chunk_index}"
 
-    case Req.get(url, receive_timeout: @fetch_timeout) do
+    peer_url
+    |> ReadSessions.request(
+      :file_chunk,
+      &Req.get(url, headers: &1, receive_timeout: @fetch_timeout)
+    )
+    |> case do
       {:ok, %{status: 200, body: body}} -> {:ok, body}
       _ when rest != [] -> try_fetch(rest, file_id, chunk_index)
       {:ok, %{status: status}} -> {:error, {:http, status}}

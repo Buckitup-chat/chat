@@ -122,11 +122,15 @@ defmodule Chat.NetworkSynchronization.PeerDetection.LanDetection do
     probe_url = "#{base_url}/electric/v1/shapes?table=user_cards&offset=-1"
 
     case Req.get(probe_url, receive_timeout: 3_000, retry: false) do
-      {:ok, %Req.Response{status: 200, headers: headers}} ->
-        if Map.has_key?(headers, "electric-handle") do
-          log("found electric peer #{base_url}", :info)
-          base_url
-        end
+      {:ok, %Req.Response{status: 200, headers: headers}}
+      when is_map_key(headers, "electric-handle") ->
+        log("found electric peer #{base_url}", :info)
+        base_url
+
+      # peer in trust mode — still a peer, reads need a session (see ReadSessions)
+      {:ok, %Req.Response{status: 401, body: %{"error" => "read_session_required"}}} ->
+        log("found gated electric peer #{base_url}", :info)
+        base_url
 
       _ ->
         nil

@@ -73,7 +73,7 @@
             <li>Decrypt each chunk with AES-256-GCM using enc_secret</li>
             <li>Reassemble and trigger browser download</li>
           </ol>
-          <p class="mt-2 text-sm">No signing keys required — only the encryption secret.</p>
+          <p class="mt-2 text-sm">Signing keys required for read-gated access (trust mode). Encryption secret needed for decryption.</p>
         </div>
       </div>
 
@@ -257,7 +257,7 @@ X-Signature        Base64(ML-DSA-87 signature)</pre>
       <div class="border-t border-gray-200 my-8"></div>
 
       <!-- Download -->
-      <section id="download-section" class="bg-white shadow rounded-lg p-6">
+      <section id="download-section" class="bg-white shadow rounded-lg p-6 hidden">
         <h3 class="text-lg font-bold mb-4">Download File</h3>
         <div class="space-y-3">
           <div>

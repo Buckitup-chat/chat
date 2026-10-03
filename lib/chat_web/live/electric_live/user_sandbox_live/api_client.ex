@@ -412,6 +412,40 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClient do
     ingest(payload, sign_skey, base_url)
   end
 
+  @doc """
+  Fetches all non-deleted storage entries for a user via the Electric shape API.
+
+  Returns:
+  - `{:ok, %{items: [storage_item, ...], log_entries: [log_entry, ...]}}`
+  - `{:error, %{reason: reason, log_entries: [log_entry, ...]}}`
+  """
+  def fetch_user_storage(user_hash, sign_skey, base_url) do
+    where = "user_hash='#{user_hash}'"
+    auth = %{user_hash: user_hash, sign_skey: sign_skey}
+
+    case fetch_shape_gated(base_url, "user_storage", where, auth) do
+      {:ok, rows, logs} ->
+        items =
+          rows
+          |> Enum.reject(&(&1["deleted_flag"] == "true"))
+          |> Enum.map(fn row ->
+            value_binary = decode_b64(row["value_b64"])
+
+            %{
+              uuid: row["uuid"],
+              value_b64: Base.encode64(value_binary),
+              size: byte_size(value_binary),
+              label: nil
+            }
+          end)
+
+        {:ok, %{items: items, log_entries: logs}}
+
+      {:error, reason, logs} ->
+        {:error, %{reason: reason, log_entries: logs}}
+    end
+  end
+
   defp fetch_storage_row(user_hash, sign_skey, uuid, base_url) do
     where = "user_hash='#{user_hash}' AND uuid='#{uuid}'"
     auth = %{user_hash: user_hash, sign_skey: sign_skey}

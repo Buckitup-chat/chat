@@ -39,6 +39,8 @@ Because the type lives inside the ciphertext, the database (and any peer without
 - [`"checkpoint"`](#checkpoint) — signed commitment to the dialog's causal history and materialized view
 - [`"review_list_key"`](#review_list_key) — the sender's `review_list_password`, shared with a contact
 - [`"quote"`](#quote) — a snapshot of a cited message, carried inside the reply
+- [`"recovery_invite"`](#recovery_invite) — an owner asking a contact to become a guardian, owner → contact
+- [`"recovery_invite_reply"`](#recovery_invite_reply) — the answer, with the guardian's stealth meta-address on acceptance, contact → owner
 - [`"recovery_share"`](#recovery_share) — one guardian's Shamir share of a community backup, owner → guardian
 - [`"recovery_share_return"`](#recovery_share_return) — the same share sent back during a recovery, guardian → owner
 - [`"recovery_binding"`](#recovery_binding) — a recovering account's proof that it controls the on-chain candidate
@@ -240,6 +242,56 @@ A quote is context, not authorship: text inside the snapshot belongs to
 
 --- 
 
+### `"recovery_invite"`
+
+The owner asking a confirmed contact to become a guardian of their community
+backup ([pq_recovery_shares § Inviting](../reqs/pq_recovery_shares.proposed.md)).
+It names no secret: consent and the meta-address it is answered with are the
+guardian's to give once per owner and deployment, while secrets and their
+versions come and go.
+
+```json
+{"recovery_invite": ["9b2e…", "eip155:11155111:0xd9ff…", 1715000000]}
+```
+
+```json
+{"recovery_invite": [invite_id, deployment, creation_unixtime]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | invite_id | 16 random bytes, lowercase hex; what the reply names |
+| 1 | deployment | Where the guardian would approve: the namespace part of `secret_ref`, `<namespace>` of `<namespace>/<id>`, in the same canonical form, e.g. `eip155:11155111:0xd9ffd20f2db9c774b9f0237c4837f52dcbd937a7` |
+| 2 | creation_unixtime | Unix seconds at sending |
+
+--- 
+
+### `"recovery_invite_reply"`
+
+The contact's answer to a [`"recovery_invite"`](#recovery_invite), sent in the
+same dialog. An acceptance carries the stealth meta-address the owner derives
+the guardian's slots from, with a proof that the replier holds its keys; the
+dialog row's ML-DSA signature says who replied. How replies to one `invite_id`
+combine is [pq_recovery_shares § Inviting](../reqs/pq_recovery_shares.proposed.md)'s to say.
+
+```json
+{"recovery_invite_reply": ["9b2e…", "accept", "0x02a1…", "<signature_b64>", 1715000300]}
+```
+
+```json
+{"recovery_invite_reply": [invite_id, answer, stealth_meta_address, proof_b64, creation_unixtime]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | invite_id | The invitation answered |
+| 1 | answer | `"accept"` or `"decline"`; a reply with any other value is ignored |
+| 2 | stealth_meta_address | On `accept`, 66 bytes as lowercase `0x` hex: the spending then the viewing public key, both compressed secp256k1 (ERC-5564 scheme 1, without the `st:eth:` prefix). On `decline`, the empty string |
+| 3 | proof_b64 | On `accept`, the EIP-191 signature by the meta-address's spending key defined in [pq_recovery_shares § Inviting](../reqs/pq_recovery_shares.proposed.md), unpadded base64. On `decline`, the empty string |
+| 4 | creation_unixtime | Unix seconds at answering |
+
+--- 
+
 ### `"recovery_share"`
 
 One guardian's Shamir share of the friends' half of an owner's community backup,
@@ -251,7 +303,7 @@ client acts on the key, and the holding rules for a share received at issue are
 wrong for one received at recovery.
 
 ```json
-{"recovery_share": ["eip155:11155111:0xe634…/0x9f3c…", 1, 3, 5, "<share_b64>", 1715000000, "4f1c…", 2, ["<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>"]]}
+{"recovery_share": ["eip155:11155111:0xd9ff…/0x9f3c…", 1, 3, 5, "<share_b64>", 1715000000, "4f1c…", 2, ["<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>"]]}
 ```
 
 ```json
@@ -260,7 +312,7 @@ wrong for one received at recovery.
 
 | Position | Field | Description |
 |---|---|---|
-| 0 | secret_ref | Which secret this share belongs to: `<namespace>/<id>`, e.g. `eip155:<chainId>:<contract>/<keccak256(abi.encode(owner, label))>` |
+| 0 | secret_ref | Which secret this share belongs to: `<namespace>/<id>`, e.g. `eip155:<chainId>:<contract>/<keccak256(abi.encode(owner, label))>`; canonical form: the chain id in decimal, the contract and the id in lowercase `0x` hex, so the string compares and hashes the same in every build |
 | 1 | version | Share epoch, the contract's own; supersession rules in [pq_recovery_shares § Dying](../reqs/pq_recovery_shares.proposed.md) |
 | 2 | threshold | Shamir shares needed to rebuild the friends' half. Not the contract's approval quorum, which counts guardians |
 | 3 | total | Shares generated at this version, issued and spare alike |
@@ -298,7 +350,7 @@ block's when the share returns as text
 and can be audited later.
 
 ```json
-{"recovery_share_return": ["eip155:11155111:0xe634…/0x9f3c…", 1, "4f1c…", 3, 5, 2, 2, "0x7a1b…", "<share_b64>", 1715600000, ["<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>"]]}
+{"recovery_share_return": ["eip155:11155111:0xd9ff…/0x9f3c…", 1, "4f1c…", 3, 5, 2, 2, "0x7a1b…", "<share_b64>", 1715600000, ["<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>"]]}
 ```
 
 ```json
@@ -334,7 +386,7 @@ dialog peer, and against the word code the owner reads out, which is what says
 the peer is the person on the call.
 
 ```json
-{"recovery_binding": ["eip155:11155111:0xe634…/0x9f3c…", "0x7a1b…", "u_ab12…", "<signature_b64>"]}
+{"recovery_binding": ["eip155:11155111:0xd9ff…/0x9f3c…", "0x7a1b…", "u_ab12…", "<signature_b64>"]}
 ```
 
 ```json

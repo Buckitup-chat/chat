@@ -71,11 +71,92 @@ Two limits belong here rather than in a later surprise:
 
 ## Scope
 
-Issuing shares to guardians, what a guardian's client does on receipt, how
+Asking a contact to be a guardian (§Inviting), issuing shares to guardians,
+what a guardian's client does on receipt, how
 shares are superseded and revoked, what the owner can see, and how a share
 travels back during a recovery (§Returning). Both directions use the dialog by
 default — §Returning names the one exception — so the friends' half is
 post-quantum both ways; the node half is not (§Problem).
+
+---
+
+## Inviting
+
+A guardian is asked before they hold anything. The owner needs one thing from
+them that nothing published can supply: the **stealth meta-address** the
+guardian's slots are derived from (§Issuing, step 3). A card carries no EVM
+address, and adding one, or reading the guardian's entry in a key registry,
+would publish the link between a chat identity and a chain address that stealth
+addresses exist to break. So the meta-address travels the way the share will,
+in the dialog, and asking for it is also how the guardian consents.
+
+1. The owner's client records the invitation in its roster (§What the owner
+   sees) — `invite_id`, the contact, the deployment — and sends a
+   [`"recovery_invite"`](../invariants/07_content_polymorphism.md#recovery_invite)
+   to a confirmed contact. A newer invitation to the same contact for the same
+   deployment supersedes the older one, and replies to a superseded invitation
+   are ignored.
+2. The guardian's client says plainly what is asked and by whom: to keep a part
+   of this person's backup, and, if they ever lose access, to check that it is
+   really them and approve their recovery on chain. By default the relayer
+   pays for approving. An invitation from someone who is not the guardian's
+   confirmed contact, or naming a deployment this build cannot reach, is shown
+   as such and can only be declined: a guardian who accepts and cannot approve
+   is counted by the owner and useless in a recovery.
+3. The guardian answers with a
+   [`"recovery_invite_reply"`](../invariants/07_content_polymorphism.md#recovery_invite_reply):
+   `accept` with the meta-address and a proof that it holds the keys, or
+   `decline`. Its client records the answer in its own `user_storage`, next to
+   its holdings (§Holding).
+4. The owner's client checks an acceptance against its roster, not against
+   dialog history: the `invite_id` is the live invitation to that same dialog
+   peer; the meta-address decodes into two valid compressed secp256k1 points;
+   the proof verifies; and no other guardian in the roster has the same
+   meta-address — one key holder counted twice casts two approvals. Then it
+   records the answer, so a second device offers the same people at backup
+   time.
+
+**The proof** is an EIP-191 signature by the meta-address's spending key over
+the UTF-8 string
+`"buckitup/recovery-invite/v1\n" || invite_id || "\n" || owner_user_hash || "\n" || guardian_user_hash`.
+Without it a contact could answer with another guardian's meta-address — every
+owner of that guardian has it — and hold a share whose slot someone else
+controls.
+
+**Answers do not race.** An invitation's state follows from the set of its
+replies, not their order, so two devices that see them in different orders
+agree. It is accepted when it has exactly one valid `accept` and no valid
+`decline`. A valid `decline`, sent at any time, withdraws it; two valid
+acceptances that differ void it and are reported. A reply counts as its first
+revision: editing or deleting the row changes nothing. A reply that fails a
+check — an unknown answer, a meta-address that does not decode, a proof that
+does not verify — is ignored and reported. Accepting again, or with new keys,
+takes a new invitation, so a meta-address never changes under the owner without
+the owner asking for it.
+
+**Withdrawing** issues nothing more to that guardian and removes nothing. The
+roster marks the guardian withdrawn, stops counting them toward the threshold
+and prompts a reshare; a share in hand follows §Holding's give-back, and only a
+`reshare` removes a guardian from the contract.
+
+**One meta-address serves every owner.** It is the guardian's, not the secret's:
+each owner derives a fresh stealth address from it per secret and version, and
+a meta-address lets its holder derive addresses for the guardian but not
+recognise the guardian's other ones — that takes the viewing key. Nothing is
+published; only owners the guardian accepted ever see it, inside the ML-DSA
+signed row.
+
+**The keys.** The guardian's client generates a 32-byte meta seed at its first
+acceptance and keeps it in the account vault. The spending key is
+`HKDF-SHA3-256(seed, "buckitup/stealth-meta/v1", "spend", 32)` and the viewing
+key the same with `"view"`, each read as a big-endian integer modulo the curve
+order. Nothing outside the vault goes in — no PIN, no device secret, and not
+the account's EVM key — so a restored account or a linked device derives the
+same keys, and nothing ties the meta-address to an address the guardian uses
+elsewhere. After a device compromise the guardian **rotates**: a new seed, and
+a `decline` on every live invitation. Each owner re-invites, receives the new
+meta-address and reshares; until then, the slots derived from the old keys stay
+with whoever holds them.
 
 ---
 
@@ -109,7 +190,10 @@ A share is issued to a **confirmed** contact only — confirmed in the client's
 sense, since the contact list is client-side state and not a data-layer entity
 ([pq_review_contacts](reviews/pq_review_contacts.done.md)), not a vouch-token
 check. An unconfirmed contact is a person the owner has not finished
-identifying, and a backup is the worst place to discover that.
+identifying, and a backup is the worst place to discover that. The contact must
+also hold a live acceptance for the deployment the secret is registered on
+(§Inviting) — consent comes before custody, for a slot and a spare alike — and
+the slot is derived from the meta-address that acceptance carried.
 
 **What the on-chain share slot carries.** `addSecret` will not accept an empty
 guardian set, and it stores `shareEncrypted` verbatim. If that field kept the
@@ -155,8 +239,8 @@ worth stating because the opposite is the natural assumption:
   address is not in `_guardians[id][version]` cannot initiate or approve a
   round.
 - Nor can the address be pre-registered. A stealth address is derived from the
-  *recipient's* published meta-address, so it cannot be computed for someone
-  who has not been chosen yet — and an address the owner's own client derived
+  meta-address the recipient sent when they accepted (§Inviting), so it
+  cannot be computed for someone who has not accepted yet — and an address the owner's own client derived
   for nobody is an address whose spending key is in the owner's vault, which
   would let a compromised owner cast that guardian's approval.
 
@@ -212,6 +296,11 @@ The guardian's client, on receiving a `recovery_share`:
   secret and the client cannot tell. Until that link exists (§Open questions) a
   holding is a claim by the dialog peer, and the owner's roster — not the
   guardian's — is what decides whether it is real.
+- Says so when its own record (§Inviting, step 3) holds no live acceptance
+  from this guardian to the sender for the share's deployment. Consent comes
+  before custody, for a slot and a spare alike, so a cooperating owner client
+  never sends such a share; the guardian is shown it as unrequested rather than
+  as a holding they agreed to.
 - Confirms receipt to the owner. The mechanism is open — see §Open questions —
   because the dialog's receipts say `delivered` and `read`, and neither of them
   says *stored*.
@@ -459,6 +548,7 @@ actually makes old bytes worthless, and `revokeSecret` does not re-split.
 
 ## What the owner sees
 
+- Who was invited, and who accepted, declined or withdrew (§Inviting).
 - Who holds a share, at what version, and whether receipt was confirmed.
 - How many confirmed holders exist against the threshold — the only number that
   answers "is my backup real yet". A backup whose guardians have quietly drifted

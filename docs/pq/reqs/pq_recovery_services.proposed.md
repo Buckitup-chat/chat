@@ -201,8 +201,8 @@ secret's nodes (§ Choosing nodes).
 
 That answer counts operators, not hosting providers. Nodes of different
 operators on one cloud provider share that provider's reach, and nothing a
-node publishes proves where it runs. The default set spreads across
-providers; an owner choosing nodes should too.
+node publishes proves where it runs. An owner choosing nodes should spread
+them across providers.
 
 **Who ships the code.** Every node runs code we release. A malicious release,
 once accepted, reads everything its node holds. What limits that:
@@ -224,46 +224,72 @@ The owner chooses which nodes hold a secret's node half. The client offers a
 default set and checks any choice.
 
 **A node says who runs it.** `GET /info` returns a descriptor:
-- the node id, its URL, the chain and the contract it serves, and an
-  `issued_at`;
-- the node's signature over these, by the node key. The id is derived from
-  that key, so the descriptor is bound to the node;
-- the operator's endorsement: their `user_hash` and an ML-DSA-87 signature
-  over the same fields, made once from the owner UI by the device owner of
-  `pq_access_gating`. The client verifies it under the `sign_pkey` of the
-  operator's verified card.
+- the node id, its URL, the chain and the contract it serves, its operator's
+  `user_hash` and an `issued_at`;
+- the node's signature over all of these, by the node key. The id is derived
+  from that key, so the descriptor — the operator included — is bound to the
+  node, and nobody can re-endorse it;
+- the operator's endorsement: an ML-DSA-87 signature over the same bytes by
+  the device owner of `pq_access_gating`, made from the owner UI, which only
+  that owner reaches. The client verifies it under the `sign_pkey` of the
+  owner's verified card.
 
 Encoding: the signed bytes are the UTF-8 of
-`"buckitup/recovery-node/v1\n" || id || "\n" || url || "\n" || chain || "\n" || contract || "\n" || issued_at`.
+`"buckitup/recovery-node/v1\n" || id || "\n" || url || "\n" || chain || "\n" || contract || "\n" || operator_user_hash || "\n" || issued_at`.
 
 A newer `issued_at` replaces an older descriptor, so a device that changes
-hands gets its new owner's. A descriptor whose chain or contract is not the
-secret's deployment is not offered. Descriptors are public metadata: the
-client gathers them from the nodes it knows (the default list, its contacts'
-devices, a URL typed in), and they may sync like any public record. Shares do
-not (§ The rule). A node without a valid descriptor is not offered.
+hands gets its new owner's. Descriptors are public metadata: the client
+gathers them from the nodes it knows — the servers it syncs with, the devices
+it has met, a URL typed in — and they may sync like any public record. Shares
+do not (§ The rule).
 
-**The rules the client applies:**
+**An operator is an account or a set of accounts.** A person is one account.
+An organisation is the set of accounts it publicly associates with its brand:
+nodes whose owners are in the set are one operator's. BuckitUp is such an
+organisation, under the same rules as anyone's: each of our servers is owned
+by an account of our set. Where and how sets are published is open (Open
+question 1). Until it is, the client build carries BuckitUp's set — the one
+set we vouch for ourselves — and every other account counts as its own
+operator.
+
+**A node is offered only when** its descriptor verifies, it serves the
+secret's chain and contract, its URL is a stable `https://` name (not a
+`.local` name or a bare IP), and it answered `/health` recently.
+
+**The rules for any set:**
 - **Count operators, not nodes.** Three nodes of one operator are one party.
   The client refuses a set in which one operator holds a threshold of the
+  nodes — ours included.
+- **No node of a guardian's operator.** One party holding both a guardian
+  share and node shares collapses the two planes the scheme splits. The client
+  refuses a node whose operator includes any guardian of the same secret: the
+  `user_hash` behind each accepted invitation, checked against every account
+  of the node's operator.
+- **A threshold of at least 2 and a spare**, suggested as 3 of 5 rather than
+  3 of 3.
+
+**The default set** is built from the nodes the client knows, not from a
+published list:
+- the offered nodes, without those the rules exclude for this secret;
+- **one node per operator**, so count-operators holds by construction and
+  BuckitUp contributes at most one;
+- up to five nodes, the threshold a majority (`⌊n/2⌋ + 1`), at least three
   nodes.
-- **BuckitUp is one operator.** Every node we run is endorsed by one published
-  BuckitUp identity, pinned in the client. "Count operators" therefore keeps
-  our nodes below the threshold of any set, default or chosen.
-- **A node's operator is never a guardian of the same secret.** One person
-  holding both a guardian share and node shares collapses the two planes the
-  scheme splits. The client compares the operators with the guardians it
-  invited (the `user_hash` behind each accepted invitation) and refuses the
-  overlap.
-- **A spare.** The client suggests one (3 of 5 rather than 3 of 3).
+
+With fewer than three operators to draw on, the backup screen says how many
+more are needed and asks the owner to add nodes: their contacts' devices, or a
+URL. One node per operator limits a hosting provider's reach only as far as
+operators use different providers; nothing a node publishes proves where it
+runs.
+
+**After the backup:**
 - **Holdings are watched.** The client asks each node `GET /shares/:id`
   periodically, so a node that lost the share shows as lost even if it is up.
   When the losses eat into the spare, it prompts a reshare.
 - **The set travels with the shares,** committed. `node_set` rides in
   `recovery_share` and comes back in `recovery_share_return`, and its hash is
   in `split_root` (`pq_recovery_shares` § Re-issuing). A recovering device
-  verifies the set against the root before it contacts any node. Node URLs are
-  stable names, or a moved device breaks every recovery that lists it.
+  verifies the set against the root before it contacts any node.
 
 What the checks cannot see is one person behind two accounts. They stop honest
 mistakes; whom to trust stays the owner's judgement.
@@ -435,12 +461,11 @@ Proposed.
 
 ## Open questions
 
-1. **The default node set:** which operators besides us are in it, and its
-   threshold. Until there are enough of them, no default set satisfies
-   "count operators", and the client's simple backup screen has no default.
-2. **The BuckitUp operator identity** that endorses our nodes: which account,
-   and where its key lives.
-3. **Shares on a device that is wiped or sold:** the threshold covers loss,
+1. **Publishing an operator's set:** where an organisation, BuckitUp
+   included, publishes the accounts it associates with its brand, and how a
+   client fetches and checks that list. Until then BuckitUp's set is built into
+   the client.
+2. **Shares on a device that is wiped or sold:** the threshold covers loss,
    but the owner should be told which secrets lose a node. That needs the
    device to know its depositors, which today it knows only as wallet
    addresses.

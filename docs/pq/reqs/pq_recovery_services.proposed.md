@@ -15,13 +15,15 @@ Today these are TypeScript services in `Community-secret-sharing`:
   indexer, read API and notifications in one process;
 - `backitup-node`: Express on a JSON file, ~900 lines.
 
-They run on Railway. This requirement moves them onto our own servers, in
-Elixir, inside the chat release. The split follows what each one may and may
-not share with its copies elsewhere.
+They run on Railway. This requirement moves them to Elixir:
+- the relayer as its own release on its own machine;
+- the indexer, read API and notifications inside the chat release on every
+  server;
+- the node as its own release beside it (§ Who runs nodes).
 
-The request and response formats do not change. The SDK, its harness, the
-demo and the client keep calling the same paths under a base URL, so each
-service can be switched separately.
+The split follows what each one may and may not share with its copies
+elsewhere. The relayer, indexer and read API keep their request and response
+formats; the node protocol gains four changes (§ Nodes).
 
 ---
 
@@ -29,23 +31,26 @@ service can be switched separately.
 
 | Service | Runs | Shares with other servers |
 |---|---|---|
-| Relayer, with an indexer for its own dispatches | **One per chain**, on a host we operate | Nothing |
+| Relayer, with an indexer for its own dispatches | **One per chain**, on its own machine (Railway), apart from the chat servers | Nothing |
 | Indexer and read API | Every server with internet | Nothing — the chain is the shared state |
 | Custodian node | Every server and device that opts in | **Nothing, ever** — § Nodes |
 | Notifications | Every server with internet | Nothing in the first version — § Notifications |
 
 ### Mounting
 
-Everything is served by the chat endpoint under `/recovery`, routed before the
-router's catch-all `get "/*path"`:
-- the relayer and read API at `/recovery/api/...`, so a client's relayer base
-  URL is `https://<host>/recovery`;
-- the node at `/recovery/node/...`, so a node is listed as
+Three releases, one URL scheme:
+- **the relayer**, its own release on its own machine (Railway), with only its
+  dispatch indexer: a chat outage does not stop recovery transactions. Its
+  base URL is `https://<relay host>/recovery`;
+- **the indexer, read API and notifications** in the chat release, under
+  `/recovery/api/...`, routed before the router's catch-all `get "/*path"`;
+- **the node**, its own release on the same host, reached through the host's
+  reverse proxy at `/recovery/node/...`. A node is listed as
   `<id>@https://<host>/recovery/node`.
 
 The paths below are relative to those bases. Configuration keeps the
 TypeScript services' variables and their meaning, under a `RECOVERY_` prefix
-where a name is taken (`PORT`, `NODE_ID`).
+where a name is taken (`PORT`).
 
 ### Relayer — one, and why
 
@@ -139,20 +144,33 @@ threshold instead: a secret split *k*-of-*n* across nodes survives the loss of
   covers that. Copying the key and id with the drive is part of the AdminDB
   backup question, not a reason to put the key beside the shares.
 
-**The node id** is configured (`RECOVERY_NODE_ID`) and stored with the key. It
-is not the server identity's `user_hash`: a node that loses its key loses its
-shares anyway, but a node whose identity is rebuilt must still answer to the
-id its depositors signed for.
+**The node id is derived from the node key**: `n_` + lowercase hex of the first
+16 bytes of `SHA3-256(node public key)`. The key is a secp256k1 key the node
+generates and keeps in AdminDB with the share-encryption key. Nobody can claim
+another node's id without its key, and a node that loses its key loses its id
+together with its shares — the threshold covers both.
 
-### Endpoints, messages and gates, unchanged
+### Endpoints, messages and gates
 
-`GET /health`, `POST /shares` and `POST /shares/:id/release` take the signed
-messages of the SDK's `src/constants/messages.ts`:
-- `Backitup node share deposit v2` and `… request v2`;
-- the node id, a single-use nonce, a timestamp and, for a deposit, the share's
-  digest.
+The protocol is the TypeScript node's v2 with four changes, which make it v3:
 
-**Every gate of the TypeScript node is part of the contract:**
+- **`GET /info`** returns the node's descriptor (§ Choosing nodes).
+- **`GET /shares/:id`** answers `{version}` while the node holds a promoted
+  share for `id`, and `404` otherwise. Who holds a share of a public secret id
+  is not secret, and the owner's client needs it to see a holding lost to a
+  wipe (§ Choosing nodes).
+- **A release is encrypted to the requester.** The node recovers the public
+  key from the request's signature, checks that its address is the candidate
+  for whom `canDecrypt` holds, and returns the share as ECIES to that key —
+  the SDK's ECIES. A signed request relayed to the node by anyone else yields
+  that relay nothing. Overview §4 already says it: nodes encrypt their share to
+  the ephemeral key.
+- **Messages name the key-derived id.** The SDK's
+  `Backitup node share deposit v2` and `… request v2` become `… v3`, otherwise
+  unchanged: the node id, a single-use nonce, a timestamp and, for a deposit,
+  the share's digest.
+
+**Every gate of the TypeScript node stays part of the contract:**
 - a timestamp older than the window, or in the future, is refused;
 - a nonce is used once;
 - a deposit is accepted only while the secret's round state is `None` or
@@ -166,24 +184,89 @@ messages of the SDK's `src/constants/messages.ts`:
 
 The `backitup-node` tests port with it.
 
-### Who runs nodes, and the limit of that
+### Who runs nodes
 
-- **Hosts.** Every BuckitUp device can run the node module, and a device
-  belongs to its owner. Our own servers run nodes too, never enough to meet a
-  threshold alone: the client's default node set and threshold keep the nodes
-  we host below the threshold. A node needs the internet to release, because
-  a release reads `canDecrypt`. Without the internet it still holds.
-- **Code.** Hosts are not the whole of independence: every node module runs
-  code we ship. A compromised or compelled release could make every device's
-  node hand over its shares at once, which meets any threshold. Counting hosts
-  does not answer that. What does:
-  - **No silent updates for the node module.** A device runs a new node
-    version only after its owner accepts it. Releases are signed and
-    reproducible, so an operator can check what they run.
-  - **Code diversity in the default set.** The client's default node set
-    includes nodes that do not run our release — the TypeScript node, run by
-    another operator — enough that our release alone stays below the
-    threshold.
+Every BuckitUp device can run the node module, and a device belongs to its
+owner. Our own servers run nodes too. A node needs the internet to release,
+because a release reads `canDecrypt`. Without the internet it still holds.
+
+Two different risks bound what a node set is worth, and they have different
+answers.
+
+**Who holds the disks.** Shares sit on the disks of whoever hosts the node. A
+breach of that host, a compelled operator or a dishonest admin reads them
+directly, at once, silently, and for every secret already deposited — no code
+change needed. The answer is that no single operator holds a threshold of a
+secret's nodes (§ Choosing nodes).
+
+That answer counts operators, not hosting providers. Nodes of different
+operators on one cloud provider share that provider's reach, and nothing a
+node publishes proves where it runs. The default set spreads across
+providers; an owner choosing nodes should too.
+
+**Who ships the code.** Every node runs code we release. A malicious release,
+once accepted, reads everything its node holds. What limits that:
+- **The node module is released and updated on its own, never as part of a
+  chat update.** It is a separate release with its own version, signed and
+  reproducible, so an operator can check what they run.
+- **A node runs a new version only after its operator accepts it.** Our own
+  servers included: no automatic node updates.
+- **Rollouts are staged**, so a release reaches nodes over days, not at once.
+
+With every node on our code, this is the remaining trust in us: a compromised
+signing key, and enough operators accepting a bad release before it is caught.
+Staging and reproducibility make that slow and visible. They do not make it
+impossible.
+
+### Choosing nodes
+
+The owner chooses which nodes hold a secret's node half. The client offers a
+default set and checks any choice.
+
+**A node says who runs it.** `GET /info` returns a descriptor:
+- the node id, its URL, the chain and the contract it serves, and an
+  `issued_at`;
+- the node's signature over these, by the node key. The id is derived from
+  that key, so the descriptor is bound to the node;
+- the operator's endorsement: their `user_hash` and an ML-DSA-87 signature
+  over the same fields, made once from the owner UI by the device owner of
+  `pq_access_gating`. The client verifies it under the `sign_pkey` of the
+  operator's verified card.
+
+Encoding: the signed bytes are the UTF-8 of
+`"buckitup/recovery-node/v1\n" || id || "\n" || url || "\n" || chain || "\n" || contract || "\n" || issued_at`.
+
+A newer `issued_at` replaces an older descriptor, so a device that changes
+hands gets its new owner's. A descriptor whose chain or contract is not the
+secret's deployment is not offered. Descriptors are public metadata: the
+client gathers them from the nodes it knows (the default list, its contacts'
+devices, a URL typed in), and they may sync like any public record. Shares do
+not (§ The rule). A node without a valid descriptor is not offered.
+
+**The rules the client applies:**
+- **Count operators, not nodes.** Three nodes of one operator are one party.
+  The client refuses a set in which one operator holds a threshold of the
+  nodes.
+- **BuckitUp is one operator.** Every node we run is endorsed by one published
+  BuckitUp identity, pinned in the client. "Count operators" therefore keeps
+  our nodes below the threshold of any set, default or chosen.
+- **A node's operator is never a guardian of the same secret.** One person
+  holding both a guardian share and node shares collapses the two planes the
+  scheme splits. The client compares the operators with the guardians it
+  invited (the `user_hash` behind each accepted invitation) and refuses the
+  overlap.
+- **A spare.** The client suggests one (3 of 5 rather than 3 of 3).
+- **Holdings are watched.** The client asks each node `GET /shares/:id`
+  periodically, so a node that lost the share shows as lost even if it is up.
+  When the losses eat into the spare, it prompts a reshare.
+- **The set travels with the shares,** committed. `node_set` rides in
+  `recovery_share` and comes back in `recovery_share_return`, and its hash is
+  in `split_root` (`pq_recovery_shares` § Re-issuing). A recovering device
+  verifies the set against the root before it contacts any node. Node URLs are
+  stable names, or a moved device breaks every recovery that lists it.
+
+What the checks cannot see is one person behind two accounts. They stop honest
+mistakes; whom to trust stays the owner's judgement.
 
 ---
 
@@ -273,9 +356,12 @@ avoids.
 
 ## The Elixir port
 
-Each service is a supervised application inside the chat release, started by
-configuration. A server without the relayer key does not start the relayer; a
-device that opts out of custody does not start the node.
+- **The relayer** is its own release, with its dispatch indexer, deployed on
+  its own machine.
+- **The indexer, read API and notifications** are supervised applications in
+  the chat release, started by configuration.
+- **The node** is its own release, updated only with its operator's consent
+  (§ Who runs nodes). A device that opts out of custody does not run it.
 
 - **Ethereum:**
   - `curvy` (already a dependency) for secp256k1 signing and recovery;
@@ -312,28 +398,36 @@ device that opts out of custody does not start the node.
   - a node's share table appears in no Electric shape and no sync
     configuration (a test checks the registry and the sync setup);
   - each node gate of § Nodes refuses what it should (the ported tests);
+  - a release request relayed by a third party yields it only ciphertext,
+    which the candidate's key opens;
+  - `/info` verifies under the node key and the operator's card, and a node
+    serving another contract is not offered;
+  - `GET /shares/:id` reports a wiped node as not holding;
   - a relayer restart in the middle of a batch leaves no nonce gap and no
     duplicate transaction.
 
 ## Migration
 
-State moves with each service; nothing is re-created empty.
+Node protocol v3 is a clean break. What the TypeScript nodes hold today are
+test deposits on test deployments, and none of it is carried over: backups are
+made again on v3.
 
 1. **Names first.** Give every service a name under our domain (e.g.
-   `node-a.buckitup.xyz`, `relay.buckitup.xyz`), pointed at Railway for now.
+   `node-a.buckitup.xyz`, `relay.buckitup.xyz`), pointed at its current host.
    Clients and node lists use these names from then on, so no later move
    changes a URL.
-2. **The TypeScript services on our host.** Copy each node's `DATA_FILE` under
-   its own `NODE_ID`, and the MongoDB subscriptions and alert history, then
-   move the names. Railway goes once the names point here.
-3. **Nodes to Elixir, one at a time, with their shares.** The Elixir node
-   imports the TypeScript node's `DATA_FILE` — promoted shares and pending
-   claims — under the same id and name. No owner needs to reshare.
-4. **Indexer, read API and notifications on every server.** Existing
-   subscriptions, imported from MongoDB, go to the server that becomes their
-   sender. Owners lose no channel.
-5. **The relayer last.** One process with one key: stop the TypeScript one,
-   then start the Elixir one, with the dispatch table imported.
+2. **The TypeScript backend stays on Railway as it is**, relayer, indexer and
+   notifications together: it is one process with one key, and it is not
+   split.
+3. **Node protocol v3** in the SDK (messages, ECIES release, `/info`), the
+   harness, and the Elixir node release. Elixir nodes go up on our servers and
+   operators' devices; the TypeScript nodes are retired.
+4. **Indexer, read API and notifications** in the chat release on every
+   server. The TypeScript backend's notifications are switched off at the same
+   moment: its Telegram token removed and its subscriptions deleted, so no
+   event is sent twice.
+5. **The relayer, on Railway.** Stop the TypeScript backend, then start the
+   Elixir relayer release in its place.
 
 ## Status
 
@@ -341,11 +435,11 @@ Proposed.
 
 ## Open questions
 
-1. **The relayer's host:** buckitup.xyz, or a separate machine, so a chat
-   outage does not stop recovery transactions? Either way the client's
-   own-gas path (§ Relayer) is what removes the single point of failure.
-2. **Node operator policy:** how many of the default nodes we may host and
-   ship code for, and who runs the nodes that do not run our release.
+1. **The default node set:** which operators besides us are in it, and its
+   threshold. Until there are enough of them, no default set satisfies
+   "count operators", and the client's simple backup screen has no default.
+2. **The BuckitUp operator identity** that endorses our nodes: which account,
+   and where its key lives.
 3. **Shares on a device that is wiped or sold:** the threshold covers loss,
    but the owner should be told which secrets lose a node. That needs the
    device to know its depositors, which today it knows only as wallet

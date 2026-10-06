@@ -349,7 +349,8 @@ this document owns is the guardian's side of it.
    `user_hash` swapped on its way to the guardian at step 2, or a candidate
    swapped on the way back, changes the words. The code is the first 110 bits
    of `SHA3-256("buckitup/recovery-code/v1\n" || secret_ref || "\n" || candidate || "\n" || user_hash)`
-   over the UTF-8 strings, big-endian, read as ten 11-bit indices into the
+   over the UTF-8 strings — `secret_ref` canonical, `candidate` as lowercase
+   `0x` hex — big-endian, read as ten 11-bit indices into the
    BIP-39 English list; 110 bits cannot be ground into a collision by minting
    candidate keys, and the code is spoken, which is why it is words.
 4. A guardian **initiates** the round and each guardian **approves**, naming as

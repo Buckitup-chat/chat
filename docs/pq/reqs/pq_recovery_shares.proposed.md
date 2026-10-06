@@ -184,7 +184,9 @@ The owner's client, at backup time:
    (§Returning). With quorum two and threshold three, only two shares can ever be
    released and an honest recovery cannot complete.
 4. Sends one `recovery_share` message per guardian being used today, in the
-   dialog that already exists with that contact.
+   dialog that already exists with that contact. Every share of the version
+   carries the same `node_set`: the nodes the owner chose for the node half
+   and their threshold (`pq_recovery_services` § Choosing nodes).
 
 A share is issued to a **confirmed** contact only — confirmed in the client's
 sense, since the contact list is client-side state and not a data-layer entity
@@ -266,6 +268,8 @@ The guardian's client, on receiving a `recovery_share`:
   and says so to the owner. Silently dropping it is the worse failure: the share
   is valid, and an owner whose roster shows a holder who holds nothing is counted
   above the threshold while being below it.
+- Keeps the envelope whole, `node_set` and any trailing field included: a
+  return reproduces what was issued, and the root covers `node_set`.
 - Copies the share into the guardian's own `user_storage`, as an ordinary slot
   reachable through the root map (scheme:
   `chat-frontend/docs/task-user-storage-slot-ids.md`). The message is not a
@@ -355,7 +359,8 @@ this document owns is the guardian's side of it.
    holding has to be findable in the guardian's account (§Holding).
 5. Once the send gate below opens, each guardian's client sends its share back
    as a `recovery_share_return` in the dialog with the temporary account. The
-   nodes release the node half to the same recipient.
+   nodes the returns name in `node_set` release the node half to the same
+   recipient.
 6. The temporary client takes the version from the chain — the one the round
    runs on — and uses only returns that name it, its own `secret_ref` and one
    `split_id`: a share kept from an earlier version verifies against that
@@ -363,7 +368,13 @@ this document owns is the guardian's side of it.
    the version's `split_root` (§Re-issuing), sets aside any that does not
    verify, naming its sender, and counts distinct `share_index` values — a
    share returned twice is one point. From `threshold` of them it rebuilds the
-   friends' half, combines it with the node half into `S`, finds and opens the vault, and the owner is back in their
+   friends' half. Every return it kept names the same `node_set`: the set is
+   in the root, so one that names another set did not verify. It asks the
+   set's nodes for the node half — all of them, until `node_threshold`
+   distinct shares arrive, so the spare nodes count. A node returns its share
+   encrypted to the key that signed the request, the candidate's
+   (`pq_recovery_services` § Nodes), so a request that reaches the wrong host
+   yields it nothing. With both halves it combines them into `S`, finds and opens the vault, and the owner is back in their
    **original** account: its keys are in the vault. The temporary account was
    only ever the return address.
 7. The owner, from the original account, **reshares** — a new `S`, a new split,
@@ -479,10 +490,15 @@ learning only that the vault did not open.
   emits it — its own x-coordinate is `i`.
 - **Root** over the split's shape and every leaf in index order, spares
   included:
-  `split_root = SHA3-512("buckitup/recovery-share/root/v1\n" || u8(threshold) || u8(total) || leaf_1 || … || leaf_total)`.
-  `threshold` is in it because the recovering client decides by it when to
-  combine, and no other signed value carries it — the contract's quorum is a
-  different number.
+  `split_root = SHA3-512("buckitup/recovery-share/root/v2\n" || u8(threshold) || u8(total) || leaf_1 || … || leaf_total || node_set_hash)`.
+  `threshold` and the node set are in it because the recovering client acts on
+  them — when to combine, and which nodes to ask for the node half — and no
+  other signed value carries them: the contract's quorum is a different number,
+  and the owner chooses the nodes (`pq_recovery_services` § Choosing nodes).
+- **`node_set_hash`** is `SHA3-512(u8(node_threshold) || u8(n) || entry_1 || … || entry_n)`,
+  each entry `u16be(len) || utf8("<id>@<url>")`, in the order `node_set` lists
+  them. With it in the root, a guardian who rewrites `node_set` in a return
+  fails the root check like one who rewrites a share.
 - **`split_proof`** is `[leaf_b64, …]`: all `total` leaves in index order,
   unpadded base64. A split is a handful of shares, so the list is short, and a
   flat list has no tree shape for two builds years apart to disagree on.
@@ -493,7 +509,8 @@ guardian could shift its share's header into `split_id` and still match its
 leaf. So: `split_id` decodes to exactly 16 bytes; `2 ≤ threshold ≤ total ≤ 255`
 and `1 ≤ share_index ≤ total`; `split_proof` holds exactly `total` leaves of
 exactly 64 bytes; the share's x-coordinate is `share_index`; its leaf equals
-`split_proof[share_index − 1]`; and `threshold`, `total` and the list hash to
+`split_proof[share_index − 1]`; `node_set` is well formed (07 §
+`recovery_share`); and `threshold`, `total`, the list and `node_set` hash to
 the root. A share without `split_proof`, or of a version whose slots carry no
 root, is set aside like one that does not verify.
 

@@ -303,11 +303,11 @@ client acts on the key, and the holding rules for a share received at issue are
 wrong for one received at recovery.
 
 ```json
-{"recovery_share": ["eip155:11155111:0xd9ff…/0x9f3c…", 1, 3, 5, "<share_b64>", 1715000000, "4f1c…", 2, ["<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>"]]}
+{"recovery_share": ["eip155:11155111:0xd9ff…/0x9f3c…", 1, 3, 5, "<share_b64>", 1715000000, "4f1c…", 2, ["<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>"], [3, ["node-a@https://node-a.example/recovery/node", "…"]]]}
 ```
 
 ```json
-{"recovery_share": [secret_ref, version, threshold, total, share_b64, creation_unixtime, split_id, share_index, split_proof]}
+{"recovery_share": [secret_ref, version, threshold, total, share_b64, creation_unixtime, split_id, share_index, split_proof, node_set]}
 ```
 
 | Position | Field | Description |
@@ -321,6 +321,7 @@ wrong for one received at recovery.
 | 6 | split_id | Which Shamir split this share belongs to; semantics in [pq_recovery_shares § Re-issuing](../reqs/pq_recovery_shares.proposed.md) |
 | 7 | share_index | The share's index within the split, 1-based; a guardian may hold more than one |
 | 8 | split_proof | `[leaf_b64, …]`: every leaf of the split, in index order — what checks this share against the split's root on chain; construction in [pq_recovery_shares § Re-issuing](../reqs/pq_recovery_shares.proposed.md) |
+| 9 | node_set | `[node_threshold, ["<id>@<url>", …]]`: the nodes holding this version's node half, as the owner chose them, and how many are needed. `id` is the node's key-derived id (no `@`), `url` is `https://`; ids are distinct; `2 ≤ node_threshold ≤ n ≤ 16`. Equal across a version's shares and hashed into `split_root`; a recovering device has no other way to learn it ([pq_recovery_shares § Re-issuing, § Returning](../reqs/pq_recovery_shares.proposed.md)) |
 
 `secret_ref` names the deployment as well as the chain, because the id does not:
 `keccak256(abi.encode(owner, label))` is the same value on every contract, so two
@@ -350,11 +351,11 @@ block's when the share returns as text
 and can be audited later.
 
 ```json
-{"recovery_share_return": ["eip155:11155111:0xd9ff…/0x9f3c…", 1, "4f1c…", 3, 5, 2, 2, "0x7a1b…", "<share_b64>", 1715600000, ["<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>"]]}
+{"recovery_share_return": ["eip155:11155111:0xd9ff…/0x9f3c…", 1, "4f1c…", 3, 5, 2, 2, "0x7a1b…", "<share_b64>", 1715600000, ["<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>"], [3, ["node-a@https://node-a.example/recovery/node", "…"]]]}
 ```
 
 ```json
-{"recovery_share_return": [secret_ref, version, split_id, threshold, total, share_index, round, candidate, share_b64, creation_unixtime, split_proof]}
+{"recovery_share_return": [secret_ref, version, split_id, threshold, total, share_index, round, candidate, share_b64, creation_unixtime, split_proof, node_set]}
 ```
 
 | Position | Field | Description |
@@ -370,6 +371,7 @@ and can be audited later.
 | 8 | share_b64 | The Shamir share itself, unpadded base64 |
 | 9 | creation_unixtime | Unix seconds at release |
 | 10 | split_proof | As in `"recovery_share"`, returned as issued; the recovering client checks the share against the version's root before combining |
+| 11 | node_set | As in `"recovery_share"`, returned as issued: where the recovering client asks for the node half |
 
 --- 
 

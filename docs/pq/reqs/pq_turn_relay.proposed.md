@@ -247,18 +247,28 @@ check first. No `::ffff:0:0/96` entry in any case (§ Why the `stun` library).
 - **On the internet** (`buckitup.xyz`): empty. The relay serves phones on the
   internet and reaches nothing private.
 - **On a BuckitUp device** (a node in an office or a home): the device's gray
-  IPs — the private ranges its network profiles give it, which the platform
-  repo (`Buckitup-chat/platform`) defines — *minus the device's own
-  addresses*: a whitelist overrides the blacklist, so the device itself must
-  fall outside it. Phones on one Wi-Fi with client isolation then reach each
-  other through the relay.
-  - The relay keeps no list of its own. It takes the ranges from the
-    platform, as chat's `LanDetector` already takes the LAN range over the
-    `chat->platform` bridge (`{:lan_ip_and_mask, pid}` →
-    `{:range, {ip, mask}}`), and takes them again when the profile changes.
-  - It listens on the device's LAN interfaces only. Its clients can reach the
-    LAN anyway; what the whitelist must never open is loopback and the device
-    itself.
+  IPs, minus its own addresses — a whitelist overrides the blacklist, so the
+  device itself must fall outside it. The platform repo
+  (`Buckitup-chat/platform`, `config/platform/target.exs`) defines them:
+
+  | Interface | Network | Device | Whitelisted |
+  |---|---|---|---|
+  | `wlan0` | the device's access point `BuckitUp.app`, `192.168.25.0/24` | `.1` | the DHCP pool `.10`–`.250` |
+  | `eth0`, profile `no_internet` | the device serves the wired LAN, `192.168.24.0/24` | `.1` | the DHCP pool `.10`–`.250` |
+  | `eth0`, profile `internet` | a DHCP client of the site's LAN | its lease | the LAN's range from `Platform.ChatBridge.Lan` (`get_ip_address/0`, `get_ip_mask/0`), minus the lease |
+  | `usb0` | a host on USB, `192.168.26.0/24` | `.1` | the DHCP pool `.10`–`.250` |
+
+  Each pool is written as the CIDR blocks that cover it. Phones on the
+  device's Wi-Fi and phones on the wired side then reach each other through
+  the relay, as do phones on a site Wi-Fi with client isolation.
+  - The relay keeps no list of its own. On a device the platform supervises
+    it — as it supervises Postgres, under `MuonTrap.Daemon` — and starts it
+    with this whitelist. It restarts it when `eth0`'s profile or lease
+    changes, following VintageNet as `Platform.Network.IptablesMonitor`
+    follows `eth0`'s connection.
+  - It listens on `wlan0`, `eth0` and `usb0` only, not on ZeroTier. Its
+    clients can reach these networks anyway; what the whitelist must never
+    open is loopback and the device itself.
   - It needs the per-address patch first: without it, a request naming one
     LAN address and `127.0.0.1` passes. Until then a device relays to public
     addresses only.
@@ -293,11 +303,13 @@ Without it TLS is silently off, and networks that block UDP get no relay.
 - **Peers:**
   - with an empty whitelist, a permission toward a public IPv4 peer is
     granted and one toward `192.168.1.10` refused;
-  - with the platform's range `192.168.1.0/24` (and the patch in),
-    `192.168.1.10` is granted; `127.0.0.1` and the device's own address are
-    refused, alone and in a request that also names `192.168.1.10`;
-  - after the platform reports another range, the old one is refused and the
-    new one granted.
+  - with a device's whitelist (and the patch in), `192.168.25.20` and
+    `192.168.24.20` are granted; `127.0.0.1`, `192.168.25.1` and
+    `192.168.24.1` are refused, alone and in a request that also names
+    `192.168.25.20`;
+  - the whitelist built for `eth0` on profile `internet` with lease
+    `10.1.2.3/16` covers `10.1.0.0/16` and leaves out `10.1.2.3`, and after a
+    switch to `no_internet` the `10.1.0.0/16` range is refused.
 - **Expiry:** after the credential expires, a Refresh and a CreatePermission
   on an existing allocation are refused.
 - **End to end:** `chat-frontend/sandbox/handshake-pq2/scripts/check.mjs` with
@@ -316,8 +328,9 @@ Without it TLS is silently off, and networks that block UDP get no relay.
   own public address or any IPv6 address is refused, and a TCP relay request
   (RFC 6062) is refused outright; a request toward a phone's public IPv4
   address is granted.
-- On a BuckitUp device: two phones on one Wi-Fi with client isolation
-  confirm through the relay, with no relay configuration on the device.
+- On a BuckitUp device, with no relay configuration on it: a phone on its
+  Wi-Fi `BuckitUp.app` and a phone on its wired side confirm through the
+  relay, in both `eth0` profiles.
 - `turns:buckitup.xyz:5349` completes a TLS allocation after a certificate
   renewal.
 
@@ -342,5 +355,5 @@ Proposed.
 - `chat-frontend/docs/task-handshake-pq2.md` — the handshake that uses the relay.
 - [PQ access gating](pq_access_gating.in_progress.md) — why the endpoint is not chain-gated.
 - [Proof-of-Possession](../invariants/01_proof_of_possession.md) — the ingest PoP that `Chat.Pq.ProofOfPossession` takes over.
-- `Buckitup-chat/platform` — the device network profiles the relay's whitelist comes from.
+- `Buckitup-chat/platform`: `config/platform/target.exs` (the device networks), `Platform.ChatBridge.Lan` (the `eth0` profile and lease) — where a device relay's whitelist comes from.
 - draft-uberti-rtcweb-turn-rest-00 — the credential scheme.

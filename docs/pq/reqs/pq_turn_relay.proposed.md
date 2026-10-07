@@ -44,13 +44,14 @@ Two parts, on the host that serves the chat backend.
 1. **Credential endpoint**, in the chat release: `POST
    /electric/v1/turn_credentials`, authenticated by proof of possession
    (§ Endpoint).
-2. **The relay**: its own release on the same host, built on ProcessOne's
-   `stun` library (hex `stun`) — not inside the chat BEAM.
-   - Every allocation holds a UDP port and a process. A relay under load
-     must not take the chat release's file descriptors and schedulers with
-     it.
-   - It checks the credentials of § Credentials itself, with the secret the
-     endpoint signs them with; it never calls the chat release.
+2. **The relay**, built on ProcessOne's `stun` library (hex `stun`). It
+   checks the credentials of § Credentials itself, with the secret the
+   endpoint signs them with; it never calls the endpoint.
+   - **On `buckitup.xyz`:** its own release on the same host, not inside the
+     chat BEAM. Every allocation holds a UDP port and a process, and a relay
+     under load must not take the chat release's file descriptors and
+     schedulers with it.
+   - **On a BuckitUp device:** inside chat (§ On a BuckitUp device).
 
 ### Why the `stun` library, and what it needs around it
 
@@ -77,7 +78,7 @@ Rel (`elixir-webrtc/rel`) is UDP-only and has had no commit since April 2024.
 | Matches an IPv4 peer against a `::ffff:0:0/96` entry as if it were mapped, so that entry blocks every IPv4 peer | The entry is never listed. The relay allocates IPv4 only, and an IPv6 peer, mapped or not, fails its family check |
 | `{expired, Pass}` from `auth_fun` only stops a new Allocate; Refresh, CreatePermission and ChannelBind still pass | `auth_fun` refuses an expired credential outright. An allocation then ends within the lifetime last granted to it |
 | The `shaper` limits only TCP and TLS clients, never UDP or relayed traffic | Per-source rate limits in the host firewall (nftables) on UDP 3478 and the relay port range |
-| No global cap on allocations | The relay port range is the cap; the endpoint's per-address issue limit and the separate release keep an exhausted relay from reaching chat |
+| No global cap on allocations | The relay port range is the cap; the endpoint's per-address issue limit and, on the server, the separate release keep an exhausted relay from reaching chat |
 
 ---
 
@@ -191,14 +192,14 @@ database it cannot reach is `503 turn_unavailable`, the documented body.
 | `TURN_CERTFILE` | required for TLS | The relay's PEM: private key and chain |
 
 The secret lives where `SECRET_KEY_BASE` does: the deploy environment, never
-the repository.
+the repository. A device sets none of these (§ On a BuckitUp device).
 
 ---
 
 ## The relay
 
-A release of its own, around the `stun` library, with two listeners and
-`use_turn`:
+On the server, a release of its own around the `stun` library, with two
+listeners and `use_turn`:
 - **UDP** on 3478;
 - **TLS** on 5349: `tls: true`, and `certfile` one PEM holding the private key
   and the chain. The library passes only `certfile` to `fast_tls`, so the key
@@ -212,9 +213,10 @@ raises — it runs inside the listener for every client:
 
 **Options:**
 - `auth_type: user`, `auth_realm` the domain.
-- `turn_ipv4_address`: `TURN_PUBLIC_IP`, required. The library's default is
-  `127.0.0.1`, which would hand out relay addresses nobody can reach, so the
-  release refuses to start without it.
+- `turn_ipv4_address`: `TURN_PUBLIC_IP`, required; on a device, each
+  listener's own address. The library's default is `127.0.0.1`, which would
+  hand out relay addresses nobody can reach, so the relay refuses to start a
+  listener without it.
 - `turn_min_port` / `turn_max_port`: the relay port range, which is also the
   cap on concurrent allocations.
 - `turn_max_allocations` 4 per credential: each phone allocates two per
@@ -261,19 +263,14 @@ check first. No `::ffff:0:0/96` entry in any case (§ Why the `stun` library).
   Each pool is written as the CIDR blocks that cover it. Phones on the
   device's Wi-Fi and phones on the wired side then reach each other through
   the relay, as do phones on a site Wi-Fi with client isolation.
-  - The relay keeps no list of its own. On a device the platform supervises
-    it — as it supervises Postgres, under `MuonTrap.Daemon` — and starts it
-    with this whitelist. It restarts it when `eth0`'s profile or lease
-    changes, following VintageNet as `Platform.Network.IptablesMonitor`
-    follows `eth0`'s connection.
-  - It listens on `wlan0`, `eth0` and `usb0` only, not on ZeroTier. Its
-    clients can reach these networks anyway; what the whitelist must never
-    open is loopback and the device itself.
+  - The relay keeps no list of its own: chat takes it from the platform
+    (§ On a BuckitUp device). Its clients can reach these networks anyway;
+    what the whitelist must never open is loopback and the device itself.
   - It needs the per-address patch first: without it, a request naming one
     LAN address and `127.0.0.1` passes. Until then a device relays to public
     addresses only.
 
-**Firewall:** open UDP 3478, TCP 5349 and the relay port range.
+**Firewall** on the server: open UDP 3478, TCP 5349 and the relay port range.
 
 **Certificate.** On staging the chat release runs behind a reverse proxy and
 holds no certificate, and certbot's `live/` directory is root-only. A certbot
@@ -283,6 +280,39 @@ Without it TLS is silently off, and networks that block UDP get no relay.
 
 **Logs:** the log names only the random `tag` from the credential, never a
 `user_hash`.
+
+### On a BuckitUp device
+
+The relay runs inside chat. A device runs one release, the platform's, with
+chat in it; chat starts the relay's listeners under its own supervision tree.
+A LAN's load is a handful of phones, and the port range still caps it.
+
+- **Listeners:** one UDP listener on 3478 per LAN interface — `wlan0`,
+  `eth0`, `usb0`, never ZeroTier — bound to the device's address there, with
+  that address as its `turn_ipv4_address`. A phone gets a relay address on
+  the network it reached the device on. No TLS listener: a LAN does not block
+  UDP, and the device holds no certificate for these addresses.
+- **Secret:** chat generates `TURN_SECRET` at start and keeps it in memory.
+  The endpoint and the relay are one release, so there is nothing to
+  configure; a restart drops the allocations and the credentials together.
+- **`uris`:** the endpoint answers one URI, the relay on the address the
+  request arrived at — `turn:192.168.25.1:3478?transport=udp` for a phone on
+  the device's Wi-Fi. The phone reached chat there, so it reaches the relay
+  there.
+- **Whitelist** (§ Which peers a relay may reach): chat asks the platform over
+  the bridge, as `LanDetector` asks for the LAN range:
+  - `{:lan_peer_ranges, pid}` on `chat->platform`, answered by
+    `Platform.ChatBridge.Worker` with `{:lan_peer_ranges, ranges}`: for each
+    interface, the device's address and the CIDR blocks to whitelist, built
+    from the platform's own configuration;
+  - when `eth0`'s profile or lease changes, the platform broadcasts
+    `{:platform_response, {:lan_peer_ranges, ranges}}` on `platform->chat`,
+    following VintageNet as `Platform.Network.IptablesMonitor` follows
+    `eth0`'s connection; chat restarts the listeners with the new addresses
+    and whitelist.
+- **Firewall:** nothing to open. The platform adds no input policy, so input
+  is accepted on every interface.
+- The endpoint's per-address rate limit holds as on the server.
 
 ---
 
@@ -310,6 +340,13 @@ Without it TLS is silently off, and networks that block UDP get no relay.
   - the whitelist built for `eth0` on profile `internet` with lease
     `10.1.2.3/16` covers `10.1.0.0/16` and leaves out `10.1.2.3`, and after a
     switch to `no_internet` the `10.1.0.0/16` range is refused.
+- **On a device:**
+  - a `lan_peer_ranges` answer starts one listener per interface, each with
+    its own address as `turn_ipv4_address`; a broadcast with another `eth0`
+    lease restarts them with the new address and whitelist;
+  - with no `TURN_*` variable set the endpoint issues credentials, and a
+    request that arrived at `192.168.25.1` gets
+    `turn:192.168.25.1:3478?transport=udp` as its only URI.
 - **Expiry:** after the credential expires, a Refresh and a CreatePermission
   on an existing allocation are refused.
 - **End to end:** `chat-frontend/sandbox/handshake-pq2/scripts/check.mjs` with

@@ -39,17 +39,20 @@ So the relay needs availability, not trust.
 
 ## Architecture
 
-Two parts, both in the chat release.
+Two parts, on the host that serves the chat backend.
 
-1. **Credential endpoint**, in Phoenix: `POST /electric/v1/turn_credentials`,
-   authenticated by proof of possession (§ Endpoint).
-2. **The relay**: ProcessOne's `stun` library (hex `stun`), started by the
-   release.
-   - Its listeners take UDP on 3478 and TLS on 5349.
-   - Its `auth_fun` checks the credentials of § Credentials in-process,
-     with the same secret the endpoint signs them with.
+1. **Credential endpoint**, in the chat release: `POST
+   /electric/v1/turn_credentials`, authenticated by proof of possession
+   (§ Endpoint).
+2. **The relay**: its own release on the same host, built on ProcessOne's
+   `stun` library (hex `stun`) — not inside the chat BEAM.
+   - Every allocation holds a UDP port and a process. A relay under load
+     must not take the chat release's file descriptors and schedulers with
+     it.
+   - It checks the credentials of § Credentials itself, with the secret the
+     endpoint signs them with; it never calls the chat release.
 
-### Why the `stun` library
+### Why the `stun` library, and what it needs around it
 
 - **It covers the transports:** UDP, TCP and TLS listeners. Networks that
   block UDP need TLS, and mobile networks are where the relay matters.
@@ -57,17 +60,24 @@ Two parts, both in the chat release.
   ejabberd and builds eturnal, a standalone TURN server, on it.
 - **It has the hooks this needs:**
   - `auth_fun`, for credentials of our own format;
-  - peer black- and whitelists per listener (§ The relay);
-  - `turn_max_allocations`, `turn_max_permissions` and a `shaper` for
-    bandwidth.
+  - peer black- and whitelists per listener;
+  - `turn_max_allocations` and `turn_max_permissions`.
 - **It is Erlang, not C.** TLS goes through `fast_tls`, so OpenSSL; check
-  before relying on it that `fast_tls` builds for the Raspberry Pi target
-  (aarch64). ejabberd runs there.
+  that `fast_tls` builds for the Raspberry Pi target (aarch64) before relying
+  on it. ejabberd runs there.
 
 Rel (`elixir-webrtc/rel`) is UDP-only and has had no commit since April 2024.
-eturnal, the same library as a daemon, and coturn validate the same
-credential format: either can stand in where the relay should run outside the
-release, with no change to the endpoint or the client.
+
+**What the library does not do, read from its source (`stun.erl`,
+`turn.erl`), and what covers each:**
+
+| The library | What covers it |
+|---|---|
+| Checks a request's peer addresses as a set: one whitelisted address lets every blacklisted one in the same request through | A patch that checks each address on its own, offered upstream. Until it lands, no deployment sets a whitelist |
+| Matches an IPv4 peer against a `::ffff:0:0/96` entry as if it were mapped, so that entry blocks every IPv4 peer | The entry is never listed. The relay allocates IPv4 only, and an IPv6 peer, mapped or not, fails its family check |
+| `{expired, Pass}` from `auth_fun` only stops a new Allocate; Refresh, CreatePermission and ChannelBind still pass | `auth_fun` refuses an expired credential outright. An allocation then ends within the lifetime last granted to it |
+| The `shaper` limits only TCP and TLS clients, never UDP or relayed traffic | Per-source rate limits in the host firewall (nftables) on UDP 3478 and the relay port range |
+| No global cap on allocations | The relay port range is the cap; the endpoint's per-address issue limit and the separate release keep an exhausted relay from reaching chat |
 
 ---
 
@@ -147,8 +157,8 @@ by a GenServer, swept like `Chat.Challenge` — and answers `429
 {"error": "rate_limited", "retry_after": <seconds>}` past it. The address is
 `conn.remote_ip`, with a reverse proxy's forwarded header trusted only from
 that proxy. The default is lenient because carrier-grade NAT puts many phones
-behind one address; what bounds a determined abuser is the relay's own quotas
-(below).
+behind one address; what bounds a determined abuser is the relay's port range
+and the host firewall's rate limits (§ The relay).
 
 **`503 turn_unavailable`** when `TURN_SECRET` is not set: a server that runs no
 relay. The client proceeds with its own addresses only, which is all a shared
@@ -165,12 +175,13 @@ database it cannot reach is `503 turn_unavailable`, the documented body.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `TURN_SECRET` | unset → `503`, no relay | The HMAC key of § Credentials, used by the endpoint and the relay's `auth_fun` |
+| `TURN_SECRET` | unset → `503` | The HMAC key of § Credentials. The endpoint and the relay release each read it; the endpoint needs no relay in its own release, so eturnal or coturn can stand in |
 | `TURN_URIS` | unset → `503` | Comma-separated list returned as `uris` |
 | `TURN_TTL_SECONDS` | `600` | Credential lifetime. A client renews when less than 150 s remain, so a session never outlives its credential |
 | `TURN_RATE_PER_IP_HOUR` | `60` | Issues per client IP per hour |
-| `TURN_PUBLIC_IP` | — | `turn_ipv4_address`: the address relays are given out under |
-| `TURN_ALLOWED_PEERS` | empty | Comma-separated subnets whitelisted for a LAN deployment (§ The relay) |
+| `TURN_PUBLIC_IP` | required by the relay | `turn_ipv4_address`: the address relays are given out under |
+| `TURN_ALLOWED_PEERS` | empty | The relay's LAN whitelist (§ The relay); set only once the per-address patch is in |
+| `TURN_CERTFILE` | required for TLS | The relay's PEM: private key and chain |
 
 The secret lives where `SECRET_KEY_BASE` does: the deploy environment, never
 the repository.
@@ -179,32 +190,40 @@ the repository.
 
 ## The relay
 
-The release starts a `stun` listener per transport when `TURN_SECRET` is
-set, with `use_turn`:
+A release of its own, around the `stun` library, with two listeners and
+`use_turn`:
 - **UDP** on 3478;
-- **TLS** on 5349, with the domain's certificate (`certfile`).
+- **TLS** on 5349: `tls: true`, and `certfile` one PEM holding the private key
+  and the chain. The library passes only `certfile` to `fast_tls`, so the key
+  must be in it.
+
+**`auth_fun(User, Realm)`** answers the credential or `<<"">>`, and never
+raises — it runs inside the listener for every client:
+- `<<"">>` when the realm is not ours, the username does not parse as
+  `<expiry>:<tag>`, or the expiry has passed;
+- otherwise `Base64(HMAC-SHA1(TURN_SECRET, username))`.
 
 **Options:**
 - `auth_type: user`, `auth_realm` the domain.
-- `auth_fun` reads the expiry from the username:
-  - expiry passed → `{expired, Credential}`: the library then accepts only
-    the release of an allocation, never a new one;
-  - otherwise → the credential, `Base64(HMAC-SHA1(TURN_SECRET, username))`.
-- `turn_ipv4_address` is the public address relayed addresses are given out
-  under, and `turn_min_port` / `turn_max_port` (49152–65535) bound the relay
-  ports.
-- **Allocations:** `turn_max_allocations` 4 per credential — each phone
-  allocates two per session — and `turn_max_permissions` small.
-- **Bandwidth:** a `shaper` of 64 KB/s per connection. A handshake moves
-  about 15 KB, a card and an ML-DSA signature each way; the shaper keeps the
-  relay from becoming a free tunnel.
+- `turn_ipv4_address`: `TURN_PUBLIC_IP`, required. The library's default is
+  `127.0.0.1`, which would hand out relay addresses nobody can reach, so the
+  release refuses to start without it.
+- `turn_min_port` / `turn_max_port`: the relay port range, which is also the
+  cap on concurrent allocations.
+- `turn_max_allocations` 4 per credential: each phone allocates two per
+  session.
+- `turn_max_permissions` 16. The library counts existing and requested
+  addresses together, repeats included, and a peer's code carries up to six;
+  a tight limit breaks a permission refresh.
+
+**The host firewall** rate-limits each source on UDP 3478 and the relay port
+range — the bandwidth the library does not shape. A handshake moves about
+15 KB, a card and an ML-DSA signature each way.
 
 ### Which peers a relay may reach
 
-A relay that reaches any address is an open proxy into the networks behind
-it. The library blocks a peer that is on the blacklist and not on the
-whitelist, so the blacklist names everything internal and the whitelist
-re-opens what a deployment needs.
+A relay that reaches any address is an open proxy into the networks behind it.
+The library refuses a peer that is on the blacklist and not on the whitelist.
 
 **The blacklist, on every deployment:**
 - IPv4:
@@ -212,23 +231,32 @@ re-opens what a deployment needs.
   - `169.254.0.0/16`, `172.16.0.0/12`, `192.0.0.0/24`, `192.168.0.0/16`;
   - `198.18.0.0/15`, `240.0.0.0/4`;
 - the host's own public address: traffic to it is delivered locally, past the
-  firewall;
-- IPv6:
-  - `::1/128`, `::ffff:0:0/96`, `64:ff9b::/96`;
-  - `2001::/32`, `2002::/16`, `fc00::/7`, `fe80::/10`.
+  firewall.
+
+No IPv6 entries: the relay is IPv4-only, and an IPv6 peer fails the family
+check first. No `::ffff:0:0/96` entry in any case (§ Why the `stun` library).
 
 **The whitelist depends on where the server is:**
-- **On the internet** (`buckitup.xyz`): empty. The relay serves phones on
-  the internet and reaches nothing private.
-- **On a LAN** (a node in an office or a home): the LAN's own subnets, from
-  `TURN_ALLOWED_PEERS` (e.g. `192.168.1.0/24`). Phones on one Wi-Fi with
-  client isolation, or on two VLANs of one site, reach each other only
-  through it. Loopback and the host itself are never whitelisted.
+- **On the internet** (`buckitup.xyz`): empty. The relay serves phones on the
+  internet and reaches nothing private.
+- **On a LAN** (a node in an office or a home): the LAN's own subnets from
+  `TURN_ALLOWED_PEERS`, written as the CIDR blocks that cover them *minus the
+  node's own addresses* — a whitelist overrides the blacklist, so the node
+  itself must fall outside it. Phones on one Wi-Fi with client isolation, or
+  on two VLANs of one site, then reach each other through the relay.
+  - The LAN relay listens on the LAN interface only. Its clients can reach
+    the LAN anyway; what the whitelist must never open is loopback and the
+    node itself.
+  - It needs the per-address patch first: without it, a request naming one
+    LAN address and `127.0.0.1` passes.
 
-**Firewall:** UDP 3478, TCP 5349, UDP 49152–65535.
+**Firewall:** open UDP 3478, TCP 5349 and the relay port range.
 
-**Certificate:** read by the release, which already serves the domain over
-TLS. A renewal reloads it like the endpoint's.
+**Certificate.** On staging the chat release runs behind a reverse proxy and
+holds no certificate, and certbot's `live/` directory is root-only. A certbot
+deploy hook writes the key and chain into one PEM readable by the relay's user,
+and restarts the relay's TLS listener, which drops `fast_tls`'s cached context.
+Without it TLS is silently off, and networks that block UDP get no relay.
 
 **Logs:** the log names only the random `tag` from the credential, never a
 `user_hash`.
@@ -247,10 +275,16 @@ TLS. A renewal reloads it like the endpoint's.
 - **`ProofOfPossession.verify/3`:** the read-session tests still pass through
   it, and a deleted card is `unknown_user` on both endpoints.
 - **The relay's `auth_fun`:** the test vector's credential is accepted before
-  its expiry, answered `{expired, …}` after it, and a wrong one refused.
-- **Peers:** with `TURN_ALLOWED_PEERS` empty, a permission toward
-  `192.168.1.10` is refused; with `192.168.1.0/24` allowed, it is granted, and
-  one toward `127.0.0.1` is still refused.
+  its expiry and refused after it; a wrong credential, a wrong realm and a
+  username that does not parse are refused, and none raises.
+- **Peers:**
+  - with `TURN_ALLOWED_PEERS` empty, a permission toward a public IPv4 peer
+    is granted and one toward `192.168.1.10` refused;
+  - with the LAN whitelisted (and the patch in), `192.168.1.10` is granted;
+    `127.0.0.1` and the node's own address are refused, alone and in a
+    request that also names `192.168.1.10`.
+- **Expiry:** after the credential expires, a Refresh and a CreatePermission
+  on an existing allocation are refused.
 - **End to end:** `chat-frontend/sandbox/handshake-pq2/scripts/check.mjs` with
   `PQ2_TURN_URL`, `PQ2_TURN_USER` and `PQ2_TURN_PASS` set from a response of
   this endpoint completes a confirmed handshake through the relay.
@@ -261,10 +295,12 @@ TLS. A renewal reloads it like the endpoint's.
   show "Contact confirmed" and the same six digits.
 - The same two phones on one Wi-Fi: confirmed over the direct path — the
   selected ICE pair is host to host (`chrome://webrtc-internals`).
-- A credential used after its expiry is refused by the relay.
+- A credential used after its expiry is refused by the relay, for a Refresh
+  as for a new allocation.
 - A relay request toward `127.0.0.1`, the host's private network, the host's
-  own public address or `::ffff:127.0.0.1` is refused, and a TCP relay
-  request (RFC 6062) is refused outright.
+  own public address or any IPv6 address is refused, and a TCP relay request
+  (RFC 6062) is refused outright; a request toward a phone's public IPv4
+  address is granted.
 - On a LAN node with `TURN_ALLOWED_PEERS` set to the LAN: two phones on one
   Wi-Fi with client isolation confirm through the relay.
 - `turns:buckitup.xyz:5349` completes a TLS allocation after a certificate

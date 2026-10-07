@@ -51,8 +51,13 @@ under a bare `/api`.
 | `GET /recovery/api/meta-address`, `/recovery/api/events` | Read API | The chat release |
 | `GET /recovery/api/alerts` | Notifications, in the app | The chat release |
 | `POST /recovery/api/notifications/subscriptions`, `GET …/subscriptions`, `DELETE …/subscriptions/:id` | Notifications, external channels | The chat release |
-| `GET /recovery/api/health` | Health of the service on that host | Each release |
-| `GET /recovery/node/health`, `/recovery/node/info`, `/recovery/node/shares/:id`; `POST /recovery/node/shares`, `/recovery/node/shares/:id/release` | Node | The node release, through the host's reverse proxy |
+| `GET /recovery/api/health` | Health of the relayer, or of the read API and notifications | The relayer release; the chat release |
+| `GET /recovery/node/health`, `/recovery/node/info`, `/recovery/node/shares/:id`; `POST /recovery/node/shares`, `/recovery/node/shares/:id/release` | Node | The node release, reached through the chat endpoint (below) |
+
+The node release listens on localhost only, and the chat endpoint forwards
+`/recovery/node/*` to it, before its catch-all. That holds wherever the chat
+release runs: behind a reverse proxy on staging, or terminating TLS itself on
+a device.
 
 A client keeps a base URL per service — `https://<relay host>/recovery` for
 the relayer, `https://<host>/recovery` for the read API, and a node as
@@ -75,7 +80,7 @@ client. Until it ships, a relayer outage stops every recovery action,
 including the owner's veto (`cancel-recovery`) during a timelock. That path
 ships before this relayer is the only one.
 
-- **Endpoints, unchanged:**
+- **Endpoints**, with the TypeScript relayer's bodies and responses:
   - `POST /recovery/api/relayer/{add-secret, revoke-secret, reshare, set-recovery-policy,
     initiate-recovery, approve-recovery, approve-recovery-batch,
     cancel-recovery, invalidate-nonce, register-keys}`;
@@ -109,7 +114,7 @@ Each server reads the contract's events itself and keeps them in its own
 Postgres tables. Two servers that index the same blocks hold the same rows,
 so nothing is replicated.
 
-- **Endpoints, unchanged:**
+- **Endpoints**, with the TypeScript read API's bodies and responses:
   - the read paths of § URLs, under `/recovery/api/secrets`,
     `/recovery/api/meta-address`, `/recovery/api/events` and
     `/recovery/api/health`.
@@ -434,7 +439,7 @@ avoids.
   - each node gate of § Nodes refuses what it should (the ported tests);
   - a release request relayed by a third party yields it only ciphertext,
     which the candidate's key opens;
-  - `/info` verifies under the node key and the operator's card, and a node
+  - `/recovery/node/info` verifies under the node key and the operator's card, and a node
     serving another contract is not offered;
   - `GET /recovery/node/shares/:id` reports a wiped node as not holding;
   - a relayer restart in the middle of a batch leaves no nonce gap and no

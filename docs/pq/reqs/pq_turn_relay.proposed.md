@@ -121,17 +121,25 @@ POST /electric/v1/turn_credentials      {user_hash, challenge_id, signature}
      ← 503 {"error": "turn_unavailable"}
 ```
 
-1. **Prove possession.** Proof of possession is its own module,
-   `Chat.Pq.ProofOfPossession.verify(user_hash, challenge_id, signature)`,
-   owned by neither read sessions nor TURN:
-   - it consumes the challenge, fetches `sign_pkey` from a card with
-     `deleted_flag: false`, and verifies ML-DSA-87 over the challenge's UTF-8
-     bytes;
-   - the steps come out of the `with` chain of `ReadGate.open_session/4`,
-     which then calls the module as this endpoint does;
-   - a deleted identity is `401 unknown_user` on both endpoints, and a
-     malformed `user_hash` a `401`, not a `500`;
-   - one error mapping for the three PoP failures serves both controllers.
+1. **Prove possession.** Proof of possession is one module,
+   `Chat.Pq.ProofOfPossession`, for its three callers — ingest, read sessions
+   and this endpoint — and owned by none of them. It holds what they do today,
+   each on its own:
+   - `take(challenge_id, signature_b64)` consumes the challenge and decodes
+     the signature, giving `%{challenge, signature}`. Ingest's
+     `ChatWeb.Utils.IngestPop.context/1` keeps reading the body's `auth` field
+     and calls it.
+   - `verify(pop, sign_pkey)` checks ML-DSA-87 over the challenge's UTF-8
+     bytes. The shapes' ingest validations call it with the key their
+     mutation answers to — the row's own `sign_pkey` for a new `user_card`, the
+     stored card's otherwise — where they call `EnigmaPq.verify/3` now.
+   - `verify_user(user_hash, challenge_id, signature_b64)` is `take`, the
+     `sign_pkey` of a card with `deleted_flag: false`, and `verify`. Its steps
+     come out of the `with` chain of `ReadGate.open_session/4`, which then
+     calls it as this endpoint does.
+   - A deleted identity is `401 unknown_user` on both endpoints, and a
+     malformed `user_hash` a `401`, not a `500`; one error mapping for the
+     three failures serves both controllers. Ingest's answers do not change.
 2. **Issue** the credentials above. `uris` is `TURN_URIS` verbatim, e.g.:
 
    ```json
@@ -180,7 +188,6 @@ database it cannot reach is `503 turn_unavailable`, the documented body.
 | `TURN_TTL_SECONDS` | `600` | Credential lifetime. A client renews when less than 150 s remain, so a session never outlives its credential |
 | `TURN_RATE_PER_IP_HOUR` | `60` | Issues per client IP per hour |
 | `TURN_PUBLIC_IP` | required by the relay | `turn_ipv4_address`: the address relays are given out under |
-| `TURN_ALLOWED_PEERS` | empty | The relay's LAN whitelist (§ The relay); set only once the per-address patch is in |
 | `TURN_CERTFILE` | required for TLS | The relay's PEM: private key and chain |
 
 The secret lives where `SECRET_KEY_BASE` does: the deploy environment, never
@@ -239,16 +246,22 @@ check first. No `::ffff:0:0/96` entry in any case (§ Why the `stun` library).
 **The whitelist depends on where the server is:**
 - **On the internet** (`buckitup.xyz`): empty. The relay serves phones on the
   internet and reaches nothing private.
-- **On a LAN** (a node in an office or a home): the LAN's own subnets from
-  `TURN_ALLOWED_PEERS`, written as the CIDR blocks that cover them *minus the
-  node's own addresses* — a whitelist overrides the blacklist, so the node
-  itself must fall outside it. Phones on one Wi-Fi with client isolation, or
-  on two VLANs of one site, then reach each other through the relay.
-  - The LAN relay listens on the LAN interface only. Its clients can reach
-    the LAN anyway; what the whitelist must never open is loopback and the
-    node itself.
+- **On a BuckitUp device** (a node in an office or a home): the device's gray
+  IPs — the private ranges its network profiles give it, which the platform
+  repo (`Buckitup-chat/platform`) defines — *minus the device's own
+  addresses*: a whitelist overrides the blacklist, so the device itself must
+  fall outside it. Phones on one Wi-Fi with client isolation then reach each
+  other through the relay.
+  - The relay keeps no list of its own. It takes the ranges from the
+    platform, as chat's `LanDetector` already takes the LAN range over the
+    `chat->platform` bridge (`{:lan_ip_and_mask, pid}` →
+    `{:range, {ip, mask}}`), and takes them again when the profile changes.
+  - It listens on the device's LAN interfaces only. Its clients can reach the
+    LAN anyway; what the whitelist must never open is loopback and the device
+    itself.
   - It needs the per-address patch first: without it, a request naming one
-    LAN address and `127.0.0.1` passes.
+    LAN address and `127.0.0.1` passes. Until then a device relays to public
+    addresses only.
 
 **Firewall:** open UDP 3478, TCP 5349 and the relay port range.
 
@@ -272,17 +285,19 @@ Without it TLS is silently off, and networks that block UDP get no relay.
   `trust` mode an identity with no vouch still gets credentials.
 - **Rate limit:** the 61st issue from one IP in an hour is `429` with
   `retry_after`; another IP is unaffected; an expired entry is swept.
-- **`ProofOfPossession.verify/3`:** the read-session tests still pass through
-  it, and a deleted card is `unknown_user` on both endpoints.
+- **`ProofOfPossession`:** the ingest and read-session tests pass unchanged
+  through it, and a deleted card is `unknown_user` on both endpoints.
 - **The relay's `auth_fun`:** the test vector's credential is accepted before
   its expiry and refused after it; a wrong credential, a wrong realm and a
   username that does not parse are refused, and none raises.
 - **Peers:**
-  - with `TURN_ALLOWED_PEERS` empty, a permission toward a public IPv4 peer
-    is granted and one toward `192.168.1.10` refused;
-  - with the LAN whitelisted (and the patch in), `192.168.1.10` is granted;
-    `127.0.0.1` and the node's own address are refused, alone and in a
-    request that also names `192.168.1.10`.
+  - with an empty whitelist, a permission toward a public IPv4 peer is
+    granted and one toward `192.168.1.10` refused;
+  - with the platform's range `192.168.1.0/24` (and the patch in),
+    `192.168.1.10` is granted; `127.0.0.1` and the device's own address are
+    refused, alone and in a request that also names `192.168.1.10`;
+  - after the platform reports another range, the old one is refused and the
+    new one granted.
 - **Expiry:** after the credential expires, a Refresh and a CreatePermission
   on an existing allocation are refused.
 - **End to end:** `chat-frontend/sandbox/handshake-pq2/scripts/check.mjs` with
@@ -301,8 +316,8 @@ Without it TLS is silently off, and networks that block UDP get no relay.
   own public address or any IPv6 address is refused, and a TCP relay request
   (RFC 6062) is refused outright; a request toward a phone's public IPv4
   address is granted.
-- On a LAN node with `TURN_ALLOWED_PEERS` set to the LAN: two phones on one
-  Wi-Fi with client isolation confirm through the relay.
+- On a BuckitUp device: two phones on one Wi-Fi with client isolation
+  confirm through the relay, with no relay configuration on the device.
 - `turns:buckitup.xyz:5349` completes a TLS allocation after a certificate
   renewal.
 
@@ -326,4 +341,6 @@ Proposed.
 
 - `chat-frontend/docs/task-handshake-pq2.md` — the handshake that uses the relay.
 - [PQ access gating](pq_access_gating.in_progress.md) — why the endpoint is not chain-gated.
+- [Proof-of-Possession](../invariants/01_proof_of_possession.md) — the ingest PoP that `Chat.Pq.ProofOfPossession` takes over.
+- `Buckitup-chat/platform` — the device network profiles the relay's whitelist comes from.
 - draft-uberti-rtcweb-turn-rest-00 — the credential scheme.

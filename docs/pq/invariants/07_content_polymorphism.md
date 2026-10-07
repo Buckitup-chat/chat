@@ -248,8 +248,9 @@ The owner asking a confirmed contact to become a guardian of their community
 backup ([pq_recovery_shares § Inviting](../reqs/pq_recovery_shares.proposed.md)).
 It names no secret: consent and the meta-address it is answered with are the
 guardian's to give once per owner and deployment, while secrets and their
-versions come and go. When it was sent is the dialog row's `owner_timestamp`:
-signed with the row, and an invitation only ever travels in a dialog.
+versions come and go. When it was sent is the dialog row's `message_id`, a UUIDv7
+signed with the row — not its `owner_timestamp`, which every edit raises. An
+invitation only ever travels in a dialog.
 
 ```json
 {"recovery_invite": ["9b2e…", "eip155:11155111:0xd9ff…"]}
@@ -271,7 +272,8 @@ signed with the row, and an invitation only ever travels in a dialog.
 The contact's answer to a [`"recovery_invite"`](#recovery_invite), sent in the
 same dialog. An acceptance carries the stealth meta-address the owner derives
 the guardian's slots from, with a proof that the replier holds its keys; the
-dialog row's ML-DSA signature says who replied, and its `owner_timestamp` when.
+dialog row's ML-DSA signature says who replied, and its `message_id` (UUIDv7)
+when.
 How replies to one `invite_id`
 combine is [pq_recovery_shares § Inviting](../reqs/pq_recovery_shares.proposed.md)'s to say.
 
@@ -317,7 +319,7 @@ wrong for one received at recovery.
 | 2 | threshold | Shamir shares needed to rebuild the friends' half. Not the contract's approval quorum, which counts guardians |
 | 3 | total | Shares generated at this version, issued and spare alike |
 | 4 | share_b64 | The Shamir share itself, unpadded base64 |
-| 5 | creation_unixtime | Unix seconds when the split was made. Not the message's `owner_timestamp`: a re-issue sends the same bytes in a later message |
+| 5 | creation_unixtime | Unix seconds when the split was made. Not the message's time: a re-issue sends the same bytes in a later message |
 | 6 | split_id | Which Shamir split this share belongs to; semantics in [pq_recovery_shares § Re-issuing](../reqs/pq_recovery_shares.proposed.md) |
 | 7 | share_index | The share's index within the split, 1-based; a guardian may hold more than one |
 | 8 | split_proof | `[leaf_b64, …]`: every leaf of the split, in index order — what checks this share against the split's root on chain; construction in [pq_recovery_shares § Re-issuing](../reqs/pq_recovery_shares.proposed.md) |

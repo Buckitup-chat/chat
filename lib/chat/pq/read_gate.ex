@@ -16,6 +16,8 @@ defmodule Chat.Pq.ReadGate do
   alias Chat.Pq.OwnerBootstrap
   alias Chat.Pq.ReadSession
 
+  use Toolbox.OriginLog
+
   @doc "Reads need a session only in `trust` mode once an owner is registered."
   def enforced? do
     AdminDb.get(:pq_gate_mode) == :trust and OwnerBootstrap.owner() != nil
@@ -36,6 +38,10 @@ defmodule Chat.Pq.ReadGate do
          :ok <- check_chain(user_hash, shape_name) do
       {:ok, ReadSession.issue(user_hash, shape_name), shape_name}
     end
+    |> tap(fn
+      {:ok, _, _} -> :ok
+      {:error, reason} -> log("ReadGate denied #{shape} for #{user_hash}: #{reason}", :warning)
+    end)
   end
 
   def check_chain(user_hash, shape_name) do

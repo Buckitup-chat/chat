@@ -36,21 +36,30 @@ formats; the node protocol gains four changes (§ Nodes).
 | Custodian node | Every server and device that opts in | **Nothing, ever** — § Nodes |
 | Notifications | Every server with internet | Nothing in the first version — § Notifications |
 
-### Mounting
+### URLs
 
-Three releases, one URL scheme:
-- **the relayer**, its own release on its own machine (Railway), with only its
-  dispatch indexer: a chat outage does not stop recovery transactions. Its
-  base URL is `https://<relay host>/recovery`;
-- **the indexer, read API and notifications** in the chat release, under
-  `/recovery/api/...`, routed before the router's catch-all `get "/*path"`;
-- **the node**, its own release on the same host, reached through the host's
-  reverse proxy at `/recovery/node/...`. A node is listed as
-  `<id>@https://<host>/recovery/node`.
+Every recovery endpoint lives under one prefix, `/recovery`, routed before the
+router's catch-all `get "/*path"`: `/recovery/api/...` for the relayer, the
+read API and notifications, `/recovery/node/...` for a node. Nothing is added
+under a bare `/api`.
 
-The paths below are relative to those bases. Configuration keeps the
-TypeScript services' variables and their meaning, under a `RECOVERY_` prefix
-where a name is taken (`PORT`).
+| Path | Service | Served by |
+|---|---|---|
+| `POST /recovery/api/relayer/{add-secret, revoke-secret, reshare, set-recovery-policy, initiate-recovery, approve-recovery, approve-recovery-batch, cancel-recovery, invalidate-nonce, register-keys}` | Relayer | The relayer release, on its own machine (Railway) |
+| `GET /recovery/api/relayer/dispatches` | Relayer | The relayer release |
+| `GET /recovery/api/secrets`, `/recovery/api/secrets/:id`, `…/:id/guardians`, `…/:id/shares/:stealthAddress`, `…/:id/can-decrypt`, `…/:id/round-state` | Read API | The chat release, every server |
+| `GET /recovery/api/meta-address`, `/recovery/api/events` | Read API | The chat release |
+| `GET /recovery/api/alerts` | Notifications, in the app | The chat release |
+| `POST /recovery/api/notifications/subscriptions`, `GET …/subscriptions`, `DELETE …/subscriptions/:id` | Notifications, external channels | The chat release |
+| `GET /recovery/api/health` | Health of the service on that host | Each release |
+| `GET /recovery/node/health`, `/recovery/node/info`, `/recovery/node/shares/:id`; `POST /recovery/node/shares`, `/recovery/node/shares/:id/release` | Node | The node release, through the host's reverse proxy |
+
+A client keeps a base URL per service — `https://<relay host>/recovery` for
+the relayer, `https://<host>/recovery` for the read API, and a node as
+`<id>@https://<host>/recovery/node` — and the SDK and harness, which call
+`/api/...` and `/health`, `/shares` relative to a base, need no change of
+paths. Configuration keeps the TypeScript services' variables and their
+meaning, under a `RECOVERY_` prefix where a name is taken (`PORT`).
 
 ### Relayer — one, and why
 
@@ -67,10 +76,10 @@ including the owner's veto (`cancel-recovery`) during a timelock. That path
 ships before this relayer is the only one.
 
 - **Endpoints, unchanged:**
-  - `POST /api/relayer/{add-secret, revoke-secret, reshare, set-recovery-policy,
+  - `POST /recovery/api/relayer/{add-secret, revoke-secret, reshare, set-recovery-policy,
     initiate-recovery, approve-recovery, approve-recovery-batch,
     cancel-recovery, invalidate-nonce, register-keys}`;
-  - `GET /api/relayer/dispatches`.
+  - `GET /recovery/api/relayer/dispatches`.
 - **What the port keeps.** Each item closes a defect the TypeScript relayer
   already had; the TypeScript tests (`test/relayer.test.ts`) port with it:
   - **One process owns the nonce.** A GenServer per dispatcher serializes
@@ -101,10 +110,9 @@ Postgres tables. Two servers that index the same blocks hold the same rows,
 so nothing is replicated.
 
 - **Endpoints, unchanged:**
-  - `GET /api/secrets`, `/api/secrets/:id`, `/api/secrets/:id/guardians`;
-  - `/api/secrets/:id/shares/:stealthAddress`, `/api/secrets/:id/can-decrypt`,
-    `/api/secrets/:id/round-state`;
-  - `/api/meta-address`, `/api/events`, `/api/health`.
+  - the read paths of § URLs, under `/recovery/api/secrets`,
+    `/recovery/api/meta-address`, `/recovery/api/events` and
+    `/recovery/api/health`.
 - **The tables are local:** not Electric shapes, not in peer sync, not in
   `user_storage`. Per deployment: `CHAIN_ID`, `RPC_URL`,
   `SECRET_RECOVERY_ADDRESS`, `KEY_REGISTRY_ADDRESS`, `START_BLOCK`.
@@ -154,8 +162,8 @@ together with its shares — the threshold covers both.
 
 The protocol is the TypeScript node's v2 with four changes, which make it v3:
 
-- **`GET /info`** returns the node's descriptor (§ Choosing nodes).
-- **`GET /shares/:id`** answers `{version}` while the node holds a promoted
+- **`GET /recovery/node/info`** returns the node's descriptor (§ Choosing nodes).
+- **`GET /recovery/node/shares/:id`** answers `{version}` while the node holds a promoted
   share for `id`, and `404` otherwise. Who holds a share of a public secret id
   is not secret, and the owner's client needs it to see a holding lost to a
   wipe (§ Choosing nodes).
@@ -223,7 +231,7 @@ impossible.
 The owner chooses which nodes hold a secret's node half. The client offers a
 default set and checks any choice.
 
-**A node says who runs it.** `GET /info` returns a descriptor:
+**A node says who runs it.** `GET /recovery/node/info` returns a descriptor:
 - the node id, its URL, the chain and the contract it serves, its operator's
   `user_hash` and an `issued_at`;
 - the node's signature over all of these, by the node key. The id is derived
@@ -254,7 +262,7 @@ operator.
 
 **A node is offered only when** its descriptor verifies, it serves the
 secret's chain and contract, its URL is a stable `https://` name (not a
-`.local` name or a bare IP), and it answered `/health` recently.
+`.local` name or a bare IP), and it answered `/recovery/node/health` recently.
 
 **The rules for any set:**
 - **Count operators, not nodes.** Three nodes of one operator are one party.
@@ -283,7 +291,7 @@ operators use different providers; nothing a node publishes proves where it
 runs.
 
 **After the backup:**
-- **Holdings are watched.** The client asks each node `GET /shares/:id`
+- **Holdings are watched.** The client asks each node `GET /recovery/node/shares/:id`
   periodically, so a node that lost the share shows as lost even if it is up.
   When the losses eat into the spare, it prompts a reshare.
 - **The set travels with the shares,** committed. `node_set` rides in
@@ -325,7 +333,7 @@ trains owners to ignore the real one.
 ### In the app: one alert at any number of servers
 
 Alerts for the app are derived from the index, not from subscriptions:
-- `GET /api/alerts?wallet=&ts=&sig=` (proof by the owner key, as the current
+- `GET /recovery/api/alerts?wallet=&ts=&sig=` (proof by the owner key, as the current
   notifications read) returns one row per live `event_id` on secrets owned by
   `wallet`, with `chainId`, `contract`, `secretId`, `round`, `type`,
   `executeAfter` and `expiresAt`;
@@ -335,7 +343,7 @@ Alerts for the app are derived from the index, not from subscriptions:
 - the client also reads its own secrets' round state from the chain, so the
   alert does not depend on any server being up.
 
-This replaces today's `GET /api/notifications?wallet=` for the app. That
+This replaces today's `GET /api/notifications?wallet=` of the TypeScript backend for the app. That
 endpoint returns one row per subscription and nothing on a server where the
 owner has none.
 
@@ -417,7 +425,7 @@ avoids.
   returns the same JSON from the Elixir and the TypeScript indexer for every
   secret the run created.
 - **The rest:**
-  - two Elixir servers indexing one contract return the same `/api/alerts`
+  - two Elixir servers indexing one contract return the same `/recovery/api/alerts`
     for an owner subscribed on neither;
   - one subscription on server A, A and B both running: one Telegram message
     per live event, and none for an event whose round has closed;
@@ -428,7 +436,7 @@ avoids.
     which the candidate's key opens;
   - `/info` verifies under the node key and the operator's card, and a node
     serving another contract is not offered;
-  - `GET /shares/:id` reports a wiped node as not holding;
+  - `GET /recovery/node/shares/:id` reports a wiped node as not holding;
   - a relayer restart in the middle of a batch leaves no nonce gap and no
     duplicate transaction.
 

@@ -1,15 +1,20 @@
 # Priorities
 
+
+
+
 ## Now
 
-9. gate reads
+1. endpoint device_id + admin_id 
 11. review tokens: generation
 10. gate review creation
-12. vouch resolution cache
+9. geted peer sync
 
 ## Next
 
+12. vouch resolution cache
 15. legal/sanity check for reviews
+16. FE: gate write behaviour
 5. doc: FE to have known files on onliners sync
 13. log access to shaper to clenup ... overflow
 
@@ -24,7 +29,9 @@
 
 
 # Updates
-- length encoded signatures
-- Vouch shape and sandbox revoke
-- 
+Eugen: files missing chunks. test repo 
+Review Tokens
+
+
+# Status
 

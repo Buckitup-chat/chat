@@ -39,6 +39,11 @@ Because the type lives inside the ciphertext, the database (and any peer without
 - [`"checkpoint"`](#checkpoint) — signed commitment to the dialog's causal history and materialized view
 - [`"review_list_key"`](#review_list_key) — the sender's `review_list_password`, shared with a contact
 - [`"quote"`](#quote) — a snapshot of a cited message, carried inside the reply
+- [`"recovery_invite"`](#recovery_invite) — an owner asking a contact to become a guardian, owner → contact
+- [`"recovery_invite_reply"`](#recovery_invite_reply) — the answer, with the guardian's stealth meta-address on acceptance, contact → owner
+- [`"recovery_share"`](#recovery_share) — one guardian's Shamir share of a community backup, owner → guardian
+- [`"recovery_share_return"`](#recovery_share_return) — the same share sent back during a recovery, guardian → owner
+- [`"recovery_binding"`](#recovery_binding) — a recovering account's proof that it controls the on-chain candidate
 
 ### `"inline_file"`
 
@@ -234,6 +239,170 @@ of the nesting they *render* inline; the wire format itself is unbounded.
 
 A quote is context, not authorship: text inside the snapshot belongs to
 `author_hash`, not to the sender of the citing message.
+
+--- 
+
+### `"recovery_invite"`
+
+The owner asking a confirmed contact to become a guardian of their community
+backup ([pq_recovery_shares § Inviting](../reqs/pq_recovery_shares.proposed.md)).
+It names no secret: consent and the meta-address it is answered with are the
+guardian's to give once per owner and deployment, while secrets and their
+versions come and go. When it was sent is the dialog row's `message_id`, a UUIDv7
+signed with the row — not its `owner_timestamp`, which every edit raises. An
+invitation only ever travels in a dialog.
+
+```json
+{"recovery_invite": ["9b2e…", "eip155:11155111:0xd9ff…"]}
+```
+
+```json
+{"recovery_invite": [invite_id, deployment]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | invite_id | 16 random bytes, lowercase hex; what the reply names |
+| 1 | deployment | Where the guardian would approve: the namespace part of `secret_ref`, `<namespace>` of `<namespace>/<id>`, in the same canonical form, e.g. `eip155:11155111:0xd9ffd20f2db9c774b9f0237c4837f52dcbd937a7` |
+
+--- 
+
+### `"recovery_invite_reply"`
+
+The contact's answer to a [`"recovery_invite"`](#recovery_invite), sent in the
+same dialog. An acceptance carries the stealth meta-address the owner derives
+the guardian's slots from, with a proof that the replier holds its keys; the
+dialog row's ML-DSA signature says who replied, and its `message_id` (UUIDv7)
+when.
+How replies to one `invite_id`
+combine is [pq_recovery_shares § Inviting](../reqs/pq_recovery_shares.proposed.md)'s to say.
+
+```json
+{"recovery_invite_reply": ["9b2e…", "accept", "0x02a1…", "<signature_b64>"]}
+```
+
+```json
+{"recovery_invite_reply": [invite_id, answer, stealth_meta_address, proof_b64]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | invite_id | The invitation answered |
+| 1 | answer | `"accept"` or `"decline"`; a reply with any other value is ignored |
+| 2 | stealth_meta_address | On `accept`, 66 bytes as lowercase `0x` hex: the spending then the viewing public key, both compressed secp256k1 (ERC-5564 scheme 1, without the `st:eth:` prefix). On `decline`, the empty string |
+| 3 | proof_b64 | On `accept`, the EIP-191 signature by the meta-address's spending key defined in [pq_recovery_shares § Inviting](../reqs/pq_recovery_shares.proposed.md), unpadded base64. On `decline`, the empty string |
+
+--- 
+
+### `"recovery_share"`
+
+One guardian's Shamir share of the friends' half of an owner's community backup,
+sent owner → guardian at issue. Post-quantum in transit for free, for the reasons
+in [pq_recovery_shares](../reqs/pq_recovery_shares.proposed.md), which owns the
+lifecycle this envelope only names. The way back is
+[`"recovery_share_return"`](#recovery_share_return): a different key, because a
+client acts on the key, and the holding rules for a share received at issue are
+wrong for one received at recovery.
+
+```json
+{"recovery_share": ["eip155:11155111:0xd9ff…/0x9f3c…", 1, 3, 5, "<share_b64>", 1715000000, "4f1c…", 2, ["<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>"], [3, ["n_9f2c…@https://node-a.example/recovery/node", "…"]]]}
+```
+
+```json
+{"recovery_share": [secret_ref, version, threshold, total, share_b64, creation_unixtime, split_id, share_index, split_proof, node_set]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | secret_ref | Which secret this share belongs to: `<namespace>/<id>`, e.g. `eip155:<chainId>:<contract>/<keccak256(abi.encode(owner, label))>`; canonical form: the chain id in decimal, the contract and the id in lowercase `0x` hex, so the string compares and hashes the same in every build |
+| 1 | version | Share epoch, the contract's own; supersession rules in [pq_recovery_shares § Dying](../reqs/pq_recovery_shares.proposed.md) |
+| 2 | threshold | Shamir shares needed to rebuild the friends' half. Not the contract's approval quorum, which counts guardians |
+| 3 | total | Shares generated at this version, issued and spare alike |
+| 4 | share_b64 | The Shamir share itself, unpadded base64 |
+| 5 | creation_unixtime | Unix seconds when the split was made. Not the message's time: a re-issue sends the same bytes in a later message |
+| 6 | split_id | Which Shamir split this share belongs to; semantics in [pq_recovery_shares § Re-issuing](../reqs/pq_recovery_shares.proposed.md) |
+| 7 | share_index | The share's index within the split, 1-based; a guardian may hold more than one |
+| 8 | split_proof | `[leaf_b64, …]`: every leaf of the split, in index order — what checks this share against the split's root on chain; construction in [pq_recovery_shares § Re-issuing](../reqs/pq_recovery_shares.proposed.md) |
+| 9 | node_set | `[node_threshold, ["<id>@<url>", …]]`: the nodes holding this version's node half, as the owner chose them, and how many are needed. Exactly two elements. `id` is the node's key-derived id (`n_` + 32 lowercase hex); `url` is an `https://` URL without credentials, written in its canonical (WHATWG-serialized) form, so every build hashes and fetches the same string; ids are distinct; `2 ≤ node_threshold ≤ n ≤ 16`. Equal across a version's shares and hashed into `split_root`; a recovering device has no other way to learn it ([pq_recovery_shares § Re-issuing, § Returning](../reqs/pq_recovery_shares.proposed.md)) |
+
+`secret_ref` names the deployment as well as the chain, because the id does not:
+`keccak256(abi.encode(owner, label))` is the same value on every contract, so two
+deployments on one chain produce identical ids for the same owner and label.
+Carrying the namespace *inside* the value is also what keeps a frozen position
+from assuming an EVM chain forever.
+
+The vault's address is **not** here, deliberately. It is derived from `S`
+(`chat-frontend/src/lib/pq/vaultEnvelope.ts`), and that derivation exists so the
+server cannot tell a vault row from any other `user_storage` row: reads there are
+public and unauthenticated, so an address handed to every guardian turns an
+unfindable row into a findable one. A recovering client does not need it either —
+by the time it can decrypt the row it holds `threshold` shares, and `S` yields
+the address directly.
+
+--- 
+
+### `"recovery_share_return"`
+
+A guardian's share sent back to the recovering owner's temporary account, after
+the guardian's own approval has been honoured on chain
+([pq_recovery_shares § Returning](../reqs/pq_recovery_shares.proposed.md)). It
+carries the round and the recipient the guardian checked, so the release
+decision is covered by the guardian's signature — the dialog row's, or the
+block's when the share returns as text
+([pq_recovery_shares § Manual return](../reqs/pq_recovery_shares.proposed.md)) —
+and can be audited later.
+
+```json
+{"recovery_share_return": ["eip155:11155111:0xd9ff…/0x9f3c…", 1, "4f1c…", 3, 5, 2, 2, "0x7a1b…", "<share_b64>", 1715600000, ["<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>"], [3, ["n_9f2c…@https://node-a.example/recovery/node", "…"]]]}
+```
+
+```json
+{"recovery_share_return": [secret_ref, version, split_id, threshold, total, share_index, round, candidate, share_b64, creation_unixtime, split_proof, node_set]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | secret_ref | As in `"recovery_share"` |
+| 1 | version | The epoch the share was issued at |
+| 2 | split_id | As in `"recovery_share"`; the recovering client groups shares by it |
+| 3 | threshold | Shamir threshold of the split — the recovering client has no other way to know how many it is waiting for; the contract's `threshold` is the guardian quorum |
+| 4 | total | Shares in the split |
+| 5 | share_index | As in `"recovery_share"` |
+| 6 | round | The contract's `recoveryRound` this release answers |
+| 7 | candidate | The recipient address the guardian approved, from the binding it verified |
+| 8 | share_b64 | The Shamir share itself, unpadded base64 |
+| 9 | creation_unixtime | Unix seconds at release. Carried in the envelope because a return also travels outside a dialog, in a manual-return block, where no row carries a timestamp |
+| 10 | split_proof | As in `"recovery_share"`, returned as issued; the recovering client checks the share against the version's root before combining |
+| 11 | node_set | As in `"recovery_share"`, returned as issued: where the recovering client asks for the node half |
+
+--- 
+
+### `"recovery_binding"`
+
+Sent by a recovering owner's temporary account, in the dialog a guardian opened
+with it — or as text, when the share will return that way — to prove that the
+chat identity the guardian is talking to controls the address it will approve
+on chain ([pq_recovery_shares § Returning](../reqs/pq_recovery_shares.proposed.md)).
+The signature is EIP-191 by the candidate's key over the UTF-8 string
+`"buckitup/recovery-binding/v1\n" || secret_ref || "\n" || user_hash`; the
+`user_hash` signed is the sender's own. The guardian checks it against the
+dialog peer, and against the word code the owner reads out, which is what says
+the peer is the person on the call.
+
+```json
+{"recovery_binding": ["eip155:11155111:0xd9ff…/0x9f3c…", "0x7a1b…", "u_ab12…", "<signature_b64>"]}
+```
+
+```json
+{"recovery_binding": [secret_ref, candidate, user_hash, signature_b64]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | secret_ref | The secret this recovery is for; supplied by the guardian's first message |
+| 1 | candidate | The address the temporary account will be elected under |
+| 2 | user_hash | The sender's own `user_hash`; must equal the dialog peer's, and is covered by the word code the owner reads out |
+| 3 | signature_b64 | EIP-191 signature by `candidate`'s key over the string above, unpadded base64 |
 
 --- 
 

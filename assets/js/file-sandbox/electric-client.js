@@ -2,6 +2,32 @@ import { signMlDsa87, uint8ToBase64Unpadded } from './crypto.js';
 
 const textEncoder = new TextEncoder();
 
+const sessionTokens = new Map();
+const tableShapes = new Map();
+
+function cachedToken(shape) {
+  const entry = sessionTokens.get(shape);
+  if (entry && Date.now() < entry.expiresAt) return entry.token;
+  sessionTokens.delete(shape);
+  return null;
+}
+
+function invalidateToken(shape) {
+  sessionTokens.delete(shape);
+}
+
+function cachedTokenForTable(table) {
+  const shape = tableShapes.get(table);
+  return shape ? cachedToken(shape) : null;
+}
+
+function cacheToken(shape, token, expiresInSec) {
+  sessionTokens.set(shape, {
+    token,
+    expiresAt: Date.now() + Math.max(0, expiresInSec - 10) * 1000
+  });
+}
+
 function applyShapeLog(rowMap, entries) {
   for (const entry of entries) {
     if (!entry.key) continue;
@@ -22,11 +48,60 @@ export async function getChallenge(baseUrl) {
   return resp.json();
 }
 
-export async function fetchChunkStatuses(baseUrl, fileIds) {
+export async function openReadSession(baseUrl, shape, userHash, signSkey, logger) {
+  const cached = cachedToken(shape);
+  if (cached) return cached;
+
+  const challengeResp = await getChallenge(baseUrl);
+  if (logger) logger('GET', `${baseUrl}/electric/v1/challenge`, null, challengeResp, 200);
+
+  const challengeBytes = textEncoder.encode(challengeResp.challenge);
+  const signature = signMlDsa87(challengeBytes, signSkey);
+  const signatureB64 = uint8ToBase64Unpadded(signature);
+
+  const payload = {
+    user_hash: userHash,
+    shape,
+    challenge_id: challengeResp.challenge_id,
+    signature: signatureB64
+  };
+
+  const resp = await fetch(`${baseUrl}/electric/v1/read_session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  const body = await resp.json();
+  if (logger) logger('POST', `${baseUrl}/electric/v1/read_session`, payload, body, resp.status);
+  if (!resp.ok) throw new Error(`Read session failed (${resp.status}): ${JSON.stringify(body)}`);
+
+  const resolvedShape = body.shape || shape;
+  cacheToken(resolvedShape, body.token, body.expires_in);
+  return body.token;
+}
+
+export async function fetchChunkStatuses(baseUrl, fileIds, auth) {
   if (fileIds.length === 0) return {};
   const url = new URL(`${baseUrl}/electric/v1/file_chunk_status`);
   url.searchParams.set('file_ids', fileIds.join(','));
-  const resp = await fetch(url, { cache: 'no-store' });
+
+  const opts = { cache: 'no-store' };
+  const knownToken = auth ? cachedTokenForTable('file_chunks') : null;
+  if (knownToken) opts.headers = { 'Authorization': `Bearer ${knownToken}` };
+
+  let resp = await fetch(url, opts);
+
+  if (resp.status === 401 && auth) {
+    const errBody = await resp.json().catch(() => ({}));
+    if (errBody.error === 'read_session_required' && errBody.shape) {
+      tableShapes.set('file_chunks', errBody.shape);
+      invalidateToken(errBody.shape);
+      const token = await openReadSession(baseUrl, errBody.shape, auth.userHash, auth.signSkey, auth.logger);
+      resp = await fetch(url, { ...opts, headers: { 'Authorization': `Bearer ${token}` } });
+    }
+  }
+
   if (!resp.ok) throw new Error(`Chunk status fetch failed: ${resp.status}`);
   return (await resp.json()).statuses;
 }
@@ -194,49 +269,32 @@ export async function putChunk(baseUrl, fileId, chunkIndex, body, headers, logge
   throw lastError;
 }
 
-export async function fetchShape(baseUrl, table, filterFn) {
+async function gatedShapeFetch(baseUrl, table, buildUrl, auth) {
   const rowMap = new Map();
   let offset = '-1';
   let handle = null;
+  let token = auth ? cachedTokenForTable(table) : null;
+  let lastGatedShape = null;
 
   while (true) {
-    const url = new URL(`${baseUrl}/electric/v1/${table}`);
-    url.searchParams.set('offset', offset);
-    if (handle) url.searchParams.set('handle', handle);
+    const url = buildUrl(offset, handle);
 
-    const resp = await fetch(url, { cache: 'no-store' });
-    if (!resp.ok) throw new Error(`Shape fetch failed: ${resp.status}`);
+    const opts = { cache: 'no-store' };
+    if (token) opts.headers = { 'Authorization': `Bearer ${token}` };
 
-    if (!handle) handle = resp.headers.get('electric-handle');
-    offset = resp.headers.get('electric-offset') || offset;
+    const resp = await fetch(url, opts);
 
-    const body = await resp.json();
-    if (Array.isArray(body)) {
-      applyShapeLog(rowMap, body);
+    if (resp.status === 401 && auth) {
+      const errBody = await resp.json().catch(() => ({}));
+      if (errBody.error === 'read_session_required' && errBody.shape && errBody.shape !== lastGatedShape) {
+        lastGatedShape = errBody.shape;
+        tableShapes.set(table, errBody.shape);
+        invalidateToken(errBody.shape);
+        token = await openReadSession(baseUrl, errBody.shape, auth.userHash, auth.signSkey, auth.logger);
+        continue;
+      }
     }
 
-    const isUpToDate = resp.headers.has('electric-up-to-date')
-      || body.some(e => e.headers?.control === 'up-to-date');
-    if (isUpToDate) break;
-  }
-
-  const rows = [...rowMap.values()];
-  return filterFn ? rows.filter(filterFn) : rows;
-}
-
-export async function fetchShapeWhere(baseUrl, table, where) {
-  const rowMap = new Map();
-  let offset = '-1';
-  let handle = null;
-
-  while (true) {
-    const url = new URL(`${baseUrl}/electric/v1/shapes`);
-    url.searchParams.set('table', table);
-    url.searchParams.set('where', where);
-    url.searchParams.set('offset', offset);
-    if (handle) url.searchParams.set('handle', handle);
-
-    const resp = await fetch(url, { cache: 'no-store' });
     if (!resp.ok) throw new Error(`Shape fetch failed: ${resp.status}`);
 
     if (!handle) handle = resp.headers.get('electric-handle');
@@ -253,4 +311,27 @@ export async function fetchShapeWhere(baseUrl, table, where) {
   }
 
   return [...rowMap.values()];
+}
+
+export async function fetchShape(baseUrl, table, auth, filterFn) {
+  const rows = await gatedShapeFetch(baseUrl, table, (offset, handle) => {
+    const url = new URL(`${baseUrl}/electric/v1/shapes`);
+    url.searchParams.set('table', table);
+    url.searchParams.set('offset', offset);
+    if (handle) url.searchParams.set('handle', handle);
+    return url;
+  }, auth);
+
+  return filterFn ? rows.filter(filterFn) : rows;
+}
+
+export async function fetchShapeWhere(baseUrl, table, where, auth) {
+  return gatedShapeFetch(baseUrl, table, (offset, handle) => {
+    const url = new URL(`${baseUrl}/electric/v1/shapes`);
+    url.searchParams.set('table', table);
+    url.searchParams.set('where', where);
+    url.searchParams.set('offset', offset);
+    if (handle) url.searchParams.set('handle', handle);
+    return url;
+  }, auth);
 }

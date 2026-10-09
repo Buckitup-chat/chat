@@ -110,11 +110,11 @@ defmodule ChatTest.NetworkSynchronization.SupervisionTest do
       assert Process.alive?(pid)
     end)
 
-    Process.sleep(50)
-
-    NetworkSynchronization.synchronisation()
-    |> Enum.each(fn {source, status} ->
-      refute source.started? and is_nil(status)
+    Support.RetryHelper.retry_until(2000, fn ->
+      NetworkSynchronization.synchronisation()
+      |> Enum.each(fn {source, status} ->
+        refute source.started? and is_nil(status)
+      end)
     end)
 
     context

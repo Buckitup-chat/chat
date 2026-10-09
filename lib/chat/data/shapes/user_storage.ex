@@ -9,6 +9,7 @@ defmodule Chat.Data.Shapes.UserStorage do
   alias Chat.Data.Types.UserStorageSignHash
   alias Chat.Data.User
   alias Chat.Data.User.Validation
+  alias Chat.Pq.WriteGate
   alias EnigmaPq
   alias Phoenix.Sync.Writer
 
@@ -97,7 +98,8 @@ defmodule Chat.Data.Shapes.UserStorage do
   def ingest_configure_writer(writer, user_pop_context) do
     Writer.allow(writer, UserStorage,
       accept: [:insert, :update],
-      check: &Validation.user_storage_allowed(&1, user_pop_context),
+      check:
+        WriteGate.and_gate(&Validation.user_storage_allowed(&1, user_pop_context), :user_storage),
       validate: &Validation.user_storage_validate_with_versioning/3,
       insert: [
         pre_apply: &Validation.user_storage_pre_apply_versioning/3

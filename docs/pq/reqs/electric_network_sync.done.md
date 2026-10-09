@@ -194,6 +194,7 @@ GET http://<ip>:<peer_port>/electric/v1/shapes?table=user_cards&offset=-1
 2. For each IP, probe `/naive_api` (GraphQL) first, then `/electric/v1/shapes?table=user_cards&offset=-1` (Electric) in a separate pass
 3. Skip IPs already known as Electric peers (`list_electric_peers/0`)
 4. Call `NetworkSynchronization.add_electric_peer/1` for each discovered peer
+5. `PeerConnector` resolves the peer's `system_identifier`, then fetches `GET /electric/v1/server_card` and stores the peer's `SyncBot_<device_id>` user card (best effort; see [`pq_access_gating`](pq_access_gating.in_progress.md#server-user-card)), then starts `PeerSync`
 
 ### Manual peer via admin panel
 
@@ -204,6 +205,14 @@ Base URL derivation: `http://IP:PORT/naive_api` → `http://IP:PORT`
 Source: [`network_synchronization.ex`](../../lib/chat/network_synchronization/network_synchronization.ex) `start_source/1`, `stop_source/1`
 
 ## API Endpoints
+
+### `GET /electric/v1/server_card`
+
+Exposed by [`ChatWeb.ServerCardController`](../../lib/chat_web/controllers/server_card_controller.ex). Returns this device's server identity `user_card` (`SyncBot_<device_id>`), signed by the server identity key.
+
+- Response: `user_hash`, `name`, `deleted_flag`, `owner_timestamp`, and Base64 `sign_pkey`, `crypt_pkey`, `crypt_cert`, `contact_pkey`, `contact_cert`, `sign_b64`
+- Always accessible, not behind Electric readiness
+- Encoding/decoding: `Chat.Pq.ServerCard.to_json/1` / `from_json/1`
 
 ### `GET /electric/v1/system_identifier`
 

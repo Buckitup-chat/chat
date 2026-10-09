@@ -6,6 +6,8 @@ defmodule Chat.Data.VouchToken do
 
   @default_max_depth 7
 
+  def default_max_depth, do: @default_max_depth
+
   def resource_forest do
     %{
       "device" => %{

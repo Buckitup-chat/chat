@@ -103,15 +103,19 @@ Ingest validation follows the same `Chat.Data.Shapes.Shape` behaviour — a `vou
 
 ## Scope Attenuation
 
-```elixir
-def attenuates?(parent, child) do
-  parent_parts = String.split(parent, ".")
-  child_parts = String.split(child, ".")
-  List.starts_with?(child_parts, parent_parts)
-end
-```
+Scope comparison is **wildcard-aware**: a `*` segment matches any value at that position. Two PostgreSQL functions implement scope arithmetic (defined in migration `20260923100000_add_scope_comparison_functions.exs`):
 
-A vouch for `device.<sn>.storage.write` attenuates to cover `device.<sn>.storage.write.dialog_messages`. A vouch for `device.<sn>.admin` does not cover `origins.<hash>.reviews`. Attenuation is checked at gate evaluation time, not at ingest.
+**`scope_narrower_or_eq(a, b)`** — returns `true` when `a` is at least as narrow as `b`. Compares segments left to right; `*` in `b` matches any segment in `a`. If `a` has fewer segments than `b`, it is wider → `false`.
+
+**`scope_intersect(a, b)`** — returns the most specific common scope, or `NULL` if incompatible. At each position: picks the concrete segment when the other is `*`, keeps the value when both agree, returns `NULL` when two concrete segments differ.
+
+| `a` | `b` | `narrower_or_eq(a, b)` | `intersect(a, b)` |
+|-----|-----|------------------------|--------------------|
+| `device.BK-001.storage.write` | `device.*.storage` | `true` | `device.BK-001.storage.write` |
+| `device.*.storage` | `device.BK-001.storage.write` | `false` | `device.BK-001.storage.write` |
+| `device.BK-001.admin` | `device.BK-001.storage` | — | `NULL` |
+
+A vouch for `device.<sn>.storage.write` attenuates to cover `device.<sn>.storage.write.dialog_messages`. A vouch for `device.*.storage.write` covers the same scope on any device. A vouch for `device.<sn>.admin` does not cover `origins.<hash>.reviews` — cross-tree attenuation is blocked by `NULL` intersection. Attenuation is checked at gate evaluation time, not at ingest.
 
 ---
 
@@ -121,7 +125,7 @@ When the trust graph contains multiple paths or conflicting signals for a subjec
 
 1. **Shortest chain wins.** If multiple paths reach a subject, the path with the fewest edges sets `chain_distance`. This is already expressed by `MIN(distance)` in the recursive CTE — shortest path means strongest signal, highest trust weight.
 
-2. **Wider scope wins (on subject end).** When resolving a subject's permission at scope `S`, a vouch granted at a wider (parent) scope takes precedence over a narrower one. A vouch for `device.<sn>.storage.write` is stronger than one for `device.<sn>.storage.write.dialog_messages` — the broader grant already covers the narrower scope via prefix containment, and carries more authority because the issuer trusted the subject with the entire subtree.
+2. **Wider scope wins (on subject end), but scope must not widen down the chain.** When resolving a subject's permission at scope `S`, a vouch granted at a wider (parent) scope takes precedence over a narrower one. A vouch for `device.<sn>.storage.write` is stronger than one for `device.<sn>.storage.write.dialog_messages`. Wildcard scopes participate: a vouch for `device.*.storage.write` covers `device.BK-001.storage.write` via `scope_intersect`. However, transitive delegation cannot escalate authority — if Alice receives a narrow scope from the owner, Alice cannot grant Bob a wider scope than she holds. The CTE enforces this via the `widened` flag and `effective_scope` tracking (see § Graph Traversal).
 
 3. **Tombstone wins over grant.** A tombstoned vouch (`deleted_flag: true`) at any `(kind, issuer_hash, subject_hash)` tuple is authoritative — it is never overridden by a grant from a different issuer or a longer alternative path. Concretely:
    - If the **owner** tombstones a direct vouch for a subject at scope `S`, that subject loses access at `S` regardless of transitive paths through other users.
@@ -170,24 +174,29 @@ Provenance inference: if `issuer_hash` = owner → direct trust (optical handsha
 
 ### Graph Traversal via Recursive CTE
 
-Chain distance is computed by walking `vouch_tokens` edges (`issuer_hash → subject_hash`) with `WITH RECURSIVE` and built-in `CYCLE` detection (PG 14+). The walk filters by `kind` prefix and respects revocation (`deleted_flag`) and replay protection (`owner_timestamp`).
+Chain distance is computed by walking `vouch_tokens` edges (`issuer_hash → subject_hash`) with `WITH RECURSIVE` and built-in `CYCLE` detection (PG 14+). The walk uses `scope_intersect` and `scope_narrower_or_eq` for wildcard-aware scope matching, tracks effective scope narrowing at each hop, and respects revocation (`deleted_flag`) and replay protection (`owner_timestamp`).
+
+**Parameters:** `$1` = `owner_hash`, `$2` = `scope_prefix`, `$3` = `max_depth`, `$4` = `subject_hash`, `$5` = `root_segment` (first segment of `scope_prefix`, used for index-friendly pre-filtering).
 
 ```sql
 WITH RECURSIVE trust_chain AS (
   -- Base: users the owner directly vouched for
   SELECT
-    vt.subject_hash AS user_hash,
-    1               AS distance
+    vt.subject_hash                AS user_hash,
+    1                              AS distance,
+    scope_intersect($2, vt.kind)   AS effective_scope,
+    false                          AS widened
   FROM vouch_tokens vt
-  WHERE vt.issuer_hash  = $owner_hash
-    AND (vt.kind LIKE $scope_prefix || '%' OR $scope_prefix LIKE vt.kind || '.%')
+  WHERE vt.issuer_hash  = $1
+    AND (vt.kind = $5 OR vt.kind LIKE $5 || '.%')
+    AND scope_intersect($2, vt.kind) IS NOT NULL
     AND vt.deleted_flag = false
     AND NOT EXISTS (
       SELECT 1 FROM vouch_tokens t
       WHERE t.issuer_hash  = vt.issuer_hash
         AND t.subject_hash = vt.subject_hash
         AND t.deleted_flag = true
-        AND vt.kind LIKE t.kind || '%'
+        AND scope_narrower_or_eq(vt.kind, t.kind)
     )
 
   UNION ALL
@@ -195,18 +204,21 @@ WITH RECURSIVE trust_chain AS (
   -- Walk outward: each subject's own vouches
   SELECT
     vt.subject_hash,
-    tc.distance + 1
+    tc.distance + 1,
+    scope_intersect(tc.effective_scope, vt.kind),
+    tc.widened OR NOT scope_narrower_or_eq(vt.kind, tc.effective_scope)
   FROM vouch_tokens vt
   JOIN trust_chain tc ON vt.issuer_hash = tc.user_hash
-  WHERE (vt.kind LIKE $scope_prefix || '%' OR $scope_prefix LIKE vt.kind || '.%')
+  WHERE (vt.kind = $5 OR vt.kind LIKE $5 || '.%')
+    AND scope_intersect(tc.effective_scope, vt.kind) IS NOT NULL
     AND vt.deleted_flag = false
-    AND tc.distance     < $max_depth
+    AND tc.distance     < $3
     AND NOT EXISTS (
       SELECT 1 FROM vouch_tokens t
       WHERE t.issuer_hash  = vt.issuer_hash
         AND t.subject_hash = vt.subject_hash
         AND t.deleted_flag = true
-        AND vt.kind LIKE t.kind || '%'
+        AND scope_narrower_or_eq(vt.kind, t.kind)
     )
 )
 CYCLE user_hash SET is_cycle USING path
@@ -214,30 +226,39 @@ CYCLE user_hash SET is_cycle USING path
 SELECT MIN(distance) AS chain_distance
 FROM trust_chain
 WHERE NOT is_cycle
-  AND user_hash = $subject_hash
+  AND user_hash = $4
+  AND (
+    (NOT widened AND (scope_narrower_or_eq(effective_scope, $2)
+                      OR scope_narrower_or_eq($2, effective_scope)))
+    OR
+    (widened AND scope_narrower_or_eq($2, effective_scope))
+  )
   AND NOT EXISTS (
     SELECT 1 FROM vouch_tokens t
-    WHERE t.issuer_hash  = $owner_hash
-      AND t.subject_hash = $subject_hash
+    WHERE t.issuer_hash  = $1
+      AND t.subject_hash = $4
       AND t.deleted_flag = true
-      AND ($scope_prefix LIKE t.kind || '%')
+      AND scope_narrower_or_eq($2, t.kind)
   )
 ```
 
-**Resource-scoped.** The `$scope_prefix` parameter (e.g. `'device.BK-001.storage.write'`) restricts the walk to vouches granting access to a specific resource subtree. Cross-tree walks (e.g. device + origins) require a separate pass per root or a broader prefix.
+Implementation: `Chat.Data.VouchToken.chain_distance/4` (`lib/chat/data/vouch_token.ex`).
 
-**Bidirectional scope matching.** The condition `(vt.kind LIKE $scope_prefix || '%' OR $scope_prefix LIKE vt.kind || '.%')` implements attenuation in both directions: a vouch at a narrower scope (e.g. `storage.write.dialog_messages`) matches a query for its parent (`storage.write`), and a vouch at a wider scope (e.g. `storage`) covers a query for a child (`storage.write`). This mirrors the `attenuates?/2` containment rule without requiring a separate check.
+**Effective scope tracking.** Each row in the CTE carries `effective_scope` — the intersection of the query scope and all vouch kinds along the chain. At each hop, `scope_intersect(tc.effective_scope, vt.kind)` narrows it further. A `NULL` intersection means the vouch is irrelevant to the query and the row is pruned.
 
-**Tombstone sub-selects.** Each CTE leg includes `NOT EXISTS` to exclude rows where a tombstoned vouch at a parent scope blocks the grant for the same `(issuer_hash, subject_hash)` pair. The final `SELECT` adds a direct-tombstone check: if the owner has tombstoned the subject at the queried scope (or a parent), the result is empty regardless of transitive paths.
+**Widening detection.** The `widened` flag is set when any hop grants a scope broader than what the previous hop's effective scope allows (`NOT scope_narrower_or_eq(vt.kind, tc.effective_scope)`). The final `SELECT` treats widened and non-widened chains differently: a non-widened chain matches if the effective scope and query scope are comparable in either direction; a widened chain matches only if the query scope is narrower than or equal to the effective scope — preventing transitive delegation from escalating authority.
+
+**Root-segment pre-filter.** The condition `(vt.kind = $5 OR vt.kind LIKE $5 || '.%')` restricts each CTE leg to the query's root segment (e.g. `device`), enabling index use. Cross-tree walks require a separate pass per root.
+
+**Tombstone sub-selects.** Each CTE leg includes `NOT EXISTS` to exclude rows where a tombstoned vouch at a parent scope (checked via `scope_narrower_or_eq`) blocks the grant for the same `(issuer_hash, subject_hash)` pair. The final `SELECT` adds a direct-tombstone check: if the owner has tombstoned the subject at the queried scope (or a parent), the result is empty regardless of transitive paths.
 
 **Notes:**
 
 - **`CYCLE … SET … USING path`** — prevents infinite loops in mutual-vouch or ring topologies. No manual visited-set.
-- **`$max_depth`** — caps traversal. Default: **7**.
-- **Single-user lookup** — the query targets a specific `$subject_hash` and returns `MIN(distance)` for that user only. A full-graph dump (all reachable users) uses the same CTE but groups by `user_hash` without the final `WHERE user_hash = $subject_hash` filter.
+- **`$3` (max_depth)** — caps traversal. Default: **7**.
+- **Single-user lookup** — the query targets a specific `$4` (subject_hash) and returns `MIN(distance)` for that user only.
 - **Revocation** — `deleted_flag = false` plus the `NOT EXISTS` tombstone checks exclude revoked vouches and their attenuated children. A tombstoned vouch at a parent scope blocks all sub-scopes for that edge.
 - **Replay safety** — `owner_timestamp` monotonicity is enforced at ingest (§ Verification), so the query sees only the latest version of each `(kind, issuer_hash, subject_hash)` tuple.
-If vouch tokens are cached in CubDB, the equivalent traversal runs in Elixir (BFS with a `MapSet` visited guard, filtering on `kind` prefix and `deleted_flag`).
 
 ---
 

@@ -23,4 +23,6 @@ Using IO data as arguments to the logging function will give a little performanc
 
 # Technical info
 
-See [docs/README.md](./docs/README.md) for the full documentation index — split into [`docs/trusted/`](./docs/trusted/) (server ECC + CubDB) and [`docs/pq/`](./docs/pq/) (frontend post-quantum + Electric/Postgres).
+See [docs/README.md](./docs/README.md) for the full documentation index — split into:
+- [`docs/trusted/`](./docs/trusted/) (server ECC + CubDB) 
+- [`docs/pq/`](./docs/pq/) (frontend post-quantum + Electric/Postgres).

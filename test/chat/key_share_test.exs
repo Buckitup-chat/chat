@@ -1,6 +1,6 @@
 defmodule Chat.KeyShareTest do
   @moduledoc false
-  use ChatWeb.DataCase, async: true
+  use ChatWeb.DataCase, async: false
 
   alias Chat.Card
   alias Chat.KeyShare

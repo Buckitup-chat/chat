@@ -1,5 +1,5 @@
 defmodule Chat.LogTest do
-  use ExUnit.Case, async: true, group: :cubdb
+  use ExUnit.Case, async: false
 
   alias Chat.Card
   alias Chat.Db

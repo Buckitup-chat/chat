@@ -247,20 +247,27 @@ defmodule Chat.Data.File.MissingChunksTest do
   end
 
   describe "missing_chunks_for_drive/2" do
-    test "returns fetchable chunks for a specific drive" do
-      file_id = FileId.generate()
+    test "returns all fetchable chunks, preferring the given drive" do
       data_hash = "fd_" <> String.duplicate("ab", 64)
+      usb1_file = FileId.generate()
+      usb2_file = FileId.generate()
 
-      FileData.insert_missing_chunks_placeholders(file_id, 1, nil, 1_000_000,
+      FileData.insert_missing_chunks_placeholders(usb1_file, 1, nil, 1_000_000,
         source_drive_id: "usb1"
       )
 
-      FileData.fill_missing_chunk(file_id, 0, data_hash, 100)
+      FileData.insert_missing_chunks_placeholders(usb2_file, 1, nil, 1_000_000,
+        source_drive_id: "usb2"
+      )
 
-      result = FileData.missing_chunks_for_drive("usb1")
-      assert length(result) == 1
+      FileData.fill_missing_chunk(usb1_file, 0, data_hash, 100)
+      FileData.fill_missing_chunk(usb2_file, 0, data_hash, 100)
 
-      assert FileData.missing_chunks_for_drive("usb_other") == []
+      assert [%{file_id: ^usb1_file}, %{file_id: ^usb2_file}] =
+               FileData.missing_chunks_for_drive("usb1")
+
+      assert [%{file_id: ^usb2_file}, %{file_id: ^usb1_file}] =
+               FileData.missing_chunks_for_drive("usb2")
     end
   end
 end

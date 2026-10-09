@@ -48,9 +48,6 @@ defmodule ChatWeb.ElectricLive.StreamIndex do
       def mount(_params, _session, socket) do
         case connected?(socket) do
           true ->
-            endpoint_url = ChatWeb.Endpoint.url() <> "/electric/v1/shapes"
-            client = Electric.Client.new!(endpoint: endpoint_url)
-
             shape =
               Electric.Client.ShapeDefinition.new!(unquote(table),
                 parser: {Electric.Client.EctoAdapter, unquote(schema)}
@@ -59,7 +56,7 @@ defmodule ChatWeb.ElectricLive.StreamIndex do
             {:ok,
              socket
              |> Phoenix.LiveView.stream_configure(unquote(stream), dom_id: &dom_id/1)
-             |> sync_stream_fixed(unquote(stream), shape, client: client)
+             |> sync_stream_fixed(unquote(stream), shape)
              |> assign(loading: false, error: nil, connected: true, live: false)}
 
           false ->

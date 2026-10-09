@@ -716,4 +716,7 @@ pinning each relation's signable field set and canonical field ordering.
 **Hash cases** pin `sign_hash`, `dialog_hash`, `receipt_hash`, `reaction_hash`,
 HKDF-SHA3-256 and HMAC-SHA3-512 constructions.
 
+The canonical serialization rules and per-type encoding are defined in
+[Integrity — Canonical serialization](../invariants/02_integrity.md#canonical-serialization).
+
 Regenerate with `WRITE_VECTORS=1` from `chat-frontend tests/pqConformance.test.ts`.

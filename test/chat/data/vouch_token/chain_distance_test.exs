@@ -81,6 +81,28 @@ defmodule Chat.Data.VouchToken.ChainDistanceTest do
       assert {:ok, 1} = VouchTokenData.chain_distance(ctx.owner_hash, ctx.alice_hash, wildcard)
       assert {:ok, 2} = VouchTokenData.chain_distance(ctx.owner_hash, ctx.bob_hash, wildcard)
     end
+
+    test "broad wildcard vouch covers narrower specific scope", ctx do
+      insert_vouch(ctx.owner, ctx.owner_hash, ctx.alice_hash, "device.*.storage")
+
+      assert {:ok, 1} =
+               VouchTokenData.chain_distance(
+                 ctx.owner_hash,
+                 ctx.alice_hash,
+                 "device.BK-001.storage.write.user_card"
+               )
+    end
+
+    test "wildcard vouch is reachable via specific device scope", ctx do
+      insert_vouch(ctx.owner, ctx.owner_hash, ctx.alice_hash, "device.*.storage.write.user_card")
+
+      assert {:ok, 1} =
+               VouchTokenData.chain_distance(
+                 ctx.owner_hash,
+                 ctx.alice_hash,
+                 "device.BK-001.storage.write.user_card"
+               )
+    end
   end
 
   describe "rule 1 — shortest chain wins" do
@@ -141,15 +163,11 @@ defmodule Chat.Data.VouchToken.ChainDistanceTest do
 
   describe "scope must not widen down the chain" do
     test "wider grant is limited to parent's narrow scope", ctx do
-      # Owner vouches Alice for narrow scope
       insert_vouch(ctx.owner, ctx.owner_hash, ctx.alice_hash, "device.BK-001.admin")
-      # Alice grants Bob wider scope — but she only has .admin
       insert_vouch(ctx.alice, ctx.alice_hash, ctx.bob_hash, "device")
 
-      # Bob unreachable at the wider scope Alice tried to grant
       assert :unreachable = VouchTokenData.chain_distance(ctx.owner_hash, ctx.bob_hash, "device")
 
-      # Bob IS reachable at Alice's actual (narrow) scope
       assert {:ok, 2} =
                VouchTokenData.chain_distance(ctx.owner_hash, ctx.bob_hash, "device.BK-001.admin")
     end
@@ -179,7 +197,6 @@ defmodule Chat.Data.VouchToken.ChainDistanceTest do
       assert :unreachable =
                VouchTokenData.chain_distance(ctx.owner_hash, ctx.carol_hash, "device.BK-001")
 
-      # Carol reachable at the narrowest effective scope
       assert {:ok, 3} =
                VouchTokenData.chain_distance(
                  ctx.owner_hash,
@@ -189,12 +206,9 @@ defmodule Chat.Data.VouchToken.ChainDistanceTest do
     end
 
     test "wildcard grant limited by parent's specific scope", ctx do
-      # Alice (admin) vouches Bob for specific device read
       insert_vouch(ctx.alice, ctx.alice_hash, ctx.bob_hash, "device.BK01.storage.read")
-      # Bob vouches Carol for wider wildcard scope
       insert_vouch(ctx.bob, ctx.bob_hash, ctx.carol_hash, "device.*.storage")
 
-      # Carol reachable at the narrow effective scope
       assert {:ok, 2} =
                VouchTokenData.chain_distance(
                  ctx.alice_hash,
@@ -202,7 +216,6 @@ defmodule Chat.Data.VouchToken.ChainDistanceTest do
                  "device.BK01.storage.read"
                )
 
-      # Carol NOT reachable at the wider wildcard scope
       assert :unreachable =
                VouchTokenData.chain_distance(ctx.alice_hash, ctx.carol_hash, "device.*.storage")
     end
@@ -270,16 +283,13 @@ defmodule Chat.Data.VouchToken.ChainDistanceTest do
     end
 
     test "owner wildcard tombstone on transitive subject denies access", ctx do
-      # alice allows bob
       insert_vouch(ctx.alice, ctx.alice_hash, ctx.bob_hash, "device.bk01.storage.write")
-      # bob allows carol
       insert_vouch(ctx.bob, ctx.bob_hash, ctx.carol_hash, "device.bk01.storage.write")
-      # alice retracts carol with wildcard scope
+
       insert_vouch(ctx.alice, ctx.alice_hash, ctx.carol_hash, "device.*.storage",
         deleted_flag: true
       )
 
-      # bob still reachable
       assert {:ok, 1} =
                VouchTokenData.chain_distance(
                  ctx.alice_hash,
@@ -287,7 +297,6 @@ defmodule Chat.Data.VouchToken.ChainDistanceTest do
                  "device.bk01.storage.write"
                )
 
-      # carol denied by owner tombstone
       assert :unreachable =
                VouchTokenData.chain_distance(
                  ctx.alice_hash,

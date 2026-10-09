@@ -1,6 +1,5 @@
 defmodule ChatWeb.Router do
   use ChatWeb, :router
-  import Phoenix.Sync.Router
 
   pipeline :browser do
     plug :accepts, ["html"]
@@ -49,10 +48,15 @@ defmodule ChatWeb.Router do
     plug :accepts, ["json", "event-stream"]
   end
 
+  pipeline :file_chunk_read_gate do
+    plug ChatWeb.Plugs.ElectricReadGate, shape: :file_chunk
+  end
+
   pipeline :chunk_upload do
     plug CORSPlug,
       origin: "*",
       headers: [
+        "authorization",
         "content-type",
         "x-data-hash",
         "x-size",
@@ -151,6 +155,7 @@ defmodule ChatWeb.Router do
       live "/electric/review_post_rights", ElectricLive.ReviewPostRightsLive.Index, :index
       live "/electric/review_revoke_rights", ElectricLive.ReviewRevokeRightsLive.Index, :index
       live "/electric/review_lists", ElectricLive.ReviewListsLive.Index, :index
+      live "/electric/vouch_tokens", ElectricLive.VouchTokensLive.Index, :index
       live "/electric/review_sandbox", ElectricLive.ReviewSandboxLive.Index, :index
       live "/electric/moderation_sandbox", ElectricLive.ModerationSandboxLive.Index, :index
       live "/electric/origin_reviews", ElectricLive.OriginReviewsLive.Index, :index
@@ -216,23 +221,16 @@ defmodule ChatWeb.Router do
     scope "/" do
       pipe_through ChatWeb.Plugs.ElectricReadiness
 
-      # Phoenix.Sync endpoint for LiveView real-time sync. Deprecated in favor to v1/shapes
-      sync("/file", Chat.Data.Schemas.File)
-      sync("/file_chunk", Chat.Data.Schemas.FileChunk)
-      sync("/user_card", Chat.Data.Schemas.UserCard)
-      sync("/user_storage", Chat.Data.Schemas.UserStorage)
-      sync("/user_storage_version", Chat.Data.Schemas.UserStorageVersion)
-      # Still consumed directly by chat-frontend's main branch (src/utils/db/localDBv2.js).
-      # Remove only after that branch's PGlite sync layer migrates to /electric/v1/shapes
-      # (already done on feat/tanstack-remove-pglite, not yet merged to main).
-      sync("/dialog_key", Chat.Data.Schemas.DialogKey)
-      sync("/dialog_message", Chat.Data.Schemas.DialogMessage)
-      sync("/dialog_message_version", Chat.Data.Schemas.DialogMessageVersion)
-      sync("/dialog_message_reaction", Chat.Data.Schemas.DialogMessageReaction)
-      sync("/dialog_message_receipt", Chat.Data.Schemas.DialogMessageReceipt)
+      options "/read_session", ReadSessionController, :options
+      post "/read_session", ReadSessionController, :create
 
-      get "/file_chunk/:file_id/:chunk_index", FileChunkController, :show
-      get "/file_chunk_status", FileChunkStatusController, :index
+      scope "/" do
+        pipe_through :file_chunk_read_gate
+
+        get "/file_chunk/:file_id/:chunk_index", FileChunkController, :show
+        options "/file_chunk_status", FileChunkStatusController, :options
+        get "/file_chunk_status", FileChunkStatusController, :index
+      end
 
       get "/system_identifier", SystemIdentifierController, :show
 
@@ -253,6 +251,7 @@ defmodule ChatWeb.Router do
     pipe_through [:electric]
     pipe_through ChatWeb.Plugs.ElectricReadiness
     pipe_through ChatWeb.Plugs.ElectricTableGuard
+    pipe_through ChatWeb.Plugs.ElectricReadGate
 
     forward "/", ChatWeb.Plugs.HexToBase64Electric
   end
@@ -278,9 +277,15 @@ defmodule ChatWeb.Router do
       ]
   end
 
-  scope "/", ChatWeb do
+  scope "/app", ChatWeb do
     pipe_through :browser
     get "/", FrontendController, :app
     get "/*path", FrontendController, :app
+  end
+
+  scope "/", ChatWeb do
+    pipe_through :browser
+    get "/", FrontendController, :redirect_to_app
+    get "/*path", FrontendController, :redirect_to_app
   end
 end

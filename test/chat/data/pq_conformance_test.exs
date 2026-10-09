@@ -58,8 +58,9 @@ defmodule Chat.Data.PqConformanceTest do
         Enum.find(@vectors["payload_cases"], &(&1["name"] == @case_name))
 
       row = build_struct(case_data["relation"], case_data["fields"])
+      expected = Base.decode64!(case_data["expected_payload"])
 
-      assert Integrity.signature_payload(row) == case_data["expected_payload"]
+      assert Integrity.signature_payload(row) == expected
     end
   end
 

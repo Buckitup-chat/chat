@@ -76,6 +76,8 @@ Hard requirements and specs. See [`pq/reqs/CLAUDE.md`](./pq/reqs/CLAUDE.md) for 
 - [PQ integrity checker](./pq/reqs/pq_integrity_checker.proposed.md)
 - [PQ recovery shares](./pq/reqs/pq_recovery_shares.proposed.md)
 - [PQ recovery services](./pq/reqs/pq_recovery_services.proposed.md)
+- [PQ node playback](./pq/reqs/pq_node_playback.proposed.md)
+- [PQ broadcast rights](./pq/reqs/pq_broadcast_rights.proposed.md)
 
 #### Files
 - [PQ files](./pq/reqs/files/pq_files.done.md)

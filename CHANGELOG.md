@@ -10,6 +10,53 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
+## 2026-09-26_fa50540\_\_\_2026-09-26_4a6a765c\_\_\_2026-09-26_4f56e01
+
+### Added
+
+- Access gating: vouch tokens with resource forest, scope-widening chains and Electric shape
+- Access gating: ingest gate on all post-quantum shapes (user card and vouch left open)
+- Access gating: server identity and device admin capture on owner bootstrap
+- Device ID: derived from server and localhost identity
+- Electric sandboxes: vouch sandbox (issue, revoke) and admin sandbox vouch token check
+- Electric sandboxes: verify imported user on the server
+- Reviews: editing, with sandbox support
+- Post-quantum dialogs: reactive reactions in sandbox
+- Ingest: return the stored row on conflict
+- Post-quantum: shared conformance vectors with the reference client
+- [platform] Device ID: read from hardware
+- [frontend] TanStack DB migration branch lands on main: PGlite removed, all tables on Electric + TanStack DB
+- [frontend] Durable outbox: intents captured before signing, dependency-scoped dispatch, one sender coordinator for live-send, retry and replay, conflict reconciliation
+- [frontend] Receive-side verification gate for signed dialog rows and a signed DAG with causal refs
+- [frontend] Signed DAG checkpoints with diff view and alerts in the dialogs list
+- [frontend] Files: attachment grid and carousel, multi-file messages, transfer queue, persistent chunk cache, progressive video with duration
+- [frontend] Chat: edit history, delete as signed tombstone, quotes, per-dialog encrypted drafts, explicit read receipts
+- [frontend] Offline: app shell opens without a backend; verified dialog and user data restored offline
+- [frontend] Account: link a second device over an ML-KEM session
+- [frontend] Backup: vault stored on the server under a wrap key, only the key is split
+- [frontend] Account-level synchronization status
+- [frontend] UI end-to-end test harness
+
+### Changed
+
+- Integrity: length-framed (u32be) signature payload, so field serialization is injective (breaking: migration truncates existing signed data)
+- Versioning: validation and versioning generalized into a shared module for dialogs, reviews and users
+- Post-quantum content: video envelope field order (duration before transport refs), quote and checkpoint content types
+- Sync routes: legacy Phoenix.Sync dialog/user/file routes removed in favor of `/electric/v1/shapes`
+- Documentation: access gating, trust metric and integrity watchdog proposals; reviews docs split
+- mix.exs split, credo updated
+- [platform] Code cleanup and docs update
+- [frontend] Signature payload uses length encoding
+- [frontend] user_storage addressed through derived slots scoped to one account
+
+### Fixed
+
+- CORS: expose `electric-*` and chunk response headers
+- Device ID: replace `.` with `_`
+- [platform] Post-quantum backup scenario: copier, stopper and drive detector fixes
+- [frontend] Signature payload: base64 padding normalized and binary columns accepted in all encodings
+- [frontend] Multiple tabs allowed again
+
 ## 2026-09-05_f2d6e03\_\_\_2026-09-05_de389dde\_\_\_2026-09-04_1f1eeae
 
 ### Added

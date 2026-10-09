@@ -12,10 +12,12 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.KeyScanner do
 
   @doc "Returns `{:ok, %{contacts: map, log_entries: list}}` or `{:error, ...}`."
   def scan(user, base_url) do
-    case DialogApi.fetch_dialog_keys(user.user_hash, base_url) do
+    auth = %{user_hash: user.user_hash, sign_skey: user.sign_skey}
+
+    case DialogApi.fetch_dialog_keys(user.user_hash, base_url, auth) do
       {:ok, %{keys: keys, log_entries: key_logs}} ->
         peer_rows = Enum.filter(keys, &(&1["peer_hash"] == user.user_hash))
-        {contacts, msg_logs} = scan_peer_rows(user.crypt_skey, peer_rows, base_url)
+        {contacts, msg_logs} = scan_peer_rows(user.crypt_skey, peer_rows, base_url, auth)
         {:ok, %{contacts: contacts, log_entries: key_logs ++ msg_logs}}
 
       {:error, _} = error ->
@@ -23,13 +25,13 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.KeyScanner do
     end
   end
 
-  defp scan_peer_rows(crypt_skey, peer_rows, base_url) do
+  defp scan_peer_rows(crypt_skey, peer_rows, base_url, auth) do
     Enum.reduce(peer_rows, {%{}, []}, fn row, {contacts, logs} ->
       peer_hash = row["sender_hash"]
 
       with {:ok, peer_key} <- unwrap_peer_key(row, crypt_skey),
            {:ok, %{messages: messages, log_entries: msg_logs}} <-
-             DialogApi.fetch_dialog_messages(row["dialog_hash"], base_url),
+             DialogApi.fetch_dialog_messages(row["dialog_hash"], base_url, auth),
            key when is_binary(key) <- find_review_list_key(messages, peer_hash, peer_key) do
         {Map.put(contacts, peer_hash, key), logs ++ msg_logs}
       else

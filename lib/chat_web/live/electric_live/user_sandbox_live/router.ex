@@ -5,6 +5,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
   import Phoenix.Component
   import Phoenix.LiveView, only: [consume_uploaded_entries: 3, push_event: 3]
 
+  alias Chat.Pq.OwnerBootstrap
   alias Chat.Proto.Shortcode
   alias ChatWeb.ElectricLive.UserSandboxLive.{ApiClient, Identity}
 
@@ -81,7 +82,9 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
     base_url = public_url(socket)
     user = socket.assigns.user
 
-    uuid = params |> Map.get("uuid", "") |> then(&if(&1 == "", do: Ecto.UUID.generate(), else: &1))
+    uuid =
+      params |> Map.get("uuid", "") |> then(&if(&1 == "", do: Ecto.UUID.generate(), else: &1))
+
     size = String.to_integer(size_str)
     value_b64 = generate_storage_value(size)
     value_binary = Base.decode64!(value_b64)
@@ -226,13 +229,23 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
   end
 
   defp try_ingest_imported_user(socket, user_data, base_url) do
-    log_entries =
+    ingest_logs =
       case ApiClient.ingest_imported_user(user_data, base_url) do
         {:ok, %{log_entries: entries}} -> entries
         {:error, %{log_entries: entries}} -> entries
       end
 
-    update(socket, :request_log, &(&1 ++ log_entries))
+    OwnerBootstrap.maybe_register_owner(user_data.user_hash, user_data.sign_pkey)
+
+    {storage_items, storage_logs} =
+      case ApiClient.fetch_user_storage(user_data.user_hash, user_data.sign_skey, base_url) do
+        {:ok, %{items: items, log_entries: entries}} -> {items, entries}
+        {:error, %{log_entries: entries}} -> {[], entries}
+      end
+
+    socket
+    |> assign(:storage_items, storage_items)
+    |> update(:request_log, &(&1 ++ ingest_logs ++ storage_logs))
   end
 
   defp update_storage_item(items, uuid, value_b64, size, label) do

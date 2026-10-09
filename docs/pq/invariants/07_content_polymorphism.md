@@ -23,7 +23,7 @@ Examples:
 ["here is example of composed message", {"inline_image": [16, 9, "thumbhash...", "some.jpg", ... ]}]
 {"inline_image": [16, 9, "thumbhash...", "photo.jpg", 204800, "image/jpeg", 1715000000, "<data_b64>"]}
 {"image": [16, 9, "thumbhash...", "photo.jpg", 5242880, "image/jpeg", 1715000000, "f_01964...", "<enc_secret_b64>"]}
-{"video": [16, 9, "thumbhash...", "clip.mp4", 52428800, "video/mp4", 1715000000, "f_01964...", "<enc_secret_b64>"]}
+{"video": [16, 9, "thumbhash...", "clip.mp4", 52428800, "video/mp4", 1715000000, 127, "f_01964...", "<enc_secret_b64>"]}
 {"file":  ["doc.pdf", 1048576, "application/pdf", 1715000000, "f_01964...", "<enc_secret_b64>"]}
 ```
 
@@ -36,7 +36,14 @@ Because the type lives inside the ciphertext, the database (and any peer without
 - [`"file"`](#file) — large file, out-of-band encrypted chunks in PostgreSQL
 - [`"image"`](#image) — large image, out-of-band with aspect ratio and thumbhash
 - [`"video"`](#video) — video, out-of-band with aspect ratio and thumbhash
+- [`"checkpoint"`](#checkpoint) — signed commitment to the dialog's causal history and materialized view
 - [`"review_list_key"`](#review_list_key) — the sender's `review_list_password`, shared with a contact
+- [`"quote"`](#quote) — a snapshot of a cited message, carried inside the reply
+- [`"recovery_invite"`](#recovery_invite) — an owner asking a contact to become a guardian, owner → contact
+- [`"recovery_invite_reply"`](#recovery_invite_reply) — the answer, with the guardian's stealth meta-address on acceptance, contact → owner
+- [`"recovery_share"`](#recovery_share) — one guardian's Shamir share of a community backup, owner → guardian
+- [`"recovery_share_return"`](#recovery_share_return) — the same share sent back during a recovery, guardian → owner
+- [`"recovery_binding"`](#recovery_binding) — a recovering account's proof that it controls the on-chain candidate
 
 ### `"inline_file"`
 
@@ -116,10 +123,10 @@ Small images (under the inline size limit) should use [`"inline_image"`](#inline
 
 ### `"video"`
 
-Out-of-band video stored as encrypted chunks in PostgreSQL. Carries aspect ratio and thumbhash (from a representative frame) for preview rendering before chunk download. See [pq_files.md](../reqs/files/pq_files.done.md) for chunk encryption.
+Out-of-band video stored as encrypted chunks in PostgreSQL. Carries aspect ratio, thumbhash (from a representative frame) and duration, so a preview with a duration badge renders before any chunk download. See [pq_files.md](../reqs/files/pq_files.done.md) for chunk encryption.
 
 ```json
-{"video": [width_aspect, height_aspect, thumb_hash_b64, name, size, mime_type, creation_unixtime, file_id, enc_secret_b64]}
+{"video": [width_aspect, height_aspect, thumb_hash_b64, name, size, mime_type, creation_unixtime, duration_seconds, file_id, enc_secret_b64]}
 ```
 
 | Position | Field | Description |
@@ -131,10 +138,40 @@ Out-of-band video stored as encrypted chunks in PostgreSQL. Carries aspect ratio
 | 4 | size | Plaintext byte size |
 | 5 | mime_type | MIME type |
 | 6 | creation_unixtime | Unix seconds of uploaded file creation |
-| 7 | file_id | References `files.file_id` |
-| 8 | enc_secret_b64 | AES-256 key for chunk decryption (base64) |
+| 7 | duration_seconds | Playback duration in seconds, rounded to the nearest integer but never below `1` for a measured clip; `0` is reserved for "the sender could not determine it" |
+| 8 | file_id | References `files.file_id` |
+| 9 | enc_secret_b64 | AES-256 key for chunk decryption (base64) |
 
 Videos are always out-of-band — there is no inline variant.
+
+### `"checkpoint"`
+
+A signed DAG checkpoint: the author attests "my device held this causally complete local
+state of the dialog, and under the named reducer it materialized to this view". It rides an
+ordinary `dialog_messages` row, so the commitments stay inside the ciphertext (the server
+sees a normal message), the row's ML-DSA signature covers them, and the row's `refs_map`
+makes the checkpoint a merge event over the attested tails. A checkpoint never claims
+global completeness — only what was locally present at signing time.
+
+```json
+{"checkpoint": [1, "dialog-state-v1", "dialog-view-tree-v1", "dfr_<hex>", "dvr_<hex>", {"dmsg_...": "dms_...", "...": "..."}, 1788470000]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | checkpoint_version | Integer; `1` = SHA3-512 commitments, domains below |
+| 1 | reducer_version | Rules that turned events into the view; `dialog-state-v1` = gate-admitted current revisions, tombstones included |
+| 2 | tree_version | View-commitment structure; `dialog-view-tree-v1` = compressed binary Merkle trie keyed by `message_id` bytes |
+| 3 | frontier_root | `dfr_` + hex SHA3-512 over `"BUCKITUP_DIALOG_FRONTIER_V1"` and the sorted `message_id\|sign_hash` pairs |
+| 4 | view_root | `dvr_` + hex root of the view trie; leaves hash `"BUCKITUP_DIALOG_VIEW_LEAF_V1"`, `message_id`, the current revision's `sign_hash` and the deleted flag; inner nodes hash `"BUCKITUP_DIALOG_VIEW_NODE_V1"`, the branching bit index and both children |
+| 5 | frontier | Object `{message_id: sign_hash}` — the DAG tails observed at checkpoint time; source of truth, position 3 is its fingerprint |
+| 6 | created_at | Unix seconds, informational |
+
+`sign_hash` already commits to a revision's full signed content, so the frontier commits to
+the causal history transitively and the view leaf needs no separate content hash. History
+and view are separate commitments on purpose: "history grew but the view is identical" is
+distinguishable from "the visible conversation changed". Unknown `reducer_version` /
+`tree_version` make the view unverifiable for the reader, not the checkpoint invalid.
 
 ### `"review_list_key"`
 
@@ -157,6 +194,215 @@ ML-KEM-1024, so the key is protected exactly as any other content. The receiving
 The key never rotates — sending it is irreversible, since a contact who has it keeps access to
 everything the sender writes afterwards. Delivery is therefore per-recipient and deliberate, not a
 broadcast.
+
+
+### `"quote"`
+
+A snapshot of a cited message, carried inside the citing message. Used as the
+first element of a composed message to express a reply:
+
+```json
+[{"quote": ["u_ab12…", "dmsg_01990c…", "dms_4f19…", "Схему пришли до четверга"]}, "Уже в очереди, вечером будет"]
+```
+
+```json
+{"quote": [author_hash, message_id, sign_hash, snapshot]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | author_hash | `user_hash` of the quoted message's author |
+| 1 | message_id | `dmsg_<UUID7>` of the quoted message |
+| 2 | sign_hash | `dms_`-prefixed revision identity of the exact version cited |
+| 3 | snapshot | The cited content **at citation time** — any value from this document (bare string, one-key object, or composed array) |
+
+The snapshot is the load-bearing field. It is frozen when the reply is
+authored, so the quote renders even when the original row never replicated to
+this peer, was edited afterwards, or was deleted — the reply is
+self-contained, and later changes to the original are detectable (the cited
+`sign_hash` no longer matches the original's tip) rather than silently
+rewriting what the reply appeared to answer.
+
+`(message_id, sign_hash)` pin the exact revision for jump-to-original
+navigation; when the pair resolves to nothing locally, the quote still
+renders from its snapshot and the client simply offers no jump.
+
+The quoted message's authoring time needs no field of its own:
+`message_id` is a UUIDv7 whose first 48 bits are the authoring unix
+milliseconds (04_ordering.md), so a client that wants to show "when was
+this said" derives it from position 1. A separate timestamp field would
+be a second source of truth that could disagree with the id.
+
+Because the snapshot is itself canonical content, quoting a message that
+contains a quote nests with no special casing. Clients should bound how much
+of the nesting they *render* inline; the wire format itself is unbounded.
+
+A quote is context, not authorship: text inside the snapshot belongs to
+`author_hash`, not to the sender of the citing message.
+
+--- 
+
+### `"recovery_invite"`
+
+The owner asking a confirmed contact to become a guardian of their community
+backup ([pq_recovery_shares § Inviting](../reqs/pq_recovery_shares.proposed.md)).
+It names no secret: consent and the meta-address it is answered with are the
+guardian's to give once per owner and deployment, while secrets and their
+versions come and go. When it was sent is the dialog row's `message_id`, a UUIDv7
+signed with the row — not its `owner_timestamp`, which every edit raises. An
+invitation only ever travels in a dialog.
+
+```json
+{"recovery_invite": ["9b2e…", "eip155:11155111:0xd9ff…"]}
+```
+
+```json
+{"recovery_invite": [invite_id, deployment]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | invite_id | 16 random bytes, lowercase hex; what the reply names |
+| 1 | deployment | Where the guardian would approve: the namespace part of `secret_ref`, `<namespace>` of `<namespace>/<id>`, in the same canonical form, e.g. `eip155:11155111:0xd9ffd20f2db9c774b9f0237c4837f52dcbd937a7` |
+
+--- 
+
+### `"recovery_invite_reply"`
+
+The contact's answer to a [`"recovery_invite"`](#recovery_invite), sent in the
+same dialog. An acceptance carries the stealth meta-address the owner derives
+the guardian's slots from, with a proof that the replier holds its keys; the
+dialog row's ML-DSA signature says who replied, and its `message_id` (UUIDv7)
+when.
+How replies to one `invite_id`
+combine is [pq_recovery_shares § Inviting](../reqs/pq_recovery_shares.proposed.md)'s to say.
+
+```json
+{"recovery_invite_reply": ["9b2e…", "accept", "0x02a1…", "<signature_b64>"]}
+```
+
+```json
+{"recovery_invite_reply": [invite_id, answer, stealth_meta_address, proof_b64]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | invite_id | The invitation answered |
+| 1 | answer | `"accept"` or `"decline"`; a reply with any other value is ignored |
+| 2 | stealth_meta_address | On `accept`, 66 bytes as lowercase `0x` hex: the spending then the viewing public key, both compressed secp256k1 (ERC-5564 scheme 1, without the `st:eth:` prefix). On `decline`, the empty string |
+| 3 | proof_b64 | On `accept`, the EIP-191 signature by the meta-address's spending key defined in [pq_recovery_shares § Inviting](../reqs/pq_recovery_shares.proposed.md), unpadded base64. On `decline`, the empty string |
+
+--- 
+
+### `"recovery_share"`
+
+One guardian's Shamir share of the friends' half of an owner's community backup,
+sent owner → guardian at issue. Post-quantum in transit for free, for the reasons
+in [pq_recovery_shares](../reqs/pq_recovery_shares.proposed.md), which owns the
+lifecycle this envelope only names. The way back is
+[`"recovery_share_return"`](#recovery_share_return): a different key, because a
+client acts on the key, and the holding rules for a share received at issue are
+wrong for one received at recovery.
+
+```json
+{"recovery_share": ["eip155:11155111:0xd9ff…/0x9f3c…", 1, 3, 5, "<share_b64>", 1715000000, "4f1c…", 2, ["<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>"], [3, ["n_9f2c…@https://node-a.example/recovery/node", "…"]]]}
+```
+
+```json
+{"recovery_share": [secret_ref, version, threshold, total, share_b64, creation_unixtime, split_id, share_index, split_proof, node_set]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | secret_ref | Which secret this share belongs to: `<namespace>/<id>`, e.g. `eip155:<chainId>:<contract>/<keccak256(abi.encode(owner, label))>`; canonical form: the chain id in decimal, the contract and the id in lowercase `0x` hex, so the string compares and hashes the same in every build |
+| 1 | version | Share epoch, the contract's own; supersession rules in [pq_recovery_shares § Dying](../reqs/pq_recovery_shares.proposed.md) |
+| 2 | threshold | Shamir shares needed to rebuild the friends' half. Not the contract's approval quorum, which counts guardians |
+| 3 | total | Shares generated at this version, issued and spare alike |
+| 4 | share_b64 | The Shamir share itself, unpadded base64 |
+| 5 | creation_unixtime | Unix seconds when the split was made. Not the message's time: a re-issue sends the same bytes in a later message |
+| 6 | split_id | Which Shamir split this share belongs to; semantics in [pq_recovery_shares § Re-issuing](../reqs/pq_recovery_shares.proposed.md) |
+| 7 | share_index | The share's index within the split, 1-based; a guardian may hold more than one |
+| 8 | split_proof | `[leaf_b64, …]`: every leaf of the split, in index order — what checks this share against the split's root on chain; construction in [pq_recovery_shares § Re-issuing](../reqs/pq_recovery_shares.proposed.md) |
+| 9 | node_set | `[node_threshold, ["<id>@<url>", …]]`: the nodes holding this version's node half, as the owner chose them, and how many are needed. Exactly two elements. `id` is the node's key-derived id (`n_` + 32 lowercase hex); `url` is an `https://` URL without credentials, written in its canonical (WHATWG-serialized) form, so every build hashes and fetches the same string; ids are distinct; `2 ≤ node_threshold ≤ n ≤ 16`. Equal across a version's shares and hashed into `split_root`; a recovering device has no other way to learn it ([pq_recovery_shares § Re-issuing, § Returning](../reqs/pq_recovery_shares.proposed.md)) |
+
+`secret_ref` names the deployment as well as the chain, because the id does not:
+`keccak256(abi.encode(owner, label))` is the same value on every contract, so two
+deployments on one chain produce identical ids for the same owner and label.
+Carrying the namespace *inside* the value is also what keeps a frozen position
+from assuming an EVM chain forever.
+
+The vault's address is **not** here, deliberately. It is derived from `S`
+(`chat-frontend/src/lib/pq/vaultEnvelope.ts`), and that derivation exists so the
+server cannot tell a vault row from any other `user_storage` row: reads there are
+public and unauthenticated, so an address handed to every guardian turns an
+unfindable row into a findable one. A recovering client does not need it either —
+by the time it can decrypt the row it holds `threshold` shares, and `S` yields
+the address directly.
+
+--- 
+
+### `"recovery_share_return"`
+
+A guardian's share sent back to the recovering owner's temporary account, after
+the guardian's own approval has been honoured on chain
+([pq_recovery_shares § Returning](../reqs/pq_recovery_shares.proposed.md)). It
+carries the round and the recipient the guardian checked, so the release
+decision is covered by the guardian's signature — the dialog row's, or the
+block's when the share returns as text
+([pq_recovery_shares § Manual return](../reqs/pq_recovery_shares.proposed.md)) —
+and can be audited later.
+
+```json
+{"recovery_share_return": ["eip155:11155111:0xd9ff…/0x9f3c…", 1, "4f1c…", 3, 5, 2, 2, "0x7a1b…", "<share_b64>", 1715600000, ["<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>", "<leaf_b64>"], [3, ["n_9f2c…@https://node-a.example/recovery/node", "…"]]]}
+```
+
+```json
+{"recovery_share_return": [secret_ref, version, split_id, threshold, total, share_index, round, candidate, share_b64, creation_unixtime, split_proof, node_set]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | secret_ref | As in `"recovery_share"` |
+| 1 | version | The epoch the share was issued at |
+| 2 | split_id | As in `"recovery_share"`; the recovering client groups shares by it |
+| 3 | threshold | Shamir threshold of the split — the recovering client has no other way to know how many it is waiting for; the contract's `threshold` is the guardian quorum |
+| 4 | total | Shares in the split |
+| 5 | share_index | As in `"recovery_share"` |
+| 6 | round | The contract's `recoveryRound` this release answers |
+| 7 | candidate | The recipient address the guardian approved, from the binding it verified |
+| 8 | share_b64 | The Shamir share itself, unpadded base64 |
+| 9 | creation_unixtime | Unix seconds at release. Carried in the envelope because a return also travels outside a dialog, in a manual-return block, where no row carries a timestamp |
+| 10 | split_proof | As in `"recovery_share"`, returned as issued; the recovering client checks the share against the version's root before combining |
+| 11 | node_set | As in `"recovery_share"`, returned as issued: where the recovering client asks for the node half |
+
+--- 
+
+### `"recovery_binding"`
+
+Sent by a recovering owner's temporary account, in the dialog a guardian opened
+with it — or as text, when the share will return that way — to prove that the
+chat identity the guardian is talking to controls the address it will approve
+on chain ([pq_recovery_shares § Returning](../reqs/pq_recovery_shares.proposed.md)).
+The signature is EIP-191 by the candidate's key over the UTF-8 string
+`"buckitup/recovery-binding/v1\n" || secret_ref || "\n" || user_hash`; the
+`user_hash` signed is the sender's own. The guardian checks it against the
+dialog peer, and against the word code the owner reads out, which is what says
+the peer is the person on the call.
+
+```json
+{"recovery_binding": ["eip155:11155111:0xd9ff…/0x9f3c…", "0x7a1b…", "u_ab12…", "<signature_b64>"]}
+```
+
+```json
+{"recovery_binding": [secret_ref, candidate, user_hash, signature_b64]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | secret_ref | The secret this recovery is for; supplied by the guardian's first message |
+| 1 | candidate | The address the temporary account will be elected under |
+| 2 | user_hash | The sender's own `user_hash`; must equal the dialog peer's, and is covered by the word code the owner reads out |
+| 3 | signature_b64 | EIP-191 signature by `candidate`'s key over the string above, unpadded base64 |
 
 --- 
 
@@ -184,6 +430,8 @@ A signed deletion is `deleted_flag = true` plus an empty `content_b64`. The empt
 - The plaintext JSON object has at most one key — it names the content type. Bare strings are text by convention.
 - Content type is never a column on the carrier row; it is only visible after decryption.
 - A new content type is a new JSON key, not a schema migration.
+- **Positional fields are append-only**, and the positions of every type in § Known types are frozen as of this document: a new field goes at the end of its type's array, a layout that must change gets a new type key, and layouts are told apart by key rather than by element count. An insertion rebinds every field after it, and codecs that disagree by one position do not fail — they hand back plausible, wrong values.
+- **A decoder accepts arrays longer than the layout it knows** and ignores the trailing elements, rather than keying on an exact element count. Without this the rule above buys nothing: an appended field would break every older reader just as loudly as an insertion, only later.
 - Out-of-band file references (`file_id`, `enc_secret_b64`) inside the envelope are integrity-bound by the carrier row's `sign_b64`; chunk integrity is ensured by `files.chunk_sign_hashes` (see [pq_files.md](../reqs/files/pq_files.done.md)).
 - An empty `content_b64` is only valid alongside `deleted_flag = true`.
 

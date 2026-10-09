@@ -1,7 +1,7 @@
 defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
   @moduledoc "API client for review sandbox: all operations via HTTP."
 
-  import ChatWeb.ElectricLive.ReviewSandboxLive.Http
+  import ChatWeb.ElectricLive.SandboxHttp
 
   alias Chat.Data.Integrity
   alias Chat.Data.ReviewRightCandidate, as: RightCandidateData
@@ -56,29 +56,27 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
       ]
     }
 
-    with {:ok, ch, log1} <- get_challenge(base_url),
-         {:ok, _resp, log2} <- post_ingest(ch, payload, author.sign_skey, base_url) do
-      review_data = %{
-        review_hash: review_hash,
-        origin_hash: origin_hash,
-        review_password: review_password,
-        rating: rating,
-        text: text,
-        content_json: content,
-        owner_timestamp: timestamp,
-        parent_sign_hash: nil,
-        sign_hash: sign_hash
-      }
+    case ingest(payload, author.sign_skey, base_url) do
+      {:ok, _body, logs} ->
+        review_data = %{
+          review_hash: review_hash,
+          origin_hash: origin_hash,
+          review_password: review_password,
+          rating: rating,
+          text: text,
+          content_json: content,
+          owner_timestamp: timestamp,
+          parent_sign_hash: nil,
+          sign_hash: sign_hash
+        }
 
-      {:ok, %{review: review_data, log_entries: [log1, log2]}}
-    else
-      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
+        {:ok, %{review: review_data, log_entries: logs}}
+
+      {:error, reason, logs} ->
+        {:error, %{reason: reason, log_entries: logs}}
     end
   end
 
-  # `owner_timestamp` is unix *seconds* and the server rejects anything not
-  # strictly newer, so an edit landing in the same second as the version it
-  # replaces has to step past it rather than restate `now`.
   def edit_review(author, review, new_rating, new_text, base_url) do
     content = review_content(new_rating, new_text)
     content_b64 = EnigmaPq.aes_gcm_encrypt(content, review.review_password)
@@ -114,26 +112,25 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
       ]
     }
 
-    with {:ok, ch, log1} <- get_challenge(base_url),
-         {:ok, _resp, log2} <- post_ingest(ch, payload, author.sign_skey, base_url) do
-      updated_review =
-        Map.merge(review, %{
-          rating: new_rating,
-          text: new_text,
-          content_json: content,
-          owner_timestamp: timestamp,
-          parent_sign_hash: review.sign_hash,
-          sign_hash: sign_hash
-        })
+    case ingest(payload, author.sign_skey, base_url) do
+      {:ok, _body, logs} ->
+        updated_review =
+          Map.merge(review, %{
+            rating: new_rating,
+            text: new_text,
+            content_json: content,
+            owner_timestamp: timestamp,
+            parent_sign_hash: review.sign_hash,
+            sign_hash: sign_hash
+          })
 
-      {:ok, %{review: updated_review, log_entries: [log1, log2]}}
-    else
-      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
+        {:ok, %{review: updated_review, log_entries: logs}}
+
+      {:error, reason, logs} ->
+        {:error, %{reason: reason, log_entries: logs}}
     end
   end
 
-  # `[rating, placeholder, content]` — the placeholder pads a rating-only review
-  # so its ciphertext size does not give away that no text was written.
   defp review_content(rating, "") do
     placeholder = 20..200 |> Enum.random() |> :crypto.strong_rand_bytes()
     Jason.encode!([rating, Base.url_encode64(placeholder, padding: false), ""])
@@ -141,11 +138,6 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
 
   defp review_content(rating, text), do: Jason.encode!([rating, "", text])
 
-  # The candidate's own sign_hash is what the server copies verbatim into
-  # review_public_passwords on promotion, so capturing it here is the author's
-  # only durable handle on the promotion proof: pre mode deletes the candidate
-  # once the rights are signed, and ML-DSA-87 signing is randomized, so it cannot
-  # be recomputed later.
   def submit_password_candidates(author, review, base_url) do
     origin_hash = review.origin_hash
     base_ts = review.owner_timestamp + 100_000
@@ -159,9 +151,9 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
     payload = %{"mutations" => [pwd_mutation, null_mutation]}
 
     with {:ok, ch, log1} <- get_challenge(base_url),
-         {:ok, resp, log2} <- post_ingest(ch, payload, author.sign_skey, base_url) do
+         {:ok, _body, log2} <- post_ingest(ch, payload, author.sign_skey, base_url) do
       candidates = read_right_candidates(review.review_hash)
-      shared_secrets = Verification.extract_shared_secrets(resp)
+      shared_secrets = Verification.extract_shared_secrets(log2.response_headers)
 
       {:ok,
        %{
@@ -191,11 +183,8 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
     mutations = Enum.map(signed, &elem(&1, 0))
     hashes = signed |> Enum.map(&elem(&1, 1)) |> Map.new()
 
-    with {:ok, ch, log1} <- get_challenge(base_url),
-         {:ok, _resp, log2} <-
-           post_ingest(ch, %{"mutations" => mutations}, author.sign_skey, base_url) do
-      {:ok, Map.merge(hashes, %{log_entries: [log1, log2]})}
-    else
+    case ingest(%{"mutations" => mutations}, author.sign_skey, base_url) do
+      {:ok, _body, logs} -> {:ok, Map.merge(hashes, %{log_entries: logs})}
       {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end
   end
@@ -245,9 +234,6 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient do
     {mutation, sign_hash}
   end
 
-  # Returns the mutation plus `{slot, sign_hash}` — the same sign_hash the server
-  # carries over into review_post_right / review_revoke_right on promotion, and
-  # therefore the value review_list must reference as its moderation proof.
   defp right_sign_mutation(candidate, author) do
     sign_b64 = candidate |> Integrity.signature_payload() |> EnigmaPq.sign(author.sign_skey)
     {sign_hash, relation, slot} = right_candidate_meta(candidate, sign_b64)

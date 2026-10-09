@@ -1,5 +1,5 @@
 defmodule Chat.Admin.AdminDbLoggerTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   require Logger
   alias Chat.AdminDb

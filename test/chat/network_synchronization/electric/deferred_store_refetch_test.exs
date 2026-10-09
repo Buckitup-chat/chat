@@ -21,10 +21,12 @@ defmodule Chat.NetworkSynchronization.Electric.DeferredStoreRefetchTest do
     Application.put_env(:chat, :deferred_mock_messages, [])
     Application.put_env(:chat, :consumer_test_pid, self())
 
-    {:ok, pid} = RewiredDeferredStore.start_link(name: :test_deferred_refetch)
+    start_supervised!(%{
+      id: :test_deferred_refetch,
+      start: {RewiredDeferredStore, :start_link, [[name: :test_deferred_refetch]]}
+    })
 
     on_exit(fn ->
-      Process.exit(pid, :normal)
       Application.delete_env(:chat, :deferred_test_pid)
       Application.delete_env(:chat, :deferred_mock_messages)
       Application.delete_env(:chat, :consumer_test_pid)

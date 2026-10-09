@@ -79,12 +79,31 @@ export async function decryptChunk(blob, encSecret) {
 
 // --- Integrity signature payload ---
 // Replicates Chat.Data.Integrity.signature_payload/1 exactly.
-// Fields are sorted alphabetically by key name, each encoded per suffix rules,
-// then concatenated into a single string that gets signed.
+// Fields sorted alphabetically by key, each length-framed: u32be(byte_length) || encoded_value.
+// Returns Uint8Array (raw binary payload ready for signing).
+
+const textEnc = new TextEncoder();
 
 export function buildSignaturePayload(fields) {
   const sorted = Object.entries(fields).sort(([a], [b]) => a.localeCompare(b));
-  return sorted.map(([key, value]) => encodeField(key, value)).join('');
+  const parts = sorted.map(([key, value]) => lengthFrameField(key, value));
+  let totalLen = 0;
+  for (const p of parts) totalLen += p.length;
+  const out = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const p of parts) {
+    out.set(p, offset);
+    offset += p.length;
+  }
+  return out;
+}
+
+function lengthFrameField(key, value) {
+  const encoded = textEnc.encode(encodeField(key, value));
+  const framed = new Uint8Array(4 + encoded.length);
+  new DataView(framed.buffer).setUint32(0, encoded.length, false);
+  framed.set(encoded, 4);
+  return framed;
 }
 
 function encodeField(key, value) {

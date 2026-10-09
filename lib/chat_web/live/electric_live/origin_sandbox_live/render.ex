@@ -4,10 +4,15 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
   use Phoenix.Component
 
   alias Chat.Proto.Shortcode
+  alias ChatWeb.ElectricLive.Components
 
   def render_page(assigns) do
     ~H"""
-    <div class="x-sandbox min-h-screen bg-gray-50 py-8" id="origin-owner-sandbox" phx-hook="DownloadFile">
+    <div
+      class="x-sandbox min-h-screen bg-gray-50 py-8"
+      id="origin-owner-sandbox"
+      phx-hook="DownloadFile"
+    >
       <div class="px-4">
         <a href="/electric" class="text-sm text-blue-600 hover:text-blue-800 mb-2 inline-block">
           &larr; Electric Index
@@ -51,9 +56,12 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
       <%= if @owner do %>
         <div class="text-sm">
           <span class="font-medium text-green-700">Identity loaded:</span>
-          <span class="font-mono text-xs text-gray-600">{Shortcode.short_code(@owner.user_hash)}</span>
+          <span class="font-mono text-xs text-gray-600">
+            {Shortcode.short_code(@owner.user_hash)}
+          </span>
           <span class="text-gray-500">({@owner.name})</span>
         </div>
+        <Components.identity_not_on_server identity={@owner} />
       <% else %>
         <form phx-change="validate_key_file" phx-submit="import_keys" class="flex items-center gap-4">
           <.live_file_input upload={@uploads.key_file} class="text-sm" />

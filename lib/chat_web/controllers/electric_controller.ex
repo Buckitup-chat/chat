@@ -11,6 +11,8 @@ defmodule ChatWeb.ElectricController do
     {:nowarn_function, handle_ingest_error: 2},
     {:nowarn_function, respond_changeset_error: 2},
     {:nowarn_function, apply_single_mutation: 2},
+    {:nowarn_function, maybe_capture_owner: 1},
+    {:nowarn_function, put_promotion_headers: 2},
     {:nowarn_function, format_mutation_error: 1},
     {:nowarn_function, detect_conflict: 1},
     {:nowarn_function, fetch_existing: 2},
@@ -19,8 +21,11 @@ defmodule ChatWeb.ElectricController do
     {:nowarn_function, changeset_errors: 1}
   ]
 
-  alias Chat.Challenge
+  alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Shapes
+  alias Chat.Pq.OwnerBootstrap
+  alias Chat.Pq.WriteGate
+  alias ChatWeb.Utils.IngestPop
   alias ChatWeb.Utils.IngestUtil
   alias Phoenix.Sync.Writer
   alias Phoenix.Sync.Writer.Format
@@ -37,7 +42,7 @@ defmodule ChatWeb.ElectricController do
          {_, true} <- {:is_mutation_list, is_list(mutations)},
          {:ok, mutations} <-
            IngestUtil.decode_mutation_fields(mutations, @hex_suffixes, @base64_suffixes),
-         {:ok, user_pop_context} <- user_pop_context(params),
+         {:ok, user_pop_context} <- IngestPop.context(params),
          {:ok, txid, changes} <-
            Writer.new()
            |> config_writer(user_pop_context)
@@ -45,6 +50,8 @@ defmodule ChatWeb.ElectricController do
              format: Format.TanstackDB,
              timeout: @ingest_timeout
            ) do
+      maybe_capture_owner(changes)
+
       conn
       |> put_promotion_headers(changes)
       |> json(%{txid: txid})
@@ -59,7 +66,7 @@ defmodule ChatWeb.ElectricController do
   def ingest_each(conn, params) do
     with {_, %{"mutations" => mutations}} <- {:correct_params, params},
          {_, true} <- {:is_mutation_list, is_list(mutations)},
-         {:ok, user_pop_context} <- user_pop_context(params) do
+         {:ok, user_pop_context} <- IngestPop.context(params) do
       writer = Writer.new() |> config_writer(user_pop_context)
 
       results =
@@ -67,8 +74,7 @@ defmodule ChatWeb.ElectricController do
         |> IngestUtil.decode_mutation_fields_each(@hex_suffixes, @base64_suffixes)
         |> Enum.map(&apply_single_mutation(writer, &1))
 
-      status = if Enum.all?(results, &(&1.status != "error")), do: 200, else: 422
-      conn |> put_status(status) |> json(%{results: results})
+      conn |> put_status(ingest_each_status(results)) |> json(%{results: results})
     else
       error -> handle_ingest_error(conn, error)
     end
@@ -79,11 +85,12 @@ defmodule ChatWeb.ElectricController do
 
   defp apply_single_mutation(writer, {index, decode_result}) do
     with {:ok, mutation} <- decode_result,
-         {:ok, txid, _changes} <-
+         {:ok, txid, changes} <-
            Writer.apply(writer, [mutation], repo(),
              format: Format.TanstackDB,
              timeout: @ingest_timeout
            ) do
+      maybe_capture_owner(changes)
       %{index: index, status: "ok", txid: txid}
     else
       {:error, _, %Ecto.Changeset{} = changeset, _} = error ->
@@ -103,15 +110,24 @@ defmodule ChatWeb.ElectricController do
     end
   end
 
+  # 403 only when trust gating is the sole reason rows failed, so the client
+  # can hold the whole batch for approval
+  defp ingest_each_status(results) do
+    case Enum.filter(results, &(&1.status == "error")) do
+      [] -> 200
+      failed -> if Enum.all?(failed, &WriteGate.denied?(&1.error)), do: 403, else: 422
+    end
+  end
+
   defp format_mutation_error(error) do
     case error do
+      {:error, _, %Writer.Error{message: msg}, _} when is_binary(msg) ->
+        if WriteGate.denied?(msg), do: WriteGate.denied_body(), else: %{error: msg}
+
       {:error, _, %Ecto.Changeset{} = changeset, _} ->
         if pub_key_unique_conflict?(changeset),
           do: %{error: "pub_key_taken"},
           else: %{error: "validation_failed", details: changeset_errors(changeset)}
-
-      {:error, _, %Writer.Error{message: msg}, _} when is_binary(msg) ->
-        %{error: msg}
 
       {:error, reason} when is_binary(reason) ->
         %{error: reason}
@@ -140,42 +156,21 @@ defmodule ChatWeb.ElectricController do
     end)
   end
 
+  defp maybe_capture_owner(changes) do
+    Enum.each(changes, fn
+      {_key, %UserCard{user_hash: user_hash, sign_pkey: sign_pkey}} ->
+        OwnerBootstrap.maybe_register_owner(user_hash, sign_pkey)
+
+      _ ->
+        :ok
+    end)
+  end
+
   defp config_writer(writer, user_pop_context) do
     Shapes.all()
     |> Enum.reduce(writer, fn shape_mod, w ->
       shape_mod.ingest_configure_writer(w, user_pop_context)
     end)
-  end
-
-  defp user_pop_context(params) do
-    {challenge_id, signature_encoded} = pop_from_body(params)
-
-    with {_, true} <- {:has_auth, is_binary(challenge_id) and is_binary(signature_encoded)},
-         {:ok, challenge} <- fetch_challenge(challenge_id),
-         {:ok, signature} <- decode_signature(signature_encoded) do
-      {:ok, %{challenge: challenge, signature: signature}}
-    else
-      {:has_auth, false} -> {:error, {:unauthorized, "Missing user PoP auth"}}
-      :error -> {:error, {:unauthorized, "Invalid or expired challenge"}}
-    end
-  end
-
-  defp pop_from_body(%{"auth" => %{"challenge_id" => challenge_id, "signature" => signature}})
-       when is_binary(challenge_id) and is_binary(signature) do
-    {challenge_id, signature}
-  end
-
-  defp pop_from_body(_params), do: {nil, nil}
-
-  defp fetch_challenge(challenge_id) do
-    case Challenge.get(challenge_id) do
-      challenge when is_binary(challenge) -> {:ok, challenge}
-      _ -> :error
-    end
-  end
-
-  defp decode_signature(signature_encoded) do
-    Base.decode64(signature_encoded, padding: false)
   end
 
   defp handle_ingest_error(conn, error) do
@@ -200,7 +195,9 @@ defmodule ChatWeb.ElectricController do
         respond_changeset_error(conn, changeset)
 
       {:error, _, %Writer.Error{message: msg}, _} when is_binary(msg) ->
-        send_resp(conn, 400, msg)
+        if WriteGate.denied?(msg),
+          do: conn |> put_status(:forbidden) |> json(WriteGate.denied_body()),
+          else: send_resp(conn, 400, msg)
 
       {:error, reason} when is_binary(reason) ->
         send_resp(conn, 400, reason)
@@ -240,18 +237,18 @@ defmodule ChatWeb.ElectricController do
   end
 
   defp fetch_existing(schema_mod, changeset) do
-    pk_fields = schema_mod.__schema__(:primary_key)
-    pk_pairs = Enum.map(pk_fields, fn f -> {f, Ecto.Changeset.get_field(changeset, f)} end)
+    pk_pairs =
+      schema_mod.__schema__(:primary_key)
+      |> Enum.map(fn f -> {f, Ecto.Changeset.get_field(changeset, f)} end)
 
-    if Enum.all?(pk_pairs, fn {_, nil} -> false; {_, _} -> true end) do
-      case repo().get_by(schema_mod, pk_pairs) do
-        nil -> :error
-        existing -> {:ok, existing}
-      end
-    else
-      :error
+    case Enum.find(pk_pairs, fn {_, v} -> is_nil(v) end) do
+      nil -> repo().get_by(schema_mod, pk_pairs) |> ok_or_error()
+      _ -> :error
     end
   end
+
+  defp ok_or_error(nil), do: :error
+  defp ok_or_error(value), do: {:ok, value}
 
   defp unique_key_conflict?(%Ecto.Changeset{} = changeset) do
     Enum.any?(changeset.errors, fn {_field, {_msg, opts}} ->

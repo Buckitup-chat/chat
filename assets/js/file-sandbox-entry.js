@@ -4,7 +4,7 @@ import {
   signMlDsa87, hash, encryptChunk, decryptChunk,
   buildSignaturePayload
 } from './file-sandbox/crypto.js';
-import { ingest, putChunk, fetchShape, fetchShapeWhere, fetchChunkStatuses } from './file-sandbox/electric-client.js';
+import { ingest, putChunk, fetchShapeWhere, fetchChunkStatuses, openReadSession } from './file-sandbox/electric-client.js';
 import { chunkFile, generateFileId, generateEncSecret } from './file-sandbox/file-chunker.js';
 import { VideoSWStreamer } from './file-sandbox/video-sw-streamer.js';
 import {
@@ -14,13 +14,17 @@ import {
 } from './file-sandbox/content-types.js';
 
 const CHUNK_SIZE = 4_194_304;
-const textEncoder = new TextEncoder();
 
 let state = {
   keys: null,
   baseUrl: window.location.origin,
   uploadedFiles: []
 };
+
+function shapeAuth() {
+  if (!state.keys) return undefined;
+  return { userHash: state.keys.user_hash, signSkey: state.keys.sign_skey, logger: addLogEntry };
+}
 
 // --- UI Initialization ---
 
@@ -75,6 +79,7 @@ async function handleKeyImport() {
       `Loaded: ${identity.name} (${identity.user_hash.slice(0, 18)}...)`;
     document.getElementById('upload-section').classList.remove('hidden');
     document.getElementById('my-files-section').classList.remove('hidden');
+    document.getElementById('download-section').classList.remove('hidden');
     setStatus('Keys imported successfully', 'success');
     loadMyFiles();
   } catch (e) {
@@ -128,8 +133,7 @@ async function handleUpload() {
         size: enc.length,
         uploader_hash: userHash
       };
-      const payloadStr = buildSignaturePayload(signableFields);
-      const payloadBytes = textEncoder.encode(payloadStr);
+      const payloadBytes = buildSignaturePayload(signableFields);
       uploadTiming.sign_payload += performance.now() - t0;
 
       t0 = performance.now();
@@ -193,8 +197,7 @@ async function handleUpload() {
       uploader_hash: userHash
     };
 
-    const manifestPayloadStr = buildSignaturePayload(manifestFields);
-    const manifestPayloadBytes = textEncoder.encode(manifestPayloadStr);
+    const manifestPayloadBytes = buildSignaturePayload(manifestFields);
     const manifestSignB64 = signMlDsa87(manifestPayloadBytes, state.keys.sign_skey);
 
     const manifestMutation = {
@@ -279,7 +282,7 @@ async function buildContentJson(file, fileId, encSecretB64) {
     const meta = await extractVideoMetadata(file);
     contentObj = buildVideoContent(
       meta.widthAspect, meta.heightAspect, meta.thumbHashB64,
-      file.name, file.size, mime, ts, fileId, encSecretB64
+      file.name, file.size, mime, ts, meta.durationSeconds, fileId, encSecretB64
     );
   } else {
     contentObj = buildFileContent(file.name, file.size, mime, ts, fileId, encSecretB64);
@@ -421,14 +424,14 @@ function escapeHtml(str) {
 
 async function fetchManifest(fileId) {
   setStatus('Fetching file manifest...', 'info');
-  const files = await fetchShapeWhere(state.baseUrl, 'files', `file_id = '${fileId}'`);
+  const files = await fetchShapeWhere(state.baseUrl, 'files', `file_id = '${fileId}'`, shapeAuth());
   if (files.length === 0) throw new Error('File manifest not found');
   return files[0];
 }
 
 async function fetchChunkMeta(fileId) {
   setStatus('Fetching chunk metadata...', 'info');
-  const rows = await fetchShapeWhere(state.baseUrl, 'file_chunks', `file_id = '${fileId}'`);
+  const rows = await fetchShapeWhere(state.baseUrl, 'file_chunks', `file_id = '${fileId}'`, shapeAuth());
   return new Map(rows.map(r => [parseInt(r.chunk_index), r]));
 }
 
@@ -438,14 +441,36 @@ function verifyChunkHash(encBytes, expectedDataHash) {
     throw new Error(`Chunk hash mismatch: expected ${expectedDataHash.slice(0, 20)}…, got ${actual.slice(0, 20)}…`);
 }
 
+let chunkReadShape = null;
+
 async function fetchChunk(fileId, index) {
-  const resp = await fetch(`${state.baseUrl}/electric/v1/file_chunk/${fileId}/${index}`);
+  const url = `${state.baseUrl}/electric/v1/file_chunk/${fileId}/${index}`;
+  const auth = shapeAuth();
+
+  let token = (chunkReadShape && auth)
+    ? await openReadSession(state.baseUrl, chunkReadShape, auth.userHash, auth.signSkey, auth.logger)
+    : null;
+
+  const opts = token ? { headers: { 'Authorization': `Bearer ${token}` } } : {};
+  let resp = await fetch(url, opts);
+
+  if (resp.status === 401 && auth) {
+    const errBody = await resp.json().catch(() => ({}));
+    if (errBody.error === 'read_session_required' && errBody.shape) {
+      chunkReadShape = errBody.shape;
+      token = await openReadSession(state.baseUrl, errBody.shape, auth.userHash, auth.signSkey, auth.logger);
+      resp = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+    }
+  }
+
   if (resp.status === 404) throw new Error(`Chunk ${index} not found`);
   if (!resp.ok) throw new Error(`Chunk fetch failed: ${resp.status}`);
   return new Uint8Array(await resp.arrayBuffer());
 }
 
 async function handleDownload() {
+  if (!state.keys) return setStatus('Import identity keys first — required for read access', 'error');
+
   const fileId = document.getElementById('download-file-id').value.trim();
   const encSecretHex = document.getElementById('download-enc-secret').value.trim();
 
@@ -528,6 +553,8 @@ async function handleDownload() {
 let previewBlobUrl = null;
 
 async function handleView() {
+  if (!state.keys) return setStatus('Import identity keys first — required for read access', 'error');
+
   const fileId = document.getElementById('download-file-id').value.trim();
   const encSecretHex = document.getElementById('download-enc-secret').value.trim();
 
@@ -585,6 +612,8 @@ function closePreview() {
 let activeStreamer = null;
 
 async function handlePlayVideo() {
+  if (!state.keys) return setStatus('Import identity keys first — required for read access', 'error');
+
   const fileId = document.getElementById('download-file-id').value.trim();
   const encSecretHex = document.getElementById('download-enc-secret').value.trim();
 
@@ -599,10 +628,7 @@ async function handlePlayVideo() {
     closePreview();
 
     const encSecret = hexToUint8(encSecretHex);
-    const files = await fetchShape(state.baseUrl, 'file', r => r.file_id === fileId);
-    if (files.length === 0) throw new Error('File manifest not found');
-
-    const manifest = files[0];
+    const manifest = await fetchManifest(fileId);
     const chunkCount = parseInt(manifest.chunk_count);
     const totalSize = parseInt(manifest.total_size);
 
@@ -616,7 +642,12 @@ async function handlePlayVideo() {
       chunkSize,
       videoElement,
       baseUrl: state.baseUrl,
-      onStatus(msg, type) { setVideoStatus(msg); setStatus(msg, type); }
+      onStatus(msg, type) { setVideoStatus(msg); setStatus(msg, type); },
+      getAuthToken: async (shape) => {
+        const auth = shapeAuth();
+        if (!auth) return null;
+        return openReadSession(state.baseUrl, shape, auth.userHash, auth.signSkey, auth.logger);
+      }
     });
 
     document.getElementById('video-player').classList.remove('hidden');
@@ -661,14 +692,15 @@ async function loadMyFiles() {
   try {
     const files = await fetchShapeWhere(
       state.baseUrl, 'files',
-      `uploader_hash = '${state.keys.user_hash}'`
+      `uploader_hash = '${state.keys.user_hash}'`,
+      shapeAuth()
     );
     console.log('[My Files] fetched', files.length, 'files:', files);
 
     const activeIds = files.filter(f => !isDeletedFile(f)).map(f => f.file_id);
     let statuses = {};
     try {
-      statuses = await fetchChunkStatuses(state.baseUrl, activeIds);
+      statuses = await fetchChunkStatuses(state.baseUrl, activeIds, shapeAuth());
     } catch (e) {
       console.warn('[My Files] chunk status fetch failed:', e);
     }
@@ -742,7 +774,7 @@ async function handleDeleteFile(fileId) {
   setStatus('Deleting file...', 'info');
 
   try {
-    const files = await fetchShapeWhere(state.baseUrl, 'files', `file_id = '${fileId}'`);
+    const files = await fetchShapeWhere(state.baseUrl, 'files', `file_id = '${fileId}'`, shapeAuth());
     if (files.length === 0) throw new Error('File not found');
 
     const manifest = files[0];
@@ -759,8 +791,7 @@ async function handleDeleteFile(fileId) {
       uploader_hash: state.keys.user_hash
     };
 
-    const payloadStr = buildSignaturePayload(signableFields);
-    const payloadBytes = textEncoder.encode(payloadStr);
+    const payloadBytes = buildSignaturePayload(signableFields);
     const signB64 = signMlDsa87(payloadBytes, state.keys.sign_skey);
 
     const mutation = {

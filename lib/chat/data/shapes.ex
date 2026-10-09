@@ -4,6 +4,7 @@ defmodule Chat.Data.Shapes do
   # order matters
   # UserCard first — it is the FK parent for DialogKeys, File, FileChunk, UserStorage
   @shapes [
+    Chat.Data.Shapes.VouchToken,
     Chat.Data.Shapes.UserCard,
     Chat.Data.Shapes.UserStorage,
     Chat.Data.Shapes.DialogKeys,
@@ -31,7 +32,17 @@ defmodule Chat.Data.Shapes do
 
   @syncable @shapes -- @not_syncable
 
+  @table_shape_names @shapes
+                     |> Enum.flat_map(fn shape ->
+                       [shape.schema_module() | List.wrap(shape.versions_schema())]
+                       |> Enum.map(&{&1.__schema__(:source), shape.shape_name()})
+                     end)
+                     |> Map.new()
+
   def all, do: @shapes
+
+  def by_name(name) when is_binary(name),
+    do: Enum.find(@shapes, &(Atom.to_string(&1.shape_name()) == name))
 
   def by_name(name), do: Enum.find(@shapes, &(&1.shape_name() == name))
 
@@ -56,6 +67,9 @@ defmodule Chat.Data.Shapes do
     sync_schemas()
     |> Enum.map(& &1.__schema__(:source))
   end
+
+  @doc "Shape name owning `table`, as its main table or its versions table. `nil` if none."
+  def shape_name_for_table(table), do: Map.get(@table_shape_names, table)
 
   def module_for_table([_schema, table]), do: module_for_table(table)
 

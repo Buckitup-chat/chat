@@ -1,7 +1,7 @@
 import { uint8ToHex } from './crypto.js';
 
 export class VideoSWStreamer {
-  constructor({ fileId, encSecret, chunkCount, totalSize, chunkSize, videoElement, baseUrl, onStatus }) {
+  constructor({ fileId, encSecret, chunkCount, totalSize, chunkSize, videoElement, baseUrl, onStatus, getAuthToken }) {
     this._fileId = fileId;
     this._encSecret = encSecret;
     this._chunkCount = chunkCount;
@@ -10,7 +10,9 @@ export class VideoSWStreamer {
     this._video = videoElement;
     this._baseUrl = baseUrl;
     this._onStatus = onStatus || (() => {});
+    this._getAuthToken = getAuthToken || (() => Promise.resolve(null));
     this._sessionId = null;
+    this._swMessageHandler = null;
   }
 
   async start() {
@@ -20,16 +22,35 @@ export class VideoSWStreamer {
     }
 
     this._onStatus('Registering service worker...', 'info');
+
+    const controllerReady = navigator.serviceWorker.controller
+      ? Promise.resolve()
+      : new Promise((resolve) => {
+          navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
+        });
+
     await navigator.serviceWorker.register('/video-sw.js', { scope: '/' });
     await navigator.serviceWorker.ready;
-
-    if (!navigator.serviceWorker.controller) {
-      await new Promise((resolve) => {
-        navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
-      });
-    }
+    await controllerReady;
 
     this._sessionId = crypto.randomUUID();
+
+    const authToken = await this._getAuthToken('file_chunk').catch(() => null);
+
+    this._swMessageHandler = (e) => {
+      if (e.data?.type === 'auth_needed' && e.data.sessionId === this._sessionId) {
+        this._getAuthToken('file_chunk')
+          .then((token) => {
+            navigator.serviceWorker.controller?.postMessage({
+              type: 'auth_token',
+              sessionId: this._sessionId,
+              token
+            });
+          })
+          .catch(() => {});
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', this._swMessageHandler);
 
     navigator.serviceWorker.controller.postMessage({
       type: 'register',
@@ -39,7 +60,8 @@ export class VideoSWStreamer {
       chunkCount: this._chunkCount,
       totalSize: this._totalSize,
       chunkSize: this._chunkSize,
-      baseUrl: this._baseUrl
+      baseUrl: this._baseUrl,
+      authToken
     });
 
     this._video.src = `/encrypted-video/${this._sessionId}`;
@@ -47,6 +69,10 @@ export class VideoSWStreamer {
   }
 
   destroy() {
+    if (this._swMessageHandler) {
+      navigator.serviceWorker.removeEventListener('message', this._swMessageHandler);
+      this._swMessageHandler = null;
+    }
     if (this._sessionId && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({
         type: 'unregister',

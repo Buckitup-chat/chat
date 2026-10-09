@@ -27,6 +27,7 @@ defmodule ChatWeb.ProxiedFileController do
          true <- type |> String.contains?("/") do
       size = String.to_integer(size_str)
       range = get_req_header(conn, "range")
+
       case range do
         [] ->
           conn

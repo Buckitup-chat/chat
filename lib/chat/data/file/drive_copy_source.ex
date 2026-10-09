@@ -148,10 +148,25 @@ defmodule Chat.Data.File.DriveCopySource do
   # Helpers
 
   defp log_fetch_result({:ok, _}, file_id, chunk_index, reason, source_dir, _fallback_dir),
-    do: log("#{file_id}:#{chunk_index} primary failed (#{inspect(reason)}, dir: #{inspect(source_dir)}), fallback ok", :info)
+    do:
+      log(
+        "#{file_id}:#{chunk_index} primary failed (#{inspect(reason)}, dir: #{inspect(source_dir)}), fallback ok",
+        :info
+      )
 
-  defp log_fetch_result({:error, fallback_reason}, file_id, chunk_index, reason, source_dir, fallback_dir),
-    do: log("#{file_id}:#{chunk_index} both failed — primary: #{inspect(reason)} (#{inspect(source_dir)}), fallback: #{inspect(fallback_reason)} (#{inspect(fallback_dir)})", :warning)
+  defp log_fetch_result(
+         {:error, fallback_reason},
+         file_id,
+         chunk_index,
+         reason,
+         source_dir,
+         fallback_dir
+       ),
+       do:
+         log(
+           "#{file_id}:#{chunk_index} both failed — primary: #{inspect(reason)} (#{inspect(source_dir)}), fallback: #{inspect(fallback_reason)} (#{inspect(fallback_dir)})",
+           :warning
+         )
 
   defp try_fetch(nil, _file_id, _chunk_index), do: {:error, :no_source}
 

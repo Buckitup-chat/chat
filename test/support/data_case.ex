@@ -29,6 +29,8 @@ defmodule ChatWeb.DataCase do
       Ecto.Adapters.SQL.Sandbox.mode(Chat.Repo, {:shared, self()})
     end
 
+    await_stale_shared_sync_released()
+
     Process.put(:phoenix_sync_validating, true)
     Phoenix.Sync.Sandbox.start!(Chat.Repo, shared: shared?)
     Process.delete(:phoenix_sync_validating)
@@ -36,6 +38,21 @@ defmodule ChatWeb.DataCase do
     ensure_electric_ready()
 
     :ok
+  end
+
+  # StackRegistry clears shared mode on the owner's :DOWN; a dead owner still
+  # registered would hand this test the previous test's stopped stack.
+  defp await_stale_shared_sync_released(attempts \\ 200) do
+    case :sys.get_state(Phoenix.Sync.Sandbox.StackRegistry) do
+      %{shared: {owner, _stack_id}} when attempts > 0 ->
+        unless Process.alive?(owner) do
+          Process.sleep(5)
+          await_stale_shared_sync_released(attempts - 1)
+        end
+
+      _ ->
+        :ok
+    end
   end
 
   @stack_id "electric-embedded"

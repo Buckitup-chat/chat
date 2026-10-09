@@ -6,6 +6,8 @@ const RETRY_BASE_DELAY_MS = 500;
 const sessions = new Map();
 const chunkCache = new Map();
 const cacheOrder = [];
+const authTokens = new Map();
+const pendingAuthRequests = new Map();
 
 // --- IndexedDB session persistence (survives SW termination/restart) ---
 
@@ -70,7 +72,7 @@ async function getSession(sessionId) {
 
 // --- SW lifecycle ---
 
-self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('install', (e) => e.waitUntil(self.skipWaiting()));
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
 // --- Session management ---
@@ -88,10 +90,21 @@ self.addEventListener('message', (e) => {
       baseUrl: e.data.baseUrl
     };
     sessions.set(sessionId, session);
+    if (e.data.authToken) authTokens.set(sessionId, e.data.authToken);
     dbPut(sessionId, session).catch(() => {});
+  } else if (type === 'auth_token') {
+    authTokens.set(sessionId, e.data.token);
+    const pending = pendingAuthRequests.get(sessionId);
+    if (pending) {
+      pendingAuthRequests.delete(sessionId);
+      pending.resolve(e.data.token);
+    }
   } else if (type === 'unregister') {
     sessions.delete(sessionId);
+    authTokens.delete(sessionId);
     dbDelete(sessionId).catch(() => {});
+    const pending = pendingAuthRequests.get(sessionId);
+    if (pending) { pendingAuthRequests.delete(sessionId); pending.reject(new Error('Session unregistered')); }
     for (const key of [...chunkCache.keys()]) {
       if (key.startsWith(sessionId + ':')) {
         chunkCache.delete(key);
@@ -225,7 +238,7 @@ async function getDecryptedChunk(session, sessionId, chunkIdx) {
     return chunkCache.get(key);
   }
 
-  const encrypted = await fetchChunkWithRetry(session.baseUrl, session.fileId, chunkIdx);
+  const encrypted = await fetchChunkWithRetry(session.baseUrl, session.fileId, chunkIdx, sessionId);
   const decrypted = await decryptChunk(encrypted, session.encSecretBytes);
 
   while (cacheOrder.length >= MAX_CACHED_CHUNKS) {
@@ -236,13 +249,54 @@ async function getDecryptedChunk(session, sessionId, chunkIdx) {
   return decrypted;
 }
 
-async function fetchChunkWithRetry(baseUrl, fileId, chunkIndex) {
+async function requestFreshToken(sessionId) {
+  const clients = await self.clients.matchAll({ type: 'window' });
+  if (clients.length === 0) throw new Error('No client available for auth refresh');
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      pendingAuthRequests.delete(sessionId);
+      reject(new Error('Auth token refresh timed out'));
+    }, 15_000);
+
+    pendingAuthRequests.set(sessionId, {
+      resolve: (token) => { clearTimeout(timeout); resolve(token); },
+      reject: (err) => { clearTimeout(timeout); reject(err); }
+    });
+
+    for (const client of clients) {
+      client.postMessage({ type: 'auth_needed', sessionId });
+    }
+  });
+}
+
+async function fetchChunkWithRetry(baseUrl, fileId, chunkIndex, sessionId) {
   const url = `${baseUrl}/electric/v1/file_chunk/${fileId}/${chunkIndex}`;
   let lastError;
 
   for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
     try {
-      const resp = await fetch(url, { cache: 'no-store' });
+      const opts = { cache: 'no-store' };
+      const token = authTokens.get(sessionId);
+      if (token) opts.headers = { 'Authorization': `Bearer ${token}` };
+
+      const resp = await fetch(url, opts);
+
+      if (resp.status === 401) {
+        const errBody = await resp.json().catch(() => ({}));
+        if (errBody.error === 'read_session_required' && errBody.shape) {
+          const freshToken = await requestFreshToken(sessionId);
+          authTokens.set(sessionId, freshToken);
+          const retryResp = await fetch(url, {
+            cache: 'no-store',
+            headers: { 'Authorization': `Bearer ${freshToken}` }
+          });
+          if (retryResp.ok) return new Uint8Array(await retryResp.arrayBuffer());
+          if (retryResp.status === 404) throw new Error(`Chunk ${chunkIndex} not found`);
+          throw new Error(`Chunk fetch failed after auth: ${retryResp.status}`);
+        }
+      }
+
       if (resp.status === 404) throw new Error(`Chunk ${chunkIndex} not found`);
       if (!resp.ok) throw new Error(`Chunk fetch failed: ${resp.status}`);
       return new Uint8Array(await resp.arrayBuffer());

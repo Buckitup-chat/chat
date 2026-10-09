@@ -39,13 +39,13 @@ defmodule ChatWeb.ElectricLive.UserSandboxLiveTest do
       assert html =~ "SHA3-512 hash"
 
       # Toggle to hide
-      html = view |> element("button", "◄") |> render_click()
+      html = view |> element("button[phx-click=toggle_docs]") |> render_click()
       # When hidden, we should see the "Show docs" title on the button
       assert html =~ "title=\"Show docs\""
       refute html =~ "SHA3-512 hash"
 
       # Toggle to show
-      html = view |> element("button", "►") |> render_click()
+      html = view |> element("button[phx-click=toggle_docs]") |> render_click()
       assert html =~ "title=\"Hide docs\""
       assert html =~ "SHA3-512 hash"
     end

@@ -14,18 +14,18 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Entries do
   alias EnigmaPq
 
   def build(reviews, passwords, post_rights, revoke_rights, crypt_skey) do
-    passwords_by_review = Enum.group_by(passwords, & &1.review_hash)
-    post_by_review = Map.new(post_rights, &{&1.review_hash, &1})
-    revoke_by_review = Map.new(revoke_rights, &{&1.review_hash, &1})
+    passwords_by_review = Enum.group_by(passwords, & &1["review_hash"])
+    post_by_review = Map.new(post_rights, &{&1["review_hash"], &1})
+    revoke_by_review = Map.new(revoke_rights, &{&1["review_hash"], &1})
 
     reviews
-    |> Enum.reject(& &1.deleted_flag)
+    |> Enum.reject(&deleted?/1)
     |> Enum.map(fn review ->
       build_entry(
         review,
-        Map.get(passwords_by_review, review.review_hash, []),
-        unwrap_right(post_by_review[review.review_hash], crypt_skey),
-        unwrap_right(revoke_by_review[review.review_hash], crypt_skey)
+        Map.get(passwords_by_review, review["review_hash"], []),
+        unwrap_right(post_by_review[review["review_hash"]], crypt_skey),
+        unwrap_right(revoke_by_review[review["review_hash"]], crypt_skey)
       )
     end)
     |> Enum.sort_by(& &1.owner_timestamp, :desc)
@@ -40,11 +40,11 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Entries do
       password_rows |> available_password(post_right) |> then(&decrypt_content(review, &1))
 
     %{
-      review_hash: review.review_hash,
-      author_hash: review.author_hash,
-      owner_timestamp: review.owner_timestamp,
+      review_hash: review["review_hash"],
+      author_hash: review["author_hash"],
+      owner_timestamp: parse_int(review["owner_timestamp"]),
       state: state(latest),
-      latest_timestamp: latest && latest.owner_timestamp,
+      latest_timestamp: latest && parse_int(latest["owner_timestamp"]),
       post_right: post_right,
       revoke_right: revoke_right,
       password_source: password_source(password_rows, post_right),
@@ -57,19 +57,22 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Entries do
   end
 
   defp latest_row([]), do: nil
-  defp latest_row(rows), do: Enum.max_by(rows, & &1.owner_timestamp)
+  defp latest_row(rows), do: Enum.max_by(rows, &parse_int(&1["owner_timestamp"]))
 
   defp state(nil), do: :pending
-  defp state(%{password_b64: nil}), do: :hidden
-  defp state(_latest), do: :public
+
+  defp state(latest) do
+    if latest["password_b64"] in [nil, ""], do: :hidden, else: :public
+  end
 
   # Visibility is LWW by owner_timestamp: submitting a pre-signed row only
   # changes what the public sees when its timestamp beats the current latest.
   defp supersedes?(%{status: :ok, owner_timestamp: ts}, nil) when is_integer(ts), do: true
 
-  defp supersedes?(%{status: :ok, owner_timestamp: ts}, %{owner_timestamp: latest_ts})
-       when is_integer(ts) and is_integer(latest_ts),
-       do: ts > latest_ts
+  defp supersedes?(%{status: :ok, owner_timestamp: ts}, latest)
+       when is_integer(ts) and is_map(latest) do
+    parse_int(latest["owner_timestamp"]) < ts
+  end
 
   defp supersedes?(_right, _latest), do: false
 
@@ -85,13 +88,13 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Entries do
 
   defp available_password(password_rows, post_right) do
     case newest_password_row(password_rows) do
-      %{password_b64: password} -> Crypto.decode_binary_field(password)
+      %{"password_b64" => password} -> Crypto.decode_binary_field(password)
       nil -> right_password(post_right)
     end
   end
 
   defp newest_password_row(password_rows) do
-    password_rows |> Enum.filter(&is_binary(&1.password_b64)) |> latest_row()
+    password_rows |> Enum.filter(&is_binary(&1["password_b64"])) |> latest_row()
   end
 
   defp right_password(%{status: :ok, row: %{"password_b64" => password}})
@@ -106,13 +109,13 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Entries do
 
   defp unwrap_right(right, crypt_skey) do
     shared_secret =
-      right.kem_ciphertext_b64
+      right["kem_ciphertext_b64"]
       |> Crypto.decode_binary_field()
       |> EnigmaPq.decapsulate_secret(crypt_skey)
 
     wrap_key = ReviewRightEnvelope.wrap_key(shared_secret)
 
-    right.wrapped_row_b64
+    right["wrapped_row_b64"]
     |> Crypto.decode_binary_field()
     |> EnigmaPq.aes_gcm_decrypt(wrap_key)
     |> Jason.decode!()
@@ -128,9 +131,14 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Entries do
   defp decrypt_content(_review, nil), do: %{rating: nil, text: nil, error: :no_password}
 
   defp decrypt_content(review, password) do
-    case ReviewContent.decode(review.content_b64, password) do
+    case ReviewContent.decode(review["content_b64"], password) do
       {:ok, decoded} -> Map.put(decoded, :error, nil)
       :error -> %{rating: nil, text: nil, error: :undecryptable}
     end
   end
+
+  defp deleted?(row), do: row["deleted_flag"] in [true, "true", "t"]
+
+  defp parse_int(v) when is_integer(v), do: v
+  defp parse_int(v) when is_binary(v), do: String.to_integer(v)
 end

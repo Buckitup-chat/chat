@@ -9,6 +9,7 @@ defmodule Chat.Data.Shapes.DialogMessages do
   alias Chat.Data.Schemas.DialogMessage
   alias Chat.Data.Schemas.DialogMessageVersion
   alias Chat.Data.Types.DialogMessageSignHash
+  alias Chat.Pq.WriteGate
   alias EnigmaPq
   alias Phoenix.Sync.Writer
 
@@ -91,7 +92,10 @@ defmodule Chat.Data.Shapes.DialogMessages do
   def ingest_configure_writer(writer, user_pop_context) do
     Writer.allow(writer, DialogMessage,
       accept: [:insert, :update],
-      check: &Validation.message_allowed(&1, user_pop_context),
+      check:
+        WriteGate.and_gate(&Validation.message_allowed(&1, user_pop_context), :dialog_messages,
+          owner: "sender_hash"
+        ),
       validate: &Validation.message_validate_with_versioning/3,
       insert: [
         pre_apply: &Validation.message_pre_apply_versioning/3

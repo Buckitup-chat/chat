@@ -31,9 +31,17 @@ Any new signable schema that omits `deleted_flag` must document its reason here.
 
 ### Canonical serialization
 
-The signature payload is the concatenation of string representations of all fields (except `sign_b64` itself and any field derived from it, such as `sign_hash`), sorted in lexicographical order by column name. No delimiters — the same record must produce the same payload on backend and frontend.
+The signature payload is built from all fields (except `sign_b64` itself and any field derived from it, such as `sign_hash`), sorted in lexicographical order by column name. Each field is **length-framed**: its string-encoded value is preceded by a 4-byte unsigned big-endian length (`u32be`). The payload is a raw binary, not a UTF-8 string.
 
-Per-type encoding:
+```
+payload = for each field (sorted by key):
+            encoded = string_encode(value)    # per-type rules below
+            u32be(byte_size(encoded)) || encoded
+```
+
+This framing makes the serialization **injective**: distinct field values always produce distinct payloads, regardless of how field boundaries align. Without it, adjacent variable-length fields (e.g. `name` + `owner_timestamp`) can be shifted to produce the same concatenated bytes — a collision that lets an attacker reuse someone else's signature on forged field values.
+
+Per-type encoding (applied before length-framing):
 
 | Column type | Encoding |
 |---|---|
@@ -63,6 +71,7 @@ Trust bootstrap:
 - **Storage row integrity**: [pq_user_storage.done.md §3.1 / §5.2](../reqs/pq_user_storage.done.md) (`sign_hash`, `sign_b64`)
 - **Table layout**: [SCHEMAS.md](../dev/SCHEMAS.md) — `user_cards` is the canonical example; `sign_b64`, `owner_timestamp`, `deleted_flag` all listed as `NOT NULL`.
 - **Reference schema modules**: `Chat.Data.Schemas.UserCard`, `Chat.Data.Schemas.File`, `Chat.Data.Schemas.FileChunk` — `Signable` impl drops only `sign_b64` (and derived fields like `sign_hash`) and `__meta__`, so every other field is covered by the signature.
+- **Cross-implementation conformance vectors**: [`test/fixtures/pq_conformance_vectors.json`](../../../test/fixtures/pq_conformance_vectors.json) — pins byte-exact payloads and hash constructions that both backend and frontend must agree on. See [SCHEMAS.md — Conformance Vectors](../dev/SCHEMAS.md#conformance-vectors).
 - **Verification primitive**: `Chat.Data.Integrity.verify_signature/1` (protocol-driven, same for every signable schema).
 - **Where verification runs**: each shape module's `ingest_configure_writer/2` (the `Chat.Data.Shapes.Shape` behaviour, `lib/chat/data/shapes/shape.ex`) passes a model-specific 3-arity `validate` function — e.g. `Chat.Data.User.Validation.user_card_validate/3`, `Chat.Data.File.Validation.file_chunk_validate/3` — as the `:validate` option to `Phoenix.Sync.Writer.allow/4`; that function calls `Integrity.verify_signature/1` (via the shared `validate_signature/1` helper) plus timestamp-monotonicity checks. [Electric_Abstraction_Layer.md](../electric/Electric_Abstraction_Layer.md) records the original design intent behind this layering (its `authorize/2`/`validate/3`/`apply/3` sketch was never implemented verbatim — see that doc's "Current Implementation" section for what was actually built).
 

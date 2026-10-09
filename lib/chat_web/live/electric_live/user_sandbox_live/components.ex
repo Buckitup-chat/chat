@@ -79,63 +79,63 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Components do
         </button>
       </div>
       <%= if @show_log do %>
-      <div class="px-4 pb-4">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="font-bold text-gray-900">Request Log</h3>
-          <%= if length(@request_log) > 0 do %>
-            <button phx-click="clear_log" class="text-sm text-gray-600 hover:text-gray-900">
-              Clear
-            </button>
+        <div class="px-4 pb-4">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="font-bold text-gray-900">Request Log</h3>
+            <%= if length(@request_log) > 0 do %>
+              <button phx-click="clear_log" class="text-sm text-gray-600 hover:text-gray-900">
+                Clear
+              </button>
+            <% end %>
+          </div>
+
+          <%= if length(@request_log) == 0 do %>
+            <p class="text-sm text-gray-500 italic">No requests yet</p>
+          <% else %>
+            <%= for log_entry <- Enum.reverse(@request_log) do %>
+              <div class="mb-4 bg-white p-3 rounded shadow-sm">
+                <div class="flex justify-between items-start mb-2">
+                  <span class="font-mono text-sm font-bold text-gray-900">
+                    {log_entry.method} {URI.parse(log_entry.url).path}
+                  </span>
+                  <span class={"text-xs px-2 py-1 rounded #{status_color(log_entry.response_status)}"}>
+                    {log_entry.response_status}
+                  </span>
+                </div>
+
+                <details class="text-xs">
+                  <summary class="cursor-pointer text-gray-600 hover:text-gray-900">
+                    Request Headers
+                  </summary>
+                  <pre class="mt-1 bg-gray-100 p-2 rounded overflow-x-auto"><%= format_headers(log_entry.request_headers) %></pre>
+                </details>
+
+                <details class="text-xs mt-1">
+                  <summary class="cursor-pointer text-gray-600 hover:text-gray-900">
+                    Request Body
+                  </summary>
+                  <pre class="mt-1 bg-gray-100 p-2 rounded overflow-x-auto"><%= log_entry.request_body %></pre>
+                </details>
+
+                <details class="text-xs mt-1">
+                  <summary class="cursor-pointer text-gray-600 hover:text-gray-900">
+                    Response Headers
+                  </summary>
+                  <pre class="mt-1 bg-gray-100 p-2 rounded overflow-x-auto"><%= format_headers(log_entry.response_headers) %></pre>
+                </details>
+
+                <details class="text-xs mt-1">
+                  <summary class="cursor-pointer text-gray-600 hover:text-gray-900">
+                    Response Body
+                  </summary>
+                  <pre class="mt-1 bg-gray-100 p-2 rounded overflow-x-auto"><%= log_entry.response_body %></pre>
+                </details>
+
+                <p class="text-xs text-gray-500 mt-2">{format_timestamp(log_entry.timestamp)}</p>
+              </div>
+            <% end %>
           <% end %>
         </div>
-
-        <%= if length(@request_log) == 0 do %>
-          <p class="text-sm text-gray-500 italic">No requests yet</p>
-        <% else %>
-          <%= for log_entry <- Enum.reverse(@request_log) do %>
-            <div class="mb-4 bg-white p-3 rounded shadow-sm">
-              <div class="flex justify-between items-start mb-2">
-                <span class="font-mono text-sm font-bold text-gray-900">
-                  {log_entry.method} {URI.parse(log_entry.url).path}
-                </span>
-                <span class={"text-xs px-2 py-1 rounded #{status_color(log_entry.response_status)}"}>
-                  {log_entry.response_status}
-                </span>
-              </div>
-
-              <details class="text-xs">
-                <summary class="cursor-pointer text-gray-600 hover:text-gray-900">
-                  Request Headers
-                </summary>
-                <pre class="mt-1 bg-gray-100 p-2 rounded overflow-x-auto"><%= format_headers(log_entry.request_headers) %></pre>
-              </details>
-
-              <details class="text-xs mt-1">
-                <summary class="cursor-pointer text-gray-600 hover:text-gray-900">
-                  Request Body
-                </summary>
-                <pre class="mt-1 bg-gray-100 p-2 rounded overflow-x-auto"><%= log_entry.request_body %></pre>
-              </details>
-
-              <details class="text-xs mt-1">
-                <summary class="cursor-pointer text-gray-600 hover:text-gray-900">
-                  Response Headers
-                </summary>
-                <pre class="mt-1 bg-gray-100 p-2 rounded overflow-x-auto"><%= format_headers(log_entry.response_headers) %></pre>
-              </details>
-
-              <details class="text-xs mt-1">
-                <summary class="cursor-pointer text-gray-600 hover:text-gray-900">
-                  Response Body
-                </summary>
-                <pre class="mt-1 bg-gray-100 p-2 rounded overflow-x-auto"><%= log_entry.response_body %></pre>
-              </details>
-
-              <p class="text-xs text-gray-500 mt-2">{format_timestamp(log_entry.timestamp)}</p>
-            </div>
-          <% end %>
-        <% end %>
-      </div>
       <% end %>
     </aside>
     """
@@ -265,5 +265,4 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Components do
     </div>
     """
   end
-
 end

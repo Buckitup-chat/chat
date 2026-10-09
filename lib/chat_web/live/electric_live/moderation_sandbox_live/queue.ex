@@ -6,31 +6,26 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Queue do
   origin and hands them to `Entries` for decryption and classification.
   """
 
-  alias Chat.Data.Schemas.Origin
-  alias Chat.Data.Schemas.Review
-  alias Chat.Data.Schemas.ReviewPostRight
-  alias Chat.Data.Schemas.ReviewPublicPassword
-  alias Chat.Data.Schemas.ReviewRevokeRight
-  alias Chat.Data.Schemas.UserCard
   alias ChatWeb.ElectricLive.ModerationSandboxLive.Entries
-  alias ChatWeb.ElectricLive.ShapeReader
+  alias ChatWeb.ElectricLive.SandboxHttp
 
   @doc "Origin row and its user_cards row — used to verify the imported identity."
-  def fetch_origin_context(origin_hash, base_url) do
-    client = client(base_url)
-
+  def fetch_origin_context(origin_hash, base_url, auth) do
     %{
-      origin: client |> rows("origins", Origin, origin_hash) |> List.first(),
-      card: client |> rows("user_cards", UserCard, origin_hash, "user_hash") |> List.first()
+      origin:
+        case fetch_first(base_url, "origins", "origin_hash='#{origin_hash}'", auth) do
+          nil -> nil
+          row -> parse_origin(row)
+        end,
+      card: fetch_first(base_url, "user_cards", "user_hash='#{origin_hash}'", auth)
     }
   end
 
-  def load(origin_hash, crypt_skey, base_url) do
-    client = client(base_url)
-    reviews = rows(client, "review", Review, origin_hash)
-    passwords = rows(client, "review_public_passwords", ReviewPublicPassword, origin_hash)
-    post_rights = rows(client, "review_post_right", ReviewPostRight, origin_hash)
-    revoke_rights = rows(client, "review_revoke_right", ReviewRevokeRight, origin_hash)
+  def load(origin_hash, crypt_skey, base_url, auth) do
+    reviews = fetch_rows(base_url, "review", origin_hash, auth)
+    passwords = fetch_rows(base_url, "review_public_passwords", origin_hash, auth)
+    post_rights = fetch_rows(base_url, "review_post_right", origin_hash, auth)
+    revoke_rights = fetch_rows(base_url, "review_revoke_right", origin_hash, auth)
 
     %{
       entries: Entries.build(reviews, passwords, post_rights, revoke_rights, crypt_skey),
@@ -45,18 +40,25 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Queue do
 
   # --- Private ---
 
-  defp client(base_url) do
-    Electric.Client.new!(endpoint: base_url <> "/electric/v1/shapes")
+  defp fetch_rows(base_url, table, origin_hash, auth) do
+    case SandboxHttp.fetch_shape_gated(base_url, table, "origin_hash='#{origin_hash}'", auth) do
+      {:ok, rows, _logs} -> rows
+      {:error, _reason, _logs} -> []
+    end
   end
 
-  defp rows(client, table, schema, hash, column \\ "origin_hash") do
-    shape =
-      Electric.Client.ShapeDefinition.new!(table,
-        where: "#{column} = $1",
-        params: [hash],
-        parser: {Electric.Client.EctoAdapter, schema}
-      )
+  defp fetch_first(base_url, table, where, auth) do
+    case SandboxHttp.fetch_shape_gated(base_url, table, where, auth) do
+      {:ok, [row | _], _logs} -> row
+      _ -> nil
+    end
+  end
 
-    ShapeReader.collect(client, shape)
+  defp parse_origin(row) do
+    %{
+      name: row["name"],
+      moderation_mode: row["moderation_mode"],
+      deleted_flag: row["deleted_flag"] in [true, "true", "t"]
+    }
   end
 end

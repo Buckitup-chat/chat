@@ -7,6 +7,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Router do
   import Phoenix.LiveView, only: [consume_uploaded_entries: 3]
 
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
+  alias ChatWeb.ElectricLive.IdentityCheck
   alias ChatWeb.ElectricLive.ReviewSandboxLive.ApiClient
   alias ChatWeb.ElectricLive.ReviewSandboxLive.Contacts
   alias ChatWeb.ElectricLive.ReviewSandboxLive.ReviewList
@@ -25,7 +26,10 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Router do
 
     case Crypto.parse_and_validate_identity(result) do
       {:ok, user_data} ->
-        socket |> load_author(user_data) |> noreply()
+        user_data
+        |> IdentityCheck.mark_on_server(public_url(socket))
+        |> then(&load_author(socket, &1))
+        |> noreply()
 
       {:error, reason} ->
         socket |> assign(error_message: "Import failed: #{reason}") |> noreply()
@@ -98,7 +102,9 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Router do
     rating = String.to_integer(raw_rating)
     text = Map.get(params, "content", "")
 
-    case concurrent_edit(review, url(socket)) do
+    auth = %{user_hash: author.user_hash, sign_skey: author.sign_skey}
+
+    case concurrent_edit(review, url(socket), auth) do
       nil -> socket |> apply_edit(author, review, rating, text) |> noreply()
       reason -> socket |> assign(error_message: reason) |> noreply()
     end
@@ -147,7 +153,9 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Router do
   # --- Step 5: review list ---
 
   def handle_event("load_review_list_proofs", _params, socket) do
-    observed = ReviewList.load_proofs(socket.assigns.review, url(socket))
+    author = socket.assigns.author
+    auth = %{user_hash: author.user_hash, sign_skey: author.sign_skey}
+    observed = ReviewList.load_proofs(socket.assigns.review, url(socket), auth)
     socket |> assign(observed_proofs: observed) |> adopt_proofs(observed) |> noreply()
   end
 
@@ -206,8 +214,8 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Router do
   # The shape lags Postgres, so a tip that still matches proves nothing about a
   # write in flight — the server re-checks parent_sign_hash either way. This only
   # spares the author a round trip when the divergence is already visible.
-  defp concurrent_edit(review, base_url) do
-    case ReviewLoader.current_sign_hash(review.review_hash, base_url) do
+  defp concurrent_edit(review, base_url, auth) do
+    case ReviewLoader.current_sign_hash(review.review_hash, base_url, auth) do
       {:ok, hash} when hash == review.sign_hash -> nil
       {:ok, _other} -> "Review was modified elsewhere — reselect the origin before editing"
       {:error, _reason} -> "Could not read the current review version — try again"

@@ -15,6 +15,8 @@ defmodule ChatWeb.FileChunkStatusController do
     end
   end
 
+  def options(conn, _params), do: send_resp(conn, 204, "")
+
   defp parse_file_ids(file_ids_str) do
     file_ids_str
     |> String.split(",", trim: true)

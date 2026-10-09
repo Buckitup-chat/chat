@@ -9,6 +9,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Render do
   import ChatWeb.ElectricLive.ReviewSandboxLive.RenderVerification
 
   alias Chat.Proto.Shortcode
+  alias ChatWeb.ElectricLive.Components
 
   def render_page(assigns) do
     ~H"""
@@ -67,6 +68,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Render do
           </span>
           <span class="text-gray-500">({@author.name})</span>
         </div>
+        <Components.identity_not_on_server identity={@author} />
       <% else %>
         <form phx-change="validate_key_file" phx-submit="import_keys" class="flex items-center gap-4">
           <.live_file_input upload={@uploads.key_file} class="text-sm" />

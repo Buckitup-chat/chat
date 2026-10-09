@@ -39,33 +39,31 @@ So the relay needs availability, not trust.
 
 ## Architecture
 
-Two parts, on the host that serves the chat backend.
+Two parts, both inside chat, the same on `buckitup.xyz`, on a BuckitUp device
+and on a local instance.
 
-1. **Credential endpoint**, in the chat release: `POST
-   /electric/v1/turn_credentials`, authenticated by proof of possession
-   (§ Endpoint).
-2. **The relay**, built on ProcessOne's `stun` library (hex `stun`). It
-   checks the credentials of § Credentials itself, with the secret the
-   endpoint signs them with; it never calls the endpoint.
-   - **On `buckitup.xyz`:** its own release on the same host, not inside the
-     chat BEAM. Every allocation holds a UDP port and a process, and a relay
-     under load must not take the chat release's file descriptors and
-     schedulers with it.
-   - **On a BuckitUp device:** inside chat (§ On a BuckitUp device).
+1. **Credential endpoint:** `POST /electric/v1/turn_credentials`,
+   authenticated by proof of possession (§ Endpoint).
+2. **The relay:** listeners of ProcessOne's `stun` library (hex `stun`) under
+   chat's supervision tree. It checks the credentials of § Credentials itself,
+   with the secret the endpoint signs them with.
+   - Every allocation holds a UDP port and a process in chat's BEAM. The
+     relay port range caps them, so chat's file-descriptor limit is set above
+     its own needs plus the range.
 
 ### Why the `stun` library, and what it needs around it
 
-- **It covers the transports:** UDP, TCP and TLS listeners. Networks that
-  block UDP need TLS, and mobile networks are where the relay matters.
+- **It covers the transports:** UDP and TCP listeners (and TLS, unused
+  here — § The relay). Networks that block UDP need TCP.
 - **It is maintained:** 1.2.23 is from August 2026. ProcessOne ships it in
   ejabberd and builds eturnal, a standalone TURN server, on it.
 - **It has the hooks this needs:**
   - `auth_fun`, for credentials of our own format;
   - peer black- and whitelists per listener;
   - `turn_max_allocations` and `turn_max_permissions`.
-- **It is Erlang, not C.** TLS goes through `fast_tls`, so OpenSSL; check
-  that `fast_tls` builds for the Raspberry Pi target (aarch64) before relying
-  on it. ejabberd runs there.
+- **It is Erlang, not C,** but it depends on `fast_tls`, an OpenSSL NIF, even
+  with no TLS listener: check that it builds for the Raspberry Pi target
+  (aarch64) before relying on it. ejabberd runs there.
 
 Rel (`elixir-webrtc/rel`) is UDP-only and has had no commit since April 2024.
 
@@ -77,16 +75,18 @@ Rel (`elixir-webrtc/rel`) is UDP-only and has had no commit since April 2024.
 | Checks a request's peer addresses as a set: one whitelisted address lets every blacklisted one in the same request through | A patch that checks each address on its own, offered upstream. Until it lands, no deployment sets a whitelist |
 | Matches an IPv4 peer against a `::ffff:0:0/96` entry as if it were mapped, so that entry blocks every IPv4 peer | The entry is never listed. The relay allocates IPv4 only, and an IPv6 peer, mapped or not, fails its family check |
 | `{expired, Pass}` from `auth_fun` only stops a new Allocate; Refresh, CreatePermission and ChannelBind still pass | `auth_fun` refuses an expired credential outright. An allocation then ends within the lifetime last granted to it |
-| The `shaper` limits only TCP and TLS clients, never UDP or relayed traffic | Per-source rate limits in the host firewall (nftables) on UDP 3478 and the relay port range |
-| No global cap on allocations | The relay port range is the cap; the endpoint's per-address issue limit and, on the server, the separate release keep an exhausted relay from reaching chat |
+| The `shaper` limits only TCP clients, never UDP or relayed traffic | Per-source rate limits in the host firewall (nftables) on 3478 and the relay port range |
+| No global cap on allocations | The relay port range is the cap, with the endpoint's per-address issue limit in front of it |
 
 ---
 
 ## Credentials
 
 The scheme is *A REST API For Access To TURN Services*
-(draft-uberti-rtcweb-turn-rest-00 §2.2): the relay's `auth_fun` checks it, and
-coturn's `use-auth-secret` and eturnal implement the same.
+(draft-uberti-rtcweb-turn-rest-00 §2.2): the relay's `auth_fun` checks it.
+`TURN_SECRET` is 32 random bytes chat generates at start and keeps in memory:
+the endpoint and the relay are one release, so there is nothing to configure,
+and a restart drops the allocations and the credentials together.
 
 ```
 username   = "<expiry_unix_seconds>:<tag>"
@@ -145,12 +145,12 @@ POST /electric/v1/turn_credentials      {user_hash, challenge_id, signature}
 
    ```json
    ["turn:buckitup.xyz:3478?transport=udp",
-    "turns:buckitup.xyz:5349?transport=tcp"]
+    "turn:buckitup.xyz:3478?transport=tcp"]
    ```
 
    **Two URIs, not more.** The browser allocates a relay on every URI it is
    given, a phone's code carries at most two relay addresses, and a slow or
-   blocked transport holds up address gathering. UDP is the fast path; TLS
+   blocked transport holds up address gathering. UDP is the fast path; TCP
    reaches networks that block UDP.
 
 **Not chain-gated, in any mode.** A new user's first optical handshake is how
@@ -169,8 +169,8 @@ that proxy. The default is lenient because carrier-grade NAT puts many phones
 behind one address; what bounds a determined abuser is the relay's port range
 and the host firewall's rate limits (§ The relay).
 
-**`503 turn_unavailable`** when `TURN_SECRET` is not set: a server that runs no
-relay. The client proceeds with its own addresses only, which is all a shared
+**`503 turn_unavailable`** when the relay is not running: a server with no
+`TURN_PUBLIC_IP` set runs none. The client proceeds with its own addresses only, which is all a shared
 network without client isolation needs.
 
 Routing: in the `/electric/v1` scope next to `/challenge`, **outside**
@@ -184,26 +184,27 @@ database it cannot reach is `503 turn_unavailable`, the documented body.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `TURN_SECRET` | unset → `503` | The HMAC key of § Credentials. The endpoint and the relay release each read it; the endpoint needs no relay in its own release, so eturnal or coturn can stand in |
-| `TURN_URIS` | unset → `503` | Comma-separated list returned as `uris` |
+| `TURN_PUBLIC_IP` | unset → no relay, `503` | `turn_ipv4_address`: the address relays are given out under |
+| `TURN_URIS` | the UDP and TCP URIs of `TURN_PUBLIC_IP` | Comma-separated list returned as `uris`, for a host whose name the clients use |
 | `TURN_TTL_SECONDS` | `600` | Credential lifetime. A client renews when less than 150 s remain, so a session never outlives its credential |
 | `TURN_RATE_PER_IP_HOUR` | `60` | Issues per client IP per hour |
-| `TURN_PUBLIC_IP` | required by the relay | `turn_ipv4_address`: the address relays are given out under |
-| `TURN_CERTFILE` | required for TLS | The relay's PEM: private key and chain |
 
-The secret lives where `SECRET_KEY_BASE` does: the deploy environment, never
-the repository. A device sets none of these (§ On a BuckitUp device).
+A device sets none of these (§ On a BuckitUp device).
 
 ---
 
 ## The relay
 
-On the server, a release of its own around the `stun` library, with two
-listeners and `use_turn`:
-- **UDP** on 3478;
-- **TLS** on 5349: `tls: true`, and `certfile` one PEM holding the private key
-  and the chain. The library passes only `certfile` to `fast_tls`, so the key
-  must be in it.
+On the server, two `stun` listeners with `use_turn`, both on 3478:
+- **UDP**;
+- **TCP**, for networks that block UDP.
+
+**No TLS.** It would add nothing the channel needs: DTLS runs end to end
+between the phones, and the credential is an HMAC the relay checks, never sent
+in clear. It would cost a certificate the relay can read — on `buckitup.xyz`
+the reverse proxy holds Let's Encrypt's, and a device has a year-long one of
+its own. What TLS alone would reach is a network that lets only TLS on 443
+through (Open question 1).
 
 **`auth_fun(User, Realm)`** answers the credential or `<<"">>`, and never
 raises — it runs inside the listener for every client:
@@ -225,7 +226,7 @@ raises — it runs inside the listener for every client:
   addresses together, repeats included, and a peer's code carries up to six;
   a tight limit breaks a permission refresh.
 
-**The host firewall** rate-limits each source on UDP 3478 and the relay port
+**The host firewall** rate-limits each source on 3478 and the relay port
 range — the bandwidth the library does not shape. A handshake moves about
 15 KB, a card and an ML-DSA signature each way.
 
@@ -270,31 +271,21 @@ check first. No `::ffff:0:0/96` entry in any case (§ Why the `stun` library).
     LAN address and `127.0.0.1` passes. Until then a device relays to public
     addresses only.
 
-**Firewall** on the server: open UDP 3478, TCP 5349 and the relay port range.
-
-**Certificate.** On staging the chat release runs behind a reverse proxy and
-holds no certificate, and certbot's `live/` directory is root-only. A certbot
-deploy hook writes the key and chain into one PEM readable by the relay's user,
-and restarts the relay's TLS listener, which drops `fast_tls`'s cached context.
-Without it TLS is silently off, and networks that block UDP get no relay.
+**Firewall** on the server: open UDP and TCP 3478 and the relay port range.
+The reverse proxy is not in the path: TURN goes to chat's listeners directly.
 
 **Logs:** the log names only the random `tag` from the credential, never a
 `user_hash`.
 
 ### On a BuckitUp device
 
-The relay runs inside chat. A device runs one release, the platform's, with
-chat in it; chat starts the relay's listeners under its own supervision tree.
-A LAN's load is a handful of phones, and the port range still caps it.
+The same relay in chat, with what differs on a LAN:
 
 - **Listeners:** one UDP listener on 3478 per LAN interface — `wlan0`,
   `eth0`, `usb0`, never ZeroTier — bound to the device's address there, with
   that address as its `turn_ipv4_address`. A phone gets a relay address on
-  the network it reached the device on. No TLS listener: a LAN does not block
-  UDP, and the device holds no certificate for these addresses.
-- **Secret:** chat generates `TURN_SECRET` at start and keeps it in memory.
-  The endpoint and the relay are one release, so there is nothing to
-  configure; a restart drops the allocations and the credentials together.
+  the network it reached the device on. No TCP listener: a LAN does not block
+  UDP.
 - **`uris`:** the endpoint answers one URI, the relay on the address the
   request arrived at — `turn:192.168.25.1:3478?transport=udp` for a phone on
   the device's Wi-Fi. The phone reached chat there, so it reaches the relay
@@ -321,7 +312,7 @@ A LAN's load is a handful of phones, and the port range still caps it.
 - **Credential function:** the test vector above. The username carries a
   future expiry and a 32-hex tag, and two issues never share a tag.
 - **Controller:** each error row of § Endpoint. A valid PoP returns the
-  configured `uris`. With `TURN_SECRET` unset the answer is `503`, and in
+  configured `uris`. With `TURN_PUBLIC_IP` unset the answer is `503`, and in
   `trust` mode an identity with no vouch still gets credentials.
 - **Rate limit:** the 61st issue from one IP in an hour is `429` with
   `retry_after`; another IP is unaffected; an expired entry is swept.
@@ -368,8 +359,8 @@ A LAN's load is a handful of phones, and the port range still caps it.
 - On a BuckitUp device, with no relay configuration on it: a phone on its
   Wi-Fi `BuckitUp.app` and a phone on its wired side confirm through the
   relay, in both `eth0` profiles.
-- `turns:buckitup.xyz:5349` completes a TLS allocation after a certificate
-  renewal.
+- From a network that blocks UDP, `turn:buckitup.xyz:3478?transport=tcp`
+  completes an allocation and the handshake confirms.
 
 ---
 
@@ -379,9 +370,10 @@ Proposed.
 
 ## Open questions
 
-1. **TURN over TLS on port 443.** Some networks allow only 443. Sharing it
-   with Phoenix takes an ALPN multiplexer in front of both; deferred until a
-   network that needs it shows up.
+1. **TURN over TLS on port 443.** Some networks let only TLS on 443 through.
+   It takes a certificate the relay can read and an ALPN multiplexer sharing
+   443 with the reverse proxy; deferred until a network that needs it shows
+   up.
 2. **IPv6 relay addresses**, when the host has IPv6: whether to relay over
    IPv6 at all, and the client's limit of two IPv6 addresses per code.
 3. **Nodes on the internet.** Whether a node with a public address runs a

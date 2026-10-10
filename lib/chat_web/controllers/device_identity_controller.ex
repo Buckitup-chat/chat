@@ -1,5 +1,5 @@
 defmodule ChatWeb.DeviceIdentityController do
-  @moduledoc "Returns the device identity: device_id, server and admin user hashes and public keys."
+  @moduledoc "Returns the device identity: device_id, sync_bot and admin user hashes and public keys."
 
   use ChatWeb, :controller
 
@@ -10,12 +10,12 @@ defmodule ChatWeb.DeviceIdentityController do
   def show(conn, _params) do
     json(conn, %{
       device_id: DeviceId.id(),
-      server: server_identity(),
+      sync_bot: sync_bot_identity(),
       admin: admin_identity()
     })
   end
 
-  defp server_identity do
+  defp sync_bot_identity do
     %{sign_pkey: sign_pkey} = ServerIdentity.get()
 
     %{

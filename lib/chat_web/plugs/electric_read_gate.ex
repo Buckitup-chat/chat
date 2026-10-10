@@ -20,13 +20,19 @@ defmodule ChatWeb.Plugs.ElectricReadGate do
 
   def init(opts), do: opts
 
+  @exempt_shapes [:user_card, :vouch_token]
+
   def call(conn, opts) do
     if ReadGate.enforced?() do
       {conn, shape} = requested_shape(conn, opts)
 
-      case conn |> bearer_token() |> ReadSession.lookup() do
-        {:ok, %{shape: ^shape}} -> register_before_send(conn, &make_private/1)
-        _ -> reject(conn, shape)
+      if shape in @exempt_shapes do
+        conn
+      else
+        case conn |> bearer_token() |> ReadSession.lookup() do
+          {:ok, %{shape: ^shape}} -> register_before_send(conn, &make_private/1)
+          _ -> reject(conn, shape)
+        end
       end
     else
       conn

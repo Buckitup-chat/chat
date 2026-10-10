@@ -217,6 +217,7 @@ defmodule ChatWeb.Router do
     # Always accessible — status probe and challenge generation don't need Electric
     get "/status", ElectricStatusController, :show
     get "/challenge", ChallengeController, :create
+    get "/device_identity", DeviceIdentityController, :show
 
     scope "/" do
       pipe_through ChatWeb.Plugs.ElectricReadiness

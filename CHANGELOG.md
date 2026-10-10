@@ -10,6 +10,44 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
+## 2026-10-05_27015cb\_\_\_2026-10-10_873ad5d8\_\_\_2026-10-10_9f5060b
+
+### Added
+
+- Access gating: read gating on sync shapes, sandboxes and network syncbot push
+- Device identity endpoint with syncbot integration
+- Backup: file chunk presence module
+- Documentation: recovery services, share formats, guardian invitations, review tokens spec
+- [frontend] Gated reads with trust-mode read sessions
+- [frontend] PQ2 optical handshake v2 sandbox: animated QR, TURN relay, post-quantum confirmation
+- [frontend] Recovery Phase 2: shares, durable contact slots, wire formats, chain reads with EIP-712 signing
+- [frontend] Durable write lifecycle: unified mutation delivery, account attribution, dependency-gated holds, corruption handling, user cards and storage
+- [frontend] Installable app from account menu
+
+### Changed
+
+- Frontend controller: redirect to app route
+- [platform] Backup scenario: wait until files are fully copied
+- [frontend] Content: preserve fields past known layout on re-encode
+- [frontend] Outbox: causal ordering, immediate resume on server response
+- [frontend] Documentation: PQ2 spec, handshake v2, recovery Phase 7
+
+### Fixed
+
+- Drive copy source: handle unhandled backfill
+- [frontend] Offline: preserve server profile across repeated offline edits
+- [frontend] Verify only admitted user_storage rows on read path; partial record ranking fix
+
+## 2026-09-26_6d6e083\_\_\_2026-09-29_e7098794\_\_\_2026-09-26_4f56e01
+
+### Changed
+
+- Content: preserve unknown fields on re-encode for forward compatibility
+
+### Fixed
+
+- File sandbox: apply length-framed encoding and fix video player streaming
+
 ## 2026-09-26_fa50540\_\_\_2026-09-26_4a6a765c\_\_\_2026-09-26_4f56e01
 
 ### Added

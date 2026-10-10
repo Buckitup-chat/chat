@@ -172,7 +172,9 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Index do
     auth = %{user_hash: identity.origin_hash, sign_skey: identity.sign_skey}
 
     async(pid, fn ->
-      %{origin: origin, card: card} = Queue.fetch_origin_context(identity.origin_hash, base_url, auth)
+      %{origin: origin, card: card} =
+        Queue.fetch_origin_context(identity.origin_hash, base_url, auth)
+
       verification = Identity.verify_against_card(identity, card)
 
       send(pid, {:identity_verified, %{origin: origin, verification: verification}})

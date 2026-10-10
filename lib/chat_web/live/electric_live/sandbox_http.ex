@@ -119,6 +119,7 @@ defmodule ChatWeb.ElectricLive.SandboxHttp do
 
         {:ok, %{status: _status} = resp} ->
           error_msg = if is_map(resp.body), do: resp.body["error"], else: nil
+
           {:error, error_msg || "Read session failed: #{resp.status}",
            [challenge_log, log_entry("POST", url, headers, body_json, resp, timestamp)]}
 
@@ -165,7 +166,18 @@ defmodule ChatWeb.ElectricLive.SandboxHttp do
 
       {:error, {status, body, rh}} ->
         {:error, "Shape request failed (#{status})",
-         [build_log("GET", url, headers, "", status, format_headers(rh), inspect(body), timestamp)]}
+         [
+           build_log(
+             "GET",
+             url,
+             headers,
+             "",
+             status,
+             format_headers(rh),
+             inspect(body),
+             timestamp
+           )
+         ]}
 
       {:error, reason} ->
         {:error, "Shape request failed: #{inspect(reason)}",
@@ -187,7 +199,18 @@ defmodule ChatWeb.ElectricLive.SandboxHttp do
             {:error, "Shape request failed (#{status})",
              logs ++
                session_logs ++
-               [build_log("GET", url, retry_headers, "", status, format_headers(rh), inspect(body), retry_ts)]}
+               [
+                 build_log(
+                   "GET",
+                   url,
+                   retry_headers,
+                   "",
+                   status,
+                   format_headers(rh),
+                   inspect(body),
+                   retry_ts
+                 )
+               ]}
 
           {:error, reason} ->
             {:error, "Shape request failed: #{inspect(reason)}",

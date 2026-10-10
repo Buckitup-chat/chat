@@ -183,11 +183,13 @@ defmodule ChatWeb.ElectricLive.OriginReviewsLive.Index do
           {:ok, rows, _log} ->
             rows
             |> Enum.reject(&deleted?/1)
-            |> Enum.map(&%{
-              origin_hash: &1["origin_hash"],
-              name: &1["name"],
-              moderation_mode: &1["moderation_mode"]
-            })
+            |> Enum.map(
+              &%{
+                origin_hash: &1["origin_hash"],
+                name: &1["name"],
+                moderation_mode: &1["moderation_mode"]
+              }
+            )
             |> Enum.sort_by(& &1.name)
 
           {:error, _reason, _log} ->

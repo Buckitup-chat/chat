@@ -89,11 +89,26 @@ The server provides nothing unless the client asks — a client must know the de
 
 The exact discovery protocol (mDNS, optical handshake extension, manual entry) is defined by the discovery flow, not this requirement. `device_identity` is the identity exchange endpoint all discovery methods use.
 
+### SyncBot Card Push
+
+When device A discovers device B (via LAN detection or manual entry in the admin panel), A **pushes its SyncBot `user_card` to B** via B's `/ingest` endpoint. This is necessary so B knows A's identity and B's admin can approve A for read/write access.
+
+The push happens early in the `PeerConnector` flow — after the system identifier is resolved but before `PeerSync` starts shape consumers. The mechanism:
+
+1. Fetch a one-time challenge from B (`GET /electric/v1/challenge`).
+2. Build the SyncBot's `user_card` insert mutation (from `ServerIdentity` + `ServerCard`).
+3. Sign the challenge with the server identity key.
+4. `POST /ingest` to B with `auth` (challenge + signature) and the `user_card` mutation.
+
+This always succeeds regardless of B's access mode — `user_card` ingest is never chain-gated (see the note under [Access Modes](#access-modes)). The push is **idempotent**: if the card already exists on B with the same or newer `owner_timestamp`, the upsert is a no-op. A network failure during the push retries with the same backoff as the rest of `PeerConnector`, since the card must land before shape sync can work in `trust` mode.
+
+After the card lands on B, B's admin sees `SyncBot_<A's device_id>` in the user list and can approve it (issue a vouch token). Until approved, A's shape consumers enter [Awaiting approval](#awaiting-approval) with backoff.
+
 ### Peer-to-Peer Sync
 
 When device A syncs from device B, device A acts as a client — it opens a [read session](#read-gating-read-sessions) on B with its own server key via PoP, and B checks A against the vouch chain (in `trust` mode). The mechanism is identical to a user reading shapes: same read gate, same check, same vouch token scopes.
 
-For this to work, B must know A's SyncBot identity (a `user_card` for A's `sync_bot.user_hash` must exist on B). See [Peer servers § Card exchange](#peer-servers).
+For this to work, B must know A's SyncBot identity (a `user_card` for A's `sync_bot.user_hash` must exist on B). The card is pushed to B during peer connection setup (see [SyncBot Card Push](#syncbot-card-push)).
 
 ---
 
@@ -354,7 +369,7 @@ Electric sends `cache-control: public` on shape responses. In `trust` mode the r
 
 A peer server reads the same way: it opens a read session per shape, signed with its server identity key, and sends the Bearer token from its Electric client. This requires the peer's server identity to have a `user_card` on the target device.
 
-Since `user_card` and `vouch_token` reads are exempt (see [Read-exempt shapes](#read-exempt-shapes)), the peer's SyncBot card arrives through normal Electric sync — device A reads device B's `user_cards` shape (ungated) and gets `SyncBot_B`'s card along with all other cards. No separate card exchange mechanism is needed.
+The peer's SyncBot card arrives on the target device through an active push: when A connects to B, A pushes its own SyncBot card via `/ingest` (see [SyncBot Card Push](#syncbot-card-push)). Additionally, since `user_card` and `vouch_token` reads are exempt (see [Read-exempt shapes](#read-exempt-shapes)), cards also propagate through normal Electric sync once shape consumers are running.
 
 - Having a card only makes the peer a known user, so it gets past `401 unknown_user`. Gated reads still need the vouch chain: in `trust` mode someone has to vouch for `SyncBot_<peer_device_id>`.
 - `GET /electric/v1/device_identity` tells the peer the `sync_bot.user_hash` it will need to vouch for, and the `admin` identity (the vouch-chain root) — useful for the Owner UI to show which device's SyncBot needs approval.
@@ -537,6 +552,12 @@ Read gating (network sync client — this device reading from a peer) is impleme
 Device identity endpoint is implemented (see [Device Identity Endpoint](#device-identity-endpoint)):
 
 - `ChatWeb.DeviceIdentityController` — `GET /electric/v1/device_identity` returns `device_id`, `sync_bot` and `admin` identities.
+
+SyncBot card push to peer (`Chat.NetworkSynchronization.Electric.SyncBotCardPusher`) is implemented:
+
+- Fetches challenge from peer, builds SyncBot `user_card` mutation, signs and POSTs `/ingest`.
+- Called by `PeerConnector` after system identifier resolution, before starting `PeerSync`.
+- Idempotent: existing card with same-or-newer timestamp is a no-op. Network failures retry with PeerConnector backoff.
 
 Pending:
 

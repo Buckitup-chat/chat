@@ -13,7 +13,9 @@ defmodule Chat.NetworkSynchronization.Electric.PeerConnectorTest do
     {Chat.NetworkSynchronization.Electric.PeerIdentifier,
      ChatSupport.Mocks.NetworkSynchronization.Electric.PeerIdentifierMock},
     {Chat.NetworkSynchronization.Electric.PeerSync,
-     ChatSupport.Mocks.NetworkSynchronization.Electric.PeerSyncMock}
+     ChatSupport.Mocks.NetworkSynchronization.Electric.PeerSyncMock},
+    {Chat.NetworkSynchronization.Electric.SyncBotCardPusher,
+     ChatSupport.Mocks.NetworkSynchronization.Electric.SyncBotCardPusherMock}
   ])
 
   setup do
@@ -30,20 +32,32 @@ defmodule Chat.NetworkSynchronization.Electric.PeerConnectorTest do
   end
 
   test "connects immediately when identifier resolves on first try" do
-    set_results([{:ok, @system_identifier}])
+    mock_identifier_responses([{:ok, @system_identifier}])
 
-    {:ok, _connector} = start_supervised({PeerConnector, peer_url: @peer_url})
+    {:ok, _connector} = start_connector()
 
     assert_receive {:identifier_fetch_attempted, @peer_url}, 500
+    assert_receive {:sync_bot_card_pushed, @peer_url}, 500
+    assert_receive {:peer_sync_started, pid, @peer_url, @system_identifier}, 500
+
+    cleanup_peer_sync(pid)
+  end
+
+  test "pushes SyncBot card to peer before starting PeerSync" do
+    mock_identifier_responses([{:ok, @system_identifier}])
+
+    {:ok, _connector} = start_connector()
+
+    assert_receive {:sync_bot_card_pushed, @peer_url}, 500
     assert_receive {:peer_sync_started, pid, @peer_url, @system_identifier}, 500
 
     cleanup_peer_sync(pid)
   end
 
   test "retries with backoff when identifier lookup fails, then succeeds" do
-    set_results([{:error, :timeout}, {:ok, @system_identifier}])
+    mock_identifier_responses([{:error, :timeout}, {:ok, @system_identifier}])
 
-    {:ok, _connector} = start_supervised({PeerConnector, peer_url: @peer_url})
+    {:ok, _connector} = start_connector()
 
     assert_receive {:identifier_fetch_attempted, @peer_url}, 500
     refute_receive {:peer_sync_started, _, _, _}, 200
@@ -55,9 +69,9 @@ defmodule Chat.NetworkSynchronization.Electric.PeerConnectorTest do
   end
 
   test "reconnects with reset backoff when PeerSync exits" do
-    set_results([{:ok, @system_identifier}, {:ok, @system_identifier}])
+    mock_identifier_responses([{:ok, @system_identifier}, {:ok, @system_identifier}])
 
-    {:ok, connector} = start_supervised({PeerConnector, peer_url: @peer_url})
+    {:ok, connector} = start_connector()
 
     assert_receive {:peer_sync_started, first_pid, @peer_url, @system_identifier}, 500
     assert %{backoff: 1_000} = :sys.get_state(connector)
@@ -73,9 +87,9 @@ defmodule Chat.NetworkSynchronization.Electric.PeerConnectorTest do
   end
 
   test "disconnect/1 terminates PeerSync and stops the connector" do
-    set_results([{:ok, @system_identifier}])
+    mock_identifier_responses([{:ok, @system_identifier}])
 
-    {:ok, connector} = start_supervised({PeerConnector, peer_url: @peer_url})
+    {:ok, connector} = start_connector()
 
     assert_receive {:peer_sync_started, peer_sync_pid, @peer_url, @system_identifier}, 500
 
@@ -86,13 +100,15 @@ defmodule Chat.NetworkSynchronization.Electric.PeerConnectorTest do
     refute Process.alive?(peer_sync_pid)
   end
 
-  defp set_results(results) do
-    Application.get_env(:chat, :peer_connector_test_results_agent)
-    |> Agent.update(fn _ -> results end)
+  defp start_connector do
+    start_supervised({PeerConnector, peer_url: @peer_url})
   end
 
-  # Cleans up the mock PeerSync this test caused to be started under the
-  # real, globally-named ElectricDynamic supervisor.
+  defp mock_identifier_responses(responses) do
+    Application.get_env(:chat, :peer_connector_test_results_agent)
+    |> Agent.update(fn _ -> responses end)
+  end
+
   defp cleanup_peer_sync(pid) do
     DynamicSupervisor.terminate_child(@electric_dynamic, pid)
   end

@@ -25,8 +25,7 @@ defmodule Chat.Pq.ServerIdentity do
 
   @impl true
   def init(_opts) do
-    identity = load_or_generate()
-    {:ok, identity}
+    {:ok, load_or_generate()}
   end
 
   @impl true
@@ -37,14 +36,30 @@ defmodule Chat.Pq.ServerIdentity do
   defp load_or_generate do
     case AdminDb.get(:pq_server_identity) do
       nil ->
-        identity = EnigmaPq.generate_identity()
-        AdminDb.put(:pq_server_identity, identity)
-        AdminDb.put_new(:pq_gate_mode, :open)
-        log("Server identity generated", :info)
-        identity
+        EnigmaPq.generate_identity()
+        |> ensure_contact_keys()
+        |> tap(fn identity ->
+          AdminDb.put(:pq_server_identity, identity)
+          AdminDb.put_new(:pq_gate_mode, :open)
+          log("Server identity generated", :info)
+        end)
 
       identity ->
+        ensure_contact_keys(identity)
+    end
+  end
+
+  defp ensure_contact_keys(identity) do
+    case identity do
+      %{contact_pkey: _} ->
         identity
+
+      _ ->
+        {contact_skey, contact_pkey} = Enigma.generate_keys()
+        upgraded = Map.merge(identity, %{contact_pkey: contact_pkey, contact_skey: contact_skey})
+        AdminDb.put(:pq_server_identity, upgraded)
+        log("Server identity upgraded with contact keys", :info)
+        upgraded
     end
   end
 end

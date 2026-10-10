@@ -5,14 +5,13 @@
 
 ## Now
 
-1. endpoint device_id + admin_id 
 11. review tokens: generation
 10. gate review creation
-9. geted peer sync
 
 ## Next
 
 12. vouch resolution cache
+17. Recovery implementation
 15. legal/sanity check for reviews
 16. FE: gate write behaviour
 5. doc: FE to have known files on onliners sync
@@ -29,8 +28,8 @@
 
 
 # Updates
-Eugen: files missing chunks. test repo 
-Review Tokens
+1. done — device_identity endpoint: returns device_id + admin_id, integrated with syncbot and read gate
+9. done — gated peer sync: peers push syncbot cards via PeerConnector, access gating marked done
 
 
 # Status

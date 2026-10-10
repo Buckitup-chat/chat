@@ -145,7 +145,7 @@ Walking the trust graph on every access check is unnecessary when the vouch set 
 **Cache value:** `{chain_distance, vouch_scopes, resolved_at}` — the result of the recursive CTE or BFS walk. `resolved_at` is **OS monotonic time** (`:erlang.monotonic_time(:second)`) — immune to NTP jumps and wall-clock drift on embedded devices.
 
 **Invalidation:**
-- **On vouch insert/revoke** — any write to `vouch_tokens` within the scope prefix invalidates all cache entries under that prefix. This is coarse but simple; the vouch table changes rarely relative to access checks.
+- **On vouch insert/revoke** — any write to `vouch_tokens` within the scope prefix invalidates all cache entries under that prefix. Use `Chat.Data.VouchToken.attenuates?/2` for Elixir-side scope comparison (no PG round-trip). This is coarse but simple; the vouch table changes rarely relative to access checks.
 - **TTL expiry** — entries older than 30 minutes are evicted regardless. Guards against missed invalidation signals (e.g. sync lag from a peer device).
 - **On demand** — the owner can force a full cache flush via admin UI (useful after bulk vouch changes).
 
@@ -289,15 +289,15 @@ The shape module implements `Chat.Data.Shapes.Shape` with standard `ingest_confi
 
 2. **Transitive vouch display.** When the UI shows "why is this user trusted?", should it show the full vouch chain or just the direct vouches? Chain display requires walking the graph; direct-only is a simple query.
 
-3. **Device identifier format.** Partially resolved. `Chat.DeviceId` behaviour with `Chat.DeviceId.Default` fallback: HTTPS domain (`Server_<host>`) when configured, otherwise localhost MAC address (`Localhost_<hex>`). Platform can supply a device-specific implementation via `:device_id_module` app env. Remaining question: should the platform target use the USB drive serial number instead?
+3. ~~**Device identifier format.**~~ **Resolved.** `Chat.DeviceId` behaviour with `Chat.DeviceId.Default` fallback: HTTPS domain (`Server_<host>`) when configured, otherwise localhost MAC address (`Localhost_<hex>`). Platform supplies a device-specific implementation via `:device_id_module` app env. Implemented and used by access gating (see [pq_access_gating](pq_access_gating.done.md#device-identity-endpoint)).
 
-4. **Scope vocabulary storage.** Device-local and discovered scopes need persistence. Options: a separate `scope_vocabulary` table (PG, synced), or CubDB (AdminDB, local-only). The core layer is compiled and needs no storage.
+4. ~~**Scope vocabulary storage.**~~ **Resolved.** Core vocabulary is compiled in `resource_forest/0`. Device-local and discovered layers are future extensions — no storage needed until a use case demands runtime-defined scopes.
 
 ---
 
 ## Status
 
-In Progress. Schema, migration, Ecto changeset, `Signable` protocol, shape behaviour, validation (insert/update/ingest), data access with recursive CTE, and Electric sync are implemented. Resolved chain cache, `attenuates?/2` helper, and scope vocabulary storage are pending.
+In Progress. Schema, migration, Ecto changeset, `Signable` protocol, shape behaviour, validation (insert/update/ingest), data access with recursive CTE, Electric sync, and `attenuates?/2` helper are implemented. Resolved chain cache is pending.
 
 ## References
 

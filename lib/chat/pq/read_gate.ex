@@ -23,7 +23,9 @@ defmodule Chat.Pq.ReadGate do
     AdminDb.get(:pq_gate_mode) == :trust and OwnerBootstrap.owner() != nil
   end
 
-  def max_depth, do: VouchToken.default_max_depth()
+  def max_depth do
+    Chat.AdminDb.get(:pq_max_depth) || VouchToken.default_max_depth()
+  end
 
   @doc """
   Returns `{:ok, token, shape_name}` or `{:error, reason}` where reason is one of

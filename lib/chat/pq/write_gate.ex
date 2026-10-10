@@ -15,7 +15,9 @@ defmodule Chat.Pq.WriteGate do
 
   @denied "not_in_trust_chain"
 
-  def max_depth, do: VouchToken.default_max_depth()
+  def max_depth do
+    AdminDb.get(:pq_max_depth) || VouchToken.default_max_depth()
+  end
 
   def denied?(error), do: error == @denied
 

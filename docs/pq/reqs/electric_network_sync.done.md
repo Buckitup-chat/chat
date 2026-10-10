@@ -194,7 +194,7 @@ GET http://<ip>:<peer_port>/electric/v1/shapes?table=user_cards&offset=-1
 2. For each IP, probe `/naive_api` (GraphQL) first, then `/electric/v1/shapes?table=user_cards&offset=-1` (Electric) in a separate pass
 3. Skip IPs already known as Electric peers (`list_electric_peers/0`)
 4. Call `NetworkSynchronization.add_electric_peer/1` for each discovered peer
-5. `PeerConnector` resolves the peer's `system_identifier`, then fetches `GET /electric/v1/server_card` and stores the peer's `SyncBot_<device_id>` user card (best effort; see [`pq_access_gating`](pq_access_gating.in_progress.md#server-user-card)), then starts `PeerSync`
+5. `PeerConnector` resolves the peer's `system_identifier`, then fetches `GET /electric/v1/server_card` and stores the peer's `SyncBot_<device_id>` user card (best effort; see [`pq_access_gating`](pq_access_gating.done.md#server-user-card)), then starts `PeerSync`
 
 ### Manual peer via admin panel
 

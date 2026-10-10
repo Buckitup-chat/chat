@@ -70,7 +70,7 @@ Hard requirements and specs. See [`pq/reqs/CLAUDE.md`](./pq/reqs/CLAUDE.md) for 
 - [PQ dialogs](./pq/reqs/pq_dialogs.done.md)
 - [PQ user](./pq/reqs/pq_user.done.md)
 - [PQ user storage](./pq/reqs/pq_user_storage.done.md)
-- [PQ access gating](./pq/reqs/pq_access_gating.in_progress.md)
+- [PQ access gating](./pq/reqs/pq_access_gating.done.md)
 - [PQ vouch tokens](./pq/reqs/pq_vouch_tokens.in_progress.md)
 - [PQ ingest conflict ownership](./pq/reqs/pq_ingest_conflict_ownership.done.md)
 - [PQ integrity checker](./pq/reqs/pq_integrity_checker.proposed.md)

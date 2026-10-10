@@ -157,7 +157,7 @@ Walking the trust graph on every access check is unnecessary when the vouch set 
 
 ## Relationship to Access Gating
 
-This table is the approval substrate for [access gating](pq_access_gating.in_progress.md). The system has three modes — `open` (no gating), `guarded` (writes chain-gated, reads open), and `trust` (all access chain-gated). In `guarded` and `trust` modes, a user is allowed through when their chain distance from the owner is within the configured max depth.
+This table is the approval substrate for [access gating](pq_access_gating.done.md). The system has three modes — `open` (no gating), `guarded` (writes chain-gated, reads open), and `trust` (all access chain-gated). In `guarded` and `trust` modes, a user is allowed through when their chain distance from the owner is within the configured max depth.
 
 All approval mechanisms produce vouch tokens with the same resource `kind`. What differs is the issuer and context — provenance is inferred, not encoded:
 
@@ -302,5 +302,5 @@ In Progress. Schema, migration, Ecto changeset, `Signable` protocol, shape behav
 ## References
 
 - [02_integrity.md](../invariants/02_integrity.md) — integrity triad: `sign_b64`, `owner_timestamp`, `deleted_flag`
-- [pq_access_gating](pq_access_gating.in_progress.md) — open/guarded/trust modes, bootstrap, gate mechanics
+- [pq_access_gating](pq_access_gating.done.md) — open/guarded/trust modes, bootstrap, gate mechanics
 - [pq_review_write_tokens](reviews/pq_review_write_tokens.proposed.md) — one-time invite links, bot delegation via `reviews.write.<nonce>` scope

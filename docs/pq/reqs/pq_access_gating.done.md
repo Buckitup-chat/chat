@@ -176,19 +176,18 @@ Owner identity and mode setting live in AdminDB — see [Open Questions §3](#op
 
 ### Where
 
-Writes and reads are gated by two plugs. They share the owner / mode / chain-distance decision but identify the caller differently:
+Writes and reads are gated at two levels:
 
-- **Writes** — `ChatWeb.Plugs.ElectricAccessGate` (target; today `Chat.Pq.WriteGate`, see below). The caller proves possession with a one-time signed challenge in the request body.
-- **Reads** — `ChatWeb.Plugs.ElectricReadGate`. The caller presents a Bearer token from a read session. See [Read Gating](#read-gating-read-sessions).
+- **Writes** — `Chat.Pq.WriteGate`, per shape inside the ingest writer. The caller proves possession with a one-time signed challenge in the request body. See [Write Gate](#write-gate-chatpqwritegate).
+- **Reads** — `ChatWeb.Plugs.ElectricReadGate`, a plug in the router pipeline. The caller presents a Bearer token from a read session. See [Read Gating](#read-gating-read-sessions).
 
 ```
 scope "/" do
   pipe_through ChatWeb.Plugs.ElectricReadiness
 
   scope "/" do
-    pipe_through ChatWeb.Plugs.ElectricAccessGate   # <-- target: PoP + vouch chain for writes
     pipe_through ChatWeb.Plugs.ElectricChallengeInjector
-    post "/ingest", ElectricController, :ingest
+    post "/ingest", ElectricController, :ingest       # write gate runs per shape inside the writer
     post "/ingest_each", ElectricController, :ingest_each
   end
 end
@@ -196,35 +195,18 @@ end
 scope "/electric/v1/shapes" do
   pipe_through ChatWeb.Plugs.ElectricReadiness
   pipe_through ChatWeb.Plugs.ElectricTableGuard
-  pipe_through ChatWeb.Plugs.ElectricReadGate       # <-- new: Bearer read session + vouch chain
+  pipe_through ChatWeb.Plugs.ElectricReadGate         # Bearer read session + vouch chain
   forward "/", ChatWeb.Plugs.HexToBase64Electric
 end
 ```
 
-### What it checks (writes)
-
-1. **No owner registered yet** → allow. If this is a `user_card` insert, register the user as owner in AdminDB (post-ingest hook or writer callback). Mode stays `open`.
-2. **Mode is `open`** → verify PoP (caller must prove key ownership), then pass through.
-3. **Caller is the owner** → pass through.
-4. **Mode is `guarded` or `trust`** → verify PoP, then look up chain distance for caller's `user_hash`; if `chain_distance ≤ max_depth`, pass through; if beyond or no path, reject with `403`.
-5. **Otherwise** → reject with `403 Forbidden`, body: `{"error": "access_denied", "mode": "<current_mode>"}`.
-
 Reads follow [Read Gating § What the gate checks](#what-the-gate-checks).
 
-### Identifying the caller (writes)
+### Write Gate (`Chat.Pq.WriteGate`)
 
-The request carries a PoP signature (signed challenge) and the caller's `user_hash`:
+Write gating is enforced per shape, inside the ingest writer, not in a router plug. `Chat.Pq.WriteGate.and_gate/3` wraps a shape's `check` callback. The chain check runs only after the shape's own PoP/ownership check returns `:ok`:
 
-1. Extract `user_hash`, `challenge_id`, and `signature` from `params["auth"]`.
-2. Look up `sign_pkey` from `user_cards` for the given `user_hash`.
-3. Verify `ML-DSA-87.verify(challenge, signature, sign_pkey)`. If valid → caller is identified, proceed with mode checks.
-4. If `user_hash` is unknown (no user_card yet) — check if this is a `user_card` create mutation. If so, extract `sign_pkey` from the mutation payload, compute `user_hash`, and verify the signature against that key. If valid, allow in every mode — `user_card` is never chain-gated (see the note under [Access Modes](#access-modes)).
-
-Caller resolution uses `user_cards` + vouch token cache — no separate derived table needed.
-
-### Current implementation: `Chat.Pq.WriteGate`
-
-Until the `ElectricAccessGate` plug lands, write gating is enforced per shape, inside the ingest writer, not in the router pipeline. `Chat.Pq.WriteGate.and_gate/3` wraps a shape's `check` callback. The chain check runs only after the shape's own PoP/ownership check returns `:ok`:
+> **Why per-shape, not a router plug?** A router-level plug would need to parse mutations to identify the caller (each shape uses a different owner field — `sender_hash`, `reactor_hash`, `uploader_hash`, etc.) and to distinguish gated from ungated shapes in mixed `/ingest_each` batches. It would duplicate logic that already runs per mutation inside the writer, with no behavioral gain — the client sees the same `403` body either way. Per-shape enforcement also lets each shape's PoP check run first, so the chain check only fires for callers who already proved key ownership.
 
 ```elixir
 check:
@@ -263,11 +245,10 @@ Not wrapped (ungated in every mode):
 - `user_card`, `vouch_token` — intentionally, so the server receives every card and token it is offered and can resolve chains (see the note under [Access Modes](#access-modes)).
 - `review_post_right(_candidate)`, `review_revoke_right(_candidate)`.
 
-**Differences from the target design above:**
+**Known limitations:**
 
 - `max_depth` is fixed at `VouchToken.default_max_depth/0` (7). There is no owner setting yet.
 - `guarded` and `trust` gate writes the same way. `trust` additionally gates reads (see [Read Gating](#read-gating-read-sessions)).
-- The rejection happens inside the writer, per mutation, not in a plug before the controller. The client sees the same `403` body either way.
 
 ---
 
@@ -514,15 +495,15 @@ Client                          Server
   |    mutations: [...]}           |
   |                                |
   |   [ElectricReadiness]          |  DB + Electric up?
-  |   [ElectricAccessGate]         |  PoP verify + mode check:
+  |   [ChallengeInjector]          |
+  |   [ElectricController.ingest]  |  writer
+  |     per shape: WriteGate       |  PoP verify + mode check:
   |     - no owner? pass + claim   |    - no owner → pass, register as owner in AdminDB
   |     - open? PoP ok → pass      |    - open → PoP valid → pass
   |     - owner? pass              |    - owner → always pass
   |     - guarded? chain check     |    - guarded → chain_distance ≤ max_depth → pass (writes)
   |     - trust? chain check       |    - trust → chain_distance ≤ max_depth → pass (all)
   |     - else? 403                |    - else → 403
-  |   [ChallengeInjector]          |
-  |   [ElectricController.ingest]  |  writer
   |                                |
   |<-- {txid} or error ------------|
 ```
@@ -531,13 +512,13 @@ Client                          Server
 
 ## Status
 
-In Progress. Server identity (`Chat.Pq.ServerIdentity`), device identity (`Chat.DeviceId`), owner bootstrap (`Chat.Pq.OwnerBootstrap`), gate mode storage in AdminDB, and admin sandbox UI with gate mode switching are implemented. Write-side vouch chain enforcement is implemented per shape via `Chat.Pq.WriteGate` (see [Current implementation](#current-implementation-chatpqwritegate)).
+Done. Server identity (`Chat.Pq.ServerIdentity`), device identity (`Chat.DeviceId`), owner bootstrap (`Chat.Pq.OwnerBootstrap`), gate mode storage in AdminDB, and admin sandbox UI with gate mode switching are implemented. Write-side vouch chain enforcement is implemented per shape via `Chat.Pq.WriteGate` (see [Write Gate](#write-gate-chatpqwritegate)).
 
 Read gating (server side) is implemented:
 
 - `Chat.Pq.ReadSession` — ETS store, per shape, 5 min fixed TTL, periodic sweep.
 - `Chat.Pq.ReadGate` — PoP + `storage.read.<shape>` chain check; `POST /electric/v1/read_session` (`ChatWeb.ReadSessionController`).
-- `ChatWeb.Plugs.ElectricReadGate` on `/shapes` (shape from `?table=`, versions tables map to the owning shape) and on `file_chunk/:file_id/:chunk_index` + `file_chunk_status` (shape `file_chunk`). Passing responses get `cache-control: private` + `vary: authorization`.
+- `ChatWeb.Plugs.ElectricReadGate` on `/shapes` (shape from `?table=`, versions tables map to the owning shape) and on `file_chunk/:file_id/:chunk_index` + `file_chunk_status` (shape `file_chunk`). Passing responses get `cache-control: private` + `vary: authorization`. Read gate exempts `user_card` and `vouch_token` shapes (`@exempt_shapes`).
 - `max_depth` in the `403` body and in the read chain check is `VouchToken.default_max_depth/0` (7) until the setting exists.
 
 Read gating (network sync client — this device reading from a peer) is implemented:
@@ -553,19 +534,27 @@ Device identity endpoint is implemented (see [Device Identity Endpoint](#device-
 
 - `ChatWeb.DeviceIdentityController` — `GET /electric/v1/device_identity` returns `device_id`, `sync_bot` and `admin` identities.
 
-SyncBot card push to peer (`Chat.NetworkSynchronization.Electric.SyncBotCardPusher`) is implemented:
+SyncBot card (`Chat.NetworkSynchronization.Electric.SyncBotCardPusher`) is implemented:
 
-- Fetches challenge from peer, builds SyncBot `user_card` mutation, signs and POSTs `/ingest`.
+- The server's SyncBot identity (`SyncBot_<device_id>`) is a user like any other, with keypairs generated by `ServerIdentity` and stored in AdminDB.
+- `SyncBotCardPusher.push/1` builds the SyncBot `user_card` from `ServerIdentity`, fetches a challenge from the peer, signs it, and POSTs `/ingest`.
 - Called by `PeerConnector` after system identifier resolution, before starting `PeerSync`.
 - Idempotent: existing card with same-or-newer timestamp is a no-op. Network failures retry with PeerConnector backoff.
 
-Pending:
+`max_depth` setting is implemented:
 
-- Server user card lifecycle: own SyncBot card stored into PostgreSQL on boot.
-- Read gate exemption for `user_card` and `vouch_token` shapes (`ElectricReadGate`).
-- The `ElectricAccessGate` plug (PoP + vouch chain enforcement in the router pipeline).
-- `max_depth` setting and enforcement (writes ignore it; reads use the fixed default).
-- chat-frontend: implement [Client Behaviour](#client-behaviour).
+- Stored in AdminDB under `:pq_max_depth`. Both `WriteGate.max_depth/0` and `ReadGate.max_depth/0` read from `AdminDb.get(:pq_max_depth)` with fallback to `VouchToken.default_max_depth/0` (7).
+- Admin sandbox UI exposes the setting (`set_max_depth` event in `AdminSandboxLive.Index`).
+
+chat-frontend [Client Behaviour](#client-behaviour) is implemented:
+
+- `readSession.ts` — lazy session open on `401 read_session_required`, per-shape token map, Bearer header via function reference, renewal.
+- `ingest.ts` — `NOT_IN_TRUST_CHAIN` detection, separate from validation errors.
+- `outbox.ts` — `awaiting_approval` hold reason, pauses draining for blocked identity, partial batch handling.
+- `shapeRead.ts` — `onError` 401 handling, session open + retry.
+- UI indicators in `ChatWindow.vue` (`⏳` for awaiting approval on messages and edits).
+
+No pending items — all features described in this requirement are implemented.
 
 ## Open Questions
 

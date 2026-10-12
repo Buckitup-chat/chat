@@ -22,12 +22,12 @@ A write token progresses through three states:
 ```
 pending  ──visit──▶  identity gate  ──PoP──▶  bound  ──submit──▶  reviewed
    │                                            │                      │
-   │ 1 week                                bind wins LWW          permanent link
+   │ 1 week (bot)                          bind wins LWW          permanent link
    ▼                                    (bot clock >> ts+1)       to author's review
-soft-deleted  ──2 weeks──▶  hard delete (row removed)
+soft-deleted  ──2 weeks (server)──▶  hard delete (row removed)
 ```
 
-Tokens that remain **pending** for 1 week (bot clock) are **soft-deleted** (`deleted_flag = true`, `owner_timestamp` set to original `owner_timestamp + 1`). The minimal timestamp bump ensures a concurrent bind on another device — which uses the bot's current clock, far higher — wins LWW. Soft-deleted tokens are **hard-deleted** 2 weeks after soft delete (3 weeks after creation). Bound and reviewed tokens persist indefinitely — they are permanent links.
+Tokens that remain **pending** for 1 week (bot clock) are **soft-deleted** by the bot (`deleted_flag = true`, `owner_timestamp` set to original `owner_timestamp + 1`). The minimal timestamp bump ensures a concurrent bind on another device — which uses the bot's current clock, far higher — wins LWW. Soft-deleted tokens are **hard-deleted** by the server 2 weeks after soft delete (3 weeks after creation). Bound and reviewed tokens persist indefinitely — they are permanent links.
 
 ---
 
@@ -43,7 +43,7 @@ The server-level syncBot handles synchronization only — it is not involved in 
 
 Each origin gets its own **review bot** — a PQ entity with its own `user_cards` row and full identity (ML-DSA-87 + ML-KEM-1024 keypairs). The review bot is created alongside the origin (or when the owner enables review invitations). Its `sign_pkey` is public via `user_cards`, so anyone can verify its vouch tokens.
 
-The bot's `user_cards` row uses the name `<originName>_Bot` — visible in the user directory, clearly associated with its origin.
+The bot's `user_cards` row uses the name `ReviewBot_<originName>` — visible in the user directory, clearly associated with its origin.
 
 One review bot per origin. No cross-origin leakage by construction — the bot exists only in the context of its origin.
 
@@ -56,6 +56,7 @@ origin_bots
 ├── origin_hash         — TEXT PK, FK → origins(origin_hash)
 ├── bot_hash            — TEXT NOT NULL, FK → user_cards(user_hash), prefix "u_"
 ├── encrypted_identity  — BYTEA NOT NULL (bot's full identity, ML-KEM encrypted to origin's crypt_pkey)
+├── deleted_flag        — BOOLEAN NOT NULL DEFAULT false (soft-delete / revoke)
 ├── owner_timestamp     — BIGINT NOT NULL (origin clock, LWW)
 ├── sign_b64            — BYTEA NOT NULL (signed by origin identity)
 ├── sign_hash           — TEXT NOT NULL, prefix "ob_"
@@ -73,35 +74,50 @@ The bot runs **on the origin owner's device** (or Nerves hardware), not on the s
 
 ### Vouch chain
 
-The origin owner vouches the review bot directly:
+The origin owner vouches the review bot in both trees — origin scope for review authorization, device scope for write access to the shapes the reviewer will need:
 
 ```
-Origin owner
+Origin owner (also device owner)
   │
-  │  Vouch token:
+  │  Vouch 1 (origin gate):
   │    kind:         origins.<origin_hash>.reviews.write
   │    issuer_hash:  origin_hash
   │    subject_hash: review_bot_hash
   │    sign_b64:     signed with origin's sign_skey (client-side)
   │
+  │  Vouch 2 (device gate):
+  │    kind:         device.<sn>.storage.write.<review_shapes>
+  │    issuer_hash:  owner_hash
+  │    subject_hash: review_bot_hash
+  │    sign_b64:     signed with owner's sign_skey (client-side)
+  │
   ▼
 Review bot (per-origin, device-side, identity in origin_bots encrypted to origin)
 ```
 
-**Origin → review bot:** The origin owner signs this vouch from their client using the origin's `sign_skey`. This is a deliberate step in the origin admin UI — the owner explicitly enables review invitations for their origin, which creates the review bot (if it doesn't exist) and vouches it.
+**Origin → review bot (vouch 1):** The origin owner signs this vouch from their client using the origin's `sign_skey`. This is a deliberate step in the origin admin UI — the owner explicitly enables review invitations for their origin, which creates the review bot (if it doesn't exist) and vouches it.
+
+**Owner → review bot (vouch 2):** The device owner delegates write access to the specific shapes the reviewer needs (reviews, review candidates, etc.). Without this vouch, the reviewer's data would be rejected by the device gate even with a valid origin vouch. The owner signs this with their own `sign_skey` — the device tree is rooted in the owner, not the origin.
 
 ### Bot → reviewer delegation
 
-On token bind, the review bot creates a vouch token:
+On token bind, the review bot creates two vouch tokens — one per gate:
 
 ```
-kind:         origins.<origin_hash>.reviews.write.<nonce>
-issuer_hash:  review_bot_hash
-subject_hash: reviewer_hash
-sign_b64:     signed with review bot's sign_skey
+Vouch 1 (origin gate):
+  kind:         origins.<origin_hash>.reviews.write.<nonce>
+  issuer_hash:  review_bot_hash
+  subject_hash: reviewer_hash
+  sign_b64:     signed with review bot's sign_skey
+
+Vouch 2 (device gate):
+  kind:         device.<sn>.storage.write.<review_shapes>
+  issuer_hash:  review_bot_hash
+  subject_hash: reviewer_hash
+  sign_b64:     signed with review bot's sign_skey
 ```
 
-Attenuation holds: `reviews.write.<nonce>` is prefix-contained by `reviews.write` (see [Scope Attenuation](../pq_vouch_tokens.in_progress.md#scope-attenuation)).
+Attenuation holds in both trees: `reviews.write.<nonce>` is prefix-contained by `reviews.write`; `storage.write.<review_shapes>` is prefix-contained by the bot's own device write scope (see [Scope Attenuation](../pq_vouch_tokens.in_progress.md#scope-attenuation)). The bot cannot delegate wider than what it was granted.
 
 The full verifiable chain: origin vouched review bot → review bot delegated to reviewer → reviewer wrote the review (ML-DSA-87 signed). Any peer can walk this chain using only public keys from `user_cards` and the vouch token rows.
 
@@ -129,10 +145,10 @@ Tokens are created by the review bot on the device when an order is opened. Ever
 review_write_tokens
 ├── nonce              — TEXT PK (URL-safe base64, 32 chars)
 ├── origin_hash        — TEXT NOT NULL, FK → origins(origin_hash)
+├── review_bot_hash    — TEXT NOT NULL, FK → user_cards(user_hash), prefix "u_" (signer — Signable lookup key)
 ├── origin_order_hash  — TEXT NOT NULL, prefix "org_ord_" (the order that triggered this token)
 ├── user_hash          — TEXT, nullable (null = pending; set = bound)
 ├── review_hash        — TEXT, nullable (set once review is written)
-├── vouch_sign_hash    — TEXT, nullable (sign_hash of the vouch token created on bind)
 ├── deleted_flag       — BOOLEAN NOT NULL DEFAULT false (soft-delete marker)
 ├── owner_timestamp    — BIGINT NOT NULL (bot clock, LWW)
 ├── sign_b64           — BYTEA NOT NULL (signed by review bot's sign_skey)
@@ -142,6 +158,8 @@ review_write_tokens
 **`origin_order_hash`** — NOT NULL. A token exists because an order was opened. The hash uses the `org_ord_` prefix. The orders table design is deferred — this is a forward reference to whatever that table becomes.
 
 **`owner_timestamp`** — bot monotonic clock, same convention as `owner_timestamp` elsewhere. The bot owns these rows and GCs against its own timeline.
+
+**`review_bot_hash`** — identifies the signing bot. The `Signable` protocol uses this to look up the bot's `sign_pkey` from `user_cards` — same direct-lookup pattern as `author_hash` on reviews and `issuer_hash` on vouch tokens.
 
 **`sign_b64` + `sign_hash`** — integrity triad. The review bot signs every token row (create, bind, review-hash capture, GC tombstone). Any device holding the bot identity can verify and update tokens.
 
@@ -207,14 +225,20 @@ Requires a live vouch: `kind = origins.<origin_hash>.reviews.write`, `issuer_has
 
 1. Validate the token is pending (not bound, not soft-deleted)
 2. Verify the caller's identity: `user_cards` row exists with valid self-signature (PoP)
-3. Verify the origin's review bot holds a live `reviews.write` vouch for this origin
-4. Review bot creates vouch token `origins.<origin_hash>.reviews.write.<nonce>` for the reviewer
-5. Bot updates token record: `user_hash`, `vouch_sign_hash`, `owner_timestamp = bot_clock` (current bot time, always >> ts+1), re-signs, ingests
+3. Verify the origin's review bot holds live vouches: `origins.<origin_hash>.reviews.write` (origin gate) and `device.<sn>.storage.write.<review_shapes>` (device gate)
+4. Review bot creates two vouch tokens for the reviewer: `origins.<origin_hash>.reviews.write.<nonce>` (origin gate) and `device.<sn>.storage.write.<review_shapes>` (device gate)
+5. Bot updates token record: `user_hash`, `owner_timestamp = bot_clock` (current bot time, always >> ts+1), re-signs, ingests
 6. Redirect to frontend review creation for this origin
 
 ### Review ingest validation
 
-When `review_access = invite_only`, review ingest checks that the author holds a live vouch token where `subject_hash = author_hash` and `kind` attenuates from `origins.<origin_hash>.reviews.write`. No vouch = ingest rejected. This applies regardless of how the review is submitted — the vouch is the gate, not the token.
+Review ingest passes through two independent gates — both must succeed:
+
+1. **Device gate** (`device.<sn>.storage.write`) — the standard write gate. The review is a PQ row hitting `/ingest` on a device; the device's access mode (`guarded` / `trust`) applies as usual. The origin vouch does not bypass the device gate.
+
+2. **Origin gate** (`origins.<origin_hash>.reviews.write`) — checked only when `review_access = invite_only`. The author must hold a live vouch where `subject_hash = author_hash` and `kind` attenuates from `origins.<origin_hash>.reviews.write`. No vouch = ingest rejected.
+
+The two gates live in different root segments of the resource forest (`device` vs `origins`) — they never intersect and are evaluated as separate chain walks. This applies regardless of how the review is submitted — the vouch is the gate, not the token.
 
 ### Review hash capture
 
@@ -224,19 +248,19 @@ When the bot observes (via Electric shape) a new review for `(origin_hash, autho
 
 The review bot GCs its own tokens using `owner_timestamp` (bot clock), not server time:
 
-Two-phase GC, both device-side in the `ReviewBotWorker`:
+Device-side in the `ReviewBotWorker`:
 
-**Phase 1 — soft delete (1 week after creation):**
+**Soft delete (1 week after creation):**
 - Bot scans tokens where `user_hash IS NULL AND deleted_flag = false AND owner_timestamp < bot_clock - 1_week`
 - Sets `deleted_flag = true`, `owner_timestamp = original_owner_timestamp + 1`, re-signs
 - The `+1` bump is intentionally minimal: if another device bound the token concurrently (using its bot clock, far higher), the bind wins LWW
 - Ingests via `/ingest`
 
-**Phase 2 — hard delete (2 weeks after soft delete, 3 weeks after creation):**
-- Bot scans tokens where `deleted_flag = true AND owner_timestamp < bot_clock - 3_weeks`
-- Hard deletes the row (DELETE via `/ingest`)
+**Hard delete (2 weeks after soft delete, server-side):**
+- Server deletes rows where `deleted_flag = true AND owner_timestamp < now - 3_weeks`
+- The bot does not hard-delete — this is server-side cleanup (space preservation)
 
-Multiple devices may race to GC the same token — idempotent (same nonce PK, LWW on `owner_timestamp`). Bound and reviewed tokens are never GC'd.
+Multiple devices may race to soft-delete the same token — idempotent (same nonce PK, LWW on `owner_timestamp`). Bound and reviewed tokens are never GC'd.
 
 ---
 
@@ -249,17 +273,23 @@ A step in the origin admin interface where the owner creates the origin's review
 3. Client creates the review bot identity:
    - Generate ML-DSA-87 `sign_skey` / `sign_pkey` keypair
    - Generate ML-KEM-1024 `crypt_skey` / `crypt_pkey` keypair
-   - Create `user_cards` row for the bot, named `<originName>_Bot` (self-signed by bot's `sign_skey`)
+   - Create `user_cards` row for the bot, named `ReviewBot_<originName>` (self-signed by bot's `sign_skey`)
    - POST `/ingest` — bot's `user_cards` enters the PQ system
 4. Client encrypts bot's full identity (`sign_skey` + `crypt_skey`) to the origin's `crypt_pkey` via ML-KEM encapsulation
 5. Client creates `origin_bots` row with `encrypted_identity`, signed by origin identity
 6. POST `/ingest` — `origin_bots` row enters the PQ system, Electric-synced to all devices holding this origin
-7. Client constructs vouch token:
-   - `kind: origins.<origin_hash>.reviews.write`
-   - `issuer_hash: origin_hash`
-   - `subject_hash: review_bot_hash`
-   - Signs with origin's `sign_skey` (held client-side)
-8. POST `/ingest` — vouch token enters the PQ system
+7. Client constructs vouch tokens:
+   - Origin gate vouch:
+     - `kind: origins.<origin_hash>.reviews.write`
+     - `issuer_hash: origin_hash`
+     - `subject_hash: review_bot_hash`
+     - Signs with origin's `sign_skey` (held client-side)
+   - Device gate vouch:
+     - `kind: device.<sn>.storage.write.<review_shapes>`
+     - `issuer_hash: owner_hash`
+     - `subject_hash: review_bot_hash`
+     - Signs with owner's `sign_skey` (held client-side)
+8. POST `/ingest` — both vouch tokens enter the PQ system
 9. Device decrypts `encrypted_identity`, starts `ReviewBotWorker` — the bot is live
 
 On other devices: Electric syncs the `origin_bots` row → device decrypts with origin's `crypt_skey` → starts its own `ReviewBotWorker`. Multiple devices can run the bot simultaneously — token creation uses random nonces so there are no conflicts.
@@ -317,7 +347,7 @@ Migration adds the column. Constraint: `review_access IN ('open', 'invite_only')
 - [ ] `OriginBotSignHash` type, `ob_` prefix in Consts
 - [ ] `ReviewWriteTokenSignHash` type, `rwt_` prefix in Consts
 - [ ] `OriginOrderHash` type, `org_ord_` prefix in Consts
-- [ ] Bot creation flow: keypair gen, `user_cards` row (`<originName>_Bot`), identity encryption, `origin_bots` ingest
+- [ ] Bot creation flow: keypair gen, `user_cards` row (`ReviewBot_<originName>`), identity encryption, `origin_bots` ingest
 - [ ] Bot vouch: origin → bot vouch token (`origins.<origin_hash>.reviews.write`)
 - [ ] `ReviewBotWorker` GenServer: decrypt identity from `origin_bots` shape, start on sync
 - [ ] `review_access` column on `origins` + migration
@@ -332,8 +362,8 @@ Migration adds the column. Constraint: `review_access IN ('open', 'invite_only')
 - [ ] `POST /api/write_tokens/:nonce/bind` — bind user with PoP, bot issues vouch, redirect to frontend
 - [ ] Token listing/deletion endpoints
 - [ ] `/r/:nonce` Phoenix route — token state check + redirect to frontend
-- [ ] Bot-side two-phase GC (soft delete at 1 week, hard delete at 3 weeks)
-- [ ] Review ingest validation: vouch check when `review_access = invite_only`
+- [ ] Bot-side GC: soft delete pending tokens at 1 week
+- [ ] Server-side GC: hard delete soft-deleted tokens after 2 weeks (3 weeks from creation)
 - [ ] Origin admin: "enable invitations" UI (triggers Phase 1 bot creation + vouch)
 
 ### Phase 3 — QR
@@ -349,7 +379,23 @@ Migration adds the column. Constraint: `review_access IN ('open', 'invite_only')
 
 2. ~~**Token metadata for QR.**~~ — resolved. Token metadata lives on the order (`origin_order_hash`). The orders table design is deferred, but the link from token to order is established.
 
-3. **Orders table.** `origin_order_hash` is a forward reference — the table that backs it is not yet designed. Until then, the hash is an opaque tag the bot stamps on each token. Schema, lifecycle, and what metadata an order carries (table number, event name, etc.) are out of scope for this document.
+3. **Orders table.** `origin_order_hash` is a forward reference — the table that backs it is not yet designed. Until then, the hash is an opaque client-generated identifier with no FK constraint. Schema, lifecycle, and what metadata an order carries (table number, event name, etc.) are out of scope for this document.
+
+4. **`/api/` endpoints vs existing ingest architecture.** The codebase has no `/api/` router scope — all PQ mutations flow through `/electric/v1/ingest` (ElectricController), all queries through GraphQL (`/naive_api`) or Electric shapes. Token creation is device-side (bot ingests rows via `/ingest`), so `open_order` may not need a server API at all. The `bind` endpoint is the exception — it orchestrates identity verification, vouch creation, and token update as a single server-side transaction. Decide: (a) token creation/listing/deletion use pure ingest + shapes (no REST), bind gets a dedicated route; (b) add an `/api/` scope to the router for all four endpoints. Either way, specify the actual route scope, `pipe_through`, and controller module.
+
+5. ~~**Hard delete mechanism.**~~ — resolved. The bot soft-deletes tokens (`deleted_flag = true`) at 1 week. The server hard-deletes soft-deleted rows after 2 more weeks (3 weeks from creation). No `:delete` through `/ingest` — hard delete is server-side only.
+
+6. **Bot PoP (Proof of Possession) for ingest.** Every ingest requires `GET /electric/v1/challenge` → sign challenge with `sign_skey` → include `auth: {challenge_id, signature}` in the ingest body (see `IngestPop`). The spec should state that the bot fetches a challenge, signs it with `bot_sign_skey`, and includes it in each ingest call. The shape's `check` function verifies the bot's PoP against its `user_cards` `sign_pkey`.
+
+7. **`<review_shapes>` scope enumeration.** The device gate vouch scope `device.<sn>.storage.write.<review_shapes>` is never expanded. The WriteGate constructs scope as `device.<id>.storage.write.<shape_name>` per shape. The reviewer needs write access to all shapes required for review creation: `review`, `review_password_candidate`, `review_post_right_candidate`, `review_revoke_right_candidate`. Specify whether a single parent scope `storage.write` is delegated (wide) or individual per-shape vouches are created (narrow but explicit).
+
+8. **Multi-device scope for device gate vouch.** The bot creates `device.<sn>.storage.write...` scoped to one device's serial number. If the reviewer submits to a different device (origin owner has multiple), the vouch doesn't cover it. Options: (a) owner issues wildcard `device.*.storage.write.<shapes>` to the bot; (b) each device's bot issues its own device-scoped vouches; (c) reviewer is restricted to the device that issued the token.
+
+9. ~~**Encrypted identity format.**~~ — not a question. Same ML-KEM-1024 encapsulation + AES-256-GCM pattern as `ReviewRightEnvelope` and dialog key wrapping. Implementation detail, not a design decision.
+
+10. **`/r/:nonce` route placement.** The catch-all `get "/*path", FrontendController, :redirect_to_app` (router.ex ~line 290) would swallow `/r/:nonce` if placed after it. The route must be added in a scope before the catch-all. Also, `FrontendController` currently has only `app/2` and `redirect_to_app/2` — a new `:write_review` action is needed.
+
+11. **Concurrent bind race — dangling vouches.** Two devices bind the same pending token to different users simultaneously. Both bots issue vouch tokens for their respective reviewers. LWW picks a bind winner, but the losing reviewer's vouch tokens remain live. Specify cleanup: does the winning device revoke the other reviewer's vouches? Or is this harmless (reviewer without a bound token can't navigate to the review form, and the vouch expires with no matching review)?
 
 ---
 

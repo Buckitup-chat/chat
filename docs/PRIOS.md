@@ -8,6 +8,9 @@
 11. review tokens: generation
 10. gate review creation
 
+## Background
+101. Liveview update: streams?
+
 ## Next
 
 12. vouch resolution cache
@@ -28,8 +31,8 @@
 
 
 # Updates
-1. done — device_identity endpoint: returns device_id + admin_id, integrated with syncbot and read gate
-9. done — gated peer sync: peers push syncbot cards via PeerConnector, access gating marked done
+1. device_identity endpoint: returns device_id + admin_id, integrated with syncbot and read gate
+9. gated peer sync: peers push syncbot cards via PeerConnector, access gating marked done
 
 
 # Status

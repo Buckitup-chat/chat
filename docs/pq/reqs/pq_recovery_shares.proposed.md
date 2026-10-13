@@ -349,7 +349,12 @@ this document owns is the guardian's side of it.
    it, because the temporary account knows nothing: not `secret_ref`, which is
    keyed by the owner's EVM address in the lost vault, and not any guardian's
    `user_hash`, which was in the lost contact list. The guardian's first message
-   carries `secret_ref`.
+   carries `secret_ref`: a text message holding it in canonical form, so a
+   guardian can also type or paste it. The temporary client takes the one
+   canonical `secret_ref` the text contains and answers a message with none, or
+   with several, with nothing. It answers every guardian who asks with a binding,
+   but follows the `secret_ref` most of them name, so a stranger who writes first
+   cannot steer the recovery to another secret.
 3. The temporary account answers with a
    [`"recovery_binding"`](../invariants/07_content_polymorphism.md#recovery_binding):
    `secret_ref`, its candidate address, and a signature by that address's key
@@ -447,7 +452,12 @@ are rebuilt where it gave them for free:
 
 1. **Guardian → owner: `secret_ref`**, in the clear, in the first contact.
 2. **Owner → guardian: the binding** of §Returning step 3, in the clear, with
-   the word code read out. The guardian's app computes the words from the
+   the word code read out, as
+
+   `BUCKITUP-BINDING.<secret_ref>.<candidate>.<user_hash>.<signature_b64>`
+
+   — the four positions of the `"recovery_binding"` part, in its order and
+   encodings; none of them contains a `.`. The guardian's app computes the words from the
    `secret_ref` it sent and the candidate and `user_hash` in the text it was
    handed; the `user_hash` the words confirm stands in for the dialog peer
    ([07 § recovery_binding](../invariants/07_content_polymorphism.md#recovery_binding)).
@@ -467,8 +477,8 @@ are rebuilt where it gave them for free:
    where `sealed` is `vaultEnvelope.sealWithKey(key, json)` verbatim — the
    vault row's `version || nonce || AES-256-GCM`, base64 — over the same
    `recovery_share_return` envelope the dialog would carry, and `sig` is the
-   guardian's ML-DSA signature over the UTF-8 of the block up to the third
-   segment. The receiver strips whitespace before parsing, since messengers
+   guardian's ML-DSA signature over the UTF-8 of the block before its last
+   `.`: everything up to and including the guardian's `user_hash`. The receiver strips whitespace before parsing, since messengers
    wrap a 2.5 KB line. The guardian reads out the six digits; the owner's app
    derives its own after decapsulating and **imports nothing until the person
    confirms they match** — a block a relay substituted was encapsulated by

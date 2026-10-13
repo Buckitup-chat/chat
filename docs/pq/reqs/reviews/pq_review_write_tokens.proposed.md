@@ -325,17 +325,9 @@ The origin owner decides whether reviews are open or invitation-only. A new fiel
 
 ---
 
-## Origin Schema Change
+## Review Access Setting
 
-A new column on the `origins` table:
-
-```
-origins
-├── ...existing columns...
-├── review_access        — TEXT NOT NULL DEFAULT 'open', enum: open / invite_only
-```
-
-Migration adds the column. Constraint: `review_access IN ('open', 'invite_only')`. Covered by the origin identity's signature (added to `Signable` fields). Changing `review_access` follows the same update path as `moderation_mode` — signed by origin identity or owner, subject to the pending-review guard.
+The `review_access` setting lives in the [`origin_settings`](pq_origin_settings.proposed.md) key-value table. The server reads it via `OriginSetting.get_review_access(origin_hash)`, which defaults to `"open"` when no row exists.
 
 ---
 
@@ -350,9 +342,9 @@ Migration adds the column. Constraint: `review_access IN ('open', 'invite_only')
 - [ ] Bot creation flow: keypair gen, `user_cards` row (`ReviewBot_<originName>`), identity encryption, `origin_bots` ingest
 - [ ] Bot vouch: origin → bot vouch token (`origins.<origin_hash>.reviews.write`)
 - [ ] `ReviewBotWorker` GenServer: decrypt identity from `origin_bots` shape, start on sync
-- [ ] `review_access` column on `origins` + migration
-- [ ] `review_access` in Origin schema, validation, Signable
-- [ ] Review ingest: vouch check when `review_access = invite_only`
+- [ ] `origin_settings` table + migration + Ecto schema + Electric shape
+- [ ] `OriginSetting` data context, validation, shape module
+- [ ] Review ingest: vouch check when `review_access = invite_only` (reads from `origin_settings`)
 
 ### Phase 2 — Token CRUD + redirect
 
@@ -409,4 +401,5 @@ Proposed.
 - [pq_reviews](pq_reviews.in_progress.md) — review system overview, pipeline, sandboxes
 - [pq_review_moderation](pq_review_moderation.done.md) — moderation pipeline, candidate promotion
 - [pq_origin](pq_origin.done.md) — origin entity, creation, ownership
+- [pq_origin_settings](pq_origin_settings.proposed.md) — per-origin key-value settings (`review_access`)
 - [pq_review_versioning](pq_review_versioning.done.md) — review editing, version chain

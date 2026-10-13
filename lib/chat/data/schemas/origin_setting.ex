@@ -40,9 +40,21 @@ defmodule Chat.Data.Schemas.OriginSetting do
       "review_access" ->
         validate_inclusion(changeset, :value, ["open", "invite_only"])
 
+      "review_token_ttl_days" ->
+        validate_positive_integer(changeset, :value, 1..365)
+
       _ ->
         changeset
     end
+  end
+
+  defp validate_positive_integer(changeset, field, first..last//1) do
+    validate_change(changeset, field, fn _field, value ->
+      case Integer.parse(value) do
+        {int, ""} when int >= first and int <= last -> []
+        _ -> [{field, "must be an integer in #{first}..#{last}"}]
+      end
+    end)
   end
 
   defimpl Chat.Data.User.Validation.TimestampedData, for: __MODULE__ do

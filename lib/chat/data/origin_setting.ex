@@ -25,6 +25,16 @@ defmodule Chat.Data.OriginSetting do
     end
   end
 
+  def get_review_token_ttl_days(origin_hash) do
+    with %OriginSetting{deleted_flag: false, value: value} <-
+           get_origin_setting(origin_hash, "review_token_ttl_days"),
+         {days, ""} when days >= 1 <- Integer.parse(value) do
+      days
+    else
+      _ -> 7
+    end
+  end
+
   defp origin_setting_upsert_query do
     from(os in OriginSetting,
       update: [

@@ -305,15 +305,31 @@ The guardian's client, on receiving a `recovery_share`:
   before custody, for a slot and a spare alike, so a cooperating owner client
   never sends such a share; the guardian is shown it as unrequested rather than
   as a holding they agreed to.
-- Confirms receipt to the owner. The mechanism is open — see §Open questions —
-  because the dialog's receipts say `delivered` and `read`, and neither of them
-  says *stored*.
+- Tells the owner where the share stands, with a
+  [`"recovery_holding"`](../invariants/07_content_polymorphism.md#recovery_holding)
+  in the same dialog — the dialog's receipts say `delivered` and `read`, and
+  neither says *stored*:
+  - `stored` once the copy is in the guardian's `user_storage` and the share
+    checks against the version's `split_root`;
+  - `unverified`, `unreachable` or `unrequested` when it is kept for one of the
+    reasons above, so the owner hears it rather than counting a holder who holds
+    nothing usable;
+  - `given_back` when the guardian gives it back (below);
+  - `dropped` when the rules in §Dying fire.
+
+  A holding's state is the latest `"recovery_holding"` for its
+  `(secret_ref, version, split_id, share_index)` in dialog order, and only the
+  dialog peer the share was sent to can state it. The owner's roster counts a
+  guardian as a holder only on `stored`, the third thing that `delivered` and
+  `read` are not, so the count against the threshold is honest.
 
 A guardian is told plainly what they are holding and for whom, can see it in one
 place, and can refuse: **a share may be given back**. Giving back is advisory —
 it removes nothing from the contract, and only a `reshare` removes a guardian —
-so it has to be visible to the owner as a prompt to reshare rather than as a
-change that already happened.
+so it reaches the owner as `given_back`, a prompt to reshare rather than a
+change that already happened. The guardian's client then drops its copy as in
+§Dying, which, as there, is what a cooperating client does and not what the
+transport guarantees.
 
 ---
 
@@ -586,12 +602,6 @@ copies in their `user_storage` (§Holding).
 
 ## Open questions
 
-- **How giving a share back is expressed on the wire.** Refusing custody has no
-  content type and no table today, and the bytes cannot actually be destroyed in
-  this layer (§Dying).
-- **What "confirmed" means.** `delivered` and `read` are what the dialog offers;
-  "I stored it" is neither, and the owner's threshold count is only honest if it
-  counts the third thing.
 - **Whether a guardian can watch the backup row.** Telling the owner their vault
   row has gone missing is a real feature, and the envelope cannot carry the
   address it would need: the locator is derived from `S` precisely so the row is

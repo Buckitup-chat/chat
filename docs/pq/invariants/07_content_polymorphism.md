@@ -44,6 +44,7 @@ Because the type lives inside the ciphertext, the database (and any peer without
 - [`"recovery_share"`](#recovery_share) — one guardian's Shamir share of a community backup, owner → guardian
 - [`"recovery_share_return"`](#recovery_share_return) — the same share sent back during a recovery, guardian → owner
 - [`"recovery_binding"`](#recovery_binding) — a recovering account's proof that it controls the on-chain candidate
+- [`"recovery_holding"`](#recovery_holding) — where a guardian's share stands: stored, kept with a problem, given back or dropped, guardian → owner
 
 ### `"inline_file"`
 
@@ -403,6 +404,33 @@ the peer is the person on the call.
 | 1 | candidate | The address the temporary account will be elected under |
 | 2 | user_hash | The sender's own `user_hash`; must equal the dialog peer's, and is covered by the word code the owner reads out |
 | 3 | signature_b64 | EIP-191 signature by `candidate`'s key over the string above, unpadded base64 |
+
+--- 
+
+### `"recovery_holding"`
+
+A guardian telling the owner where the share they were sent stands
+([pq_recovery_shares § Holding](../reqs/pq_recovery_shares.proposed.md)), in
+the dialog the share came in. The dialog row's ML-DSA signature says which
+guardian; a holding's state is the latest of these for its share in dialog
+order. Only `stored` counts the guardian as a holder.
+
+```json
+{"recovery_holding": ["eip155:11155111:0xd9ff…/0x9f3c…", 2, "a41c…", 3, "stored", ""]}
+```
+
+```json
+{"recovery_holding": [secret_ref, version, split_id, share_index, state, detail]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | secret_ref | As in the share |
+| 1 | version | As in the share |
+| 2 | split_id | As in the share |
+| 3 | share_index | As in the share, 1-based |
+| 4 | state | `"stored"`: kept in the guardian's `user_storage` and checked against `split_root`. `"unverified"`: kept, does not check against the root on chain. `"unreachable"`: kept, its deployment is one this build cannot reach. `"unrequested"`: kept, no live acceptance from this guardian for that deployment. `"given_back"`: the guardian gives it back. `"dropped"`: dropped under § Dying. Any other value is ignored |
+| 5 | detail | Human-readable reason for the non-`stored` states, or the empty string |
 
 --- 
 

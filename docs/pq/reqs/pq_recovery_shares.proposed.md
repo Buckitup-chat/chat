@@ -146,8 +146,9 @@ recognise the guardian's other ones — that takes the viewing key. Nothing is
 published; only owners the guardian accepted ever see it, inside the ML-DSA
 signed row.
 
-**The keys.** The guardian's client generates a 32-byte meta seed at its first
-acceptance and keeps it in the account vault. The spending key is
+**The keys.** The account's client generates a 32-byte meta seed when it creates
+the account, with the account's other keys, and keeps it in the account vault,
+which every device of the account holds the same. The spending key is
 `HKDF-SHA3-256(seed, "buckitup/stealth-meta/v1", "spend", 32)` and the viewing
 key the same with `"view"`, each read as a big-endian integer modulo the curve
 order. Nothing outside the vault goes in — no PIN, no device secret, and not

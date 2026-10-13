@@ -1,33 +1,48 @@
 # PQ Review Write Tokens
 
-One-time links that lead a user to writing a review for a given origin.
+Links that lead a user to writing a review for a given origin.
 
 ## Goal
 
-An origin owner generates a short URL (printable as QR, shareable via NFC/text/email) that, when opened, guides the visitor through identity creation (or import) and into writing a review for that specific origin. The token is one-time — once bound to a reviewer, it becomes a permanent redirect to that reviewer's review.
+An origin owner generates a short URL (printable as QR, shareable via NFC/text/email) that, when opened, guides the visitor through identity creation (or import) and into writing a review for that specific origin. Tokens come in two modes: **order-linked** (one-time — once bound to a reviewer, it becomes a permanent redirect to that reviewer's review) and **reusable** (a standing invitation link that can bind many reviewers, each getting their own bound token copy).
 
 ---
 
 ## Token Lifecycle
 
-A write token progresses through three states:
+A write token progresses through these states:
 
-| State | `user_hash` | `review_hash` | `deleted_flag` | Behavior on visit |
-|-------|-------------|---------------|----------------|-------------------|
-| **pending** | null | null | false | Identity gate → bind → review form |
-| **bound** | set | null | false | Review form (same user) / 403 (different user) |
-| **reviewed** | set | set | false | Redirect to review (view/edit) |
-| **soft-deleted** | null | null | true | "This link has expired" |
+| State | `user_hash` | `review_hash` | `deleted_flag` | `parent_nonce` | Behavior on visit |
+|-------|-------------|---------------|----------------|----------------|-------------------|
+| **pending** | null | null | false | null | Identity gate → bind → review form |
+| **bound** | set | null | false | null or set | Review form (same user) / 403 (different user) |
+| **reviewed** | set | set | false | null or set | Redirect to review (view/edit) |
+| **soft-deleted** | null | null | true | null | "This link has expired" |
+
+`parent_nonce` is null on order-linked tokens and on the reusable parent. It is set on bound copies created from a reusable parent.
 
 ```
-pending  ──visit──▶  identity gate  ──PoP──▶  bound  ──submit──▶  reviewed
-   │                                            │                      │
-   │ 1 week (bot)                          bind wins LWW          permanent link
-   ▼                                    (bot clock >> ts+1)       to author's review
+                    ┌─────────── order-linked (origin_order_hash set) ───────────┐
+                    │                                                            │
+pending  ──visit──▶ │ identity gate  ──PoP──▶  bound  ──submit──▶  reviewed     │
+   │                │                            │                      │        │
+   │                │                       bind wins LWW          permanent     │
+   │                │                    (bot clock >> ts+1)       link          │
+   │                └────────────────────────────────────────────────────────────┘
+   │
+   │                ┌─────────── reusable (origin_order_hash null) ──────────────┐
+   │                │                                                            │
+   ├──visit──▶      │ identity gate  ──PoP──▶  NEW bound token (fresh nonce,    │
+   │                │                           parent_nonce = this nonce)       │
+   │                │                           original stays pending           │
+   │                └────────────────────────────────────────────────────────────┘
+   │
+   │ ttl_days (bot, default 7)
+   ▼
 soft-deleted  ──2 weeks (server)──▶  hard delete (row removed)
 ```
 
-Tokens that remain **pending** for 1 week (bot clock) are **soft-deleted** by the bot (`deleted_flag = true`, `owner_timestamp` set to original `owner_timestamp + 1`). The minimal timestamp bump ensures a concurrent bind on another device — which uses the bot's current clock, far higher — wins LWW. Soft-deleted tokens are **hard-deleted** by the server 2 weeks after soft delete (3 weeks after creation). Bound and reviewed tokens persist indefinitely — they are permanent links.
+Tokens that remain **pending** for `review_token_ttl_days` (default 7, configurable per origin in `origin_settings`) are **soft-deleted** by the bot (`deleted_flag = true`, `owner_timestamp` set to original `owner_timestamp + 1`). The minimal timestamp bump ensures a concurrent bind on another device — which uses the bot's current clock, far higher — wins LWW. Soft-deleted tokens are **hard-deleted** by the server 2 weeks after soft delete. Bound and reviewed tokens persist indefinitely — they are permanent links.
 
 ---
 
@@ -45,7 +60,7 @@ Each origin gets its own **review bot** — a PQ entity with its own `user_cards
 
 The bot's `user_cards` row uses the name `ReviewBot_<originName>` — visible in the user directory, clearly associated with its origin.
 
-One review bot per origin. No cross-origin leakage by construction — the bot exists only in the context of its origin.
+Ideally one review bot per origin, but multiple are tolerated (device fragmentation — each device may independently create a bot if it hasn't synced the existing one yet). No cross-origin leakage by construction — each bot exists only in the context of its origin.
 
 ### Origin bot storage — `origin_bots` table
 
@@ -53,8 +68,8 @@ The bot's full identity (both keypairs' secret keys) is encrypted to the origin'
 
 ```
 origin_bots
-├── origin_hash         — TEXT PK, FK → origins(origin_hash)
-├── bot_hash            — TEXT NOT NULL, FK → user_cards(user_hash), prefix "u_"
+├── origin_hash         — TEXT NOT NULL, FK → origins(origin_hash)
+├── bot_hash            — TEXT PK, FK → user_cards(user_hash), prefix "u_"
 ├── encrypted_identity  — BYTEA NOT NULL (bot's full identity, ML-KEM encrypted to origin's crypt_pkey)
 ├── deleted_flag        — BOOLEAN NOT NULL DEFAULT false (soft-delete / revoke)
 ├── owner_timestamp     — BIGINT NOT NULL (origin clock, LWW)
@@ -146,7 +161,8 @@ review_write_tokens
 ├── nonce              — TEXT PK (URL-safe base64, 32 chars)
 ├── origin_hash        — TEXT NOT NULL, FK → origins(origin_hash)
 ├── review_bot_hash    — TEXT NOT NULL, FK → user_cards(user_hash), prefix "u_" (signer — Signable lookup key)
-├── origin_order_hash  — TEXT NOT NULL, prefix "org_ord_" (the order that triggered this token)
+├── origin_order_hash  — TEXT, nullable, prefix "org_ord_" (the order that triggered this token; null = reusable invitation)
+├── parent_nonce       — TEXT, nullable (set on bound copies of a reusable token; points to the parent's nonce)
 ├── user_hash          — TEXT, nullable (null = pending; set = bound)
 ├── review_hash        — TEXT, nullable (set once review is written)
 ├── deleted_flag       — BOOLEAN NOT NULL DEFAULT false (soft-delete marker)
@@ -155,7 +171,7 @@ review_write_tokens
 ├── sign_hash          — TEXT NOT NULL, prefix "rwt_"
 ```
 
-**`origin_order_hash`** — NOT NULL. A token exists because an order was opened. The hash uses the `org_ord_` prefix. The orders table design is deferred — this is a forward reference to whatever that table becomes.
+**`origin_order_hash`** — nullable. When set (prefix `org_ord_`), the token is order-linked and one-time. When null, the token is a reusable invitation link — binding creates a new bound token row instead of modifying this one. The orders table design is deferred — when present, the hash is an opaque client-generated identifier with no FK constraint.
 
 **`owner_timestamp`** — bot monotonic clock, same convention as `owner_timestamp` elsewhere. The bot owns these rows and GCs against its own timeline.
 
@@ -163,7 +179,9 @@ review_write_tokens
 
 **`sign_b64` + `sign_hash`** — integrity triad. The review bot signs every token row (create, bind, review-hash capture, GC tombstone). Any device holding the bot identity can verify and update tokens.
 
-**No `max_uses`** — tokens are one-time. One nonce, one reviewer, one review.
+**`parent_nonce`** — nullable. Set on bound tokens created from a reusable (order-less) parent. Points to the original pending token's nonce. Null on order-linked tokens and on the reusable parent itself.
+
+**No `max_uses`** — order-linked tokens are one-time: one nonce, one reviewer, one review. Reusable tokens (null `origin_order_hash`) can bind many reviewers — each bind produces a new token row with its own nonce and `parent_nonce` pointing back to the reusable parent.
 
 **No `expires_at`** — expiry is implicit: the bot GCs pending tokens older than its threshold. Bound tokens never expire.
 
@@ -179,10 +197,10 @@ Indexes: `origin_hash` (list tokens per origin), `origin_order_hash` (lookup by 
 
 | Endpoint | Auth | Purpose |
 |----------|------|---------|
-| `POST /api/origins/:origin_hash/open_order` | Origin owner | Open order → bot creates token, returns nonce + URL |
-| `POST /api/write_tokens/:nonce/bind` | Authenticated (PoP) | Bind user to token → bot issues vouch → redirect to review creation |
-| `GET /api/origins/:origin_hash/write_tokens` | Origin owner | List active tokens for this origin |
-| `DELETE /api/origins/:origin_hash/write_tokens/:nonce` | Origin owner / bot | Revoke (delete) a token |
+| `POST /r/api/token/create` | AuthToken (origin → bot) | Create token (with or without order), returns nonce + URL |
+| `POST /r/api/token/bind` | Reviewer (PoP) | Bind user to token → bot issues vouches → redirect to review nonce page |
+
+Token listing and deletion flow through Electric shapes + ingest (no REST endpoints).
 
 ### Route
 
@@ -200,20 +218,20 @@ GET /r/:nonce
   │   review exists              → redirect to review (view/edit)
   ├── bound to current user,
   │   no review yet              → redirect to review creation for this origin
-  └── pending                    → redirect to frontend with nonce context
-                                   (frontend handles identity create/import,
-                                    then calls /bind)
+  └── pending                    → login-kind landing page
+                                   (identity create/import → PoP → /bind
+                                    → redirect to review nonce page)
 ```
 
 The existing frontend handles identity creation, review writing, and the full review pipeline. No separate SPA flow needed.
 
-### Open order (token creation)
+### Token creation
 
-`POST /api/origins/:origin_hash/open_order`:
+`POST /r/api/token/create`:
 
-1. Verify caller is origin owner
+1. Verify caller via AuthToken — a token encrypted by the origin for the bot (not PoP)
 2. Bot generates nonce (24 random bytes, URL-safe base64)
-3. Bot constructs token row with `origin_order_hash` (required), signs it
+3. Bot constructs token row — `origin_order_hash` is optional (null = reusable invitation link), signs it
 4. Bot ingests via `POST /ingest` — server validates bot signature + live vouch
 5. Returns nonce + full URL (`https://<host>/r/<nonce>`) for QR generation
 
@@ -221,14 +239,22 @@ Requires a live vouch: `kind = origins.<origin_hash>.reviews.write`, `issuer_has
 
 ### Token bind
 
-`POST /api/write_tokens/:nonce/bind`:
+Binding is a multi-step browser flow, not a single API call:
 
-1. Validate the token is pending (not bound, not soft-deleted)
+1. **Landing** — visitor opens `/r/:nonce`, gets a login-kind page
+2. **Identity** — visitor creates a new identity or imports an existing one
+3. **Bind** — visitor proves PoP (signs challenge with `sign_skey`) to `POST /r/api/token/bind`
+4. **Redirect** — on success, redirect to origin review (nonce) create/edit page
+
+`POST /r/api/token/bind` (step 3):
+
+1. Validate the token exists and is not soft-deleted
 2. Verify the caller's identity: `user_cards` row exists with valid self-signature (PoP)
-3. Verify the origin's review bot holds live vouches: `origins.<origin_hash>.reviews.write` (origin gate) and `device.<sn>.storage.write.<review_shapes>` (device gate)
-4. Review bot creates two vouch tokens for the reviewer: `origins.<origin_hash>.reviews.write.<nonce>` (origin gate) and `device.<sn>.storage.write.<review_shapes>` (device gate)
-5. Bot updates token record: `user_hash`, `owner_timestamp = bot_clock` (current bot time, always >> ts+1), re-signs, ingests
-6. Redirect to frontend review creation for this origin
+3. Verify the origin's review bot holds live vouches: `origins.<origin_hash>.reviews.write` (origin gate) and per-shape device gate vouches (`device.<sn>.storage.write.<shape>` for each of: `review`, `review_password_candidate`, `review_post_right_candidate`, `review_revoke_right_candidate`)
+4. Review bot creates per-shape vouch tokens for the reviewer: `origins.<origin_hash>.reviews.write.<nonce>` (origin gate) and `device.<sn>.storage.write.<shape>` for each required shape (device gate)
+5. **Order-linked token** (`origin_order_hash` set): bot updates the token row — sets `user_hash`, `owner_timestamp = bot_clock`, re-signs, ingests. Token is now one-time bound.
+6. **Reusable token** (`origin_order_hash` null): bot creates a NEW token row with a fresh nonce, `parent_nonce = original_nonce`, `user_hash = reviewer_hash`, `origin_order_hash = null`, signs and ingests. The original pending token stays untouched for more binds.
+7. Redirect to origin review (nonce) create/edit page
 
 ### Review ingest validation
 
@@ -250,8 +276,9 @@ The review bot GCs its own tokens using `owner_timestamp` (bot clock), not serve
 
 Device-side in the `ReviewBotWorker`:
 
-**Soft delete (1 week after creation):**
-- Bot scans tokens where `user_hash IS NULL AND deleted_flag = false AND owner_timestamp < bot_clock - 1_week`
+**Soft delete (configurable, default 7 days after creation):**
+- Bot reads `review_token_ttl_days` from `origin_settings` (default: 7)
+- Bot scans tokens where `user_hash IS NULL AND deleted_flag = false AND owner_timestamp < bot_clock - ttl_days`
 - Sets `deleted_flag = true`, `owner_timestamp = original_owner_timestamp + 1`, re-signs
 - The `+1` bump is intentionally minimal: if another device bound the token concurrently (using its bot clock, far higher), the bind wins LWW
 - Ingests via `/ingest`
@@ -292,7 +319,7 @@ A step in the origin admin interface where the owner creates the origin's review
 8. POST `/ingest` — both vouch tokens enter the PQ system
 9. Device decrypts `encrypted_identity`, starts `ReviewBotWorker` — the bot is live
 
-On other devices: Electric syncs the `origin_bots` row → device decrypts with origin's `crypt_skey` → starts its own `ReviewBotWorker`. Multiple devices can run the bot simultaneously — token creation uses random nonces so there are no conflicts.
+On other devices: Electric syncs `origin_bots` rows → device decrypts with origin's `crypt_skey` → starts a `ReviewBotWorker` for each bot. Multiple devices can run bots simultaneously — token creation uses random nonces so there are no conflicts. If a device hasn't synced the existing bot yet, it may create a new one — both will work, and the origin vouches each independently.
 
 Revoking: the owner can revoke the review bot's vouch (signed tombstone, `deleted_flag: true`). Existing bound tokens remain valid (the vouch for the individual reviewer is already issued), but no new tokens can be created.
 
@@ -329,6 +356,8 @@ The origin owner decides whether reviews are open or invitation-only. A new fiel
 
 The `review_access` setting lives in the [`origin_settings`](pq_origin_settings.proposed.md) key-value table. The server reads it via `OriginSetting.get_review_access(origin_hash)`, which defaults to `"open"` when no row exists.
 
+The `review_token_ttl_days` setting (also in `origin_settings`) controls the soft-delete span for pending tokens, in days (default: 7). The bot reads this to decide when to GC pending tokens.
+
 ---
 
 ## Implementation Phases
@@ -348,11 +377,10 @@ The `review_access` setting lives in the [`origin_settings`](pq_origin_settings.
 
 ### Phase 2 — Token CRUD + redirect
 
-- [ ] `review_write_tokens` migration (with `origin_order_hash` NOT NULL, integrity triad, `deleted_flag`) + Electric shape
+- [ ] `review_write_tokens` migration (with nullable `origin_order_hash`, `parent_nonce`, integrity triad, `deleted_flag`) + Electric shape
 - [ ] `ReviewWriteToken` Ecto schema
-- [ ] `POST /api/origins/:origin_hash/open_order` — bot creates token on order open
-- [ ] `POST /api/write_tokens/:nonce/bind` — bind user with PoP, bot issues vouch, redirect to frontend
-- [ ] Token listing/deletion endpoints
+- [ ] `POST /r/api/token/create` — bot creates token (with or without order), returns nonce + URL
+- [ ] `POST /r/api/token/bind` — bind user with PoP, bot issues per-shape vouches, redirect to frontend
 - [ ] `/r/:nonce` Phoenix route — token state check + redirect to frontend
 - [ ] Bot-side GC: soft delete pending tokens at 1 week
 - [ ] Server-side GC: hard delete soft-deleted tokens after 2 weeks (3 weeks from creation)
@@ -371,23 +399,35 @@ The `review_access` setting lives in the [`origin_settings`](pq_origin_settings.
 
 2. ~~**Token metadata for QR.**~~ — resolved. Token metadata lives on the order (`origin_order_hash`). The orders table design is deferred, but the link from token to order is established.
 
-3. **Orders table.** `origin_order_hash` is a forward reference — the table that backs it is not yet designed. Until then, the hash is an opaque client-generated identifier with no FK constraint. Schema, lifecycle, and what metadata an order carries (table number, event name, etc.) are out of scope for this document.
+3. ~~**Orders table.**~~ — resolved. `origin_order_hash` is nullable. Tokens without an order are reusable invitation links (see Q11). The orders table design is deferred — when present, the hash is an opaque client-generated identifier with no FK constraint.
 
-4. **`/api/` endpoints vs existing ingest architecture.** The codebase has no `/api/` router scope — all PQ mutations flow through `/electric/v1/ingest` (ElectricController), all queries through GraphQL (`/naive_api`) or Electric shapes. Token creation is device-side (bot ingests rows via `/ingest`), so `open_order` may not need a server API at all. The `bind` endpoint is the exception — it orchestrates identity verification, vouch creation, and token update as a single server-side transaction. Decide: (a) token creation/listing/deletion use pure ingest + shapes (no REST), bind gets a dedicated route; (b) add an `/api/` scope to the router for all four endpoints. Either way, specify the actual route scope, `pipe_through`, and controller module.
+4. ~~**`/api/` endpoints vs existing ingest architecture.**~~ — resolved. Two REST endpoints under `/r/api/token/`:
+   - `POST /r/api/token/create` — order/token creation (bot creates token, returns nonce + URL)
+   - `POST /r/api/token/bind` — bind user to token (bot issues vouches, updates token)
+
+   Token listing and deletion flow through Electric shapes + ingest (no REST). The `/r` scope sits before the catch-all in the router.
 
 5. ~~**Hard delete mechanism.**~~ — resolved. The bot soft-deletes tokens (`deleted_flag = true`) at 1 week. The server hard-deletes soft-deleted rows after 2 more weeks (3 weeks from creation). No `:delete` through `/ingest` — hard delete is server-side only.
 
 6. **Bot PoP (Proof of Possession) for ingest.** Every ingest requires `GET /electric/v1/challenge` → sign challenge with `sign_skey` → include `auth: {challenge_id, signature}` in the ingest body (see `IngestPop`). The spec should state that the bot fetches a challenge, signs it with `bot_sign_skey`, and includes it in each ingest call. The shape's `check` function verifies the bot's PoP against its `user_cards` `sign_pkey`.
 
-7. **`<review_shapes>` scope enumeration.** The device gate vouch scope `device.<sn>.storage.write.<review_shapes>` is never expanded. The WriteGate constructs scope as `device.<id>.storage.write.<shape_name>` per shape. The reviewer needs write access to all shapes required for review creation: `review`, `review_password_candidate`, `review_post_right_candidate`, `review_revoke_right_candidate`. Specify whether a single parent scope `storage.write` is delegated (wide) or individual per-shape vouches are created (narrow but explicit).
+7. ~~**`<review_shapes>` scope enumeration.**~~ — resolved. Per-shape vouches (narrow, explicit). The bot creates individual vouches for each shape the reviewer needs: `review`, `review_password_candidate`, `review_post_right_candidate`, `review_revoke_right_candidate`. No broad `storage.write` delegation.
 
-8. **Multi-device scope for device gate vouch.** The bot creates `device.<sn>.storage.write...` scoped to one device's serial number. If the reviewer submits to a different device (origin owner has multiple), the vouch doesn't cover it. Options: (a) owner issues wildcard `device.*.storage.write.<shapes>` to the bot; (b) each device's bot issues its own device-scoped vouches; (c) reviewer is restricted to the device that issued the token.
+8. ~~**Multi-device scope for device gate vouch.**~~ — resolved. The bot gets device scope for the device it runs on. If the origin owner wants multi-device support, they explicitly allow the bot on other devices as well (separate device-scoped vouches per device). No wildcards.
 
 9. ~~**Encrypted identity format.**~~ — not a question. Same ML-KEM-1024 encapsulation + AES-256-GCM pattern as `ReviewRightEnvelope` and dialog key wrapping. Implementation detail, not a design decision.
 
-10. **`/r/:nonce` route placement.** The catch-all `get "/*path", FrontendController, :redirect_to_app` (router.ex ~line 290) would swallow `/r/:nonce` if placed after it. The route must be added in a scope before the catch-all. Also, `FrontendController` currently has only `app/2` and `redirect_to_app/2` — a new `:write_review` action is needed.
+10. ~~**`/r/:nonce` route placement.**~~ — resolved. The `/r` scope (containing `/:nonce`, `api/token/create`, `api/token/bind`) is placed before the catch-all `/*path` route. `FrontendController` gets a new `:write_review` action.
 
-11. **Concurrent bind race — dangling vouches.** Two devices bind the same pending token to different users simultaneously. Both bots issue vouch tokens for their respective reviewers. LWW picks a bind winner, but the losing reviewer's vouch tokens remain live. Specify cleanup: does the winning device revoke the other reviewer's vouches? Or is this harmless (reviewer without a bound token can't navigate to the review form, and the vouch expires with no matching review)?
+11. ~~**Concurrent bind race — dangling vouches.**~~ — resolved. Two token modes based on `origin_order_hash`:
+
+    **Order-linked** (`origin_order_hash` set): one-time token. Concurrent binds resolve via LWW — the higher `owner_timestamp` wins. Dangling vouches from the loser are harmless (reviewer can't navigate to the review form without a bound token, and the vouch attenuates to a nonce that leads nowhere).
+
+    **Reusable** (`origin_order_hash` null): multi-use invitation link. Binding does NOT modify the original token row — instead the bot creates a new bound token row (with a fresh nonce). The original pending token stays alive for more binds until soft-deleted.
+
+    Soft-delete span is configurable per origin via `origin_settings` key `review_token_ttl_days` (default: 7).
+
+12. ~~**Bot runtime location.**~~ — resolved. The bot runs on the device. The origin stores the bot's secret keys in its user storage (encrypted to the origin's `crypt_pkey` in `origin_bots`). On device startup, the origin decrypts the bot identity and starts the `ReviewBotWorker`. The bot keeps keys in memory while running. The server never sees secret keys in cleartext.
 
 ---
 

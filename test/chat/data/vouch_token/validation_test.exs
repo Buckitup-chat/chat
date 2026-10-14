@@ -93,6 +93,29 @@ defmodule Chat.Data.VouchToken.ValidationTest do
     end
   end
 
+  describe "vouch_token_validate/3 :update (HTTP ingest)" do
+    test "on an equal timestamp a revocation supersedes a grant", ctx do
+      existing = build_vouch_token(ctx, "device.BK-001.storage.read", ts: 1000)
+      update = build_vouch_token(ctx, "device.BK-001.storage.read", ts: 1000, deleted_flag: true)
+
+      cs = Validation.vouch_token_validate(existing, update_changes(update), :update)
+      assert cs.valid?, inspect(cs.errors)
+    end
+
+    test "on an equal timestamp a grant does not supersede a revocation", ctx do
+      existing =
+        build_vouch_token(ctx, "device.BK-001.storage.read", ts: 1000, deleted_flag: true)
+
+      update = build_vouch_token(ctx, "device.BK-001.storage.read", ts: 1000)
+
+      cs = Validation.vouch_token_validate(existing, update_changes(update), :update)
+      refute cs.valid?
+    end
+  end
+
+  defp update_changes(vt),
+    do: Map.take(Map.from_struct(vt), [:deleted_flag, :owner_timestamp, :sign_b64])
+
   defp build_vouch_token(ctx, kind, opts \\ []) do
     vt = %VouchToken{
       kind: kind,

@@ -3,6 +3,7 @@ defmodule ChatWeb.ReadSessionController do
 
   alias Chat.Pq.ReadGate
   alias Chat.Pq.ReadSession
+  alias ChatWeb.Utils.KeyProofResponse
 
   def create(conn, params) do
     params["user_hash"]
@@ -18,24 +19,17 @@ defmodule ChatWeb.ReadSessionController do
 
   def options(conn, _params), do: send_resp(conn, 204, "")
 
-  @doc "Renders a refused read session or key proof (see `Chat.Pq.KeyProof.prove/3`)."
-  def reject(conn, reason) do
+  defp reject(conn, reason) do
     {status, body} =
       case reason do
         :unknown_shape ->
           {400, %{error: "unknown_shape"}}
 
-        :invalid_challenge ->
-          {401, %{error: "Invalid or expired challenge"}}
-
-        :unknown_user ->
-          {401, %{error: "unknown_user"}}
-
-        :invalid_signature ->
-          {401, %{error: "invalid_signature"}}
-
         :not_in_trust_chain ->
           {403, %{error: "not_in_trust_chain", max_depth: ReadGate.max_depth()}}
+
+        key_proof_failure ->
+          KeyProofResponse.of(key_proof_failure)
       end
 
     conn

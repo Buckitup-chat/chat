@@ -8,7 +8,7 @@ defmodule ChatWeb.OwnerClaimController do
 
   alias Chat.Pq.KeyProof
   alias Chat.Pq.OwnerBootstrap
-  alias ChatWeb.ReadSessionController
+  alias ChatWeb.Utils.KeyProofResponse
 
   def create(conn, params) do
     with {:ok, card} <-
@@ -17,8 +17,12 @@ defmodule ChatWeb.OwnerClaimController do
            OwnerBootstrap.maybe_register_card(card) do
       json(conn, %{admin: OwnerBootstrap.owner_hash()})
     else
-      :not_eligible -> conn |> put_status(403) |> json(%{error: "not_eligible"})
-      {:error, reason} -> ReadSessionController.reject(conn, reason)
+      :not_eligible ->
+        conn |> put_status(403) |> json(%{error: "not_eligible"})
+
+      {:error, reason} ->
+        {status, body} = KeyProofResponse.of(reason)
+        conn |> put_status(status) |> json(body)
     end
   end
 

@@ -12,7 +12,7 @@ defmodule ChatWeb.Utils.IngestPop do
   @doc "Returns `{:ok, %{challenge, signature}}` or `{:error, {:unauthorized, msg}}`."
   def context(params) do
     with {:ok, challenge_id, signature_encoded} <- pop_from_body(params),
-         {:ok, challenge} <- fetch_challenge(challenge_id),
+         {:ok, challenge} <- Challenge.fetch(challenge_id),
          {:ok, signature} <- Base.decode64(signature_encoded, padding: false) do
       {:ok, %{challenge: challenge, signature: signature}}
     else
@@ -26,11 +26,4 @@ defmodule ChatWeb.Utils.IngestPop do
        do: {:ok, challenge_id, signature}
 
   defp pop_from_body(_params), do: :no_auth
-
-  defp fetch_challenge(challenge_id) do
-    case Challenge.get(challenge_id) do
-      challenge when is_binary(challenge) -> {:ok, challenge}
-      _ -> :error
-    end
-  end
 end

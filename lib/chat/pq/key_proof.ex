@@ -21,14 +21,9 @@ defmodule Chat.Pq.KeyProof do
     end
   end
 
-  defp consume_challenge(challenge_id) when is_binary(challenge_id) do
-    case Challenge.get(challenge_id) do
-      challenge when is_binary(challenge) -> {:ok, challenge}
-      _ -> {:error, :invalid_challenge}
-    end
+  defp consume_challenge(challenge_id) do
+    with :error <- Challenge.fetch(challenge_id), do: {:error, :invalid_challenge}
   end
-
-  defp consume_challenge(_), do: {:error, :invalid_challenge}
 
   defp fetch_card(user_hash) when is_binary(user_hash) do
     case UserData.get_card(user_hash) do

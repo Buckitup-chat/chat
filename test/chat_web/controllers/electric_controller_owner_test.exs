@@ -2,6 +2,8 @@ defmodule ChatWeb.ElectricControllerOwnerTest do
   use ChatWeb.ConnCase, async: false
   use ChatWeb.DataCase
 
+  import Chat.Test.ReviewFixtures, only: [sign_with_key: 2]
+
   alias Chat.AdminDb
   alias Chat.Challenge
   alias Chat.Data.User
@@ -70,6 +72,38 @@ defmodule ChatWeb.ElectricControllerOwnerTest do
       conn = claim(conn, card.user_hash, mallory.sign_skey)
 
       assert json_response(conn, 401) == %{"error" => "invalid_signature"}
+      assert OwnerBootstrap.owner() == nil
+    end
+
+    test "a deleted card cannot claim the device", %{conn: conn} do
+      identity = User.generate_pq_identity("Gone")
+
+      card =
+        identity
+        |> User.extract_pq_card()
+        |> Map.put(:deleted_flag, true)
+        |> sign_with_key(identity.sign_skey)
+
+      {:ok, _} = ShapeWriter.write(:user_card, :insert, card)
+
+      conn = claim(conn, card.user_hash, identity.sign_skey)
+
+      assert json_response(conn, 401) == %{"error" => "unknown_user"}
+      assert OwnerBootstrap.owner() == nil
+    end
+
+    test "a claim over an unknown challenge is refused", %{conn: conn} do
+      identity = User.generate_pq_identity("Alice")
+      card = synced_card(identity)
+
+      conn =
+        post(conn, "/electric/v1/owner_claim", %{
+          user_hash: card.user_hash,
+          challenge_id: Ecto.UUID.generate(),
+          signature: "AAAA"
+        })
+
+      assert json_response(conn, 401) == %{"error" => "Invalid or expired challenge"}
       assert OwnerBootstrap.owner() == nil
     end
 

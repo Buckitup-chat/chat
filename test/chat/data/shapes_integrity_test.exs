@@ -7,6 +7,7 @@ defmodule Chat.Data.ShapesIntegrityTest do
   alias Chat.Data.Schemas.FileChunk
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Schemas.UserStorage
+  alias Chat.Data.Schemas.VouchToken
   alias Chat.Data.Shapes
   alias Chat.Data.Types.FileId
   alias Chat.Data.Types.UserStorageSignHash
@@ -176,6 +177,32 @@ defmodule Chat.Data.ShapesIntegrityTest do
     end
   end
 
+  describe "older vouch replayed by a peer snapshot" do
+    setup do
+      issuer = User.generate_pq_identity("Issuer")
+      issuer_hash = insert_signed_user_card(issuer).user_hash
+      subject_hash = insert_signed_user_card(User.generate_pq_identity("Subject")).user_hash
+      {:ok, issuer: issuer, issuer_hash: issuer_hash, subject_hash: subject_hash}
+    end
+
+    test "does not undo a newer revocation", %{issuer: issuer} = ctx do
+      revoked = signed_vouch(issuer, ctx, 200, true)
+      granted = signed_vouch(issuer, ctx, 100, false)
+
+      {:ok, _} = ShapeWriter.write(:vouch_token, :insert, revoked)
+      {:ok, _} = ShapeWriter.write(:vouch_token, :insert, granted)
+
+      assert %{deleted_flag: true, owner_timestamp: 200} = stored_vouch(ctx)
+    end
+
+    test "a newer revocation replaces an older grant", %{issuer: issuer} = ctx do
+      {:ok, _} = ShapeWriter.write(:vouch_token, :insert, signed_vouch(issuer, ctx, 100, false))
+      {:ok, _} = ShapeWriter.write(:vouch_token, :insert, signed_vouch(issuer, ctx, 200, true))
+
+      assert %{deleted_flag: true, owner_timestamp: 200} = stored_vouch(ctx)
+    end
+  end
+
   # --- Helpers ---
 
   defp sign_with_key(struct, sign_skey) do
@@ -190,6 +217,27 @@ defmodule Chat.Data.ShapesIntegrityTest do
       _ ->
         signed
     end
+  end
+
+  @vouch_kind "device.BK-001.storage.write"
+
+  defp signed_vouch(issuer, %{issuer_hash: issuer_hash, subject_hash: subject_hash}, ts, deleted) do
+    %VouchToken{
+      kind: @vouch_kind,
+      issuer_hash: issuer_hash,
+      subject_hash: subject_hash,
+      owner_timestamp: ts,
+      deleted_flag: deleted
+    }
+    |> sign_with_key(issuer.sign_skey)
+  end
+
+  defp stored_vouch(%{issuer_hash: issuer_hash, subject_hash: subject_hash}) do
+    Repo.get_by(VouchToken,
+      kind: @vouch_kind,
+      issuer_hash: issuer_hash,
+      subject_hash: subject_hash
+    )
   end
 
   defp signed_user_card(identity, attrs \\ %{}) do

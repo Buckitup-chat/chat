@@ -1,6 +1,8 @@
 defmodule Chat.Data.VouchToken do
   @moduledoc "Data access for vouch_tokens."
 
+  import Ecto.Query
+
   alias Chat.Data.Schemas.VouchToken
   alias Chat.Repo
 
@@ -119,6 +121,17 @@ defmodule Chat.Data.VouchToken do
         {"*", _} -> true
         {g, r} -> g == r
       end)
+  end
+
+  def scoped_vouch_exists?(subject_hash, scope_prefix) do
+    Repo.exists?(
+      from(vt in VouchToken,
+        where:
+          vt.subject_hash == ^subject_hash and
+            like(vt.kind, ^(scope_prefix <> ".%")) and
+            vt.deleted_flag == false
+      )
+    )
   end
 
   def upsert_vouch_token(changeset) do

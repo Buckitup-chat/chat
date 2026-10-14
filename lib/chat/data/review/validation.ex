@@ -2,12 +2,15 @@ defmodule Chat.Data.Review.Validation do
   @moduledoc "Signature and integrity validation for review operations."
 
   alias Chat.Data.Origin, as: OriginData
+  alias Chat.Data.OriginSetting
   alias Chat.Data.Review, as: ReviewData
   alias Chat.Data.Review.Versioning
   alias Chat.Data.ReviewPublicPassword, as: PublicPasswordData
   alias Chat.Data.Schemas.Review
   alias Chat.Data.User, as: UserData
   alias Chat.Data.User.Validation, as: UserValidation
+  alias Chat.Data.VouchToken, as: VouchTokenData
+  alias Chat.Pq.WriteGate
   alias EnigmaPq
   alias Phoenix.Sync.Writer.Operation
 
@@ -60,6 +63,13 @@ defmodule Chat.Data.Review.Validation do
     end
   end
 
+  defp review_author_hash(review_hash) do
+    case ReviewData.get_review(review_hash) do
+      %{author_hash: ah} -> ah
+      _ -> nil
+    end
+  end
+
   def review_validate(review, changes, op) do
     case op do
       :insert ->
@@ -99,7 +109,9 @@ defmodule Chat.Data.Review.Validation do
 
     case {op, changeset.valid?} do
       {:insert, true} ->
-        Versioning.check_insert_versioning(changeset)
+        changeset
+        |> validate_origin_gate()
+        |> Versioning.check_insert_versioning()
 
       {:update, true} ->
         case Ecto.Changeset.apply_action(changeset, :update) do
@@ -115,6 +127,34 @@ defmodule Chat.Data.Review.Validation do
       _ ->
         changeset
     end
+  end
+
+  defp validate_origin_gate(changeset) do
+    origin_hash = Ecto.Changeset.get_field(changeset, :origin_hash)
+    author_hash = Ecto.Changeset.get_field(changeset, :author_hash)
+
+    case OriginSetting.get_review_access(origin_hash) do
+      "open" ->
+        changeset
+
+      "invite_only" ->
+        scope = "origins.#{origin_hash}.reviews.write"
+
+        if author_hash == origin_hash or invited_to_write?(origin_hash, author_hash, scope),
+          do: changeset,
+          else: Ecto.Changeset.add_error(changeset, :author_hash, "not invited")
+
+      _ ->
+        Ecto.Changeset.add_error(changeset, :author_hash, "not invited")
+    end
+  end
+
+  defp invited_to_write?(origin_hash, author_hash, scope) do
+    VouchTokenData.scoped_vouch_exists?(author_hash, scope) and
+      match?(
+        {:ok, _},
+        VouchTokenData.chain_distance(origin_hash, author_hash, scope, WriteGate.max_depth())
+      )
   end
 
   defp check_review_update_versioning(%{valid?: false} = changeset, _existing, _new_review),
@@ -146,14 +186,7 @@ defmodule Chat.Data.Review.Validation do
     Versioning.pre_apply_versioning(multi, changeset, context)
   end
 
-  # --- Origin existence check ---
-
-  defp review_author_hash(review_hash) do
-    case ReviewData.get_review(review_hash) do
-      %{author_hash: ah} -> ah
-      _ -> nil
-    end
-  end
+  # --- Shared helpers ---
 
   defp validate_origin_exists(changeset, origin_hash) when is_binary(origin_hash) do
     case OriginData.get_origin(origin_hash) do

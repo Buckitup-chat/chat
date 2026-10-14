@@ -23,6 +23,7 @@ defmodule ChatWeb.ElectricController do
 
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Shapes
+  alias Chat.Pq.Ingest
   alias Chat.Pq.OwnerBootstrap
   alias Chat.Pq.WriteGate
   alias ChatWeb.Utils.IngestPop
@@ -30,12 +31,11 @@ defmodule ChatWeb.ElectricController do
   alias Phoenix.Sync.Writer
   alias Phoenix.Sync.Writer.Format
 
+  @ingest_timeout 60_000
   @hex_suffixes ~w[]
   @base64_suffixes ~w[_pkey _cert _b64 _hashes]
 
   def options(conn, _params), do: send_resp(conn, 204, "")
-
-  @ingest_timeout 60_000
 
   def ingest(conn, params) do
     with {_, %{"mutations" => mutations}} <- {:correct_params, params},
@@ -43,13 +43,7 @@ defmodule ChatWeb.ElectricController do
          {:ok, mutations} <-
            IngestUtil.decode_mutation_fields(mutations, @hex_suffixes, @base64_suffixes),
          {:ok, user_pop_context} <- IngestPop.context(params),
-         {:ok, txid, changes} <-
-           Writer.new()
-           |> config_writer(user_pop_context)
-           |> Writer.apply(mutations, repo(),
-             format: Format.TanstackDB,
-             timeout: @ingest_timeout
-           ) do
+         {:ok, txid, changes} <- Ingest.apply(mutations, user_pop_context) do
       maybe_capture_owner(changes)
 
       conn
@@ -67,7 +61,7 @@ defmodule ChatWeb.ElectricController do
     with {_, %{"mutations" => mutations}} <- {:correct_params, params},
          {_, true} <- {:is_mutation_list, is_list(mutations)},
          {:ok, user_pop_context} <- IngestPop.context(params) do
-      writer = Writer.new() |> config_writer(user_pop_context)
+      writer = Writer.new() |> Ingest.config_writer(user_pop_context)
 
       results =
         mutations
@@ -163,13 +157,6 @@ defmodule ChatWeb.ElectricController do
 
       _ ->
         :ok
-    end)
-  end
-
-  defp config_writer(writer, user_pop_context) do
-    Shapes.all()
-    |> Enum.reduce(writer, fn shape_mod, w ->
-      shape_mod.ingest_configure_writer(w, user_pop_context)
     end)
   end
 

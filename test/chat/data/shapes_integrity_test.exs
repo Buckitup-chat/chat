@@ -201,6 +201,15 @@ defmodule Chat.Data.ShapesIntegrityTest do
 
       assert %{deleted_flag: true, owner_timestamp: 200} = stored_vouch(ctx)
     end
+
+    test "on an equal timestamp the revocation wins, in either order", %{issuer: issuer} = ctx do
+      {:ok, _} = ShapeWriter.write(:vouch_token, :insert, signed_vouch(issuer, ctx, 300, false))
+      {:ok, _} = ShapeWriter.write(:vouch_token, :insert, signed_vouch(issuer, ctx, 300, true))
+      assert %{deleted_flag: true, owner_timestamp: 300} = stored_vouch(ctx)
+
+      {:ok, _} = ShapeWriter.write(:vouch_token, :insert, signed_vouch(issuer, ctx, 300, false))
+      assert %{deleted_flag: true, owner_timestamp: 300} = stored_vouch(ctx)
+    end
   end
 
   # --- Helpers ---

@@ -28,7 +28,7 @@ defmodule ChatWeb.ElectricControllerOwnerTest do
       conn = ingest_card(conn, card, identity)
 
       assert %{"txid" => _} = json_response(conn, 200)
-      assert owner_hash() == card.user_hash
+      assert OwnerBootstrap.owner_hash() == card.user_hash
     end
 
     test "a peer's SyncBot card pushed here does not become the owner", %{conn: conn} do
@@ -60,7 +60,7 @@ defmodule ChatWeb.ElectricControllerOwnerTest do
       conn = claim(conn, card.user_hash, identity.sign_skey)
 
       assert json_response(conn, 200) == %{"admin" => card.user_hash}
-      assert owner_hash() == card.user_hash
+      assert OwnerBootstrap.owner_hash() == card.user_hash
     end
 
     test "a claim signed with another key is refused", %{conn: conn} do
@@ -92,14 +92,7 @@ defmodule ChatWeb.ElectricControllerOwnerTest do
       conn = claim(conn, bob_card.user_hash, bob.sign_skey)
 
       assert json_response(conn, 200) == %{"admin" => alice_card.user_hash}
-      assert owner_hash() == alice_card.user_hash
-    end
-  end
-
-  defp owner_hash do
-    case OwnerBootstrap.owner() do
-      %{user_hash: user_hash} -> user_hash
-      nil -> nil
+      assert OwnerBootstrap.owner_hash() == alice_card.user_hash
     end
   end
 

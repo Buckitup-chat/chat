@@ -30,6 +30,14 @@ defmodule Chat.Pq.OwnerBootstrap do
     AdminDb.get(:pq_admin)
   end
 
+  @doc "The owner's user_hash, or nil while the device has none."
+  def owner_hash do
+    case owner() do
+      %{user_hash: user_hash} -> user_hash
+      _ -> nil
+    end
+  end
+
   def owner?(user_hash) do
     case owner() do
       %{user_hash: ^user_hash} -> true

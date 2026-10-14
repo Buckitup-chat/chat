@@ -18,7 +18,8 @@ defmodule ChatWeb.ReadSessionController do
 
   def options(conn, _params), do: send_resp(conn, 204, "")
 
-  defp reject(conn, reason) do
+  @doc "Renders a refused read session or key proof (see `Chat.Pq.KeyProof.prove/3`)."
+  def reject(conn, reason) do
     {status, body} =
       case reason do
         :unknown_shape ->

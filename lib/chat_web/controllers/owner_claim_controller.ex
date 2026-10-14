@@ -6,27 +6,21 @@ defmodule ChatWeb.OwnerClaimController do
 
   use ChatWeb, :controller
 
+  alias Chat.Pq.KeyProof
   alias Chat.Pq.OwnerBootstrap
-  alias Chat.Pq.ReadGate
+  alias ChatWeb.ReadSessionController
 
   def create(conn, params) do
     with {:ok, card} <-
-           ReadGate.prove_key(params["user_hash"], params["challenge_id"], params["signature"]),
+           KeyProof.prove(params["user_hash"], params["challenge_id"], params["signature"]),
          result when result in [:registered, :already_registered] <-
            OwnerBootstrap.maybe_register_card(card) do
-      json(conn, %{admin: owner_hash()})
+      json(conn, %{admin: OwnerBootstrap.owner_hash()})
     else
       :not_eligible -> conn |> put_status(403) |> json(%{error: "not_eligible"})
-      {:error, reason} -> conn |> put_status(401) |> json(%{error: Atom.to_string(reason)})
+      {:error, reason} -> ReadSessionController.reject(conn, reason)
     end
   end
 
   def options(conn, _params), do: send_resp(conn, 204, "")
-
-  defp owner_hash do
-    case OwnerBootstrap.owner() do
-      %{user_hash: user_hash} -> user_hash
-      _ -> nil
-    end
-  end
 end

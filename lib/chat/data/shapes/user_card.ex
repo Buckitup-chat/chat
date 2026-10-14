@@ -7,7 +7,6 @@ defmodule Chat.Data.Shapes.UserCard do
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.User
   alias Chat.Data.User.Validation
-  alias Chat.Pq.OwnerBootstrap
   alias Phoenix.Sync.Writer
 
   @impl true
@@ -56,10 +55,7 @@ defmodule Chat.Data.Shapes.UserCard do
   defp persist_insert(changeset, card) do
     case changeset do
       %{valid?: true} ->
-        with {:ok, stored} = result <- User.upsert_card(changeset) do
-          OwnerBootstrap.maybe_register_card(stored)
-          result
-        end
+        User.upsert_card(changeset)
 
       %{valid?: false} ->
         log(

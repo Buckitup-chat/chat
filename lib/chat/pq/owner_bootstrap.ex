@@ -1,5 +1,9 @@
 defmodule Chat.Pq.OwnerBootstrap do
-  @moduledoc "Registers the first user_card as the device owner (pq_admin) in AdminDB."
+  @moduledoc """
+  Registers the device owner (pq_admin) in AdminDB: the first person to sign in
+  on this device, by ingesting their card here or by claiming it
+  (`ChatWeb.OwnerClaimController`). Peer sync never registers an owner.
+  """
 
   alias Chat.AdminDb
   alias Chat.Pq.SyncBot

@@ -34,9 +34,7 @@ defmodule Chat.Pq.ReadGate do
   """
   def open_session(user_hash, shape, challenge_id, signature_b64) do
     with {:ok, shape_name} <- resolve_shape(shape),
-         {:ok, challenge} <- consume_challenge(challenge_id),
-         {:ok, sign_pkey} <- fetch_sign_pkey(user_hash),
-         :ok <- verify_signature(challenge, signature_b64, sign_pkey),
+         {:ok, _card} <- prove_key(user_hash, challenge_id, signature_b64),
          :ok <- check_chain(user_hash, shape_name) do
       {:ok, ReadSession.issue(user_hash, shape_name), shape_name}
     end
@@ -44,6 +42,19 @@ defmodule Chat.Pq.ReadGate do
       {:ok, _, _} -> :ok
       {:error, reason} -> log("ReadGate denied #{shape} for #{user_hash}: #{reason}", :warning)
     end)
+  end
+
+  @doc """
+  Proves that `user_hash` holds the key of its stored, undeleted card by its
+  signature over a fresh challenge. Returns `{:ok, card}` or `{:error, reason}`
+  where reason is one of `:invalid_challenge`, `:unknown_user`, `:invalid_signature`.
+  """
+  def prove_key(user_hash, challenge_id, signature_b64) do
+    with {:ok, challenge} <- consume_challenge(challenge_id),
+         {:ok, card} <- fetch_card(user_hash),
+         :ok <- verify_signature(challenge, signature_b64, card.sign_pkey) do
+      {:ok, card}
+    end
   end
 
   def check_chain(user_hash, shape_name) do
@@ -82,16 +93,16 @@ defmodule Chat.Pq.ReadGate do
 
   defp consume_challenge(_), do: {:error, :invalid_challenge}
 
-  defp fetch_sign_pkey(user_hash) when is_binary(user_hash) do
+  defp fetch_card(user_hash) when is_binary(user_hash) do
     case UserData.get_card(user_hash) do
-      %{deleted_flag: false, sign_pkey: sign_pkey} -> {:ok, sign_pkey}
+      %{deleted_flag: false} = card -> {:ok, card}
       _ -> {:error, :unknown_user}
     end
   rescue
     Ecto.Query.CastError -> {:error, :unknown_user}
   end
 
-  defp fetch_sign_pkey(_), do: {:error, :unknown_user}
+  defp fetch_card(_), do: {:error, :unknown_user}
 
   defp verify_signature(challenge, signature_b64, sign_pkey) when is_binary(signature_b64) do
     with {:ok, signature} <- Base.decode64(signature_b64, padding: false),

@@ -8,7 +8,7 @@ Control who can read and write data through the Electric API. Three distinct sur
 - **Read / sync (shape subscriptions)** — gated in `trust` mode only: a per-shape [read session](#read-gating-read-sessions) (PoP + chain check on open), then a Bearer token on every read.
 - **Network discovery** — captures the peer's sync key so clients can establish sync relationships.
 
-The system starts in `open` mode. The first user to ingest a `user_card` becomes the **owner** (persisted in AdminDB); a device's SyncBot card never does. While in `open` mode, anyone with valid PoP can read and write. The owner can escalate to `guarded` (writes chain-gated, reads open) or `trust` (all access chain-gated). The server provides nothing to clients unless they ask — a client must know the device serial number to request access.
+The system starts in `open` mode. The first person to sign in on the device becomes the **owner** (persisted in AdminDB); peer sync never registers one. While in `open` mode, anyone with valid PoP can read and write. The owner can escalate to `guarded` (writes chain-gated, reads open) or `trust` (all access chain-gated). The server provides nothing to clients unless they ask — a client must know the device serial number to request access.
 
 ---
 
@@ -29,7 +29,12 @@ Optical-handshake contacts and explicit owner approvals are vouch tokens grantin
 
 ## Bootstrap and Owner
 
-The system starts in `open` mode with no owner. The first `user_card` successfully ingested — over HTTP or stored by peer sync — registers that user as the **owner**: their `user_hash` and `sign_pkey` are persisted in AdminDB. Neither a deleted card nor a SyncBot card (any card whose name starts with `SyncBot_`) registers, by ingest or by sync. Peer devices push their SyncBot cards through `/ingest` (see [SyncBot Card Push](#syncbot-card-push)) and sync them like any card. The mode remains `open` until the owner explicitly changes it.
+The system starts in `open` mode with no owner. The first person to sign in on this device becomes the **owner**: their `user_hash` and `sign_pkey` are persisted in AdminDB. Signing in registers in one of two ways:
+
+- **Card ingest**: the first `user_card` ingested over HTTP (`/ingest`, `/ingest_each`, insert or update) by the key it belongs to.
+- **Owner claim**: `POST /electric/v1/owner_claim` with `user_hash`, `challenge_id` and `signature` (the user's signature over a fresh challenge, as for a read session) for a card already stored here. This covers a person whose card arrived by peer sync before they signed in: the client claims after sign-in when `device_identity` reports no `admin`. Responses: `200 {"admin": <owner user_hash>}` (the existing owner when one is registered already), `401 {"error": "invalid_challenge" | "unknown_user" | "invalid_signature"}`, `403 {"error": "not_eligible"}`.
+
+Peer sync never registers an owner. Neither does a deleted card or a SyncBot card (any card whose name starts with `SyncBot_`): peer devices push their SyncBot cards through `/ingest` (see [SyncBot Card Push](#syncbot-card-push)). The mode remains `open` until the owner explicitly changes it.
 
 - Owner is always approved regardless of mode.
 - Owner can change the access mode (`open` ↔ `guarded` ↔ `trust`).
@@ -562,7 +567,7 @@ No pending items — all features described in this requirement are implemented.
 2. ~~Should there be a "pending" state where unapproved users' requests are queued rather than rejected?~~ **Out of scope** — deferred to a separate feature.
 3. **Where to store owner identity and mode setting?**
 
-   Resolved. Owner identity is stored under `:pq_admin` (`%{user_hash, sign_pkey}`) in AdminDB (CubDB). Access mode is stored under `:pq_gate_mode` (`:open` / `:guarded` / `:trust`). Server identity keypair is stored under `:pq_server_identity`, its signed `user_card` under `:pq_server_card`. On first boot `ServerIdentity` seeds `:pq_gate_mode` to `:open` via `AdminDb.put_new/2`. Ingest and peer sync register the owner via `OwnerBootstrap.maybe_register_card/1` on the first stored `user_card` that is neither deleted nor a SyncBot card.
+   Resolved. Owner identity is stored under `:pq_admin` (`%{user_hash, sign_pkey}`) in AdminDB (CubDB). Access mode is stored under `:pq_gate_mode` (`:open` / `:guarded` / `:trust`). Server identity keypair is stored under `:pq_server_identity`, its signed `user_card` under `:pq_server_card`. On first boot `ServerIdentity` seeds `:pq_gate_mode` to `:open` via `AdminDb.put_new/2`. Card ingest and the owner claim register the owner via `OwnerBootstrap.maybe_register_card/1`, which refuses deleted and SyncBot cards.
 
    Sub-question: should AdminDB settings be **replicated to the backup drive**? On the platform, each USB drive gets its own PG instance with logical replication between main and internal. AdminDB is currently single-drive — backup requires explicit copy logic.
 

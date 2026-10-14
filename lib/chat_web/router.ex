@@ -225,6 +225,9 @@ defmodule ChatWeb.Router do
       options "/read_session", ReadSessionController, :options
       post "/read_session", ReadSessionController, :create
 
+      options "/owner_claim", OwnerClaimController, :options
+      post "/owner_claim", OwnerClaimController, :create
+
       scope "/" do
         pipe_through :file_chunk_read_gate
 

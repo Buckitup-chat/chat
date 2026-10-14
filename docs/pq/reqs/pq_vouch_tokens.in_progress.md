@@ -95,7 +95,7 @@ No new verification code. The vouch token implements the `Signable` protocol and
 1. Fetch issuer's `sign_pkey` from `user_cards`.
 2. `Integrity.verify_signature/1` — same function, same path as every other signed row.
 3. Check `owner_timestamp` monotonicity — reject replays.
-4. Check `deleted_flag` — a `true` with higher `owner_timestamp` revokes the vouch.
+4. Check `deleted_flag` — a `true` with a higher `owner_timestamp` revokes the vouch. On an equal `owner_timestamp` the tombstone wins: a revocation replaces a grant with the same timestamp, a grant never replaces a revocation. Peer sync applies the same rule, so such a tie resolves the same way on every replica, whichever row arrives first.
 
 Ingest validation follows the same `Chat.Data.Shapes.Shape` behaviour — a `vouch_token_validate/3` function passed to `Phoenix.Sync.Writer.allow/4`.
 

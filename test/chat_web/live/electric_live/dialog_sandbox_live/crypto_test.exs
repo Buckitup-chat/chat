@@ -74,6 +74,63 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.CryptoTest do
     |> Map.put(peer.user_hash, unwrapped)
   end
 
+  describe "parse_and_validate_identity/1" do
+    test "accepts an export whose secret key matches its public key" do
+      keys = identity_keys()
+
+      assert {:ok, %{user_hash: user_hash}} =
+               keys |> identity_json() |> Crypto.parse_and_validate_identity()
+
+      assert user_hash == keys.user_hash
+    end
+
+    test "refuses a published public key paired with another secret key" do
+      owner = identity_keys()
+      json = identity_json(%{owner | sign_skey: identity_keys().sign_skey})
+
+      assert Crypto.parse_and_validate_identity(json) ==
+               {:error, "sign_skey does not match sign_pkey"}
+    end
+
+    test "refuses a public key with a malformed secret key" do
+      json = identity_json(%{identity_keys() | sign_skey: ""})
+
+      assert Crypto.parse_and_validate_identity(json) ==
+               {:error, "sign_skey does not match sign_pkey"}
+    end
+  end
+
+  defp identity_keys do
+    {sign_pkey, sign_skey} = EnigmaPq.generate_sign_keypair()
+    {crypt_pkey, crypt_skey} = EnigmaPq.generate_crypt_keypair()
+    {contact_pkey, contact_skey} = EnigmaPq.generate_crypt_keypair()
+
+    %{
+      user_hash: sign_pkey |> EnigmaPq.hash() |> Chat.Data.Types.UserHash.from_binary(),
+      sign_pkey: sign_pkey,
+      sign_skey: sign_skey,
+      crypt_pkey: crypt_pkey,
+      crypt_skey: crypt_skey,
+      crypt_cert: EnigmaPq.sign(crypt_pkey, sign_skey),
+      contact_pkey: contact_pkey,
+      contact_skey: contact_skey,
+      contact_cert: EnigmaPq.sign(contact_pkey, sign_skey)
+    }
+  end
+
+  defp identity_json(keys) do
+    keys
+    |> Map.drop([:user_hash])
+    |> Map.new(fn {field, bin} -> {field, Base.encode64(bin, padding: false)} end)
+    |> Map.merge(%{
+      type: "buckitup_pq_identity",
+      version: 2,
+      user_hash: keys.user_hash,
+      name: "Owner"
+    })
+    |> Jason.encode!()
+  end
+
   defp sender_msg_key(user, peer_hash) do
     Crypto.derive_sender_msg_key(user.sign_skey, user.crypt_skey, user.contact_skey, peer_hash)
   end

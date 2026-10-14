@@ -29,7 +29,7 @@ Optical-handshake contacts and explicit owner approvals are vouch tokens grantin
 
 ## Bootstrap and Owner
 
-The system starts in `open` mode with no owner. The first `user_card` successfully ingested — over HTTP or stored by peer sync — registers that user as the **owner**: their `user_hash` and `sign_pkey` are persisted in AdminDB. A SyncBot card (any card whose name starts with `SyncBot_`) never registers, however it arrives: peer devices push theirs through `/ingest` (see [SyncBot Card Push](#syncbot-card-push)) and sync them like any card. The mode remains `open` until the owner explicitly changes it.
+The system starts in `open` mode with no owner. The first `user_card` successfully ingested — over HTTP or stored by peer sync — registers that user as the **owner**: their `user_hash` and `sign_pkey` are persisted in AdminDB. Neither a deleted card nor a SyncBot card (any card whose name starts with `SyncBot_`) registers, by ingest or by sync. Peer devices push their SyncBot cards through `/ingest` (see [SyncBot Card Push](#syncbot-card-push)) and sync them like any card. The mode remains `open` until the owner explicitly changes it.
 
 - Owner is always approved regardless of mode.
 - Owner can change the access mode (`open` ↔ `guarded` ↔ `trust`).
@@ -562,7 +562,7 @@ No pending items — all features described in this requirement are implemented.
 2. ~~Should there be a "pending" state where unapproved users' requests are queued rather than rejected?~~ **Out of scope** — deferred to a separate feature.
 3. **Where to store owner identity and mode setting?**
 
-   Resolved. Owner identity is stored under `:pq_admin` (`%{user_hash, sign_pkey}`) in AdminDB (CubDB). Access mode is stored under `:pq_gate_mode` (`:open` / `:guarded` / `:trust`). Server identity keypair is stored under `:pq_server_identity`, its signed `user_card` under `:pq_server_card`. On first boot `ServerIdentity` seeds `:pq_gate_mode` to `:open` via `AdminDb.put_new/2`. Ingest and peer sync register the owner via `OwnerBootstrap.maybe_register_card/1` on the first stored `user_card` that is not a SyncBot card. The user sandbox identity import (`/electric/user_sandbox`, a development page) registers the imported identity directly.
+   Resolved. Owner identity is stored under `:pq_admin` (`%{user_hash, sign_pkey}`) in AdminDB (CubDB). Access mode is stored under `:pq_gate_mode` (`:open` / `:guarded` / `:trust`). Server identity keypair is stored under `:pq_server_identity`, its signed `user_card` under `:pq_server_card`. On first boot `ServerIdentity` seeds `:pq_gate_mode` to `:open` via `AdminDb.put_new/2`. Ingest and peer sync register the owner via `OwnerBootstrap.maybe_register_card/1` on the first stored `user_card` that is neither deleted nor a SyncBot card.
 
    Sub-question: should AdminDB settings be **replicated to the backup drive**? On the platform, each USB drive gets its own PG instance with logical replication between main and internal. AdminDB is currently single-drive — backup requires explicit copy logic.
 

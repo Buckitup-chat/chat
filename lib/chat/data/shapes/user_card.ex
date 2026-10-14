@@ -33,9 +33,6 @@ defmodule Chat.Data.Shapes.UserCard do
   end
 
   @impl true
-  def sync_after_persist(_operation, _struct, _opts), do: :ok
-
-  @impl true
   def ingest_configure_writer(writer, user_pop_context) do
     Writer.allow(writer, UserCard,
       accept: [:insert, :update],

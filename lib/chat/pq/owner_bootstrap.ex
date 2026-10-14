@@ -13,7 +13,9 @@ defmodule Chat.Pq.OwnerBootstrap do
     end
   end
 
-  @doc "Registers the owner from a stored user_card; a device's SyncBot card never owns a device."
+  @doc "Registers the owner from a stored user_card; a deleted card or a device's SyncBot card never owns a device."
+  def maybe_register_card(%{deleted_flag: true}), do: :not_eligible
+
   def maybe_register_card(%{user_hash: user_hash, sign_pkey: sign_pkey} = card) do
     if SyncBot.card?(card),
       do: :not_eligible,

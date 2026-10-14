@@ -136,17 +136,6 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.CryptoTest do
   end
 
   defp build_user do
-    {sign_pkey, sign_skey} = EnigmaPq.generate_sign_keypair()
-    {crypt_pkey, crypt_skey} = EnigmaPq.generate_crypt_keypair()
-    {_contact_pkey, contact_skey} = EnigmaPq.generate_crypt_keypair()
-    user_hash = sign_pkey |> EnigmaPq.hash() |> Chat.Data.Types.UserHash.from_binary()
-
-    %{
-      user_hash: user_hash,
-      sign_skey: sign_skey,
-      crypt_pkey: crypt_pkey,
-      crypt_skey: crypt_skey,
-      contact_skey: contact_skey
-    }
+    Map.take(identity_keys(), [:user_hash, :sign_skey, :crypt_pkey, :crypt_skey, :contact_skey])
   end
 end

@@ -2,6 +2,8 @@ defmodule ChatWeb.ElectricControllerOwnerTest do
   use ChatWeb.ConnCase, async: false
   use ChatWeb.DataCase
 
+  import Chat.Test.ReviewFixtures, only: [sign_with_key: 2]
+
   alias Chat.AdminDb
   alias Chat.Challenge
   alias Chat.Data.User
@@ -55,6 +57,21 @@ defmodule ChatWeb.ElectricControllerOwnerTest do
     {:ok, _} = ShapeWriter.write(:user_card, :insert, card)
 
     assert User.get_card(card.user_hash)
+    assert OwnerBootstrap.owner() == nil
+  end
+
+  test "a deleted card stored by peer sync does not become the owner" do
+    identity = User.generate_pq_identity("Gone")
+
+    card =
+      identity
+      |> User.extract_pq_card()
+      |> Map.put(:deleted_flag, true)
+      |> sign_with_key(identity.sign_skey)
+
+    {:ok, _} = ShapeWriter.write(:user_card, :insert, card)
+
+    assert %{deleted_flag: true} = User.get_card(card.user_hash)
     assert OwnerBootstrap.owner() == nil
   end
 

@@ -8,17 +8,10 @@ defmodule Chat.NetworkSynchronization.Electric.SyncBotCardPusher do
   """
 
   alias Chat.Data.User
-  alias Chat.DeviceId
   alias Chat.Pq.ServerIdentity
+  alias Chat.Pq.SyncBot
 
   @timeout 10_000
-  @name_prefix "SyncBot_"
-
-  @doc "Whether `card` is a device's SyncBot card: the name every device gives the card it pushes."
-  def sync_bot_card?(%{name: name}) when is_binary(name),
-    do: String.starts_with?(name, @name_prefix)
-
-  def sync_bot_card?(_card), do: false
 
   @doc """
   Pushes the local SyncBot's user_card to `peer_url`.
@@ -42,7 +35,7 @@ defmodule Chat.NetworkSynchronization.Electric.SyncBotCardPusher do
 
   defp server_identity_with_name do
     ServerIdentity.get()
-    |> Map.put(:name, @name_prefix <> DeviceId.id())
+    |> Map.put(:name, SyncBot.card_name())
   end
 
   defp ingest_payload(card, challenge_id, signature) do

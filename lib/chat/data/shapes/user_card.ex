@@ -32,18 +32,6 @@ defmodule Chat.Data.Shapes.UserCard do
     end
   end
 
-  # persist_insert reports {:ok, _} for a card it refused too: only a stored card can own.
-  @impl true
-  def sync_after_persist(:insert, %UserCard{user_hash: user_hash}, _opts)
-      when is_binary(user_hash) do
-    case User.get_card(user_hash) do
-      %UserCard{} = stored -> OwnerBootstrap.maybe_register_card(stored)
-      nil -> :ok
-    end
-
-    :ok
-  end
-
   @impl true
   def sync_after_persist(_operation, _struct, _opts), do: :ok
 
@@ -71,7 +59,10 @@ defmodule Chat.Data.Shapes.UserCard do
   defp persist_insert(changeset, card) do
     case changeset do
       %{valid?: true} ->
-        User.upsert_card(changeset)
+        with {:ok, stored} = result <- User.upsert_card(changeset) do
+          OwnerBootstrap.maybe_register_card(stored)
+          result
+        end
 
       %{valid?: false} ->
         log(

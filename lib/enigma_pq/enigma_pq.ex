@@ -62,6 +62,17 @@ defmodule EnigmaPq do
     :crypto.verify(:mldsa87, :none, data, signature, sign_pkey)
   end
 
+  # Whether sign_skey is the secret half of sign_pkey: signs a fresh nonce and verifies it.
+  def signs_for?(sign_skey, sign_pkey) do
+    nonce = :crypto.strong_rand_bytes(32)
+
+    nonce
+    |> sign(sign_skey)
+    |> then(&verify(nonce, &1, sign_pkey))
+  rescue
+    _ -> false
+  end
+
   # --- KEM ---
   # Spec: pq_dialogs.done.md §Key wrapping — ML-KEM-1024 (FIPS 203)
   # Used for: wrapping sender_msg_key to peer in dialog_keys

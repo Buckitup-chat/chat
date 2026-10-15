@@ -24,8 +24,7 @@ defmodule Chat.NetworkSynchronization.Electric.PeerConnector do
   import Tools.GenServerHelpers
 
   alias Chat.NetworkSynchronization
-  alias Chat.NetworkSynchronization.Electric.PeerIdentifier
-  alias Chat.NetworkSynchronization.Electric.PeerSync
+  alias Chat.NetworkSynchronization.Electric.{PeerIdentifier, PeerSync, SyncBotCardPusher}
 
   @electric_dynamic Chat.NetworkSynchronization.Supervisor.ElectricDynamic
 
@@ -50,20 +49,22 @@ defmodule Chat.NetworkSynchronization.Electric.PeerConnector do
   def handle_continue(:connect, state), do: state |> attempt_connect() |> noreply()
 
   @impl true
-  def handle_info(:connect, state), do: state |> attempt_connect() |> noreply()
+  def handle_info(msg, %{peer_sync_pid: peer_sync_pid} = state) do
+    case msg do
+      :connect ->
+        state |> attempt_connect() |> noreply()
 
-  def handle_info(
-        {:DOWN, _ref, :process, pid, reason},
-        %{peer_sync_pid: pid, peer_url: peer_url} = state
-      ) do
-    log("PeerSync for #{peer_url} exited (#{inspect(reason)}), reconnecting", :warning)
+      {:DOWN, _ref, :process, ^peer_sync_pid, reason} when is_pid(peer_sync_pid) ->
+        log("PeerSync for #{state.peer_url} exited (#{inspect(reason)}), reconnecting", :warning)
 
-    %{state | peer_sync_pid: nil, backoff: @initial_backoff_ms}
-    |> attempt_connect()
-    |> noreply()
+        %{state | peer_sync_pid: nil, backoff: @initial_backoff_ms}
+        |> attempt_connect()
+        |> noreply()
+
+      {:DOWN, _ref, :process, _pid, _reason} ->
+        state |> noreply()
+    end
   end
-
-  def handle_info({:DOWN, _ref, :process, _pid, _reason}, state), do: state |> noreply()
 
   @impl true
   def handle_call(:disconnect, _from, %{peer_sync_pid: peer_sync_pid} = state) do
@@ -80,8 +81,22 @@ defmodule Chat.NetworkSynchronization.Electric.PeerConnector do
 
   defp attempt_connect(%{peer_url: peer_url} = state) do
     case PeerIdentifier.fetch_system_identifier(peer_url) do
-      {:ok, system_identifier} -> start_peer_sync(state, system_identifier)
-      {:error, reason} -> retry(state, "system_identifier lookup failed (#{inspect(reason)})")
+      {:ok, system_identifier} ->
+        push_sync_bot_card(peer_url)
+        start_peer_sync(state, system_identifier)
+
+      {:error, reason} ->
+        retry(state, "system_identifier lookup failed (#{inspect(reason)})")
+    end
+  end
+
+  defp push_sync_bot_card(peer_url) do
+    case SyncBotCardPusher.push(peer_url) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        log("SyncBot card push to #{peer_url} failed: #{inspect(reason)}", :warning)
     end
   end
 

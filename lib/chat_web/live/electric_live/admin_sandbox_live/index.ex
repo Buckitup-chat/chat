@@ -22,6 +22,7 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Index do
       server_user_hash: server_user_hash(),
       admin_user_hash: admin_user_hash(),
       gate_mode: gate_mode(),
+      max_depth: max_depth(),
       identity: nil,
       is_admin: false,
       admin_role: nil,
@@ -76,6 +77,21 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Index do
     end
   end
 
+  def handle_event("set_max_depth", %{"value" => depth_str}, socket) do
+    case Integer.parse(depth_str) do
+      {depth, ""} when depth >= 1 ->
+        if socket.assigns.is_admin do
+          AdminDb.put(:pq_max_depth, depth)
+          socket |> assign(max_depth: depth) |> noreply()
+        else
+          socket |> assign(error_message: "Only admin can change max depth") |> noreply()
+        end
+
+      _ ->
+        socket |> assign(error_message: "Max depth must be a positive integer") |> noreply()
+    end
+  end
+
   def handle_event("clear_error", _params, socket) do
     socket |> assign(:error_message, nil) |> noreply()
   end
@@ -114,6 +130,7 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Index do
   end
 
   defp gate_mode, do: AdminDb.get(:pq_gate_mode) || :open
+  defp max_depth, do: AdminDb.get(:pq_max_depth) || VouchToken.default_max_depth()
 
   defp admin_user_hash do
     case OwnerBootstrap.owner() do

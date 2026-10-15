@@ -167,6 +167,35 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Render do
       <p :if={!@is_admin} class="mt-3 text-xs text-gray-400">
         Import admin identity above to change the gate mode.
       </p>
+
+      <div :if={@gate_mode != :open} class="mt-6 pt-4 border-t border-gray-200">
+        <h3 class="text-sm font-semibold text-gray-900 mb-2">Max Chain Depth</h3>
+        <p class="text-xs text-gray-500 mb-3">
+          Users reachable within this many vouch-chain hops can access.
+        </p>
+        <div class="flex items-center gap-3">
+          <input
+            type="number"
+            min="1"
+            value={@max_depth}
+            disabled={!@is_admin}
+            phx-blur="set_max_depth"
+            phx-keydown="set_max_depth"
+            phx-key="Enter"
+            name="depth"
+            class={[
+              "w-20 px-3 py-2 border rounded-lg text-sm font-mono",
+              if(@is_admin,
+                do: "border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500",
+                else: "border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed"
+              )
+            ]}
+          />
+          <span class="text-sm text-gray-600">
+            (default: 7)
+          </span>
+        </div>
+      </div>
     </div>
     """
   end

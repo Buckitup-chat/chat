@@ -13,15 +13,15 @@ The system starts in `open` mode. The first user to ingest a `user_card` registe
 ---
 
 ## Access Modes
-| Mode | `user_card` / `vouch_token` ingest | Other ingest | Shape reads / sync |
-|------|------------------------------------|--------------|--------------------|
-| `open` | Anyone with valid PoP | Anyone with valid PoP | Anyone (not gated) |
-| `guarded` | Anyone with valid PoP (never chain-gated) | Chain-gated (see [Trust Gate](#trust-gate)) | Anyone (not gated) |
-| `trust` | Anyone with valid PoP (never chain-gated) | Chain-gated (see [Trust Gate](#trust-gate)) | Read session + chain-gated (see [Read Gating](#read-gating-read-sessions)) |
+| Mode | `user_card` / `vouch_token` ingest | Other ingest | `user_card` / `vouch_token` reads | Other shape reads / sync |
+|------|------------------------------------|--------------|------------------------------------|--------------------------|
+| `open` | Anyone with valid PoP | Anyone with valid PoP | Anyone (not gated) | Anyone (not gated) |
+| `guarded` | Anyone with valid PoP (never chain-gated) | Chain-gated (see [Trust Gate](#trust-gate)) | Anyone (not gated) | Anyone (not gated) |
+| `trust` | Anyone with valid PoP (never chain-gated) | Chain-gated (see [Trust Gate](#trust-gate)) | Anyone (never gated) | Read session + chain-gated (see [Read Gating](#read-gating-read-sessions)) |
 
 Default mode: `open` (preserves current behavior). `guarded` mode gates writes via vouch chain and leaves reads open. `trust` mode gates **all** access — reads, writes, and peer sync — via PoP + vouch chain. The same mechanism applies to users and peer servers alike.
 
-> **`user_card` and `vouch_token` are never chain-gated.** They are the inputs to chain resolution: `user_cards` supply `sign_pkey` for each `user_hash`, and vouch tokens are the graph edges. The server must accept every one it is offered, in any mode, so it can resolve chains. Gating them would be circular — a user couldn't become reachable without first being reachable, and a missing intermediate card or token would break chains for everyone downstream of it. Both still go through their shape's own PoP / signature checks. Accepting a card or token grants nothing by itself: the chain check on other shapes decides what the user can write.
+> **`user_card` and `vouch_token` are never chain-gated — neither writes nor reads.** They are the inputs to chain resolution: `user_cards` supply `sign_pkey` for each `user_hash`, and vouch tokens are the graph edges. The server must accept every one it is offered, in any mode, so it can resolve chains, and every client and peer must be able to read them so it can learn the trust topology it needs to authenticate. Gating them would be circular — a user couldn't become reachable without first being reachable, and a missing intermediate card or token would break chains for everyone downstream of it. Both still go through their shape's own PoP / signature checks on writes. Accepting a card or token grants nothing by itself: the chain check on other shapes decides what the user can access.
 
 Optical-handshake contacts and explicit owner approvals are vouch tokens granting `device.<sn>.storage.write` (and optionally `device.<sn>.storage.read`) — they place a user at chain distance 1 from the owner. Provenance (how trust was established) is inferred from the issuer, not encoded in the scope. The owner controls effective behavior by tuning the maximum allowed chain depth.
 
@@ -55,25 +55,60 @@ Every participant — user or server — has its own keypair and authenticates t
 
 The server identity is a user like any other on the wire, so it needs a `user_card`. The `SyncBot_` prefix tells people it is an auxiliary identity that syncs data between devices, not a person.
 
-- **Name**: `SyncBot_<device_id>` (`Chat.Pq.ServerCard.name/0`, device id from `Chat.DeviceId`).
-- **Build**: `Chat.Pq.ServerIdentity` builds and signs the card at start and keeps it in AdminDB under `:pq_server_card`. It is rebuilt only when the name changes (the device id changed), so `owner_timestamp` does not move on every boot.
-- **Own card**: stored into PostgreSQL after migrations on every repo start (`Chat.Db.Boot.RepoReady.store_server_card/1`, called by `RepoReady` on host and by `Platform.Storage.Repo.MigrationRunner` for each drive repo). The upsert keeps the newer `owner_timestamp`, so repeating it is a no-op.
-- **Served**: `GET /electric/v1/server_card` returns the card as JSON with binary fields in Base64. Always accessible, no Electric readiness required.
-- **Peer cards**: on peer discovery `PeerConnector` fetches the peer's card and stores it (see [Peer servers](#peer-servers)).
-- **Owner bootstrap**: server cards are written directly, not through `ShapeWriter`, so they never trigger `OwnerBootstrap` and cannot claim device ownership.
+- **Name**: `SyncBot_<device_id>` (device id from `Chat.DeviceId`).
+- **Own card**: the device's own SyncBot card is stored into PostgreSQL after migrations on every repo start. The upsert keeps the newer `owner_timestamp`, so repeating it is a no-op. Written directly (not through `ShapeWriter`), so it never triggers `OwnerBootstrap` and cannot claim device ownership.
+- **Discovery**: `GET /electric/v1/device_identity` exposes the SyncBot's `user_hash` and `sign_pkey` (see [Device Identity Endpoint](#device-identity-endpoint)). Peer devices use this to know which identity to vouch for.
+- **Peer cards**: arrive through normal `user_card` sync — `user_card` reads are exempt from gating (see [Read-exempt shapes](#read-exempt-shapes)), so peers always receive each other's SyncBot cards.
+
+### Device Identity Endpoint
+
+`GET /electric/v1/device_identity` — always accessible (no Electric readiness, no auth). Returns the three things a peer needs to know about this device:
+
+```json
+{
+  "device_id": "<serial number>",
+  "sync_bot": { "user_hash": "u_…", "sign_pkey": "<base64>" },
+  "admin":    { "user_hash": "u_…", "sign_pkey": "<base64>" }
+}
+```
+
+| Field | Meaning | null when |
+|-------|---------|-----------|
+| `device_id` | Device serial number. Scopes are `device.<device_id>.storage.*` | never |
+| `sync_bot` | This device's SyncBot identity — the `user_hash` that will request read sessions on the peer | `ServerIdentity` not started (shouldn't happen) |
+| `admin` | The owner / vouch-chain root of this device | no owner registered yet |
+
+A peer uses this to know **which `user_hash` to vouch for** — the `sync_bot.user_hash` is who will be authenticating when reading shapes from the peer.
 
 ### Network Discovery
 
-The server provides nothing unless the client asks — a client must know the device serial number. **Network discovery** captures the peer server's public key so that:
+The server provides nothing unless the client asks — a client must know the device serial number. **Network discovery** captures the peer's identity so that:
 
-- A client can authenticate the server it syncs from.
-- A peer server can authenticate against the target device's gate.
+- A peer server can authenticate against the target device's gate (`sync_bot.user_hash`).
+- The owner knows which identity to approve (`sync_bot.user_hash` from the peer's `device_identity`).
 
-The exact discovery protocol (mDNS, optical handshake extension, manual entry) is defined by the discovery flow, not this requirement.
+The exact discovery protocol (mDNS, optical handshake extension, manual entry) is defined by the discovery flow, not this requirement. `device_identity` is the identity exchange endpoint all discovery methods use.
+
+### SyncBot Card Push
+
+When device A discovers device B (via LAN detection or manual entry in the admin panel), A **pushes its SyncBot `user_card` to B** via B's `/ingest` endpoint. This is necessary so B knows A's identity and B's admin can approve A for read/write access.
+
+The push happens early in the `PeerConnector` flow — after the system identifier is resolved but before `PeerSync` starts shape consumers. The mechanism:
+
+1. Fetch a one-time challenge from B (`GET /electric/v1/challenge`).
+2. Build the SyncBot's `user_card` insert mutation (from `ServerIdentity` + `ServerCard`).
+3. Sign the challenge with the server identity key.
+4. `POST /ingest` to B with `auth` (challenge + signature) and the `user_card` mutation.
+
+This always succeeds regardless of B's access mode — `user_card` ingest is never chain-gated (see the note under [Access Modes](#access-modes)). The push is **idempotent**: if the card already exists on B with the same or newer `owner_timestamp`, the upsert is a no-op. A network failure during the push retries with the same backoff as the rest of `PeerConnector`, since the card must land before shape sync can work in `trust` mode.
+
+After the card lands on B, B's admin sees `SyncBot_<A's device_id>` in the user list and can approve it (issue a vouch token). Until approved, A's shape consumers enter [Awaiting approval](#awaiting-approval) with backoff.
 
 ### Peer-to-Peer Sync
 
 When device A syncs from device B, device A acts as a client — it opens a [read session](#read-gating-read-sessions) on B with its own server key via PoP, and B checks A against the vouch chain (in `trust` mode). The mechanism is identical to a user reading shapes: same read gate, same check, same vouch token scopes.
+
+For this to work, B must know A's SyncBot identity (a `user_card` for A's `sync_bot.user_hash` must exist on B). The card is pushed to B during peer connection setup (see [SyncBot Card Push](#syncbot-card-push)).
 
 ---
 
@@ -141,19 +176,18 @@ Owner identity and mode setting live in AdminDB — see [Open Questions §3](#op
 
 ### Where
 
-Writes and reads are gated by two plugs. They share the owner / mode / chain-distance decision but identify the caller differently:
+Writes and reads are gated at two levels:
 
-- **Writes** — `ChatWeb.Plugs.ElectricAccessGate` (target; today `Chat.Pq.WriteGate`, see below). The caller proves possession with a one-time signed challenge in the request body.
-- **Reads** — `ChatWeb.Plugs.ElectricReadGate`. The caller presents a Bearer token from a read session. See [Read Gating](#read-gating-read-sessions).
+- **Writes** — `Chat.Pq.WriteGate`, per shape inside the ingest writer. The caller proves possession with a one-time signed challenge in the request body. See [Write Gate](#write-gate-chatpqwritegate).
+- **Reads** — `ChatWeb.Plugs.ElectricReadGate`, a plug in the router pipeline. The caller presents a Bearer token from a read session. See [Read Gating](#read-gating-read-sessions).
 
 ```
 scope "/" do
   pipe_through ChatWeb.Plugs.ElectricReadiness
 
   scope "/" do
-    pipe_through ChatWeb.Plugs.ElectricAccessGate   # <-- target: PoP + vouch chain for writes
     pipe_through ChatWeb.Plugs.ElectricChallengeInjector
-    post "/ingest", ElectricController, :ingest
+    post "/ingest", ElectricController, :ingest       # write gate runs per shape inside the writer
     post "/ingest_each", ElectricController, :ingest_each
   end
 end
@@ -161,35 +195,18 @@ end
 scope "/electric/v1/shapes" do
   pipe_through ChatWeb.Plugs.ElectricReadiness
   pipe_through ChatWeb.Plugs.ElectricTableGuard
-  pipe_through ChatWeb.Plugs.ElectricReadGate       # <-- new: Bearer read session + vouch chain
+  pipe_through ChatWeb.Plugs.ElectricReadGate         # Bearer read session + vouch chain
   forward "/", ChatWeb.Plugs.HexToBase64Electric
 end
 ```
 
-### What it checks (writes)
-
-1. **No owner registered yet** → allow. If this is a `user_card` insert, register the user as owner in AdminDB (post-ingest hook or writer callback). Mode stays `open`.
-2. **Mode is `open`** → verify PoP (caller must prove key ownership), then pass through.
-3. **Caller is the owner** → pass through.
-4. **Mode is `guarded` or `trust`** → verify PoP, then look up chain distance for caller's `user_hash`; if `chain_distance ≤ max_depth`, pass through; if beyond or no path, reject with `403`.
-5. **Otherwise** → reject with `403 Forbidden`, body: `{"error": "access_denied", "mode": "<current_mode>"}`.
-
 Reads follow [Read Gating § What the gate checks](#what-the-gate-checks).
 
-### Identifying the caller (writes)
+### Write Gate (`Chat.Pq.WriteGate`)
 
-The request carries a PoP signature (signed challenge) and the caller's `user_hash`:
+Write gating is enforced per shape, inside the ingest writer, not in a router plug. `Chat.Pq.WriteGate.and_gate/3` wraps a shape's `check` callback. The chain check runs only after the shape's own PoP/ownership check returns `:ok`:
 
-1. Extract `user_hash`, `challenge_id`, and `signature` from `params["auth"]`.
-2. Look up `sign_pkey` from `user_cards` for the given `user_hash`.
-3. Verify `ML-DSA-87.verify(challenge, signature, sign_pkey)`. If valid → caller is identified, proceed with mode checks.
-4. If `user_hash` is unknown (no user_card yet) — check if this is a `user_card` create mutation. If so, extract `sign_pkey` from the mutation payload, compute `user_hash`, and verify the signature against that key. If valid, allow in every mode — `user_card` is never chain-gated (see the note under [Access Modes](#access-modes)).
-
-Caller resolution uses `user_cards` + vouch token cache — no separate derived table needed.
-
-### Current implementation: `Chat.Pq.WriteGate`
-
-Until the `ElectricAccessGate` plug lands, write gating is enforced per shape, inside the ingest writer, not in the router pipeline. `Chat.Pq.WriteGate.and_gate/3` wraps a shape's `check` callback. The chain check runs only after the shape's own PoP/ownership check returns `:ok`:
+> **Why per-shape, not a router plug?** A router-level plug would need to parse mutations to identify the caller (each shape uses a different owner field — `sender_hash`, `reactor_hash`, `uploader_hash`, etc.) and to distinguish gated from ungated shapes in mixed `/ingest_each` batches. It would duplicate logic that already runs per mutation inside the writer, with no behavioral gain — the client sees the same `403` body either way. Per-shape enforcement also lets each shape's PoP check run first, so the chain check only fires for callers who already proved key ownership.
 
 ```elixir
 check:
@@ -228,11 +245,10 @@ Not wrapped (ungated in every mode):
 - `user_card`, `vouch_token` — intentionally, so the server receives every card and token it is offered and can resolve chains (see the note under [Access Modes](#access-modes)).
 - `review_post_right(_candidate)`, `review_revoke_right(_candidate)`.
 
-**Differences from the target design above:**
+**Known limitations:**
 
 - `max_depth` is fixed at `VouchToken.default_max_depth/0` (7). There is no owner setting yet.
 - `guarded` and `trust` gate writes the same way. `trust` additionally gates reads (see [Read Gating](#read-gating-read-sessions)).
-- The rejection happens inside the writer, per mutation, not in a plug before the controller. The client sees the same `403` body either way.
 
 ---
 
@@ -300,16 +316,19 @@ Client rules (lazy opening, sharing, renewal, stream wiring) are in [Client Beha
 
 1. **Mode is not `trust`** → pass.
 2. **No owner registered** → pass.
-3. **Valid session** — the `Authorization: Bearer` token exists in ETS, is not expired, and its `shape` equals the requested table's shape → pass.
-4. **Otherwise** (no header, unknown or expired token, or token for another shape) → `401 {"error": "read_session_required", "shape": "<shape>"}`.
+3. **Exempt shape** (`user_card`, `vouch_token`) → pass. See [Read-exempt shapes](#read-exempt-shapes).
+4. **Valid session** — the `Authorization: Bearer` token exists in ETS, is not expired, and its `shape` equals the requested table's shape → pass.
+5. **Otherwise** (no header, unknown or expired token, or token for another shape) → `401 {"error": "read_session_required", "shape": "<shape>"}`.
 
 The gate does no signature check and no chain lookup. Both happened when the session was opened.
 
-### Nothing is exempt
+### Read-exempt shapes
 
-Unlike writes, **no shape is exempt** from read gating in `trust` mode, including `user_card` and `vouch_token`. The write-side exemption exists because the server needs cards and tokens to resolve chains, and the server reads its own database directly. Leaving `vouch_tokens` readable would expose the trust topology (see [Open Questions §4](#open-questions)).
+**`user_card` and `vouch_token` reads are exempt** from read gating in `trust` mode, same as their writes. The reasoning is the same: they are the inputs to chain resolution, and gating them would be circular.
 
-An unvouched client can still ingest its `user_card`, but opening a read session for any shape fails with `403 not_in_trust_chain`. The client enters [Awaiting approval](#awaiting-approval).
+This also solves peer sync bootstrap: when device A syncs from device B, A reads B's `user_cards` (including `SyncBot_B`) and `vouch_tokens` without a session. A then has the trust data it needs to open read sessions for everything else.
+
+An unvouched client can still ingest its `user_card` and read `user_cards` / `vouch_tokens`, but opening a read session for any other shape fails with `403 not_in_trust_chain`. The client enters [Awaiting approval](#awaiting-approval).
 
 ### Gated surfaces
 
@@ -321,7 +340,7 @@ Every route that serves synced data gets the read gate. Otherwise gating `/shape
 | `GET /electric/v1/file_chunk/:file_id/:chunk_index` | Session for shape `file_chunk` |
 | `GET /electric/v1/file_chunk_status` | Session for shape `file_chunk` |
 
-Not gated: `/status`, `/challenge`, `/read_session`, `/system_identifier` (needed before authenticating).
+Not gated: `/status`, `/challenge`, `/read_session`, `/system_identifier`, `/device_identity` (needed before authenticating).
 
 ### HTTP caching
 
@@ -331,12 +350,10 @@ Electric sends `cache-control: public` on shape responses. In `trust` mode the r
 
 A peer server reads the same way: it opens a read session per shape, signed with its server identity key, and sends the Bearer token from its Electric client. This requires the peer's server identity to have a `user_card` on the target device.
 
-That card arrives through peer discovery. When `PeerConnector` has resolved a peer's `system_identifier`, it calls `GET /electric/v1/server_card` on the peer and stores the result with `Chat.Pq.ServerCard.store_peer/1`, before `PeerSync` starts. Discovery runs on both devices, so each one ends up holding the other's card.
+The peer's SyncBot card arrives on the target device through an active push: when A connects to B, A pushes its own SyncBot card via `/ingest` (see [SyncBot Card Push](#syncbot-card-push)). Additionally, since `user_card` and `vouch_token` reads are exempt (see [Read-exempt shapes](#read-exempt-shapes)), cards also propagate through normal Electric sync once shape consumers are running.
 
-- Only cards named `SyncBot_*` are accepted (`{:error, :not_a_server_card}` otherwise).
-- The card must pass the same checks as a user card insert: signature, `user_hash` against `sign_pkey`, `crypt_cert` and `contact_cert`.
-- The fetch is best effort. If the peer has no endpoint (older firmware) or fails, a warning is logged and sync starts anyway.
 - Having a card only makes the peer a known user, so it gets past `401 unknown_user`. Gated reads still need the vouch chain: in `trust` mode someone has to vouch for `SyncBot_<peer_device_id>`.
+- `GET /electric/v1/device_identity` tells the peer the `sync_bot.user_hash` it will need to vouch for, and the `admin` identity (the vouch-chain root) — useful for the Owner UI to show which device's SyncBot needs approval.
 
 ---
 
@@ -478,15 +495,15 @@ Client                          Server
   |    mutations: [...]}           |
   |                                |
   |   [ElectricReadiness]          |  DB + Electric up?
-  |   [ElectricAccessGate]         |  PoP verify + mode check:
+  |   [ChallengeInjector]          |
+  |   [ElectricController.ingest]  |  writer
+  |     per shape: WriteGate       |  PoP verify + mode check:
   |     - no owner? pass + claim   |    - no owner → pass, register as owner in AdminDB
   |     - open? PoP ok → pass      |    - open → PoP valid → pass
   |     - owner? pass              |    - owner → always pass
   |     - guarded? chain check     |    - guarded → chain_distance ≤ max_depth → pass (writes)
   |     - trust? chain check       |    - trust → chain_distance ≤ max_depth → pass (all)
   |     - else? 403                |    - else → 403
-  |   [ChallengeInjector]          |
-  |   [ElectricController.ingest]  |  writer
   |                                |
   |<-- {txid} or error ------------|
 ```
@@ -495,13 +512,13 @@ Client                          Server
 
 ## Status
 
-In Progress. Server identity (`Chat.Pq.ServerIdentity`), device identity (`Chat.DeviceId`), owner bootstrap (`Chat.Pq.OwnerBootstrap`), gate mode storage in AdminDB, and admin sandbox UI with gate mode switching are implemented. Write-side vouch chain enforcement is implemented per shape via `Chat.Pq.WriteGate` (see [Current implementation](#current-implementation-chatpqwritegate)).
+Done. Server identity (`Chat.Pq.ServerIdentity`), device identity (`Chat.DeviceId`), owner bootstrap (`Chat.Pq.OwnerBootstrap`), gate mode storage in AdminDB, and admin sandbox UI with gate mode switching are implemented. Write-side vouch chain enforcement is implemented per shape via `Chat.Pq.WriteGate` (see [Write Gate](#write-gate-chatpqwritegate)).
 
 Read gating (server side) is implemented:
 
 - `Chat.Pq.ReadSession` — ETS store, per shape, 5 min fixed TTL, periodic sweep.
 - `Chat.Pq.ReadGate` — PoP + `storage.read.<shape>` chain check; `POST /electric/v1/read_session` (`ChatWeb.ReadSessionController`).
-- `ChatWeb.Plugs.ElectricReadGate` on `/shapes` (shape from `?table=`, versions tables map to the owning shape) and on `file_chunk/:file_id/:chunk_index` + `file_chunk_status` (shape `file_chunk`). Passing responses get `cache-control: private` + `vary: authorization`.
+- `ChatWeb.Plugs.ElectricReadGate` on `/shapes` (shape from `?table=`, versions tables map to the owning shape) and on `file_chunk/:file_id/:chunk_index` + `file_chunk_status` (shape `file_chunk`). Passing responses get `cache-control: private` + `vary: authorization`. Read gate exempts `user_card` and `vouch_token` shapes (`@exempt_shapes`).
 - `max_depth` in the `403` body and in the read chain check is `VouchToken.default_max_depth/0` (7) until the setting exists.
 
 Read gating (network sync client — this device reading from a peer) is implemented:
@@ -513,17 +530,31 @@ Read gating (network sync client — this device reading from a peer) is impleme
 - `SyncSource` chunk fetches (`file_chunk`) go through `ReadSessions.request/4`.
 - LAN detection treats a `401 read_session_required` probe response as a (gated) Electric peer.
 
-Server user cards are implemented (see [Server User Card](#server-user-card)):
+Device identity endpoint is implemented (see [Device Identity Endpoint](#device-identity-endpoint)):
 
-- `Chat.Pq.ServerCard` — `SyncBot_<device_id>` name, build, JSON encoding, `store_own/1`, `store_peer/1`.
-- `ChatWeb.ServerCardController` — `GET /electric/v1/server_card`.
-- `PeerConnector` stores the peer's card on discovery. `RepoReady.store_server_card/1` stores the device's own card after migrations.
+- `ChatWeb.DeviceIdentityController` — `GET /electric/v1/device_identity` returns `device_id`, `sync_bot` and `admin` identities.
 
-Pending:
+SyncBot card (`Chat.NetworkSynchronization.Electric.SyncBotCardPusher`) is implemented:
 
-- The `ElectricAccessGate` plug (PoP + vouch chain enforcement in the router pipeline).
-- `max_depth` setting and enforcement (writes ignore it; reads use the fixed default).
-- chat-frontend: implement [Client Behaviour](#client-behaviour).
+- The server's SyncBot identity (`SyncBot_<device_id>`) is a user like any other, with keypairs generated by `ServerIdentity` and stored in AdminDB.
+- `SyncBotCardPusher.push/1` builds the SyncBot `user_card` from `ServerIdentity`, fetches a challenge from the peer, signs it, and POSTs `/ingest`.
+- Called by `PeerConnector` after system identifier resolution, before starting `PeerSync`.
+- Idempotent: existing card with same-or-newer timestamp is a no-op. Network failures retry with PeerConnector backoff.
+
+`max_depth` setting is implemented:
+
+- Stored in AdminDB under `:pq_max_depth`. Both `WriteGate.max_depth/0` and `ReadGate.max_depth/0` read from `AdminDb.get(:pq_max_depth)` with fallback to `VouchToken.default_max_depth/0` (7).
+- Admin sandbox UI exposes the setting (`set_max_depth` event in `AdminSandboxLive.Index`).
+
+chat-frontend [Client Behaviour](#client-behaviour) is implemented:
+
+- `readSession.ts` — lazy session open on `401 read_session_required`, per-shape token map, Bearer header via function reference, renewal.
+- `ingest.ts` — `NOT_IN_TRUST_CHAIN` detection, separate from validation errors.
+- `outbox.ts` — `awaiting_approval` hold reason, pauses draining for blocked identity, partial batch handling.
+- `shapeRead.ts` — `onError` 401 handling, session open + retry.
+- UI indicators in `ChatWindow.vue` (`⏳` for awaiting approval on messages and edits).
+
+No pending items — all features described in this requirement are implemented.
 
 ## Open Questions
 
@@ -535,7 +566,7 @@ Pending:
 
    Sub-question: should AdminDB settings be **replicated to the backup drive**? On the platform, each USB drive gets its own PG instance with logical replication between main and internal. AdminDB is currently single-drive — backup requires explicit copy logic.
 
-4. **Should chain distance be visible to users?** Transparency aids debugging ("why was I rejected?") but also reveals the trust topology. Options: visible to owner only, visible to each user for their own distance, or fully opaque.
+4. **Should chain distance be visible to users?** Transparency aids debugging ("why was I rejected?") but also reveals the trust topology. Note: vouch token reads are now exempt from gating (see [Read-exempt shapes](#read-exempt-shapes)), so the token graph is already visible to anyone who syncs. The remaining question is whether *computed* chain distance should be surfaced in the UI. Options: visible to owner only, visible to each user for their own distance, or fully opaque.
 
 5. **Offline chain evaluation.** ~~Should vouch attestations be structured as self-contained signed tokens?~~ **Yes** — vouch tokens must be self-contained signed attestations so the gate can evaluate trust without live lookups. Chain-distance computation works from the token chain alone, enabling offline evaluation. See [Vouch Tokens](pq_vouch_tokens.in_progress.md) for the self-contained token structure.
 

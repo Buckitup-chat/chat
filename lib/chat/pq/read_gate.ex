@@ -16,12 +16,16 @@ defmodule Chat.Pq.ReadGate do
   alias Chat.Pq.OwnerBootstrap
   alias Chat.Pq.ReadSession
 
+  use Toolbox.OriginLog
+
   @doc "Reads need a session only in `trust` mode once an owner is registered."
   def enforced? do
     AdminDb.get(:pq_gate_mode) == :trust and OwnerBootstrap.owner() != nil
   end
 
-  def max_depth, do: VouchToken.default_max_depth()
+  def max_depth do
+    Chat.AdminDb.get(:pq_max_depth) || VouchToken.default_max_depth()
+  end
 
   @doc """
   Returns `{:ok, token, shape_name}` or `{:error, reason}` where reason is one of
@@ -36,6 +40,10 @@ defmodule Chat.Pq.ReadGate do
          :ok <- check_chain(user_hash, shape_name) do
       {:ok, ReadSession.issue(user_hash, shape_name), shape_name}
     end
+    |> tap(fn
+      {:ok, _, _} -> :ok
+      {:error, reason} -> log("ReadGate denied #{shape} for #{user_hash}: #{reason}", :warning)
+    end)
   end
 
   def check_chain(user_hash, shape_name) do

@@ -108,6 +108,19 @@ defmodule Chat.Data.VouchToken do
     """
   end
 
+  def attenuates?(granted, requested) do
+    granted_parts = String.split(granted, ".")
+    requested_parts = String.split(requested, ".")
+
+    length(requested_parts) >= length(granted_parts) and
+      granted_parts
+      |> Enum.zip(requested_parts)
+      |> Enum.all?(fn
+        {"*", _} -> true
+        {g, r} -> g == r
+      end)
+  end
+
   def upsert_vouch_token(changeset) do
     Repo.insert(changeset,
       on_conflict: :replace_all,

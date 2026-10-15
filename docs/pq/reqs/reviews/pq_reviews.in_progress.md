@@ -174,19 +174,23 @@ See [Contacts](pq_review_contacts.done.md).
 - [ ] Owner-signed authorization for dangerous origin ops (moderation mode, soft delete) — see the Status note under [Origin creation](pq_origin.done.md#origin-creation)
 - [ ] Origin keys in User Storage for multi-device access
 
-### Phase 4 — Write tokens and review access control
+### Phase 4 — Origin bot, write tokens, and review access control
 
 See [Write Tokens](pq_review_write_tokens.proposed.md).
 
+- [ ] `origin_bots` table + schema + Electric shape (bot identity encrypted to origin)
 - [ ] `review_access` column on `origins` (`open` / `invite_only`)
 - [ ] Review ingest vouch check when `review_access = invite_only`
-- [ ] `review_write_tokens` table + schema + CRUD controller
-- [ ] Bot identity + vouch delegation chain (admin → bot, origin → bot)
+- [ ] Bot creation: keypair gen, `<originName>_Bot` user_cards, encrypted identity storage
+- [ ] `ReviewBotWorker` GenServer: decrypt bot identity from synced `origin_bots`, start on device
+- [ ] `review_write_tokens` table + schema (with `origin_order_hash` NOT NULL)
+- [ ] Bot-side token creation (order opened → token with `origin_order_hash` → `/ingest`)
+- [ ] Vouch delegation chain: origin → bot, bot → reviewer on bind
 - [ ] `/r/:nonce` route — token validation, identity gate, bind flow
-- [ ] Origin admin UI: "enable review invitations" (origin → bot vouch)
+- [ ] Origin admin UI: "enable review invitations" (create bot + vouch)
 - [ ] SPA write flow: identity creation/import, review form, pipeline orchestration
-- [ ] `ReviewWriteTokenCleaner` — GC pending tokens older than 1 month
-- [ ] Batch token creation + QR generation
+- [ ] Bot-side GC of pending tokens (bot clock)
+- [ ] QR generation
 
 ### Phase 5 — `to_contacts` visibility tier (future)
 

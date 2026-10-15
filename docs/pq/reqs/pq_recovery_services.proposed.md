@@ -489,5 +489,5 @@ Proposed.
   these services serve.
 - PQ TURN relay (`pq_turn_relay.proposed.md`, in review) — the other service
   on the same host, behind the same PoP.
-- [PQ access gating](pq_access_gating.in_progress.md) — the server identity
+- [PQ access gating](pq_access_gating.done.md) — the server identity
   and AdminDB that the node module uses.

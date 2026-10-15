@@ -76,6 +76,11 @@ defmodule Chat.Data.File.DriveCopySource do
     {:noreply, state |> scan_drives() |> enqueue_poll() |> drain()}
   end
 
+  def handle_extra_info({:chunk_pipeline, :backfill_done}, state) do
+    log("retriggering drive copy after backfill finished", :info)
+    {:noreply, state |> enqueue_poll() |> drain()}
+  end
+
   def handle_extra_info({:chunk_pipeline, event}, state), do: handle_cast(event, state)
   def handle_extra_info(_msg, state), do: {:noreply, state}
 

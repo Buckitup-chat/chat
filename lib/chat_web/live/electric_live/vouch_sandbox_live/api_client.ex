@@ -56,9 +56,14 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.ApiClient do
     auth = %{user_hash: identity.user_hash, sign_skey: identity.sign_skey}
 
     case insert_vouch(identity, vouch, base_url) do
-      {:ok, logs} -> {:ok, %{log_entries: logs}}
-      {:error, "Ingest failed: 409", logs} -> update_existing(identity, vouch, base_url, logs, auth)
-      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
+      {:ok, logs} ->
+        {:ok, %{log_entries: logs}}
+
+      {:error, "Ingest failed: 409", logs} ->
+        update_existing(identity, vouch, base_url, logs, auth)
+
+      {:error, reason, logs} ->
+        {:error, %{reason: reason, log_entries: logs}}
     end
   end
 

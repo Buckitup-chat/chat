@@ -35,7 +35,12 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.ReviewList do
   end
 
   defp observed_password_hash(review, base_url, auth) do
-    case fetch_shape_gated(base_url, "review_public_passwords", "review_hash='#{review.review_hash}'", auth) do
+    case fetch_shape_gated(
+           base_url,
+           "review_public_passwords",
+           "review_hash='#{review.review_hash}'",
+           auth
+         ) do
       {:ok, rows, _logs} ->
         rows
         |> Enum.filter(&is_binary(&1["password_b64"]))

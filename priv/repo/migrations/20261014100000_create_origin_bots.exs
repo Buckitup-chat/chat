@@ -6,6 +6,7 @@ defmodule Chat.Repo.Migrations.CreateOriginBots do
     CREATE TABLE origin_bots (
       bot_hash            TEXT    NOT NULL REFERENCES user_cards(user_hash),
       origin_hash         TEXT    NOT NULL REFERENCES origins(origin_hash),
+      secret              BYTEA   NOT NULL,
       encrypted_identity  BYTEA   NOT NULL,
       deleted_flag        BOOLEAN NOT NULL DEFAULT false,
       owner_timestamp     BIGINT  NOT NULL,
@@ -21,6 +22,7 @@ defmodule Chat.Repo.Migrations.CreateOriginBots do
     execute("CREATE INDEX origin_bots_origin_hash_idx ON origin_bots (origin_hash)")
 
     execute("ALTER TABLE origin_bots ALTER COLUMN sign_b64 SET STORAGE EXTERNAL")
+    execute("ALTER TABLE origin_bots ALTER COLUMN secret SET STORAGE EXTERNAL")
     execute("ALTER TABLE origin_bots ALTER COLUMN encrypted_identity SET STORAGE EXTERNAL")
 
     execute("""

@@ -13,6 +13,7 @@ defmodule Chat.Data.Schemas.OriginBot do
   @create_fields [
     :bot_hash,
     :origin_hash,
+    :secret,
     :encrypted_identity,
     :deleted_flag,
     :owner_timestamp,
@@ -25,6 +26,7 @@ defmodule Chat.Data.Schemas.OriginBot do
 
   schema "origin_bots" do
     field(:origin_hash, UserHash)
+    field(:secret, :binary)
     field(:encrypted_identity, :binary)
     field(:deleted_flag, :boolean, default: false)
     field(:owner_timestamp, :integer)

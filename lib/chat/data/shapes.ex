@@ -15,6 +15,7 @@ defmodule Chat.Data.Shapes do
     Chat.Data.Shapes.FileChunk,
     Chat.Data.Shapes.Origin,
     Chat.Data.Shapes.OriginSetting,
+    Chat.Data.Shapes.OriginBot,
     Chat.Data.Shapes.Review,
     Chat.Data.Shapes.ReviewPublicPasswords,
     Chat.Data.Shapes.ReviewPostRight,

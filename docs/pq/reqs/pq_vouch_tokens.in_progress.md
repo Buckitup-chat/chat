@@ -264,7 +264,7 @@ Implementation: `Chat.Data.VouchToken.chain_distance/4` (`lib/chat/data/vouch_to
 
 ## Relationship to Review Write Tokens
 
-The `origins.<origin_hash>.reviews.write.<write_token>` scope path is consumed by the [review write tokens](reviews/pq_review_write_tokens.proposed.md) system — one-time invite links that lead a user to writing a review for an origin.
+The `origins.<origin_hash>.reviews.write.<write_token>` scope path is consumed by the [review write tokens](reviews/pq_review_write_tokens.in_progress.md) system — one-time invite links that lead a user to writing a review for an origin.
 
 The vouch delegation chain for write tokens:
 
@@ -303,4 +303,4 @@ In Progress. Schema, migration, Ecto changeset, `Signable` protocol, shape behav
 
 - [02_integrity.md](../invariants/02_integrity.md) — integrity triad: `sign_b64`, `owner_timestamp`, `deleted_flag`
 - [pq_access_gating](pq_access_gating.done.md) — open/guarded/trust modes, bootstrap, gate mechanics
-- [pq_review_write_tokens](reviews/pq_review_write_tokens.proposed.md) — one-time invite links, bot delegation via `reviews.write.<nonce>` scope
+- [pq_review_write_tokens](reviews/pq_review_write_tokens.in_progress.md) — one-time invite links, bot delegation via `reviews.write.<nonce>` scope

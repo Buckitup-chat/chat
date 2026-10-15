@@ -38,7 +38,7 @@ Migration: [`20261013100000_create_origin_settings`](../../../../priv/repo/migra
 
 | Key | Values | Default (when absent) | Purpose |
 |-----|--------|-----------------------|---------|
-| `review_access` | `open`, `invite_only` | `open` | Controls who can enter the review pipeline. See [pq_review_write_tokens](pq_review_write_tokens.proposed.md#review-access-mode--per-origin-policy). |
+| `review_access` | `open`, `invite_only` | `open` | Controls who can enter the review pipeline. See [pq_review_write_tokens](pq_review_write_tokens.in_progress.md#review-access-mode--per-origin-policy). |
 
 ---
 
@@ -70,4 +70,4 @@ Proposed.
 ## References
 
 - [pq_origin](pq_origin.done.md) — origin entity, creation, ownership
-- [pq_review_write_tokens](pq_review_write_tokens.proposed.md) — consumes `review_access` setting
+- [pq_review_write_tokens](pq_review_write_tokens.in_progress.md) — consumes `review_access` setting

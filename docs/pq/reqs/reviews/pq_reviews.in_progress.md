@@ -29,7 +29,7 @@ The origin identity (not the owner) should be able to:
 - **Ingest via candidates**: all *author-submitted* `review_public_passwords` entries flow through `review_password_candidate` — the server validates and promotes. See [Candidate-only ingest](pq_review_moderation.done.md#candidate-only-ingest).
 - **Origin key management**: origin keypairs are independently generated on the client (not derived from owner keys), stored client-side in the owner's identity, same pattern as regular user keys (see [pq_user.done.md](../pq_user.done.md)). Multi-device access via User Storage.
 - **Origin creation**: three-step flow. See [Origin creation](pq_origin.done.md#origin-creation).
-- **Review access control**: per-origin `review_access` mode (`open` / `invite_only`) determines whether anyone can write a review or only write-token holders. See [Write Tokens](pq_review_write_tokens.proposed.md).
+- **Review access control**: per-origin `review_access` mode (`open` / `invite_only`) determines whether anyone can write a review or only write-token holders. See [Write Tokens](pq_review_write_tokens.in_progress.md).
 
 ## Three entities
 
@@ -56,7 +56,7 @@ Origin (the coffee shop)
 | [Moderation](pq_review_moderation.done.md) | done | Crypto pipeline, visibility tiers, content model, comments, schemas, shapes, security |
 | [Contacts](pq_review_contacts.done.md) | done | Contacts channel, review_list, key delivery, proof matrix |
 | [Versioning](pq_review_versioning.done.md) | done | Review editing, version chain, pre-mode lock, review_versions table |
-| [Write Tokens](pq_review_write_tokens.proposed.md) | proposed | One-time invite links, bot delegation, review_access mode, identity gate |
+| [Write Tokens](pq_review_write_tokens.in_progress.md) | proposed | One-time invite links, bot delegation, review_access mode, identity gate |
 
 ## Sandboxes
 
@@ -176,7 +176,7 @@ See [Contacts](pq_review_contacts.done.md).
 
 ### Phase 4 — Origin bot, write tokens, and review access control
 
-See [Write Tokens](pq_review_write_tokens.proposed.md).
+See [Write Tokens](pq_review_write_tokens.in_progress.md).
 
 - [ ] `origin_bots` table + schema + Electric shape (bot identity encrypted to origin)
 - [ ] `review_access` column on `origins` (`open` / `invite_only`)

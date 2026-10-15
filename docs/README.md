@@ -88,7 +88,7 @@ Hard requirements and specs. See [`pq/reqs/CLAUDE.md`](./pq/reqs/CLAUDE.md) for 
 - [PQ review contacts](./pq/reqs/reviews/pq_review_contacts.done.md)
 - [PQ review moderation](./pq/reqs/reviews/pq_review_moderation.done.md)
 - [PQ review versioning](./pq/reqs/reviews/pq_review_versioning.done.md)
-- [PQ review write tokens](./pq/reqs/reviews/pq_review_write_tokens.proposed.md)
+- [PQ review write tokens](./pq/reqs/reviews/pq_review_write_tokens.in_progress.md)
 
 ## proposal/ — generation-agnostic
 

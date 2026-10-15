@@ -1,6 +1,8 @@
 defmodule Chat.Data.VouchToken do
   @moduledoc "Data access for vouch_tokens."
 
+  import Ecto.Query, only: [from: 2]
+
   alias Chat.Data.Schemas.VouchToken
   alias Chat.Repo
 
@@ -123,8 +125,29 @@ defmodule Chat.Data.VouchToken do
 
   def upsert_vouch_token(changeset) do
     Repo.insert(changeset,
-      on_conflict: :replace_all,
-      conflict_target: [:kind, :issuer_hash, :subject_hash]
+      on_conflict: vouch_token_upsert_query(),
+      conflict_target: [:kind, :issuer_hash, :subject_hash],
+      allow_stale: true
+    )
+  end
+
+  # Only a newer row replaces the stored one: a peer snapshot replays old rows
+  # as inserts, and an older grant must not undo a newer tombstone. On an equal
+  # timestamp the tombstone wins (see Validation.validate_supersedes).
+  defp vouch_token_upsert_query do
+    from(v in VouchToken,
+      update: [
+        set: [
+          deleted_flag: fragment("EXCLUDED.deleted_flag"),
+          owner_timestamp: fragment("EXCLUDED.owner_timestamp"),
+          sign_b64: fragment("EXCLUDED.sign_b64")
+        ]
+      ],
+      where:
+        is_nil(v.owner_timestamp) or
+          v.owner_timestamp < fragment("EXCLUDED.owner_timestamp") or
+          (v.owner_timestamp == fragment("EXCLUDED.owner_timestamp") and
+             fragment("EXCLUDED.deleted_flag") and not v.deleted_flag)
     )
   end
 end

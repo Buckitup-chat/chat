@@ -20,7 +20,7 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Index do
     |> assign(
       device_id: DeviceId.id(),
       server_user_hash: server_user_hash(),
-      admin_user_hash: admin_user_hash(),
+      admin_user_hash: OwnerBootstrap.owner_hash(),
       gate_mode: gate_mode(),
       max_depth: max_depth(),
       identity: nil,
@@ -131,13 +131,6 @@ defmodule ChatWeb.ElectricLive.AdminSandboxLive.Index do
 
   defp gate_mode, do: AdminDb.get(:pq_gate_mode) || :open
   defp max_depth, do: AdminDb.get(:pq_max_depth) || VouchToken.default_max_depth()
-
-  defp admin_user_hash do
-    case OwnerBootstrap.owner() do
-      %{user_hash: hash} -> hash
-      _ -> nil
-    end
-  end
 
   defp server_user_hash do
     ServerIdentity.user_hash()

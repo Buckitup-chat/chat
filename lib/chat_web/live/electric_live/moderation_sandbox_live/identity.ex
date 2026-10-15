@@ -41,7 +41,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Identity do
     crypt_pkey = Crypto.decode_binary_field(card["crypt_pkey"])
 
     cond do
-      not signs_for?(identity.sign_skey, sign_pkey) ->
+      not EnigmaPq.signs_for?(identity.sign_skey, sign_pkey) ->
         {:error, "sign_skey does not match the origin card's sign_pkey"}
 
       not decrypts_for?(identity.crypt_skey, crypt_pkey) ->
@@ -76,16 +76,6 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Identity do
       {:ok, <<_::binary-1, _::binary>> = key} -> {:ok, key}
       _ -> {:error, "invalid or empty #{field}"}
     end
-  end
-
-  defp signs_for?(sign_skey, sign_pkey) do
-    nonce = :crypto.strong_rand_bytes(32)
-
-    nonce
-    |> EnigmaPq.sign(sign_skey)
-    |> then(&EnigmaPq.verify(nonce, &1, sign_pkey))
-  rescue
-    _ -> false
   end
 
   defp decrypts_for?(crypt_skey, crypt_pkey) do

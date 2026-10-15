@@ -25,6 +25,16 @@ defmodule Chat.Challenge do
     GenServer.call(__MODULE__, {:get, key})
   end
 
+  @doc "Takes the challenge stored under `key`: `{:ok, challenge}`, or `:error` once used or expired."
+  def fetch(key) when is_binary(key) do
+    case get(key) do
+      challenge when is_binary(challenge) -> {:ok, challenge}
+      _ -> :error
+    end
+  end
+
+  def fetch(_key), do: :error
+
   ## Defining GenServer Callbacks
 
   def start_link(opts) do

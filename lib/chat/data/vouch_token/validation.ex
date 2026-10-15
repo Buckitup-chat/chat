@@ -24,7 +24,7 @@ defmodule Chat.Data.VouchToken.Validation do
     existing
     |> VouchToken.update_changeset(attrs)
     |> UserValidation.validate_signature()
-    |> UserValidation.validate_timestamp_newer_than_existing()
+    |> validate_supersedes()
   end
 
   # --- HTTP ingestion ---
@@ -58,7 +58,20 @@ defmodule Chat.Data.VouchToken.Validation do
         vt
         |> VouchToken.update_changeset(changes)
         |> UserValidation.validate_signature()
-        |> UserValidation.validate_timestamp_newer_than_existing()
+        |> validate_supersedes()
     end
+  end
+
+  # A newer row supersedes the stored one; on an equal owner_timestamp a
+  # revocation supersedes a grant, never the reverse (tombstone wins).
+  defp validate_supersedes(%{data: existing} = changeset) do
+    revokes_on_tie? =
+      Ecto.Changeset.get_field(changeset, :owner_timestamp) == existing.owner_timestamp and
+        Ecto.Changeset.get_field(changeset, :deleted_flag) == true and
+        existing.deleted_flag == false
+
+    if revokes_on_tie?,
+      do: changeset,
+      else: UserValidation.validate_timestamp_newer_than_existing(changeset)
   end
 end

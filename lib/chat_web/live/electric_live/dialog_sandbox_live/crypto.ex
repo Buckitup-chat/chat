@@ -219,6 +219,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
     end
   end
 
+  @keypair_mismatch "sign_skey does not match sign_pkey"
+
   @identity_keys ~w(user_hash name sign_pkey sign_skey crypt_pkey crypt_skey
                      crypt_cert contact_pkey contact_skey contact_cert)
 
@@ -226,7 +228,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
     with {:ok, data} <- Jason.decode(json_string),
          {:ok, _} <- validate_identity_format(data),
          {:ok, keys} <- decode_identity_keys(data),
-         :ok <- verify_user_hash(data["user_hash"], keys) do
+         :ok <- verify_user_hash(data["user_hash"], keys),
+         :ok <- verify_sign_keypair(keys) do
       {:ok, build_user_data(data, keys)}
     end
   end
@@ -253,6 +256,12 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
   defp verify_user_hash(user_hash, keys) do
     expected = keys.sign_pkey |> EnigmaPq.hash() |> UserHash.from_binary()
     if user_hash == expected, do: :ok, else: {:error, "user_hash does not match sign_pkey"}
+  end
+
+  # The public key is published (device_identity, user_cards); only the matching
+  # secret key proves the identity, and the admin role is granted on it.
+  defp verify_sign_keypair(%{sign_pkey: sign_pkey, sign_skey: sign_skey}) do
+    if EnigmaPq.signs_for?(sign_skey, sign_pkey), do: :ok, else: {:error, @keypair_mismatch}
   end
 
   defp build_user_data(data, keys) do

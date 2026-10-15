@@ -5,7 +5,6 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
   import Phoenix.Component
   import Phoenix.LiveView, only: [consume_uploaded_entries: 3, push_event: 3]
 
-  alias Chat.Pq.OwnerBootstrap
   alias Chat.Proto.Shortcode
   alias ChatWeb.ElectricLive.UserSandboxLive.{ApiClient, Identity}
 
@@ -234,8 +233,6 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.Router do
         {:ok, %{log_entries: entries}} -> entries
         {:error, %{log_entries: entries}} -> entries
       end
-
-    OwnerBootstrap.maybe_register_owner(user_data.user_hash, user_data.sign_pkey)
 
     {storage_items, storage_logs} =
       case ApiClient.fetch_user_storage(user_data.user_hash, user_data.sign_skey, base_url) do

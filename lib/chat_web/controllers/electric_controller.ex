@@ -158,8 +158,8 @@ defmodule ChatWeb.ElectricController do
 
   defp maybe_capture_owner(changes) do
     Enum.each(changes, fn
-      {_key, %UserCard{user_hash: user_hash, sign_pkey: sign_pkey}} ->
-        OwnerBootstrap.maybe_register_owner(user_hash, sign_pkey)
+      {_key, %UserCard{} = card} ->
+        OwnerBootstrap.maybe_register_card(card)
 
       _ ->
         :ok

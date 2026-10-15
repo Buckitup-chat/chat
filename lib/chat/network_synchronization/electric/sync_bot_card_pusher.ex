@@ -8,8 +8,8 @@ defmodule Chat.NetworkSynchronization.Electric.SyncBotCardPusher do
   """
 
   alias Chat.Data.User
-  alias Chat.DeviceId
   alias Chat.Pq.ServerIdentity
+  alias Chat.Pq.SyncBot
 
   @timeout 10_000
 
@@ -35,7 +35,7 @@ defmodule Chat.NetworkSynchronization.Electric.SyncBotCardPusher do
 
   defp server_identity_with_name do
     ServerIdentity.get()
-    |> Map.put(:name, "SyncBot_#{DeviceId.id()}")
+    |> Map.put(:name, SyncBot.card_name())
   end
 
   defp ingest_payload(card, challenge_id, signature) do

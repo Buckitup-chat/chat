@@ -29,8 +29,8 @@ defmodule Chat.Data.OriginBot do
     from(ob in OriginBot,
       update: [
         set: [
-          secret: fragment("EXCLUDED.secret"),
-          encrypted_identity: fragment("EXCLUDED.encrypted_identity"),
+          secret_b64: fragment("EXCLUDED.secret_b64"),
+          encrypted_identity_b64: fragment("EXCLUDED.encrypted_identity_b64"),
           deleted_flag: fragment("EXCLUDED.deleted_flag"),
           owner_timestamp: fragment("EXCLUDED.owner_timestamp"),
           sign_b64: fragment("EXCLUDED.sign_b64"),

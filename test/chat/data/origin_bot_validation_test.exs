@@ -153,8 +153,8 @@ defmodule Chat.Data.OriginBotValidationTest do
     bot = %OriginBot{
       bot_hash: ctx.bot_hash,
       origin_hash: ctx.origin_hash,
-      secret: :crypto.strong_rand_bytes(1568),
-      encrypted_identity: :crypto.strong_rand_bytes(128),
+      secret_b64: :crypto.strong_rand_bytes(1568),
+      encrypted_identity_b64: :crypto.strong_rand_bytes(128),
       deleted_flag: deleted_flag,
       owner_timestamp: owner_timestamp
     }

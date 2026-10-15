@@ -74,6 +74,23 @@ defmodule EnigmaPq do
     :crypto.decapsulate_key(:mlkem1024, recipient_crypt_skey, ciphertext)
   end
 
+  # --- KEM wrap/unwrap ---
+  # Encapsulate + HKDF + AES-256-GCM in one call.
+  # Returns {secret, encrypted} — two fields for DB storage (see dialog_keys, origin_bots).
+  # HKDF info fixed to "wrap" — only one key is derived per encapsulation.
+
+  def kem_encrypt(plaintext, recipient_crypt_pkey, salt) do
+    {shared_secret, secret} = encapsulate_secret(recipient_crypt_pkey)
+    wrap_key = hkdf_derive(shared_secret, salt, "wrap")
+    {secret, aes_gcm_encrypt(plaintext, wrap_key)}
+  end
+
+  def kem_decrypt(secret, encrypted, recipient_crypt_skey, salt) do
+    shared_secret = decapsulate_secret(secret, recipient_crypt_skey)
+    wrap_key = hkdf_derive(shared_secret, salt, "wrap")
+    aes_gcm_decrypt(encrypted, wrap_key)
+  end
+
   # --- AES-256-GCM ---
   # Spec: pq_dialogs.done.md §Key derivation — AES-256-GCM (NIST SP 800-38D)
   # Spec: 07_content_polymorphism.md — blob format: nonce(12) || ciphertext || tag(16)

@@ -70,24 +70,19 @@ The bot's full identity (both keypairs' secret keys) is encrypted to the origin'
 origin_bots
 ├── origin_hash         — TEXT NOT NULL, FK → origins(origin_hash)
 ├── bot_hash            — TEXT PK, FK → user_cards(user_hash), prefix "u_"
-├── secret              — BYTEA NOT NULL (ML-KEM-1024 ciphertext — encapsulated shared secret)
-├── encrypted_identity  — BYTEA NOT NULL (AES-256-GCM blob — bot's sign_skey + crypt_skey)
+├── secret_b64          — BYTEA NOT NULL (ML-KEM-1024 ciphertext — encapsulated shared secret)
+├── encrypted_identity_b64 — BYTEA NOT NULL (AES-256-GCM blob — bot's sign_skey + crypt_skey)
 ├── deleted_flag        — BOOLEAN NOT NULL DEFAULT false (soft-delete / revoke)
 ├── owner_timestamp     — BIGINT NOT NULL (origin clock, LWW)
 ├── sign_b64            — BYTEA NOT NULL (signed by origin identity)
 ├── sign_hash           — TEXT NOT NULL, prefix "ob_"
 ```
 
-**`secret`** — the ML-KEM-1024 ciphertext produced by `EnigmaPq.encapsulate_secret(origin_crypt_pkey)`. The decryptor calls `EnigmaPq.decapsulate_secret(secret, origin_crypt_skey)` to recover the shared secret, then derives the wrap key via HKDF. Same two-field pattern as `dialog_keys` (`peer_kem_wrap_key_b64` + `peer_wrapped_msg_key_b64`); see `Chat.Data.Schemas.DialogKey`.
-
-**`encrypted_identity`** — the AES-256-GCM blob (`nonce || ciphertext || tag`) containing the bot's `sign_skey` + `crypt_skey`. Encrypted with the wrap key derived from the KEM shared secret: `wrap_key = EnigmaPq.hkdf_derive(shared_secret, "buckitup/origin-bot/v1", "wrap")`. See `EnigmaPq.aes_gcm_encrypt/2`.
+**`secret_b64` + `encrypted_identity_b64`** — two-field KEM wrap, same pattern as `dialog_keys` (`peer_kem_wrap_key_b64` + `peer_wrapped_msg_key_b64`). `secret_b64` holds the ML-KEM-1024 ciphertext; `encrypted_identity_b64` holds the AES-256-GCM blob containing the bot's `sign_skey` + `crypt_skey`. Produced by `EnigmaPq.kem_encrypt/3`, unwrapped by `EnigmaPq.kem_decrypt/4` with salt `"buckitup/origin-bot/v1"`.
 
 **Device startup flow:**
 1. Device syncs `origin_bots` shape (filtered by origins this device holds keys for)
-2. For each origin bot:
-   - `shared_secret = EnigmaPq.decapsulate_secret(secret, origin_crypt_skey)`
-   - `wrap_key = EnigmaPq.hkdf_derive(shared_secret, "buckitup/origin-bot/v1", "wrap")`
-   - `identity = EnigmaPq.aes_gcm_decrypt(encrypted_identity, wrap_key)`
+2. For each origin bot: `identity = EnigmaPq.kem_decrypt(secret_b64, encrypted_identity_b64, origin_crypt_skey, "buckitup/origin-bot/v1")`
 3. Start `ReviewBotWorker` GenServer with the decrypted identity
 4. Bot can now create tokens, issue vouches, GC — all on the device
 
@@ -308,11 +303,8 @@ A step in the origin admin interface where the owner creates the origin's review
    - Generate ML-KEM-1024 `crypt_skey` / `crypt_pkey` keypair
    - Create `user_cards` row for the bot, named `ReviewBot_<originName>` (self-signed by bot's `sign_skey`)
    - POST `/ingest` — bot's `user_cards` enters the PQ system
-4. Client encrypts bot identity to the origin's `crypt_pkey`:
-   - `{shared_secret, secret} = EnigmaPq.encapsulate_secret(origin_crypt_pkey)`
-   - `wrap_key = EnigmaPq.hkdf_derive(shared_secret, "buckitup/origin-bot/v1", "wrap")`
-   - `encrypted_identity = EnigmaPq.aes_gcm_encrypt(sign_skey <> crypt_skey, wrap_key)`
-5. Client creates `origin_bots` row with `secret` + `encrypted_identity`, signed by origin identity
+4. Client encrypts bot identity: `{secret_b64, encrypted_identity_b64} = EnigmaPq.kem_encrypt(sign_skey <> crypt_skey, origin_crypt_pkey, "buckitup/origin-bot/v1")`
+5. Client creates `origin_bots` row with `secret_b64` + `encrypted_identity_b64`, signed by origin identity
 6. POST `/ingest` — `origin_bots` row enters the PQ system, Electric-synced to all devices holding this origin
 7. Client constructs vouch tokens:
    - Origin gate vouch:
@@ -326,9 +318,9 @@ A step in the origin admin interface where the owner creates the origin's review
      - `subject_hash: review_bot_hash`
      - Signs with owner's `sign_skey` (held client-side)
 8. POST `/ingest` — both vouch tokens enter the PQ system
-9. Device decrypts `encrypted_identity`, starts `ReviewBotWorker` — the bot is live
+9. Device decrypts `encrypted_identity_b64`, starts `ReviewBotWorker` — the bot is live
 
-On other devices: Electric syncs `origin_bots` rows → device decapsulates `secret` with origin's `crypt_skey`, derives wrap key, decrypts `encrypted_identity` → starts a `ReviewBotWorker` for each bot. Multiple devices can run bots simultaneously — token creation uses random nonces so there are no conflicts. If a device hasn't synced the existing bot yet, it may create a new one — both will work, and the origin vouches each independently.
+On other devices: Electric syncs `origin_bots` rows → device decapsulates `secret_b64` with origin's `crypt_skey`, derives wrap key, decrypts `encrypted_identity_b64` → starts a `ReviewBotWorker` for each bot. Multiple devices can run bots simultaneously — token creation uses random nonces so there are no conflicts. If a device hasn't synced the existing bot yet, it may create a new one — both will work, and the origin vouches each independently.
 
 Revoking: the owner can revoke the review bot's vouch (signed tombstone, `deleted_flag: true`). Existing bound tokens remain valid (the vouch for the individual reviewer is already issued), but no new tokens can be created.
 
@@ -424,7 +416,7 @@ The `review_token_ttl_days` setting (also in `origin_settings`) controls the sof
 
 8. ~~**Multi-device scope for device gate vouch.**~~ — resolved. The bot gets device scope for the device it runs on. If the origin owner wants multi-device support, they explicitly allow the bot on other devices as well (separate device-scoped vouches per device). No wildcards.
 
-9. ~~**Encrypted identity format.**~~ — resolved. Two-field pattern matching `dialog_keys` (`peer_kem_wrap_key_b64` / `peer_wrapped_msg_key_b64`): `secret` holds the ML-KEM-1024 ciphertext, `encrypted_identity` holds the AES-256-GCM blob. HKDF salt: `"buckitup/origin-bot/v1"`. See `Chat.Data.Schemas.OriginBot`.
+9. ~~**Encrypted identity format.**~~ — resolved. Two-field KEM wrap via `EnigmaPq.kem_encrypt/3` / `kem_decrypt/4`. Salt: `"buckitup/origin-bot/v1"`. See `Chat.Data.Schemas.OriginBot`.
 
 10. ~~**`/r/:nonce` route placement.**~~ — resolved. The `/r` scope (containing `/:nonce`, `api/token/create`, `api/token/bind`) is placed before the catch-all `/*path` route. `FrontendController` gets a new `:write_review` action.
 
@@ -436,7 +428,7 @@ The `review_token_ttl_days` setting (also in `origin_settings`) controls the sof
 
     Soft-delete span is configurable per origin via `origin_settings` key `review_token_ttl_days` (default: 7).
 
-12. ~~**Bot runtime location.**~~ — resolved. The bot runs on the device. The origin stores the bot's secret keys in `origin_bots` — `secret` (KEM ciphertext) + `encrypted_identity` (AES-GCM blob), decryptable only with the origin's `crypt_skey`. On device startup, the origin decapsulates, derives the wrap key, and decrypts the bot identity to start `ReviewBotWorker`. The bot keeps keys in memory while running. The server never sees secret keys in cleartext.
+12. ~~**Bot runtime location.**~~ — resolved. The bot runs on the device. The origin stores the bot's secret keys in `origin_bots` — `secret_b64` (KEM ciphertext) + `encrypted_identity_b64` (AES-GCM blob), decryptable only with the origin's `crypt_skey`. On device startup, the origin decapsulates, derives the wrap key, and decrypts the bot identity to start `ReviewBotWorker`. The bot keeps keys in memory while running. The server never sees secret keys in cleartext.
 
 ---
 

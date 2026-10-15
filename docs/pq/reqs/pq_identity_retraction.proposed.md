@@ -40,7 +40,7 @@ A new table, `identity_retractions`, holds one row per retracted identity:
 | `sign_b64` | `bytea` | ML-DSA-87 signature by the identity's own `sign_pkey` |
 
 The row verifies on its own: `user_hash` must be the hash of `sign_pkey`, as on
-a card, and `sign_b64` must verify under that key. A retraction therefore
+a [card](pq_user.done.md), and `sign_b64` must verify under that key. A retraction therefore
 checks out anywhere with no lookup: on a server that never had the card,
 offline, or outside the database (on paper, in a guardian's share, on chain).
 
@@ -101,15 +101,15 @@ versions it: a format change bumps it. The client builds the same bytes with
 
 - **HTTP ingest.**
   - `/ingest` and `/ingest_each` accept `insert` for `identity_retractions`.
-    The writer checks `user_hash` against `sign_pkey` and the signature; no
-    card is needed.
+    The writer verifies the row as in [Statement](#statement); no card is
+    needed.
   - There is **no** proof-of-possession check: the statement carries its own
     signature, and replaying it is harmless.
   - `update` and `delete` are refused (insert-only, see [Semantics](#semantics)).
 - **Peer sync.**
   - `sync_persist(:insert, …)` validates the signature and inserts, keeping a
     stored row; `:update` and `:delete` are ignored.
-  - The row has no required parents: it carries its own key.
+  - The row has no required parents.
 - **Reads.** `identity_retractions` joins the read-exempt shapes beside
   `user_card` and `vouch_token`. Clients read the whole table. Retractions are
   rare, and a whole-table read tells the server nothing about whose
@@ -138,7 +138,7 @@ versions it: a format change bumps it. The client builds the same bytes with
     classify those rows instead.
 - **Key proofs.** `KeyProof.prove/3` treats a retracted identity as
   `:unknown_user`, so it opens no read session and claims no device.
-- **Reads.**
+- **Read sessions.**
   - `open`: anyone reads without a session, a retracted identity included.
   - `guarded`: reads need a read session — a key proof with no chain check —
     so that a retracted identity, whose proofs fail, reads nothing. Today
@@ -173,9 +173,7 @@ versions it: a format change bumps it. The client builds the same bytes with
      history stays readable but nothing more can be sent;
   2. signs the statement and ingests it;
   3. offers to retire the account's community backup on chain (`revokeSecret`),
-     off by default: kept, it lets the owner recover the old account's data
-     later; retired,
-     guardians and nodes drop their shares (`pq_recovery_shares` § Dying);
+     off by default (see Community backup below);
   4. signs out. Deleting the local data is offered, not done by default.
 - **The retraction set.**
   - Every client syncs `identity_retractions` and keeps a persisted local set
@@ -198,7 +196,8 @@ versions it: a format change bumps it. The client builds the same bytes with
     lost in the roster, with a reshare prompt;
   - a guardian sees "owner closed their account" on the holding and keeps it,
     since the owner may still recover the old account's data; it drops the
-    holding when the backup is retired on chain.
+    holding when the backup is retired on chain (`pq_recovery_shares` § Dying);
+    the owner chooses which when closing, retiring being off by default.
 - **No successor.** A new account is a new identity. Contacts connect to it in
   person, as with any account.
 

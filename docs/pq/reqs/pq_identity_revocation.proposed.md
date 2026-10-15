@@ -126,6 +126,13 @@ versions it: a format change bumps it. The client builds the same bytes with
     classify those rows instead.
 - **Key proofs.** `KeyProof.prove/3` treats a revoked identity as
   `:unknown_user`, so it opens no read session and claims no device.
+- **Reads.**
+  - `open`: anyone reads without a session, a revoked identity included.
+  - `guarded`: reads need a read session — a key proof with no chain check —
+    so that a revoked identity, whose proofs fail, reads nothing. Today
+    `guarded` reads are anonymous; with this, `ReadGate.enforced?/0` holds in
+    `guarded` as in `trust`, and only `trust` checks the chain.
+  - `trust`: unchanged; a session needs a key proof and a chain.
 - **Trust graph.** The chain-distance query skips every vouch whose issuer is
   revoked, at every hop, and refuses a revoked subject: a revoked identity
   neither grants nor holds a place in any chain. A revocation carries no scope,
@@ -136,11 +143,13 @@ versions it: a format change bumps it. The client builds the same bytes with
     `guarded` and `trust` nobody's chain reaches it, so only the gate modes'
     own exemptions pass. `open` stays open.
   - The revoked key cannot act as owner, because its key proofs fail.
-  - A new owner replaces the revoked entry in AdminDB (registration skips the
-    `put_new` refusal when the stored owner is revoked). How a new owner
-    claims such a device is open question 5: by signing in first, as on a
-    fresh device ([Bootstrap and Owner](pq_access_gating.done.md#bootstrap-and-owner)),
-    races the thief.
+  - Nobody can take the device over remotely: neither ingest nor the owner
+    claim registers a new owner while a revoked one is stored. A device gets a
+    new owner only by reinstalling its firmware, which wipes AdminDB. The
+    first person to sign in on it afterwards becomes the owner, as on a fresh
+    device ([Bootstrap and Owner](pq_access_gating.done.md#bootstrap-and-owner)).
+    That step needs physical access, which a thief who revoked the owner
+    remotely does not have.
 
 ---
 
@@ -151,8 +160,9 @@ versions it: a format change bumps it. The client builds the same bytes with
   1. shows what closing costs — every contact has to be met again, and the
      history stays readable but nothing more can be sent;
   2. signs the statement and ingests it;
-  3. revokes the account's community backup on chain, so that guardians and
-     nodes drop their shares (`pq_recovery_shares` § Dying);
+  3. offers to revoke the account's community backup on chain, off by default:
+     kept, it lets the owner recover the old account's data later; revoked,
+     guardians and nodes drop their shares (`pq_recovery_shares` § Dying);
   4. signs out. Deleting the local data is offered, not done by default.
 - **The revocation set.**
   - Every client syncs `identity_revocations` and keeps a persisted local set
@@ -173,8 +183,9 @@ versions it: a format change bumps it. The client builds the same bytes with
 - **Community backup:**
   - an owner whose guardian or node operator is revoked sees that holding as
     lost in the roster, with a reshare prompt;
-  - a guardian sees "owner closed their account" on the holding, and drops it
-    when the backup is revoked on chain.
+  - a guardian sees "owner closed their account" on the holding and keeps it,
+    since the owner may still recover the old account's data; it drops the
+    holding when the backup is revoked on chain.
 - **No successor.** A new account is a new identity. Contacts connect to it in
   person, as with any account.
 
@@ -204,20 +215,8 @@ versions it: a format change bumps it. The client builds the same bytes with
 
 ## Open questions
 
-1. Does closing revoke the community backup by default? Keeping it would let
-   the owner recover the old account's data later, but it keeps guardians
-   holding shares for a dead identity.
-2. What does a client do with a revoked identity's rows first seen after the
-   revocation: label them (as above), or hide them behind a click?
-3. Should a server keep accepting a revoked identity's *reads* in `open` and
-   `guarded` modes? Today those modes read without a session.
-4. Should `identity_revocations` rows carry the card's `sign_pkey`, so a
+1. Should `identity_revocations` rows carry the card's `sign_pkey`, so a
    revocation verifies even where the card has not arrived yet?
-5. How does a device whose owner was revoked get a new owner? Signing in
-   first, as on a fresh device, lets a thief who revoked the owner claim it
-   before the owner's new account does. A step on the device itself (a button,
-   the local console, a reset) would close that, at the cost of needing
-   physical access.
 
 ---
 

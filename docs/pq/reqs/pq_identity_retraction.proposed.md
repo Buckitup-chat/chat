@@ -75,6 +75,12 @@ The `domain` value separates the statement from rows of other tables and
 versions it: a format change bumps it. The client builds the same bytes with
 `canonicalPayload`. Both stacks pin them with one golden vector.
 
+The same key signs proof-of-possession challenges. Those need a domain of
+their own, so that a server cannot obtain a retraction signature by sending
+a crafted challenge; `pq_pop_binding.proposed.md` proposes it. Until then
+the separation rests on the framed payload not being valid UTF-8, which
+challenges are encoded as.
+
 ---
 
 ## Semantics
@@ -99,16 +105,29 @@ versions it: a format change bumps it. The client builds the same bytes with
 
 ## Ingest and sync
 
+- **Verification, everywhere.** HTTP ingest, peer sync and clients accept a
+  row only when **both** hold: `user_hash` is the hash of `sign_pkey`, and
+  `sign_b64` verifies under `sign_pkey`. A signature check alone proves
+  nothing, because the row names its own key: anyone could sign with their
+  own key and put a victim's `user_hash` beside it.
 - **HTTP ingest.**
-  - `/ingest` and `/ingest_each` accept `insert` for `identity_retractions`.
-    The writer verifies the row as in [Statement](#statement); no card is
-    needed.
+  - `/ingest` and `/ingest_each` accept `insert` for `identity_retractions`; no
+    card is needed.
   - There is **no** proof-of-possession check: the statement carries its own
     signature, and replaying it is harmless.
+  - The insert is never chain-gated, in any mode, like a `user_card` insert.
+    Anyone can deliver a retraction, a guardian or a new account included.
   - `update` and `delete` are refused (insert-only, see [Semantics](#semantics)).
+  - The shape's conflict fingerprint is `user_hash`. A second valid statement
+    for an already retracted identity answers `exists` with
+    `conflicted: false`, and clients count it as delivered. Two devices of
+    one owner closing the account at once both succeed.
+  - The same rate limits as card ingest apply. A throwaway key can sign a
+    retraction of itself, as it can publish a card today. Rows are never
+    deleted, so these limits are the only bound on the table.
 - **Peer sync.**
-  - `sync_persist(:insert, …)` validates the signature and inserts, keeping a
-    stored row; `:update` and `:delete` are ignored.
+  - `sync_persist(:insert, …)` verifies as above and inserts, keeping a stored
+    row; `:update` and `:delete` are ignored.
   - The row has no required parents.
 - **Reads.** `identity_retractions` joins the read-exempt shapes beside
   `user_card` and `vouch_token`. Clients read the whole table. Retractions are
@@ -120,32 +139,51 @@ versions it: a format change bumps it. The client builds the same bytes with
 ## Server enforcement
 
 - **Writes.**
-  - Every HTTP ingest refuses a retracted acting identity, **in every gate mode,
-    `open` included**: `403 {"error": "identity_retracted"}` on `/ingest` and,
-    per row, on `/ingest_each`. The one exception is an `identity_retractions`
-    insert itself, which is accepted again so that a replay is idempotent.
+  - Every write a server accepts over HTTP refuses a retracted acting identity,
+    **in every gate mode, `open` included, and for the owner too**. That covers
+    `/ingest`, `/ingest_each` per row, and `PUT /electric/v1/file_chunk`.
+    This amends the decision order of [Access Gating](pq_access_gating.done.md):
+    the retraction check comes before "`open` allows" and before "the owner is
+    always approved".
+  - The one exception is an `identity_retractions` insert itself, accepted
+    again so that a replay is idempotent.
+  - The **acting identity** is the one whose key proved possession for the
+    request: the PoP signer, or the uploader for a chunk. It is not whichever
+    field a shape's gate names. An `origin` update, for example, is gated on
+    `origin_hash` but proved by the origin owner's key, and the owner is the
+    identity checked.
   - One unconditional helper does it, with no gate-mode branch: an indexed
-    lookup by `user_hash`, called at the top of `WriteGate.check_access/2`
-    before the mode is read (so all shapes behind `and_gate` inherit it), and
-    in every writer check that bypasses `WriteGate`: `user_card_allowed`,
-    `vouch_token_allowed` and the review right candidates'
-    `right_candidate_check`. It belongs nowhere inside `enforce/2`, which never
-    runs in `open` mode.
+    lookup by `user_hash`. It runs where the acting identity is known: in each
+    PoP verifier (`*_allowed`, the review right candidates'
+    `right_candidate_check`) and in the chunk upload. It belongs nowhere inside
+    `WriteGate.enforce/2`, which never runs in `open` mode.
+  - The answer is `403 {"error": "identity_retracted"}` on `/ingest` and as
+    the row's error on `/ingest_each` (whose batch status becomes 403).
+    `ElectricController` maps it beside `not_in_trust_chain`.
   - Clients treat `identity_retracted` as permanent and drop the identity's
     queued writes instead of retrying them.
   - Peer sync does **not** refuse a retracted identity's rows. A server that
     refused rows another server accepted would never converge with it. Clients
     classify those rows instead.
-- **Key proofs.** `KeyProof.prove/3` treats a retracted identity as
-  `:unknown_user`, so it opens no read session and claims no device.
+- **Key proofs.**
+  - `KeyProof.prove/3` refuses a retracted identity with its own reason,
+    `:identity_retracted`, answered as `403 {"error": "identity_retracted"}`.
+    It is not `:unknown_user`, which tells a client to re-ingest its card and
+    retry.
+  - Read sessions already issued to the identity are dropped when the
+    retraction arrives.
+  - Every other place that grants a role from an identity's key refuses a
+    retracted one as well. In particular, the admin sandbox does not grant
+    the owner role to a retracted owner's key file.
 - **Reads stay as the gate modes define them**
   ([Access Modes](pq_access_gating.done.md)).
   - In `open` and `guarded`, reads are anonymous, so a retracted identity
     reads like anyone else. Refusing it there would need every reader to prove
     a key. Even then, the holder of a retracted key would simply read under a
     new account, since neither mode checks a chain for reads.
-  - In `trust`, a read session needs a key proof, which a retracted identity
-    cannot give. It reads nothing there.
+  - In `trust`, a gated shape needs a read session, which a retracted identity
+    can no longer open. The read-exempt shapes (`user_card`, `vouch_token`,
+    `identity_retractions`) stay readable by anyone, as for every reader.
 - **Trust graph.** The chain-distance query skips every vouch whose issuer is
   retracted, at every hop, and refuses a retracted subject: a retracted identity
   neither grants nor holds a place in any chain. A retraction carries no scope,
@@ -155,14 +193,18 @@ versions it: a format change bumps it. The client builds the same bytes with
   - The gates treat a retracted owner as present but unable to vouch: in
     `guarded` and `trust` nobody's chain reaches it, so only the gate modes'
     own exemptions pass. `open` stays open.
-  - The retracted key cannot act as owner, because its key proofs fail.
+  - The retracted key cannot act as owner: its key proofs fail, and the admin
+    UI refuses it.
   - Nobody can take the device over remotely: neither ingest nor the owner
-    claim registers a new owner while a retracted one is stored. A device gets a
-    new owner only by reinstalling its firmware, which wipes AdminDB. The
-    first person to sign in on it afterwards becomes the owner, as on a fresh
-    device ([Bootstrap and Owner](pq_access_gating.done.md#bootstrap-and-owner)).
-    That step needs physical access, which a thief who retracted the owner
-    remotely does not have.
+    claim registers a new owner while a retracted one is stored (`put_new`
+    keeps the stored owner).
+  - A device gets a new owner only after a firmware reinstall that wipes
+    AdminDB. Wherever the platform keeps AdminDB, the reinstall must clear it.
+    The wipe resets more than the owner:
+    - the device gets a new server identity (SyncBot key), so peers vouch for
+      it again;
+    - the gate mode returns to `open`.
+  - Who becomes owner after the reinstall is [open question 1](#open-questions).
 
 ---
 
@@ -182,14 +224,20 @@ versions it: a format change bumps it. The client builds the same bytes with
   - A retracted identity stays retracted locally, even if a server later serves a
     view without it.
   - The client records, per identity, when it first learned of the retraction.
+  - On every connect, the retraction set syncs to up-to-date **before** the
+    client applies any other shape's catch-up. A contact back after a week
+    offline therefore knows of a retraction before it sees the messages that
+    followed it.
 - **A contact's retraction:**
   - The dialog shows one fixed banner — "This account was closed by its owner"
     — and the composer is disabled.
   - The contact's name comes from the local contact record, never again from
     the card.
-  - Messages, edits and deletions from the identity that this client first
-    sees after it learned of the retraction are shown labelled, not applied
-    silently. Earlier history stays as it was.
+  - New messages from the identity that this client first sees after it
+    learned of the retraction are shown, labelled.
+  - Edits and deletions it sees after that point are **not applied**. Each is
+    shown as a labelled note beside the revision it would replace, so earlier
+    history stays as it was.
   - The banner says what to do: do not trust new messages, change anything
     secret shared with that account, meet in person to reconnect.
 - **Community backup:**
@@ -223,6 +271,16 @@ versions it: a format change bumps it. The client builds the same bytes with
   time no server controls.
 - **Reports by others.** Signals about someone else's account, weighted by
   each viewer's own trust graph and never enforced network-wide.
+
+---
+
+## Open questions
+
+1. Who becomes owner after the reinstall? The first sign-in over the network
+   registers one, and a thief who watches `/electric/v1/device_identity` can be
+   first, as can any client that reconnects and re-ingests its card. Closing
+   that needs registration on a freshly reset device to come from the device
+   itself: the local console, a setup window opened by a button, or a USB key.
 
 ---
 

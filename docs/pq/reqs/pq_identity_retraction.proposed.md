@@ -138,13 +138,14 @@ versions it: a format change bumps it. The client builds the same bytes with
     classify those rows instead.
 - **Key proofs.** `KeyProof.prove/3` treats a retracted identity as
   `:unknown_user`, so it opens no read session and claims no device.
-- **Read sessions.**
-  - `open`: anyone reads without a session, a retracted identity included.
-  - `guarded`: reads need a read session — a key proof with no chain check —
-    so that a retracted identity, whose proofs fail, reads nothing. Today
-    `guarded` reads are anonymous; with this, `ReadGate.enforced?/0` holds in
-    `guarded` as in `trust`, and only `trust` checks the chain.
-  - `trust`: unchanged; a session needs a key proof and a chain.
+- **Reads stay as the gate modes define them**
+  ([Access Modes](pq_access_gating.done.md)).
+  - In `open` and `guarded`, reads are anonymous, so a retracted identity
+    reads like anyone else. Refusing it there would need every reader to prove
+    a key. Even then, the holder of a retracted key would simply read under a
+    new account, since neither mode checks a chain for reads.
+  - In `trust`, a read session needs a key proof, which a retracted identity
+    cannot give. It reads nothing there.
 - **Trust graph.** The chain-distance query skips every vouch whose issuer is
   retracted, at every hop, and refuses a retracted subject: a retracted identity
   neither grants nor holds a place in any chain. A retraction carries no scope,

@@ -7,7 +7,6 @@ defmodule Chat.Data.Shapes.UserCard do
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.User
   alias Chat.Data.User.Validation
-  alias Chat.Pq.OwnerBootstrap
   alias Phoenix.Sync.Writer
 
   @impl true
@@ -30,12 +29,6 @@ defmodule Chat.Data.Shapes.UserCard do
       :update ->
         persist_update(card)
     end
-  end
-
-  @impl true
-  def sync_after_persist(:insert, %UserCard{user_hash: user_hash, sign_pkey: sign_pkey}, _opts) do
-    OwnerBootstrap.maybe_register_owner(user_hash, sign_pkey)
-    :ok
   end
 
   @impl true

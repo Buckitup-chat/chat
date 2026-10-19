@@ -204,7 +204,11 @@ challenges are encoded as.
     - the device gets a new server identity (SyncBot key), so peers vouch for
       it again;
     - the gate mode returns to `open`.
-  - Who becomes owner after the reinstall is [open question 1](#open-questions).
+  - After the reinstall the owner registers only through the device's own
+    access point: a person signs in on the device over its local network.
+    Ingest and the owner claim over any other route register nobody on a
+    freshly reset device, so a thief who watches
+    `/electric/v1/device_identity` from elsewhere cannot be first.
 
 ---
 
@@ -271,16 +275,6 @@ challenges are encoded as.
   time no server controls.
 - **Reports by others.** Signals about someone else's account, weighted by
   each viewer's own trust graph and never enforced network-wide.
-
----
-
-## Open questions
-
-1. Who becomes owner after the reinstall? The first sign-in over the network
-   registers one, and a thief who watches `/electric/v1/device_identity` can be
-   first, as can any client that reconnects and re-ingests its card. Closing
-   that needs registration on a freshly reset device to come from the device
-   itself: the local console, a setup window opened by a button, or a USB key.
 
 ---
 

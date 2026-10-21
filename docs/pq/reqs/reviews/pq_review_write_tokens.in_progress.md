@@ -80,13 +80,14 @@ origin_bots
 
 **`secret_b64` + `encrypted_identity_b64`** — two-field KEM wrap, same pattern as `dialog_keys` (`peer_kem_wrap_key_b64` + `peer_wrapped_msg_key_b64`). `secret_b64` holds the ML-KEM-1024 ciphertext; `encrypted_identity_b64` holds the AES-256-GCM blob containing the bot's `sign_skey` + `crypt_skey`. Produced by `EnigmaPq.kem_encrypt/3`, unwrapped by `EnigmaPq.kem_decrypt/4` with salt `"buckitup/origin-bot/v1"`.
 
-**Device startup flow:**
-1. Device syncs `origin_bots` shape (filtered by origins this device holds keys for)
-2. For each origin bot: `identity = EnigmaPq.kem_decrypt(secret_b64, encrypted_identity_b64, origin_crypt_skey, "buckitup/origin-bot/v1")`
-3. Start `ReviewBotWorker` GenServer with the decrypted identity
-4. Bot can now create tokens, issue vouches, GC — all on the device
+**Bot startup flow (explicit, from admin page):**
+1. Origin owner opens admin page, which lists `origin_bots` via Electric shape
+2. Owner clicks "Start" on a bot row
+3. Client decrypts: `identity = EnigmaPq.kem_decrypt(secret_b64, encrypted_identity_b64, origin_crypt_skey, "buckitup/origin-bot/v1")`
+4. Client starts `ReviewBotWorker` GenServer under `Chat.ReviewBot.WorkerSupervisor` (DynamicSupervisor), registered via `Chat.ReviewBot.Registry`
+5. Bot can now create tokens, issue vouches, GC — all on the device
 
-The bot runs **on the origin owner's device** (or Nerves hardware), not on the server. Token creation and vouch issuance happen device-side, hitting `/ingest` the same way all other PQ rows do.
+The bot runs **on the origin owner's device** (or Nerves hardware), not on the server. Startup is explicit — the owner must decrypt and start each bot from the admin UI. Token creation and vouch issuance happen device-side, hitting `/ingest` the same way all other PQ rows do.
 
 ### Vouch chain
 
@@ -365,16 +366,16 @@ The `review_token_ttl_days` setting (also in `origin_settings`) controls the sof
 
 ### Phase 1 — Origin bot + token infrastructure
 
-- [ ] `origin_bots` migration + Ecto schema + Electric shape
-- [ ] `OriginBotSignHash` type, `ob_` prefix in Consts
+- [x] `origin_bots` migration + Ecto schema + Electric shape
+- [x] `OriginBotSignHash` type, `ob_` prefix in Consts
 - [ ] `ReviewWriteTokenSignHash` type, `rwt_` prefix in Consts
 - [ ] `OriginOrderHash` type, `org_ord_` prefix in Consts
-- [ ] Bot creation flow: keypair gen, `user_cards` row (`ReviewBot_<originName>`), identity encryption, `origin_bots` ingest
-- [ ] Bot vouch: origin → bot vouch token (`origins.<origin_hash>.reviews.write`)
-- [ ] `ReviewBotWorker` GenServer: decrypt identity from `origin_bots` shape, start on sync
+- [x] Bot creation flow: keypair gen, `user_cards` row (`ReviewBot_<originName>`), identity encryption, `origin_bots` ingest
+- [x] Bot vouch: origin → bot vouch token (`origins.<origin_hash>.reviews.write`)
+- [x] `ReviewBotWorker` GenServer: decrypt identity from `origin_bots`, explicit start from admin page
 - [ ] `origin_settings` table + migration + Ecto schema + Electric shape
 - [ ] `OriginSetting` data context, validation, shape module
-- [ ] Review ingest: vouch check when `review_access = invite_only` (reads from `origin_settings`)
+- [x] Review ingest: vouch check when `review_access = invite_only` (reads from `origin_settings`)
 
 ### Phase 2 — Token CRUD + redirect
 

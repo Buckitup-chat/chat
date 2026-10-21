@@ -36,7 +36,9 @@ defmodule Chat.Data.Shapes.OriginSetting do
       check:
         WriteGate.and_gate(
           &Validation.origin_setting_allowed(&1, user_pop_context),
-          :origin_setting, owner: "origin_hash"),
+          :origin_setting,
+          owner: "origin_hash"
+        ),
       validate: &Validation.origin_setting_validate/3
     )
   end

@@ -72,6 +72,7 @@ defmodule Chat.Application do
   else
     defp more_children do
       [
+        Chat.ReviewBot.Supervisor,
         Chat.Data.File.GC,
         Chat.Upload.StaleUploadsPruner,
         Chat.Data.ReviewCandidateCleaner

@@ -1,4 +1,4 @@
-defmodule Chat.ReviewBot.CreationTest do
+defmodule Chat.ReviewBot.RowBuilderTest do
   use ChatWeb.DataCase, async: true, group: :ets_deferred
 
   import Chat.Test.ReviewFixtures
@@ -9,7 +9,7 @@ defmodule Chat.ReviewBot.CreationTest do
   alias Chat.Data.User
   alias Chat.Data.VouchToken
   alias Chat.NetworkSynchronization.Electric.ShapeWriter
-  alias Chat.ReviewBot.Creation
+  alias Chat.ReviewBot.RowBuilder
   alias Chat.ReviewBot.Identity
 
   setup do
@@ -29,7 +29,7 @@ defmodule Chat.ReviewBot.CreationTest do
 
   describe "generate_identity/1" do
     test "generates a named identity" do
-      bot = Creation.generate_identity("CoffeeShop")
+      bot = RowBuilder.generate_identity("CoffeeShop")
       assert bot.name == "ReviewBot_CoffeeShop"
       assert is_binary(bot.sign_skey)
       assert is_binary(bot.crypt_skey)
@@ -38,12 +38,12 @@ defmodule Chat.ReviewBot.CreationTest do
 
   describe "origin_bot/5" do
     test "builds a signed origin_bot with KEM-wrapped identity", ctx do
-      bot = Creation.generate_identity("CoffeeShop")
+      bot = RowBuilder.generate_identity("CoffeeShop")
       bot_card = User.extract_pq_card(bot)
       insert_user_card(bot)
 
       ob =
-        Creation.origin_bot(
+        RowBuilder.origin_bot(
           bot_card.user_hash,
           bot,
           ctx.origin_card.user_hash,
@@ -60,12 +60,12 @@ defmodule Chat.ReviewBot.CreationTest do
     end
 
     test "wrapped identity can be unwrapped with origin crypt_skey", ctx do
-      bot = Creation.generate_identity("CoffeeShop")
+      bot = RowBuilder.generate_identity("CoffeeShop")
       bot_card = User.extract_pq_card(bot)
       insert_user_card(bot)
 
       ob =
-        Creation.origin_bot(
+        RowBuilder.origin_bot(
           bot_card.user_hash,
           bot,
           ctx.origin_card.user_hash,
@@ -87,11 +87,11 @@ defmodule Chat.ReviewBot.CreationTest do
 
   describe "origin_vouch/3" do
     test "builds a vouch with correct scope", ctx do
-      bot = Creation.generate_identity("CoffeeShop")
+      bot = RowBuilder.generate_identity("CoffeeShop")
       bot_card = User.extract_pq_card(bot)
 
       vouch =
-        Creation.origin_vouch(
+        RowBuilder.origin_vouch(
           ctx.origin_card.user_hash,
           ctx.origin_identity.sign_skey,
           bot_card.user_hash
@@ -107,14 +107,14 @@ defmodule Chat.ReviewBot.CreationTest do
 
   describe "device_vouches/4" do
     test "builds vouches for all required shapes", ctx do
-      bot = Creation.generate_identity("CoffeeShop")
+      bot = RowBuilder.generate_identity("CoffeeShop")
       bot_card = User.extract_pq_card(bot)
       insert_user_card(bot)
 
       owner_card = User.extract_pq_card(ctx.owner)
 
       vouches =
-        Creation.device_vouches(
+        RowBuilder.device_vouches(
           owner_card.user_hash,
           ctx.owner.sign_skey,
           bot_card.user_hash,
@@ -138,13 +138,13 @@ defmodule Chat.ReviewBot.CreationTest do
 
   describe "full creation flow" do
     test "creates bot, persists rows, verifies vouch chain", ctx do
-      bot = Creation.generate_identity("CoffeeShop")
+      bot = RowBuilder.generate_identity("CoffeeShop")
       bot_card = User.extract_pq_card(bot)
 
       {:ok, _} = ShapeWriter.write(:user_card, :insert, bot_card)
 
       ob =
-        Creation.origin_bot(
+        RowBuilder.origin_bot(
           bot_card.user_hash,
           bot,
           ctx.origin_card.user_hash,
@@ -157,7 +157,7 @@ defmodule Chat.ReviewBot.CreationTest do
       assert persisted.bot_hash == bot_card.user_hash
 
       vouch =
-        Creation.origin_vouch(
+        RowBuilder.origin_vouch(
           ctx.origin_card.user_hash,
           ctx.origin_identity.sign_skey,
           bot_card.user_hash

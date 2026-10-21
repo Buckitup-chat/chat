@@ -1,5 +1,5 @@
-defmodule Chat.ReviewBot.Creation do
-  @moduledoc "Pure mutation builders for review bot creation. No side effects."
+defmodule Chat.ReviewBot.RowBuilder do
+  @moduledoc "Builds signed PQ row structs for review bot ingest. No side effects."
 
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.OriginBot

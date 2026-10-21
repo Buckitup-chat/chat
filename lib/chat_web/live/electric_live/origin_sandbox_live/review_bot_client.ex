@@ -6,10 +6,10 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ReviewBotClient do
   alias Chat.Data.Schemas.OriginBot, as: OriginBotSchema
   alias Chat.Data.Types.OriginBotSignHash
   alias Chat.Data.User
-  alias Chat.ReviewBot.Creation
+  alias Chat.ReviewBot.RowBuilder
 
   def create_bot(origin_identity, base_url) do
-    bot = Creation.generate_identity(origin_identity.name)
+    bot = RowBuilder.generate_identity(origin_identity.name)
     bot_card = User.extract_pq_card(bot)
 
     with {:ok, _body, card_logs} <- ingest_user_card(bot_card, bot.sign_skey, base_url),
@@ -95,7 +95,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ReviewBotClient do
     origin_hash = origin_hash_from(origin_identity)
 
     ob =
-      Creation.origin_bot(
+      RowBuilder.origin_bot(
         bot_card.user_hash,
         bot_identity,
         origin_hash,
@@ -104,7 +104,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ReviewBotClient do
       )
 
     vouch =
-      Creation.origin_vouch(origin_hash, origin_identity.sign_skey, bot_card.user_hash)
+      RowBuilder.origin_vouch(origin_hash, origin_identity.sign_skey, bot_card.user_hash)
 
     payload = %{
       "mutations" => [

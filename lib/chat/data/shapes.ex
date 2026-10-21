@@ -23,7 +23,8 @@ defmodule Chat.Data.Shapes do
     Chat.Data.Shapes.ReviewPasswordCandidate,
     Chat.Data.Shapes.ReviewPostRightCandidate,
     Chat.Data.Shapes.ReviewRevokeRightCandidate,
-    Chat.Data.Shapes.ReviewList
+    Chat.Data.Shapes.ReviewList,
+    Chat.Data.Shapes.ReviewWriteToken
   ]
 
   @not_syncable [

@@ -280,6 +280,13 @@ the client library implements it.
 `@buckitup/pq-client`: the protocol without Vue, Pinia or TanStack. BuckitUp's
 frontend moves onto it, so there is one implementation.
 
+- **Where:** a package in `Buckitup-chat/chat-frontend` (`packages/pq-client`),
+  next to the app that uses it.
+- **Published** to the public npm registry as `@buckitup/pq-client`.
+- **Licence:** GPLv3, as the repository. A client that bundles it and is
+  distributed to users is a work based on it under GPLv3: the partner's web UI
+  built on the library is released under GPLv3 too.
+
 | Module | Contents |
 |---|---|
 | `identity` | key generation; `user_cards` row; certificates; `user_hash` |

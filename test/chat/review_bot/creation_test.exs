@@ -36,14 +36,14 @@ defmodule Chat.ReviewBot.CreationTest do
     end
   end
 
-  describe "build_origin_bot/5" do
+  describe "origin_bot/5" do
     test "builds a signed origin_bot with KEM-wrapped identity", ctx do
       bot = Creation.generate_identity("CoffeeShop")
       bot_card = User.extract_pq_card(bot)
       insert_user_card(bot)
 
       ob =
-        Creation.build_origin_bot(
+        Creation.origin_bot(
           bot_card.user_hash,
           bot,
           ctx.origin_card.user_hash,
@@ -65,7 +65,7 @@ defmodule Chat.ReviewBot.CreationTest do
       insert_user_card(bot)
 
       ob =
-        Creation.build_origin_bot(
+        Creation.origin_bot(
           bot_card.user_hash,
           bot,
           ctx.origin_card.user_hash,
@@ -85,13 +85,13 @@ defmodule Chat.ReviewBot.CreationTest do
     end
   end
 
-  describe "build_origin_vouch/3" do
+  describe "origin_vouch/3" do
     test "builds a vouch with correct scope", ctx do
       bot = Creation.generate_identity("CoffeeShop")
       bot_card = User.extract_pq_card(bot)
 
       vouch =
-        Creation.build_origin_vouch(
+        Creation.origin_vouch(
           ctx.origin_card.user_hash,
           ctx.origin_identity.sign_skey,
           bot_card.user_hash
@@ -105,7 +105,7 @@ defmodule Chat.ReviewBot.CreationTest do
     end
   end
 
-  describe "build_device_vouches/4" do
+  describe "device_vouches/4" do
     test "builds vouches for all required shapes", ctx do
       bot = Creation.generate_identity("CoffeeShop")
       bot_card = User.extract_pq_card(bot)
@@ -114,7 +114,7 @@ defmodule Chat.ReviewBot.CreationTest do
       owner_card = User.extract_pq_card(ctx.owner)
 
       vouches =
-        Creation.build_device_vouches(
+        Creation.device_vouches(
           owner_card.user_hash,
           ctx.owner.sign_skey,
           bot_card.user_hash,
@@ -144,7 +144,7 @@ defmodule Chat.ReviewBot.CreationTest do
       {:ok, _} = ShapeWriter.write(:user_card, :insert, bot_card)
 
       ob =
-        Creation.build_origin_bot(
+        Creation.origin_bot(
           bot_card.user_hash,
           bot,
           ctx.origin_card.user_hash,
@@ -157,7 +157,7 @@ defmodule Chat.ReviewBot.CreationTest do
       assert persisted.bot_hash == bot_card.user_hash
 
       vouch =
-        Creation.build_origin_vouch(
+        Creation.origin_vouch(
           ctx.origin_card.user_hash,
           ctx.origin_identity.sign_skey,
           bot_card.user_hash

@@ -15,7 +15,7 @@ defmodule Chat.ReviewBot.Creation do
     User.generate_pq_identity("ReviewBot_#{origin_name}")
   end
 
-  def build_origin_bot(bot_hash, bot_identity, origin_hash, origin_crypt_pkey, origin_sign_skey) do
+  def origin_bot(bot_hash, bot_identity, origin_hash, origin_crypt_pkey, origin_sign_skey) do
     {secret, encrypted} = Identity.wrap(bot_identity, origin_crypt_pkey)
 
     %OriginBot{
@@ -29,7 +29,7 @@ defmodule Chat.ReviewBot.Creation do
     |> sign_struct(origin_sign_skey, &OriginBotSignHash.from_binary/1)
   end
 
-  def build_origin_vouch(origin_hash, origin_sign_skey, bot_hash) do
+  def origin_vouch(origin_hash, origin_sign_skey, bot_hash) do
     "origins.#{origin_hash}.reviews.write"
     |> build_vouch(origin_hash, bot_hash, origin_sign_skey)
   end
@@ -44,14 +44,14 @@ defmodule Chat.ReviewBot.Creation do
     :review_public_passwords
   ]
 
-  def build_device_vouches(owner_hash, owner_sign_skey, bot_hash, device_sn) do
+  def device_vouches(owner_hash, owner_sign_skey, bot_hash, device_sn) do
     Enum.map(@device_vouch_shapes, fn shape ->
       "device.#{device_sn}.storage.write.#{shape}"
       |> build_vouch(owner_hash, bot_hash, owner_sign_skey)
     end)
   end
 
-  def derive_hash(%{sign_pkey: sign_pkey}) do
+  def derive_hash(sign_pkey) do
     sign_pkey
     |> EnigmaPq.hash()
     |> UserHash.from_binary()

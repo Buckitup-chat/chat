@@ -95,7 +95,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ReviewBotClient do
     origin_hash = origin_hash_from(origin_identity)
 
     ob =
-      Creation.build_origin_bot(
+      Creation.origin_bot(
         bot_card.user_hash,
         bot_identity,
         origin_hash,
@@ -104,7 +104,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ReviewBotClient do
       )
 
     vouch =
-      Creation.build_origin_vouch(origin_hash, origin_identity.sign_skey, bot_card.user_hash)
+      Creation.origin_vouch(origin_hash, origin_identity.sign_skey, bot_card.user_hash)
 
     payload = %{
       "mutations" => [

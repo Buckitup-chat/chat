@@ -12,7 +12,7 @@ An origin has:
 - its own `user_cards` row (ML-DSA-87 signing keypair, ML-KEM-1024 encryption keypair)
 - an owner (the user who created it)
 - a moderation policy for public reviews
-- public metadata (name, description — signed by origin identity)
+- public metadata (a name, signed by the origin identity)
 
 The origin identity is separate from the owner's personal identity. One user can own multiple origins. Because it is a `user_cards` entry, the existing dialog infrastructure (see [pq_dialogs.done.md](../pq_dialogs.done.md)) works directly for `to_origin` communication.
 
@@ -36,7 +36,8 @@ Two levels of control:
 > **Status (deferred to Phase 3).** The two-tier split is not fully enforced. Origin `update` operations — including
 > `moderation_mode` changes and soft delete (`deleted_flag`) — currently accept **either** the origin identity's
 > **or** the owner's signature ([`Origin.Validation.validate_origin_update_signature/1`](../../../../lib/chat/data/origin/validation.ex):87).
-> A delegated origin-identity holder can therefore perform dangerous ops. Requiring the **owner's** signature
+> Over HTTP an update also needs the owner's key proof, so a delegated origin-identity holder can make such a
+> change only through peer sync, by an update it signed itself. Requiring the **owner's** signature
 > exclusively for these operations lands with the Phase 3 owner/moderation UI. `owner_cert` is still verified on
 > origin creation.
 
@@ -70,8 +71,8 @@ origins                                              — DB table name
 ├── moderation_mode       — TEXT NOT NULL DEFAULT 'none', enum: none / post / pre
 ├── deleted_flag          — BOOLEAN NOT NULL DEFAULT false, soft delete by owner
 ├── owner_timestamp       — BIGINT NOT NULL, causal ordering (LWW)
-├── sign_b64              — BYTEA NOT NULL, origin identity's ML-DSA-87 signature over all fields
-└── sign_hash             — TEXT NOT NULL, prefix "ors_" + hex(SHA3-512 of sign_b64)
+├── sign_b64              — BYTEA NOT NULL, ML-DSA-87 signature over all other fields: by the origin identity on insert, by the origin or the owner on update
+└── sign_hash             — TEXT NOT NULL, prefix "ors_" + hex(SHA3-512 of sign_b64); sent by the client on HTTP ingest
 ```
 
 Constraints: `origin_hash` and `owner_hash` match `^u_[a-f0-9]{128}$`, `sign_hash` matches `^ors_[a-f0-9]{128}$`, `moderation_mode` IN (`none`, `post`, `pre`). Index on `owner_hash`.
@@ -82,9 +83,13 @@ Note: `sign_pkey` and `crypt_pkey` are on the origin's `user_cards` row, not dup
 
 ## Electric shape
 
-Shape: [`Chat.Data.Shapes.Origin`](../../../../lib/chat/data/shapes/origin.ex). Synced to everyone — public directory of origins.
+Shape: [`Chat.Data.Shapes.Origin`](../../../../lib/chat/data/shapes/origin.ex), shape name `origin`. Readable without a session in the `open` and `guarded` access modes; in `trust` a read session for `origin` ([pq_access_gating.done.md](../pq_access_gating.done.md)).
 
-Access control: insert requires origin identity auth; update requires owner auth (with [`has_pending_reviews?/1`](../../../../lib/chat/data/origin/validation.ex) guard).
+Access control on HTTP ingest:
+- **Insert:** the row is signed by the origin identity, the key proof is the origin identity's, and `owner_cert` must verify against the owner's `sign_pkey`.
+- **Update:** the row is signed by the origin or the owner; the key proof is the owner's; only `name`, `moderation_mode`, `deleted_flag` and `owner_timestamp` change, and the update is refused while reviews await moderation ([`has_pending_reviews?/1`](../../../../lib/chat/data/origin/validation.ex)).
+- **Write gate:** in `guarded` and `trust`, the **origin identity** (`origin_hash`) needs a vouch chain for `device.<id>.storage.write.origin`, for inserts and updates alike. A vouch for the owner does not cover it.
+- There is no delete: a removed origin has `deleted_flag = true`.
 
 ## Open questions
 

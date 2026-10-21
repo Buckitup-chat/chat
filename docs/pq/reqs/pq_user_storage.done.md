@@ -51,23 +51,22 @@ User Storage is a user-scoped key-value storage system that provides encrypted, 
 ### 4.1 Authentication Flow
 
 **Write Operations**:
-1. Client obtains a challenge from `GET /electric/challenge`
-2. Client signs challenge with sign_skey
-3. Challenge + signature are injected by [`ChatWeb.Plugs.ElectricChallengeInjector`](../../../lib/chat_web/plugs/electric_challenge_injector.ex)
+1. Client obtains a challenge from `GET /electric/v1/challenge`
+2. Client signs the challenge with sign_skey
+3. Client sends `challenge_id` and the signature in the request body, as `auth` next to `mutations` (§ 5.2)
 4. Server verifies via [`user_storage_allowed/2`](../../../lib/chat/data/user/validation.ex):
    - user_hash → UserCard lookup → `sign_pkey`
    - `EnigmaPq.verify(challenge, signature, sign_pkey)`
 
 **Read Operations**:
-- No authentication required
-- Public read access to all user storage
+- No authentication in the `open` and `guarded` access modes; in `trust` a read session ([pq_access_gating.done.md](pq_access_gating.done.md))
 - Privacy protected via client-side encryption
 
 ### 4.2 Proof-of-Possession (PoP)
 
 PoP mechanism follows the same protocol as UserCards system.
 
-**Reference**: See [electric-proof-of-possesion.md](./electric-proof-of-possesion.md) for complete PoP protocol details.
+**Reference**: See [01_proof_of_possession.md](../invariants/01_proof_of_possession.md) for complete PoP protocol details.
 
 ### 4.3 Signature Integrity
 
@@ -80,56 +79,43 @@ Each mutation carries an ML-DSA-87 signature (`sign_b64`) over its fields. The s
 
 ### 5.1 Read Operations (Electric Shapes)
 
-User storage is exposed via Electric shapes. The primary endpoint supports per-user filtering; a deprecated legacy endpoint provides full-table sync.
-
-#### 5.1.1 Client-Controlled Shapes (v1) — Primary
+User storage is exposed via Electric shapes, with per-user filtering.
 
 **Endpoint**: `GET /electric/v1/shapes`
 
-Router ([`router.ex:233-239`](../../../lib/chat_web/router.ex#L233)):
+Router ([`router.ex`](../../../lib/chat_web/router.ex)):
 ```elixir
 scope "/electric/v1/shapes" do
   pipe_through [:electric]
   pipe_through ChatWeb.Plugs.ElectricReadiness
   pipe_through ChatWeb.Plugs.ElectricTableGuard
+  pipe_through ChatWeb.Plugs.ElectricReadGate
   forward "/", ChatWeb.Plugs.HexToBase64Electric
 end
 ```
 
 Clients pass `table`, `where`, `columns` as query params. Per-user filtering is achieved via `where=user_hash=u_...` — this is the bandwidth-optimized path for single-user queries. The [`ElectricTableGuard`](../../../lib/chat_web/plugs/electric_table_guard.ex) plug restricts which tables are accessible.
 
-#### 5.1.2 Legacy Sync (Phoenix.Sync) — Deprecated
-
-**Deprecated** in favor of v1/shapes.
-
-**Endpoint**: `GET /electric/user_storage`
-
-Router ([`router.ex:204`](../../../lib/chat_web/router.ex#L204)):
-```elixir
-sync("/user_storage", Chat.Data.Schemas.UserStorage)
-```
-
-Full table sync — no server-side filtering, client must filter by `user_hash` locally. Versions exposed separately at `GET /electric/user_storage_version` ([`router.ex:205`](../../../lib/chat_web/router.ex#L205)).
-
 ### 5.2 Write Operations (Ingest Endpoint)
 
 Write operations (insert, update) use the centralized ingest endpoint. Delete is not supported via ingest — use `deleted_flag` for soft deletes.
 
-**Endpoint**: `POST /electric/ingest`
+**Endpoint**: `POST /electric/v1/ingest`
 
-**Alternative**: `POST /electric/ingest_each` (processes mutations individually instead of as a batch)
+**Alternative**: `POST /electric/v1/ingest_each` (processes mutations individually instead of as a batch)
 
-Router ([`router.ex:226-227`](../../../lib/chat_web/router.ex#L226)):
+Router ([`router.ex`](../../../lib/chat_web/router.ex), under `/electric/v1`):
 ```elixir
 post "/ingest", ElectricController, :ingest
 post "/ingest_each", ElectricController, :ingest_each
 ```
 
-**Authentication**: Challenge and signature are injected by [`ElectricChallengeInjector`](../../../lib/chat_web/plugs/electric_challenge_injector.ex) plug (from headers/cookies), not from the request body.
+**Authentication**: the request body carries `auth: {challenge_id, signature}`: a challenge from `GET /electric/v1/challenge`, signed by the row owner's `sign_skey` (unpadded base64). After a successful response, [`ElectricChallengeInjector`](../../../lib/chat_web/plugs/electric_challange_injector.ex) adds the next challenge as `x-challenge-id` / `x-challenge` response headers; they are not exposed to cross-origin pages, which fetch each challenge instead.
 
 **Request Format**:
 ```json
 {
+  "auth": { "challenge_id": "<id>", "signature": "<base64, unpadded>" },
   "mutations": [
     {
       "table": "user_storage",

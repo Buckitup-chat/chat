@@ -20,12 +20,12 @@ defmodule Chat.Data.Schemas.ReviewWriteTokenTest do
 
   describe "create_changeset/2" do
     test "valid attrs produce a valid changeset" do
-      cs = ReviewWriteToken.create_changeset(%ReviewWriteToken{}, @valid_attrs)
-      assert cs.valid?
+      changeset = ReviewWriteToken.create_changeset(%ReviewWriteToken{}, @valid_attrs)
+      assert changeset.valid?
     end
 
     test "accepts nullable fields as nil" do
-      cs =
+      changeset =
         ReviewWriteToken.create_changeset(
           %ReviewWriteToken{},
           Map.merge(@valid_attrs, %{
@@ -36,12 +36,12 @@ defmodule Chat.Data.Schemas.ReviewWriteTokenTest do
           })
         )
 
-      assert cs.valid?
+      assert changeset.valid?
     end
 
     test "requires mandatory fields" do
-      cs = ReviewWriteToken.create_changeset(%ReviewWriteToken{}, %{})
-      refute cs.valid?
+      changeset = ReviewWriteToken.create_changeset(%ReviewWriteToken{}, %{})
+      refute changeset.valid?
 
       for field <- [
             :nonce,
@@ -51,7 +51,7 @@ defmodule Chat.Data.Schemas.ReviewWriteTokenTest do
             :sign_b64,
             :sign_hash
           ] do
-        assert Keyword.has_key?(cs.errors, field), "expected error on #{field}"
+        assert Keyword.has_key?(changeset.errors, field), "expected error on #{field}"
       end
     end
   end
@@ -60,7 +60,7 @@ defmodule Chat.Data.Schemas.ReviewWriteTokenTest do
     test "valid update attrs produce a valid changeset" do
       existing = struct(ReviewWriteToken, @valid_attrs)
 
-      cs =
+      changeset =
         ReviewWriteToken.update_changeset(existing, %{
           deleted_flag: true,
           owner_timestamp: 2_000_000,
@@ -68,23 +68,23 @@ defmodule Chat.Data.Schemas.ReviewWriteTokenTest do
           sign_hash: @valid_sign_hash
         })
 
-      assert cs.valid?
+      assert changeset.valid?
     end
 
     test "requires update fields" do
       existing = struct(ReviewWriteToken, @valid_attrs)
 
-      cs =
+      changeset =
         ReviewWriteToken.update_changeset(existing, %{
           owner_timestamp: nil,
           sign_b64: nil,
           sign_hash: nil
         })
 
-      refute cs.valid?
+      refute changeset.valid?
 
       for field <- [:owner_timestamp, :sign_b64, :sign_hash] do
-        assert Keyword.has_key?(cs.errors, field), "expected error on #{field}"
+        assert Keyword.has_key?(changeset.errors, field), "expected error on #{field}"
       end
     end
   end

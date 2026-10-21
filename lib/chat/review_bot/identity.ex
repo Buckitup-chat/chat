@@ -18,18 +18,15 @@ defmodule Chat.ReviewBot.Identity do
   end
 
   def decode(binary) when is_binary(binary) do
-    case Jason.decode(binary) do
-      {:ok, %{"v" => 1, "sign_skey" => s, "crypt_skey" => c}} ->
-        {:ok, %{sign_skey: Base.decode64!(s), crypt_skey: Base.decode64!(c)}}
-
-      {:ok, _} ->
-        {:error, :unsupported_version}
-
-      {:error, _} ->
-        {:error, :invalid_json}
+    with {:ok, %{"v" => 1, "sign_skey" => s, "crypt_skey" => c}} <- Jason.decode(binary),
+         {:ok, sign_skey} <- Base.decode64(s),
+         {:ok, crypt_skey} <- Base.decode64(c) do
+      {:ok, %{sign_skey: sign_skey, crypt_skey: crypt_skey}}
+    else
+      {:ok, _} -> {:error, :unsupported_version}
+      {:error, _} -> {:error, :invalid_json}
+      :error -> {:error, :decode_failed}
     end
-  rescue
-    _ -> {:error, :decode_failed}
   end
 
   def wrap(identity, crypt_pkey) do
@@ -43,8 +40,6 @@ defmodule Chat.ReviewBot.Identity do
       plaintext when is_binary(plaintext) -> decode(plaintext)
       _ -> {:error, :decryption_failed}
     end
-  rescue
-    _ -> {:error, :decryption_failed}
   end
 
   def matches_card?(identity, user_card) do

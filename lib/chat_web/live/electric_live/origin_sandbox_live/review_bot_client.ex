@@ -5,12 +5,12 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ReviewBotClient do
 
   alias Chat.Data.Schemas.OriginBot, as: OriginBotSchema
   alias Chat.Data.Types.OriginBotSignHash
+  alias Chat.Data.User
   alias Chat.ReviewBot.Creation
 
   def create_bot(origin_identity, base_url) do
-    origin_name = origin_identity.name
-    bot = Creation.new_bot(origin_name)
-    bot_card = Creation.card(bot)
+    bot = Creation.generate_identity(origin_identity.name)
+    bot_card = User.extract_pq_card(bot)
 
     with {:ok, _body, card_logs} <- ingest_user_card(bot_card, bot.sign_skey, base_url),
          {:ok, _body, bot_logs} <-
@@ -28,7 +28,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ReviewBotClient do
     end
   end
 
-  def tombstone_bot(bot, origin_identity, base_url) do
+  def tombstone_bot(bot, origin_sign_skey, base_url) do
     new_timestamp = bot.owner_timestamp + 1
 
     bot_struct = %OriginBotSchema{
@@ -40,7 +40,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ReviewBotClient do
       owner_timestamp: new_timestamp
     }
 
-    {sign_b64, sign_hash} = sign_struct(bot_struct, origin_identity.sign_skey, OriginBotSignHash)
+    {sign_b64, sign_hash} = sign_struct(bot_struct, origin_sign_skey, OriginBotSignHash)
 
     payload = %{
       "mutations" => [
@@ -58,7 +58,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ReviewBotClient do
       ]
     }
 
-    case ingest(payload, origin_identity.sign_skey, base_url) do
+    case ingest(payload, origin_sign_skey, base_url) do
       {:ok, _body, logs} -> {:ok, %{log_entries: logs}}
       {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
     end
@@ -95,15 +95,16 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ReviewBotClient do
     origin_hash = origin_hash_from(origin_identity)
 
     ob =
-      Creation.origin_bot(
-        bot_card,
+      Creation.build_origin_bot(
+        bot_card.user_hash,
         bot_identity,
         origin_hash,
         origin_identity.crypt_pkey,
         origin_identity.sign_skey
       )
 
-    vouch = Creation.origin_vouch(origin_hash, origin_identity.sign_skey, bot_card)
+    vouch =
+      Creation.build_origin_vouch(origin_hash, origin_identity.sign_skey, bot_card.user_hash)
 
     payload = %{
       "mutations" => [

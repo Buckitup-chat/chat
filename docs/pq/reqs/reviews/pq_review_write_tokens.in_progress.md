@@ -81,13 +81,13 @@ origin_bots
 **`secret_b64` + `encrypted_identity_b64`** — two-field KEM wrap, same pattern as `dialog_keys` (`peer_kem_wrap_key_b64` + `peer_wrapped_msg_key_b64`). `secret_b64` holds the ML-KEM-1024 ciphertext; `encrypted_identity_b64` holds the AES-256-GCM blob containing the bot's `sign_skey` + `crypt_skey`. Produced by `EnigmaPq.kem_encrypt/3`, unwrapped by `EnigmaPq.kem_decrypt/4` with salt `"buckitup/origin-bot/v1"`.
 
 **Bot startup flow (explicit, from admin page):**
-1. Origin owner opens admin page, which lists `origin_bots` via Electric shape
-2. Owner clicks "Start" on a bot row
+1. Origin identity opens admin page, which lists `origin_bots` via Electric shape
+2. Origin identity clicks "Start" on a bot row
 3. Client decrypts: `identity = EnigmaPq.kem_decrypt(secret_b64, encrypted_identity_b64, origin_crypt_skey, "buckitup/origin-bot/v1")`
 4. Client starts `ReviewBotWorker` GenServer under `Chat.ReviewBot.WorkerSupervisor` (DynamicSupervisor), registered via `Chat.ReviewBot.Registry`
 5. Bot can now create tokens, issue vouches, GC — all on the device
 
-The bot runs **on the origin owner's device** (or Nerves hardware), not on the server. Startup is explicit — the owner must decrypt and start each bot from the admin UI. Token creation and vouch issuance happen device-side, hitting `/ingest` the same way all other PQ rows do.
+The bot runs **on the origin identity's device** (or Nerves hardware), not on the server. Startup is explicit — the origin identity must decrypt and start each bot from the admin UI. Token creation and vouch issuance happen device-side, hitting `/ingest` the same way all other PQ rows do.
 
 ### Vouch chain
 
@@ -264,7 +264,7 @@ Review ingest passes through two independent gates — both must succeed:
 
 1. **Device gate** (`device.<sn>.storage.write`) — the standard write gate. The review is a PQ row hitting `/ingest` on a device; the device's access mode (`guarded` / `trust`) applies as usual. The origin vouch does not bypass the device gate.
 
-2. **Origin gate** (`origins.<origin_hash>.reviews.write`) — checked only when `review_access = invite_only`. The author must hold a live vouch where `subject_hash = author_hash` and `kind` attenuates from `origins.<origin_hash>.reviews.write`. No vouch = ingest rejected.
+2. **Origin gate** (`origins.<origin_hash>.reviews.write`) — always checked. The author must hold a live vouch where `subject_hash = author_hash` and `kind` attenuates from `origins.<origin_hash>.reviews.write`. No vouch = ingest rejected.
 
 The two gates live in different root segments of the resource forest (`device` vs `origins`) — they never intersect and are evaluated as separate chain walks. This applies regardless of how the review is submitted — the vouch is the gate, not the token.
 
@@ -343,12 +343,12 @@ The origin owner decides whether reviews are open or invitation-only. A new fiel
 
 | `review_access` | Behavior |
 |-----------------|----------|
-| `open` (default) | Anyone with an identity can write a review. Write tokens are optional (provenance, not gate). |
-| `invite_only` | Review ingest requires a vouch in `origins.<origin_hash>.reviews.write.*` scope. No vouch = rejected. |
+| `open` (default) | Vouch required; write tokens are the standard way to obtain one. |
+| `invite_only` | Same vouch requirement; tokens are the only way to obtain a vouch. |
 
-**Enforcement at ingest.** When `review_access = invite_only`, `Review.Validation` checks for a live (non-tombstoned) vouch token where `subject_hash = author_hash` and `kind` attenuates from `origins.<origin_hash>.reviews.write`. This covers both bot-delegated tokens (`reviews.write.<nonce>`) and any direct vouches.
+**Enforcement at ingest.** `Review.Validation` always checks for a live (non-tombstoned) vouch token where `subject_hash = author_hash` and `kind` attenuates from `origins.<origin_hash>.reviews.write`. This covers both bot-delegated tokens (`reviews.write.<nonce>`) and any direct vouches. The `review_access` mode controls how vouches are *obtained* (open mode allows broader vouch issuance), not whether they are *checked*.
 
-**Mode change with existing reviews.** Switching from `open` to `invite_only` does not retroactively affect existing reviews — they are already in the pipeline. Only new review submissions are gated. Switching from `invite_only` to `open` is immediate.
+**Mode change with existing reviews.** Switching modes does not retroactively affect existing reviews — they are already in the pipeline and their vouches remain valid. Reviewers who obtained vouches in any mode retain access.
 
 **Relationship to moderation.** `review_access` controls who can *enter* the pipeline. `moderation_mode` controls what happens *inside* the pipeline. They are orthogonal — an `invite_only` origin can still run `pre` moderation on invited reviews.
 
@@ -375,7 +375,7 @@ The `review_token_ttl_days` setting (also in `origin_settings`) controls the sof
 - [x] `ReviewBotWorker` GenServer: decrypt identity from `origin_bots`, explicit start from admin page
 - [ ] `origin_settings` table + migration + Ecto schema + Electric shape
 - [ ] `OriginSetting` data context, validation, shape module
-- [x] Review ingest: vouch check when `review_access = invite_only` (reads from `origin_settings`)
+- [x] Review ingest: vouch check always (regardless of `review_access` mode)
 
 ### Phase 2 — Token CRUD + redirect
 

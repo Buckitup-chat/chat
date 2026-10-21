@@ -11,32 +11,27 @@ defmodule Chat.ReviewBot.Creation do
   alias Chat.TimeKeeper
   alias EnigmaPq
 
-  def new_bot(origin_name) do
+  def generate_identity(origin_name) do
     User.generate_pq_identity("ReviewBot_#{origin_name}")
   end
 
-  def card(bot_identity) do
-    User.extract_pq_card(bot_identity)
-  end
-
-  def origin_bot(bot_card, bot_identity, origin_hash, origin_crypt_pkey, origin_sign_skey) do
+  def build_origin_bot(bot_hash, bot_identity, origin_hash, origin_crypt_pkey, origin_sign_skey) do
     {secret, encrypted} = Identity.wrap(bot_identity, origin_crypt_pkey)
 
-    bot = %OriginBot{
-      bot_hash: bot_card.user_hash,
+    %OriginBot{
+      bot_hash: bot_hash,
       origin_hash: origin_hash,
       secret_b64: secret,
       encrypted_identity_b64: encrypted,
       deleted_flag: false,
       owner_timestamp: TimeKeeper.now_unix()
     }
-
-    sign_struct(bot, origin_sign_skey, &OriginBotSignHash.from_binary/1)
+    |> sign_struct(origin_sign_skey, &OriginBotSignHash.from_binary/1)
   end
 
-  def origin_vouch(origin_hash, origin_sign_skey, bot_card) do
-    kind = "origins.#{origin_hash}.reviews.write"
-    build_vouch(kind, origin_hash, bot_card.user_hash, origin_sign_skey)
+  def build_origin_vouch(origin_hash, origin_sign_skey, bot_hash) do
+    "origins.#{origin_hash}.reviews.write"
+    |> build_vouch(origin_hash, bot_hash, origin_sign_skey)
   end
 
   @device_vouch_shapes [
@@ -49,14 +44,17 @@ defmodule Chat.ReviewBot.Creation do
     :review_public_passwords
   ]
 
-  def device_vouches(owner_identity, bot_hash, device_sn) do
-    owner_card = User.extract_pq_card(owner_identity)
-
-    @device_vouch_shapes
-    |> Enum.map(fn shape ->
-      kind = "device.#{device_sn}.storage.write.#{shape}"
-      build_vouch(kind, owner_card.user_hash, bot_hash, owner_identity.sign_skey)
+  def build_device_vouches(owner_hash, owner_sign_skey, bot_hash, device_sn) do
+    Enum.map(@device_vouch_shapes, fn shape ->
+      "device.#{device_sn}.storage.write.#{shape}"
+      |> build_vouch(owner_hash, bot_hash, owner_sign_skey)
     end)
+  end
+
+  def derive_hash(%{sign_pkey: sign_pkey}) do
+    sign_pkey
+    |> EnigmaPq.hash()
+    |> UserHash.from_binary()
   end
 
   defp build_vouch(kind, issuer_hash, subject_hash, sign_skey) do
@@ -84,11 +82,5 @@ defmodule Chat.ReviewBot.Creation do
 
     sign_hash = sign_b64 |> EnigmaPq.hash() |> hash_fn.()
     %{struct | sign_b64: sign_b64, sign_hash: sign_hash}
-  end
-
-  def bot_hash(%{sign_pkey: sign_pkey}) do
-    sign_pkey
-    |> EnigmaPq.hash()
-    |> UserHash.from_binary()
   end
 end

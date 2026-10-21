@@ -215,11 +215,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
         {:noreply, assign(socket, error_message: "Bot not found")}
 
       bot ->
-        origin_identity = %{
-          sign_skey: origin.origin_sign_skey
-        }
-
-        case ReviewBotClient.tombstone_bot(bot, origin_identity, base_url) do
+        case ReviewBotClient.tombstone_bot(bot, origin.origin_sign_skey, base_url) do
           {:ok, %{log_entries: logs}} ->
             bots = ReviewBotClient.list_origin_bots(origin.origin_hash, base_url, auth(socket))
             {:noreply, socket |> assign(origin_bots: bots) |> append_logs(logs)}

@@ -283,9 +283,9 @@ frontend moves onto it, so there is one implementation.
 - **Where:** a package in `Buckitup-chat/chat-frontend` (`packages/pq-client`),
   next to the app that uses it.
 - **Published** to the public npm registry as `@buckitup/pq-client`.
-- **Licence:** GPLv3, as the repository. A client that bundles it and is
-  distributed to users is a work based on it under GPLv3: the partner's web UI
-  built on the library is released under GPLv3 too.
+- **Licence:** GPLv3, as the repository. On the usual reading of GPLv3, a web
+  UI that bundles the library and is served to users is released under GPLv3
+  as well. The partner confirms this suits it before building on the library.
 
 | Module | Contents |
 |---|---|

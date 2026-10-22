@@ -5,6 +5,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
 
   alias Chat.Proto.Shortcode
   alias ChatWeb.ElectricLive.Components
+  alias ChatWeb.ElectricLive.OriginSandboxLive.ReviewBot
 
   def render_page(assigns) do
     ~H"""
@@ -36,6 +37,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
           <% end %>
           <%= if @origin do %>
             {render_operations_section(assigns)}
+            {ReviewBot.render_bot_section(assigns)}
           <% end %>
           {render_log_section(assigns)}
         </div>

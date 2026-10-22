@@ -4,7 +4,7 @@ Links that lead a user to writing a review for a given origin.
 
 ## Goal
 
-An origin owner generates a short URL (printable as QR, shareable via NFC/text/email) that, when opened, guides the visitor through identity creation (or import) and into writing a review for that specific origin. Tokens come in two modes: **order-linked** (one-time — once bound to a reviewer, it becomes a permanent redirect to that reviewer's review) and **reusable** (a standing invitation link that can bind many reviewers, each getting their own bound token copy).
+The origin identity generates a short URL (printable as QR, shareable via NFC/text/email) that, when opened, guides the visitor through identity creation (or import) and into writing a review for that specific origin. Tokens come in two modes: **order-linked** (one-time — once bound to a reviewer, it becomes a permanent redirect to that reviewer's review) and **reusable** (a standing invitation link that can bind many reviewers, each getting their own bound token copy).
 
 ---
 
@@ -56,7 +56,7 @@ The server-level syncBot handles synchronization only — it is not involved in 
 
 ### Review bot identity
 
-Each origin gets its own **review bot** — a PQ entity with its own `user_cards` row and full identity (ML-DSA-87 + ML-KEM-1024 keypairs). The review bot is created alongside the origin (or when the owner enables review invitations). Its `sign_pkey` is public via `user_cards`, so anyone can verify its vouch tokens.
+Each origin gets its own **review bot** — a PQ entity with its own `user_cards` row and full identity (ML-DSA-87 + ML-KEM-1024 keypairs). The review bot is created alongside the origin (or when the origin identity enables review invitations). Its `sign_pkey` is public via `user_cards`, so anyone can verify its vouch tokens.
 
 The bot's `user_cards` row uses the name `ReviewBot_<originName>` — visible in the user directory, clearly associated with its origin.
 
@@ -80,20 +80,21 @@ origin_bots
 
 **`secret_b64` + `encrypted_identity_b64`** — two-field KEM wrap, same pattern as `dialog_keys` (`peer_kem_wrap_key_b64` + `peer_wrapped_msg_key_b64`). `secret_b64` holds the ML-KEM-1024 ciphertext; `encrypted_identity_b64` holds the AES-256-GCM blob containing the bot's `sign_skey` + `crypt_skey`. Produced by `EnigmaPq.kem_encrypt/3`, unwrapped by `EnigmaPq.kem_decrypt/4` with salt `"buckitup/origin-bot/v1"`.
 
-**Device startup flow:**
-1. Device syncs `origin_bots` shape (filtered by origins this device holds keys for)
-2. For each origin bot: `identity = EnigmaPq.kem_decrypt(secret_b64, encrypted_identity_b64, origin_crypt_skey, "buckitup/origin-bot/v1")`
-3. Start `ReviewBotWorker` GenServer with the decrypted identity
-4. Bot can now create tokens, issue vouches, GC — all on the device
+**Bot startup flow (explicit, from admin page):**
+1. Origin identity opens admin page, which lists `origin_bots` via Electric shape
+2. Origin identity clicks "Start" on a bot row
+3. Client decrypts: `identity = EnigmaPq.kem_decrypt(secret_b64, encrypted_identity_b64, origin_crypt_skey, "buckitup/origin-bot/v1")`
+4. Client starts `ReviewBotWorker` GenServer under `Chat.ReviewBot.WorkerSupervisor` (DynamicSupervisor), registered via `Chat.ReviewBot.Registry`
+5. Bot can now create tokens, issue vouches, GC — all on the device
 
-The bot runs **on the origin owner's device** (or Nerves hardware), not on the server. Token creation and vouch issuance happen device-side, hitting `/ingest` the same way all other PQ rows do.
+The bot runs **on the origin identity's device** (or Nerves hardware), not on the server. Startup is explicit — the origin identity must decrypt and start each bot from the admin UI. Token creation and vouch issuance happen device-side, hitting `/ingest` the same way all other PQ rows do.
 
 ### Vouch chain
 
-The origin owner vouches the review bot in both trees — origin scope for review authorization, device scope for write access to the shapes the reviewer will need:
+The origin identity vouches the review bot in both trees — origin scope for review authorization, device scope for write access to the shapes the reviewer will need:
 
 ```
-Origin owner (also device owner)
+Origin identity (also device owner)
   │
   │  Vouch 1 (origin gate):
   │    kind:         origins.<origin_hash>.reviews.write
@@ -111,9 +112,9 @@ Origin owner (also device owner)
 Review bot (per-origin, device-side, identity in origin_bots encrypted to origin)
 ```
 
-**Origin → review bot (vouch 1):** The origin owner signs this vouch from their client using the origin's `sign_skey`. This is a deliberate step in the origin admin UI — the owner explicitly enables review invitations for their origin, which creates the review bot (if it doesn't exist) and vouches it.
+**Origin → review bot (vouch 1):** The origin identity signs this vouch from their client using the origin's `sign_skey`. This is a deliberate step in the origin admin UI — the origin identity explicitly enables review invitations for their origin, which creates the review bot (if it doesn't exist) and vouches it.
 
-**Owner → review bot (vouch 2):** The device owner delegates write access to the specific shapes the reviewer needs (reviews, review candidates, etc.). Without this vouch, the reviewer's data would be rejected by the device gate even with a valid origin vouch. The owner signs this with their own `sign_skey` — the device tree is rooted in the owner, not the origin.
+**Device owner → review bot (vouch 2):** The device owner delegates write access to the specific shapes the reviewer needs (reviews, review candidates, etc.). Without this vouch, the reviewer's data would be rejected by the device gate even with a valid origin vouch. The device owner signs this with their own `sign_skey` — the device tree is rooted in the device owner, not the origin.
 
 ### Bot → reviewer delegation
 
@@ -263,7 +264,7 @@ Review ingest passes through two independent gates — both must succeed:
 
 1. **Device gate** (`device.<sn>.storage.write`) — the standard write gate. The review is a PQ row hitting `/ingest` on a device; the device's access mode (`guarded` / `trust`) applies as usual. The origin vouch does not bypass the device gate.
 
-2. **Origin gate** (`origins.<origin_hash>.reviews.write`) — checked only when `review_access = invite_only`. The author must hold a live vouch where `subject_hash = author_hash` and `kind` attenuates from `origins.<origin_hash>.reviews.write`. No vouch = ingest rejected.
+2. **Origin gate** (`origins.<origin_hash>.reviews.write`) — checked when `review_access = invite_only`. The author must hold a live vouch where `subject_hash = author_hash` and `kind` attenuates from `origins.<origin_hash>.reviews.write`. No vouch = ingest rejected. The bot always provides vouches on bind regardless of mode, so reviewers retain access if the mode later switches to `invite_only`.
 
 The two gates live in different root segments of the resource forest (`device` vs `origins`) — they never intersect and are evaluated as separate chain walks. This applies regardless of how the review is submitted — the vouch is the gate, not the token.
 
@@ -294,9 +295,9 @@ Multiple devices may race to soft-delete the same token — idempotent (same non
 
 ## Origin Admin UI: "Enable Review Invitations"
 
-A step in the origin admin interface where the owner creates the origin's review bot and delegates write scope to it. Everything happens client-side (or on the Nerves device) — the server only receives PQ rows via `/ingest`.
+A step in the origin admin interface where the origin identity creates the review bot and delegates write scope to it. Everything happens client-side (or on the Nerves device) — the server only receives PQ rows via `/ingest`.
 
-1. Owner opens origin settings
+1. Origin identity opens origin settings
 2. Clicks "Enable review invitations"
 3. Client creates the review bot identity:
    - Generate ML-DSA-87 `sign_skey` / `sign_pkey` keypair
@@ -322,7 +323,7 @@ A step in the origin admin interface where the owner creates the origin's review
 
 On other devices: Electric syncs `origin_bots` rows → device decapsulates `secret_b64` with origin's `crypt_skey`, derives wrap key, decrypts `encrypted_identity_b64` → starts a `ReviewBotWorker` for each bot. Multiple devices can run bots simultaneously — token creation uses random nonces so there are no conflicts. If a device hasn't synced the existing bot yet, it may create a new one — both will work, and the origin vouches each independently.
 
-Revoking: the owner can revoke the review bot's vouch (signed tombstone, `deleted_flag: true`). Existing bound tokens remain valid (the vouch for the individual reviewer is already issued), but no new tokens can be created.
+Revoking: the origin identity can revoke the review bot's vouch (signed tombstone, `deleted_flag: true`). Existing bound tokens remain valid (the vouch for the individual reviewer is already issued), but no new tokens can be created.
 
 ---
 
@@ -338,16 +339,18 @@ Write tokens consume the vouch token infrastructure for trust delegation. The `o
 
 ### Review access mode — per-origin policy
 
-The origin owner decides whether reviews are open or invitation-only. A new field on the `origins` table:
+The origin identity decides whether reviews are open or invitation-only. A new field on the `origins` table:
 
 | `review_access` | Behavior |
 |-----------------|----------|
-| `open` (default) | Anyone with an identity can write a review. Write tokens are optional (provenance, not gate). |
+| `open` (default) | Anyone with an identity can write a review. Bot still provides vouches on bind (provenance + future-proofing). |
 | `invite_only` | Review ingest requires a vouch in `origins.<origin_hash>.reviews.write.*` scope. No vouch = rejected. |
 
-**Enforcement at ingest.** When `review_access = invite_only`, `Review.Validation` checks for a live (non-tombstoned) vouch token where `subject_hash = author_hash` and `kind` attenuates from `origins.<origin_hash>.reviews.write`. This covers both bot-delegated tokens (`reviews.write.<nonce>`) and any direct vouches.
+**Enforcement at ingest.** When `review_access = invite_only`, `Review.Validation` checks for a live (non-tombstoned) vouch token where `subject_hash = author_hash` and `kind` attenuates from `origins.<origin_hash>.reviews.write`. This covers both bot-delegated tokens (`reviews.write.<nonce>`) and any direct vouches. In `open` mode the origin gate is not checked.
 
-**Mode change with existing reviews.** Switching from `open` to `invite_only` does not retroactively affect existing reviews — they are already in the pipeline. Only new review submissions are gated. Switching from `invite_only` to `open` is immediate.
+**Vouches always provided.** The bot issues vouch tokens on every bind, regardless of `review_access` mode. This ensures that reviewers who obtained access in `open` mode retain it if the origin later switches to `invite_only`.
+
+**Mode change with existing reviews.** Switching from `open` to `invite_only` does not retroactively affect existing reviews — they are already in the pipeline. Reviewers who bound tokens in `open` mode already hold vouches, so new submissions are still accepted. Switching from `invite_only` to `open` is immediate.
 
 **Relationship to moderation.** `review_access` controls who can *enter* the pipeline. `moderation_mode` controls what happens *inside* the pipeline. They are orthogonal — an `invite_only` origin can still run `pre` moderation on invited reviews.
 
@@ -365,16 +368,16 @@ The `review_token_ttl_days` setting (also in `origin_settings`) controls the sof
 
 ### Phase 1 — Origin bot + token infrastructure
 
-- [ ] `origin_bots` migration + Ecto schema + Electric shape
-- [ ] `OriginBotSignHash` type, `ob_` prefix in Consts
+- [x] `origin_bots` migration + Ecto schema + Electric shape
+- [x] `OriginBotSignHash` type, `ob_` prefix in Consts
 - [ ] `ReviewWriteTokenSignHash` type, `rwt_` prefix in Consts
 - [ ] `OriginOrderHash` type, `org_ord_` prefix in Consts
-- [ ] Bot creation flow: keypair gen, `user_cards` row (`ReviewBot_<originName>`), identity encryption, `origin_bots` ingest
-- [ ] Bot vouch: origin → bot vouch token (`origins.<origin_hash>.reviews.write`)
-- [ ] `ReviewBotWorker` GenServer: decrypt identity from `origin_bots` shape, start on sync
+- [x] Bot creation flow: keypair gen, `user_cards` row (`ReviewBot_<originName>`), identity encryption, `origin_bots` ingest
+- [x] Bot vouch: origin → bot vouch token (`origins.<origin_hash>.reviews.write`)
+- [x] `ReviewBotWorker` GenServer: decrypt identity from `origin_bots`, explicit start from admin page
 - [ ] `origin_settings` table + migration + Ecto schema + Electric shape
 - [ ] `OriginSetting` data context, validation, shape module
-- [ ] Review ingest: vouch check when `review_access = invite_only` (reads from `origin_settings`)
+- [ ] Review ingest: origin gate vouch check when `review_access = invite_only` (reads from `origin_settings`)
 
 ### Phase 2 — Token CRUD + redirect
 
@@ -414,7 +417,7 @@ The `review_token_ttl_days` setting (also in `origin_settings`) controls the sof
 
 7. ~~**`<review_shapes>` scope enumeration.**~~ — resolved. Per-shape vouches (narrow, explicit). The bot creates individual vouches for each shape the reviewer needs: `review`, `review_password_candidate`, `review_post_right_candidate`, `review_revoke_right_candidate`. No broad `storage.write` delegation.
 
-8. ~~**Multi-device scope for device gate vouch.**~~ — resolved. The bot gets device scope for the device it runs on. If the origin owner wants multi-device support, they explicitly allow the bot on other devices as well (separate device-scoped vouches per device). No wildcards.
+8. ~~**Multi-device scope for device gate vouch.**~~ — resolved. The bot gets device scope for the device it runs on. If the origin identity wants multi-device support, they explicitly allow the bot on other devices as well (separate device-scoped vouches per device). No wildcards.
 
 9. ~~**Encrypted identity format.**~~ — resolved. Two-field KEM wrap via `EnigmaPq.kem_encrypt/3` / `kem_decrypt/4`. Salt: `"buckitup/origin-bot/v1"`. See `Chat.Data.Schemas.OriginBot`.
 

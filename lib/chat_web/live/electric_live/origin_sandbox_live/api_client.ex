@@ -172,7 +172,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
       owner_timestamp: TimeKeeper.now_unix()
     }
 
-    {sign_b64, _sign_hash} = sign_origin(origin_struct, origin_sign_skey)
+    {sign_b64, sign_hash} = sign_origin(origin_struct, origin_sign_skey)
 
     payload = %{
       "mutations" => [
@@ -186,7 +186,8 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ApiClient do
             "moderation_mode" => moderation_mode,
             "deleted_flag" => false,
             "owner_timestamp" => origin_struct.owner_timestamp,
-            "sign_b64" => encode_base64(sign_b64)
+            "sign_b64" => encode_base64(sign_b64),
+            "sign_hash" => sign_hash
           },
           "syncMetadata" => %{"relation" => "origins"}
         }

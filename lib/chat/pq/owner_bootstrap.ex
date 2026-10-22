@@ -3,9 +3,14 @@ defmodule Chat.Pq.OwnerBootstrap do
 
   alias Chat.AdminDb
 
+  @topic "chat::OwnerBootstrap"
+
+  def topic, do: @topic
+
   def maybe_register_owner(user_hash, sign_pkey) do
     with nil <- owner(),
          :ok <- AdminDb.put_new(:pq_admin, %{user_hash: user_hash, sign_pkey: sign_pkey}) do
+      Phoenix.PubSub.broadcast(Chat.PubSub, @topic, {:owner_registered, user_hash})
       :registered
     else
       _ -> :already_registered

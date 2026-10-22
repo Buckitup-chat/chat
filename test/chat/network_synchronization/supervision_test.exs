@@ -87,7 +87,8 @@ defmodule ChatTest.NetworkSynchronization.SupervisionTest do
                 name: S5,
                 dynamic_name: context.dynamic,
                 registry_name: context.registry,
-                deferred_store_name: :"S5.DeferredStore"}
+                deferred_store_name: :"S5.DeferredStore",
+                peer_sync_decider_name: :"S5.PeerSyncDecider"}
              )
 
     context |> Map.put(:supervisor_pid, pid)

@@ -3,10 +3,23 @@ defmodule ChatWeb.SystemIdentifierController do
 
   import Chat.Db, only: [repo: 0]
 
+  alias Chat.Pq.OwnerBootstrap
   alias Ecto.Adapters.SQL
   alias Postgrex.Result
 
   def show(conn, _params) do
+    case OwnerBootstrap.owner() do
+      nil ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{error: "device not activated"})
+
+      _owner ->
+        serve_system_identifier(conn)
+    end
+  end
+
+  defp serve_system_identifier(conn) do
     case query_system_identifier() do
       {:ok, identifier} ->
         json(conn, %{system_identifier: identifier})

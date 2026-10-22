@@ -37,6 +37,8 @@ defmodule Chat.ReviewBot.Worker do
 
   @impl true
   def init(%{bot_hash: bot_hash, origin_hash: origin_hash, identity: identity}) do
+    Process.flag(:sensitive, true)
+
     %{bot_hash: bot_hash, origin_hash: origin_hash, identity: identity}
     |> ok()
   end
@@ -54,14 +56,6 @@ defmodule Chat.ReviewBot.Worker do
 
   def handle_call(:info, _from, state) do
     state |> reply(%{bot_hash: state.bot_hash, origin_hash: state.origin_hash})
-  end
-
-  @impl true
-  def format_status(status) do
-    Map.update(status, :state, :redacted, fn
-      %{identity: _} = state -> %{state | identity: :redacted}
-      other -> other
-    end)
   end
 
   defp via(bot_hash), do: {:via, Registry, {Chat.ReviewBot.Registry, bot_hash}}

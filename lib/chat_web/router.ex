@@ -278,6 +278,11 @@ defmodule ChatWeb.Router do
       ]
   end
 
+  scope "/r", ChatWeb do
+    pipe_through :browser
+    get "/:nonce", ReviewTokenController, :show
+  end
+
   scope "/app", ChatWeb do
     pipe_through :browser
     get "/", FrontendController, :app

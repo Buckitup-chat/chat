@@ -57,14 +57,13 @@ deleting `:pq_admin` from AdminDb on the server.
 
 Procedure for a new server:
 1. Deploy with the HTTP port reachable only by the administrator (firewall or
-   bind address).
+   bind address), and not by the partner's other servers: a peer that connects
+   pushes its SyncBot card over HTTP ingest, and on a server without an owner
+   that card is taken as the owner's.
 2. The administrator signs in to the partner's UI pointed at this server; the
    card it publishes makes them the owner.
 3. Check `GET /electric/v1/device_identity`: `admin.user_hash` is theirs.
 4. Open the server to the public.
-
-`POST /electric/v1/owner_claim` (claiming an ownerless server with a key proof)
-is on branch `fix/revocation-integrity`, not on `main`.
 
 ### Access mode
 
@@ -83,11 +82,11 @@ closed pilot only. `trust` adds per-shape read sessions; it hides metadata from
 anonymous readers, and notifications (§ Notifications) then need a vouched
 reader.
 
-**Prerequisite:** on `main` the admin sandbox accepts an identity file without
-checking that its secret key matches its public key. Since O's public key is
-published, anyone can act as O there and change the mode. The fix (commit
-3285d1a0, branch `fix/revocation-integrity`) must be in the release a partner
-deploys.
+**Prerequisite:** the admin sandbox accepts an identity file without checking
+that its secret key matches its public key. Since O's public key is published,
+anyone who reaches the sandbox can act as O there and change the mode. A
+release a partner deploys either checks the key pair on import or does not
+serve the sandbox; without the sandbox the mode is set from the console.
 
 ### Cross-origin access
 
@@ -150,8 +149,8 @@ requirement.
 
 ### 1. Venue creation (venue owner, partner UI)
 
-1. Generate the venue's keys: ML-DSA-87, ML-KEM-1024, secp256k1 contact key and
-   `evm_skey` (§ Dialog key derivation).
+1. Generate the venue's keys: ML-DSA-87, ML-KEM-1024 and a secp256k1 contact
+   key.
 2. Ingest V's `user_cards` row, signed by V, key proof by V.
 3. Ingest the `origins` row:
    - `origin_hash` = V's `user_hash`, `owner_hash` = VO's;
@@ -246,7 +245,7 @@ can act as V.
   key per venue so that two devices adding venues at once merge:
   ```json
   { "<origin_hash>": { "name": "…", "sign_skey": "<b64>", "crypt_skey": "<b64>",
-                       "contact_skey": "<hex>", "evm_skey": "<hex>",
+                       "contact_skey": "<hex>",
                        "sign_pkey": "<b64>", "crypt_pkey": "<b64>" } }
   ```
 - **Encryption and addressing:** as every User Storage slot of the frontend
@@ -262,16 +261,11 @@ A device that has VO's keys (device link, backup, recovery) has V's.
 
 ## Dialog key derivation
 
-[pq_dialogs.done.md § Key derivation](pq_dialogs.done.md) gives
-`IKM = sign_skey || crypt_skey || peer_user_hash`. The frontend uses
-`sign_skey || crypt_skey || evm_skey || peer_user_hash`
-(`src/lib/data/messageIntent.ts`, `DialogCrypto.deriveSenderMsgKey`).
-
-A peer unwraps a sender's key from `dialog_keys`, so the two derivations
-interoperate between different identities. They do not for one identity used
-from two clients: each derives a different key for its own messages. Before a
-partner client ships, the spec and the frontend agree on one derivation, and
-the client library implements it.
+`sender_msg_key` is derived as [pq_dialogs.done.md § Key derivation](pq_dialogs.done.md)
+gives it: `IKM = sign_skey || crypt_skey || peer_user_hash`, salt
+`buckitup/dialog-mk/v1`. The client library and the BuckitUp frontend use this
+derivation and no other key: one identity used from two clients derives the
+same key for its own messages.
 
 ---
 
@@ -285,7 +279,7 @@ frontend moves onto it, so there is one implementation.
 - **Published** to the public npm registry as `@buckitup/pq-client`.
 - **Licence:** GPLv3, as the repository. On the usual reading of GPLv3, a web
   UI that bundles the library and is served to users is released under GPLv3
-  as well. The partner confirms this suits it before building on the library.
+  as well. The partner has confirmed this suits it.
 
 | Module | Contents |
 |---|---|
@@ -322,7 +316,7 @@ frontend moves onto it, so there is one implementation.
 
 | Phase | BuckitUp | Partner | Done when |
 |---|---|---|---|
-| **0. Ground** | Merge `fix/revocation-integrity`. Settle the `sender_msg_key` derivation. Correct `pq_user_storage.done.md` (paths, injector), the `router.ex` CORS comment, `pq_origin.done.md`. Publish an external-client guide. | Deploy a server on its domain; first owner per § First owner; `guarded`. | Partner's test client ingests a signed `user_cards` row and reads it back from a shape |
+| **0. Ground** | Backend: a SyncBot card never becomes the owner; an older `vouch_tokens` row from a peer never replaces a newer one; the sandbox checks the key pair or is not served. Frontend: `sender_msg_key` per `pq_dialogs` (no `evm_skey`). Correct `pq_user_storage.done.md` (paths, injector), the `router.ex` CORS comment, `pq_origin.done.md`. Publish an external-client guide. | Deploy a server on its domain; first owner per § First owner; `guarded`. | Partner's test client ingests a signed `user_cards` row and reads it back from a shape |
 | **1. Library** | Extract `@buckitup/pq-client`; frontend on it; multi-identity vault | Build its UI on pre-releases | Library passes the conformance vectors; frontend tests green on it |
 | **2. Venue messaging** | Venue creation, venue keys slot in the library; support | B, guest admission, guest and owner UI, notifications by shape | On the partner's test server: VO creates V; G scans a code, is vouched, writes; VO reads and replies from a second device; the partner backend is notified without content; retracting B → G stops G |
 | **3. Sign-in by key (R-7)** | Support | Sign-in on its site with the same-domain identity | A guest signs in with the key alone |
@@ -331,6 +325,5 @@ frontend moves onto it, so there is one implementation.
 
 ## Open questions
 
-1. `sender_msg_key`: the spec's derivation or the frontend's?
-2. Should the library ship before the partner starts on its UI, or alongside?
-3. Erasure: confirm cascade behaviour on a test server (Flow 7).
+1. Should the library ship before the partner starts on its UI, or alongside?
+2. Erasure: confirm cascade behaviour on a test server (Flow 7).

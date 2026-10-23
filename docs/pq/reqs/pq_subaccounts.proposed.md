@@ -102,6 +102,11 @@ Constraints that shape the design:
   person's choice.
 - **One passkey.** Changing which account is the master does not change the
   passkey: the device's vault is re-locked around the new master's keys.
+- **The master lives in BuckitUp's own client.** The keyring, its format and
+  its operations belong to that client, not to the public contract of
+  `@buckitup/pq-client`. A partner's client built on the library keeps the
+  keys of the venues its users own ([pq_partner_venue_messaging.proposed.md](pq_partner_venue_messaging.proposed.md)
+  § Venue keys) but hosts no master: no absorbing, delegating or switching.
 
 ### Keyring
 
@@ -141,7 +146,7 @@ slot is encrypted like every slot, under a key derived from the master's
 | **Detach** | The entry is removed from the keyring, optionally after an export |
 | **Switch master** | The vault on the device is re-locked around the new master's keys under the same passkey; the keyring moves to the new master's User Storage, with the old master as a subaccount in it |
 | **Delegate** a venue | The owner hands the venue's full keys to a staff member's keyring as `delegated` |
-| **Withdraw a delegation** | The delegate cannot be made to forget the keys: withdrawal means a new venue identity (see open questions) |
+| **Withdraw a delegation** | The delegate cannot be made to forget the keys: withdrawal means a new venue identity |
 
 ### Moving keys between accounts and domains
 
@@ -152,10 +157,11 @@ slot is encrypted like every slot, under a key derived from the master's
 - **On one device across domains**, two apps cannot share storage. The
   proof of concept `docs/proposal/device_webrtc.md` (on the review branches;
   page `/dev/device_webrtc`) puts tabs of different origins on one device
-  into a shared Phoenix room by device fingerprint and IP. It can serve as
-  the meeting point for a device link between the two apps. It only helps
-  them find each other: who is at the other end is still proven by the
-  device link's code and ML-KEM session, never by the room.
+  into a shared Phoenix room by device fingerprint and IP. It becomes the
+  meeting point for a device link between the two apps once it has passed a
+  security audit. It only lets them find each other: who is at the other
+  end is still proven by the device link's code and ML-KEM session, never by
+  the room.
 - A backup file remains the fallback where no live transfer is possible.
 
 ### Recovery
@@ -174,6 +180,11 @@ Master and subaccounts have independent backups.
 
 - Only the venue's owner delegates.
 - A delegate receives the venue's full keys and can act as the venue.
+- A delegate can pass the keys on. Keys are bearer secrets: nothing in the
+  protocol can stop it, and the client does not pretend to.
+- Withdrawing a delegation means moving to a new venue identity. The old
+  identity, with its dialogs and reviews, stays with whoever holds its keys.
+  Revocable staff access (per-staff keys) is not part of this requirement.
 - Before delegation ships, the dangerous operations on a venue (moderation
   mode, deletion) require the owner's signature, as
   [reviews/pq_origin.done.md](reviews/pq_origin.done.md) plans in its Phase 3
@@ -199,7 +210,7 @@ switches between.
 | Phase | Scope |
 |---|---|
 | **1. Keyring and owned subaccounts** | The slot, create, activate, per-identity session. Covers venues (U1) and the partner integration |
-| **2. Absorb, export, switch master** | Device link between accounts, the cross-domain meeting point, master switch with the recovery reminder |
+| **2. Absorb, export, switch master** | Device link between accounts; the cross-domain meeting point after its security audit; master switch with the recovery reminder |
 | **3. Several servers** | A subaccount used on its own servers from the master's app |
 | **4. Delegation** | Owner-only dangerous operations on a venue first, then delegate |
 
@@ -207,20 +218,7 @@ switches between.
 
 ## Open questions
 
-1. **Where the master can live.** Only in BuckitUp's app, or in any app
-   built on `@buckitup/pq-client`, a partner's included? This decides whether
-   the keyring format and operations are part of the library's public
-   contract (versioned, documented for partners) or internal to our app. It
-   also decides whose code handles all of a person's keys: if a partner's app
-   can be the master, absorbing a BuckitUp account into it gives the
-   partner's code that account's keys.
-2. **Passing a delegation on.** May a delegate hand the venue's keys to
-   someone else? The keys allow it technically; the question is whether the
-   client offers it.
-3. **Withdrawing a delegation.** With full keys handed over, the only real
-   withdrawal is a new venue identity, which loses the old one's dialogs and
-   reviews. Is that acceptable as the answer, or is revocable staff access
-   (per-staff keys, re-wrapping) a later requirement?
-4. **The cross-domain meeting point.** Is the `device_webrtc` room the way
-   two apps on one device find each other, and does it move out of the proof
-   of concept for this?
+1. **Venue owners in a partner's client.** The master lives only in
+   BuckitUp's client, while a partner's owner UI holds the owner's account
+   and its venues' keys (U1). Is "a partner's client keeps owned venues only"
+   the boundary, or must owners manage venues in BuckitUp's client?

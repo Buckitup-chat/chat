@@ -239,7 +239,10 @@ a test server before this is relied on.
 ## Venue keys
 
 V's secret keys live in VO's User Storage, so every device VO signs in on
-can act as V.
+can act as V. A venue is an owned subaccount of its owner
+([pq_subaccounts.proposed.md](pq_subaccounts.proposed.md), branch
+`docs/subaccounts`); a partner's client keeps the venues its users own and
+nothing more of that model.
 
 - **Slot:** a named JSON slot `origins` in VO's User Storage, one top-level
   key per venue so that two devices adding venues at once merge:
@@ -284,7 +287,7 @@ frontend moves onto it, so there is one implementation.
 | Module | Contents |
 |---|---|
 | `identity` | key generation; `user_cards` row; certificates; `user_hash` |
-| `vault` | secret keys at rest under a passkey; several identities per session |
+| `vault` | secret keys at rest under a passkey's WebAuthn PRF output; several identities per session |
 | `rows` | canonical payload, signing, verification, base64 padding rules |
 | `transport` | challenge; `ingest` / `ingest_each` with key proof; shape reads, live; read sessions; error mapping |
 | `dialogs` | `dialog_hash`; `sender_msg_key`; key wrap and unwrap; content encryption; messages, versions, `sign_hash`; row verification |
@@ -297,14 +300,19 @@ frontend moves onto it, so there is one implementation.
   parent row and a transport failure are distinct.
 - Golden vectors from the backend's conformance file are part of its tests.
 - Semver; a protocol change is a major version and is announced to partners.
+- The vault needs a passkey with the WebAuthn PRF extension. Which devices
+  have it is measured with the probe page `/app/sandbox/prf-probe/index.html`
+  of BuckitUp's client; the same table holds for the partner's users.
 
 ---
 
 ## Out of scope
 
 - Restricting a guest to one venue (needs peer-scoped grants in the backend).
-- Staff access to a venue without its full keys: handing a staff member V's
-  keys gives them V's signing key too. A design needs its own requirement.
+- Staff access to a venue. Delegating a venue hands its full keys to a staff
+  member and happens in BuckitUp's own client
+  ([pq_subaccounts.proposed.md](pq_subaccounts.proposed.md) § Delegation); a
+  partner's client does not delegate.
 - Signing in on a partner site with a key held by BuckitUp's own app (D6).
 - Sync between a partner's servers and BuckitUp's.
 - The partner's screens, codes and their protocol: `pq_review_mvp_qr_flow`

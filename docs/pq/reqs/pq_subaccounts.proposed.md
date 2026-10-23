@@ -2,10 +2,10 @@
 
 One person, several identities. A **master account** holds the secret keys
 of the person's **subaccounts** and acts as any of them where it is needed.
-This requirement sets the scope; the open questions at the end decide the
-design.
+This requirement sets the scope and the decisions taken so far; the open
+questions at the end remain.
 
-Status: proposed, scope for discussion. Nothing here is implemented.
+Status: proposed. Nothing here is implemented.
 
 ---
 
@@ -82,11 +82,31 @@ Constraints that shape the design:
 
 ---
 
-## Proposed model
+## Model
+
+### Principles
+
+- **An account is the same whether it is a master or a subaccount.** Its
+  contacts, dialogs, room keys, settings and backups live in its own User
+  Storage under its own keys, as they would if it stood alone. Being a
+  subaccount adds one thing: its identity keys are also kept in a master's
+  keyring.
+- **No server learns how a person's accounts relate.** The keyring is an
+  opaque slot in the master's User Storage. Acting as a subaccount, the
+  client signs and proves keys only as that subaccount, never as the master,
+  and writes nothing that ties the two together. The one link that exists by
+  design is a venue's `owner_cert`, which the review protocol publishes.
+- **A subaccount keeps working on its own.** Absorbing an account does not
+  disable its own vault and passkey on its own domain; the person may still
+  sign in to it there. Its keys then exist in two places, which is the
+  person's choice.
+- **One passkey.** Changing which account is the master does not change the
+  passkey: the device's vault is re-locked around the new master's keys.
 
 ### Keyring
 
-A named User Storage slot of the master, one entry per subaccount:
+A named User Storage slot of the master, one entry per subaccount, holding
+identity keys only:
 
 ```json
 { "<user_hash>": {
@@ -100,12 +120,11 @@ A named User Storage slot of the master, one entry per subaccount:
 } }
 ```
 
-- **owned:** created by the master (a venue). Bound by `owner_cert` where the
+- **owned:** created by the master (a venue), bound by `owner_cert` where the
   protocol has one.
-- **absorbed:** an existing account moved in (U3). Its old vault on its old
-  domain is kept or deleted by the person.
-- **delegated:** keys someone else handed over (U2). The keyring records who
-  delegated it.
+- **absorbed:** an existing account moved in (U3).
+- **delegated:** a venue's keys handed over by its owner (U2); the entry
+  records who delegated it.
 
 One top-level key per subaccount, so two devices adding at once merge. The
 slot is encrypted like every slot, under a key derived from the master's
@@ -116,13 +135,50 @@ slot is encrypted like every slot, under a key derived from the master's
 | Operation | What happens |
 |---|---|
 | **Create** an owned subaccount | New keys, its `user_cards` row on the chosen server, keyring entry |
-| **Absorb** an account | Its keys arrive by backup file or QR transfer, the master checks them against the account's `user_cards` row (signature and KEM round trip), adds an entry |
-| **Export** a subaccount | Its keys leave as a backup file or QR transfer, as an account's do today |
+| **Absorb** an account | Its keys arrive by device link (below); the master checks them against the account's `user_cards` row (signature and KEM round trip) and adds an entry |
+| **Export** a subaccount | Its keys leave by device link or as a backup file, as an account's do today |
 | **Activate** | The session signs, proves keys and reads as that subaccount on its servers |
-| **Detach** | The entry is removed from the keyring; optionally exported first |
-| **Switch master** | A subaccount becomes the master (its keys move into a vault under a passkey), the old master becomes a subaccount in the new keyring |
-| **Delegate** | A subaccount's keys go to another person's keyring as `delegated` |
-| **Withdraw a delegation** | See open questions: with shared keys this cannot be enforced |
+| **Detach** | The entry is removed from the keyring, optionally after an export |
+| **Switch master** | The vault on the device is re-locked around the new master's keys under the same passkey; the keyring moves to the new master's User Storage, with the old master as a subaccount in it |
+| **Delegate** a venue | The owner hands the venue's full keys to a staff member's keyring as `delegated` |
+| **Withdraw a delegation** | The delegate cannot be made to forget the keys: withdrawal means a new venue identity (see open questions) |
+
+### Moving keys between accounts and domains
+
+- **Device link** already moves a whole identity between two devices of one
+  account: a QR code read by eye, an ML-KEM-1024 session, the backend's
+  Phoenix channel as transport (frontend `docs/device-link.md`). Absorbing
+  and exporting reuse it, from one account's app to another's.
+- **On one device across domains**, two apps cannot share storage. The
+  proof of concept `docs/proposal/device_webrtc.md` (on the review branches;
+  page `/dev/device_webrtc`) puts tabs of different origins on one device
+  into a shared Phoenix room by device fingerprint and IP. It can serve as
+  the meeting point for a device link between the two apps. It only helps
+  them find each other: who is at the other end is still proven by the
+  device link's code and ML-KEM session, never by the room.
+- A backup file remains the fallback where no live transfer is possible.
+
+### Recovery
+
+Master and subaccounts have independent backups.
+- **When an account becomes the master**, the client reminds the person to
+  set up its community backup. If guardians are already set up for another
+  of the person's accounts, they are offered as the default set; the person
+  edits or approves the set before any share is sent.
+- **Existing backups stay.** A backup made for an account when it was a
+  master, or on its own, is not withdrawn unless the person asks for it.
+- Restoring a master restores its keyring, so its subaccounts come back with
+  it; a subaccount with its own backup can also be restored on its own.
+
+### Delegation
+
+- Only the venue's owner delegates.
+- A delegate receives the venue's full keys and can act as the venue.
+- Before delegation ships, the dangerous operations on a venue (moderation
+  mode, deletion) require the owner's signature, as
+  [reviews/pq_origin.done.md](reviews/pq_origin.done.md) plans in its Phase 3
+  note. Until then a holder of the venue's keys can perform them through
+  peer sync.
 
 ### Session
 
@@ -133,6 +189,9 @@ The client holds the master and every activated subaccount at once:
 - subscriptions per identity and server;
 - logout clears them all.
 
+The first UI is the simplest: subaccounts as separate contexts the person
+switches between.
+
 ---
 
 ## Phases
@@ -140,29 +199,28 @@ The client holds the master and every activated subaccount at once:
 | Phase | Scope |
 |---|---|
 | **1. Keyring and owned subaccounts** | The slot, create, activate, per-identity session. Covers venues (U1) and the partner integration |
-| **2. Absorb, export, switch master** | Moving accounts in and out (U3, first step); master switch with its effect on recovery |
-| **3. Several servers** | A subaccount used on its own servers from the master's app; what each server learns |
-| **4. Delegation** | Delegate and withdraw (U2), after the design questions below are settled |
+| **2. Absorb, export, switch master** | Device link between accounts, the cross-domain meeting point, master switch with the recovery reminder |
+| **3. Several servers** | A subaccount used on its own servers from the master's app |
+| **4. Delegation** | Owner-only dangerous operations on a venue first, then delegate |
 
 ---
 
 ## Open questions
 
-**Master and switching**
-1. When the master changes, does the new master get a new passkey, or does the existing passkey's vault re-lock the new master?
-2. Recovery is set up for the master (guardians hold shares of its keys). On a master switch, is recovery re-made for the new master automatically, or does the person do it?
-3. Can a subaccount still be signed into on its own (its old vault and passkey), or does absorbing it remove that?
-
-**Accumulation across servers**
-4. Must servers be unable to link a person's identities? The keyring sits on the master's server; other servers see only the subaccount they serve. Is that enough, or must the master's server not learn there are subaccounts at all?
-5. Where does the master live: only in BuckitUp's app, or in any app built on `@buckitup/pq-client` (a partner's too)?
-6. Absorbing from another domain: is a backup file enough, or is a QR transfer between two apps needed (device link between domains)?
-7. In the UI, are subaccounts separate contexts the person switches between, or one inbox that marks which identity each conversation uses?
-
-**Delegation**
-8. Is handing over the venue's full keys acceptable (a delegate keeps them forever; withdrawing means a new venue identity), or must staff access be revocable? Revocable access needs protocol work: per-staff keys and re-wrapping of what they may read.
-9. Who may delegate: the owner only, or the venue identity too? May a delegate pass it on?
-10. Must the owner-only rule for dangerous operations ([reviews/pq_origin.done.md](reviews/pq_origin.done.md), Status note) be enforced before delegation ships? Today a delegate can change the moderation mode or delete the venue through peer sync.
-
-**Format**
-11. Should the keyring also be where room keys go once rooms exist (`pq_rooms`, TBD), as the previous generation kept room keys next to the user's?
+1. **Where the master can live.** Only in BuckitUp's app, or in any app
+   built on `@buckitup/pq-client`, a partner's included? This decides whether
+   the keyring format and operations are part of the library's public
+   contract (versioned, documented for partners) or internal to our app. It
+   also decides whose code handles all of a person's keys: if a partner's app
+   can be the master, absorbing a BuckitUp account into it gives the
+   partner's code that account's keys.
+2. **Passing a delegation on.** May a delegate hand the venue's keys to
+   someone else? The keys allow it technically; the question is whether the
+   client offers it.
+3. **Withdrawing a delegation.** With full keys handed over, the only real
+   withdrawal is a new venue identity, which loses the old one's dialogs and
+   reviews. Is that acceptable as the answer, or is revocable staff access
+   (per-staff keys, re-wrapping) a later requirement?
+4. **The cross-domain meeting point.** Is the `device_webrtc` room the way
+   two apps on one device find each other, and does it move out of the proof
+   of concept for this?

@@ -44,6 +44,8 @@ Because the type lives inside the ciphertext, the database (and any peer without
 - [`"recovery_share"`](#recovery_share) — one guardian's Shamir share of a community backup, owner → guardian
 - [`"recovery_share_return"`](#recovery_share_return) — the same share sent back during a recovery, guardian → owner
 - [`"recovery_binding"`](#recovery_binding) — a recovering account's proof that it controls the on-chain candidate
+- [`"avatar"`](#avatar) — one of the sender's profile photos, added to or set as main in their gallery
+- [`"avatar_removed"`](#avatar_removed) — a photo the sender took out of their gallery
 
 ### `"inline_file"`
 
@@ -403,6 +405,48 @@ the peer is the person on the call.
 | 1 | candidate | The address the temporary account will be elected under |
 | 2 | user_hash | The sender's own `user_hash`; must equal the dialog peer's, and is covered by the word code the owner reads out |
 | 3 | signature_b64 | EIP-191 signature by `candidate`'s key over the string above, unpadded base64 |
+
+--- 
+
+### `"avatar"`
+
+One of the sender's profile photos, in the gallery that this dialog's messages
+build ([pq_avatars](../reqs/pq_avatars.proposed.md)): it puts `avatar_id` at
+the newest position, which makes it the sender's current avatar. A message may
+carry several, oldest first — the whole gallery, sent into a new dialog.
+
+```json
+{"avatar": ["5c0f…", {"image": [1, 1, "thumbhash…", "avatar.jpg", 48213, "image/jpeg", 1791200000, "f_01964…", "<enc_secret_b64>"]}]}
+```
+
+```json
+{"avatar": [avatar_id, photo]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | avatar_id | 16 random bytes, lowercase hex; one photo across every message and dialog that carries it |
+| 1 | photo | The photo as one nested element: `{"image": …}` or `{"inline_image": …}`, at most 640 px on the longer side. Any other element makes the part unreadable, and it is ignored |
+
+--- 
+
+### `"avatar_removed"`
+
+A photo the sender took out of their gallery
+([pq_avatars](../reqs/pq_avatars.proposed.md)). It removes nothing a reader
+already downloaded.
+
+```json
+{"avatar_removed": ["5c0f…"]}
+```
+
+```json
+{"avatar_removed": [avatar_id]}
+```
+
+| Position | Field | Description |
+|---|---|---|
+| 0 | avatar_id | The photo removed |
 
 --- 
 

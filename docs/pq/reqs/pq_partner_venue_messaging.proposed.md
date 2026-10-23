@@ -82,11 +82,8 @@ closed pilot only. `trust` adds per-shape read sessions; it hides metadata from
 anonymous readers, and notifications (§ Notifications) then need a vouched
 reader.
 
-**Prerequisite:** the admin sandbox accepts an identity file without checking
-that its secret key matches its public key. Since O's public key is published,
-anyone who reaches the sandbox can act as O there and change the mode. A
-release a partner deploys either checks the key pair on import or does not
-serve the sandbox; without the sandbox the mode is set from the console.
+The sandboxes (`/electric/*_sandbox`) are development tools: a production
+server does not expose them, and the mode is then set from the console.
 
 ### Cross-origin access
 
@@ -324,7 +321,7 @@ frontend moves onto it, so there is one implementation.
 
 | Phase | BuckitUp | Partner | Done when |
 |---|---|---|---|
-| **0. Ground** | Backend: a SyncBot card never becomes the owner; an older `vouch_tokens` row from a peer never replaces a newer one; the sandbox checks the key pair or is not served. Frontend: `sender_msg_key` per `pq_dialogs` (no `evm_skey`). Correct `pq_user_storage.done.md` (paths, injector), the `router.ex` CORS comment, `pq_origin.done.md`. Publish an external-client guide. | Deploy a server on its domain; first owner per § First owner; `guarded`. | Partner's test client ingests a signed `user_cards` row and reads it back from a shape |
+| **0. Ground** | Backend: a SyncBot card never becomes the owner; an older `vouch_tokens` row from a peer never replaces a newer one; sandboxes are not exposed on production servers. Frontend: `sender_msg_key` per `pq_dialogs` (no `evm_skey`). Correct `pq_user_storage.done.md` (paths, injector), the `router.ex` CORS comment, `pq_origin.done.md`. Publish an external-client guide. | Deploy a server on its domain; first owner per § First owner; `guarded`. | Partner's test client ingests a signed `user_cards` row and reads it back from a shape |
 | **1. Library** | Extract `@buckitup/pq-client`; frontend on it; multi-identity vault | Build its UI on pre-releases | Library passes the conformance vectors; frontend tests green on it |
 | **2. Venue messaging** | Venue creation, venue keys slot in the library; support | B, guest admission, guest and owner UI, notifications by shape | On the partner's test server: VO creates V; G scans a code, is vouched, writes; VO reads and replies from a second device; the partner backend is notified without content; retracting B → G stops G |
 | **3. Sign-in by key (R-7)** | Support | Sign-in on its site with the same-domain identity | A guest signs in with the key alone |

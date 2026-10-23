@@ -214,11 +214,3 @@ switches between.
 | **3. Several servers** | A subaccount used on its own servers from the master's app |
 | **4. Delegation** | Owner-only dangerous operations on a venue first, then delegate |
 
----
-
-## Open questions
-
-1. **Venue owners in a partner's client.** The master lives only in
-   BuckitUp's client, while a partner's owner UI holds the owner's account
-   and its venues' keys (U1). Is "a partner's client keeps owned venues only"
-   the boundary, or must owners manage venues in BuckitUp's client?

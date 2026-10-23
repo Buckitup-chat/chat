@@ -9,6 +9,14 @@
       <h1 style="font-size: 28px; line-height: 34px;" class="font-inter font-bold text-white">
         Log In
       </h1>
+      <div id="test-veu">
+        <.vue
+          count={@vue_test_count}
+          v-component="Counter"
+          v-socket={@socket}
+          v-on:inc={JS.push("vue_test_inc")}
+        />
+      </div>
       <p
         :if={is_nil(assigns[:skip_user_creation])}
         class="mt-2.5 font-inter text-sm text-white/70"

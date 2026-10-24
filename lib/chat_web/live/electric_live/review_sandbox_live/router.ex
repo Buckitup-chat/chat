@@ -13,6 +13,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Router do
   alias ChatWeb.ElectricLive.ReviewSandboxLive.ReviewList
   alias ChatWeb.ElectricLive.ReviewSandboxLive.ReviewLoader
   alias ChatWeb.ElectricLive.ReviewSandboxLive.Verification
+  alias ChatWeb.ElectricLive.ReviewSandboxLive.WriteToken
 
   # --- Step 1: identity ---
 
@@ -204,6 +205,20 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Router do
     |> append_logs(result.log_entries)
     |> noreply()
   end
+
+  # --- Write token bind ---
+
+  def handle_event("check_token" = ev, params, socket),
+    do: WriteToken.handle_event(ev, params, socket)
+
+  def handle_event("bind_token" = ev, params, socket),
+    do: WriteToken.handle_event(ev, params, socket)
+
+  def handle_event("refresh_vouches" = ev, params, socket),
+    do: WriteToken.handle_event(ev, params, socket)
+
+  def handle_event("wt_form_changed" = ev, params, socket),
+    do: WriteToken.handle_event(ev, params, socket)
 
   def handle_event("clear_error", _params, socket) do
     socket |> assign(error_message: nil) |> noreply()

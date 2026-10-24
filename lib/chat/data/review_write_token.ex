@@ -10,6 +10,24 @@ defmodule Chat.Data.ReviewWriteToken do
     repo().get(ReviewWriteToken, nonce)
   end
 
+  def pending_expired_tokens(origin_hash, threshold_ts) do
+    from(rwt in ReviewWriteToken,
+      where:
+        rwt.origin_hash == ^origin_hash and
+          is_nil(rwt.user_hash) and
+          rwt.deleted_flag == false and
+          rwt.owner_timestamp < ^threshold_ts
+    )
+    |> repo().all()
+  end
+
+  def hard_delete_old_tombstones(threshold_ts) do
+    from(rwt in ReviewWriteToken,
+      where: rwt.deleted_flag == true and rwt.owner_timestamp < ^threshold_ts
+    )
+    |> repo().delete_all()
+  end
+
   def upsert_review_write_token(changeset) do
     repo().insert(changeset,
       on_conflict: review_write_token_upsert_query(),

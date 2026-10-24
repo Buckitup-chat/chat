@@ -281,6 +281,7 @@ defmodule ChatWeb.Router do
   scope "/r/api", ChatWeb do
     pipe_through :api
     post "/token/create", ReviewTokenController, :create
+    post "/token/bind", ReviewTokenController, :bind
   end
 
   scope "/r", ChatWeb do

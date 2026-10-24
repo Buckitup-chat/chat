@@ -1,10 +1,12 @@
 defmodule ChatWeb.ReviewTokenController do
-  @moduledoc "Handles review write token routes: GET /r/:nonce and POST /r/api/token/create."
+  @moduledoc "Handles review write token routes: GET /r/:nonce, POST /r/api/token/create, POST /r/api/token/bind."
 
   use ChatWeb, :controller
 
   alias Chat.Data.ReviewWriteToken
+  alias Chat.ReviewBot.TokenBinder
   alias Chat.ReviewBot.TokenCreator
+  alias ChatWeb.Utils.IngestPop
 
   def create(conn, params) do
     bot_hash = params["bot_hash"]
@@ -23,6 +25,31 @@ defmodule ChatWeb.ReviewTokenController do
 
       {:error, reason} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+    end
+  end
+
+  @bind_errors %{
+    token_not_found: {:not_found, "Token not found"},
+    token_deleted: {:gone, "Token has been deleted"},
+    reviewer_not_found: {:not_found, "Reviewer identity not found"},
+    invalid_pop: {:unauthorized, "Invalid proof of possession"},
+    bot_not_running: {:service_unavailable, "Review bot not running"},
+    no_bot_origin_vouch: {:forbidden, "Bot lacks origin vouch"},
+    no_bot_device_vouch: {:forbidden, "Bot lacks device vouch"}
+  }
+
+  def bind(conn, %{"nonce" => nonce, "user_hash" => user_hash} = params) do
+    with {:ok, pop_context} <- IngestPop.context(params),
+         {:ok, bound_nonce} <- TokenBinder.bind(nonce, user_hash, pop_context) do
+      url = "#{ChatWeb.Endpoint.url()}/r/#{bound_nonce}"
+      json(conn, %{nonce: bound_nonce, url: url})
+    else
+      {:error, {:unauthorized, msg}} ->
+        conn |> put_status(:unauthorized) |> json(%{error: msg})
+
+      {:error, reason} ->
+        {status, msg} = Map.get(@bind_errors, reason, {:unprocessable_entity, inspect(reason)})
+        conn |> put_status(status) |> json(%{error: msg})
     end
   end
 

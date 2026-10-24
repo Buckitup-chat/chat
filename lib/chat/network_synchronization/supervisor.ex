@@ -5,6 +5,7 @@ defmodule Chat.NetworkSynchronization.Supervisor do
 
   alias Chat.NetworkSynchronization.Electric.DeferredStore
   alias Chat.NetworkSynchronization.PeerDetection.LanDetector
+  alias Chat.NetworkSynchronization.PeerSyncDecider
   alias Chat.NetworkSynchronization.Store
 
   def start_link(arg) do
@@ -37,13 +38,17 @@ defmodule Chat.NetworkSynchronization.Supervisor do
     deferred_store_name =
       Keyword.get(opts, :deferred_store_name, DeferredStore)
 
+    peer_sync_decider_name =
+      Keyword.get(opts, :peer_sync_decider_name, PeerSyncDecider)
+
     children = [
       {DynamicSupervisor, name: dynamic_name, strategy: :one_for_one},
       {Registry, name: registry_name, keys: :unique},
       {LanDetector, name: detector_name},
       {DeferredStore, name: deferred_store_name},
       {DynamicSupervisor, name: electric_dynamic_name, strategy: :one_for_one},
-      {Registry, name: electric_registry_name, keys: :unique}
+      {Registry, name: electric_registry_name, keys: :unique},
+      {PeerSyncDecider, name: peer_sync_decider_name}
     ]
 
     Store.init()

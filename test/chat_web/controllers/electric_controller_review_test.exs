@@ -27,7 +27,9 @@ defmodule ChatWeb.ElectricControllerReviewTest do
   alias Chat.Data.Types.ReviewListSignHash
   alias Chat.Data.Types.ReviewPasswordSignHash
   alias Chat.Data.Types.ReviewSignHash
+  alias Chat.Data.Schemas.VouchToken
   alias Chat.Data.User, as: UserData
+  alias Chat.Data.VouchToken, as: VouchTokenData
   alias EnigmaPq
 
   setup %{conn: conn} do
@@ -69,6 +71,88 @@ defmodule ChatWeb.ElectricControllerReviewTest do
 
       assert conn.status in [400, 401, 422], conn.resp_body
       assert ReviewData.get_review(review_hash) == nil
+    end
+  end
+
+  describe "review insert (invite_only gate in check phase)" do
+    setup ctx do
+      Repo.insert!(%Chat.Data.Schemas.OriginSetting{
+        origin_hash: ctx.origin_hash,
+        key: "review_access",
+        value: "invite_only",
+        deleted_flag: false,
+        owner_timestamp: 1,
+        sign_b64: <<0::256>>
+      })
+
+      :ok
+    end
+
+    test "rejects review without vouch before validation", ctx do
+      {review_hash, mutation, _sign_hash} = build_review_mutation(ctx)
+
+      conn = post_ingest(ctx.conn, %{"mutations" => [mutation]}, ctx.author.sign_skey)
+
+      assert conn.status in [400, 401, 422], conn.resp_body
+      assert ReviewData.get_review(review_hash) == nil
+    end
+
+    test "accepts review when author has token-scoped vouch", ctx do
+      nonce = "tok_http_test"
+      insert_origin_vouch(ctx.origin_identity, ctx.origin_hash, ctx.author_hash, nonce)
+
+      {review_hash, mutation, _sign_hash} = build_review_mutation(ctx)
+
+      conn = post_ingest(ctx.conn, %{"mutations" => [mutation]}, ctx.author.sign_skey)
+
+      assert conn.status == 200, conn.resp_body
+      assert ReviewData.get_review(review_hash) != nil
+    end
+  end
+
+  describe "review insert with nonce-based token linking" do
+    test "links token review_hash atomically on insert", ctx do
+      nonce = insert_bound_token(ctx, ctx.origin_hash, ctx.author_hash)
+
+      {review_hash, mutation, _sign_hash} = build_review_mutation(ctx)
+
+      conn =
+        post_ingest_with_nonce(
+          ctx.conn,
+          %{"mutations" => [mutation]},
+          ctx.author.sign_skey,
+          nonce
+        )
+
+      assert conn.status == 200, conn.resp_body
+      assert ReviewData.get_review(review_hash) != nil
+
+      token = Chat.Data.ReviewWriteToken.get_review_write_token(nonce)
+      assert token.review_hash == review_hash
+    end
+
+    test "rejects insert when nonce token not found", ctx do
+      {review_hash, mutation, _sign_hash} = build_review_mutation(ctx)
+
+      conn =
+        post_ingest_with_nonce(
+          ctx.conn,
+          %{"mutations" => [mutation]},
+          ctx.author.sign_skey,
+          "nonexistent"
+        )
+
+      assert conn.status in [400, 401, 422], conn.resp_body
+      assert ReviewData.get_review(review_hash) == nil
+    end
+
+    test "works normally when no nonce provided", ctx do
+      {review_hash, mutation, _sign_hash} = build_review_mutation(ctx)
+
+      conn = post_ingest(ctx.conn, %{"mutations" => [mutation]}, ctx.author.sign_skey)
+
+      assert conn.status == 200, conn.resp_body
+      assert ReviewData.get_review(review_hash) != nil
     end
   end
 
@@ -497,5 +581,69 @@ defmodule ChatWeb.ElectricControllerReviewTest do
     conn
     |> put_req_header("content-type", "application/json")
     |> post("/electric/v1/ingest", Jason.encode!(payload))
+  end
+
+  defp post_ingest_with_nonce(conn, payload, sign_skey, nonce) do
+    {challenge_id, challenge} = Challenge.store()
+
+    signature_b64 = challenge |> EnigmaPq.sign(sign_skey) |> Base.encode64(padding: false)
+
+    payload =
+      Map.put(payload, "auth", %{
+        "challenge_id" => challenge_id,
+        "signature" => signature_b64,
+        "nonce" => nonce
+      })
+
+    conn
+    |> put_req_header("content-type", "application/json")
+    |> post("/electric/v1/ingest", Jason.encode!(payload))
+  end
+
+  defp insert_bound_token(ctx, origin_hash, user_hash) do
+    nonce = "tok_#{:crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)}"
+    bot = UserData.generate_pq_identity("TestBot")
+    bot_card = insert_user_card(bot)
+
+    token =
+      %Chat.Data.Schemas.ReviewWriteToken{
+        nonce: nonce,
+        origin_hash: origin_hash,
+        review_bot_hash: bot_card.user_hash,
+        user_hash: user_hash,
+        review_hash: nil,
+        deleted_flag: false,
+        owner_timestamp: System.os_time(:millisecond)
+      }
+      |> sign_with_hash(bot.sign_skey, &Chat.Data.Types.ReviewWriteTokenSignHash.from_binary/1)
+
+    {:ok, _} =
+      Chat.Data.ReviewWriteToken.upsert_review_write_token(
+        Chat.Data.Schemas.ReviewWriteToken.create_changeset(
+          %Chat.Data.Schemas.ReviewWriteToken{},
+          Map.from_struct(token)
+        )
+      )
+
+    nonce
+  end
+
+  defp insert_origin_vouch(origin_identity, origin_hash, author_hash, nonce) do
+    issuer_hash = UserData.extract_pq_card(origin_identity).user_hash
+
+    vt =
+      %VouchToken{
+        kind: "origins.#{origin_hash}.reviews.write.#{nonce}",
+        issuer_hash: issuer_hash,
+        subject_hash: author_hash,
+        owner_timestamp: System.os_time(:millisecond),
+        deleted_flag: false
+      }
+      |> sign_with_key(origin_identity.sign_skey)
+
+    {:ok, _} =
+      VouchTokenData.upsert_vouch_token(
+        VouchToken.create_changeset(%VouchToken{}, Map.from_struct(vt))
+      )
   end
 end

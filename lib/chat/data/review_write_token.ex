@@ -28,6 +28,13 @@ defmodule Chat.Data.ReviewWriteToken do
     |> repo().delete_all()
   end
 
+  def link_to_review(repo, nonce, review_hash) do
+    from(rwt in ReviewWriteToken,
+      where: rwt.nonce == ^nonce and is_nil(rwt.review_hash)
+    )
+    |> repo.update_all(set: [review_hash: review_hash])
+  end
+
   def upsert_review_write_token(changeset) do
     repo().insert(changeset,
       on_conflict: review_write_token_upsert_query(),

@@ -86,15 +86,25 @@ defmodule Chat.Data.Shapes.Review do
 
   @impl true
   def ingest_configure_writer(writer, user_pop_context) do
+    device_gate =
+      WriteGate.and_gate(&Validation.review_allowed(&1, user_pop_context), :review,
+        owner: "author_hash"
+      )
+
     Writer.allow(writer, Review,
       accept: [:insert, :update],
-      check:
-        WriteGate.and_gate(&Validation.review_allowed(&1, user_pop_context), :review,
-          owner: "author_hash"
-        ),
+      check: fn operation ->
+        with :ok <- device_gate.(operation) do
+          Validation.check_review_gate(operation, user_pop_context)
+        end
+      end,
       validate: &Validation.review_validate_with_versioning/3,
       insert: [
-        pre_apply: &Validation.review_pre_apply_versioning/3
+        pre_apply: fn multi, changeset, context ->
+          multi
+          |> Validation.review_pre_apply_versioning(changeset, context)
+          |> Validation.link_token_if_nonce(changeset, user_pop_context)
+        end
       ],
       update: [
         pre_apply: &Validation.review_pre_apply_versioning/3

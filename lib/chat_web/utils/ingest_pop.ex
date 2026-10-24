@@ -14,12 +14,17 @@ defmodule ChatWeb.Utils.IngestPop do
     with {:ok, challenge_id, signature_encoded} <- pop_from_body(params),
          {:ok, challenge} <- fetch_challenge(challenge_id),
          {:ok, signature} <- Base.decode64(signature_encoded, padding: false) do
-      {:ok, %{challenge: challenge, signature: signature}}
+      {:ok, %{challenge: challenge, signature: signature} |> maybe_add_nonce(params)}
     else
       :no_auth -> {:error, {:unauthorized, "Missing user PoP auth"}}
       :error -> {:error, {:unauthorized, "Invalid or expired challenge"}}
     end
   end
+
+  defp maybe_add_nonce(ctx, %{"auth" => %{"nonce" => nonce}}) when is_binary(nonce),
+    do: Map.put(ctx, :nonce, nonce)
+
+  defp maybe_add_nonce(ctx, _), do: ctx
 
   defp pop_from_body(%{"auth" => %{"challenge_id" => challenge_id, "signature" => signature}})
        when is_binary(challenge_id) and is_binary(signature),

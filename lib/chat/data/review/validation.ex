@@ -6,7 +6,9 @@ defmodule Chat.Data.Review.Validation do
   alias Chat.Data.Review, as: ReviewData
   alias Chat.Data.Review.Versioning
   alias Chat.Data.ReviewPublicPassword, as: PublicPasswordData
+  alias Chat.Data.ReviewWriteToken, as: TokenData
   alias Chat.Data.Schemas.Review
+  alias Chat.Data.Schemas.ReviewWriteToken
   alias Chat.Data.User, as: UserData
   alias Chat.Data.User.Validation, as: UserValidation
   alias Chat.Data.VouchToken, as: VouchTokenData
@@ -88,6 +90,62 @@ defmodule Chat.Data.Review.Validation do
     end
   end
 
+  # --- Review gate (check phase) ---
+
+  def check_review_gate(%Operation{operation: :insert, changes: changes}, pop_context) do
+    origin_hash = changes["origin_hash"] || changes[:origin_hash]
+    author_hash = changes["author_hash"] || changes[:author_hash]
+
+    with :ok <- check_origin_access(origin_hash, author_hash) do
+      check_token_nonce(pop_context, author_hash, origin_hash)
+    end
+  end
+
+  def check_review_gate(%Operation{operation: :update}, _pop_context), do: :ok
+
+  defp check_origin_access(origin_hash, author_hash) do
+    case OriginSetting.get_review_access(origin_hash) do
+      "open" ->
+        :ok
+
+      "invite_only" ->
+        scope = "origins.#{origin_hash}.reviews.write"
+
+        if author_hash == origin_hash or invited_to_write?(origin_hash, author_hash, scope),
+          do: :ok,
+          else: {:error, "not invited"}
+
+      _ ->
+        {:error, "not invited"}
+    end
+  end
+
+  defp check_token_nonce(%{nonce: nonce}, author_hash, origin_hash) when is_binary(nonce) do
+    case TokenData.get_review_write_token(nonce) do
+      %ReviewWriteToken{
+        deleted_flag: false,
+        user_hash: ^author_hash,
+        origin_hash: ^origin_hash,
+        review_hash: nil
+      } ->
+        :ok
+
+      %ReviewWriteToken{review_hash: rh} when not is_nil(rh) ->
+        {:error, "token already used"}
+
+      %ReviewWriteToken{deleted_flag: true} ->
+        {:error, "token expired"}
+
+      nil ->
+        {:error, "token not found"}
+
+      _ ->
+        {:error, "token mismatch"}
+    end
+  end
+
+  defp check_token_nonce(_pop_context, _author_hash, _origin_hash), do: :ok
+
   # --- HTTP ingestion with versioning ---
 
   def review_validate_with_versioning(review, changes, op) do
@@ -109,9 +167,7 @@ defmodule Chat.Data.Review.Validation do
 
     case {op, changeset.valid?} do
       {:insert, true} ->
-        changeset
-        |> validate_origin_gate()
-        |> Versioning.check_insert_versioning()
+        Versioning.check_insert_versioning(changeset)
 
       {:update, true} ->
         case Ecto.Changeset.apply_action(changeset, :update) do
@@ -126,26 +182,6 @@ defmodule Chat.Data.Review.Validation do
 
       _ ->
         changeset
-    end
-  end
-
-  defp validate_origin_gate(changeset) do
-    origin_hash = Ecto.Changeset.get_field(changeset, :origin_hash)
-    author_hash = Ecto.Changeset.get_field(changeset, :author_hash)
-
-    case OriginSetting.get_review_access(origin_hash) do
-      "open" ->
-        changeset
-
-      "invite_only" ->
-        scope = "origins.#{origin_hash}.reviews.write"
-
-        if author_hash == origin_hash or invited_to_write?(origin_hash, author_hash, scope),
-          do: changeset,
-          else: Ecto.Changeset.add_error(changeset, :author_hash, "not invited")
-
-      _ ->
-        Ecto.Changeset.add_error(changeset, :author_hash, "not invited")
     end
   end
 
@@ -185,6 +221,24 @@ defmodule Chat.Data.Review.Validation do
   def review_pre_apply_versioning(multi, changeset, context) do
     Versioning.pre_apply_versioning(multi, changeset, context)
   end
+
+  def link_token_if_nonce(multi, changeset, %{nonce: nonce}) when is_binary(nonce) do
+    import Ecto.Query
+
+    review_hash = Ecto.Changeset.get_field(changeset, :review_hash)
+
+    Ecto.Multi.run(multi, :link_review_token, fn repo, _changes ->
+      {count, _} =
+        from(rwt in ReviewWriteToken,
+          where: rwt.nonce == ^nonce and is_nil(rwt.review_hash)
+        )
+        |> repo.update_all(set: [review_hash: review_hash])
+
+      {:ok, count}
+    end)
+  end
+
+  def link_token_if_nonce(multi, _changeset, _pop_context), do: multi
 
   # --- Shared helpers ---
 

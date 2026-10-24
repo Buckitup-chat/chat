@@ -1,9 +1,30 @@
 defmodule ChatWeb.ReviewTokenController do
-  @moduledoc "Handles GET /r/:nonce — public entry point for review write tokens."
+  @moduledoc "Handles review write token routes: GET /r/:nonce and POST /r/api/token/create."
 
   use ChatWeb, :controller
 
   alias Chat.Data.ReviewWriteToken
+  alias Chat.ReviewBot.TokenCreator
+
+  def create(conn, params) do
+    bot_hash = params["bot_hash"]
+    origin_order_hash = params["origin_order_hash"]
+
+    case TokenCreator.create(bot_hash, origin_order_hash) do
+      {:ok, nonce} ->
+        url = "#{ChatWeb.Endpoint.url()}/r/#{nonce}"
+        json(conn, %{nonce: nonce, url: url})
+
+      {:error, :bot_not_running} ->
+        conn |> put_status(:not_found) |> json(%{error: "Bot not running"})
+
+      {:error, :no_live_vouch} ->
+        conn |> put_status(:forbidden) |> json(%{error: "No live vouch for this bot"})
+
+      {:error, reason} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+    end
+  end
 
   def show(conn, %{"nonce" => nonce}) do
     case ReviewWriteToken.get_review_write_token(nonce) do

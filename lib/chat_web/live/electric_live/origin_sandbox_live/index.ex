@@ -10,6 +10,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
   alias ChatWeb.ElectricLive.OriginSandboxLive.Render
   alias ChatWeb.ElectricLive.OriginSandboxLive.ReviewBot
   alias ChatWeb.ElectricLive.OriginSandboxLive.ReviewBotClient
+  alias ChatWeb.ElectricLive.OriginSandboxLive.WriteToken
 
   @impl true
   def mount(_params, _session, socket) do
@@ -20,6 +21,8 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
         origin: nil,
         origins: [],
         origin_bots: [],
+        write_tokens: [],
+        last_token_result: nil,
         request_log: [],
         error_message: nil,
         pending_reviews: nil
@@ -64,7 +67,14 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
 
         {:noreply,
          socket
-         |> assign(origin: origin, origins: origins, pending_reviews: pending, origin_bots: bots)
+         |> assign(
+           origin: origin,
+           origins: origins,
+           pending_reviews: pending,
+           origin_bots: bots,
+           write_tokens: [],
+           last_token_result: nil
+         )
          |> append_logs(logs)}
 
       {:error, %{reason: reason, log_entries: logs}} ->
@@ -81,9 +91,15 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
 
       found ->
         auth = auth(socket)
-        pending = ApiClient.has_pending_reviews?(hash, base_url, auth)
-        bots = ReviewBotClient.list_origin_bots(hash, base_url, auth)
-        {:noreply, assign(socket, origin: found, pending_reviews: pending, origin_bots: bots)}
+
+        {:noreply,
+         assign(socket,
+           origin: found,
+           pending_reviews: ApiClient.has_pending_reviews?(hash, base_url, auth),
+           origin_bots: ReviewBotClient.list_origin_bots(hash, base_url, auth),
+           write_tokens: fetch_tokens(hash, base_url, auth),
+           last_token_result: nil
+         )}
     end
   end
 
@@ -233,6 +249,14 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
     {:noreply, assign(socket, origin_bots: bots)}
   end
 
+  def handle_event("create_write_token", params, socket) do
+    WriteToken.handle_create(params, public_url(socket), socket)
+  end
+
+  def handle_event("refresh_tokens", _params, socket) do
+    WriteToken.handle_refresh(public_url(socket), auth(socket), socket)
+  end
+
   def handle_event("clear_error", _params, socket) do
     {:noreply, assign(socket, :error_message, nil)}
   end
@@ -255,6 +279,10 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
   defp auth(socket) do
     owner = socket.assigns.owner
     %{user_hash: owner.user_hash, sign_skey: owner.sign_skey}
+  end
+
+  defp fetch_tokens(origin_hash, base_url, auth) do
+    WriteToken.list_tokens(origin_hash, base_url, auth)
   end
 
   defp append_logs(socket, logs), do: update(socket, :request_log, &(logs ++ &1))

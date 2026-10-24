@@ -370,14 +370,14 @@ The `review_token_ttl_days` setting (also in `origin_settings`) controls the sof
 
 - [x] `origin_bots` migration + Ecto schema + Electric shape
 - [x] `OriginBotSignHash` type, `ob_` prefix in Consts
-- [ ] `ReviewWriteTokenSignHash` type, `rwt_` prefix in Consts
-- [ ] `OriginOrderHash` type, `org_ord_` prefix in Consts
+- [x] `ReviewWriteTokenSignHash` type, `rwt_` prefix in Consts
+- [x] `OriginOrderHash` type, `org_ord_` prefix in Consts
 - [x] Bot creation flow: keypair gen, `user_cards` row (`ReviewBot_<originName>`), identity encryption, `origin_bots` ingest
 - [x] Bot vouch: origin → bot vouch token (`origins.<origin_hash>.reviews.write`)
 - [x] `ReviewBotWorker` GenServer: decrypt identity from `origin_bots`, explicit start from admin page
-- [ ] `origin_settings` table + migration + Ecto schema + Electric shape
-- [ ] `OriginSetting` data context, validation, shape module
-- [ ] Review ingest: origin gate vouch check when `review_access = invite_only` (reads from `origin_settings`)
+- [x] `origin_settings` table + migration + Ecto schema + Electric shape
+- [x] `OriginSetting` data context, validation, shape module
+- [x] Review ingest: origin gate vouch check when `review_access = invite_only` (reads from `origin_settings`)
 
 ### Phase 2 — Token CRUD + redirect
 

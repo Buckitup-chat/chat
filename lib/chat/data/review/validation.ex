@@ -223,17 +223,10 @@ defmodule Chat.Data.Review.Validation do
   end
 
   def link_token_if_nonce(multi, changeset, %{nonce: nonce}) when is_binary(nonce) do
-    import Ecto.Query
-
     review_hash = Ecto.Changeset.get_field(changeset, :review_hash)
 
     Ecto.Multi.run(multi, :link_review_token, fn repo, _changes ->
-      {count, _} =
-        from(rwt in ReviewWriteToken,
-          where: rwt.nonce == ^nonce and is_nil(rwt.review_hash)
-        )
-        |> repo.update_all(set: [review_hash: review_hash])
-
+      {count, _} = TokenData.link_to_review(repo, nonce, review_hash)
       {:ok, count}
     end)
   end

@@ -33,17 +33,13 @@ defmodule Chat.ReviewBot.TokenBinder do
   end
 
   defp verify_reviewer(reviewer_hash, %{challenge: challenge, signature: signature}) do
-    case BinderQueries.get_card(reviewer_hash) do
-      nil ->
-        {:error, :reviewer_not_found}
-
-      card ->
-        with true <- BinderQueries.valid_card?(card),
-             true <- EnigmaPq.verify(challenge, signature, card.sign_pkey) do
-          {:ok, card}
-        else
-          _ -> {:error, :invalid_pop}
-        end
+    with {:card, card} when card != nil <- {:card, BinderQueries.get_card(reviewer_hash)},
+         true <- BinderQueries.valid_card?(card),
+         true <- EnigmaPq.verify(challenge, signature, card.sign_pkey) do
+      {:ok, card}
+    else
+      {:card, nil} -> {:error, :reviewer_not_found}
+      _ -> {:error, :invalid_pop}
     end
   end
 

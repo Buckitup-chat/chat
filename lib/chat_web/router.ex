@@ -156,6 +156,9 @@ defmodule ChatWeb.Router do
       live "/electric/review_revoke_rights", ElectricLive.ReviewRevokeRightsLive.Index, :index
       live "/electric/review_lists", ElectricLive.ReviewListsLive.Index, :index
       live "/electric/vouch_tokens", ElectricLive.VouchTokensLive.Index, :index
+      live "/electric/origin_bots", ElectricLive.OriginBotsLive.Index, :index
+      live "/electric/origin_settings", ElectricLive.OriginSettingsLive.Index, :index
+      live "/electric/review_write_tokens", ElectricLive.ReviewWriteTokensLive.Index, :index
       live "/electric/review_sandbox", ElectricLive.ReviewSandboxLive.Index, :index
       live "/electric/moderation_sandbox", ElectricLive.ModerationSandboxLive.Index, :index
       live "/electric/origin_reviews", ElectricLive.OriginReviewsLive.Index, :index

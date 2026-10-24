@@ -6,10 +6,7 @@ defmodule Chat.ReviewBot.Worker do
   import Tools.GenServerHelpers
 
   alias Chat.Pq.Ingest
-  alias Chat.ReviewBot.GarbageCollector
   alias EnigmaPq
-
-  @gc_interval :timer.hours(1)
 
   def start_link(%{bot_hash: bot_hash} = init_arg) do
     GenServer.start_link(__MODULE__, init_arg, name: via(bot_hash))
@@ -42,8 +39,6 @@ defmodule Chat.ReviewBot.Worker do
   def init(%{bot_hash: bot_hash, origin_hash: origin_hash, identity: identity}) do
     Process.flag(:sensitive, true)
 
-    schedule_gc()
-
     %{bot_hash: bot_hash, origin_hash: origin_hash, identity: identity}
     |> ok()
   end
@@ -62,15 +57,6 @@ defmodule Chat.ReviewBot.Worker do
   def handle_call(:info, _from, state) do
     state |> reply(%{bot_hash: state.bot_hash, origin_hash: state.origin_hash})
   end
-
-  @impl true
-  def handle_info(:gc_tick, state) do
-    GarbageCollector.run(state.bot_hash, state.origin_hash)
-    schedule_gc()
-    {:noreply, state}
-  end
-
-  defp schedule_gc, do: Process.send_after(self(), :gc_tick, @gc_interval)
 
   defp via(bot_hash), do: {:via, Registry, {Chat.ReviewBot.Registry, bot_hash}}
 end

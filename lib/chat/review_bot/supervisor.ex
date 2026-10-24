@@ -12,7 +12,7 @@ defmodule Chat.ReviewBot.Supervisor do
     children = [
       {Registry, keys: :unique, name: Chat.ReviewBot.Registry},
       {DynamicSupervisor, name: Chat.ReviewBot.WorkerSupervisor, strategy: :one_for_one},
-      Chat.ReviewBot.TombstoneCleaner
+      Chat.ReviewBot.GcServer
     ]
 
     Supervisor.init(children, strategy: :rest_for_one)

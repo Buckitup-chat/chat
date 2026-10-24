@@ -2,22 +2,12 @@ defmodule Chat.ReviewBot.GarbageCollector do
   @moduledoc "Soft-deletes expired pending review write tokens for a review bot."
 
   alias Chat.Data.Integrity
-  alias Chat.Data.OriginSetting
   alias Chat.Data.Schemas.ReviewWriteToken
   alias Chat.Data.Types.ReviewWriteTokenSignHash
-  alias Chat.ReviewBot.TokenQueries
   alias Chat.ReviewBot.Worker
-  alias Chat.TimeKeeper
 
-  @seconds_per_day 86_400
-
-  def run(bot_hash, origin_hash) do
-    ttl_days = OriginSetting.get_review_token_ttl_days(origin_hash)
-    threshold_ts = TimeKeeper.now_unix() - ttl_days * @seconds_per_day
-
-    origin_hash
-    |> TokenQueries.pending_expired_tokens(threshold_ts)
-    |> Enum.each(&soft_delete(bot_hash, &1))
+  def soft_delete_tokens(tokens, bot_hash) do
+    Enum.each(tokens, &soft_delete(bot_hash, &1))
   end
 
   defp soft_delete(bot_hash, %ReviewWriteToken{} = token) do

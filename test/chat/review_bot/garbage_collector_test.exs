@@ -6,15 +6,6 @@ defmodule Chat.ReviewBot.GarbageCollectorTest do
 
   @bot_hash "u_" <> String.duplicate("ab", 64)
   @origin_hash "u_" <> String.duplicate("cd", 64)
-  @now 1_700_000_000
-
-  defmodule FakeTimeKeeper do
-    def now_unix, do: 1_700_000_000
-  end
-
-  defmodule FakeOriginSetting do
-    def get_review_token_ttl_days(_), do: 7
-  end
 
   defmodule FakeWorker do
     def sign(_, _), do: :crypto.strong_rand_bytes(100)
@@ -25,68 +16,31 @@ defmodule Chat.ReviewBot.GarbageCollectorTest do
     end
   end
 
-  defmodule OneExpired do
-    @origin_hash "u_" <> String.duplicate("cd", 64)
-    @bot_hash "u_" <> String.duplicate("ab", 64)
-    @expired_ts 1_700_000_000 - 8 * 86_400
-
-    def pending_expired_tokens(@origin_hash, _threshold) do
-      [
-        %ReviewWriteToken{
-          nonce: "expired_1",
-          origin_hash: @origin_hash,
-          review_bot_hash: @bot_hash,
-          origin_order_hash: nil,
-          parent_nonce: nil,
-          user_hash: nil,
-          review_hash: nil,
-          deleted_flag: false,
-          owner_timestamp: @expired_ts,
-          sign_b64: :crypto.strong_rand_bytes(100),
-          sign_hash: "rwt_sign_" <> String.duplicate("00", 64)
-        }
-      ]
-    end
+  defp expired_token(nonce, ts) do
+    %ReviewWriteToken{
+      nonce: nonce,
+      origin_hash: @origin_hash,
+      review_bot_hash: @bot_hash,
+      origin_order_hash: nil,
+      parent_nonce: nil,
+      user_hash: nil,
+      review_hash: nil,
+      deleted_flag: false,
+      owner_timestamp: ts,
+      sign_b64: :crypto.strong_rand_bytes(100),
+      sign_hash: "rwt_sign_" <> String.duplicate("00", 64)
+    }
   end
 
-  defmodule NoExpired do
-    def pending_expired_tokens(_, _), do: []
+  defp gc do
+    rewire(Chat.ReviewBot.GarbageCollector, Worker: FakeWorker)
   end
 
-  defmodule TwoExpired do
-    @origin_hash "u_" <> String.duplicate("cd", 64)
-    @bot_hash "u_" <> String.duplicate("ab", 64)
-
-    def pending_expired_tokens(@origin_hash, _threshold) do
-      for {nonce, ts} <- [{"n1", 1_700_000_000 - 8 * 86_400}, {"n2", 1_700_000_000 - 15 * 86_400}] do
-        %ReviewWriteToken{
-          nonce: nonce,
-          origin_hash: @origin_hash,
-          review_bot_hash: @bot_hash,
-          origin_order_hash: nil,
-          parent_nonce: nil,
-          user_hash: nil,
-          review_hash: nil,
-          deleted_flag: false,
-          owner_timestamp: ts,
-          sign_b64: :crypto.strong_rand_bytes(100),
-          sign_hash: "rwt_sign_" <> String.duplicate("00", 64)
-        }
-      end
-    end
-  end
-
-  describe "run/2" do
+  describe "soft_delete_tokens/2" do
     test "soft-deletes expired pending tokens" do
-      gc =
-        rewire(Chat.ReviewBot.GarbageCollector,
-          Worker: FakeWorker,
-          TimeKeeper: FakeTimeKeeper,
-          OriginSetting: FakeOriginSetting,
-          TokenQueries: OneExpired
-        )
+      token = expired_token("expired_1", 1_000_000)
 
-      gc.run(@bot_hash, @origin_hash)
+      gc().soft_delete_tokens([token], @bot_hash)
 
       assert_received {:ingested, @bot_hash, [mutation]}
       assert mutation["modified"]["deleted_flag"] == true
@@ -95,46 +49,25 @@ defmodule Chat.ReviewBot.GarbageCollectorTest do
     end
 
     test "owner_timestamp bump is +1, not bot clock" do
-      gc =
-        rewire(Chat.ReviewBot.GarbageCollector,
-          Worker: FakeWorker,
-          TimeKeeper: FakeTimeKeeper,
-          OriginSetting: FakeOriginSetting,
-          TokenQueries: OneExpired
-        )
+      ts = 1_700_000_000
+      token = expired_token("expired_1", ts)
 
-      gc.run(@bot_hash, @origin_hash)
+      gc().soft_delete_tokens([token], @bot_hash)
 
-      expected_ts = @now - 8 * 86_400 + 1
       assert_received {:ingested, _, [mutation]}
-      assert mutation["modified"]["owner_timestamp"] == expected_ts
-      assert mutation["modified"]["owner_timestamp"] != @now
+      assert mutation["modified"]["owner_timestamp"] == ts + 1
     end
 
-    test "does not touch anything when no tokens expired" do
-      gc =
-        rewire(Chat.ReviewBot.GarbageCollector,
-          Worker: FakeWorker,
-          TimeKeeper: FakeTimeKeeper,
-          OriginSetting: FakeOriginSetting,
-          TokenQueries: NoExpired
-        )
-
-      gc.run(@bot_hash, @origin_hash)
+    test "does not touch anything when no tokens" do
+      gc().soft_delete_tokens([], @bot_hash)
 
       refute_received {:ingested, _, _}
     end
 
     test "processes each expired token separately" do
-      gc =
-        rewire(Chat.ReviewBot.GarbageCollector,
-          Worker: FakeWorker,
-          TimeKeeper: FakeTimeKeeper,
-          OriginSetting: FakeOriginSetting,
-          TokenQueries: TwoExpired
-        )
+      tokens = [expired_token("n1", 1_000), expired_token("n2", 2_000)]
 
-      gc.run(@bot_hash, @origin_hash)
+      gc().soft_delete_tokens(tokens, @bot_hash)
 
       assert_received {:ingested, @bot_hash, [m1]}
       assert_received {:ingested, @bot_hash, [m2]}

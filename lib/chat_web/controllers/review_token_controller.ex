@@ -1,10 +1,12 @@
 defmodule ChatWeb.ReviewTokenController do
-  @moduledoc "Handles review write token routes: GET /r/:nonce and POST /r/api/token/create."
+  @moduledoc "Handles review write token routes: GET /r/:nonce, POST /r/api/token/create, POST /r/api/token/bind."
 
   use ChatWeb, :controller
 
   alias Chat.Data.ReviewWriteToken
+  alias Chat.ReviewBot.TokenBinder
   alias Chat.ReviewBot.TokenCreator
+  alias ChatWeb.Utils.IngestPop
 
   def create(conn, params) do
     bot_hash = params["bot_hash"]
@@ -20,6 +22,41 @@ defmodule ChatWeb.ReviewTokenController do
 
       {:error, :no_live_vouch} ->
         conn |> put_status(:forbidden) |> json(%{error: "No live vouch for this bot"})
+
+      {:error, reason} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+    end
+  end
+
+  def bind(conn, %{"nonce" => nonce, "user_hash" => user_hash} = params) do
+    with {:ok, pop_context} <- IngestPop.context(params),
+         {:ok, bound_nonce} <- TokenBinder.bind(nonce, user_hash, pop_context) do
+      url = "#{ChatWeb.Endpoint.url()}/r/#{bound_nonce}"
+      json(conn, %{nonce: bound_nonce, url: url})
+    else
+      {:error, {:unauthorized, msg}} ->
+        conn |> put_status(:unauthorized) |> json(%{error: msg})
+
+      {:error, :token_not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "Token not found"})
+
+      {:error, :token_deleted} ->
+        conn |> put_status(:gone) |> json(%{error: "Token has been deleted"})
+
+      {:error, :reviewer_not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "Reviewer identity not found"})
+
+      {:error, :invalid_pop} ->
+        conn |> put_status(:unauthorized) |> json(%{error: "Invalid proof of possession"})
+
+      {:error, :bot_not_running} ->
+        conn |> put_status(:service_unavailable) |> json(%{error: "Review bot not running"})
+
+      {:error, :no_bot_origin_vouch} ->
+        conn |> put_status(:forbidden) |> json(%{error: "Bot lacks origin vouch"})
+
+      {:error, :no_bot_device_vouch} ->
+        conn |> put_status(:forbidden) |> json(%{error: "Bot lacks device vouch"})
 
       {:error, reason} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})

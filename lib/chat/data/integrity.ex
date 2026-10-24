@@ -26,7 +26,7 @@ defmodule Chat.Data.Integrity do
     def signature(data)
   end
 
-  @prefixed_hash_pattern ~r/^[a-z][a-z0-9]*_[0-9a-f]+$/
+  @prefixed_hash_pattern ~r/^[a-z](?:[a-z0-9]*_)+[0-9a-f]+$/
 
   @doc """
   Generates signature payload from any signable data structure.

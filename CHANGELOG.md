@@ -10,6 +10,46 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
+### Added
+
+- Write token create and list in origin sandbox
+
+## 2026-10-17_8bfa4f6\_\_\_2026-10-24_6ef8569e\_\_\_2026-10-23_b7ebd02
+
+### Added
+
+- Review gating: origin settings, origin bots — schemas, Electric shapes, ingest validation, and API spec
+- Review bot worker with identity management, admin page controls, and garbage collection
+- Review write tokens: migration, schema, validation, and Electric shape
+- Review write token endpoints: creation, identity binding, and nonce-based state redirect
+- Electric shape readers for origin_bots, origin_settings, and review_write_tokens
+- Documentation: TURN relay specification and review screen MVP proposal
+- [frontend] Recovery Phase 7: community backup — guardian invitations (7.1), backup setup and resumable runs (7.2), shared keeping with alerts (7.3), owner roster with change/revoke/spares and reshare (7.4), and full restore flow (7.5)
+- [frontend] Recovery: node client on node protocol v3
+- [frontend] Optical handshake v2 (PQ2) ships; PQ1 removed
+- [frontend] TURN relay credentials client
+- [frontend] Avatars: profile-photo galleries between contacts with inline_image envelopes
+- [frontend] Composer: drag-and-drop files into a dialog, paste screenshots
+- [frontend] File integrity: verify manifests and chunks on the read path
+- [frontend] Device claim on sign-in for ownerless devices
+- [frontend] Contact vouches issued and revoked after QR confirmation
+
+### Changed
+
+- Gate network peer sync on unactivated device
+- Remove admin capture on network sync
+- [frontend] Drop buckitup-sdk, account activation, and the old registry client
+- [frontend] Shared gallery replaces per-dialog updates
+
+### Fixed
+
+- Backup: Electric shape ordering
+- [platform] Backup: supervision fix (copier and boot supervisor)
+- [frontend] Vault: check account binding on every sign-in path
+- [frontend] Passkey selection limited to recoverable local vaults; offline message order preserved
+- [frontend] Peer avatar shown after first message without contact
+- [frontend] Handshake: PQ1 scanner layout, scan region, and camera fixes
+
 ## 2026-10-05_27015cb\_\_\_2026-10-10_873ad5d8\_\_\_2026-10-10_9f5060b
 
 ### Added

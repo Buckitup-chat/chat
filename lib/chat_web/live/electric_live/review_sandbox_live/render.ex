@@ -7,6 +7,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Render do
   import ChatWeb.ElectricLive.ReviewSandboxLive.RenderEdit
   import ChatWeb.ElectricLive.ReviewSandboxLive.RenderReviewList
   import ChatWeb.ElectricLive.ReviewSandboxLive.RenderVerification
+  import ChatWeb.ElectricLive.ReviewSandboxLive.WriteToken, only: [render_write_token_section: 1]
 
   alias Chat.Proto.Shortcode
   alias ChatWeb.ElectricLive.Components
@@ -33,6 +34,7 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Render do
         <div class="space-y-6">
           {render_author_section(assigns)}
           <%= if @author do %>
+            {render_write_token_section(assigns)}
             {render_review_section(assigns)}
           <% end %>
           <%= if @review do %>

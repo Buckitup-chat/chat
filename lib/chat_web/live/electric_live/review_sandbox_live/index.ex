@@ -33,7 +33,12 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Index do
       review_list: %{entry: nil},
       peers: [],
       selected_contacts: [],
-      key_sent_to: []
+      key_sent_to: [],
+      wt_nonce: "",
+      wt_token: nil,
+      wt_error: nil,
+      wt_bind_result: nil,
+      wt_vouches: []
     )
     |> allow_upload(:key_file, accept: ~w(.json), max_entries: 1, max_file_size: 100_000)
     |> tap(fn s -> if connected?(s), do: fetch_origins_async(public_url(s)) end)

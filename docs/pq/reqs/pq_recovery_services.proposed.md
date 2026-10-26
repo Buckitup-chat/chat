@@ -183,6 +183,46 @@ The protocol is the TypeScript node's v2 with four changes, which make it v3:
   unchanged: the node id, a single-use nonce, a timestamp and, for a deposit,
   the share's digest.
 
+**The wire forms of v3.** Every implementation — the node, the SDK, the
+client — produces and checks exactly these:
+
+- **The node key** is secp256k1. Its public key, where it is hashed or sent, is
+  the 33-byte compressed SEC1 form; the id is `n_` + lowercase hex of the first
+  16 bytes of `SHA3-256(that)`.
+- **The descriptor** (`GET /recovery/node/info`) is JSON:
+
+  ```json
+  {"id": "n_…", "url": "https://<host>/recovery/node", "chain": "eip155:11155111",
+   "contract": "0x…", "operator": "u_…", "issued_at": 1791200000,
+   "node_pubkey": "0x02…", "node_sig": "0x…", "operator_sig": "<base64>"}
+  ```
+
+  - `url` is canonical as in `node_set` (`pq_recovery_shares` § Re-issuing);
+    `chain` is the CAIP-2 id; `contract` is lowercase; `issued_at` is unix
+    seconds, written in the signed bytes in decimal.
+  - `node_sig` is ECDSA over secp256k1 of `SHA3-256(signed bytes)` (§ Choosing
+    nodes), as `r || s`, 64 bytes, low-s, `0x` hex. A client checks it under
+    `node_pubkey` and that `node_pubkey` hashes to `id`.
+  - `operator_sig` is ML-DSA-87 over the signed bytes, padded base64, checked
+    under the `sign_pkey` of the operator's verified card. A node that has no
+    endorsement yet answers `null`, and is not offered.
+- **Deposit and release** keep v2's routes under `/recovery/node` and v2's
+  texts with `v3` and the key-derived id: `Backitup node share deposit v3`
+  and `Backitup node share request v3`, each line as in v2, signed as an
+  EIP-191 personal message.
+- **A release** answers `{"nodeId", "version", "share_ecies"}`. `share_ecies`
+  is the SDK's ECIES (eccrypto) of the share's UTF-8 to the public key
+  recovered from the request's signature, as lowercase hex of
+  `iv(16) || ephemeral public key, compressed (33) || mac(32) || ciphertext`:
+  - `Px` = the x coordinate of ECDH(ephemeral, recipient), **32 bytes,
+    zero-padded** — eccrypto's JavaScript fallback strips leading zeros, which
+    fails one release in 256 against any other implementation;
+  - `SHA-512(Px)` splits into the AES-256-CBC key (first 32 bytes) and the
+    HMAC-SHA-256 key (last 32);
+  - the MAC covers `iv || ephemeral public key, uncompressed (65) || ciphertext`.
+- **A holding** (`GET /recovery/node/shares/:id`) is `{"version"}` for a
+  promoted share; a staged claim is not a holding and answers `404`.
+
 **Every gate of the TypeScript node stays part of the contract:**
 - a timestamp older than the window, or in the future, is refused;
 - a nonce is used once;

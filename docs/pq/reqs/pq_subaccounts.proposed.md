@@ -59,6 +59,14 @@ The first step is **absorbing** an account into another: its keys move from
 its own vault into the master's keyring, and it becomes a subaccount. Which
 account is the master is the person's choice and can change.
 
+### U4. Notes to self — derived subaccounts
+
+Notes are dialogs of a hidden identity derived from the account's own keys,
+so that the server cannot tell they are notes or whose they are
+([pq_notes_to_self.proposed.md](pq_notes_to_self.proposed.md)). A derived
+subaccount needs no keyring entry: every device of the account derives it.
+Notes are the first user of the per-identity session below.
+
 ---
 
 ## What exists today
@@ -209,7 +217,7 @@ switches between.
 
 | Phase | Scope |
 |---|---|
-| **1. Keyring and owned subaccounts** | The slot, create, activate, per-identity session. Covers venues (U1) and the partner integration |
+| **1. Keyring and owned subaccounts** | The slot, create, activate, per-identity session. Covers venues (U1) and the partner integration. The per-identity session may land first with notes (U4) |
 | **2. Absorb, export, switch master** | Device link between accounts; the cross-domain meeting point after its security audit; master switch with the recovery reminder |
 | **3. Several servers** | A subaccount used on its own servers from the master's app |
 | **4. Delegation** | Owner-only dangerous operations on a venue first, then delegate |

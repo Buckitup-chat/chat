@@ -10,6 +10,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
   alias ChatWeb.ElectricLive.OriginSandboxLive.Render
   alias ChatWeb.ElectricLive.OriginSandboxLive.ReviewBot
   alias ChatWeb.ElectricLive.OriginSandboxLive.ReviewBotClient
+  alias ChatWeb.ElectricLive.OriginSandboxLive.Settings
   alias ChatWeb.ElectricLive.OriginSandboxLive.WriteToken
 
   @impl true
@@ -21,6 +22,9 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
         origin: nil,
         origins: [],
         origin_bots: [],
+        origin_settings: [],
+        setting_form_key: "review_access",
+        setting_form_value: "open",
         write_tokens: [],
         last_token_result: nil,
         request_log: [],
@@ -64,6 +68,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
         origins = ApiClient.list_owner_origins(owner.user_hash, base_url, auth)
         pending = ApiClient.has_pending_reviews?(origin.origin_hash, base_url, auth)
         bots = ReviewBotClient.list_origin_bots(origin.origin_hash, base_url, auth)
+        settings = Settings.load_settings(origin.origin_hash, base_url, auth)
 
         {:noreply,
          socket
@@ -72,6 +77,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
            origins: origins,
            pending_reviews: pending,
            origin_bots: bots,
+           origin_settings: settings,
            write_tokens: [],
            last_token_result: nil
          )
@@ -91,12 +97,16 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
 
       found ->
         auth = auth(socket)
+        pending = ApiClient.has_pending_reviews?(hash, base_url, auth)
+        bots = ReviewBotClient.list_origin_bots(hash, base_url, auth)
+        settings = Settings.load_settings(hash, base_url, auth)
 
         {:noreply,
          assign(socket,
            origin: found,
-           pending_reviews: ApiClient.has_pending_reviews?(hash, base_url, auth),
-           origin_bots: ReviewBotClient.list_origin_bots(hash, base_url, auth),
+           pending_reviews: pending,
+           origin_bots: bots,
+           origin_settings: settings,
            write_tokens: fetch_tokens(hash, base_url, auth),
            last_token_result: nil
          )}
@@ -243,10 +253,19 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
   end
 
   def handle_event("refresh_bots", _params, socket) do
-    base_url = public_url(socket)
-    origin = socket.assigns.origin
-    bots = ReviewBotClient.list_origin_bots(origin.origin_hash, base_url, auth(socket))
+    bots =
+      ReviewBotClient.list_origin_bots(
+        socket.assigns.origin.origin_hash,
+        public_url(socket),
+        auth(socket)
+      )
+
     {:noreply, assign(socket, origin_bots: bots)}
+  end
+
+  def handle_event(event, params, socket)
+      when event in ~w(refresh_settings setting_form_change set_setting tombstone_setting) do
+    Settings.handle_event(event, params, socket, public_url(socket), auth(socket))
   end
 
   def handle_event("create_write_token", params, socket) do
@@ -271,15 +290,10 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
   end
 
   defp update_in_list(origins, updated) do
-    Enum.map(origins, fn o ->
-      if o.origin_hash == updated.origin_hash, do: updated, else: o
-    end)
+    Enum.map(origins, &if(&1.origin_hash == updated.origin_hash, do: updated, else: &1))
   end
 
-  defp auth(socket) do
-    owner = socket.assigns.owner
-    %{user_hash: owner.user_hash, sign_skey: owner.sign_skey}
-  end
+  defp auth(socket), do: Map.take(socket.assigns.owner, [:user_hash, :sign_skey])
 
   defp fetch_tokens(origin_hash, base_url, auth) do
     WriteToken.list_tokens(origin_hash, base_url, auth)

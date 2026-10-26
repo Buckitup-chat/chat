@@ -38,13 +38,21 @@ salt = "buckitup/notes-identity/v1"
 sign seed    = HKDF-SHA3-256(IKM, salt, info = "sign",    L = 32)  → ML-DSA-87 keygen
 crypt seed   = HKDF-SHA3-256(IKM, salt, info = "crypt",   L = 64)  → ML-KEM-1024 keygen
 contact seed = HKDF-SHA3-256(IKM, salt, info = "contact", L = 48)  → secp256k1: (OS2IP(seed) mod (n − 1)) + 1
+name byte    = HKDF-SHA3-256(IKM, salt, info = "name",    L = 1)   → card name: list[byte mod 64]
 ```
 
 HKDF as in [09_symmetric_keys.md](../invariants/09_symmetric_keys.md). The
 identity has a normal `user_cards` row ([pq_user.done.md](pq_user.done.md)).
-Its `name` (required, non-empty) is a plausible name picked from a word list
-by the identity's own key, so every device publishes the same card and the
-name does not mark it as a notes identity.
+Its `name` (required, non-empty) is a common given name from a fixed list of
+64 (`@buckitup/pq-client` `DERIVED_CARD_NAMES`), picked by the name byte.
+The byte comes from the secret IKM, not from anything public: a name picked
+by the `user_hash` could be recomputed by anyone and would mark the card as
+derived.
+
+Every device derives the same identity and name, but not the same row: card
+signatures are randomized and the timestamp is the device's. A device that
+finds a valid card for the identity does not publish another, and one that
+loses a race to publish treats the other device's card as its own.
 
 ### Note peers
 
@@ -56,11 +64,12 @@ own, derived from the notes identity and the note's id:
 ```
 IKM  = sign_skey || crypt_skey                    # the notes identity's
 salt = "buckitup/notes-peer/v1"
-info = note_id || label                           # label: "sign" | "crypt" | "contact", lengths as above
+info = note_id || label                           # label: "sign" | "crypt" | "contact" | "name", lengths as above
 ```
 
-`note_id` is 16 random bytes (hex in storage). It is random, not a counter,
-so that two devices creating notes offline never collide.
+`note_id` is 16 random bytes, stored as 32 lowercase hex characters. It is
+random, not a counter, so that two devices creating notes offline never
+collide.
 
 A note peer has a `user_cards` row (needed by the `dialog_keys` foreign key;
 card ingest is never chain-gated, [pq_access_gating.done.md](pq_access_gating.done.md))
@@ -122,9 +131,20 @@ Names and order live in the account's User Storage, in a named slot
 
 The client signs, proves keys and queues writes as the notes identity, not
 as the account:
-- ingest with the notes identity's PoP;
+- ingest with the notes identity's PoP, one identity per request: the
+  server checks each row against its author, and a request proven by the
+  account but carrying a notes row would both fail and link the two;
 - the outbox records which identity signs each pending write;
-- shape subscriptions by `sender_hash` = the notes identity.
+- shape subscriptions by `sender_hash` = the notes identity, never with the
+  account's read-session token.
+
+Nothing the account signs ever lands in a note dialog: no receipts (a chat
+view that acknowledges every message not written by "me" must know that in a
+note, "me" is the notes identity), no reactions.
+
+Notes cards are published lazily, with the first message of the first note,
+not at registration or login: publishing then would pair every new account
+with a new card a moment later.
 
 This is the per-identity session of [pq_subaccounts.proposed.md](pq_subaccounts.proposed.md)
 § Session, limited to one extra identity that is always active.

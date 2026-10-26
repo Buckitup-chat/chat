@@ -134,13 +134,17 @@ This is the per-identity session of [pq_subaccounts.proposed.md](pq_subaccounts.
 | Mode | What the notes identity needs |
 |---|---|
 | `open` | Nothing |
-| `guarded` | A vouch chain for writes. By default the account vouches for it, as for any person it invites |
+| `guarded` | A vouch chain for writes: the account vouches for it, as for any person it invites |
 | `trust` | The same chain, with read scopes as well, and read sessions as the notes identity |
 
 The vouch is the one row tying the account to the notes identity, and it
-says only "the account invited someone". The alternative, approval by the
-server owner like any new user, leaves no row at all but needs the owner to
-act; whether the client offers it is open.
+says only "the account invited someone". The notes identity sits one step
+further from the server owner than the account, so an account at the
+owner's maximum chain depth cannot keep notes on that server; the client
+says so instead of failing silently.
+
+Approval by the server owner instead of the account's vouch would leave no
+row at all, but needs the owner to act. It is not offered for now.
 
 ---
 
@@ -177,8 +181,3 @@ separate connection per identity and is out of scope.
 | **1. Identity and session** | Derivations with golden vectors (library), notes identity card, per-identity signer, PoP and outbox |
 | **2. Notes** | The slot, create / rename / delete, note peers, the chat view without a peer |
 | **3. Access modes** | Vouch for the notes identity in `guarded` / `trust`; read sessions as it |
-
-## Open questions
-
-1. In `guarded` and `trust`, offer owner approval instead of the account's
-   vouch, for people who want no link at all?

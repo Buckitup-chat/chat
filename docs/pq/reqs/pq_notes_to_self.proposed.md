@@ -146,6 +146,14 @@ Notes cards are published lazily, with the first message of the first note,
 not at registration or login: publishing then would pair every new account
 with a new card a moment later.
 
+A notes card waits while the server has no owner. The server makes the
+first card it takes over HTTP its owner (`OwnerBootstrap`), and an identity
+derived from an account must never own a server. A host server can run
+without an owner, its peer sync bringing the account's card from elsewhere.
+There notes stay on the device until the server gets an owner, and the
+client says so. A card the server already holds (from another device of
+the account) settles without waiting: meeting it registers no owner.
+
 This is the per-identity session of [pq_subaccounts.proposed.md](pq_subaccounts.proposed.md)
 § Session, limited to one extra identity that is always active.
 

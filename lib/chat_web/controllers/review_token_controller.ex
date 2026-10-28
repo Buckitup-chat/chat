@@ -3,19 +3,32 @@ defmodule ChatWeb.ReviewTokenController do
 
   use ChatWeb, :controller
 
+  alias Chat.Data.OriginSetting
   alias Chat.Data.ReviewWriteToken
   alias Chat.ReviewBot.TokenBinder
   alias Chat.ReviewBot.TokenCreator
+  alias Chat.ReviewBot.Worker
   alias ChatWeb.Utils.IngestPop
 
   def create(conn, params) do
     bot_hash = params["bot_hash"]
     origin_order_hash = params["origin_order_hash"]
 
-    case TokenCreator.create(bot_hash, origin_order_hash) do
-      {:ok, nonce} ->
-        url = "#{ChatWeb.Endpoint.url()}/r/#{nonce}"
-        json(conn, %{nonce: nonce, url: url})
+    with {:ok, bearer} <- extract_bearer(conn),
+         {:ok, origin_hash} <- fetch_bot_origin(bot_hash),
+         :ok <- verify_auth_token(origin_hash, bearer),
+         {:ok, nonce} <- TokenCreator.create(bot_hash, origin_order_hash) do
+      url = "#{ChatWeb.Endpoint.url()}/r/#{nonce}"
+      json(conn, %{nonce: nonce, url: url})
+    else
+      {:error, :missing_auth_token} ->
+        conn |> put_status(:unauthorized) |> json(%{error: "Missing Authorization header"})
+
+      {:error, :invalid_auth_token} ->
+        conn |> put_status(:forbidden) |> json(%{error: "Invalid auth token"})
+
+      {:error, :no_auth_token_configured} ->
+        conn |> put_status(:forbidden) |> json(%{error: "No auth token configured for this origin"})
 
       {:error, :bot_not_running} ->
         conn |> put_status(:not_found) |> json(%{error: "Bot not running"})
@@ -25,6 +38,28 @@ defmodule ChatWeb.ReviewTokenController do
 
       {:error, reason} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+    end
+  end
+
+  defp extract_bearer(conn) do
+    case get_req_header(conn, "authorization") do
+      ["Bearer " <> token] -> {:ok, token}
+      _ -> {:error, :missing_auth_token}
+    end
+  end
+
+  defp fetch_bot_origin(bot_hash) do
+    case Worker.running?(bot_hash) do
+      true -> {:ok, Worker.info(bot_hash).origin_hash}
+      false -> {:error, :bot_not_running}
+    end
+  end
+
+  defp verify_auth_token(origin_hash, bearer) do
+    case OriginSetting.get_auth_token(origin_hash) do
+      nil -> {:error, :no_auth_token_configured}
+      expected when expected == bearer -> :ok
+      _ -> {:error, :invalid_auth_token}
     end
   end
 

@@ -8,8 +8,9 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.WriteToken do
 
   def handle_create(%{"bot_hash" => bot_hash} = params, base_url, socket) do
     order_hash = params["origin_order_hash"]
+    auth_token = find_setting_value(socket.assigns.origin_settings, "auth_token")
 
-    case WriteTokenClient.create_token(bot_hash, order_hash, base_url) do
+    case WriteTokenClient.create_token(bot_hash, order_hash, auth_token, base_url) do
       {:ok, result, logs} ->
         {:noreply, socket |> assign(:last_token_result, result) |> append_logs(logs)}
 
@@ -190,6 +191,13 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.WriteToken do
 
   defp has_active_bot?(bots), do: Enum.any?(bots, &(not &1.deleted_flag))
   defp active_bots(bots), do: Enum.reject(bots, & &1.deleted_flag)
+
+  defp find_setting_value(settings, key) do
+    case Enum.find(settings, &(&1.key == key && !&1.deleted_flag)) do
+      %{value: value} -> value
+      nil -> nil
+    end
+  end
 
   defp truncate_nonce(nil), do: "—"
   defp truncate_nonce(nonce) when byte_size(nonce) > 12, do: binary_part(nonce, 0, 12) <> "…"

@@ -5,10 +5,18 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.WriteTokenClient do
 
   alias Chat.TimeKeeper
 
-  def create_token(bot_hash, origin_order_hash, base_url) do
+  def create_token(bot_hash, origin_order_hash, auth_token, base_url) do
     url = base_url <> "/r/api/token/create"
     timestamp = TimeKeeper.now()
-    headers = [{"accept", "application/json"}, {"content-type", "application/json"}]
+
+    headers =
+      [{"accept", "application/json"}, {"content-type", "application/json"}]
+      |> then(fn h ->
+        case auth_token do
+          nil -> h
+          token -> [{"authorization", "Bearer #{token}"} | h]
+        end
+      end)
 
     body =
       %{"bot_hash" => bot_hash}

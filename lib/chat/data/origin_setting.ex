@@ -25,6 +25,13 @@ defmodule Chat.Data.OriginSetting do
     end
   end
 
+  def get_auth_token(origin_hash) do
+    case get_origin_setting(origin_hash, "auth_token") do
+      %OriginSetting{deleted_flag: false, value: value} -> value
+      _ -> nil
+    end
+  end
+
   def get_review_token_ttl_days(origin_hash) do
     with %OriginSetting{deleted_flag: false, value: value} <-
            get_origin_setting(origin_hash, "review_token_ttl_days"),

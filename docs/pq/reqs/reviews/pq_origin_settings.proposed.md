@@ -39,6 +39,7 @@ Migration: [`20261013100000_create_origin_settings`](../../../../priv/repo/migra
 | Key | Values | Default (when absent) | Purpose |
 |-----|--------|-----------------------|---------|
 | `review_access` | `open`, `invite_only` | `open` | Controls who can enter the review pipeline. See [pq_review_write_tokens](pq_review_write_tokens.in_progress.md#review-access-mode--per-origin-policy). |
+| `auth_token` | string (16–256 chars) | *none* | Shared secret gating `POST /r/api/token/create`. Origin owner sets it; callers pass it as `Authorization: Bearer <token>`. Required — token creation is rejected when no `auth_token` is configured. |
 
 ---
 

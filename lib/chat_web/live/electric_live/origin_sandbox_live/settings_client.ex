@@ -14,8 +14,12 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.SettingsClient do
     end
   end
 
-  def set_setting(origin_hash, key, value, origin_sign_skey, base_url) do
-    timestamp = TimeKeeper.now_unix()
+  def set_setting(origin_hash, key, value, existing, origin_sign_skey, base_url) do
+    timestamp =
+      case existing do
+        nil -> TimeKeeper.now_unix()
+        %{owner_timestamp: ts} -> max(TimeKeeper.now_unix(), ts + 1)
+      end
 
     setting_struct = %OriginSetting{
       origin_hash: origin_hash,
@@ -25,61 +29,87 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.SettingsClient do
       owner_timestamp: timestamp
     }
 
-    sign_b64 = sign_setting(setting_struct, origin_sign_skey)
+    mutation =
+      case existing do
+        nil ->
+          insert_mutation(setting_struct, origin_sign_skey)
 
-    payload = %{
-      "mutations" => [
-        %{
-          "type" => "insert",
-          "modified" => %{
-            "origin_hash" => origin_hash,
-            "key" => key,
-            "value" => value,
-            "deleted_flag" => false,
-            "owner_timestamp" => timestamp,
-            "sign_b64" => encode_base64(sign_b64)
-          },
-          "syncMetadata" => %{"relation" => "origin_settings"}
-        }
-      ]
-    }
+        _existing ->
+          update_mutation(
+            origin_hash,
+            key,
+            %{value: value, deleted_flag: false},
+            timestamp,
+            origin_sign_skey
+          )
+      end
 
-    case ingest(payload, origin_sign_skey, base_url) do
-      {:ok, _body, logs} -> {:ok, %{log_entries: logs}}
-      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
-    end
+    do_ingest(mutation, origin_sign_skey, base_url)
   end
 
   def tombstone_setting(setting, origin_sign_skey, base_url) do
     new_timestamp = setting.owner_timestamp + 1
 
+    mutation =
+      update_mutation(
+        setting.origin_hash,
+        setting.key,
+        %{value: setting.value, deleted_flag: true},
+        new_timestamp,
+        origin_sign_skey
+      )
+
+    do_ingest(mutation, origin_sign_skey, base_url)
+  end
+
+  defp insert_mutation(setting_struct, origin_sign_skey) do
+    sign_b64 = sign_setting(setting_struct, origin_sign_skey)
+
+    %{
+      "type" => "insert",
+      "modified" => %{
+        "origin_hash" => setting_struct.origin_hash,
+        "key" => setting_struct.key,
+        "value" => setting_struct.value,
+        "deleted_flag" => setting_struct.deleted_flag,
+        "owner_timestamp" => setting_struct.owner_timestamp,
+        "sign_b64" => encode_base64(sign_b64)
+      },
+      "syncMetadata" => %{"relation" => "origin_settings"}
+    }
+  end
+
+  defp update_mutation(origin_hash, key, changes, timestamp, origin_sign_skey) do
     setting_struct = %OriginSetting{
-      origin_hash: setting.origin_hash,
-      key: setting.key,
-      value: setting.value,
-      deleted_flag: true,
-      owner_timestamp: new_timestamp
+      origin_hash: origin_hash,
+      key: key,
+      value: changes.value,
+      deleted_flag: changes.deleted_flag,
+      owner_timestamp: timestamp
     }
 
     sign_b64 = sign_setting(setting_struct, origin_sign_skey)
 
-    payload = %{
-      "mutations" => [
-        %{
-          "type" => "update",
-          "original" => %{
-            "origin_hash" => setting.origin_hash,
-            "key" => setting.key
-          },
-          "changes" => %{
-            "deleted_flag" => true,
-            "owner_timestamp" => new_timestamp,
+    %{
+      "type" => "update",
+      "original" => %{
+        "origin_hash" => origin_hash,
+        "key" => key
+      },
+      "changes" =>
+        Map.merge(
+          %{
+            "owner_timestamp" => timestamp,
             "sign_b64" => encode_base64(sign_b64)
           },
-          "syncMetadata" => %{"relation" => "origin_settings"}
-        }
-      ]
+          changes |> Map.new(fn {k, v} -> {to_string(k), v} end)
+        ),
+      "syncMetadata" => %{"relation" => "origin_settings"}
     }
+  end
+
+  defp do_ingest(mutation, origin_sign_skey, base_url) do
+    payload = %{"mutations" => [mutation]}
 
     case ingest(payload, origin_sign_skey, base_url) do
       {:ok, _body, logs} -> {:ok, %{log_entries: logs}}

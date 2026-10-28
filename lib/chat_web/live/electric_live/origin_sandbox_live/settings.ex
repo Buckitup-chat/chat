@@ -32,8 +32,9 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Settings do
 
   def handle_event("set_setting", %{"key" => key, "value" => value}, socket, base_url, auth) do
     %{origin_hash: oh, origin_sign_skey: skey} = socket.assigns.origin
+    existing = Enum.find(socket.assigns.origin_settings, &(&1.key == key))
 
-    SettingsClient.set_setting(oh, key, value, skey, base_url)
+    SettingsClient.set_setting(oh, key, value, existing, skey, base_url)
     |> apply_result(socket, base_url, auth)
   end
 

@@ -26,8 +26,15 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Settings do
   end
 
   def handle_event("setting_form_change", %{"key" => key} = params, socket, _base_url, _auth) do
-    value = params["value"] || default_value_for_key(key)
-    {:noreply, assign(socket, setting_form_key: key, setting_form_value: value)}
+    value =
+      if key != socket.assigns.setting_form_key do
+        lookup_current_value(key, socket.assigns.origin_settings)
+      else
+        params["value"] || default_value_for_key(key)
+      end
+
+    {:noreply,
+     assign(socket, setting_form_key: key, setting_form_value: value, setting_form_open: true)}
   end
 
   def handle_event("set_setting", %{"key" => key, "value" => value}, socket, base_url, auth) do
@@ -52,7 +59,11 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Settings do
 
   defp apply_result({:ok, %{log_entries: logs}}, socket, base_url, auth) do
     settings = load_settings(socket.assigns.origin.origin_hash, base_url, auth)
-    {:noreply, socket |> assign(origin_settings: settings) |> update(:request_log, &(logs ++ &1))}
+
+    {:noreply,
+     socket
+     |> assign(origin_settings: settings, setting_form_open: true)
+     |> update(:request_log, &(logs ++ &1))}
   end
 
   defp apply_result({:error, %{reason: reason, log_entries: logs}}, socket, _base_url, _auth) do
@@ -63,6 +74,13 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Settings do
     case Enum.find(@known_keys, fn {k, _, _} -> k == key end) do
       {_, _, default} -> default
       nil -> ""
+    end
+  end
+
+  defp lookup_current_value(key, origin_settings) do
+    case Enum.find(origin_settings, &(&1.key == key && !&1.deleted_flag)) do
+      %{value: value} -> value
+      nil -> default_value_for_key(key)
     end
   end
 
@@ -128,7 +146,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Settings do
     assigns = do_assign_new(assigns, :known_keys, fn -> @known_keys end)
 
     ~H"""
-    <details class="mt-4">
+    <details class="mt-4" open={@setting_form_open}>
       <summary class="cursor-pointer text-sm font-medium text-gray-700">
         Set a Setting
       </summary>

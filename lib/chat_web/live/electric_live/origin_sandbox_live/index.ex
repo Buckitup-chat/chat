@@ -25,6 +25,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
         origin_settings: [],
         setting_form_key: "review_access",
         setting_form_value: "open",
+        setting_form_open: false,
         write_tokens: [],
         last_token_result: nil,
         request_log: [],

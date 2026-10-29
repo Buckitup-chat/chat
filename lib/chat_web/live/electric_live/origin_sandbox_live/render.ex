@@ -5,9 +5,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
 
   alias Chat.Proto.Shortcode
   alias ChatWeb.ElectricLive.Components
-  alias ChatWeb.ElectricLive.ModerationSandboxLive.ReviewBot
-  alias ChatWeb.ElectricLive.ModerationSandboxLive.Settings
-  alias ChatWeb.ElectricLive.ModerationSandboxLive.WriteToken
+  alias ChatWeb.ElectricLive.OriginSandboxLive.RequestLog
 
   def render_page(assigns) do
     ~H"""
@@ -39,9 +37,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
           <% end %>
           <%= if @origin do %>
             {render_operations_section(assigns)}
-            {Settings.render_settings_section(assigns)}
-            {ReviewBot.render_bot_section(assigns)}
-            {WriteToken.render_token_section(assigns)}
+            {render_manage_as_origin_card(assigns)}
           <% end %>
           {render_log_section(assigns)}
         </div>
@@ -240,6 +236,25 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
     """
   end
 
+  defp render_manage_as_origin_card(assigns) do
+    ~H"""
+    <div class="bg-white shadow rounded-lg p-6">
+      <h2 class="text-lg font-semibold text-gray-900 mb-2">Origin Console</h2>
+      <p class="text-sm text-gray-600 mb-3">
+        Settings, review bots, and write tokens are managed by the origin identity.
+        Export the origin identity (available right after creation), then import it in the
+        Origin Console. Identity can only be exported in the session that created the origin.
+      </p>
+      <a
+        href="/electric/moderation_sandbox"
+        class="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+      >
+        Open Origin Console
+      </a>
+    </div>
+    """
+  end
+
   defp render_pending_status(assigns) do
     ~H"""
     <%= case @pending_reviews do %>
@@ -257,45 +272,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
 
   defp render_log_section(assigns) do
     ~H"""
-    <div class="bg-white shadow rounded-lg p-6">
-      <h2 class="text-lg font-semibold text-gray-900 mb-4">Request Log</h2>
-      <%= if @request_log == [] do %>
-        <p class="text-sm text-gray-500">No requests yet</p>
-      <% else %>
-        <div class="space-y-3">
-          <div
-            :for={entry <- @request_log}
-            class={"text-xs font-mono p-3 rounded #{if entry.response_status in 200..299, do: "bg-green-50", else: "bg-red-50"}"}
-          >
-            <p class="font-semibold">{entry.method} {entry.url} -> {entry.response_status}</p>
-            <details class="mt-1">
-              <summary class="cursor-pointer text-gray-600">Request headers</summary>
-              <pre class="mt-1 whitespace-pre-wrap text-xs overflow-x-auto">{format_headers(entry.request_headers)}</pre>
-            </details>
-            <%= if entry.request_body != "" do %>
-              <details class="mt-1">
-                <summary class="cursor-pointer text-gray-600">Request body</summary>
-                <pre class="mt-1 whitespace-pre-wrap text-xs overflow-x-auto">{entry.request_body}</pre>
-              </details>
-            <% end %>
-            <details class="mt-1">
-              <summary class="cursor-pointer text-gray-600">Response headers</summary>
-              <pre class="mt-1 whitespace-pre-wrap text-xs overflow-x-auto">{format_headers(entry.response_headers)}</pre>
-            </details>
-            <details class="mt-1">
-              <summary class="cursor-pointer text-gray-600">Response body</summary>
-              <pre class="mt-1 whitespace-pre-wrap text-xs overflow-x-auto">{entry.response_body}</pre>
-            </details>
-          </div>
-        </div>
-      <% end %>
-    </div>
+    <RequestLog.render_section log={@request_log} />
     """
   end
-
-  defp format_headers(headers) when is_list(headers) do
-    Enum.map_join(headers, "\n", fn {k, v} -> "#{k}: #{v}" end)
-  end
-
-  defp format_headers(_), do: ""
 end

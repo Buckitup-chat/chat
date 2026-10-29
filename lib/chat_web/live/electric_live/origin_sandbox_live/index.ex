@@ -8,10 +8,6 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
   alias ChatWeb.ElectricLive.IdentityCheck
   alias ChatWeb.ElectricLive.OriginSandboxLive.ApiClient
   alias ChatWeb.ElectricLive.OriginSandboxLive.Render
-  alias ChatWeb.ElectricLive.ModerationSandboxLive.ReviewBot
-  alias ChatWeb.ElectricLive.ModerationSandboxLive.ReviewBotClient
-  alias ChatWeb.ElectricLive.ModerationSandboxLive.Settings
-  alias ChatWeb.ElectricLive.ModerationSandboxLive.WriteToken
 
   @impl true
   def mount(_params, _session, socket) do
@@ -21,13 +17,6 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
         owner: nil,
         origin: nil,
         origins: [],
-        origin_bots: [],
-        origin_settings: [],
-        setting_form_key: "review_access",
-        setting_form_value: "open",
-        setting_form_open: false,
-        write_tokens: [],
-        last_token_result: nil,
         request_log: [],
         error_message: nil,
         pending_reviews: nil
@@ -68,20 +57,10 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
         auth = %{user_hash: owner.user_hash, sign_skey: owner.sign_skey}
         origins = ApiClient.list_owner_origins(owner.user_hash, base_url, auth)
         pending = ApiClient.has_pending_reviews?(origin.origin_hash, base_url, auth)
-        bots = ReviewBotClient.list_origin_bots(origin.origin_hash, base_url, auth)
-        settings = Settings.load_settings(origin.origin_hash, base_url, auth)
 
         {:noreply,
          socket
-         |> assign(
-           origin: origin,
-           origins: origins,
-           pending_reviews: pending,
-           origin_bots: bots,
-           origin_settings: settings,
-           write_tokens: [],
-           last_token_result: nil
-         )
+         |> assign(origin: origin, origins: origins, pending_reviews: pending)
          |> append_logs(logs)}
 
       {:error, %{reason: reason, log_entries: logs}} ->
@@ -99,18 +78,8 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
       found ->
         auth = auth(socket)
         pending = ApiClient.has_pending_reviews?(hash, base_url, auth)
-        bots = ReviewBotClient.list_origin_bots(hash, base_url, auth)
-        settings = Settings.load_settings(hash, base_url, auth)
 
-        {:noreply,
-         assign(socket,
-           origin: found,
-           pending_reviews: pending,
-           origin_bots: bots,
-           origin_settings: settings,
-           write_tokens: fetch_tokens(hash, base_url, auth),
-           last_token_result: nil
-         )}
+        {:noreply, assign(socket, origin: found, pending_reviews: pending)}
     end
   end
 
@@ -178,105 +147,6 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
     {:noreply, push_event(socket, "download_file", %{data: data, filename: filename})}
   end
 
-  def handle_event("create_review_bot", _params, socket) do
-    base_url = public_url(socket)
-    origin = socket.assigns.origin
-    origin_card = Chat.Data.User.get_card(origin.origin_hash)
-
-    origin_identity = %{
-      origin_hash: origin.origin_hash,
-      name: origin.name,
-      sign_skey: origin.origin_sign_skey,
-      sign_pkey: origin_card.sign_pkey,
-      crypt_skey: origin[:origin_crypt_skey],
-      crypt_pkey: origin_card.crypt_pkey
-    }
-
-    case ReviewBotClient.create_bot(origin_identity, base_url) do
-      {:ok, %{log_entries: logs}} ->
-        bots = ReviewBotClient.list_origin_bots(origin.origin_hash, base_url, auth(socket))
-
-        {:noreply,
-         socket
-         |> assign(origin_bots: bots)
-         |> append_logs(logs)}
-
-      {:error, %{reason: reason, log_entries: logs}} ->
-        {:noreply, socket |> assign(error_message: reason) |> append_logs(logs)}
-    end
-  end
-
-  def handle_event("start_review_bot", %{"hash" => bot_hash}, socket) do
-    origin = socket.assigns.origin
-
-    case Enum.find(socket.assigns.origin_bots, &(&1.bot_hash == bot_hash)) do
-      nil ->
-        {:noreply, assign(socket, error_message: "Bot not found")}
-
-      bot ->
-        case ReviewBot.decrypt_and_start(bot, origin[:origin_crypt_skey]) do
-          {:ok, _pid} ->
-            {:noreply, assign(socket, origin_bots: socket.assigns.origin_bots)}
-
-          {:error, reason} ->
-            {:noreply, assign(socket, error_message: "Start failed: #{inspect(reason)}")}
-        end
-    end
-  end
-
-  def handle_event("stop_review_bot", %{"hash" => bot_hash}, socket) do
-    case ReviewBot.stop(bot_hash) do
-      :ok -> {:noreply, assign(socket, origin_bots: socket.assigns.origin_bots)}
-      {:error, _} -> {:noreply, assign(socket, error_message: "Bot not running")}
-    end
-  end
-
-  def handle_event("revoke_review_bot", %{"hash" => bot_hash}, socket) do
-    base_url = public_url(socket)
-    origin = socket.assigns.origin
-
-    ReviewBot.stop(bot_hash)
-
-    case Enum.find(socket.assigns.origin_bots, &(&1.bot_hash == bot_hash)) do
-      nil ->
-        {:noreply, assign(socket, error_message: "Bot not found")}
-
-      bot ->
-        case ReviewBotClient.tombstone_bot(bot, origin.origin_sign_skey, base_url) do
-          {:ok, %{log_entries: logs}} ->
-            bots = ReviewBotClient.list_origin_bots(origin.origin_hash, base_url, auth(socket))
-            {:noreply, socket |> assign(origin_bots: bots) |> append_logs(logs)}
-
-          {:error, %{reason: reason, log_entries: logs}} ->
-            {:noreply, socket |> assign(error_message: reason) |> append_logs(logs)}
-        end
-    end
-  end
-
-  def handle_event("refresh_bots", _params, socket) do
-    bots =
-      ReviewBotClient.list_origin_bots(
-        socket.assigns.origin.origin_hash,
-        public_url(socket),
-        auth(socket)
-      )
-
-    {:noreply, assign(socket, origin_bots: bots)}
-  end
-
-  def handle_event(event, params, socket)
-      when event in ~w(refresh_settings setting_form_change set_setting tombstone_setting) do
-    Settings.handle_event(event, params, socket, public_url(socket), auth(socket))
-  end
-
-  def handle_event("create_write_token", params, socket) do
-    WriteToken.handle_create(params, public_url(socket), socket)
-  end
-
-  def handle_event("refresh_tokens", _params, socket) do
-    WriteToken.handle_refresh(public_url(socket), auth(socket), socket)
-  end
-
   def handle_event("clear_error", _params, socket) do
     {:noreply, assign(socket, :error_message, nil)}
   end
@@ -295,10 +165,6 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
   end
 
   defp auth(socket), do: Map.take(socket.assigns.owner, [:user_hash, :sign_skey])
-
-  defp fetch_tokens(origin_hash, base_url, auth) do
-    WriteToken.list_tokens(origin_hash, base_url, auth)
-  end
 
   defp append_logs(socket, logs), do: update(socket, :request_log, &(logs ++ &1))
 

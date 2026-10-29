@@ -21,7 +21,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Settings do
   end
 
   def handle_event("refresh_settings", _params, socket, base_url, auth) do
-    settings = load_settings(socket.assigns.origin.origin_hash, base_url, auth)
+    settings = load_settings(socket.assigns.identity.origin_hash, base_url, auth)
     {:noreply, assign(socket, origin_settings: settings)}
   end
 
@@ -38,28 +38,35 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Settings do
   end
 
   def handle_event("set_setting", %{"key" => key, "value" => value}, socket, base_url, auth) do
-    %{origin_hash: oh, origin_sign_skey: skey} = socket.assigns.origin
+    identity = socket.assigns.identity
     existing = Enum.find(socket.assigns.origin_settings, &(&1.key == key))
 
-    SettingsClient.set_setting(oh, key, value, existing, skey, base_url)
+    SettingsClient.set_setting(
+      identity.origin_hash,
+      key,
+      value,
+      existing,
+      identity.sign_skey,
+      base_url
+    )
     |> apply_result(socket, base_url, auth)
   end
 
   def handle_event("tombstone_setting", %{"key" => key}, socket, base_url, auth) do
-    origin = socket.assigns.origin
+    identity = socket.assigns.identity
 
     case Enum.find(socket.assigns.origin_settings, &(&1.key == key)) do
       nil ->
         {:noreply, assign(socket, error_message: "Setting not found")}
 
       setting ->
-        SettingsClient.tombstone_setting(setting, origin.origin_sign_skey, base_url)
+        SettingsClient.tombstone_setting(setting, identity.sign_skey, base_url)
         |> apply_result(socket, base_url, auth)
     end
   end
 
   defp apply_result({:ok, %{log_entries: logs}}, socket, base_url, auth) do
-    settings = load_settings(socket.assigns.origin.origin_hash, base_url, auth)
+    settings = load_settings(socket.assigns.identity.origin_hash, base_url, auth)
 
     {:noreply,
      socket
@@ -99,14 +106,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Settings do
       </div>
 
       {render_settings_list(assigns)}
-
-      <%= if @origin[:origin_sign_skey] do %>
-        {render_setting_form(assigns)}
-      <% else %>
-        <p class="text-sm text-gray-500 mt-4">
-          Origin identity keys not available. Export the origin identity first.
-        </p>
-      <% end %>
+      {render_setting_form(assigns)}
     </div>
     """
   end
@@ -128,15 +128,14 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Settings do
               <span class="text-red-500 ml-2">[deleted]</span>
             <% end %>
           </div>
-          <%= if @origin[:origin_sign_skey] && !setting.deleted_flag do %>
-            <button
-              phx-click="tombstone_setting"
-              phx-value-key={setting.key}
-              class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-            >
-              Delete
-            </button>
-          <% end %>
+          <button
+            :if={!setting.deleted_flag}
+            phx-click="tombstone_setting"
+            phx-value-key={setting.key}
+            class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+          >
+            Delete
+          </button>
         </div>
       </div>
     <% end %>

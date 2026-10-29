@@ -19,14 +19,14 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Manage do
   def handle_event("create_review_bot", _params, socket, base_url) do
     identity = socket.assigns.identity
     origin = socket.assigns.origin
-    origin_card = Chat.Data.User.get_card(origin.origin_hash)
+    origin_card = socket.assigns.origin_card
 
     origin_identity = %{
-      origin_hash: origin.origin_hash,
+      origin_hash: identity.origin_hash,
       name: origin.name,
       sign_skey: identity.sign_skey,
       sign_pkey: origin_card.sign_pkey,
-      crypt_skey: identity[:crypt_skey],
+      crypt_skey: identity.crypt_skey,
       crypt_pkey: origin_card.crypt_pkey
     }
 
@@ -34,7 +34,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Manage do
 
     case ReviewBotClient.create_bot(origin_identity, base_url) do
       {:ok, %{log_entries: logs}} ->
-        bots = ReviewBotClient.list_origin_bots(origin.origin_hash, base_url, auth)
+        bots = ReviewBotClient.list_origin_bots(identity.origin_hash, base_url, auth)
 
         {:noreply,
          socket
@@ -79,7 +79,6 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Manage do
 
   def handle_event("revoke_review_bot", %{"hash" => bot_hash}, socket, base_url) do
     identity = socket.assigns.identity
-    origin = socket.assigns.origin
     auth = origin_auth(identity)
 
     ReviewBot.stop(bot_hash)
@@ -91,7 +90,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Manage do
       bot ->
         case ReviewBotClient.tombstone_bot(bot, identity.sign_skey, base_url) do
           {:ok, %{log_entries: logs}} ->
-            bots = ReviewBotClient.list_origin_bots(origin.origin_hash, base_url, auth)
+            bots = ReviewBotClient.list_origin_bots(identity.origin_hash, base_url, auth)
 
             {:noreply, socket |> Phoenix.Component.assign(origin_bots: bots) |> append_logs(logs)}
 
@@ -103,14 +102,10 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Manage do
   end
 
   def handle_event("refresh_bots", _params, socket, base_url) do
-    auth = origin_auth(socket.assigns.identity)
+    identity = socket.assigns.identity
+    auth = origin_auth(identity)
 
-    bots =
-      ReviewBotClient.list_origin_bots(
-        socket.assigns.origin.origin_hash,
-        base_url,
-        auth
-      )
+    bots = ReviewBotClient.list_origin_bots(identity.origin_hash, base_url, auth)
 
     {:noreply, Phoenix.Component.assign(socket, origin_bots: bots)}
   end

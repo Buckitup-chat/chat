@@ -15,6 +15,11 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.SettingsClient do
   end
 
   def set_setting(origin_hash, key, value, existing, origin_sign_skey, base_url) do
+    mutation = build_set_payload(origin_hash, key, value, existing, origin_sign_skey)
+    do_ingest(mutation, origin_sign_skey, base_url)
+  end
+
+  def build_set_payload(origin_hash, key, value, existing, origin_sign_skey) do
     timestamp =
       case existing do
         nil -> TimeKeeper.now_unix()
@@ -29,22 +34,19 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.SettingsClient do
       owner_timestamp: timestamp
     }
 
-    mutation =
-      case existing do
-        nil ->
-          insert_mutation(setting_struct, origin_sign_skey)
+    case existing do
+      nil ->
+        insert_mutation(setting_struct, origin_sign_skey)
 
-        _existing ->
-          update_mutation(
-            origin_hash,
-            key,
-            %{value: value, deleted_flag: false},
-            timestamp,
-            origin_sign_skey
-          )
-      end
-
-    do_ingest(mutation, origin_sign_skey, base_url)
+      _existing ->
+        update_mutation(
+          origin_hash,
+          key,
+          %{value: value, deleted_flag: false},
+          timestamp,
+          origin_sign_skey
+        )
+    end
   end
 
   def tombstone_setting(setting, origin_sign_skey, base_url) do

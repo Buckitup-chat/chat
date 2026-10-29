@@ -1,6 +1,6 @@
 defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Index do
   @moduledoc """
-  Interactive sandbox for the origin admin/moderator persona.
+  Origin Console — the single sandbox for moderation, settings, bots, and write tokens.
 
   Authenticates as the origin identity (not the owner), reads the origin's
   reviews and right envelopes via Electric shapes, KEM-decrypts the rights, and
@@ -13,9 +13,16 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Index do
   import ChatWeb.ElectricLive.ModerationSandboxLive.Render
   import ChatWeb.ElectricLive.RequestLog, only: [render_log_section: 1]
 
+  alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
   alias ChatWeb.ElectricLive.ModerationSandboxLive.ApiClient
   alias ChatWeb.ElectricLive.ModerationSandboxLive.Identity
+  alias ChatWeb.ElectricLive.ModerationSandboxLive.Manage
   alias ChatWeb.ElectricLive.ModerationSandboxLive.Queue
+  alias ChatWeb.ElectricLive.ModerationSandboxLive.ReviewBot
+  alias ChatWeb.ElectricLive.ModerationSandboxLive.Settings
+  alias ChatWeb.ElectricLive.ModerationSandboxLive.WriteToken
+
+  @manage_events Manage.events()
 
   @impl true
   def mount(_params, _session, socket) do
@@ -23,12 +30,20 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Index do
     |> assign(
       identity: nil,
       origin: nil,
+      origin_card: nil,
       verification: nil,
       entries: [],
       counts: nil,
       loading: false,
       request_log: [],
-      error_message: nil
+      error_message: nil,
+      origin_settings: [],
+      origin_bots: [],
+      write_tokens: [],
+      last_token_result: nil,
+      setting_form_key: "review_access",
+      setting_form_value: "open",
+      setting_form_open: false
     )
     |> allow_upload(:key_file, accept: ~w(.json), max_entries: 1, max_file_size: 100_000)
     |> ok()
@@ -42,9 +57,9 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Index do
         <a href="/electric" class="text-sm text-blue-600 hover:text-blue-800 mb-2 inline-block">
           &larr; Electric Index
         </a>
-        <h1 class="text-2xl font-bold text-gray-900 mb-2">Origin Moderation Sandbox</h1>
+        <h1 class="text-2xl font-bold text-gray-900 mb-2">Origin Console</h1>
         <p class="text-sm text-gray-600 mb-6">
-          Approve, reject and revoke public reviews as the origin identity
+          Moderation, settings, bots, and write tokens — all as the origin identity
         </p>
 
         <div
@@ -59,6 +74,9 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Index do
           {render_identity_section(assigns)}
           <%= if @verification == :ok do %>
             {render_queue_section(assigns)}
+            {Settings.render_settings_section(assigns)}
+            {ReviewBot.render_bot_section(assigns)}
+            {WriteToken.render_token_section(assigns)}
           <% end %>
           {render_log_section(assigns)}
         </div>
@@ -70,6 +88,10 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Index do
   # --- Events ---
 
   @impl true
+  def handle_event(event, params, socket) when event in @manage_events do
+    Manage.handle_event(event, params, socket, public_url(socket))
+  end
+
   def handle_event("validate_key_file", _params, socket), do: socket |> noreply()
 
   def handle_event("import_identity", _params, socket) do
@@ -120,9 +142,15 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Index do
   @impl true
   def handle_info({:identity_verified, %{verification: :ok} = result}, socket) do
     load_queue_async(socket.assigns.identity, public_url(socket))
+    load_manage_async(socket.assigns.identity, public_url(socket))
 
     socket
-    |> assign(origin: result.origin, verification: :ok, loading: true)
+    |> assign(
+      origin: result.origin,
+      origin_card: result.origin_card,
+      verification: :ok,
+      loading: true
+    )
     |> noreply()
   end
 
@@ -135,6 +163,16 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Index do
   def handle_info({:queue_loaded, %{entries: entries, counts: counts}}, socket) do
     socket
     |> assign(entries: entries, counts: counts, loading: false)
+    |> noreply()
+  end
+
+  def handle_info({:manage_loaded, manage_data}, socket) do
+    socket
+    |> assign(
+      origin_settings: manage_data.origin_settings,
+      origin_bots: manage_data.origin_bots,
+      write_tokens: manage_data.write_tokens
+    )
     |> noreply()
   end
 
@@ -169,7 +207,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Index do
 
   defp verify_identity_async(identity, base_url) do
     pid = self()
-    auth = %{user_hash: identity.origin_hash, sign_skey: identity.sign_skey}
+    auth = Manage.origin_auth(identity)
 
     async(pid, fn ->
       %{origin: origin, card: card} =
@@ -177,18 +215,38 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Index do
 
       verification = Identity.verify_against_card(identity, card)
 
-      send(pid, {:identity_verified, %{origin: origin, verification: verification}})
+      origin_card =
+        if card do
+          %{
+            sign_pkey: Crypto.decode_binary_field(card["sign_pkey"]),
+            crypt_pkey: Crypto.decode_binary_field(card["crypt_pkey"])
+          }
+        end
+
+      send(
+        pid,
+        {:identity_verified,
+         %{origin: origin, origin_card: origin_card, verification: verification}}
+      )
     end)
   end
 
   defp load_queue_async(identity, base_url) do
     pid = self()
-    auth = %{user_hash: identity.origin_hash, sign_skey: identity.sign_skey}
+    auth = Manage.origin_auth(identity)
 
     async(pid, fn ->
       result = Queue.load(identity.origin_hash, identity.crypt_skey, base_url, auth)
-
       send(pid, {:queue_loaded, result})
+    end)
+  end
+
+  defp load_manage_async(identity, base_url) do
+    pid = self()
+
+    async(pid, fn ->
+      result = Manage.load_all(identity, base_url)
+      send(pid, {:manage_loaded, result})
     end)
   end
 

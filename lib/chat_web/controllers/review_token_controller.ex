@@ -28,7 +28,9 @@ defmodule ChatWeb.ReviewTokenController do
         conn |> put_status(:forbidden) |> json(%{error: "Invalid auth token"})
 
       {:error, :no_auth_token_configured} ->
-        conn |> put_status(:forbidden) |> json(%{error: "No auth token configured for this origin"})
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "No auth token configured for this origin"})
 
       {:error, :bot_not_running} ->
         conn |> put_status(:not_found) |> json(%{error: "Bot not running"})

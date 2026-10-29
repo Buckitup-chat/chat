@@ -20,9 +20,9 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.WriteToken do
   end
 
   def handle_refresh(base_url, auth, socket) do
-    origin = socket.assigns.origin
+    identity = socket.assigns.identity
 
-    case WriteTokenClient.list_tokens(origin.origin_hash, base_url, auth) do
+    case WriteTokenClient.list_tokens(identity.origin_hash, base_url, auth) do
       {:ok, tokens, logs} ->
         {:noreply, socket |> assign(:write_tokens, tokens) |> append_logs(logs)}
 

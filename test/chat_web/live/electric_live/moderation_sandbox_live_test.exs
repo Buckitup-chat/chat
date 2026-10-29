@@ -9,7 +9,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLiveTest do
     test "renders the identity import step", %{conn: conn} do
       {:ok, _view, html} = live(conn, "/electric/moderation_sandbox")
 
-      assert html =~ "Origin Moderation Sandbox"
+      assert html =~ "Origin Console"
       assert html =~ "Step 1: Import Origin Identity"
       assert html =~ "Import Identity"
     end

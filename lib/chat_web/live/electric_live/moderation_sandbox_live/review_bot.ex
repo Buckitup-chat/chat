@@ -11,14 +11,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.ReviewBot do
     ~H"""
     <div class="bg-white shadow rounded-lg p-6">
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Review Bot</h2>
-
-      <%= if @origin[:origin_crypt_skey] do %>
-        {render_bot_controls(assigns)}
-      <% else %>
-        <p class="text-sm text-gray-500">
-          Origin identity keys not available. Export the origin identity first.
-        </p>
-      <% end %>
+      {render_bot_controls(assigns)}
     </div>
     """
   end

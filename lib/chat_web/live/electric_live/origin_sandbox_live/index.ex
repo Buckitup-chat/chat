@@ -8,10 +8,10 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Index do
   alias ChatWeb.ElectricLive.IdentityCheck
   alias ChatWeb.ElectricLive.OriginSandboxLive.ApiClient
   alias ChatWeb.ElectricLive.OriginSandboxLive.Render
-  alias ChatWeb.ElectricLive.OriginSandboxLive.ReviewBot
-  alias ChatWeb.ElectricLive.OriginSandboxLive.ReviewBotClient
-  alias ChatWeb.ElectricLive.OriginSandboxLive.Settings
-  alias ChatWeb.ElectricLive.OriginSandboxLive.WriteToken
+  alias ChatWeb.ElectricLive.ModerationSandboxLive.ReviewBot
+  alias ChatWeb.ElectricLive.ModerationSandboxLive.ReviewBotClient
+  alias ChatWeb.ElectricLive.ModerationSandboxLive.Settings
+  alias ChatWeb.ElectricLive.ModerationSandboxLive.WriteToken
 
   @impl true
   def mount(_params, _session, socket) do

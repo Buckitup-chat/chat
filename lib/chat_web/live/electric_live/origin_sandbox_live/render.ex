@@ -5,9 +5,9 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Render do
 
   alias Chat.Proto.Shortcode
   alias ChatWeb.ElectricLive.Components
-  alias ChatWeb.ElectricLive.OriginSandboxLive.ReviewBot
-  alias ChatWeb.ElectricLive.OriginSandboxLive.Settings
-  alias ChatWeb.ElectricLive.OriginSandboxLive.WriteToken
+  alias ChatWeb.ElectricLive.ModerationSandboxLive.ReviewBot
+  alias ChatWeb.ElectricLive.ModerationSandboxLive.Settings
+  alias ChatWeb.ElectricLive.ModerationSandboxLive.WriteToken
 
   def render_page(assigns) do
     ~H"""

@@ -10,7 +10,7 @@ defmodule Chat.Data.Schemas.OriginBot do
 
   @primary_key {:bot_hash, UserHash, []}
 
-  @create_fields [
+  @create_required [
     :bot_hash,
     :origin_hash,
     :secret_b64,
@@ -20,15 +20,17 @@ defmodule Chat.Data.Schemas.OriginBot do
     :sign_b64,
     :sign_hash
   ]
-  @create_required @create_fields
+  @create_fields @create_required ++ [:encrypted_auth_token_b64]
 
-  @update_fields [:deleted_flag, :owner_timestamp, :sign_b64, :sign_hash]
+  @update_required [:deleted_flag, :owner_timestamp, :sign_b64, :sign_hash]
+  @update_fields @update_required ++ [:encrypted_auth_token_b64]
 
   schema "origin_bots" do
     field(:origin_hash, UserHash)
     field(:secret_b64, :binary)
     field(:encrypted_identity_b64, :binary)
     field(:deleted_flag, :boolean, default: false)
+    field(:encrypted_auth_token_b64, :binary)
     field(:owner_timestamp, :integer)
     field(:sign_b64, :binary)
     field(:sign_hash, OriginBotSignHash)
@@ -44,7 +46,7 @@ defmodule Chat.Data.Schemas.OriginBot do
   def update_changeset(bot, attrs) do
     bot
     |> cast(attrs, @update_fields)
-    |> validate_required(@update_fields)
+    |> validate_required(@update_required)
   end
 
   defimpl Chat.Data.User.Validation.TimestampedData, for: __MODULE__ do

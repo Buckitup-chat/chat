@@ -8,7 +8,6 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.Settings do
   @known_keys [
     {"review_access", "open / invite_only", "open"},
     {"review_token_ttl_days", "integer 1..365", "7"},
-    {"auth_token", "min 16 chars", ""},
     {"google_review_url", "URL string", ""},
     {"review_greeting", "text", ""}
   ]

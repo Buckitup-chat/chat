@@ -35,20 +35,20 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.SettingsTest do
 
     test "switching key resets value to current setting value" do
       existing_settings = [
-        %{key: "auth_token", value: "secret123", deleted_flag: false}
+        %{key: "google_review_url", value: "https://example.com", deleted_flag: false}
       ]
 
       {:noreply, result} =
         Settings.handle_event(
           "setting_form_change",
-          %{"key" => "auth_token"},
+          %{"key" => "google_review_url"},
           socket(%{origin_settings: existing_settings, setting_form_key: "review_access"}),
           "http://localhost",
           %{}
         )
 
-      assert result.assigns.setting_form_key == "auth_token"
-      assert result.assigns.setting_form_value == "secret123"
+      assert result.assigns.setting_form_key == "google_review_url"
+      assert result.assigns.setting_form_value == "https://example.com"
     end
 
     test "switching key prefills default when no existing value" do

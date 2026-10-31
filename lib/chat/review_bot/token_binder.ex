@@ -76,7 +76,7 @@ defmodule Chat.ReviewBot.TokenBinder do
     end
   end
 
-  defp bind_order_linked(token, bot_hash, origin_hash, reviewer_hash) do
+  defp bind_order_linked(%ReviewWriteToken{} = token, bot_hash, origin_hash, reviewer_hash) do
     bound = %ReviewWriteToken{
       token
       | user_hash: reviewer_hash,

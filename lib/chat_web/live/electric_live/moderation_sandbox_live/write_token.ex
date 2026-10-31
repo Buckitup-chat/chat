@@ -8,7 +8,8 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.WriteToken do
 
   def handle_create(%{"bot_hash" => bot_hash} = params, base_url, socket) do
     order_hash = params["origin_order_hash"]
-    auth_token = find_setting_value(socket.assigns.origin_settings, "auth_token")
+    auth_token = params["auth_token"]
+    auth_token = if auth_token in [nil, ""], do: nil, else: auth_token
 
     case WriteTokenClient.create_token(bot_hash, order_hash, auth_token, base_url) do
       {:ok, result, logs} ->
@@ -77,6 +78,15 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.WriteToken do
               {Shortcode.short_code(bot.bot_hash)}
             </option>
           </select>
+        </div>
+        <div class="flex-1">
+          <label class="block text-xs font-medium text-gray-700 mb-1">Auth token</label>
+          <input
+            type="text"
+            name="auth_token"
+            placeholder="Bearer token for bot auth"
+            class="w-full px-3 py-2 border rounded-lg text-sm"
+          />
         </div>
         <div class="flex-1">
           <label class="block text-xs font-medium text-gray-700 mb-1">
@@ -191,13 +201,6 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.WriteToken do
 
   defp has_active_bot?(bots), do: Enum.any?(bots, &(not &1.deleted_flag))
   defp active_bots(bots), do: Enum.reject(bots, & &1.deleted_flag)
-
-  defp find_setting_value(settings, key) do
-    case Enum.find(settings, &(&1.key == key && !&1.deleted_flag)) do
-      %{value: value} -> value
-      nil -> nil
-    end
-  end
 
   defp truncate_nonce(nil), do: "—"
   defp truncate_nonce(nonce) when byte_size(nonce) > 12, do: binary_part(nonce, 0, 12) <> "…"

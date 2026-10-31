@@ -50,10 +50,10 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.SettingsClientTest do
 
     test "bumps timestamp above existing on update", %{sign_skey: skey} do
       ts = Chat.TimeKeeper.now_unix() + 1_000_000
-      existing = %{key: "auth_token", value: "old", owner_timestamp: ts, deleted_flag: false}
+      existing = %{key: "review_greeting", value: "old", owner_timestamp: ts, deleted_flag: false}
 
       mutation =
-        SettingsClient.build_set_payload(@origin_hash, "auth_token", "new", existing, skey)
+        SettingsClient.build_set_payload(@origin_hash, "review_greeting", "new", existing, skey)
 
       assert mutation["changes"]["owner_timestamp"] >= ts + 1
     end

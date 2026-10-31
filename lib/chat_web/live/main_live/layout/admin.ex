@@ -70,6 +70,10 @@ defmodule ChatWeb.MainLive.Layout.Admin do
         <span>{@free_spaces.main_db}</span>
       </div>
       <div>
+        <label class="text-black/50"> Backup DB: </label>
+        <span>{@free_spaces.backup_db}</span>
+      </div>
+      <div>
         <label class="text-black/50"> Media DB: </label>
         <span>{@free_spaces.media_db}</span>
       </div>

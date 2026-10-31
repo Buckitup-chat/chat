@@ -10,7 +10,7 @@ defmodule Chat.Db.FreeSpaces do
       |> Stream.map(&{&1 |> atomize_db_name(), &1 |> get_one()})
       |> Enum.into(%{})
 
-    media_dbs = [:backup_db, :cargo_db, :onliners_db]
+    media_dbs = [:cargo_db, :onliners_db]
 
     media_db_space =
       media_dbs
@@ -39,6 +39,10 @@ defmodule Chat.Db.FreeSpaces do
       nil -> -1
       _pid -> db |> Maintenance.db_free_space()
     end
+  rescue
+    _ -> -1
+  catch
+    :exit, _ -> -1
   end
 
   defp bytes_to_mega_bytes(space) do

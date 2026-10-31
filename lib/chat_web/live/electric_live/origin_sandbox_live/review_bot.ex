@@ -44,11 +44,15 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ReviewBot do
               <span class={"ml-2 text-xs font-medium #{bot_status_class(bot)}"}>
                 {bot_status_label(bot)}
               </span>
+              <span class={"ml-2 text-xs #{if bot.encrypted_auth_token_b64, do: "text-green-600", else: "text-amber-600"}"}>
+                {if bot.encrypted_auth_token_b64, do: "Auth token configured", else: "No auth token"}
+              </span>
             </div>
             <div class="flex gap-2">
               {render_bot_actions(Map.put(assigns, :bot, bot))}
             </div>
           </div>
+          {render_auth_token_form(Map.put(assigns, :bot, bot))}
         </div>
       </div>
     <% end %>
@@ -90,6 +94,38 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ReviewBot do
         >
           Revoke
         </button>
+    <% end %>
+    """
+  end
+
+  defp render_auth_token_form(assigns) do
+    ~H"""
+    <%= if !@bot.deleted_flag do %>
+      <div class="mt-2 pt-2 border-t border-gray-100">
+        <form phx-submit="set_auth_token" class="flex items-end gap-2">
+          <input type="hidden" name="hash" value={@bot.bot_hash} />
+          <div class="flex-1">
+            <label class="block text-xs text-gray-500 mb-1">Auth Token</label>
+            <input
+              type="password"
+              name="auth_token"
+              placeholder="min 16 characters"
+              minlength="16"
+              required
+              class="w-full px-2 py-1 border rounded text-sm"
+            />
+          </div>
+          <button
+            type="submit"
+            class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
+          >
+            Set Token
+          </button>
+        </form>
+        <p :if={Worker.running?(@bot.bot_hash)} class="text-xs text-amber-600 mt-1">
+          Updating the auth token will restart the review bot
+        </p>
+      </div>
     <% end %>
     """
   end

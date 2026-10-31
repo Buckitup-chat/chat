@@ -33,13 +33,22 @@ defmodule Chat.ReviewBot.Worker do
     GenServer.call(via(bot_hash), :info)
   end
 
+  def verify_auth(bot_hash, bearer) do
+    GenServer.call(via(bot_hash), {:verify_auth, bearer})
+  end
+
   # --- Callbacks ---
 
   @impl true
-  def init(%{bot_hash: bot_hash, origin_hash: origin_hash, identity: identity}) do
+  def init(%{bot_hash: bot_hash, origin_hash: origin_hash, identity: identity} = init_arg) do
     Process.flag(:sensitive, true)
 
-    %{bot_hash: bot_hash, origin_hash: origin_hash, identity: identity}
+    %{
+      bot_hash: bot_hash,
+      origin_hash: origin_hash,
+      identity: identity,
+      auth_token: Map.get(init_arg, :auth_token)
+    }
     |> ok()
   end
 
@@ -56,6 +65,17 @@ defmodule Chat.ReviewBot.Worker do
 
   def handle_call(:info, _from, state) do
     state |> reply(%{bot_hash: state.bot_hash, origin_hash: state.origin_hash})
+  end
+
+  def handle_call({:verify_auth, _bearer}, _from, %{auth_token: nil} = state) do
+    state |> reply({:error, :no_auth_token_configured})
+  end
+
+  def handle_call({:verify_auth, bearer}, _from, state) do
+    case Plug.Crypto.secure_compare(state.auth_token, bearer) do
+      true -> state |> reply(:ok)
+      false -> state |> reply({:error, :invalid_auth_token})
+    end
   end
 
   defp via(bot_hash), do: {:via, Registry, {Chat.ReviewBot.Registry, bot_hash}}

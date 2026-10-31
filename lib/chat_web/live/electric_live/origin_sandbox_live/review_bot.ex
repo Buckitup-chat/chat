@@ -96,10 +96,18 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ReviewBot do
 
   def decrypt_and_start(bot, origin_crypt_skey) do
     with {:ok, identity} <-
-           Identity.unwrap(bot.secret_b64, bot.encrypted_identity_b64, origin_crypt_skey) do
+           Identity.unwrap(bot.secret_b64, bot.encrypted_identity_b64, origin_crypt_skey),
+         {:ok, auth_token} <-
+           Identity.unwrap_token(bot.secret_b64, bot.encrypted_auth_token_b64, origin_crypt_skey) do
       DynamicSupervisor.start_child(
         Chat.ReviewBot.WorkerSupervisor,
-        {Worker, %{bot_hash: bot.bot_hash, origin_hash: bot.origin_hash, identity: identity}}
+        {Worker,
+         %{
+           bot_hash: bot.bot_hash,
+           origin_hash: bot.origin_hash,
+           identity: identity,
+           auth_token: auth_token
+         }}
       )
     end
   end

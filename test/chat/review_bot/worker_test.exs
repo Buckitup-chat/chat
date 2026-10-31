@@ -52,6 +52,25 @@ defmodule Chat.ReviewBot.WorkerTest do
     end
   end
 
+  describe "verify_auth/2" do
+    test "returns ok for correct token", ctx do
+      start_worker!(ctx, auth_token: "s3cr3t")
+      assert Worker.verify_auth(ctx.bot_card.user_hash, "s3cr3t") == :ok
+    end
+
+    test "returns invalid_auth_token for wrong token", ctx do
+      start_worker!(ctx, auth_token: "s3cr3t")
+      assert Worker.verify_auth(ctx.bot_card.user_hash, "wrong") == {:error, :invalid_auth_token}
+    end
+
+    test "returns no_auth_token_configured when nil", ctx do
+      start_worker!(ctx)
+
+      assert Worker.verify_auth(ctx.bot_card.user_hash, "anything") ==
+               {:error, :no_auth_token_configured}
+    end
+  end
+
   describe "format_status/1" do
     test "redacts identity from status", ctx do
       start_worker!(ctx)
@@ -65,13 +84,14 @@ defmodule Chat.ReviewBot.WorkerTest do
     end
   end
 
-  defp start_worker!(ctx) do
+  defp start_worker!(ctx, opts \\ []) do
     start_supervised!(
       {Worker,
        %{
          bot_hash: ctx.bot_card.user_hash,
          origin_hash: ctx.origin_card.user_hash,
-         identity: ctx.identity
+         identity: ctx.identity,
+         auth_token: Keyword.get(opts, :auth_token)
        }}
     )
   end

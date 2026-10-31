@@ -48,6 +48,36 @@ defmodule Chat.ReviewBot.IdentityTest do
     end
   end
 
+  describe "wrap_token/unwrap_token round-trip" do
+    test "wraps to origin crypt_pkey, unwraps with crypt_skey", ctx do
+      {secret, encrypted} = Identity.wrap_token("s3cr3t-bearer-token", ctx.origin.crypt_pkey)
+
+      assert is_binary(secret)
+      assert is_binary(encrypted)
+
+      assert {:ok, "s3cr3t-bearer-token"} =
+               Identity.unwrap_token(secret, encrypted, ctx.origin.crypt_skey)
+    end
+
+    test "uses a distinct salt from identity wrap/unwrap" do
+      refute Identity.auth_token_salt() == Identity.origin_salt()
+    end
+
+    test "fails with wrong crypt_skey", ctx do
+      {secret, encrypted} = Identity.wrap_token("s3cr3t-bearer-token", ctx.origin.crypt_pkey)
+      stranger = User.generate_pq_identity("Stranger")
+      assert {:error, _} = Identity.unwrap_token(secret, encrypted, stranger.crypt_skey)
+    end
+
+    test "handles nil auth token gracefully on wrap", ctx do
+      assert {nil, nil} = Identity.wrap_token(nil, ctx.origin.crypt_pkey)
+    end
+
+    test "handles nil auth token gracefully on unwrap", ctx do
+      assert {:ok, nil} = Identity.unwrap_token(nil, nil, ctx.origin.crypt_skey)
+    end
+  end
+
   describe "matches_card?/2" do
     test "returns true for matching identity and card", ctx do
       assert Identity.matches_card?(ctx.bot, ctx.bot_card)

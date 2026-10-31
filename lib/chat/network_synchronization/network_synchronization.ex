@@ -106,9 +106,11 @@ defmodule Chat.NetworkSynchronization do
   end
 
   defp maybe_start_electric_peer(source) do
-    case source_base_url(source) do
-      {:ok, base_url} -> add_electric_peer(base_url)
-      :error -> :ok
+    with true <- Chat.Pq.OwnerBootstrap.owner() != nil,
+         {:ok, base_url} <- source_base_url(source) do
+      add_electric_peer(base_url)
+    else
+      _ -> :ok
     end
   end
 

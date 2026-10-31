@@ -16,6 +16,7 @@ defmodule ChatWeb.ReviewTokenController do
 
     with {:ok, bearer} <- extract_bearer(conn),
          {:ok, origin_hash} <- fetch_bot_origin(bot_hash),
+         :ok <- check_rate_limit(origin_hash),
          :ok <- verify_auth_token(origin_hash, bearer),
          {:ok, nonce} <- TokenCreator.create(bot_hash, origin_order_hash) do
       url = "#{ChatWeb.Endpoint.url()}/r/#{nonce}"
@@ -38,6 +39,12 @@ defmodule ChatWeb.ReviewTokenController do
       {:error, :no_live_vouch} ->
         conn |> put_status(:forbidden) |> json(%{error: "No live vouch for this bot"})
 
+      {:error, {:rate_limited, retry_after}} ->
+        conn
+        |> put_resp_header("retry-after", Integer.to_string(retry_after))
+        |> put_status(:too_many_requests)
+        |> json(%{error: "Too many requests"})
+
       {:error, reason} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
     end
@@ -54,6 +61,13 @@ defmodule ChatWeb.ReviewTokenController do
     case Worker.running?(bot_hash) do
       true -> {:ok, Worker.info(bot_hash).origin_hash}
       false -> {:error, :bot_not_running}
+    end
+  end
+
+  defp check_rate_limit(origin_hash) do
+    case ChatWeb.RateLimiter.check({:token_create, origin_hash}) do
+      :ok -> :ok
+      {:error, retry_after} -> {:error, {:rate_limited, retry_after}}
     end
   end
 

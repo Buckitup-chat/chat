@@ -46,6 +46,7 @@ defmodule Chat.Application do
         {DynamicSupervisor, name: Chat.Upload.UploadSupervisor},
         {DynamicSupervisor, name: Chat.Db.FreeSpacesSupervisor},
         ChatWeb.Presence,
+        ChatWeb.RateLimiter,
         # Start the Endpoint (http/https)
         {ChatWeb.Endpoint, phoenix_sync: Phoenix.Sync.plug_opts()},
         # Staged boot: Repo → Electric check → ChunkPipeline (host only)

@@ -43,9 +43,6 @@ defmodule Chat.Data.Schemas.OriginSetting do
       "review_token_ttl_days" ->
         validate_positive_integer(changeset, :value, 1..365)
 
-      "auth_token" ->
-        validate_length(changeset, :value, min: 16, max: 256)
-
       _ ->
         changeset
     end

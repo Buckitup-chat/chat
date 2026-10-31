@@ -113,21 +113,15 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Manage do
 
     with {:length, true} <- {:length, byte_size(auth_token) >= 16},
          {:bot, bot} when bot != nil <-
-           {:bot, Enum.find(socket.assigns.origin_bots, &(&1.bot_hash == bot_hash))} do
-      encrypted = Identity.re_wrap_token(auth_token, bot.secret_b64, identity.crypt_skey)
+           {:bot, Enum.find(socket.assigns.origin_bots, &(&1.bot_hash == bot_hash))},
+         encrypted = Identity.re_wrap_token(auth_token, bot.secret_b64, identity.crypt_skey),
+         {:ok, %{log_entries: logs}} <-
+           ReviewBotClient.update_auth_token(bot, encrypted, identity.sign_skey, base_url) do
+      restart_if_running(bot, encrypted, identity.crypt_skey)
+      auth = origin_auth(identity)
+      bots = ReviewBotClient.list_origin_bots(identity.origin_hash, base_url, auth)
 
-      case ReviewBotClient.update_auth_token(bot, encrypted, identity.sign_skey, base_url) do
-        {:ok, %{log_entries: logs}} ->
-          restart_if_running(bot, encrypted, identity.crypt_skey)
-          auth = origin_auth(identity)
-          bots = ReviewBotClient.list_origin_bots(identity.origin_hash, base_url, auth)
-
-          {:noreply, socket |> Phoenix.Component.assign(origin_bots: bots) |> append_logs(logs)}
-
-        {:error, %{reason: reason, log_entries: logs}} ->
-          {:noreply,
-           socket |> Phoenix.Component.assign(error_message: reason) |> append_logs(logs)}
-      end
+      {:noreply, socket |> Phoenix.Component.assign(origin_bots: bots) |> append_logs(logs)}
     else
       {:length, false} ->
         {:noreply,
@@ -137,6 +131,9 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Manage do
 
       {:bot, nil} ->
         {:noreply, Phoenix.Component.assign(socket, error_message: "Bot not found")}
+
+      {:error, %{reason: reason, log_entries: logs}} ->
+        {:noreply, socket |> Phoenix.Component.assign(error_message: reason) |> append_logs(logs)}
     end
   end
 

@@ -3,7 +3,6 @@ defmodule ChatWeb.ReviewTokenController do
 
   use ChatWeb, :controller
 
-  alias Chat.Data.OriginSetting
   alias Chat.Data.ReviewWriteToken
   alias Chat.ReviewBot.TokenBinder
   alias Chat.ReviewBot.TokenCreator
@@ -17,7 +16,7 @@ defmodule ChatWeb.ReviewTokenController do
     with {:ok, bearer} <- extract_bearer(conn),
          {:ok, origin_hash} <- fetch_bot_origin(bot_hash),
          :ok <- check_rate_limit(origin_hash),
-         :ok <- verify_auth_token(origin_hash, bearer),
+         :ok <- Worker.verify_auth(bot_hash, bearer),
          {:ok, nonce} <- TokenCreator.create(bot_hash, origin_order_hash) do
       url = "#{ChatWeb.Endpoint.url()}/r/#{nonce}"
       json(conn, %{nonce: nonce, url: url})
@@ -68,14 +67,6 @@ defmodule ChatWeb.ReviewTokenController do
     case ChatWeb.RateLimiter.check({:token_create, origin_hash}) do
       :ok -> :ok
       {:error, retry_after} -> {:error, {:rate_limited, retry_after}}
-    end
-  end
-
-  defp verify_auth_token(origin_hash, bearer) do
-    case OriginSetting.get_auth_token(origin_hash) do
-      nil -> {:error, :no_auth_token_configured}
-      expected when expected == bearer -> :ok
-      _ -> {:error, :invalid_auth_token}
     end
   end
 

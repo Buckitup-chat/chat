@@ -28,6 +28,43 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.ReviewBotClient do
     end
   end
 
+  def update_auth_token(bot, encrypted_auth_token_b64, origin_sign_skey, base_url) do
+    new_timestamp = bot.owner_timestamp + 1
+
+    bot_struct = %OriginBotSchema{
+      bot_hash: bot.bot_hash,
+      origin_hash: bot.origin_hash,
+      secret_b64: bot.secret_b64,
+      encrypted_identity_b64: bot.encrypted_identity_b64,
+      encrypted_auth_token_b64: encrypted_auth_token_b64,
+      deleted_flag: bot.deleted_flag,
+      owner_timestamp: new_timestamp
+    }
+
+    {sign_b64, sign_hash} = sign_struct(bot_struct, origin_sign_skey, OriginBotSignHash)
+
+    payload = %{
+      "mutations" => [
+        %{
+          "type" => "update",
+          "original" => %{"bot_hash" => bot.bot_hash},
+          "changes" => %{
+            "encrypted_auth_token_b64" => encode_base64(encrypted_auth_token_b64),
+            "owner_timestamp" => new_timestamp,
+            "sign_b64" => encode_base64(sign_b64),
+            "sign_hash" => sign_hash
+          },
+          "syncMetadata" => %{"relation" => "origin_bots"}
+        }
+      ]
+    }
+
+    case ingest(payload, origin_sign_skey, base_url) do
+      {:ok, _body, logs} -> {:ok, %{log_entries: logs}}
+      {:error, reason, logs} -> {:error, %{reason: reason, log_entries: logs}}
+    end
+  end
+
   def tombstone_bot(bot, origin_sign_skey, base_url) do
     new_timestamp = bot.owner_timestamp + 1
 
@@ -162,6 +199,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.ReviewBotClient do
       origin_hash: row["origin_hash"],
       secret_b64: decode_binary(row["secret_b64"]),
       encrypted_identity_b64: decode_binary(row["encrypted_identity_b64"]),
+      encrypted_auth_token_b64: decode_binary(row["encrypted_auth_token_b64"]),
       deleted_flag: row["deleted_flag"] in [true, "true", "t"],
       owner_timestamp: parse_int(row["owner_timestamp"]),
       sign_hash: row["sign_hash"]

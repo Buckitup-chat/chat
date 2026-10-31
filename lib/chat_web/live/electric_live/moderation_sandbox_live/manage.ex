@@ -1,12 +1,14 @@
 defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Manage do
   @moduledoc false
 
+  alias Chat.ReviewBot.Identity
+  alias Chat.ReviewBot.Worker
   alias ChatWeb.ElectricLive.ModerationSandboxLive.ReviewBot
   alias ChatWeb.ElectricLive.ModerationSandboxLive.ReviewBotClient
   alias ChatWeb.ElectricLive.ModerationSandboxLive.Settings
   alias ChatWeb.ElectricLive.ModerationSandboxLive.WriteToken
 
-  @events ~w(refresh_settings setting_form_change set_setting tombstone_setting create_review_bot start_review_bot stop_review_bot revoke_review_bot refresh_bots create_write_token refresh_tokens)
+  @events ~w(refresh_settings setting_form_change set_setting tombstone_setting create_review_bot start_review_bot stop_review_bot revoke_review_bot set_auth_token refresh_bots create_write_token refresh_tokens)
 
   def events, do: @events
 
@@ -101,6 +103,43 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Manage do
     end
   end
 
+  def handle_event(
+        "set_auth_token",
+        %{"hash" => bot_hash, "auth_token" => auth_token},
+        socket,
+        base_url
+      ) do
+    identity = socket.assigns.identity
+
+    with {:length, true} <- {:length, byte_size(auth_token) >= 16},
+         {:bot, bot} when bot != nil <-
+           {:bot, Enum.find(socket.assigns.origin_bots, &(&1.bot_hash == bot_hash))} do
+      encrypted = Identity.re_wrap_token(auth_token, bot.secret_b64, identity.crypt_skey)
+
+      case ReviewBotClient.update_auth_token(bot, encrypted, identity.sign_skey, base_url) do
+        {:ok, %{log_entries: logs}} ->
+          restart_if_running(bot, encrypted, identity.crypt_skey)
+          auth = origin_auth(identity)
+          bots = ReviewBotClient.list_origin_bots(identity.origin_hash, base_url, auth)
+
+          {:noreply, socket |> Phoenix.Component.assign(origin_bots: bots) |> append_logs(logs)}
+
+        {:error, %{reason: reason, log_entries: logs}} ->
+          {:noreply,
+           socket |> Phoenix.Component.assign(error_message: reason) |> append_logs(logs)}
+      end
+    else
+      {:length, false} ->
+        {:noreply,
+         Phoenix.Component.assign(socket,
+           error_message: "Auth token must be at least 16 characters"
+         )}
+
+      {:bot, nil} ->
+        {:noreply, Phoenix.Component.assign(socket, error_message: "Bot not found")}
+    end
+  end
+
   def handle_event("refresh_bots", _params, socket, base_url) do
     identity = socket.assigns.identity
     auth = origin_auth(identity)
@@ -131,6 +170,15 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Manage do
 
   def origin_auth(identity) do
     %{user_hash: identity.origin_hash, sign_skey: identity.sign_skey}
+  end
+
+  defp restart_if_running(bot, encrypted, crypt_skey) do
+    if Worker.running?(bot.bot_hash) do
+      ReviewBot.stop(bot.bot_hash)
+
+      %{bot | encrypted_auth_token_b64: encrypted, owner_timestamp: bot.owner_timestamp + 1}
+      |> ReviewBot.decrypt_and_start(crypt_skey)
+    end
   end
 
   defp append_logs(socket, logs),

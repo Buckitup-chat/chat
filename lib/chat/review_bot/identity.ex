@@ -60,6 +60,12 @@ defmodule Chat.ReviewBot.Identity do
     end
   end
 
+  def re_wrap_token(auth_token, existing_secret, crypt_skey) do
+    shared_secret = EnigmaPq.decapsulate_secret(existing_secret, crypt_skey)
+    wrap_key = EnigmaPq.hkdf_derive(shared_secret, @auth_token_salt, "wrap")
+    EnigmaPq.aes_gcm_encrypt(auth_token, wrap_key)
+  end
+
   def matches_card?(identity, user_card) do
     probe = :crypto.strong_rand_bytes(32)
     signature = EnigmaPq.sign(probe, identity.sign_skey)

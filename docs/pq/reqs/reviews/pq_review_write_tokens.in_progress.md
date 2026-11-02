@@ -270,7 +270,9 @@ The two gates live in different root segments of the resource forest (`device` v
 
 ### Review hash capture
 
-When the bot observes (via Electric shape) a new review for `(origin_hash, author_hash)` matching a bound token, it updates the token's `review_hash`, signs the updated row, and ingests it. This connects the token to its review for future redirects. Any device running the bot can perform this capture.
+~~When the bot observes (via Electric shape) a new review for `(origin_hash, author_hash)` matching a bound token, it updates the token's `review_hash`, signs the updated row, and ingests it.~~
+
+**Implemented:** review hash linking happens atomically at ingest time. When a reviewer submits a review with a known nonce, `ReviewWriteToken.link_to_review/3` sets `review_hash` on the token row inside the same transaction as the review insert. The review gate (`Validation.check_review_gate/2`) runs in the `check` phase — before validation — alongside the device gate. This eliminates the async observe-and-backfill pattern as the primary mechanism.
 
 ### Garbage collection
 
@@ -358,7 +360,7 @@ The origin identity decides whether reviews are open or invitation-only. A new f
 
 ## Review Access Setting
 
-The `review_access` setting lives in the [`origin_settings`](pq_origin_settings.proposed.md) key-value table. The server reads it via `OriginSetting.get_review_access(origin_hash)`, which defaults to `"open"` when no row exists.
+The `review_access` setting lives in the [`origin_settings`](pq_origin_settings.done.md) key-value table. The server reads it via `OriginSetting.get_review_access(origin_hash)`, which defaults to `"open"` when no row exists.
 
 The `review_token_ttl_days` setting (also in `origin_settings`) controls the soft-delete span for pending tokens, in days (default: 7). The bot reads this to decide when to GC pending tokens.
 
@@ -381,18 +383,23 @@ The `review_token_ttl_days` setting (also in `origin_settings`) controls the sof
 
 ### Phase 2 — Token CRUD + redirect
 
-- [ ] `review_write_tokens` migration (with nullable `origin_order_hash`, `parent_nonce`, integrity triad, `deleted_flag`) + Electric shape
-- [ ] `ReviewWriteToken` Ecto schema
-- [ ] `POST /r/api/token/create` — bot creates token (with or without order), returns nonce + URL
-- [ ] `POST /r/api/token/bind` — bind user with PoP, bot issues per-shape vouches, redirect to frontend
-- [ ] `/r/:nonce` Phoenix route — token state check + redirect to frontend
-- [ ] Bot-side GC: soft delete pending tokens at 1 week
-- [ ] Server-side GC: hard delete soft-deleted tokens after 2 weeks (3 weeks from creation)
-- [ ] Origin admin: "enable invitations" UI (triggers Phase 1 bot creation + vouch)
+- [x] `review_write_tokens` migration (with nullable `origin_order_hash`, `parent_nonce`, integrity triad, `deleted_flag`) + Electric shape
+- [x] `ReviewWriteToken` Ecto schema
+- [x] `POST /r/api/token/create` — bot creates token (with or without order), returns nonce + URL
+- [x] `POST /r/api/token/bind` — bind user with PoP, bot issues per-shape vouches, redirect to frontend
+- [x] `/r/:nonce` Phoenix route — token state check + redirect to frontend
+- [x] Bot-side GC: soft delete pending tokens at 1 week (`GarbageCollector` + `GcServer`)
+- [x] Server-side GC: hard delete soft-deleted tokens after 2 weeks (`GcServer.hard_delete_old_tombstones`)
+- [x] Origin admin: sandbox-level UI for bot creation, token creation, settings, and bind flow
+
+### Phase 2a — Review hash capture (spec amendment)
+
+- [x] Review gate moved from `validate` to `check` phase (`Validation.check_review_gate/2` chained in `Shapes.Review`)
+- [x] Nonce-based `review_hash` linking at ingest time (`ReviewWriteToken.link_to_review/3`) — atomic, replaces the async bot-observes-and-backfills pattern described in the original spec
 
 ### Phase 3 — QR
 
-- [ ] QR code generation (frontend, from full URL)
+- [x] QR code generation (reuses existing `Utils.qr_base64_from_url`, sandbox references QR nonce URLs)
 - [ ] Printable QR sheet (multiple tokens per page)
 
 ---
@@ -437,7 +444,7 @@ The `review_token_ttl_days` setting (also in `origin_settings`) controls the sof
 
 ## Status
 
-Proposed.
+In progress. Phase 1, 2, 2a complete. Phase 3 partial (QR generation done, printable sheet pending).
 
 ## References
 
@@ -445,5 +452,5 @@ Proposed.
 - [pq_reviews](pq_reviews.in_progress.md) — review system overview, pipeline, sandboxes
 - [pq_review_moderation](pq_review_moderation.done.md) — moderation pipeline, candidate promotion
 - [pq_origin](pq_origin.done.md) — origin entity, creation, ownership
-- [pq_origin_settings](pq_origin_settings.proposed.md) — per-origin key-value settings (`review_access`)
+- [pq_origin_settings](pq_origin_settings.done.md) — per-origin key-value settings (`review_access`)
 - [pq_review_versioning](pq_review_versioning.done.md) — review editing, version chain

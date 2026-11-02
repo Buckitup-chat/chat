@@ -290,6 +290,6 @@ Proposed.
 ## References
 
 - [pq_origin](pq_origin.done.md) — origin entity
-- [pq_origin_settings](pq_origin_settings.proposed.md) — per-origin key-value settings (Google review URL, greeting)
+- [pq_origin_settings](pq_origin_settings.done.md) — per-origin key-value settings (Google review URL, greeting)
 - [pq_reviews](pq_reviews.in_progress.md) — review pipeline, moderation (future integration)
 - [pq_review_contacts](pq_review_contacts.done.md) — contacts channel, review list

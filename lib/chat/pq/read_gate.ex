@@ -28,15 +28,27 @@ defmodule Chat.Pq.ReadGate do
   end
 
   @doc """
+  Proves possession: consumes a one-time challenge, fetches the user's signing key
+  and verifies the ML-DSA signature.
+
+  Returns `{:ok, sign_pkey}` or `{:error, :invalid_challenge | :unknown_user | :invalid_signature}`.
+  """
+  def verify_user(user_hash, challenge_id, signature_b64) do
+    with {:ok, challenge} <- consume_challenge(challenge_id),
+         {:ok, sign_pkey} <- fetch_sign_pkey(user_hash),
+         :ok <- verify_signature(challenge, signature_b64, sign_pkey) do
+      {:ok, sign_pkey}
+    end
+  end
+
+  @doc """
   Returns `{:ok, token, shape_name}` or `{:error, reason}` where reason is one of
   `:unknown_shape`, `:invalid_challenge`, `:unknown_user`, `:invalid_signature`,
   `:not_in_trust_chain`.
   """
   def open_session(user_hash, shape, challenge_id, signature_b64) do
     with {:ok, shape_name} <- resolve_shape(shape),
-         {:ok, challenge} <- consume_challenge(challenge_id),
-         {:ok, sign_pkey} <- fetch_sign_pkey(user_hash),
-         :ok <- verify_signature(challenge, signature_b64, sign_pkey),
+         {:ok, _sign_pkey} <- verify_user(user_hash, challenge_id, signature_b64),
          :ok <- check_chain(user_hash, shape_name) do
       {:ok, ReadSession.issue(user_hash, shape_name), shape_name}
     end

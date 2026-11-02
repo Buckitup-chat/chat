@@ -15,6 +15,7 @@ defmodule Chat.Application do
   def start(_type, _args) do
     Logger.put_application_level(:ssl, :error)
     log_version()
+    Chat.Turn.Config.setup()
 
     children =
       [

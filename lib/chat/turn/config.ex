@@ -1,69 +1,44 @@
 defmodule Chat.Turn.Config do
   @moduledoc "TURN relay configuration and per-boot secret"
 
-  use GenServer
-
+  @key __MODULE__
   @secret_size 32
   @default_ttl 600
   @default_rate_per_ip_hour 60
   @turn_port 3478
 
-  def start_link(opts \\ []) do
-    {name, init_opts} = Keyword.pop(opts, :name, __MODULE__)
-    GenServer.start_link(__MODULE__, init_opts, name: name)
-  end
-
-  def secret, do: GenServer.call(__MODULE__, :secret)
-  def enabled?, do: GenServer.call(__MODULE__, :enabled?)
-  def public_ip, do: GenServer.call(__MODULE__, :public_ip)
-  def uris, do: GenServer.call(__MODULE__, :uris)
-  def ttl, do: GenServer.call(__MODULE__, :ttl)
-  def rate_per_ip_hour, do: GenServer.call(__MODULE__, :rate_per_ip_hour)
-
-  @impl true
-  def init(_opts) do
+  def setup do
     secret = :crypto.strong_rand_bytes(@secret_size)
-
     turn_public_ip = System.get_env("TURN_PUBLIC_IP")
     domain = endpoint_domain()
     resolved_ip = resolve_domain(domain)
-
     public_ip = turn_public_ip || resolved_ip
-    enabled = public_ip != nil
 
-    uris = parse_uris(System.get_env("TURN_URIS"), domain, turn_public_ip)
-
-    ttl =
-      case System.get_env("TURN_TTL_SECONDS") do
-        nil -> @default_ttl
-        val -> String.to_integer(val)
-      end
-
-    rate =
-      case System.get_env("TURN_RATE_PER_IP_HOUR") do
-        nil -> @default_rate_per_ip_hour
-        val -> String.to_integer(val)
-      end
-
-    state = %{
+    :persistent_term.put(@key, %{
       secret: secret,
-      enabled: enabled,
+      enabled: public_ip != nil,
       public_ip: public_ip,
-      uris: uris,
-      ttl: ttl,
-      rate_per_ip_hour: rate
-    }
-
-    {:ok, state}
+      uris: parse_uris(System.get_env("TURN_URIS"), domain, turn_public_ip),
+      ttl: env_int("TURN_TTL_SECONDS", @default_ttl),
+      rate_per_ip_hour: env_int("TURN_RATE_PER_IP_HOUR", @default_rate_per_ip_hour)
+    })
   end
 
-  @impl true
-  def handle_call(:secret, _from, state), do: {:reply, state.secret, state}
-  def handle_call(:enabled?, _from, state), do: {:reply, state.enabled, state}
-  def handle_call(:public_ip, _from, state), do: {:reply, state.public_ip, state}
-  def handle_call(:uris, _from, state), do: {:reply, state.uris, state}
-  def handle_call(:ttl, _from, state), do: {:reply, state.ttl, state}
-  def handle_call(:rate_per_ip_hour, _from, state), do: {:reply, state.rate_per_ip_hour, state}
+  def secret, do: get(:secret)
+  def enabled?, do: get(:enabled)
+  def public_ip, do: get(:public_ip)
+  def uris, do: get(:uris)
+  def ttl, do: get(:ttl)
+  def rate_per_ip_hour, do: get(:rate_per_ip_hour)
+
+  defp get(key), do: :persistent_term.get(@key)[key]
+
+  defp env_int(name, default) do
+    case System.get_env(name) do
+      nil -> default
+      val -> String.to_integer(val)
+    end
+  end
 
   defp endpoint_domain do
     case Application.get_env(:chat, ChatWeb.Endpoint)[:url][:host] do

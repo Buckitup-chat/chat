@@ -3,26 +3,26 @@ defmodule Chat.Turn.ConfigTest do
 
   alias Chat.Turn.Config
 
-  defp start_config(env_vars) do
-    prev =
+  defp setup_config(env_vars) do
+    prev_state = :persistent_term.get(Config, nil)
+
+    prev_env =
       Enum.map(env_vars, fn {key, val} ->
         prev = System.get_env(key)
         System.put_env(key, val)
         {key, prev}
       end)
 
-    {:ok, pid} = Config.start_link(name: :"turn_config_#{:erlang.unique_integer([:positive])}")
+    Config.setup()
 
     on_exit(fn ->
-      if Process.alive?(pid), do: GenServer.stop(pid)
-
-      Enum.each(prev, fn
+      Enum.each(prev_env, fn
         {key, nil} -> System.delete_env(key)
         {key, val} -> System.put_env(key, val)
       end)
-    end)
 
-    pid
+      if prev_state, do: :persistent_term.put(Config, prev_state)
+    end)
   end
 
   describe "defaults (no TURN env vars, test env)" do
@@ -47,45 +47,39 @@ defmodule Chat.Turn.ConfigTest do
 
   describe "with TURN_PUBLIC_IP" do
     test "enabled? returns true" do
-      pid = start_config([{"TURN_PUBLIC_IP", "203.0.113.1"}])
-      assert GenServer.call(pid, :enabled?)
+      setup_config([{"TURN_PUBLIC_IP", "203.0.113.1"}])
+      assert Config.enabled?()
     end
 
     test "public_ip returns the override" do
-      pid = start_config([{"TURN_PUBLIC_IP", "203.0.113.1"}])
-      assert GenServer.call(pid, :public_ip) == "203.0.113.1"
+      setup_config([{"TURN_PUBLIC_IP", "203.0.113.1"}])
+      assert Config.public_ip() == "203.0.113.1"
     end
 
     test "uris returns two default URIs with the IP" do
-      pid = start_config([{"TURN_PUBLIC_IP", "203.0.113.1"}])
-      uris = GenServer.call(pid, :uris)
+      setup_config([{"TURN_PUBLIC_IP", "203.0.113.1"}])
 
-      assert uris == [
+      assert Config.uris() == [
                "turn:203.0.113.1:3478?transport=udp",
                "turn:203.0.113.1:3478?transport=tcp"
              ]
     end
 
-    test "secret is 32 bytes and differs from the global instance" do
-      pid = start_config([{"TURN_PUBLIC_IP", "203.0.113.1"}])
-      secret = GenServer.call(pid, :secret)
-      assert byte_size(secret) == 32
-      assert secret != Config.secret()
+    test "secret is 32 bytes" do
+      setup_config([{"TURN_PUBLIC_IP", "203.0.113.1"}])
+      assert byte_size(Config.secret()) == 32
     end
   end
 
   describe "with custom TURN_URIS" do
     test "uris returns the parsed list" do
-      pid =
-        start_config([
-          {"TURN_PUBLIC_IP", "203.0.113.1"},
-          {"TURN_URIS",
-           "turn:relay.example.com:3478?transport=udp, turn:relay.example.com:3478?transport=tcp"}
-        ])
+      setup_config([
+        {"TURN_PUBLIC_IP", "203.0.113.1"},
+        {"TURN_URIS",
+         "turn:relay.example.com:3478?transport=udp, turn:relay.example.com:3478?transport=tcp"}
+      ])
 
-      uris = GenServer.call(pid, :uris)
-
-      assert uris == [
+      assert Config.uris() == [
                "turn:relay.example.com:3478?transport=udp",
                "turn:relay.example.com:3478?transport=tcp"
              ]
@@ -94,13 +88,13 @@ defmodule Chat.Turn.ConfigTest do
 
   describe "with custom TTL and rate" do
     test "ttl returns custom value" do
-      pid = start_config([{"TURN_PUBLIC_IP", "203.0.113.1"}, {"TURN_TTL_SECONDS", "300"}])
-      assert GenServer.call(pid, :ttl) == 300
+      setup_config([{"TURN_PUBLIC_IP", "203.0.113.1"}, {"TURN_TTL_SECONDS", "300"}])
+      assert Config.ttl() == 300
     end
 
     test "rate_per_ip_hour returns custom value" do
-      pid = start_config([{"TURN_PUBLIC_IP", "203.0.113.1"}, {"TURN_RATE_PER_IP_HOUR", "120"}])
-      assert GenServer.call(pid, :rate_per_ip_hour) == 120
+      setup_config([{"TURN_PUBLIC_IP", "203.0.113.1"}, {"TURN_RATE_PER_IP_HOUR", "120"}])
+      assert Config.rate_per_ip_hour() == 120
     end
   end
 end

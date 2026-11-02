@@ -15,6 +15,7 @@ defmodule Chat.Application do
   def start(_type, _args) do
     Logger.put_application_level(:ssl, :error)
     log_version()
+    Chat.Turn.Config.setup()
 
     children =
       [
@@ -43,7 +44,6 @@ defmodule Chat.Application do
         Chat.Sync.CargoRoom,
         Chat.Sync.OnlinersSync,
         Chat.Sync.UsbDriveDumpRoom,
-        Chat.Turn.Config,
         {DynamicSupervisor, name: Chat.Upload.UploadSupervisor},
         {DynamicSupervisor, name: Chat.Db.FreeSpacesSupervisor},
         ChatWeb.Presence,

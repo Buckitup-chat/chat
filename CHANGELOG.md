@@ -12,7 +12,29 @@ straightforward as possible.
 
 ### Added
 
-- Write token create and list in origin sandbox
+- Review: gated integration tests for review tokens via sandboxes
+
+## 2026-10-31_5bb3238\_\_\_2026-10-31_957ea34f\_\_\_2026-10-30_8bf16bd
+
+### Added
+
+- Review auth tokens: encrypted bot storage, identity-based encrypt/decrypt, worker verification, rate-limited creation endpoint, and sandbox UI
+- Review sandbox: token bind flow; write token create and list in origin sandbox
+- Review: gated reviews integration test
+- Backup: display free space in admin while regular backup runs
+- Documentation: subaccounts scope (venues, delegation, identities), account recovery via passkey (WebAuthn PRF), notes-to-self as derived subaccounts, node playback spec, avatars as dialog content, guardian meta seed, recovery services wire forms, review auth token spec
+- [frontend] `@buckitup/pq-client` package: protocol layer extracted as standalone Node-loadable library — transport (challenges, key proofs, writes, read sessions, shape reads), dialog primitives (hash, message keys, wrapping, content, reactions, receipts), and AES-256-GCM encryption
+
+### Changed
+
+- Origin sandbox slimmed to owner-only; origin management moved to moderation sandbox
+- Review MVP spec: switch to go_server, refine QR flow
+
+### Fixed
+
+- Settings form: prevent collapse on keystroke, fix update mutation for existing settings
+- Gate Electric peer sync on owner presence in start_source
+- [platform] Remove redundant init_electric_peers from PhoenixSyncInit
 
 ## 2026-10-17_8bfa4f6\_\_\_2026-10-24_6ef8569e\_\_\_2026-10-23_b7ebd02
 

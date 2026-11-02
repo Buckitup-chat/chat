@@ -122,25 +122,18 @@ POST /electric/v1/turn_credentials      {user_hash, challenge_id, signature}
      ← 503 {"error": "turn_unavailable"}
 ```
 
-1. **Prove possession.** Proof of possession is one module,
-   `Chat.Pq.ProofOfPossession`, for its three callers — ingest, read sessions
-   and this endpoint — and owned by none of them. It holds what they do today,
-   each on its own:
-   - `take(challenge_id, signature_b64)` consumes the challenge and decodes
-     the signature, giving `%{challenge, signature}`. Ingest's
-     `ChatWeb.Utils.IngestPop.context/1` keeps reading the body's `auth` field
-     and calls it.
-   - `verify(pop, sign_pkey)` checks ML-DSA-87 over the challenge's UTF-8
-     bytes. The shapes' ingest validations call it with the key their
-     mutation answers to — the row's own `sign_pkey` for a new `user_card`, the
-     stored card's otherwise — where they call `EnigmaPq.verify/3` now.
-   - `verify_user(user_hash, challenge_id, signature_b64)` is `take`, the
-     `sign_pkey` of a card with `deleted_flag: false`, and `verify`. Its steps
-     come out of the `with` chain of `ReadGate.open_session/4`, which then
-     calls it as this endpoint does.
+1. **Prove possession.** `ReadGate.verify_user(user_hash, challenge_id,
+   signature_b64)` — extracted from the `with` chain of
+   `ReadGate.open_session/4` — consumes the challenge, fetches the
+   `sign_pkey` of a card with `deleted_flag: false`, and verifies ML-DSA-87
+   over the challenge's UTF-8 bytes. This endpoint and `open_session` both
+   call it; `open_session` then checks the vouch chain on top.
    - A deleted identity is `401 unknown_user` on both endpoints, and a
      malformed `user_hash` a `401`, not a `500`; one error mapping for the
-     three failures serves both controllers. Ingest's answers do not change.
+     three failures serves both controllers.
+   - Ingest is not involved: `ChatWeb.Utils.IngestPop` stays as it is — it
+     returns the raw challenge and signature for each shape's validation to
+     verify against the mutation's own key, which differs per shape.
 2. **Issue** the credentials above. `uris` is `TURN_URIS` verbatim, e.g.:
 
    ```json
@@ -316,8 +309,8 @@ The same relay in chat, with what differs on a LAN:
   `trust` mode an identity with no vouch still gets credentials.
 - **Rate limit:** the 61st issue from one IP in an hour is `429` with
   `retry_after`; another IP is unaffected; an expired entry is swept.
-- **`ProofOfPossession`:** the ingest and read-session tests pass unchanged
-  through it, and a deleted card is `unknown_user` on both endpoints.
+- **`verify_user`:** a deleted card is `unknown_user` on both the TURN and
+  read-session endpoints; `ReadGate.open_session` tests pass unchanged.
 - **The relay's `auth_fun`:** the test vector's credential is accepted before
   its expiry and refused after it; a wrong credential, a wrong realm and a
   username that does not parse are refused, and none raises.
@@ -383,6 +376,6 @@ Proposed.
 
 - `chat-frontend/docs/task-handshake-pq2.md` — the handshake that uses the relay.
 - [PQ access gating](pq_access_gating.in_progress.md) — why the endpoint is not chain-gated.
-- [Proof-of-Possession](../invariants/01_proof_of_possession.md) — the ingest PoP that `Chat.Pq.ProofOfPossession` takes over.
+- [Proof-of-Possession](../invariants/01_proof_of_possession.md) — the ingest PoP; `ReadGate.verify_user` shares the pattern.
 - `Buckitup-chat/platform`: `config/platform/target.exs` (the device networks), `Platform.ChatBridge.Lan` (the `eth0` profile and lease) — where a device relay's whitelist comes from.
 - draft-uberti-rtcweb-turn-rest-00 — the credential scheme.

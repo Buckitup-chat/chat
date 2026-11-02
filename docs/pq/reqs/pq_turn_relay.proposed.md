@@ -162,9 +162,10 @@ that proxy. The default is lenient because carrier-grade NAT puts many phones
 behind one address; what bounds a determined abuser is the relay's port range
 and the host firewall's rate limits (§ The relay).
 
-**`503 turn_unavailable`** when the relay is not running: a server with no
-`TURN_PUBLIC_IP` set runs none. The client proceeds with its own addresses only, which is all a shared
-network without client isolation needs.
+**`503 turn_unavailable`** when the relay is not running: a server whose
+`DOMAIN` does not resolve to an IPv4 address (and has no `TURN_PUBLIC_IP`
+override) runs none. The client proceeds with its own addresses only, which is
+all a shared network without client isolation needs.
 
 Routing: in the `/electric/v1` scope next to `/challenge`, **outside**
 `ElectricReadiness`, with an `options` route for CORS. The endpoint needs the
@@ -177,12 +178,15 @@ database it cannot reach is `503 turn_unavailable`, the documented body.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `TURN_PUBLIC_IP` | unset → no relay, `503` | `turn_ipv4_address`: the address relays are given out under |
-| `TURN_URIS` | the UDP and TCP URIs of `TURN_PUBLIC_IP` | Comma-separated list returned as `uris`, for a host whose name the clients use |
+| `TURN_PUBLIC_IP` | resolved from `DOMAIN` at startup; unresolvable → no relay, `503` | `turn_ipv4_address`: the IPv4 address the stun library hands out in relay allocations. Override when the relay's IP differs from the domain's A record |
+| `TURN_URIS` | `turn:<DOMAIN>:3478?transport=udp`, `turn:<DOMAIN>:3478?transport=tcp` | Comma-separated list returned as `uris`. Uses the hostname so clients resolve it themselves |
 | `TURN_TTL_SECONDS` | `600` | Credential lifetime. A client renews when less than 150 s remain, so a session never outlives its credential |
 | `TURN_RATE_PER_IP_HOUR` | `60` | Issues per client IP per hour |
 
-A device sets none of these (§ On a BuckitUp device).
+`DOMAIN` is already set in `config/prod.exs` and `config/platform/target.exs`.
+When neither `TURN_PUBLIC_IP` nor `DOMAIN` yields an IPv4 address, `enabled?/0`
+returns `false` and the endpoint answers `503`. A device sets none of these
+(§ On a BuckitUp device).
 
 ---
 
@@ -207,10 +211,11 @@ raises — it runs inside the listener for every client:
 
 **Options:**
 - `auth_type: user`, `auth_realm` the domain.
-- `turn_ipv4_address`: `TURN_PUBLIC_IP`, required; on a device, each
-  listener's own address. The library's default is `127.0.0.1`, which would
-  hand out relay addresses nobody can reach, so the relay refuses to start a
-  listener without it.
+- `turn_ipv4_address`: `TURN_PUBLIC_IP` if set, otherwise `DOMAIN` resolved
+  via `:inet.getaddr(domain, :inet)` at startup; on a device, each listener's
+  own address. The library's default is `127.0.0.1`, which would hand out
+  relay addresses nobody can reach, so the relay refuses to start a listener
+  without it.
 - `turn_min_port` / `turn_max_port`: the relay port range, which is also the
   cap on concurrent allocations.
 - `turn_max_allocations` 4 per credential: each phone allocates two per
@@ -305,8 +310,9 @@ The same relay in chat, with what differs on a LAN:
 - **Credential function:** the test vector above. The username carries a
   future expiry and a 32-hex tag, and two issues never share a tag.
 - **Controller:** each error row of § Endpoint. A valid PoP returns the
-  configured `uris`. With `TURN_PUBLIC_IP` unset the answer is `503`, and in
-  `trust` mode an identity with no vouch still gets credentials.
+  configured `uris`. With neither `TURN_PUBLIC_IP` set nor `DOMAIN` resolvable
+  the answer is `503`, and in `trust` mode an identity with no vouch still
+  gets credentials.
 - **Rate limit:** the 61st issue from one IP in an hour is `429` with
   `retry_after`; another IP is unaffected; an expired entry is swept.
 - **`verify_user`:** a deleted card is `unknown_user` on both the TURN and

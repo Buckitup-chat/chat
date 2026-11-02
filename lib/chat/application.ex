@@ -43,6 +43,7 @@ defmodule Chat.Application do
         Chat.Sync.CargoRoom,
         Chat.Sync.OnlinersSync,
         Chat.Sync.UsbDriveDumpRoom,
+        Chat.Turn.Config,
         {DynamicSupervisor, name: Chat.Upload.UploadSupervisor},
         {DynamicSupervisor, name: Chat.Db.FreeSpacesSupervisor},
         ChatWeb.Presence,

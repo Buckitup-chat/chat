@@ -8,6 +8,7 @@ defmodule Chat.Turn.Supervisor do
   alias Chat.Turn.Auth
   alias Chat.Turn.Config
   alias Chat.Turn.PeerPolicy
+  alias Chat.Turn.RateLimiter
 
   @turn_port 3478
   @relay_min_port 49_152
@@ -23,7 +24,7 @@ defmodule Chat.Turn.Supervisor do
   def init(_arg) do
     children =
       if Config.enabled?() do
-        [{Task, fn -> start_listeners() end}]
+        [RateLimiter, {Task, fn -> start_listeners() end}]
       else
         log("TURN relay disabled — no public IP", :info)
         []

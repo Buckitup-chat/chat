@@ -7,6 +7,7 @@ defmodule Chat.Turn.Supervisor do
 
   alias Chat.Turn.Auth
   alias Chat.Turn.Config
+  alias Chat.Turn.PeerPolicy
   alias Chat.Turn.RateLimiter
 
   @turn_port 3478
@@ -58,6 +59,6 @@ defmodule Chat.Turn.Supervisor do
       turn_max_port: @relay_max_port,
       turn_max_allocations: @max_allocations,
       turn_max_permissions: @max_permissions
-    ]
+    ] ++ PeerPolicy.listener_opts()
   end
 end

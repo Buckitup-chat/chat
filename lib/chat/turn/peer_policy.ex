@@ -61,11 +61,13 @@ defmodule Chat.Turn.PeerPolicy do
   defp host_subnet(ip), do: {ip, 32}
 
   @spec matches?(subnet(), :inet.ip4_address()) :: boolean()
-  def matches?({{a, b, c, d}, mask}, {e, f, g, h}) do
-    import Bitwise
-    subnet_int = (a <<< 24) + (b <<< 16) + (c <<< 8) + d
-    ip_int = (e <<< 24) + (f <<< 16) + (g <<< 8) + h
-    shift = 32 - mask
-    subnet_int >>> shift == ip_int >>> shift
+  def matches?({net, mask}, ip) do
+    IP.Prefix.contains_address?(to_prefix(net, mask), to_address(ip))
   end
+
+  defp to_address(tuple) do
+    tuple |> :inet.ntoa() |> to_string() |> IP.Address.from_string!()
+  end
+
+  defp to_prefix(net, mask), do: IP.Prefix.new(to_address(net), mask)
 end

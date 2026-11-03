@@ -221,6 +221,8 @@ defmodule ChatWeb.Router do
     get "/status", ElectricStatusController, :show
     get "/challenge", ChallengeController, :create
     get "/device_identity", DeviceIdentityController, :show
+    options "/turn_credentials", TurnCredentialsController, :options
+    post "/turn_credentials", TurnCredentialsController, :create
 
     scope "/" do
       pipe_through ChatWeb.Plugs.ElectricReadiness

@@ -4,6 +4,7 @@ defmodule ChatWeb.TurnCredentialsController do
   alias Chat.Pq.ReadGate
   alias Chat.Turn.Config
   alias Chat.Turn.Credentials
+  alias Chat.Turn.RateLimiter
 
   def create(conn, params) do
     if Config.enabled?() do
@@ -18,6 +19,18 @@ defmodule ChatWeb.TurnCredentialsController do
   def options(conn, _params), do: send_resp(conn, 204, "")
 
   defp issue_credentials(conn, params) do
+    case RateLimiter.check_and_increment(conn.remote_ip) do
+      :ok ->
+        authenticate_and_issue(conn, params)
+
+      {:error, retry_after} ->
+        conn
+        |> put_status(429)
+        |> json(%{error: "rate_limited", retry_after: retry_after})
+    end
+  end
+
+  defp authenticate_and_issue(conn, params) do
     params["user_hash"]
     |> ReadGate.verify_user(params["challenge_id"], params["signature"])
     |> case do

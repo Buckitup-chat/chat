@@ -3,7 +3,7 @@ defmodule Chat.Turn.Supervisor do
 
   use Supervisor
 
-  require Logger
+  use Toolbox.OriginLog
 
   alias Chat.Turn.Auth
   alias Chat.Turn.Config
@@ -24,7 +24,7 @@ defmodule Chat.Turn.Supervisor do
       if Config.enabled?() do
         [{Task, fn -> start_listeners() end}]
       else
-        Logger.info("[turn] TURN relay disabled — no public IP")
+        log("TURN relay disabled — no public IP", :info)
         []
       end
 
@@ -36,13 +36,13 @@ defmodule Chat.Turn.Supervisor do
     opts = listener_opts()
 
     case :stun_listener.add_listener(ip, @turn_port, :udp, opts) do
-      :ok -> Logger.info("[turn] UDP listener started on 0.0.0.0:#{@turn_port}")
-      {:error, reason} -> Logger.error("[turn] UDP listener failed: #{inspect(reason)}")
+      :ok -> log("UDP listener started on 0.0.0.0:#{@turn_port}", :info)
+      {:error, reason} -> log("UDP listener failed: #{inspect(reason)}", :error)
     end
 
     case :stun_listener.add_listener(ip, @turn_port, :tcp, opts) do
-      :ok -> Logger.info("[turn] TCP listener started on 0.0.0.0:#{@turn_port}")
-      {:error, reason} -> Logger.error("[turn] TCP listener failed: #{inspect(reason)}")
+      :ok -> log("TCP listener started on 0.0.0.0:#{@turn_port}", :info)
+      {:error, reason} -> log("TCP listener failed: #{inspect(reason)}", :error)
     end
   end
 

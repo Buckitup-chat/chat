@@ -4,7 +4,7 @@ defmodule Chat.Turn.Auth do
   alias Chat.Turn.Config
 
   @spec auth_fun(binary(), binary()) :: binary()
-  def auth_fun(username, realm) do
+  def auth_fun(username, realm) when is_binary(username) and is_binary(realm) do
     with :ok <- check_realm(realm),
          {:ok, expiry_str, tag} <- parse_username(username),
          {:ok, expiry} <- parse_expiry(expiry_str),
@@ -13,9 +13,9 @@ defmodule Chat.Turn.Auth do
     else
       _ -> <<"">>
     end
-  rescue
-    _ -> <<"">>
   end
+
+  def auth_fun(_username, _realm), do: <<"">>
 
   defp check_realm(realm) do
     if realm == Config.realm(), do: :ok, else: :error

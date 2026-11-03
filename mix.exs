@@ -135,6 +135,7 @@ defmodule Chat.MixProject do
         {:httpoison, "~> 2.0"},
         {:req, "~> 0.5"},
         {:tesla, "~> 1.7"},
+        {:stun, "~> 1.2"},
 
         # ElectricSQL / Phoenix.Sync
         {:electric, "~> 1.1"},

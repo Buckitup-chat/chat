@@ -18,6 +18,8 @@ defmodule Chat.Turn.Config do
       secret: secret,
       enabled: public_ip != nil,
       public_ip: public_ip,
+      public_ip_tuple: parse_ip_tuple(public_ip),
+      realm: domain || "buckitup.local",
       uris: parse_uris(System.get_env("TURN_URIS"), domain, turn_public_ip),
       ttl: env_int("TURN_TTL_SECONDS", @default_ttl),
       rate_per_ip_hour: env_int("TURN_RATE_PER_IP_HOUR", @default_rate_per_ip_hour)
@@ -27,6 +29,8 @@ defmodule Chat.Turn.Config do
   def secret, do: get(:secret)
   def enabled?, do: get(:enabled)
   def public_ip, do: get(:public_ip)
+  def public_ip_tuple, do: get(:public_ip_tuple)
+  def realm, do: get(:realm)
   def uris, do: get(:uris)
   def ttl, do: get(:ttl)
   def rate_per_ip_hour, do: get(:rate_per_ip_hour)
@@ -54,6 +58,13 @@ defmodule Chat.Turn.Config do
       {:ok, ip} -> ip |> :inet.ntoa() |> to_string()
       _ -> nil
     end
+  end
+
+  defp parse_ip_tuple(nil), do: nil
+
+  defp parse_ip_tuple(ip_string) do
+    {:ok, tuple} = ip_string |> String.to_charlist() |> :inet.parse_address()
+    tuple
   end
 
   defp parse_uris(nil, domain, turn_public_ip) do

@@ -50,6 +50,7 @@ defmodule Chat.Application do
         ChatWeb.RateLimiter,
         # Start the Endpoint (http/https)
         {ChatWeb.Endpoint, phoenix_sync: Phoenix.Sync.plug_opts()},
+        Chat.Turn.Supervisor,
         # Staged boot: Repo → Electric check → ChunkPipeline (host only)
         Chat.DbBootSupervisor |> if_on_host(),
         NetworkSynchronization.Supervisor,

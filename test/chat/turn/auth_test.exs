@@ -60,6 +60,17 @@ defmodule Chat.Turn.AuthTest do
       username = "#{past}:#{@test_tag}"
       assert Auth.auth_fun(username, @test_realm) == <<"">>
     end
+
+    test "expired credential is refused outright, not returned as {expired, pass}" do
+      setup_config()
+      past = System.os_time(:second) - 1
+      username = "#{past}:#{@test_tag}"
+      result = Auth.auth_fun(username, @test_realm)
+
+      assert result == <<"">>
+      expected_credential = :crypto.mac(:hmac, :sha, @test_secret, username) |> Base.encode64()
+      refute result == expected_credential
+    end
   end
 
   describe "refuses wrong realm" do

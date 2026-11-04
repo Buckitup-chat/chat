@@ -1,6 +1,7 @@
 defmodule Chat.Data.ReviewWriteToken.Validation do
   @moduledoc "Validation for review_write_token operations."
 
+  alias Chat.Data.ReviewWriteToken, as: ReviewWriteTokenData
   alias Chat.Data.Schemas.ReviewWriteToken
   alias Chat.Data.User, as: UserData
   alias Chat.Data.User.Validation, as: UserValidation
@@ -38,7 +39,8 @@ defmodule Chat.Data.ReviewWriteToken.Validation do
   # --- HTTP ingestion ---
 
   def review_write_token_allowed(operation, %{challenge: challenge, signature: signature}) do
-    with %{sign_pkey: sign_pkey} <- UserData.get_card(review_bot_hash(operation)),
+    with bot_hash when is_binary(bot_hash) <- review_bot_hash(operation),
+         %{sign_pkey: sign_pkey} <- UserData.get_card(bot_hash),
          true <- EnigmaPq.verify(challenge, signature, sign_pkey) do
       :ok
     else
@@ -64,5 +66,11 @@ defmodule Chat.Data.ReviewWriteToken.Validation do
   defp review_bot_hash(%Operation{operation: :insert, changes: changes}),
     do: changes["review_bot_hash"] || changes[:review_bot_hash]
 
-  defp review_bot_hash(%Operation{data: %{"review_bot_hash" => hash}}), do: hash
+  # Update `original` carries only the primary key; trust the stored row's bot
+  defp review_bot_hash(%Operation{data: %{"nonce" => nonce}}) do
+    case ReviewWriteTokenData.get_review_write_token(nonce) do
+      %ReviewWriteToken{review_bot_hash: hash} -> hash
+      nil -> nil
+    end
+  end
 end

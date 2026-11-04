@@ -118,6 +118,30 @@ defmodule Chat.Data.ReviewWriteTokenValidationTest do
       assert {:error, "Invalid operation"} =
                Validation.review_write_token_allowed(operation, pop_context)
     end
+
+    test "accepts update (PK-only original) signed by review bot", ctx do
+      token = insert_token(ctx)
+      operation = update_operation(token.nonce)
+      pop_context = sign_challenge(ctx.bot_identity)
+      assert :ok = Validation.review_write_token_allowed(operation, pop_context)
+    end
+
+    test "rejects update signed by a stranger", ctx do
+      token = insert_token(ctx)
+      operation = update_operation(token.nonce)
+      pop_context = sign_challenge(ctx.stranger)
+
+      assert {:error, "Invalid operation"} =
+               Validation.review_write_token_allowed(operation, pop_context)
+    end
+
+    test "rejects update of unknown token", ctx do
+      operation = update_operation("missing_nonce")
+      pop_context = sign_challenge(ctx.bot_identity)
+
+      assert {:error, "Invalid operation"} =
+               Validation.review_write_token_allowed(operation, pop_context)
+    end
   end
 
   describe "upsert LWW" do
@@ -202,6 +226,16 @@ defmodule Chat.Data.ReviewWriteTokenValidationTest do
       relation: "review_write_tokens",
       data: nil,
       changes: %{"review_bot_hash" => review_bot_hash}
+    }
+  end
+
+  defp update_operation(nonce) do
+    %Operation{
+      index: 0,
+      operation: :update,
+      relation: "review_write_tokens",
+      data: %{"nonce" => nonce},
+      changes: %{"user_hash" => nil}
     }
   end
 

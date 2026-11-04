@@ -30,10 +30,10 @@ defmodule Chat.Turn.SupervisorTest do
       assert {:ok, {_, []}} = Chat.Turn.Supervisor.init([])
     end
 
-    test "starts with a listener task and rate limiter when TURN is enabled" do
+    test "starts a listener task when TURN is enabled" do
       setup_config(%{enabled: true, public_ip: "203.0.113.1", public_ip_tuple: {203, 0, 113, 1}})
       {:ok, {_, children}} = Chat.Turn.Supervisor.init([])
-      assert length(children) == 2
+      assert length(children) == 1
     end
   end
 end

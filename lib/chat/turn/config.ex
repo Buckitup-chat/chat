@@ -7,24 +7,51 @@ defmodule Chat.Turn.Config do
   @default_rate_per_ip_hour 60
   @turn_port 3478
 
-  def setup do
-    secret = :crypto.strong_rand_bytes(@secret_size)
-    turn_public_ip = System.get_env("TURN_PUBLIC_IP")
+  @doc """
+  Puts the per-boot config. `:server` relays on a public IP from TURN_* env or
+  the endpoint domain; `:lan` (device) relays on LAN addresses driven by
+  platform via `Chat.Turn.LanRelay`, ignoring TURN_* env and domain lookup.
+  """
+  def setup(mode \\ default_mode()) do
     domain = endpoint_domain()
-    resolved_ip = resolve_domain(domain)
-    public_ip = turn_public_ip || resolved_ip
 
-    :persistent_term.put(@key, %{
-      secret: secret,
+    %{
+      mode: mode,
+      secret: :crypto.strong_rand_bytes(@secret_size),
+      realm: domain || "buckitup.local",
+      ttl: env_int("TURN_TTL_SECONDS", @default_ttl),
+      rate_per_ip_hour: env_int("TURN_RATE_PER_IP_HOUR", @default_rate_per_ip_hour)
+    }
+    |> Map.merge(relay_config(mode, domain))
+    |> then(&:persistent_term.put(@key, &1))
+  end
+
+  defp relay_config(:lan, _domain) do
+    %{enabled: false, public_ip: nil, public_ip_tuple: nil, uris: []}
+  end
+
+  defp relay_config(:server, domain) do
+    turn_public_ip = System.get_env("TURN_PUBLIC_IP")
+    public_ip = turn_public_ip || resolve_domain(domain)
+
+    %{
       enabled: public_ip != nil,
       public_ip: public_ip,
       public_ip_tuple: parse_ip_tuple(public_ip),
-      realm: domain || "buckitup.local",
-      uris: parse_uris(System.get_env("TURN_URIS"), domain, turn_public_ip),
-      ttl: env_int("TURN_TTL_SECONDS", @default_ttl),
-      rate_per_ip_hour: env_int("TURN_RATE_PER_IP_HOUR", @default_rate_per_ip_hour)
-    })
+      uris: parse_uris(System.get_env("TURN_URIS"), domain, turn_public_ip)
+    }
   end
+
+  # coveralls-ignore-start
+  if Mix.target() == :host do
+    defp default_mode, do: :server
+  else
+    defp default_mode, do: :lan
+  end
+
+  # coveralls-ignore-stop
+
+  def mode, do: get(:mode)
 
   def secret, do: get(:secret)
   def enabled?, do: get(:enabled)
@@ -34,6 +61,9 @@ defmodule Chat.Turn.Config do
   def uris, do: get(:uris)
   def ttl, do: get(:ttl)
   def rate_per_ip_hour, do: get(:rate_per_ip_hour)
+
+  @doc "The only URI of a device relay listening on `ip`"
+  def lan_uri(ip), do: "turn:#{:inet.ntoa(ip)}:#{@turn_port}?transport=udp"
 
   defp get(key), do: :persistent_term.get(@key)[key]
 

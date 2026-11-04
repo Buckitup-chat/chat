@@ -1,20 +1,14 @@
 defmodule Chat.Turn.Supervisor do
-  @moduledoc "Starts TURN relay listeners when TURN is enabled"
+  @moduledoc "Starts the public TURN relay listeners (host only) when TURN is enabled"
 
   use Supervisor
 
   use Toolbox.OriginLog
 
-  alias Chat.Turn.Auth
   alias Chat.Turn.Config
-  alias Chat.Turn.PeerPolicy
-  alias Chat.Turn.RateLimiter
+  alias Chat.Turn.Listener
 
-  @turn_port 3478
-  @relay_min_port 49_152
-  @relay_max_port 65_535
-  @max_allocations 4
-  @max_permissions 16
+  @any_ip {0, 0, 0, 0}
 
   def start_link(arg) do
     Supervisor.start_link(__MODULE__, arg, name: __MODULE__)
@@ -24,7 +18,7 @@ defmodule Chat.Turn.Supervisor do
   def init(_arg) do
     children =
       if Config.enabled?() do
-        [RateLimiter, {Task, fn -> start_listeners() end}]
+        [{Task, fn -> start_listeners() end}]
       else
         log("TURN relay disabled — no public IP", :info)
         []
@@ -34,31 +28,14 @@ defmodule Chat.Turn.Supervisor do
   end
 
   defp start_listeners do
-    ip = {0, 0, 0, 0}
-    opts = listener_opts()
+    public_ip = Config.public_ip_tuple()
+    opts = Listener.opts(public_ip, [public_ip])
 
-    case :stun_listener.add_listener(ip, @turn_port, :udp, opts) do
-      :ok -> log("UDP listener started on 0.0.0.0:#{@turn_port}", :info)
-      {:error, reason} -> log("UDP listener failed: #{inspect(reason)}", :error)
-    end
-
-    case :stun_listener.add_listener(ip, @turn_port, :tcp, opts) do
-      :ok -> log("TCP listener started on 0.0.0.0:#{@turn_port}", :info)
-      {:error, reason} -> log("TCP listener failed: #{inspect(reason)}", :error)
-    end
-  end
-
-  defp listener_opts do
-    [
-      use_turn: true,
-      auth_type: :user,
-      auth_realm: Config.realm(),
-      auth_fun: &Auth.auth_fun/2,
-      turn_ipv4_address: Config.public_ip_tuple(),
-      turn_min_port: @relay_min_port,
-      turn_max_port: @relay_max_port,
-      turn_max_allocations: @max_allocations,
-      turn_max_permissions: @max_permissions
-    ] ++ PeerPolicy.listener_opts()
+    Enum.each([:udp, :tcp], fn transport ->
+      case Listener.add(@any_ip, transport, opts) do
+        :ok -> log("#{transport} listener started on 0.0.0.0:#{Listener.port()}", :info)
+        {:error, reason} -> log("#{transport} listener failed: #{inspect(reason)}", :error)
+      end
+    end)
   end
 end

@@ -4,24 +4,38 @@ defmodule ChatWeb.TurnCredentialsController do
   alias Chat.Pq.ReadGate
   alias Chat.Turn.Config
   alias Chat.Turn.Credentials
+  alias Chat.Turn.LanRelay
   alias Chat.Turn.RateLimiter
 
   def create(conn, params) do
-    if Config.enabled?() do
-      issue_credentials(conn, params)
-    else
-      conn
-      |> put_status(503)
-      |> json(%{error: "turn_unavailable"})
+    case relay_uris(conn) do
+      {:ok, uris} ->
+        issue_credentials(conn, params, uris)
+
+      :unavailable ->
+        conn
+        |> put_status(503)
+        |> json(%{error: "turn_unavailable"})
     end
   end
 
   def options(conn, _params), do: send_resp(conn, 204, "")
 
-  defp issue_credentials(conn, params) do
+  defp relay_uris(conn) do
+    case Config.mode() do
+      :server ->
+        if Config.enabled?(), do: {:ok, Config.uris()}, else: :unavailable
+
+      :lan ->
+        %{address: local_ip} = get_sock_data(conn)
+        if LanRelay.active?(local_ip), do: {:ok, [Config.lan_uri(local_ip)]}, else: :unavailable
+    end
+  end
+
+  defp issue_credentials(conn, params, uris) do
     case RateLimiter.check_and_increment(conn.remote_ip) do
       :ok ->
-        authenticate_and_issue(conn, params)
+        authenticate_and_issue(conn, params, uris)
 
       {:error, retry_after} ->
         conn
@@ -30,7 +44,7 @@ defmodule ChatWeb.TurnCredentialsController do
     end
   end
 
-  defp authenticate_and_issue(conn, params) do
+  defp authenticate_and_issue(conn, params, uris) do
     params["user_hash"]
     |> ReadGate.verify_user(params["challenge_id"], params["signature"])
     |> case do
@@ -41,7 +55,7 @@ defmodule ChatWeb.TurnCredentialsController do
           username: username,
           credential: credential,
           ttl: ttl,
-          uris: Config.uris()
+          uris: uris
         })
 
       {:error, reason} ->

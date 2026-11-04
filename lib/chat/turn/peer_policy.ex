@@ -1,11 +1,20 @@
 defmodule Chat.Turn.PeerPolicy do
-  @moduledoc "Builds TURN peer blacklist/whitelist for stun listener options"
+  @moduledoc """
+  Builds the TURN peer access list for stun listener options.
 
-  alias Chat.Turn.Config
+  Allowed LAN ranges are encoded as holes cut out of the blacklist, and
+  `turn_whitelist_peers` stays empty. stun checks all peers of one request as
+  a set (`turn.erl` `is_blacklisted/3`): a single whitelisted address would
+  let every blacklisted address of the same request through. With an empty
+  whitelist the check is effectively per address.
+  """
 
-  @type subnet :: {:inet.ip4_address(), 0..32}
+  alias Chat.Turn.Cidr
 
-  @rfc1918_blacklist [
+  @type subnet :: Cidr.subnet()
+
+  @base_blacklist [
+    {{0, 0, 0, 0}, 8},
     {{10, 0, 0, 0}, 8},
     {{100, 64, 0, 0}, 10},
     {{127, 0, 0, 0}, 8},
@@ -17,57 +26,35 @@ defmodule Chat.Turn.PeerPolicy do
     {{240, 0, 0, 0}, 4}
   ]
 
-  @unsafe_ips [
-    {0, 0, 0, 1},
-    {127, 0, 0, 1}
+  @never_allowed [
+    {{0, 0, 0, 0}, 8},
+    {{127, 0, 0, 0}, 8}
   ]
 
-  @spec listener_opts(whitelist :: [subnet()]) :: keyword()
-  def listener_opts(whitelist \\ []) do
-    public_ip = Config.public_ip_tuple()
+  @doc """
+  Listener options refusing `base_blacklist/0` and `own_ips`, except the
+  `allowed` ranges. Loopback, `0.0.0.0/8` and `own_ips` are never allowed.
+  """
+  @spec listener_opts([:inet.ip4_address()], [subnet()]) :: keyword()
+  def listener_opts(own_ips, allowed \\ []) do
+    own = Enum.map(own_ips, &{&1, 32})
+    holes = Cidr.subtract(allowed, @never_allowed ++ own)
 
     [
-      blacklist_peers: blacklist(public_ip),
-      whitelist_peers: sanitize_whitelist(whitelist, public_ip)
+      turn_blacklist_peers: Cidr.subtract(@base_blacklist ++ own, holes),
+      turn_whitelist_peers: []
     ]
   end
 
-  @spec blacklist(:inet.ip4_address() | nil) :: [subnet()]
-  def blacklist(public_ip) do
-    base = @rfc1918_blacklist
+  @spec base_blacklist() :: [subnet()]
+  def base_blacklist, do: @base_blacklist
 
-    case public_ip do
-      {_, _, _, _} -> [host_subnet(public_ip) | base]
-      _ -> base
-    end
+  @doc "Mirrors stun's per-address check for an empty whitelist"
+  @spec allowed?(keyword(), :inet.ip4_address()) :: boolean()
+  def allowed?(opts, ip) do
+    opts
+    |> Keyword.fetch!(:turn_blacklist_peers)
+    |> Enum.any?(&Cidr.contains?(&1, ip))
+    |> Kernel.not()
   end
-
-  @spec sanitize_whitelist([subnet()], :inet.ip4_address() | nil) :: [subnet()]
-  def sanitize_whitelist(whitelist, public_ip) do
-    Enum.reject(whitelist, &unsafe?(&1, public_ip))
-  end
-
-  defp unsafe?({_net, _mask} = subnet, public_ip) do
-    covers_unsafe_ip?(subnet) or covers_host?(subnet, public_ip)
-  end
-
-  defp covers_unsafe_ip?(subnet) do
-    Enum.any?(@unsafe_ips, fn ip -> matches?(subnet, ip) end)
-  end
-
-  defp covers_host?(_subnet, nil), do: false
-  defp covers_host?(subnet, public_ip), do: matches?(subnet, public_ip)
-
-  defp host_subnet(ip), do: {ip, 32}
-
-  @spec matches?(subnet(), :inet.ip4_address()) :: boolean()
-  def matches?({net, mask}, ip) do
-    IP.Prefix.contains_address?(to_prefix(net, mask), to_address(ip))
-  end
-
-  defp to_address(tuple) do
-    tuple |> :inet.ntoa() |> to_string() |> IP.Address.from_string!()
-  end
-
-  defp to_prefix(net, mask), do: IP.Prefix.new(to_address(net), mask)
 end

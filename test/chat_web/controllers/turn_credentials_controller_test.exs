@@ -6,11 +6,15 @@ defmodule ChatWeb.TurnCredentialsControllerTest do
 
   alias Chat.Challenge
   alias Chat.Turn.Config
+  alias Chat.Turn.LanRelay
+  alias Chat.Turn.RateLimiter
 
   @path "/electric/v1/turn_credentials"
+  @loopback {127, 0, 0, 1}
 
   setup do
     :ets.delete_all_objects(:buckitup_deferred_records)
+    :ets.delete_all_objects(RateLimiter)
 
     {alice, alice_card} = identity_with_card("Alice")
 
@@ -112,6 +116,43 @@ defmodule ChatWeb.TurnCredentialsControllerTest do
     end
   end
 
+  describe "on a device (lan mode)" do
+    setup do
+      put_lan_mode()
+      put_gate(:open)
+      :ok = LanRelay.start(@loopback, [@loopback], [])
+      on_exit(fn -> LanRelay.stop(@loopback) end)
+    end
+
+    test "without TURN_* env the only URI is the relay at the arrival address", ctx do
+      assert System.get_env("TURN_PUBLIC_IP") == nil
+
+      conn = post_turn_credentials(ctx.conn, ctx.alice_card.user_hash, ctx.alice.sign_skey)
+
+      assert %{"uris" => ["turn:127.0.0.1:3478?transport=udp"], "credential" => _} =
+               json_response(conn, 200)
+    end
+
+    test "address without a relay returns 503", ctx do
+      conn =
+        ctx.conn
+        |> arrived_at({192, 168, 25, 1})
+        |> post_turn_credentials(ctx.alice_card.user_hash, ctx.alice.sign_skey)
+
+      assert %{"error" => "turn_unavailable"} = json_response(conn, 503)
+    end
+
+    test "per-address rate limit holds", ctx do
+      for _ <- 1..Config.rate_per_ip_hour() do
+        RateLimiter.check_and_increment({127, 0, 0, 1})
+      end
+
+      conn = post_turn_credentials(ctx.conn, ctx.alice_card.user_hash, ctx.alice.sign_skey)
+
+      assert %{"error" => "rate_limited"} = json_response(conn, 429)
+    end
+  end
+
   describe "CORS" do
     setup do
       enable_turn()
@@ -149,6 +190,19 @@ defmodule ChatWeb.TurnCredentialsControllerTest do
 
       if prev_state, do: :persistent_term.put(Config, prev_state), else: Config.setup()
     end)
+  end
+
+  defp put_lan_mode do
+    prev_state = :persistent_term.get(Config, nil)
+    Config.setup(:lan)
+
+    on_exit(fn ->
+      if prev_state, do: :persistent_term.put(Config, prev_state), else: Config.setup()
+    end)
+  end
+
+  defp arrived_at(%{adapter: {adapter, payload}} = conn, local_ip) do
+    %{conn | adapter: {adapter, %{payload | sock_data: %{address: local_ip, port: 4444}}}}
   end
 
   defp cors_preflight(conn, path) do

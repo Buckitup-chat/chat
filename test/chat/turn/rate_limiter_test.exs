@@ -22,7 +22,8 @@ defmodule Chat.Turn.RateLimiterTest do
       rate_per_ip_hour: @limit
     })
 
-    start_supervised!(RateLimiter)
+    # RateLimiter runs under Chat.Application; start from an empty table
+    :ets.delete_all_objects(RateLimiter)
 
     on_exit(fn ->
       if prev, do: :persistent_term.put(Config, prev), else: :persistent_term.erase(Config)

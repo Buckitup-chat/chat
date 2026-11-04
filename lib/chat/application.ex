@@ -48,9 +48,11 @@ defmodule Chat.Application do
         {DynamicSupervisor, name: Chat.Db.FreeSpacesSupervisor},
         ChatWeb.Presence,
         ChatWeb.RateLimiter,
+        Chat.Turn.RateLimiter,
         # Start the Endpoint (http/https)
         {ChatWeb.Endpoint, phoenix_sync: Phoenix.Sync.plug_opts()},
-        Chat.Turn.Supervisor,
+        # Device relay listeners are driven by platform via Chat.Turn.LanRelay
+        Chat.Turn.Supervisor |> if_on_host(),
         # Staged boot: Repo → Electric check → ChunkPipeline (host only)
         Chat.DbBootSupervisor |> if_on_host(),
         NetworkSynchronization.Supervisor,

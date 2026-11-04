@@ -27,6 +27,7 @@ defmodule Chat.Turn.ConfigTest do
 
   describe "defaults (no TURN env vars, test env)" do
     test "enabled? returns false when no TURN_PUBLIC_IP and domain is localhost" do
+      assert Config.mode() == :server
       refute Config.enabled?()
     end
 
@@ -83,6 +84,25 @@ defmodule Chat.Turn.ConfigTest do
                "turn:relay.example.com:3478?transport=udp",
                "turn:relay.example.com:3478?transport=tcp"
              ]
+    end
+  end
+
+  describe "lan mode" do
+    test "ignores TURN_PUBLIC_IP and keeps the secret and realm" do
+      setup_config([{"TURN_PUBLIC_IP", "203.0.113.1"}, {"TURN_TTL_SECONDS", "300"}])
+      Config.setup(:lan)
+
+      assert Config.mode() == :lan
+      refute Config.enabled?()
+      assert Config.public_ip() == nil
+      assert Config.uris() == []
+      assert byte_size(Config.secret()) == 32
+      assert Config.realm() == "buckitup.local"
+      assert Config.ttl() == 300
+    end
+
+    test "lan_uri is the single UDP URI of the address" do
+      assert Config.lan_uri({192, 168, 25, 1}) == "turn:192.168.25.1:3478?transport=udp"
     end
   end
 

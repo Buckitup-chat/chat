@@ -39,8 +39,9 @@ So the relay needs availability, not trust.
 
 ## Architecture
 
-Two parts, both inside chat, the same on `buckitup.xyz`, on a BuckitUp device
-and on a local instance.
+Two parts, both in chat's code, the same on `buckitup.xyz`, on a BuckitUp
+device and on a local instance. On a device the platform decides when the
+relay's listeners run (§ On a BuckitUp device); the code they run is chat's.
 
 1. **Credential endpoint:** `POST /electric/v1/turn_credentials`,
    authenticated by proof of possession (§ Endpoint).
@@ -72,7 +73,8 @@ Rel (`elixir-webrtc/rel`) is UDP-only and has had no commit since April 2024.
 
 | The library | What covers it |
 |---|---|
-| Checks a request's peer addresses as a set: one whitelisted address lets every blacklisted one in the same request through | A patch that checks each address on its own, offered upstream. Until it lands, no deployment sets a whitelist |
+| Checks a request's peer addresses as a set: one whitelisted address lets every blacklisted one in the same request through | No deployment sets a whitelist. Allowed ranges are cut out of the blacklist instead, and with an empty whitelist the check is per address (§ Which peers a relay may reach) |
+| Takes peer lists only as `turn_blacklist_peers` / `turn_whitelist_peers`; any other key exits the listener with `unknown_option` | `Chat.Turn.Listener` builds every listener's options in one place |
 | Matches an IPv4 peer against a `::ffff:0:0/96` entry as if it were mapped, so that entry blocks every IPv4 peer | The entry is never listed. The relay allocates IPv4 only, and an IPv6 peer, mapped or not, fails its family check |
 | `{expired, Pass}` from `auth_fun` only stops a new Allocate; Refresh, CreatePermission and ChannelBind still pass | `auth_fun` refuses an expired credential outright. An allocation then ends within the lifetime last granted to it |
 | The `shaper` limits only TCP clients, never UDP or relayed traffic | Per-source rate limits in the host firewall (nftables) on 3478 and the relay port range |
@@ -231,7 +233,15 @@ range — the bandwidth the library does not shape. A handshake moves about
 ### Which peers a relay may reach
 
 A relay that reaches any address is an open proxy into the networks behind it.
-The library refuses a peer that is on the blacklist and not on the whitelist.
+The library refuses a peer that is on the blacklist and not on the whitelist,
+but checks all peers of one request as a set (§ Why the `stun` library). So
+the whitelist stays empty everywhere, and the ranges a relay may reach are
+**holes cut out of the blacklist**: `turn_blacklist_peers` = (base blacklist ∪
+the host's own addresses) − allowed ranges, written as CIDR blocks
+(`Chat.Turn.PeerPolicy`, `Chat.Turn.Cidr`). The platform's own networks are
+gray — inside the blacklisted RFC 1918 ranges — and are reachable only through
+such holes. A hole never covers loopback, `0.0.0.0/8` or the host's own
+addresses: they are subtracted from the allowed ranges first.
 
 **The blacklist, on every deployment:**
 - IPv4:
@@ -244,30 +254,29 @@ The library refuses a peer that is on the blacklist and not on the whitelist.
 No IPv6 entries: the relay is IPv4-only, and an IPv6 peer fails the family
 check first. No `::ffff:0:0/96` entry in any case (§ Why the `stun` library).
 
-**The whitelist depends on where the server is:**
-- **On the internet** (`buckitup.xyz`): empty. The relay serves phones on the
+**The allowed ranges depend on where the server is:**
+- **On the internet** (`buckitup.xyz`): none. The relay serves phones on the
   internet and reaches nothing private.
 - **On a BuckitUp device** (a node in an office or a home): the device's gray
-  IPs, minus its own addresses — a whitelist overrides the blacklist, so the
-  device itself must fall outside it. The platform repo
-  (`Buckitup-chat/platform`, `config/platform/target.exs`) defines them:
+  IPs, minus its own addresses. They come from VintageNet's live
+  configuration of each interface (defaults in the platform repo's
+  `config/platform/target.exs`):
 
-  | Interface | Network | Device | Whitelisted |
+  | Interface | Network | Device | Allowed |
   |---|---|---|---|
   | `wlan0` | the device's access point `BuckitUp.app`, `192.168.25.0/24` | `.1` | the DHCP pool `.10`–`.250` |
   | `eth0`, profile `no_internet` | the device serves the wired LAN, `192.168.24.0/24` | `.1` | the DHCP pool `.10`–`.250` |
-  | `eth0`, profile `internet` | a DHCP client of the site's LAN | its lease | the LAN's range from `Platform.ChatBridge.Lan` (`get_ip_address/0`, `get_ip_mask/0`), minus the lease |
+  | `eth0`, profile `internet` | a DHCP client of the site's LAN | its lease | the network of the lease (address and prefix length from VintageNet), minus the lease |
   | `usb0` | a host on USB, `192.168.26.0/24` | `.1` | the DHCP pool `.10`–`.250` |
 
   Each pool is written as the CIDR blocks that cover it. Phones on the
   device's Wi-Fi and phones on the wired side then reach each other through
   the relay, as do phones on a site Wi-Fi with client isolation.
-  - The relay keeps no list of its own: chat takes it from the platform
-    (§ On a BuckitUp device). Its clients can reach these networks anyway;
-    what the whitelist must never open is loopback and the device itself.
-  - It needs the per-address patch first: without it, a request naming one
-    LAN address and `127.0.0.1` passes. Until then a device relays to public
-    addresses only.
+  - The relay keeps no list of its own: the platform derives it from
+    VintageNet (§ On a BuckitUp device). Its clients can reach these networks
+    anyway; what a hole must never open is loopback and the device itself.
+  - No library patch is needed: with an empty whitelist, a request naming a
+    LAN address and `127.0.0.1` is refused for `127.0.0.1`.
 
 **Firewall** on the server: open UDP and TCP 3478 and the relay port range.
 The reverse proxy is not in the path: TURN goes to chat's listeners directly.
@@ -277,7 +286,19 @@ The reverse proxy is not in the path: TURN goes to chat's listeners directly.
 
 ### On a BuckitUp device
 
-The same relay in chat, with what differs on a LAN:
+The same relay code, with what differs on a LAN. Chat and the platform run
+in one BEAM, so the platform calls chat's modules directly — no bridge
+messages:
+
+- **Who runs it:** chat's `Chat.Turn.Supervisor` starts on a host only.
+  On a device `Platform.Network.TurnRelay` (target only) subscribes to
+  VintageNet `addresses` and `config` of `wlan0`, `eth0` and `usb0`, plans
+  each interface's address and allowed ranges (`TurnRelay.Plan`), and calls
+  `Chat.Turn.LanRelay.start/3` and `stop/1`. A listener starts as soon as its
+  interface has an IPv4 address; a start that fails (the address still
+  settling) is retried after 5 s. `Chat.Turn.Config.setup/0` runs in chat as
+  everywhere, so the platform's listeners check credentials with the same
+  secret and realm the endpoint signs with.
 
 - **Listeners:** one UDP listener on 3478 per LAN interface — `wlan0`,
   `eth0`, `usb0`, never ZeroTier — bound to the device's address there, with
@@ -285,20 +306,17 @@ The same relay in chat, with what differs on a LAN:
   the network it reached the device on. No TCP listener: a LAN does not block
   UDP.
 - **`uris`:** the endpoint answers one URI, the relay on the address the
-  request arrived at — `turn:192.168.25.1:3478?transport=udp` for a phone on
-  the device's Wi-Fi. The phone reached chat there, so it reaches the relay
-  there.
-- **Whitelist** (§ Which peers a relay may reach): chat asks the platform over
-  the bridge, as `LanDetector` asks for the LAN range:
-  - `{:lan_peer_ranges, pid}` on `chat->platform`, answered by
-    `Platform.ChatBridge.Worker` with `{:lan_peer_ranges, ranges}`: for each
-    interface, the device's address and the CIDR blocks to whitelist, built
-    from the platform's own configuration;
-  - when `eth0`'s profile or lease changes, the platform broadcasts
-    `{:platform_response, {:lan_peer_ranges, ranges}}` on `platform->chat`,
-    following VintageNet as `Platform.Network.IptablesMonitor` follows
-    `eth0`'s connection; chat restarts the listeners with the new addresses
-    and whitelist.
+  request arrived at (the socket's local address) —
+  `turn:192.168.25.1:3478?transport=udp` for a phone on the device's Wi-Fi.
+  The phone reached chat there, so it reaches the relay there. A request that
+  arrived at an address with no relay (ZeroTier, loopback) gets `503`.
+- **Config:** `Chat.Turn.Config` is in `:lan` mode on a device (chosen by the
+  compile target): it ignores `TURN_*` and does not resolve `DOMAIN`, which a
+  device maps to `127.0.0.1`.
+- **Allowed ranges** (§ Which peers a relay may reach): when `eth0`'s profile
+  or lease changes, VintageNet reports a new address or config and only the
+  `eth0` listener restarts, with the new address and ranges. Restarting it
+  drops its live allocations.
 - **Firewall:** nothing to open. The platform adds no input policy, so input
   is accepted on every interface.
 - The endpoint's per-address rate limit holds as on the server.
@@ -321,19 +339,19 @@ The same relay in chat, with what differs on a LAN:
   its expiry and refused after it; a wrong credential, a wrong realm and a
   username that does not parse are refused, and none raises.
 - **Peers:**
-  - with an empty whitelist, a permission toward a public IPv4 peer is
-    granted and one toward `192.168.1.10` refused;
-  - with a device's whitelist (and the patch in), `192.168.25.20` and
-    `192.168.24.20` are granted; `127.0.0.1`, `192.168.25.1` and
-    `192.168.24.1` are refused, alone and in a request that also names
+  - on the server, a permission toward a public IPv4 peer is granted and one
+    toward `192.168.1.10` refused;
+  - with a device's allowed ranges, `192.168.25.20` and `192.168.24.20` are
+    granted; `127.0.0.1`, `192.168.25.1` and `192.168.24.1` are refused, and
+    the whitelist is empty, so they are refused also in a request that names
     `192.168.25.20`;
-  - the whitelist built for `eth0` on profile `internet` with lease
+  - the ranges built for `eth0` on profile `internet` with lease
     `10.1.2.3/16` covers `10.1.0.0/16` and leaves out `10.1.2.3`, and after a
     switch to `no_internet` the `10.1.0.0/16` range is refused.
 - **On a device:**
-  - a `lan_peer_ranges` answer starts one listener per interface, each with
-    its own address as `turn_ipv4_address`; a broadcast with another `eth0`
-    lease restarts them with the new address and whitelist;
+  - the plan from VintageNet state gives one listener per interface, each
+    with its own address as `turn_ipv4_address`; another `eth0` lease
+    restarts only that listener, with the new address and ranges;
   - with no `TURN_*` variable set the endpoint issues credentials, and a
     request that arrived at `192.168.25.1` gets
     `turn:192.168.25.1:3478?transport=udp` as its only URI.
@@ -383,5 +401,5 @@ Proposed.
 - `chat-frontend/docs/task-handshake-pq2.md` — the handshake that uses the relay.
 - [PQ access gating](pq_access_gating.in_progress.md) — why the endpoint is not chain-gated.
 - [Proof-of-Possession](../invariants/01_proof_of_possession.md) — the ingest PoP; `ReadGate.verify_user` shares the pattern.
-- `Buckitup-chat/platform`: `config/platform/target.exs` (the device networks), `Platform.ChatBridge.Lan` (the `eth0` profile and lease) — where a device relay's whitelist comes from.
+- `Buckitup-chat/platform`: `config/platform/target.exs` (the device networks), `Platform.Network.TurnRelay` (runs a device's listeners from VintageNet) — where a device relay's addresses and allowed ranges come from.
 - draft-uberti-rtcweb-turn-rest-00 — the credential scheme.

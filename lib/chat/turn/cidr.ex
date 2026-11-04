@@ -1,51 +1,71 @@
 defmodule Chat.Turn.Cidr do
   @moduledoc """
-  IPv4 range math over `{ip_tuple, prefix_len}` subnets.
+  CIDR set operations built on the `ip` library.
 
-  Ranges are handled as inclusive integer intervals, so subtraction and
-  pool → CIDR decomposition are exact.
+  Pool and subtract provide range-to-prefix decomposition and set
+  difference that `IP.Prefix` does not offer natively.
+
+  The subnet type matches `:stun`'s `turn:subnet()` so values pass
+  through to listener options unchanged.
   """
 
   import Bitwise
 
   @type subnet :: {:inet.ip4_address(), 0..32}
 
-  @max 0xFFFFFFFF
-
   @spec contains?(subnet(), :inet.ip4_address()) :: boolean()
   def contains?(subnet, ip) do
-    {lo, hi} = to_range(subnet)
-    n = to_int(ip)
-    n >= lo and n <= hi
+    IP.Prefix.contains_address?(to_prefix(subnet), IP.Address.from_tuple!(ip))
   end
 
   @doc "Subnet of `ip` with `prefix_len` (host bits cleared)"
   @spec network(:inet.ip4_address(), 0..32) :: subnet()
   def network(ip, prefix_len) do
-    {ip |> to_int() |> band(mask(prefix_len)) |> from_int(), prefix_len}
+    prefix = IP.Prefix.new(IP.Address.from_tuple!(ip), prefix_len)
+    from_prefix(prefix)
   end
 
   @doc "Minimal subnets covering `first..last` inclusive"
   @spec pool(:inet.ip4_address(), :inet.ip4_address()) :: [subnet()]
-  def pool(first, last), do: from_range(to_int(first), to_int(last))
+  def pool(first, last) do
+    from_range(to_int(first), to_int(last))
+  end
 
   @doc "Subnets covering every address of `subnets` that is not in `holes`"
   @spec subtract([subnet()], [subnet()]) :: [subnet()]
   def subtract(subnets, holes) do
-    holes = holes |> Enum.map(&to_range/1) |> merge()
+    holes = holes |> Enum.map(&prefix_range/1) |> merge()
 
     subnets
-    |> Enum.map(&to_range/1)
+    |> Enum.map(&prefix_range/1)
     |> merge()
     |> Enum.flat_map(&cut(&1, holes))
     |> Enum.flat_map(fn {lo, hi} -> from_range(lo, hi) end)
   end
 
   @spec to_range(subnet()) :: {non_neg_integer(), non_neg_integer()}
-  def to_range({ip, prefix_len}) do
-    lo = ip |> to_int() |> band(mask(prefix_len))
-    {lo, lo + (1 <<< (32 - prefix_len)) - 1}
+  def to_range(subnet), do: prefix_range(subnet)
+
+  # Conversions between stun tuples and IP library structs
+
+  defp to_prefix({ip, len}), do: IP.Prefix.new(IP.Address.from_tuple!(ip), len)
+
+  defp from_prefix(prefix) do
+    {IP.Address.to_tuple(IP.Prefix.first(prefix)), IP.Prefix.length(prefix)}
   end
+
+  defp prefix_range(subnet) do
+    prefix = to_prefix(subnet)
+    {to_int(prefix, :first), to_int(prefix, :last)}
+  end
+
+  defp to_int(prefix, :first), do: prefix |> IP.Prefix.first() |> IP.Address.to_integer()
+  defp to_int(prefix, :last), do: prefix |> IP.Prefix.last() |> IP.Address.to_integer()
+
+  defp to_int(ip_tuple), do: ip_tuple |> IP.Address.from_tuple!() |> IP.Address.to_integer()
+  defp from_int(n), do: n |> IP.Address.from_integer!(4) |> IP.Address.to_tuple()
+
+  # Range set operations (pure integer math — no IP library equivalent)
 
   defp cut(range, holes) do
     Enum.reduce(holes, [range], fn hole, acc -> Enum.flat_map(acc, &cut_one(&1, hole)) end)
@@ -80,10 +100,4 @@ defmodule Chat.Turn.Cidr do
     |> Range.new(0, -1)
     |> Enum.find(fn bits -> rem(lo, 1 <<< bits) == 0 and 1 <<< bits <= count end)
   end
-
-  defp mask(prefix_len), do: @max <<< (32 - prefix_len) &&& @max
-
-  defp to_int({a, b, c, d}), do: (a <<< 24) + (b <<< 16) + (c <<< 8) + d
-
-  defp from_int(n), do: {n >>> 24 &&& 255, n >>> 16 &&& 255, n >>> 8 &&& 255, n &&& 255}
 end

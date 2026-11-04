@@ -114,6 +114,26 @@ defmodule Chat.Data.OriginBotValidationTest do
       pop_context = sign_challenge(ctx.stranger)
       assert {:error, "Invalid operation"} = Validation.origin_bot_allowed(operation, pop_context)
     end
+
+    test "accepts update (PK-only original) signed by origin identity", ctx do
+      insert_origin_bot(ctx)
+      operation = update_operation(ctx.bot_hash)
+      pop_context = sign_challenge(ctx.origin_identity)
+      assert :ok = Validation.origin_bot_allowed(operation, pop_context)
+    end
+
+    test "rejects update signed by a stranger", ctx do
+      insert_origin_bot(ctx)
+      operation = update_operation(ctx.bot_hash)
+      pop_context = sign_challenge(ctx.stranger)
+      assert {:error, "Invalid operation"} = Validation.origin_bot_allowed(operation, pop_context)
+    end
+
+    test "rejects update of unknown bot", ctx do
+      operation = update_operation(ctx.bot_hash)
+      pop_context = sign_challenge(ctx.origin_identity)
+      assert {:error, "Invalid operation"} = Validation.origin_bot_allowed(operation, pop_context)
+    end
   end
 
   describe "upsert LWW" do
@@ -188,6 +208,16 @@ defmodule Chat.Data.OriginBotValidationTest do
       relation: "origin_bots",
       data: nil,
       changes: %{"origin_hash" => origin_hash}
+    }
+  end
+
+  defp update_operation(bot_hash) do
+    %Operation{
+      index: 0,
+      operation: :update,
+      relation: "origin_bots",
+      data: %{"bot_hash" => bot_hash},
+      changes: %{"encrypted_auth_token_b64" => :crypto.strong_rand_bytes(48)}
     }
   end
 

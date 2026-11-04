@@ -1,6 +1,7 @@
 defmodule Chat.Data.OriginBot.Validation do
   @moduledoc "Signature and integrity validation for origin bot operations."
 
+  alias Chat.Data.OriginBot, as: OriginBotData
   alias Chat.Data.Schemas.OriginBot
   alias Chat.Data.User, as: UserData
   alias Chat.Data.User.Validation, as: UserValidation
@@ -27,7 +28,8 @@ defmodule Chat.Data.OriginBot.Validation do
   end
 
   def origin_bot_allowed(operation, %{challenge: challenge, signature: signature}) do
-    with %{sign_pkey: sign_pkey} <- UserData.get_card(origin_hash(operation)),
+    with origin_hash when is_binary(origin_hash) <- origin_hash(operation),
+         %{sign_pkey: sign_pkey} <- UserData.get_card(origin_hash),
          true <- EnigmaPq.verify(challenge, signature, sign_pkey) do
       :ok
     else
@@ -57,5 +59,11 @@ defmodule Chat.Data.OriginBot.Validation do
   defp origin_hash(%Operation{operation: :insert, changes: changes}),
     do: changes["origin_hash"] || changes[:origin_hash]
 
-  defp origin_hash(%Operation{data: %{"origin_hash" => hash}}), do: hash
+  # Update/delete `original` carries only the primary key; trust the stored row's origin
+  defp origin_hash(%Operation{data: %{"bot_hash" => bot_hash}}) do
+    case OriginBotData.get_origin_bot(bot_hash) do
+      %OriginBot{origin_hash: hash} -> hash
+      nil -> nil
+    end
+  end
 end

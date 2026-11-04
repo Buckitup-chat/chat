@@ -122,6 +122,17 @@ defmodule ChatWeb.ReadSessionControllerTest do
       assert %{"error" => "unknown_user"} = json_response(conn, 401)
     end
 
+    test "deleted card returns unknown_user", %{conn: conn, alice: alice, alice_card: card} do
+      Chat.Repo.update_all(
+        Ecto.Query.from(c in Chat.Data.Schemas.UserCard, where: c.user_hash == ^card.user_hash),
+        set: [deleted_flag: true]
+      )
+
+      conn = post_read_session(conn, card.user_hash, "file", alice.sign_skey)
+
+      assert %{"error" => "unknown_user"} = json_response(conn, 401)
+    end
+
     test "signature by another key", %{conn: conn, owner: owner, alice_card: card} do
       conn = post_read_session(conn, card.user_hash, "file", owner.sign_skey)
 

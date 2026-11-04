@@ -1,4 +1,4 @@
-.PHONY: check test ci-check empty_db help assets
+.PHONY: check test test-brief ci-check empty_db help assets
 
 help:
 	@clear
@@ -42,6 +42,19 @@ test:
 	MIX_ENV=test mix ecto.create
 	MIX_ENV=test mix ecto.migrate
 	MIX_ENV=test mix test --max-failures=3 --cover
+
+## Full suite, quiet: prints only a summary + one line per failure.
+## Full output goes to _build/test_full.log. Pass extra args via ARGS="...".
+test-brief:
+	@rm -rf priv/test_db priv/test_admin_db _build/test_failures.txt
+	@mkdir -p priv/test_db priv/test_admin_db
+	@MIX_ENV=test mix do ecto.create --quiet, ecto.migrate --quiet > _build/test_full.log 2>&1 \
+		|| { tail -n 40 _build/test_full.log; exit 1; }
+	@MIX_ENV=test mix test --formatter Chat.Test.BriefFormatter $(ARGS) >> _build/test_full.log 2>&1; \
+		status=$$?; \
+		if [ -f _build/test_failures.txt ]; then cat _build/test_failures.txt; \
+		else echo "Suite did not finish (exit $$status). Last log lines:"; tail -n 40 _build/test_full.log; fi; \
+		exit $$status
 
 coverage:
 	MIX_ENV=test mix coveralls.html

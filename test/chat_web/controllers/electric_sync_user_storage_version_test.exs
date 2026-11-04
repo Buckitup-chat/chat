@@ -14,9 +14,9 @@ defmodule ChatWeb.ElectricSyncUserStorageVersionTest do
     {:ok, conn: conn}
   end
 
-  describe "GET /electric/v1/user_storage_version - sync endpoint" do
+  describe "GET /electric/v1/shapes?table=user_storage_versions - sync endpoint" do
     test "returns response with correct status", %{conn: conn} do
-      conn = get(conn, "/electric/v1/user_storage_version?offset=-1")
+      conn = get(conn, "/electric/v1/shapes", %{"table" => "user_storage_versions", "offset" => "-1"})
 
       assert conn.status == 200
     end
@@ -26,14 +26,14 @@ defmodule ChatWeb.ElectricSyncUserStorageVersionTest do
       insert_version!(card.user_hash, Ecto.UUID.generate())
       insert_version!(card.user_hash, Ecto.UUID.generate())
 
-      conn = get(conn, "/electric/v1/user_storage_version?offset=-1")
+      conn = get(conn, "/electric/v1/shapes", %{"table" => "user_storage_versions", "offset" => "-1"})
 
       assert conn.status == 200
       assert length(Repo.all(UserStorageVersion)) == 2
     end
   end
 
-  describe "GET /electric/v1/user_storage_version/:user_hash/:uuid - filtered by user and key" do
+  describe "GET /electric/v1/shapes?table=user_storage_versions - filtered by user and key" do
     @tag :skip
     test "returns SSE stream filtered by user_hash and uuid", %{conn: conn} do
       card1 = insert_card!("Alice")

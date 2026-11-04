@@ -35,9 +35,9 @@ defmodule ChatWeb.ElectricSyncTest do
     }
   end
 
-  describe "GET /electric/v1/user_card - sync endpoint" do
+  describe "GET /electric/v1/shapes?table=user_cards - sync endpoint" do
     test "returns response with correct status", %{conn: conn} do
-      conn = get(conn, "/electric/v1/user_card?offset=-1")
+      conn = get(conn, "/electric/v1/shapes", %{"table" => "user_cards", "offset" => "-1"})
 
       assert conn.status == 200
     end
@@ -53,7 +53,7 @@ defmodule ChatWeb.ElectricSyncTest do
         |> UserCard.create_changeset(user_card_attrs("Bob"))
         |> Repo.insert()
 
-      conn = get(conn, "/electric/v1/user_card?offset=-1")
+      conn = get(conn, "/electric/v1/shapes", %{"table" => "user_cards", "offset" => "-1"})
 
       assert conn.status == 200
 

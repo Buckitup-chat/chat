@@ -78,5 +78,14 @@ defmodule Chat.ReviewBot.Worker do
     end
   end
 
+  # `:sensitive` hides state from tracing only; `:sys.get_status` and crash reports still need this.
+  @impl true
+  def format_status(status) do
+    Map.update(status, :state, :redacted, fn
+      %{identity: _} = state -> %{state | identity: :redacted, auth_token: :redacted}
+      other -> other
+    end)
+  end
+
   defp via(bot_hash), do: {:via, Registry, {Chat.ReviewBot.Registry, bot_hash}}
 end

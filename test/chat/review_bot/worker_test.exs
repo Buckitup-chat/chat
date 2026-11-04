@@ -77,9 +77,10 @@ defmodule Chat.ReviewBot.WorkerTest do
       pid = Worker.whereis(ctx.bot_card.user_hash)
       status = :sys.get_status(pid)
 
-      status_str = inspect(status)
-      refute status_str =~ inspect(ctx.identity.sign_skey)
-      refute status_str =~ inspect(ctx.identity.crypt_skey)
+      full = [limit: :infinity, printable_limit: :infinity]
+      status_str = inspect(status, full)
+      refute status_str =~ inspect(ctx.identity.sign_skey, full)
+      refute status_str =~ inspect(ctx.identity.crypt_skey, full)
       assert status_str =~ ":redacted"
     end
   end

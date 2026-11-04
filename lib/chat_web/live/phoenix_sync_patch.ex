@@ -29,8 +29,7 @@ defmodule ChatWeb.PhoenixSyncPatch do
       end
 
     if Phoenix.LiveView.connected?(socket) do
-      client =
-        Keyword.get_lazy(electric_opts, :client, &ChatWeb.ElectricLive.SandboxGatedFetch.client/0)
+      client = Keyword.get_lazy(electric_opts, :client, &default_client/0)
 
       Phoenix.LiveView.stream(
         socket,
@@ -51,6 +50,18 @@ defmodule ChatWeb.PhoenixSyncPatch do
   end
 
   # Private functions - patched versions
+
+  # Test env has no HTTP server, so it swaps in the embedded `Phoenix.Sync` client.
+  defp default_client do
+    {module, fun} =
+      Application.get_env(
+        :chat,
+        :sync_stream_client,
+        {ChatWeb.ElectricLive.SandboxGatedFetch, :client}
+      )
+
+    apply(module, fun, [])
+  end
 
   defp client_live_stream_fixed(client, name, query, component) do
     pid = self()

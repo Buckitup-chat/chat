@@ -32,6 +32,9 @@ config :phoenix_sync,
   env: config_env(),
   mode: :sandbox
 
+# No HTTP server in tests — sandbox LiveViews read shapes via the embedded client
+config :chat, :sync_stream_client, {Phoenix.Sync, :client!}
+
 config :chat, Chat.Repo,
   username: "postgres",
   password: "postgres",

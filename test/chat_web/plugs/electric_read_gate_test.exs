@@ -40,21 +40,27 @@ defmodule ChatWeb.Plugs.ElectricReadGateTest do
       put_gate(:trust, owner_card)
     end
 
-    test "no token is rejected with the table's shape", %{conn: conn} do
-      conn = get_shape(conn, "user_cards")
+    test "exempt shapes read without a token", %{conn: conn} do
+      assert get_shape(conn, "user_cards").status == 200
+      assert get_shape(conn, "vouch_tokens").status == 200
+    end
 
-      assert %{"error" => "read_session_required", "shape" => "user_card"} =
+    test "no token is rejected with the table's shape", %{conn: conn} do
+      conn = get_shape(conn, "user_storage")
+
+      assert %{"error" => "read_session_required", "shape" => "user_storage"} =
                json_response(conn, 401)
     end
 
     test "unknown token is rejected", %{conn: conn} do
-      conn = conn |> with_bearer("bogus") |> get_shape("user_cards")
+      conn = conn |> with_bearer("bogus") |> get_shape("user_storage")
 
       assert json_response(conn, 401)
     end
 
     test "session token passes and response is private", ctx do
-      conn = ctx.conn |> with_bearer(owner_session(ctx, "user_card")) |> get_shape("user_cards")
+      conn =
+        ctx.conn |> with_bearer(owner_session(ctx, "user_storage")) |> get_shape("user_storage")
 
       assert conn.status == 200
       assert [cache_control] = get_resp_header(conn, "cache-control")
@@ -65,9 +71,9 @@ defmodule ChatWeb.Plugs.ElectricReadGateTest do
     end
 
     test "token for another shape is rejected", ctx do
-      conn = ctx.conn |> with_bearer(owner_session(ctx, "file")) |> get_shape("user_cards")
+      conn = ctx.conn |> with_bearer(owner_session(ctx, "file")) |> get_shape("user_storage")
 
-      assert %{"shape" => "user_card"} = json_response(conn, 401)
+      assert %{"shape" => "user_storage"} = json_response(conn, 401)
     end
 
     test "versions table needs its owning shape's session", ctx do

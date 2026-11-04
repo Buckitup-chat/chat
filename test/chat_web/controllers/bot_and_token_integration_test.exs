@@ -17,6 +17,7 @@ defmodule ChatWeb.BotAndTokenIntegrationTest do
     only: [put_gate: 2, identity_with_card: 1, open_read_session!: 4, with_bearer: 2]
 
   import Chat.Test.ReviewFixtures, only: [insert_user_card: 1]
+  import ChatWeb.LiveTestHelpers, only: [wait_until: 3]
 
   alias Chat.Challenge
   alias Chat.Data.Integrity
@@ -37,7 +38,10 @@ defmodule ChatWeb.BotAndTokenIntegrationTest do
     :ets.delete_all_objects(:buckitup_deferred_records)
 
     start_supervised!({Registry, keys: :unique, name: Chat.ReviewBot.Registry})
-    start_supervised!({DynamicSupervisor, name: Chat.ReviewBot.WorkerSupervisor, strategy: :one_for_one})
+
+    start_supervised!(
+      {DynamicSupervisor, name: Chat.ReviewBot.WorkerSupervisor, strategy: :one_for_one}
+    )
 
     {owner, owner_card} = identity_with_card("Owner")
     {reviewer, reviewer_card} = identity_with_card("Reviewer")
@@ -64,7 +68,9 @@ defmodule ChatWeb.BotAndTokenIntegrationTest do
       owner_timestamp: System.os_time(:millisecond)
     }
 
-    signed_bot = sign_with_hash(origin_bot, origin_identity.sign_skey, &OriginBotSignHash.from_binary/1)
+    signed_bot =
+      sign_with_hash(origin_bot, origin_identity.sign_skey, &OriginBotSignHash.from_binary/1)
+
     {:ok, _} = ShapeWriter.write(:origin_bot, :insert, signed_bot)
 
     origin_vouch = %VouchToken{
@@ -122,7 +128,7 @@ defmodule ChatWeb.BotAndTokenIntegrationTest do
         deleted_flag: false,
         owner_timestamp: signed_bot.owner_timestamp,
         sign_hash: signed_bot.sign_hash
-      },
+      }
     }
   end
 
@@ -145,7 +151,11 @@ defmodule ChatWeb.BotAndTokenIntegrationTest do
       pid = Worker.whereis(ctx.bot_hash)
       DynamicSupervisor.terminate_child(Chat.ReviewBot.WorkerSupervisor, pid)
 
-      refute Worker.running?(ctx.bot_hash)
+      # Registry drops the entry asynchronously after the process exits
+      assert :ok =
+               wait_until(fn -> not Worker.running?(ctx.bot_hash) end, "bot stopped",
+                 interval: 10
+               )
     end
   end
 
@@ -225,12 +235,20 @@ defmodule ChatWeb.BotAndTokenIntegrationTest do
       origin_kind = "origins.#{ctx.origin_hash}.reviews.write.#{bound_nonce}"
 
       assert %{deleted_flag: false} =
-               VouchTokenData.get_vouch_token(origin_kind, ctx.bot_hash, ctx.reviewer_card.user_hash)
+               VouchTokenData.get_vouch_token(
+                 origin_kind,
+                 ctx.bot_hash,
+                 ctx.reviewer_card.user_hash
+               )
 
       device_kind = "device.#{DeviceId.id()}.storage.write.review"
 
       assert %{deleted_flag: false} =
-               VouchTokenData.get_vouch_token(device_kind, ctx.bot_hash, ctx.reviewer_card.user_hash)
+               VouchTokenData.get_vouch_token(
+                 device_kind,
+                 ctx.bot_hash,
+                 ctx.reviewer_card.user_hash
+               )
     end
 
     test "rejects bind when bot is not running", ctx do
@@ -290,7 +308,10 @@ defmodule ChatWeb.BotAndTokenIntegrationTest do
           ctx.reviewer.sign_skey
         )
 
-      assert ctx.conn |> with_bearer(token) |> get_shape("review_write_tokens") |> Map.get(:status) == 200
+      assert ctx.conn
+             |> with_bearer(token)
+             |> get_shape("review_write_tokens")
+             |> Map.get(:status) == 200
     end
   end
 

@@ -26,7 +26,7 @@ Three-step flow following the same pattern as user creation (see [pq_user.done.m
 
 The `owner_cert` is `ML-DSA-87.sign(origin_sign_pkey, owner_sign_skey)` — the owner signs the origin's public signing key, binding the origin identity to the owner. Same pattern as `crypt_cert` binds encryption key to identity.
 
-Origin secret keys (`sign_skey`, `crypt_skey`) are generated independently (not derived from owner keys) and stored client-side. For multi-device access, the owner encrypts origin keys into User Storage, decryptable by the owner's own keys on other devices.
+Origin secret keys (`sign_skey`, `crypt_skey`) are generated independently (not derived from owner keys) and stored client-side. Keeping origin keys in User Storage for the owner's other devices is planned ([pq_reviews.in_progress.md](pq_reviews.in_progress.md) Phase 3; the keyring of [pq_subaccounts.proposed.md](../pq_subaccounts.proposed.md)).
 
 Two levels of control:
 
@@ -35,7 +35,7 @@ Two levels of control:
 
 > **Status (deferred to Phase 3).** The two-tier split is not fully enforced. Origin `update` operations — including
 > `moderation_mode` changes and soft delete (`deleted_flag`) — currently accept **either** the origin identity's
-> **or** the owner's signature ([`Origin.Validation.validate_origin_update_signature/1`](../../../../lib/chat/data/origin/validation.ex):87).
+> **or** the owner's signature ([`Origin.Validation.validate_origin_update_signature/1`](../../../../lib/chat/data/origin/validation.ex):86).
 > Over HTTP an update also needs the owner's key proof, so a delegated origin-identity holder can make such a
 > change only through peer sync, by an update it signed itself. Requiring the **owner's** signature
 > exclusively for these operations lands with the Phase 3 owner/moderation UI. `owner_cert` is still verified on

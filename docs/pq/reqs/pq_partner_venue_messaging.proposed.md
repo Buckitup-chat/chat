@@ -5,7 +5,7 @@ privately to the venues it lists. YourTake is the first partner; nothing here
 is specific to it.
 
 Status: proposed. Every statement about current behaviour was checked against
-`origin/main` at c2d4a77e (backend) and bc20acf (frontend); code references
+`origin/main` at 40d8c8e4 (backend) and 507d0ff (frontend); code references
 are given where a reader might doubt it.
 
 ---
@@ -50,16 +50,15 @@ and the SyncBot.
 
 ### First owner
 
-The first `user_cards` row written over HTTP ingest makes its user the server
-owner (`lib/chat/pq/owner_bootstrap.ex`, called from
-`ElectricController`). Peer sync never does. Nothing resets it short of
-deleting `:pq_admin` from AdminDb on the server.
+The first card the server takes makes its user the server owner, and until
+then it starts no peer sync for its configured sources and other servers
+do not sync with it
+([pq_access_gating.done.md § Bootstrap and Owner](pq_access_gating.done.md#bootstrap-and-owner)).
+Nothing resets it short of deleting `:pq_admin` from AdminDb on the server.
 
 Procedure for a new server:
 1. Deploy with the HTTP port reachable only by the administrator (firewall or
-   bind address), and not by the partner's other servers: a peer that connects
-   pushes its SyncBot card over HTTP ingest, and on a server without an owner
-   that card is taken as the owner's.
+   bind address).
 2. The administrator signs in to the partner's UI pointed at this server; the
    card it publishes makes them the owner.
 3. Check `GET /electric/v1/device_identity`: `admin.user_hash` is theirs.
@@ -74,7 +73,7 @@ Procedure for a new server:
 | `trust` | As `guarded` | Need a read session per shape: a vouch chain for `device.<id>.storage.read.<shape>` (`user_cards`, `vouch_tokens` stay open) |
 
 The mode is changed on `/electric/admin_sandbox` by O or an identity vouched
-for `device.<id>.admin`, or from a console with
+for `device.<id>.admin` or `device.*.admin`, or from a console with
 `Chat.AdminDb.put(:pq_gate_mode, :guarded)`. No HTTP API reports the mode.
 
 **Production runs `guarded`.** `open` lets anyone write any row and is for a
@@ -82,8 +81,11 @@ closed pilot only. `trust` adds per-shape read sessions; it hides metadata from
 anonymous readers, and notifications (§ Notifications) then need a vouched
 reader.
 
-The sandboxes (`/electric/*_sandbox`) are development tools: a production
-server does not expose them, and the mode is then set from the console.
+Every release serves development and admin pages to anyone who reaches the
+server: the LiveViews under `/electric`, the sandboxes among them,
+`/dashboard`, `/log`, `/db_log`, `/data_keys`, `/naive_api_console`. A
+partner's reverse proxy passes only `/electric/v1/` and what its own UI
+needs, and the mode is then set from the console.
 
 ### Cross-origin access
 
@@ -227,9 +229,12 @@ Done by the operator on the partner's database:
 - an erased venue's dialogs become unreadable once its keys are deleted from
   VO's User Storage.
 
-Whether every table referencing `user_cards` cascades, and whether a
-`REVOKE DELETE` on the application role blocks a cascade, is to be checked on
-a test server before this is relied on.
+`origin_bots` and `review_write_tokens` reference `user_cards` and `origins`
+without `ON DELETE CASCADE`: delete a venue's rows there first, or deleting
+its card fails. A guest's `user_hash` in `review_write_tokens` has no foreign
+key; those rows are deleted by hand. Whether a `REVOKE DELETE`
+on the application role blocks a cascade is to be checked on a test server
+before this is relied on.
 
 ---
 
@@ -237,9 +242,8 @@ a test server before this is relied on.
 
 V's secret keys live in VO's User Storage, so every device VO signs in on
 can act as V. A venue is an owned subaccount of its owner
-([pq_subaccounts.proposed.md](pq_subaccounts.proposed.md), branch
-`docs/subaccounts`); a partner's client keeps the venues its users own and
-nothing more of that model.
+([pq_subaccounts.proposed.md](pq_subaccounts.proposed.md)); a partner's client
+keeps the venues its users own and nothing more of that model.
 
 - **Slot:** a named JSON slot `origins` in VO's User Storage, one top-level
   key per venue so that two devices adding venues at once merge:
@@ -249,7 +253,7 @@ nothing more of that model.
                        "sign_pkey": "<b64>", "crypt_pkey": "<b64>" } }
   ```
 - **Encryption and addressing:** as every User Storage slot of the frontend
-  (`src/lib/data/slots.ts`, `src/lib/pq/slotId.ts`): the root record at a uuid
+  (`src/lib/data/slots.ts`, `@buckitup/pq-client/slotId`): the root record at a uuid
   derived from VO's `crypt_skey` maps slot names to random uuids; values are
   AES-256-GCM under a key derived from VO's `crypt_skey`.
 - **Removing a venue:** drop its key from the slot. User Storage keeps
@@ -263,23 +267,31 @@ A device that has VO's keys (device link, backup, recovery) has V's.
 
 `sender_msg_key` is derived as [pq_dialogs.done.md § Key derivation](pq_dialogs.done.md)
 gives it: `IKM = sign_skey || crypt_skey || peer_user_hash`, salt
-`buckitup/dialog-mk/v1`. The client library and the BuckitUp frontend use this
-derivation and no other key: one identity used from two clients derives the
-same key for its own messages.
+`buckitup/dialog-mk/v1`. `@buckitup/pq-client/dialogs` uses this derivation.
+BuckitUp's app adds `evm_skey` to the IKM (`DialogCrypto.deriveSenderMsgKey`)
+until Phase 0; until then one identity used from both clients derives
+different keys for its own messages.
 
 ---
 
 ## Client library
 
 `@buckitup/pq-client`: the protocol without Vue, Pinia or TanStack. BuckitUp's
-frontend moves onto it, so there is one implementation.
+frontend is built on it (one difference: § Dialog key derivation).
 
 - **Where:** a package in `Buckitup-chat/chat-frontend` (`packages/pq-client`),
   next to the app that uses it.
-- **Published** to the public npm registry as `@buckitup/pq-client`.
-- **Licence:** GPLv3, as the repository. On the usual reading of GPLv3, a web
+- **npm:** `@buckitup/pq-client` on the public registry from Phase 1; 0.1.0
+  is only in chat-frontend `main` so far.
+- **Licence:** GPL-3.0-only, as the repository. On the usual reading of GPLv3, a web
   UI that bundles the library and is served to users is released under GPLv3
   as well. The partner has confirmed this suits it.
+
+Each module is an entry point of its own (`@buckitup/pq-client/<module>`).
+The table is what the library covers for a partner by Phase 2. Of it, 0.1.0
+has `dialogs` and `transport` (without batch `/ingest` and live reads);
+canonical payloads and signatures are in `signature`; the rest is not in it
+yet.
 
 | Module | Contents |
 |---|---|
@@ -298,8 +310,8 @@ frontend moves onto it, so there is one implementation.
 - Golden vectors from the backend's conformance file are part of its tests.
 - Semver; a protocol change is a major version and is announced to partners.
 - The vault needs a passkey with the WebAuthn PRF extension. Which devices
-  have it is measured with the probe page `/app/sandbox/prf-probe/index.html`
-  of BuckitUp's client; the same table holds for the partner's users.
+  have it is measured with BuckitUp's PRF probe page (chat-frontend branch
+  `feat/prf-probe`); the same table holds for the partner's users.
 
 ---
 
@@ -321,8 +333,8 @@ frontend moves onto it, so there is one implementation.
 
 | Phase | BuckitUp | Partner | Done when |
 |---|---|---|---|
-| **0. Ground** | Backend: a SyncBot card never becomes the owner; an older `vouch_tokens` row from a peer never replaces a newer one; sandboxes are not exposed on production servers. Frontend: `sender_msg_key` per `pq_dialogs` (no `evm_skey`). Correct `pq_user_storage.done.md` (paths, injector), the `router.ex` CORS comment, `pq_origin.done.md`. Publish an external-client guide. | Deploy a server on its domain; first owner per § First owner; `guarded`. | Partner's test client ingests a signed `user_cards` row and reads it back from a shape |
-| **1. Library** | Extract `@buckitup/pq-client`; frontend on it; multi-identity vault | Build its UI on pre-releases | Library passes the conformance vectors; frontend tests green on it |
+| **0. Ground** | Backend: an older `vouch_tokens` row from a peer never replaces a newer one; sandboxes are not exposed on production servers; the `router.ex` CORS comment. Frontend: `sender_msg_key` per `pq_dialogs` (no `evm_skey`). | Deploy a server on its domain; first owner per § First owner; `guarded`. | Partner's test client ingests a signed `user_cards` row and reads it back from a shape |
+| **1. Library** | Publish `@buckitup/pq-client`; multi-identity vault | Build its UI on pre-releases | Library passes the conformance vectors; frontend tests green on it |
 | **2. Venue messaging** | Venue creation, venue keys slot in the library; support | B, guest admission, guest and owner UI, notifications by shape | On the partner's test server: VO creates V; G scans a code, is vouched, writes; VO reads and replies from a second device; the partner backend is notified without content; retracting B → G stops G |
 | **3. Sign-in by key (R-7)** | Support | Sign-in on its site with the same-domain identity | A guest signs in with the key alone |
 

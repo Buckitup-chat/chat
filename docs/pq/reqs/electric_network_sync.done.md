@@ -220,6 +220,7 @@ Exposed by [`ChatWeb.SystemIdentifierController`](../../lib/chat_web/controllers
 
 - Queries `SELECT system_identifier FROM pg_control_system()` via `Ecto.Adapters.SQL.query/3` on `Chat.Db.repo/0`
 - Response: `{"system_identifier": "<string>"}`
+- `503 {"error": "device not activated"}` while the server has no owner ([pq_access_gating.done.md § Bootstrap and Owner](pq_access_gating.done.md#bootstrap-and-owner))
 - Error: 500 with `{"error": "<reason>"}`
 
 ## Conflict Resolution
@@ -256,10 +257,10 @@ Where `status` is one of:
 
 In [`Chat.NetworkSynchronization`](../../lib/chat/network_synchronization/network_synchronization.ex):
 
-- `add_electric_peer(peer_url)` — starts a `PeerSync` supervisor for the peer; notifies `SyncSource` of connection
+- `add_electric_peer(peer_url)` — starts a `PeerConnector` for the peer, which starts its `PeerSync` once the peer's `/system_identifier` answers; notifies `SyncSource` of connection
 - `remove_electric_peer(peer_url)` — purges deferred records, notifies `SyncSource` of disconnection, terminates the peer's supervisor
 - `list_electric_peers()` — returns list of registered peer URLs
-- `init_electric_peers/0` — on startup, re-starts Electric peers for all started GraphQL sources
+- `init_electric_peers/0` — on startup, re-starts Electric peers for all started GraphQL sources once the server has an owner (`PeerSyncDecider` runs it again when the owner registers)
 
 ## Admin UI
 

@@ -30,8 +30,7 @@ bound to its owner by `owner_cert` ([reviews/pq_origin.done.md](reviews/pq_origi
 Its keys must reach every device of the owner ("Origin keys in User Storage",
 [reviews/pq_reviews.in_progress.md](reviews/pq_reviews.in_progress.md) Phase 3),
 and the owner acts as the venue to reply to guests and moderate reviews.
-Partner integrations depend on it ([pq_partner_venue_messaging.proposed.md](pq_partner_venue_messaging.proposed.md),
-branch `docs/partner-venue-messaging`).
+Partner integrations depend on it ([pq_partner_venue_messaging.proposed.md](pq_partner_venue_messaging.proposed.md)).
 
 ### U2. Delegating a venue to staff
 

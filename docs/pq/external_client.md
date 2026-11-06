@@ -7,7 +7,7 @@ in [invariants/02_integrity.md](invariants/02_integrity.md).
 
 ## Endpoints
 
-All under `https://<host>/electric/v1`. CORS allows any origin.
+Under `https://<host>/electric/v1`. CORS allows any origin.
 
 | Method and path | Purpose |
 |---|---|
@@ -18,8 +18,14 @@ All under `https://<host>/electric/v1`. CORS allows any origin.
 | `POST /read_session` | Open a read session for a shape (access mode `trust` only) |
 | `GET /device_identity` | `{device_id, admin, sync_bot}`: the server's id for scopes and its owner |
 | `GET /status` | Readiness: `200` or `503` |
-| `GET /system_identifier` | The database's system identifier |
+| `GET /system_identifier` | The database's system identifier; `503 {"error": "device not activated"}` until the server has an owner |
 | `PUT /file_chunk/…`, `GET /file_chunk/…` | Encrypted file chunks ([reqs/files](reqs/files)) |
+| `GET /file_chunk_status?file_ids=…` | Per file, how many chunks the server holds and how many are missing |
+| `POST /turn_credentials` | TURN credentials for the optical handshake: `{user_hash, challenge_id, signature}` ([reqs/pq_turn_relay.proposed.md](reqs/pq_turn_relay.proposed.md)) |
+
+The review write-token routes under `/r` belong to BuckitUp's review flow; a
+review insert made under a write token adds its `nonce` to `auth`
+([reqs/reviews/pq_review_write_tokens.in_progress.md](reqs/reviews/pq_review_write_tokens.in_progress.md)).
 
 ## Key proof
 
@@ -68,6 +74,10 @@ POST /electric/v1/ingest
 - There is no delete: a removed row is an update with `deleted_flag = true`.
 - Write a new identity's `user_cards` row alone, in its own request, before
   anything else of it.
+- On a server without an owner the first card ingested makes its user the
+  owner ([reqs/pq_access_gating.done.md § Bootstrap and Owner](reqs/pq_access_gating.done.md#bootstrap-and-owner)):
+  check `admin` in `/device_identity` before publishing a service identity's
+  card.
 
 Test a signer against `test/fixtures/pq_conformance_vectors.json`.
 

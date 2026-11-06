@@ -25,13 +25,13 @@ The PoP context is resolved once per request and shared across all mutations in 
 ## Where this lives
 
 - **Protocol spec**: this document
-- **User-side application of PoP**: [pq_user_storage.md §4.2](../reqs/pq_user_storage.md)
+- **User-side application of PoP**: [pq_user_storage.done.md §4.1](../reqs/pq_user_storage.done.md)
 - **Ingest controller**: `lib/chat_web/controllers/electric_controller.ex` (`ingest/2` — batched; `ingest_each/2` — per-mutation transactions, same PoP context)
 - **Abstraction layer context**: [Electric_Abstraction_Layer.md](../electric/Electric_Abstraction_Layer.md) — PoP runs *before* per-model `authorize/2`
 
 ## Invariants
 
-- Reads are public — no PoP needed.
+- Reads need no PoP, except to open a read session in `trust` mode ([pq_access_gating.done.md](../reqs/pq_access_gating.done.md)).
 - Peer-to-peer replication (`Electric.ShapeWriter`) **bypasses** PoP: sync is a trusted internal operation between already-verified rows (see [electric_network_sync.done.md](../reqs/electric_network_sync.done.md)). Integrity is re-checked per-row from signatures.
 - Challenge reuse across requests is disallowed — replay prevention.
 - Not every replicated table is reachable through ingest: shapes that don't implement `ingest_configure_writer/2` (e.g. `ReviewPostRight`, `ReviewRevokeRight`) get no `Writer.allow` config, so `Phoenix.Sync.Writer` rejects any mutation targeting them outright rather than running a PoP check. Those rows are written server-side only (e.g. when a review's secret-sharing threshold resolves).

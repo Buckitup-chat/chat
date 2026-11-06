@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-User Storage is a user-scoped key-value storage system that provides encrypted, per-user data persistence synchronized via Electric shapes. The system enables authenticated users to store arbitrary encrypted data accessible through a public read, authenticated write model.
+User Storage is a user-scoped key-value storage system that provides encrypted, per-user data persistence synchronized via Electric shapes. The system enables authenticated users to store arbitrary encrypted data.
 
 **Schema Definition**: See [pq_user.done.md](./pq_user.done.md) for complete schema details.
 
@@ -11,7 +11,7 @@ User Storage is a user-scoped key-value storage system that provides encrypted, 
 ### 2.1 Architecture
 - **Storage Model**: Key-value store scoped by user_hash
 - **Synchronization**: Electric shapes for real-time sync
-- **Security Model**: Public reads, authenticated writes via Proof-of-Possession (PoP)
+- **Security Model**: Owner-only writes via Proof-of-Possession (PoP); reads and writes follow the server's access mode ([pq_access_gating.done.md](pq_access_gating.done.md))
 - **Encryption**: Client-side encryption; server stores values as opaque blobs
 - **Versioning**: Archive-on-update — previous versions move to `user_storage_versions`
 
@@ -21,7 +21,7 @@ User Storage is a user-scoped key-value storage system that provides encrypted, 
 - **Conflict Resolution**: Last write wins (LWW) via `owner_timestamp`
 - **Deletion Strategy**: Soft deletes via `deleted_flag`
 - **Value Size Limit**: 10 MB maximum per value
-- **Access Control**: Any user can read any storage (read public), only owner can write (via PoP)
+- **Access Control**: Only the owner writes (via PoP); who reads follows the access mode (§ 2.1)
 - **Signature Hashing**: `sign_hash` is server-derived from `sign_b64` via `EnigmaPq.hash/1`, not client-provided
 
 ## 3. Requirements
@@ -30,7 +30,7 @@ User Storage is a user-scoped key-value storage system that provides encrypted, 
 
 **FR-1**: User MUST be able to create and update key-value pairs in their storage
 **FR-2**: All write operations MUST be authenticated via Proof-of-Possession
-**FR-3**: Read operations MUST NOT require authentication
+**FR-3**: Read operations MUST NOT require authentication in the `open` and `guarded` access modes
 **FR-4**: System MUST support batch operations (multiple mutations in single request)
 **FR-5**: System MUST expose user storage and versions via Electric shapes
 **FR-6**: Users MUST be able to list all their keys
@@ -118,17 +118,17 @@ post "/ingest_each", ElectricController, :ingest_each
   "auth": { "challenge_id": "<id>", "signature": "<base64, unpadded>" },
   "mutations": [
     {
-      "table": "user_storage",
-      "operation": "insert",
-      "data": {
+      "type": "insert",
+      "modified": {
         "user_hash": "u_a3f2b9c4d5e6f789...",
         "uuid": "<uuid>",
         "value_b64": "<base64_encoded_encrypted_blob>",
-        "parent_sign_hash": "uss_...",
+        "parent_sign_hash": null,
         "owner_timestamp": 1234567890,
         "sign_b64": "<base64_signature>",
         "deleted_flag": false
-      }
+      },
+      "syncMetadata": { "relation": "user_storage" }
     }
   ]
 }
@@ -136,7 +136,7 @@ post "/ingest_each", ElectricController, :ingest_each
 
 **Note**: `sign_hash` is not sent by the client — it is derived server-side from `sign_b64`.
 
-**Operations**: `insert`, `update`
+**Operations**: `insert`, `update` (format: [external_client.md](../external_client.md) § Writing rows).
 
 **Batch Operations**: Multiple mutations supported in single request (via `/ingest`). Per-mutation processing available via `/ingest_each`.
 
@@ -144,7 +144,7 @@ post "/ingest_each", ElectricController, :ingest_each
 ```elixir
 Writer.allow(writer, UserStorage,
   accept: [:insert, :update],
-  check: &Validation.user_storage_allowed(&1, user_pop_context),
+  check: WriteGate.and_gate(&Validation.user_storage_allowed(&1, user_pop_context), :user_storage),
   validate: &Validation.user_storage_validate_with_versioning/3,
   insert: [pre_apply: &Validation.user_storage_pre_apply_versioning/3],
   update: [pre_apply: &Validation.user_storage_pre_apply_versioning/3]
@@ -153,42 +153,32 @@ Writer.allow(writer, UserStorage,
 
 #### 5.2.1 Response Codes
 
-**Success (200)**:
-```json
-{
-  "txid": "<transaction_id>"
-}
-```
+Answers as in [external_client.md § Responses](../external_client.md#responses). For `user_storage`:
 
-**Error Responses**:
-
-| Status | Condition | Description |
-|--------|-----------|-------------|
-| 400 | Invalid payload | Value > 10MB, missing fields, malformed data |
-| 401 | PoP verification failed | Invalid signature, expired challenge |
-| 409 | Conflict | UUID collision on insert |
-| 422 | Validation failed | Ecto changeset errors |
+- `400`: a key proof that does not verify (`Invalid operation`), malformed data;
+- `403 not_in_trust_chain`: the access mode requires a vouch chain for `storage.write.user_storage` that the owner lacks;
+- `409`: an insert of a `uuid` that exists;
+- `413`: a request body over 8 MB, the JSON parser's limit, which comes before the 10 MB value check.
 
 #### 5.2.2 Request Validation
 
 **Required Fields (insert)**:
-- `mutations[].table`: Must be "user_storage"
-- `mutations[].operation`: One of: `insert`, `update`
-- `mutations[].data.user_hash`: URL-friendly hex string with "u_" prefix (130 chars)
-- `mutations[].data.uuid`: Client-generated UUID
-- `mutations[].data.value_b64`: Base64-encoded encrypted blob
-- `mutations[].data.owner_timestamp`: Monotonic timestamp for conflict resolution
-- `mutations[].data.sign_b64`: ML-DSA-87 signature for integrity verification
-- `mutations[].data.deleted_flag`: Soft delete flag (boolean)
+- `mutations[].syncMetadata.relation`: Must be "user_storage"
+- `mutations[].type`: One of: `insert`, `update`
+- `mutations[].modified.user_hash`: URL-friendly hex string with "u_" prefix (130 chars)
+- `mutations[].modified.uuid`: Client-generated UUID
+- `mutations[].modified.value_b64`: Base64-encoded encrypted blob
+- `mutations[].modified.owner_timestamp`: Monotonic timestamp for conflict resolution
+- `mutations[].modified.sign_b64`: ML-DSA-87 signature for integrity verification
+- `mutations[].modified.deleted_flag`: Soft delete flag (boolean)
 
 **Required Fields (update)**:
-- `mutations[].data.owner_timestamp`
-- `mutations[].data.sign_b64`
-- `mutations[].data.sign_hash` (derived server-side, but required in changeset)
+- `mutations[].original.user_hash`, `mutations[].original.uuid`
+- `mutations[].changes.parent_sign_hash`: the current row's `sign_hash`
+- `mutations[].changes.owner_timestamp`
+- `mutations[].changes.sign_b64`
 
-**Derived Fields** (server computes, client does not send):
-- `sign_hash`: Computed from `sign_b64` via `EnigmaPq.hash/1`, prefixed with "uss_"
-- `parent_sign_hash`: Set to existing record's `sign_hash` during versioning
+**Derived Field** (server computes, client does not send): `sign_hash`, from `sign_b64` via `EnigmaPq.hash/1`, prefixed with "uss_". `parent_sign_hash` is the client's: it signs the current row's `sign_hash` there (null for a new row), and versioning sets the same value.
 
 **Constraints**:
 - Value size ≤ 10 MB (before base64 encoding)
@@ -292,8 +282,8 @@ Versioning is used by both ingestion paths:
 | User data operations | [`lib/chat/data/user.ex`](../../../lib/chat/data/user.ex) |
 | Custom type (sign_hash) | [`lib/chat/data/types/user_storage_sign_hash.ex`](../../../lib/chat/data/types/user_storage_sign_hash.ex) |
 | Ingest controller | [`lib/chat_web/controllers/electric_controller.ex`](../../../lib/chat_web/controllers/electric_controller.ex) |
-| Router (sync + ingest) | [`lib/chat_web/router.ex`](../../../lib/chat_web/router.ex) |
-| PoP protocol | [electric-proof-of-possesion.md](./electric-proof-of-possesion.md) |
+| Router (shapes + ingest) | [`lib/chat_web/router.ex`](../../../lib/chat_web/router.ex) |
+| PoP protocol | [01_proof_of_possession.md](../invariants/01_proof_of_possession.md) |
 
 ### 8.2 Migrations
 
@@ -323,7 +313,7 @@ Versioning is used by both ingestion paths:
 ### 9.1 Encryption
 - Client MUST encrypt values before sending to server
 - Server stores encrypted blobs without decryption
-- Encryption ensures privacy despite public read access
+- Encryption keeps values private from every reader
 
 ### 9.2 UUID Management
 - Client MUST generate UUIDs for new storage entries
@@ -349,4 +339,4 @@ Versioning is used by both ingestion paths:
 
 ### 10.2 Related Specifications
 - [pq_user.done.md](./pq_user.done.md) - User schema definition (parent of user_storage)
-- [electric-proof-of-possesion.md](./electric-proof-of-possesion.md) - PoP authentication protocol
+- [01_proof_of_possession.md](../invariants/01_proof_of_possession.md) - PoP authentication protocol

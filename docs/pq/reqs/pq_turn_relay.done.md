@@ -381,9 +381,179 @@ messages:
 
 ---
 
+## Manual verification
+
+How to confirm the relay is running, end to end, on a device and on
+`buckitup.xyz`. The checks go from the inside out: process → listener →
+HTTP → UDP.
+
+### On a BuckitUp device
+
+SSH into the device (`make ssh` from `platform/`) and run in IEx:
+
+```elixir
+# 1. GenServer alive?
+Process.whereis(Platform.Network.TurnRelay)
+# => #PID<…>
+
+# 2. Which interfaces have a relay?
+:sys.get_state(Platform.Network.TurnRelay)
+# => %{running: %{"wlan0" => %{ip: {192,168,25,1}, allowed: […]}, …}}
+
+# 3. Chat side: active relay IPs
+Chat.Turn.LanRelay.active()
+# => MapSet with one IP per running interface
+
+# 4. Config mode (must be :lan on a device)
+Chat.Turn.Config.mode()
+# => :lan
+
+# 5. Generate test credentials
+Chat.Turn.Credentials.issue()
+# => {"<expiry>:<tag>", "<credential>", 600}
+
+# 6. Logs
+RingLogger.grep(~r/relay/)
+# => "relay started on 192.168.25.1, 11 allowed ranges" per interface
+```
+
+From a machine on the same LAN (e.g. wired, `192.168.0.x`):
+
+```bash
+# HTTP endpoint alive? Expect 401, not 503
+curl -sS -X POST http://<device-ip>/electric/v1/turn_credentials \
+  -H "Content-Type: application/json" -d '{}'
+# => {"error":"Invalid or expired challenge"}
+
+# STUN binding (UDP listener alive?)
+# Any STUN client, or a raw binding request:
+stun -s <device-ip> -p 3478
+# => STUN Binding Success, XOR-MAPPED-ADDRESS = your IP
+
+# TURN allocation with the credentials from step 5:
+turnutils_uclient -t -u "<username>" -w "<credential>" <device-ip>
+# => allocate OK, relayed address on the device's IP, relay port in 49152–65535
+```
+
+### On buckitup.xyz
+
+SSH into the server and run in the release console:
+
+```elixir
+# 1. Supervisor alive?
+Process.whereis(Chat.Turn.Supervisor)
+# => #PID<…>
+
+# 2. Config
+Chat.Turn.Config.mode()       # => :server
+Chat.Turn.Config.enabled?()   # => true
+Chat.Turn.Config.public_ip()  # => the server's public IPv4
+Chat.Turn.Config.uris()
+# => ["turn:buckitup.xyz:3478?transport=udp",
+#     "turn:buckitup.xyz:3478?transport=tcp"]
+
+# 3. Generate test credentials
+Chat.Turn.Credentials.issue()
+# => {"<expiry>:<tag>", "<credential>", 600}
+```
+
+From any machine on the internet:
+
+```bash
+# HTTP endpoint (expect 401, not 503)
+curl -sS -X POST https://buckitup.xyz/electric/v1/turn_credentials \
+  -H "Content-Type: application/json" -d '{}'
+# => {"error":"Invalid or expired challenge"}
+
+# STUN binding over UDP
+stun -s buckitup.xyz -p 3478
+# => Binding Success
+
+# TURN allocation over UDP
+turnutils_uclient -t -u "<username>" -w "<credential>" buckitup.xyz
+# => allocate OK
+
+# TURN allocation over TCP
+turnutils_uclient -t -T -u "<username>" -w "<credential>" buckitup.xyz
+# => allocate OK
+```
+
+### What each response means
+
+| Response | Meaning |
+|---|---|
+| HTTP `401` (any reason) | Endpoint live, relay active on this address |
+| HTTP `503 turn_unavailable` | Relay not running on the address the request arrived at |
+| STUN Binding Success | UDP listener accepts packets on 3478 |
+| STUN timeout | Firewall, wrong port, or listener not started |
+| Allocate Success (relayed address + lifetime) | Full relay path works: auth, allocation, port assignment |
+| Allocate `401` | Credentials wrong or expired; re-issue |
+| Allocate `442` | Transport encoding wrong in the client |
+| Allocate `486` | Max allocations reached for this credential |
+
+---
+
 ## Status
 
-Proposed.
+Done.
+
+### Implemented
+
+**Chat — relay and endpoint:**
+
+- `Chat.Turn.Config` — per-boot config with `:server` / `:lan` mode selection
+  at compile time; reads `TURN_*` env on server, ignores it on device.
+- `Chat.Turn.Credentials` — issues time-limited HMAC-SHA1 credentials
+  (draft-uberti-rtcweb-turn-rest-00).
+- `Chat.Turn.Auth` — `auth_fun/2` callback for the `stun` listener; refuses
+  expired credentials outright (not `{expired, pass}`).
+- `Chat.Turn.Listener` — single place for listener options and add/remove;
+  wires `PeerPolicy` into every listener.
+- `Chat.Turn.PeerPolicy` — base blacklist (RFC 1918, loopback, link-local,
+  own IPs) with allowed-range holes; empty whitelist everywhere.
+- `Chat.Turn.Cidr` — CIDR arithmetic: `contains?/2`, `network/2`, `pool/2`,
+  `subtract/2`.
+- `Chat.Turn.Supervisor` — starts UDP + TCP listeners on `0.0.0.0:3478` in
+  `:server` mode when `enabled?/0` is true.
+- `Chat.Turn.LanRelay` — device relay API; tracks active IPs in
+  `:persistent_term`; the credentials endpoint reads `active?/1`.
+- `Chat.Turn.RateLimiter` — per-IP sliding-window rate limit with sweep.
+- `ChatWeb.TurnCredentialsController` — `POST /electric/v1/turn_credentials`,
+  PoP via `ReadGate.verify_user/3`, routes `uris` from config (server) or
+  `LanRelay` (device); returns `503` when no relay is active.
+- Route placed in `/electric/v1` scope outside `ElectricReadiness`, with
+  `OPTIONS` for CORS.
+
+**Platform — device relay management:**
+
+- `Platform.Network.TurnRelay` — GenServer subscribing to VintageNet
+  `addresses` and `config` on `wlan0`, `eth0`, `usb0`; reconciles desired
+  state against running listeners via `LanRelay.start/3` / `stop/1`; retries
+  failed starts after 5 s; safety reconcile every 60 s.
+- `Platform.Network.TurnRelay.Plan` — pure planning: derives each interface's
+  IP and allowed CIDR ranges from VintageNet state (DHCP pool for AP
+  interfaces, lease network for `eth0` internet profile).
+
+**Tests (chat):**
+
+- `Chat.Turn.Credentials` — test vector, expiry, tag uniqueness.
+- `Chat.Turn.Auth` — test vector, valid/expired/wrong-realm/malformed
+  username, refuses outright (not `{expired, pass}`).
+- `Chat.Turn.PeerPolicy` — server (no allowed), device (allowed LAN ranges),
+  own-IP exclusion, whitelist-is-empty invariant.
+- `Chat.Turn.Cidr` — contains, network, pool, subtract.
+- `Chat.Turn.RateLimiter` — limit hit, different IP unaffected, sweep.
+- `Chat.Turn.Config` — server mode, lan mode, env overrides.
+- `Chat.Turn.Supervisor` — starts/skips based on `enabled?`.
+- `Chat.Turn.LanRelay` — start/stop/active tracking.
+- `ChatWeb.TurnCredentialsController` — each error row (invalid challenge,
+  unknown user, invalid signature, rate limited, turn unavailable), valid PoP
+  returns credentials + uris, deleted card returns 401.
+
+**Tests (platform):**
+
+- `Platform.Network.TurnRelay.Plan` — desired state from VintageNet, diff
+  (start/stop/keep), own-IP list, interface filtering, eth0 profile switch.
 
 ## Open questions
 

@@ -527,7 +527,7 @@ Proposed.
 
 - `chat-frontend/docs/backup-recovery-plan.md` — phases, and the client work
   these services serve.
-- PQ TURN relay (`pq_turn_relay.proposed.md`, in review) — the other service
+- PQ TURN relay (`pq_turn_relay.done.md`) — the other service
   on the same host, behind the same PoP.
 - [PQ access gating](pq_access_gating.done.md) — the server identity
   and AdminDB that the node module uses.

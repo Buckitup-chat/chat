@@ -340,6 +340,7 @@ def plan(:onliners, internal, onliners), do: [            # with :pg (planned)
      └─ LinkRunner main~>internal    bootstrap → replicate
 ```
 
+- **Placement:** `Link`, `Links`, `PlanRunner`, `LinkRunner` and the plans live in **chat** (`Chat.Storage.*`), next to `Unit`, `Units`, `Default` and the chunk pipeline. Platform only decides *which* plan runs: its scenario supervisors start `{PlanRunner, plan: {:main_attach, internal, main}}`.
 - **`LinkRunner`** (GracefulGenServer) owns one link. `on_exit` → `Link.stop/1`. Eject, crash and restart all clean up through the same path.
 - **`Links` registry**, keyed by `Link.id/1`, holds the status: `:idle | {:bootstrapping, progress} | :replicating | {:awaiting, {done, total}} | :stopped | {:partial, map} | {:error, term}`, plus `lag_bytes` for replicating links.
 
@@ -356,6 +357,7 @@ It replaces `:flags` (`backup:`, `replication:`), `:mode`, the global `Platform.
 | Today | With Link |
 |---|---|
 | `Sync.run_local_sync/1` (with backfill), `Backup.Copier.sync_pg/1` (without), `InternalToMain.Copier.sync_pg_to_main/1` | `Link.bootstrap/1` |
+| `Platform.Tools.Postgres.BatchSync`, `LogicalReplicator` (+ `TableSync`, `Subscription`) | moved to `Chat.Storage.Pg.*` (pure Ecto/SQL; the only platform coupling was a default-schemas lookup) |
 | `InternalToMain.Copier`, `InternalToMain.Switcher`, `Backup.Copier`, `Backup.ChunkAwaiter` | plans + `LinkRunner` |
 | `Storage.Logic.do_replicate_to_internal/0` (`Process.whereis(backup)` picks mirrors; `TODO: continuous backup need a way for new changes`) | the set of active links |
 | hardcoded `"internal_to_main"`, `"backup_from_internal"`, … | `Link.name/2` |
@@ -462,6 +464,7 @@ Removing `pq_files` from inside `v.10.1_files` also cleans the CubDB generation.
 
 ### 7.3 Steps
 
+0. **Move PG tooling to chat:** `BatchSync`, `LogicalReplicator` → `Chat.Storage.Pg.*`.
 1. **Model:** `Unit`, `Role`, `Units`, `Default`, `Link` with pure unit tests (derivation table per role × resource, host/target roots, link names).
 2. **Platform boot:** Resolve → Scenario → Engines → Announce → Links. `Decider` splits into role resolution and scenario choice.
 3. **Chunk pipeline + `ChunkStore` on `%Unit{}`.** Delete `DriveDirs`.

@@ -7,6 +7,7 @@ defmodule Chat.Data.File.MissingChunksBackfillTest do
   alias Chat.Data.Schemas.File, as: FileSchema
   alias Chat.Data.Schemas.FileChunk
   alias Chat.Data.Schemas.MissingChunk
+  alias Chat.Data.Types.FileChunkDataHash
   alias Chat.Data.Types.FileId
   alias Chat.Data.User
   alias Chat.NetworkSynchronization.Electric.ShapeWriter
@@ -163,7 +164,7 @@ defmodule Chat.Data.File.MissingChunksBackfillTest do
 
   defp signed_file_chunk(identity, user_hash, file_id, index) do
     raw_data = :crypto.strong_rand_bytes(100)
-    data_hash = raw_data |> EnigmaPq.hash() |> Chat.Data.Types.FileChunkDataHash.from_binary()
+    data_hash = raw_data |> EnigmaPq.hash() |> FileChunkDataHash.from_binary()
 
     chunk = %FileChunk{
       file_id: file_id,

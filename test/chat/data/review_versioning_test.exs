@@ -6,6 +6,7 @@ defmodule Chat.Data.ReviewVersioningTest do
 
   alias Chat.Data.Review, as: ReviewData
   alias Chat.Data.Review.Validation
+  alias Chat.Data.Review.Versioning
   alias Chat.Data.Schemas.Review
   alias Chat.Data.Schemas.ReviewVersion
   alias Chat.Data.Types.ReviewSignHash
@@ -123,7 +124,7 @@ defmodule Chat.Data.ReviewVersioningTest do
       v2 = build_signed_review_update(ctx.author, review, 2000)
       {:ok, _} = ReviewData.update_review_with_versioning(review, v2)
 
-      changeset = Chat.Data.Review.Versioning.archive_changeset(review)
+      changeset = Versioning.archive_changeset(review)
 
       assert {:ok, _} =
                Repo.insert(changeset,

@@ -17,6 +17,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
   alias ChatWeb.ElectricLive.SandboxHttp
   alias Electric.Client.Message
+  alias Electric.Client.ShapeDefinition
 
   def fetch_all_user_cards(base_url, auth) do
     base_url |> SandboxHttp.fetch_shape_gated("user_cards", auth) |> wrap_gated_result(:cards)
@@ -315,7 +316,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
     client = gated_client(base_url, auth)
 
     shape =
-      Electric.Client.ShapeDefinition.new!("dialog_messages",
+      ShapeDefinition.new!("dialog_messages",
         where: "dialog_hash = '#{dialog_hash}'"
       )
 
@@ -545,7 +546,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
     client = gated_client(base_url, auth)
 
     shape =
-      Electric.Client.ShapeDefinition.new!(table,
+      ShapeDefinition.new!(table,
         where: "dialog_hash = '#{dialog_hash}'"
       )
 

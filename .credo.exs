@@ -66,8 +66,7 @@
           {Credo.Check.Readability.WithSingleClause, []},
 
           ## Readability — newly enabled (exit_status: 0 until codebase is clean)
-          {Credo.Check.Readability.NestedFunctionCalls,
-           [min_pipeline_length: 3, exit_status: 0]},
+          {Credo.Check.Readability.NestedFunctionCalls, [min_pipeline_length: 3, exit_status: 0]},
           {Credo.Check.Readability.PreferUnquotedAtoms, [exit_status: 0]},
           {Credo.Check.Readability.StrictModuleLayout, [exit_status: 0]},
 
@@ -129,19 +128,21 @@
           ## credo_naming — module/filename consistency (exit_status: 0 until clean)
           #
           {CredoNaming.Check.Consistency.ModuleFilename,
-           [exit_status: 0,
-            excluded_paths: ["test/support", "priv", "rel", "mix.exs"],
-            plugins: [CredoNaming.Check.Consistency.ModuleFilename.Plugins.Phoenix],
-            acronyms: [
-              {"GraphQL", "graphql"},
-              {"PubSub", "pub_sub"},
-              {"GenServer", "gen_server"},
-              {"OAuth", "oauth"},
-              {"OpenAI", "open_ai"},
-              {"AssemblyAI", "assembly_ai"},
-              {"LLM", "llm"},
-              {"E2E", "e2e"}
-            ]]},
+           [
+             exit_status: 0,
+             excluded_paths: ["test/support", "priv", "rel", "mix.exs"],
+             plugins: [CredoNaming.Check.Consistency.ModuleFilename.Plugins.Phoenix],
+             acronyms: [
+               {"GraphQL", "graphql"},
+               {"PubSub", "pub_sub"},
+               {"GenServer", "gen_server"},
+               {"OAuth", "oauth"},
+               {"OpenAI", "open_ai"},
+               {"AssemblyAI", "assembly_ai"},
+               {"LLM", "llm"},
+               {"E2E", "e2e"}
+             ]
+           ]},
           {CredoNaming.Check.Warning.AvoidSpecificTermsInModuleNames,
            [exit_status: 0, terms: ["Manager", ~r/Helpers?/, "Utils"]]},
 

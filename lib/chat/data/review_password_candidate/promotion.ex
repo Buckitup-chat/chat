@@ -28,6 +28,7 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion do
   alias Chat.Data.Schemas.ReviewPasswordCandidate
   alias Chat.Data.Schemas.ReviewRevokeRight
   alias Chat.Data.Schemas.ReviewRevokeRightCandidate
+  alias Chat.Data.User
 
   # --- Phase 1: Server wraps candidates into unsigned right candidates ---
 
@@ -259,6 +260,6 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion do
   end
 
   defp user_card(hash) do
-    Chat.Data.User.get_card(hash)
+    User.get_card(hash)
   end
 end

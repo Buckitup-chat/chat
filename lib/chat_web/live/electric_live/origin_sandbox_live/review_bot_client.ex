@@ -5,6 +5,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ReviewBotClient do
 
   alias Chat.Data.Schemas.OriginBot, as: OriginBotSchema
   alias Chat.Data.Types.OriginBotSignHash
+  alias Chat.Data.Types.UserHash
   alias Chat.Data.User
   alias Chat.ReviewBot.RowBuilder
 
@@ -190,7 +191,7 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.ReviewBotClient do
   defp origin_hash_from(identity) do
     identity.sign_pkey
     |> EnigmaPq.hash()
-    |> Chat.Data.Types.UserHash.from_binary()
+    |> UserHash.from_binary()
   end
 
   defp parse_origin_bot_row(row) do

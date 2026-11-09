@@ -3,6 +3,7 @@ defmodule ChatWeb.ElectricLive.FileChunksLive.Index do
   import ChatWeb.PhoenixSyncPatch
 
   alias Chat.Data.Schemas.FileChunk
+  alias Electric.Client.ShapeDefinition
 
   @columns ["file_id", "chunk_index", "size", "uploader_hash", "owner_timestamp", "sign_b64"]
 
@@ -10,7 +11,7 @@ defmodule ChatWeb.ElectricLive.FileChunksLive.Index do
   def mount(_params, _session, socket) do
     if connected?(socket) do
       shape =
-        Electric.Client.ShapeDefinition.new!("file_chunks",
+        ShapeDefinition.new!("file_chunks",
           columns: @columns,
           parser: {Electric.Client.EctoAdapter, FileChunk}
         )

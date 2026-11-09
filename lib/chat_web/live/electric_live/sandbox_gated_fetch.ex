@@ -13,6 +13,7 @@ defmodule ChatWeb.ElectricLive.SandboxGatedFetch do
 
   @behaviour Electric.Client.Fetch
 
+  alias Chat.Pq.ServerIdentity
   alias ChatWeb.ElectricLive.SandboxHttp
   alias Electric.Client.Fetch
 
@@ -20,7 +21,7 @@ defmodule ChatWeb.ElectricLive.SandboxGatedFetch do
 
   @doc "Builds an `Electric.Client` that authenticates shape reads with the server identity."
   def client do
-    identity = Chat.Pq.ServerIdentity.get()
+    identity = ServerIdentity.get()
 
     Electric.Client.new!(
       endpoint: ChatWeb.Endpoint.url() <> "/electric/v1/shapes",
@@ -28,7 +29,7 @@ defmodule ChatWeb.ElectricLive.SandboxGatedFetch do
         {__MODULE__,
          [
            base_url: ChatWeb.Endpoint.url(),
-           user_hash: Chat.Pq.ServerIdentity.user_hash(),
+           user_hash: ServerIdentity.user_hash(),
            sign_skey: identity.sign_skey
          ]}
     )

@@ -8,6 +8,7 @@ defmodule Chat.Data.ShapesIntegrityTest do
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.Schemas.UserStorage
   alias Chat.Data.Shapes
+  alias Chat.Data.Types.FileChunkDataHash
   alias Chat.Data.Types.FileId
   alias Chat.Data.Types.UserStorageSignHash
   alias Chat.Data.User
@@ -245,7 +246,7 @@ defmodule Chat.Data.ShapesIntegrityTest do
 
   defp build_file_chunk(user_hash, file_id, index) do
     raw_data = :crypto.strong_rand_bytes(100)
-    data_hash = raw_data |> EnigmaPq.hash() |> Chat.Data.Types.FileChunkDataHash.from_binary()
+    data_hash = raw_data |> EnigmaPq.hash() |> FileChunkDataHash.from_binary()
 
     %FileChunk{
       file_id: file_id,

@@ -4,6 +4,7 @@ defmodule Chat.TimeTest do
   import Rewire
 
   alias Chat.TimeKeeper
+  alias Chat.TimeTest.FakeSource
 
   test "best_local_time is after 2023" do
     assert :lt =
@@ -37,17 +38,17 @@ defmodule Chat.TimeTest do
     end
 
     test "best_local_time includes persist file mtime" do
-      path = Chat.TimeTest.FakeSource.persist_path()
+      path = FakeSource.persist_path()
       File.write!(path, "0")
 
-      keeper = rewire(Chat.TimeKeeper, [{Chat.TimeKeeper.Source, Chat.TimeTest.FakeSource}])
+      keeper = rewire(Chat.TimeKeeper, [{Chat.TimeKeeper.Source, FakeSource}])
 
       %{mtime: mtime} = File.lstat!(path, time: :posix)
 
       result_unix = keeper.best_local_time() |> DateTime.to_unix()
       assert result_unix >= mtime
     after
-      File.rm(Chat.TimeTest.FakeSource.persist_path())
+      File.rm(FakeSource.persist_path())
     end
 
     test "set_initial_system_time with NTP failure completes without crash" do
@@ -59,7 +60,7 @@ defmodule Chat.TimeTest do
     end
 
     defp keeper_with_failed_ntp do
-      rewire(Chat.TimeKeeper, [{Chat.TimeKeeper.Source, Chat.TimeTest.FakeSource}])
+      rewire(Chat.TimeKeeper, [{Chat.TimeKeeper.Source, FakeSource}])
     end
 
     defp keeper_with_future_ntp do

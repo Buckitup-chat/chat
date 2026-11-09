@@ -1,11 +1,13 @@
 defmodule Chat.NetworkSynchronization do
   @moduledoc "Network synchronisation"
 
+  alias Chat.Data.File.ChunkPipeline
   alias Chat.NetworkSynchronization.Electric.DeferredStore
   alias Chat.NetworkSynchronization.Electric.PeerConnector
   alias Chat.NetworkSynchronization.Source
   alias Chat.NetworkSynchronization.Store
   alias Chat.NetworkSynchronization.Worker
+  alias Chat.Pq.OwnerBootstrap
 
   alias Phoenix.PubSub
 
@@ -106,7 +108,7 @@ defmodule Chat.NetworkSynchronization do
   end
 
   defp maybe_start_electric_peer(source) do
-    with true <- Chat.Pq.OwnerBootstrap.owner() != nil,
+    with true <- OwnerBootstrap.owner() != nil,
          {:ok, base_url} <- source_base_url(source) do
       add_electric_peer(base_url)
     else
@@ -188,7 +190,7 @@ defmodule Chat.NetworkSynchronization do
   end
 
   defp safe_active_drive_id do
-    Chat.Data.File.ChunkPipeline.active_drive_id()
+    ChunkPipeline.active_drive_id()
   rescue
     _ -> nil
   end

@@ -29,6 +29,8 @@ defmodule ChatWeb.ElectricLive.StreamIndex do
 
   use Phoenix.Component
 
+  alias Electric.Client.ShapeDefinition
+
   # --- Macro ---
 
   defmacro __using__(opts) do
@@ -49,7 +51,7 @@ defmodule ChatWeb.ElectricLive.StreamIndex do
         case connected?(socket) do
           true ->
             shape =
-              Electric.Client.ShapeDefinition.new!(unquote(table),
+              ShapeDefinition.new!(unquote(table),
                 parser: {Electric.Client.EctoAdapter, unquote(schema)}
               )
 

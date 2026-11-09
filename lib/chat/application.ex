@@ -10,12 +10,13 @@ defmodule Chat.Application do
   alias Chat.AdminDb.AdminLogger
   alias Chat.NetworkSynchronization
   alias Chat.NetworkSynchronization.Retrieval
+  alias Chat.Turn.Config
 
   @impl true
   def start(_type, _args) do
     Logger.put_application_level(:ssl, :error)
     log_version()
-    Chat.Turn.Config.setup()
+    Config.setup()
 
     children =
       [

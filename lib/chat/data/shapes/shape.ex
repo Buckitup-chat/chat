@@ -58,6 +58,8 @@ defmodule Chat.Data.Shapes.Shape do
         ]
   """
 
+  alias Chat.Data.Shapes.Shape
+
   @type operation :: :insert | :update
   @type parent_ref :: {shape_name :: atom(), key :: term()}
 
@@ -95,7 +97,7 @@ defmodule Chat.Data.Shapes.Shape do
     persist_ast = if persist_opts, do: build_persist_helpers(persist_opts)
 
     quote do
-      @behaviour Chat.Data.Shapes.Shape
+      @behaviour Shape
 
       @impl true
       def versions_schema, do: nil
@@ -116,7 +118,7 @@ defmodule Chat.Data.Shapes.Shape do
       def fingerprint(record) do
         case record do
           %{sign_hash: hash} when is_binary(hash) ->
-            Chat.Data.Shapes.Shape.sign_hash_to_binary(hash)
+            Shape.sign_hash_to_binary(hash)
 
           %{sign_b64: sig} when is_binary(sig) ->
             EnigmaPq.hash(sig)

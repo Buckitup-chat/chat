@@ -29,6 +29,8 @@ defmodule Chat.Data.Versioning do
     - `pre_apply_versioning/3`
   """
 
+  alias Chat.Data.Versioning
+
   def compare_timestamps(changeset, existing, new_record) do
     if new_record.owner_timestamp > existing.owner_timestamp do
       Ecto.Changeset.put_change(changeset, :parent_sign_hash, existing.sign_hash)
@@ -178,7 +180,7 @@ defmodule Chat.Data.Versioning do
       def check_insert_versioning(changeset) do
         with {:ok, record} <- Ecto.Changeset.apply_action(changeset, :insert),
              existing when not is_nil(existing) <- fetch_existing(nil, record) do
-          Chat.Data.Versioning.compare_timestamps(changeset, existing, record)
+          Versioning.compare_timestamps(changeset, existing, record)
         else
           _ -> changeset
         end
@@ -187,7 +189,7 @@ defmodule Chat.Data.Versioning do
       def check_update_versioning(changeset) do
         case Ecto.Changeset.apply_action(changeset, :update) do
           {:ok, record} ->
-            Chat.Data.Versioning.compare_timestamps(changeset, changeset.data, record)
+            Versioning.compare_timestamps(changeset, changeset.data, record)
 
           _ ->
             changeset
@@ -199,7 +201,7 @@ defmodule Chat.Data.Versioning do
           changeset.valid? ->
             versioning_archive_if_newer(multi, changeset)
 
-          Chat.Data.Versioning.timestamp_not_newer?(changeset) ->
+          Versioning.timestamp_not_newer?(changeset) ->
             versioning_archive_old(multi, changeset)
 
           true ->

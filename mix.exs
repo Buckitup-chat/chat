@@ -115,6 +115,9 @@ defmodule Chat.MixProject do
         # Build tooling
         {:live_vue, "~> 0.5"},
         {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
+        {:credo_naming, "~> 2.1", only: [:dev, :test], runtime: false},
+        {:oeditus_credo, "~> 0.12", only: [:dev, :test], runtime: false},
+        {:credo_unnecessary_reduce, "~> 0.4", only: [:dev, :test], runtime: false},
         {:sobelow, "~> 0.8", only: [:dev, :test], runtime: false},
         {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
         {:excoveralls, "~> 0.14", only: [:test]},

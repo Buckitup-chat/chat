@@ -1,26 +1,8 @@
-# This file contains the configuration for Credo and you are probably reading
-# this after creating it with `mix credo.gen.config`.
-#
-# If you find anything wrong or unclear in this file, please report an
-# issue on GitHub: https://github.com/rrrene/credo/issues
-#
 %{
-  #
-  # You can have as many configs as you like in the `configs:` field.
   configs: [
     %{
-      #
-      # Run any config using `mix credo -C <name>`. If no config name is given
-      # "default" is used.
-      #
       name: "default",
-      #
-      # These are the files included in the analysis:
       files: %{
-        #
-        # You can give explicit globs or simply directories.
-        # In the latter case `**/*.{ex,exs}` will be used.
-        #
         included: [
           "lib/",
           "src/",
@@ -33,37 +15,11 @@
         ],
         excluded: [~r"/_build/", ~r"/deps/", ~r"/node_modules/"]
       },
-      #
-      # Load and configure plugins here:
-      #
       plugins: [],
-      #
-      # If you create your own checks, you must specify the source files for
-      # them here, so they can be loaded by Credo before running the analysis.
-      #
       requires: [],
-      #
-      # If you want to enforce a style guide and need a more traditional linting
-      # experience, you can change `strict` to `true` below:
-      #
       strict: false,
-      #
-      # To modify the timeout for parsing files, change this value:
-      #
       parse_timeout: 5000,
-      #
-      # If you want to use uncolored output by default, you can change `color`
-      # to `false` below:
-      #
       color: true,
-      #
-      # You can customize the parameters of any check by adding a second element
-      # to the tuple.
-      #
-      # To disable a check put `false` as second element:
-      #
-      #     {Credo.Check.Design.DuplicatedCode, false}
-      #
       checks: %{
         enabled: [
           #
@@ -79,15 +35,8 @@
           #
           ## Design Checks
           #
-          # You can customize the priority of any check
-          # Priority values are: `low, normal, high, higher`
-          #
           {Credo.Check.Design.AliasUsage,
            [priority: :low, if_nested_deeper_than: 2, if_called_more_often_than: 0]},
-          # You can also customize the exit_status of each check.
-          # If you don't want TODO comments to cause `mix credo` to fail, just
-          # set this value to 0 (zero).
-          #
           {Credo.Check.Design.TagTODO, [exit_status: 0]},
           {Credo.Check.Design.TagFIXME, []},
 
@@ -116,24 +65,37 @@
           {Credo.Check.Readability.VariableNames, []},
           {Credo.Check.Readability.WithSingleClause, []},
 
+          ## Readability — newly enabled (exit_status: 0 until codebase is clean)
+          {Credo.Check.Readability.NestedFunctionCalls,
+           [min_pipeline_length: 3, exit_status: 0]},
+          {Credo.Check.Readability.PreferUnquotedAtoms, [exit_status: 0]},
+          {Credo.Check.Readability.StrictModuleLayout, [exit_status: 0]},
+
           #
           ## Refactoring Opportunities
           #
           {Credo.Check.Refactor.Apply, []},
           {Credo.Check.Refactor.CondStatements, []},
           {Credo.Check.Refactor.CyclomaticComplexity, [max_complexity: 20]},
+          {Credo.Check.Refactor.FilterFilter, []},
           {Credo.Check.Refactor.FunctionArity, []},
           {Credo.Check.Refactor.LongQuoteBlocks, []},
-          {Credo.Check.Refactor.MatchInCondition, []},
           {Credo.Check.Refactor.MapJoin, []},
+          {Credo.Check.Refactor.MatchInCondition, []},
           {Credo.Check.Refactor.NegatedConditionsInUnless, []},
           {Credo.Check.Refactor.NegatedConditionsWithElse, []},
           {Credo.Check.Refactor.Nesting, []},
+          {Credo.Check.Refactor.RedundantWithClauseResult, []},
+          {Credo.Check.Refactor.RejectReject, []},
           {Credo.Check.Refactor.UnlessWithElse, []},
           {Credo.Check.Refactor.WithClauses, []},
-          {Credo.Check.Refactor.FilterFilter, []},
-          {Credo.Check.Refactor.RejectReject, []},
-          {Credo.Check.Refactor.RedundantWithClauseResult, []},
+
+          ## Refactoring — newly enabled (exit_status: 0 until codebase is clean)
+          {Credo.Check.Refactor.AppendSingleItem, [exit_status: 0]},
+          {Credo.Check.Refactor.CaseTrivialMatches, [exit_status: 0]},
+          {Credo.Check.Refactor.FilterCount, [exit_status: 0]},
+          {Credo.Check.Refactor.PerceivedComplexity, [exit_status: 0]},
+          {Credo.Check.Refactor.UtcNowTruncate, [exit_status: 0]},
 
           #
           ## Warnings
@@ -147,7 +109,7 @@
           {Credo.Check.Warning.OperationWithConstantResult, []},
           {Credo.Check.Warning.RaiseInsideRescue, []},
           {Credo.Check.Warning.SpecWithStruct, []},
-          {Credo.Check.Warning.WrongTestFileExtension, []},
+          {Credo.Check.Warning.UnsafeExec, []},
           {Credo.Check.Warning.UnusedEnumOperation, []},
           {Credo.Check.Warning.UnusedFileOperation, []},
           {Credo.Check.Warning.UnusedKeywordOperation, []},
@@ -156,15 +118,98 @@
           {Credo.Check.Warning.UnusedRegexOperation, []},
           {Credo.Check.Warning.UnusedStringOperation, []},
           {Credo.Check.Warning.UnusedTupleOperation, []},
-          {Credo.Check.Warning.UnsafeExec, []}
+          {Credo.Check.Warning.WrongTestFileExtension, []},
+
+          ## Warnings — newly enabled (exit_status: 0 until codebase is clean)
+          {Credo.Check.Warning.Dbg, [exit_status: 0]},
+          {Credo.Check.Warning.UnusedMapOperation, [exit_status: 0]},
+          {Credo.Check.Warning.UnsafeToAtom, [exit_status: 0]},
+
+          #
+          ## credo_naming — module/filename consistency (exit_status: 0 until clean)
+          #
+          {CredoNaming.Check.Consistency.ModuleFilename,
+           [exit_status: 0,
+            excluded_paths: ["test/support", "priv", "rel", "mix.exs"],
+            plugins: [CredoNaming.Check.Consistency.ModuleFilename.Plugins.Phoenix],
+            acronyms: [
+              {"GraphQL", "graphql"},
+              {"PubSub", "pub_sub"},
+              {"GenServer", "gen_server"},
+              {"OAuth", "oauth"},
+              {"OpenAI", "open_ai"},
+              {"AssemblyAI", "assembly_ai"},
+              {"LLM", "llm"},
+              {"E2E", "e2e"}
+            ]]},
+          {CredoNaming.Check.Warning.AvoidSpecificTermsInModuleNames,
+           [exit_status: 0, terms: ["Manager", ~r/Helpers?/, "Utils"]]},
+
+          #
+          ## credo_unnecessary_reduce (exit_status: 0 until clean)
+          #
+          {CredoUnnecessaryReduce.Check, [exit_status: 0]},
+
+          #
+          ## oeditus_credo — idiomatic refactoring (exit_status: 0 until clean)
+          #
+          {OeditusCredo.Check.Readability.UnnecessaryInterpolatingSigil, [exit_status: 0]},
+          {OeditusCredo.Check.Refactoring.PreferCasePatternMatching, [exit_status: 0]},
+          {OeditusCredo.Check.Refactoring.PreferMultiHeadFunction, [exit_status: 0]},
+          {OeditusCredo.Check.Refactoring.PreferMultiHeadForNil, [exit_status: 0]},
+          {OeditusCredo.Check.Refactoring.PreferTaggedTuplesForErrors, [exit_status: 0]},
+          {OeditusCredo.Check.Refactoring.PreferWithClause, [exit_status: 0]},
+          {OeditusCredo.Check.Refactoring.PreferDestructuring, [exit_status: 0]},
+          {OeditusCredo.Check.Refactoring.PreferPipelineOperator, [exit_status: 0]},
+          {OeditusCredo.Check.Refactoring.PreferFunctionCapture, [exit_status: 0]},
+          {OeditusCredo.Check.Refactoring.PreferDotAccessForStructs, [exit_status: 0]},
+          {OeditusCredo.Check.Refactoring.PreferInplaceMapMatching, [exit_status: 0]},
+          {OeditusCredo.Check.Refactoring.PreferInplaceListMatching, [exit_status: 0]},
+          {OeditusCredo.Check.Refactoring.PreferInplaceBinaryMatching, [exit_status: 0]},
+          {OeditusCredo.Check.Refactoring.PreferShortFieldAccessCapture, [exit_status: 0]},
+          {OeditusCredo.Check.Refactoring.PreferPatternMatchingForEmptiness, [exit_status: 0]},
+          {OeditusCredo.Check.Refactoring.PreferStringBoundariesOverRegex, [exit_status: 0]},
+          {OeditusCredo.Check.Refactoring.PreferMapMerge, [exit_status: 0]},
+          {OeditusCredo.Check.Refactoring.PreferForComprehensionOverFilterMap, [exit_status: 0]},
+          {OeditusCredo.Check.Refactoring.AvoidUnawaitedTaskAsync, [exit_status: 0]},
+
+          #
+          ## oeditus_credo — warnings (exit_status: 0 until clean)
+          #
+          {OeditusCredo.Check.Warning.SwallowingException, [exit_status: 0]},
+          {OeditusCredo.Check.Warning.CallbackHell, [exit_status: 0]},
+          {OeditusCredo.Check.Warning.SyncOverAsync, [exit_status: 0]},
+          {OeditusCredo.Check.Warning.MissingHandleAsync, [exit_status: 0]},
+          {OeditusCredo.Check.Warning.SilentErrorCase, [exit_status: 0]},
+          {OeditusCredo.Check.Warning.DirectStructUpdate, [exit_status: 0]},
+          {OeditusCredo.Check.Warning.InefficientFilter, [exit_status: 0]},
+          {OeditusCredo.Check.Warning.NPlusOneQuery, [exit_status: 0]},
+          {OeditusCredo.Check.Warning.MissingPreload, [exit_status: 0]},
+          {OeditusCredo.Check.Warning.UnmanagedTask, [exit_status: 0]},
+          {OeditusCredo.Check.Warning.BlockingInPlug, [exit_status: 0]},
+          {OeditusCredo.Check.Warning.TelemetryInRecursiveFunction, [exit_status: 0]},
+
+          #
+          ## oeditus_credo — security (exit_status: 0 until reviewed)
+          #
+          {OeditusCredo.Check.Security.SQLInjection, [exit_status: 0]},
+          {OeditusCredo.Check.Security.OSCommandInjection, [exit_status: 0]},
+          {OeditusCredo.Check.Security.CodeInjection, [exit_status: 0]},
+          {OeditusCredo.Check.Security.XSSVulnerability, [exit_status: 0]},
+          {OeditusCredo.Check.Security.HardcodedCredentials, [exit_status: 0]},
+          {OeditusCredo.Check.Security.UnsafeDeserialization, [exit_status: 0]},
+          {OeditusCredo.Check.Security.PathTraversal, [exit_status: 0]},
+          {OeditusCredo.Check.Security.InsecureDirectObjectReference, [exit_status: 0]},
+          {OeditusCredo.Check.Security.SensitiveDataExposure, [exit_status: 0]},
+          {OeditusCredo.Check.Security.TOCTOU, [exit_status: 0]},
+          {OeditusCredo.Check.Security.SSRFVulnerability, [exit_status: 0]},
+          {OeditusCredo.Check.Security.UnrestrictedFileUpload, [exit_status: 0]},
+          {OeditusCredo.Check.Security.IncorrectAuthorization, [exit_status: 0]},
+          {OeditusCredo.Check.Security.ImproperInputValidation, [exit_status: 0]}
         ],
         disabled: [
           #
-          # Checks scheduled for next check update (opt-in for now, just replace `false` with `[]`)
-
-          #
-          # Controversial and experimental checks (opt-in, just move the check to `:enabled`
-          #   and be sure to use `mix credo --strict` to see low priority checks)
+          ## Built-in — intentionally off
           #
           {Credo.Check.Consistency.MultiAliasImportRequireUse, []},
           {Credo.Check.Consistency.UnusedVariableNames, []},
@@ -174,35 +219,40 @@
           {Credo.Check.Readability.BlockPipe, []},
           {Credo.Check.Readability.ImplTrue, []},
           {Credo.Check.Readability.MultiAlias, []},
-          {Credo.Check.Readability.NestedFunctionCalls, []},
           {Credo.Check.Readability.SeparateAliasRequire, []},
           {Credo.Check.Readability.SingleFunctionToBlockPipe, []},
-          {Credo.Check.Readability.SinglePipe, []},
           {Credo.Check.Readability.Specs, []},
-          {Credo.Check.Readability.StrictModuleLayout, []},
           {Credo.Check.Readability.WithCustomTaggedTuple, []},
           {Credo.Check.Refactor.ABCSize, []},
-          {Credo.Check.Refactor.AppendSingleItem, []},
           {Credo.Check.Refactor.DoubleBooleanNegation, []},
           {Credo.Check.Refactor.FilterReject, []},
           {Credo.Check.Refactor.IoPuts, []},
           {Credo.Check.Refactor.MapMap, []},
           {Credo.Check.Refactor.ModuleDependencies, []},
           {Credo.Check.Refactor.NegatedIsNil, []},
-          {Credo.Check.Refactor.PipeChainStart, []},
           {Credo.Check.Refactor.RejectFilter, []},
           {Credo.Check.Refactor.VariableRebinding, []},
           {Credo.Check.Warning.LazyLogging, []},
           {Credo.Check.Warning.LeakyEnvironment, []},
           {Credo.Check.Warning.MapGetUnsafePass, []},
           {Credo.Check.Warning.MixEnv, []},
-          {Credo.Check.Warning.UnsafeToAtom, []}
-
-          # {Credo.Check.Refactor.MapInto, []},
 
           #
-          # Custom checks can be created using `mix credo.gen.check`.
+          ## oeditus_credo — off (overlap, opt-in, or too broad)
           #
+          {OeditusCredo.Check.Refactoring.AvoidSinglePipe, false},
+          {OeditusCredo.Check.Refactoring.PreferListPrepend, false},
+          {OeditusCredo.Check.Refactoring.ChangeRiskAntiPatterns, false},
+          {OeditusCredo.Check.Refactoring.SuggestFSM, false},
+          {OeditusCredo.Check.Warning.UnsafeMapAccess, false},
+          {OeditusCredo.Check.Warning.MissingThrottle, false},
+          {OeditusCredo.Check.Warning.InlineJavascript, false},
+          {OeditusCredo.Check.Warning.MissingTelemetryInAuthPlug, false},
+          {OeditusCredo.Check.Warning.MissingTelemetryForExternalHttp, false},
+          {OeditusCredo.Check.Warning.MissingErrorHandling, false},
+          {OeditusCredo.Check.Security.MissingAuthentication, false},
+          {OeditusCredo.Check.Security.MissingAuthorization, false},
+          {OeditusCredo.Check.Security.MissingCSRFProtection, false}
         ]
       }
     }

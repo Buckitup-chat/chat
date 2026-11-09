@@ -30,6 +30,8 @@ defmodule ChatWeb.BotAndTokenIntegrationTest do
   alias Chat.ReviewBot.Identity
   alias Chat.ReviewBot.Worker
   alias Chat.NetworkSynchronization.Electric.ShapeWriter
+  alias Chat.Test.ReadGateHelpers
+  alias Chat.Test.ReviewFixtures
   alias Phoenix.Sync.Sandbox
 
   @auth_token "super-secret-token-1234"
@@ -48,7 +50,7 @@ defmodule ChatWeb.BotAndTokenIntegrationTest do
 
     origin_identity = User.generate_pq_identity("TestOrigin")
     origin_card = insert_user_card(origin_identity)
-    _origin = Chat.Test.ReviewFixtures.insert_origin(origin_identity, owner, :none)
+    _origin = ReviewFixtures.insert_origin(origin_identity, owner, :none)
     origin_hash = origin_card.user_hash
 
     bot_identity = User.generate_pq_identity("ReviewBot_TestOrigin")
@@ -293,7 +295,7 @@ defmodule ChatWeb.BotAndTokenIntegrationTest do
     test "trust mode — read vouch enables access", ctx do
       put_gate(:trust, ctx.owner_card)
 
-      Chat.Test.ReadGateHelpers.vouch(
+      ReadGateHelpers.vouch(
         ctx.owner,
         ctx.owner_card.user_hash,
         ctx.reviewer_card.user_hash,

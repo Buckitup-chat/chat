@@ -5,6 +5,7 @@ defmodule ChatWeb.TurnCredentialsControllerTest do
   import Chat.Test.ReadGateHelpers
 
   alias Chat.Challenge
+  alias Chat.Data.User
   alias Chat.Turn.Config
   alias Chat.Turn.LanRelay
   alias Chat.Turn.RateLimiter
@@ -54,8 +55,8 @@ defmodule ChatWeb.TurnCredentialsControllerTest do
     end
 
     test "unknown user returns 401", %{conn: conn, alice: alice} do
-      stranger = Chat.Data.User.generate_pq_identity("Stranger")
-      stranger_hash = Chat.Data.User.extract_pq_card(stranger).user_hash
+      stranger = User.generate_pq_identity("Stranger")
+      stranger_hash = User.extract_pq_card(stranger).user_hash
 
       conn = post_turn_credentials(conn, stranger_hash, alice.sign_skey)
 
@@ -63,7 +64,7 @@ defmodule ChatWeb.TurnCredentialsControllerTest do
     end
 
     test "wrong signature returns 401", %{conn: conn, alice_card: card} do
-      other = Chat.Data.User.generate_pq_identity("Other")
+      other = User.generate_pq_identity("Other")
 
       conn = post_turn_credentials(conn, card.user_hash, other.sign_skey)
 

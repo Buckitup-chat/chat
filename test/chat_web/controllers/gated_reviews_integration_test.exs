@@ -20,6 +20,7 @@ defmodule ChatWeb.GatedReviewsIntegrationTest do
   alias Chat.Data.User
   alias Chat.Data.VouchToken, as: VouchTokenData
   alias Chat.DeviceId
+  alias Chat.Test.ReviewFixtures
   alias Phoenix.Sync.Sandbox
 
   setup %{conn: conn} do
@@ -46,7 +47,7 @@ defmodule ChatWeb.GatedReviewsIntegrationTest do
   end
 
   defp insert_origin(origin_identity, owner) do
-    Chat.Test.ReviewFixtures.insert_origin(origin_identity, owner, :none)
+    ReviewFixtures.insert_origin(origin_identity, owner, :none)
   end
 
   describe "gated reviews e2e" do
@@ -130,7 +131,12 @@ defmodule ChatWeb.GatedReviewsIntegrationTest do
                |> post_review_ingest(ctx.author, ctx.origin_hash)
                |> json_response(200)
 
-      revoke_vouch(ctx.owner, ctx.owner_card.user_hash, ctx.author_card.user_hash, "storage.write")
+      revoke_vouch(
+        ctx.owner,
+        ctx.owner_card.user_hash,
+        ctx.author_card.user_hash,
+        "storage.write"
+      )
 
       assert %{"error" => "not_in_trust_chain"} =
                ctx.conn

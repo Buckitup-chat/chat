@@ -27,6 +27,7 @@ defmodule ChatWeb.SandboxGatedReviewsIntegrationTest do
   alias Chat.Data.Types.ReviewSignHash
   alias Chat.Data.User
   alias Chat.DeviceId
+  alias Chat.Test.ReviewFixtures
   alias Phoenix.Sync.Sandbox
 
   setup %{conn: conn} do
@@ -37,7 +38,7 @@ defmodule ChatWeb.SandboxGatedReviewsIntegrationTest do
 
     origin_identity = User.generate_pq_identity("TestOrigin")
     origin_card = insert_user_card(origin_identity)
-    origin = Chat.Test.ReviewFixtures.insert_origin(origin_identity, owner, :none)
+    origin = ReviewFixtures.insert_origin(origin_identity, owner, :none)
 
     conn = Sandbox.init_test_session(conn, Chat.Repo)
 
@@ -211,7 +212,8 @@ defmodule ChatWeb.SandboxGatedReviewsIntegrationTest do
   end
 
   defp set_origin_review_access!(conn, origin_identity, origin_hash, value) do
-    mutation = origin_setting_insert_mutation(origin_hash, "review_access", value, origin_identity)
+    mutation =
+      origin_setting_insert_mutation(origin_hash, "review_access", value, origin_identity)
 
     assert %{"txid" => _} =
              conn
@@ -259,7 +261,8 @@ defmodule ChatWeb.SandboxGatedReviewsIntegrationTest do
       owner_timestamp: System.os_time(:millisecond)
     }
 
-    sign_b64 = setting |> Integrity.signature_payload() |> EnigmaPq.sign(origin_identity.sign_skey)
+    sign_b64 =
+      setting |> Integrity.signature_payload() |> EnigmaPq.sign(origin_identity.sign_skey)
 
     %{
       "type" => "insert",

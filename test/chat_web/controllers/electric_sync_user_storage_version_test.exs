@@ -16,7 +16,8 @@ defmodule ChatWeb.ElectricSyncUserStorageVersionTest do
 
   describe "GET /electric/v1/shapes?table=user_storage_versions - sync endpoint" do
     test "returns response with correct status", %{conn: conn} do
-      conn = get(conn, "/electric/v1/shapes", %{"table" => "user_storage_versions", "offset" => "-1"})
+      conn =
+        get(conn, "/electric/v1/shapes", %{"table" => "user_storage_versions", "offset" => "-1"})
 
       assert conn.status == 200
     end
@@ -26,7 +27,8 @@ defmodule ChatWeb.ElectricSyncUserStorageVersionTest do
       insert_version!(card.user_hash, Ecto.UUID.generate())
       insert_version!(card.user_hash, Ecto.UUID.generate())
 
-      conn = get(conn, "/electric/v1/shapes", %{"table" => "user_storage_versions", "offset" => "-1"})
+      conn =
+        get(conn, "/electric/v1/shapes", %{"table" => "user_storage_versions", "offset" => "-1"})
 
       assert conn.status == 200
       assert length(Repo.all(UserStorageVersion)) == 2

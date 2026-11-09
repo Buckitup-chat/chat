@@ -28,6 +28,7 @@ defmodule ChatWeb.ElectricControllerReviewTest do
   alias Chat.Data.Types.ReviewPasswordSignHash
   alias Chat.Data.Types.ReviewSignHash
   alias Chat.Data.Schemas.VouchToken
+  alias Chat.Data.Types.ReviewWriteTokenSignHash
   alias Chat.Data.User, as: UserData
   alias Chat.Data.VouchToken, as: VouchTokenData
   alias EnigmaPq
@@ -615,7 +616,7 @@ defmodule ChatWeb.ElectricControllerReviewTest do
         deleted_flag: false,
         owner_timestamp: System.os_time(:millisecond)
       }
-      |> sign_with_hash(bot.sign_skey, &Chat.Data.Types.ReviewWriteTokenSignHash.from_binary/1)
+      |> sign_with_hash(bot.sign_skey, &ReviewWriteTokenSignHash.from_binary/1)
 
     {:ok, _} =
       Chat.Data.ReviewWriteToken.upsert_review_write_token(

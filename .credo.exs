@@ -16,7 +16,7 @@
         excluded: [~r"/_build/", ~r"/deps/", ~r"/node_modules/"]
       },
       plugins: [],
-      requires: [],
+      requires: ["credo_checks/**/*.ex"],
       strict: false,
       parse_timeout: 5000,
       color: true,
@@ -68,7 +68,8 @@
           ## Readability — newly enabled (exit_status: 0 until codebase is clean)
           {Credo.Check.Readability.NestedFunctionCalls, [min_pipeline_length: 3, exit_status: 0]},
           {Credo.Check.Readability.PreferUnquotedAtoms, [exit_status: 0]},
-          {Credo.Check.Readability.StrictModuleLayout, [exit_status: 0]},
+          # alias may precede use when the use references it (see credo_checks/)
+          {Chat.Credo.Check.StrictModuleLayout, [exit_status: 0]},
 
           #
           ## Refactoring Opportunities

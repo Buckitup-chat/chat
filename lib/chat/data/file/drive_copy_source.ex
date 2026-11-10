@@ -5,7 +5,7 @@ defmodule Chat.Data.File.DriveCopySource do
 
   alias Chat.Data.File.ChunkStore
   alias Chat.Data.File.DriveDirs
-  alias Ecto.Adapters.SQL
+  alias Chat.Storage.Pg
 
   def chunk_fetchable(drive_id, file_id, chunk_index, source_drive_id) do
     GenServer.cast(via(drive_id), {:chunk_fetchable, file_id, chunk_index, source_drive_id})
@@ -122,17 +122,11 @@ defmodule Chat.Data.File.DriveCopySource do
     end
   end
 
-  defp query_system_id(nil), do: :error
-
   defp query_system_id(repo) when is_atom(repo) do
-    case SQL.query(repo, "SELECT system_identifier FROM pg_control_system()", []) do
-      {:ok, %{rows: [[identifier]]}} -> {:ok, to_string(identifier)}
-      _ -> :error
+    case Pg.system_identifier(repo) do
+      nil -> :error
+      system_id -> {:ok, system_id}
     end
-  rescue
-    _ -> :error
-  catch
-    :exit, _ -> :error
   end
 
   defp query_system_id(device) when is_binary(device) do

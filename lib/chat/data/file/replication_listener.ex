@@ -6,8 +6,8 @@ defmodule Chat.Data.File.ReplicationListener do
 
   alias Chat.Data.File, as: FileData
   alias Chat.Data.File.DriveCopySource
+  alias Chat.Storage.Pg
   alias Chat.TimeKeeper
-  alias Ecto.Adapters.SQL
 
   @registry Chat.Data.File.ChunkPipelineRegistry
 
@@ -21,7 +21,7 @@ defmodule Chat.Data.File.ReplicationListener do
     drive_id = Keyword.fetch!(opts, :drive_id)
     repo = Keyword.get(opts, :repo)
 
-    system_id = query_system_id(repo)
+    system_id = Pg.system_identifier(repo)
     state = %{drive_id: drive_id, repo: repo, system_id: system_id, conn: nil, refs: %{}}
 
     case connect_and_listen(repo) do
@@ -82,15 +82,6 @@ defmodule Chat.Data.File.ReplicationListener do
          {:ok, ref1} <- Postgrex.Notifications.listen(conn, "file_replicated"),
          {:ok, ref2} <- Postgrex.Notifications.listen(conn, "file_chunk_replicated") do
       {:ok, conn, %{file_replicated: ref1, file_chunk_replicated: ref2}}
-    end
-  end
-
-  defp query_system_id(nil), do: nil
-
-  defp query_system_id(repo) do
-    case SQL.query(repo, "SELECT system_identifier FROM pg_control_system()", []) do
-      {:ok, %{rows: [[identifier]]}} -> to_string(identifier)
-      _ -> nil
     end
   end
 

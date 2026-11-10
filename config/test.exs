@@ -48,3 +48,20 @@ config :chat, Chat.Repo,
   connect_timeout: 1000,
   handshake_timeout: 1000,
   prepare: :unnamed
+
+# Two-database PG pair for sync/replication tests (Chat.Test.PgPairCase).
+# Created, migrated and dropped by Chat.Test.PgPairHelper — not in :ecto_repos.
+for {repo, database} <- [
+      {Chat.Test.UnitARepo, "chat_test_unit_a"},
+      {Chat.Test.UnitBRepo, "chat_test_unit_b"}
+    ] do
+  config :chat, repo,
+    username: "postgres",
+    password: "postgres",
+    hostname: "localhost",
+    database: database,
+    pool: Ecto.Adapters.SQL.Sandbox,
+    pool_size: 4,
+    ownership_timeout: 60_000,
+    prepare: :unnamed
+end

@@ -3,8 +3,8 @@ defmodule Chat.Storage.UnitTest do
 
   alias Chat.Storage.Unit
 
-  @target [internal_root: "/root", media_root: "/root/media", internal_pg: :managed]
-  @host [internal_root: "priv", media_root: "priv/media", internal_pg: :external]
+  @target [internal_root: "/root", media_root: "/root/media"]
+  @host [internal_root: "priv", media_root: "priv/media"]
 
   @target_paths %{
     internal: {:internal, "/root/db"},
@@ -65,16 +65,12 @@ defmodule Chat.Storage.UnitTest do
     for {role, {id, dir}} <- @host_paths, {resource, segment} <- @segments do
       test "#{role} #{resource}" do
         unit = unit_for(unquote(role), unquote(id))
-
-        expected =
-          expected_host_path(unquote(role), unquote(resource), unquote(dir), unquote(segment))
-
-        assert Unit.path(unit, unquote(resource)) == expected
+        assert Unit.path(unit, unquote(resource)) == Path.join(unquote(dir), unquote(segment))
       end
     end
 
-    test "internal has no managed PG" do
-      assert Unit.internal() |> Unit.pg_run() == nil
+    test "pg_run is per device" do
+      assert Unit.internal() |> Unit.pg_run() == "/tmp/pg_run/internal"
       assert Unit.usb("sdc1", :main) |> Unit.pg_run() == "/tmp/pg_run/sdc1"
     end
   end
@@ -118,7 +114,4 @@ defmodule Chat.Storage.UnitTest do
 
   defp unit_for(:internal, :internal), do: Unit.internal()
   defp unit_for(role, device), do: Unit.usb(device, role)
-
-  defp expected_host_path(:internal, :pg, _dir, _segment), do: nil
-  defp expected_host_path(_role, _resource, dir, segment), do: Path.join(dir, segment)
 end

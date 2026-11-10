@@ -15,7 +15,8 @@ defmodule Chat.Storage.Unit do
       pq_files/      :pq_files   chunk blobs, not versioned
       electric/      :electric   Electric shape cache (Default unit only)
 
-  On host PG is external, so `:pg` and `pg_run/1` are `nil` for the internal unit.
+  PG paths are always derived; whether a PG cluster is actually started there is
+  the caller's (platform's) decision.
 
   See `docs/pq/reqs/files/pq_storage_units.proposed.md` §2.1–2.2.
   """
@@ -55,13 +56,9 @@ defmodule Chat.Storage.Unit do
     %__MODULE__{id: device, role: role, root: Path.join(config(:media_root), device)}
   end
 
-  @spec path(t(), resource()) :: Path.t() | nil
-  def path(%__MODULE__{} = unit, resource) do
-    case {resource, managed_pg?(unit)} do
-      {:pg, false} -> nil
-      _ -> [unit.root, role_dir(unit), segment(resource)] |> Path.join()
-    end
-  end
+  @spec path(t(), resource()) :: Path.t()
+  def path(%__MODULE__{} = unit, resource),
+    do: [unit.root, role_dir(unit), segment(resource)] |> Path.join()
 
   @spec role_dir(t()) :: String.t()
   def role_dir(%__MODULE__{role: role}), do: Role.dir(role)
@@ -70,10 +67,8 @@ defmodule Chat.Storage.Unit do
   def pg_port(%__MODULE__{id: :internal}), do: @pg_base_port
   def pg_port(%__MODULE__{id: "sd" <> <<letter, _::binary>>}), do: @pg_base_port + 1 + letter - ?a
 
-  @spec pg_run(t()) :: Path.t() | nil
-  def pg_run(%__MODULE__{} = unit) do
-    if managed_pg?(unit), do: Path.join(@pg_run_dir, to_string(unit.id))
-  end
+  @spec pg_run(t()) :: Path.t()
+  def pg_run(%__MODULE__{id: id}), do: Path.join(@pg_run_dir, to_string(id))
 
   @spec repo(t()) :: module()
   def repo(%__MODULE__{id: :internal}), do: Chat.Repo
@@ -95,9 +90,6 @@ defmodule Chat.Storage.Unit do
   defp segment(:pg), do: "pg"
   defp segment(:pq_files), do: "pq_files"
   defp segment(:electric), do: "electric"
-
-  defp managed_pg?(%__MODULE__{id: :internal}), do: config(:internal_pg) == :managed
-  defp managed_pg?(%__MODULE__{}), do: true
 
   defp config(key), do: Application.fetch_env!(:chat, Chat.Storage) |> Keyword.fetch!(key)
 end

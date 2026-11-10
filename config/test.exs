@@ -21,8 +21,7 @@ config :chat, :admin_cub_db_file, "priv/test_admin_db"
 
 config :chat, Chat.Storage,
   internal_root: "priv/test_db",
-  media_root: "priv/test_media",
-  internal_pg: :external
+  media_root: "priv/test_media"
 
 config :chat, :admin_cub_db_auto_compact, false
 

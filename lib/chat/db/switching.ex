@@ -5,6 +5,7 @@ defmodule Chat.Db.Switching do
 
   alias Chat.Db.Common
   alias Chat.Db.WriteQueue
+  alias Chat.Storage.Unit
 
   def mirror(from, to) when is_list(to) do
     from_queue = Common.names(from, :queue)
@@ -30,7 +31,7 @@ defmodule Chat.Db.Switching do
 
     Common.put_chat_db_env(:data_queue, queue_name)
     Common.put_chat_db_env(:data_pid, name)
-    Common.put_chat_db_env(:files_base_dir, CubDB.data_dir(name) <> "_files")
+    Common.put_chat_db_env(:files_base_dir, name |> CubDB.data_dir() |> Unit.cub_files_dir())
     Common.put_chat_db_env(:data_dry, status_relay_name)
 
     if drive_id = opts[:drive_id] do

@@ -15,14 +15,16 @@ defmodule Chat.Data.File.DriveDirs do
   `nil` for standalone chat (no USB drives to discover).
   """
 
-  @main_db_dir "main_db"
-  @files_suffix "_files"
+  alias Chat.Storage.Unit
+
   @pq_files_dir "pq_files"
 
-  def internal_files_dir, do: Chat.Db.file_path() <> @files_suffix
+  def internal_files_dir, do: Unit.internal() |> Unit.path(:cub_files)
 
-  def usb_files_dir(mount_path),
-    do: Path.join([mount_path, @main_db_dir, Chat.Db.version_path()]) <> @files_suffix
+  def usb_files_dir(mount_path) do
+    %Unit{id: Path.basename(mount_path), role: :main, root: mount_path}
+    |> Unit.path(:cub_files)
+  end
 
   def media_root, do: Application.get_env(:chat, :usb_media_root)
 

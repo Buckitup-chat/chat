@@ -114,9 +114,13 @@ Exactly one module holds path segments and naming conventions: `Chat.Storage.Uni
 
 ```elixir
 config :chat, Chat.Storage,
-  internal_root: "/root",       # priv/db (dev), priv/test_db (test)
+  internal_root: "/root",       # priv (dev, test, standalone)
+  internal_dir: "db",           # optional; "test_db" (test), "data" (standalone, platform host)
   media_root: "/root/media"     # priv/media (host); nil for standalone chat
 ```
+
+`internal_dir` overrides the internal unit's role dir only, so legacy CubDB locations
+(`priv/test_db/v.10.1`, `priv/data/v.10.1`) stay byte-for-byte the same.
 
 This replaces `:cub_db_file`, `:files_base_dir`, `:usb_media_root`, `:internal_root` and platform's `:mount_path_media`. The Mounter reads its target from `Unit.root/1`.
 

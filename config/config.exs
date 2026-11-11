@@ -78,10 +78,12 @@ config :chat,
   env: config_env(),
   file_chunk_size: 10 * 1024 * 1024
 
-# Storage unit roots (see Chat.Storage.Unit). Target (platform) overrides with
-# internal_root: "/root", media_root: "/root/media"
+# Storage unit roots (see Chat.Storage.Unit). Target (platform) uses
+# internal_root: "/root", media_root: "/root/media" and the default "db" internal dir.
+# internal_dir "data" keeps standalone CubDB at priv/data/v.10.1; dev and test override it.
 config :chat, Chat.Storage,
   internal_root: "priv",
+  internal_dir: "data",
   media_root: "priv/media"
 
 config :chat, Chat.Db.ChangeTracker, expire_seconds: 31

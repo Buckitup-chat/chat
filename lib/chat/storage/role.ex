@@ -9,13 +9,6 @@ defmodule Chat.Storage.Role do
   @type t :: :internal | :main | :backup | :cargo | :onliners
   @type capability :: :cub | :pg | :pq_files | :pipeline
 
-  @capabilities %{
-    internal: [:cub, :pg, :pq_files, :pipeline],
-    main: [:cub, :pg, :pq_files, :pipeline],
-    backup: [:cub, :pg, :pq_files, :pipeline],
-    cargo: [:cub],
-    onliners: [:cub]
-  }
   @dirs %{
     internal: "db",
     main: "main_db",
@@ -25,15 +18,6 @@ defmodule Chat.Storage.Role do
   }
   # Decider's current order: the first present role dir wins
   @priority [:cargo, :onliners, :backup, :main]
-
-  @spec all() :: [t()]
-  def all, do: Map.keys(@dirs)
-
-  @spec capabilities(t()) :: [capability()]
-  def capabilities(role), do: Map.fetch!(@capabilities, role)
-
-  @spec dir(t()) :: String.t()
-  def dir(role), do: Map.fetch!(@dirs, role)
 
   @doc """
   Resolves the role of a mounted USB drive.
@@ -55,4 +39,21 @@ defmodule Chat.Storage.Role do
       {[role | _], _} -> {:ok, role}
     end
   end
+
+  @capabilities %{
+    internal: [:cub, :pg, :pq_files, :pipeline],
+    main: [:cub, :pg, :pq_files, :pipeline],
+    backup: [:cub, :pg, :pq_files, :pipeline],
+    cargo: [:cub],
+    onliners: [:cub]
+  }
+
+  @spec capabilities(t()) :: [capability()]
+  def capabilities(role), do: Map.fetch!(@capabilities, role)
+
+  @spec dir(t()) :: String.t()
+  def dir(role), do: Map.fetch!(@dirs, role)
+
+  @spec all() :: [t()]
+  def all, do: Map.keys(@dirs)
 end

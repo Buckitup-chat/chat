@@ -3,7 +3,7 @@ defmodule Chat.Data.File.DriveAnnouncer do
 
   use GenServer
 
-  alias Ecto.Adapters.SQL
+  alias Chat.Storage.Pg
 
   @topic "chunk_pipeline"
 
@@ -30,12 +30,10 @@ defmodule Chat.Data.File.DriveAnnouncer do
     :ok
   end
 
-  defp query_system_id(nil), do: {:error, :no_repo}
-
   defp query_system_id(repo) do
-    case SQL.query(repo, "SELECT system_identifier FROM pg_control_system()", []) do
-      {:ok, %{rows: [[identifier]]}} -> {:ok, to_string(identifier)}
-      {:error, reason} -> {:error, reason}
+    case Pg.system_identifier(repo) do
+      nil -> {:error, :no_system_id}
+      system_id -> {:ok, system_id}
     end
   end
 

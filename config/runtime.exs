@@ -16,9 +16,13 @@ if config_env() == :dev do
   data_dir = System.get_env("DATA_DIR") || "priv/db"
 
   config :chat,
-    cub_db_file: data_dir,
     admin_cub_db_file: "#{data_dir}/../admin_db_v2",
     files_base_dir: "#{data_dir}/files"
+
+  # Internal CubDB stays at <DATA_DIR>/v.10.1
+  config :chat, Chat.Storage,
+    internal_root: Path.dirname(data_dir),
+    internal_dir: Path.basename(data_dir)
 
   config :chat, ChatWeb.Endpoint,
     # Binding to loopback ipv4 address prevents access from other machines.

@@ -15,6 +15,9 @@ defmodule Chat.Storage.Unit do
       pq_files/      :pq_files   chunk blobs, not versioned
       electric/      :electric   Electric shape cache (Default unit only)
 
+  The internal role dir is `"db"`; `config :chat, Chat.Storage, internal_dir: ...`
+  overrides it to keep legacy locations (`priv/data` standalone, `priv/test_db` in tests).
+
   PG paths are always derived; whether a PG cluster is actually started there is
   the caller's (platform's) decision.
 
@@ -52,7 +55,7 @@ defmodule Chat.Storage.Unit do
     segment =
       case resource do
         :cub_db -> Chat.Db.version_path()
-        :cub_files -> Chat.Db.version_path() <> "_files"
+        :cub_files -> Chat.Db.version_path() |> cub_files_dir()
         :pg -> "pg"
         :pq_files -> "pq_files"
         :electric -> "electric"
@@ -61,8 +64,21 @@ defmodule Chat.Storage.Unit do
     [unit.root, role_dir(unit), segment] |> Path.join()
   end
 
+  @doc """
+  FileFs dir that sits next to a CubDB data dir. For running databases whose
+  unit is not at hand (`CubDB.data_dir/1`).
+  """
+  @spec cub_files_dir(Path.t()) :: Path.t()
+  def cub_files_dir(cub_db_dir), do: cub_db_dir <> "_files"
+
+  # `internal_dir` keeps legacy internal locations (`priv/test_db`, `priv/data`)
   @spec role_dir(t()) :: String.t()
-  def role_dir(%__MODULE__{role: role}), do: Role.dir(role)
+  def role_dir(%__MODULE__{role: role}) do
+    case role do
+      :internal -> Keyword.get(storage_config(), :internal_dir, Role.dir(:internal))
+      role -> Role.dir(role)
+    end
+  end
 
   @spec capabilities(t()) :: [Role.capability()]
   def capabilities(%__MODULE__{role: role}), do: Role.capabilities(role)
@@ -112,5 +128,6 @@ defmodule Chat.Storage.Unit do
   def via(%__MODULE__{id: id}, component),
     do: {:via, Registry, {@drives_registry, {component, id}}}
 
-  defp config(key), do: Application.fetch_env!(:chat, Chat.Storage) |> Keyword.fetch!(key)
+  defp config(key), do: storage_config() |> Keyword.fetch!(key)
+  defp storage_config, do: Application.fetch_env!(:chat, Chat.Storage)
 end

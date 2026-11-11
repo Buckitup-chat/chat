@@ -16,11 +16,12 @@ config :logger, level: :warning
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime
 
-config :chat, :cub_db_file, "priv/test_db"
 config :chat, :admin_cub_db_file, "priv/test_admin_db"
 
+# Internal CubDB stays at priv/test_db/v.10.1
 config :chat, Chat.Storage,
-  internal_root: "priv/test_db",
+  internal_root: "priv",
+  internal_dir: "test_db",
   media_root: "priv/test_media"
 
 config :chat, :admin_cub_db_auto_compact, false

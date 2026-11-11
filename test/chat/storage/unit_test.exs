@@ -103,10 +103,42 @@ defmodule Chat.Storage.UnitTest do
     end
 
     test "role_dir and capabilities come from Role" do
+      use_storage_config(@target)
       assert Unit.internal() |> Unit.role_dir() == "db"
       assert Unit.usb("sdb1", :cargo) |> Unit.role_dir() == "cargo_db"
       assert Unit.usb("sdb1", :cargo) |> Unit.capabilities() == [:cub]
       assert Unit.usb("sdb1", :main) |> Unit.capabilities() == [:cub, :pg, :pq_files, :pipeline]
+    end
+  end
+
+  describe "legacy internal dir" do
+    test "internal_dir overrides only the internal role dir" do
+      use_storage_config(internal_root: "priv", internal_dir: "test_db", media_root: "priv/m")
+
+      assert Unit.internal() |> Unit.path(:cub_db) == "priv/test_db/v.10.1"
+      assert Unit.internal() |> Unit.path(:cub_files) == "priv/test_db/v.10.1_files"
+      assert Unit.usb("sdb1", :main) |> Unit.path(:cub_db) == "priv/m/sdb1/main_db/v.10.1"
+    end
+
+    test "CubDB paths of each env equal today's" do
+      use_storage_config(internal_root: "priv", internal_dir: "data", media_root: "priv/media")
+      assert Chat.Db.file_path() == "priv/data/v.10.1"
+
+      use_storage_config(internal_root: "priv", internal_dir: "db", media_root: "priv/media")
+      assert Chat.Db.file_path() == "priv/db/v.10.1"
+
+      use_storage_config(@target)
+      assert Chat.Db.file_path() == "/root/db/v.10.1"
+    end
+
+    test "test env keeps priv/test_db" do
+      assert Chat.Db.file_path() == "priv/test_db/v.10.1"
+    end
+  end
+
+  describe "cub_files_dir/1" do
+    test "is next to the CubDB dir" do
+      assert Unit.cub_files_dir("/x/main_db/v.10.1") == "/x/main_db/v.10.1_files"
     end
   end
 

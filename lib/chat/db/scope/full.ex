@@ -6,6 +6,7 @@ defmodule Chat.Db.Scope.Full do
   @dialyzer {:no_opaque, join_keys_of: 2}
 
   alias Chat.FileFs
+  alias Chat.Storage.Unit
 
   @doc "Data keys in db and associated files"
   @spec keys(GenServer.server()) :: MapSet.t()
@@ -68,7 +69,7 @@ defmodule Chat.Db.Scope.Full do
   defp join_fs_keys(keys, db) do
     db
     |> CubDB.data_dir()
-    |> then(&"#{&1}_files")
+    |> Unit.cub_files_dir()
     |> FileFs.list_all_db_keys()
     |> MapSet.new()
     |> MapSet.union(keys)

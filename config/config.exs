@@ -78,6 +78,12 @@ config :chat,
   env: config_env(),
   file_chunk_size: 10 * 1024 * 1024
 
+# Storage unit roots (see Chat.Storage.Unit). Target (platform) overrides with
+# internal_root: "/root", media_root: "/root/media"
+config :chat, Chat.Storage,
+  internal_root: "priv",
+  media_root: "priv/media"
+
 config :chat, Chat.Db.ChangeTracker, expire_seconds: 31
 
 config :chat,

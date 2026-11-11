@@ -13,6 +13,7 @@ defmodule Chat.Data.File.GCTest do
   alias Chat.Data.User
   alias Chat.NetworkSynchronization.Electric.ShapeWriter
   alias Chat.Repo
+  alias Chat.Storage.Unit
 
   setup do
     identity = User.generate_pq_identity("Alice")
@@ -61,18 +62,16 @@ defmodule Chat.Data.File.GCTest do
     test "deletes ChunkStore files for deleted files", %{identity: identity, user_hash: user_hash} do
       file = insert_file_with_chunk(identity, user_hash)
       tmp_dir = System.tmp_dir!() |> Path.join("gc_test_#{System.unique_integer([:positive])}")
+      unit = %Unit{id: :internal, role: :internal, root: tmp_dir}
 
-      :ok = ChunkStore.put(file.file_id, 0, "chunk data", tmp_dir)
-      assert {:ok, "chunk data"} = ChunkStore.fetch(file.file_id, 0, tmp_dir)
+      :ok = ChunkStore.put(unit, file.file_id, 0, "chunk data")
+      assert {:ok, "chunk data"} = ChunkStore.fetch(unit, file.file_id, 0)
 
       soft_delete_file(file, identity.sign_skey)
 
-      "f_" <> hex = file.file_id
-      shard = String.slice(hex, -2, 2)
-      file_dir = Path.join([tmp_dir, "pq_files", shard, file.file_id])
-      File.rm_rf!(file_dir)
+      unit |> ChunkStore.file_dir(file.file_id) |> File.rm_rf!()
 
-      assert {:error, :enoent} = ChunkStore.fetch(file.file_id, 0, tmp_dir)
+      assert {:error, :enoent} = ChunkStore.fetch(unit, file.file_id, 0)
 
       on_exit(fn -> File.rm_rf!(tmp_dir) end)
     end

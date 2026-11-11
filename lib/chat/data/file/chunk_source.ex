@@ -26,6 +26,7 @@ defmodule Chat.Data.File.ChunkSource do
       alias Chat.Data.File, as: FileData
       alias Chat.Data.File.ChunkWriter
       alias Chat.Data.Types.FileChunkDataHash
+      alias Chat.Storage.Unit
       alias Chat.TimeKeeper
 
       @behaviour Chat.Data.File.ChunkSource
@@ -46,16 +47,19 @@ defmodule Chat.Data.File.ChunkSource do
       defoverridable on_init: 1, can_poll?: 1, handle_extra_info: 2
 
       def start_link(opts),
-        do: GenServer.start_link(__MODULE__, opts, name: via(Keyword.fetch!(opts, :drive_id)))
+        do: GenServer.start_link(__MODULE__, opts, name: via(Keyword.fetch!(opts, :unit).id))
 
       @impl GenServer
       def init(opts) do
         schedule_poll()
 
+        %Unit{} = unit = Keyword.fetch!(opts, :unit)
+
         state =
           %{
-            drive_id: Keyword.fetch!(opts, :drive_id),
-            repo: Keyword.get(opts, :repo),
+            unit: unit,
+            drive_id: unit.id,
+            repo: Unit.repo(unit),
             sweep_timers: %{},
             to_fetch: :queue.new(),
             fetching: %{},
@@ -202,7 +206,7 @@ defmodule Chat.Data.File.ChunkSource do
       end
 
       defp enqueue_poll(state) do
-        if Chat.Db.repo_ready?(repo_module(state)) and can_poll?(state) do
+        if Chat.Db.repo_ready?(state.repo) and can_poll?(state) do
           in_pipeline = in_pipeline_keys(state)
           limit = MapSet.size(in_pipeline) + @batch_size
 
@@ -227,7 +231,7 @@ defmodule Chat.Data.File.ChunkSource do
         do: :queue.to_list(q) |> Enum.map(fn {fid, ci, _} -> {fid, ci} end)
 
       defp enqueue_sweep(state, source_id) do
-        if Chat.Db.repo_ready?(repo_module(state)) do
+        if Chat.Db.repo_ready?(state.repo) do
           sweep_query(source_id, state.repo)
           |> Enum.reduce(state, fn mc, acc ->
             enqueue(acc, mc.file_id, mc.chunk_index, source_id)
@@ -289,8 +293,6 @@ defmodule Chat.Data.File.ChunkSource do
         )
       end
 
-      defp repo_module(%{repo: nil}), do: Chat.Db.repo()
-      defp repo_module(%{repo: repo}), do: repo
       defp schedule_poll, do: Process.send_after(self(), :poll, @poll_interval)
       defp via(drive_id), do: {:via, Registry, {@registry, {registry_key(), drive_id}}}
     end

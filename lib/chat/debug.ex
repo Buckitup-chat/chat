@@ -7,6 +7,7 @@ defmodule Chat.Debug do
   import Ecto.Query
 
   alias Chat.Data.File, as: FileData
+  alias Chat.Data.File.ChunkPipeline
   alias Chat.Data.File.ChunkStore
   alias Chat.Data.File.DriveCopySource
   alias Chat.Data.File.SyncSource
@@ -14,8 +15,9 @@ defmodule Chat.Debug do
   alias Chat.Data.Schemas.FileChunk
   alias Chat.Data.Schemas.MissingChunk
   alias Chat.Data.Schemas.UploadChunk
-  alias Chat.Db.Common
   alias Chat.Repo
+  alias Chat.Storage.Unit
+  alias Chat.Storage.Units
   alias Chat.TimeKeeper
 
   @registry Chat.Data.File.ChunkPipelineRegistry
@@ -29,8 +31,8 @@ defmodule Chat.Debug do
   def reset_pq_files! do
     Repo.query!("TRUNCATE files, file_chunks, upload_chunks, missing_chunks")
 
-    Common.get_chat_db_env(:files_base_dir)
-    |> Path.join("pq_files")
+    ChunkPipeline.active_unit()
+    |> Unit.path(:pq_files)
     |> File.rm_rf!()
 
     :ok
@@ -43,7 +45,7 @@ defmodule Chat.Debug do
       file_chunks: FileData.get_file_chunk_count(file_id),
       upload_chunks: upload_chunk_count(file_id),
       missing_chunks: FileData.missing_chunk_count(file_id),
-      chunks_on_disk: chunks_on_disk(file_id)
+      chunks_on_disk: chunks_on_disk(ChunkPipeline.active_unit(), file_id)
     }
   end
 
@@ -78,9 +80,9 @@ defmodule Chat.Debug do
     |> Repo.one()
   end
 
-  defp chunks_on_disk(file_id, base_dir \\ nil) do
-    file_id
-    |> ChunkStore.file_dir(base_dir)
+  defp chunks_on_disk(unit, file_id) do
+    unit
+    |> ChunkStore.file_dir(file_id)
     |> File.ls()
     |> case do
       {:ok, entries} -> Enum.sort(entries)
@@ -107,7 +109,7 @@ defmodule Chat.Debug do
       manifest: repo && repo.get(FileSchema, file_id),
       replicated_chunk_indices: repo && file_chunk_indices(repo, file_id),
       missing_chunks: repo && missing_chunks_with_status(repo, file_id),
-      chunks_on_disk: writer_state && chunks_on_disk(file_id, writer_state.base_dir),
+      chunks_on_disk: writer_state && chunks_on_disk(writer_state.unit, file_id),
       replication_listener: listener_status(listener_state),
       drive_copy_source: drive_copy_status(registry_pid(:drive_copy_source, drive_id), file_id),
       sync_source: sync_status(registry_pid(:sync_source, drive_id), file_id),
@@ -165,7 +167,7 @@ defmodule Chat.Debug do
 
     %{
       registered?: true,
-      known_drives: Map.keys(state.other_drives),
+      known_units: state.unit |> Units.others() |> Enum.map(& &1.id),
       can_poll?: DriveCopySource.can_poll?(state)
     }
     |> Map.merge(source_queues(state, file_id))

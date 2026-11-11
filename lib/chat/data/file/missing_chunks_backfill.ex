@@ -8,6 +8,7 @@ defmodule Chat.Data.File.MissingChunksBackfill do
 
   alias Chat.Data.File.ChunkStore
   alias Chat.Data.Schemas.MissingChunk
+  alias Chat.Storage.Unit
   alias Chat.TimeKeeper
 
   @batch_size 200
@@ -17,12 +18,12 @@ defmodule Chat.Data.File.MissingChunksBackfill do
   end
 
   def run(opts) do
-    repo = Keyword.get(opts, :repo) || Chat.Repo
-    base_dir = Keyword.get(opts, :base_dir)
+    %Unit{} = unit = Keyword.fetch!(opts, :unit)
+    repo = Unit.repo(unit)
     now = TimeKeeper.now_unix()
 
     file_ids = active_file_ids(repo)
-    count = backfill_files(file_ids, base_dir, now, repo)
+    count = backfill_files(file_ids, unit, now, repo)
 
     if count > 0 do
       log("Backfilled #{count} missing_chunks entries", :info)
@@ -35,19 +36,19 @@ defmodule Chat.Data.File.MissingChunksBackfill do
     |> repo.all()
   end
 
-  defp backfill_files(file_ids, base_dir, now, repo) do
+  defp backfill_files(file_ids, unit, now, repo) do
     Enum.reduce(file_ids, 0, fn file_id, total ->
-      total + backfill_one_file(file_id, base_dir, now, repo)
+      total + backfill_one_file(file_id, unit, now, repo)
     end)
   end
 
-  defp backfill_one_file(file_id, base_dir, now, repo) do
+  defp backfill_one_file(file_id, unit, now, repo) do
     from(fc in "file_chunks",
       where: fc.file_id == ^file_id and not is_nil(fc.data_hash),
       select: %{chunk_index: fc.chunk_index, data_hash: fc.data_hash, size: fc.size}
     )
     |> repo.all()
-    |> Enum.reject(fn fc -> chunk_on_disk?(file_id, fc.chunk_index, base_dir) end)
+    |> Enum.reject(fn fc -> chunk_on_disk?(unit, file_id, fc.chunk_index) end)
     |> Enum.chunk_every(@batch_size)
     |> Enum.reduce(0, fn batch, acc ->
       {inserted, _} = insert_missing(file_id, batch, now, repo)
@@ -55,8 +56,8 @@ defmodule Chat.Data.File.MissingChunksBackfill do
     end)
   end
 
-  defp chunk_on_disk?(file_id, chunk_index, base_dir) do
-    case ChunkStore.fetch(file_id, chunk_index, base_dir) do
+  defp chunk_on_disk?(unit, file_id, chunk_index) do
+    case ChunkStore.fetch(unit, file_id, chunk_index) do
       {:ok, _} -> true
       _ -> false
     end

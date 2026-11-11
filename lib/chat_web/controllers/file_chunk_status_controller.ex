@@ -2,6 +2,7 @@ defmodule ChatWeb.FileChunkStatusController do
   use ChatWeb, :controller
 
   alias Chat.Data.File, as: FileData
+  alias Chat.Data.File.ChunkPipeline
   alias Chat.Data.File.ChunkStore
 
   def index(conn, params) do
@@ -27,11 +28,12 @@ defmodule ChatWeb.FileChunkStatusController do
 
   defp build_statuses(file_ids) do
     missing_counts = FileData.missing_chunk_counts(file_ids)
+    unit = ChunkPipeline.active_unit()
 
     Map.new(file_ids, fn file_id ->
       {file_id,
        %{
-         on_disk: ChunkStore.count_on_disk(file_id),
+         on_disk: ChunkStore.count_on_disk(unit, file_id),
          missing: Map.get(missing_counts, file_id, 0)
        }}
     end)

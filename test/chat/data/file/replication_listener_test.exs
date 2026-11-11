@@ -4,6 +4,7 @@ defmodule Chat.Data.File.ReplicationListenerTest do
   import Rewire
 
   alias Chat.Data.File.ReplicationListener
+  alias Chat.Storage.Unit
 
   defmodule FileDataMock do
     def insert_missing_chunks_placeholders(file_id, chunk_count, _peer_url, _now, _opts) do
@@ -34,7 +35,8 @@ defmodule Chat.Data.File.ReplicationListenerTest do
     {Chat.TimeKeeper, TimeKeeperMock}
   ])
 
-  @drive_id "test_repl_drive"
+  # No repo module exists for this device in chat tests
+  @drive_id "sdr1"
 
   setup do
     Process.register(self(), :repl_test)
@@ -101,7 +103,7 @@ defmodule Chat.Data.File.ReplicationListenerTest do
   end
 
   describe "init" do
-    test "starts with nil conn when no repo provided", %{pid: pid} do
+    test "starts with nil conn when the unit repo is not running", %{pid: pid} do
       state = :sys.get_state(pid)
 
       assert state.conn == nil
@@ -112,7 +114,7 @@ defmodule Chat.Data.File.ReplicationListenerTest do
   # Helpers
 
   defp start_listener do
-    {:ok, pid} = GenServer.start_link(ReplicationListener, drive_id: @drive_id, repo: nil)
+    {:ok, pid} = GenServer.start_link(ReplicationListener, unit: Unit.usb(@drive_id, :main))
     pid
   end
 

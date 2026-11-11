@@ -4,12 +4,13 @@ defmodule Chat.Data.File.ChunkPipelineSupervisor do
   use Supervisor
 
   alias Chat.Data.File.ChunkWriter
-  alias Chat.Data.File.DriveAnnouncer
   alias Chat.Data.File.DriveCopySource
   alias Chat.Data.File.MissingChunksBackfill
   alias Chat.Data.File.ReplicationListener
   alias Chat.Data.File.SyncSource
   alias Chat.Data.File.TmpSweeper
+  alias Chat.Storage.Unit
+  alias Chat.Storage.UnitAnnouncer
 
   def start_link(opts) do
     Supervisor.start_link(__MODULE__, opts)
@@ -20,6 +21,7 @@ defmodule Chat.Data.File.ChunkPipelineSupervisor do
     drive_id = Keyword.fetch!(opts, :drive_id)
     base_dir = Keyword.get(opts, :base_dir)
     repo = Keyword.get(opts, :repo)
+    unit = Keyword.get_lazy(opts, :unit, fn -> legacy_unit(drive_id) end)
 
     children = [
       {ChunkWriter, drive_id: drive_id, base_dir: base_dir},
@@ -28,9 +30,13 @@ defmodule Chat.Data.File.ChunkPipelineSupervisor do
       {DriveCopySource, drive_id: drive_id, repo: repo},
       {SyncSource, drive_id: drive_id, repo: repo},
       {TmpSweeper, drive_id: drive_id, base_dir: base_dir},
-      {DriveAnnouncer, repo: repo}
+      {UnitAnnouncer, unit: unit, repo: repo}
     ]
 
     Supervisor.init(children, strategy: :one_for_one)
   end
+
+  # Until #802 callers pass `unit:`: only the internal unit is known by its drive id
+  defp legacy_unit(:internal), do: Unit.internal()
+  defp legacy_unit(_device), do: nil
 end

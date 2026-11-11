@@ -16,7 +16,7 @@ See [pq_files.done.md §14](pq_files.done.md#14-implementation-history) for the 
   │  ├─ DriveCopySource  (GenServer)     │   │  ├─ DriveCopySource  (GenServer)     │
   │  ├─ SyncSource       (GenServer)     │   │  ├─ SyncSource       (GenServer)     │
   │  ├─ TmpSweeper       (gen_statem)    │   │  ├─ TmpSweeper       (gen_statem)    │
-  │  └─ DriveAnnouncer   (GenServer)     │   │  └─ DriveAnnouncer   (GenServer)     │
+  │  └─ UnitAnnouncer   (GenServer)     │   │  └─ UnitAnnouncer   (GenServer)     │
   │                                      │   │                                      │
   │  UploadSource ──┐                    │   │  UploadSource ──┐                    │
   │  (plain module) │  ┌──────────────┐  │   │  (plain module) │  ┌──────────────┐  │
@@ -73,7 +73,7 @@ Three byte sources feed into each drive's ChunkWriter:
 |---|---|---|
 | [**MissingChunksBackfill**](../../../../lib/chat/data/file/missing_chunks_backfill.ex) | Task (restart: :temporary) | On pipeline start: scans all `file_chunks` rows, compares against on-disk chunks, inserts `missing_chunks` for any gaps. Broadcasts `{:chunk_pipeline, :backfill_done}` on completion to trigger DriveCopySource poll. |
 | [**ReplicationListener**](../../../../lib/chat/data/file/replication_listener.ex) | GenServer (wraps `Postgrex.Notifications`) | Listens for PG replica trigger notifications (`file_replicated`, `file_chunk_replicated`), calls `FileData` to fill `missing_chunks`, casts to DriveCopySource |
-| [**DriveAnnouncer**](../../../../lib/chat/data/file/drive_announcer.ex) | GenServer (traps exit) | On init: broadcasts `{:chunk_pipeline, {:drive_mounted, system_id}}` on PubSub `"chunk_pipeline"`. On terminate: broadcasts `{:chunk_pipeline, {:drive_unmounted, system_id}}`. DriveCopySource handles these via `handle_extra_info`. Returns `:ignore` if system identifier is unqueryable. |
+| [**UnitAnnouncer**](../../../../lib/chat/storage/unit_announcer.ex) | GenServer (traps exit) | Formerly `DriveAnnouncer`. With `unit:` it also registers the unit in `Chat.Storage.Units` and broadcasts `{:unit_up / :unit_down, unit}` on `"storage"` ([pq_storage_units](pq_storage_units.proposed.md) §2.5). On init: broadcasts `{:chunk_pipeline, {:drive_mounted, system_id}}` on PubSub `"chunk_pipeline"`. On terminate: broadcasts `{:chunk_pipeline, {:drive_unmounted, system_id}}`. DriveCopySource handles these via `handle_extra_info`. Returns `:ignore` if system identifier is unqueryable. |
 | [**TmpSweeper**](../../../../lib/chat/data/file/tmp_sweeper.ex) | `:gen_statem` | Hourly sweep of stale `.tmp` files from ChunkStore (crash residue from interrupted writes) |
 | [**GC**](../../../../lib/chat/data/file/gc.ex) | GenServer (singleton, not per-drive) | Hourly garbage collection — purges chunk files (in batches of 50) and `missing_chunks` rows for deleted files and stale uploads (>48h) |
 
@@ -324,7 +324,7 @@ ChunkWriter does not gate PostgreSQL writes — each drive's PG manages its own 
 
 Each drive is identified by its PostgreSQL **system identifier** — a unique 64-bit integer assigned at `initdb`, queried via `SELECT system_identifier FROM pg_control_system()`. This is stable across reboots and unique across drives.
 
-**DriveAnnouncer** ([source](../../../../lib/chat/data/file/drive_announcer.ex)): per-drive GenServer that queries the drive's PG for its system_identifier, broadcasts `{:chunk_pipeline, {:drive_mounted, system_id}}` on PubSub `"chunk_pipeline"`, and on terminate broadcasts `{:chunk_pipeline, {:drive_unmounted, system_id}}`. Returns `:ignore` if the system identifier can't be queried. Not named via Registry (starts unnamed).
+**UnitAnnouncer** ([source](../../../../lib/chat/storage/unit_announcer.ex)): per-drive GenServer that queries the drive's PG for its system_identifier, broadcasts `{:chunk_pipeline, {:drive_mounted, system_id}}` on PubSub `"chunk_pipeline"`, and on terminate broadcasts `{:chunk_pipeline, {:drive_unmounted, system_id}}`. Returns `:ignore` if the system identifier can't be queried. Not named via Registry (starts unnamed).
 
 **Drive discovery** (DriveCopySource): on init and on mount events, scans for mounted drives via [`DriveDirs.list_usb_drive_dirs/0`](../../../../lib/chat/data/file/drive_dirs.ex), plus queries the internal drive via `Chat.Repo`. Queries each drive's PG for its system_identifier, builds a map `%{system_id => base_dir}` of other drives' chunk stores (excluding own drive).
 
@@ -343,7 +343,7 @@ Chat.Application supervisor
             ├─ DriveCopySource
             ├─ SyncSource
             ├─ TmpSweeper
-            └─ DriveAnnouncer
+            └─ UnitAnnouncer
 
 # Target — internal drive
 Platform.App.DatabaseSupervisor
@@ -356,7 +356,7 @@ Platform.App.Drive.MainDbSupervisor (per USB drive)
   └─ ChunkPipelineSupervisor (drive_id: device, base_dir: ..., repo: ...)
 ```
 
-[`ChunkPipelineSupervisor`](../../../../lib/chat/data/file/chunk_pipeline_supervisor.ex) — process names are scoped per drive via `{:via, Registry, {ChunkPipelineRegistry, {role, drive_id}}}` (except DriveAnnouncer, which starts unnamed).
+[`ChunkPipelineSupervisor`](../../../../lib/chat/data/file/chunk_pipeline_supervisor.ex) — process names are scoped per drive via `{:via, Registry, {ChunkPipelineRegistry, {role, drive_id}}}` (except UnitAnnouncer, which starts unnamed).
 
 #### 4.5.2 Crash Recovery
 
@@ -366,9 +366,9 @@ For fetch sources: crashed fetch/write tasks are caught by `handle_info({:DOWN, 
 
 #### 4.5.3 Drive Mount/Unmount
 
-**Mount**: Platform starts the drive's `ChunkPipelineSupervisor`. DriveAnnouncer broadcasts `{:chunk_pipeline, {:drive_mounted, ...}}`. DriveCopySources on other drives receive the PubSub message via `handle_extra_info`, re-scan drives, and schedule a reconnect sweep (5-second timer — see §4.6).
+**Mount**: Platform starts the drive's `ChunkPipelineSupervisor`. UnitAnnouncer broadcasts `{:chunk_pipeline, {:drive_mounted, ...}}`. DriveCopySources on other drives receive the PubSub message via `handle_extra_info`, re-scan drives, and schedule a reconnect sweep (5-second timer — see §4.6).
 
-**Unmount**: Platform stops the drive's pipeline group. DriveAnnouncer broadcasts `{:chunk_pipeline, {:drive_unmounted, ...}}`. DriveCopySources on other drives remove this drive from their source maps. In-flight calls to the stopped ChunkWriter receive `{:EXIT, ...}`. Chunks whose `source_drive_id` pointed to the unmounted drive remain in `missing_chunks` — subsequent fetches try random available drives.
+**Unmount**: Platform stops the drive's pipeline group. UnitAnnouncer broadcasts `{:chunk_pipeline, {:drive_unmounted, ...}}`. DriveCopySources on other drives remove this drive from their source maps. In-flight calls to the stopped ChunkWriter receive `{:EXIT, ...}`. Chunks whose `source_drive_id` pointed to the unmounted drive remain in `missing_chunks` — subsequent fetches try random available drives.
 
 #### 4.5.4 Main DB Switch and Upload Routing
 

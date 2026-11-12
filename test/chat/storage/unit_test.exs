@@ -57,6 +57,12 @@ defmodule Chat.Storage.UnitTest do
       assert Unit.internal() |> Unit.pg_run() == "/tmp/pg_run/internal"
       assert Unit.usb("sdb1", :main) |> Unit.pg_run() == "/tmp/pg_run/sdb1"
     end
+
+    test "root/1 is the unit root, or a device's mount target before its role is known" do
+      assert Unit.internal() |> Unit.root() == "/root"
+      assert Unit.usb("sdb1", :backup) |> Unit.root() == "/root/media/sdb1"
+      assert Unit.root("sdb1") == "/root/media/sdb1"
+    end
   end
 
   describe "path/2 on host" do

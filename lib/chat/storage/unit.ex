@@ -44,9 +44,15 @@ defmodule Chat.Storage.Unit do
   def internal, do: %__MODULE__{id: :internal, role: :internal, root: config(:internal_root)}
 
   @spec usb(String.t(), Role.t()) :: t()
-  def usb(device, role) when is_binary(device) and role != :internal do
-    %__MODULE__{id: device, role: role, root: Path.join(config(:media_root), device)}
-  end
+  def usb(device, role) when is_binary(device) and role != :internal,
+    do: %__MODULE__{id: device, role: role, root: root(device)}
+
+  @doc """
+  Root of a unit, or the mount target of a USB device whose role is not known yet.
+  """
+  @spec root(t() | String.t()) :: Path.t()
+  def root(%__MODULE__{root: root}), do: root
+  def root(device) when is_binary(device), do: config(:media_root) |> Path.join(device)
 
   # --- Disk layout: `<root>/<role_dir>/<segment>`, the only place segments are known
 

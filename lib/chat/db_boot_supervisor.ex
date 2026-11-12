@@ -10,9 +10,9 @@ defmodule Chat.DbBootSupervisor do
 
   import Toolbox.StagedSupervisor
 
-  alias Chat.Data.File.DriveDirs
   alias Chat.Db.Boot.ElectricReady
   alias Chat.Db.Boot.RepoReady
+  alias Chat.Storage.Unit
 
   def start_link(init_arg) do
     Supervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
@@ -28,8 +28,7 @@ defmodule Chat.DbBootSupervisor do
       {:ok, _} =
         DynamicSupervisor.start_child(
           sup,
-          {Chat.Data.File.ChunkPipelineSupervisor,
-           drive_id: :internal, repo: Chat.Repo, base_dir: DriveDirs.internal_files_dir()}
+          {Chat.Data.File.ChunkPipelineSupervisor, unit: Unit.internal()}
         )
 
       Supervisor.init([], strategy: :one_for_one)
@@ -47,8 +46,7 @@ defmodule Chat.DbBootSupervisor do
         {:step, ElectricVerified,
          {ElectricReady, task_in: task_supervisor}
          |> exit_takes(15_000)},
-        {Chat.Data.File.ChunkPipelineSupervisor,
-         drive_id: :internal, repo: Chat.Repo, base_dir: DriveDirs.internal_files_dir()}
+        {Chat.Data.File.ChunkPipelineSupervisor, unit: Unit.internal()}
       ]
       |> prepare_stages(Chat.Db.BootStages)
       |> Supervisor.init(strategy: :rest_for_one, max_restarts: 10, max_seconds: 30)

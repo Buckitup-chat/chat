@@ -2,6 +2,7 @@ defmodule Chat.Data.File.UploadSourceTest do
   use ExUnit.Case, async: true
 
   alias Chat.Data.File.ChunkWriter
+  alias Chat.Storage.Unit
 
   @drive_id :test_upload_drive
 
@@ -17,7 +18,7 @@ defmodule Chat.Data.File.UploadSourceTest do
     File.mkdir_p!(tmp_dir)
 
     {:ok, writer_pid} =
-      GenServer.start_link(ChunkWriter, [drive_id: @drive_id, base_dir: tmp_dir],
+      GenServer.start_link(ChunkWriter, [unit: %Unit{id: @drive_id, role: :main, root: tmp_dir}],
         name: writer_name
       )
 

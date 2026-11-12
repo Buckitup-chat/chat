@@ -4,6 +4,7 @@ defmodule Chat.Data.File.SyncSourceTest do
   import Rewire
 
   alias Chat.Data.File.SyncSource
+  alias Chat.Storage.Unit
 
   defmodule DbMock do
     def repo_ready?(_), do: false
@@ -43,7 +44,7 @@ defmodule Chat.Data.File.SyncSourceTest do
     {Req, ReqMock}
   ])
 
-  @drive_id "test_sync_drive_#{System.unique_integer([:positive])}"
+  @drive_id "sds1"
 
   setup do
     unless Process.whereis(Chat.TaskSupervisor),
@@ -152,7 +153,9 @@ defmodule Chat.Data.File.SyncSourceTest do
   # Helpers
 
   defp start_source(drive_id) do
-    {:ok, pid} = GenServer.start_link(SyncSource, drive_id: drive_id, repo: nil)
+    {:ok, pid} =
+      GenServer.start_link(SyncSource, unit: %Unit{id: drive_id, role: :main, root: "/tmp"})
+
     pid
   end
 

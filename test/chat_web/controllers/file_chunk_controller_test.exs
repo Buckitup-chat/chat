@@ -14,8 +14,10 @@ defmodule ChatWeb.FileChunkControllerTest do
   alias Chat.Db.Common
   alias Chat.NetworkSynchronization.Electric.ShapeWriter
   alias Chat.Repo
+  alias Chat.Storage.Unit
+  alias Chat.Storage.Units
 
-  @drive_id :test_chunk_ctrl
+  @drive_id "sdk1"
 
   setup %{conn: conn} do
     identity = UserData.generate_pq_identity("Alice")
@@ -29,23 +31,22 @@ defmodule ChatWeb.FileChunkControllerTest do
 
     File.mkdir_p!(tmp_dir)
 
-    prev_base = Common.get_chat_db_env(:files_base_dir)
-    Common.put_chat_db_env(:files_base_dir, tmp_dir)
+    # The active unit; registered by the test process, so it is gone after the test
+    unit = %Unit{id: @drive_id, role: :main, root: tmp_dir, system_id: "sys_chunk_ctrl"}
+    :ok = Units.register(unit)
 
-    {:ok, writer_pid} =
-      ChunkWriter.start_link(drive_id: @drive_id, base_dir: tmp_dir)
+    {:ok, writer_pid} = ChunkWriter.start_link(unit: unit)
 
     prev_drive = Application.get_env(:chat, :active_drive_id)
     Common.put_chat_db_env(:active_drive_id, @drive_id)
 
     on_exit(fn ->
       if Process.alive?(writer_pid), do: GenServer.stop(writer_pid)
-      Common.put_chat_db_env(:files_base_dir, prev_base)
       if prev_drive, do: Common.put_chat_db_env(:active_drive_id, prev_drive)
       File.rm_rf!(tmp_dir)
     end)
 
-    {:ok, identity: identity, card: card, user_hash: card.user_hash, conn: conn, tmp_dir: tmp_dir}
+    {:ok, identity: identity, card: card, user_hash: card.user_hash, conn: conn, unit: unit}
   end
 
   describe "GET /electric/v1/file_chunk/:file_id/:chunk_index (show)" do
@@ -53,13 +54,13 @@ defmodule ChatWeb.FileChunkControllerTest do
       conn: conn,
       identity: identity,
       user_hash: uh,
-      tmp_dir: tmp_dir
+      unit: unit
     } do
       file_id = FileId.generate()
       raw_data = :crypto.strong_rand_bytes(100)
       chunk = insert_file_chunk(identity, uh, file_id, 0)
 
-      :ok = ChunkStore.put(file_id, 0, raw_data, tmp_dir)
+      :ok = ChunkStore.put(unit, file_id, 0, raw_data)
 
       conn = get(conn, "/electric/v1/file_chunk/#{file_id}/0")
 
@@ -98,7 +99,7 @@ defmodule ChatWeb.FileChunkControllerTest do
       conn: conn,
       identity: identity,
       user_hash: uh,
-      tmp_dir: tmp_dir
+      unit: unit
     } do
       file_id = FileId.generate()
       raw_data = :crypto.strong_rand_bytes(100)
@@ -116,7 +117,7 @@ defmodule ChatWeb.FileChunkControllerTest do
       assert Repo.get_by(FileChunk, file_id: file_id, chunk_index: 0) != nil
       assert Repo.get_by(UploadChunk, file_id: file_id, chunk_index: 0) != nil
 
-      assert {:ok, ^raw_data} = ChunkStore.fetch(file_id, 0, tmp_dir)
+      assert {:ok, ^raw_data} = ChunkStore.fetch(unit, file_id, 0)
     end
 
     test "returns 400 when headers missing", %{conn: conn} do

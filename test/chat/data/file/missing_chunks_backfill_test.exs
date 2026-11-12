@@ -11,6 +11,7 @@ defmodule Chat.Data.File.MissingChunksBackfillTest do
   alias Chat.Data.Types.FileId
   alias Chat.Data.User
   alias Chat.NetworkSynchronization.Electric.ShapeWriter
+  alias Chat.Storage.Unit
 
   setup do
     identity = User.generate_pq_identity("Alice")
@@ -24,7 +25,10 @@ defmodule Chat.Data.File.MissingChunksBackfillTest do
     File.mkdir_p!(tmp_dir)
     on_exit(fn -> File.rm_rf!(tmp_dir) end)
 
-    {:ok, identity: identity, user_hash: card.user_hash, base_dir: tmp_dir}
+    {:ok,
+     identity: identity,
+     user_hash: card.user_hash,
+     unit: %Unit{id: :internal, role: :internal, root: tmp_dir}}
   end
 
   describe "run/1" do
@@ -33,7 +37,7 @@ defmodule Chat.Data.File.MissingChunksBackfillTest do
       insert_chunk(ctx, file.file_id, 0)
       insert_chunk(ctx, file.file_id, 1)
 
-      MissingChunksBackfill.run(repo: Repo, base_dir: ctx.base_dir)
+      MissingChunksBackfill.run(unit: ctx.unit)
 
       missing =
         Repo.all(
@@ -52,9 +56,9 @@ defmodule Chat.Data.File.MissingChunksBackfillTest do
       insert_chunk(ctx, file.file_id, 0)
       insert_chunk(ctx, file.file_id, 1)
 
-      :ok = ChunkStore.put(file.file_id, 0, "data on disk", ctx.base_dir)
+      :ok = ChunkStore.put(ctx.unit, file.file_id, 0, "data on disk")
 
-      MissingChunksBackfill.run(repo: Repo, base_dir: ctx.base_dir)
+      MissingChunksBackfill.run(unit: ctx.unit)
 
       missing =
         Repo.all(from(m in MissingChunk, where: m.file_id == ^file.file_id))
@@ -67,7 +71,7 @@ defmodule Chat.Data.File.MissingChunksBackfillTest do
       file = insert_file(ctx)
       chunk = insert_chunk(ctx, file.file_id, 0)
 
-      MissingChunksBackfill.run(repo: Repo, base_dir: ctx.base_dir)
+      MissingChunksBackfill.run(unit: ctx.unit)
 
       missing = Repo.one!(from(m in MissingChunk, where: m.file_id == ^file.file_id))
       assert missing.data_hash == chunk.data_hash
@@ -79,7 +83,7 @@ defmodule Chat.Data.File.MissingChunksBackfillTest do
       insert_chunk(ctx, file.file_id, 0)
       soft_delete_file(file, ctx.identity.sign_skey)
 
-      MissingChunksBackfill.run(repo: Repo, base_dir: ctx.base_dir)
+      MissingChunksBackfill.run(unit: ctx.unit)
 
       assert Repo.aggregate(
                from(m in MissingChunk, where: m.file_id == ^file.file_id),
@@ -91,8 +95,8 @@ defmodule Chat.Data.File.MissingChunksBackfillTest do
       file = insert_file(ctx)
       insert_chunk(ctx, file.file_id, 0)
 
-      MissingChunksBackfill.run(repo: Repo, base_dir: ctx.base_dir)
-      MissingChunksBackfill.run(repo: Repo, base_dir: ctx.base_dir)
+      MissingChunksBackfill.run(unit: ctx.unit)
+      MissingChunksBackfill.run(unit: ctx.unit)
 
       assert Repo.aggregate(
                from(m in MissingChunk, where: m.file_id == ^file.file_id),
@@ -101,7 +105,7 @@ defmodule Chat.Data.File.MissingChunksBackfillTest do
     end
 
     test "does nothing when no files exist", _ctx do
-      MissingChunksBackfill.run(repo: Repo, base_dir: "/nonexistent")
+      MissingChunksBackfill.run(unit: %Unit{id: :internal, role: :internal, root: "/nonexistent"})
 
       assert Repo.aggregate(MissingChunk, :count) == 0
     end

@@ -6,23 +6,21 @@ defmodule Chat.Data.File.ReplicationListener do
 
   alias Chat.Data.File, as: FileData
   alias Chat.Data.File.DriveCopySource
-  alias Chat.Storage.Pg
+  alias Chat.Storage.Unit
   alias Chat.TimeKeeper
 
   @registry Chat.Data.File.ChunkPipelineRegistry
 
   def start_link(opts) do
-    drive_id = Keyword.fetch!(opts, :drive_id)
+    %Unit{id: drive_id} = Keyword.fetch!(opts, :unit)
     GenServer.start_link(__MODULE__, opts, name: via(drive_id))
   end
 
   @impl true
   def init(opts) do
-    drive_id = Keyword.fetch!(opts, :drive_id)
-    repo = Keyword.get(opts, :repo)
-
-    system_id = Pg.system_identifier(repo)
-    state = %{drive_id: drive_id, repo: repo, system_id: system_id, conn: nil, refs: %{}}
+    %Unit{} = unit = Keyword.fetch!(opts, :unit)
+    repo = Unit.repo(unit)
+    state = %{drive_id: unit.id, repo: repo, system_id: unit.system_id, conn: nil, refs: %{}}
 
     case connect_and_listen(repo) do
       {:ok, conn, refs} ->
@@ -69,9 +67,11 @@ defmodule Chat.Data.File.ReplicationListener do
 
   def handle_info(_msg, state), do: {:noreply, state}
 
-  defp connect_and_listen(nil), do: {:error, :no_repo}
-
   defp connect_and_listen(repo) do
+    if Code.ensure_loaded?(repo), do: listen(repo), else: {:error, :no_repo}
+  end
+
+  defp listen(repo) do
     pg_opts =
       repo.config()
       |> Keyword.take([:hostname, :port, :database, :username, :password])

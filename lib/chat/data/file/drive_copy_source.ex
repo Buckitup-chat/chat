@@ -1,11 +1,16 @@
 defmodule Chat.Data.File.DriveCopySource do
-  @moduledoc "Event-driven sink for drive-to-drive chunk copy. Reads from other drives' ChunkStores."
+  @moduledoc """
+  Event-driven sink for unit-to-unit chunk copy. Reads from other units' ChunkStores.
+
+  Sources are the units registered in `Chat.Storage.Units` other than the own
+  one; `{:unit_up, unit}` / `{:unit_down, unit}` on `"storage"` connect and
+  disconnect them. A `missing_chunks.source_drive_id` is a unit's PG system id.
+  """
 
   use Chat.Data.File.ChunkSource
 
   alias Chat.Data.File.ChunkStore
-  alias Chat.Data.File.DriveDirs
-  alias Chat.Storage.Pg
+  alias Chat.Storage.Units
 
   def chunk_fetchable(drive_id, file_id, chunk_index, source_drive_id) do
     GenServer.cast(via(drive_id), {:chunk_fetchable, file_id, chunk_index, source_drive_id})
@@ -18,34 +23,30 @@ defmodule Chat.Data.File.DriveCopySource do
   def writer_tag, do: :drive_copy
 
   @impl Chat.Data.File.ChunkSource
-  def init_extra(_opts), do: %{other_drives: %{}}
+  def init_extra(_opts), do: %{}
 
   @impl Chat.Data.File.ChunkSource
   def on_init(state) do
+    Phoenix.PubSub.subscribe(Chat.PubSub, "storage")
     Phoenix.PubSub.subscribe(Chat.PubSub, "chunk_pipeline")
-    scan_drives(state)
+    state
   end
 
   @impl Chat.Data.File.ChunkSource
-  def can_poll?(state), do: map_size(state.other_drives) > 0
+  def can_poll?(state), do: other_units(state) != []
 
   @impl Chat.Data.File.ChunkSource
-  def handle_source_cast({:drive_mounted, system_id}, state) do
-    if system_id == own_system_id(state) do
-      {:source_disconnected, system_id, state}
-    else
-      state = scan_drives(state)
-      {:source_connected, system_id, state}
-    end
+  def handle_source_cast({:unit_up, unit}, state) do
+    if own?(state, unit),
+      do: {:source_disconnected, unit.system_id, state},
+      else: {:source_connected, unit.system_id, state}
   end
 
-  def handle_source_cast({:drive_unmounted, system_id}, state) do
-    others = Map.delete(state.other_drives, system_id)
-    {:source_disconnected, system_id, %{state | other_drives: others}}
-  end
+  def handle_source_cast({:unit_down, unit}, state),
+    do: {:source_disconnected, unit.system_id, state}
 
   @impl Chat.Data.File.ChunkSource
-  def source_connected?(state, system_id), do: Map.has_key?(state.other_drives, system_id)
+  def source_connected?(state, system_id), do: source_unit(state, system_id) != nil
 
   @impl Chat.Data.File.ChunkSource
   def poll_query(limit, repo),
@@ -58,22 +59,28 @@ defmodule Chat.Data.File.DriveCopySource do
   @impl Chat.Data.File.ChunkSource
   def chunk_source_id(mc), do: mc.source_drive_id
 
+  @doc """
+  Fetches from the unit with `source_drive_id` first, then from every other
+  unit in turn.
+  """
   @impl Chat.Data.File.ChunkSource
   def fetch_chunk(state, file_id, chunk_index, source_drive_id) do
-    source_dir = Map.get(state.other_drives, source_drive_id)
+    primary = source_unit(state, source_drive_id)
+    fallbacks = state |> other_units() |> Enum.reject(&(&1 == primary))
 
-    with {:error, reason} <- try_fetch(source_dir, file_id, chunk_index) do
-      fallback_dir = state.other_drives |> Map.delete(source_drive_id) |> pick_random_drive()
-
-      try_fetch(fallback_dir, file_id, chunk_index)
-      |> tap(&log_fetch_result(&1, file_id, chunk_index, reason, source_dir, fallback_dir))
-    end
+    [primary | fallbacks]
+    |> Enum.reject(&is_nil/1)
+    |> try_fetch(file_id, chunk_index, {:error, :no_source})
+    |> tap(&log_fetch_result(&1, file_id, chunk_index, primary))
   end
 
   @impl Chat.Data.File.ChunkSource
+  def handle_extra_info({event, unit}, state) when event in [:unit_up, :unit_down],
+    do: handle_cast({event, unit}, state)
+
   def handle_extra_info({:chunk_pipeline, :pg_diff_copied}, state) do
     log("retriggering drive copy after pg replication finished", :info)
-    {:noreply, state |> scan_drives() |> enqueue_poll() |> drain()}
+    {:noreply, state |> enqueue_poll() |> drain()}
   end
 
   def handle_extra_info({:chunk_pipeline, :backfill_done}, state) do
@@ -81,97 +88,41 @@ defmodule Chat.Data.File.DriveCopySource do
     {:noreply, state |> enqueue_poll() |> drain()}
   end
 
-  def handle_extra_info({:chunk_pipeline, event}, state), do: handle_cast(event, state)
   def handle_extra_info(_msg, state), do: {:noreply, state}
 
-  # Scanning
+  # Sources
 
-  defp scan_drives(state) do
-    discover_drives()
-    |> Enum.reject(fn {sys_id, _} -> sys_id == own_system_id(state) end)
-    |> Map.new()
-    |> then(&%{state | other_drives: &1})
-  end
+  defp other_units(state), do: Units.others(state.unit)
 
-  defp discover_drives do
-    usb_drives =
-      DriveDirs.list_usb_drive_dirs()
-      |> Enum.flat_map(fn {device, base_dir} ->
-        case query_system_id(device) do
-          {:ok, system_id} -> [{system_id, base_dir}]
-          _ -> []
-        end
-      end)
+  defp source_unit(_state, nil), do: nil
 
-    internal_drive =
-      case query_system_id(Chat.Repo) do
-        {:ok, system_id} ->
-          [{system_id, DriveDirs.internal_files_dir()}]
-
-        _ ->
-          []
-      end
-
-    usb_drives ++ internal_drive
-  end
-
-  defp own_system_id(%{repo: repo}) do
-    case query_system_id(repo) do
-      {:ok, id} -> id
+  defp source_unit(state, system_id) do
+    case Units.by_system_id(system_id) do
+      {:ok, unit} -> if own?(state, unit), do: nil, else: unit
       :error -> nil
     end
   end
 
-  defp query_system_id(repo) when is_atom(repo) do
-    case Pg.system_identifier(repo) do
-      nil -> :error
-      system_id -> {:ok, system_id}
+  # Units are unique per role
+  defp own?(state, unit), do: unit.role == state.unit.role
+
+  defp try_fetch([], _file_id, _chunk_index, last_result), do: last_result
+
+  defp try_fetch([unit | rest], file_id, chunk_index, _last_result) do
+    case ChunkStore.fetch(unit, file_id, chunk_index) do
+      {:ok, _body} = ok -> ok
+      error -> try_fetch(rest, file_id, chunk_index, error)
     end
   end
 
-  defp query_system_id(device) when is_binary(device) do
-    repo = device_repo(device)
+  defp log_fetch_result({:ok, _}, _file_id, _chunk_index, _primary), do: :ok
 
-    if function_exported?(repo, :config, 0) do
-      query_system_id(repo)
-    else
-      :error
-    end
+  defp log_fetch_result({:error, reason}, file_id, chunk_index, primary) do
+    primary_id = primary && primary.id
+
+    log(
+      "#{file_id}:#{chunk_index} no unit has it (#{inspect(reason)}), primary: #{inspect(primary_id)}",
+      :warning
+    )
   end
-
-  defp device_repo(device) do
-    "sd" <> <<index::bitstring-size(8)>> <> _ = device
-    Module.concat([Platform.Dev, :"Sd#{index}", Repo])
-  end
-
-  # Helpers
-
-  defp log_fetch_result({:ok, _}, file_id, chunk_index, reason, source_dir, _fallback_dir),
-    do:
-      log(
-        "#{file_id}:#{chunk_index} primary failed (#{inspect(reason)}, dir: #{inspect(source_dir)}), fallback ok",
-        :info
-      )
-
-  defp log_fetch_result(
-         {:error, fallback_reason},
-         file_id,
-         chunk_index,
-         reason,
-         source_dir,
-         fallback_dir
-       ),
-       do:
-         log(
-           "#{file_id}:#{chunk_index} both failed — primary: #{inspect(reason)} (#{inspect(source_dir)}), fallback: #{inspect(fallback_reason)} (#{inspect(fallback_dir)})",
-           :warning
-         )
-
-  defp try_fetch(nil, _file_id, _chunk_index), do: {:error, :no_source}
-
-  defp try_fetch(source_dir, file_id, chunk_index),
-    do: ChunkStore.fetch(file_id, chunk_index, source_dir)
-
-  defp pick_random_drive(drives) when map_size(drives) == 0, do: nil
-  defp pick_random_drive(drives), do: drives |> Map.values() |> Enum.random()
 end

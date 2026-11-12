@@ -3,32 +3,15 @@ defmodule ChatWeb.FileChunkStatusControllerTest do
   use ChatWeb.DataCase
 
   alias Chat.Data.File, as: FileData
-  alias Chat.Data.File.ChunkPipeline
   alias Chat.Data.File.ChunkStore
   alias Chat.Data.Types.FileId
-  alias Chat.Storage.Unit
-  alias Chat.Storage.Units
+  alias Chat.Storage.Default
 
   @chunk_status_path "/electric/v1/file_chunk_status"
 
   setup %{conn: conn} do
-    tmp_dir =
-      System.tmp_dir!()
-      |> Path.join("chunk_status_ctrl_test_#{System.unique_integer([:positive])}")
-
-    File.mkdir_p!(tmp_dir)
-
-    # The active unit; registered by the test process, so it is gone after the test
-    unit = %Unit{id: "sdk2", role: :main, root: tmp_dir, system_id: "sys_chunk_status"}
-    :ok = Units.register(unit)
-
-    prev_drive = ChunkPipeline.active_drive_id()
-    ChunkPipeline.set_active_drive_id(unit.id)
-
-    on_exit(fn ->
-      ChunkPipeline.set_active_drive_id(prev_drive)
-      File.rm_rf!(tmp_dir)
-    end)
+    # The Default unit: its repo is the test Chat.Repo
+    unit = Default.unit()
 
     {:ok, conn: conn, unit: unit}
   end

@@ -5,11 +5,11 @@ defmodule Chat.Data.Shapes.FileChunk do
   use Toolbox.OriginLog
 
   alias Chat.Data.File, as: FileData
-  alias Chat.Data.File.ChunkPipeline
   alias Chat.Data.File.SyncSource
   alias Chat.Data.File.Validation
   alias Chat.Data.Schemas.FileChunk
   alias Chat.Pq.WriteGate
+  alias Chat.Storage.Default
   alias Phoenix.Sync.Writer
 
   @impl true
@@ -64,7 +64,7 @@ defmodule Chat.Data.Shapes.FileChunk do
     FileData.fill_missing_chunk(chunk.file_id, chunk.chunk_index, chunk.data_hash, chunk.size)
 
     SyncSource.chunk_fetchable(
-      ChunkPipeline.active_drive_id(),
+      Default.unit().id,
       chunk.file_id,
       chunk.chunk_index,
       peer_url

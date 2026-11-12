@@ -7,7 +7,6 @@ defmodule Chat.Debug do
   import Ecto.Query
 
   alias Chat.Data.File, as: FileData
-  alias Chat.Data.File.ChunkPipeline
   alias Chat.Data.File.ChunkStore
   alias Chat.Data.File.DriveCopySource
   alias Chat.Data.File.SyncSource
@@ -16,6 +15,7 @@ defmodule Chat.Debug do
   alias Chat.Data.Schemas.MissingChunk
   alias Chat.Data.Schemas.UploadChunk
   alias Chat.Repo
+  alias Chat.Storage.Default
   alias Chat.Storage.Unit
   alias Chat.Storage.Units
   alias Chat.TimeKeeper
@@ -31,7 +31,7 @@ defmodule Chat.Debug do
   def reset_pq_files! do
     Repo.query!("TRUNCATE files, file_chunks, upload_chunks, missing_chunks")
 
-    ChunkPipeline.active_unit()
+    Default.unit()
     |> Unit.path(:pq_files)
     |> File.rm_rf!()
 
@@ -45,7 +45,7 @@ defmodule Chat.Debug do
       file_chunks: FileData.get_file_chunk_count(file_id),
       upload_chunks: upload_chunk_count(file_id),
       missing_chunks: FileData.missing_chunk_count(file_id),
-      chunks_on_disk: chunks_on_disk(ChunkPipeline.active_unit(), file_id)
+      chunks_on_disk: chunks_on_disk(Default.unit(), file_id)
     }
   end
 

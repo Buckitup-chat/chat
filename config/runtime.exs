@@ -16,8 +16,7 @@ if config_env() == :dev do
   data_dir = System.get_env("DATA_DIR") || "priv/db"
 
   config :chat,
-    admin_cub_db_file: "#{data_dir}/../admin_db_v2",
-    files_base_dir: "#{data_dir}/files"
+    admin_cub_db_file: "#{data_dir}/../admin_db_v2"
 
   # Internal CubDB stays at <DATA_DIR>/v.10.1
   config :chat, Chat.Storage,

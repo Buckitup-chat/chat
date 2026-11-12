@@ -2,11 +2,12 @@ defmodule Chat.FileFs.Common do
   @moduledoc """
   Common filesystem functions
   """
+  alias Chat.Storage.Unit
+
   @int_padding 20
 
-  alias Chat.Db.Common
-
-  def build_path(nil), do: Common.get_chat_db_env(:files_base_dir)
+  # FileFs sits next to the current CubDB, which `Chat.Storage.Default` points at
+  def build_path(nil), do: Chat.Db.db() |> CubDB.data_dir() |> Unit.cub_files_dir()
   def build_path(str), do: str
 
   def key_path(binary_key, prefix) do

@@ -5,8 +5,8 @@ defmodule Chat.Data.File.GC do
   use Toolbox.OriginLog
 
   alias Chat.Data.File, as: FileData
-  alias Chat.Data.File.ChunkPipeline
   alias Chat.Data.File.ChunkStore
+  alias Chat.Storage.Default
   alias Chat.TimeKeeper
 
   @gc_interval :timer.hours(1)
@@ -47,7 +47,7 @@ defmodule Chat.Data.File.GC do
   defp purge_deleted_file(file_id) do
     count = delete_chunks_in_batches(file_id)
     FileData.delete_missing_chunks_for_file(file_id)
-    ChunkStore.delete_file(ChunkPipeline.active_unit(), file_id)
+    ChunkStore.delete_file(Default.unit(), file_id)
     log("GC: deleted #{count} chunks + store from deleted file #{file_id}", :debug)
   end
 
@@ -61,7 +61,7 @@ defmodule Chat.Data.File.GC do
     {uc_count, _} = FileData.delete_upload_chunks_for_file(file_id)
     fc_count = delete_chunks_in_batches(file_id)
     FileData.delete_missing_chunks_for_file(file_id)
-    ChunkStore.delete_file(ChunkPipeline.active_unit(), file_id)
+    ChunkStore.delete_file(Default.unit(), file_id)
 
     log(
       "GC: pruned #{uc_count} upload_chunks and #{fc_count} orphan file_chunks + store from stale upload #{file_id}",

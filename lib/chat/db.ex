@@ -10,6 +10,7 @@ defmodule Chat.Db do
   alias Chat.Db.Queries
   alias Chat.Db.WriteQueue
   alias Chat.Db.WriteQueue.FileReader
+  alias Chat.Storage.Default
   alias Chat.Storage.Unit
 
   @db_version "v.10.1"
@@ -99,9 +100,8 @@ defmodule Chat.Db do
 
   def version_path, do: @db_version
 
-  def repo do
-    Application.get_env(:chat, :repo, Chat.Repo)
-  end
+  @doc "Repo of the Default unit (edge)."
+  def repo, do: Default.unit() |> Unit.repo()
 
   def repo_ready? do
     repo_ready?(repo())
@@ -121,17 +121,6 @@ defmodule Chat.Db do
     :exit, _ -> false
   end
 
-  def set_repo(repo) do
-    current_repo = repo()
-
-    with pid <- Process.whereis(repo),
-         true <- is_pid(pid),
-         true <- Process.alive?(pid) do
-      Application.put_env(:chat, :repo, repo)
-      maybe_reinit_phoenix_sync(current_repo, repo)
-    end
-  end
-
   defp repo_query_ok?(repo) do
     case repo.query("SELECT 1", []) do
       {:ok, _} -> true
@@ -141,18 +130,5 @@ defmodule Chat.Db do
     _ -> false
   catch
     :exit, _ -> false
-  end
-
-  defp maybe_reinit_phoenix_sync(repo, repo), do: :ok
-
-  defp maybe_reinit_phoenix_sync(_previous_repo, _current_repo) do
-    case Chat.PhoenixSyncReinit.reinit() do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        log("Phoenix.Sync reinit failed after repo switch: #{inspect(reason)}", :error)
-        {:error, reason}
-    end
   end
 end

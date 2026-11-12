@@ -1,6 +1,6 @@
 defmodule ChatSupport.Mocks.PhoenixSync.ApplicationMock do
   @moduledoc """
-  Mock for Phoenix.Sync.Application used in PhoenixSyncReinit tests.
+  Mock for Phoenix.Sync.Application used in `Chat.Storage.Default.Electric` tests.
 
   Rewire replaces Phoenix.Sync.Application with this module, but because
   `Application` is a trailing component of that module name, Rewire also
@@ -11,6 +11,7 @@ defmodule ChatSupport.Mocks.PhoenixSync.ApplicationMock do
   whatever is configured via `:phoenix_sync_children_mock` in Application env.
   """
 
+  defdelegate get_env(app, key), to: Application
   defdelegate get_env(app, key, default), to: Application
   defdelegate get_all_env(app), to: Application
   defdelegate put_env(app, key, value), to: Application

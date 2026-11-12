@@ -4,20 +4,15 @@ defmodule ChatWeb.FileChunkControllerTest do
 
   alias Chat.Data.File, as: FileData
   alias Chat.Data.File.ChunkStore
-  alias Chat.Data.File.ChunkWriter
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.FileChunk
   alias Chat.Data.Schemas.UploadChunk
   alias Chat.Data.Types.FileChunkDataHash
   alias Chat.Data.Types.FileId
   alias Chat.Data.User, as: UserData
-  alias Chat.Db.Common
   alias Chat.NetworkSynchronization.Electric.ShapeWriter
   alias Chat.Repo
-  alias Chat.Storage.Unit
-  alias Chat.Storage.Units
-
-  @drive_id "sdk1"
+  alias Chat.Storage.Default
 
   setup %{conn: conn} do
     identity = UserData.generate_pq_identity("Alice")
@@ -26,25 +21,8 @@ defmodule ChatWeb.FileChunkControllerTest do
     signed_card = sign_card(card, identity)
     {:ok, _} = ShapeWriter.write(:user_card, :insert, signed_card)
 
-    tmp_dir =
-      System.tmp_dir!() |> Path.join("chunk_ctrl_test_#{System.unique_integer([:positive])}")
-
-    File.mkdir_p!(tmp_dir)
-
-    # The active unit; registered by the test process, so it is gone after the test
-    unit = %Unit{id: @drive_id, role: :main, root: tmp_dir, system_id: "sys_chunk_ctrl"}
-    :ok = Units.register(unit)
-
-    {:ok, writer_pid} = ChunkWriter.start_link(unit: unit)
-
-    prev_drive = Application.get_env(:chat, :active_drive_id)
-    Common.put_chat_db_env(:active_drive_id, @drive_id)
-
-    on_exit(fn ->
-      if Process.alive?(writer_pid), do: GenServer.stop(writer_pid)
-      if prev_drive, do: Common.put_chat_db_env(:active_drive_id, prev_drive)
-      File.rm_rf!(tmp_dir)
-    end)
+    # The Default unit: its repo is the test Chat.Repo, and its chunk writer is the app's
+    unit = Default.unit()
 
     {:ok, identity: identity, card: card, user_hash: card.user_hash, conn: conn, unit: unit}
   end

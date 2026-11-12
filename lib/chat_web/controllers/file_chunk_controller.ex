@@ -4,12 +4,12 @@ defmodule ChatWeb.FileChunkController do
   use Toolbox.OriginLog
 
   alias Chat.Data.File, as: FileData
-  alias Chat.Data.File.ChunkPipeline
   alias Chat.Data.File.ChunkStore
   alias Chat.Data.File.UploadSource
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.FileChunk
   alias Chat.Data.Types.FileChunkDataHash
+  alias Chat.Storage.Default
   alias Chat.TimeKeeper
   alias EnigmaPq
 
@@ -19,7 +19,7 @@ defmodule ChatWeb.FileChunkController do
   def show(conn, %{"file_id" => file_id, "chunk_index" => chunk_index_str}) do
     with {chunk_index, ""} <- Integer.parse(chunk_index_str),
          %{} = chunk <- FileData.get_file_chunk(file_id, chunk_index),
-         {:ok, data} <- ChunkStore.fetch(ChunkPipeline.active_unit(), file_id, chunk_index) do
+         {:ok, data} <- ChunkStore.fetch(Default.unit(), file_id, chunk_index) do
       conn
       |> put_resp_content_type("application/octet-stream")
       |> put_resp_header("x-chunk-size", to_string(chunk.size))
@@ -37,7 +37,7 @@ defmodule ChatWeb.FileChunkController do
          :ok <- check_file_not_deleted(file_id, headers.uploader_hash),
          chunk = build_chunk(file_id, chunk_index, headers),
          :ok <- Integrity.verify_signature(chunk),
-         unit = ChunkPipeline.active_unit(),
+         unit = Default.unit(),
          :ok <- check_free_space(unit, headers.size),
          {:ok, body, conn} <- read_chunk_body(conn),
          :ok <- verify_body_hash(body, headers.data_hash),

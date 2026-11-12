@@ -27,7 +27,6 @@ config :chat, Chat.Storage,
 config :chat, :admin_cub_db_auto_compact, false
 
 config :chat,
-  files_base_dir: "priv/test_db/files",
   write_budget: 100_000_000,
   writable: :yes
 

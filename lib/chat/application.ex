@@ -26,6 +26,7 @@ defmodule Chat.Application do
         {Phoenix.PubSub, name: Chat.PubSub},
         {Registry, name: Chat.Data.File.ChunkPipelineRegistry, keys: :unique},
         Chat.Storage.Units,
+        Chat.Storage.Links,
         Chat.TimeKeeper |> if_on_host(),
         {DynamicSupervisor, name: Chat.RepoDynamicSupervisor, strategy: :one_for_one},
         # Start DB

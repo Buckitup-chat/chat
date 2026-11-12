@@ -1,11 +1,20 @@
 defmodule Chat.Data.File.ReplicationListener do
-  @moduledoc "Listens for PG replica trigger notifications and activates DriveCopySource."
+  @moduledoc """
+  Listens for PG replica trigger notifications on one unit and activates its
+  DriveCopySource.
+
+  Replicated rows are stamped with the unit they came from: the replication source
+  that `Chat.Storage.Link.replicate/1` registered in `Chat.Storage.Links`. A trigger
+  cannot know the origin of a row, a link can (spec §1.6). Without a registered
+  source the stamp is `nil` (any unit).
+  """
 
   use GenServer
   use Toolbox.OriginLog
 
   alias Chat.Data.File, as: FileData
   alias Chat.Data.File.DriveCopySource
+  alias Chat.Storage.Links
   alias Chat.Storage.Unit
   alias Chat.TimeKeeper
 
@@ -20,7 +29,7 @@ defmodule Chat.Data.File.ReplicationListener do
   def init(opts) do
     %Unit{} = unit = Keyword.fetch!(opts, :unit)
     repo = Unit.repo(unit)
-    state = %{drive_id: unit.id, repo: repo, system_id: unit.system_id, conn: nil, refs: %{}}
+    state = %{unit: unit, drive_id: unit.id, repo: repo, conn: nil, refs: %{}}
 
     case connect_and_listen(repo) do
       {:ok, conn, refs} ->
@@ -41,7 +50,7 @@ defmodule Chat.Data.File.ReplicationListener do
           chunk_count,
           nil,
           TimeKeeper.now_unix(),
-          source_drive_id: state.system_id,
+          source_drive_id: Links.replication_source(state.unit),
           repo: state.repo
         )
 
@@ -56,7 +65,13 @@ defmodule Chat.Data.File.ReplicationListener do
     case Jason.decode(payload) do
       {:ok, %{"file_id" => fid, "chunk_index" => ci, "data_hash" => dh, "size" => s}} ->
         FileData.fill_missing_chunk(fid, ci, dh, s, repo: state.repo)
-        DriveCopySource.chunk_fetchable(state.drive_id, fid, ci, state.system_id)
+
+        DriveCopySource.chunk_fetchable(
+          state.drive_id,
+          fid,
+          ci,
+          Links.replication_source(state.unit)
+        )
 
       _ ->
         log("ReplicationListener: bad file_chunk_replicated payload", :warning)

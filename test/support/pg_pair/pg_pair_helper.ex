@@ -10,6 +10,7 @@ defmodule Chat.Test.PgPairHelper do
 
   import ExUnit.Assertions, only: [flunk: 1]
 
+  alias Chat.Storage.Unit
   alias Chat.Test.PgPairHelper.Db
   alias Chat.Test.{UnitARepo, UnitBRepo}
   alias Ecto.Adapters.SQL.Sandbox
@@ -105,17 +106,18 @@ defmodule Chat.Test.PgPairHelper do
   end
 
   @doc """
-  Unit fixture for `repo` with real temporary `pq_files` / `cub` dirs under `root`.
+  `%Chat.Storage.Unit{}` on `repo` (pinned by id in `config :chat, Chat.Storage, repos:`)
+  with a real temporary `pq_files` dir under `root`.
 
-  Shaped like `%Chat.Storage.Unit{}` (#799) plus `:repo`; switch to the struct once it lands.
+  `unit_a` is `:main`, `unit_b` is `:backup` (the app's own internal unit holds `:internal`). Both databases share one cluster, so
+  their real `system_id/1` is equal; the fixtures carry distinct fake ids instead,
+  which is what links and `missing_chunks.source_drive_id` tell apart.
   """
   def unit_fixture(repo, root) do
-    {id, role} = if repo == UnitARepo, do: {"unit_a", :internal}, else: {"unit_b", :main}
+    {id, role} = if repo == UnitARepo, do: {"unit_a", :main}, else: {"unit_b", :backup}
 
-    ~W(pq_files cub)
-    |> Enum.each(&(root |> Path.join(&1) |> File.mkdir_p!()))
-
-    %{id: id, role: role, root: root, repo: repo, system_id: system_id(repo)}
+    %Unit{id: id, role: role, root: root, system_id: "sys_#{id}"}
+    |> tap(&(&1 |> Unit.path(:pq_files) |> File.mkdir_p!()))
   end
 
   def databases, do: Enum.map(@repos, &(&1.config() |> Keyword.fetch!(:database)))

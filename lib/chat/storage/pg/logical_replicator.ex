@@ -160,10 +160,8 @@ defmodule Chat.Storage.Pg.LogicalReplicator do
   def check_replication_lag(repo, subscription_name) do
     sql = """
     SELECT
-      COALESCE(
-        pg_wal_lsn_diff(latest_end_lsn, received_lsn),
-        0
-      ) AS lag_bytes
+      -- received_lsn can run ahead of latest_end_lsn, which made the diff negative
+      GREATEST(COALESCE(pg_wal_lsn_diff(latest_end_lsn, received_lsn), 0), 0) AS lag_bytes
     FROM pg_stat_subscription
     WHERE subname = '#{subscription_name}'
     """

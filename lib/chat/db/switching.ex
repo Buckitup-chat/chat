@@ -25,6 +25,9 @@ defmodule Chat.Db.Switching do
     WriteQueue.set_mirrors(nil, to_queue)
   end
 
+  @doc "Stops mirroring writes of `from` anywhere."
+  def unmirror(from), do: WriteQueue.set_mirrors(nil, Common.names(from, :queue))
+
   def set_default(name, opts \\ []) do
     queue_name = Common.names(name, :queue)
     status_relay_name = Common.names(name, :status)

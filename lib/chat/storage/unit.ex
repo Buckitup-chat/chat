@@ -102,11 +102,16 @@ defmodule Chat.Storage.Unit do
   # Same names BootSupervisor defines at runtime; built at compile time to avoid runtime atoms
   @usb_repos Map.new(?a..?z, &{&1, Module.concat([Platform.Dev, :"Sd#{<<&1>>}", Repo])})
 
+  @doc """
+  Repo of the unit's PG. `config :chat, Chat.Storage, repos: %{id => repo}` pins a
+  repo per unit id (tests run units on `Chat.Test.UnitARepo` / `UnitBRepo`).
+  """
   @spec repo(t()) :: module()
   def repo(%__MODULE__{id: id}) do
-    case id do
-      :internal -> Chat.Repo
-      "sd" <> <<letter, _::binary>> -> Map.fetch!(@usb_repos, letter)
+    case {storage_config() |> Keyword.get(:repos, %{}) |> Map.get(id), id} do
+      {repo, _id} when repo != nil -> repo
+      {nil, :internal} -> Chat.Repo
+      {nil, "sd" <> <<letter, _::binary>>} -> Map.fetch!(@usb_repos, letter)
     end
   end
 
@@ -121,8 +126,9 @@ defmodule Chat.Storage.Unit do
   }
   @drives_registry Platform.Drives.Registry
 
-  @spec cub_name(t()) :: module()
-  def cub_name(%__MODULE__{role: role}), do: Map.fetch!(@cub_names, role)
+  @spec cub_name(t() | Role.t()) :: module()
+  def cub_name(%__MODULE__{role: role}), do: cub_name(role)
+  def cub_name(role) when is_atom(role), do: Map.fetch!(@cub_names, role)
 
   @spec via(t(), atom()) :: {:via, Registry, {module(), {atom(), id()}}}
   def via(%__MODULE__{id: id}, component),

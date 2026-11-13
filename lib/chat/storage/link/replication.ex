@@ -20,12 +20,8 @@ defmodule Chat.Storage.Link.Replication do
   alias Chat.Storage.Link
   alias Chat.Storage.Link.Filter
   alias Chat.Storage.Links
-  alias Chat.Storage.Pg
   alias Chat.Storage.Pg.LogicalReplicator
   alias Chat.Storage.Unit
-
-  @slot_drop_attempts 20
-  @slot_drop_retry_ms 100
 
   @spec start(Link.t()) :: :ok | {:error, term()}
   def start(%Link{} = link) do
@@ -56,7 +52,7 @@ defmodule Chat.Storage.Link.Replication do
       slot = Link.name(link, :slot)
 
       _ = safely(fn -> LogicalReplicator.drop_subscription_if_exists(Unit.repo(to), slot) end)
-      _ = safely(fn -> release_slot(Unit.repo(from), slot) end)
+      _ = safely(fn -> LogicalReplicator.release_slot(Unit.repo(from), slot) end)
     end
 
     log("#{inspect(Link.id(link))} stopped", :info)
@@ -72,48 +68,13 @@ defmodule Chat.Storage.Link.Replication do
   end
 
   defp start_pg(%Link{from: from, to: to, filter: filter} = link) do
-    {from_repo, to_repo} = {Unit.repo(from), Unit.repo(to)}
-    {publication, slot} = {Link.name(link, :publication), Link.name(link, :slot)}
-
-    with :ok <- LogicalReplicator.drop_subscription_if_exists(to_repo, slot),
-         :ok <- release_slot(from_repo, slot),
-         :ok <-
-           LogicalReplicator.create_publication(from_repo, Filter.tables(filter), publication),
-         # slot first: a subscription creating its own slot hangs when both share a cluster
-         :ok <- LogicalReplicator.ensure_slot_on_source(from_repo, slot),
-         :ok <-
-           LogicalReplicator.create_subscription(
-             to_repo,
-             Pg.build_connection_string(from_repo),
-             publication,
-             slot,
-             copy_data: false,
-             enabled: false
-           ) do
-      LogicalReplicator.enable_subscription(to_repo, slot)
-    end
-  end
-
-  # Terminates the walsender still holding the slot (a subscriber whose unit is
-  # gone), then drops the slot.
-  defp release_slot(repo, slot, attempts \\ @slot_drop_attempts) do
-    _ =
-      repo.query(
-        """
-        SELECT pg_terminate_backend(active_pid) FROM pg_replication_slots
-        WHERE slot_name = $1 AND active_pid IS NOT NULL
-        """,
-        [slot]
-      )
-
-    case LogicalReplicator.drop_slot_if_exists(repo, slot) do
-      {:error, _reason} when attempts > 1 ->
-        Process.sleep(@slot_drop_retry_ms)
-        release_slot(repo, slot, attempts - 1)
-
-      result ->
-        result
-    end
+    LogicalReplicator.follow(
+      Unit.repo(from),
+      Unit.repo(to),
+      Filter.tables(filter),
+      Link.name(link, :publication),
+      Link.name(link, :slot)
+    )
   end
 
   # CubDB mirrors of `from` = the units its replicating links point to
@@ -121,17 +82,21 @@ defmodule Chat.Storage.Link.Replication do
     from_cub = Unit.cub_name(from)
 
     if cub?(from) and running?(from_cub) do
-      for {_from_role, to_role} <- Links.replicating_from(from.role),
-          to_cub = Unit.cub_name(to_role),
-          running?(to_cub) do
-        to_cub
-      end
-      |> case do
-        [] -> Switching.unmirror(from_cub)
-        to_cubs -> Switching.mirror(from_cub, to_cubs)
-      end
+      from.role
+      |> running_mirror_targets()
+      |> apply_mirrors(from_cub)
     end
   end
+
+  defp running_mirror_targets(from_role) do
+    from_role
+    |> Links.replicating_from()
+    |> Enum.map(fn {_from_role, to_role} -> Unit.cub_name(to_role) end)
+    |> Enum.filter(&running?/1)
+  end
+
+  defp apply_mirrors([], from_cub), do: Switching.unmirror(from_cub)
+  defp apply_mirrors(to_cubs, from_cub), do: Switching.mirror(from_cub, to_cubs)
 
   defp cub?(unit), do: :cub in Unit.capabilities(unit)
   defp running?(name), do: name |> Process.whereis() |> is_pid()

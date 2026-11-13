@@ -1,6 +1,6 @@
 defmodule Chat.Storage.Pg.LogicalReplicator do
   @moduledoc """
-  Manages PostgreSQL logical replication publications, slots, and lag checking.
+  Manages PostgreSQL logical replication publications, slots, following, and lag checking.
 
   Subscription management is in `Chat.Storage.Pg.LogicalReplicator.Subscription`.
 
@@ -9,7 +9,11 @@ defmodule Chat.Storage.Pg.LogicalReplicator do
 
   use Toolbox.OriginLog
 
-  alias __MODULE__.Subscription
+  alias Chat.Storage.Pg
+  alias Chat.Storage.Pg.LogicalReplicator.Subscription
+
+  @slot_drop_attempts 20
+  @slot_drop_retry_ms 100
 
   @type repo :: module()
   @type table_name :: String.t()
@@ -65,6 +69,61 @@ defmodule Chat.Storage.Pg.LogicalReplicator do
         )
 
         error
+    end
+  end
+
+  # --- Follow (publication + slot on source, subscription on target) ---
+
+  @doc """
+  Makes `target_repo` live-follow `tables` of `source_repo`.
+
+  Starts from a fresh slot every time (any previous subscription and slot are
+  dropped first), so a stale slot never replays rows already copied. The slot is
+  created before the subscription: a subscription creating its own slot hangs
+  when source and target share a cluster. Existing data is not copied.
+  """
+  @spec follow(repo(), repo(), [table_name()], publication_name(), String.t()) ::
+          :ok | {:error, term()}
+  def follow(source_repo, target_repo, tables, publication_name, slot_name) do
+    with :ok <- drop_subscription_if_exists(target_repo, slot_name),
+         :ok <- release_slot(source_repo, slot_name),
+         :ok <- create_publication(source_repo, tables, publication_name),
+         :ok <- ensure_slot_on_source(source_repo, slot_name),
+         :ok <-
+           create_subscription(
+             target_repo,
+             Pg.build_connection_string(source_repo),
+             publication_name,
+             slot_name,
+             copy_data: false,
+             enabled: false
+           ) do
+      enable_subscription(target_repo, slot_name)
+    end
+  end
+
+  @doc """
+  Terminates the walsender still holding the slot (e.g. a subscriber whose
+  database is gone), then drops the slot. Retries while the slot is still busy.
+  """
+  @spec release_slot(repo(), String.t(), pos_integer()) :: :ok | {:error, term()}
+  def release_slot(source_repo, slot_name, attempts \\ @slot_drop_attempts) do
+    _ =
+      source_repo.query(
+        """
+        SELECT pg_terminate_backend(active_pid) FROM pg_replication_slots
+        WHERE slot_name = $1 AND active_pid IS NOT NULL
+        """,
+        [slot_name]
+      )
+
+    case drop_slot_if_exists(source_repo, slot_name) do
+      {:error, _reason} when attempts > 1 ->
+        Process.sleep(@slot_drop_retry_ms)
+        release_slot(source_repo, slot_name, attempts - 1)
+
+      result ->
+        result
     end
   end
 

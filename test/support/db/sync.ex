@@ -113,13 +113,11 @@ defmodule Support.Db.Sync do
     prev_settings = %{
       queue_name: Common.get_chat_db_env(:data_queue),
       status_relay_name: Common.get_chat_db_env(:data_dry),
-      files_base_dir: Common.get_chat_db_env(:files_base_dir),
       data_pid: Common.get_chat_db_env(:data_pid)
     }
 
     Common.put_chat_db_env(:data_queue, queue_name)
     Common.put_chat_db_env(:data_pid, name)
-    Common.put_chat_db_env(:files_base_dir, CubDB.data_dir(name) <> "_files")
     Common.put_chat_db_env(:data_dry, status_relay_name)
 
     Chat.Ordering.reset()
@@ -130,7 +128,6 @@ defmodule Support.Db.Sync do
   defp restore_settings(prev_settings) do
     Common.put_chat_db_env(:data_queue, prev_settings[:queue_name])
     Common.put_chat_db_env(:data_pid, prev_settings[:data_pid])
-    Common.put_chat_db_env(:files_base_dir, prev_settings[:files_base_dir])
     Common.put_chat_db_env(:data_dry, prev_settings[:status_relay_name])
 
     Chat.Ordering.reset()

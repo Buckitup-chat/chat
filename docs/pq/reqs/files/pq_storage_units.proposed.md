@@ -7,7 +7,7 @@ The system works through two layers:
 - **Default** — the unit the system currently writes to. One pointer, switched atomically.
 - **Targeted** — specific units named explicitly (syncs, copies, per-unit pipelines). They never consult Default.
 
-**Compatibility:** the CubDB generation stays compatible, because its paths are unchanged (§2.2). The PostgreSQL generation (PG clusters, PQ blobs, Electric storage) is dropped and recreated; see §7.
+**Compatibility:** the CubDB generation stays compatible, because its paths are unchanged (§2.2). The PostgreSQL generation (PG clusters, PQ blobs, Electric storage) is moved under the role dir once; see §7.
 
 Motivating symptom: [#795](https://github.com/Buckitup-chat/chat/issues/795). Backup restore copies PQ rows, but the blobs are never found. The root cause is not a single wrong path: the unit concept is missing, so `DriveCopySource` re-derives unit → dir by globbing `/root/media/sd*` and querying repos, and it only knows the `main_db/…` layout.
 
@@ -437,34 +437,41 @@ Functions that act on a unit take `%Unit{}` as the **first** argument. There is 
 - **`DriveCopySource` fallback:** iterate `Units.others/1` instead of picking one random dir.
 - **Idle Electric slots retain WAL** (§1.6). Can ship before this refactor: stop pre-creating `electric_slot_default` on non-Default units, drop it on the unit left behind, and set `max_slot_wal_keep_size`.
 
-## 7. Migration — keep CubDB, drop PostgreSQL
+## 7. Migration — keep CubDB, relocate PostgreSQL
 
 ### 7.1 Compatibility
 
 | Generation | Policy | Why it works |
 |---|---|---|
 | CubDB (`v.10.1`, `v.10.1_files`) | **kept** | paths are identical: internal `role_dir = "db"` → `/root/db/v.10.1`; USB `<mount>/<role>_db/v.10.1`. `@db_version` unchanged. `Bouncer` / `DbType`, `Copying`, `Switching.mirror` unchanged. |
-| PostgreSQL (`pg`, `pq_files`, Electric storage) | **dropped** | early stage; recreated on first boot by Engines + migrations |
+| PostgreSQL (`pg`, `pq_files`, Electric storage) | **moved** under the role dir | one-time relocation (§7.2). Port and socket dir derive from the device, not the path, so the moved cluster starts as is. Whatever has no home is dropped and recreated by Engines + migrations |
 
 Rules that keep existing CubDB drives working:
 
 - **Role resolution accepts legacy multi-role drives.** If several `*_db` dirs exist, keep the current priority (cargo > onliners > backup > main). Return `{:error, :multiple_roles}` only when more than one of them contains `pg/`.
-- **Blank detection** stays "mount root is empty". A legacy drive with only `<mount>/pg` gets that dir removed by the reset below, then is treated as blank.
+- **Blank detection** stays "mount root is empty". A legacy drive with only `<mount>/pg` has no role dir, so the relocation below removes that dir and the drive is treated as blank.
 - **CubDB copy order inside `Link.bootstrap/1`** is exactly the current `Copying.await_copied` / `Switching.mirror` sequence. Only the PG and blob halves are new.
 - **CubDB process names** (`Chat.Db.MainDb`, …) are runtime-only. Deriving them via `Unit.cub_name/1` has no on-disk effect.
 
-### 7.2 One-time PQ reset
+### 7.2 One-time PQ relocation
 
-A step in Resolve (§3) runs before engines start. It is idempotent and is removed once the fleet is migrated.
+A step in Resolve (§3) runs before engines start (`Platform.Storage.PqReset`). It is idempotent, because it only touches legacy locations, and it is removed once the fleet is migrated.
 
-| Unit | Removes |
-|---|---|
-| internal | `/root/pg`, `/root/db/v.10.1_files/pq_files`, `/root/electric` |
-| USB | `<mount>/pg`, `<mount>/<role_dir>/v.10.1_files/pq_files` |
+| Unit | Legacy | Moved to |
+|---|---|---|
+| internal | `/root/pg` | `/root/db/pg` |
+| internal | `/root/db/v.10.1_files/pq_files` | `/root/db/pq_files` |
+| internal | `/root/electric` | `/root/db/electric` |
+| USB | `<mount>/pg` | `<mount>/<role_dir>/pg` |
+| USB | `<mount>/<role_dir>/v.10.1_files/pq_files` | `<mount>/<role_dir>/pq_files` |
 
-Removing `pq_files` from inside `v.10.1_files` also cleans the CubDB generation. FileFs walks `v.10.1_files/<hc>/<key>` two levels deep (`list_all_db_keys/1`, `list_file_errors/1`). Today it descends into `pq_files/<shard>/f_…` too, and only a `rescue` keeps it from crashing.
+- A USB cluster goes to the role the drive resolves to (`Role.from_mount/1`). Blobs are relocated in every role dir, so a legacy multi-role drive is handled too.
+- The role dir is chmodded `0755` after a move so postgres can traverse it, as `Lifecycle.Init` does for a fresh cluster.
+- **Removed instead** when a legacy location has no home: the role lacks the capability (cargo, onliners), the drive has no role dir, the unit already has its own copy, or the rename fails (e.g. across filesystems). Only data removed this way is lost; it is recreated empty by Engines + migrations.
 
-**Lost by the reset:** everything that exists only in PQ — PQ users (`UserCard`), PQ-uploaded files, vouch tokens, reviews, origins. Electric clients get 409 / must-refetch and resync against the empty stack.
+Moving `pq_files` out of `v.10.1_files` also cleans the CubDB generation. FileFs walks `v.10.1_files/<hc>/<key>` two levels deep (`list_all_db_keys/1`, `list_file_errors/1`). Today it descends into `pq_files/<shard>/f_…` too, and only a `rescue` keeps it from crashing.
+
+**Preserved by the relocation:** PQ users (`UserCard`), PQ-uploaded files, vouch tokens, reviews, origins, and the Electric cache.
 
 ### 7.3 Steps
 
@@ -476,7 +483,7 @@ Removing `pq_files` from inside `v.10.1_files` also cleans the CubDB generation.
 5. **`Link`.** Port the main and backup scenarios to link plans. Delete `Storage.Sync`, `Backup.Copier.sync_pg/1` and `InternalToMain.Copier.sync_pg_to_main/1`.
 6. **CubDB file paths via `Unit`.**
 7. **Literal-grep invariant test.**
-8. **PQ reset step (§7.2).** Verify on a device with a legacy main drive and a legacy backup drive that CubDB data and files survive and the PQ generation rebuilds.
+8. **PQ relocation step (§7.2).** Verify on a device with a legacy main drive and a legacy backup drive that CubDB data and files survive, and that PQ data, blobs and Electric storage are moved under the role dir and stay readable.
 
 ## 8. Decisions
 

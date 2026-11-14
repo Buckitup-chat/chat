@@ -38,6 +38,17 @@ defmodule Chat.Storage.Link.BootstrapTest do
       assert %{0 => "sys_unit_a"} == Files.missing_sources(UnitBRepo, file_id)
     end
 
+    test "nudges the chunk pipelines only when it queued blobs", %{unit_a: a, unit_b: b} do
+      Phoenix.PubSub.subscribe(Chat.PubSub, "chunk_pipeline")
+
+      assert :ok = Link.bootstrap(a ~> b)
+      refute_received {:chunk_pipeline, :pg_diff_copied}
+
+      Files.file!(UnitARepo, Files.new_file_id(), 1)
+      assert :ok = Link.bootstrap(a ~> b)
+      assert_received {:chunk_pipeline, :pg_diff_copied}
+    end
+
     test "a filter without chunk rows tracks no blobs", %{unit_a: a, unit_b: b} do
       file_id = Files.file!(UnitARepo, Files.new_file_id(), 1)
       link = Link.new(a, b, filter: %Filter{schemas: [UserCard]})

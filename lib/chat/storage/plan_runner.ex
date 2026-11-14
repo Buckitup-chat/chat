@@ -84,6 +84,10 @@ defmodule Chat.Storage.PlanRunner do
     end
   end
 
+  # Steps run in this process, so replies meant for them can land here
+  # (e.g. Electric's startup messages from `Default.switch_to/1`)
+  def on_msg(_msg, state), do: {:noreply, state}
+
   @impl GracefulGenServer
   def on_exit(_reason, %{runners: runners}) do
     runners |> Map.values() |> Enum.each(&stop_runner/1)

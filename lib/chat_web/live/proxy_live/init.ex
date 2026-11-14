@@ -59,6 +59,7 @@ defmodule ChatWeb.ProxyLive.Init do
     |> assign(:operating_system, os_name)
     |> assign(:db_status, %{
       flags: [],
+      links: [],
       mode: :proxy,
       compacting: false,
       writable: :yes

@@ -77,6 +77,16 @@ defmodule Chat.Storage.PlanRunnerTest do
       stop_supervised!(PlanRunner)
       refute slot?("backup_from_main")
     end
+
+    test "ignores messages its steps did not take", %{unit_a: a} do
+      parent = self()
+      eject = fn -> send(self(), {:stray, :reply}) |> then(fn _ -> send(parent, :ejected) end) end
+      runner = start_supervised!({PlanRunner, plan: [:eject, {:switch_default, a}], eject: eject})
+
+      assert_receive :ejected
+      assert %{status: {:halted, _, _}} = await_info(runner, &match?({:halted, _, _}, &1.status))
+      assert Process.alive?(runner)
+    end
   end
 
   defp await_info(runner, done?, attempts \\ 100) do

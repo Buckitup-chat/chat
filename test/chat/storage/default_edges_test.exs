@@ -5,6 +5,7 @@ defmodule Chat.Storage.DefaultEdgesTest do
   @edges ~W[
     lib/chat/storage/default.ex
     lib/chat/db.ex
+    lib/chat/db/status_poller.ex
     lib/chat/debug.ex
     lib/chat/data/file/gc.ex
     lib/chat/data/file/validation.ex

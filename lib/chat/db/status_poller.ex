@@ -4,6 +4,8 @@ defmodule Chat.Db.StatusPoller do
   use GenServer
 
   alias Chat.Db.Common
+  alias Chat.Storage.Default
+  alias Chat.Storage.Links
   alias Phoenix.PubSub
 
   @interval :timer.seconds(1)
@@ -20,10 +22,12 @@ defmodule Chat.Db.StatusPoller do
 
     compacting = db |> CubDB.compacting?()
 
-    [:mode, :flags]
-    |> Enum.map(&{&1, Common.get_chat_db_env(&1)})
-    |> Enum.into(%{})
-    |> Map.put(:compacting, compacting)
+    %{
+      mode: Default.unit().role,
+      links: Links.list(),
+      flags: Common.get_chat_db_env(:flags),
+      compacting: compacting
+    }
     |> Map.put(:writable, if(Common.dry?(), do: :no, else: :yes))
   end
 

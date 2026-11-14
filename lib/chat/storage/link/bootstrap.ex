@@ -5,7 +5,9 @@ defmodule Chat.Storage.Link.Bootstrap do
   1. `:cub` — `Chat.Db.Copying.await_copied/3`, scoped by the filter's `cub_scope`
   2. `:rows` — `Chat.Storage.Pg.BatchSync` diff+copy of the filter's schemas
   3. `:chunks` — `missing_chunks` on `to` for every `file_chunks` row whose blob `to`
-     lacks, with `source_drive_id = from.system_id` (spec §5 invariant 6)
+     lacks, with `source_drive_id = from.system_id` (spec §5 invariant 6); new rows
+     nudge the chunk pipelines (`{:chunk_pipeline, :pg_diff_copied}`) so `to` pulls
+     the blobs right away
 
   A failing layer stops the ones after it. Progress and the final status go to
   `Chat.Storage.Links`; a full disk on `to` surfaces as `{:error, :disk_full}`.
@@ -83,6 +85,7 @@ defmodule Chat.Storage.Link.Bootstrap do
     link
     |> backfill_chunks()
     |> tap(&log("#{inspect(Link.id(link))} backfilled #{&1} missing_chunks", :info))
+    |> tap(&if(&1 > 0, do: nudge_pipelines()))
     |> then(fn _count -> :done end)
   rescue
     e in [Postgrex.Error, DBConnection.ConnectionError] -> {:error, e}
@@ -114,6 +117,11 @@ defmodule Chat.Storage.Link.Bootstrap do
       |> elem(0)
     end)
   end
+
+  # `to`'s drive copy source polls hourly; make it pick up the new rows now
+  defp nudge_pipelines,
+    do:
+      Phoenix.PubSub.broadcast(Chat.PubSub, "chunk_pipeline", {:chunk_pipeline, :pg_diff_copied})
 
   defp missing_row(chunk, source_drive_id, now) do
     chunk

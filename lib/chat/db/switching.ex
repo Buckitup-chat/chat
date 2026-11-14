@@ -24,6 +24,9 @@ defmodule Chat.Db.Switching do
     WriteQueue.set_mirrors(nil, to_queue)
   end
 
+  @doc "Stops mirroring writes of `from` anywhere."
+  def unmirror(from), do: WriteQueue.set_mirrors(nil, Common.names(from, :queue))
+
   @doc "Points the CubDB read pid and write queue at `name`. Called by `Chat.Storage.Default.switch_to/1`."
   def set_default(name) do
     queue_name = Common.names(name, :queue)

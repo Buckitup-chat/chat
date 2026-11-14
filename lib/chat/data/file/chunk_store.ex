@@ -25,6 +25,10 @@ defmodule Chat.Data.File.ChunkStore do
     unit |> chunk_path(file_id, chunk_index) |> File.read()
   end
 
+  def exists?(%Unit{} = unit, file_id, chunk_index) do
+    unit |> chunk_path(file_id, chunk_index) |> File.regular?()
+  end
+
   def count_on_disk(%Unit{} = unit, file_id) do
     unit
     |> file_dir(file_id)

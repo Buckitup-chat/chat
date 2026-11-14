@@ -47,12 +47,16 @@ defmodule Chat.Storage.Link do
   @doc """
   PG object names: the publication lives on `from` (`"internal_to_main"`); the
   subscription on `to` and its slot on `from` share one name (`"main_from_internal"`).
+
+  Takes a link, or a link id when the units are not at hand (stale-object cleanup).
   """
-  @spec name(t(), :publication | :subscription | :slot) :: String.t()
-  def name(%__MODULE__{from: from, to: to}, kind) do
+  @spec name(t() | id(), :publication | :subscription | :slot) :: String.t()
+  def name(%__MODULE__{} = link, kind), do: link |> id() |> name(kind)
+
+  def name({from, to}, kind) do
     case kind do
-      :publication -> "#{from.role}_to_#{to.role}"
-      kind when kind in [:subscription, :slot] -> "#{to.role}_from_#{from.role}"
+      :publication -> "#{from}_to_#{to}"
+      kind when kind in [:subscription, :slot] -> "#{to}_from_#{from}"
     end
   end
 

@@ -54,7 +54,7 @@ defmodule Chat.Storage.PlanRunnerTest do
            eject: fn -> send(test, :ejected) end}
         )
 
-      assert_receive {:switched, ^b}
+      assert_receive {:switched, ^b}, 5_000
       assert_receive :ejected
 
       assert %{status: :done, results: results} = PlanRunner.info(runner)

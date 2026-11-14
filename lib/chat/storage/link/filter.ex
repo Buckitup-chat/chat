@@ -10,7 +10,7 @@ defmodule Chat.Storage.Link.Filter do
 
   Only `cub_scope` and `schemas` are applied for now (#805).
 
-  See `docs/pq/reqs/files/pq_storage_units.proposed.md` §2.7.2.
+  See `docs/pq/reqs/files/pq_storage_units.done.md` §2.7.2.
   """
 
   alias Chat.Data.Schemas.FileChunk

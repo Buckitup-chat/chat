@@ -3,7 +3,7 @@ defmodule Chat.Storage.Role do
   Storage unit roles: capabilities, on-disk dirs and role resolution from a mount.
 
   The role dir (`<mount>/<role>_db`) is the source of truth for a drive's role.
-  See `docs/pq/reqs/files/pq_storage_units.proposed.md` §2.3 and §7.1.
+  See `docs/pq/reqs/files/pq_storage_units.done.md` §2.3 and §7.1.
   """
 
   @type t :: :internal | :main | :backup | :cargo | :onliners

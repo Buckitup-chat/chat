@@ -73,7 +73,7 @@ Three byte sources feed into each drive's ChunkWriter:
 |---|---|---|
 | [**MissingChunksBackfill**](../../../../lib/chat/data/file/missing_chunks_backfill.ex) | Task (restart: :temporary) | On pipeline start: scans all `file_chunks` rows, compares against on-disk chunks, inserts `missing_chunks` for any gaps. Broadcasts `{:chunk_pipeline, :backfill_done}` on completion to trigger DriveCopySource poll. |
 | [**ReplicationListener**](../../../../lib/chat/data/file/replication_listener.ex) | GenServer (wraps `Postgrex.Notifications`) | Listens for PG replica trigger notifications (`file_replicated`, `file_chunk_replicated`), calls `FileData` to fill `missing_chunks`, casts to DriveCopySource |
-| [**UnitAnnouncer**](../../../../lib/chat/storage/unit_announcer.ex) | GenServer (traps exit) | Formerly `DriveAnnouncer`. With `unit:` it also registers the unit in `Chat.Storage.Units` and broadcasts `{:unit_up / :unit_down, unit}` on `"storage"` ([pq_storage_units](pq_storage_units.proposed.md) §2.5). On init: broadcasts `{:chunk_pipeline, {:drive_mounted, system_id}}` on PubSub `"chunk_pipeline"`. On terminate: broadcasts `{:chunk_pipeline, {:drive_unmounted, system_id}}`. DriveCopySource handles these via `handle_extra_info`. Returns `:ignore` if system identifier is unqueryable. |
+| [**UnitAnnouncer**](../../../../lib/chat/storage/unit_announcer.ex) | GenServer (traps exit) | Formerly `DriveAnnouncer`. With `unit:` it also registers the unit in `Chat.Storage.Units` and broadcasts `{:unit_up / :unit_down, unit}` on `"storage"` ([pq_storage_units](pq_storage_units.done.md) §2.5). On init: broadcasts `{:chunk_pipeline, {:drive_mounted, system_id}}` on PubSub `"chunk_pipeline"`. On terminate: broadcasts `{:chunk_pipeline, {:drive_unmounted, system_id}}`. DriveCopySource handles these via `handle_extra_info`. Returns `:ignore` if system identifier is unqueryable. |
 | [**TmpSweeper**](../../../../lib/chat/data/file/tmp_sweeper.ex) | `:gen_statem` | Hourly sweep of stale `.tmp` files from ChunkStore (crash residue from interrupted writes) |
 | [**GC**](../../../../lib/chat/data/file/gc.ex) | GenServer (singleton, not per-drive) | Hourly garbage collection — purges chunk files (in batches of 50) and `missing_chunks` rows for deleted files and stale uploads (>48h) |
 
@@ -85,9 +85,9 @@ Browser HTTP PUT
   → FileChunkController.create
     → parse_chunk_headers + Integrity.verify_signature
     → check_free_space (ChunkStore.available_space)
-    → UploadSource.submit(active_drive_id, body, meta)
+    → UploadSource.submit(Default.unit().id, body, meta)
       → ChunkWriter.submit(drive_id, :upload, body, meta)  [GenServer.call, blocks]
-        → Task: ChunkStore.put(file_id, chunk_index, body, base_dir)  [FS write]
+        → Task: ChunkStore.put(unit, file_id, chunk_index, body)  [FS write]
         ← :ok | {:busy, 2}
       ← result
     → insert file_chunks + upload_chunks rows (PG)
@@ -103,7 +103,7 @@ Electric shape arrives (file insert)
 Electric shape arrives (file_chunk insert)
   → Shapes.FileChunk.sync_after_persist
     → FileData.fill_missing_chunk (populates data_hash/size on missing_chunks)
-    → SyncSource.chunk_fetchable(active_drive_id, file_id, chunk_index, peer_url)  [cast]
+    → SyncSource.chunk_fetchable(Default.unit().id, file_id, chunk_index, peer_url)  [cast]
 
 SyncSource receives cast
   → enqueue {file_id, chunk_index, peer_url} in to_fetch
@@ -301,15 +301,15 @@ Migrations: [`create_missing_chunks`](../../../../priv/repo/migrations/202606131
 
 ### 4.2 ChunkStore
 
-[`Chat.Data.File.ChunkStore`](../../../../lib/chat/data/file/chunk_store.ex) — filesystem storage for raw encrypted chunk bytes. Path layout: `{base_dir}/pq_files/{shard}/{file_id}/{zero_padded_index}`.
+[`Chat.Data.File.ChunkStore`](../../../../lib/chat/data/file/chunk_store.ex) — filesystem storage for raw encrypted chunk bytes. Path layout: `Unit.path(unit, :pq_files)/{shard}/{file_id}/{zero_padded_index}`, i.e. `<root>/<role_dir>/pq_files/…` ([pq_storage_units](pq_storage_units.done.md) §2.2). Every function takes the `%Unit{}` first.
 
 - **Sharding**: last 2 hex chars of `file_id` (after `f_` prefix) → 256 directories.
 - **Write protocol**: `File.write(tmp_path, binary)` + `File.rename(tmp, path)`. Atomic-replace via temp file prevents partial reads. Directory is created with `File.mkdir_p/1` if absent.
-- **`base_dir`**: defaults to `Common.get_chat_db_env(:files_base_dir)` (runtime config), overridable per drive. USB drives pass their mount-specific path.
+- **Unit**: no default directory. Callers pass the unit (edges pass `Chat.Storage.Default.unit()`).
 - **`sync_dir/2`**: explicit fsync on the file's directory via `:file.datasync/1`.
 - **`sweep_tmp_files/2`**: deletes `.tmp` files older than a threshold — cleanup for writes interrupted by crashes.
 - **`count_on_disk/2`**: counts chunk files on disk for a given `file_id` (excludes `.tmp`).
-- **`available_space/0`**: queries `df` for free space on the chunk store device.
+- **`available_space/1`**: queries `df` for free space on the unit's chunk store device.
 
 ### 4.3 PG I/O Interaction
 
@@ -326,7 +326,7 @@ Each drive is identified by its PostgreSQL **system identifier** — a unique 64
 
 **UnitAnnouncer** ([source](../../../../lib/chat/storage/unit_announcer.ex)): per-drive GenServer that queries the drive's PG for its system_identifier, broadcasts `{:chunk_pipeline, {:drive_mounted, system_id}}` on PubSub `"chunk_pipeline"`, and on terminate broadcasts `{:chunk_pipeline, {:drive_unmounted, system_id}}`. Returns `:ignore` if the system identifier can't be queried. Not named via Registry (starts unnamed).
 
-**Drive discovery** (DriveCopySource): on init and on mount events, scans for mounted drives via [`DriveDirs.list_usb_drive_dirs/0`](../../../../lib/chat/data/file/drive_dirs.ex), plus queries the internal drive via `Chat.Repo`. Queries each drive's PG for its system_identifier, builds a map `%{system_id => base_dir}` of other drives' chunk stores (excluding own drive).
+**Drive discovery** (DriveCopySource): other units come from `Chat.Storage.Units.others/1`, and a `source_drive_id` resolves via `Units.by_system_id/1`. It reconnects on `{:unit_up, unit}` / `{:unit_down, unit}` on `"storage"`. No directory scanning or PG queries ([pq_storage_units](pq_storage_units.done.md) §4).
 
 ### 4.5 Lifecycle
 
@@ -372,7 +372,7 @@ For fetch sources: crashed fetch/write tasks are caught by `handle_info({:DOWN, 
 
 #### 4.5.4 Main DB Switch and Upload Routing
 
-[`FileChunkController`](../../../../lib/chat_web/controllers/file_chunk_controller.ex) resolves the active drive via [`ChunkPipeline.active_drive_id/0`](../../../../lib/chat/data/file/chunk_pipeline.ex). [`Chat.Db.Switching.set_default/2`](../../../../lib/chat/db/switching.ex) updates this on switch (when `drive_id` option is provided). In-flight uploads complete on the old drive; new requests route to the new drive.
+[`FileChunkController`](../../../../lib/chat_web/controllers/file_chunk_controller.ex) writes to `Chat.Storage.Default.unit()`. [`Default.switch_to/1`](../../../../lib/chat/storage/default.ex) moves the CubDB queue, repo, upload writer and Electric together ([pq_storage_units](pq_storage_units.done.md) §2.6). In-flight uploads complete on the old unit; new requests route to the new one.
 
 ### 4.6 Source Reconnect Sweep
 

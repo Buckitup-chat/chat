@@ -17,7 +17,7 @@ defmodule Chat.Storage.Links do
 
   Backed by a public ETS table owned by this process.
 
-  See `docs/pq/reqs/files/pq_storage_units.proposed.md` §2.7.4.
+  See `docs/pq/reqs/files/pq_storage_units.done.md` §2.7.4.
   """
 
   use GenServer

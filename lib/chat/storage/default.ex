@@ -8,7 +8,7 @@ defmodule Chat.Storage.Default do
   only setter. Only edges read it (controllers, shapes, `Chat.Db.repo/0`,
   FileFs readers); everything below them takes a `%Unit{}`.
 
-  See `docs/pq/reqs/files/pq_storage_units.proposed.md` §2.6.
+  See `docs/pq/reqs/files/pq_storage_units.done.md` §2.6.
   """
 
   use Toolbox.OriginLog

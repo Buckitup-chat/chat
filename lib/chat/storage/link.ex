@@ -16,7 +16,7 @@ defmodule Chat.Storage.Link do
 
   Status lives in `Chat.Storage.Links`.
 
-  See `docs/pq/reqs/files/pq_storage_units.proposed.md` §2.7.
+  See `docs/pq/reqs/files/pq_storage_units.done.md` §2.7.
   """
 
   alias Chat.Storage.Link.Bootstrap

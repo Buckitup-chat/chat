@@ -9,7 +9,7 @@ defmodule Chat.Storage.LinkRunner do
 
   Options: `link:` (required), `lag_ms:` (lag poll interval, default 5 s).
 
-  See `docs/pq/reqs/files/pq_storage_units.proposed.md` §2.7.4.
+  See `docs/pq/reqs/files/pq_storage_units.done.md` §2.7.4.
   """
 
   use GracefulGenServer

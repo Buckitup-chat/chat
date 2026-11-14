@@ -26,7 +26,7 @@ defmodule Chat.Storage.PlanRunner do
   Options: `plan:` (required), `switch_default:` (fun/1), `eject:` (fun/0),
   `await:` (opts for `Link.await/3`), `link_runner:` (opts for `LinkRunner`).
 
-  See `docs/pq/reqs/files/pq_storage_units.proposed.md` §2.7.3–2.7.4.
+  See `docs/pq/reqs/files/pq_storage_units.done.md` §2.7.3–2.7.4.
   """
 
   use GracefulGenServer

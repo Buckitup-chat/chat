@@ -7,7 +7,7 @@ defmodule Chat.Storage.Units do
   that registered it (the unit's `UnitAnnouncer`) and disappears when that
   process stops.
 
-  See `docs/pq/reqs/files/pq_storage_units.proposed.md` §2.5.
+  See `docs/pq/reqs/files/pq_storage_units.done.md` §2.5.
   """
 
   alias Chat.Storage.Role

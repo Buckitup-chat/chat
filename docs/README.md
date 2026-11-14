@@ -83,6 +83,7 @@ Hard requirements and specs. See [`pq/reqs/CLAUDE.md`](./pq/reqs/CLAUDE.md) for 
 #### Files
 - [PQ files](./pq/reqs/files/pq_files.done.md)
 - [PQ chunk writer](./pq/reqs/files/pq_chunk_writer.done.md)
+- [PQ storage units](./pq/reqs/files/pq_storage_units.done.md)
 - [PQ video streaming](./pq/reqs/files/pq_video_streaming.done.md)
 
 #### Reviews

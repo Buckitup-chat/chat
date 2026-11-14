@@ -21,7 +21,7 @@ defmodule Chat.Storage.Unit do
   PG paths are always derived; whether a PG cluster is actually started there is
   the caller's (platform's) decision.
 
-  See `docs/pq/reqs/files/pq_storage_units.proposed.md` §2.1–2.2.
+  See `docs/pq/reqs/files/pq_storage_units.done.md` §2.1–2.2.
   """
 
   alias Chat.Storage.Role

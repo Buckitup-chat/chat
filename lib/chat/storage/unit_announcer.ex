@@ -11,7 +11,7 @@ defmodule Chat.Storage.UnitAnnouncer do
 
   Returns `:ignore` when there is no system id or the unit's role is already taken.
 
-  See `docs/pq/reqs/files/pq_storage_units.proposed.md` §2.5.
+  See `docs/pq/reqs/files/pq_storage_units.done.md` §2.5.
   """
 
   use GenServer

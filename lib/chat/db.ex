@@ -13,8 +13,6 @@ defmodule Chat.Db do
   alias Chat.Storage.Default
   alias Chat.Storage.Unit
 
-  @db_version "v.10.1"
-
   def list(range, transform), do: Queries.list(db(), range, transform)
   def list({_min, _max} = range), do: Queries.list(db(), range)
   def select({_min, _max} = range, amount), do: Queries.select(db(), range, amount)
@@ -98,7 +96,7 @@ defmodule Chat.Db do
 
   def file_path, do: Unit.internal() |> Unit.path(:cub_db)
 
-  def version_path, do: @db_version
+  defdelegate version_path, to: Unit, as: :cub_version
 
   @doc "Repo of the Default unit (edge)."
   def repo, do: Default.unit() |> Unit.repo()

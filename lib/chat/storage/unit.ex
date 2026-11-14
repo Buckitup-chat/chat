@@ -26,6 +26,9 @@ defmodule Chat.Storage.Unit do
 
   alias Chat.Storage.Role
 
+  # CubDB generation; bumping it starts a fresh CubDB next to the old one
+  @cub_version "v.10.1"
+
   @enforce_keys [:id, :role, :root]
   defstruct [:id, :role, :root, :system_id]
 
@@ -60,8 +63,8 @@ defmodule Chat.Storage.Unit do
   def path(%__MODULE__{} = unit, resource) do
     segment =
       case resource do
-        :cub_db -> Chat.Db.version_path()
-        :cub_files -> Chat.Db.version_path() |> cub_files_dir()
+        :cub_db -> @cub_version
+        :cub_files -> @cub_version |> cub_files_dir()
         :pg -> "pg"
         :pq_files -> "pq_files"
         :electric -> "electric"
@@ -69,6 +72,10 @@ defmodule Chat.Storage.Unit do
 
     [unit.root, role_dir(unit), segment] |> Path.join()
   end
+
+  @doc "CubDB generation dir name, e.g. `\"v.10.1\"`."
+  @spec cub_version() :: String.t()
+  def cub_version, do: @cub_version
 
   @doc """
   FileFs dir that sits next to a CubDB data dir. For running databases whose

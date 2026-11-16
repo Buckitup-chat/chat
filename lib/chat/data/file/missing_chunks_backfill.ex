@@ -6,6 +6,7 @@ defmodule Chat.Data.File.MissingChunksBackfill do
 
   import Ecto.Query
 
+  alias Chat.Data.File, as: FileData
   alias Chat.Data.File.ChunkStore
   alias Chat.Data.Schemas.MissingChunk
   alias Chat.Storage.Unit
@@ -20,15 +21,32 @@ defmodule Chat.Data.File.MissingChunksBackfill do
   def run(opts) do
     %Unit{} = unit = Keyword.fetch!(opts, :unit)
     repo = Unit.repo(unit)
-    now = TimeKeeper.now_unix()
 
-    file_ids = active_file_ids(repo)
-    count = backfill_files(file_ids, unit, now, repo)
+    filled = fill_placeholders(repo)
+    backfilled = backfill(unit, repo)
 
-    if count > 0 do
-      log("Backfilled #{count} missing_chunks entries", :info)
+    if filled + backfilled > 0 do
       Phoenix.PubSub.broadcast(Chat.PubSub, "chunk_pipeline", {:chunk_pipeline, :backfill_done})
     end
+  end
+
+  defp fill_placeholders(repo) do
+    FileData.fill_missing_chunks_from_file_chunks(repo: repo)
+    |> elem(0)
+    |> tap(&log_count(&1, "Filled #{&1} placeholder missing_chunks"))
+  end
+
+  defp backfill(unit, repo) do
+    now = TimeKeeper.now_unix()
+
+    repo
+    |> active_file_ids()
+    |> backfill_files(unit, now, repo)
+    |> tap(&log_count(&1, "Backfilled #{&1} missing_chunks entries"))
+  end
+
+  defp log_count(count, message) do
+    if count > 0, do: log(message, :info)
   end
 
   defp active_file_ids(repo) do

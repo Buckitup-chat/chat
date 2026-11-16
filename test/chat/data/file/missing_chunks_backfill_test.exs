@@ -1,6 +1,7 @@
 defmodule Chat.Data.File.MissingChunksBackfillTest do
   use ChatWeb.DataCase, async: true
 
+  alias Chat.Data.File, as: FileData
   alias Chat.Data.File.ChunkStore
   alias Chat.Data.File.MissingChunksBackfill
   alias Chat.Data.Integrity
@@ -104,6 +105,30 @@ defmodule Chat.Data.File.MissingChunksBackfillTest do
              ) == 1
     end
 
+    test "fills placeholders left without a hash", ctx do
+      file = insert_file(ctx)
+      chunk = insert_chunk(ctx, file.file_id, 0)
+
+      insert_hashless_placeholder(file, 0)
+
+      MissingChunksBackfill.run(unit: ctx.unit)
+
+      assert %MissingChunk{data_hash: hash, size: size} = missing_chunk_of(file)
+
+      assert {hash, size} == {chunk.data_hash, chunk.size}
+    end
+
+    test "placeholders take the hash of a chunk that came before its file", ctx do
+      file = insert_file(ctx)
+      chunk = insert_chunk(ctx, file.file_id, 0)
+
+      FileData.insert_missing_chunks_placeholders(file.file_id, 1, nil, 1_000_000)
+
+      assert %MissingChunk{data_hash: hash} = missing_chunk_of(file)
+
+      assert hash == chunk.data_hash
+    end
+
     test "does nothing when no files exist", _ctx do
       MissingChunksBackfill.run(unit: %Unit{id: :internal, role: :internal, root: "/nonexistent"})
 
@@ -112,6 +137,17 @@ defmodule Chat.Data.File.MissingChunksBackfillTest do
   end
 
   # Helpers
+
+  defp insert_hashless_placeholder(file, index) do
+    Repo.insert_all(MissingChunk, [
+      %{file_id: file.file_id, chunk_index: index, attempts: 1, updated_at: 1}
+    ])
+  end
+
+  defp missing_chunk_of(file) do
+    from(m in MissingChunk, where: m.file_id == ^file.file_id)
+    |> Repo.one!()
+  end
 
   defp insert_file(%{identity: identity, user_hash: user_hash}) do
     file = signed_file(identity, user_hash)

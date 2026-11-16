@@ -111,7 +111,7 @@ defmodule Chat.Storage.Link.Bootstrap do
       rows = Enum.map(batch, &missing_row(&1, from.system_id, now))
 
       repo.insert_all(MissingChunk, rows,
-        on_conflict: {:replace, [:source_drive_id]},
+        on_conflict: {:replace, [:source_drive_id, :data_hash, :size, :attempts]},
         conflict_target: [:file_id, :chunk_index]
       )
       |> elem(0)

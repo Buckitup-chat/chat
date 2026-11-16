@@ -19,9 +19,11 @@ defmodule Chat.Storage.PlanRunner do
   - `{:switch_default, unit}` — the `:switch_default` callback (`Default.switch_to/1`)
   - `:eject` — the `:eject` callback
 
-  A step returning `{:error, _}` halts the plan; `{:partial, _}` and a stalled await
-  are recorded and the plan goes on. When the runner exits, every link it still
-  runs is stopped.
+  A step returning `{:error, _}` (or crashing) halts the plan; `{:partial, _}` and a
+  stalled await are recorded and the plan goes on. Steps other than `:stop` run in a
+  task under `Chat.TaskSupervisor`, so `info/1` answers while a step takes as long as
+  it needs. When the runner exits, the running step is killed and every link it
+  still runs is stopped.
 
   Options: `plan:` (required), `switch_default:` (fun/1), `eject:` (fun/0),
   `await:` (opts for `Link.await/3`), `link_runner:` (opts for `LinkRunner`).
@@ -55,7 +57,8 @@ defmodule Chat.Storage.PlanRunner do
       opts: opts,
       runners: %{},
       results: [],
-      status: :running
+      status: :running,
+      task: nil
     }
   end
 
@@ -69,8 +72,35 @@ defmodule Chat.Storage.PlanRunner do
     {:noreply, %{state | status: :done}}
   end
 
-  def on_msg(:next, %{steps: [step | rest]} = state) do
-    {result, state} = run(step, state)
+  def on_msg(:next, %{steps: [step | _]} = state) do
+    case run(step, state) do
+      {:done, result, state} -> finish(state, result)
+      {:async, job, state} -> {:noreply, %{state | task: start_task(job)}}
+    end
+  end
+
+  def on_msg({ref, result}, %{task: %Task{ref: ref}} = state) do
+    Process.demonitor(ref, [:flush])
+    finish(%{state | task: nil}, result)
+  end
+
+  def on_msg({:DOWN, ref, :process, _pid, reason}, %{task: %Task{ref: ref}} = state),
+    do: finish(%{state | task: nil}, {:error, {:step_crashed, reason}})
+
+  # Steps run in a task, so replies meant for them can land there; anything
+  # else that reaches this process is ignored
+  def on_msg(_msg, state), do: {:noreply, state}
+
+  @impl GracefulGenServer
+  def on_exit(_reason, %{runners: runners, task: task}) do
+    kill_step(task)
+    runners |> Map.values() |> Enum.each(&stop_runner/1)
+  end
+
+  defp kill_step(nil), do: :ok
+  defp kill_step(%Task{} = task), do: Task.shutdown(task, :brutal_kill)
+
+  defp finish(%{steps: [step | rest]} = state, result) do
     state = %{state | steps: rest, results: [{step, result} | state.results]}
 
     case result do
@@ -84,25 +114,31 @@ defmodule Chat.Storage.PlanRunner do
     end
   end
 
-  # Steps run in this process, so replies meant for them can land here
-  # (e.g. Electric's startup messages from `Default.switch_to/1`)
-  def on_msg(_msg, state), do: {:noreply, state}
-
-  @impl GracefulGenServer
-  def on_exit(_reason, %{runners: runners}) do
-    runners |> Map.values() |> Enum.each(&stop_runner/1)
-  end
-
+  # Link runners and their bookkeeping stay in this process; only the
+  # (possibly long) work runs in a task, so `info/1` and stopping stay prompt
   defp run(step, state) do
     case step do
-      {:bootstrap, link} -> with_runner(state, link, &LinkRunner.bootstrap/1)
-      {:replicate, link} -> with_runner(state, link, &LinkRunner.replicate/1)
-      {:stop, link} -> {:ok, stop_link(state, link)}
-      {:await, links, :chunks} -> {Link.await(links, :chunks, state.opts[:await] || []), state}
-      {:switch_default, unit} -> {callback(state, :switch_default, [unit]), state}
-      :eject -> {callback(state, :eject, []), state}
+      {:bootstrap, link} ->
+        with_runner(state, link, &LinkRunner.bootstrap/1)
+
+      {:replicate, link} ->
+        with_runner(state, link, &LinkRunner.replicate/1)
+
+      {:stop, link} ->
+        {:done, :ok, stop_link(state, link)}
+
+      {:await, links, :chunks} ->
+        {:async, fn -> Link.await(links, :chunks, state.opts[:await] || []) end, state}
+
+      {:switch_default, unit} ->
+        {:async, fn -> callback(state, :switch_default, [unit]) end, state}
+
+      :eject ->
+        {:async, fn -> callback(state, :eject, []) end, state}
     end
   end
+
+  defp start_task(job), do: Task.Supervisor.async_nolink(Chat.TaskSupervisor, job)
 
   defp with_runner(state, link, operation) do
     id = Link.id(link)
@@ -118,7 +154,7 @@ defmodule Chat.Storage.PlanRunner do
           {runner, %{state | runners: Map.put(runners, id, runner)}}
       end
 
-    {operation.(runner), state}
+    {:async, fn -> operation.(runner) end, state}
   end
 
   defp stop_link(state, link) do

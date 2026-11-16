@@ -57,7 +57,7 @@ defmodule Chat.Storage.PlanRunnerTest do
       assert_receive {:switched, ^b}, 5_000
       assert_receive :ejected
 
-      assert %{status: :done, results: results} = PlanRunner.info(runner)
+      assert %{status: :done, results: results} = await_info(runner, &(&1.status == :done))
 
       assert [:ok, :ok, :ok, :ok, {:switched, b}, :ejected] ==
                for({_step, result} <- results, do: result)
@@ -76,6 +76,36 @@ defmodule Chat.Storage.PlanRunnerTest do
       assert slot?("backup_from_main")
       stop_supervised!(PlanRunner)
       refute slot?("backup_from_main")
+    end
+
+    test "answers info and stops promptly while a step runs", %{unit_a: a} do
+      test = self()
+
+      switch = fn _unit ->
+        send(test, {:step, self()})
+        receive do: (:go -> :switched)
+      end
+
+      runner =
+        start_supervised!({PlanRunner, plan: [{:switch_default, a}], switch_default: switch})
+
+      assert_receive {:step, step}
+
+      assert %{status: :running, results: []} = PlanRunner.info(runner)
+
+      ref = Process.monitor(step)
+      stop_supervised!(PlanRunner)
+      assert_receive {:DOWN, ^ref, :process, ^step, _}
+    end
+
+    test "a crashing step halts the plan", %{unit_a: a} do
+      runner =
+        start_supervised!(
+          {PlanRunner, plan: [{:switch_default, a}], switch_default: fn _ -> raise "boom" end}
+        )
+
+      assert %{status: {:halted, {:switch_default, ^a}, {:step_crashed, _}}} =
+               await_info(runner, &match?({:halted, _, _}, &1.status))
     end
 
     test "ignores messages its steps did not take", %{unit_a: a} do

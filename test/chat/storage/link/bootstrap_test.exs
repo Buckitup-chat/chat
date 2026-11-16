@@ -5,6 +5,7 @@ defmodule Chat.Storage.Link.BootstrapTest do
 
   alias Chat.Data.File.ChunkStore
   alias Chat.Data.Schemas.FileChunk
+  alias Chat.Data.Schemas.MissingChunk
   alias Chat.Data.Schemas.UserCard
   alias Chat.Storage.Link
   alias Chat.Storage.Link.Bootstrap
@@ -36,6 +37,19 @@ defmodule Chat.Storage.Link.BootstrapTest do
 
       assert :ok = Link.bootstrap(a ~> b)
       assert %{0 => "sys_unit_a"} == Files.missing_sources(UnitBRepo, file_id)
+    end
+
+    test "fills the hash of a placeholder already missing on `to`", %{unit_a: a, unit_b: b} do
+      file_id = Files.file!(UnitARepo, Files.new_file_id(), 1)
+      Files.missing!(UnitBRepo, file_id, 0, nil)
+      UnitBRepo.update_all(MissingChunk, set: [data_hash: nil, size: nil, attempts: 3])
+
+      assert :ok = Link.bootstrap(a ~> b)
+
+      assert %MissingChunk{data_hash: "fd_" <> _, size: size, attempts: 0} =
+               UnitBRepo.one!(MissingChunk)
+
+      assert is_integer(size)
     end
 
     test "nudges the chunk pipelines only when it queued blobs", %{unit_a: a, unit_b: b} do

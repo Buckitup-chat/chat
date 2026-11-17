@@ -99,6 +99,29 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.CryptoTest do
       assert Crypto.parse_and_validate_identity(json) ==
                {:error, "sign_skey does not match sign_pkey"}
     end
+
+    test "refuses crypt and contact public keys paired with other secret keys" do
+      other = identity_keys()
+
+      assert identity_keys()
+             |> Map.put(:crypt_skey, other.crypt_skey)
+             |> identity_json()
+             |> Crypto.parse_and_validate_identity() ==
+               {:error, "crypt_skey does not match crypt_pkey"}
+
+      assert identity_keys()
+             |> Map.put(:contact_skey, other.contact_skey)
+             |> identity_json()
+             |> Crypto.parse_and_validate_identity() ==
+               {:error, "contact_skey does not match contact_pkey"}
+    end
+
+    test "refuses a malformed crypt secret key" do
+      json = identity_json(%{identity_keys() | crypt_skey: ""})
+
+      assert Crypto.parse_and_validate_identity(json) ==
+               {:error, "crypt_skey does not match crypt_pkey"}
+    end
   end
 
   defp identity_keys do

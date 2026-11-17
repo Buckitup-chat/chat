@@ -229,7 +229,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
          {:ok, _} <- validate_identity_format(data),
          {:ok, keys} <- decode_identity_keys(data),
          :ok <- verify_user_hash(data["user_hash"], keys),
-         :ok <- verify_sign_keypair(keys) do
+         :ok <- verify_sign_keypair(keys),
+         :ok <- verify_kem_keypairs(keys) do
       {:ok, build_user_data(data, keys)}
     end
   end
@@ -266,6 +267,23 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
     if EnigmaPq.verify(nonce, signature, sign_pkey), do: :ok, else: {:error, @keypair_mismatch}
   rescue
     _ in [ArgumentError, ErlangError] -> {:error, @keypair_mismatch}
+  end
+
+  defp verify_kem_keypairs(keys) do
+    [crypt: {keys.crypt_pkey, keys.crypt_skey}, contact: {keys.contact_pkey, keys.contact_skey}]
+    |> Enum.find_value(:ok, fn {name, pair} ->
+      if kem_round_trip?(pair),
+        do: nil,
+        else: {:error, "#{name}_skey does not match #{name}_pkey"}
+    end)
+  end
+
+  # ML-KEM implicit rejection: a foreign skey decapsulates to a different secret
+  defp kem_round_trip?({pkey, skey}) do
+    {secret, ciphertext} = EnigmaPq.encapsulate_secret(pkey)
+    secret == EnigmaPq.decapsulate_secret(ciphertext, skey)
+  rescue
+    _ in [ArgumentError, ErlangError] -> false
   end
 
   defp build_user_data(data, keys) do

@@ -39,6 +39,20 @@ defmodule ChatWeb.ElectricShapesTest do
       assert %{"error" => _} = Jason.decode!(conn.resp_body)
     end
 
+    test "rejects ingest-only review_password_candidate", %{conn: conn} do
+      conn = get_shape(conn, "review_password_candidate")
+
+      assert conn.status == 400
+
+      assert %{"error" => ~s(table "review_password_candidate" is not allowed)} =
+               Jason.decode!(conn.resp_body)
+    end
+
+    test "serves right candidates (author reads them to sign)", %{conn: conn} do
+      assert get_shape(conn, "review_post_right_candidate").status == 200
+      assert get_shape(conn, "review_revoke_right_candidate").status == 200
+    end
+
     test "rejects requests without table param", %{conn: conn} do
       conn = get(conn, "/electric/v1/shapes", %{"offset" => "-1"})
 

@@ -35,6 +35,13 @@ defmodule Chat.Data.Shapes do
 
   @syncable @shapes -- @not_syncable
 
+  # Ingest-only: served by /ingest, never by /shapes (holds plaintext review passwords)
+  @not_readable [
+    Chat.Data.Shapes.ReviewPasswordCandidate
+  ]
+
+  @readable @shapes -- @not_readable
+
   @table_shape_names @shapes
                      |> Enum.flat_map(fn shape ->
                        [shape.schema_module() | List.wrap(shape.versions_schema())]
@@ -43,6 +50,13 @@ defmodule Chat.Data.Shapes do
                      |> Map.new()
 
   def all, do: @shapes
+
+  @doc "Tables (main and versions) a client may read through `/shapes`."
+  def readable_tables do
+    @readable
+    |> Enum.flat_map(&[&1.schema_module() | List.wrap(&1.versions_schema())])
+    |> Enum.map(& &1.__schema__(:source))
+  end
 
   def by_name(name) when is_binary(name),
     do: Enum.find(@shapes, &(Atom.to_string(&1.shape_name()) == name))

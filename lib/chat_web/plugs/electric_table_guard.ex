@@ -2,17 +2,13 @@ defmodule ChatWeb.Plugs.ElectricTableGuard do
   @moduledoc """
   Rejects Electric shape requests for tables not in the allowed list.
 
-  Allowed tables are derived at compile time from Chat.Data.Shapes registry,
-  including version schemas.
+  Allowed tables are derived at compile time from `Chat.Data.Shapes.readable_tables/0`
+  (the registry, including version schemas, minus ingest-only tables).
   """
 
   import Plug.Conn
 
-  @allowed_tables Chat.Data.Shapes.all()
-                  |> Enum.flat_map(fn shape ->
-                    [shape.schema_module() | List.wrap(shape.versions_schema())]
-                  end)
-                  |> Enum.map(& &1.__schema__(:source))
+  @allowed_tables Chat.Data.Shapes.readable_tables()
 
   def init(opts), do: opts
 

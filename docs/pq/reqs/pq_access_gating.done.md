@@ -342,6 +342,23 @@ Every route that serves synced data gets the read gate. Otherwise gating `/shape
 
 Not gated: `/status`, `/challenge`, `/read_session`, `/system_identifier`, `/device_identity` (needed before authenticating).
 
+### Ingest-only tables
+
+`/shapes` serves `Chat.Data.Shapes.readable_tables/0`: the registry minus ingest-only tables (`ElectricTableGuard`, `400 table ... is not allowed`). Today that is `review_password_candidate` — it holds the plaintext `password_b64` before the moderation decision, so reading it would bypass pre-moderation. It is still written through `/ingest`.
+
+`review_post_right_candidate` / `review_revoke_right_candidate` stay readable: the author's client reads the envelope in promotion phase 2 to sign it. Their payload is a KEM envelope for the origin.
+
+### Row-level exposure (accepted)
+
+Read gating is **per shape (whole table), not per row**. The client's `where` is not checked, and the server adds no row filter for the session user. This is an accepted design decision (2026-11-18), not a pending item:
+
+- In `open` / `guarded` any client reads every row of every readable table.
+- In `trust` any holder of `device.<sn>.storage.read.<shape>` reads every row of that table.
+
+What is exposed is **metadata, never plaintext content** (content is end-to-end encrypted): who writes to whom, message times, sizes and edit history, receipts, reactions, file sizes and uploaders, user card names, review/origin linkage, right-candidate envelopes. Deployments that need to limit this must run in `trust` and vouch read scopes narrowly.
+
+The acceptance covers metadata only. A table whose rows carry a **secret or a capability** (a password, a bearer nonce) must not be readable through `/shapes`: make it ingest-only, or store only a hash of the secret.
+
 ### HTTP caching
 
 Electric sends `cache-control: public` on shape responses. In `trust` mode the read gate rewrites it to `private` and adds `Vary: Authorization`. Otherwise a shared HTTP cache could serve gated data to an unauthorized client. The frontend service worker does not cache `/api` (Electric long-polls and ingest pass through untouched) and must keep it that way.

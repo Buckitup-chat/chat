@@ -41,7 +41,8 @@ defmodule Chat.Data.PqConformanceTest do
   defp decode_field(%{"t" => "null"}), do: nil
 
   defp build_struct(relation, fields) do
-    module = Map.fetch!(@schema_by_relation, relation)
+    # field atoms exist only once the schema module is loaded
+    module = @schema_by_relation |> Map.fetch!(relation) |> Code.ensure_loaded!()
 
     attrs =
       Map.new(fields, fn {name, spec} ->

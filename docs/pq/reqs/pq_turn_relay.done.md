@@ -432,7 +432,7 @@ stun -s <device-ip> -p 3478
 
 # TURN allocation with the credentials from step 5:
 turnutils_uclient -t -u "<username>" -w "<credential>" <device-ip>
-# => allocate OK, relayed address on the device's IP, relay port in 49152–65535
+# => allocate OK, relayed address on the device's IP, relay port in 49152–50175
 ```
 
 ### On buckitup.xyz

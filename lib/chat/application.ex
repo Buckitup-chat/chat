@@ -50,6 +50,7 @@ defmodule Chat.Application do
         ChatWeb.Presence,
         ChatWeb.RateLimiter,
         Chat.Turn.RateLimiter,
+        Chat.Turn.AllocationTracker,
         # Start the Endpoint (http/https)
         {ChatWeb.Endpoint, phoenix_sync: Phoenix.Sync.plug_opts()},
         # Device relay listeners are driven by platform via Chat.Turn.LanRelay

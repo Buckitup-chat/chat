@@ -1,14 +1,15 @@
 defmodule Chat.Turn.Listener do
   @moduledoc "Single place for stun listener options and add/remove calls"
 
+  alias Chat.Turn.AllocationTracker
   alias Chat.Turn.Auth
   alias Chat.Turn.Config
   alias Chat.Turn.PeerPolicy
 
   @turn_port 3478
+  # The range is the global cap on live allocations (one relay port each)
   @relay_min_port 49_152
-  @relay_max_port 65_535
-  @max_allocations 4
+  @relay_max_port 50_175
   @max_permissions 16
 
   def port, do: @turn_port
@@ -25,10 +26,12 @@ defmodule Chat.Turn.Listener do
       auth_type: :user,
       auth_realm: Config.realm(),
       auth_fun: &Auth.auth_fun/2,
+      hook_fun: &AllocationTracker.hook/2,
       turn_ipv4_address: relay_ip,
       turn_min_port: @relay_min_port,
       turn_max_port: @relay_max_port,
-      turn_max_allocations: @max_allocations,
+      # Ignored by stun 1.2.x; enforced by AllocationTracker
+      turn_max_allocations: AllocationTracker.max_per_user(),
       turn_max_permissions: @max_permissions
     ] ++ PeerPolicy.listener_opts(own_ips, allowed)
   end

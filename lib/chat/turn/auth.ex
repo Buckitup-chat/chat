@@ -1,15 +1,23 @@
 defmodule Chat.Turn.Auth do
   @moduledoc "TURN credential verification for the stun listener's auth_fun callback"
 
+  alias Chat.Turn.AllocationTracker
   alias Chat.Turn.Config
 
-  @spec auth_fun(binary(), binary()) :: binary()
+  @doc """
+  The credential for `username`, or `""` to refuse it. A credential holding
+  `AllocationTracker.max_per_user/0` allocations comes back as expired: stun
+  then refuses its new allocations but keeps refreshing the live ones.
+  """
+  @spec auth_fun(binary(), binary()) :: binary() | {:expired, binary()}
   def auth_fun(username, realm) when is_binary(username) and is_binary(realm) do
     with :ok <- check_realm(realm),
          {:ok, expiry_str, tag} <- parse_username(username),
          {:ok, expiry} <- parse_expiry(expiry_str),
          :ok <- check_not_expired(expiry) do
-      credential(username, tag)
+      username
+      |> credential(tag)
+      |> expire_at_limit(username)
     else
       _ -> <<"">>
     end
@@ -37,6 +45,10 @@ defmodule Chat.Turn.Auth do
 
   defp check_not_expired(expiry) do
     if expiry > System.os_time(:second), do: :ok, else: :error
+  end
+
+  defp expire_at_limit(credential, username) do
+    if AllocationTracker.user_at_limit?(username), do: {:expired, credential}, else: credential
   end
 
   defp credential(username, _tag) do

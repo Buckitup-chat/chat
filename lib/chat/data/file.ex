@@ -147,8 +147,30 @@ defmodule Chat.Data.File do
         }
       end
 
-    use_repo(opts).insert_all(MissingChunk, rows, on_conflict: :nothing)
+    MissingChunk
+    |> use_repo(opts).insert_all(rows, on_conflict: :nothing)
+    |> tap(fn _ -> fill_missing_chunks_from_file_chunks(Keyword.put(opts, :file_id, file_id)) end)
   end
+
+  @doc """
+  Fills `data_hash`/`size` of placeholder rows whose `file_chunks` row is already
+  there. Placeholders and fills come from separate events (file vs chunk
+  replication / sync) in no guaranteed order, and a fill finding no row is lost.
+  `file_id:` narrows it to one file.
+  """
+  def fill_missing_chunks_from_file_chunks(opts \\ []) do
+    from(m in MissingChunk,
+      join: fc in FileChunk,
+      on: fc.file_id == m.file_id and fc.chunk_index == m.chunk_index,
+      where: is_nil(m.data_hash) and not is_nil(fc.data_hash),
+      update: [set: [data_hash: fc.data_hash, size: fc.size]]
+    )
+    |> filter_by_file_id(Keyword.get(opts, :file_id))
+    |> use_repo(opts).update_all([])
+  end
+
+  defp filter_by_file_id(query, nil), do: query
+  defp filter_by_file_id(query, file_id), do: where(query, [m], m.file_id == ^file_id)
 
   def fill_missing_chunk(file_id, chunk_index, data_hash, size, opts \\ []) do
     from(m in MissingChunk,

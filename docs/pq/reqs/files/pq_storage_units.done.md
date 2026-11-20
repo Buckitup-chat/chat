@@ -7,13 +7,22 @@ The system works through two layers:
 - **Default** — the unit the system currently writes to. One pointer, switched atomically.
 - **Targeted** — specific units named explicitly (syncs, copies, per-unit pipelines). They never consult Default.
 
-**Compatibility:** the CubDB generation stays compatible, because its paths are unchanged (§2.2). The PostgreSQL generation (PG clusters, PQ blobs, Electric storage) is dropped and recreated; see §7.
+**Compatibility:** the CubDB generation stays compatible, because its paths are unchanged (§2.2). The PostgreSQL generation (PG clusters, PQ blobs, Electric storage) is moved under the role dir once; see §7.
+
+**Status: done.** Shipped in #797–#809 (merged into `storage_unit`). Still open:
+
+- [#795](https://github.com/Buckitup-chat/chat/issues/795): device check of the backup restore, together with the PQ relocation check (§7.3 step 8).
+- [#796](https://github.com/Buckitup-chat/chat/issues/796): `max_slot_wal_keep_size` safety net.
+
+Where the code differs from the plan below, the difference is noted in place and collected in §10.
 
 Motivating symptom: [#795](https://github.com/Buckitup-chat/chat/issues/795). Backup restore copies PQ rows, but the blobs are never found. The root cause is not a single wrong path: the unit concept is missing, so `DriveCopySource` re-derives unit → dir by globbing `/root/media/sd*` and querying repos, and it only knows the `main_db/…` layout.
 
 ---
 
-## 1. Current State
+## 1. State Before Units
+
+Historical: the layout and flows this change replaced.
 
 ### 1.1 The unit is spread over five unrelated keys
 
@@ -109,14 +118,23 @@ All facets are **pure derivations** of the struct:
 | `Unit.cub_name(u)` | `Chat.Db.InternalDb`, `MainDb`, `BackupDb`, … (one per role — see §2.4) |
 | `Unit.via(u, component)` | registry name for pipeline/stage processes |
 | `Unit.capabilities(u)` | from `Role` (§2.3) |
+| `Unit.internal()`, `Unit.usb(device, role)` | constructors |
+| `Unit.cub_version()` | `"v.10.1"`, the CubDB generation dir |
+| `Unit.cub_files_dir(cub_db_dir)` | `<cub_db_dir>_files`, for a running CubDB whose unit is not at hand |
 
-Exactly one module holds path segments and naming conventions: `Chat.Storage.Unit` (or a `Unit.Layout` submodule). Roots come from one config entry:
+Exactly one module holds path segments and naming conventions: `Chat.Storage.Unit`. Roots come from one config entry:
 
 ```elixir
 config :chat, Chat.Storage,
-  internal_root: "/root",       # priv/db (dev), priv/test_db (test)
+  internal_root: "/root",       # priv (dev, test, standalone)
+  internal_dir: "db",           # optional; "test_db" (test), "data" (standalone, platform host)
   media_root: "/root/media"     # priv/media (host); nil for standalone chat
 ```
+
+`internal_dir` overrides the internal unit's role dir only, so legacy CubDB locations
+(`priv/test_db/v.10.1`, `priv/data/v.10.1`) stay byte-for-byte the same.
+
+`repos: %{id => repo}` pins a repo per unit id; tests use it to run units on `Chat.Test.UnitARepo` / `UnitBRepo`.
 
 This replaces `:cub_db_file`, `:files_base_dir`, `:usb_media_root`, `:internal_root` and platform's `:mount_path_media`. The Mounter reads its target from `Unit.root/1`.
 
@@ -193,7 +211,7 @@ end
 ```
 
 - **Backing:** `Registry`, unique key = `role` (enforces §2.4), value = `%Unit{}`.
-- **Registered** by the unit's `UnitAnnouncer` (renamed `DriveAnnouncer`), the last child of the unit's engine tree. It broadcasts `{:unit_up, unit}` and `{:unit_down, unit}` on `"storage"`.
+- **Registered** by the unit's `UnitAnnouncer` (renamed `DriveAnnouncer`), the last child of the unit's `ChunkPipelineSupervisor`. It broadcasts `{:unit_up, unit}` and `{:unit_down, unit}` on `"storage"`.
 - **Invariant:** a registered unit has all capability engines running.
 
 ### 2.6 Default — the pointer
@@ -216,10 +234,13 @@ end
 7. `DbBrokers.refresh/0`.
 8. Broadcast `{:default_switched, unit}`.
 
-Safety net, independent of this flow: `-c max_slot_wal_keep_size=<N>MB` in `@pg_minimal_settings`. A forgotten slot (Electric or link) is then invalidated instead of filling the disk.
+Safety net, independent of this flow: `-c max_slot_wal_keep_size=<N>MB` in `@pg_minimal_settings`. A forgotten slot (Electric or link) is then invalidated instead of filling the disk. **Not set yet** — tracked in #796.
+
+As built: the Electric steps live in `Chat.Storage.Default.Electric` (`stop/0`, `release/1`, `start/1`). The upload writer is not a separate field: it derives from `Default.unit()`, so steps 3–5 are one `:persistent_term` write plus `Switching.set_default/1`.
 
 - **Storage:** `:persistent_term`.
 - **Removed:** `:files_base_dir`, `:active_drive_id`, `:repo` env keys, `Chat.Db.set_repo/1`, `ChunkPipeline.set_active_drive_id/1`, `Platform.Storage.PhoenixSyncInit` as a separate stage, and `:mode`. `:mode` becomes `Default.unit().role` plus link state (§2.7).
+- **Kept:** the `:flags` env (`backup: true`). `BackupPlan` and `Backup.Starter` still write it; `Platform.Storage.Logic.info/0` and `Chat.Db.StatusPoller` still read it.
 - **Read only at edges:** controllers, shapes, top-level chat API. Code under `Chat.Data.File.*`, `Platform.Storage.*` and `Platform.App.Drive.*` receives a `%Unit{}` and never calls `Default`.
 
 | Edge | Today | After |
@@ -278,6 +299,7 @@ end
 ```
 
 - **`bootstrap`** applies `schemas` and `rows` to `BatchSync`. `missing_chunks` are created only for `FileChunk` rows that made it through.
+- **As built:** only `cub_scope` and `schemas` are applied. `rows` is defined but not applied yet, and no plan uses a filter: cargo and onliners still copy through `Platform.Storage.Copier` (`get_db_keys_from:`), not through a link.
 - **`replicate`** maps the filter to a PG publication row filter (`CREATE PUBLICATION … FOR TABLE t WHERE (…)`, PG ≥ 15). If a predicate is not expressible there, the link is bootstrap-only.
 - **The filter belongs to the link, not the role.** It describes this flow. The same role can receive different scopes from different plans.
 
@@ -333,14 +355,15 @@ def plan(:onliners, internal, onliners), do: [            # with :pg (planned)
 #### 2.7.4 Runtime
 
 ```
-<Role>DbSupervisor (rest_for_one)
-├─ …engines (CubDB, PG, pipeline, UnitAnnouncer)…
-└─ PlanRunner  plan(:main_attach)
-     ├─ LinkRunner internal~>main    bootstrap → replicate → stop
-     └─ LinkRunner main~>internal    bootstrap → replicate
+MainDbSupervisor (rest_for_one)
+├─ …engines (CubDB, ChunkPipelineSupervisor … UnitAnnouncer)…
+└─ MainPlan                          on exit: plan(:main_eject)
+     └─ PlanRunner  plan(:main_attach)
+          ├─ LinkRunner internal~>main    bootstrap → replicate → stop
+          └─ LinkRunner main~>internal    bootstrap → replicate
 ```
 
-- **Placement:** `Link`, `Links`, `PlanRunner`, `LinkRunner` and the plans live in **chat** (`Chat.Storage.*`), next to `Unit`, `Units`, `Default` and the chunk pipeline. Platform only decides *which* plan runs: its scenario supervisors start `{PlanRunner, plan: {:main_attach, internal, main}}`.
+- **Placement:** `Link`, `Links`, `PlanRunner` and `LinkRunner` live in **chat** (`Chat.Storage.*`), next to `Unit`, `Units`, `Default` and the chunk pipeline. **The plans live in platform** (deviation): `Platform.Storage.MainPlan` and `Platform.Storage.BackupPlan` are GracefulGenServers that build the step lists, start `PlanRunner` with the `switch_default:` / `eject:` callbacks, and react to `{:default_switched, _}`. `MainDbSupervisor` and `BackupDbSupervisor` start them as their last child.
 - **`LinkRunner`** (GracefulGenServer) owns one link. `on_exit` → `Link.stop/1`. Eject, crash and restart all clean up through the same path.
 - **`Links` registry**, keyed by `Link.id/1`, holds the status: `:idle | {:bootstrapping, progress} | :replicating | {:awaiting, {done, total}} | :stopped | {:partial, map} | {:error, term}`, plus `lag_bytes` for replicating links.
 
@@ -350,7 +373,7 @@ Links.list()
 #    %{id: {:internal, :backup}, status: {:bootstrapping, %{rows: :done, chunks: {120, 400}}}}]
 ```
 
-It replaces `:flags` (`backup:`, `replication:`), `:mode`, the global `Platform.Storage.Sync` status and `Platform.Storage.Logic.info/0`. Admin UI and LEDs read one place.
+It replaces `:mode` and the global `Platform.Storage.Sync` status. `Platform.Storage.Logic.info/0` stays as a thin view: `Default.unit().role`, `Links.list()`, plus the remaining env flags. `:flags` is not replaced yet (§2.6).
 
 #### 2.7.5 What it replaces
 
@@ -362,32 +385,37 @@ It replaces `:flags` (`backup:`, `replication:`), `:mode`, the global `Platform.
 | `Storage.Logic.do_replicate_to_internal/0` (`Process.whereis(backup)` picks mirrors; `TODO: continuous backup need a way for new changes`) | the set of active links |
 | hardcoded `"internal_to_main"`, `"backup_from_internal"`, … | `Link.name/2` |
 | `ChatBridge.Logic.unmount_main/0` (parses the device from `MainDb`'s CubDB path) | `Units.by_role(:main).id` |
-| onliners/cargo `Copier get_db_keys_from:` | `Link.Filter.cub_scope` |
+| onliners/cargo `Copier get_db_keys_from:` | `Link.Filter.cub_scope` — **not ported yet**, still `Platform.Storage.Copier` |
 
-**Testing:** one host integration test per operation, with `Platform.Test.InternalRepo` / `MainRepo` and temporary `pq_files` dirs. Plans are pure lists, tested as data.
+**Testing:** link operations are tested in chat against two real PG databases (`PgPairCase`, #809) with temporary `pq_files` dirs. Plans are pure lists, tested as data (`MainPlan` / `BackupPlan` tests in platform). Platform tests cannot write to `Chat.Repo`, so a full main/backup flow with data is not covered end to end on host.
 
 ---
 
 ## 3. Unit Lifecycle (boot order)
 
+As built (`Platform.App.Drive.BootSupervisor`):
+
 ```
-Healer → Mount
-  → Resolve   Role.from_mount/1
+Healer → Mount → InternalDbAwaiter
+  → Resolve   (Platform.UsbDrives.Resolver) PqReset.usb (§7.2), then Role.from_mount/1
                 :blank            → maybe optimize_fs (nothing on disk yet) → pick role from MediaSettings → mkdir role_dir   ← role sticks here
                 {:ok, role}       → check cardinality (Units.by_role) — conflict → stop, no engines
                 {:error, multi}   → stop, log
-  → Scenario  dump override (UsbDriveDumpRoom) → dump scenario, no engines
-  → Engines   per Role.capabilities:  :cub → CubDB  ·  :pg → PG init/daemon/db/repo/migrations  ·  :pipeline → ChunkPipelineSupervisor
-  → Announce  query system_id → Units.register → {:unit_up, unit}
-  → Links     run the scenario's link plan (§2.7)
+                dump override (UsbDriveDumpRoom) → dump scenario, no engines
+  → PG        only for roles with :pg — InitPg → PgServer → DbCreated → RepoStarted → MigrationsRun
+  → Decider   starts the scenario supervisor for the role (Decider.scenario/1)
+                CubDB → ChunkPipelineSupervisor (… UnitAnnouncer: Units.register → {:unit_up, unit})
+                → MainPlan / BackupPlan (§2.7.4)
 ```
+
+The resolution (role or dump) is decided in Resolve; `Decider` only maps it to a scenario supervisor.
 
 - `optimize_fs` runs before anything is written, so the blank check is meaningful again and never formats under a live PG.
 - PG starts only for roles with `:pg`. Today that excludes dump, cargo and onliners; onliners joins when its capability flips. PG also never starts for a rejected duplicate role.
-- `BootWatchdog` watches stages keyed by `Unit.via/2`.
+- Stage processes are named by `Platform.UsbDrives.Drive.registry_name/2` (the same registry and key shape as `Unit.via/2`). `BootWatchdog` fingerprints each staged tree: the internal DB tree up to the chunk pipeline, and each drive tree up to `Decider`.
 - Eject reverses the order: links stop → `Default.switch_to(internal)` if needed → unregister → engines stop.
 
-The internal unit follows the same sequence. Its root and role are fixed (`/root`, `:internal`), and there is no mount or resolve step.
+The internal unit follows the same sequence in `Platform.App.DatabaseSupervisor`. Its root and role are fixed (`/root`, `:internal`), and there is no mount or resolve step; `PqReset` runs as its first stage.
 
 ---
 
@@ -407,13 +435,15 @@ Functions that act on a unit take `%Unit{}` as the **first** argument. There is 
 | CubDB `Copying.Progress`, `WriteQueue.ReadStream`, `Pipeline.Writer` | `CubDB.data_dir(db) <> "_files"` | `Unit.path(unit, :cub_files)` |
 | `Chat.Debug` | own `pq_files` join | `Unit.path(unit, :pq_files)` |
 
-**Deleted:** `Chat.Data.File.DriveDirs`, `Dev.path/3`, `Platform.Storage.Sync` (absorbed by `Link`), `Platform.Storage.PhoenixSyncInit` (absorbed by `Default.switch_to/1`), every `<> "_files"`, hardcoded publication/slot/subscription strings.
+**Deleted:** `Chat.Data.File.DriveDirs`, `Dev.path/3`, `Platform.Storage.Sync` (absorbed by `Link`), `Platform.Storage.PhoenixSyncInit` (absorbed by `Default.switch_to/1`), `InternalToMain.Copier` / `Switcher`, `Backup.Copier`, `Backup.ChunkAwaiter` (→ `Chat.Storage.Link.ChunkAwait`), every `<> "_files"` outside `Unit.cub_files_dir/1`, hardcoded publication/slot/subscription strings.
+
+**Kept:** `Platform.Storage.Backup.Starter` (backup, cargo, onliners and dump supervisors still start through it), `Platform.Storage.Copier` (scoped CubDB copy for cargo/onliners), `Platform.Storage.Logic.info/0` (now a view over `Default` and `Links`).
 
 ---
 
 ## 5. Invariants
 
-1. **Only `Chat.Storage.Unit` / `Role` / `Link` contain** path segments (`"pg"`, `"pq_files"`, `"_files"`, `"_db"`, version) and link-name strings. A test greps `lib/` of chat and platform for these literals.
+1. **Only `Chat.Storage.Unit` / `Role` / `Link` contain** path segments (`"pg"`, `"pq_files"`, `"_files"`, `"_db"`, version) and link-name strings. `test/chat/storage/literal_invariant_test.exs` checks the string literals in the AST of chat `lib/` and `../platform/lib` (docs and comments excluded). `Platform.Storage.PqReset` is allowed too: it holds the legacy segments.
 2. **At most one registered unit per role.** Exactly one internal.
 3. **A registered unit has all its capability engines running.** If it has `:pg`, its `system_id` is non-nil.
 4. **`Default.unit()` is always a registered unit.** CubDB queue, repo, upload writer and Electric always point at it. They never diverge observably.
@@ -423,56 +453,65 @@ Functions that act on a unit take `%Unit{}` as the **first** argument. There is 
 
 ---
 
-## 6. Follow-ups Unlocked (separate issues)
+## 6. Follow-ups Unlocked
 
-- **#795:** backup → Default blobs. Comes from `Link.bootstrap` (invariant 6) plus `Units.by_system_id`.
-- **`ChunkAwaiter`:** await both `to` units. "Present" means the blob is on disk, not "no missing_chunks row".
-- **Upload/manifest split window:** closed by invariant 4.
-- **Continuous backup:** a `default ~> backup` link that re-homes on Default switch (§2.7.3), instead of hardcoded `Chat.Repo` / `Switching.mirror(Chat.Db.MainDb, …)`.
-- **Replicated chunk source:** `ReplicationListener` stamps `from.system_id` registered by `Link.replicate/1` instead of its own id (§1.6).
-- **`DriveCopySource` fallback:** iterate `Units.others/1` instead of picking one random dir.
-- **Idle Electric slots retain WAL** (§1.6). Can ship before this refactor: stop pre-creating `electric_slot_default` on non-Default units, drop it on the unit left behind, and set `max_slot_wal_keep_size`.
+Status as of the merge into `storage_unit`.
 
-## 7. Migration — keep CubDB, drop PostgreSQL
+- **#795:** backup → Default blobs. Comes from `Link.bootstrap` (invariant 6) plus `Units.by_system_id`. **Done in code** (#807, plus a `{:chunk_pipeline, :pg_diff_copied}` nudge after bootstrap so `DriveCopySource` does not wait for its hourly poll); device check pending.
+- **`ChunkAwaiter`:** await both `to` units. **Done**: `Link.await(links, :chunks)` (`Chat.Storage.Link.ChunkAwait`) waits on every link of the step. It still counts `missing_chunks` rows per source, not blobs on disk.
+- **Upload/manifest split window:** closed by invariant 4. **Done** (#804).
+- **Continuous backup:** a `default ~> backup` link that re-homes on Default switch (§2.7.3), instead of hardcoded `Chat.Repo` / `Switching.mirror(Chat.Db.MainDb, …)`. **Done** (#807, `BackupPlan`).
+- **Replicated chunk source:** `ReplicationListener` stamps `from.system_id` registered by `Link.replicate/1` instead of its own id (§1.6). **Done**: `Links.replication_source/1`.
+- **`DriveCopySource` fallback:** iterate `Units.others/1` instead of picking one random dir. **Done** (#802).
+- **Idle Electric slots retain WAL** (§1.6). Can ship before this refactor: stop pre-creating `electric_slot_default` on non-Default units, drop it on the unit left behind, and set `max_slot_wal_keep_size`. **Partly done**: `MigrationRunner` no longer pre-creates the slot and `Default.Electric.release/1` drops it on the unit left behind; `max_slot_wal_keep_size` is still open (#796).
+
+## 7. Migration — keep CubDB, relocate PostgreSQL
 
 ### 7.1 Compatibility
 
 | Generation | Policy | Why it works |
 |---|---|---|
 | CubDB (`v.10.1`, `v.10.1_files`) | **kept** | paths are identical: internal `role_dir = "db"` → `/root/db/v.10.1`; USB `<mount>/<role>_db/v.10.1`. `@db_version` unchanged. `Bouncer` / `DbType`, `Copying`, `Switching.mirror` unchanged. |
-| PostgreSQL (`pg`, `pq_files`, Electric storage) | **dropped** | early stage; recreated on first boot by Engines + migrations |
+| PostgreSQL (`pg`, `pq_files`, Electric storage) | **moved** under the role dir | one-time relocation (§7.2). Port and socket dir derive from the device, not the path, so the moved cluster starts as is. Whatever has no home is dropped and recreated by Engines + migrations |
 
 Rules that keep existing CubDB drives working:
 
 - **Role resolution accepts legacy multi-role drives.** If several `*_db` dirs exist, keep the current priority (cargo > onliners > backup > main). Return `{:error, :multiple_roles}` only when more than one of them contains `pg/`.
-- **Blank detection** stays "mount root is empty". A legacy drive with only `<mount>/pg` gets that dir removed by the reset below, then is treated as blank.
+- **Blank detection** stays "mount root is empty". A legacy drive with only `<mount>/pg` has no role dir, so the relocation below removes that dir and the drive is treated as blank.
 - **CubDB copy order inside `Link.bootstrap/1`** is exactly the current `Copying.await_copied` / `Switching.mirror` sequence. Only the PG and blob halves are new.
 - **CubDB process names** (`Chat.Db.MainDb`, …) are runtime-only. Deriving them via `Unit.cub_name/1` has no on-disk effect.
 
-### 7.2 One-time PQ reset
+### 7.2 One-time PQ relocation
 
-A step in Resolve (§3) runs before engines start. It is idempotent and is removed once the fleet is migrated.
+A step in Resolve (§3) runs before engines start (`Platform.Storage.PqReset`). It is idempotent, because it only touches legacy locations, and it is removed once the fleet is migrated.
 
-| Unit | Removes |
-|---|---|
-| internal | `/root/pg`, `/root/db/v.10.1_files/pq_files`, `/root/electric` |
-| USB | `<mount>/pg`, `<mount>/<role_dir>/v.10.1_files/pq_files` |
+| Unit | Legacy | Moved to |
+|---|---|---|
+| internal | `/root/pg` | `/root/db/pg` |
+| internal | `/root/db/v.10.1_files/pq_files` | `/root/db/pq_files` |
+| internal | `/root/electric` | `/root/db/electric` |
+| USB | `<mount>/pg` | `<mount>/<role_dir>/pg` |
+| USB | `<mount>/<role_dir>/v.10.1_files/pq_files` | `<mount>/<role_dir>/pq_files` |
 
-Removing `pq_files` from inside `v.10.1_files` also cleans the CubDB generation. FileFs walks `v.10.1_files/<hc>/<key>` two levels deep (`list_all_db_keys/1`, `list_file_errors/1`). Today it descends into `pq_files/<shard>/f_…` too, and only a `rescue` keeps it from crashing.
+- A USB cluster goes to the role the drive resolves to (`Role.from_mount/1`). Blobs are relocated in every role dir, so a legacy multi-role drive is handled too.
+- The role dir is chmodded `0755` after a move so postgres can traverse it, as `Lifecycle.Init` does for a fresh cluster.
+- **Removed instead** when a legacy location has no home: the role lacks the capability (cargo, onliners), the drive has no role dir, the unit already has its own copy, or the rename fails (e.g. across filesystems). Only data removed this way is lost; it is recreated empty by Engines + migrations.
 
-**Lost by the reset:** everything that exists only in PQ — PQ users (`UserCard`), PQ-uploaded files, vouch tokens, reviews, origins. Electric clients get 409 / must-refetch and resync against the empty stack.
+Moving `pq_files` out of `v.10.1_files` also cleans the CubDB generation. FileFs walks `v.10.1_files/<hc>/<key>` two levels deep (`list_all_db_keys/1`, `list_file_errors/1`). Today it descends into `pq_files/<shard>/f_…` too, and only a `rescue` keeps it from crashing.
+
+**Preserved by the relocation:** PQ users (`UserCard`), PQ-uploaded files, vouch tokens, reviews, origins, and the Electric cache.
 
 ### 7.3 Steps
 
-0. **Move PG tooling to chat:** `BatchSync`, `LogicalReplicator` → `Chat.Storage.Pg.*`.
-1. **Model:** `Unit`, `Role`, `Units`, `Default`, `Link` with pure unit tests (derivation table per role × resource, host/target roots, link names).
-2. **Platform boot:** Resolve → Scenario → Engines → Announce → Links. `Decider` splits into role resolution and scenario choice.
-3. **Chunk pipeline + `ChunkStore` on `%Unit{}`.** Delete `DriveDirs`.
-4. **`Default.switch_to/1`.** Remove the env keys, `set_repo`, `set_active_drive_id`, `PhoenixSyncInit`.
-5. **`Link`.** Port the main and backup scenarios to link plans. Delete `Storage.Sync`, `Backup.Copier.sync_pg/1` and `InternalToMain.Copier.sync_pg_to_main/1`.
-6. **CubDB file paths via `Unit`.**
-7. **Literal-grep invariant test.**
-8. **PQ reset step (§7.2).** Verify on a device with a legacy main drive and a legacy backup drive that CubDB data and files survive and the PQ generation rebuilds.
+0. **Move PG tooling to chat:** `BatchSync`, `LogicalReplicator` → `Chat.Storage.Pg.*`. — ✅ #797
+1. **Model:** `Unit`, `Role`, `Units`, `Default`, `Link` with pure unit tests (derivation table per role × resource, host/target roots, link names). — ✅ #798, #799, #804, #805
+2. **Platform boot:** Resolve → Scenario → Engines → Announce → Links. `Decider` splits into role resolution and scenario choice. — ✅ #800
+3. **Chunk pipeline + `ChunkStore` on `%Unit{}`.** Delete `DriveDirs`. — ✅ #802
+4. **`Default.switch_to/1`.** Remove the env keys, `set_repo`, `set_active_drive_id`, `PhoenixSyncInit`. — ✅ #804
+5. **`Link`.** Port the main and backup scenarios to link plans. Delete `Storage.Sync`, `Backup.Copier.sync_pg/1` and `InternalToMain.Copier.sync_pg_to_main/1`. — ✅ #805, #806, #807
+6. **CubDB file paths via `Unit`.** — ✅ #801
+7. **Literal-grep invariant test.** — ✅ #808
+8. **PQ relocation step (§7.2).** Verify on a device with a legacy main drive and a legacy backup drive that CubDB data and files survive, and that PQ data, blobs and Electric storage are moved under the role dir and stay readable. — code ✅ #803; device verification not done yet
 
 ## 8. Decisions
 
@@ -489,5 +528,17 @@ Removing `pq_files` from inside `v.10.1_files` also cleans the CubDB generation.
 - **Onliners filter contents:** which schemas and row predicates define the onliners scope in PG terms, and whether they are expressible as publication row filters (otherwise onliners stays bootstrap-only).
 - **Internal overflow vs `main ~> internal` (out of scope).** Internal (SD) tends to overflow while running on main. A full disk makes the `main ~> internal` subscription fail. Internal PG may then halt on apply errors, and the slot on main retains WAL until `max_slot_wal_keep_size` invalidates it (#796). This is likely addressed by a separate rollover/retention plan (deleting old data on internal), possibly combined with a `filter` on that link (§2.7.2). This proposal only requires that the link surfaces it as `{:error, :disk_full}` in `Links` rather than failing silently.
 - **Cargo:** CubDB-only for now. If it gains `:pg`, it follows the same path as onliners.
-- **Electric `storage_dir` on reinit:** verify that `Phoenix.Sync.Application.children/0` picks up a changed `storage_dir` from app env (today `PhoenixSyncReinit` only updates `:repo` and `:connection_opts`). If not, pass it explicitly when building the stack children.
+- ~~**Electric `storage_dir` on reinit**~~ — resolved: `Phoenix.Sync.Application.children/0` reads the whole `:phoenix_sync` env, so `Default.Electric` puts `:repo`, `:connection_opts` and `:storage_dir` there before starting the stack.
 - **`max_slot_wal_keep_size` value:** it must exceed the worst-case gap for a legitimate link slot (e.g. a backup drive reconnecting), yet stay well below free space on SD. Tracked in [#796](https://github.com/Buckitup-chat/chat/issues/796).
+
+## 10. As Built — Deviations
+
+| Plan | Shipped |
+|---|---|
+| Plans live in chat (§2.7.4) | Plans live in platform: `Platform.Storage.MainPlan`, `Platform.Storage.BackupPlan`. Chat holds `Link`, `Links`, `PlanRunner`, `LinkRunner`. |
+| `Links` replaces `:flags` and `Logic.info/0` (§2.7.4) | `:flags` (`backup: true`) is still written by `BackupPlan` and `Backup.Starter`. `Logic.info/0` remains as a view over `Default` + `Links`. |
+| `Link.Filter` narrows all three layers (§2.7.2) | Only `cub_scope` and `schemas` are applied; `rows` is not. Cargo and onliners still use `Platform.Storage.Copier`, not links. |
+| `UnitAnnouncer` is the last child of the engine tree (§2.5) | It is the last child of `ChunkPipelineSupervisor`. |
+| Stage names via `Unit.via/2` (§3) | Via `Platform.UsbDrives.Drive.registry_name/2`, same registry and key shape. |
+| `max_slot_wal_keep_size` safety net (§2.6) | Not set; #796. |
+| `Backup.Starter` deleted with the backup port | Kept: the backup, cargo, onliners and dump supervisors still start through it. |

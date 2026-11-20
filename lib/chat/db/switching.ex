@@ -24,18 +24,17 @@ defmodule Chat.Db.Switching do
     WriteQueue.set_mirrors(nil, to_queue)
   end
 
-  def set_default(name, opts \\ []) do
+  @doc "Stops mirroring writes of `from` anywhere."
+  def unmirror(from), do: WriteQueue.set_mirrors(nil, Common.names(from, :queue))
+
+  @doc "Points the CubDB read pid and write queue at `name`. Called by `Chat.Storage.Default.switch_to/1`."
+  def set_default(name) do
     queue_name = Common.names(name, :queue)
     status_relay_name = Common.names(name, :status)
 
     Common.put_chat_db_env(:data_queue, queue_name)
     Common.put_chat_db_env(:data_pid, name)
-    Common.put_chat_db_env(:files_base_dir, CubDB.data_dir(name) <> "_files")
     Common.put_chat_db_env(:data_dry, status_relay_name)
-
-    if drive_id = opts[:drive_id] do
-      Common.put_chat_db_env(:active_drive_id, drive_id)
-    end
 
     Chat.Ordering.reset()
   end

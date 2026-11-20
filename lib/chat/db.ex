@@ -10,9 +10,8 @@ defmodule Chat.Db do
   alias Chat.Db.Queries
   alias Chat.Db.WriteQueue
   alias Chat.Db.WriteQueue.FileReader
-
-  @db_version "v.10.1"
-  @db_location Application.compile_env(:chat, :cub_db_file, "priv/data")
+  alias Chat.Storage.Default
+  alias Chat.Storage.Unit
 
   def list(range, transform), do: Queries.list(db(), range, transform)
   def list({_min, _max} = range), do: Queries.list(db(), range)
@@ -41,6 +40,9 @@ defmodule Chat.Db do
   end
 
   def queue, do: :data_queue |> get_chat_db_env()
+
+  @doc "Child specs of a CubDB with its queue and pipeline, at a unit's `:cub_db` path or a raw path."
+  def supervise(db_name, %Unit{} = unit), do: supervise(db_name, Unit.path(unit, :cub_db))
 
   def supervise(db_name, path) do
     %{
@@ -88,20 +90,16 @@ defmodule Chat.Db do
        status_relay: dry_relay_name,
        write_supervisor: write_supervisor,
        db: db_name,
-       files_path: path <> "_files"}
+       files_path: Unit.cub_files_dir(path)}
     ]
   end
 
-  def file_path do
-    data_dir = Application.get_env(:chat, :cub_db_file, @db_location)
-    "#{data_dir}/#{@db_version}"
-  end
+  def file_path, do: Unit.internal() |> Unit.path(:cub_db)
 
-  def version_path, do: @db_version
+  defdelegate version_path, to: Unit, as: :cub_version
 
-  def repo do
-    Application.get_env(:chat, :repo, Chat.Repo)
-  end
+  @doc "Repo of the Default unit (edge)."
+  def repo, do: Default.unit() |> Unit.repo()
 
   def repo_ready? do
     repo_ready?(repo())
@@ -121,17 +119,6 @@ defmodule Chat.Db do
     :exit, _ -> false
   end
 
-  def set_repo(repo) do
-    current_repo = repo()
-
-    with pid <- Process.whereis(repo),
-         true <- is_pid(pid),
-         true <- Process.alive?(pid) do
-      Application.put_env(:chat, :repo, repo)
-      maybe_reinit_phoenix_sync(current_repo, repo)
-    end
-  end
-
   defp repo_query_ok?(repo) do
     case repo.query("SELECT 1", []) do
       {:ok, _} -> true
@@ -141,18 +128,5 @@ defmodule Chat.Db do
     _ -> false
   catch
     :exit, _ -> false
-  end
-
-  defp maybe_reinit_phoenix_sync(repo, repo), do: :ok
-
-  defp maybe_reinit_phoenix_sync(_previous_repo, _current_repo) do
-    case Chat.PhoenixSyncReinit.reinit() do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        log("Phoenix.Sync reinit failed after repo switch: #{inspect(reason)}", :error)
-        {:error, reason}
-    end
   end
 end

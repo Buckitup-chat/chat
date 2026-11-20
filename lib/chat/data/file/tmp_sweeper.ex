@@ -4,17 +4,18 @@ defmodule Chat.Data.File.TmpSweeper do
   @behaviour :gen_statem
 
   alias Chat.Data.File.ChunkStore
+  alias Chat.Storage.Unit
 
   @registry Chat.Data.File.ChunkPipelineRegistry
   @interval :timer.hours(1)
 
   def start_link(opts) do
-    drive_id = Keyword.fetch!(opts, :drive_id)
+    %Unit{id: drive_id} = Keyword.fetch!(opts, :unit)
     :gen_statem.start_link(via(drive_id), __MODULE__, opts, [])
   end
 
   def child_spec(opts) do
-    drive_id = Keyword.fetch!(opts, :drive_id)
+    %Unit{id: drive_id} = Keyword.fetch!(opts, :unit)
 
     %{
       id: {__MODULE__, drive_id},
@@ -27,12 +28,12 @@ defmodule Chat.Data.File.TmpSweeper do
 
   @impl true
   def init(opts) do
-    data = %{base_dir: Keyword.get(opts, :base_dir)}
+    data = %{unit: Keyword.fetch!(opts, :unit)}
     {:ok, :sweeping, data, [{:next_event, :internal, :sweep}]}
   end
 
   def sweeping(:internal, :sweep, data) do
-    ChunkStore.sweep_tmp_files(@interval, data.base_dir)
+    ChunkStore.sweep_tmp_files(data.unit, @interval)
     {:next_state, :cooldown, data, [{:state_timeout, @interval, :sweep}]}
   end
 

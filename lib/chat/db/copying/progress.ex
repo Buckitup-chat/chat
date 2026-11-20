@@ -6,6 +6,7 @@ defmodule Chat.Db.Copying.Progress do
   require Logger
 
   alias Chat.Db.WriteQueue.FileSkipSet
+  alias Chat.Storage.Unit
 
   defstruct file_keys: [],
             data_keys: [],
@@ -120,7 +121,7 @@ defmodule Chat.Db.Copying.Progress do
   defp eliminate_written_files(%__MODULE__{file_keys: []} = state), do: state
 
   defp eliminate_written_files(%__MODULE__{file_keys: file_keys, db: db} = state) do
-    path = CubDB.data_dir(db) <> "_files"
+    path = db |> CubDB.data_dir() |> Unit.cub_files_dir()
 
     file_keys
     |> Enum.reject(fn {:file_chunk, file_key, a, b} ->

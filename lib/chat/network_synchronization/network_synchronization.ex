@@ -1,7 +1,6 @@
 defmodule Chat.NetworkSynchronization do
   @moduledoc "Network synchronisation"
 
-  alias Chat.Data.File.ChunkPipeline
   alias Chat.NetworkSynchronization.Electric.DeferredStore
   alias Chat.NetworkSynchronization.Electric.PeerConnector
   alias Chat.NetworkSynchronization.Source
@@ -190,7 +189,7 @@ defmodule Chat.NetworkSynchronization do
   end
 
   defp safe_active_drive_id do
-    ChunkPipeline.active_drive_id()
+    Chat.Storage.Default.unit().id
   rescue
     _ -> nil
   end

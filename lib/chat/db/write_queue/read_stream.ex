@@ -8,6 +8,7 @@ defmodule Chat.Db.WriteQueue.ReadStream do
 
   alias Chat.Db.Common
   alias Chat.Db.WriteQueue.FileReader
+  alias Chat.Storage.Unit
 
   Record.defrecord(:read_stream,
     db: nil,
@@ -85,7 +86,7 @@ defmodule Chat.Db.WriteQueue.ReadStream do
     {keys, new_list} = take_portion(list, [], 100)
     db_pid = Process.whereis(db)
     true = is_pid(db_pid) and Process.alive?(db_pid)
-    files_path = CubDB.data_dir(db) <> "_files"
+    files_path = db |> CubDB.data_dir() |> Unit.cub_files_dir()
     file_reader = file_reader(db)
 
     {file_keys, db_keys} =

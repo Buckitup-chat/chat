@@ -3,178 +3,133 @@ defmodule Chat.Data.File.DriveCopySourceTest do
 
   import Rewire
 
+  alias Chat.Data.File.ChunkStore
   alias Chat.Data.File.DriveCopySource
+  alias Chat.Data.Types.FileChunkDataHash
+  alias Chat.Storage.Unit
+  alias Chat.Storage.Units
+
+  @body "chunk body"
+  @file_id "f_00000000000000000000000000000abc"
 
   defmodule DbMock do
     def repo_ready?(_), do: false
-    def repo, do: __MODULE__
   end
 
   defmodule FileDataMock do
     def fetchable_missing_chunks_for_copy(_, _, _), do: []
     def missing_chunks_for_drive(_, _), do: []
     def delete_missing_chunk(_, _, _), do: :ok
-    def increment_missing_chunk_attempts(_, _, _, _), do: :ok
-    def get_missing_chunk_hash(_, _, _), do: "fd_" <> String.duplicate("ab", 64)
+
+    def increment_missing_chunk_attempts(file_id, chunk_index, _, _),
+      do: send(:dcs_test, {:failed, file_id, chunk_index})
+
+    def get_missing_chunk_hash(_, _, _),
+      do: "chunk body" |> EnigmaPq.hash() |> FileChunkDataHash.from_binary()
   end
 
   defmodule WriterMock do
-    def submit(_, _, _, _), do: :ok
-  end
-
-  defmodule ChunkStoreMock do
-    def fetch(_file_id, _chunk_index, base_dir) do
-      Agent.update(:dcs_test_calls, &[base_dir | &1])
-
-      if base_dir == Agent.get(:dcs_test_fail_dir, & &1) do
-        {:error, :enoent}
-      else
-        {:ok, "mock_body"}
-      end
+    def submit(drive_id, lane, body, meta) do
+      send(:dcs_test, {:submitted, drive_id, lane, body, meta})
+      :ok
     end
   end
 
   rewire(DriveCopySource, [
     {Chat.Db, DbMock},
     {Chat.Data.File, FileDataMock},
-    {Chat.Data.File.ChunkWriter, WriterMock},
-    {Chat.Data.File.ChunkStore, ChunkStoreMock}
+    {Chat.Data.File.ChunkWriter, WriterMock}
   ])
 
-  @drive_id "test_drive_#{System.unique_integer([:positive])}"
+  # Stands in for the internal unit; the real one is up in the test env under id :internal
+  @own %Unit{id: "sdo1", role: :internal, root: "/nonexistent"}
 
   setup do
-    unless Process.whereis(Chat.TaskSupervisor),
-      do: start_supervised!({Task.Supervisor, name: Chat.TaskSupervisor})
+    Process.register(self(), :dcs_test)
 
-    start_supervised!(%{
-      id: :dcs_test_calls,
-      start: {Agent, :start_link, [fn -> [] end, [name: :dcs_test_calls]]}
-    })
+    tmp_dir = System.tmp_dir!() |> Path.join("dcs_test_#{System.unique_integer([:positive])}")
+    on_exit(fn -> File.rm_rf!(tmp_dir) end)
 
-    start_supervised!(%{
-      id: :dcs_test_fail_dir,
-      start: {Agent, :start_link, [fn -> nil end, [name: :dcs_test_fail_dir]]}
-    })
+    {:ok, pid} = GenServer.start_link(DriveCopySource, unit: @own)
+    on_exit(fn -> if Process.alive?(pid), do: GenServer.stop(pid, :normal, 1_000) end)
 
-    pid = start_source(@drive_id)
-
-    on_exit(fn ->
-      if Process.alive?(pid), do: GenServer.stop(pid, :normal, 1_000)
-    end)
-
-    %{pid: pid}
+    %{pid: pid, tmp_dir: tmp_dir}
   end
 
-  describe "drive mount/unmount" do
-    test "drive_unmounted removes drive and cancels sweep timer", %{pid: pid} do
-      inject_drive(pid, "sys_id_1", "/mnt/usb1")
+  describe "fetch from other units" do
+    test "fetches a chunk from a registered backup unit", %{pid: pid, tmp_dir: tmp_dir} do
+      backup = register(%Unit{id: "sdb1", role: :backup, root: tmp_dir, system_id: "sys_b"})
+      :ok = ChunkStore.put(backup, @file_id, 0, @body)
 
-      GenServer.cast(pid, {:drive_unmounted, "sys_id_1"})
-      wait_for_cast(pid)
+      GenServer.cast(pid, {:chunk_fetchable, @file_id, 0, "sys_b"})
 
-      state = :sys.get_state(pid)
-      refute Map.has_key?(state.other_drives, "sys_id_1")
-      refute Map.has_key?(state.sweep_timers, "sys_id_1")
+      assert_receive {:submitted, "sdo1", :drive_copy, @body,
+                      %{file_id: @file_id, chunk_index: 0}}
     end
 
-    test "unmount before sweep timer fires prevents sweep", %{pid: pid} do
-      inject_drive(pid, "sys_flap", "/mnt/usb_flap")
+    test "falls back to the other units when the source unit is gone", %{pid: pid, tmp_dir: tmp} do
+      backup = register(%Unit{id: "sdb1", role: :backup, root: tmp, system_id: "sys_b"})
+      :ok = ChunkStore.put(backup, @file_id, 0, @body)
 
-      GenServer.cast(pid, {:drive_unmounted, "sys_flap"})
-      wait_for_cast(pid)
+      GenServer.cast(pid, {:chunk_fetchable, @file_id, 0, "sys_gone"})
 
-      Process.sleep(100)
-
-      state = :sys.get_state(pid)
-      refute Map.has_key?(state.other_drives, "sys_flap")
-      refute Map.has_key?(state.sweep_timers, "sys_flap")
+      assert_receive {:submitted, "sdo1", :drive_copy, @body, _meta}
     end
-  end
 
-  describe "PubSub integration" do
-    test "responds to chunk_pipeline drive_unmounted broadcast", %{pid: pid} do
-      inject_drive(pid, "sys_id_2", "/mnt/usb2")
+    test "falls back to the next unit when the source unit lacks the chunk", %{pid: pid} = ctx do
+      register(%Unit{id: "sdb1", role: :backup, root: ctx.tmp_dir <> "/b", system_id: "sys_b"})
 
-      Phoenix.PubSub.broadcast(
-        Chat.PubSub,
-        "chunk_pipeline",
-        {:chunk_pipeline, {:drive_unmounted, "sys_id_2"}}
-      )
+      main =
+        register(%Unit{id: "sdm1", role: :main, root: ctx.tmp_dir <> "/m", system_id: "sys_m"})
 
-      wait_for_cast(pid)
+      :ok = ChunkStore.put(main, @file_id, 0, @body)
 
-      state = :sys.get_state(pid)
-      refute Map.has_key?(state.other_drives, "sys_id_2")
+      GenServer.cast(pid, {:chunk_fetchable, @file_id, 0, "sys_b"})
+
+      assert_receive {:submitted, "sdo1", :drive_copy, @body, _meta}
+    end
+
+    test "records a failure when no other unit has the chunk", %{pid: pid, tmp_dir: tmp_dir} do
+      register(%Unit{id: "sdb1", role: :backup, root: tmp_dir, system_id: "sys_b"})
+
+      GenServer.cast(pid, {:chunk_fetchable, @file_id, 0, "sys_b"})
+
+      assert_receive {:failed, @file_id, 0}
+      refute_received {:submitted, _, _, _, _}
     end
   end
 
-  describe "poll" do
-    test "poll skipped when no other drives mounted", %{pid: pid} do
-      send(pid, :poll)
-      wait_for_cast(pid)
+  describe "sources" do
+    test "polls only while another unit is registered", %{pid: pid, tmp_dir: tmp_dir} do
+      refute pid |> :sys.get_state() |> DriveCopySource.can_poll?()
 
-      assert Process.alive?(pid)
+      register(%Unit{id: "sdb1", role: :backup, root: tmp_dir, system_id: "sys_b"})
+
+      assert pid |> :sys.get_state() |> DriveCopySource.can_poll?()
+    end
+
+    test ":unit_up schedules a sweep and :unit_down cancels it", %{pid: pid, tmp_dir: tmp_dir} do
+      backup = %Unit{id: "sdb1", role: :backup, root: tmp_dir, system_id: "sys_b"}
+
+      send(pid, {:unit_up, backup})
+      assert %{sweep_timers: %{"sys_b" => _}} = :sys.get_state(pid)
+
+      send(pid, {:unit_down, backup})
+      assert %{sweep_timers: timers} = :sys.get_state(pid)
+      refute Map.has_key?(timers, "sys_b")
+    end
+
+    test "ignores its own role coming up", %{pid: pid} do
+      send(pid, {:unit_up, %{@own | system_id: "sys_own"}})
+
+      assert %{sweep_timers: timers} = :sys.get_state(pid)
+      refute Map.has_key?(timers, "sys_own")
     end
   end
 
-  describe "resolve_source_dir" do
-    test "no drives mounted does not crash on chunk_fetchable", %{pid: pid} do
-      GenServer.cast(pid, {:chunk_fetchable, "f_abc123", 0, "missing_drive"})
-      wait_for_cast(pid)
-
-      assert Process.alive?(pid)
-    end
-
-    test "falls back to random drive when source drive not mounted", %{pid: pid} do
-      inject_drive(pid, "sys_id_1", "/mnt/usb1")
-
-      GenServer.cast(pid, {:chunk_fetchable, "f_abc123", 0, "sys_gone"})
-      wait_for_cast(pid)
-      Process.sleep(200)
-
-      assert Agent.get(:dcs_test_calls, & &1) == ["/mnt/usb1"]
-    end
-
-    test "falls back to a different source when the assigned source's fetch fails", %{pid: pid} do
-      inject_drive(pid, "sys_primary", "/mnt/primary")
-      inject_drive(pid, "sys_fallback", "/mnt/fallback")
-      Agent.update(:dcs_test_fail_dir, fn _ -> "/mnt/primary" end)
-
-      GenServer.cast(pid, {:chunk_fetchable, "f_abc123", 0, "sys_primary"})
-      wait_for_cast(pid)
-      Process.sleep(200)
-
-      assert Agent.get(:dcs_test_calls, &Enum.reverse(&1)) == [
-               "/mnt/primary",
-               "/mnt/fallback"
-             ]
-    end
-  end
-
-  # Helpers
-
-  defp start_source(drive_id) do
-    {:ok, pid} = GenServer.start_link(DriveCopySource, drive_id: drive_id, repo: nil)
-    pid
-  end
-
-  defp inject_drive(pid, system_id, base_dir) do
-    :sys.replace_state(pid, fn state ->
-      others = Map.put(state.other_drives, system_id, base_dir)
-
-      timers =
-        Map.put(
-          state.sweep_timers,
-          system_id,
-          Process.send_after(pid, {:sweep, system_id}, 5_000)
-        )
-
-      %{state | other_drives: others, sweep_timers: timers}
-    end)
-  end
-
-  defp wait_for_cast(pid) do
-    _ = :sys.get_state(pid)
+  # Registered by the test process, so it is unregistered when the test ends
+  defp register(unit) do
+    :ok = Units.register(unit)
+    unit
   end
 end

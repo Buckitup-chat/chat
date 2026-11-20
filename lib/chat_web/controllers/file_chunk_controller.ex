@@ -4,12 +4,12 @@ defmodule ChatWeb.FileChunkController do
   use Toolbox.OriginLog
 
   alias Chat.Data.File, as: FileData
-  alias Chat.Data.File.ChunkPipeline
   alias Chat.Data.File.ChunkStore
   alias Chat.Data.File.UploadSource
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.FileChunk
   alias Chat.Data.Types.FileChunkDataHash
+  alias Chat.Storage.Default
   alias Chat.TimeKeeper
   alias EnigmaPq
 
@@ -19,7 +19,7 @@ defmodule ChatWeb.FileChunkController do
   def show(conn, %{"file_id" => file_id, "chunk_index" => chunk_index_str}) do
     with {chunk_index, ""} <- Integer.parse(chunk_index_str),
          %{} = chunk <- FileData.get_file_chunk(file_id, chunk_index),
-         {:ok, data} <- ChunkStore.fetch(file_id, chunk_index) do
+         {:ok, data} <- ChunkStore.fetch(Default.unit(), file_id, chunk_index) do
       conn
       |> put_resp_content_type("application/octet-stream")
       |> put_resp_header("x-chunk-size", to_string(chunk.size))
@@ -37,12 +37,12 @@ defmodule ChatWeb.FileChunkController do
          :ok <- check_file_not_deleted(file_id, headers.uploader_hash),
          chunk = build_chunk(file_id, chunk_index, headers),
          :ok <- Integrity.verify_signature(chunk),
-         :ok <- check_free_space(headers.size),
+         unit = Default.unit(),
+         :ok <- check_free_space(unit, headers.size),
          {:ok, body, conn} <- read_chunk_body(conn),
          :ok <- verify_body_hash(body, headers.data_hash),
          :ok <- verify_body_size(body, headers.size),
-         {:ok, drive_id} <- fetch_active_drive_id(),
-         :ok <- submit_chunk(drive_id, body, file_id, chunk_index),
+         :ok <- submit_chunk(unit.id, body, file_id, chunk_index),
          {:ok, _} <- persist_chunk(chunk) do
       json(conn, %{status: "ok"})
     else
@@ -125,12 +125,6 @@ defmodule ChatWeb.FileChunkController do
     }
   end
 
-  defp fetch_active_drive_id do
-    {:ok, ChunkPipeline.active_drive_id()}
-  rescue
-    _ -> {:error, :no_active_drive}
-  end
-
   defp submit_chunk(drive_id, body, file_id, chunk_index) do
     UploadSource.submit(drive_id, body, %{file_id: file_id, chunk_index: chunk_index})
   catch
@@ -139,8 +133,8 @@ defmodule ChatWeb.FileChunkController do
       {:error, :writer_unavailable}
   end
 
-  defp check_free_space(chunk_size) do
-    case ChunkStore.available_space() do
+  defp check_free_space(unit, chunk_size) do
+    case ChunkStore.available_space(unit) do
       {:ok, free} when free > chunk_size + @min_free_bytes -> :ok
       {:ok, _} -> {:error, :insufficient_space}
       {:error, _} -> :ok

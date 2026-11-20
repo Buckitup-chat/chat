@@ -33,11 +33,14 @@ defmodule ChatWeb.MainLive.Layout.Admin do
       |> Enum.filter(fn {_, v} -> v == true end)
       |> Enum.map_join(", ", &elem(&1, 0))
 
-    assigns = assign(assigns, flags: flags)
+    links = assigns.status.links |> Enum.map_join(", ", &link_status/1)
+
+    assigns = assign(assigns, flags: flags, links: links)
 
     ~H"""
     <label class="text-black/50"> Mode: </label><span><%= @status.mode %></span> <br />
     <label class="text-black/50"> Flags: </label><span><%= @flags %></span> <br />
+    <label class="text-black/50"> Links: </label><span><%= @links %></span> <br />
     <label class="text-black/50"> Writable: </label><span><%= @status.writable %></span> <br />
     <label class="text-black/50"> DB compaction: </label><span><%= @status.compacting %></span> <br />
     """
@@ -106,4 +109,9 @@ defmodule ChatWeb.MainLive.Layout.Admin do
     </div>
     """
   end
+
+  defp link_status(%{id: {from, to}, status: status}), do: "#{from}→#{to} #{status_name(status)}"
+
+  defp status_name({name, _details}), do: name
+  defp status_name(name), do: name
 end

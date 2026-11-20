@@ -2,6 +2,7 @@ defmodule Chat.Data.File.TmpSweeperTest do
   use ExUnit.Case, async: true
 
   alias Chat.Data.File.TmpSweeper
+  alias Chat.Storage.Unit
 
   setup do
     tmp_dir =
@@ -9,22 +10,23 @@ defmodule Chat.Data.File.TmpSweeperTest do
       |> Path.join("tmp_sweeper_test_#{System.unique_integer([:positive])}")
 
     File.mkdir_p!(tmp_dir)
-    pq_dir = Path.join(tmp_dir, "pq_files")
+    unit = %Unit{id: "sdu1", role: :main, root: tmp_dir}
+    pq_dir = Unit.path(unit, :pq_files)
     File.mkdir_p!(pq_dir)
 
     on_exit(fn -> File.rm_rf!(tmp_dir) end)
 
-    %{base_dir: tmp_dir, pq_dir: pq_dir}
+    %{unit: unit, pq_dir: pq_dir}
   end
 
-  defp start_sweeper(base_dir, id) do
-    {:ok, pid} = :gen_statem.start_link(TmpSweeper, [drive_id: id, base_dir: base_dir], [])
+  defp start_sweeper(unit, id) do
+    {:ok, pid} = :gen_statem.start_link(TmpSweeper, [unit: %{unit | id: id}], [])
     :sys.get_state(pid)
     Process.sleep(50)
     pid
   end
 
-  test "sweeps stale .tmp files on init", %{base_dir: base_dir, pq_dir: pq_dir} do
+  test "sweeps stale .tmp files on init", %{unit: unit, pq_dir: pq_dir} do
     shard_dir = Path.join([pq_dir, "ab", "f_00ab"])
     File.mkdir_p!(shard_dir)
 
@@ -35,7 +37,7 @@ defmodule Chat.Data.File.TmpSweeperTest do
     recent_tmp = Path.join(shard_dir, "recent.tmp")
     File.write!(recent_tmp, "recent data")
 
-    pid = start_sweeper(base_dir, :test_sweep)
+    pid = start_sweeper(unit, :test_sweep)
 
     refute File.exists?(stale_tmp)
     assert File.exists?(recent_tmp)
@@ -43,8 +45,8 @@ defmodule Chat.Data.File.TmpSweeperTest do
     :gen_statem.stop(pid)
   end
 
-  test "periodic sweep removes stale files", %{base_dir: base_dir, pq_dir: pq_dir} do
-    pid = start_sweeper(base_dir, :test_periodic)
+  test "periodic sweep removes stale files", %{unit: unit, pq_dir: pq_dir} do
+    pid = start_sweeper(unit, :test_periodic)
 
     shard_dir = Path.join([pq_dir, "cd", "f_00cd"])
     File.mkdir_p!(shard_dir)
@@ -62,7 +64,7 @@ defmodule Chat.Data.File.TmpSweeperTest do
     :gen_statem.stop(pid)
   end
 
-  test "keeps regular chunk files untouched", %{base_dir: base_dir, pq_dir: pq_dir} do
+  test "keeps regular chunk files untouched", %{unit: unit, pq_dir: pq_dir} do
     shard_dir = Path.join([pq_dir, "ef", "f_00ef"])
     File.mkdir_p!(shard_dir)
 
@@ -70,7 +72,7 @@ defmodule Chat.Data.File.TmpSweeperTest do
     File.write!(chunk_file, "real chunk")
     File.touch!(chunk_file, System.os_time(:second) - 7200)
 
-    pid = start_sweeper(base_dir, :test_keep)
+    pid = start_sweeper(unit, :test_keep)
 
     assert File.exists?(chunk_file)
 

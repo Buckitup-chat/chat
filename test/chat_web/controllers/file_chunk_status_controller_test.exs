@@ -5,32 +5,21 @@ defmodule ChatWeb.FileChunkStatusControllerTest do
   alias Chat.Data.File, as: FileData
   alias Chat.Data.File.ChunkStore
   alias Chat.Data.Types.FileId
-  alias Chat.Db.Common
+  alias Chat.Storage.Default
 
   @chunk_status_path "/electric/v1/file_chunk_status"
 
   setup %{conn: conn} do
-    tmp_dir =
-      System.tmp_dir!()
-      |> Path.join("chunk_status_ctrl_test_#{System.unique_integer([:positive])}")
+    # The Default unit: its repo is the test Chat.Repo
+    unit = Default.unit()
 
-    File.mkdir_p!(tmp_dir)
-
-    prev_base = Common.get_chat_db_env(:files_base_dir)
-    Common.put_chat_db_env(:files_base_dir, tmp_dir)
-
-    on_exit(fn ->
-      Common.put_chat_db_env(:files_base_dir, prev_base)
-      File.rm_rf!(tmp_dir)
-    end)
-
-    {:ok, conn: conn, tmp_dir: tmp_dir}
+    {:ok, conn: conn, unit: unit}
   end
 
   describe "GET /electric/v1/file_chunk_status" do
-    test "returns on_disk and missing counts for a file", %{conn: conn, tmp_dir: tmp_dir} do
+    test "returns on_disk and missing counts for a file", %{conn: conn, unit: unit} do
       file_id = FileId.generate()
-      store_chunks(file_id, 2, tmp_dir)
+      store_chunks(unit, file_id, 2)
       mark_missing_chunks(file_id, 2)
 
       statuses = conn |> get(chunk_status_path(file_id)) |> decode_statuses()
@@ -53,9 +42,9 @@ defmodule ChatWeb.FileChunkStatusControllerTest do
       assert Jason.decode!(conn.resp_body)["error"] == "missing file_ids parameter"
     end
 
-    test "dedupes and trims comma-separated file_ids", %{conn: conn, tmp_dir: tmp_dir} do
+    test "dedupes and trims comma-separated file_ids", %{conn: conn, unit: unit} do
       file_id = FileId.generate()
-      store_chunks(file_id, 1, tmp_dir)
+      store_chunks(unit, file_id, 1)
 
       statuses =
         conn
@@ -66,11 +55,11 @@ defmodule ChatWeb.FileChunkStatusControllerTest do
       assert statuses[file_id]["on_disk"] == 1
     end
 
-    test "returns independent counts for multiple file_ids", %{conn: conn, tmp_dir: tmp_dir} do
+    test "returns independent counts for multiple file_ids", %{conn: conn, unit: unit} do
       file_id_a = FileId.generate()
       file_id_b = FileId.generate()
 
-      store_chunks(file_id_a, 1, tmp_dir)
+      store_chunks(unit, file_id_a, 1)
       mark_missing_chunks(file_id_b, 3)
 
       statuses =
@@ -89,8 +78,8 @@ defmodule ChatWeb.FileChunkStatusControllerTest do
     @chunk_status_path <> "?" <> URI.encode_query(%{"file_ids" => file_ids_param})
   end
 
-  defp store_chunks(file_id, count, tmp_dir) do
-    for i <- 0..(count - 1), do: ChunkStore.put(file_id, i, "chunk_#{i}", tmp_dir)
+  defp store_chunks(unit, file_id, count) do
+    for i <- 0..(count - 1), do: ChunkStore.put(unit, file_id, i, "chunk_#{i}")
   end
 
   defp mark_missing_chunks(file_id, count) do

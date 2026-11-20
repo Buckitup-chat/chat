@@ -16,12 +16,19 @@ config :logger, level: :warning
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime
 
-config :chat, :cub_db_file, "priv/test_db"
 config :chat, :admin_cub_db_file, "priv/test_admin_db"
+
+# Internal CubDB stays at priv/test_db/v.10.1
+config :chat, Chat.Storage,
+  internal_root: "priv",
+  internal_dir: "test_db",
+  media_root: "priv/test_media",
+  # PgPairCase units (Chat.Test.PgPairHelper.unit_fixture/2)
+  repos: %{"unit_a" => Chat.Test.UnitARepo, "unit_b" => Chat.Test.UnitBRepo}
+
 config :chat, :admin_cub_db_auto_compact, false
 
 config :chat,
-  files_base_dir: "priv/test_db/files",
   write_budget: 100_000_000,
   writable: :yes
 
@@ -48,3 +55,20 @@ config :chat, Chat.Repo,
   connect_timeout: 1000,
   handshake_timeout: 1000,
   prepare: :unnamed
+
+# Two-database PG pair for sync/replication tests (Chat.Test.PgPairCase).
+# Created, migrated and dropped by Chat.Test.PgPairHelper — not in :ecto_repos.
+for {repo, database} <- [
+      {Chat.Test.UnitARepo, "chat_test_unit_a"},
+      {Chat.Test.UnitBRepo, "chat_test_unit_b"}
+    ] do
+  config :chat, repo,
+    username: "postgres",
+    password: "postgres",
+    hostname: "localhost",
+    database: database,
+    pool: Ecto.Adapters.SQL.Sandbox,
+    pool_size: 4,
+    ownership_timeout: 60_000,
+    prepare: :unnamed
+end

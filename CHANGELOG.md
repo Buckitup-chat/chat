@@ -10,9 +10,58 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 Here we write upgrading notes for brands. It's a team effort to make them as
 straightforward as possible.
 
+## 2026-11-14_fcab3a7\_\_\_2026-11-16_265505a0\_\_\_2026-11-13_b44f63e
+
 ### Added
 
+- Storage units: `Unit` + `Role` model, `Units` registry with `UnitAnnouncer`, `Unit.root/1` for a device's mount target before its role is known
+- Storage: `Chat.Storage.Default` — single atomic default unit, switched via `Default.switch_to/1`
+- Storage: `Link` core (CubDB + PG rows + chunk blobs between units) with `Links` status registry and `PlanRunner`
+- TURN relay: config with per-boot secret, credential endpoint (`POST /electric/v1/turn_credentials`) with per-IP rate limiting, relay listeners, peer blacklist/whitelist policy, device relay with LAN whitelist, expiry enforcement
 - Review: gated integration tests for review tokens via sandboxes
+- Tests: two-database PG test infra (`PgPairCase`), storage literal-grep invariant
+- Documentation: storage units spec (done, with as-built notes), TURN relay spec (done)
+- [platform] Role-based PQ layout with one-time PQ reset (legacy PQ generation is relocated, not dropped)
+- [platform] Host emulation of per-drive PG so drive scenario tests run
+- [frontend] Keep on this device: offline kept files with pinned chunks, sealed per-account index, on-device storage management; chat opens a kept file from the device before downloading
+- [frontend] Account storage status: whether the browser may clear data, probe table, short status in the Account menu
+- [frontend] Account recovery and vault locking with passkey PRF
+- [frontend] Notes to self: derived identities in pq-client, outbox sends writes of derived identities proven by their own keys
+- [frontend] 2026-10 design: design tokens and icon set, section rail and phone tabs, Identity, Backup Center, Notifications, Checkpoints, Install app and in-person handshake screens
+- [frontend] Resume an interrupted upload after a reload
+- [frontend] Reuse files when sending them to different chats
+- [frontend] Chat: editing a long message
+
+### Changed
+
+- Storage: CubDB file paths and the chunk pipeline (`ChunkStore`) derive from `%Unit{}`; `internal_pg` config dropped
+- Storage: link PG follow and slot release moved into `LogicalReplicator`; admin status reads `Default` + `Links`
+- TURN config is a plain module instead of a GenServer; `verify_user/3` extracted from `ReadGate.open_session/4`
+- CIDR and subnet matching rewritten on the `ip` library
+- Credo config refreshed
+- [platform] `BatchSync` and `LogicalReplicator` moved from platform to chat
+- [platform] Main attach/eject and backup rewritten as link plans (fixes #795)
+- [platform] Drive role resolved before starting engines; storage literals only via `Unit` / `Role` / `Link`
+- [platform] Configure `Chat.Storage` roots instead of `:cub_db_file`; pass storage units to the chunk pipeline
+- [platform] Drop `max_slot_wal_keep_size` from minimal PG settings
+- [platform] Remove unused OpenSpec and LFS config
+- [frontend] Wipe all: delete on the next load, and say when another tab holds the data; Accounts and wipe dialog lead to Backup Center
+- [frontend] Platform system font instead of Inter
+
+### Fixed
+
+- Review write token and origin bot updates: validate against the stored row's bot/origin since `original` carries only the primary key
+- Link plans: steps run in tasks, hashless `missing_chunks` filled, bootstrap nudges chunk pipelines after queueing blobs; `PlanRunner` ignores stray messages
+- [platform] Drop stale link slots on repo start; Default gets internal `system_id`
+- [platform] Stale platform tests (Sync, drive names, logger level); wipe test admin CubDB before boot
+- [frontend] Preserve quotes and attachments when editing messages
+- [frontend] Stop storing file keys in plaintext and sweep the ones left behind
+- [frontend] Feed order: break same-millisecond ties by message id; checkpoint scan uses a feed-order watermark
+- [frontend] Startup: repair a vault database that lacks its store
+- [frontend] Handshake: offer virtual networks last, use qr-scanner's decoder away from Android
+- [frontend] Checkpoints: a dialog that did not load is not a changed one
+- [frontend] Clipboard: report a refused write instead of throwing; refused localStorage write is not a private window
+- [frontend] Derived note cards wait for the device to have an owner and keep a checked copy of their signer
 
 ## 2026-10-31_5bb3238\_\_\_2026-10-31_957ea34f\_\_\_2026-10-30_8bf16bd
 

@@ -7,6 +7,7 @@ defmodule Chat.Data.File.Validation do
   alias Chat.Data.Schemas.FileChunk
   alias Chat.Data.User, as: UserData
   alias Chat.Data.User.Validation, as: UserValidation
+  alias Chat.Storage.Default
   alias Chat.TimeKeeper
   alias EnigmaPq
   alias Phoenix.Sync.Writer.Operation
@@ -56,7 +57,7 @@ defmodule Chat.Data.File.Validation do
           verify_file_chunks(file)
         end)
         |> Ecto.Multi.run(:sync_chunks, fn _repo, _changes ->
-          ChunkStore.sync_dir(file.file_id)
+          ChunkStore.sync_dir(Default.unit(), file.file_id)
           {:ok, :synced}
         end)
         |> Ecto.Multi.run(:cleanup_upload_chunks, fn _repo, _changes ->

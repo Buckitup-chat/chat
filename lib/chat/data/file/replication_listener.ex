@@ -1,28 +1,35 @@
 defmodule Chat.Data.File.ReplicationListener do
-  @moduledoc "Listens for PG replica trigger notifications and activates DriveCopySource."
+  @moduledoc """
+  Listens for PG replica trigger notifications on one unit and activates its
+  DriveCopySource.
+
+  Replicated rows are stamped with the unit they came from: the replication source
+  that `Chat.Storage.Link.replicate/1` registered in `Chat.Storage.Links`. A trigger
+  cannot know the origin of a row, a link can (spec §1.6). Without a registered
+  source the stamp is `nil` (any unit).
+  """
 
   use GenServer
   use Toolbox.OriginLog
 
   alias Chat.Data.File, as: FileData
   alias Chat.Data.File.DriveCopySource
+  alias Chat.Storage.Links
+  alias Chat.Storage.Unit
   alias Chat.TimeKeeper
-  alias Ecto.Adapters.SQL
 
   @registry Chat.Data.File.ChunkPipelineRegistry
 
   def start_link(opts) do
-    drive_id = Keyword.fetch!(opts, :drive_id)
+    %Unit{id: drive_id} = Keyword.fetch!(opts, :unit)
     GenServer.start_link(__MODULE__, opts, name: via(drive_id))
   end
 
   @impl true
   def init(opts) do
-    drive_id = Keyword.fetch!(opts, :drive_id)
-    repo = Keyword.get(opts, :repo)
-
-    system_id = query_system_id(repo)
-    state = %{drive_id: drive_id, repo: repo, system_id: system_id, conn: nil, refs: %{}}
+    %Unit{} = unit = Keyword.fetch!(opts, :unit)
+    repo = Unit.repo(unit)
+    state = %{unit: unit, drive_id: unit.id, repo: repo, conn: nil, refs: %{}}
 
     case connect_and_listen(repo) do
       {:ok, conn, refs} ->
@@ -43,7 +50,7 @@ defmodule Chat.Data.File.ReplicationListener do
           chunk_count,
           nil,
           TimeKeeper.now_unix(),
-          source_drive_id: state.system_id,
+          source_drive_id: Links.replication_source(state.unit),
           repo: state.repo
         )
 
@@ -58,7 +65,13 @@ defmodule Chat.Data.File.ReplicationListener do
     case Jason.decode(payload) do
       {:ok, %{"file_id" => fid, "chunk_index" => ci, "data_hash" => dh, "size" => s}} ->
         FileData.fill_missing_chunk(fid, ci, dh, s, repo: state.repo)
-        DriveCopySource.chunk_fetchable(state.drive_id, fid, ci, state.system_id)
+
+        DriveCopySource.chunk_fetchable(
+          state.drive_id,
+          fid,
+          ci,
+          Links.replication_source(state.unit)
+        )
 
       _ ->
         log("ReplicationListener: bad file_chunk_replicated payload", :warning)
@@ -69,9 +82,11 @@ defmodule Chat.Data.File.ReplicationListener do
 
   def handle_info(_msg, state), do: {:noreply, state}
 
-  defp connect_and_listen(nil), do: {:error, :no_repo}
-
   defp connect_and_listen(repo) do
+    if Code.ensure_loaded?(repo), do: listen(repo), else: {:error, :no_repo}
+  end
+
+  defp listen(repo) do
     pg_opts =
       repo.config()
       |> Keyword.take([:hostname, :port, :database, :username, :password])
@@ -82,15 +97,6 @@ defmodule Chat.Data.File.ReplicationListener do
          {:ok, ref1} <- Postgrex.Notifications.listen(conn, "file_replicated"),
          {:ok, ref2} <- Postgrex.Notifications.listen(conn, "file_chunk_replicated") do
       {:ok, conn, %{file_replicated: ref1, file_chunk_replicated: ref2}}
-    end
-  end
-
-  defp query_system_id(nil), do: nil
-
-  defp query_system_id(repo) do
-    case SQL.query(repo, "SELECT system_identifier FROM pg_control_system()", []) do
-      {:ok, %{rows: [[identifier]]}} -> to_string(identifier)
-      _ -> nil
     end
   end
 

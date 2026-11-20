@@ -5,6 +5,7 @@ defmodule Chat.Data.File.ChunkWriter do
   use Toolbox.OriginLog
 
   alias Chat.Data.File.ChunkStore
+  alias Chat.Storage.Unit
 
   @registry Chat.Data.File.ChunkPipelineRegistry
   @lanes [:upload, :drive_copy, :network_sync]
@@ -12,7 +13,7 @@ defmodule Chat.Data.File.ChunkWriter do
   @max_queue_size 2
 
   def start_link(opts) do
-    drive_id = Keyword.fetch!(opts, :drive_id)
+    %Unit{id: drive_id} = Keyword.fetch!(opts, :unit)
     GenServer.start_link(__MODULE__, opts, name: via(drive_id))
   end
 
@@ -26,12 +27,11 @@ defmodule Chat.Data.File.ChunkWriter do
 
   @impl true
   def init(opts) do
-    drive_id = Keyword.fetch!(opts, :drive_id)
-    base_dir = Keyword.get(opts, :base_dir)
+    %Unit{} = unit = Keyword.fetch!(opts, :unit)
 
     state = %{
-      drive_id: drive_id,
-      base_dir: base_dir,
+      drive_id: unit.id,
+      unit: unit,
       queues: Map.new(@lanes, &{&1, :queue.new()}),
       wait_counters: %{drive_copy: 0, network_sync: 0},
       writing: nil
@@ -67,7 +67,7 @@ defmodule Chat.Data.File.ChunkWriter do
 
       task =
         Task.async(fn ->
-          ChunkStore.put(meta.file_id, meta.chunk_index, chunk_data, state.base_dir)
+          ChunkStore.put(state.unit, meta.file_id, meta.chunk_index, chunk_data)
         end)
 
       writing = {task.ref, from, lane}

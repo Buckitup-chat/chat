@@ -221,7 +221,7 @@ GET /electric/v1/file_chunk/:file_id/:chunk_index
 
 Returns the raw encrypted chunk bytes as `application/octet-stream`, read from `ChunkStore` on the filesystem. Response header `x-chunk-size` carries the chunk's `size` value.
 
-**Implementation**: [`ChatWeb.FileChunkController.show/2`](../../../lib/chat_web/controllers/file_chunk_controller.ex) → [`Chat.Data.File.ChunkStore.fetch/2`](../../../lib/chat/data/file/chunk_store.ex) (single on-disk file read; the chunk metadata row supplies `size`).
+**Implementation**: [`ChatWeb.FileChunkController.show/2`](../../../lib/chat_web/controllers/file_chunk_controller.ex) → [`Chat.Data.File.ChunkStore.fetch/3`](../../../lib/chat/data/file/chunk_store.ex) (single on-disk file read; the chunk metadata row supplies `size`).
 
 **Why not Electric shapes?** Each unique `(table, where)` combination creates a persistent Electric shape: a Consumer GenServer, a PG snapshot transaction, disk-backed shape log, and ongoing WAL filtering. Fetching N chunks via shapes creates N long-lived server-side resources for what is a simple point read. The direct endpoint performs one file read with no persistent overhead. This matters especially for video streaming (see [pq_video_streaming.done.md §6](pq_video_streaming.done.md#6-chunk-fetch-strategy)), where seeking triggers many single-chunk fetches.
 
@@ -280,13 +280,13 @@ Separately, [`TmpSweeper`](../../../lib/chat/data/file/tmp_sweeper.ex) (per driv
 [`Chat.Data.File.ChunkStore`](../../../lib/chat/data/file/chunk_store.ex) — raw encrypted bytes, one file per chunk:
 
 ```
-<files_base_dir>/pq_files/<last-2-hex-of-file_id>/<file_id>/<10-digit-zero-padded-chunk_index>
+<root>/<role_dir>/pq_files/<last-2-hex-of-file_id>/<file_id>/<10-digit-zero-padded-chunk_index>
 ```
 
 - **Sharding**: the last two hex chars of `file_id` (from UUIDv7's random tail → uniform 256-way split) keep per-directory entry counts low for FAT/exFAT drives. The front of the ID is not used — it is the `f_` prefix followed by the UUIDv7 timestamp, whose leading hex chars are effectively constant.
-- **Writes**: temp file + `rename`. Sync (`datasync`) is deferred to manifest commit time ([`Validation.file_pre_apply_insert`](../../../lib/chat/data/file/validation.ex) calls `ChunkStore.sync_dir/1`), not per-chunk — a crash leaves at most a stale `*.tmp`, never a torn chunk.
-- **Per drive**: each storage device (SD, USB) has its own `ChunkStore` path and its own `missing_chunks` table; a drive is identified by its PostgreSQL `system_identifier`.
-- API: `put/4`, `fetch/2`, `count_on_disk/1`, `delete_file/1`, `sweep_tmp_files/1`, `available_space/0`, `sync_dir/1`, `file_dir/1` (all accept an optional `base_dir` override, raising max arity by 1).
+- **Writes**: temp file + `rename`. Sync (`datasync`) is deferred to manifest commit time ([`Validation.file_pre_apply_insert`](../../../lib/chat/data/file/validation.ex) calls `ChunkStore.sync_dir/2`), not per-chunk — a crash leaves at most a stale `*.tmp`, never a torn chunk.
+- **Per drive**: each storage unit (SD, USB) has its own `ChunkStore` path (`Unit.path(unit, :pq_files)`, see [pq_storage_units](pq_storage_units.done.md) §2.2) and its own `missing_chunks` table; a drive is identified by its PostgreSQL `system_identifier`.
+- API: `put/4`, `fetch/3`, `exists?/3`, `count_on_disk/2`, `delete_file/2`, `sweep_tmp_files/2`, `available_space/1`, `sync_dir/2`, `file_dir/2`. The `%Unit{}` is always the first argument.
 
 ### 9.2 PostgreSQL
 
@@ -391,4 +391,4 @@ Realized gains per 100 MB upload (26 chunks):
 - [`20260627120001_create_replica_triggers`](../../../priv/repo/migrations/20260627120001_create_replica_triggers.exs) — `pg_notify` on `files`/`file_chunks` replica inserts (drives drive-copy sync)
 - [`20260807100000_drop_duplicate_missing_chunks_index`](../../../priv/repo/migrations/20260807100000_drop_duplicate_missing_chunks_index.exs) — drop redundant `missing_chunks_attempts_updated_at_index`
 
-**Pipeline**: the per-drive chunk admission pipeline — a serialized [`ChunkWriter`](../../../lib/chat/data/file/chunk_writer.ex) fed by [`UploadSource`](../../../lib/chat/data/file/upload_source.ex), [`SyncSource`](../../../lib/chat/data/file/sync_source.ex), and [`DriveCopySource`](../../../lib/chat/data/file/drive_copy_source.ex) over a shared [`ChunkSource`](../../../lib/chat/data/file/chunk_source.ex) behaviour — is documented in [pq_chunk_writer.done.md](pq_chunk_writer.done.md). It replaced the single `ChunkFetcher` worker sketched in early drafts (never shipped) and the removed `ElectricIngestThrottle`. The pipeline is supervised by [`ChunkPipelineSupervisor`](../../../lib/chat/data/file/chunk_pipeline_supervisor.ex), which also starts [`ReplicationListener`](../../../lib/chat/data/file/replication_listener.ex), [`TmpSweeper`](../../../lib/chat/data/file/tmp_sweeper.ex), [`MissingChunksBackfill`](../../../lib/chat/data/file/missing_chunks_backfill.ex), and [`DriveAnnouncer`](../../../lib/chat/data/file/drive_announcer.ex).
+**Pipeline**: the per-drive chunk admission pipeline — a serialized [`ChunkWriter`](../../../lib/chat/data/file/chunk_writer.ex) fed by [`UploadSource`](../../../lib/chat/data/file/upload_source.ex), [`SyncSource`](../../../lib/chat/data/file/sync_source.ex), and [`DriveCopySource`](../../../lib/chat/data/file/drive_copy_source.ex) over a shared [`ChunkSource`](../../../lib/chat/data/file/chunk_source.ex) behaviour — is documented in [pq_chunk_writer.done.md](pq_chunk_writer.done.md). It replaced the single `ChunkFetcher` worker sketched in early drafts (never shipped) and the removed `ElectricIngestThrottle`. The pipeline is supervised by [`ChunkPipelineSupervisor`](../../../lib/chat/data/file/chunk_pipeline_supervisor.ex), which also starts [`ReplicationListener`](../../../lib/chat/data/file/replication_listener.ex), [`TmpSweeper`](../../../lib/chat/data/file/tmp_sweeper.ex), [`MissingChunksBackfill`](../../../lib/chat/data/file/missing_chunks_backfill.ex), and [`UnitAnnouncer`](../../../lib/chat/storage/unit_announcer.ex).

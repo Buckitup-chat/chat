@@ -6,6 +6,7 @@ defmodule Chat do
   alias Chat.Db.Copying
   alias Chat.Ordering
   alias Chat.SignedParcel
+  alias Chat.Storage.Unit
 
   @doc """
   Updates a signed parcel by replacing `:next` placeholder indexes with actual numeric
@@ -102,5 +103,5 @@ defmodule Chat do
     Chat.FileFs.read_file_chunk(first, key, path())
   end
 
-  defp path, do: CubDB.data_dir(Chat.Db.db()) <> "_files"
+  defp path, do: Chat.Db.db() |> CubDB.data_dir() |> Unit.cub_files_dir()
 end

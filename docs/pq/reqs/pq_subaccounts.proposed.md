@@ -76,7 +76,7 @@ Notes are the first user of the per-identity session below.
 | Moving a whole identity | frontend backup file (password-protected), device link (QR, ML-KEM-1024, `docs/device-link.md`), `exportVaultKeys` / `importVaultKeys` | Carries every secret key of an identity; today it lands in a vault of its own, not in another account |
 | Encrypted per-user storage | User Storage, named JSON slots (`pq_user_storage.done.md`; frontend `slots.ts`) | Readable on every device of its owner; the natural home for a keyring |
 | Recovery | Backup & Recovery (frontend `docs/backup-recovery-plan.md`) | Restores the master's keys; anything kept in the master's User Storage comes back with them |
-| A client for several servers | `@buckitup/pq-client` transport, server as a parameter (frontend `packages/pq-client`) | One app can sign and read on many servers |
+| A client for several servers | `@buckitup/pq-client` transport, server as a parameter (`Buckitup-chat/pq-library`) | One app can sign and read on many servers |
 | Client limits today | Session holds one identity: one `sign_skey`, read sessions keyed by shape, outbox signed as the current user | All of this becomes per identity |
 
 Constraints that shape the design:

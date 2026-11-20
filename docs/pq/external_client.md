@@ -109,7 +109,9 @@ Electric HTTP API: a first request returns rows and `electric-handle` /
 `electric-offset` headers; `&live=true&handle=…&offset=…` long-polls for
 changes.
 
-- Any table of the server's registry is readable, with any `where`.
+- Every table of the server's registry is readable, with any `where`, except
+  `review_password_candidate`: it holds plaintext review passwords, is written
+  through `/ingest` only, and a read gets `400` (table not allowed).
 - Binary columns come back as base64 **without** padding. Pad them before
   verifying a signature.
 - Access mode `trust`: a read without a session gets

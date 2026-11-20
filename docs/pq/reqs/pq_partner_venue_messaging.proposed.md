@@ -5,8 +5,8 @@ privately to the venues it lists. YourTake is the first partner; nothing here
 is specific to it.
 
 Status: proposed. Every statement about current behaviour was checked against
-`origin/main` at 40d8c8e4 (backend) and 507d0ff (frontend); code references
-are given where a reader might doubt it.
+the backend at 28157924, the frontend at b687fa6 and `@buckitup/pq-client`
+1.0.1; code references are given where a reader might doubt it.
 
 ---
 
@@ -252,8 +252,8 @@ keeps the venues its users own and nothing more of that model.
                        "contact_skey": "<hex>",
                        "sign_pkey": "<b64>", "crypt_pkey": "<b64>" } }
   ```
-- **Encryption and addressing:** as every User Storage slot of the frontend
-  (`src/lib/data/slots.ts`, `@buckitup/pq-client/slotId`): the root record at a uuid
+- **Encryption and addressing:** as every User Storage slot
+  (`@buckitup/pq-client/storage`, `slotId`): the root record at a uuid
   derived from VO's `crypt_skey` maps slot names to random uuids; values are
   AES-256-GCM under a key derived from VO's `crypt_skey`.
 - **Removing a venue:** drop its key from the slot. User Storage keeps
@@ -267,31 +267,29 @@ A device that has VO's keys (device link, backup, recovery) has V's.
 
 `sender_msg_key` is derived as [pq_dialogs.done.md § Key derivation](pq_dialogs.done.md)
 gives it: `IKM = sign_skey || crypt_skey || peer_user_hash`, salt
-`buckitup/dialog-mk/v1`. `@buckitup/pq-client/dialogs` uses this derivation.
-BuckitUp's app adds `evm_skey` to the IKM (`DialogCrypto.deriveSenderMsgKey`)
-until Phase 0; until then one identity used from both clients derives
-different keys for its own messages.
+`buckitup/dialog-mk/v1`. `@buckitup/pq-client/dialogs` implements it, and
+BuckitUp's frontend derives through it, so one identity used from both clients
+derives the same keys.
 
 ---
 
 ## Client library
 
 `@buckitup/pq-client`: the protocol without Vue, Pinia or TanStack. BuckitUp's
-frontend is built on it (one difference: § Dialog key derivation).
+frontend is built on it.
 
-- **Where:** a package in `Buckitup-chat/chat-frontend` (`packages/pq-client`),
-  next to the app that uses it.
-- **npm:** `@buckitup/pq-client` on the public registry from Phase 1; 0.1.0
-  is only in chat-frontend `main` so far.
+- **Where:** its own repository, `Buckitup-chat/pq-library`, with its protocol
+  tests, golden vectors and release workflow.
+- **npm:** `@buckitup/pq-client` on the public registry, published by
+  pq-library's GitHub Actions with a provenance attestation; 1.0.1 is current.
 - **Licence:** GPL-3.0-only, as the repository. On the usual reading of GPLv3, a web
   UI that bundles the library and is served to users is released under GPLv3
   as well. The partner has confirmed this suits it.
 
 Each module is an entry point of its own (`@buckitup/pq-client/<module>`).
-The table is what the library covers for a partner by Phase 2. Of it, 0.1.0
-has `dialogs` and `transport` (without batch `/ingest` and live reads);
-canonical payloads and signatures are in `signature`; the rest is not in it
-yet.
+The table is what the library covers for a partner by Phase 2. 1.0 has all
+eight modules; where it departs from this document is listed in pq-library
+`docs/protocol.md` § Initial requirements and acceptance.
 
 | Module | Contents |
 |---|---|
@@ -333,7 +331,7 @@ yet.
 
 | Phase | BuckitUp | Partner | Done when |
 |---|---|---|---|
-| **0. Ground** | Backend: an older `vouch_tokens` row from a peer never replaces a newer one; sandboxes are not exposed on production servers; the `router.ex` CORS comment. Frontend: `sender_msg_key` per `pq_dialogs` (no `evm_skey`). | Deploy a server on its domain; first owner per § First owner; `guarded`. | Partner's test client ingests a signed `user_cards` row and reads it back from a shape |
+| **0. Ground** | Backend: an older `vouch_tokens` row from a peer never replaces a newer one; sandboxes are not exposed on production servers; the `router.ex` CORS comment. Frontend: `sender_msg_key` per `pq_dialogs` (no `evm_skey`) — done. | Deploy a server on its domain; first owner per § First owner; `guarded`. | Partner's test client ingests a signed `user_cards` row and reads it back from a shape |
 | **1. Library** | Publish `@buckitup/pq-client`; multi-identity vault | Build its UI on pre-releases | Library passes the conformance vectors; frontend tests green on it |
 | **2. Venue messaging** | Venue creation, venue keys slot in the library; support | B, guest admission, guest and owner UI, notifications by shape | On the partner's test server: VO creates V; G scans a code, is vouched, writes; VO reads and replies from a second device; the partner backend is notified without content; retracting B → G stops G |
 | **3. Sign-in by key (R-7)** | Support | Sign-in on its site with the same-domain identity | A guest signs in with the key alone |
@@ -342,5 +340,4 @@ yet.
 
 ## Open questions
 
-1. Should the library ship before the partner starts on its UI, or alongside?
-2. Erasure: confirm cascade behaviour on a test server (Flow 7).
+1. Erasure: confirm cascade behaviour on a test server (Flow 7).

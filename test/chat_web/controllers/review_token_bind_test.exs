@@ -46,11 +46,20 @@ defmodule ChatWeb.ReviewTokenBindTest do
     def bind(_nonce, _user_hash, _pop), do: {:error, :no_bot_device_vouch}
   end
 
+  setup %{conn: conn} do
+    %{conn: %{conn | remote_ip: unique_ip()}}
+  end
+
+  defp unique_ip do
+    n = System.unique_integer([:positive])
+    {10, rem(div(n, 65_536), 256), rem(div(n, 256), 256), rem(n, 256)}
+  end
+
   defp bind_params(overrides \\ %{}) do
     Map.merge(
       %{
         "nonce" => "test_nonce",
-        "user_hash" => "u_reviewer",
+        "user_hash" => "u_reviewer_#{System.unique_integer([:positive])}",
         "auth" => %{"challenge_id" => "ch_1", "signature" => "c2ln"}
       },
       overrides
@@ -184,6 +193,55 @@ defmodule ChatWeb.ReviewTokenBindTest do
         |> controller.bind(bind_params())
 
       assert %{"error" => "Bot lacks device vouch"} = json_response(conn, 403)
+    end
+  end
+
+  describe "POST /r/api/token/bind rate limit" do
+    setup do
+      %{
+        controller:
+          rewire(ChatWeb.ReviewTokenController, IngestPop: PopOk, TokenBinder: BinderReusable)
+      }
+    end
+
+    test "returns 429 with retry-after when one IP exceeds the limit", %{
+      conn: conn,
+      controller: controller
+    } do
+      for _ <- 1..10 do
+        assert %{"nonce" => _} = conn |> controller.bind(bind_params()) |> json_response(200)
+      end
+
+      limited = controller.bind(conn, bind_params())
+
+      assert %{"error" => "Too many requests"} = json_response(limited, 429)
+      assert [retry_after] = get_resp_header(limited, "retry-after")
+      assert String.to_integer(retry_after) >= 1
+    end
+
+    test "returns 429 when one user_hash exceeds the limit across IPs", %{controller: controller} do
+      params = bind_params(%{"user_hash" => "u_rl_#{System.unique_integer([:positive])}"})
+
+      bind_from_new_ip = fn ->
+        controller.bind(%{build_conn() | remote_ip: unique_ip()}, params)
+      end
+
+      for _ <- 1..10, do: assert(%{"nonce" => _} = json_response(bind_from_new_ip.(), 200))
+
+      limited = bind_from_new_ip.()
+
+      assert %{"error" => "Too many requests"} = json_response(limited, 429)
+      assert [_retry_after] = get_resp_header(limited, "retry-after")
+    end
+
+    test "rejects before PoP check when limited", %{conn: conn} do
+      controller =
+        rewire(ChatWeb.ReviewTokenController, IngestPop: PopMissing, TokenBinder: BinderReusable)
+
+      for _ <- 1..10, do: assert(json_response(controller.bind(conn, bind_params()), 401))
+
+      assert %{"error" => "Too many requests"} =
+               conn |> controller.bind(bind_params()) |> json_response(429)
     end
   end
 end

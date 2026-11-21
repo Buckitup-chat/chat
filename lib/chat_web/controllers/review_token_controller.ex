@@ -8,6 +8,7 @@ defmodule ChatWeb.ReviewTokenController do
   alias Chat.ReviewBot.TokenBinder
   alias Chat.ReviewBot.TokenCreator
   alias Chat.ReviewBot.Worker
+  alias ChatWeb.RateLimiter
   alias ChatWeb.Utils.IngestPop
 
   def create(conn, params) do
@@ -40,10 +41,7 @@ defmodule ChatWeb.ReviewTokenController do
         conn |> put_status(:forbidden) |> json(%{error: "No live vouch for this bot"})
 
       {:error, {:rate_limited, retry_after}} ->
-        conn
-        |> put_resp_header("retry-after", Integer.to_string(retry_after))
-        |> put_status(:too_many_requests)
-        |> json(%{error: "Too many requests"})
+        too_many_requests(conn, retry_after)
 
       {:error, reason} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
@@ -65,10 +63,21 @@ defmodule ChatWeb.ReviewTokenController do
   end
 
   defp check_rate_limit(origin_hash) do
-    case ChatWeb.RateLimiter.check({:token_create, origin_hash}) do
+    check_rate_limit_key({:token_create, origin_hash})
+  end
+
+  defp check_rate_limit_key(key) do
+    case RateLimiter.check(key) do
       :ok -> :ok
       {:error, retry_after} -> {:error, {:rate_limited, retry_after}}
     end
+  end
+
+  defp too_many_requests(conn, retry_after) do
+    conn
+    |> put_resp_header("retry-after", Integer.to_string(retry_after))
+    |> put_status(:too_many_requests)
+    |> json(%{error: "Too many requests"})
   end
 
   @bind_errors %{
@@ -82,11 +91,16 @@ defmodule ChatWeb.ReviewTokenController do
   }
 
   def bind(conn, %{"nonce" => nonce, "user_hash" => user_hash} = params) do
-    with {:ok, pop_context} <- IngestPop.context(params),
+    with :ok <- check_rate_limit_key({:token_bind_ip, conn.remote_ip}),
+         :ok <- check_rate_limit_key({:token_bind_user, user_hash}),
+         {:ok, pop_context} <- IngestPop.context(params),
          {:ok, bound_nonce} <- TokenBinder.bind(nonce, user_hash, pop_context) do
       url = "#{ChatWeb.Endpoint.url()}/r/#{bound_nonce}"
       json(conn, %{nonce: bound_nonce, url: url})
     else
+      {:error, {:rate_limited, retry_after}} ->
+        too_many_requests(conn, retry_after)
+
       {:error, {:unauthorized, msg}} ->
         conn |> put_status(:unauthorized) |> json(%{error: msg})
 

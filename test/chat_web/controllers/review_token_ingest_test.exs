@@ -28,9 +28,9 @@ defmodule ChatWeb.ReviewTokenIngestTest do
     :ets.delete_all_objects(:buckitup_deferred_records)
     start_bot_registry!()
 
-    ctx = Map.put(setup_origin_with_bot(), :conn, Sandbox.init_test_session(conn, Chat.Repo))
-    start_bot!(ctx)
-    ctx
+    setup_origin_with_bot()
+    |> Map.put(:conn, Sandbox.init_test_session(conn, Chat.Repo))
+    |> tap(&start_bot!/1)
   end
 
   # A second HTTP bind by the same reviewer trips on existing device vouches

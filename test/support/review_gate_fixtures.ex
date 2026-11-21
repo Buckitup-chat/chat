@@ -25,14 +25,15 @@ defmodule Chat.Test.ReviewGateFixtures do
   end
 
   def set_review_access(origin_hash, value) do
-    Repo.insert!(%OriginSetting{
+    %OriginSetting{
       origin_hash: origin_hash,
       key: "review_access",
       value: value,
       deleted_flag: false,
       owner_timestamp: 1,
       sign_b64: <<0::256>>
-    })
+    }
+    |> Repo.insert!()
   end
 
   def insert_origin_vouch(issuer_identity, origin_hash, subject_hash, scope_suffix, opts \\ []) do
@@ -46,7 +47,7 @@ defmodule Chat.Test.ReviewGateFixtures do
   end
 
   def insert_vouch(issuer_identity, issuer_hash, subject_hash, kind, opts \\ []) do
-    vt =
+    {:ok, _} =
       %VouchToken{
         kind: kind,
         issuer_hash: issuer_hash,
@@ -55,11 +56,9 @@ defmodule Chat.Test.ReviewGateFixtures do
         deleted_flag: Keyword.get(opts, :deleted_flag, false)
       }
       |> sign_with_key(issuer_identity.sign_skey)
-
-    {:ok, _} =
-      VouchTokenData.upsert_vouch_token(
-        VouchToken.create_changeset(%VouchToken{}, Map.from_struct(vt))
-      )
+      |> Map.from_struct()
+      |> then(&VouchToken.create_changeset(%VouchToken{}, &1))
+      |> VouchTokenData.upsert_vouch_token()
   end
 
   @doc "Exact bind vouch `origins.<oh>.reviews.write.<nonce_hash>` from the bot to the user."
@@ -77,7 +76,7 @@ defmodule Chat.Test.ReviewGateFixtures do
     nonce = "tok_#{:crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)}"
     bot_hash = User.extract_pq_card(bot_identity).user_hash
 
-    token =
+    {:ok, _} =
       %ReviewWriteToken{
         nonce_hash: ReviewWriteTokenNonceHash.from_nonce(nonce),
         nonce_enc_b64: Identity.wrap_nonce(nonce, bot_identity.crypt_skey),
@@ -89,11 +88,9 @@ defmodule Chat.Test.ReviewGateFixtures do
         owner_timestamp: System.os_time(:millisecond)
       }
       |> sign_with_hash(bot_identity.sign_skey, &ReviewWriteTokenSignHash.from_binary/1)
-
-    {:ok, _} =
-      TokenData.upsert_review_write_token(
-        ReviewWriteToken.create_changeset(%ReviewWriteToken{}, Map.from_struct(token))
-      )
+      |> Map.from_struct()
+      |> then(&ReviewWriteToken.create_changeset(%ReviewWriteToken{}, &1))
+      |> TokenData.upsert_review_write_token()
 
     nonce
   end

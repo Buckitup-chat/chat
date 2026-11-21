@@ -3,17 +3,26 @@ defmodule Chat.ReviewBot.TokenBinderTest do
   import Rewire
 
   alias Chat.Data.Schemas.ReviewWriteToken
+  alias Chat.Data.Types.ReviewWriteTokenNonceHash
 
   @bot_hash "u_bot"
   @origin_hash "u_origin"
   @reviewer_hash "u_reviewer"
   @nonce "test_nonce_abc"
+  @nonce_hash ReviewWriteTokenNonceHash.from_nonce(@nonce)
   @pop %{challenge: "test_challenge", signature: "test_sig"}
 
   defmodule Tokens do
+    def nonce_hash, do: ReviewWriteTokenNonceHash.from_nonce("test_nonce_abc")
+
+    def lookup(nonce_hash, token_fun) do
+      if nonce_hash == nonce_hash(), do: token_fun.()
+    end
+
     def order_linked do
       %ReviewWriteToken{
-        nonce: "test_nonce_abc",
+        nonce_hash: nonce_hash(),
+        nonce_enc_b64: "enc_test_nonce_abc",
         origin_hash: "u_origin",
         review_bot_hash: "u_bot",
         origin_order_hash: "org_ord_1",
@@ -30,7 +39,7 @@ defmodule Chat.ReviewBot.TokenBinderTest do
   end
 
   defmodule QueriesOrderLinked do
-    def get_review_write_token("test_nonce_abc"), do: Tokens.order_linked()
+    def get_review_write_token(hash), do: Tokens.lookup(hash, &Tokens.order_linked/0)
     def get_card("u_reviewer"), do: %{sign_pkey: "pkey_reviewer"}
     def valid_card?(_), do: true
     def get_vouch_token(_, _, _), do: %{deleted_flag: false}
@@ -38,7 +47,7 @@ defmodule Chat.ReviewBot.TokenBinderTest do
   end
 
   defmodule QueriesReusable do
-    def get_review_write_token("test_nonce_abc"), do: Tokens.reusable()
+    def get_review_write_token(hash), do: Tokens.lookup(hash, &Tokens.reusable/0)
     def get_card("u_reviewer"), do: %{sign_pkey: "pkey_reviewer"}
     def valid_card?(_), do: true
     def get_vouch_token(_, _, _), do: %{deleted_flag: false}
@@ -54,25 +63,25 @@ defmodule Chat.ReviewBot.TokenBinderTest do
   end
 
   defmodule QueriesReviewerNotFound do
-    def get_review_write_token("test_nonce_abc"), do: Tokens.order_linked()
+    def get_review_write_token(hash), do: Tokens.lookup(hash, &Tokens.order_linked/0)
     def get_card("u_reviewer"), do: nil
   end
 
   defmodule QueriesInvalidPop do
-    def get_review_write_token("test_nonce_abc"), do: Tokens.order_linked()
+    def get_review_write_token(hash), do: Tokens.lookup(hash, &Tokens.order_linked/0)
     def get_card("u_reviewer"), do: %{sign_pkey: "pkey_reviewer"}
     def valid_card?(_), do: true
   end
 
   defmodule QueriesNoOriginVouch do
-    def get_review_write_token("test_nonce_abc"), do: Tokens.order_linked()
+    def get_review_write_token(hash), do: Tokens.lookup(hash, &Tokens.order_linked/0)
     def get_card("u_reviewer"), do: %{sign_pkey: "pkey_reviewer"}
     def valid_card?(_), do: true
     def get_vouch_token(_, _, _), do: nil
   end
 
   defmodule QueriesNoDeviceVouch do
-    def get_review_write_token("test_nonce_abc"), do: Tokens.order_linked()
+    def get_review_write_token(hash), do: Tokens.lookup(hash, &Tokens.order_linked/0)
     def get_card("u_reviewer"), do: %{sign_pkey: "pkey_reviewer"}
     def valid_card?(_), do: true
     def get_vouch_token(_, _, _), do: %{deleted_flag: false}
@@ -92,6 +101,7 @@ defmodule Chat.ReviewBot.TokenBinderTest do
     def running?("u_bot"), do: true
     def info("u_bot"), do: %{origin_hash: "u_origin"}
     def sign("u_bot", _payload), do: "test_signature_b64"
+    def wrap_nonce("u_bot", nonce), do: "enc_" <> nonce
 
     def ingest("u_bot", mutations) do
       test_pid = Process.whereis(:binder_test)
@@ -116,9 +126,7 @@ defmodule Chat.ReviewBot.TokenBinderTest do
     def now_unix, do: 5000
   end
 
-  defmodule SignHashOk do
-    def from_binary(_), do: "rwt_test"
-  end
+  rewire(Chat.ReviewBot.RowBuilder, Worker: WorkerOk, Integrity: IntegrityOk, as: RowBuilderOk)
 
   describe "bind/3 order-linked" do
     test "sets user_hash on existing token and creates vouches" do
@@ -132,7 +140,7 @@ defmodule Chat.ReviewBot.TokenBinderTest do
           DeviceId: DeviceIdOk,
           Integrity: IntegrityOk,
           TimeKeeper: TimeKeeperOk,
-          ReviewWriteTokenSignHash: SignHashOk
+          RowBuilder: RowBuilderOk
         )
 
       assert {:ok, @nonce} = binder.bind(@nonce, @reviewer_hash, @pop)
@@ -148,8 +156,10 @@ defmodule Chat.ReviewBot.TokenBinderTest do
       assert length(token_mutations) == 1
 
       [token_mut] = token_mutations
-      assert token_mut["modified"]["nonce"] == @nonce
+      assert token_mut["modified"]["nonce_hash"] == @nonce_hash
+      assert token_mut["modified"]["nonce_enc_b64"] == "enc_" <> @nonce
       assert token_mut["modified"]["user_hash"] == @reviewer_hash
+      assert token_mut["modified"]["sign_b64"] == "test_signature_b64"
 
       origin_vouches =
         Enum.filter(vouch_mutations, &String.starts_with?(&1["modified"]["kind"], "origins."))
@@ -161,7 +171,7 @@ defmodule Chat.ReviewBot.TokenBinderTest do
       assert length(device_vouches) == 4
 
       [ov] = origin_vouches
-      assert ov["modified"]["kind"] == "origins.#{@origin_hash}.reviews.write.#{@nonce}"
+      assert ov["modified"]["kind"] == "origins.#{@origin_hash}.reviews.write.#{@nonce_hash}"
       assert ov["modified"]["issuer_hash"] == @bot_hash
       assert ov["modified"]["subject_hash"] == @reviewer_hash
 
@@ -179,7 +189,7 @@ defmodule Chat.ReviewBot.TokenBinderTest do
   end
 
   describe "bind/3 reusable" do
-    test "creates new token with parent_nonce, original stays untouched" do
+    test "creates new token with parent_nonce_hash, original stays untouched" do
       Process.register(self(), :binder_test)
 
       binder =
@@ -190,7 +200,7 @@ defmodule Chat.ReviewBot.TokenBinderTest do
           DeviceId: DeviceIdOk,
           Integrity: IntegrityOk,
           TimeKeeper: TimeKeeperOk,
-          ReviewWriteTokenSignHash: SignHashOk
+          RowBuilder: RowBuilderOk
         )
 
       assert {:ok, new_nonce} = binder.bind(@nonce, @reviewer_hash, @pop)
@@ -203,8 +213,15 @@ defmodule Chat.ReviewBot.TokenBinderTest do
 
       assert length(token_mutations) == 1
       [token_mut] = token_mutations
-      assert token_mut["modified"]["nonce"] == new_nonce
-      assert token_mut["modified"]["parent_nonce"] == @nonce
+      new_nonce_hash = ReviewWriteTokenNonceHash.from_nonce(new_nonce)
+      assert token_mut["modified"]["nonce_hash"] == new_nonce_hash
+      assert token_mut["modified"]["nonce_enc_b64"] == "enc_" <> new_nonce
+      assert token_mut["modified"]["parent_nonce_hash"] == @nonce_hash
+
+      [ov] =
+        Enum.filter(mutations, &String.starts_with?(&1["modified"]["kind"] || "", "origins."))
+
+      assert ov["modified"]["kind"] == "origins.#{@origin_hash}.reviews.write.#{new_nonce_hash}"
       assert token_mut["modified"]["user_hash"] == @reviewer_hash
       assert token_mut["modified"]["origin_order_hash"] == nil
     after

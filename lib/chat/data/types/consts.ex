@@ -25,5 +25,6 @@ defmodule Chat.Data.Types.Consts do
   def review_list_sign_prefix, do: "rvls_"
   def origin_bot_sign_prefix, do: "ob_"
   def review_write_token_sign_prefix, do: "rwt_"
+  def review_write_token_nonce_prefix, do: "rwn_"
   def origin_order_prefix, do: "org_ord_"
 end

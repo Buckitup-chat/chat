@@ -3,13 +3,14 @@ defmodule Chat.Data.Schemas.ReviewWriteTokenTest do
 
   alias Chat.Data.Schemas.ReviewWriteToken
 
-  @valid_nonce Base.url_encode64(:crypto.strong_rand_bytes(24), padding: false)
+  @valid_nonce_hash "rwn_" <> String.duplicate("12", 64)
   @valid_user_hash "u_" <> String.duplicate("ab", 64)
   @valid_bot_hash "u_" <> String.duplicate("cd", 64)
   @valid_sign_hash "rwt_" <> String.duplicate("ef", 64)
 
   @valid_attrs %{
-    nonce: @valid_nonce,
+    nonce_hash: @valid_nonce_hash,
+    nonce_enc_b64: :crypto.strong_rand_bytes(60),
     origin_hash: @valid_user_hash,
     review_bot_hash: @valid_bot_hash,
     deleted_flag: false,
@@ -30,7 +31,7 @@ defmodule Chat.Data.Schemas.ReviewWriteTokenTest do
           %ReviewWriteToken{},
           Map.merge(@valid_attrs, %{
             origin_order_hash: nil,
-            parent_nonce: nil,
+            parent_nonce_hash: nil,
             user_hash: nil,
             review_hash: nil
           })
@@ -44,7 +45,8 @@ defmodule Chat.Data.Schemas.ReviewWriteTokenTest do
       refute changeset.valid?
 
       for field <- [
-            :nonce,
+            :nonce_hash,
+            :nonce_enc_b64,
             :origin_hash,
             :review_bot_hash,
             :owner_timestamp,
@@ -69,6 +71,22 @@ defmodule Chat.Data.Schemas.ReviewWriteTokenTest do
         })
 
       assert changeset.valid?
+    end
+
+    test "ignores nonce_hash and nonce_enc_b64 changes" do
+      existing = struct(ReviewWriteToken, @valid_attrs)
+
+      changeset =
+        ReviewWriteToken.update_changeset(existing, %{
+          nonce_hash: "rwn_" <> String.duplicate("34", 64),
+          nonce_enc_b64: :crypto.strong_rand_bytes(60),
+          owner_timestamp: 2_000_000,
+          sign_b64: :crypto.strong_rand_bytes(64),
+          sign_hash: @valid_sign_hash
+        })
+
+      refute Map.has_key?(changeset.changes, :nonce_hash)
+      refute Map.has_key?(changeset.changes, :nonce_enc_b64)
     end
 
     test "requires update fields" do

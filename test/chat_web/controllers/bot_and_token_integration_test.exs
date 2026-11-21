@@ -22,8 +22,10 @@ defmodule ChatWeb.BotAndTokenIntegrationTest do
   alias Chat.Challenge
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.OriginBot
+  alias Chat.Data.Schemas.ReviewWriteToken
   alias Chat.Data.Schemas.VouchToken
   alias Chat.Data.Types.OriginBotSignHash
+  alias Chat.Data.Types.ReviewWriteTokenNonceHash
   alias Chat.Data.User
   alias Chat.Data.VouchToken, as: VouchTokenData
   alias Chat.DeviceId
@@ -234,7 +236,8 @@ defmodule ChatWeb.BotAndTokenIntegrationTest do
       assert bound_nonce != parent_nonce
       assert url =~ "/r/#{bound_nonce}"
 
-      origin_kind = "origins.#{ctx.origin_hash}.reviews.write.#{bound_nonce}"
+      origin_kind =
+        "origins.#{ctx.origin_hash}.reviews.write.#{ReviewWriteTokenNonceHash.from_nonce(bound_nonce)}"
 
       assert %{deleted_flag: false} =
                VouchTokenData.get_vouch_token(
@@ -276,6 +279,32 @@ defmodule ChatWeb.BotAndTokenIntegrationTest do
                  })
                )
                |> json_response(503)
+    end
+  end
+
+  describe "plaintext nonce exposure" do
+    test "no /shapes response and no stored row holds a plaintext nonce", ctx do
+      start_bot!(ctx)
+      put_gate(:open, ctx.owner_card)
+      parent_nonce = create_token!(ctx)
+      bound_nonce = bind_token!(ctx, parent_nonce)
+      nonces = [parent_nonce, bound_nonce]
+
+      tokens_body = get_shape(ctx.conn, "review_write_tokens").resp_body
+      assert tokens_body =~ ReviewWriteTokenNonceHash.from_nonce(parent_nonce)
+      assert tokens_body =~ ReviewWriteTokenNonceHash.from_nonce(bound_nonce)
+
+      vouches_body = get_shape(ctx.conn, "vouch_tokens").resp_body
+      assert vouches_body =~ ReviewWriteTokenNonceHash.from_nonce(bound_nonce)
+
+      stored =
+        [ReviewWriteToken, VouchToken]
+        |> Enum.flat_map(&Chat.Repo.all/1)
+        |> :erlang.term_to_binary()
+
+      for haystack <- [tokens_body, vouches_body, stored], nonce <- nonces do
+        refute haystack =~ nonce
+      end
     end
   end
 
@@ -359,6 +388,25 @@ defmodule ChatWeb.BotAndTokenIntegrationTest do
       |> json_response(200)
 
     nonce
+  end
+
+  defp bind_token!(ctx, nonce) do
+    {challenge_id, challenge} = Challenge.store()
+    signature = challenge |> EnigmaPq.sign(ctx.reviewer.sign_skey) |> b64()
+
+    body = %{
+      "nonce" => nonce,
+      "user_hash" => ctx.reviewer_card.user_hash,
+      "auth" => %{"challenge_id" => challenge_id, "signature" => signature}
+    }
+
+    %{"nonce" => bound_nonce} =
+      ctx.conn
+      |> put_req_header("content-type", "application/json")
+      |> post("/r/api/token/bind", Jason.encode!(body))
+      |> json_response(200)
+
+    bound_nonce
   end
 
   defp get_shape(conn, table),

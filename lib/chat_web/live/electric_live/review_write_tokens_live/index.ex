@@ -6,7 +6,7 @@ defmodule ChatWeb.ElectricLive.ReviewWriteTokensLive.Index do
     table: "review_write_tokens",
     schema: Chat.Data.Schemas.ReviewWriteToken
 
-  defp dom_id(%ReviewWriteToken{nonce: nonce}), do: "rwt-#{nonce}"
+  defp dom_id(%ReviewWriteToken{nonce_hash: nonce_hash}), do: "rwt-#{nonce_hash}"
 
   @impl true
   def render(assigns) do
@@ -29,7 +29,7 @@ defmodule ChatWeb.ElectricLive.ReviewWriteTokensLive.Index do
           >
             <div class="min-w-0 flex-1">
               <p class="text-sm font-medium text-gray-900 truncate">
-                Nonce: <span class="font-mono">{token.nonce}</span>
+                Nonce hash: <span class="font-mono">{token.nonce_hash}</span>
                 <span
                   :if={token.deleted_flag}
                   class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"

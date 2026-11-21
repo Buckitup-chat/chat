@@ -3,6 +3,7 @@ defmodule Chat.ReviewBot.GarbageCollectorTest do
   import Rewire
 
   alias Chat.Data.Schemas.ReviewWriteToken
+  alias Chat.Data.Types.ReviewWriteTokenNonceHash
 
   @bot_hash "u_" <> String.duplicate("ab", 64)
   @origin_hash "u_" <> String.duplicate("cd", 64)
@@ -16,13 +17,16 @@ defmodule Chat.ReviewBot.GarbageCollectorTest do
     end
   end
 
+  rewire(Chat.ReviewBot.RowBuilder, Worker: FakeWorker, as: FakeRowBuilder)
+
   defp expired_token(nonce, ts) do
     %ReviewWriteToken{
-      nonce: nonce,
+      nonce_hash: ReviewWriteTokenNonceHash.from_nonce(nonce),
+      nonce_enc_b64: "enc_" <> nonce,
       origin_hash: @origin_hash,
       review_bot_hash: @bot_hash,
       origin_order_hash: nil,
-      parent_nonce: nil,
+      parent_nonce_hash: nil,
       user_hash: nil,
       review_hash: nil,
       deleted_flag: false,
@@ -33,7 +37,7 @@ defmodule Chat.ReviewBot.GarbageCollectorTest do
   end
 
   defp gc do
-    rewire(Chat.ReviewBot.GarbageCollector, Worker: FakeWorker)
+    rewire(Chat.ReviewBot.GarbageCollector, Worker: FakeWorker, RowBuilder: FakeRowBuilder)
   end
 
   describe "soft_delete_tokens/2" do
@@ -44,7 +48,11 @@ defmodule Chat.ReviewBot.GarbageCollectorTest do
 
       assert_received {:ingested, @bot_hash, [mutation]}
       assert mutation["modified"]["deleted_flag"] == true
-      assert mutation["modified"]["nonce"] == "expired_1"
+
+      assert mutation["modified"]["nonce_hash"] ==
+               ReviewWriteTokenNonceHash.from_nonce("expired_1")
+
+      assert mutation["modified"]["nonce_enc_b64"] == "enc_expired_1"
       assert mutation["type"] == "insert"
     end
 
@@ -71,8 +79,9 @@ defmodule Chat.ReviewBot.GarbageCollectorTest do
 
       assert_received {:ingested, @bot_hash, [m1]}
       assert_received {:ingested, @bot_hash, [m2]}
-      nonces = MapSet.new([m1["modified"]["nonce"], m2["modified"]["nonce"]])
-      assert MapSet.equal?(nonces, MapSet.new(["n1", "n2"]))
+      hashes = MapSet.new([m1["modified"]["nonce_hash"], m2["modified"]["nonce_hash"]])
+      expected = MapSet.new(["n1", "n2"], &ReviewWriteTokenNonceHash.from_nonce/1)
+      assert MapSet.equal?(hashes, expected)
     end
   end
 end

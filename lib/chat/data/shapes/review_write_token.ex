@@ -11,7 +11,7 @@ defmodule Chat.Data.Shapes.ReviewWriteToken do
     persist: [
       upsert: &ReviewWriteTokenData.upsert_review_write_token/1,
       get: &ReviewWriteTokenData.get_review_write_token/1,
-      lookup_key: :nonce,
+      lookup_key: :nonce_hash,
       validate_insert: &Validation.validate_review_write_token_insert/1,
       validate_update: &Validation.validate_review_write_token_update/2
     ]

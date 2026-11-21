@@ -2,17 +2,30 @@ defmodule Chat.ReviewBot.TokenCreatorTest do
   use ExUnit.Case, async: true
   import Rewire
 
+  alias Chat.Data.Types.ReviewWriteTokenNonceHash
+  alias Chat.ReviewBot.Identity
+
   @fake_bot_hash "u_" <> String.duplicate("cd", 64)
 
   defmodule WorkerOk do
+    alias Chat.ReviewBot.Identity
+
     @origin_hash "u_" <> String.duplicate("ab", 64)
     @bot_hash "u_" <> String.duplicate("cd", 64)
 
     def running?(_), do: true
     def info(_), do: %{bot_hash: @bot_hash, origin_hash: @origin_hash}
     def sign(_, _), do: :crypto.strong_rand_bytes(100)
-    def ingest(_, _), do: {:ok, 1, []}
+    def crypt_skey, do: String.duplicate("k", 3168)
+    def wrap_nonce(_, nonce), do: Identity.wrap_nonce(nonce, crypt_skey())
+
+    def ingest(_, mutations) do
+      send(self(), {:ingested, mutations})
+      {:ok, 1, []}
+    end
   end
+
+  rewire(Chat.ReviewBot.RowBuilder, Worker: WorkerOk, as: RowBuilderOk)
 
   defmodule WorkerNotRunning do
     def running?(_), do: false
@@ -32,7 +45,13 @@ defmodule Chat.ReviewBot.TokenCreatorTest do
 
   describe "create/2" do
     test "creates order-linked token and returns nonce" do
-      creator = rewire(Chat.ReviewBot.TokenCreator, Worker: WorkerOk, VouchToken: LiveVouch)
+      creator =
+        rewire(Chat.ReviewBot.TokenCreator,
+          Worker: WorkerOk,
+          VouchToken: LiveVouch,
+          RowBuilder: RowBuilderOk
+        )
+
       order_hash = "org_ord_" <> String.duplicate("ef", 64)
 
       assert {:ok, nonce} = creator.create(@fake_bot_hash, order_hash)
@@ -40,8 +59,31 @@ defmodule Chat.ReviewBot.TokenCreatorTest do
       assert byte_size(nonce) == 32
     end
 
+    test "row is keyed by nonce hash and carries only the bot-encrypted nonce" do
+      creator =
+        rewire(Chat.ReviewBot.TokenCreator,
+          Worker: WorkerOk,
+          VouchToken: LiveVouch,
+          RowBuilder: RowBuilderOk
+        )
+
+      assert {:ok, nonce} = creator.create(@fake_bot_hash)
+      assert_received {:ingested, [%{"modified" => row}]}
+
+      assert row["nonce_hash"] == ReviewWriteTokenNonceHash.from_nonce(nonce)
+      assert byte_size(row["nonce_enc_b64"]) == 60
+      assert {:ok, ^nonce} = Identity.unwrap_nonce(row["nonce_enc_b64"], WorkerOk.crypt_skey())
+      refute Map.has_key?(row, "nonce")
+      refute row |> :erlang.term_to_binary() |> String.contains?(nonce)
+    end
+
     test "creates reusable token (nil origin_order_hash)" do
-      creator = rewire(Chat.ReviewBot.TokenCreator, Worker: WorkerOk, VouchToken: LiveVouch)
+      creator =
+        rewire(Chat.ReviewBot.TokenCreator,
+          Worker: WorkerOk,
+          VouchToken: LiveVouch,
+          RowBuilder: RowBuilderOk
+        )
 
       assert {:ok, nonce} = creator.create(@fake_bot_hash)
       assert is_binary(nonce)
@@ -49,7 +91,12 @@ defmodule Chat.ReviewBot.TokenCreatorTest do
     end
 
     test "nonce is URL-safe base64 encoding of 24 random bytes" do
-      creator = rewire(Chat.ReviewBot.TokenCreator, Worker: WorkerOk, VouchToken: LiveVouch)
+      creator =
+        rewire(Chat.ReviewBot.TokenCreator,
+          Worker: WorkerOk,
+          VouchToken: LiveVouch,
+          RowBuilder: RowBuilderOk
+        )
 
       {:ok, nonce} = creator.create(@fake_bot_hash)
 
@@ -58,7 +105,12 @@ defmodule Chat.ReviewBot.TokenCreatorTest do
     end
 
     test "each call generates a unique nonce" do
-      creator = rewire(Chat.ReviewBot.TokenCreator, Worker: WorkerOk, VouchToken: LiveVouch)
+      creator =
+        rewire(Chat.ReviewBot.TokenCreator,
+          Worker: WorkerOk,
+          VouchToken: LiveVouch,
+          RowBuilder: RowBuilderOk
+        )
 
       {:ok, nonce1} = creator.create(@fake_bot_hash)
       {:ok, nonce2} = creator.create(@fake_bot_hash)

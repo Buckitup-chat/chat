@@ -15,9 +15,11 @@ defmodule Chat.Data.ReviewOriginGateTest do
   alias Chat.Data.Schemas.OriginSetting, as: OriginSettingSchema
   alias Chat.Data.Schemas.ReviewWriteToken
   alias Chat.Data.Schemas.VouchToken
+  alias Chat.Data.Types.ReviewWriteTokenNonceHash
   alias Chat.Data.Types.ReviewWriteTokenSignHash
   alias Chat.Data.User
   alias Chat.Data.VouchToken, as: VouchTokenData
+  alias Chat.ReviewBot.Identity
   alias Phoenix.Sync.Writer.Operation
 
   setup do
@@ -221,7 +223,8 @@ defmodule Chat.Data.ReviewOriginGateTest do
 
     token =
       %ReviewWriteToken{
-        nonce: nonce,
+        nonce_hash: ReviewWriteTokenNonceHash.from_nonce(nonce),
+        nonce_enc_b64: Identity.wrap_nonce(nonce, bot_identity.crypt_skey),
         origin_hash: origin_hash,
         review_bot_hash: bot_hash,
         user_hash: user_hash,

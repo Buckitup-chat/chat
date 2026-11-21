@@ -67,8 +67,8 @@ defmodule Chat.Data.ReviewWriteToken.Validation do
     do: changes["review_bot_hash"] || changes[:review_bot_hash]
 
   # Update `original` carries only the primary key; trust the stored row's bot
-  defp review_bot_hash(%Operation{data: %{"nonce" => nonce}}) do
-    case ReviewWriteTokenData.get_review_write_token(nonce) do
+  defp review_bot_hash(%Operation{data: %{"nonce_hash" => nonce_hash}}) do
+    case ReviewWriteTokenData.get_review_write_token(nonce_hash) do
       %ReviewWriteToken{review_bot_hash: hash} -> hash
       nil -> nil
     end

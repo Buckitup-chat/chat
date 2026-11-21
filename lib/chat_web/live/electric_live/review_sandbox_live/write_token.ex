@@ -133,8 +133,8 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.WriteToken do
         </p>
         <div class="space-y-0.5 text-xs text-gray-600">
           <p>
-            <span class="font-medium">Nonce:</span>
-            <span class="font-mono">{@wt_token.nonce}</span>
+            <span class="font-medium">Nonce hash:</span>
+            <span class="font-mono">{@wt_token.nonce_hash}</span>
           </p>
           <p>
             <span class="font-medium">Origin:</span>

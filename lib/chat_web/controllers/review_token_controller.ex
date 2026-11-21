@@ -4,6 +4,7 @@ defmodule ChatWeb.ReviewTokenController do
   use ChatWeb, :controller
 
   alias Chat.Data.ReviewWriteToken
+  alias Chat.Data.Types.ReviewWriteTokenNonceHash
   alias Chat.ReviewBot.TokenBinder
   alias Chat.ReviewBot.TokenCreator
   alias Chat.ReviewBot.Worker
@@ -96,7 +97,9 @@ defmodule ChatWeb.ReviewTokenController do
   end
 
   def show(conn, %{"nonce" => nonce}) do
-    case ReviewWriteToken.get_review_write_token(nonce) do
+    case nonce
+         |> ReviewWriteTokenNonceHash.from_nonce()
+         |> ReviewWriteToken.get_review_write_token() do
       nil -> render_expired(conn)
       %{deleted_flag: true} -> render_expired(conn)
       _token -> serve_app(conn)

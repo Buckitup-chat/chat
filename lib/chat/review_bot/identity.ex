@@ -5,6 +5,7 @@ defmodule Chat.ReviewBot.Identity do
 
   @origin_salt "buckitup/origin-bot/v1"
   @auth_token_salt "buckitup/origin-bot-auth/v1"
+  @nonce_salt "buckitup/review-token-nonce/v1"
   @version 1
 
   def origin_salt, do: @origin_salt
@@ -65,6 +66,23 @@ defmodule Chat.ReviewBot.Identity do
     wrap_key = EnigmaPq.hkdf_derive(shared_secret, @auth_token_salt, "wrap")
     EnigmaPq.aes_gcm_encrypt(auth_token, wrap_key)
   end
+
+  # Symmetric on purpose: the bot both writes and reads `nonce_enc_b64`, so a KEM
+  # wrap (as in `wrap_token/2`) would only add a 1568-byte ciphertext per row.
+  def wrap_nonce(nonce, crypt_skey) when is_binary(nonce) do
+    EnigmaPq.aes_gcm_encrypt(nonce, nonce_key(crypt_skey))
+  end
+
+  def unwrap_nonce(nonce_enc, crypt_skey) when is_binary(nonce_enc) do
+    case EnigmaPq.aes_gcm_decrypt(nonce_enc, nonce_key(crypt_skey)) do
+      nonce when is_binary(nonce) -> {:ok, nonce}
+      _ -> {:error, :decryption_failed}
+    end
+  end
+
+  # Derived from the exact `crypt_skey` bytes `encode/1` stores; changing that
+  # format makes every stored `nonce_enc_b64` undecryptable.
+  def nonce_key(crypt_skey), do: EnigmaPq.hkdf_derive(crypt_skey, @nonce_salt, "nonce")
 
   def matches_card?(identity, user_card) do
     probe = :crypto.strong_rand_bytes(32)

@@ -28,9 +28,11 @@ defmodule ChatWeb.ElectricControllerReviewTest do
   alias Chat.Data.Types.ReviewPasswordSignHash
   alias Chat.Data.Types.ReviewSignHash
   alias Chat.Data.Schemas.VouchToken
+  alias Chat.Data.Types.ReviewWriteTokenNonceHash
   alias Chat.Data.Types.ReviewWriteTokenSignHash
   alias Chat.Data.User, as: UserData
   alias Chat.Data.VouchToken, as: VouchTokenData
+  alias Chat.ReviewBot.Identity
   alias EnigmaPq
 
   setup %{conn: conn} do
@@ -128,7 +130,11 @@ defmodule ChatWeb.ElectricControllerReviewTest do
       assert conn.status == 200, conn.resp_body
       assert ReviewData.get_review(review_hash) != nil
 
-      token = Chat.Data.ReviewWriteToken.get_review_write_token(nonce)
+      token =
+        nonce
+        |> ReviewWriteTokenNonceHash.from_nonce()
+        |> Chat.Data.ReviewWriteToken.get_review_write_token()
+
       assert token.review_hash == review_hash
     end
 
@@ -608,7 +614,8 @@ defmodule ChatWeb.ElectricControllerReviewTest do
 
     token =
       %Chat.Data.Schemas.ReviewWriteToken{
-        nonce: nonce,
+        nonce_hash: ReviewWriteTokenNonceHash.from_nonce(nonce),
+        nonce_enc_b64: Identity.wrap_nonce(nonce, bot.crypt_skey),
         origin_hash: origin_hash,
         review_bot_hash: bot_card.user_hash,
         user_hash: user_hash,

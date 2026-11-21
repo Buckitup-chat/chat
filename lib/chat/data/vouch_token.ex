@@ -127,23 +127,10 @@ defmodule Chat.Data.VouchToken do
     subject_hash |> live_scoped_query(scope_prefix) |> Repo.exists?()
   end
 
-  @doc "Live vouch under `scope_prefix` whose first child segment starts with `only:`."
-  def scoped_vouch_exists?(subject_hash, scope_prefix, only: child_prefix) do
-    pattern = like_escape(scope_prefix <> "." <> child_prefix) <> "%"
-
+  @doc "Kinds of live vouches for `subject_hash` under `scope_prefix`."
+  def scoped_vouch_kinds(subject_hash, scope_prefix) do
     subject_hash
     |> live_scoped_query(scope_prefix)
-    |> where([vt], like(vt.kind, ^pattern))
-    |> Repo.exists?()
-  end
-
-  @doc "Kinds of live vouches under `scope_prefix`, skipping children starting with `excluding:`."
-  def scoped_vouch_kinds(subject_hash, scope_prefix, excluding: child_prefix) do
-    pattern = like_escape(scope_prefix <> "." <> child_prefix) <> "%"
-
-    subject_hash
-    |> live_scoped_query(scope_prefix)
-    |> where([vt], not like(vt.kind, ^pattern))
     |> select([vt], vt.kind)
     |> Repo.all()
   end
@@ -152,7 +139,7 @@ defmodule Chat.Data.VouchToken do
     from(vt in VouchToken,
       where:
         vt.subject_hash == ^subject_hash and
-          like(vt.kind, ^(scope_prefix <> ".%")) and
+          like(vt.kind, ^(like_escape(scope_prefix) <> ".%")) and
           vt.deleted_flag == false
     )
   end

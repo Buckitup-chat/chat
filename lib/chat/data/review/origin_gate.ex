@@ -37,15 +37,27 @@ defmodule Chat.Data.Review.OriginGate do
   defp nonce_from(_pop_context), do: nil
 
   defp check_access(access, origin_hash, author_hash, nonce) do
-    scope = write_scope(origin_hash)
-
     cond do
       access == "open" -> :ok
       access != "invite_only" -> {:error, "not invited"}
       author_hash == origin_hash -> :ok
-      direct_vouch?(origin_hash, author_hash, scope) -> :ok
       is_binary(nonce) -> :ok
-      token_vouch?(author_hash, scope) -> {:error, "nonce required"}
+      true -> check_invited(origin_hash, author_hash)
+    end
+  end
+
+  defp check_invited(origin_hash, author_hash) do
+    scope = write_scope(origin_hash)
+    token_kind_prefix = "#{scope}.#{token_child_prefix()}"
+
+    {token_kinds, direct_kinds} =
+      author_hash
+      |> VouchTokenData.scoped_vouch_kinds(scope)
+      |> Enum.split_with(&String.starts_with?(&1, token_kind_prefix))
+
+    cond do
+      direct_vouch?(origin_hash, author_hash, direct_kinds) -> :ok
+      token_kinds != [] -> {:error, "nonce required"}
       true -> {:error, "not invited"}
     end
   end
@@ -105,19 +117,13 @@ defmodule Chat.Data.Review.OriginGate do
 
   defp check_bind_chain(_access, _origin_hash, _author_hash, _kind), do: :ok
 
-  defp direct_vouch?(origin_hash, author_hash, scope) do
-    author_hash
-    |> VouchTokenData.scoped_vouch_kinds(scope, excluding: token_child_prefix())
-    |> Enum.any?(fn kind ->
+  defp direct_vouch?(origin_hash, author_hash, kinds) do
+    Enum.any?(kinds, fn kind ->
       match?(
         {:ok, _},
         VouchTokenData.chain_distance(origin_hash, author_hash, kind, WriteGate.max_depth())
       )
     end)
-  end
-
-  defp token_vouch?(author_hash, scope) do
-    VouchTokenData.scoped_vouch_exists?(author_hash, scope, only: token_child_prefix())
   end
 
   defp write_scope(origin_hash), do: "origins.#{origin_hash}.reviews.write"

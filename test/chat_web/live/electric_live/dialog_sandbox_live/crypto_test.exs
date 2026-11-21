@@ -2,7 +2,9 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.CryptoTest do
   use ExUnit.Case, async: true
 
   alias Chat.Data.Types.UserHash
+  alias Chat.Data.User
   alias ChatWeb.ElectricLive.DialogSandboxLive.Crypto
+  alias ChatWeb.ElectricLive.UserSandboxLive.Identity
 
   describe "reaction decryption / [no key]" do
     test "reactor reads their own reaction (own key always in cache)" do
@@ -116,6 +118,34 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.CryptoTest do
                {:error, "contact_skey does not match contact_pkey"}
     end
 
+    test "accepts an identity exported by the user sandbox" do
+      user = User.generate_pq_identity("Owner")
+      card = User.extract_pq_card(user)
+
+      json =
+        user
+        |> Map.merge(%{
+          user_hash: card.user_hash,
+          crypt_cert: card.crypt_cert,
+          contact_cert: card.contact_cert,
+          owner_timestamp: 0
+        })
+        |> Identity.to_json()
+
+      assert {:ok, %{user_hash: user_hash, contact_skey: contact_skey}} =
+               Crypto.parse_and_validate_identity(json)
+
+      assert user_hash == card.user_hash
+      assert contact_skey == user.contact_skey
+    end
+
+    test "refuses a malformed contact secret key" do
+      json = identity_json(%{identity_keys() | contact_skey: ""})
+
+      assert Crypto.parse_and_validate_identity(json) ==
+               {:error, "contact_skey does not match contact_pkey"}
+    end
+
     test "refuses a malformed crypt secret key" do
       json = identity_json(%{identity_keys() | crypt_skey: ""})
 
@@ -124,22 +154,18 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.CryptoTest do
     end
   end
 
+  # Keys as the app generates them: secp256k1 contact pair, ML-KEM crypt pair
   defp identity_keys do
-    {sign_pkey, sign_skey} = EnigmaPq.generate_sign_keypair()
-    {crypt_pkey, crypt_skey} = EnigmaPq.generate_crypt_keypair()
-    {contact_pkey, contact_skey} = EnigmaPq.generate_crypt_keypair()
+    identity = User.generate_pq_identity("Owner")
+    card = User.extract_pq_card(identity)
 
-    %{
-      user_hash: sign_pkey |> EnigmaPq.hash() |> Chat.Data.Types.UserHash.from_binary(),
-      sign_pkey: sign_pkey,
-      sign_skey: sign_skey,
-      crypt_pkey: crypt_pkey,
-      crypt_skey: crypt_skey,
-      crypt_cert: EnigmaPq.sign(crypt_pkey, sign_skey),
-      contact_pkey: contact_pkey,
-      contact_skey: contact_skey,
-      contact_cert: EnigmaPq.sign(contact_pkey, sign_skey)
-    }
+    identity
+    |> Map.take(~W(sign_pkey sign_skey crypt_pkey crypt_skey contact_pkey contact_skey)a)
+    |> Map.merge(%{
+      user_hash: card.user_hash,
+      crypt_cert: card.crypt_cert,
+      contact_cert: card.contact_cert
+    })
   end
 
   defp identity_json(keys) do

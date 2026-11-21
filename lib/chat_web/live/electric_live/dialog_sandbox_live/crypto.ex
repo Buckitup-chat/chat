@@ -230,8 +230,12 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
          {:ok, keys} <- decode_identity_keys(data),
          :ok <- verify_user_hash(data["user_hash"], keys),
          :ok <- verify_sign_keypair(keys),
-         :ok <- verify_kem_keypairs(keys) do
+         {:crypt, true} <- {:crypt, kem_round_trip?({keys.crypt_pkey, keys.crypt_skey})},
+         {:contact, true} <- {:contact, ecdh_pair?({keys.contact_pkey, keys.contact_skey})} do
       {:ok, build_user_data(data, keys)}
+    else
+      {name, false} -> {:error, "#{name}_skey does not match #{name}_pkey"}
+      error -> error
     end
   end
 
@@ -269,16 +273,14 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
     _ in [ArgumentError, ErlangError] -> {:error, @keypair_mismatch}
   end
 
-  defp verify_kem_keypairs(keys) do
-    [crypt: {keys.crypt_pkey, keys.crypt_skey}, contact: {keys.contact_pkey, keys.contact_skey}]
-    |> Enum.find_value(:ok, fn {name, pair} ->
-      if kem_round_trip?(pair),
-        do: nil,
-        else: {:error, "#{name}_skey does not match #{name}_pkey"}
-    end)
+  # contact keys are secp256k1 (Enigma.generate_keys/0), not ML-KEM
+  defp ecdh_pair?({pkey, skey}) do
+    Enigma.private_to_public(skey) == pkey
+  rescue
+    _ -> false
   end
 
-  # ML-KEM implicit rejection: a foreign skey decapsulates to a different secret
+  # crypt keys: ML-KEM implicit rejection: a foreign skey decapsulates to a different secret
   defp kem_round_trip?({pkey, skey}) do
     {secret, ciphertext} = EnigmaPq.encapsulate_secret(pkey)
     secret == EnigmaPq.decapsulate_secret(ciphertext, skey)

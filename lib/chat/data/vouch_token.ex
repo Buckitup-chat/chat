@@ -124,15 +124,27 @@ defmodule Chat.Data.VouchToken do
   end
 
   def scoped_vouch_exists?(subject_hash, scope_prefix) do
-    Repo.exists?(
-      from(vt in VouchToken,
-        where:
-          vt.subject_hash == ^subject_hash and
-            like(vt.kind, ^(scope_prefix <> ".%")) and
-            vt.deleted_flag == false
-      )
+    subject_hash |> live_scoped_query(scope_prefix) |> Repo.exists?()
+  end
+
+  @doc "Kinds of live vouches for `subject_hash` under `scope_prefix`."
+  def scoped_vouch_kinds(subject_hash, scope_prefix) do
+    subject_hash
+    |> live_scoped_query(scope_prefix)
+    |> select([vt], vt.kind)
+    |> Repo.all()
+  end
+
+  defp live_scoped_query(subject_hash, scope_prefix) do
+    from(vt in VouchToken,
+      where:
+        vt.subject_hash == ^subject_hash and
+          like(vt.kind, ^(like_escape(scope_prefix) <> ".%")) and
+          vt.deleted_flag == false
     )
   end
+
+  defp like_escape(text), do: String.replace(text, ["\\", "%", "_"], &("\\" <> &1))
 
   def upsert_vouch_token(changeset) do
     Repo.insert(changeset,

@@ -1,25 +1,18 @@
 defmodule Chat.Data.ReviewOriginGateTest do
   @moduledoc """
   Origin gate for review ingest: when `review_access = invite_only`,
-  new reviews require a token-scoped vouch for the author
-  at `origins.<origin_hash>.reviews.write.<nonce>`.
+  new reviews require a scoped vouch for the author under
+  `origins.<origin_hash>.reviews.write.` (direct) or a valid nonce.
 
   The gate runs in the `check` phase (before changeset validation).
   """
   use ChatWeb.DataCase, async: true, group: :ets_deferred
 
   import Chat.Test.ReviewFixtures
+  import Chat.Test.ReviewGateFixtures
 
   alias Chat.Data.Review.Validation
-  alias Chat.Data.ReviewWriteToken, as: TokenData
-  alias Chat.Data.Schemas.OriginSetting, as: OriginSettingSchema
-  alias Chat.Data.Schemas.ReviewWriteToken
-  alias Chat.Data.Schemas.VouchToken
-  alias Chat.Data.Types.ReviewWriteTokenNonceHash
-  alias Chat.Data.Types.ReviewWriteTokenSignHash
   alias Chat.Data.User
-  alias Chat.Data.VouchToken, as: VouchTokenData
-  alias Chat.ReviewBot.Identity
   alias Phoenix.Sync.Writer.Operation
 
   setup do
@@ -119,8 +112,9 @@ defmodule Chat.Data.ReviewOriginGateTest do
       assert :ok == check_insert(ctx.author_hash, ctx.origin_hash)
     end
 
-    test "passes with valid bound token", ctx do
+    test "passes with valid bound token and its bind vouch", ctx do
       nonce = insert_bound_token(ctx.bot, ctx.origin_hash, ctx.author_hash)
+      insert_bind_vouch(ctx.bot, ctx.origin_hash, ctx.author_hash, nonce)
       assert :ok == check_insert(ctx.author_hash, ctx.origin_hash, %{nonce: nonce})
     end
 
@@ -164,81 +158,5 @@ defmodule Chat.Data.ReviewOriginGateTest do
       assert {:error, "token mismatch"} ==
                check_insert(ctx.author_hash, ctx.origin_hash, %{nonce: nonce})
     end
-  end
-
-  # --- Helpers ---
-
-  defp check_insert(author_hash, origin_hash, pop_context \\ %{}) do
-    operation = %Operation{
-      operation: :insert,
-      changes: %{"author_hash" => author_hash, "origin_hash" => origin_hash}
-    }
-
-    Validation.check_review_gate(operation, pop_context)
-  end
-
-  defp set_review_access(origin_hash, value) do
-    Repo.insert!(%OriginSettingSchema{
-      origin_hash: origin_hash,
-      key: "review_access",
-      value: value,
-      deleted_flag: false,
-      owner_timestamp: 1,
-      sign_b64: <<0::256>>
-    })
-  end
-
-  defp insert_origin_vouch(issuer_identity, origin_hash, subject_hash, scope_suffix, opts \\ []) do
-    insert_vouch(
-      issuer_identity,
-      User.extract_pq_card(issuer_identity).user_hash,
-      subject_hash,
-      "origins.#{origin_hash}.#{scope_suffix}",
-      opts
-    )
-  end
-
-  defp insert_vouch(issuer_identity, issuer_hash, subject_hash, kind, opts \\ []) do
-    vt =
-      %VouchToken{
-        kind: kind,
-        issuer_hash: issuer_hash,
-        subject_hash: subject_hash,
-        owner_timestamp: Keyword.get(opts, :ts, System.os_time(:millisecond)),
-        deleted_flag: Keyword.get(opts, :deleted_flag, false)
-      }
-      |> sign_with_key(issuer_identity.sign_skey)
-
-    {:ok, _} =
-      VouchTokenData.upsert_vouch_token(
-        VouchToken.create_changeset(%VouchToken{}, Map.from_struct(vt))
-      )
-  end
-
-  defp insert_bound_token(bot_identity, origin_hash, user_hash, opts \\ []) do
-    nonce = "tok_#{:crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)}"
-    bot_hash = User.extract_pq_card(bot_identity).user_hash
-
-    review_hash = Keyword.get(opts, :review_hash)
-
-    token =
-      %ReviewWriteToken{
-        nonce_hash: ReviewWriteTokenNonceHash.from_nonce(nonce),
-        nonce_enc_b64: Identity.wrap_nonce(nonce, bot_identity.crypt_skey),
-        origin_hash: origin_hash,
-        review_bot_hash: bot_hash,
-        user_hash: user_hash,
-        review_hash: review_hash,
-        deleted_flag: Keyword.get(opts, :deleted_flag, false),
-        owner_timestamp: System.os_time(:millisecond)
-      }
-      |> sign_with_hash(bot_identity.sign_skey, &ReviewWriteTokenSignHash.from_binary/1)
-
-    {:ok, _} =
-      TokenData.upsert_review_write_token(
-        ReviewWriteToken.create_changeset(%ReviewWriteToken{}, Map.from_struct(token))
-      )
-
-    nonce
   end
 end

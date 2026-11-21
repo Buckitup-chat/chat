@@ -34,6 +34,7 @@ defmodule Chat.Data.ReviewWriteToken.Validation do
     |> ReviewWriteToken.update_changeset(attrs)
     |> UserValidation.validate_signature()
     |> UserValidation.validate_timestamp_newer_than_existing()
+    |> validate_set_once([:user_hash, :review_hash])
   end
 
   # --- HTTP ingestion ---
@@ -60,6 +61,24 @@ defmodule Chat.Data.ReviewWriteToken.Validation do
         |> ReviewWriteToken.update_changeset(changes)
         |> UserValidation.validate_signature()
         |> UserValidation.validate_timestamp_newer_than_existing()
+        |> validate_set_once([:user_hash, :review_hash])
+    end
+  end
+
+  @doc """
+  Refuses changing `fields` that already hold a value in `changeset.data`.
+  nil -> value and value -> same value pass (the latter produces no change).
+  """
+  def validate_set_once(changeset, fields) do
+    fields
+    |> Enum.filter(&set_field_changed?(changeset, &1))
+    |> Enum.reduce(changeset, &Ecto.Changeset.add_error(&2, &1, "already set"))
+  end
+
+  defp set_field_changed?(changeset, field) do
+    case Map.get(changeset.data, field) do
+      nil -> false
+      _ -> match?({:ok, _}, Ecto.Changeset.fetch_change(changeset, field))
     end
   end
 

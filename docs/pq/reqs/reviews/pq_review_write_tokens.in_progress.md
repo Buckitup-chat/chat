@@ -12,14 +12,14 @@ The origin identity generates a short URL (printable as QR, shareable via NFC/te
 
 A write token progresses through these states:
 
-| State | `user_hash` | `review_hash` | `deleted_flag` | `parent_nonce` | Behavior on visit |
+| State | `user_hash` | `review_hash` | `deleted_flag` | `parent_nonce_hash` | Behavior on visit |
 |-------|-------------|---------------|----------------|----------------|-------------------|
 | **pending** | null | null | false | null | Identity gate → bind → review form |
 | **bound** | set | null | false | null or set | Review form (same user) / 403 (different user) |
 | **reviewed** | set | set | false | null or set | Redirect to review (view/edit) |
 | **soft-deleted** | null | null | true | null | "This link has expired" |
 
-`parent_nonce` is null on order-linked tokens and on the reusable parent. It is set on bound copies created from a reusable parent.
+`parent_nonce_hash` is null on order-linked tokens and on the reusable parent. It is set on bound copies created from a reusable parent.
 
 ```
                     ┌─────────── order-linked (origin_order_hash set) ───────────┐
@@ -33,7 +33,7 @@ pending  ──visit──▶ │ identity gate  ──PoP──▶  bound  ─�
    │                ┌─────────── reusable (origin_order_hash null) ──────────────┐
    │                │                                                            │
    ├──visit──▶      │ identity gate  ──PoP──▶  NEW bound token (fresh nonce,    │
-   │                │                           parent_nonce = this nonce)       │
+   │                │                    parent_nonce_hash = H(this nonce))      │
    │                │                           original stays pending           │
    │                └────────────────────────────────────────────────────────────┘
    │
@@ -122,7 +122,7 @@ On token bind, the review bot creates two vouch tokens — one per gate:
 
 ```
 Vouch 1 (origin gate):
-  kind:         origins.<origin_hash>.reviews.write.<nonce>
+  kind:         origins.<origin_hash>.reviews.write.<nonce_hash>
   issuer_hash:  review_bot_hash
   subject_hash: reviewer_hash
   sign_b64:     signed with review bot's sign_skey
@@ -134,9 +134,11 @@ Vouch 2 (device gate):
   sign_b64:     signed with review bot's sign_skey
 ```
 
-Attenuation holds in both trees: `reviews.write.<nonce>` is prefix-contained by `reviews.write`; `storage.write.<review_shapes>` is prefix-contained by the bot's own device write scope (see [Scope Attenuation](../pq_vouch_tokens.in_progress.md#scope-attenuation)). The bot cannot delegate wider than what it was granted.
+Attenuation holds in both trees: `reviews.write.<nonce_hash>` is prefix-contained by `reviews.write`; `storage.write.<review_shapes>` is prefix-contained by the bot's own device write scope (see [Scope Attenuation](../pq_vouch_tokens.in_progress.md#scope-attenuation)). The bot cannot delegate wider than what it was granted.
 
 The full verifiable chain: origin vouched review bot → review bot delegated to reviewer → reviewer wrote the review (ML-DSA-87 signed). Any peer can walk this chain using only public keys from `user_cards` and the vouch token rows.
+
+The kind carries `nonce_hash`, never the nonce: vouch rows are public, and a plaintext nonce in a kind would hand anyone reading `vouch_tokens` a bindable link.
 
 ---
 
@@ -147,6 +149,22 @@ https://<host>/r/<nonce>
 ```
 
 `<nonce>` is 24 random bytes, URL-safe base64 encoded (32 characters). Short enough for QR codes and NFC payloads. The full URL is the QR payload — no app-specific scanner required.
+
+### Nonce secrecy
+
+The nonce is a bearer secret: whoever holds it can bind the token. It is never stored or synced in plaintext. Everything persisted is keyed by
+
+```
+nonce_hash = "rwn_" <> hex(SHA3-512(nonce))     # EnigmaPq.hash/1, Types.ReviewWriteTokenNonceHash
+```
+
+The plaintext nonce exists only in:
+
+- the `POST /r/api/token/create` and `POST /r/api/token/bind` responses
+- the `/r/<nonce>` URL (QR / link)
+- review ingest `auth.nonce`
+
+Every entry point hashes the nonce first and works with `nonce_hash` from there on.
 
 ---
 
@@ -160,13 +178,14 @@ Tokens are created by the review bot on the device when an order is opened. Ever
 
 ```
 review_write_tokens
-├── nonce              — TEXT PK (URL-safe base64, 32 chars)
+├── nonce_hash         — TEXT PK, prefix "rwn_" (SHA3-512 of the nonce)
+├── nonce_enc_b64      — BYTEA NOT NULL (AES-256-GCM of the nonce, bot-only key)
 ├── origin_hash        — TEXT NOT NULL, FK → origins(origin_hash)
 ├── review_bot_hash    — TEXT NOT NULL, FK → user_cards(user_hash), prefix "u_" (signer — Signable lookup key)
 ├── origin_order_hash  — TEXT, nullable, prefix "org_ord_" (the order that triggered this token; null = reusable invitation)
-├── parent_nonce       — TEXT, nullable (set on bound copies of a reusable token; points to the parent's nonce)
-├── user_hash          — TEXT, nullable (null = pending; set = bound)
-├── review_hash        — TEXT, nullable (set once review is written)
+├── parent_nonce_hash  — TEXT, nullable, prefix "rwn_" (set on bound copies of a reusable token; the parent's nonce_hash)
+├── user_hash          — TEXT, nullable (null = pending; set = bound; set-once)
+├── review_hash        — TEXT, nullable (set once review is written; set-once)
 ├── deleted_flag       — BOOLEAN NOT NULL DEFAULT false (soft-delete marker)
 ├── owner_timestamp    — BIGINT NOT NULL (bot clock, LWW)
 ├── sign_b64           — BYTEA NOT NULL (signed by review bot's sign_skey)
@@ -181,13 +200,26 @@ review_write_tokens
 
 **`sign_b64` + `sign_hash`** — integrity triad. The review bot signs every token row (create, bind, review-hash capture, GC tombstone). Any device holding the bot identity can verify and update tokens.
 
-**`parent_nonce`** — nullable. Set on bound tokens created from a reusable (order-less) parent. Points to the original pending token's nonce. Null on order-linked tokens and on the reusable parent itself.
+**`nonce_hash`** — primary key, `rwn_` + SHA3-512 of the nonce (`Types.ReviewWriteTokenNonceHash.from_nonce/1`). Every lookup — `/r/<nonce>`, bind, review ingest — hashes the nonce and reads by this key, so none of them needs the bot. There are no plaintext `nonce` / `parent_nonce` columns.
 
-**No `max_uses`** — order-linked tokens are one-time: one nonce, one reviewer, one review. Reusable tokens (null `origin_order_hash`) can bind many reviewers — each bind produces a new token row with its own nonce and `parent_nonce` pointing back to the reusable parent.
+**`nonce_enc_b64`** — the nonce, encrypted so the bot can re-display a link (QR, URL) after issue:
+
+```
+nonce_key     = EnigmaPq.hkdf_derive(bot crypt_skey, "buckitup/review-token-nonce/v1", "nonce")
+nonce_enc_b64 = EnigmaPq.aes_gcm_encrypt(nonce, nonce_key)
+```
+
+Symmetric on purpose — the bot both writes and reads this column (`ReviewBot.Identity.wrap_nonce/2` / `unwrap_nonce/2`). This is not the two-field KEM wrap used by `origin_bots`: there the origin encrypts for a different party (the bot), here the same party encrypts and decrypts, so a KEM ciphertext would only add ~1.6 KB per row. Only a running bot (holding `crypt_skey`) can decrypt it.
+
+**`parent_nonce_hash`** — nullable. Set on bound tokens created from a reusable (order-less) parent. Holds the parent's `nonce_hash`. Null on order-linked tokens and on the reusable parent itself.
+
+**Set-once invariant** — `user_hash` and `review_hash` can only go from null to a value. Any update (bot via `/ingest` or peer sync) that changes or clears an already-set value is refused (`ReviewWriteToken.Validation.validate_set_once/2`). A bound token can never be rebound; a reviewed token can never be pointed at another review.
+
+**No `max_uses`** — order-linked tokens are one-time: one nonce, one reviewer, one review. Reusable tokens (null `origin_order_hash`) can bind many reviewers — each bind produces a new token row with its own nonce and `parent_nonce_hash` pointing back to the reusable parent.
 
 **No `expires_at`** — expiry is implicit: the bot GCs pending tokens older than its threshold. Bound tokens never expire.
 
-**Electric shape** — devices filter by origins they hold keys for. Any device that starts its `ReviewBotWorker` sees all tokens for that origin and can create, bind, or GC them. Multiple devices creating tokens simultaneously is conflict-free (random nonces as PKs).
+**Electric shape** — devices filter by origins they hold keys for. Any device that starts its `ReviewBotWorker` sees all tokens for that origin and can create, bind, or GC them. Multiple devices creating tokens simultaneously is conflict-free (hashes of random nonces as PKs). Of the nonce, the shape carries only `nonce_hash` and `nonce_enc_b64` — nothing in it is bindable.
 
 Indexes: `origin_hash` (list tokens per origin), `origin_order_hash` (lookup by order), `user_hash` (lookup by reviewer).
 
@@ -210,20 +242,24 @@ Token listing and deletion flow through Electric shapes + ingest (no REST endpoi
 /r/:nonce → FrontendController, :write_review
 ```
 
-Phoenix checks token state and redirects:
+The server hashes the nonce and looks the token up by `nonce_hash` — no bot needed:
 
 ```
-GET /r/:nonce
-  ├── not found / soft-deleted   → "This link has expired"
-  ├── bound to different user    → "This link was already used"
-  ├── bound to current user,
-  │   review exists              → redirect to review (view/edit)
-  ├── bound to current user,
-  │   no review yet              → redirect to review creation for this origin
-  └── pending                    → login-kind landing page
-                                   (identity create/import → PoP → /bind
-                                    → redirect to review nonce page)
+GET /r/:nonce                               (server: ReviewTokenController.show/2)
+  ├── not found / soft-deleted   → 410 "This link has expired"
+  └── otherwise                  → serve the SPA, which reads the token row
+                                   (by nonce_hash) and its local identity:
+      ├── bound to different user    → "This link was already used"
+      ├── bound to current user,
+      │   review_hash set            → redirect to that exact review (view/edit)
+      ├── bound to current user,
+      │   no review yet              → review form for this origin (carries the nonce)
+      └── pending                    → login-kind landing page
+                                       (identity create/import → PoP → /bind
+                                        → review form)
 ```
+
+**Who is "current user".** A `GET` from a scanned QR carries no identity — keys live in the SPA. So the server decides only "expired or not", and the per-user branches are decided client-side from the token's `user_hash` / `review_hash` (both public in the shape). This is display only: the security decisions are made server-side by bind (409 for another user) and by review ingest (exact bind vouch + token bound to the author).
 
 The existing frontend handles identity creation, review writing, and the full review pipeline. No separate SPA flow needed.
 
@@ -233,9 +269,11 @@ The existing frontend handles identity creation, review writing, and the full re
 
 1. Verify caller via AuthToken — a token encrypted by the origin for the bot (not PoP)
 2. Bot generates nonce (24 random bytes, URL-safe base64)
-3. Bot constructs token row — `origin_order_hash` is optional (null = reusable invitation link), signs it
+3. Bot constructs token row — `nonce_hash = H(nonce)`, `nonce_enc_b64 = wrap_nonce(nonce)`, `origin_order_hash` optional (null = reusable invitation link) — and signs it
 4. Bot ingests via `POST /ingest` — server validates bot signature + live vouch
-5. Returns nonce + full URL (`https://<host>/r/<nonce>`) for QR generation
+5. Returns nonce + full URL (`https://<host>/r/<nonce>`) for QR generation — the only time the server hands out a new token's plaintext nonce
+
+Re-displaying a link later (admin UI, printable QR) asks the running bot to unwrap `nonce_enc_b64`; the bot's `crypt_skey` never leaves the `ReviewBotWorker`.
 
 Requires a live vouch: `kind = origins.<origin_hash>.reviews.write`, `issuer_hash = origin_hash`, `subject_hash = review_bot_hash`, `deleted_flag = false`. If no live vouch, rejects.
 
@@ -248,15 +286,30 @@ Binding is a multi-step browser flow, not a single API call:
 3. **Bind** — visitor proves PoP (signs challenge with `sign_skey`) to `POST /r/api/token/bind`
 4. **Redirect** — on success, redirect to origin review (nonce) create/edit page
 
-`POST /r/api/token/bind` (step 3):
+`POST /r/api/token/bind` (step 3) — needs the running bot:
 
-1. Validate the token exists and is not soft-deleted
-2. Verify the caller's identity: `user_cards` row exists with valid self-signature (PoP)
-3. Verify the origin's review bot holds live vouches: `origins.<origin_hash>.reviews.write` (origin gate) and per-shape device gate vouches (`device.<sn>.storage.write.<shape>` for each of: `review`, `review_password_candidate`, `review_post_right_candidate`, `review_revoke_right_candidate`)
-4. Review bot creates per-shape vouch tokens for the reviewer: `origins.<origin_hash>.reviews.write.<nonce>` (origin gate) and `device.<sn>.storage.write.<shape>` for each required shape (device gate)
-5. **Order-linked token** (`origin_order_hash` set): bot updates the token row — sets `user_hash`, `owner_timestamp = bot_clock`, re-signs, ingests. Token is now one-time bound.
-6. **Reusable token** (`origin_order_hash` null): bot creates a NEW token row with a fresh nonce, `parent_nonce = original_nonce`, `user_hash = reviewer_hash`, `origin_order_hash = null`, signs and ingests. The original pending token stays untouched for more binds.
-7. Redirect to origin review (nonce) create/edit page
+1. **Rate limit** before anything else — per remote IP (`{:token_bind_ip, ip}`) and per claimed `user_hash` (`{:token_bind_user, user_hash}`), default 10/minute each. Over the limit → 429 with `retry-after`. Bounds nonce guessing and bind spam; checked before PoP so it is cheap to refuse.
+2. Hash the nonce, look up the token by `nonce_hash`; not found or soft-deleted → reject
+3. Verify the caller's identity: `user_cards` row exists with valid self-signature (PoP)
+4. Verify the origin's review bot holds live vouches: `origins.<origin_hash>.reviews.write` (origin gate) and per-shape device gate vouches (`device.<sn>.storage.write.<shape>` for each of: `review`, `review_password_candidate`, `review_post_right_candidate`, `review_revoke_right_candidate`)
+5. Apply the bind rules (below)
+6. Review bot creates per-shape vouch tokens for the reviewer: `origins.<origin_hash>.reviews.write.<nonce_hash>` (origin gate, `nonce_hash` of the token the reviewer ends up bound to) and `device.<sn>.storage.write.<shape>` for each required shape (device gate)
+7. **Order-linked token** (`origin_order_hash` set): bot updates the token row — sets `user_hash`, `owner_timestamp = bot_clock`, re-signs, ingests. Token is now one-time bound.
+8. **Reusable token** (`origin_order_hash` null): bot creates a NEW token row with a fresh nonce — `nonce_hash = H(new_nonce)`, `nonce_enc_b64 = wrap_nonce(new_nonce)`, `parent_nonce_hash = original nonce_hash`, `user_hash = reviewer_hash`, `origin_order_hash = null` — signs and ingests. The original pending token stays untouched for more binds.
+9. Respond with the nonce of the bound token (the new copy's nonce for a reusable parent) → redirect to the origin review create/edit page
+
+**Bind rules:**
+
+| Token | Caller | Result |
+|-------|--------|--------|
+| bound copy (`parent_nonce_hash` set) | anyone | 409 — a bound copy is not an invitation |
+| order-linked, pending | — | bind |
+| order-linked, bound to caller | caller | idempotent — return the same nonce, no new vouches needed |
+| order-linked, bound to another user | caller | 409 — already used |
+| reusable parent | caller already has a copy | idempotent — return that copy's nonce (unwrapped by the bot), no new copy |
+| reusable parent | caller has no copy | mint a new copy |
+
+So a reusable token gives at most one copy per `(root nonce_hash, user_hash)`. The set-once invariant on `user_hash` is the second line of defence: even a buggy bind cannot rebind a row.
 
 ### Review ingest validation
 
@@ -264,15 +317,27 @@ Review ingest passes through two independent gates — both must succeed:
 
 1. **Device gate** (`device.<sn>.storage.write`) — the standard write gate. The review is a PQ row hitting `/ingest` on a device; the device's access mode (`guarded` / `trust`) applies as usual. The origin vouch does not bypass the device gate.
 
-2. **Origin gate** (`origins.<origin_hash>.reviews.write`) — checked when `review_access = invite_only`. The author must hold a live vouch where `subject_hash = author_hash` and `kind` attenuates from `origins.<origin_hash>.reviews.write`. No vouch = ingest rejected. The bot always provides vouches on bind regardless of mode, so reviewers retain access if the mode later switches to `invite_only`.
+2. **Origin gate** (`origins.<origin_hash>.reviews.write`) — checked when `review_access = invite_only`:
+   - **Direct vouch** — a live vouch with `subject_hash = author_hash` whose kind attenuates from `origins.<origin_hash>.reviews.write` but is *not* a token vouch (kind not ending in `.rwn_…`). Passes without a nonce.
+   - **Token vouch** — if the author's only access is a token vouch, the review must carry `auth.nonce`; without it → rejected ("nonce required").
 
-The two gates live in different root segments of the resource forest (`device` vs `origins`) — they never intersect and are evaluated as separate chain walks. This applies regardless of how the review is submitted — the vouch is the gate, not the token.
+   The bot always provides vouches on bind regardless of mode, so reviewers retain access if the mode later switches to `invite_only`.
+
+3. **Token check** — whenever the review carries `auth.nonce` (required as above in `invite_only`, optional in `open`), the server computes `nonce_hash = H(nonce)` and requires all of:
+   - the token exists, is not soft-deleted, `origin_hash` matches the review
+   - `user_hash = author_hash` (token bound to the author)
+   - the token is unused (`review_hash` null) — or already linked to this same review (edit / new version)
+   - the **exact** live vouch `origins.<origin_hash>.reviews.write.<nonce_hash>` with `subject_hash = author_hash` and `issuer_hash = token.review_bot_hash` — an exact-kind lookup, not a prefix match
+
+   On success the review's `review_hash` is linked to that token (see [Review hash capture](#review-hash-capture)). The nonce selects which vouch is the gate; the exact bind vouch is the gate. One review per token: a reviewer may hold several tokens for the same origin (several orders), and each review links to the token whose nonce it carried. More reviews need another token or a direct vouch.
+
+The device and origin gates live in different root segments of the resource forest (`device` vs `origins`) — they never intersect and are evaluated as separate chain walks. Review ingest needs no bot: everything it checks is keyed by `nonce_hash` and public vouch rows.
 
 ### Review hash capture
 
 ~~When the bot observes (via Electric shape) a new review for `(origin_hash, author_hash)` matching a bound token, it updates the token's `review_hash`, signs the updated row, and ingests it.~~
 
-**Implemented:** review hash linking happens atomically at ingest time. When a reviewer submits a review with a known nonce, `ReviewWriteToken.link_to_review/3` sets `review_hash` on the token row inside the same transaction as the review insert. The review gate (`Validation.check_review_gate/2`) runs in the `check` phase — before validation — alongside the device gate. This eliminates the async observe-and-backfill pattern as the primary mechanism.
+**Implemented:** review hash linking happens atomically at ingest time. When a reviewer submits a review with `auth.nonce`, the server hashes it and `ReviewWriteToken.link_to_review/3` sets `review_hash` on the token row found by `nonce_hash`, inside the same transaction as the review insert. `review_hash` is set-once — a token cannot be re-pointed at another review. The review gate (`Validation.check_review_gate/2`) runs in the `check` phase — before validation — alongside the device gate. This eliminates the async observe-and-backfill pattern as the primary mechanism.
 
 ### Garbage collection
 
@@ -291,7 +356,34 @@ Device-side in the `ReviewBotWorker`:
 - Server deletes rows where `deleted_flag = true AND owner_timestamp < now - 3_weeks`
 - The bot does not hard-delete — this is server-side cleanup (space preservation)
 
-Multiple devices may race to soft-delete the same token — idempotent (same nonce PK, LWW on `owner_timestamp`). Bound and reviewed tokens are never GC'd.
+Multiple devices may race to soft-delete the same token — idempotent (same `nonce_hash` PK, LWW on `owner_timestamp`). Bound and reviewed tokens are never GC'd. The tombstone keeps `nonce_hash` and `nonce_enc_b64`; neither is bindable.
+
+---
+
+## Bot Dependency
+
+| Operation | Needs running bot | Why |
+|-----------|-------------------|-----|
+| `GET /r/<nonce>` | no | lookup by `nonce_hash` |
+| Review ingest (gate + link) | no | `nonce_hash` + public vouch rows |
+| Token create | yes | bot signs the row, encrypts the nonce |
+| Token bind | yes | bot issues vouches, signs the row, unwraps an existing copy's nonce |
+| GC (soft delete) | yes | bot re-signs the tombstone |
+| Re-displaying a link / QR | yes | only the bot can unwrap `nonce_enc_b64` |
+
+---
+
+## Security
+
+The nonce is the only bearer secret in this design. Nothing readable by a third party lets anyone bind:
+
+- **`/shapes` (`review_write_tokens`)** — carries `nonce_hash` and `nonce_enc_b64` only. The hash is one-way (SHA3-512 of 24 random bytes); the ciphertext needs the bot's `crypt_skey`.
+- **`vouch_tokens`** — kinds end in `<nonce_hash>`, not the nonce.
+- **Peer sync** — syncs the same rows; the set-once invariant stops a peer from rebinding (`user_hash`) or re-pointing (`review_hash`) a token.
+- **Holding a vouch without the nonce** — not enough in `invite_only` when the vouch is a token vouch: ingest requires `auth.nonce` and the token bound to the author.
+- **Guessing** — 192-bit nonces; bind is rate-limited per IP and per `user_hash`.
+
+The plaintext nonce reaches only the origin backend (create response), the reviewer (link / QR, bind response) and the server for the duration of a request.
 
 ---
 
@@ -337,7 +429,7 @@ The vouch token gates entry (when `review_access = invite_only`). Once the revie
 
 ### Vouch tokens — consumer
 
-Write tokens consume the vouch token infrastructure for trust delegation. The `origins.<origin_hash>.reviews.write.<nonce>` scope sits in the origins subtree of the [Resource Forest](../pq_vouch_tokens.in_progress.md#resource-forest).
+Write tokens consume the vouch token infrastructure for trust delegation. The `origins.<origin_hash>.reviews.write.<nonce_hash>` scope sits in the origins subtree of the [Resource Forest](../pq_vouch_tokens.in_progress.md#resource-forest).
 
 ### Review access mode — per-origin policy
 
@@ -348,7 +440,7 @@ The origin identity decides whether reviews are open or invitation-only. A new f
 | `open` (default) | Anyone with an identity can write a review. Bot still provides vouches on bind (provenance + future-proofing). |
 | `invite_only` | Review ingest requires a vouch in `origins.<origin_hash>.reviews.write.*` scope. No vouch = rejected. |
 
-**Enforcement at ingest.** When `review_access = invite_only`, `Review.Validation` checks for a live (non-tombstoned) vouch token where `subject_hash = author_hash` and `kind` attenuates from `origins.<origin_hash>.reviews.write`. This covers both bot-delegated tokens (`reviews.write.<nonce>`) and any direct vouches. In `open` mode the origin gate is not checked.
+**Enforcement at ingest.** When `review_access = invite_only`, `Review.Validation` checks for a live (non-tombstoned) vouch token where `subject_hash = author_hash` and `kind` attenuates from `origins.<origin_hash>.reviews.write`. Direct vouches pass on their own; bot-delegated token vouches (`reviews.write.<nonce_hash>`) pass only together with `auth.nonce` and the token check (see [Review ingest validation](#review-ingest-validation)). In `open` mode the origin gate is not checked, but a supplied nonce is still validated.
 
 **Vouches always provided.** The bot issues vouch tokens on every bind, regardless of `review_access` mode. This ensures that reviewers who obtained access in `open` mode retain it if the origin later switches to `invite_only`.
 
@@ -402,6 +494,16 @@ The `review_token_ttl_days` setting (also in `origin_settings`) controls the sof
 - [x] QR code generation (reuses existing `Utils.qr_base64_from_url`, sandbox references QR nonce URLs)
 - [ ] Printable QR sheet (multiple tokens per page)
 
+### Phase 4 — Nonce secrecy and bind rules (#831 follow-up)
+
+- [ ] Spec amendment — this document (#833)
+- [ ] `nonce_hash` PK + `nonce_enc_b64`, no plaintext nonce columns (#836)
+- [ ] Set-once `user_hash` / `review_hash` on every update path (#834)
+- [ ] Rate limit `POST /r/api/token/bind` (#835)
+- [ ] Review ingest: exact bind vouch by `nonce_hash`, nonce required for token vouches (#838)
+- [ ] `TokenBinder` bind rules: no bound copies, no rebinding, one copy per (root, user) (#839)
+- [ ] Sandboxes show own links via bot unwrap; end-to-end test with no plaintext nonce stored (#841)
+
 ---
 
 ## Open Questions
@@ -432,7 +534,7 @@ The `review_token_ttl_days` setting (also in `origin_settings`) controls the sof
 
 11. ~~**Concurrent bind race — dangling vouches.**~~ — resolved. Two token modes based on `origin_order_hash`:
 
-    **Order-linked** (`origin_order_hash` set): one-time token. Concurrent binds resolve via LWW — the higher `owner_timestamp` wins. Dangling vouches from the loser are harmless (reviewer can't navigate to the review form without a bound token, and the vouch attenuates to a nonce that leads nowhere).
+    **Order-linked** (`origin_order_hash` set): one-time token. Concurrent binds resolve via LWW — the higher `owner_timestamp` wins. Dangling vouches from the loser are harmless: review ingest requires the token to be bound to the author, so a vouch for a token bound to someone else opens nothing.
 
     **Reusable** (`origin_order_hash` null): multi-use invitation link. Binding does NOT modify the original token row — instead the bot creates a new bound token row (with a fresh nonce). The original pending token stays alive for more binds until soft-deleted.
 
@@ -440,11 +542,20 @@ The `review_token_ttl_days` setting (also in `origin_settings`) controls the sof
 
 12. ~~**Bot runtime location.**~~ — resolved. The bot runs on the device. The origin stores the bot's secret keys in `origin_bots` — `secret_b64` (KEM ciphertext) + `encrypted_identity_b64` (AES-GCM blob), decryptable only with the origin's `crypt_skey`. On device startup, the origin decapsulates, derives the wrap key, and decrypts the bot identity to start `ReviewBotWorker`. The bot keeps keys in memory while running. The server never sees secret keys in cleartext.
 
+13. ~~**Where the nonce lives.**~~ — resolved. Key rows by `nonce_hash = H(nonce)` and keep the nonce encrypted for the bot in `nonce_enc_b64` (see [Nonce secrecy](#nonce-secrecy)). Rejected alternatives:
+    - **Plain hash only** — rejected: links are not recoverable after issue. If the create response never reaches a client (crash, restart), the token is lost; the admin UI cannot re-show a QR.
+    - **Encryption only, with a bot-side nonce index** — rejected: `/r/` and review ingest would depend on a running bot, and the index must be kept in sync across devices and peer sync.
+    - **Per-token KEM wrap** (like `origin_bots`) — rejected: the same party encrypts and decrypts, so KEM adds nothing but ~1.6 KB of ciphertext per row.
+
+14. ~~**Token gate vs vouch gate.**~~ — resolved. Earlier text said "the vouch is the gate, not the token". Refined: the exact bind vouch `reviews.write.<nonce_hash>` is the gate, and the nonce selects it. A prefix match over the author's vouches is not enough — it would let one token's vouch cover any review.
+
+15. ~~**`/r/:nonce` and the current user.**~~ — resolved. The server answers only "expired / not found"; the per-user branches are decided by the SPA from public token state. Enforcement is at bind and ingest (see [Route](#route)).
+
 ---
 
 ## Status
 
-In progress. Phase 1, 2, 2a complete. Phase 3 partial (QR generation done, printable sheet pending).
+In progress. Phase 1, 2, 2a complete. Phase 3 partial (QR generation done, printable sheet pending). Phase 4 (nonce secrecy) in progress.
 
 ## References
 

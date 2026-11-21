@@ -108,6 +108,32 @@ defmodule Chat.ReviewBot.TokenBinderTest do
     end
   end
 
+  describe "concurrent binds" do
+    test "same user racing on a reusable root gets one copy", ctx do
+      root = create!(ctx)
+
+      copies =
+        1..5
+        |> Task.async_stream(fn _ -> bind(ctx, root, ctx.reviewer) end, max_concurrency: 5)
+        |> Enum.map(fn {:ok, {:ok, copy}} -> copy end)
+
+      assert [_single] = Enum.uniq(copies)
+      assert copy_count(root) == 1
+    end
+
+    test "two users racing on an order-linked token bind it once", ctx do
+      nonce = create!(ctx, order_hash())
+      {other, _card} = identity_with_card("Other")
+
+      results =
+        [ctx.reviewer, other]
+        |> Task.async_stream(&bind(ctx, nonce, &1), max_concurrency: 2)
+        |> Enum.map(fn {:ok, result} -> result end)
+
+      assert Enum.sort(results) == Enum.sort([{:ok, nonce}, {:error, :token_already_bound}])
+    end
+  end
+
   describe "reviewer binding several tokens" do
     test "reuses device vouches across tokens", ctx do
       {:ok, _copy} = bind(ctx, create!(ctx), ctx.reviewer)
@@ -223,6 +249,11 @@ defmodule Chat.ReviewBot.TokenBinderTest do
         v.issuer_hash == ^ctx.bot_hash and v.subject_hash == ^user_hash and
           like(v.kind, "device.%")
     )
+    |> Repo.aggregate(:count)
+  end
+
+  defp copy_count(root) do
+    from(t in ReviewWriteToken, where: t.parent_nonce_hash == ^hash(root))
     |> Repo.aggregate(:count)
   end
 

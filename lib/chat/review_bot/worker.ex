@@ -7,6 +7,7 @@ defmodule Chat.ReviewBot.Worker do
 
   alias Chat.Pq.Ingest
   alias Chat.ReviewBot.Identity
+  alias Chat.ReviewBot.TokenBinder
   alias EnigmaPq
 
   def start_link(%{bot_hash: bot_hash} = init_arg) do
@@ -40,6 +41,13 @@ defmodule Chat.ReviewBot.Worker do
 
   def info(bot_hash) do
     GenServer.call(via(bot_hash), :info)
+  end
+
+  @bind_timeout 15_000
+
+  @doc "Runs `TokenBinder.bind_in_bot/3` in this bot's process; the mailbox serializes binds."
+  def bind(bot_hash, nonce, reviewer_hash) do
+    GenServer.call(via(bot_hash), {:bind, nonce, reviewer_hash}, @bind_timeout)
   end
 
   def verify_auth(bot_hash, bearer) do
@@ -80,6 +88,13 @@ defmodule Chat.ReviewBot.Worker do
     state |> reply(Identity.unwrap_nonce(nonce_enc, state.identity.crypt_skey))
   end
 
+  def handle_call({:bind, nonce, reviewer_hash}, _from, state) do
+    state
+    |> bot_ops()
+    |> TokenBinder.bind_in_bot(nonce, reviewer_hash)
+    |> then(&reply(state, &1))
+  end
+
   def handle_call(:info, _from, state) do
     state |> reply(%{bot_hash: state.bot_hash, origin_hash: state.origin_hash})
   end
@@ -102,6 +117,18 @@ defmodule Chat.ReviewBot.Worker do
       %{identity: _} = state -> %{state | identity: :redacted, auth_token: :redacted}
       other -> other
     end)
+  end
+
+  # Closures over the identity; only ever called within this process
+  defp bot_ops(%{identity: identity} = state) do
+    %{
+      bot_hash: state.bot_hash,
+      origin_hash: state.origin_hash,
+      sign: &EnigmaPq.sign(&1, identity.sign_skey),
+      wrap_nonce: &Identity.wrap_nonce(&1, identity.crypt_skey),
+      unwrap_nonce: &Identity.unwrap_nonce(&1, identity.crypt_skey),
+      ingest: &Ingest.apply(&1, Ingest.self_pop(identity.sign_skey))
+    }
   end
 
   defp via(bot_hash), do: {:via, Registry, {Chat.ReviewBot.Registry, bot_hash}}

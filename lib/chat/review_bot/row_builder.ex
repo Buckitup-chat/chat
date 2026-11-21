@@ -54,10 +54,12 @@ defmodule Chat.ReviewBot.RowBuilder do
     end)
   end
 
-  @doc "Signs `token` with its running bot and returns the review_write_tokens insert mutation."
-  def review_write_token_mutation(%ReviewWriteToken{review_bot_hash: bot_hash} = token) do
-    sign_b64 = Worker.sign(bot_hash, Integrity.signature_payload(token))
-    sign_hash = sign_b64 |> EnigmaPq.hash() |> ReviewWriteTokenSignHash.from_binary()
+  @doc """
+  Signs `token` and returns the review_write_tokens insert mutation. `sign` defaults
+  to the token's running bot; pass it when already inside that bot's `Worker`.
+  """
+  def review_write_token_mutation(%ReviewWriteToken{} = token, sign \\ nil) do
+    {sign_b64, sign_hash} = sign_token(token, sign)
 
     %{
       "type" => "insert",
@@ -77,6 +79,30 @@ defmodule Chat.ReviewBot.RowBuilder do
       },
       "syncMetadata" => %{"relation" => "review_write_tokens"}
     }
+  end
+
+  @doc "Like `review_write_token_mutation/2`, but an update mutation carrying `fields`."
+  def review_write_token_update_mutation(%ReviewWriteToken{} = token, fields, sign \\ nil) do
+    {sign_b64, sign_hash} = sign_token(token, sign)
+
+    changes =
+      token
+      |> Map.take([:owner_timestamp | fields])
+      |> Map.new(fn {k, v} -> {Atom.to_string(k), v} end)
+      |> Map.merge(%{"sign_b64" => sign_b64, "sign_hash" => sign_hash})
+
+    %{
+      "type" => "update",
+      "original" => %{"nonce_hash" => token.nonce_hash},
+      "changes" => changes,
+      "syncMetadata" => %{"relation" => "review_write_tokens"}
+    }
+  end
+
+  defp sign_token(%ReviewWriteToken{review_bot_hash: bot_hash} = token, sign) do
+    sign = sign || (&Worker.sign(bot_hash, &1))
+    sign_b64 = token |> Integrity.signature_payload() |> sign.()
+    {sign_b64, sign_b64 |> EnigmaPq.hash() |> ReviewWriteTokenSignHash.from_binary()}
   end
 
   def derive_hash(sign_pkey) do

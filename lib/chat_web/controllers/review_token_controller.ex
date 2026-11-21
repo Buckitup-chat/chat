@@ -83,6 +83,8 @@ defmodule ChatWeb.ReviewTokenController do
   @bind_errors %{
     token_not_found: {:not_found, "Token not found"},
     token_deleted: {:gone, "Token has been deleted"},
+    token_not_invitation: {:conflict, "Token is a bound copy, not an invitation"},
+    token_already_bound: {:conflict, "Token is already bound to another user"},
     reviewer_not_found: {:not_found, "Reviewer identity not found"},
     invalid_pop: {:unauthorized, "Invalid proof of possession"},
     bot_not_running: {:service_unavailable, "Review bot not running"},

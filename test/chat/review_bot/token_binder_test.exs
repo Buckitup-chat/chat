@@ -1,292 +1,263 @@
 defmodule Chat.ReviewBot.TokenBinderTest do
-  use ExUnit.Case, async: true
-  import Rewire
+  @moduledoc """
+  `TokenBinder.bind/3` against a running bot and the real Writer: bind rules
+  for order-linked tokens, reusable roots and their bound copies.
+  """
+  use ChatWeb.DataCase, async: false
+
+  import Chat.Test.ReadGateHelpers, only: [identity_with_card: 1]
+
+  import Chat.Test.ReviewBotFixtures,
+    only: [setup_origin_with_bot: 0, start_bot!: 1, start_bot_registry!: 0, stop_bot!: 1]
+
+  import Ecto.Query
 
   alias Chat.Data.Schemas.ReviewWriteToken
+  alias Chat.Data.Schemas.VouchToken
+  alias Chat.Data.Types.OriginOrderHash
   alias Chat.Data.Types.ReviewWriteTokenNonceHash
+  alias Chat.Data.Types.UserHash
+  alias Chat.Data.User
+  alias Chat.Repo
+  alias Chat.ReviewBot.TokenBinder
+  alias Chat.ReviewBot.TokenCreator
 
-  @bot_hash "u_bot"
-  @origin_hash "u_origin"
-  @reviewer_hash "u_reviewer"
-  @nonce "test_nonce_abc"
-  @nonce_hash ReviewWriteTokenNonceHash.from_nonce(@nonce)
-  @pop %{challenge: "test_challenge", signature: "test_sig"}
+  setup do
+    :ets.delete_all_objects(:buckitup_deferred_records)
+    start_bot_registry!()
+    ctx = setup_origin_with_bot()
+    start_bot!(ctx)
+    ctx
+  end
 
-  defmodule Tokens do
-    def nonce_hash, do: ReviewWriteTokenNonceHash.from_nonce("test_nonce_abc")
+  describe "order-linked token" do
+    test "first bind sets user_hash and issues origin + device vouches", ctx do
+      nonce = create!(ctx, order_hash())
 
-    def lookup(nonce_hash, token_fun) do
-      if nonce_hash == nonce_hash(), do: token_fun.()
+      assert {:ok, ^nonce} = bind(ctx, nonce, ctx.reviewer)
+
+      assert %{user_hash: user_hash} = token(nonce)
+      assert user_hash == ctx.reviewer_card.user_hash
+      assert bind_vouch?(ctx, nonce, ctx.reviewer_card.user_hash)
+      assert device_vouch_count(ctx, ctx.reviewer_card.user_hash) == 4
     end
 
-    def order_linked do
-      %ReviewWriteToken{
-        nonce_hash: nonce_hash(),
-        nonce_enc_b64: "enc_test_nonce_abc",
-        origin_hash: "u_origin",
-        review_bot_hash: "u_bot",
-        origin_order_hash: "org_ord_1",
-        deleted_flag: false,
-        owner_timestamp: 1000,
-        sign_b64: "old_sig",
-        sign_hash: "rwt_old"
-      }
+    test "same user binding twice is idempotent and adds no rows", ctx do
+      nonce = create!(ctx, order_hash())
+      {:ok, ^nonce} = bind(ctx, nonce, ctx.reviewer)
+      counts = row_counts()
+
+      assert {:ok, ^nonce} = bind(ctx, nonce, ctx.reviewer)
+      assert row_counts() == counts
     end
 
-    def reusable do
-      %{order_linked() | origin_order_hash: nil}
-    end
-  end
+    test "another user is refused with token_already_bound", ctx do
+      nonce = create!(ctx, order_hash())
+      {:ok, ^nonce} = bind(ctx, nonce, ctx.reviewer)
+      {other, other_card} = identity_with_card("Other")
+      counts = row_counts()
 
-  defmodule QueriesOrderLinked do
-    def get_review_write_token(hash), do: Tokens.lookup(hash, &Tokens.order_linked/0)
-    def get_card("u_reviewer"), do: %{sign_pkey: "pkey_reviewer"}
-    def valid_card?(_), do: true
-    def get_vouch_token(_, _, _), do: %{deleted_flag: false}
-    def scoped_vouch_exists?(_, _), do: true
-  end
-
-  defmodule QueriesReusable do
-    def get_review_write_token(hash), do: Tokens.lookup(hash, &Tokens.reusable/0)
-    def get_card("u_reviewer"), do: %{sign_pkey: "pkey_reviewer"}
-    def valid_card?(_), do: true
-    def get_vouch_token(_, _, _), do: %{deleted_flag: false}
-    def scoped_vouch_exists?(_, _), do: true
-  end
-
-  defmodule QueriesDeleted do
-    def get_review_write_token(_), do: %ReviewWriteToken{deleted_flag: true}
-  end
-
-  defmodule QueriesNotFound do
-    def get_review_write_token(_), do: nil
-  end
-
-  defmodule QueriesReviewerNotFound do
-    def get_review_write_token(hash), do: Tokens.lookup(hash, &Tokens.order_linked/0)
-    def get_card("u_reviewer"), do: nil
-  end
-
-  defmodule QueriesInvalidPop do
-    def get_review_write_token(hash), do: Tokens.lookup(hash, &Tokens.order_linked/0)
-    def get_card("u_reviewer"), do: %{sign_pkey: "pkey_reviewer"}
-    def valid_card?(_), do: true
-  end
-
-  defmodule QueriesNoOriginVouch do
-    def get_review_write_token(hash), do: Tokens.lookup(hash, &Tokens.order_linked/0)
-    def get_card("u_reviewer"), do: %{sign_pkey: "pkey_reviewer"}
-    def valid_card?(_), do: true
-    def get_vouch_token(_, _, _), do: nil
-  end
-
-  defmodule QueriesNoDeviceVouch do
-    def get_review_write_token(hash), do: Tokens.lookup(hash, &Tokens.order_linked/0)
-    def get_card("u_reviewer"), do: %{sign_pkey: "pkey_reviewer"}
-    def valid_card?(_), do: true
-    def get_vouch_token(_, _, _), do: %{deleted_flag: false}
-    def scoped_vouch_exists?(_, _), do: false
-  end
-
-  defmodule EnigmaOk do
-    def verify(_, _, _), do: true
-    def hash(data), do: :crypto.hash(:sha256, data)
-  end
-
-  defmodule EnigmaInvalid do
-    def verify(_, _, _), do: false
-  end
-
-  defmodule WorkerOk do
-    def running?("u_bot"), do: true
-    def info("u_bot"), do: %{origin_hash: "u_origin"}
-    def sign("u_bot", _payload), do: "test_signature_b64"
-    def wrap_nonce("u_bot", nonce), do: "enc_" <> nonce
-
-    def ingest("u_bot", mutations) do
-      test_pid = Process.whereis(:binder_test)
-      if test_pid, do: send(test_pid, {:ingested, mutations})
-      {:ok, "txid_1", []}
+      assert {:error, :token_already_bound} = bind(ctx, nonce, other)
+      assert token(nonce).user_hash == ctx.reviewer_card.user_hash
+      refute bind_vouch?(ctx, nonce, other_card.user_hash)
+      assert row_counts() == counts
     end
   end
 
-  defmodule WorkerNotRunning do
-    def running?("u_bot"), do: false
-  end
+  describe "reusable token" do
+    test "bind mints one copy, the root stays unbound", ctx do
+      root = create!(ctx)
 
-  defmodule DeviceIdOk do
-    def id, do: "test_device"
-  end
+      assert {:ok, copy} = bind(ctx, root, ctx.reviewer)
+      refute copy == root
 
-  defmodule IntegrityOk do
-    def signature_payload(_data), do: "payload_bytes"
-  end
+      assert %{user_hash: nil, parent_nonce_hash: nil} = token(root)
+      assert %{parent_nonce_hash: parent, user_hash: user_hash} = token(copy)
+      assert parent == hash(root)
+      assert user_hash == ctx.reviewer_card.user_hash
+      assert bind_vouch?(ctx, copy, ctx.reviewer_card.user_hash)
+    end
 
-  defmodule TimeKeeperOk do
-    def now_unix, do: 5000
-  end
+    test "same user binding twice gets the same copy and adds no rows", ctx do
+      root = create!(ctx)
+      {:ok, copy} = bind(ctx, root, ctx.reviewer)
+      counts = row_counts()
 
-  rewire(Chat.ReviewBot.RowBuilder, Worker: WorkerOk, Integrity: IntegrityOk, as: RowBuilderOk)
+      assert {:ok, ^copy} = bind(ctx, root, ctx.reviewer)
+      assert row_counts() == counts
+    end
 
-  describe "bind/3 order-linked" do
-    test "sets user_hash on existing token and creates vouches" do
-      Process.register(self(), :binder_test)
+    test "each user gets an own copy", ctx do
+      root = create!(ctx)
+      {other, other_card} = identity_with_card("Other")
 
-      binder =
-        rewire(Chat.ReviewBot.TokenBinder,
-          BinderQueries: QueriesOrderLinked,
-          EnigmaPq: EnigmaOk,
-          Worker: WorkerOk,
-          DeviceId: DeviceIdOk,
-          Integrity: IntegrityOk,
-          TimeKeeper: TimeKeeperOk,
-          RowBuilder: RowBuilderOk
-        )
+      {:ok, copy} = bind(ctx, root, ctx.reviewer)
+      assert {:ok, other_copy} = bind(ctx, root, other)
+      refute other_copy == copy
+      assert token(other_copy).user_hash == other_card.user_hash
+    end
 
-      assert {:ok, @nonce} = binder.bind(@nonce, @reviewer_hash, @pop)
-      assert_received {:ingested, mutations}
+    test "binding a bound copy is refused with token_not_invitation", ctx do
+      {:ok, copy} = bind(ctx, create!(ctx), ctx.reviewer)
+      {other, _card} = identity_with_card("Other")
+      counts = row_counts()
 
-      vouch_mutations =
-        Enum.filter(mutations, &(&1["syncMetadata"]["relation"] == "vouch_tokens"))
-
-      token_mutations =
-        Enum.filter(mutations, &(&1["syncMetadata"]["relation"] == "review_write_tokens"))
-
-      assert length(vouch_mutations) == 5
-      assert length(token_mutations) == 1
-
-      [token_mut] = token_mutations
-      assert token_mut["modified"]["nonce_hash"] == @nonce_hash
-      assert token_mut["modified"]["nonce_enc_b64"] == "enc_" <> @nonce
-      assert token_mut["modified"]["user_hash"] == @reviewer_hash
-      assert token_mut["modified"]["sign_b64"] == "test_signature_b64"
-
-      origin_vouches =
-        Enum.filter(vouch_mutations, &String.starts_with?(&1["modified"]["kind"], "origins."))
-
-      device_vouches =
-        Enum.filter(vouch_mutations, &String.starts_with?(&1["modified"]["kind"], "device."))
-
-      assert length(origin_vouches) == 1
-      assert length(device_vouches) == 4
-
-      [ov] = origin_vouches
-      assert ov["modified"]["kind"] == "origins.#{@origin_hash}.reviews.write.#{@nonce_hash}"
-      assert ov["modified"]["issuer_hash"] == @bot_hash
-      assert ov["modified"]["subject_hash"] == @reviewer_hash
-
-      device_kinds = device_vouches |> Enum.map(& &1["modified"]["kind"]) |> Enum.sort()
-
-      assert device_kinds == [
-               "device.test_device.storage.write.review",
-               "device.test_device.storage.write.review_password_candidate",
-               "device.test_device.storage.write.review_post_right_candidate",
-               "device.test_device.storage.write.review_revoke_right_candidate"
-             ]
-    after
-      Process.unregister(:binder_test)
+      assert {:error, :token_not_invitation} = bind(ctx, copy, other)
+      assert {:error, :token_not_invitation} = bind(ctx, copy, ctx.reviewer)
+      assert row_counts() == counts
     end
   end
 
-  describe "bind/3 reusable" do
-    test "creates new token with parent_nonce_hash, original stays untouched" do
-      Process.register(self(), :binder_test)
+  describe "concurrent binds" do
+    test "same user racing on a reusable root gets one copy", ctx do
+      root = create!(ctx)
 
-      binder =
-        rewire(Chat.ReviewBot.TokenBinder,
-          BinderQueries: QueriesReusable,
-          EnigmaPq: EnigmaOk,
-          Worker: WorkerOk,
-          DeviceId: DeviceIdOk,
-          Integrity: IntegrityOk,
-          TimeKeeper: TimeKeeperOk,
-          RowBuilder: RowBuilderOk
-        )
+      copies =
+        1..5
+        |> Task.async_stream(fn _ -> bind(ctx, root, ctx.reviewer) end, max_concurrency: 5)
+        |> Enum.map(fn {:ok, {:ok, copy}} -> copy end)
 
-      assert {:ok, new_nonce} = binder.bind(@nonce, @reviewer_hash, @pop)
-      assert new_nonce != @nonce
+      assert [_single] = Enum.uniq(copies)
+      assert copy_count(root) == 1
+    end
 
-      assert_received {:ingested, mutations}
+    test "two users racing on an order-linked token bind it once", ctx do
+      nonce = create!(ctx, order_hash())
+      {other, _card} = identity_with_card("Other")
 
-      token_mutations =
-        Enum.filter(mutations, &(&1["syncMetadata"]["relation"] == "review_write_tokens"))
+      results =
+        [ctx.reviewer, other]
+        |> Task.async_stream(&bind(ctx, nonce, &1), max_concurrency: 2)
+        |> Enum.map(fn {:ok, result} -> result end)
 
-      assert length(token_mutations) == 1
-      [token_mut] = token_mutations
-      new_nonce_hash = ReviewWriteTokenNonceHash.from_nonce(new_nonce)
-      assert token_mut["modified"]["nonce_hash"] == new_nonce_hash
-      assert token_mut["modified"]["nonce_enc_b64"] == "enc_" <> new_nonce
-      assert token_mut["modified"]["parent_nonce_hash"] == @nonce_hash
-
-      [ov] =
-        Enum.filter(mutations, &String.starts_with?(&1["modified"]["kind"] || "", "origins."))
-
-      assert ov["modified"]["kind"] == "origins.#{@origin_hash}.reviews.write.#{new_nonce_hash}"
-      assert token_mut["modified"]["user_hash"] == @reviewer_hash
-      assert token_mut["modified"]["origin_order_hash"] == nil
-    after
-      Process.unregister(:binder_test)
+      assert Enum.sort(results) == Enum.sort([{:ok, nonce}, {:error, :token_already_bound}])
     end
   end
 
-  describe "bind/3 rejections" do
-    test "rejects when token not found" do
-      binder = rewire(Chat.ReviewBot.TokenBinder, BinderQueries: QueriesNotFound)
-      assert {:error, :token_not_found} = binder.bind("missing", @reviewer_hash, @pop)
+  describe "reviewer binding several tokens" do
+    test "reuses device vouches across tokens", ctx do
+      {:ok, _copy} = bind(ctx, create!(ctx), ctx.reviewer)
+      nonce = create!(ctx, order_hash())
+
+      assert {:ok, ^nonce} = bind(ctx, nonce, ctx.reviewer)
+      assert {:ok, _copy} = bind(ctx, create!(ctx), ctx.reviewer)
+      assert device_vouch_count(ctx, ctx.reviewer_card.user_hash) == 4
+    end
+  end
+
+  describe "refusals" do
+    test "token not found", ctx do
+      assert {:error, :token_not_found} = bind(ctx, TokenCreator.generate_nonce(), ctx.reviewer)
     end
 
-    test "rejects when token is soft-deleted" do
-      binder = rewire(Chat.ReviewBot.TokenBinder, BinderQueries: QueriesDeleted)
-      assert {:error, :token_deleted} = binder.bind(@nonce, @reviewer_hash, @pop)
+    test "soft-deleted token", ctx do
+      nonce = create!(ctx)
+      update_token!(nonce, deleted_flag: true)
+
+      assert {:error, :token_deleted} = bind(ctx, nonce, ctx.reviewer)
     end
 
-    test "rejects when reviewer identity not found" do
-      binder = rewire(Chat.ReviewBot.TokenBinder, BinderQueries: QueriesReviewerNotFound)
-      assert {:error, :reviewer_not_found} = binder.bind(@nonce, @reviewer_hash, @pop)
+    test "reviewer without card", ctx do
+      nonce = create!(ctx)
+      {challenge, signature} = pop(ctx.reviewer)
+      pop = %{challenge: challenge, signature: signature}
+      unknown_hash = 64 |> :crypto.strong_rand_bytes() |> UserHash.from_binary()
+
+      assert {:error, :reviewer_not_found} = TokenBinder.bind(nonce, unknown_hash, pop)
     end
 
-    test "rejects when PoP signature is invalid" do
-      binder =
-        rewire(Chat.ReviewBot.TokenBinder,
-          BinderQueries: QueriesInvalidPop,
-          EnigmaPq: EnigmaInvalid
-        )
+    test "invalid PoP", ctx do
+      nonce = create!(ctx)
+      {other, _card} = identity_with_card("Other")
+      {challenge, signature} = pop(other)
 
-      assert {:error, :invalid_pop} = binder.bind(@nonce, @reviewer_hash, @pop)
+      assert {:error, :invalid_pop} =
+               TokenBinder.bind(nonce, ctx.reviewer_card.user_hash, %{
+                 challenge: challenge,
+                 signature: signature
+               })
     end
 
-    test "rejects when bot is not running" do
-      binder =
-        rewire(Chat.ReviewBot.TokenBinder,
-          BinderQueries: QueriesOrderLinked,
-          EnigmaPq: EnigmaOk,
-          Worker: WorkerNotRunning
-        )
+    test "bot not running", ctx do
+      nonce = create!(ctx)
+      stop_bot!(ctx.bot_hash)
 
-      assert {:error, :bot_not_running} = binder.bind(@nonce, @reviewer_hash, @pop)
+      assert {:error, :bot_not_running} = bind(ctx, nonce, ctx.reviewer)
     end
 
-    test "rejects when bot lacks origin vouch" do
-      binder =
-        rewire(Chat.ReviewBot.TokenBinder,
-          BinderQueries: QueriesNoOriginVouch,
-          EnigmaPq: EnigmaOk,
-          Worker: WorkerOk
-        )
+    test "bot origin vouch tombstoned", ctx do
+      nonce = create!(ctx)
+      tombstone_vouches!(ctx.bot_hash, "origins.#{ctx.origin_hash}.reviews.write")
 
-      assert {:error, :no_bot_origin_vouch} = binder.bind(@nonce, @reviewer_hash, @pop)
+      assert {:error, :no_bot_origin_vouch} = bind(ctx, nonce, ctx.reviewer)
     end
 
-    test "rejects when bot lacks device vouch" do
-      binder =
-        rewire(Chat.ReviewBot.TokenBinder,
-          BinderQueries: QueriesNoDeviceVouch,
-          EnigmaPq: EnigmaOk,
-          Worker: WorkerOk,
-          DeviceId: DeviceIdOk
-        )
+    test "bot device vouch tombstoned", ctx do
+      nonce = create!(ctx)
+      tombstone_vouches!(ctx.bot_hash, "device.%")
 
-      assert {:error, :no_bot_device_vouch} = binder.bind(@nonce, @reviewer_hash, @pop)
+      assert {:error, :no_bot_device_vouch} = bind(ctx, nonce, ctx.reviewer)
     end
+  end
+
+  defp create!(ctx, order_hash \\ nil) do
+    {:ok, nonce} = TokenCreator.create(ctx.bot_hash, order_hash)
+    nonce
+  end
+
+  defp bind(_ctx, nonce, reviewer) do
+    {challenge, signature} = pop(reviewer)
+    reviewer_hash = User.extract_pq_card(reviewer).user_hash
+    TokenBinder.bind(nonce, reviewer_hash, %{challenge: challenge, signature: signature})
+  end
+
+  defp pop(identity) do
+    challenge = :crypto.strong_rand_bytes(32)
+    {challenge, EnigmaPq.sign(challenge, identity.sign_skey)}
+  end
+
+  defp order_hash, do: 64 |> :crypto.strong_rand_bytes() |> OriginOrderHash.from_binary()
+
+  defp hash(nonce), do: ReviewWriteTokenNonceHash.from_nonce(nonce)
+
+  defp token(nonce), do: Repo.get!(ReviewWriteToken, hash(nonce))
+
+  defp update_token!(nonce, set) do
+    from(t in ReviewWriteToken, where: t.nonce_hash == ^hash(nonce))
+    |> Repo.update_all(set: set)
+  end
+
+  defp tombstone_vouches!(subject_hash, kind_like) do
+    from(v in VouchToken, where: v.subject_hash == ^subject_hash and like(v.kind, ^kind_like))
+    |> Repo.update_all(set: [deleted_flag: true])
+  end
+
+  defp bind_vouch?(ctx, nonce, user_hash) do
+    kind = "origins.#{ctx.origin_hash}.reviews.write.#{hash(nonce)}"
+
+    from(v in VouchToken,
+      where:
+        v.kind == ^kind and v.issuer_hash == ^ctx.bot_hash and v.subject_hash == ^user_hash and
+          v.deleted_flag == false
+    )
+    |> Repo.exists?()
+  end
+
+  defp device_vouch_count(ctx, user_hash) do
+    from(v in VouchToken,
+      where:
+        v.issuer_hash == ^ctx.bot_hash and v.subject_hash == ^user_hash and
+          like(v.kind, "device.%")
+    )
+    |> Repo.aggregate(:count)
+  end
+
+  defp copy_count(root) do
+    from(t in ReviewWriteToken, where: t.parent_nonce_hash == ^hash(root))
+    |> Repo.aggregate(:count)
+  end
+
+  defp row_counts do
+    {Repo.aggregate(ReviewWriteToken, :count), Repo.aggregate(VouchToken, :count)}
   end
 end

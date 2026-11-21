@@ -29,10 +29,9 @@ defmodule ChatWeb.ElectricControllerReviewTest do
   alias Chat.Data.Types.ReviewSignHash
   alias Chat.Data.Schemas.VouchToken
   alias Chat.Data.Types.ReviewWriteTokenNonceHash
-  alias Chat.Data.Types.ReviewWriteTokenSignHash
   alias Chat.Data.User, as: UserData
   alias Chat.Data.VouchToken, as: VouchTokenData
-  alias Chat.ReviewBot.Identity
+  alias Chat.Test.ReviewGateFixtures
   alias EnigmaPq
 
   setup %{conn: conn} do
@@ -115,7 +114,7 @@ defmodule ChatWeb.ElectricControllerReviewTest do
 
   describe "review insert with nonce-based token linking" do
     test "links token review_hash atomically on insert", ctx do
-      nonce = insert_bound_token(ctx, ctx.origin_hash, ctx.author_hash)
+      nonce = insert_bound_token(ctx.origin_hash, ctx.author_hash)
 
       {review_hash, mutation, _sign_hash} = build_review_mutation(ctx)
 
@@ -607,32 +606,11 @@ defmodule ChatWeb.ElectricControllerReviewTest do
     |> post("/electric/v1/ingest", Jason.encode!(payload))
   end
 
-  defp insert_bound_token(ctx, origin_hash, user_hash) do
-    nonce = "tok_#{:crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)}"
+  defp insert_bound_token(origin_hash, user_hash) do
     bot = UserData.generate_pq_identity("TestBot")
-    bot_card = insert_user_card(bot)
-
-    token =
-      %Chat.Data.Schemas.ReviewWriteToken{
-        nonce_hash: ReviewWriteTokenNonceHash.from_nonce(nonce),
-        nonce_enc_b64: Identity.wrap_nonce(nonce, bot.crypt_skey),
-        origin_hash: origin_hash,
-        review_bot_hash: bot_card.user_hash,
-        user_hash: user_hash,
-        review_hash: nil,
-        deleted_flag: false,
-        owner_timestamp: System.os_time(:millisecond)
-      }
-      |> sign_with_hash(bot.sign_skey, &ReviewWriteTokenSignHash.from_binary/1)
-
-    {:ok, _} =
-      Chat.Data.ReviewWriteToken.upsert_review_write_token(
-        Chat.Data.Schemas.ReviewWriteToken.create_changeset(
-          %Chat.Data.Schemas.ReviewWriteToken{},
-          Map.from_struct(token)
-        )
-      )
-
+    insert_user_card(bot)
+    nonce = ReviewGateFixtures.insert_bound_token(bot, origin_hash, user_hash)
+    ReviewGateFixtures.insert_bind_vouch(bot, origin_hash, user_hash, nonce)
     nonce
   end
 

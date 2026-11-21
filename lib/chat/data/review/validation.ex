@@ -2,18 +2,15 @@ defmodule Chat.Data.Review.Validation do
   @moduledoc "Signature and integrity validation for review operations."
 
   alias Chat.Data.Origin, as: OriginData
-  alias Chat.Data.OriginSetting
   alias Chat.Data.Review, as: ReviewData
+  alias Chat.Data.Review.OriginGate
   alias Chat.Data.Review.Versioning
   alias Chat.Data.ReviewPublicPassword, as: PublicPasswordData
   alias Chat.Data.ReviewWriteToken, as: TokenData
   alias Chat.Data.Schemas.Review
-  alias Chat.Data.Schemas.ReviewWriteToken
   alias Chat.Data.Types.ReviewWriteTokenNonceHash
   alias Chat.Data.User, as: UserData
   alias Chat.Data.User.Validation, as: UserValidation
-  alias Chat.Data.VouchToken, as: VouchTokenData
-  alias Chat.Pq.WriteGate
   alias EnigmaPq
   alias Phoenix.Sync.Writer.Operation
 
@@ -93,59 +90,7 @@ defmodule Chat.Data.Review.Validation do
 
   # --- Review gate (check phase) ---
 
-  def check_review_gate(%Operation{operation: :insert, changes: changes}, pop_context) do
-    origin_hash = changes["origin_hash"] || changes[:origin_hash]
-    author_hash = changes["author_hash"] || changes[:author_hash]
-
-    with :ok <- check_origin_access(origin_hash, author_hash) do
-      check_token_nonce(pop_context, author_hash, origin_hash)
-    end
-  end
-
-  def check_review_gate(%Operation{operation: :update}, _pop_context), do: :ok
-
-  defp check_origin_access(origin_hash, author_hash) do
-    case OriginSetting.get_review_access(origin_hash) do
-      "open" ->
-        :ok
-
-      "invite_only" ->
-        scope = "origins.#{origin_hash}.reviews.write"
-
-        if author_hash == origin_hash or invited_to_write?(origin_hash, author_hash, scope),
-          do: :ok,
-          else: {:error, "not invited"}
-
-      _ ->
-        {:error, "not invited"}
-    end
-  end
-
-  defp check_token_nonce(%{nonce: nonce}, author_hash, origin_hash) when is_binary(nonce) do
-    case nonce |> ReviewWriteTokenNonceHash.from_nonce() |> TokenData.get_review_write_token() do
-      %ReviewWriteToken{
-        deleted_flag: false,
-        user_hash: ^author_hash,
-        origin_hash: ^origin_hash,
-        review_hash: nil
-      } ->
-        :ok
-
-      %ReviewWriteToken{review_hash: rh} when not is_nil(rh) ->
-        {:error, "token already used"}
-
-      %ReviewWriteToken{deleted_flag: true} ->
-        {:error, "token expired"}
-
-      nil ->
-        {:error, "token not found"}
-
-      _ ->
-        {:error, "token mismatch"}
-    end
-  end
-
-  defp check_token_nonce(_pop_context, _author_hash, _origin_hash), do: :ok
+  defdelegate check_review_gate(operation, pop_context), to: OriginGate, as: :check
 
   # --- HTTP ingestion with versioning ---
 
@@ -184,14 +129,6 @@ defmodule Chat.Data.Review.Validation do
       _ ->
         changeset
     end
-  end
-
-  defp invited_to_write?(origin_hash, author_hash, scope) do
-    VouchTokenData.scoped_vouch_exists?(author_hash, scope) and
-      match?(
-        {:ok, _},
-        VouchTokenData.chain_distance(origin_hash, author_hash, scope, WriteGate.max_depth())
-      )
   end
 
   defp check_review_update_versioning(%{valid?: false} = changeset, _existing, _new_review),

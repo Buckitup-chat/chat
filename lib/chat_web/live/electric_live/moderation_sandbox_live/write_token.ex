@@ -142,7 +142,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.WriteToken do
         >
           <div class="flex items-center justify-between">
             <div>
-              <span class="font-mono text-gray-600">{truncate_nonce(token.nonce)}</span>
+              <span class="font-mono text-gray-600">{truncate_nonce(token.nonce_hash)}</span>
               <span class={"ml-2 font-medium #{token_status_class(token)}"}>
                 {token_status(token)}
               </span>
@@ -162,8 +162,8 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.WriteToken do
             <p :if={token.origin_order_hash}>
               <span class="font-medium">Order:</span> {Shortcode.short_code(token.origin_order_hash)}
             </p>
-            <p :if={token.parent_nonce}>
-              <span class="font-medium">Parent:</span> {truncate_nonce(token.parent_nonce)}
+            <p :if={token.parent_nonce_hash}>
+              <span class="font-medium">Parent:</span> {truncate_nonce(token.parent_nonce_hash)}
             </p>
           </div>
         </div>

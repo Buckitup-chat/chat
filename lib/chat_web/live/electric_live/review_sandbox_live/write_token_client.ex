@@ -3,10 +3,11 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.WriteTokenClient do
 
   import ChatWeb.ElectricLive.SandboxHttp
 
+  alias Chat.Data.Types.ReviewWriteTokenNonceHash
   alias Chat.TimeKeeper
 
   def check_token(nonce, base_url, auth) do
-    where = "nonce='#{nonce}'"
+    where = "nonce_hash='#{ReviewWriteTokenNonceHash.from_nonce(nonce)}'"
 
     case fetch_shape_gated(base_url, "review_write_tokens", where, auth) do
       {:ok, [row | _], logs} -> {:ok, parse_token(row), logs}
@@ -68,13 +69,13 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.WriteTokenClient do
 
   defp parse_token(row) do
     %{
-      nonce: row["nonce"],
+      nonce_hash: row["nonce_hash"],
       origin_hash: row["origin_hash"],
       bot_hash: row["bot_hash"],
       user_hash: row["user_hash"],
       review_hash: row["review_hash"],
       origin_order_hash: row["origin_order_hash"],
-      parent_nonce: row["parent_nonce"],
+      parent_nonce_hash: row["parent_nonce_hash"],
       deleted_flag: row["deleted_flag"] in [true, "true", "t"],
       owner_timestamp: parse_int(row["owner_timestamp"])
     }

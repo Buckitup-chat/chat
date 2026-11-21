@@ -6,6 +6,7 @@ defmodule Chat.ReviewBot.Worker do
   import Tools.GenServerHelpers
 
   alias Chat.Pq.Ingest
+  alias Chat.ReviewBot.Identity
   alias EnigmaPq
 
   def start_link(%{bot_hash: bot_hash} = init_arg) do
@@ -27,6 +28,14 @@ defmodule Chat.ReviewBot.Worker do
 
   def sign(bot_hash, payload) do
     GenServer.call(via(bot_hash), {:sign, payload})
+  end
+
+  def wrap_nonce(bot_hash, nonce) do
+    GenServer.call(via(bot_hash), {:wrap_nonce, nonce})
+  end
+
+  def unwrap_nonce(bot_hash, nonce_enc) do
+    GenServer.call(via(bot_hash), {:unwrap_nonce, nonce_enc})
   end
 
   def info(bot_hash) do
@@ -61,6 +70,14 @@ defmodule Chat.ReviewBot.Worker do
   def handle_call({:sign, payload}, _from, state) do
     signature = EnigmaPq.sign(payload, state.identity.sign_skey)
     state |> reply(signature)
+  end
+
+  def handle_call({:wrap_nonce, nonce}, _from, state) do
+    state |> reply(Identity.wrap_nonce(nonce, state.identity.crypt_skey))
+  end
+
+  def handle_call({:unwrap_nonce, nonce_enc}, _from, state) do
+    state |> reply(Identity.unwrap_nonce(nonce_enc, state.identity.crypt_skey))
   end
 
   def handle_call(:info, _from, state) do

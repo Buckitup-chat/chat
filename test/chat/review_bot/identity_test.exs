@@ -78,6 +78,34 @@ defmodule Chat.ReviewBot.IdentityTest do
     end
   end
 
+  describe "wrap_nonce/unwrap_nonce" do
+    test "bot unwraps its own 60-byte ciphertext", %{bot: bot} do
+      nonce = Base.url_encode64(:crypto.strong_rand_bytes(24), padding: false)
+      enc = Identity.wrap_nonce(nonce, bot.crypt_skey)
+
+      assert byte_size(enc) == 60
+      refute String.contains?(enc, nonce)
+      assert {:ok, ^nonce} = Identity.unwrap_nonce(enc, bot.crypt_skey)
+    end
+
+    test "another bot's key fails", %{bot: bot, origin: other} do
+      enc = Identity.wrap_nonce("some_nonce", bot.crypt_skey)
+
+      assert {:error, :decryption_failed} = Identity.unwrap_nonce(enc, other.crypt_skey)
+    end
+
+    test "derived key survives identity encode/decode", %{bot: bot} do
+      {:ok, restored} = bot |> Identity.encode() |> Identity.decode()
+
+      assert Identity.nonce_key(restored.crypt_skey) == Identity.nonce_key(bot.crypt_skey)
+
+      assert {:ok, "n"} =
+               "n"
+               |> Identity.wrap_nonce(bot.crypt_skey)
+               |> Identity.unwrap_nonce(restored.crypt_skey)
+    end
+  end
+
   describe "matches_card?/2" do
     test "returns true for matching identity and card", ctx do
       assert Identity.matches_card?(ctx.bot, ctx.bot_card)

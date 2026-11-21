@@ -7,8 +7,10 @@ defmodule Chat.Data.ReviewWriteTokenValidationTest do
   alias Chat.Data.ReviewWriteToken, as: ReviewWriteTokenData
   alias Chat.Data.ReviewWriteToken.Validation
   alias Chat.Data.Schemas.ReviewWriteToken
+  alias Chat.Data.Types.ReviewWriteTokenNonceHash
   alias Chat.Data.Types.ReviewWriteTokenSignHash
   alias Chat.Data.User
+  alias Chat.ReviewBot.Identity
   alias Phoenix.Sync.Writer.Operation
 
   setup do
@@ -121,14 +123,14 @@ defmodule Chat.Data.ReviewWriteTokenValidationTest do
 
     test "accepts update (PK-only original) signed by review bot", ctx do
       token = insert_token(ctx)
-      operation = update_operation(token.nonce)
+      operation = update_operation(token.nonce_hash)
       pop_context = sign_challenge(ctx.bot_identity)
       assert :ok = Validation.review_write_token_allowed(operation, pop_context)
     end
 
     test "rejects update signed by a stranger", ctx do
       token = insert_token(ctx)
-      operation = update_operation(token.nonce)
+      operation = update_operation(token.nonce_hash)
       pop_context = sign_challenge(ctx.stranger)
 
       assert {:error, "Invalid operation"} =
@@ -136,7 +138,7 @@ defmodule Chat.Data.ReviewWriteTokenValidationTest do
     end
 
     test "rejects update of unknown token", ctx do
-      operation = update_operation("missing_nonce")
+      operation = update_operation(ReviewWriteTokenNonceHash.from_nonce("missing_nonce"))
       pop_context = sign_challenge(ctx.bot_identity)
 
       assert {:error, "Invalid operation"} =
@@ -168,7 +170,12 @@ defmodule Chat.Data.ReviewWriteTokenValidationTest do
         |> ReviewWriteToken.create_changeset(Map.from_struct(stale))
 
       {:ok, _} = ReviewWriteTokenData.upsert_review_write_token(changeset)
-      reloaded = ReviewWriteTokenData.get_review_write_token(nonce)
+
+      reloaded =
+        nonce
+        |> ReviewWriteTokenNonceHash.from_nonce()
+        |> ReviewWriteTokenData.get_review_write_token()
+
       assert reloaded.deleted_flag == false
     end
   end
@@ -186,11 +193,12 @@ defmodule Chat.Data.ReviewWriteTokenValidationTest do
       end)
 
     token = %ReviewWriteToken{
-      nonce: nonce,
+      nonce_hash: ReviewWriteTokenNonceHash.from_nonce(nonce),
+      nonce_enc_b64: Identity.wrap_nonce(nonce, ctx.bot_identity.crypt_skey),
       origin_hash: ctx.origin_hash,
       review_bot_hash: ctx.bot_hash,
       origin_order_hash: nil,
-      parent_nonce: nil,
+      parent_nonce_hash: nil,
       user_hash: nil,
       review_hash: nil,
       deleted_flag: deleted_flag,
@@ -229,12 +237,12 @@ defmodule Chat.Data.ReviewWriteTokenValidationTest do
     }
   end
 
-  defp update_operation(nonce) do
+  defp update_operation(nonce_hash) do
     %Operation{
       index: 0,
       operation: :update,
       relation: "review_write_tokens",
-      data: %{"nonce" => nonce},
+      data: %{"nonce_hash" => nonce_hash},
       changes: %{"user_hash" => nil}
     }
   end

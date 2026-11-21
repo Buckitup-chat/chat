@@ -11,14 +11,14 @@ defmodule ChatWeb.ReviewTokenControllerTest do
 
   defmodule MockTokenDeleted do
     def get_review_write_token(_nonce) do
-      %ReviewWriteToken{nonce: "test", deleted_flag: true, owner_timestamp: 1}
+      %ReviewWriteToken{nonce_hash: "rwn_test", deleted_flag: true, owner_timestamp: 1}
     end
   end
 
   defmodule MockTokenPending do
     def get_review_write_token(_nonce) do
       %ReviewWriteToken{
-        nonce: "test",
+        nonce_hash: "rwn_test",
         origin_hash: "origin",
         review_bot_hash: "bot",
         deleted_flag: false,
@@ -34,7 +34,7 @@ defmodule ChatWeb.ReviewTokenControllerTest do
   defmodule MockTokenBound do
     def get_review_write_token(_nonce) do
       %ReviewWriteToken{
-        nonce: "test",
+        nonce_hash: "rwn_test",
         origin_hash: "origin",
         review_bot_hash: "bot",
         deleted_flag: false,
@@ -50,7 +50,7 @@ defmodule ChatWeb.ReviewTokenControllerTest do
   defmodule MockTokenReviewed do
     def get_review_write_token(_nonce) do
       %ReviewWriteToken{
-        nonce: "test",
+        nonce_hash: "rwn_test",
         origin_hash: "origin",
         review_bot_hash: "bot",
         deleted_flag: false,
@@ -61,6 +61,23 @@ defmodule ChatWeb.ReviewTokenControllerTest do
         sign_hash: "hash"
       }
     end
+  end
+
+  defmodule MockTokenByHash do
+    alias Chat.Data.Types.ReviewWriteTokenNonceHash
+
+    def get_review_write_token(nonce_hash) do
+      if nonce_hash == ReviewWriteTokenNonceHash.from_nonce("pending"),
+        do: %ReviewWriteToken{nonce_hash: nonce_hash, deleted_flag: false, owner_timestamp: 1}
+    end
+  end
+
+  # No review bot is started here: `/r/:nonce` must not need one
+  test "looks the token up by nonce hash", %{conn: conn} do
+    controller = rewire(ChatWeb.ReviewTokenController, ReviewWriteToken: MockTokenByHash)
+
+    assert controller.show(conn, %{"nonce" => "pending"}).status == 200
+    assert controller.show(build_conn(), %{"nonce" => "other"}).status == 410
   end
 
   test "returns 410 for nonexistent nonce", %{conn: conn} do

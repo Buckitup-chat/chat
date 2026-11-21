@@ -53,13 +53,13 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.WriteTokenClient do
 
   defp parse_token_row(row) do
     %{
-      nonce: row["nonce"],
+      nonce_hash: row["nonce_hash"],
       origin_hash: row["origin_hash"],
       origin_order_hash: row["origin_order_hash"],
       bot_hash: row["bot_hash"],
       user_hash: row["user_hash"],
       review_hash: row["review_hash"],
-      parent_nonce: row["parent_nonce"],
+      parent_nonce_hash: row["parent_nonce_hash"],
       deleted_flag: row["deleted_flag"] in [true, "true", "t"],
       owner_timestamp: parse_int(row["owner_timestamp"])
     }

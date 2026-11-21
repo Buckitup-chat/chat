@@ -9,6 +9,7 @@ defmodule Chat.Data.Review.Validation do
   alias Chat.Data.ReviewWriteToken, as: TokenData
   alias Chat.Data.Schemas.Review
   alias Chat.Data.Schemas.ReviewWriteToken
+  alias Chat.Data.Types.ReviewWriteTokenNonceHash
   alias Chat.Data.User, as: UserData
   alias Chat.Data.User.Validation, as: UserValidation
   alias Chat.Data.VouchToken, as: VouchTokenData
@@ -121,7 +122,7 @@ defmodule Chat.Data.Review.Validation do
   end
 
   defp check_token_nonce(%{nonce: nonce}, author_hash, origin_hash) when is_binary(nonce) do
-    case TokenData.get_review_write_token(nonce) do
+    case nonce |> ReviewWriteTokenNonceHash.from_nonce() |> TokenData.get_review_write_token() do
       %ReviewWriteToken{
         deleted_flag: false,
         user_hash: ^author_hash,
@@ -226,7 +227,8 @@ defmodule Chat.Data.Review.Validation do
     review_hash = Ecto.Changeset.get_field(changeset, :review_hash)
 
     Ecto.Multi.run(multi, :link_review_token, fn repo, _changes ->
-      {count, _} = TokenData.link_to_review(repo, nonce, review_hash)
+      nonce_hash = ReviewWriteTokenNonceHash.from_nonce(nonce)
+      {count, _} = TokenData.link_to_review(repo, nonce_hash, review_hash)
       {:ok, count}
     end)
   end

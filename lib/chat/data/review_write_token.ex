@@ -6,8 +6,8 @@ defmodule Chat.Data.ReviewWriteToken do
 
   alias Chat.Data.Schemas.ReviewWriteToken
 
-  def get_review_write_token(nonce) do
-    repo().get(ReviewWriteToken, nonce)
+  def get_review_write_token(nonce_hash) do
+    repo().get(ReviewWriteToken, nonce_hash)
   end
 
   def pending_expired_tokens(origin_hash, threshold_ts) do
@@ -28,9 +28,9 @@ defmodule Chat.Data.ReviewWriteToken do
     |> repo().delete_all()
   end
 
-  def link_to_review(repo, nonce, review_hash) do
+  def link_to_review(repo, nonce_hash, review_hash) do
     from(rwt in ReviewWriteToken,
-      where: rwt.nonce == ^nonce and is_nil(rwt.review_hash)
+      where: rwt.nonce_hash == ^nonce_hash and is_nil(rwt.review_hash)
     )
     |> repo.update_all(set: [review_hash: review_hash])
   end
@@ -38,7 +38,7 @@ defmodule Chat.Data.ReviewWriteToken do
   def upsert_review_write_token(changeset) do
     repo().insert(changeset,
       on_conflict: review_write_token_upsert_query(),
-      conflict_target: :nonce,
+      conflict_target: :nonce_hash,
       allow_stale: true
     )
   end

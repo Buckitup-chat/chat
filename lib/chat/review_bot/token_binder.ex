@@ -4,14 +4,15 @@ defmodule Chat.ReviewBot.TokenBinder do
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.ReviewWriteToken
   alias Chat.Data.Schemas.VouchToken
-  alias Chat.Data.Types.ReviewWriteTokenSignHash
+  alias Chat.Data.Types.ReviewWriteTokenNonceHash
   alias Chat.DeviceId
   alias Chat.ReviewBot.BinderQueries
+  alias Chat.ReviewBot.RowBuilder
+  alias Chat.ReviewBot.TokenCreator
   alias Chat.ReviewBot.Worker
   alias Chat.TimeKeeper
 
   @review_shapes ~w(review review_password_candidate review_post_right_candidate review_revoke_right_candidate)
-  @nonce_bytes 24
 
   def bind(nonce, reviewer_hash, pop_context) do
     with {:ok, token} <- fetch_valid_token(nonce),
@@ -20,12 +21,14 @@ defmodule Chat.ReviewBot.TokenBinder do
          {:ok, %{origin_hash: origin_hash}} <- fetch_bot_info(bot_hash),
          :ok <- verify_bot_origin_vouch(origin_hash, bot_hash),
          :ok <- verify_bot_device_vouches(bot_hash) do
-      do_bind(token, bot_hash, origin_hash, reviewer_hash)
+      do_bind(token, nonce, origin_hash, reviewer_hash)
     end
   end
 
   defp fetch_valid_token(nonce) do
-    case BinderQueries.get_review_write_token(nonce) do
+    case nonce
+         |> ReviewWriteTokenNonceHash.from_nonce()
+         |> BinderQueries.get_review_write_token() do
       nil -> {:error, :token_not_found}
       %{deleted_flag: true} -> {:error, :token_deleted}
       %ReviewWriteToken{} = token -> {:ok, token}
@@ -69,83 +72,61 @@ defmodule Chat.ReviewBot.TokenBinder do
     end
   end
 
-  defp do_bind(token, bot_hash, origin_hash, reviewer_hash) do
+  defp do_bind(token, nonce, origin_hash, reviewer_hash) do
+    bot_hash = token.review_bot_hash
+
     case token.origin_order_hash do
       nil -> bind_reusable(token, bot_hash, origin_hash, reviewer_hash)
-      _order_hash -> bind_order_linked(token, bot_hash, origin_hash, reviewer_hash)
+      _order_hash -> bind_order_linked(token, bot_hash, origin_hash, reviewer_hash, nonce)
     end
   end
 
-  defp bind_order_linked(%ReviewWriteToken{} = token, bot_hash, origin_hash, reviewer_hash) do
+  defp bind_order_linked(%ReviewWriteToken{} = token, bot_hash, origin_hash, reviewer_hash, nonce) do
     bound = %ReviewWriteToken{
       token
       | user_hash: reviewer_hash,
         owner_timestamp: TimeKeeper.now_unix()
     }
 
-    vouch_mutations = build_vouch_mutations(bot_hash, origin_hash, reviewer_hash, token.nonce)
-    token_mutation = sign_and_build_token_mutation(bot_hash, bound)
-
-    Worker.ingest(bot_hash, vouch_mutations ++ [token_mutation])
-    |> then(fn
-      {:ok, _txid, _changes} -> {:ok, token.nonce}
-      error -> error
-    end)
+    bot_hash
+    |> build_vouch_mutations(origin_hash, reviewer_hash, token.nonce_hash)
+    |> Enum.concat([RowBuilder.review_write_token_mutation(bound)])
+    |> ingest(bot_hash, nonce)
   end
 
   defp bind_reusable(token, bot_hash, origin_hash, reviewer_hash) do
-    new_nonce = generate_nonce()
+    new_nonce = TokenCreator.generate_nonce()
+    new_nonce_hash = ReviewWriteTokenNonceHash.from_nonce(new_nonce)
 
     bound = %ReviewWriteToken{
-      nonce: new_nonce,
+      nonce_hash: new_nonce_hash,
+      nonce_enc_b64: Worker.wrap_nonce(bot_hash, new_nonce),
       origin_hash: origin_hash,
       review_bot_hash: bot_hash,
       origin_order_hash: nil,
-      parent_nonce: token.nonce,
+      parent_nonce_hash: token.nonce_hash,
       user_hash: reviewer_hash,
       review_hash: nil,
       deleted_flag: false,
       owner_timestamp: TimeKeeper.now_unix()
     }
 
-    vouch_mutations = build_vouch_mutations(bot_hash, origin_hash, reviewer_hash, new_nonce)
-    token_mutation = sign_and_build_token_mutation(bot_hash, bound)
+    bot_hash
+    |> build_vouch_mutations(origin_hash, reviewer_hash, new_nonce_hash)
+    |> Enum.concat([RowBuilder.review_write_token_mutation(bound)])
+    |> ingest(bot_hash, new_nonce)
+  end
 
-    Worker.ingest(bot_hash, vouch_mutations ++ [token_mutation])
-    |> then(fn
-      {:ok, _txid, _changes} -> {:ok, new_nonce}
+  defp ingest(mutations, bot_hash, bound_nonce) do
+    case Worker.ingest(bot_hash, mutations) do
+      {:ok, _txid, _changes} -> {:ok, bound_nonce}
       error -> error
-    end)
+    end
   end
 
-  defp sign_and_build_token_mutation(bot_hash, token) do
-    payload = Integrity.signature_payload(token)
-    sign_b64 = Worker.sign(bot_hash, payload)
-    sign_hash = sign_b64 |> EnigmaPq.hash() |> ReviewWriteTokenSignHash.from_binary()
-    signed = %{token | sign_b64: sign_b64, sign_hash: sign_hash}
-
-    %{
-      "type" => "insert",
-      "modified" => %{
-        "nonce" => signed.nonce,
-        "origin_hash" => signed.origin_hash,
-        "review_bot_hash" => signed.review_bot_hash,
-        "origin_order_hash" => signed.origin_order_hash,
-        "parent_nonce" => signed.parent_nonce,
-        "user_hash" => signed.user_hash,
-        "review_hash" => signed.review_hash,
-        "deleted_flag" => signed.deleted_flag,
-        "owner_timestamp" => signed.owner_timestamp,
-        "sign_b64" => signed.sign_b64,
-        "sign_hash" => signed.sign_hash
-      },
-      "syncMetadata" => %{"relation" => "review_write_tokens"}
-    }
-  end
-
-  defp build_vouch_mutations(bot_hash, origin_hash, reviewer_hash, nonce) do
+  defp build_vouch_mutations(bot_hash, origin_hash, reviewer_hash, nonce_hash) do
     origin_vouch =
-      build_vouch(bot_hash, reviewer_hash, "origins.#{origin_hash}.reviews.write.#{nonce}")
+      build_vouch(bot_hash, reviewer_hash, "origins.#{origin_hash}.reviews.write.#{nonce_hash}")
 
     device_id = DeviceId.id()
 
@@ -181,11 +162,5 @@ defmodule Chat.ReviewBot.TokenBinder do
       },
       "syncMetadata" => %{"relation" => "vouch_tokens"}
     }
-  end
-
-  defp generate_nonce do
-    @nonce_bytes
-    |> :crypto.strong_rand_bytes()
-    |> Base.url_encode64(padding: false)
   end
 end

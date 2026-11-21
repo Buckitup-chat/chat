@@ -14,14 +14,34 @@ defmodule Chat.ReviewBot.TokenBinder do
 
   @review_shapes ~w(review review_password_candidate review_post_right_candidate review_revoke_right_candidate)
 
+  @doc """
+  Binds `reviewer_hash` to the token behind `nonce`, returns `{:ok, bound_nonce}`.
+
+  Bound copies are not invitations. An order-linked token binds once (same user
+  gets it back), a reusable root yields one copy per user. Runs under a per-nonce
+  lock so a single device never double-binds.
+  """
   def bind(nonce, reviewer_hash, pop_context) do
+    nonce
+    |> ReviewWriteTokenNonceHash.from_nonce()
+    |> then(&{__MODULE__, &1})
+    |> then(
+      &:global.trans({&1, self()}, fn -> locked_bind(nonce, reviewer_hash, pop_context) end)
+    )
+  end
+
+  defp locked_bind(nonce, reviewer_hash, pop_context) do
     with {:ok, token} <- fetch_valid_token(nonce),
+         {:invitation, true} <- {:invitation, is_nil(token.parent_nonce_hash)},
          {:ok, _card} <- verify_reviewer(reviewer_hash, pop_context),
          bot_hash = token.review_bot_hash,
          {:ok, %{origin_hash: origin_hash}} <- fetch_bot_info(bot_hash),
          :ok <- verify_bot_origin_vouch(origin_hash, bot_hash),
          :ok <- verify_bot_device_vouches(bot_hash) do
       do_bind(token, nonce, origin_hash, reviewer_hash)
+    else
+      {:invitation, false} -> {:error, :token_not_invitation}
+      error -> error
     end
   end
 
@@ -75,9 +95,11 @@ defmodule Chat.ReviewBot.TokenBinder do
   defp do_bind(token, nonce, origin_hash, reviewer_hash) do
     bot_hash = token.review_bot_hash
 
-    case token.origin_order_hash do
-      nil -> bind_reusable(token, bot_hash, origin_hash, reviewer_hash)
-      _order_hash -> bind_order_linked(token, bot_hash, origin_hash, reviewer_hash, nonce)
+    case {token.origin_order_hash, token.user_hash} do
+      {nil, _} -> bind_reusable(token, bot_hash, origin_hash, reviewer_hash)
+      {_order, nil} -> bind_order_linked(token, bot_hash, origin_hash, reviewer_hash, nonce)
+      {_order, ^reviewer_hash} -> {:ok, nonce}
+      {_order, _other} -> {:error, :token_already_bound}
     end
   end
 
@@ -85,16 +107,24 @@ defmodule Chat.ReviewBot.TokenBinder do
     bound = %ReviewWriteToken{
       token
       | user_hash: reviewer_hash,
-        owner_timestamp: TimeKeeper.now_unix()
+        # the Writer refuses updates not strictly newer; bind may land in the create second
+        owner_timestamp: max(TimeKeeper.now_unix(), token.owner_timestamp + 1)
     }
 
     bot_hash
     |> build_vouch_mutations(origin_hash, reviewer_hash, token.nonce_hash)
-    |> Enum.concat([RowBuilder.review_write_token_mutation(bound)])
+    |> Enum.concat([RowBuilder.review_write_token_update_mutation(bound, [:user_hash])])
     |> ingest(bot_hash, nonce)
   end
 
   defp bind_reusable(token, bot_hash, origin_hash, reviewer_hash) do
+    case BinderQueries.get_bound_copy(token.nonce_hash, reviewer_hash) do
+      nil -> mint_copy(token, bot_hash, origin_hash, reviewer_hash)
+      copy -> Worker.unwrap_nonce(bot_hash, copy.nonce_enc_b64)
+    end
+  end
+
+  defp mint_copy(token, bot_hash, origin_hash, reviewer_hash) do
     new_nonce = TokenCreator.generate_nonce()
     new_nonce_hash = ReviewWriteTokenNonceHash.from_nonce(new_nonce)
 
@@ -136,6 +166,14 @@ defmodule Chat.ReviewBot.TokenBinder do
       end)
 
     [origin_vouch | device_vouches]
+    |> Enum.reject(&live_vouch?/1)
+  end
+
+  # Device vouches are shared by every token the reviewer binds via this bot
+  defp live_vouch?(%{
+         "modified" => %{"kind" => kind, "issuer_hash" => issuer, "subject_hash" => subject}
+       }) do
+    match?(%{deleted_flag: false}, BinderQueries.get_vouch_token(kind, issuer, subject))
   end
 
   defp build_vouch(bot_hash, reviewer_hash, kind) do

@@ -11,7 +11,7 @@ defmodule Chat.ReviewBot.GarbageCollector do
 
   defp soft_delete(bot_hash, %ReviewWriteToken{} = token) do
     %ReviewWriteToken{token | deleted_flag: true, owner_timestamp: token.owner_timestamp + 1}
-    |> RowBuilder.review_write_token_mutation()
+    |> RowBuilder.review_write_token_update_mutation([:deleted_flag])
     |> List.wrap()
     |> then(&Worker.ingest(bot_hash, &1))
   end

@@ -15,9 +15,13 @@ defmodule Chat.Test.ReviewBotFixtures do
     only: [insert_user_card: 1, sign_with_hash: 3, sign_with_key: 2]
 
   alias Chat.Challenge
+  alias Chat.Data.Integrity
   alias Chat.Data.Schemas.OriginBot
+  alias Chat.Data.Schemas.Review
   alias Chat.Data.Schemas.VouchToken
   alias Chat.Data.Types.OriginBotSignHash
+  alias Chat.Data.Types.ReviewHash
+  alias Chat.Data.Types.ReviewSignHash
   alias Chat.Data.User
   alias Chat.Data.VouchToken, as: VouchTokenData
   alias Chat.DeviceId
@@ -165,6 +169,62 @@ defmodule Chat.Test.ReviewBotFixtures do
       |> json_response(200)
 
     bound_nonce
+  end
+
+  @doc "Posts a signed review insert to `/electric/v1/ingest`, with `nonce` in auth when given."
+  def post_review(ctx, nonce) do
+    {mutation, review_hash} = review_insert_mutation(ctx.reviewer, ctx.origin_hash)
+    {challenge_id, challenge} = Challenge.store()
+    signature = challenge |> EnigmaPq.sign(ctx.reviewer.sign_skey) |> b64()
+
+    auth =
+      %{"challenge_id" => challenge_id, "signature" => signature}
+      |> then(&if nonce, do: Map.put(&1, "nonce", nonce), else: &1)
+
+    resp =
+      ctx.conn
+      |> put_req_header("content-type", "application/json")
+      |> post("/electric/v1/ingest", Jason.encode!(%{"auth" => auth, "mutations" => [mutation]}))
+
+    {resp, review_hash}
+  end
+
+  defp review_insert_mutation(author, origin_hash) do
+    author_hash = User.extract_pq_card(author).user_hash
+    review_hash = :crypto.strong_rand_bytes(64) |> ReviewHash.from_binary()
+    content_b64 = EnigmaPq.aes_gcm_encrypt("Great place!", :crypto.strong_rand_bytes(32))
+    timestamp = System.os_time(:millisecond)
+
+    sign_b64 =
+      %Review{
+        review_hash: review_hash,
+        origin_hash: origin_hash,
+        author_hash: author_hash,
+        content_b64: content_b64,
+        deleted_flag: false,
+        parent_sign_hash: nil,
+        owner_timestamp: timestamp
+      }
+      |> Integrity.signature_payload()
+      |> EnigmaPq.sign(author.sign_skey)
+
+    mutation = %{
+      "type" => "insert",
+      "modified" => %{
+        "review_hash" => review_hash,
+        "origin_hash" => origin_hash,
+        "author_hash" => author_hash,
+        "content_b64" => b64(content_b64),
+        "deleted_flag" => false,
+        "parent_sign_hash" => nil,
+        "owner_timestamp" => timestamp,
+        "sign_b64" => b64(sign_b64),
+        "sign_hash" => sign_b64 |> EnigmaPq.hash() |> ReviewSignHash.from_binary()
+      },
+      "syncMetadata" => %{"relation" => "review"}
+    }
+
+    {mutation, review_hash}
   end
 
   def b64(bin), do: Base.encode64(bin, padding: false)

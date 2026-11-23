@@ -5,6 +5,7 @@ defmodule Chat.ReviewBot.Worker do
 
   import Tools.GenServerHelpers
 
+  alias Chat.Data.Types.ReviewWriteTokenNonceHash
   alias Chat.Pq.Ingest
   alias Chat.ReviewBot.Identity
   alias Chat.ReviewBot.TokenBinder
@@ -37,6 +38,17 @@ defmodule Chat.ReviewBot.Worker do
 
   def unwrap_nonce(bot_hash, nonce_enc) do
     GenServer.call(via(bot_hash), {:unwrap_nonce, nonce_enc})
+  end
+
+  @doc """
+  Decrypts a token row's `nonce_enc_b64` inside the bot. `{:ok, nonce}` only when
+  it hashes back to the row's `nonce_hash`; the key never leaves this process.
+  """
+  def reveal_nonce(bot_hash, %{nonce_hash: nonce_hash, nonce_enc_b64: nonce_enc}) do
+    case whereis(bot_hash) do
+      nil -> {:error, :bot_not_running}
+      pid -> GenServer.call(pid, {:reveal_nonce, nonce_hash, nonce_enc})
+    end
   end
 
   def info(bot_hash) do
@@ -92,6 +104,17 @@ defmodule Chat.ReviewBot.Worker do
     state
     |> bot_ops()
     |> TokenBinder.bind_in_bot(nonce, reviewer_hash)
+    |> then(&reply(state, &1))
+  end
+
+  def handle_call({:reveal_nonce, nonce_hash, nonce_enc}, _from, state) do
+    with {:ok, nonce} <- Identity.unwrap_nonce(nonce_enc, state.identity.crypt_skey),
+         {:hash, true} <- {:hash, ReviewWriteTokenNonceHash.from_nonce(nonce) == nonce_hash} do
+      {:ok, nonce}
+    else
+      {:hash, false} -> {:error, :nonce_mismatch}
+      error -> error
+    end
     |> then(&reply(state, &1))
   end
 

@@ -47,13 +47,11 @@ defmodule Chat.ReviewBot.GarbageCollectorTest do
       gc().soft_delete_tokens([token], @bot_hash)
 
       assert_received {:ingested, @bot_hash, [mutation]}
-      assert mutation["modified"]["deleted_flag"] == true
+      assert mutation["type"] == "update"
+      assert mutation["changes"]["deleted_flag"] == true
 
-      assert mutation["modified"]["nonce_hash"] ==
+      assert mutation["original"]["nonce_hash"] ==
                ReviewWriteTokenNonceHash.from_nonce("expired_1")
-
-      assert mutation["modified"]["nonce_enc_b64"] == "enc_expired_1"
-      assert mutation["type"] == "insert"
     end
 
     test "owner_timestamp bump is +1, not bot clock" do
@@ -63,7 +61,7 @@ defmodule Chat.ReviewBot.GarbageCollectorTest do
       gc().soft_delete_tokens([token], @bot_hash)
 
       assert_received {:ingested, _, [mutation]}
-      assert mutation["modified"]["owner_timestamp"] == ts + 1
+      assert mutation["changes"]["owner_timestamp"] == ts + 1
     end
 
     test "does not touch anything when no tokens" do
@@ -79,7 +77,7 @@ defmodule Chat.ReviewBot.GarbageCollectorTest do
 
       assert_received {:ingested, @bot_hash, [m1]}
       assert_received {:ingested, @bot_hash, [m2]}
-      hashes = MapSet.new([m1["modified"]["nonce_hash"], m2["modified"]["nonce_hash"]])
+      hashes = MapSet.new([m1["original"]["nonce_hash"], m2["original"]["nonce_hash"]])
       expected = MapSet.new(["n1", "n2"], &ReviewWriteTokenNonceHash.from_nonce/1)
       assert MapSet.equal?(hashes, expected)
     end

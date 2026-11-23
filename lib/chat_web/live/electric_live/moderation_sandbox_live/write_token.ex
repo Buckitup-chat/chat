@@ -5,6 +5,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.WriteToken do
 
   alias Chat.Proto.Shortcode
   alias ChatWeb.ElectricLive.ModerationSandboxLive.WriteTokenClient
+  alias ChatWeb.ElectricLive.WriteTokenLinks
 
   def handle_create(%{"bot_hash" => bot_hash} = params, base_url, socket) do
     order_hash = params["origin_order_hash"]
@@ -22,9 +23,11 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.WriteToken do
 
   def handle_refresh(base_url, auth, socket) do
     identity = socket.assigns.identity
+    bots = socket.assigns.origin_bots
 
     case WriteTokenClient.list_tokens(identity.origin_hash, base_url, auth) do
       {:ok, tokens, logs} ->
+        tokens = WriteTokenLinks.attach(tokens, bots, identity.crypt_skey, base_url)
         {:noreply, socket |> assign(:write_tokens, tokens) |> append_logs(logs)}
 
       {:error, reason, logs} ->
@@ -32,9 +35,10 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.WriteToken do
     end
   end
 
-  def list_tokens(origin_hash, base_url, auth) do
+  @doc "Tokens of `origin_hash`, with links decrypted via `bots` and the origin's `crypt_skey`."
+  def list_tokens(origin_hash, crypt_skey, bots, base_url, auth) do
     case WriteTokenClient.list_tokens(origin_hash, base_url, auth) do
-      {:ok, tokens, _logs} -> tokens
+      {:ok, tokens, _logs} -> WriteTokenLinks.attach(tokens, bots, crypt_skey, base_url)
       {:error, _reason, _logs} -> []
     end
   end
@@ -166,6 +170,7 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.WriteToken do
               <span class="font-medium">Parent:</span> {truncate_nonce(token.parent_nonce_hash)}
             </p>
           </div>
+          <WriteTokenLinks.token_link token={token} />
         </div>
       </div>
     <% end %>

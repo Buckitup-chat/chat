@@ -56,7 +56,8 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.WriteTokenClient do
       nonce_hash: row["nonce_hash"],
       origin_hash: row["origin_hash"],
       origin_order_hash: row["origin_order_hash"],
-      bot_hash: row["bot_hash"],
+      bot_hash: row["review_bot_hash"],
+      nonce_enc_b64: decode_b64(row["nonce_enc_b64"]),
       user_hash: row["user_hash"],
       review_hash: row["review_hash"],
       parent_nonce_hash: row["parent_nonce_hash"],
@@ -100,6 +101,15 @@ defmodule ChatWeb.ElectricLive.OriginSandboxLive.WriteTokenClient do
 
   defp format_headers(headers) when is_list(headers), do: headers
   defp format_headers(_), do: []
+
+  defp decode_b64(nil), do: nil
+
+  defp decode_b64(value) do
+    case Base.decode64(value, padding: false) do
+      {:ok, bin} -> bin
+      :error -> nil
+    end
+  end
 
   defp parse_int(v) when is_integer(v), do: v
   defp parse_int(v) when is_binary(v), do: String.to_integer(v)

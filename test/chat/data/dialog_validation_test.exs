@@ -143,7 +143,7 @@ defmodule Chat.Data.DialogValidationTest do
 
       operation = reaction_operation(ctx.alice_hash, ctx.dialog_hash)
 
-      assert {:error, "dialog_key required before posting to dialog"} =
+      assert {:error, "not a dialog participant"} =
                Validation.reaction_allowed(operation, %{
                  challenge: challenge,
                  signature: signature
@@ -194,10 +194,15 @@ defmodule Chat.Data.DialogValidationTest do
   # --- receipt_allowed/2 ---
 
   describe "receipt_allowed/2" do
+    setup :join_dialog
+
     test "valid PoP returns :ok", ctx do
       {challenge, signature} = sign_challenge(ctx.alice)
 
-      operation = %Operation{operation: :insert, changes: %{"peer_hash" => ctx.alice_hash}}
+      operation = %Operation{
+        operation: :insert,
+        changes: %{"peer_hash" => ctx.alice_hash, "dialog_hash" => ctx.dialog_hash}
+      }
 
       assert :ok =
                Validation.receipt_allowed(operation, %{challenge: challenge, signature: signature})
@@ -207,7 +212,10 @@ defmodule Chat.Data.DialogValidationTest do
       {challenge, _} = sign_challenge(ctx.alice)
       {_, wrong_sig} = sign_challenge(ctx.bob)
 
-      operation = %Operation{operation: :insert, changes: %{"peer_hash" => ctx.alice_hash}}
+      operation = %Operation{
+        operation: :insert,
+        changes: %{"peer_hash" => ctx.alice_hash, "dialog_hash" => ctx.dialog_hash}
+      }
 
       assert {:error, _} =
                Validation.receipt_allowed(operation, %{challenge: challenge, signature: wrong_sig})
@@ -219,7 +227,11 @@ defmodule Chat.Data.DialogValidationTest do
 
       operation = %Operation{
         operation: :insert,
-        changes: %{"peer_hash" => ctx.alice_hash, "message_id" => msg.message_id}
+        changes: %{
+          "peer_hash" => ctx.alice_hash,
+          "dialog_hash" => ctx.dialog_hash,
+          "message_id" => msg.message_id
+        }
       }
 
       assert {:error, "cannot receipt own message"} =
@@ -232,7 +244,11 @@ defmodule Chat.Data.DialogValidationTest do
 
       operation = %Operation{
         operation: :insert,
-        changes: %{"peer_hash" => ctx.bob_hash, "message_id" => msg.message_id}
+        changes: %{
+          "peer_hash" => ctx.bob_hash,
+          "dialog_hash" => ctx.dialog_hash,
+          "message_id" => msg.message_id
+        }
       }
 
       assert :ok =
@@ -416,8 +432,10 @@ defmodule Chat.Data.DialogValidationTest do
   # --- reaction_validate/3 ---
 
   describe "reaction_validate/3" do
+    setup :join_dialog
+
     test "valid insert returns valid changeset", ctx do
-      reaction = signed_reaction(ctx.alice, ctx.alice_hash)
+      reaction = signed_reaction(ctx.alice, ctx.alice_hash, dialog_hash: ctx.dialog_hash)
 
       changeset =
         Validation.reaction_validate(%DialogMessageReaction{}, to_changes(reaction), :insert)
@@ -429,7 +447,11 @@ defmodule Chat.Data.DialogValidationTest do
       message_id = DialogMessageId.generate()
 
       reaction =
-        signed_reaction(ctx.alice, ctx.alice_hash, message_id: message_id, owner_timestamp: 100)
+        signed_reaction(ctx.alice, ctx.alice_hash,
+          message_id: message_id,
+          owner_timestamp: 100,
+          dialog_hash: ctx.dialog_hash
+        )
 
       {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, reaction)
       existing = Dialog.get_reaction(reaction.reaction_hash)
@@ -438,7 +460,8 @@ defmodule Chat.Data.DialogValidationTest do
         signed_reaction(ctx.alice, ctx.alice_hash,
           message_id: message_id,
           reaction_hash: reaction.reaction_hash,
-          owner_timestamp: 200
+          owner_timestamp: 200,
+          dialog_hash: ctx.dialog_hash
         )
 
       changeset = Validation.reaction_validate(existing, to_changes(reaction2), :update)
@@ -449,7 +472,11 @@ defmodule Chat.Data.DialogValidationTest do
       message_id = DialogMessageId.generate()
 
       reaction =
-        signed_reaction(ctx.alice, ctx.alice_hash, message_id: message_id, owner_timestamp: 200)
+        signed_reaction(ctx.alice, ctx.alice_hash,
+          message_id: message_id,
+          owner_timestamp: 200,
+          dialog_hash: ctx.dialog_hash
+        )
 
       {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, reaction)
       existing = Dialog.get_reaction(reaction.reaction_hash)
@@ -458,7 +485,8 @@ defmodule Chat.Data.DialogValidationTest do
         signed_reaction(ctx.alice, ctx.alice_hash,
           message_id: message_id,
           reaction_hash: reaction.reaction_hash,
-          owner_timestamp: 100
+          owner_timestamp: 100,
+          dialog_hash: ctx.dialog_hash
         )
 
       changeset = Validation.reaction_validate(existing, to_changes(reaction2), :update)
@@ -470,7 +498,8 @@ defmodule Chat.Data.DialogValidationTest do
 
   describe "receipt_validate/3" do
     test "valid insert returns valid changeset", ctx do
-      receipt = signed_receipt(ctx.alice, ctx.alice_hash, "delivered")
+      receipt =
+        signed_receipt(ctx.alice, ctx.alice_hash, "delivered", dialog_hash: ctx.dialog_hash)
 
       changeset =
         Validation.receipt_validate(%DialogMessageReceipt{}, to_changes(receipt), :insert)
@@ -483,12 +512,17 @@ defmodule Chat.Data.DialogValidationTest do
 
   describe "validate_reaction_insert/1 — self-reaction guard" do
     setup ctx do
+      join_dialog(ctx)
       msg = insert_persisted_message(ctx)
       {:ok, message_id: msg.message_id}
     end
 
     test "rejects reaction where reactor is message author", ctx do
-      reaction = signed_reaction(ctx.alice, ctx.alice_hash, message_id: ctx.message_id)
+      reaction =
+        signed_reaction(ctx.alice, ctx.alice_hash,
+          message_id: ctx.message_id,
+          dialog_hash: ctx.dialog_hash
+        )
 
       changeset = Validation.validate_reaction_insert(reaction)
       refute changeset.valid?
@@ -496,7 +530,11 @@ defmodule Chat.Data.DialogValidationTest do
     end
 
     test "allows reaction where reactor is peer", ctx do
-      reaction = signed_reaction(ctx.bob, ctx.bob_hash, message_id: ctx.message_id)
+      reaction =
+        signed_reaction(ctx.bob, ctx.bob_hash,
+          message_id: ctx.message_id,
+          dialog_hash: ctx.dialog_hash
+        )
 
       changeset = Validation.validate_reaction_insert(reaction)
       assert changeset.valid?
@@ -505,12 +543,17 @@ defmodule Chat.Data.DialogValidationTest do
 
   describe "validate_receipt_insert/1 — self-receipt guard" do
     setup ctx do
+      join_dialog(ctx)
       msg = insert_persisted_message(ctx)
       {:ok, message_id: msg.message_id}
     end
 
     test "rejects receipt where peer is message author", ctx do
-      receipt = signed_receipt(ctx.alice, ctx.alice_hash, "delivered", message_id: ctx.message_id)
+      receipt =
+        signed_receipt(ctx.alice, ctx.alice_hash, "delivered",
+          message_id: ctx.message_id,
+          dialog_hash: ctx.dialog_hash
+        )
 
       changeset = Validation.validate_receipt_insert(receipt)
       refute changeset.valid?
@@ -518,7 +561,11 @@ defmodule Chat.Data.DialogValidationTest do
     end
 
     test "allows receipt where peer is not message author", ctx do
-      receipt = signed_receipt(ctx.bob, ctx.bob_hash, "delivered", message_id: ctx.message_id)
+      receipt =
+        signed_receipt(ctx.bob, ctx.bob_hash, "delivered",
+          message_id: ctx.message_id,
+          dialog_hash: ctx.dialog_hash
+        )
 
       changeset = Validation.validate_receipt_insert(receipt)
       assert changeset.valid?
@@ -591,7 +638,7 @@ defmodule Chat.Data.DialogValidationTest do
   defp signed_reaction(identity, reactor_hash, attrs \\ []) do
     %DialogMessageReaction{
       reaction_hash: Keyword.get(attrs, :reaction_hash, generate_reaction_hash()),
-      dialog_hash: "di_" <> String.duplicate("ab", 64),
+      dialog_hash: Keyword.fetch!(attrs, :dialog_hash),
       message_id: Keyword.get(attrs, :message_id, DialogMessageId.generate()),
       message_sign_hash: "dms_" <> String.duplicate("cd", 64),
       reactor_hash: reactor_hash,
@@ -605,7 +652,7 @@ defmodule Chat.Data.DialogValidationTest do
   defp signed_receipt(identity, peer_hash, type, attrs \\ []) do
     %DialogMessageReceipt{
       receipt_hash: Keyword.get(attrs, :receipt_hash, generate_receipt_hash()),
-      dialog_hash: "di_" <> String.duplicate("ab", 64),
+      dialog_hash: Keyword.fetch!(attrs, :dialog_hash),
       message_id: Keyword.get(attrs, :message_id, DialogMessageId.generate()),
       peer_hash: peer_hash,
       type: type,
@@ -633,6 +680,12 @@ defmodule Chat.Data.DialogValidationTest do
     dk = signed_dialog_key(identity, dialog_hash, sender_hash, peer_hash)
     {:ok, _} = ShapeWriter.write(:dialog_keys, :insert, dk)
     dk
+  end
+
+  defp join_dialog(ctx) do
+    insert_dialog_key(ctx.alice, ctx.dialog_hash, ctx.alice_hash, ctx.bob_hash)
+    insert_dialog_key(ctx.bob, ctx.dialog_hash, ctx.bob_hash, ctx.alice_hash)
+    :ok
   end
 
   defp insert_persisted_message(ctx) do

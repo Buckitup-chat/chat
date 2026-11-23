@@ -17,14 +17,25 @@ defmodule Chat.Data.DialogReactionTest do
     :ets.delete_all_objects(:buckitup_deferred_records)
 
     alice = User.generate_pq_identity("Alice")
+    bob = User.generate_pq_identity("Bob")
     alice_card = insert_signed_user_card(alice)
+    bob_card = insert_signed_user_card(bob)
 
-    {:ok, alice: alice, alice_hash: alice_card.user_hash}
+    dialog_hash = DialogHash.for_pair(alice_card.user_hash, bob_card.user_hash)
+    insert_dialog_key(alice, dialog_hash, alice_card.user_hash, bob_card.user_hash)
+    insert_dialog_key(bob, dialog_hash, bob_card.user_hash, alice_card.user_hash)
+
+    {:ok,
+     alice: alice,
+     alice_hash: alice_card.user_hash,
+     bob: bob,
+     bob_hash: bob_card.user_hash,
+     dialog_hash: dialog_hash}
   end
 
   describe "valid reaction — peer sync" do
     test "is persisted", ctx do
-      reaction = signed_reaction(ctx.alice, ctx.alice_hash)
+      reaction = signed_reaction(ctx.alice, ctx.alice_hash, dialog_hash: ctx.dialog_hash)
       {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, reaction)
 
       assert Dialog.get_reaction(reaction.reaction_hash) != nil
@@ -36,13 +47,15 @@ defmodule Chat.Data.DialogReactionTest do
       r1 =
         signed_reaction(ctx.alice, ctx.alice_hash,
           reaction_hash: reaction_hash,
-          owner_timestamp: 100
+          owner_timestamp: 100,
+          dialog_hash: ctx.dialog_hash
         )
 
       r2 =
         signed_reaction(ctx.alice, ctx.alice_hash,
           reaction_hash: reaction_hash,
-          owner_timestamp: 200
+          owner_timestamp: 200,
+          dialog_hash: ctx.dialog_hash
         )
 
       {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, r1)
@@ -58,13 +71,15 @@ defmodule Chat.Data.DialogReactionTest do
       r1 =
         signed_reaction(ctx.alice, ctx.alice_hash,
           reaction_hash: reaction_hash,
-          owner_timestamp: 200
+          owner_timestamp: 200,
+          dialog_hash: ctx.dialog_hash
         )
 
       r2 =
         signed_reaction(ctx.alice, ctx.alice_hash,
           reaction_hash: reaction_hash,
-          owner_timestamp: 100
+          owner_timestamp: 100,
+          dialog_hash: ctx.dialog_hash
         )
 
       {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, r1)
@@ -77,7 +92,7 @@ defmodule Chat.Data.DialogReactionTest do
 
   describe "tampered reaction — peer sync" do
     test "tampered field is not persisted", ctx do
-      reaction = signed_reaction(ctx.alice, ctx.alice_hash)
+      reaction = signed_reaction(ctx.alice, ctx.alice_hash, dialog_hash: ctx.dialog_hash)
       tampered = %{reaction | type_b64: "tampered"}
 
       {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, tampered)
@@ -88,30 +103,31 @@ defmodule Chat.Data.DialogReactionTest do
 
   describe "self-reaction — peer sync" do
     setup ctx do
-      bob = User.generate_pq_identity("Bob")
-      bob_card = insert_signed_user_card(bob)
-
-      dialog_hash = compute_dialog_hash(ctx.alice_hash, bob_card.user_hash)
-      insert_dialog_key(ctx.alice, dialog_hash, ctx.alice_hash, bob_card.user_hash)
-      msg = signed_message(ctx.alice, dialog_hash, ctx.alice_hash)
+      msg = signed_message(ctx.alice, ctx.dialog_hash, ctx.alice_hash)
       {:ok, _} = ShapeWriter.write(:dialog_messages, :insert, msg)
 
-      {:ok,
-       bob: bob,
-       bob_hash: bob_card.user_hash,
-       dialog_hash: dialog_hash,
-       message_id: msg.message_id}
+      {:ok, message_id: msg.message_id}
     end
 
     test "author cannot react to own message", ctx do
-      reaction = signed_reaction(ctx.alice, ctx.alice_hash, message_id: ctx.message_id)
+      reaction =
+        signed_reaction(ctx.alice, ctx.alice_hash,
+          message_id: ctx.message_id,
+          dialog_hash: ctx.dialog_hash
+        )
+
       {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, reaction)
 
       assert Dialog.get_reaction(reaction.reaction_hash) == nil
     end
 
     test "peer can react to author's message", ctx do
-      reaction = signed_reaction(ctx.bob, ctx.bob_hash, message_id: ctx.message_id)
+      reaction =
+        signed_reaction(ctx.bob, ctx.bob_hash,
+          message_id: ctx.message_id,
+          dialog_hash: ctx.dialog_hash
+        )
+
       {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, reaction)
 
       assert Dialog.get_reaction(reaction.reaction_hash) != nil
@@ -145,10 +161,22 @@ defmodule Chat.Data.DialogReactionTest do
       reaction_hash = generate_reaction_hash()
       shared = [reaction_hash: reaction_hash, message_id: DialogMessageId.generate()]
 
-      r1 = signed_reaction(ctx.alice, ctx.alice_hash, shared ++ [owner_timestamp: 100])
+      r1 =
+        signed_reaction(
+          ctx.alice,
+          ctx.alice_hash,
+          shared ++ [owner_timestamp: 100, dialog_hash: ctx.dialog_hash]
+        )
+
       {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, r1)
 
-      r2 = signed_reaction(ctx.alice, ctx.alice_hash, shared ++ [owner_timestamp: 200])
+      r2 =
+        signed_reaction(
+          ctx.alice,
+          ctx.alice_hash,
+          shared ++ [owner_timestamp: 200, dialog_hash: ctx.dialog_hash]
+        )
+
       {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :update, r2)
 
       persisted = Dialog.get_reaction(reaction_hash)
@@ -159,10 +187,22 @@ defmodule Chat.Data.DialogReactionTest do
       reaction_hash = generate_reaction_hash()
       shared = [reaction_hash: reaction_hash, message_id: DialogMessageId.generate()]
 
-      r1 = signed_reaction(ctx.alice, ctx.alice_hash, shared ++ [owner_timestamp: 200])
+      r1 =
+        signed_reaction(
+          ctx.alice,
+          ctx.alice_hash,
+          shared ++ [owner_timestamp: 200, dialog_hash: ctx.dialog_hash]
+        )
+
       {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, r1)
 
-      r2 = signed_reaction(ctx.alice, ctx.alice_hash, shared ++ [owner_timestamp: 100])
+      r2 =
+        signed_reaction(
+          ctx.alice,
+          ctx.alice_hash,
+          shared ++ [owner_timestamp: 100, dialog_hash: ctx.dialog_hash]
+        )
+
       {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :update, r2)
 
       persisted = Dialog.get_reaction(reaction_hash)
@@ -170,7 +210,7 @@ defmodule Chat.Data.DialogReactionTest do
     end
 
     test "update for non-existing reaction is ignored", ctx do
-      reaction = signed_reaction(ctx.alice, ctx.alice_hash)
+      reaction = signed_reaction(ctx.alice, ctx.alice_hash, dialog_hash: ctx.dialog_hash)
       {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :update, reaction)
 
       assert Dialog.get_reaction(reaction.reaction_hash) == nil
@@ -180,14 +220,20 @@ defmodule Chat.Data.DialogReactionTest do
       reaction_hash = generate_reaction_hash()
       shared = [reaction_hash: reaction_hash, message_id: DialogMessageId.generate()]
 
-      r1 = signed_reaction(ctx.alice, ctx.alice_hash, shared ++ [owner_timestamp: 100])
+      r1 =
+        signed_reaction(
+          ctx.alice,
+          ctx.alice_hash,
+          shared ++ [owner_timestamp: 100, dialog_hash: ctx.dialog_hash]
+        )
+
       {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, r1)
 
       r2 =
         signed_reaction(
           ctx.alice,
           ctx.alice_hash,
-          shared ++ [owner_timestamp: 200, deleted_flag: true]
+          shared ++ [owner_timestamp: 200, deleted_flag: true, dialog_hash: ctx.dialog_hash]
         )
 
       {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :update, r2)
@@ -201,11 +247,20 @@ defmodule Chat.Data.DialogReactionTest do
       bob = User.generate_pq_identity("Bob")
       shared = [reaction_hash: generate_reaction_hash(), message_id: DialogMessageId.generate()]
 
-      r1 = signed_reaction(ctx.alice, ctx.alice_hash, shared ++ [owner_timestamp: 100])
+      r1 =
+        signed_reaction(
+          ctx.alice,
+          ctx.alice_hash,
+          shared ++ [owner_timestamp: 100, dialog_hash: ctx.dialog_hash]
+        )
+
       {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, r1)
 
       r2 =
-        build_reaction(ctx.alice_hash, shared ++ [owner_timestamp: 200])
+        build_reaction(
+          ctx.alice_hash,
+          shared ++ [owner_timestamp: 200, dialog_hash: ctx.dialog_hash]
+        )
         |> sign_with_key(bob.sign_skey)
 
       {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :update, r2)
@@ -216,12 +271,6 @@ defmodule Chat.Data.DialogReactionTest do
   end
 
   # --- Helpers ---
-
-  defp compute_dialog_hash(hash_a, hash_b) do
-    sorted = Enum.sort([hash_a, hash_b])
-    binary = :crypto.hash(:sha3_512, Enum.join(sorted))
-    DialogHash.from_binary(binary)
-  end
 
   defp signed_message(identity, dialog_hash, sender_hash) do
     %Chat.Data.Schemas.DialogMessage{
@@ -251,7 +300,7 @@ defmodule Chat.Data.DialogReactionTest do
   defp build_reaction(reactor_hash, attrs \\ []) do
     %DialogMessageReaction{
       reaction_hash: Keyword.get(attrs, :reaction_hash, generate_reaction_hash()),
-      dialog_hash: "di_" <> String.duplicate("ab", 64),
+      dialog_hash: Keyword.fetch!(attrs, :dialog_hash),
       message_id: Keyword.get(attrs, :message_id, DialogMessageId.generate()),
       message_sign_hash: "dms_" <> String.duplicate("cd", 64),
       reactor_hash: reactor_hash,

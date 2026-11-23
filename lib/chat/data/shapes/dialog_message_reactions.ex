@@ -17,7 +17,8 @@ defmodule Chat.Data.Shapes.DialogMessageReactions do
   def schema_module, do: DialogMessageReaction
 
   @impl true
-  def sync_required_parents(_op, %{reactor_hash: hash}), do: [{:user_card, hash}]
+  def sync_required_parents(_op, %{reactor_hash: hash, dialog_hash: dh}),
+    do: [{:user_card, hash}, {:dialog_keys, {dh, hash}}]
 
   @impl true
   def sync_persist(operation, reaction) do

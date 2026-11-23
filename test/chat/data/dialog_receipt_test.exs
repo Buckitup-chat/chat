@@ -17,14 +17,27 @@ defmodule Chat.Data.DialogReceiptTest do
     :ets.delete_all_objects(:buckitup_deferred_records)
 
     alice = User.generate_pq_identity("Alice")
+    bob = User.generate_pq_identity("Bob")
     alice_card = insert_signed_user_card(alice)
+    bob_card = insert_signed_user_card(bob)
 
-    {:ok, alice: alice, alice_hash: alice_card.user_hash}
+    dialog_hash = DialogHash.for_pair(alice_card.user_hash, bob_card.user_hash)
+    insert_dialog_key(alice, dialog_hash, alice_card.user_hash, bob_card.user_hash)
+    insert_dialog_key(bob, dialog_hash, bob_card.user_hash, alice_card.user_hash)
+
+    {:ok,
+     alice: alice,
+     alice_hash: alice_card.user_hash,
+     bob: bob,
+     bob_hash: bob_card.user_hash,
+     dialog_hash: dialog_hash}
   end
 
   describe "valid receipt — peer sync" do
     test "is persisted", ctx do
-      receipt = signed_receipt(ctx.alice, ctx.alice_hash, "delivered")
+      receipt =
+        signed_receipt(ctx.alice, ctx.alice_hash, "delivered", dialog_hash: ctx.dialog_hash)
+
       {:ok, _} = ShapeWriter.write(:dialog_message_receipts, :insert, receipt)
 
       assert Dialog.get_receipt(receipt.receipt_hash) != nil
@@ -36,13 +49,15 @@ defmodule Chat.Data.DialogReceiptTest do
       r1 =
         signed_receipt(ctx.alice, ctx.alice_hash, "delivered",
           receipt_hash: receipt_hash,
-          owner_timestamp: 100
+          owner_timestamp: 100,
+          dialog_hash: ctx.dialog_hash
         )
 
       r2 =
         signed_receipt(ctx.alice, ctx.alice_hash, "delivered",
           receipt_hash: receipt_hash,
-          owner_timestamp: 200
+          owner_timestamp: 200,
+          dialog_hash: ctx.dialog_hash
         )
 
       {:ok, _} = ShapeWriter.write(:dialog_message_receipts, :insert, r1)
@@ -53,7 +68,7 @@ defmodule Chat.Data.DialogReceiptTest do
     end
 
     test "accepts read type", ctx do
-      receipt = signed_receipt(ctx.alice, ctx.alice_hash, "read")
+      receipt = signed_receipt(ctx.alice, ctx.alice_hash, "read", dialog_hash: ctx.dialog_hash)
       {:ok, _} = ShapeWriter.write(:dialog_message_receipts, :insert, receipt)
 
       persisted = Dialog.get_receipt(receipt.receipt_hash)
@@ -63,7 +78,9 @@ defmodule Chat.Data.DialogReceiptTest do
 
   describe "tampered receipt — peer sync" do
     test "tampered field is not persisted", ctx do
-      receipt = signed_receipt(ctx.alice, ctx.alice_hash, "delivered")
+      receipt =
+        signed_receipt(ctx.alice, ctx.alice_hash, "delivered", dialog_hash: ctx.dialog_hash)
+
       tampered = %{receipt | type: "read"}
 
       {:ok, _} = ShapeWriter.write(:dialog_message_receipts, :insert, tampered)
@@ -74,30 +91,31 @@ defmodule Chat.Data.DialogReceiptTest do
 
   describe "self-receipt — peer sync" do
     setup ctx do
-      bob = User.generate_pq_identity("Bob")
-      bob_card = insert_signed_user_card(bob)
-
-      dialog_hash = compute_dialog_hash(ctx.alice_hash, bob_card.user_hash)
-      insert_dialog_key(ctx.alice, dialog_hash, ctx.alice_hash, bob_card.user_hash)
-      msg = signed_message(ctx.alice, dialog_hash, ctx.alice_hash)
+      msg = signed_message(ctx.alice, ctx.dialog_hash, ctx.alice_hash)
       {:ok, _} = ShapeWriter.write(:dialog_messages, :insert, msg)
 
-      {:ok,
-       bob: bob,
-       bob_hash: bob_card.user_hash,
-       dialog_hash: dialog_hash,
-       message_id: msg.message_id}
+      {:ok, message_id: msg.message_id}
     end
 
     test "author cannot receipt own message", ctx do
-      receipt = signed_receipt(ctx.alice, ctx.alice_hash, "delivered", message_id: ctx.message_id)
+      receipt =
+        signed_receipt(ctx.alice, ctx.alice_hash, "delivered",
+          message_id: ctx.message_id,
+          dialog_hash: ctx.dialog_hash
+        )
+
       {:ok, _} = ShapeWriter.write(:dialog_message_receipts, :insert, receipt)
 
       assert Dialog.get_receipt(receipt.receipt_hash) == nil
     end
 
     test "peer can receipt author's message", ctx do
-      receipt = signed_receipt(ctx.bob, ctx.bob_hash, "delivered", message_id: ctx.message_id)
+      receipt =
+        signed_receipt(ctx.bob, ctx.bob_hash, "delivered",
+          message_id: ctx.message_id,
+          dialog_hash: ctx.dialog_hash
+        )
+
       {:ok, _} = ShapeWriter.write(:dialog_message_receipts, :insert, receipt)
 
       assert Dialog.get_receipt(receipt.receipt_hash) != nil
@@ -129,12 +147,6 @@ defmodule Chat.Data.DialogReceiptTest do
 
   # --- Helpers ---
 
-  defp compute_dialog_hash(hash_a, hash_b) do
-    sorted = Enum.sort([hash_a, hash_b])
-    binary = :crypto.hash(:sha3_512, Enum.join(sorted))
-    DialogHash.from_binary(binary)
-  end
-
   defp signed_message(identity, dialog_hash, sender_hash) do
     %Chat.Data.Schemas.DialogMessage{
       message_id: DialogMessageId.generate(),
@@ -163,7 +175,7 @@ defmodule Chat.Data.DialogReceiptTest do
   defp build_receipt(peer_hash, type, attrs \\ []) do
     %DialogMessageReceipt{
       receipt_hash: Keyword.get(attrs, :receipt_hash, generate_receipt_hash()),
-      dialog_hash: "di_" <> String.duplicate("ab", 64),
+      dialog_hash: Keyword.fetch!(attrs, :dialog_hash),
       message_id: Keyword.get(attrs, :message_id, DialogMessageId.generate()),
       peer_hash: peer_hash,
       type: type,

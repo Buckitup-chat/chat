@@ -11,10 +11,8 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
   alias Chat.Data.Types.UserHash
   alias ChatWeb.ElectricLive.DialogSandboxLive.Content
 
-  def compute_dialog_hash(user_hash_a, user_hash_b) do
-    [a, b] = Enum.sort([user_hash_a, user_hash_b])
-    EnigmaPq.hash(a <> b) |> DialogHash.from_binary()
-  end
+  def compute_dialog_hash(user_hash_a, user_hash_b),
+    do: DialogHash.for_pair(user_hash_a, user_hash_b)
 
   def derive_sender_msg_key(sign_skey, crypt_skey, contact_skey, peer_user_hash) do
     ikm = sign_skey <> crypt_skey <> contact_skey <> peer_user_hash

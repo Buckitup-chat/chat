@@ -10,6 +10,17 @@ defmodule Chat.Data.ReviewWriteToken do
     repo().get(ReviewWriteToken, nonce_hash)
   end
 
+  @doc "Live copy of reusable root `parent_nonce_hash` bound to `user_hash`, or nil."
+  def get_bound_copy(parent_nonce_hash, user_hash) do
+    from(rwt in ReviewWriteToken,
+      where:
+        rwt.parent_nonce_hash == ^parent_nonce_hash and rwt.user_hash == ^user_hash and
+          rwt.deleted_flag == false,
+      limit: 1
+    )
+    |> repo().one()
+  end
+
   def pending_expired_tokens(origin_hash, threshold_ts) do
     from(rwt in ReviewWriteToken,
       where:

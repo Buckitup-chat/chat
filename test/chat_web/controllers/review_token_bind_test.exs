@@ -26,6 +26,14 @@ defmodule ChatWeb.ReviewTokenBindTest do
     def bind(_nonce, _user_hash, _pop), do: {:error, :token_deleted}
   end
 
+  defmodule BinderNotInvitation do
+    def bind(_nonce, _user_hash, _pop), do: {:error, :token_not_invitation}
+  end
+
+  defmodule BinderAlreadyBound do
+    def bind(_nonce, _user_hash, _pop), do: {:error, :token_already_bound}
+  end
+
   defmodule BinderReviewerNotFound do
     def bind(_nonce, _user_hash, _pop), do: {:error, :reviewer_not_found}
   end
@@ -130,6 +138,30 @@ defmodule ChatWeb.ReviewTokenBindTest do
         |> controller.bind(bind_params())
 
       assert %{"error" => "Token has been deleted"} = json_response(conn, 410)
+    end
+
+    test "returns 409 for a bound copy", %{conn: conn} do
+      controller =
+        rewire(ChatWeb.ReviewTokenController, IngestPop: PopOk, TokenBinder: BinderNotInvitation)
+
+      conn =
+        conn
+        |> put_req_header("content-type", "application/json")
+        |> controller.bind(bind_params())
+
+      assert %{"error" => "Token is a bound copy, not an invitation"} = json_response(conn, 409)
+    end
+
+    test "returns 409 for a token bound to another user", %{conn: conn} do
+      controller =
+        rewire(ChatWeb.ReviewTokenController, IngestPop: PopOk, TokenBinder: BinderAlreadyBound)
+
+      conn =
+        conn
+        |> put_req_header("content-type", "application/json")
+        |> controller.bind(bind_params())
+
+      assert %{"error" => "Token is already bound to another user"} = json_response(conn, 409)
     end
 
     test "returns 404 when reviewer not found", %{conn: conn} do

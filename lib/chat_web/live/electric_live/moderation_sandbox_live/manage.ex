@@ -157,11 +157,13 @@ defmodule ChatWeb.ElectricLive.ModerationSandboxLive.Manage do
 
   def load_all(identity, base_url) do
     auth = origin_auth(identity)
+    bots = ReviewBotClient.list_origin_bots(identity.origin_hash, base_url, auth)
 
     %{
       origin_settings: Settings.load_settings(identity.origin_hash, base_url, auth),
-      origin_bots: ReviewBotClient.list_origin_bots(identity.origin_hash, base_url, auth),
-      write_tokens: WriteToken.list_tokens(identity.origin_hash, base_url, auth)
+      origin_bots: bots,
+      write_tokens:
+        WriteToken.list_tokens(identity.origin_hash, identity.crypt_skey, bots, base_url, auth)
     }
   end
 

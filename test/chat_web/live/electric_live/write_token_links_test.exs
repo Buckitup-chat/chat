@@ -1,7 +1,8 @@
 defmodule ChatWeb.ElectricLive.WriteTokenLinksTest do
   @moduledoc """
-  Sandbox token links: the running bot decrypts `nonce_enc_b64` into a full
-  `/r/<nonce>` link + QR; rows alone never yield a link.
+  Sandbox token links: the origin key unwraps the bot identity from its
+  `origin_bots` row, which decrypts `nonce_enc_b64` into a `/r/<nonce>` link + QR.
+  No Worker call, so a stopped bot or bad ciphertext only drops the link.
   """
   use ChatWeb.DataCase, async: false
 
@@ -12,10 +13,12 @@ defmodule ChatWeb.ElectricLive.WriteTokenLinksTest do
 
   alias Chat.Data.ReviewWriteToken, as: TokenData
   alias Chat.Data.Types.ReviewWriteTokenNonceHash
+  alias Chat.Data.Types.UserHash
   alias Chat.ReviewBot.TokenCreator
-  alias Chat.ReviewBot.Worker
-  alias ChatWeb.ElectricLive.OriginSandboxLive.WriteToken
+  alias ChatWeb.ElectricLive.ModerationSandboxLive.WriteToken
   alias ChatWeb.ElectricLive.WriteTokenLinks
+
+  @base_url "http://buckitup.local"
 
   setup do
     :ets.delete_all_objects(:buckitup_deferred_records)
@@ -25,22 +28,22 @@ defmodule ChatWeb.ElectricLive.WriteTokenLinksTest do
     ctx
   end
 
-  test "own token gets its full link and QR from the bot", ctx do
+  test "invitation token gets its link and QR on the sandbox's base_url", ctx do
     nonce = create!(ctx)
 
-    assert [%{url: url, qr: qr}] = WriteTokenLinks.attach([listed(nonce)])
-    assert url == "#{ChatWeb.Endpoint.url()}/r/#{nonce}"
+    assert [%{url: url, qr: qr}] = attach(ctx, [listed(nonce)])
+    assert url == "#{@base_url}/r/#{nonce}"
     assert is_binary(qr)
   end
 
-  test "origin sandbox token list renders the link and QR", ctx do
+  test "moderation sandbox token list renders the link and QR", ctx do
     nonce = create!(ctx)
 
     html =
       %{
-        origin_bots: [%{bot_hash: ctx.bot_hash, deleted_flag: false}],
+        origin_bots: [ctx.signed_bot],
         last_token_result: nil,
-        write_tokens: WriteTokenLinks.attach([listed(nonce)])
+        write_tokens: attach(ctx, [listed(nonce)])
       }
       |> WriteToken.render_token_section()
       |> rendered_to_string()
@@ -49,30 +52,71 @@ defmodule ChatWeb.ElectricLive.WriteTokenLinksTest do
     assert html =~ "t-token-qr"
   end
 
-  test "no link when the bot is not running", ctx do
+  test "link does not need the bot running", ctx do
     nonce = create!(ctx)
     stop_bot!(ctx.bot_hash)
 
-    assert [token] = WriteTokenLinks.attach([listed(nonce)])
-    refute Map.has_key?(token, :url)
+    assert [%{url: _}] = attach(ctx, [listed(nonce)])
   end
 
   test "no link for a soft-deleted token", ctx do
-    nonce = create!(ctx)
-
-    assert [token] = WriteTokenLinks.attach([%{listed(nonce) | deleted_flag: true}])
+    assert [token] = attach(ctx, [%{listed(create!(ctx)) | deleted_flag: true}])
     refute Map.has_key?(token, :url)
   end
 
-  test "bot refuses a ciphertext that does not hash to the row's nonce_hash", ctx do
+  test "no link for a token bound to a reviewer", ctx do
+    bound = %{listed(create!(ctx)) | user_hash: ctx.reviewer_card.user_hash}
+
+    assert [token] = attach(ctx, [bound])
+    refute Map.has_key?(token, :url)
+  end
+
+  test "no link when the bot row is tombstoned or unknown", ctx do
+    token = listed(create!(ctx))
+
+    assert [t1] =
+             WriteTokenLinks.attach(
+               [token],
+               [%{ctx.signed_bot | deleted_flag: true}],
+               key(ctx),
+               @base_url
+             )
+
+    assert [t2] =
+             WriteTokenLinks.attach(
+               [%{token | bot_hash: other_hash()}],
+               [ctx.signed_bot],
+               key(ctx),
+               @base_url
+             )
+
+    refute Map.has_key?(t1, :url)
+    refute Map.has_key?(t2, :url)
+  end
+
+  test "ciphertext that does not hash to the row's nonce_hash yields no link", ctx do
     a = listed(create!(ctx))
     b = listed(create!(ctx))
-    swapped = %{a | nonce_enc_b64: b.nonce_enc_b64}
 
-    assert {:error, :nonce_mismatch} = Worker.reveal_nonce(ctx.bot_hash, swapped)
-    assert [token] = WriteTokenLinks.attach([swapped])
+    assert [token] = attach(ctx, [%{a | nonce_enc_b64: b.nonce_enc_b64}])
     refute Map.has_key?(token, :url)
   end
+
+  test "truncated or garbage ciphertext yields no link instead of raising", ctx do
+    token = listed(create!(ctx))
+
+    for enc <- [<<>>, <<1, 2, 3>>, :crypto.strong_rand_bytes(20), :crypto.strong_rand_bytes(64)] do
+      assert [t] = attach(ctx, [%{token | nonce_enc_b64: enc}])
+      refute Map.has_key?(t, :url)
+    end
+  end
+
+  defp attach(ctx, tokens),
+    do: WriteTokenLinks.attach(tokens, [ctx.signed_bot], key(ctx), @base_url)
+
+  defp key(ctx), do: ctx.origin_identity.crypt_skey
+
+  defp other_hash, do: 64 |> :crypto.strong_rand_bytes() |> UserHash.from_binary()
 
   defp create!(ctx) do
     {:ok, nonce} = TokenCreator.create(ctx.bot_hash)

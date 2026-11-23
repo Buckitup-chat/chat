@@ -73,12 +73,15 @@ defmodule Chat.ReviewBot.Identity do
     EnigmaPq.aes_gcm_encrypt(nonce, nonce_key(crypt_skey))
   end
 
-  def unwrap_nonce(nonce_enc, crypt_skey) when is_binary(nonce_enc) do
+  # 12-byte IV + 16-byte tag; anything shorter would crash `aes_gcm_decrypt/2`
+  def unwrap_nonce(<<_::binary-28, _::binary>> = nonce_enc, crypt_skey) do
     case EnigmaPq.aes_gcm_decrypt(nonce_enc, nonce_key(crypt_skey)) do
       nonce when is_binary(nonce) -> {:ok, nonce}
       _ -> {:error, :decryption_failed}
     end
   end
+
+  def unwrap_nonce(_nonce_enc, _crypt_skey), do: {:error, :decryption_failed}
 
   # Derived from the exact `crypt_skey` bytes `encode/1` stores; changing that
   # format makes every stored `nonce_enc_b64` undecryptable.

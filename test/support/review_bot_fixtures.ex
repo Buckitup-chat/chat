@@ -162,8 +162,9 @@ defmodule Chat.Test.ReviewBotFixtures do
       "auth" => %{"challenge_id" => challenge_id, "signature" => signature}
     }
 
+    # fresh IP per bind: the per-IP bind limit is shared across the whole suite
     %{"nonce" => bound_nonce} =
-      ctx.conn
+      %{ctx.conn | remote_ip: unique_ip()}
       |> put_req_header("content-type", "application/json")
       |> post("/r/api/token/bind", Jason.encode!(body))
       |> json_response(200)
@@ -242,5 +243,10 @@ defmodule Chat.Test.ReviewBotFixtures do
       |> Map.from_struct()
       |> then(&VouchToken.create_changeset(%VouchToken{}, &1))
       |> VouchTokenData.upsert_vouch_token()
+  end
+
+  defp unique_ip do
+    n = System.unique_integer([:positive])
+    {10, rem(div(n, 65_536), 256), rem(div(n, 256), 256), rem(n, 256)}
   end
 end

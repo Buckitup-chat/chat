@@ -12,7 +12,7 @@ defmodule ChatWeb.ReviewTokenIngestTest do
   import Chat.Test.ReviewFixtures, only: [insert_user_card: 1]
 
   import Chat.Test.ReviewGateFixtures,
-    only: [insert_bind_vouch: 4, insert_bound_token: 3, set_review_access: 2]
+    only: [set_review_access: 2]
 
   alias Chat.Data.ReviewWriteToken, as: TokenData
   alias Chat.Data.Types.ReviewWriteTokenNonceHash
@@ -28,12 +28,9 @@ defmodule ChatWeb.ReviewTokenIngestTest do
     |> tap(&start_bot!/1)
   end
 
-  # A second HTTP bind by the same reviewer trips on existing device vouches
-  # (TokenBinder, #839), so the second bound copy is stored directly.
   test "two bound tokens: each review links to the token whose nonce it carried", ctx do
     nonce_a = ctx |> create_token!() |> then(&bind_token!(ctx, &1))
-    nonce_b = insert_bound_token(ctx.bot_identity, ctx.origin_hash, ctx.reviewer_card.user_hash)
-    insert_bind_vouch(ctx.bot_identity, ctx.origin_hash, ctx.reviewer_card.user_hash, nonce_b)
+    nonce_b = ctx |> create_token!() |> then(&bind_token!(ctx, &1))
 
     {resp_b, review_b} = post_review(ctx, nonce_b)
     {resp_a, review_a} = post_review(ctx, nonce_a)

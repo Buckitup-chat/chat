@@ -131,21 +131,17 @@ so "first" is a race.
 - Required:
   - Sandboxes and debug routes are off in `prod` unless enabled by a setting;
     off answers 404.
-  - One admin page stays: access mode, sync sources, interface upload (W1),
-    firmware update (W5). It answers only the server owner or holders of
-    `device.<id>.admin`, proven by a signed challenge
+  - One admin page stays: access mode, sync sources and interface upload
+    (W1). It answers only the server owner or holders of `device.<id>.admin`,
+    proven by a signed challenge
     (`invariants/01_proof_of_possession.md`), never by uploading secret keys.
 
-### W5. Images for partner devices — platform, chat
+### W5. Images for partner devices — platform
 
 - BuckitUp builds the images. The certificate is added at build time, so a
   certificate renewal is a new image: public certificates are limited to 200
   days since 2026-03-15 and to 100 days from 2027-03-15.
-- The admin "GitHub upgrade" form installs the newest `.fw` from
-  `Buckitup-chat/platform` releases (`github_firmware_upgrade_form.ex:7`). On a
-  partner device it would install our image, with our interface and domain.
-  The releases URL is a build setting; a partner image points to the partner's
-  channel.
+- Images are installed by BuckitUp by hand, as on our devices.
 - An image carries the domain's TLS private key and the SSH keys that may log
   in to the device (`target.exs:37-53`). It is not published where anyone can
   download it.
@@ -170,8 +166,7 @@ across domains use the same.
       keys.
 - [ ] Device: an image built with the partner's interface names its commit in
       the version; the interface uploaded on the admin page with a valid
-      signature replaces it, an unsigned one is refused; the upgrade form offers
-      only the partner's channel.
+      signature replaces it, an unsigned one is refused.
 - [ ] The SDK exports backup export/import and the device-link relay;
       `chat-frontend` uses them; the owner's account moves to a second device by
       either.

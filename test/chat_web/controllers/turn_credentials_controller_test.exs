@@ -105,6 +105,33 @@ defmodule ChatWeb.TurnCredentialsControllerTest do
 
       assert %{"username" => _, "credential" => _} = json_response(conn, 200)
     end
+
+    test "failed PoP doesn't consume the rate limit", %{
+      conn: conn,
+      alice: alice,
+      alice_card: card
+    } do
+      for _ <- 1..(Config.rate_per_ip_hour() + 1) do
+        bogus = %{user_hash: card.user_hash, challenge_id: "bogus", signature: "x"}
+        assert conn |> post(@path, bogus) |> json_response(401)
+      end
+
+      conn = post_turn_credentials(conn, card.user_hash, alice.sign_skey)
+
+      assert %{"username" => _, "credential" => _} = json_response(conn, 200)
+    end
+
+    test "successful requests are rate limited", %{conn: conn, alice: alice, alice_card: card} do
+      for _ <- 1..Config.rate_per_ip_hour() do
+        assert conn
+               |> post_turn_credentials(card.user_hash, alice.sign_skey)
+               |> json_response(200)
+      end
+
+      conn = post_turn_credentials(conn, card.user_hash, alice.sign_skey)
+
+      assert %{"error" => "rate_limited", "retry_after" => _} = json_response(conn, 429)
+    end
   end
 
   describe "with TURN disabled" do

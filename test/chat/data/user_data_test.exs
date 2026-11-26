@@ -121,7 +121,11 @@ defmodule Chat.Data.UserDataTest do
     test "rejects card with invalid prefix in hash" do
       identity = User.generate_pq_identity("BadPrefix")
       card = User.extract_pq_card(identity)
-      bad_card = %{card | user_hash: Consts.dialog_hash_prefix() <> EnigmaPq.hash(card.sign_pkey)}
+
+      bad_hash =
+        Consts.dialog_prefix() <> Base.encode16(EnigmaPq.hash(card.sign_pkey), case: :lower)
+
+      bad_card = %{card | user_hash: bad_hash}
 
       refute User.valid_card?(bad_card)
     end
@@ -195,7 +199,8 @@ defmodule Chat.Data.UserDataTest do
     {crypt_pkey, _} = :crypto.generate_key(:mlkem1024, [])
 
     %{
-      user_hash: Consts.dialog_hash_prefix() <> :crypto.strong_rand_bytes(64),
+      user_hash:
+        Consts.dialog_prefix() <> Base.encode16(:crypto.strong_rand_bytes(64), case: :lower),
       sign_pkey: sign_pkey,
       contact_pkey: contact_pkey,
       contact_cert: EnigmaPq.sign(contact_pkey, sign_skey),

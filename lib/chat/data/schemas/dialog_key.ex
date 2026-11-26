@@ -47,6 +47,7 @@ defmodule Chat.Data.Schemas.DialogKey do
     dialog_key
     |> cast(attrs, @create_fields)
     |> validate_required(@create_required)
+    |> validate_dialog_hash_matches_pair()
     |> unique_constraint([:dialog_hash, :sender_hash], name: :dialog_keys_pkey)
   end
 
@@ -54,6 +55,19 @@ defmodule Chat.Data.Schemas.DialogKey do
     dialog_key
     |> cast(attrs, @update_fields)
     |> validate_required(@update_fields)
+  end
+
+  # A key row is bound to the dialog of its (sender, peer) pair; it cannot be
+  # lifted into another dialog.
+  defp validate_dialog_hash_matches_pair(changeset) do
+    with dialog_hash when is_binary(dialog_hash) <- get_field(changeset, :dialog_hash),
+         sender_hash when is_binary(sender_hash) <- get_field(changeset, :sender_hash),
+         peer_hash when is_binary(peer_hash) <- get_field(changeset, :peer_hash),
+         false <- dialog_hash == DialogHash.for_pair(sender_hash, peer_hash) do
+      add_error(changeset, :dialog_hash, "does not match sender/peer pair")
+    else
+      _ -> changeset
+    end
   end
 
   defimpl Chat.Data.User.Validation.TimestampedData, for: __MODULE__ do

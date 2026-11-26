@@ -17,7 +17,7 @@ defmodule Chat.Data.DialogKeyTest do
     alice_card = insert_signed_user_card(alice)
     bob_card = insert_signed_user_card(bob)
 
-    dialog_hash = compute_dialog_hash(alice_card.user_hash, bob_card.user_hash)
+    dialog_hash = DialogHash.for_pair(alice_card.user_hash, bob_card.user_hash)
 
     {:ok,
      alice: alice,
@@ -183,12 +183,6 @@ defmodule Chat.Data.DialogKeyTest do
   end
 
   # --- Helpers ---
-
-  defp compute_dialog_hash(hash_a, hash_b) do
-    sorted = Enum.sort([hash_a, hash_b])
-    binary = :crypto.hash(:sha3_512, Enum.join(sorted))
-    DialogHash.from_binary(binary)
-  end
 
   defp build_dialog_key(dialog_hash, sender_hash, peer_hash, attrs \\ []) do
     %DialogKey{

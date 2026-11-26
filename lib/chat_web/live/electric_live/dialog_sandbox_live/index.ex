@@ -3,6 +3,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
 
   import ChatWeb.ElectricLive.DialogSandboxLive.Components
 
+  alias Chat.Data.Types.DialogHash
   alias ChatWeb.ElectricLive.DialogSandboxLive.{ApiClient, Crypto}
   alias ChatWeb.ElectricLive.IdentityCheck
 
@@ -643,7 +644,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
   end
 
   defp ensure_dialog_key(socket, user, peer_hash, base_url) do
-    dialog_hash = Crypto.compute_dialog_hash(user.user_hash, peer_hash)
+    dialog_hash = DialogHash.for_pair(user.user_hash, peer_hash)
     auth = auth(socket)
 
     case ApiClient.fetch_dialog_keys_by_dialog(dialog_hash, base_url, auth) do
@@ -702,7 +703,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Index do
     if Map.has_key?(keys_cache, peer_hash) do
       keys_cache
     else
-      dialog_hash = Crypto.compute_dialog_hash(user.user_hash, peer_hash)
+      dialog_hash = DialogHash.for_pair(user.user_hash, peer_hash)
 
       with {:ok, %{keys: keys}} <-
              ApiClient.fetch_dialog_keys_by_dialog(dialog_hash, base_url, auth),

@@ -4,17 +4,11 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
   All functions delegate to EnigmaPq primitives.
   """
 
-  alias Chat.Data.Types.DialogHash
   alias Chat.Data.Types.DialogMessageReactionHash
   alias Chat.Data.Types.DialogMessageReceiptHash
   alias Chat.Data.Types.DialogMessageSignHash
   alias Chat.Data.Types.UserHash
   alias ChatWeb.ElectricLive.DialogSandboxLive.Content
-
-  def compute_dialog_hash(user_hash_a, user_hash_b) do
-    [a, b] = Enum.sort([user_hash_a, user_hash_b])
-    EnigmaPq.hash(a <> b) |> DialogHash.from_binary()
-  end
 
   def derive_sender_msg_key(sign_skey, crypt_skey, contact_skey, peer_user_hash) do
     ikm = sign_skey <> crypt_skey <> contact_skey <> peer_user_hash

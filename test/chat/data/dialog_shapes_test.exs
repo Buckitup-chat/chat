@@ -75,9 +75,12 @@ defmodule Chat.Data.DialogShapesTest do
       assert DialogMessageReactions.schema_module() == DialogMessageReaction
     end
 
-    test "sync_required_parents returns user_card dependency for reactor" do
-      assert [{:user_card, "u_abc"}] =
-               DialogMessageReactions.sync_required_parents(:insert, %{reactor_hash: "u_abc"})
+    test "sync_required_parents returns user_card and dialog_keys dependencies for reactor" do
+      assert [{:user_card, "u_abc"}, {:dialog_keys, {"di_def", "u_abc"}}] =
+               DialogMessageReactions.sync_required_parents(:insert, %{
+                 reactor_hash: "u_abc",
+                 dialog_hash: "di_def"
+               })
     end
   end
 
@@ -90,9 +93,12 @@ defmodule Chat.Data.DialogShapesTest do
       assert DialogMessageReceipts.schema_module() == DialogMessageReceipt
     end
 
-    test "sync_required_parents returns user_card dependency for peer" do
-      assert [{:user_card, "u_abc"}] =
-               DialogMessageReceipts.sync_required_parents(:insert, %{peer_hash: "u_abc"})
+    test "sync_required_parents returns user_card and dialog_keys dependencies for peer" do
+      assert [{:user_card, "u_abc"}, {:dialog_keys, {"di_def", "u_abc"}}] =
+               DialogMessageReceipts.sync_required_parents(:insert, %{
+                 peer_hash: "u_abc",
+                 dialog_hash: "di_def"
+               })
     end
   end
 end

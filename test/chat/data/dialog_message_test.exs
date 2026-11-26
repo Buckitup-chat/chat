@@ -20,7 +20,7 @@ defmodule Chat.Data.DialogMessageTest do
     alice_card = insert_signed_user_card(alice)
     bob_card = insert_signed_user_card(bob)
 
-    dialog_hash = compute_dialog_hash(alice_card.user_hash, bob_card.user_hash)
+    dialog_hash = DialogHash.for_pair(alice_card.user_hash, bob_card.user_hash)
 
     alice_dk = signed_dialog_key(alice, dialog_hash, alice_card.user_hash, bob_card.user_hash)
     {:ok, _} = ShapeWriter.write(:dialog_keys, :insert, alice_dk)
@@ -225,12 +225,6 @@ defmodule Chat.Data.DialogMessageTest do
   end
 
   # --- Helpers ---
-
-  defp compute_dialog_hash(hash_a, hash_b) do
-    sorted = Enum.sort([hash_a, hash_b])
-    binary = :crypto.hash(:sha3_512, Enum.join(sorted))
-    DialogHash.from_binary(binary)
-  end
 
   defp build_message(dialog_hash, sender_hash, attrs \\ []) do
     %DialogMessage{

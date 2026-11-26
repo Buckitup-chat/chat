@@ -1,7 +1,7 @@
 defmodule Chat.Data.Dialog.Validation do
   @moduledoc "Signature and integrity validation for dialog operations."
 
-  alias Chat.Data.Dialog
+  alias Chat.Data.Dialog.Guards
   alias Chat.Data.Dialog.Versioning
   alias Chat.Data.Schemas.DialogKey
   alias Chat.Data.Schemas.DialogMessage
@@ -80,6 +80,11 @@ defmodule Chat.Data.Dialog.Validation do
     %DialogMessage{}
     |> DialogMessage.create_changeset(Map.from_struct(message_struct))
     |> UserValidation.validate_signature()
+    |> Guards.validate_participant(
+      :sender_hash,
+      message_struct.dialog_hash,
+      message_struct.sender_hash
+    )
   end
 
   def validate_message_update(existing, message_struct) do
@@ -117,7 +122,7 @@ defmodule Chat.Data.Dialog.Validation do
 
     with %{sign_pkey: sign_pkey} <- UserData.get_card(sender_hash),
          true <- EnigmaPq.verify(challenge, signature, sign_pkey),
-         :ok <- check_dialog_key_published(dialog_hash, sender_hash) do
+         :ok <- Guards.check_dialog_key_published(dialog_hash, sender_hash) do
       :ok
     else
       {:error, reason} -> {:error, reason}
@@ -156,7 +161,13 @@ defmodule Chat.Data.Dialog.Validation do
     %DialogMessageReaction{}
     |> DialogMessageReaction.create_changeset(Map.from_struct(reaction_struct))
     |> UserValidation.validate_signature()
-    |> validate_not_self_reaction(reaction_struct.message_id, reaction_struct.reactor_hash)
+    |> Guards.validate_participant(
+      :reactor_hash,
+      reaction_struct.dialog_hash,
+      reaction_struct.reactor_hash
+    )
+    |> Guards.validate_message_in_dialog(reaction_struct.message_id, reaction_struct.dialog_hash)
+    |> Guards.validate_not_self_reaction(reaction_struct.message_id, reaction_struct.reactor_hash)
   end
 
   def validate_reaction_update(existing, reaction_struct) do
@@ -188,8 +199,9 @@ defmodule Chat.Data.Dialog.Validation do
 
     with %{sign_pkey: sign_pkey} <- UserData.get_card(reactor_hash),
          true <- EnigmaPq.verify(challenge, signature, sign_pkey),
-         :ok <- check_dialog_key_published(dialog_hash, reactor_hash),
-         :ok <- check_not_self_reaction(message_id, reactor_hash) do
+         :ok <- Guards.check_participant(dialog_hash, reactor_hash),
+         :ok <- Guards.check_message_in_dialog(message_id, dialog_hash),
+         :ok <- Guards.check_not_self_reaction(message_id, reactor_hash) do
       :ok
     else
       {:error, reason} -> {:error, reason}
@@ -218,7 +230,13 @@ defmodule Chat.Data.Dialog.Validation do
     %DialogMessageReceipt{}
     |> DialogMessageReceipt.create_changeset(Map.from_struct(receipt_struct))
     |> UserValidation.validate_signature()
-    |> validate_not_self_receipt(receipt_struct.message_id, receipt_struct.peer_hash)
+    |> Guards.validate_participant(
+      :peer_hash,
+      receipt_struct.dialog_hash,
+      receipt_struct.peer_hash
+    )
+    |> Guards.validate_message_in_dialog(receipt_struct.message_id, receipt_struct.dialog_hash)
+    |> Guards.validate_not_self_receipt(receipt_struct.message_id, receipt_struct.peer_hash)
   end
 
   # --- Dialog Message Receipts: HTTP ingestion ---
@@ -228,11 +246,14 @@ defmodule Chat.Data.Dialog.Validation do
         %{challenge: challenge, signature: signature}
       ) do
     peer_hash = changes["peer_hash"] || changes[:peer_hash]
+    dialog_hash = changes["dialog_hash"] || changes[:dialog_hash]
     message_id = changes["message_id"] || changes[:message_id]
 
     with %{sign_pkey: sign_pkey} <- UserData.get_card(peer_hash),
          true <- EnigmaPq.verify(challenge, signature, sign_pkey),
-         :ok <- check_not_self_receipt(message_id, peer_hash) do
+         :ok <- Guards.check_participant(dialog_hash, peer_hash),
+         :ok <- Guards.check_message_in_dialog(message_id, dialog_hash),
+         :ok <- Guards.check_not_self_receipt(message_id, peer_hash) do
       :ok
     else
       {:error, reason} -> {:error, reason}
@@ -244,49 +265,5 @@ defmodule Chat.Data.Dialog.Validation do
     receipt
     |> DialogMessageReceipt.create_changeset(changes)
     |> UserValidation.validate_signature()
-  end
-
-  # --- Dialog establishment guard ---
-
-  # The poster must have published their own dialog_key first, otherwise the peer
-  # has no way to unwrap the poster's sender_msg_key and decrypt what they post.
-  defp check_dialog_key_published(dialog_hash, sender_hash) do
-    case Dialog.get_dialog_key(dialog_hash, sender_hash) do
-      %DialogKey{} -> :ok
-      _ -> {:error, "dialog_key required before posting to dialog"}
-    end
-  end
-
-  # --- Self-action guards ---
-
-  defp message_authored_by?(message_id, actor_hash) do
-    case message_id && Dialog.get_message(message_id) do
-      %DialogMessage{sender_hash: ^actor_hash} -> true
-      _ -> false
-    end
-  end
-
-  defp check_not_self_reaction(message_id, reactor_hash) do
-    if message_authored_by?(message_id, reactor_hash),
-      do: {:error, "cannot react to own message"},
-      else: :ok
-  end
-
-  defp check_not_self_receipt(message_id, peer_hash) do
-    if message_authored_by?(message_id, peer_hash),
-      do: {:error, "cannot receipt own message"},
-      else: :ok
-  end
-
-  defp validate_not_self_reaction(changeset, message_id, reactor_hash) do
-    if message_authored_by?(message_id, reactor_hash),
-      do: Ecto.Changeset.add_error(changeset, :reactor_hash, "cannot react to own message"),
-      else: changeset
-  end
-
-  defp validate_not_self_receipt(changeset, message_id, peer_hash) do
-    if message_authored_by?(message_id, peer_hash),
-      do: Ecto.Changeset.add_error(changeset, :peer_hash, "cannot receipt own message"),
-      else: changeset
   end
 end

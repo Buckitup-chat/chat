@@ -9,6 +9,7 @@ defmodule ChatWeb.FileChunkController do
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.FileChunk
   alias Chat.Data.Types.FileChunkDataHash
+  alias Chat.Pq.WriteGate
   alias Chat.Storage.Default
   alias Chat.TimeKeeper
   alias EnigmaPq
@@ -37,6 +38,7 @@ defmodule ChatWeb.FileChunkController do
          :ok <- check_file_not_deleted(file_id, headers.uploader_hash),
          chunk = build_chunk(file_id, chunk_index, headers),
          :ok <- Integrity.verify_signature(chunk),
+         :ok <- check_write_gate(headers.uploader_hash),
          unit = Default.unit(),
          :ok <- check_free_space(unit, headers.size),
          {:ok, body, conn} <- read_chunk_body(conn),
@@ -53,6 +55,9 @@ defmodule ChatWeb.FileChunkController do
 
       {:error, :invalid_signature} ->
         send_resp(conn, 401, Jason.encode!(%{error: "invalid signature"}))
+
+      {:error, :not_in_trust_chain} ->
+        conn |> put_status(:forbidden) |> json(WriteGate.denied_body())
 
       {:error, :file_deleted} ->
         send_resp(conn, 410, Jason.encode!(%{error: "file deleted"}))
@@ -138,6 +143,13 @@ defmodule ChatWeb.FileChunkController do
       {:ok, free} when free > chunk_size + @min_free_bytes -> :ok
       {:ok, _} -> {:error, :insufficient_space}
       {:error, _} -> :ok
+    end
+  end
+
+  defp check_write_gate(uploader_hash) do
+    case WriteGate.check_access(uploader_hash, :file_chunk) do
+      :ok -> :ok
+      {:error, _} -> {:error, :not_in_trust_chain}
     end
   end
 

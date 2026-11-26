@@ -25,7 +25,7 @@ defmodule Chat.Data.DialogValidationTest do
     alice_card = insert_signed_user_card(alice)
     bob_card = insert_signed_user_card(bob)
 
-    dialog_hash = compute_dialog_hash(alice_card.user_hash, bob_card.user_hash)
+    dialog_hash = DialogHash.for_pair(alice_card.user_hash, bob_card.user_hash)
 
     {:ok,
      alice: alice,
@@ -583,12 +583,6 @@ defmodule Chat.Data.DialogValidationTest do
     |> Map.from_struct()
     |> Map.take(@message_update_fields)
     |> Map.reject(fn {_k, v} -> is_nil(v) end)
-  end
-
-  defp compute_dialog_hash(hash_a, hash_b) do
-    sorted = Enum.sort([hash_a, hash_b])
-    binary = :crypto.hash(:sha3_512, Enum.join(sorted))
-    DialogHash.from_binary(binary)
   end
 
   defp sign_challenge(identity) do

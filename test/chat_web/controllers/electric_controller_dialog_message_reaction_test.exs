@@ -28,7 +28,7 @@ defmodule ChatWeb.ElectricControllerDialogMessageReactionTest do
     alice_card = insert_signed_user_card(alice)
     bob_card = insert_signed_user_card(bob)
 
-    dialog_hash = compute_dialog_hash(alice_card.user_hash, bob_card.user_hash)
+    dialog_hash = DialogHash.for_pair(alice_card.user_hash, bob_card.user_hash)
 
     {:ok, _} =
       ShapeWriter.write(
@@ -136,14 +136,6 @@ defmodule ChatWeb.ElectricControllerDialogMessageReactionTest do
     updated = %{reaction | deleted_flag: true, owner_timestamp: reaction.owner_timestamp + 1}
     sign_b64 = updated |> Integrity.signature_payload() |> EnigmaPq.sign(identity.sign_skey)
     %{updated | sign_b64: sign_b64}
-  end
-
-  defp compute_dialog_hash(hash_a, hash_b) do
-    [hash_a, hash_b]
-    |> Enum.sort()
-    |> Enum.join()
-    |> then(&:crypto.hash(:sha3_512, &1))
-    |> DialogHash.from_binary()
   end
 
   defp signed_dialog_key(identity, dialog_hash, sender_hash, peer_hash) do

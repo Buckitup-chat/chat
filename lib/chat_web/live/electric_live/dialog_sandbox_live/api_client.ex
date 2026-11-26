@@ -11,6 +11,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
   alias Chat.Data.Schemas.DialogMessage
   alias Chat.Data.Schemas.DialogMessageReaction
   alias Chat.Data.Schemas.DialogMessageReceipt
+  alias Chat.Data.Types.DialogHash
   alias Chat.Data.Types.DialogMessageId
   alias Chat.TimeKeeper
   alias ChatWeb.ElectricLive.DialogSandboxLive.Content
@@ -85,7 +86,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
   end
 
   def publish_dialog_key(user, peer_hash, peer_crypt_pkey, base_url) do
-    dialog_hash = Crypto.compute_dialog_hash(user.user_hash, peer_hash)
+    dialog_hash = DialogHash.for_pair(user.user_hash, peer_hash)
 
     sender_msg_key =
       Crypto.derive_sender_msg_key(user.sign_skey, user.crypt_skey, user.contact_skey, peer_hash)

@@ -18,6 +18,7 @@ defmodule Chat.Data.PqConformanceTest do
 
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas
+  alias Chat.Data.Types.DialogHash
 
   @vectors "test/fixtures/pq_conformance_vectors.json"
            |> File.read!()
@@ -78,8 +79,7 @@ defmodule Chat.Data.PqConformanceTest do
               Base.encode16(EnigmaPq.hash(Base.decode64!(input["sign_b64"])), case: :lower)
 
           "dialog_hash" ->
-            [a, b] = Enum.sort([input["user_a"], input["user_b"]])
-            "di_" <> Base.encode16(EnigmaPq.hash(a <> b), case: :lower)
+            DialogHash.for_pair(input["user_a"], input["user_b"])
 
           "receipt_hash" ->
             data =

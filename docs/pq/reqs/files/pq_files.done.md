@@ -130,18 +130,20 @@ The `"file"` content type and its positional array schema are defined in [07_con
 
 ## 4. Upload Protocol
 
-Chunks upload via a **dedicated raw binary endpoint**; the `files` manifest uses JSON ingest.
+Chunks upload via a **dedicated raw binary endpoint**; the `files` manifest uses JSON ingest. `file_chunks` rows are **not** accepted through `/ingest` — they are written only by the chunk PUT (together with their bytes) and by peer sync (§5).
 
 **Chunk upload** — `PUT /electric/v1/file_chunk/:file_id/:chunk_index`:
 
 Implementation: [`ChatWeb.FileChunkController.create/2`](../../../lib/chat_web/controllers/file_chunk_controller.ex).
 
 - Raw encrypted bytes in the body; metadata + signature in headers: `x-data-hash` (`fd_`-prefixed), `x-size`, `x-uploader-hash`, `x-owner-timestamp`, `x-signature`.
-- The server verifies the ML-DSA-87 signature (against the uploader's `sign_pkey` from `user_cards`) and the deleted-file / uploader-match checks **before reading the body** — an unknown user or bad signature costs one verify, not a 4 MB read.
+- The server verifies the ML-DSA-87 signature (against the uploader's `sign_pkey` from `user_cards`), the write gate and the ownership checks **before reading the body** — an unknown user, bad signature or foreign `file_id` costs one verify and a few PK lookups, not a 4 MB read.
 - **Write gate**: once the signature proves `x-uploader-hash`, the PUT passes [`Chat.Pq.WriteGate.check_access/2`](../../../lib/chat/pq/write_gate.ex) with shape `:file_chunk` — the same vouch scope (`device.<id>.storage.write.file_chunk`) the `/ingest` path enforces. In `guarded`/`trust` an uploader outside the owner's trust chain gets 403 before the body is read, so no bytes reach `ChunkWriter` and the free-space budget cannot be drained by unvouched users. `open` mode is unaffected.
+- **Ownership** ([`Chat.Data.File.UploadOwner.check/1`](../../../lib/chat/data/file/upload_owner.ex)): `file_id` is client-chosen and others learn it only from the `file_chunks` shape, so a `file_id` belongs to the uploader of its stored chunks — to `files.uploader_hash` once the manifest lands. A PUT is refused with 410 if the `files` row is deleted, and with 403 `uploader mismatch` if the `files` row or any `file_chunks` row of the `file_id` has another `uploader_hash`. Because the ownership row is the very row that makes the `file_id` visible, no other uploader can get in before it exists.
+- **No overwrite**: if `(file_id, chunk_index)` already has a `file_chunks` row, the same `sign_b64` answers 200 without touching `ChunkStore` (replay / retry), any other signature answers 409 and the stored bytes stay as they are.
 - Then: free-space check → read body → hash the body and compare to the signed `data_hash` → submit to [`ChunkWriter`](../../../lib/chat/data/file/chunk_writer.ex) via [`UploadSource`](../../../lib/chat/data/file/upload_source.ex) (`:upload` lane) → insert `file_chunks` row → insert `upload_chunks` row (separate idempotent inserts with `on_conflict: :nothing`).
-- **No challenge/PoP** on this endpoint — the chunk signature binds the uploader key to the exact bytes, position, and `owner_timestamp`, which is strictly stronger than the ingest challenge. A replayed PUT is an idempotent no-op (same PK, hash-identical body).
-- Statuses: **200** ok; **429** upload lane busy (`Retry-After`); **401** bad signature; **403** `not_in_trust_chain` (write gate, body `{error, max_depth}`); **410** file deleted; **403** uploader mismatch; **422** hash/size mismatch; **413** disk full / body too large; **400** missing headers; **500** chunk write failed; **503** storage not ready / writer unavailable.
+- **No challenge/PoP** on this endpoint — the chunk signature binds the uploader key to the exact bytes, position, and `owner_timestamp`, which is strictly stronger than the ingest challenge. A replayed PUT is an idempotent no-op: the stored `file_chunks` row has the same `sign_b64`, so nothing is rewritten.
+- Statuses: **200** ok; **429** upload lane busy (`Retry-After`); **401** bad signature; **403** `not_in_trust_chain` (write gate, body `{error, max_depth}`); **410** file deleted; **403** uploader mismatch (`file_id` belongs to another uploader); **409** chunk exists (index holds a different signed chunk); **422** hash/size mismatch; **413** disk full / body too large; **400** missing headers; **500** chunk write failed; **503** storage not ready / writer unavailable.
 
 **Manifest commit** — `POST /electric/v1/ingest` (JSON): after all chunks are on the device, the client builds the `files` row with `chunk_sign_hashes` (computed locally from its own `sign_b64` values), signs it, and ingests it. The device verifies the manifest signature (via [`Chat.Data.File.Validation.file_pre_apply_insert/3`](../../../lib/chat/data/file/validation.ex)), that all `chunk_count` chunks are present, and that each `chunk_sign_hashes[i]` matches the stored chunk's `SHA3-512(sign_b64)`, then syncs the ChunkStore directory and deletes the `upload_chunks` rows.
 
@@ -157,10 +159,12 @@ Client                                    Device
   │                                          │    x-signature
   │                                          │  verify signature (before body read)
   │                                          │  WriteGate :file_chunk (before body read)
+  │                                          │  owner check: files / file_chunks
+  │                                          │    same sign_b64 at index → 200, done
   │                                          │  read body → hash → compare data_hash
   │                                          │  ChunkWriter ← UploadSource (raw bytes → FS)
   │                                          │  insert file_chunks + upload_chunks
-  │<─ 200|429|401|403|410|413|500 ───────────│
+  │<─ 200|429|401|403|409|410|413|500 ───────│
   │─ ... progressive encrypt + upload ...    │
   │                                          │
   │  resume: shape read on file_chunks       │

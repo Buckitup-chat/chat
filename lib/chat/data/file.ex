@@ -20,6 +20,11 @@ defmodule Chat.Data.File do
     |> repo().all()
   end
 
+  def chunks_of_other_uploader?(file_id, uploader_hash) do
+    from(c in FileChunk, where: c.file_id == ^file_id and c.uploader_hash != ^uploader_hash)
+    |> repo().exists?()
+  end
+
   def get_file_chunk_count(file_id) do
     from(c in FileChunk, where: c.file_id == ^file_id, select: count())
     |> repo().one()

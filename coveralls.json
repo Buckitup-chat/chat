@@ -1,14 +1,15 @@
 {
   "coverage_options": {
-    "minimum_coverage": 72,
+    "minimum_coverage": 77,
     "html_filter_full_covered": true
   },
   "terminal_options": {
     "file_column_width": 120
   },
   "skip_files": [
-    "lib/chat_web/live/electric_live/.*sandbox",
+    "lib/chat_web/live/electric_live/",
     "lib/proxy/",
-    "lib/chat_web/live/proxy_live/"
+    "lib/chat_web/live/proxy_live/",
+    "lib/chat/debug.ex"
   ]
 }

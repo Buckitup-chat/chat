@@ -8,9 +8,7 @@ defmodule Chat.Data.Shapes.FileChunk do
   alias Chat.Data.File.SyncSource
   alias Chat.Data.File.Validation
   alias Chat.Data.Schemas.FileChunk
-  alias Chat.Pq.WriteGate
   alias Chat.Storage.Default
-  alias Phoenix.Sync.Writer
 
   @impl true
   def shape_name, do: :file_chunk
@@ -71,18 +69,5 @@ defmodule Chat.Data.Shapes.FileChunk do
     )
 
     :ok
-  end
-
-  @impl true
-  def ingest_configure_writer(writer, user_pop_context) do
-    Writer.allow(writer, FileChunk,
-      accept: [:insert],
-      check:
-        WriteGate.and_gate(&Validation.file_chunk_allowed(&1, user_pop_context), :file_chunk,
-          owner: "uploader_hash"
-        ),
-      validate: &Validation.file_chunk_validate/3,
-      insert: [pre_apply: &Validation.file_chunk_pre_apply_insert/3]
-    )
   end
 end

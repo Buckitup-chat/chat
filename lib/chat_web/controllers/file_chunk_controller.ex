@@ -5,6 +5,7 @@ defmodule ChatWeb.FileChunkController do
 
   alias Chat.Data.File, as: FileData
   alias Chat.Data.File.ChunkStore
+  alias Chat.Data.File.UploadOwner
   alias Chat.Data.File.UploadSource
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.FileChunk
@@ -35,10 +36,10 @@ defmodule ChatWeb.FileChunkController do
   def create(conn, %{"file_id" => file_id, "chunk_index" => chunk_index_str}) do
     with {chunk_index, ""} <- Integer.parse(chunk_index_str),
          {:ok, headers} <- parse_chunk_headers(conn),
-         :ok <- check_file_not_deleted(file_id, headers.uploader_hash),
          chunk = build_chunk(file_id, chunk_index, headers),
          :ok <- Integrity.verify_signature(chunk),
          :ok <- check_write_gate(headers.uploader_hash),
+         :ok <- UploadOwner.check(chunk),
          unit = Default.unit(),
          :ok <- check_free_space(unit, headers.size),
          {:ok, body, conn} <- read_chunk_body(conn),
@@ -48,6 +49,9 @@ defmodule ChatWeb.FileChunkController do
          {:ok, _} <- persist_chunk(chunk) do
       json(conn, %{status: "ok"})
     else
+      :already_stored ->
+        json(conn, %{status: "ok"})
+
       {:busy, retry_after} ->
         conn
         |> put_resp_header("retry-after", to_string(retry_after))
@@ -64,6 +68,9 @@ defmodule ChatWeb.FileChunkController do
 
       {:error, :uploader_mismatch} ->
         send_resp(conn, 403, Jason.encode!(%{error: "uploader mismatch"}))
+
+      {:error, :chunk_exists} ->
+        send_resp(conn, 409, Jason.encode!(%{error: "chunk exists"}))
 
       {:error, :hash_mismatch} ->
         send_resp(conn, 422, Jason.encode!(%{error: "body hash mismatch"}))
@@ -150,15 +157,6 @@ defmodule ChatWeb.FileChunkController do
     case WriteGate.check_access(uploader_hash, :file_chunk) do
       :ok -> :ok
       {:error, _} -> {:error, :not_in_trust_chain}
-    end
-  end
-
-  defp check_file_not_deleted(file_id, uploader_hash) do
-    case FileData.get_file(file_id) do
-      nil -> :ok
-      %{deleted_flag: true} -> {:error, :file_deleted}
-      %{uploader_hash: ^uploader_hash} -> :ok
-      _ -> {:error, :uploader_mismatch}
     end
   end
 

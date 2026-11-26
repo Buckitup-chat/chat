@@ -8,7 +8,6 @@ defmodule Chat.Data.File.Validation do
   alias Chat.Data.User, as: UserData
   alias Chat.Data.User.Validation, as: UserValidation
   alias Chat.Storage.Default
-  alias Chat.TimeKeeper
   alias EnigmaPq
   alias Phoenix.Sync.Writer.Operation
 
@@ -92,44 +91,6 @@ defmodule Chat.Data.File.Validation do
   end
 
   # --- FileChunks ---
-
-  def file_chunk_allowed(operation, %{challenge: challenge, signature: signature}) do
-    %Operation{operation: :insert, changes: changes} = operation
-
-    uploader_hash = changes["uploader_hash"] || changes[:uploader_hash]
-    card = UserData.get_card(uploader_hash)
-    true = EnigmaPq.verify(challenge, signature, card.sign_pkey)
-    :ok
-  rescue
-    _ -> {:error, "Invalid operation"}
-  end
-
-  def file_chunk_validate(chunk, changes, :insert) do
-    chunk
-    |> FileChunk.create_changeset(changes)
-    |> UserValidation.validate_signature()
-  end
-
-  def file_chunk_pre_apply_insert(multi, changeset, _context) do
-    case Ecto.Changeset.apply_action(changeset, :insert) do
-      {:ok, chunk} ->
-        Ecto.Multi.run(multi, :upload_chunk_bookkeeping, fn _repo, _changes ->
-          chunk_sign_hash = EnigmaPq.hash(chunk.sign_b64)
-
-          FileData.insert_upload_chunk(%{
-            file_id: chunk.file_id,
-            chunk_index: chunk.chunk_index,
-            chunk_sign_hash: chunk_sign_hash,
-            uploader_hash: chunk.uploader_hash,
-            size: chunk.size,
-            updated_at: TimeKeeper.now_unix()
-          })
-        end)
-
-      _ ->
-        multi
-    end
-  end
 
   def validate_file_chunk_insert(chunk_struct) do
     %FileChunk{}

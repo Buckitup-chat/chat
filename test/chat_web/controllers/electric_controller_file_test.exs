@@ -3,6 +3,7 @@ defmodule ChatWeb.ElectricControllerFileTest do
   use ChatWeb.DataCase
 
   alias Chat.Challenge
+  alias Chat.Data.File, as: FileData
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.File, as: FileSchema
   alias Chat.Data.Schemas.FileChunk
@@ -21,43 +22,19 @@ defmodule ChatWeb.ElectricControllerFileTest do
   end
 
   describe "file_chunk ingest" do
-    test "insert returns txid", %{conn: conn, identity: identity, user_hash: user_hash} do
-      {chunk, _data_b64} = build_signed_chunk(identity, user_hash, FileId.generate(), 0)
-      payload = file_chunk_insert_payload(chunk)
-
-      conn = post_ingest(conn, payload, identity.sign_skey)
-
-      assert conn.status == 200, conn.resp_body
-      assert %{"txid" => txid} = Jason.decode!(conn.resp_body)
-      assert is_integer(txid)
-    end
-
-    test "insert persists chunk and bookkeeping row", %{
+    test "insert is refused — chunks are uploaded only via PUT", %{
       conn: conn,
       identity: identity,
       user_hash: user_hash
     } do
       file_id = FileId.generate()
-      {chunk, _data_b64} = build_signed_chunk(identity, user_hash, file_id, 0)
-      payload = file_chunk_insert_payload(chunk)
+      {chunk, _data} = build_signed_chunk(identity, user_hash, file_id, 0)
 
-      conn = post_ingest(conn, payload, identity.sign_skey)
-      assert conn.status == 200
+      conn = post_ingest(conn, file_chunk_insert_payload(chunk), identity.sign_skey)
 
-      assert Repo.get_by(FileChunk, file_id: file_id, chunk_index: 0) != nil
-      assert Repo.get_by(UploadChunk, file_id: file_id, chunk_index: 0) != nil
-    end
-
-    test "insert without PoP returns 401", %{conn: conn, identity: identity, user_hash: user_hash} do
-      {chunk, _} = build_signed_chunk(identity, user_hash, FileId.generate(), 0)
-      payload = file_chunk_insert_payload(chunk)
-
-      conn =
-        conn
-        |> put_req_header("content-type", "application/json")
-        |> post("/electric/v1/ingest", Jason.encode!(payload))
-
-      assert conn.status == 401
+      assert conn.status in 400..499, conn.resp_body
+      assert Repo.get_by(FileChunk, file_id: file_id, chunk_index: 0) == nil
+      assert Repo.get_by(UploadChunk, file_id: file_id, chunk_index: 0) == nil
     end
   end
 
@@ -70,8 +47,7 @@ defmodule ChatWeb.ElectricControllerFileTest do
       file_id = FileId.generate()
 
       {chunk, _} = build_signed_chunk(identity, user_hash, file_id, 0)
-      chunk_conn = post_ingest(conn, file_chunk_insert_payload(chunk), identity.sign_skey)
-      assert chunk_conn.status == 200
+      store_chunk(chunk)
 
       file = build_signed_file(identity, user_hash, file_id, [chunk])
       file_conn = post_ingest(conn, file_insert_payload(file), identity.sign_skey)
@@ -88,7 +64,7 @@ defmodule ChatWeb.ElectricControllerFileTest do
       file_id = FileId.generate()
 
       {chunk, _} = build_signed_chunk(identity, user_hash, file_id, 0)
-      assert post_ingest(conn, file_chunk_insert_payload(chunk), identity.sign_skey).status == 200
+      store_chunk(chunk)
 
       assert Repo.get_by(UploadChunk, file_id: file_id, chunk_index: 0) != nil
 
@@ -143,7 +119,7 @@ defmodule ChatWeb.ElectricControllerFileTest do
 
     defp upload_file(conn, identity, user_hash, file_id) do
       {chunk, _} = build_signed_chunk(identity, user_hash, file_id, 0)
-      assert post_ingest(conn, file_chunk_insert_payload(chunk), identity.sign_skey).status == 200
+      store_chunk(chunk)
 
       file = build_signed_file(identity, user_hash, file_id, [chunk])
       assert post_ingest(conn, file_insert_payload(file), identity.sign_skey).status == 200
@@ -230,6 +206,22 @@ defmodule ChatWeb.ElectricControllerFileTest do
   end
 
   # Helpers
+
+  # Same rows the chunk PUT writes (FileChunkController.persist_chunk/1)
+  defp store_chunk(chunk) do
+    attrs = chunk |> Map.from_struct() |> Map.drop([:__meta__])
+    {:ok, _} = %FileChunk{} |> FileChunk.create_changeset(attrs) |> FileData.insert_file_chunk()
+
+    {:ok, _} =
+      FileData.insert_upload_chunk(%{
+        file_id: chunk.file_id,
+        chunk_index: chunk.chunk_index,
+        chunk_sign_hash: EnigmaPq.hash(chunk.sign_b64),
+        uploader_hash: chunk.uploader_hash,
+        size: chunk.size,
+        updated_at: System.os_time(:second)
+      })
+  end
 
   defp file_chunk_insert_payload(chunk) do
     %{

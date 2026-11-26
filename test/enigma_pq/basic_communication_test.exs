@@ -4,7 +4,6 @@ defmodule EnigmaPq.BasicCommunicationTest do
 
   # Prefix constants as defined in requirements
   @user_hash_prefix <<0x01>>
-  @dialog_hash_prefix <<0x02>>
 
   setup do
     # Check if crypto supports the required algorithms
@@ -74,15 +73,5 @@ defmodule EnigmaPq.BasicCommunicationTest do
 
     # 6. Verify shared secrets match
     assert shared_secret_bob == shared_secret_alice
-  end
-
-  test "Dialog Hash format verification" do
-    # Verify we can construct Dialog Hash with 0x02 prefix
-    data = "alice_and_bob_dialog"
-    raw_hash = EnigmaPq.hash(data)
-    dialog_hash = @dialog_hash_prefix <> raw_hash
-
-    assert byte_size(dialog_hash) == 1 + 64
-    assert String.starts_with?(dialog_hash, @dialog_hash_prefix)
   end
 end

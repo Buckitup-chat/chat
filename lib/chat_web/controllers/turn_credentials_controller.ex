@@ -32,31 +32,19 @@ defmodule ChatWeb.TurnCredentialsController do
     end
   end
 
+  # The limit is counted only after PoP passes, so junk requests from a shared
+  # address can't exhaust the bucket of a client that authenticates correctly.
   defp issue_credentials(conn, params, uris) do
-    case RateLimiter.check_and_increment(conn.remote_ip) do
-      :ok ->
-        authenticate_and_issue(conn, params, uris)
-
-      {:error, retry_after} ->
+    with {:ok, _sign_pkey} <-
+           ReadGate.verify_user(params["user_hash"], params["challenge_id"], params["signature"]),
+         :ok <- RateLimiter.check_and_increment(conn.remote_ip) do
+      {username, credential, ttl} = Credentials.issue()
+      json(conn, %{username: username, credential: credential, ttl: ttl, uris: uris})
+    else
+      {:error, retry_after} when is_integer(retry_after) ->
         conn
         |> put_status(429)
         |> json(%{error: "rate_limited", retry_after: retry_after})
-    end
-  end
-
-  defp authenticate_and_issue(conn, params, uris) do
-    params["user_hash"]
-    |> ReadGate.verify_user(params["challenge_id"], params["signature"])
-    |> case do
-      {:ok, _sign_pkey} ->
-        {username, credential, ttl} = Credentials.issue()
-
-        json(conn, %{
-          username: username,
-          credential: credential,
-          ttl: ttl,
-          uris: uris
-        })
 
       {:error, reason} ->
         reject(conn, reason)

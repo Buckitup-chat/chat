@@ -118,9 +118,7 @@ defmodule ChatWeb.ElectricLive.SandboxHttp do
            [challenge_log, log_entry("POST", url, headers, body_json, resp, timestamp)]}
 
         {:ok, %{status: _status} = resp} ->
-          error_msg = if is_map(resp.body), do: resp.body["error"], else: nil
-
-          {:error, error_msg || "Read session failed: #{resp.status}",
+          {:error, body_error(resp.body) || "Read session failed: #{resp.status}",
            [challenge_log, log_entry("POST", url, headers, body_json, resp, timestamp)]}
 
         {:error, error} ->
@@ -129,6 +127,9 @@ defmodule ChatWeb.ElectricLive.SandboxHttp do
       end
     end
   end
+
+  defp body_error(%{} = body), do: body["error"]
+  defp body_error(_body), do: nil
 
   # --- Gated shape reads ---
 

@@ -109,7 +109,7 @@ defmodule Chat.Db.CopyingTest do
           _ -> false
         end)
 
-      if length(upload_tracking_keys) > 0 do
+      if upload_tracking_keys != [] do
         IO.puts(
           "Found upload tracking keys that may be causing the difference: #{inspect(upload_tracking_keys)}"
         )

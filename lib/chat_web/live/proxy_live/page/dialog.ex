@@ -36,6 +36,8 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
   alias Proxy
   alias Proxy.SocketClient
 
+  require Logger
+
   @per_page 15
 
   def init(%{assigns: %{}} = socket) do
@@ -80,11 +82,21 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
 
   def handle_event(msg, params, socket) do
     case msg do
-      "dialog/switch" -> socket |> switch_dialog(params)
-      "chat:load-more" -> socket |> load_more_messages()
-      "dialog/message/open-image-gallery" -> socket |> open_image_gallery(params)
-      "dialog/text-message" -> socket |> send_text_message(params)
-      _ -> socket |> tap(fn _ -> dbg([msg, params]) end)
+      "dialog/switch" ->
+        socket |> switch_dialog(params)
+
+      "chat:load-more" ->
+        socket |> load_more_messages()
+
+      "dialog/message/open-image-gallery" ->
+        socket |> open_image_gallery(params)
+
+      "dialog/text-message" ->
+        socket |> send_text_message(params)
+
+      _ ->
+        socket
+        |> tap(fn _ -> Logger.warning(["unhandled dialog event ", inspect({msg, params})]) end)
     end
   end
 
@@ -94,7 +106,6 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
         socket |> add_loaded_messages(messages, amount, dialog)
 
       {:new_dialog_message, {dialog_key, indexed_message}} ->
-        dialog_key |> dbg()
         current_dialog = socket.assigns.dialog
 
         if current_dialog && Chat.Dialogs.key(current_dialog) == dialog_key,
@@ -102,7 +113,7 @@ defmodule ChatWeb.ProxyLive.Page.Dialog do
           else: socket
 
       anything ->
-        ["unhandled dialog info", anything] |> dbg()
+        Logger.warning(["unhandled dialog info ", inspect(anything)])
         socket
     end
   end

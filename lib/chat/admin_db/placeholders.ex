@@ -22,11 +22,14 @@ defmodule Chat.AdminDb.Placeholders do
     with {:ok, _} <- remove_folder(folder_path),
          :ok <- File.mkdir(folder_path),
          data <- :crypto.strong_rand_bytes(@placeholder_size) do
-      for i <- 1..@placeholders_num do
-        file_path = Path.join(folder_path, "#{@placeholder_prefix}#{i}.txt")
-        File.open(file_path, [:write, :binary], fn file -> IO.binwrite(file, data) end)
-      end
+      for i <- 1..@placeholders_num, do: write_placeholder(folder_path, i, data)
     end
+  end
+
+  defp write_placeholder(folder_path, i, data) do
+    folder_path
+    |> Path.join("#{@placeholder_prefix}#{i}.txt")
+    |> File.open([:write, :binary], &IO.binwrite(&1, data))
   end
 
   defp remove_single(folder_path) do

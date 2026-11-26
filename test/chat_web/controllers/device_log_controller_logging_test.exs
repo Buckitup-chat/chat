@@ -94,8 +94,7 @@ defmodule ChatWebTest.Controllers.DeviceLogControllerLoggingTest do
       :get_device_log ->
         action.()
 
-      x ->
-        x |> dbg()
+      _ ->
         receive_loop(action)
     after
       1000 ->

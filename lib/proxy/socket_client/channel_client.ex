@@ -100,7 +100,7 @@ defmodule Proxy.SocketClient.ChannelClient do
         maybe_leave(socket, topic)
 
       x ->
-        ["!!!! channel_clients", x] |> dbg() |> inspect() |> Logger.error()
+        ["!!!! channel_clients", x] |> inspect() |> Logger.error()
         socket
     end
     |> noreply()

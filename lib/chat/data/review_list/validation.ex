@@ -3,8 +3,8 @@ defmodule Chat.Data.ReviewList.Validation do
 
   alias Chat.Data.Origin, as: OriginData
   alias Chat.Data.Review, as: ReviewData
-  alias Chat.Data.ReviewPublicPassword
   alias Chat.Data.ReviewPostRight
+  alias Chat.Data.ReviewPublicPassword
   alias Chat.Data.ReviewRevokeRight
   alias Chat.Data.Schemas.ReviewList
   alias Chat.Data.User, as: UserData

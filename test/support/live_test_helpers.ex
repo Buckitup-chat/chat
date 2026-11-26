@@ -127,12 +127,14 @@ defmodule ChatWeb.LiveTestHelpers do
       ~r/v-component="LinkedText"[^>]*>.*?(#{content_or_validator})/s
     ]
 
-    Enum.find_value(linked_text_patterns, false, fn pattern ->
-      with [match | _] <- Regex.run(pattern, html) do
-        if debug_mode, do: IO.puts("\n[DEBUG] Found LinkedText match: #{match}")
-        true
-      end
-    end)
+    Enum.find_value(linked_text_patterns, false, &linked_text_match?(&1, html, debug_mode))
+  end
+
+  defp linked_text_match?(pattern, html, debug_mode) do
+    with [match | _] <- Regex.run(pattern, html) do
+      if debug_mode, do: IO.puts("\n[DEBUG] Found LinkedText match: #{match}")
+      true
+    end
   end
 
   defp find_standard_component_content(html, component_name, content_or_validator, debug_mode) do

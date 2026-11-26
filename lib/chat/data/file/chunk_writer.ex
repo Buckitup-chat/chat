@@ -122,17 +122,17 @@ defmodule Chat.Data.File.ChunkWriter do
         true -> {lane, count + 1}
       end
     end)
-    |> tap(fn counters ->
-      Enum.each(counters, fn {lane, count} ->
-        threshold = @override_thresholds[lane]
-        warn_at = div(threshold * 80, 100)
-
-        if count >= warn_at and count < threshold do
-          log("#{state.drive_id}: #{lane} wait counter #{count}/#{threshold}", :warning)
-        end
-      end)
-    end)
+    |> tap(&Enum.each(&1, fn counter -> warn_near_threshold(state, counter) end))
     |> then(&%{state | wait_counters: &1})
+  end
+
+  defp warn_near_threshold(state, {lane, count}) do
+    threshold = @override_thresholds[lane]
+    warn_at = div(threshold * 80, 100)
+
+    if count >= warn_at and count < threshold do
+      log("#{state.drive_id}: #{lane} wait counter #{count}/#{threshold}", :warning)
+    end
   end
 
   defp writing_lane?(state, lane) do

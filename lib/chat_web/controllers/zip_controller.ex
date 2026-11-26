@@ -91,35 +91,13 @@ defmodule ChatWeb.ZipController do
 
       file_entries =
         messages
-        |> Enum.reduce([], fn msg, file_entries ->
-          with %{type: type, content: json} when type in [:audio, :file, :image, :video] <- msg,
-               {id, content} <- StorageId.from_json(json),
-               [chunk_key, chunk_secret_raw, _, _type, filename, _size] <- Files.get(id, content),
-               chunk_secret <- Base.decode64!(chunk_secret_raw),
-               file_stream <- ChunkedFiles.stream_chunks(chunk_key, chunk_secret) do
-            filename = ExportHelper.get_filename(filename, id)
-
-            entry = Zstream.entry("files/#{filename}", file_stream)
-
-            [entry | file_entries]
-          else
-            _ ->
-              file_entries
-          end
-        end)
+        |> Enum.map(&file_entry/1)
         |> Enum.reject(&is_nil/1)
+        |> Enum.reverse()
 
       [index_entry | file_entries]
       |> Zstream.zip()
-      |> Enum.reduce_while(conn, fn archive, conn ->
-        case chunk(conn, archive) do
-          {:ok, conn} ->
-            {:cont, conn}
-
-          {:error, :closed} ->
-            {:halt, conn}
-        end
-      end)
+      |> Enum.reduce_while(conn, &send_archive_chunk/2)
     else
       _ ->
         raise "404"
@@ -127,6 +105,25 @@ defmodule ChatWeb.ZipController do
   rescue
     _ ->
       send_resp(conn, 404, "")
+  end
+
+  defp file_entry(msg) do
+    with %{type: type, content: json} when type in [:audio, :file, :image, :video] <- msg,
+         {id, content} <- StorageId.from_json(json),
+         [chunk_key, chunk_secret_raw, _, _type, filename, _size] <- Files.get(id, content),
+         chunk_secret <- Base.decode64!(chunk_secret_raw),
+         file_stream <- ChunkedFiles.stream_chunks(chunk_key, chunk_secret) do
+      Zstream.entry("files/#{ExportHelper.get_filename(filename, id)}", file_stream)
+    else
+      _ -> nil
+    end
+  end
+
+  defp send_archive_chunk(archive, conn) do
+    case chunk(conn, archive) do
+      {:ok, conn} -> {:cont, conn}
+      {:error, :closed} -> {:halt, conn}
+    end
   end
 
   defp get_filename(:dialog, {_dialog, _messages_ids, _me, peer}),

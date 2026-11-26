@@ -18,9 +18,9 @@ defmodule Chat.Admin.AdminDbLoggerTest do
 
     assert 0 < count_generation_rows(current_generation)
 
-    assert 0 < Enum.count(AdminLogger.get_log())
-    assert 0 < Enum.count(AdminLogger.get_log(:prev))
-    assert 0 < Enum.count(AdminLogger.get_log(:prev_prev))
+    refute Enum.empty?(AdminLogger.get_log())
+    refute Enum.empty?(AdminLogger.get_log(:prev))
+    refute Enum.empty?(AdminLogger.get_log(:prev_prev))
   end
 
   defp populate_3_more_generation do

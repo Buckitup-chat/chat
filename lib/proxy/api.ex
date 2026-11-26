@@ -85,11 +85,7 @@ defmodule Proxy.Api do
     requester_pub_key = Identify.pub_key(requester_card)
     time = Chat.TimeKeeper.now_unix()
 
-    room =
-      Rooms.add_request(room_key, requester_pub_key, time, fn req_message ->
-        # Page.Room.broadcast_new_message(req_message, room_key, me, time)
-        req_message |> dbg()
-      end)
+    room = Rooms.add_request(room_key, requester_pub_key, time)
 
     Rooms.RoomsBroker.put(room)
     Broadcast.room_requested(room, requester_pub_key)

@@ -185,17 +185,18 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.Crypto do
     keys
     |> Enum.group_by(& &1["dialog_hash"])
     |> Enum.map(fn {dialog_hash, rows} ->
-      peer_hash =
-        Enum.find_value(rows, fn row ->
-          cond do
-            row["sender_hash"] == my_hash -> row["peer_hash"]
-            row["peer_hash"] == my_hash -> row["sender_hash"]
-            true -> nil
-          end
-        end)
+      peer_hash = Enum.find_value(rows, &peer_of(&1, my_hash))
 
       %{dialog_hash: dialog_hash, peer_hash: peer_hash || "unknown"}
     end)
+  end
+
+  defp peer_of(row, my_hash) do
+    cond do
+      row["sender_hash"] == my_hash -> row["peer_hash"]
+      row["peer_hash"] == my_hash -> row["sender_hash"]
+      true -> nil
+    end
   end
 
   def decode_binary_field(nil), do: nil

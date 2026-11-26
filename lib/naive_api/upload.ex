@@ -2,8 +2,8 @@ defmodule NaiveApi.Upload do
   @moduledoc "Upload resolvers"
   use NaiveApi, :resolver
 
-  alias Chat.Db.ChangeTracker
   alias Chat.{ChunkedFiles, ChunkedFilesMultisecret}
+  alias Chat.Db.ChangeTracker
   alias Chat.Identity
   alias Chat.Upload.{Upload, UploadIndex, UploadKey}
 

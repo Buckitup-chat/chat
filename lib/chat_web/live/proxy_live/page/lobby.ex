@@ -17,6 +17,8 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
 
   alias Proxy.SocketClient
 
+  require Logger
+
   def init(socket) do
     # PubSub.subscribe(Chat.PubSub, StatusPoller.channel())
 
@@ -46,10 +48,18 @@ defmodule ChatWeb.ProxyLive.Page.Lobby do
 
   def handle_event(msg, params, socket) do
     case msg do
-      "lobby/search" -> socket |> filter_search_results(params)
-      "room/send-request" -> socket |> send_room_request(params)
-      "room/sync-stored" -> socket |> MainLoginPage.sync_stored_room(params)
-      _ -> socket |> tap(fn _ -> dbg(msg, params) end)
+      "lobby/search" ->
+        socket |> filter_search_results(params)
+
+      "room/send-request" ->
+        socket |> send_room_request(params)
+
+      "room/sync-stored" ->
+        socket |> MainLoginPage.sync_stored_room(params)
+
+      _ ->
+        socket
+        |> tap(fn _ -> Logger.warning(["unhandled lobby event ", inspect({msg, params})]) end)
     end
   end
 

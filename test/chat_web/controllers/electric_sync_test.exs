@@ -128,7 +128,7 @@ defmodule ChatWeb.ElectricSyncTest do
         WHERE slot_name = 'electric_slot_default'
         """)
 
-      if length(result.rows) > 0 do
+      if result.rows != [] do
         assert hd(result.rows) == ["electric_slot_default"]
       else
         assert true

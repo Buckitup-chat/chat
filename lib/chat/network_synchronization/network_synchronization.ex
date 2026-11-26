@@ -7,6 +7,7 @@ defmodule Chat.NetworkSynchronization do
   alias Chat.NetworkSynchronization.Store
   alias Chat.NetworkSynchronization.Worker
   alias Chat.Pq.OwnerBootstrap
+  alias Chat.Storage.Default
 
   alias Phoenix.PubSub
 
@@ -189,7 +190,7 @@ defmodule Chat.NetworkSynchronization do
   end
 
   defp safe_active_drive_id do
-    Chat.Storage.Default.unit().id
+    Default.unit().id
   rescue
     _ -> nil
   end

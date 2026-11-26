@@ -4,11 +4,11 @@ defmodule Chat.Test.ReviewFixtures do
   alias Chat.Data.Integrity
   alias Chat.Data.ReviewPasswordCandidate, as: CandidateData
   alias Chat.Data.ReviewPostRight, as: PostRightData
+  alias Chat.Data.ReviewPublicPassword, as: PublicPasswordData
+  alias Chat.Data.ReviewPublicPassword.Validation, as: PublicPasswordValidation
   alias Chat.Data.ReviewRevokeRight, as: RevokeRightData
   alias Chat.Data.ReviewRightCandidate, as: RightCandidateData
   alias Chat.Data.ReviewRightEnvelope
-  alias Chat.Data.ReviewPublicPassword, as: PublicPasswordData
-  alias Chat.Data.ReviewPublicPassword.Validation, as: PublicPasswordValidation
   alias Chat.Data.Schemas.Origin
   alias Chat.Data.Schemas.Review
   alias Chat.Data.Schemas.ReviewPasswordCandidate

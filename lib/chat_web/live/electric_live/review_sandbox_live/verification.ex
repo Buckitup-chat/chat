@@ -52,16 +52,14 @@ defmodule ChatWeb.ElectricLive.ReviewSandboxLive.Verification do
              review,
              author,
              :post
-           ),
-         :ok <-
-           check_candidate(
-             candidates.revoke,
-             shared_secrets[:revoke_shared_secret],
-             review,
-             author,
-             :revoke
            ) do
-      :ok
+      check_candidate(
+        candidates.revoke,
+        shared_secrets[:revoke_shared_secret],
+        review,
+        author,
+        :revoke
+      )
     end
   end
 

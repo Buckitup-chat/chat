@@ -380,13 +380,15 @@ defmodule ChatWeb.MainLive.Admin.NetworkSourceList do
   end
 
   defp merge_new_status({id, new_status}, list) do
-    if index = list |> Enum.find_index(&(source_id(&1) === id)) do
-      List.update_at(list, index, fn {source, _} -> {source, new_status} end)
-    else
-      NetworkSynchronization.synchronisation()
-      |> Enum.filter(&(source_id(&1) == id))
-      |> Enum.concat(list)
-      |> Enum.sort_by(&source_id/1)
+    case Enum.find_index(list, &(source_id(&1) === id)) do
+      nil ->
+        NetworkSynchronization.synchronisation()
+        |> Enum.filter(&(source_id(&1) == id))
+        |> Enum.concat(list)
+        |> Enum.sort_by(&source_id/1)
+
+      index ->
+        List.update_at(list, index, fn {source, _} -> {source, new_status} end)
     end
   end
 

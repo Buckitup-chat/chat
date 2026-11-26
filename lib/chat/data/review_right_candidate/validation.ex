@@ -32,30 +32,32 @@ defmodule Chat.Data.ReviewRightCandidate.Validation do
   defp try_complete(review_hash) do
     with %{origin_hash: oh} <- ReviewData.get_review(review_hash),
          %{moderation_mode: mode} <- OriginData.get_origin(oh) do
-      case mode do
-        :post ->
-          case RightCandidateData.get_revoke_candidate(review_hash) do
-            %{sign_b64: sign} when not is_nil(sign) -> Promotion.complete_promotion(review_hash)
-            _ -> {:ok, :pending}
-          end
-
-        :pre ->
-          post_c = RightCandidateData.get_post_candidate(review_hash)
-          revoke_c = RightCandidateData.get_revoke_candidate(review_hash)
-
-          if post_c && post_c.sign_b64 && revoke_c && revoke_c.sign_b64 do
-            Promotion.complete_promotion(review_hash)
-          else
-            {:ok, :pending}
-          end
-
-        :none ->
-          {:ok, :not_applicable}
-      end
+      complete_when_signed(mode, review_hash)
     else
       _ -> {:ok, :pending}
     end
   end
+
+  defp complete_when_signed(:none, _review_hash), do: {:ok, :not_applicable}
+
+  defp complete_when_signed(mode, review_hash) do
+    if mode |> required_candidates(review_hash) |> Enum.all?(&signed?/1),
+      do: Promotion.complete_promotion(review_hash),
+      else: {:ok, :pending}
+  end
+
+  defp required_candidates(:post, review_hash),
+    do: [RightCandidateData.get_revoke_candidate(review_hash)]
+
+  defp required_candidates(:pre, review_hash) do
+    [
+      RightCandidateData.get_post_candidate(review_hash),
+      RightCandidateData.get_revoke_candidate(review_hash)
+    ]
+  end
+
+  defp signed?(%{sign_b64: sign}), do: not is_nil(sign)
+  defp signed?(_candidate), do: false
 
   defp validate_signature_update(candidate, changes, schema, pop_context) do
     changeset = schema.sign_changeset(candidate, changes)

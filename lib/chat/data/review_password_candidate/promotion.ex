@@ -22,10 +22,10 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion do
   alias Chat.Data.ReviewPublicPassword, as: PublicPasswordData
   alias Chat.Data.ReviewRevokeRight, as: RevokeRightData
   alias Chat.Data.ReviewRightCandidate, as: RightCandidateData
+  alias Chat.Data.Schemas.ReviewPasswordCandidate
   alias Chat.Data.Schemas.ReviewPostRight
   alias Chat.Data.Schemas.ReviewPostRightCandidate
   alias Chat.Data.Schemas.ReviewPublicPassword
-  alias Chat.Data.Schemas.ReviewPasswordCandidate
   alias Chat.Data.Schemas.ReviewRevokeRight
   alias Chat.Data.Schemas.ReviewRevokeRightCandidate
   alias Chat.Data.User
@@ -106,28 +106,10 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion do
         )
         |> RightCandidateData.insert_revoke_candidate()
 
-      case mode do
-        :post ->
-          with {:ok, _} <- revoke_result do
-            {:ok, %{revoke_shared_secret: revoke_secret}}
-          end
-
-        :pre ->
-          {post_secret, post_kem, post_wrapped} =
-            Candidates.wrap_candidate_for_origin(pwd_c, pkey)
-
-          post_result =
-            %ReviewPostRightCandidate{}
-            |> ReviewPostRightCandidate.create_changeset(
-              right_candidate_attrs(candidate, origin_hash, post_kem, post_wrapped)
-            )
-            |> RightCandidateData.insert_post_candidate()
-
-          with {:ok, _} <- post_result,
-               {:ok, _} <- revoke_result do
-            {:ok, %{post_shared_secret: post_secret, revoke_shared_secret: revoke_secret}}
-          end
+      with {:ok, _} <- revoke_result do
+        {:ok, %{revoke_shared_secret: revoke_secret}}
       end
+      |> add_post_candidate(mode, candidate, origin_hash, pwd_c, pkey)
     else
       {:card, _} -> {:error, "origin card not found"}
       {:pwd, nil} -> {:error, "password candidate required for #{mode} mode"}
@@ -135,6 +117,25 @@ defmodule Chat.Data.ReviewPasswordCandidate.Promotion do
       {:valid_pwd, {:error, reason}} -> {:error, reason}
       {:valid_null, {:error, reason}} -> {:error, reason}
       {:order, false} -> {:error, "revoke timestamp must exceed password timestamp"}
+    end
+  end
+
+  defp add_post_candidate(revoke_result, :post, _candidate, _origin_hash, _pwd_c, _pkey),
+    do: revoke_result
+
+  defp add_post_candidate(revoke_result, :pre, candidate, origin_hash, pwd_c, pkey) do
+    {post_secret, post_kem, post_wrapped} = Candidates.wrap_candidate_for_origin(pwd_c, pkey)
+
+    post_result =
+      %ReviewPostRightCandidate{}
+      |> ReviewPostRightCandidate.create_changeset(
+        right_candidate_attrs(candidate, origin_hash, post_kem, post_wrapped)
+      )
+      |> RightCandidateData.insert_post_candidate()
+
+    with {:ok, _} <- post_result,
+         {:ok, secrets} <- revoke_result do
+      {:ok, Map.put(secrets, :post_shared_secret, post_secret)}
     end
   end
 

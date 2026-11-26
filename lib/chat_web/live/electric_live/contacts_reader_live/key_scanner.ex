@@ -58,14 +58,18 @@ defmodule ChatWeb.ElectricLive.ContactsReaderLive.KeyScanner do
     |> Enum.find_value(fn msg ->
       case Crypto.decrypt_single_message(msg, keys_cache) do
         %{content: {:review_list_key, %{key_b64: key_b64}}} ->
-          case Base.decode64(key_b64, padding: false) do
-            {:ok, decoded} -> decoded
-            :error -> nil
-          end
+          decode_key(key_b64)
 
         _ ->
           nil
       end
     end)
+  end
+
+  defp decode_key(key_b64) do
+    case Base.decode64(key_b64, padding: false) do
+      {:ok, decoded} -> decoded
+      :error -> nil
+    end
   end
 end

@@ -22,7 +22,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClientTest do
       assert {:error, %{reason: reason, log_entries: log_entries}} = result
       assert is_binary(reason)
       assert is_list(log_entries)
-      assert length(log_entries) >= 1
+      assert log_entries != []
 
       # Verify log entry structure
       [log_entry | _] = log_entries
@@ -54,7 +54,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClientTest do
 
       assert {:error, %{reason: _reason, log_entries: log_entries}} = result
       assert is_list(log_entries)
-      assert length(log_entries) >= 1
+      assert log_entries != []
     end
   end
 
@@ -91,7 +91,7 @@ defmodule ChatWeb.ElectricLive.UserSandboxLive.ApiClientTest do
 
       assert {:error, %{reason: _reason, log_entries: log_entries}} = result
       assert is_list(log_entries)
-      assert length(log_entries) >= 1
+      assert log_entries != []
     end
 
     test "generates UUID if not provided" do

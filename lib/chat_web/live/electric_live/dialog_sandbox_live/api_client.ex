@@ -339,28 +339,7 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
         end,
         fn {msgs, resume} ->
           send(subscriber_pid, {:dialog_msgs_loaded, Enum.reverse(msgs)})
-
-          stream_opts =
-            if resume,
-              do: [resume: resume, replica: :full, errors: :stream],
-              else: [replica: :full, errors: :stream]
-
-          client
-          |> Electric.Client.stream(shape, stream_opts)
-          |> Stream.each(fn
-            %Message.ChangeMessage{headers: %{operation: :insert}, value: value} ->
-              send(subscriber_pid, {:dialog_msg_new, value})
-
-            %Message.ChangeMessage{headers: %{operation: :update}, value: value} ->
-              send(subscriber_pid, {:dialog_msg_updated, value})
-
-            %Message.ControlMessage{control: :up_to_date} ->
-              send(subscriber_pid, {:dialog_msg_live})
-
-            _ ->
-              :ok
-          end)
-          |> Stream.run()
+          run_live_stream(client, shape, resume, &forward_dialog_msg(&1, subscriber_pid))
         end
       )
       |> Stream.run()
@@ -569,28 +548,41 @@ defmodule ChatWeb.ElectricLive.DialogSandboxLive.ApiClient do
         end,
         fn {rows, resume} ->
           send(subscriber_pid, {loaded_tag, Enum.reverse(rows)})
-
-          stream_opts =
-            if resume,
-              do: [resume: resume, replica: :full, errors: :stream],
-              else: [replica: :full, errors: :stream]
-
-          client
-          |> Electric.Client.stream(shape, stream_opts)
-          |> Stream.each(fn
-            %Message.ChangeMessage{headers: %{operation: op}, value: value}
-            when op in [:insert, :update] ->
-              send(subscriber_pid, {change_tag, value})
-
-            _ ->
-              :ok
-          end)
-          |> Stream.run()
+          run_live_stream(client, shape, resume, &forward_change(&1, subscriber_pid, change_tag))
         end
       )
       |> Stream.run()
     end)
   end
+
+  defp run_live_stream(client, shape, resume, handler) do
+    opts =
+      if resume,
+        do: [resume: resume, replica: :full, errors: :stream],
+        else: [replica: :full, errors: :stream]
+
+    client
+    |> Electric.Client.stream(shape, opts)
+    |> Stream.each(handler)
+    |> Stream.run()
+  end
+
+  defp forward_dialog_msg(%Message.ChangeMessage{headers: %{operation: :insert}, value: v}, pid),
+    do: send(pid, {:dialog_msg_new, v})
+
+  defp forward_dialog_msg(%Message.ChangeMessage{headers: %{operation: :update}, value: v}, pid),
+    do: send(pid, {:dialog_msg_updated, v})
+
+  defp forward_dialog_msg(%Message.ControlMessage{control: :up_to_date}, pid),
+    do: send(pid, {:dialog_msg_live})
+
+  defp forward_dialog_msg(_message, _pid), do: :ok
+
+  defp forward_change(%Message.ChangeMessage{headers: %{operation: op}, value: v}, pid, tag)
+       when op in [:insert, :update],
+       do: send(pid, {tag, v})
+
+  defp forward_change(_message, _pid, _tag), do: :ok
 
   defp publish_insert(relation, fields, sign_skey, base_url) do
     payload = %{

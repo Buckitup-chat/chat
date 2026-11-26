@@ -34,12 +34,14 @@ defmodule Chat.DeviceId.Default do
   end
 
   defp first_hw_address do
-    with {:ok, ifaddrs} <- :inet.getifaddrs() do
-      ifaddrs
-      |> Enum.reject(&loopback?/1)
-      |> Enum.find_value(&extract_mac/1)
-    else
-      _ -> nil
+    case :inet.getifaddrs() do
+      {:ok, ifaddrs} ->
+        ifaddrs
+        |> Enum.reject(&loopback?/1)
+        |> Enum.find_value(&extract_mac/1)
+
+      _ ->
+        nil
     end
   end
 

@@ -237,15 +237,14 @@ defmodule ChatWeb.ElectricLive.VouchSandboxLive.Index do
 
   defp mark_vouch_revoked(socket, kind, subject_hash, new_timestamp) do
     update(socket, :vouches_by_me, fn vouches ->
-      Enum.map(vouches, fn v ->
-        if v.kind == kind and v.subject_hash == subject_hash do
-          %{v | deleted_flag: true, owner_timestamp: new_timestamp}
-        else
-          v
-        end
-      end)
+      Enum.map(vouches, &revoke_matching(&1, kind, subject_hash, new_timestamp))
     end)
   end
+
+  defp revoke_matching(%{kind: kind, subject_hash: subject_hash} = v, kind, subject_hash, ts),
+    do: %{v | deleted_flag: true, owner_timestamp: ts}
+
+  defp revoke_matching(v, _kind, _subject_hash, _ts), do: v
 
   defp load_vouches(socket, base_url) do
     identity = socket.assigns.identity

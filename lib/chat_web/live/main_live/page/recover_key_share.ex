@@ -77,11 +77,7 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
     case uploaded_entries(socket, :recovery_keys) do
       {[_ | _] = entries, []} ->
         uploaded_shares =
-          for entry <- entries, into: MapSet.new() do
-            consume_uploaded_entry(socket, entry, fn %{path: path} ->
-              share_from_upload(path, entry)
-            end)
-          end
+          for entry <- entries, into: MapSet.new(), do: consume_share(socket, entry)
 
         socket = check_broken_content(socket, uploaded_shares)
         update(socket, :shares, &KeyShare.compose(&1, uploaded_shares))
@@ -89,6 +85,10 @@ defmodule ChatWeb.MainLive.Page.RecoverKeyShare do
       _ ->
         socket
     end
+  end
+
+  defp consume_share(socket, entry) do
+    consume_uploaded_entry(socket, entry, fn %{path: path} -> share_from_upload(path, entry) end)
   end
 
   def share_from_upload(path, entry) do

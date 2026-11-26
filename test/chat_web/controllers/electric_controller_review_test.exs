@@ -20,14 +20,15 @@ defmodule ChatWeb.ElectricControllerReviewTest do
   alias Chat.Data.ReviewPostRight, as: PostRightData
   alias Chat.Data.ReviewPublicPassword, as: PublicPasswordData
   alias Chat.Data.ReviewRevokeRight, as: RevokeRightData
+  alias Chat.Data.ReviewWriteToken
   alias Chat.Data.Schemas.Review
   alias Chat.Data.Schemas.ReviewList
   alias Chat.Data.Schemas.ReviewPublicPassword
+  alias Chat.Data.Schemas.VouchToken
   alias Chat.Data.Types.ReviewHash
   alias Chat.Data.Types.ReviewListSignHash
   alias Chat.Data.Types.ReviewPasswordSignHash
   alias Chat.Data.Types.ReviewSignHash
-  alias Chat.Data.Schemas.VouchToken
   alias Chat.Data.Types.ReviewWriteTokenNonceHash
   alias Chat.Data.User, as: UserData
   alias Chat.Data.VouchToken, as: VouchTokenData
@@ -132,7 +133,7 @@ defmodule ChatWeb.ElectricControllerReviewTest do
       token =
         nonce
         |> ReviewWriteTokenNonceHash.from_nonce()
-        |> Chat.Data.ReviewWriteToken.get_review_write_token()
+        |> ReviewWriteToken.get_review_write_token()
 
       assert token.review_hash == review_hash
     end

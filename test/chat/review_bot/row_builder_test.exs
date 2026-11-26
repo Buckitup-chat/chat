@@ -9,8 +9,8 @@ defmodule Chat.ReviewBot.RowBuilderTest do
   alias Chat.Data.User
   alias Chat.Data.VouchToken
   alias Chat.NetworkSynchronization.Electric.ShapeWriter
-  alias Chat.ReviewBot.RowBuilder
   alias Chat.ReviewBot.Identity
+  alias Chat.ReviewBot.RowBuilder
 
   setup do
     :ets.delete_all_objects(:buckitup_deferred_records)

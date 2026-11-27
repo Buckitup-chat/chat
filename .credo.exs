@@ -69,7 +69,10 @@
           {Credo.Check.Readability.NestedFunctionCalls, [min_pipeline_length: 3, exit_status: 0]},
           {Credo.Check.Readability.PreferUnquotedAtoms, [exit_status: 0]},
           # alias may precede use when the use references it (see credo_checks/)
-          {Chat.Credo.Check.StrictModuleLayout, [exit_status: 0]},
+          {Chat.Credo.Check.StrictModuleLayout,
+           [order: ~w/shortdoc moduledoc behaviour use require import alias/a, exit_status: 0]},
+          # whole-codebase consistency of `alias Foo.{A, B}` vs one-per-line (see elixir-module skill)
+          {Credo.Check.Consistency.MultiAliasImportRequireUse, [exit_status: 0]},
 
           #
           ## Refactoring Opportunities
@@ -137,8 +140,6 @@
                {"PubSub", "pub_sub"},
                {"GenServer", "gen_server"},
                {"OAuth", "oauth"},
-               {"OpenAI", "open_ai"},
-               {"AssemblyAI", "assembly_ai"},
                {"LLM", "llm"},
                {"E2E", "e2e"}
              ]
@@ -212,7 +213,6 @@
           #
           ## Built-in — intentionally off
           #
-          {Credo.Check.Consistency.MultiAliasImportRequireUse, []},
           {Credo.Check.Consistency.UnusedVariableNames, []},
           {Credo.Check.Design.DuplicatedCode, []},
           {Credo.Check.Design.SkipTestWithoutComment, []},

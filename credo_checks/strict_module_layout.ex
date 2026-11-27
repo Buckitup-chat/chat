@@ -7,7 +7,7 @@ defmodule Chat.Credo.Check.StrictModuleLayout do
     category: :readability,
     tags: [:controversial],
     param_defaults: [
-      order: ~w/shortdoc moduledoc behaviour use import alias require/a,
+      order: ~w/shortdoc moduledoc behaviour use require import alias/a,
       ignore: [],
       ignore_module_attributes: []
     ],

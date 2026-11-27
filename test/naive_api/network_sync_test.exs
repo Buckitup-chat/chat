@@ -1,4 +1,4 @@
-defmodule NailveApi.NetworkSyncTest do
+defmodule NaiveApi.NetworkSyncTest do
   use ExUnit.Case, async: true
 
   alias Chat.Card

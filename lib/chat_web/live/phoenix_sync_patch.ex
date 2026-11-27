@@ -170,10 +170,14 @@ defmodule ChatWeb.PhoenixSyncPatch do
   end
 
   defp format_client_error(%Electric.Client.Error{message: message, resp: resp}) do
-    [message, resp && Map.get(resp, :body)]
+    [message, response_body(resp)]
     |> Enum.map(&extract_client_error_message/1)
     |> Enum.find("Electric sync failed", &is_binary/1)
   end
+
+  # Transport failures carry the bare reason (e.g. `:econnrefused`), not a response
+  defp response_body(%{body: body}), do: body
+  defp response_body(_), do: nil
 
   defp extract_client_error_message(message) when is_binary(message), do: message
   defp extract_client_error_message(%{message: message}) when is_binary(message), do: message

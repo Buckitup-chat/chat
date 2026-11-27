@@ -6,6 +6,24 @@ defmodule ChatWeb.Plugs.HexToBase64Test do
 
   alias ChatWeb.Plugs.HexToBase64Adapter, as: HexToBase64
 
+  defmodule FakeAdapter do
+    @moduledoc false
+
+    def chunk(:closed, _data), do: {:error, :closed}
+    def chunk(:inner, data), do: {:ok, data, :chunked}
+    def send_chunked(:inner, _status, _headers), do: {:ok, nil, :chunked}
+    def send_resp(:inner, _status, _headers, body), do: {:ok, body, :sent}
+    def send_file(:inner, _status, _headers, _path, _offset, _length), do: {:ok, nil, :file}
+    def get_peer_data(payload), do: {:peer, payload}
+    def get_http_protocol(payload), do: {:protocol, payload}
+    def inform(payload, status, _headers), do: {:inform, payload, status}
+    def push(payload, path, _headers), do: {:push, payload, path}
+    def read_req_body(:inner, _opts), do: {:ok, "body", :read}
+    def read_req_body(:more, _opts), do: {:more, "part", :read}
+    def read_req_body(:error, _opts), do: {:error, :timeout}
+    def upgrade(payload, protocol, _opts), do: {:upgrade, payload, protocol}
+  end
+
   defp call_plug(body, content_type \\ "application/json") do
     :get
     |> conn("/")
@@ -15,6 +33,8 @@ defmodule ChatWeb.Plugs.HexToBase64Test do
   end
 
   defp decoded_body(conn), do: Jason.decode!(conn.resp_body)
+
+  defp json_headers, do: [{"content-type", "application/json; charset=utf-8"}]
 
   describe "scalar bytea" do
     test "converts hex-encoded bytea to base64" do
@@ -133,6 +153,101 @@ defmodule ChatWeb.Plugs.HexToBase64Test do
         |> send_resp(400, Jason.encode!(%{"error" => "bad"}))
 
       assert decoded_body(conn) == %{"error" => "bad"}
+    end
+  end
+
+  describe "bytea array edge cases" do
+    test "converts arrays with NULL elements" do
+      conn = call_plug([%{"v" => ~s({"\\\\xABCD",NULL})}])
+
+      assert [%{"v" => [abcd, nil]}] = decoded_body(conn)
+      assert abcd == Base.encode64(<<0xAB, 0xCD>>, padding: false)
+    end
+
+    test "leaves arrays unchanged unless every element is valid hex" do
+      for array <- [
+            ~s({"\\\\xABCD","plain"}),
+            ~s({"\\\\xA"}),
+            ~s({{"\\\\xABCD"}}),
+            ~S({}),
+            ~S({"unterminated)
+          ] do
+        assert [%{"v" => ^array}] = decoded_body(call_plug([%{"v" => array}]))
+      end
+    end
+  end
+
+  describe "send_resp edge cases" do
+    test "passes nil and iodata bodies through" do
+      assert {:ok, nil, {FakeAdapter, :sent}} =
+               HexToBase64.send_resp({FakeAdapter, :inner}, 200, json_headers(), nil)
+
+      body = ["{\"a\":", "\"\\\\xAB\"}"]
+
+      assert {:ok, ^body, {FakeAdapter, :sent}} =
+               HexToBase64.send_resp({FakeAdapter, :inner}, 200, json_headers(), body)
+    end
+
+    test "passes a body that looks like hex but is not JSON through" do
+      body = "not json \\xAB"
+
+      assert {:ok, ^body, _} =
+               HexToBase64.send_resp({FakeAdapter, :inner}, 200, json_headers(), body)
+    end
+  end
+
+  describe "chunk/2" do
+    test "converts hex values in JSON chunks" do
+      chunk = Jason.encode!([%{"k" => "\\xABCD"}])
+
+      assert {:ok, sent, {FakeAdapter, :chunked}} =
+               HexToBase64.chunk({FakeAdapter, :inner}, chunk)
+
+      assert [%{"k" => "q80"}] = Jason.decode!(sent)
+    end
+
+    test "passes chunks it cannot or need not convert through" do
+      for chunk <- ["plain text", ["not json ", "\\\\x"], :not_iodata] do
+        assert {:ok, ^chunk, _} = HexToBase64.chunk({FakeAdapter, :inner}, chunk)
+      end
+    end
+
+    test "returns inner adapter errors unchanged" do
+      assert {:error, :closed} = HexToBase64.chunk({FakeAdapter, :closed}, "data")
+    end
+  end
+
+  describe "adapter delegation" do
+    test "wraps the payload returned by the inner adapter" do
+      adapter = {FakeAdapter, :inner}
+
+      assert {:ok, nil, {FakeAdapter, :chunked}} = HexToBase64.send_chunked(adapter, 200, [])
+      assert {:ok, nil, {FakeAdapter, :file}} = HexToBase64.send_file(adapter, 200, [], "p", 0, 1)
+      assert {:ok, "body", {FakeAdapter, :read}} = HexToBase64.read_req_body(adapter, [])
+
+      assert {:more, "part", {FakeAdapter, :read}} =
+               HexToBase64.read_req_body({FakeAdapter, :more}, [])
+
+      assert {:error, :timeout} = HexToBase64.read_req_body({FakeAdapter, :error}, [])
+    end
+
+    test "passes the rest straight to the inner adapter" do
+      adapter = {FakeAdapter, :inner}
+
+      assert {:peer, :inner} = HexToBase64.get_peer_data(adapter)
+      assert {:protocol, :inner} = HexToBase64.get_http_protocol(adapter)
+      assert {:inform, :inner, 103} = HexToBase64.inform(adapter, 103, [])
+      assert {:push, :inner, "/a.js"} = HexToBase64.push(adapter, "/a.js", [])
+      assert {:upgrade, :inner, :websocket} = HexToBase64.upgrade(adapter, :websocket, [])
+    end
+
+    test "unwrap/1 restores the inner adapter and ignores unwrapped conns" do
+      conn = conn(:get, "/")
+      wrapped = HexToBase64.wrap(conn)
+
+      assert {HexToBase64, _} = wrapped.adapter
+      assert HexToBase64.unwrap(wrapped).adapter == conn.adapter
+      assert HexToBase64.unwrap(conn) == conn
     end
   end
 end

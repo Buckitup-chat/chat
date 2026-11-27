@@ -4,9 +4,12 @@ defmodule ChatWeb.MainLive.Page.FeedTest do
   import Phoenix.LiveViewTest
   import ChatWeb.LiveTestHelpers
   import Rewire
+  import Support.RetryHelper
 
   alias Chat.Card
   alias Chat.Identity
+
+  @wait 3_000
 
   # Define mock modules for Rewire
   defmodule UserMock do
@@ -103,7 +106,34 @@ defmodule ChatWeb.MainLive.Page.FeedTest do
     end
   end
 
+  describe "feed mode" do
+    setup [:prepare_view, :create_and_open_room]
+
+    test "lists logged actions, loads more and closes", %{view: view, socket: socket} do
+      %{assigns: %{room: %{name: room_name}}} = socket
+
+      retry_until(@wait, fn ->
+        render_hook(view, "switch-lobby-mode", %{"lobby-mode" => "feeds"})
+        assert view |> element("#action-feed-list") |> render() =~ room_name
+      end)
+
+      assert %{lobby_mode: :feeds, items: [_ | _] = items} = assigns(view)
+
+      render_hook(view, "feed-more", %{})
+
+      assert %{feed_update_mode: :append, items: more_items} = assigns(view)
+      assert length(more_items) >= length(items)
+
+      render_hook(view, "switch-lobby-mode", %{"lobby-mode" => "chats"})
+
+      assert %{lobby_mode: :chats, items: nil, action_feed_till: nil} = assigns(view)
+    end
+  end
+
   # Helper functions
+
+  defp assigns(view), do: reload_view(%{view: view}).socket.assigns
+
   defp setup_feed_data(%{conn: _conn}) do
     # Create test user
     test_identity = Identity.create("Test User")

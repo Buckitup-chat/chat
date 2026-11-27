@@ -30,8 +30,12 @@ defmodule ChatWeb.MainLive.Admin.CargoCheckpointsForm do
     |> ok()
   end
 
-  defp handle_update(socket, %{action: :refresh}),
-    do: socket |> assign_checkpoints() |> reset_selected_user()
+  defp handle_update(socket, %{action: :refresh}) do
+    socket
+    |> assign(:cargo_settings, AdminRoom.get_cargo_settings())
+    |> assign_checkpoints()
+    |> reset_selected_user()
+  end
 
   defp handle_update(socket, _assigns), do: socket
 

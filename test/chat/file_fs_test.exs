@@ -3,6 +3,9 @@ defmodule Chat.FileFsTest do
 
   import Chat.FileFs.Common, only: [binread: 1]
 
+  alias Chat.FileFs
+  alias Chat.FileFs.Dir2
+
   describe "old FS operations" do
     setup do
       path =
@@ -51,6 +54,57 @@ defmodule Chat.FileFsTest do
     test "stream file", %{path: path, db_key: {_, key, _, _}, content: content} do
       assert ^content =
                Chat.FileFs.stream_file_chunks(key, path) |> Enum.to_list() |> List.first()
+    end
+  end
+
+  describe "integrity check" do
+    setup do
+      prefix = Path.join(System.tmp_dir!(), "file_fs_integrity_#{UUID.uuid4()}")
+      File.mkdir_p!(prefix)
+      on_exit(fn -> File.rm_rf!(prefix) end)
+
+      %{prefix: prefix}
+    end
+
+    test "reports nothing for a missing dir" do
+      assert [] == FileFs.list_file_errors("/nonexistent/#{UUID.uuid4()}")
+    end
+
+    test "reports nothing when all chunks have their declared size", %{prefix: prefix} do
+      key = Enigma.hash(UUID.uuid4())
+      FileFs.write_file("0123456789", {key, 0, 9}, prefix)
+      FileFs.write_file("abc", {key, 10, 12}, prefix)
+
+      assert [] == FileFs.list_file_errors(prefix)
+    end
+
+    test "reports a chunk with a size other than declared", %{prefix: prefix} do
+      key = Enigma.hash(UUID.uuid4())
+      FileFs.write_file("short", {key, 0, 9}, prefix)
+
+      assert [[file_size: 5, meta_size: 10, meta: {hex, {^key, 0, 9}}]] =
+               FileFs.list_file_errors(prefix)
+
+      assert hex == Base.encode16(key, case: :lower)
+    end
+
+    test "reports a chunk whose file is gone", %{prefix: prefix} do
+      key = Enigma.hash(UUID.uuid4())
+      path = Dir2.file_path({key, 0, 9}, prefix)
+      File.mkdir_p!(Path.dirname(path))
+      File.ln_s!(Path.join(prefix, "nowhere"), path)
+
+      hex = Base.encode16(key, case: :lower)
+      assert [{:no_file, ^hex, ^key, 0, 9}] = FileFs.list_file_errors(prefix)
+    end
+
+    test "skips stray files among the hash dirs", %{prefix: prefix} do
+      File.write!(Path.join(prefix, "stray"), "x")
+      key = Enigma.hash(UUID.uuid4())
+      FileFs.write_file("0123456789", {key, 0, 9}, prefix)
+
+      assert [] == FileFs.list_file_errors(prefix)
+      assert [{:file_chunk, ^key, 0, 9}] = FileFs.list_all_db_keys(prefix)
     end
   end
 

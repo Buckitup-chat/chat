@@ -6,11 +6,18 @@ defmodule Chat.Db.WriteQueue.FileReaderTest do
   In best case scenario they should optimise, like reading for one stream should yield in both streams
   """
   use ExUnit.Case, async: true
+  import ExUnit.CaptureLog
   import Rewire
+  import Support.RetryHelper
 
   alias Chat.Db.WriteQueue.FileReader
+  alias Chat.Db.WriteQueue.FileSkipSet
 
   defmodule FileFsMock do
+    def read_exact_file_chunk(_, :empty, _), do: {"", 0}
+    def read_exact_file_chunk(_, :short, _), do: {"ab", 2}
+    def read_exact_file_chunk(_, :broken, _), do: raise("disk failure")
+
     def read_exact_file_chunk({first, last}, _, _) do
       Process.sleep(:rand.uniform(450) + 50)
       size = last - first + 1
@@ -30,6 +37,43 @@ defmodule Chat.Db.WriteQueue.FileReaderTest do
     |> assert_streams_read_completely()
   end
 
+  test "unreadable files are logged and added to the skip set" do
+    reader = start_isolated_file_reader()
+    skip_set = FileSkipSet.new()
+    keys = [:empty, :short, :broken] |> Enum.map(&{:file_chunk, &1, 0, 9})
+
+    log =
+      capture_log(fn ->
+        Enum.each(keys, &FileReader.add_task(reader, &1, __DIR__, skip_set))
+
+        retry_until(1000, fn ->
+          assert %{keys: keys} = :sys.get_state(reader)
+          assert keys == %{}
+        end)
+      end)
+
+    assert Enum.all?(keys, &FileSkipSet.member?(skip_set, &1))
+    assert log =~ "Error reading"
+    assert log =~ ":empty"
+    assert log =~ "{:size, 2}"
+    assert log =~ "disk failure"
+    assert {nil, []} = FileReader.yield_file(reader, [])
+  end
+
+  test "stray down messages are logged and ignored" do
+    reader = start_isolated_file_reader()
+
+    log =
+      capture_log(fn ->
+        send(reader, {:DOWN, make_ref(), :process, self(), :killed})
+        send(reader, {:DOWN, make_ref(), :port, self(), :closed})
+        :sys.get_state(reader)
+      end)
+
+    assert log =~ "ended with reason: killed"
+    assert Process.alive?(reader)
+  end
+
   defp start_file_reader do
     name = WriteQueue.FileReader.ConcurrentReadTest
     supervisor = WriteQueue.FileReader.ConcurrentReadTestSupervisor
@@ -38,6 +82,11 @@ defmodule Chat.Db.WriteQueue.FileReaderTest do
     {:ok, _pid} = FileReader.start_link(name: name, read_supervisor: supervisor)
 
     name
+  end
+
+  defp start_isolated_file_reader do
+    supervisor = start_supervised!(Task.Supervisor)
+    start_supervised!({FileReader, read_supervisor: supervisor})
   end
 
   defp run_streams(name) do

@@ -1,7 +1,11 @@
 {
   "coverage_options": {
-    "minimum_coverage": 77,
+    "minimum_coverage": 90,
     "html_filter_full_covered": true
+  },
+  "dir_thresholds": {
+    "lib/chat/": 90,
+    "lib/chat_web/": 75
   },
   "terminal_options": {
     "file_column_width": 120

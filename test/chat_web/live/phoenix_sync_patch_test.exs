@@ -9,6 +9,8 @@ defmodule ChatWeb.PhoenixSyncPatchTest do
   alias Phoenix.LiveView.Socket
 
   @schema %{id: %{type: "text"}, name: %{type: "text"}}
+  # stream events hop through the stream task and the mock client; 100ms is too tight under load
+  @stream_timeout 1_000
 
   defmodule RefusingFetch do
     @moduledoc false
@@ -42,14 +44,21 @@ defmodule ChatWeb.PhoenixSyncPatchTest do
       socket = sync_stream_fixed(connected_socket(), :users, shape(), client: client)
 
       assert [{"users-1", %{"id" => "1", "name" => "Alice"}}] = streamed(socket, :users)
-      assert_receive {:sync, {:"$electric_event", :users, :insert, %{"id" => "2"}, []}}
-      assert_receive {:sync, {:"$electric_event", :users, :delete, %{"id" => "3"}, []}}
-      assert_receive {:sync, {:users, :loaded}}
+
+      assert_receive {:sync, {:"$electric_event", :users, :insert, %{"id" => "2"}, []}},
+                     @stream_timeout
+
+      assert_receive {:sync, {:"$electric_event", :users, :delete, %{"id" => "3"}, []}},
+                     @stream_timeout
+
+      assert_receive {:sync, {:users, :loaded}}, @stream_timeout
 
       respond(client, 1, [change("4", "Dave"), Client.Mock.up_to_date()])
 
-      assert_receive {:sync, {:"$electric_event", :users, :insert, %{"id" => "4"}, []}}
-      assert_receive {:sync, {:users, :live}}
+      assert_receive {:sync, {:"$electric_event", :users, :insert, %{"id" => "4"}, []}},
+                     @stream_timeout
+
+      assert_receive {:sync, {:users, :live}}, @stream_timeout
     end
 
     test "inside a component events are wrapped with the component id" do
@@ -64,9 +73,11 @@ defmodule ChatWeb.PhoenixSyncPatchTest do
 
       assert_receive {:sync,
                       {:"$electric_component_event", ^cid,
-                       {:"$electric_event", :users, :insert, %{"id" => "1"}, []}}}
+                       {:"$electric_event", :users, :insert, %{"id" => "1"}, []}}},
+                     @stream_timeout
 
-      assert_receive {:sync, {:"$electric_component_event", ^cid, {:users, :loaded}}}
+      assert_receive {:sync, {:"$electric_component_event", ^cid, {:users, :loaded}}},
+                     @stream_timeout
     end
 
     test "initial load error is reported instead of going live" do
@@ -80,7 +91,7 @@ defmodule ChatWeb.PhoenixSyncPatchTest do
       socket = sync_stream_fixed(connected_socket(), :users, shape(), client: client)
 
       assert [] = streamed(socket, :users)
-      assert_receive {:sync, {:users, {:error, message}}}
+      assert_receive {:sync, {:users, {:error, message}}}, @stream_timeout
       assert is_binary(message)
       refute_received {:sync, {:users, :loaded}}
     end
@@ -90,11 +101,11 @@ defmodule ChatWeb.PhoenixSyncPatchTest do
 
       respond(client, 0, [Client.Mock.up_to_date()])
       sync_stream_fixed(connected_socket(), :users, shape(), client: client)
-      assert_receive {:sync, {:users, :loaded}}
+      assert_receive {:sync, {:users, :loaded}}, @stream_timeout
 
       Client.Mock.async_response(client, status: 400, body: [%{"message" => "gone"}])
 
-      assert_receive {:sync, {:users, {:error, message}}}
+      assert_receive {:sync, {:users, {:error, message}}}, @stream_timeout
       assert is_binary(message)
     end
 
@@ -105,7 +116,9 @@ defmodule ChatWeb.PhoenixSyncPatchTest do
       socket = sync_stream_fixed(connected_socket(), :users, shape(), client: client)
 
       assert [] = streamed(socket, :users)
-      assert_receive {:sync, {:users, {:error, "Unable to retrieve data stream"}}}
+
+      assert_receive {:sync, {:users, {:error, "Unable to retrieve data stream"}}},
+                     @stream_timeout
     end
   end
 

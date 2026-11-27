@@ -73,15 +73,25 @@ defmodule ChatWeb.ReviewTokenControllerTest do
   end
 
   # No review bot is started here: `/r/:nonce` must not need one
+
+  defmodule ReviewWriteTokenStub do
+    def get_review_write_token(a1),
+      do: Process.get({:mock, :ReviewWriteToken}).get_review_write_token(a1)
+  end
+
+  # One rewire per file: Rewire names each rewired module <Target>.R<random 0..10_000>
+  # at compile time, so many rewires of one target collide and overwrite each other.
+  rewire(ChatWeb.ReviewTokenController, ReviewWriteToken: ReviewWriteTokenStub, as: Controller)
+
   test "looks the token up by nonce hash", %{conn: conn} do
-    controller = rewire(ChatWeb.ReviewTokenController, ReviewWriteToken: MockTokenByHash)
+    controller = with_mocks(ReviewWriteToken: MockTokenByHash)
 
     assert controller.show(conn, %{"nonce" => "pending"}).status == 200
     assert controller.show(build_conn(), %{"nonce" => "other"}).status == 410
   end
 
   test "returns 410 for nonexistent nonce", %{conn: conn} do
-    controller = rewire(ChatWeb.ReviewTokenController, ReviewWriteToken: MockTokenNil)
+    controller = with_mocks(ReviewWriteToken: MockTokenNil)
     conn = controller.show(conn, %{"nonce" => "nonexistent"})
 
     assert conn.status == 410
@@ -89,7 +99,7 @@ defmodule ChatWeb.ReviewTokenControllerTest do
   end
 
   test "returns 410 for soft-deleted token", %{conn: conn} do
-    controller = rewire(ChatWeb.ReviewTokenController, ReviewWriteToken: MockTokenDeleted)
+    controller = with_mocks(ReviewWriteToken: MockTokenDeleted)
     conn = controller.show(conn, %{"nonce" => "deleted"})
 
     assert conn.status == 410
@@ -97,7 +107,7 @@ defmodule ChatWeb.ReviewTokenControllerTest do
   end
 
   test "serves SPA for pending token", %{conn: conn} do
-    controller = rewire(ChatWeb.ReviewTokenController, ReviewWriteToken: MockTokenPending)
+    controller = with_mocks(ReviewWriteToken: MockTokenPending)
     conn = controller.show(conn, %{"nonce" => "pending"})
 
     assert conn.status == 200
@@ -105,16 +115,23 @@ defmodule ChatWeb.ReviewTokenControllerTest do
   end
 
   test "serves SPA for bound token", %{conn: conn} do
-    controller = rewire(ChatWeb.ReviewTokenController, ReviewWriteToken: MockTokenBound)
+    controller = with_mocks(ReviewWriteToken: MockTokenBound)
     conn = controller.show(conn, %{"nonce" => "bound"})
 
     assert conn.status == 200
   end
 
   test "serves SPA for reviewed token", %{conn: conn} do
-    controller = rewire(ChatWeb.ReviewTokenController, ReviewWriteToken: MockTokenReviewed)
+    controller = with_mocks(ReviewWriteToken: MockTokenReviewed)
     conn = controller.show(conn, %{"nonce" => "reviewed"})
 
     assert conn.status == 200
+  end
+
+  # Helpers
+
+  defp with_mocks(mocks) do
+    Enum.each(mocks, fn {dep, mock} -> Process.put({:mock, dep}, mock) end)
+    Controller
   end
 end

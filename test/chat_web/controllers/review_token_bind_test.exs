@@ -54,6 +54,22 @@ defmodule ChatWeb.ReviewTokenBindTest do
     def bind(_nonce, _user_hash, _pop), do: {:error, :no_bot_device_vouch}
   end
 
+  defmodule IngestPopStub do
+    def context(a1), do: Process.get({:mock, :IngestPop}).context(a1)
+  end
+
+  defmodule TokenBinderStub do
+    def bind(a1, a2, a3), do: Process.get({:mock, :TokenBinder}).bind(a1, a2, a3)
+  end
+
+  # One rewire per file: Rewire names each rewired module <Target>.R<random 0..10_000>
+  # at compile time, so many rewires of one target collide and overwrite each other.
+  rewire(ChatWeb.ReviewTokenController,
+    IngestPop: IngestPopStub,
+    TokenBinder: TokenBinderStub,
+    as: Controller
+  )
+
   setup %{conn: conn} do
     %{conn: %{conn | remote_ip: unique_ip()}}
   end
@@ -77,7 +93,7 @@ defmodule ChatWeb.ReviewTokenBindTest do
   describe "POST /r/api/token/bind" do
     test "returns nonce and url on order-linked bind", %{conn: conn} do
       controller =
-        rewire(ChatWeb.ReviewTokenController, IngestPop: PopOk, TokenBinder: BinderOrderLinked)
+        with_mocks(IngestPop: PopOk, TokenBinder: BinderOrderLinked)
 
       conn =
         conn
@@ -90,7 +106,7 @@ defmodule ChatWeb.ReviewTokenBindTest do
 
     test "returns new nonce on reusable bind", %{conn: conn} do
       controller =
-        rewire(ChatWeb.ReviewTokenController, IngestPop: PopOk, TokenBinder: BinderReusable)
+        with_mocks(IngestPop: PopOk, TokenBinder: BinderReusable)
 
       conn =
         conn
@@ -103,10 +119,7 @@ defmodule ChatWeb.ReviewTokenBindTest do
 
     test "returns 401 when PoP is missing", %{conn: conn} do
       controller =
-        rewire(ChatWeb.ReviewTokenController,
-          IngestPop: PopMissing,
-          TokenBinder: BinderOrderLinked
-        )
+        with_mocks(IngestPop: PopMissing, TokenBinder: BinderOrderLinked)
 
       conn =
         conn
@@ -118,7 +131,7 @@ defmodule ChatWeb.ReviewTokenBindTest do
 
     test "returns 404 when token not found", %{conn: conn} do
       controller =
-        rewire(ChatWeb.ReviewTokenController, IngestPop: PopOk, TokenBinder: BinderTokenNotFound)
+        with_mocks(IngestPop: PopOk, TokenBinder: BinderTokenNotFound)
 
       conn =
         conn
@@ -130,7 +143,7 @@ defmodule ChatWeb.ReviewTokenBindTest do
 
     test "returns 410 when token deleted", %{conn: conn} do
       controller =
-        rewire(ChatWeb.ReviewTokenController, IngestPop: PopOk, TokenBinder: BinderTokenDeleted)
+        with_mocks(IngestPop: PopOk, TokenBinder: BinderTokenDeleted)
 
       conn =
         conn
@@ -142,7 +155,7 @@ defmodule ChatWeb.ReviewTokenBindTest do
 
     test "returns 409 for a bound copy", %{conn: conn} do
       controller =
-        rewire(ChatWeb.ReviewTokenController, IngestPop: PopOk, TokenBinder: BinderNotInvitation)
+        with_mocks(IngestPop: PopOk, TokenBinder: BinderNotInvitation)
 
       conn =
         conn
@@ -154,7 +167,7 @@ defmodule ChatWeb.ReviewTokenBindTest do
 
     test "returns 409 for a token bound to another user", %{conn: conn} do
       controller =
-        rewire(ChatWeb.ReviewTokenController, IngestPop: PopOk, TokenBinder: BinderAlreadyBound)
+        with_mocks(IngestPop: PopOk, TokenBinder: BinderAlreadyBound)
 
       conn =
         conn
@@ -166,10 +179,7 @@ defmodule ChatWeb.ReviewTokenBindTest do
 
     test "returns 404 when reviewer not found", %{conn: conn} do
       controller =
-        rewire(ChatWeb.ReviewTokenController,
-          IngestPop: PopOk,
-          TokenBinder: BinderReviewerNotFound
-        )
+        with_mocks(IngestPop: PopOk, TokenBinder: BinderReviewerNotFound)
 
       conn =
         conn
@@ -181,7 +191,7 @@ defmodule ChatWeb.ReviewTokenBindTest do
 
     test "returns 401 when PoP is invalid", %{conn: conn} do
       controller =
-        rewire(ChatWeb.ReviewTokenController, IngestPop: PopOk, TokenBinder: BinderInvalidPop)
+        with_mocks(IngestPop: PopOk, TokenBinder: BinderInvalidPop)
 
       conn =
         conn
@@ -193,7 +203,7 @@ defmodule ChatWeb.ReviewTokenBindTest do
 
     test "returns 503 when bot not running", %{conn: conn} do
       controller =
-        rewire(ChatWeb.ReviewTokenController, IngestPop: PopOk, TokenBinder: BinderBotNotRunning)
+        with_mocks(IngestPop: PopOk, TokenBinder: BinderBotNotRunning)
 
       conn =
         conn
@@ -205,7 +215,7 @@ defmodule ChatWeb.ReviewTokenBindTest do
 
     test "returns 403 when bot lacks origin vouch", %{conn: conn} do
       controller =
-        rewire(ChatWeb.ReviewTokenController, IngestPop: PopOk, TokenBinder: BinderNoOriginVouch)
+        with_mocks(IngestPop: PopOk, TokenBinder: BinderNoOriginVouch)
 
       conn =
         conn
@@ -217,7 +227,7 @@ defmodule ChatWeb.ReviewTokenBindTest do
 
     test "returns 403 when bot lacks device vouch", %{conn: conn} do
       controller =
-        rewire(ChatWeb.ReviewTokenController, IngestPop: PopOk, TokenBinder: BinderNoDeviceVouch)
+        with_mocks(IngestPop: PopOk, TokenBinder: BinderNoDeviceVouch)
 
       conn =
         conn
@@ -231,8 +241,7 @@ defmodule ChatWeb.ReviewTokenBindTest do
   describe "POST /r/api/token/bind rate limit" do
     setup do
       %{
-        controller:
-          rewire(ChatWeb.ReviewTokenController, IngestPop: PopOk, TokenBinder: BinderReusable)
+        controller: with_mocks(IngestPop: PopOk, TokenBinder: BinderReusable)
       }
     end
 
@@ -268,12 +277,19 @@ defmodule ChatWeb.ReviewTokenBindTest do
 
     test "rejects before PoP check when limited", %{conn: conn} do
       controller =
-        rewire(ChatWeb.ReviewTokenController, IngestPop: PopMissing, TokenBinder: BinderReusable)
+        with_mocks(IngestPop: PopMissing, TokenBinder: BinderReusable)
 
       for _ <- 1..10, do: assert(json_response(controller.bind(conn, bind_params()), 401))
 
       assert %{"error" => "Too many requests"} =
                conn |> controller.bind(bind_params()) |> json_response(429)
     end
+  end
+
+  # Helpers
+
+  defp with_mocks(mocks) do
+    Enum.each(mocks, fn {dep, mock} -> Process.put({:mock, dep}, mock) end)
+    Controller
   end
 end

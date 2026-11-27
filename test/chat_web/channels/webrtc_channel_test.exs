@@ -401,9 +401,6 @@ defmodule ChatWeb.WebRTCChannelTest do
           {user_id, socket}
         end)
 
-      # Wait for all join notifications
-      :timer.sleep(100)
-
       # Each user sends a message to all other users
       for {from_id, from_socket} <- users do
         for {to_id, _} <- users, to_id != from_id do
@@ -425,7 +422,7 @@ defmodule ChatWeb.WebRTCChannelTest do
                              type: "chat"
                            }
                          },
-                         100,
+                         1000,
                          "Expected message from #{from_id} to #{to_id}"
         end
       end

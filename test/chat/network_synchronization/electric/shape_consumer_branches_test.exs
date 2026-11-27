@@ -223,5 +223,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerBranchesTest do
   defp write_change(consumer) do
     send(consumer, {:change, :insert, :row})
     assert_receive {:write_called, :user_card, :insert, :row, _opts}, 500
+    # the consumer logs after the writer returns; wait until it is done
+    :sys.get_state(consumer)
   end
 end

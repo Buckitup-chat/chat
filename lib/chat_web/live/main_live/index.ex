@@ -53,7 +53,7 @@ defmodule ChatWeb.MainLive.Index do
     if connected?(socket) do
       if action == :export do
         socket
-        |> assign(:need_login, false)
+        |> assign(need_login: false, monotonic_offset: 0)
         |> Page.ExportKeyRing.init(params["id"])
         |> Page.Login.check_stored()
         |> ok()

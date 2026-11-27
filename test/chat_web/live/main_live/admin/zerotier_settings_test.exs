@@ -22,8 +22,8 @@ defmodule ChatWebTest.MainLive.Admin.ZerotierSettingsTest do
     assert has_element?(view, ".t-status", "loading...")
     assert has_element?(view, ".t-networks", "loading...")
 
-    reply(:info, {:ok, @info})
-    reply(:list_networks, {:ok, @networks})
+    reply(view, :info, {:ok, @info})
+    reply(view, :list_networks, {:ok, @networks})
 
     assert has_element?(view, ".t-status b", "online")
     assert has_element?(view, ".t-status i", "abc123")
@@ -35,7 +35,7 @@ defmodule ChatWebTest.MainLive.Admin.ZerotierSettingsTest do
   test "offline status is rendered without bold marker" do
     view = mount_settings()
 
-    reply(:info, {:ok, ~s({"address": "abc123", "online": false, "version": "1.0"})})
+    reply(view, :info, {:ok, ~s({"address": "abc123", "online": false, "version": "1.0"})})
 
     assert has_element?(view, ".t-status", "offline")
     refute has_element?(view, ".t-status b")
@@ -44,8 +44,8 @@ defmodule ChatWebTest.MainLive.Admin.ZerotierSettingsTest do
   test "error and unknown replies keep the loading state" do
     view = mount_settings()
 
-    reply(:info, {:error, "not running"})
-    reply(:list_networks, :unexpected)
+    reply(view, :info, {:error, "not running"})
+    reply(view, :list_networks, :unexpected)
 
     assert has_element?(view, ".t-status", "loading...")
     assert has_element?(view, ".t-networks", "loading...")
@@ -53,7 +53,7 @@ defmodule ChatWebTest.MainLive.Admin.ZerotierSettingsTest do
 
   test "joining a network casts join and reloads the list" do
     view = mount_settings()
-    reply(:list_networks, {:ok, "[]"})
+    reply(view, :list_networks, {:ok, "[]"})
     assert has_element?(view, ".t-networks button.t-open-new-network-form")
 
     view
@@ -68,7 +68,7 @@ defmodule ChatWebTest.MainLive.Admin.ZerotierSettingsTest do
 
   test "leaving a network casts leave and reloads the list" do
     view = mount_settings()
-    reply(:list_networks, {:ok, @networks})
+    reply(view, :list_networks, {:ok, @networks})
 
     view
     |> element("#zerotier-network-8056c2e21c000001 .t-leave-network")
@@ -97,15 +97,26 @@ defmodule ChatWebTest.MainLive.Admin.ZerotierSettingsTest do
     view
   end
 
-  # Both the disconnected and the connected mount send a request; only the
-  # connected one (the second) targets the live view process
-  defp reply(command, response) do
-    for _mount <- [:disconnected, :connected] do
-      assert_receive {^command, pid}
-      ref = Process.monitor(pid)
-      send(pid, {command, response})
-      # the task has sent its send_update to the view once it is down
-      assert_receive {:DOWN, ^ref, :process, ^pid, _}
+  # Both the disconnected and the connected mount send requests (networks are
+  # re-requested on a timer), so answer the one started by the view process
+  defp reply(view, command, response) do
+    pid = await_request_from(view.pid, command)
+    ref = Process.monitor(pid)
+    send(pid, {command, response})
+    # the task has sent its send_update to the view once it is down
+    assert_receive {:DOWN, ^ref, :process, ^pid, _}
+  end
+
+  defp await_request_from(view_pid, command) do
+    assert_receive {^command, pid}
+
+    if view_pid in callers(pid), do: pid, else: await_request_from(view_pid, command)
+  end
+
+  defp callers(pid) do
+    case Process.info(pid, :dictionary) do
+      {:dictionary, dict} -> Keyword.get(dict, :"$callers", [])
+      nil -> []
     end
   end
 end

@@ -24,24 +24,31 @@ defmodule ChatWeb.PhoenixSyncPatchTest do
   end
 
   describe "sync_stream_fixed/4" do
-    test "disconnected socket gets an empty stream and no client calls" do
-      socket = sync_stream_fixed(bare_socket(), :users, shape(), client: :never_used)
+    # Electric.Client.Fetch.Pool coalesces identical requests across clients, so
+    # each test syncs its own table to keep async tests off each other's mocks
+    setup do
+      %{table: "users_#{System.unique_integer([:positive])}"}
+    end
+
+    test "disconnected socket gets an empty stream and no client calls", %{table: table} do
+      socket = sync_stream_fixed(bare_socket(), :users, shape(table), client: :never_used)
 
       assert %{users: _} = socket.assigns.streams
       refute_received {:sync, _}
     end
 
-    test "initial load streams inserts, replays updates and deletes, then goes live" do
+    test "initial load streams inserts, replays updates and deletes, then goes live",
+         %{table: table} do
       {:ok, client} = Client.Mock.new()
 
-      respond(client, 0, [
+      respond(client, table, 0, [
         change("1", "Alice"),
         change("2", "Bob", :update),
         change("3", "Carol", :delete),
         Client.Mock.up_to_date()
       ])
 
-      socket = sync_stream_fixed(connected_socket(), :users, shape(), client: client)
+      socket = sync_stream_fixed(connected_socket(), :users, shape(table), client: client)
 
       assert [{"users-1", %{"id" => "1", "name" => "Alice"}}] = streamed(socket, :users)
 
@@ -53,7 +60,7 @@ defmodule ChatWeb.PhoenixSyncPatchTest do
 
       assert_receive {:sync, {:users, :loaded}}, @stream_timeout
 
-      respond(client, 1, [change("4", "Dave"), Client.Mock.up_to_date()])
+      respond(client, table, 1, [change("4", "Dave"), Client.Mock.up_to_date()])
 
       assert_receive {:sync, {:"$electric_event", :users, :insert, %{"id" => "4"}, []}},
                      @stream_timeout
@@ -61,15 +68,15 @@ defmodule ChatWeb.PhoenixSyncPatchTest do
       assert_receive {:sync, {:users, :live}}, @stream_timeout
     end
 
-    test "inside a component events are wrapped with the component id" do
+    test "inside a component events are wrapped with the component id", %{table: table} do
       {:ok, client} = Client.Mock.new()
       cid = %Phoenix.LiveComponent.CID{cid: 7}
 
-      respond(client, 0, [change("1", "Alice", :update), Client.Mock.up_to_date()])
+      respond(client, table, 0, [change("1", "Alice", :update), Client.Mock.up_to_date()])
 
       connected_socket()
       |> put_in([Access.key(:assigns), :myself], cid)
-      |> sync_stream_fixed(:users, shape(), client: client)
+      |> sync_stream_fixed(:users, shape(table), client: client)
 
       assert_receive {:sync,
                       {:"$electric_component_event", ^cid,
@@ -80,7 +87,7 @@ defmodule ChatWeb.PhoenixSyncPatchTest do
                      @stream_timeout
     end
 
-    test "initial load error is reported instead of going live" do
+    test "initial load error is reported instead of going live", %{table: table} do
       {:ok, client} = Client.Mock.new()
 
       Client.Mock.async_response(client,
@@ -88,7 +95,7 @@ defmodule ChatWeb.PhoenixSyncPatchTest do
         body: %{"message" => "bad where clause"}
       )
 
-      socket = sync_stream_fixed(connected_socket(), :users, shape(), client: client)
+      socket = sync_stream_fixed(connected_socket(), :users, shape(table), client: client)
 
       assert [] = streamed(socket, :users)
       assert_receive {:sync, {:users, {:error, message}}}, @stream_timeout
@@ -96,11 +103,11 @@ defmodule ChatWeb.PhoenixSyncPatchTest do
       refute_received {:sync, {:users, :loaded}}
     end
 
-    test "live stream error is reported" do
+    test "live stream error is reported", %{table: table} do
       {:ok, client} = Client.Mock.new()
 
-      respond(client, 0, [Client.Mock.up_to_date()])
-      sync_stream_fixed(connected_socket(), :users, shape(), client: client)
+      respond(client, table, 0, [Client.Mock.up_to_date()])
+      sync_stream_fixed(connected_socket(), :users, shape(table), client: client)
       assert_receive {:sync, {:users, :loaded}}, @stream_timeout
 
       Client.Mock.async_response(client, status: 400, body: [%{"message" => "gone"}])
@@ -109,11 +116,11 @@ defmodule ChatWeb.PhoenixSyncPatchTest do
       assert is_binary(message)
     end
 
-    test "transport failure without a response body is reported" do
+    test "transport failure without a response body is reported", %{table: table} do
       {:ok, client} =
         Client.new(base_url: "http://unreachable.electric", fetch: {RefusingFetch, []})
 
-      socket = sync_stream_fixed(connected_socket(), :users, shape(), client: client)
+      socket = sync_stream_fixed(connected_socket(), :users, shape(table), client: client)
 
       assert [] = streamed(socket, :users)
 
@@ -146,7 +153,7 @@ defmodule ChatWeb.PhoenixSyncPatchTest do
 
   # Helpers
 
-  defp shape, do: ShapeDefinition.new!("users")
+  defp shape(table), do: ShapeDefinition.new!(table)
 
   defp connected_socket, do: %{bare_socket() | transport_pid: self()}
 
@@ -158,12 +165,12 @@ defmodule ChatWeb.PhoenixSyncPatchTest do
   defp change(id, name, operation \\ :insert),
     do: Client.Mock.change(value: %{id: id, name: name}, operation: operation)
 
-  defp respond(client, offset, body) do
+  defp respond(client, table, offset, body) do
     Client.Mock.async_response(client,
       status: 200,
       schema: @schema,
       last_offset: Offset.new(0, offset),
-      shape_handle: "users-shape",
+      shape_handle: "#{table}-shape",
       body: body
     )
   end

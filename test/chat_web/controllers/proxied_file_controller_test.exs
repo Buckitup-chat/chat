@@ -1,6 +1,6 @@
 defmodule ChatWeb.ProxiedFileControllerTest do
   use ChatWeb.ConnCase, async: true
-  import Rewire
+  import Support.Rewire
 
   alias ChatWeb.ProxiedFileController
 

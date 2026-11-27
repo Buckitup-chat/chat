@@ -1,6 +1,6 @@
 defmodule Chat.Db.Pipeline.CompactorTest do
   use ExUnit.Case, async: true
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Db.Pipeline.Compactor
 

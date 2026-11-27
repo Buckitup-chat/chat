@@ -1,7 +1,7 @@
 defmodule Chat.ChunkedFilesTest do
   use ExUnit.Case, async: true, group: :cubdb
 
-  import Rewire
+  import Support.Rewire
 
   alias Chat.ChunkedFiles
   alias Chat.ChunkedFilesBroker

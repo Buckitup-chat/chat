@@ -1,7 +1,7 @@
 defmodule Chat.Storage.DefaultTest do
   use ExUnit.Case, async: false
 
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Db.Common
   alias Chat.Db.Switching

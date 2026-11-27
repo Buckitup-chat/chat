@@ -1,7 +1,7 @@
 defmodule Chat.NetworkSynchronization.Electric.PeerConnectorTest do
   use ExUnit.Case, async: false
 
-  import Rewire
+  import Support.Rewire
 
   alias Chat.NetworkSynchronization.Electric.PeerConnector
 

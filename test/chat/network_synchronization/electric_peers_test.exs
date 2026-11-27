@@ -30,7 +30,7 @@ end
 defmodule ChatTest.NetworkSynchronization.ElectricPeersTest do
   use ExUnit.Case, async: true
 
-  import Rewire
+  import Support.Rewire
 
   alias Chat.NetworkSynchronization
   alias Chat.NetworkSynchronization.Store

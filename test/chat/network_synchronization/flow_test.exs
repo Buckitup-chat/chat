@@ -1,6 +1,6 @@
 defmodule Chat.NetworkSynchronization.FlowTest do
   use ExUnit.Case, async: true
-  import Rewire
+  import Support.Rewire
 
   alias Chat.NetworkSynchronization
   alias Chat.NetworkSynchronization.Flow

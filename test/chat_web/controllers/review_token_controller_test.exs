@@ -1,7 +1,7 @@
 defmodule ChatWeb.ReviewTokenControllerTest do
   use ChatWeb.ConnCase, async: false
   use ChatWeb.DataCase
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Data.Schemas.ReviewWriteToken
 

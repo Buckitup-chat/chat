@@ -1,6 +1,6 @@
 defmodule Chat.ReviewBot.GarbageCollectorTest do
   use ExUnit.Case, async: true
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Data.Schemas.ReviewWriteToken
   alias Chat.Data.Types.ReviewWriteTokenNonceHash

@@ -1,6 +1,6 @@
 defmodule ChatWeb.ReviewTokenBindTest do
   use ChatWeb.ConnCase, async: true
-  import Rewire
+  import Support.Rewire
 
   defmodule PopOk do
     def context(_params), do: {:ok, %{challenge: "test_challenge", signature: "test_sig"}}

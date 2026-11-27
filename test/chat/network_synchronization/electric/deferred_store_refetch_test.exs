@@ -1,7 +1,7 @@
 defmodule Chat.NetworkSynchronization.Electric.DeferredStoreRefetchTest do
   use ExUnit.Case, async: true, group: :ets_deferred
 
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Data.Schemas.UserStorage
   alias Chat.NetworkSynchronization.Electric.DeferredRecord

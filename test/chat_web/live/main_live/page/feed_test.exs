@@ -3,7 +3,7 @@ defmodule ChatWeb.MainLive.Page.FeedTest do
 
   import Phoenix.LiveViewTest
   import ChatWeb.LiveTestHelpers
-  import Rewire
+  import Support.Rewire
   import Support.RetryHelper
 
   alias Chat.Card

@@ -20,7 +20,7 @@ defmodule Chat.NetworkSynchronization.Electric.ShapeWriterBranchesTest do
   use ChatWeb.DataCase, async: true
 
   import ExUnit.CaptureLog
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Data.Types.DialogHash
   alias Chat.Data.Types.UserHash

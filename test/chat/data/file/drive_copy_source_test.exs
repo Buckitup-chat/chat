@@ -1,7 +1,7 @@
 defmodule Chat.Data.File.DriveCopySourceTest do
   use ExUnit.Case, async: false
 
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Data.File.ChunkStore
   alias Chat.Data.File.DriveCopySource

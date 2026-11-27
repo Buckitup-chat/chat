@@ -3,7 +3,7 @@ defmodule Chat.NetworkSynchronization.Electric.SyncBotCardPusherTest do
   use ChatWeb.DataCase
 
   import Chat.Test.ReadGateHelpers, only: [identity_with_card: 1, put_gate: 2]
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.User

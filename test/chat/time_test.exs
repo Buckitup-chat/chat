@@ -1,7 +1,7 @@
 defmodule Chat.TimeTest do
   use ExUnit.Case, async: true
 
-  import Rewire
+  import Support.Rewire
 
   alias Chat.TimeKeeper
   alias Chat.TimeTest.FakeSource

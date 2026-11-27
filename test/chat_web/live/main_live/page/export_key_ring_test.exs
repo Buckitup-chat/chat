@@ -2,7 +2,7 @@ defmodule ChatWeb.MainLive.Page.ExportKeyRingTest do
   use ChatWeb.ConnCase, async: true, group: :cubdb
 
   import ChatWeb.LiveTestHelpers
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Identity
   alias ChatWeb.MainLive.Page.ExportKeyRing

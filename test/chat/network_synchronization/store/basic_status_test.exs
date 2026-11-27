@@ -1,6 +1,6 @@
 defmodule Chat.NetworkSynchronization.Store.BasicStatusTest do
   use ExUnit.Case, async: true
-  import Rewire
+  import Support.Rewire
 
   alias Chat.NetworkSynchronization.Status.CoolingStatus
   alias Chat.NetworkSynchronization.Store

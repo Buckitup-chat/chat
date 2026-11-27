@@ -2,7 +2,7 @@ defmodule Chat.Db.Boot.ElectricReadyTest do
   use ExUnit.Case, async: false
 
   import ExUnit.CaptureLog
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Db.Boot.ElectricReady
 

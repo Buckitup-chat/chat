@@ -1,6 +1,6 @@
 defmodule Chat.NetworkSynchronization.Store.SourceOperationsTest do
   use ExUnit.Case, async: true
-  import Rewire
+  import Support.Rewire
 
   alias Chat.NetworkSynchronization.Store
 

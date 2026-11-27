@@ -3,7 +3,7 @@ defmodule ChatWebTest.MainLive.Admin.GithubFirmwareUpgradeFormTest do
 
   import Phoenix.LiveViewTest
   import LiveIsolatedComponent
-  import Rewire
+  import Support.Rewire
   import Support.RetryHelper
 
   alias ChatWeb.MainLive.Admin.GithubFirmwareUpgradeForm

@@ -1,6 +1,6 @@
 defmodule ChatWeb.ReviewTokenCreateTest do
   use ChatWeb.ConnCase, async: true
-  import Rewire
+  import Support.Rewire
 
   defmodule CreatorOk do
     def create(_bot_hash, _origin_order_hash), do: {:ok, "AAAABBBBCCCCDDDDEEEEFFFFGGGG1234"}

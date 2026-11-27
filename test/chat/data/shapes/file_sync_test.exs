@@ -8,7 +8,7 @@ defmodule Chat.Data.Shapes.FileSyncTest do
 
   import Chat.Test.ReviewFixtures, only: [insert_user_card: 1, sign_with_key: 2]
   import ExUnit.CaptureLog
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Data.File, as: FileData
   alias Chat.Data.Schemas.File, as: FileSchema

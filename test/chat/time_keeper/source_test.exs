@@ -1,7 +1,7 @@
 defmodule Chat.TimeKeeper.SourceTest do
   use ExUnit.Case, async: true
 
-  import Rewire
+  import Support.Rewire
 
   alias Chat.TimeKeeper.Source
 

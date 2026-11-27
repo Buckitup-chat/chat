@@ -1,7 +1,7 @@
 defmodule Chat.Db.Copying.ProgressTest do
   use ExUnit.Case, async: true
 
-  import Rewire
+  import Support.Rewire
 
   defmodule DbMock do
     def data_dir(_) do

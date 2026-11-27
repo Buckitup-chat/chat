@@ -7,7 +7,7 @@ defmodule Chat.Db.WriteQueue.FileReaderTest do
   """
   use ExUnit.Case, async: true
   import ExUnit.CaptureLog
-  import Rewire
+  import Support.Rewire
   import Support.RetryHelper
 
   alias Chat.Db.WriteQueue.FileReader

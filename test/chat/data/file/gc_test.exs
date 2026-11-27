@@ -3,6 +3,7 @@ defmodule Chat.Data.File.GCTest do
 
   alias Chat.Data.File, as: FileData
   alias Chat.Data.File.ChunkStore
+  alias Chat.Data.File.GC
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.File, as: FileSchema
   alias Chat.Data.Schemas.FileChunk
@@ -13,7 +14,9 @@ defmodule Chat.Data.File.GCTest do
   alias Chat.Data.User
   alias Chat.NetworkSynchronization.Electric.ShapeWriter
   alias Chat.Repo
-  alias Chat.Storage.Unit
+  alias Chat.Storage.Default
+  alias Chat.TimeKeeper
+  alias Ecto.Adapters.SQL.Sandbox
 
   setup do
     identity = User.generate_pq_identity("Alice")
@@ -23,154 +26,145 @@ defmodule Chat.Data.File.GCTest do
     {:ok, identity: identity, user_hash: card.user_hash}
   end
 
-  describe "gc_deleted_files" do
-    test "deletes file_chunks for deleted files", %{identity: identity, user_hash: user_hash} do
-      file = insert_file_with_chunk(identity, user_hash)
-      soft_delete_file(file, identity.sign_skey)
-
-      assert Repo.get_by(FileChunk, file_id: file.file_id, chunk_index: 0) != nil
-
-      FileData.deleted_file_ids_with_chunks()
-      |> Enum.each(&FileData.delete_file_chunks_batch(&1, 50))
-
-      assert Repo.get_by(FileChunk, file_id: file.file_id, chunk_index: 0) == nil
-    end
-
-    test "deletes missing_chunks for deleted files", %{identity: identity, user_hash: user_hash} do
-      file = insert_file_with_chunk(identity, user_hash)
+  describe "handle_info(:gc)" do
+    test "purges chunk rows, missing chunks and stored blobs of deleted files", ctx do
+      file = insert_file_with_chunk(ctx.identity, ctx.user_hash)
       FileData.insert_missing_chunks_placeholders(file.file_id, 3, nil, 1_000_000)
+      :ok = ChunkStore.put(Default.unit(), file.file_id, 0, "chunk data")
+      soft_delete_file(file, ctx.identity.sign_skey)
 
-      soft_delete_file(file, identity.sign_skey)
+      run_gc()
 
-      assert Repo.aggregate(
-               from(m in MissingChunk, where: m.file_id == ^file.file_id),
-               :count
-             ) == 3
-
-      FileData.deleted_file_ids_with_chunks()
-      |> Enum.each(fn file_id ->
-        FileData.delete_file_chunks_batch(file_id, 50)
-        FileData.delete_missing_chunks_for_file(file_id)
-      end)
-
-      assert Repo.aggregate(
-               from(m in MissingChunk, where: m.file_id == ^file.file_id),
-               :count
-             ) == 0
+      assert chunk_count(file.file_id) == 0
+      assert missing_count(file.file_id) == 0
+      assert {:error, :enoent} = ChunkStore.fetch(Default.unit(), file.file_id, 0)
     end
 
-    test "deletes ChunkStore files for deleted files", %{identity: identity, user_hash: user_hash} do
-      file = insert_file_with_chunk(identity, user_hash)
-      tmp_dir = System.tmp_dir!() |> Path.join("gc_test_#{System.unique_integer([:positive])}")
-      unit = %Unit{id: :internal, role: :internal, root: tmp_dir}
+    test "purges deleted file chunks beyond a single batch", ctx do
+      file = insert_file_with_chunk(ctx.identity, ctx.user_hash)
+      insert_raw_chunks(file.file_id, 1..120, ctx.user_hash)
+      soft_delete_file(file, ctx.identity.sign_skey)
+      assert chunk_count(file.file_id) == 121
 
-      :ok = ChunkStore.put(unit, file.file_id, 0, "chunk data")
-      assert {:ok, "chunk data"} = ChunkStore.fetch(unit, file.file_id, 0)
+      run_gc()
 
-      soft_delete_file(file, identity.sign_skey)
-
-      unit |> ChunkStore.file_dir(file.file_id) |> File.rm_rf!()
-
-      assert {:error, :enoent} = ChunkStore.fetch(unit, file.file_id, 0)
-
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      assert chunk_count(file.file_id) == 0
     end
 
-    defp insert_file_with_chunk(identity, user_hash) do
-      file = signed_file(identity, user_hash)
-      {:ok, _} = ShapeWriter.write(:file, :insert, file)
+    test "purges stale uploads with their orphan chunks and blobs", ctx do
+      file_id = FileId.generate()
+      insert_raw_chunks(file_id, [0], ctx.user_hash)
+      insert_upload_chunk(file_id, ctx.user_hash, _stale = 1_000_000)
+      FileData.insert_missing_chunks_placeholders(file_id, 2, nil, 1_000_000)
+      :ok = ChunkStore.put(Default.unit(), file_id, 0, "upload data")
 
-      chunk = signed_file_chunk(identity, user_hash, file.file_id, 0)
-      {:ok, _} = ShapeWriter.write(:file_chunk, :insert, chunk)
+      run_gc()
 
-      file
+      assert Repo.get_by(UploadChunk, file_id: file_id, chunk_index: 0) == nil
+      assert chunk_count(file_id) == 0
+      assert missing_count(file_id) == 0
+      assert {:error, :enoent} = ChunkStore.fetch(Default.unit(), file_id, 0)
     end
 
-    defp soft_delete_file(file, sign_skey) do
-      deleted =
-        signed_file_from(file, sign_skey, %{
-          deleted_flag: true,
-          chunk_sign_hashes: [],
-          owner_timestamp: file.owner_timestamp + 1
-        })
+    test "keeps live files, fresh uploads and committed uploads", ctx do
+      live = insert_file_with_chunk(ctx.identity, ctx.user_hash)
+      :ok = ChunkStore.put(Default.unit(), live.file_id, 0, "live data")
+      on_exit(fn -> ChunkStore.delete_file(Default.unit(), live.file_id) end)
 
-      {:ok, _} = ShapeWriter.write(:file, :update, deleted)
+      fresh_id = FileId.generate()
+      insert_raw_chunks(fresh_id, [0], ctx.user_hash)
+      insert_upload_chunk(fresh_id, ctx.user_hash, TimeKeeper.now_unix())
+
+      committed = insert_file_with_chunk(ctx.identity, ctx.user_hash)
+      insert_upload_chunk(committed.file_id, ctx.user_hash, _stale = 1_000_000)
+
+      run_gc()
+
+      assert chunk_count(live.file_id) == 1
+      assert {:ok, "live data"} = ChunkStore.fetch(Default.unit(), live.file_id, 0)
+      assert Repo.get_by(UploadChunk, file_id: fresh_id, chunk_index: 0)
+      assert chunk_count(fresh_id) == 1
+      assert Repo.get_by(UploadChunk, file_id: committed.file_id, chunk_index: 0)
+      assert chunk_count(committed.file_id) == 1
+    end
+
+    test "ignores unknown messages and stays alive" do
+      pid = start_gc()
+      send(pid, :unexpected)
+
+      assert %{} = :sys.get_state(pid)
     end
   end
 
-  describe "gc_stale_uploads" do
-    test "deletes stale upload_chunks and orphan file_chunks", %{
-      identity: identity,
-      user_hash: user_hash
-    } do
-      file_id = FileId.generate()
-      chunk = insert_orphan_chunk(identity, user_hash, file_id)
-      insert_upload_chunk_record(file_id, 0, chunk, user_hash, _stale_timestamp = 1_000_000)
+  defp start_gc do
+    pid = start_supervised!({GC, name: nil})
+    Sandbox.allow(Repo, self(), pid)
+    pid
+  end
 
-      stale_ids = FileData.stale_upload_chunk_file_ids(2_000_000)
-      assert file_id in stale_ids
+  defp run_gc do
+    pid = start_gc()
+    send(pid, :gc)
+    :sys.get_state(pid)
+  end
 
-      Enum.each(stale_ids, &FileData.delete_upload_chunks_for_file/1)
-      Enum.each(stale_ids, &FileData.delete_file_chunks_batch(&1, 50))
+  defp chunk_count(file_id) do
+    from(c in FileChunk, where: c.file_id == ^file_id)
+    |> Repo.aggregate(:count)
+  end
 
-      assert Repo.get_by(UploadChunk, file_id: file_id, chunk_index: 0) == nil
-      assert Repo.get_by(FileChunk, file_id: file_id, chunk_index: 0) == nil
-    end
+  defp missing_count(file_id) do
+    from(m in MissingChunk, where: m.file_id == ^file_id)
+    |> Repo.aggregate(:count)
+  end
 
-    test "deletes missing_chunks for stale uploads", %{
-      identity: identity,
-      user_hash: user_hash
-    } do
-      file_id = FileId.generate()
-      chunk = insert_orphan_chunk(identity, user_hash, file_id)
-      insert_upload_chunk_record(file_id, 0, chunk, user_hash, _stale_timestamp = 1_000_000)
-      FileData.insert_missing_chunks_placeholders(file_id, 2, nil, 1_000_000)
-
-      stale_ids = FileData.stale_upload_chunk_file_ids(2_000_000)
-      assert file_id in stale_ids
-
-      Enum.each(stale_ids, fn fid ->
-        FileData.delete_upload_chunks_for_file(fid)
-        FileData.delete_file_chunks_batch(fid, 50)
-        FileData.delete_missing_chunks_for_file(fid)
+  defp insert_raw_chunks(file_id, indexes, user_hash) do
+    rows =
+      Enum.map(indexes, fn index ->
+        %{
+          file_id: file_id,
+          chunk_index: index,
+          data_hash: :crypto.strong_rand_bytes(64) |> FileChunkDataHash.from_binary(),
+          size: 100,
+          uploader_hash: user_hash,
+          owner_timestamp: System.os_time(:millisecond),
+          sign_b64: :crypto.strong_rand_bytes(64)
+        }
       end)
 
-      assert Repo.aggregate(
-               from(m in MissingChunk, where: m.file_id == ^file_id),
-               :count
-             ) == 0
-    end
+    Repo.insert_all(FileChunk, rows)
+  end
 
-    test "does not delete upload_chunks for committed files", %{
-      identity: identity,
-      user_hash: user_hash
-    } do
-      file = signed_file(identity, user_hash)
-      {:ok, _} = ShapeWriter.write(:file, :insert, file)
+  defp insert_file_with_chunk(identity, user_hash) do
+    file = signed_file(identity, user_hash)
+    {:ok, _} = ShapeWriter.write(:file, :insert, file)
 
-      insert_upload_chunk_record(file.file_id, 0, nil, user_hash, _stale_timestamp = 1_000_000)
+    chunk = signed_file_chunk(identity, user_hash, file.file_id, 0)
+    {:ok, _} = ShapeWriter.write(:file_chunk, :insert, chunk)
 
-      stale_ids = FileData.stale_upload_chunk_file_ids(2_000_000)
-      refute file.file_id in stale_ids
-    end
+    file
+  end
 
-    defp insert_orphan_chunk(identity, user_hash, file_id) do
-      chunk = signed_file_chunk(identity, user_hash, file_id, 0)
-      {:ok, _} = ShapeWriter.write(:file_chunk, :insert, chunk)
-      chunk
-    end
-
-    defp insert_upload_chunk_record(file_id, index, chunk, user_hash, updated_at) do
-      Repo.insert!(%UploadChunk{
-        file_id: file_id,
-        chunk_index: index,
-        chunk_sign_hash:
-          if(chunk, do: EnigmaPq.hash(chunk.sign_b64), else: :crypto.strong_rand_bytes(64)),
-        uploader_hash: user_hash,
-        size: if(chunk, do: chunk.size, else: 100),
-        updated_at: updated_at
+  defp soft_delete_file(file, sign_skey) do
+    deleted =
+      signed_file_from(file, sign_skey, %{
+        deleted_flag: true,
+        chunk_sign_hashes: [],
+        owner_timestamp: file.owner_timestamp + 1
       })
-    end
+
+    {:ok, _} = ShapeWriter.write(:file, :update, deleted)
+  end
+
+  defp insert_upload_chunk(file_id, user_hash, updated_at) do
+    Repo.insert!(%UploadChunk{
+      file_id: file_id,
+      chunk_index: 0,
+      chunk_sign_hash: :crypto.strong_rand_bytes(64),
+      uploader_hash: user_hash,
+      size: 100,
+      updated_at: updated_at
+    })
   end
 
   # Helpers

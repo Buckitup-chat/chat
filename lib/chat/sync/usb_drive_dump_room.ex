@@ -174,7 +174,7 @@ defmodule Chat.Sync.UsbDriveDumpRoom do
     {:noreply, dump_room}
   end
 
-  def handle_cast({:update_progress, _file_number, _filename, _size, _last_chunk?}, dump_room),
+  def handle_cast({:update_progress, _file_number, _filename, _size}, dump_room),
     do: {:noreply, dump_room}
 
   def handle_cast(:mark_successful, dump_room) do

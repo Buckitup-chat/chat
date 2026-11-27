@@ -34,7 +34,8 @@ ci-check:
 ci-test:
 	npm install --prefix ./assets
 	mix assets.deploy
-	MIX_ENV=test mix test --max-failures=3 --cover 
+	MIX_ENV=test mix coveralls.json --max-failures=3
+	MIX_ENV=test mix coverage.dirs
 
 test: 
 	rm -rf priv/test_db priv/test_admin_db

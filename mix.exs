@@ -22,7 +22,9 @@ defmodule Chat.MixProject do
       preferred_envs: [
         coveralls: :test,
         "coveralls.detail": :test,
-        "coveralls.html": :test
+        "coveralls.html": :test,
+        "coveralls.json": :test,
+        "coverage.dirs": :test
       ]
     ]
   end

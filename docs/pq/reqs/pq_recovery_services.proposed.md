@@ -19,7 +19,8 @@ They run on Railway. This requirement moves them to Elixir:
 - the relayer as its own release on its own machine;
 - the indexer, read API and notifications inside the chat release on every
   server;
-- the node as its own release beside it (§ Who runs nodes).
+- the node as its own versioned package beside it, started only in the
+  version its operator approved (§ Versions and approval).
 
 The split follows what each one may and may not share with its copies
 elsewhere. The relayer, indexer and read API keep their request and response
@@ -52,12 +53,13 @@ under a bare `/api`.
 | `GET /recovery/api/alerts` | Notifications, in the app | The chat release |
 | `POST /recovery/api/notifications/subscriptions`, `GET …/subscriptions`, `DELETE …/subscriptions/:id` | Notifications, external channels | The chat release |
 | `GET /recovery/api/health` | Health of the relayer, or of the read API and notifications | The relayer release; the chat release |
-| `GET /recovery/node/health`, `/recovery/node/info`, `/recovery/node/shares/:id`; `POST /recovery/node/shares`, `/recovery/node/shares/:id/release` | Node | The node release, reached through the chat endpoint (below) |
+| `GET /recovery/node/health`, `/recovery/node/info`, `/recovery/node/shares/:id`; `POST /recovery/node/shares`, `/recovery/node/shares/:id/release` | Node | The node package, reached through the chat endpoint (below) |
 
-The node release listens on localhost only, and the chat endpoint forwards
-`/recovery/node/*` to it, before its catch-all. That holds wherever the chat
-release runs: behind a reverse proxy on staging, or terminating TLS itself on
-a device.
+The chat endpoint routes `/recovery/node/*` to the node, before its
+catch-all: forwarded to the node's localhost listener in the own-process mode,
+dispatched in the VM in the chat-VM mode (§ Two ways to run). That holds
+wherever the chat release runs: behind a reverse proxy on staging, or
+terminating TLS itself on a device.
 
 A client keeps a base URL per service — `https://<relay host>/recovery` for
 the relayer, `https://<host>/recovery` for the read API, and a node as
@@ -149,19 +151,22 @@ threshold instead: a secret split *k*-of-*n* across nodes survives the loss of
 **Storage.**
 - Shares go in a local Postgres table outside the Electric registry, each
   encrypted at rest under a node key.
-- The node key and the node's id live in AdminDB, so a Postgres dump alone
-  yields nothing.
-- AdminDB is single-drive today (`pq_access_gating`, Open question 3), while
-  Postgres replicates to the device's backup drive. A node restored from that
-  drive has its shares but not the key, which is the node lost. The threshold
-  covers that. Copying the key and id with the drive is part of the AdminDB
-  backup question, not a reason to put the key beside the shares.
+- The node key, the share-encryption key and the node's id live in the node's
+  **key store**, apart from the shares, so a Postgres dump alone yields
+  nothing. The key store is AdminDB when the node runs in the chat VM, and the
+  node's own CubDB file when it runs as its own process (§ Two ways to run).
+- The key store is single-drive today (for AdminDB: `pq_access_gating`, Open
+  question 3), while Postgres replicates to the device's backup drive. A node
+  restored from that drive has its shares but not the key, which is the node
+  lost. The threshold covers that. Copying the key and id with the drive is
+  part of the key-store backup question, not a reason to put the key beside
+  the shares.
 
 **The node id is derived from the node key**: `n_` + lowercase hex of the first
 16 bytes of `SHA3-256(node public key)`. The key is a secp256k1 key the node
-generates and keeps in AdminDB with the share-encryption key. Nobody can claim
-another node's id without its key, and a node that loses its key loses its id
-together with its shares — the threshold covers both.
+generates and keeps in its key store with the share-encryption key. Nobody can
+claim another node's id without its key, and a node that loses its key loses
+its id together with its shares — the threshold covers both.
 
 ### Endpoints, messages and gates
 
@@ -193,13 +198,17 @@ client — produces and checks exactly these:
 
   ```json
   {"id": "n_…", "url": "https://<host>/recovery/node", "chain": "eip155:11155111",
-   "contract": "0x…", "operator": "u_…", "issued_at": 1791200000,
+   "contract": "0x…", "operator": "u_…", "code_version": "112",
+   "code_hash": "…", "issued_at": 1791200000,
    "node_pubkey": "0x02…", "node_sig": "0x…", "operator_sig": "<base64>"}
   ```
 
   - `url` is canonical as in `node_set` (`pq_recovery_shares` § Re-issuing);
     `chain` is the CAIP-2 id; `contract` is lowercase; `issued_at` is unix
     seconds, written in the signed bytes in decimal.
+  - `code_version` and `code_hash` name the node code the operator approved
+    and the node is running (§ Versions and approval); `code_hash` is
+    lowercase hex.
   - `node_sig` is ECDSA over secp256k1 of `SHA3-256(signed bytes)` (§ Choosing
     nodes), as `r || s`, 64 bytes, low-s, `0x` hex. A client checks it under
     `node_pubkey` and that `node_pubkey` hashes to `id`.
@@ -259,17 +268,95 @@ them across providers.
 
 **Who ships the code.** Every node runs code we release. A malicious release,
 once accepted, reads everything its node holds. What limits that:
-- **The node module is released and updated on its own, never as part of a
-  chat update.** It is a separate release with its own version, signed and
-  reproducible, so an operator can check what they run.
-- **A node runs a new version only after its operator accepts it.** Our own
-  servers included: no automatic node updates.
+- **The node code is versioned on its own, never as part of a chat update.**
+  It is a separate package with its own version, signed and reproducible, so
+  an operator can check what they run.
+- **A node runs only the version its operator approved** (§ Versions and
+  approval). Our own servers included: no automatic switch to a new version.
 - **Rollouts are staged**, so a release reaches nodes over days, not at once.
 
 With every node on our code, this is the remaining trust in us: a compromised
-signing key, and enough operators accepting a bad release before it is caught.
+signing key, and enough operators approving a bad release before it is caught.
 Staging and reproducibility make that slow and visible. They do not make it
-impossible.
+impossible. § The trust ceiling says what approval does not cover.
+
+### Versions and approval
+
+The chat release (and, on a device, the firmware) carries **several versions
+of the node code** — the current one and the few before it — and updates as
+often as chat does. Carrying a version does not run it. A node starts **only
+the version whose hash its owner signed**, so a chat or firmware update never
+changes what a node runs.
+
+- **The code hash** is `SHA3-256` of the version's manifest: one line
+  `<path> NUL <lowercase hex SHA3-256 of the file>` per file of the node
+  package, sorted by path, joined with `\n`. The package is every file the
+  node loads: `.beam` files, NIF shared objects (secp256k1, Keccak), `.app`
+  and configuration files, and ERTS when the package bundles it. A NIF left out
+  of the manifest is native code nobody approved.
+- **The approval is the operator's endorsement.** `code_version` and
+  `code_hash` are part of the descriptor's signed bytes (§ Choosing nodes), so
+  the one ML-DSA-87 signature the owner makes from the owner UI says both
+  "I run this node" and "it runs this code". There is no separate approval
+  record. A vouch token is not used: it is a delegable trust edge between
+  identities, and approving code is neither.
+- **The loader** checks, before starting a node: the endorsement verifies under
+  the owner's card; the endorsement's `code_hash` equals the computed hash of a
+  carried version; that version is not on the stop list. Otherwise the node
+  does not start, and `/recovery/node/info` answers that no version is approved.
+- **Nothing approved, nothing runs.** A fresh device, or one whose owner never
+  opted in, starts no node.
+- **The newest endorsement wins.** A newer `issued_at` replaces an older
+  endorsement, as for any descriptor. An older endorsement of an older version
+  never restarts it, so a version once replaced cannot be rolled back to by
+  replaying its approval.
+- **The stop list** is a signed list of version hashes we publish as bad. It
+  can only stop a version, never start one, so it gives us no way to run code
+  an owner did not approve.
+- **One version runs at a time.** The share store carries a format version;
+  a newer node version migrates it forward only, and an older version refuses
+  a store newer than it knows.
+- **The owner UI** lists the carried versions with their hashes and marks the
+  ones in our published list of reproducible builds (Open question 4).
+
+### Two ways to run
+
+The same node package runs in one of two modes, chosen per host. The approval
+and the loader are the same in both.
+
+| | **Own process** (our servers) | **In the chat VM** (devices) |
+|---|---|---|
+| Process | a separate BEAM, started by the loader, **not connected to chat by distributed Erlang** | an OTP application started by the loader in the chat VM |
+| Postgres | its own connection under **its own Postgres role**, granted only its share table; chat's role cannot read that table | `Chat.Repo` |
+| Key store | the node's own CubDB file | AdminDB |
+| Talks to chat | HTTP on localhost only: the `/recovery/node/*` proxy and a local endpoint that takes the owner's endorsement | function calls |
+| What it protects | with its own OS user, a code execution in chat does not reach the shares or the key | the version and the owner's approval; no isolation from chat |
+
+**No distributed Erlang between chat and the node.** Nodes that share a cookie
+trust each other completely: either can run any code on the other
+(`:erpc.call/4`, `:sys.get_state/1`), so a clustered node is isolated from
+chat no more than one in the same VM, at the cost of a second VM.
+
+**Why devices run it in the chat VM.** On Nerves everything runs as root, and
+whoever controls the firmware controls the disk (§ The trust ceiling). A
+separate process, Postgres role and file there protect nothing and cost a
+second VM on a Raspberry Pi.
+
+### The trust ceiling
+
+The loader is part of the chat release or the firmware, which we update. A
+malicious chat release or firmware can skip the check, start unapproved code,
+or read the share table and the key store directly. Approval protects against
+an honest release changing a node's code without its owner; it does not
+protect against a malicious release of what hosts the node.
+
+- **On our servers** the own-process mode adds isolation from chat, so a chat
+  compromise alone does not reach the shares.
+- **On a device** there is no hardware root of trust: the ceiling is the
+  firmware, whatever the mode.
+
+The threshold across operators (§ Choosing nodes) is what bounds this: one
+host's firmware reads one node's share, never a threshold of them.
 
 ### Choosing nodes
 
@@ -278,7 +365,7 @@ default set and checks any choice.
 
 **A node says who runs it.** `GET /recovery/node/info` returns a descriptor:
 - the node id, its URL, the chain and the contract it serves, its operator's
-  `user_hash` and an `issued_at`;
+  `user_hash`, the version and hash of the code it runs, and an `issued_at`;
 - the node's signature over all of these, by the node key. The id is derived
   from that key, so the descriptor — the operator included — is bound to the
   node, and nobody can re-endorse it;
@@ -288,7 +375,11 @@ default set and checks any choice.
   owner's verified card.
 
 Encoding: the signed bytes are the UTF-8 of
-`"buckitup/recovery-node/v1\n" || id || "\n" || url || "\n" || chain || "\n" || contract || "\n" || operator_user_hash || "\n" || issued_at`.
+`"buckitup/recovery-node/v1\n" || id || "\n" || url || "\n" || chain || "\n" || contract || "\n" || operator_user_hash || "\n" || code_version || "\n" || code_hash || "\n" || issued_at`.
+
+The descriptor makes the code a node runs public. The client can refuse a node
+whose `code_hash` is not in our published list of reproducible builds, or is on
+the stop list (§ Versions and approval).
 
 A newer `issued_at` replaces an older descriptor, so a device that changes
 hands gets its new owner's. Descriptors are public metadata: the client
@@ -439,8 +530,11 @@ avoids.
   its own machine.
 - **The indexer, read API and notifications** are supervised applications in
   the chat release, started by configuration.
-- **The node** is its own release, updated only with its operator's consent
-  (§ Who runs nodes). A device that opts out of custody does not run it.
+- **The node** is its own package with its own version, carried in several
+  versions by the chat release and the firmware, and started by a loader only
+  in the version its operator approved (§ Versions and approval): as its own
+  process on our servers, in the chat VM on devices (§ Two ways to run). A
+  device that opts out of custody runs none.
 
 - **Ethereum:**
   - `curvy` (already a dependency) for secp256k1 signing and recovery;
@@ -482,6 +576,13 @@ avoids.
   - `/recovery/node/info` verifies under the node key and the operator's card, and a node
     serving another contract is not offered;
   - `GET /recovery/node/shares/:id` reports a wiped node as not holding;
+  - the loader starts no node with no endorsement, with an endorsement whose
+    `code_hash` matches no carried version, or with a version on the stop
+    list; a file of the package changed by one byte changes the hash;
+  - an older endorsement replayed after a newer one does not bring its
+    version back;
+  - in the own-process mode, chat's Postgres role cannot read the share table,
+    and chat and the node are not connected by distributed Erlang;
   - a relayer restart in the middle of a batch leaves no nonce gap and no
     duplicate transaction.
 
@@ -498,9 +599,11 @@ made again on v3.
 2. **The TypeScript backend stays on Railway as it is**, relayer, indexer and
    notifications together: it is one process with one key, and it is not
    split.
-3. **Node protocol v3** in the SDK (messages, ECIES release, `/info`), the
-   harness, and the Elixir node release. Elixir nodes go up on our servers and
-   operators' devices; the TypeScript nodes are retired.
+3. **Node protocol v3** in the SDK (messages, ECIES release, `/info` with
+   `code_version` and `code_hash` in its signed bytes), the harness, and the
+   Elixir node package with its loader. Elixir nodes go up on our servers and
+   operators' devices, each started in the version its operator approved; the
+   TypeScript nodes are retired.
 4. **Indexer, read API and notifications** in the chat release on every
    server. The TypeScript backend's notifications are switched off at the same
    moment: its Telegram token removed and its subscriptions deleted, so no
@@ -522,6 +625,14 @@ Proposed.
    but the owner should be told which secrets lose a node. That needs the
    device to know its depositors, which today it knows only as wallet
    addresses.
+3. **A deposit is plaintext to chat.** Chat terminates TLS and proxies
+   `/recovery/node/*`, so it sees every deposited share in the clear; only a
+   release is ECIES. That undoes the own-process mode's isolation for every
+   deposit. Encrypting the deposit to `node_pubkey` from `/info` closes it, and
+   changes the v3 deposit message in the SDK.
+4. **The list of reproducible builds and the stop list:** where we publish
+   them, who signs them, and how the client and the owner UI fetch and check
+   them.
 
 ## References
 

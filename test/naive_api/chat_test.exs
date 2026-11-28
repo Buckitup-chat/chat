@@ -47,9 +47,7 @@ defmodule NaiveApi.ChatTest do
       }
     """
     setup do
-      me = User.login("Pedro") |> tap(&User.register/1)
-      peer = User.login("Diego") |> tap(&User.register/1)
-      dialog = Dialogs.find_or_open(me, Card.from_identity(peer))
+      %{me: me, peer: peer, dialog: dialog} = open_dialog()
       {room_identity, _my_room} = Rooms.add(me, @room_name)
 
       %Messages.Text{text: @text, timestamp: now()}
@@ -72,10 +70,7 @@ defmodule NaiveApi.ChatTest do
         Absinthe.run(@read_query, @schema,
           variables: %{
             "peerPublicKey" => Bitstring.serialize_33(peer.public_key),
-            "myKeypair" => %{
-              "privateKey" => Bitstring.serialize_32(me.private_key),
-              "publicKey" => Bitstring.serialize_33(me.public_key)
-            }
+            "myKeypair" => my_keypair(me)
           }
         )
 
@@ -113,9 +108,7 @@ defmodule NaiveApi.ChatTest do
       }
     """
     setup do
-      me = User.login("Pedro") |> tap(&User.register/1)
-      peer = User.login("Diego") |> tap(&User.register/1)
-      dialog = Dialogs.find_or_open(me, Card.from_identity(peer))
+      %{me: me, peer: peer, dialog: dialog} = open_dialog()
 
       ChangeTracker.await()
 
@@ -127,10 +120,7 @@ defmodule NaiveApi.ChatTest do
         Absinthe.run(@send_text_mutation, @schema,
           variables: %{
             "peerPublicKey" => Bitstring.serialize_33(peer.public_key),
-            "myKeypair" => %{
-              "publicKey" => Bitstring.serialize_33(me.public_key),
-              "privateKey" => Bitstring.serialize_32(me.private_key)
-            },
+            "myKeypair" => my_keypair(me),
             "text" => @text,
             "timestamp" => now()
           }
@@ -177,9 +167,7 @@ defmodule NaiveApi.ChatTest do
     """
 
     setup do
-      me = User.login("Pedro") |> tap(&User.register/1)
-      peer = User.login("Diego") |> tap(&User.register/1)
-      dialog = Dialogs.find_or_open(me, Card.from_identity(peer))
+      %{me: me, peer: peer, dialog: dialog} = open_dialog()
 
       ChangeTracker.await()
 
@@ -193,10 +181,7 @@ defmodule NaiveApi.ChatTest do
                 "privateKey" => Bitstring.serialize_32(me.private_key)
               }
             },
-            "myKeypair" => %{
-              "publicKey" => Bitstring.serialize_33(me.public_key),
-              "privateKey" => Bitstring.serialize_32(me.private_key)
-            },
+            "myKeypair" => my_keypair(me),
             "entry" => %{
               "clientName" => "vacation.jpeg",
               "clientType" => "image/jpeg",
@@ -216,16 +201,7 @@ defmodule NaiveApi.ChatTest do
       upload_key: upload_key
     } do
       {:ok, %{data: %{"chatSendFile" => message_reference}}} =
-        Absinthe.run(@send_file_mutation, @schema,
-          variables: %{
-            "peerPublicKey" => Bitstring.serialize_33(peer.public_key),
-            "myKeypair" => %{
-              "publicKey" => Bitstring.serialize_33(me.public_key),
-              "privateKey" => Bitstring.serialize_32(me.private_key)
-            },
-            "uploadKey" => upload_key
-          }
-        )
+        send_file(me, peer, upload_key)
 
       assert 1 == message_reference["index"]
 
@@ -242,16 +218,7 @@ defmodule NaiveApi.ChatTest do
       upload_key: upload_key
     } do
       {:ok, %{data: %{"chatSendFile" => %{"id" => _msg_id}}}} =
-        Absinthe.run(@send_file_mutation, @schema,
-          variables: %{
-            "peerPublicKey" => Bitstring.serialize_33(peer.public_key),
-            "myKeypair" => %{
-              "publicKey" => Bitstring.serialize_33(me.public_key),
-              "privateKey" => Bitstring.serialize_32(me.private_key)
-            },
-            "uploadKey" => upload_key
-          }
-        )
+        send_file(me, peer, upload_key)
 
       ChangeTracker.await()
 
@@ -268,16 +235,7 @@ defmodule NaiveApi.ChatTest do
       fake_upload_key = :crypto.strong_rand_bytes(32)
 
       {:ok, %{errors: [%{message: error_message}]}} =
-        Absinthe.run(@send_file_mutation, @schema,
-          variables: %{
-            "peerPublicKey" => Bitstring.serialize_33(peer.public_key),
-            "myKeypair" => %{
-              "publicKey" => Bitstring.serialize_33(me.public_key),
-              "privateKey" => Bitstring.serialize_32(me.private_key)
-            },
-            "uploadKey" => Bitstring.serialize_32(fake_upload_key)
-          }
-        )
+        send_file(me, peer, Bitstring.serialize_32(fake_upload_key))
 
       assert "Wrong upload key" == error_message
     end
@@ -287,16 +245,7 @@ defmodule NaiveApi.ChatTest do
       peer: peer,
       upload_key: upload_key
     } do
-      Absinthe.run(@send_file_mutation, @schema,
-        variables: %{
-          "peerPublicKey" => Bitstring.serialize_33(peer.public_key),
-          "myKeypair" => %{
-            "publicKey" => Bitstring.serialize_33(me.public_key),
-            "privateKey" => Bitstring.serialize_32(me.private_key)
-          },
-          "uploadKey" => upload_key
-        }
-      )
+      send_file(me, peer, upload_key)
 
       ChangeTracker.await()
 
@@ -304,10 +253,7 @@ defmodule NaiveApi.ChatTest do
         Absinthe.run(@chat_read_query, @schema,
           variables: %{
             "peerPublicKey" => Bitstring.serialize_33(peer.public_key),
-            "myKeypair" => %{
-              "publicKey" => Bitstring.serialize_33(me.public_key),
-              "privateKey" => Bitstring.serialize_32(me.private_key)
-            }
+            "myKeypair" => my_keypair(me)
           }
         )
 
@@ -318,6 +264,29 @@ defmodule NaiveApi.ChatTest do
                "type" => "IMAGE"
              } = file_message["content"]
     end
+  end
+
+  defp send_file(me, peer, upload_key) do
+    Absinthe.run(@send_file_mutation, @schema,
+      variables: %{
+        "peerPublicKey" => Bitstring.serialize_33(peer.public_key),
+        "myKeypair" => my_keypair(me),
+        "uploadKey" => upload_key
+      }
+    )
+  end
+
+  defp open_dialog do
+    me = User.login("Pedro") |> tap(&User.register/1)
+    peer = User.login("Diego") |> tap(&User.register/1)
+    %{me: me, peer: peer, dialog: Dialogs.find_or_open(me, Card.from_identity(peer))}
+  end
+
+  defp my_keypair(me) do
+    %{
+      "publicKey" => Bitstring.serialize_33(me.public_key),
+      "privateKey" => Bitstring.serialize_32(me.private_key)
+    }
   end
 
   defp now, do: DateTime.utc_now() |> DateTime.to_unix()

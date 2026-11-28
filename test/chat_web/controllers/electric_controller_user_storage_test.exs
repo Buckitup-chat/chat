@@ -3,16 +3,21 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
   use ChatWeb.DataCase
 
   import Chat.Test.ElectricIngestFixtures, only: [user_card_modified: 1, user_card_payload: 1]
-  import Chat.Test.ElectricIngestHelpers, only: [post_ingest: 3, to_base64: 1]
+  import Chat.Test.ElectricIngestHelpers, only: [post_ingest: 3]
 
-  alias Chat.Data.Integrity
-  alias Chat.Data.Schemas.UserStorage
-  alias Chat.Data.Types.UserStorageSignHash
+  import Chat.Test.UserStorageIngestFixtures,
+    only: [
+      user_storage_delete_payload: 2,
+      user_storage_insert_payload: 4,
+      user_storage_insert_payload: 5,
+      user_storage_update_payload: 4
+    ]
+
   alias Chat.Data.User, as: UserData
 
   describe "user storage insert operations" do
     setup %{conn: conn} do
-      insert_user_card(conn)
+      insert_user_card!(conn)
     end
 
     test "POST /electric/v1/ingest with valid user_storage insert returns txid", ctx do
@@ -60,7 +65,7 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
       assert first_conn.status == 200
 
       duplicate_payload =
-        user_storage_insert_payload_with_timestamp(
+        user_storage_insert_payload(
           ctx.card.user_hash,
           uuid,
           "different_value",
@@ -132,7 +137,7 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
 
   describe "user storage update operations" do
     setup %{conn: conn} do
-      insert_user_card(conn)
+      insert_user_card!(conn)
     end
 
     test "POST /electric/v1/ingest with valid update returns txid", ctx do
@@ -187,7 +192,7 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
 
   describe "user storage delete operations" do
     setup %{conn: conn} do
-      insert_user_card(conn)
+      insert_user_card!(conn)
     end
 
     test "POST /electric/v1/ingest delete is not accepted", ctx do
@@ -208,7 +213,7 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
 
   describe "batch operations" do
     setup %{conn: conn} do
-      insert_user_card(conn)
+      insert_user_card!(conn)
     end
 
     test "POST /electric/v1/ingest with multiple user_storage inserts in batch succeeds", ctx do
@@ -233,140 +238,13 @@ defmodule ChatWeb.ElectricControllerUserStorageTest do
     end
   end
 
-  defp insert_user_card(conn) do
+  defp insert_user_card!(conn) do
     identity = UserData.generate_pq_identity("Bob")
     card = UserData.extract_pq_card(identity)
 
-    card_payload = user_card_payload(user_card_modified(card))
-    card_conn = post_ingest(conn, card_payload, identity.sign_skey)
-    assert card_conn.status == 200
+    %{status: 200} =
+      post_ingest(conn, user_card_payload(user_card_modified(card)), identity.sign_skey)
 
     %{identity: identity, card: card}
-  end
-
-  defp user_storage_insert_payload_with_timestamp(
-         user_hash,
-         uuid,
-         value,
-         sign_skey,
-         owner_timestamp
-       ) do
-    {sign_b64, sign_hash} =
-      sign_storage(user_hash, uuid, value, false, nil, owner_timestamp, sign_skey)
-
-    %{
-      "mutations" => [
-        %{
-          "type" => "insert",
-          "modified" => %{
-            "user_hash" => user_hash,
-            "uuid" => uuid,
-            "value_b64" => to_base64(value),
-            "deleted_flag" => false,
-            "owner_timestamp" => owner_timestamp,
-            "sign_b64" => to_base64(sign_b64),
-            "sign_hash" => sign_hash
-          },
-          "syncMetadata" => %{"relation" => "user_storage"}
-        }
-      ]
-    }
-  end
-
-  defp user_storage_insert_payload(user_hash, uuid, value, sign_skey) do
-    owner_timestamp = System.system_time(:second)
-
-    {sign_b64, sign_hash} =
-      sign_storage(user_hash, uuid, value, false, nil, owner_timestamp, sign_skey)
-
-    %{
-      "mutations" => [
-        %{
-          "type" => "insert",
-          "modified" => %{
-            "user_hash" => user_hash,
-            "uuid" => uuid,
-            "value_b64" => to_base64(value),
-            "deleted_flag" => false,
-            "owner_timestamp" => owner_timestamp,
-            "sign_b64" => to_base64(sign_b64),
-            "sign_hash" => sign_hash
-          },
-          "syncMetadata" => %{"relation" => "user_storage"}
-        }
-      ]
-    }
-  end
-
-  defp user_storage_update_payload(user_hash, uuid, new_value, sign_skey) do
-    owner_timestamp = System.system_time(:second) + 1
-
-    {sign_b64, sign_hash} =
-      sign_storage(user_hash, uuid, new_value, false, nil, owner_timestamp, sign_skey)
-
-    %{
-      "mutations" => [
-        %{
-          "type" => "update",
-          "original" => %{
-            "user_hash" => user_hash,
-            "uuid" => uuid
-          },
-          "changes" => %{
-            "value_b64" => to_base64(new_value),
-            "owner_timestamp" => owner_timestamp,
-            "sign_b64" => to_base64(sign_b64),
-            "sign_hash" => sign_hash
-          },
-          "syncMetadata" => %{"relation" => "user_storage"}
-        }
-      ]
-    }
-  end
-
-  defp user_storage_delete_payload(user_hash, uuid) do
-    %{
-      "mutations" => [
-        %{
-          "type" => "delete",
-          "original" => %{
-            "user_hash" => user_hash,
-            "uuid" => uuid
-          },
-          "syncMetadata" => %{"relation" => "user_storage"}
-        }
-      ]
-    }
-  end
-
-  defp sign_storage(
-         user_hash,
-         uuid,
-         value,
-         deleted_flag,
-         parent_sign_hash,
-         owner_timestamp,
-         sign_skey
-       ) do
-    storage = %UserStorage{
-      user_hash: user_hash,
-      uuid: uuid,
-      value_b64: value,
-      deleted_flag: deleted_flag,
-      parent_sign_hash: parent_sign_hash,
-      owner_timestamp: owner_timestamp
-    }
-
-    sign_b64 =
-      storage
-      |> Integrity.signature_payload()
-      |> EnigmaPq.sign(sign_skey)
-
-    sign_hash =
-      sign_b64
-      |> EnigmaPq.hash()
-      |> UserStorageSignHash.from_binary()
-
-    {sign_b64, sign_hash}
   end
 end

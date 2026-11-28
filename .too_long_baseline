@@ -24,8 +24,6 @@
 798 lib/chat_web/live/proxy_live/page/room.ex
 308 lib/chat_web/router.ex
 353 test/chat/data/file/chunk_writer_test.exs
-361 test/chat/data/review_list_validation_test.exs
-412 test/chat/data/review_moderation_test.exs
 448 test/chat/data/user_storage_versioning_test.exs
 337 test/chat/data/vouch_token/chain_distance_test.exs
 307 test/chat/db/scope/cargo_key_scope_on_isolated_test.exs

@@ -8,9 +8,6 @@ defmodule Chat.DbBootSupervisor do
 
   use Supervisor
 
-  import Toolbox.StagedSupervisor
-
-  alias Chat.Db.Boot.ElectricReady
   alias Chat.Db.Boot.RepoReady
   alias Chat.Storage.Unit
 
@@ -34,6 +31,10 @@ defmodule Chat.DbBootSupervisor do
       Supervisor.init([], strategy: :one_for_one)
     end
   else
+    import Toolbox.StagedSupervisor
+
+    alias Chat.Db.Boot.ElectricReady
+
     @impl true
     def init(_init_arg) do
       task_supervisor = __MODULE__.TaskSupervisor

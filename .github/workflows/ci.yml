@@ -19,7 +19,7 @@ env:
 jobs:
   lint:
     name: lint
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -37,9 +37,9 @@ jobs:
           path: |
             deps
             _build
-          key: mix-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
+          key: mix-ubuntu-26.04-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
           restore-keys: |
-            mix-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-
+            mix-ubuntu-26.04-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-
 
       - run: mix deps.get
 
@@ -52,9 +52,9 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: priv/plts
-          key: plt-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
+          key: plt-ubuntu-26.04-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
           restore-keys: |
-            plt-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-
+            plt-ubuntu-26.04-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-
 
       - name: Build PLT
         if: steps.plt_cache.outputs.cache-hit != 'true'
@@ -72,7 +72,7 @@ jobs:
 
   test:
     name: test
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
@@ -83,6 +83,15 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
+
+      # EnigmaPq uses ML-DSA-87 / ML-KEM-1024: OTP must link OpenSSL >= 3.5 (ubuntu-26.04 has 3.5.x)
+      - name: Check post-quantum crypto support
+        run: |
+          erl -noshell -eval '
+            io:format("~s~n", [element(3, hd(crypto:info_lib()))]),
+            Need = [{public_keys, mldsa87}, {kems, mlkem1024}],
+            Missing = [A || {K, A} <- Need, not lists:member(A, proplists:get_value(K, crypto:supports(), []))],
+            case Missing of [] -> halt(0); _ -> io:format("missing: ~p~n", [Missing]), halt(1) end.'
 
       - name: Set up Node
         uses: actions/setup-node@v7
@@ -111,9 +120,9 @@ jobs:
           path: |
             deps
             _build
-          key: mix-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
+          key: mix-ubuntu-26.04-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
           restore-keys: |
-            mix-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-
+            mix-ubuntu-26.04-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-
 
       - run: mix deps.get
 

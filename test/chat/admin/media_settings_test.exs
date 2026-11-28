@@ -27,11 +27,11 @@ defmodule Chat.Admin.MediaSettingsTest do
     test "with missing or invalid functionality returns an error" do
       params = @valid_params |> Map.put(:functionality, nil)
       changeset = MediaSettings.changeset(%MediaSettings{}, params)
-      assert_has_error(changeset, :functionality, "can't be blank")
+      assert has_error?(changeset, :functionality, "can't be blank")
 
       params = @valid_params |> Map.put(:functionality, "unknown")
       changeset = MediaSettings.changeset(%MediaSettings{}, params)
-      assert_has_error(changeset, :functionality, "is invalid")
+      assert has_error?(changeset, :functionality, "is invalid")
     end
   end
 end

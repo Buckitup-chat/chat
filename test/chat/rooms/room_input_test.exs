@@ -26,20 +26,20 @@ defmodule Chat.Rooms.RoomInputTest do
     test "with missing or invalid name returns an error" do
       params = @valid_params |> Map.put(:name, nil)
       changeset = RoomInput.changeset(%RoomInput{}, params)
-      assert_has_error(changeset, :name, "can't be blank")
+      assert has_error?(changeset, :name, "can't be blank")
     end
 
     test "with invalid type returns an error" do
       params = @valid_params |> Map.put(:type, "unknown")
       changeset = RoomInput.changeset(%RoomInput{}, params)
-      assert_has_error(changeset, :type, "is invalid")
+      assert has_error?(changeset, :type, "is invalid")
     end
 
     test "cargo type needs to be enabled" do
       media_settings = %MediaSettings{}
       params = @valid_params |> Map.put(:type, "cargo")
       changeset = RoomInput.changeset(%RoomInput{}, params, media_settings)
-      assert_has_error(changeset, :type, "is invalid")
+      assert has_error?(changeset, :type, "is invalid")
 
       media_settings = %MediaSettings{functionality: :cargo}
       params = @valid_params |> Map.put(:type, "cargo")
@@ -61,7 +61,7 @@ defmodule Chat.Rooms.RoomInputTest do
       media_settings = %MediaSettings{functionality: :cargo}
       params = @valid_params |> Map.put(:type, "cargo")
       changeset = RoomInput.changeset(%RoomInput{}, params, media_settings)
-      assert_has_error(changeset, :name, "has already been taken")
+      assert has_error?(changeset, :name, "has already been taken")
     end
   end
 end

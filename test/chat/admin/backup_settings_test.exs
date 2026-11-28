@@ -27,11 +27,11 @@ defmodule Chat.Admin.BackupSettingsTest do
     test "with missing or invalid type returns an error" do
       params = @valid_params |> Map.put(:type, nil)
       changeset = BackupSettings.changeset(%BackupSettings{}, params)
-      assert_has_error(changeset, :type, "can't be blank")
+      assert has_error?(changeset, :type, "can't be blank")
 
       params = @valid_params |> Map.put(:type, "unknown")
       changeset = BackupSettings.changeset(%BackupSettings{}, params)
-      assert_has_error(changeset, :type, "is invalid")
+      assert has_error?(changeset, :type, "is invalid")
     end
   end
 end

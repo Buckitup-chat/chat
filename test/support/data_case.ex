@@ -111,9 +111,9 @@ defmodule ChatWeb.DataCase do
     end)
   end
 
-  def assert_has_error(changeset, field, error_message) do
-    assert is_struct(changeset, Ecto.Changeset)
-    refute changeset.valid?
-    assert error_message in Map.get(errors_on(changeset), field, [])
-  end
+  @doc "True when `changeset` is an invalid `Ecto.Changeset` carrying `error_message` on `field`."
+  def has_error?(%Ecto.Changeset{valid?: false} = changeset, field, error_message),
+    do: error_message in Map.get(errors_on(changeset), field, [])
+
+  def has_error?(_changeset, _field, _error_message), do: false
 end

@@ -1,6 +1,3 @@
-304 lib/chat/db/scope/key_scope.ex
-341 lib/chat/signed_parcel.ex
-308 lib/chat_web/router.ex
 618 test/chat_web/controllers/electric_controller_candidate_ingest_test.exs
 623 test/chat_web/controllers/electric_controller_review_test.exs
 372 test/chat_web/controllers/electric_controller_user_storage_test.exs

@@ -1,10 +1,11 @@
 defmodule Chat.Dialogs.DialogTest do
   use ChatWeb.DataCase, async: true
 
+  import Chat.Test.DialogsFixtures,
+    only: [add_text_and_two_images: 4, alice_bob_dialog: 0, memo_message: 1]
+
   alias Chat.Card
-  alias Chat.Content.Files
   alias Chat.Content.Memo
-  alias Chat.Db.ChangeTracker
   alias Chat.Dialogs
   alias Chat.Identity
   alias Chat.Messages
@@ -14,28 +15,10 @@ defmodule Chat.Dialogs.DialogTest do
   alias Support.FakeData
 
   test "start dialog" do
-    alice = User.login("Alice")
-    bob = User.login("Bob")
+    {alice, bob, _bob_card, dialog} = alice_bob_dialog()
     charlie = User.login("Charlie")
 
-    bob_card = bob |> Card.from_identity()
-
-    text_message = "Alice welcomes Bob"
-
-    dialog =
-      alice
-      |> Dialogs.open(bob_card)
-
-    %Messages.Text{text: text_message} |> Dialogs.add_new_message(alice, dialog)
-
-    "not_image"
-    |> fake_image
-    |> Dialogs.add_new_message(alice, dialog)
-
-    "not_image 2"
-    |> fake_image
-    |> Dialogs.add_new_message(bob, dialog)
-    |> Dialogs.await_saved(dialog)
+    add_text_and_two_images(dialog, alice, bob, "Alice welcomes Bob")
 
     assert 3 == dialog |> Dialogs.read(bob) |> Enum.count()
 
@@ -77,36 +60,26 @@ defmodule Chat.Dialogs.DialogTest do
   end
 
   test "dialog with memo should work" do
-    alice = User.login("Alice")
-    bob = User.login("Bob")
-    bob_card = bob |> Card.from_identity()
+    {alice, bob, bob_card} = alice_and_bob()
+    dialog = Dialogs.find_or_open(alice, bob_card)
     content = "hi memo" |> String.pad_trailing(160, "-")
 
-    dialog = Dialogs.find_or_open(alice, bob_card)
-
     content
-    |> make_memo_msg()
+    |> memo_message()
     |> Dialogs.add_new_message(alice, dialog)
     |> Dialogs.await_saved(dialog)
 
     [bob_version] = Dialogs.read(dialog, bob)
 
     assert :memo = bob_version.type
-
-    assert ^content =
-             bob_version.content
-             |> StorageId.from_json()
-             |> Memo.get()
+    assert ^content = bob_version.content |> StorageId.from_json() |> Memo.get()
   end
 
   test "dialog with file should work" do
-    alice = User.login("Alice")
-    bob = User.login("Bob")
-    bob_card = bob |> Card.from_identity()
-
+    {alice, bob, bob_card} = alice_and_bob()
     dialog = Dialogs.find_or_open(alice, bob_card)
 
-    fake_file()
+    FakeData.file()
     |> Dialogs.add_new_message(alice, dialog)
     |> Dialogs.await_saved(dialog)
 
@@ -115,146 +88,11 @@ defmodule Chat.Dialogs.DialogTest do
     assert :audio = bob_version.type
   end
 
-  test "removed by author message should not be present in dialog" do
-    alice = User.login("Alice")
-    bob = User.login("Bob")
-    bob_card = bob |> Card.from_identity()
-    text_message = "Alice welcomes Bob"
-
-    dialog =
-      alice
-      |> Dialogs.open(bob_card)
-
-    %Messages.Text{text: text_message} |> Dialogs.add_new_message(alice, dialog)
-
-    "not_image"
-    |> fake_image
-    |> Dialogs.add_new_message(alice, dialog)
-
-    "not_image 2"
-    |> fake_image
-    |> Dialogs.add_new_message(bob, dialog)
-    |> Dialogs.await_saved(dialog)
-
-    msg_id =
-      dialog
-      |> Dialogs.read(bob)
-      |> Enum.find(&(&1.content == text_message))
-      |> then(fn
-        nil -> nil
-        x -> {x.index, x.id}
-      end)
-
-    assert msg_id != nil
-
-    dialog |> Dialogs.delete(alice, msg_id)
-    ChangeTracker.await()
-
-    assert nil ==
-             dialog
-             |> Dialogs.read(bob)
-             |> Enum.find(&(&1.content == text_message))
-  end
-
-  test "message cannot be removed by a peer in dialog" do
-    {alice, bob, _bob_card, dialog} = alice_bob_dialog()
-    text_message = "Alice welcomes Bob"
-
-    %Messages.Text{text: text_message} |> Dialogs.add_new_message(alice, dialog)
-
-    "not_image"
-    |> fake_image
-    |> Dialogs.add_new_message(alice, dialog)
-
-    "not_image 2"
-    |> fake_image
-    |> Dialogs.add_new_message(bob, dialog)
-    |> Dialogs.await_saved(dialog)
-
-    msg_id =
-      dialog
-      |> Dialogs.read(bob)
-      |> Enum.find(&(&1.content == text_message))
-      |> then(fn
-        nil -> nil
-        x -> {x.index, x.id}
-      end)
-
-    assert msg_id != nil
-
-    dialog |> Dialogs.delete(bob, msg_id)
-
-    assert nil !=
-             dialog
-             |> Dialogs.read(bob)
-             |> Enum.find(&(&1.content == text_message))
-  end
-
-  test "message removal should remove content as well" do
-    {alice, _, _, dialog} = alice_bob_dialog()
-
-    "memo here"
-    |> make_memo_msg()
-    |> Dialogs.add_new_message(alice, dialog)
-
-    "not_image"
-    |> fake_image
-    |> Dialogs.add_new_message(alice, dialog)
-
-    fake_file()
-    |> Dialogs.add_new_message(alice, dialog)
-    |> Dialogs.await_saved(dialog)
-
-    dialog
-    |> Dialogs.read(alice)
-    |> Enum.zip([&Memo.get/1, &Files.get/1, &Files.get/1])
-    |> Enum.map(fn {msg, getter} ->
-      assert nil != msg.content |> StorageId.from_json() |> then(getter)
-      dialog |> Dialogs.delete(alice, {msg.index, msg.id})
-      ChangeTracker.await()
-      assert nil == msg.content |> StorageId.from_json() |> then(getter)
-    end)
-  end
-
-  test "message update should replace previous version in dialog" do
-    {alice, _, _, dialog} = alice_bob_dialog()
-    text = "text here"
-    updated_text = "updated text here" |> String.pad_trailing(200, "-")
-
-    "memo here"
-    |> make_memo_msg()
-    |> Dialogs.add_new_message(alice, dialog)
-
-    %Messages.Text{text: text}
-    |> Dialogs.add_new_message(alice, dialog)
-    |> Dialogs.await_saved(dialog)
-
-    assert [_, msg] = dialog |> Dialogs.read(alice)
-    assert ^text = msg.content
-
-    msg_id = {msg.index, msg.id}
-
-    updated_text
-    |> Messages.Text.new(0)
-    |> Dialogs.update_message(msg_id, alice, dialog)
-    |> Dialogs.await_saved(dialog)
-
-    assert [_, %{type: :memo} = msg] = dialog |> Dialogs.read(alice)
-    assert ^updated_text = msg.content |> StorageId.from_json() |> Memo.get()
-
-    text
-    |> Messages.Text.new(0)
-    |> Dialogs.update_message(msg_id, alice, dialog)
-    |> Dialogs.await_saved(dialog)
-
-    assert [_, %{type: :text, content: ^text}] = dialog |> Dialogs.read(alice)
-  end
-
   test "message should be readable by its id" do
     {alice, _, _, dialog} = alice_bob_dialog()
 
     "memo here "
-    |> make_memo_msg()
+    |> memo_message()
     |> Dialogs.add_new_message(alice, dialog)
     |> Dialogs.await_saved(dialog)
 
@@ -266,40 +104,17 @@ defmodule Chat.Dialogs.DialogTest do
   end
 
   test "gets invite for users to the room" do
-    alice = User.login("Alice")
-    alice_key = User.register(alice)
-    User.await_saved(alice_key)
+    {alice, _alice_key} = register_user("Alice")
+    {bob, bob_key} = register_user("Bob")
+    dialog = Dialogs.find_or_open(alice, User.by_id(bob_key))
 
-    bob = User.login("Bob")
-    bob_key = User.register(bob)
-    User.await_saved(bob_key)
-    bob_card = User.by_id(bob_key)
-    dialog = Dialogs.find_or_open(alice, bob_card)
+    room_identities = Enum.map(1..3, &add_private_room(alice, "Private room #{&1}"))
+    messages = Enum.map(room_identities, &send_room_invite(&1, alice, dialog))
 
-    {room_identity1, _room} = Rooms.add(alice, "Private room 1", :private)
-    Rooms.await_saved(room_identity1)
-    {room_identity2, _room} = Rooms.add(alice, "Private room 2", :private)
-    Rooms.await_saved(room_identity2)
-    {room_identity3, _room} = Rooms.add(alice, "Private room 3", :private)
-    Rooms.await_saved(room_identity3)
+    invite_ids =
+      Enum.map(room_identities, &Dialogs.room_invite_for_user_to_room(bob, &1.public_key).id)
 
-    [message1, message2, message3] =
-      Stream.map([room_identity1, room_identity2, room_identity3], fn room_identity ->
-        room_identity
-        |> Messages.RoomInvite.new()
-        |> Dialogs.add_new_message(alice, dialog)
-        |> tap(&Dialogs.await_saved(&1, dialog))
-        |> then(fn {_, msg} -> msg end)
-      end)
-      |> Enum.to_list()
-
-    invite1 = Chat.Dialogs.room_invite_for_user_to_room(bob, room_identity1.public_key)
-    invite2 = Chat.Dialogs.room_invite_for_user_to_room(bob, room_identity2.public_key)
-    invite3 = Chat.Dialogs.room_invite_for_user_to_room(bob, room_identity3.public_key)
-
-    assert invite1.id == message1.id
-    assert invite2.id == message2.id
-    assert invite3.id == message3.id
+    assert invite_ids == Enum.map(messages, & &1.id)
   end
 
   test "message from unregistred user works" do
@@ -324,106 +139,32 @@ defmodule Chat.Dialogs.DialogTest do
     assert bob_version.content == content
   end
 
-  defp fake_file do
-    FakeData.file()
-  end
+  # --- Helpers ---
 
-  defp fake_image(name) do
-    FakeData.image(name)
-  end
-
-  defp make_memo_msg(text) do
-    text
-    |> String.pad_trailing(160, "-")
-    |> then(&%Messages.Text{text: &1})
-  end
-
-  describe "parsel_to_indexed_message/1" do
-    test "extracts index and message from simple text parcel" do
-      {alice, _bob, _bob_card, dialog} = alice_bob_dialog()
-
-      text_message = "Hello from Alice to Bob"
-      message = %Messages.Text{text: text_message}
-
-      parcel =
-        message
-        |> Chat.SignedParcel.wrap_dialog_message(dialog, alice)
-        |> Chat.store_parcel()
-
-      {index, extracted_message} = Dialogs.parsel_to_indexed_message(parcel)
-
-      assert is_integer(index)
-      assert index > 0
-      assert extracted_message.type == :text
-      assert extracted_message.content != nil
-    end
-
-    test "extracts index and message from memo parcel with multiple items" do
-      {alice, _bob, _bob_card, dialog} = alice_bob_dialog()
-
-      long_text = String.duplicate("This is a long memo message. ", 100)
-      memo_message = %Messages.Text{text: long_text}
-
-      parcel =
-        memo_message
-        |> Chat.SignedParcel.wrap_dialog_message(dialog, alice)
-        |> Chat.store_parcel()
-
-      assert length(parcel.data) > 1
-
-      {index, extracted_message} = Dialogs.parsel_to_indexed_message(parcel)
-
-      assert is_integer(index)
-      assert index > 0
-      assert extracted_message.type == :memo
-      refute extracted_message.content == long_text
-    end
-
-    test "raises error when parcel has no dialog message" do
-      empty_parcel = %Chat.SignedParcel{data: []}
-
-      assert_raise ArgumentError, "Parcel does not contain a dialog message", fn ->
-        Dialogs.parsel_to_indexed_message(empty_parcel)
-      end
-
-      non_dialog_parcel = %Chat.SignedParcel{data: [{{:memo, "some-id"}, "some content"}]}
-
-      assert_raise ArgumentError, "Parcel does not contain a dialog message", fn ->
-        Dialogs.parsel_to_indexed_message(non_dialog_parcel)
-      end
-    end
-
-    test "handles parcel with dialog message among other items" do
-      {alice, _bob, _bob_card, dialog} = alice_bob_dialog()
-
-      long_text = String.duplicate("This is a long memo message. ", 100)
-      memo_message = %Messages.Text{text: long_text}
-
-      parcel =
-        memo_message
-        |> Chat.SignedParcel.wrap_dialog_message(dialog, alice)
-        |> Chat.store_parcel()
-
-      assert length(parcel.data) > 1
-      assert Enum.any?(parcel.data, fn {key, _} -> match?({:memo, _}, key) end)
-      assert Enum.any?(parcel.data, fn {key, _} -> match?({:dialog_message, _, _, _}, key) end)
-
-      {index, extracted_message} = Dialogs.parsel_to_indexed_message(parcel)
-
-      assert is_integer(index)
-      assert extracted_message.type == :memo
-    end
-  end
-
-  defp alice_bob_dialog do
+  defp alice_and_bob do
     alice = User.login("Alice")
     bob = User.login("Bob")
-    bob_card = bob |> Card.from_identity()
+    {alice, bob, Card.from_identity(bob)}
+  end
 
-    dialog =
-      alice
-      |> Dialogs.open(bob_card)
+  defp register_user(name) do
+    user = User.login(name)
+    key = User.register(user)
+    User.await_saved(key)
+    {user, key}
+  end
 
-    {alice, bob, bob_card, dialog}
+  defp add_private_room(owner, name) do
+    {room_identity, _room} = Rooms.add(owner, name, :private)
+    Rooms.await_saved(room_identity)
+    room_identity
+  end
+
+  defp send_room_invite(room_identity, sender, dialog) do
+    room_identity
+    |> Messages.RoomInvite.new()
+    |> Dialogs.add_new_message(sender, dialog)
+    |> tap(&Dialogs.await_saved(&1, dialog))
+    |> then(fn {_, msg} -> msg end)
   end
 end

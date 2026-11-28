@@ -2,7 +2,9 @@ defmodule ChatWeb.ElectricControllerTest do
   use ChatWeb.ConnCase, async: true
   use ChatWeb.DataCase
 
-  alias Chat.Challenge
+  import Chat.Test.ElectricIngestFixtures, only: [user_card_modified: 1, user_card_payload: 1]
+  import Chat.Test.ElectricIngestHelpers, only: [post_ingest: 3, to_base64: 1]
+
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.UserCard
   alias Chat.Data.User, as: UserData
@@ -187,18 +189,6 @@ defmodule ChatWeb.ElectricControllerTest do
 
   # Payload builders
 
-  defp user_card_payload(modified) do
-    %{
-      "mutations" => [
-        %{
-          "type" => "insert",
-          "modified" => modified,
-          "syncMetadata" => %{"relation" => "user_cards"}
-        }
-      ]
-    }
-  end
-
   defp update_name_payload(card, sign_skey, new_name) do
     updated =
       signed_user_card(card, sign_skey, %{
@@ -245,21 +235,6 @@ defmodule ChatWeb.ElectricControllerTest do
     }
   end
 
-  defp user_card_modified(card) do
-    %{
-      "user_hash" => card.user_hash,
-      "sign_pkey" => to_base64(card.sign_pkey),
-      "contact_pkey" => to_base64(card.contact_pkey),
-      "contact_cert" => to_base64(card.contact_cert),
-      "crypt_pkey" => to_base64(card.crypt_pkey),
-      "crypt_cert" => to_base64(card.crypt_cert),
-      "name" => card.name,
-      "deleted_flag" => card.deleted_flag,
-      "owner_timestamp" => card.owner_timestamp,
-      "sign_b64" => to_base64(card.sign_b64)
-    }
-  end
-
   defp payload_with_tampered_cert(card, field) do
     tampered_value =
       card
@@ -287,8 +262,6 @@ defmodule ChatWeb.ElectricControllerTest do
     %{updated_card | sign_b64: sign_b64}
   end
 
-  defp to_base64(bin), do: Base.encode64(bin, padding: false)
-
   # Request helpers
 
   defp insert_card(conn, card, sign_skey) do
@@ -296,23 +269,6 @@ defmodule ChatWeb.ElectricControllerTest do
     result = post_ingest(conn, payload, sign_skey)
     assert result.status == 200
     result
-  end
-
-  defp post_ingest(conn, payload, sign_skey) do
-    {challenge_id, challenge} = Challenge.store()
-
-    signature_b64 =
-      challenge
-      |> EnigmaPq.sign(sign_skey)
-      |> Base.encode64(padding: false)
-
-    payload =
-      payload
-      |> Map.put("auth", %{"challenge_id" => challenge_id, "signature" => signature_b64})
-
-    conn
-    |> put_req_header("content-type", "application/json")
-    |> post("/electric/v1/ingest", Jason.encode!(payload))
   end
 
   defp post_without_auth(conn, payload) do

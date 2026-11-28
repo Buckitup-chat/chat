@@ -9,9 +9,9 @@ defmodule ChatWeb.ElectricControllerCandidateIngestTest do
   use ChatWeb.ConnCase, async: true
   use ChatWeb.DataCase
 
+  import Chat.Test.ElectricIngestHelpers, only: [post_ingest: 3, to_base64: 1]
   import Chat.Test.ReviewFixtures
 
-  alias Chat.Challenge
   alias Chat.Data.Integrity
   alias Chat.Data.ReviewPasswordCandidate, as: CandidateData
   alias Chat.Data.ReviewPostRight, as: PostRightData
@@ -613,20 +613,6 @@ defmodule ChatWeb.ElectricControllerCandidateIngestTest do
     }
   end
 
-  defp to_base64(bin) when is_binary(bin), do: Base.encode64(bin, padding: false)
-
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, to_base64(value))
-
-  defp post_ingest(conn, payload, sign_skey) do
-    {challenge_id, challenge} = Challenge.store()
-    signature_b64 = challenge |> EnigmaPq.sign(sign_skey) |> Base.encode64(padding: false)
-
-    payload =
-      Map.put(payload, "auth", %{"challenge_id" => challenge_id, "signature" => signature_b64})
-
-    conn
-    |> put_req_header("content-type", "application/json")
-    |> post("/electric/v1/ingest", Jason.encode!(payload))
-  end
 end

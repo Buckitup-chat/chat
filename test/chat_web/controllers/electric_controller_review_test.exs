@@ -10,10 +10,12 @@ defmodule ChatWeb.ElectricControllerReviewTest do
   use ChatWeb.ConnCase, async: true
   use ChatWeb.DataCase
 
+  import Chat.Test.ElectricIngestHelpers,
+    only: [post_ingest: 3, signature_and_hash: 3, to_base64: 1]
+
   import Chat.Test.ReviewFixtures
 
   alias Chat.Challenge
-  alias Chat.Data.Integrity
   alias Chat.Data.Review, as: ReviewData
   alias Chat.Data.ReviewList, as: ReviewListData
   alias Chat.Data.ReviewPasswordCandidate.Promotion
@@ -397,7 +399,8 @@ defmodule ChatWeb.ElectricControllerReviewTest do
       owner_timestamp: ts
     }
 
-    {sign_b64, sign_hash} = sign(review, ctx.author.sign_skey, &ReviewSignHash.from_binary/1)
+    {sign_b64, sign_hash} =
+      signature_and_hash(review, ctx.author.sign_skey, &ReviewSignHash.from_binary/1)
 
     mutation = %{
       "type" => "insert",
@@ -431,7 +434,8 @@ defmodule ChatWeb.ElectricControllerReviewTest do
       owner_timestamp: ts
     }
 
-    {sign_b64, sign_hash} = sign(review, ctx.author.sign_skey, &ReviewSignHash.from_binary/1)
+    {sign_b64, sign_hash} =
+      signature_and_hash(review, ctx.author.sign_skey, &ReviewSignHash.from_binary/1)
 
     %{
       "type" => "update",
@@ -464,7 +468,8 @@ defmodule ChatWeb.ElectricControllerReviewTest do
       owner_timestamp: ts
     }
 
-    {sign_b64, sign_hash} = sign(rl, ctx.author.sign_skey, &ReviewListSignHash.from_binary/1)
+    {sign_b64, sign_hash} =
+      signature_and_hash(rl, ctx.author.sign_skey, &ReviewListSignHash.from_binary/1)
 
     %{
       "type" => "insert",
@@ -496,7 +501,8 @@ defmodule ChatWeb.ElectricControllerReviewTest do
       owner_timestamp: ts
     }
 
-    {sign_b64, sign_hash} = sign(rp, ctx.author.sign_skey, &ReviewPasswordSignHash.from_binary/1)
+    {sign_b64, sign_hash} =
+      signature_and_hash(rp, ctx.author.sign_skey, &ReviewPasswordSignHash.from_binary/1)
 
     %{
       "type" => "insert",
@@ -529,7 +535,8 @@ defmodule ChatWeb.ElectricControllerReviewTest do
       owner_timestamp: ts
     }
 
-    {sign_b64, sign_hash} = sign(rp, ctx.author.sign_skey, &ReviewPasswordSignHash.from_binary/1)
+    {sign_b64, sign_hash} =
+      signature_and_hash(rp, ctx.author.sign_skey, &ReviewPasswordSignHash.from_binary/1)
 
     {:ok, _} =
       %ReviewPublicPassword{}
@@ -568,26 +575,6 @@ defmodule ChatWeb.ElectricControllerReviewTest do
     end
 
     {:ok, _} = Promotion.complete_promotion(review.review_hash)
-  end
-
-  defp sign(struct, sign_skey, hash_fn) do
-    sign_b64 = struct |> Integrity.signature_payload() |> EnigmaPq.sign(sign_skey)
-    {sign_b64, sign_b64 |> EnigmaPq.hash() |> hash_fn.()}
-  end
-
-  defp to_base64(bin) when is_binary(bin), do: Base.encode64(bin, padding: false)
-
-  defp post_ingest(conn, payload, sign_skey) do
-    {challenge_id, challenge} = Challenge.store()
-
-    signature_b64 = challenge |> EnigmaPq.sign(sign_skey) |> Base.encode64(padding: false)
-
-    payload =
-      Map.put(payload, "auth", %{"challenge_id" => challenge_id, "signature" => signature_b64})
-
-    conn
-    |> put_req_header("content-type", "application/json")
-    |> post("/electric/v1/ingest", Jason.encode!(payload))
   end
 
   defp post_ingest_with_nonce(conn, payload, sign_skey, nonce) do

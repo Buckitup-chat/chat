@@ -2,9 +2,9 @@ defmodule ChatWeb.ElectricControllerWriteGateTest do
   use ChatWeb.ConnCase, async: false
   use ChatWeb.DataCase
 
+  import Chat.Test.ElectricIngestHelpers, only: [post_signed: 4, to_base64: 1]
   import Chat.Test.ReadGateHelpers
 
-  alias Chat.Challenge
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.UserStorage
   alias Chat.Data.Types.UserStorageSignHash
@@ -21,7 +21,7 @@ defmodule ChatWeb.ElectricControllerWriteGateTest do
 
   describe "POST /electric/v1/ingest" do
     test "unvouched write is 403 JSON", ctx do
-      conn = post_ingest(ctx.conn, "/ingest", [storage_insert(ctx.bob_card, ctx.bob)], ctx.bob)
+      conn = post_mutations(ctx.conn, "/ingest", [storage_insert(ctx.bob_card, ctx.bob)], ctx.bob)
 
       assert %{"error" => "not_in_trust_chain", "max_depth" => 7} = json_response(conn, 403)
     end
@@ -29,7 +29,7 @@ defmodule ChatWeb.ElectricControllerWriteGateTest do
     test "vouched write passes", ctx do
       vouch(ctx.owner, ctx.owner_card.user_hash, ctx.bob_card.user_hash, "storage.write")
 
-      conn = post_ingest(ctx.conn, "/ingest", [storage_insert(ctx.bob_card, ctx.bob)], ctx.bob)
+      conn = post_mutations(ctx.conn, "/ingest", [storage_insert(ctx.bob_card, ctx.bob)], ctx.bob)
 
       assert %{"txid" => _} = json_response(conn, 200)
     end
@@ -39,7 +39,7 @@ defmodule ChatWeb.ElectricControllerWriteGateTest do
     test "all rows blocked is 403 with per-row errors", ctx do
       mutations = [storage_insert(ctx.bob_card, ctx.bob), storage_insert(ctx.bob_card, ctx.bob)]
 
-      conn = post_ingest(ctx.conn, "/ingest_each", mutations, ctx.bob)
+      conn = post_mutations(ctx.conn, "/ingest_each", mutations, ctx.bob)
 
       assert %{"results" => [row, _]} = json_response(conn, 403)
       assert %{"status" => "error", "error" => "not_in_trust_chain", "max_depth" => 7} = row
@@ -52,7 +52,7 @@ defmodule ChatWeb.ElectricControllerWriteGateTest do
         storage_insert(ctx.bob_card, ctx.bob)
       ]
 
-      conn = post_ingest(ctx.conn, "/ingest_each", mutations, ctx.bob)
+      conn = post_mutations(ctx.conn, "/ingest_each", mutations, ctx.bob)
 
       assert %{"results" => [invalid, blocked]} = json_response(conn, 422)
       assert %{"error" => "Invalid operation"} = invalid
@@ -60,19 +60,8 @@ defmodule ChatWeb.ElectricControllerWriteGateTest do
     end
   end
 
-  defp post_ingest(conn, path, mutations, identity) do
-    {challenge_id, challenge} = Challenge.store()
-    signature = challenge |> EnigmaPq.sign(identity.sign_skey) |> b64()
-
-    conn
-    |> put_req_header("content-type", "application/json")
-    |> post(
-      "/electric/v1" <> path,
-      Jason.encode!(%{
-        "auth" => %{"challenge_id" => challenge_id, "signature" => signature},
-        "mutations" => mutations
-      })
-    )
+  defp post_mutations(conn, path, mutations, identity) do
+    post_signed(conn, "/electric/v1" <> path, %{"mutations" => mutations}, identity.sign_skey)
   end
 
   defp storage_insert(card, identity) do
@@ -92,15 +81,13 @@ defmodule ChatWeb.ElectricControllerWriteGateTest do
       "modified" => %{
         "user_hash" => row.user_hash,
         "uuid" => row.uuid,
-        "value_b64" => b64(row.value_b64),
+        "value_b64" => to_base64(row.value_b64),
         "deleted_flag" => row.deleted_flag,
         "owner_timestamp" => row.owner_timestamp,
-        "sign_b64" => b64(sign_b64),
+        "sign_b64" => to_base64(sign_b64),
         "sign_hash" => sign_b64 |> EnigmaPq.hash() |> UserStorageSignHash.from_binary()
       },
       "syncMetadata" => %{"relation" => "user_storage"}
     }
   end
-
-  defp b64(bin), do: Base.encode64(bin, padding: false)
 end

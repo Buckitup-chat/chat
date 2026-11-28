@@ -16,6 +16,7 @@ defmodule ChatWeb.SandboxGatedReviewsIntegrationTest do
   use ChatWeb.ConnCase, async: false
   use ChatWeb.DataCase
 
+  import Chat.Test.ElectricIngestHelpers, only: [challenge_auth: 3, to_base64: 1]
   import Chat.Test.ReadGateHelpers, only: [put_gate: 2, identity_with_card: 1]
   import Chat.Test.ReviewFixtures, only: [insert_user_card: 1]
 
@@ -192,23 +193,22 @@ defmodule ChatWeb.SandboxGatedReviewsIntegrationTest do
     json_response(resp, 200)
   end
 
-  defp post_ingest(conn, mutations, sign_skey) do
+  defp ingest_via_http(conn, mutations, sign_skey) do
     %{"challenge" => challenge, "challenge_id" => challenge_id} = get_challenge(conn)
-    signature = challenge |> EnigmaPq.sign(sign_skey) |> b64()
 
     conn
     |> put_req_header("content-type", "application/json")
     |> post(
       "/electric/v1/ingest",
       Jason.encode!(%{
-        "auth" => %{"challenge_id" => challenge_id, "signature" => signature},
+        "auth" => challenge_auth(challenge_id, challenge, sign_skey),
         "mutations" => mutations
       })
     )
   end
 
   defp post_review_ingest(conn, author, origin_hash) do
-    post_ingest(conn, [review_insert_mutation(author, origin_hash)], author.sign_skey)
+    ingest_via_http(conn, [review_insert_mutation(author, origin_hash)], author.sign_skey)
   end
 
   defp set_origin_review_access!(conn, origin_identity, origin_hash, value) do
@@ -217,7 +217,7 @@ defmodule ChatWeb.SandboxGatedReviewsIntegrationTest do
 
     assert %{"txid" => _} =
              conn
-             |> post_ingest([mutation], origin_identity.sign_skey)
+             |> ingest_via_http([mutation], origin_identity.sign_skey)
              |> json_response(200)
   end
 
@@ -226,7 +226,7 @@ defmodule ChatWeb.SandboxGatedReviewsIntegrationTest do
 
     assert %{"txid" => _} =
              conn
-             |> post_ingest([mutation], issuer_identity.sign_skey)
+             |> ingest_via_http([mutation], issuer_identity.sign_skey)
              |> json_response(200)
   end
 
@@ -234,7 +234,7 @@ defmodule ChatWeb.SandboxGatedReviewsIntegrationTest do
     mutation = vouch_insert_mutation(issuer_identity, subject_hash, kind, deleted_flag: true)
 
     # May 409 if row exists, use update in that case
-    resp = post_ingest(conn, [mutation], issuer_identity.sign_skey)
+    resp = ingest_via_http(conn, [mutation], issuer_identity.sign_skey)
 
     case resp.status do
       200 ->
@@ -245,7 +245,7 @@ defmodule ChatWeb.SandboxGatedReviewsIntegrationTest do
 
         assert %{"txid" => _} =
                  conn
-                 |> post_ingest([update], issuer_identity.sign_skey)
+                 |> ingest_via_http([update], issuer_identity.sign_skey)
                  |> json_response(200)
     end
   end
@@ -272,7 +272,7 @@ defmodule ChatWeb.SandboxGatedReviewsIntegrationTest do
         "value" => value,
         "deleted_flag" => false,
         "owner_timestamp" => setting.owner_timestamp,
-        "sign_b64" => b64(sign_b64)
+        "sign_b64" => to_base64(sign_b64)
       },
       "syncMetadata" => %{"relation" => "origin_settings"}
     }
@@ -300,7 +300,7 @@ defmodule ChatWeb.SandboxGatedReviewsIntegrationTest do
         "subject_hash" => subject_hash,
         "owner_timestamp" => vouch.owner_timestamp,
         "deleted_flag" => deleted_flag,
-        "sign_b64" => b64(sign_b64)
+        "sign_b64" => to_base64(sign_b64)
       },
       "syncMetadata" => %{"relation" => "vouch_tokens"}
     }
@@ -331,7 +331,7 @@ defmodule ChatWeb.SandboxGatedReviewsIntegrationTest do
       "changes" => %{
         "owner_timestamp" => timestamp,
         "deleted_flag" => deleted_flag,
-        "sign_b64" => b64(sign_b64)
+        "sign_b64" => to_base64(sign_b64)
       },
       "syncMetadata" => %{"relation" => "vouch_tokens"}
     }
@@ -362,16 +362,14 @@ defmodule ChatWeb.SandboxGatedReviewsIntegrationTest do
         "review_hash" => review_hash,
         "origin_hash" => origin_hash,
         "author_hash" => author_card.user_hash,
-        "content_b64" => b64(content_b64),
+        "content_b64" => to_base64(content_b64),
         "deleted_flag" => false,
         "parent_sign_hash" => nil,
         "owner_timestamp" => timestamp,
-        "sign_b64" => b64(sign_b64),
+        "sign_b64" => to_base64(sign_b64),
         "sign_hash" => sign_hash
       },
       "syncMetadata" => %{"relation" => "review"}
     }
   end
-
-  defp b64(bin), do: Base.encode64(bin, padding: false)
 end

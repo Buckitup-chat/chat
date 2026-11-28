@@ -32,10 +32,12 @@ defmodule Chat.LiveServer.BuckitupXyzIngestEachTest do
 
   use ExUnit.Case, async: false
 
+  import Chat.Test.ElectricIngestHelpers,
+    only: [challenge_auth: 3, signature_of: 2, to_base64: 1]
+
   @moduletag :live_server
   @moduletag timeout: 60_000
 
-  alias Chat.Data.Integrity
   alias Chat.Data.Schemas.DialogMessage
   alias Chat.Data.Schemas.DialogMessageReaction
   alias Chat.Data.Schemas.UserCard
@@ -106,7 +108,7 @@ defmodule Chat.LiveServer.BuckitupXyzIngestEachTest do
     {:ok, challenge_resp} = get_challenge()
 
     {:ok, %{status: status, body: body}} =
-      post_ingest_each(challenge_resp, payload, bob.sign_skey)
+      req_post_ingest_each(challenge_resp, payload, bob.sign_skey)
 
     assert status == 200, "ingest_each failed: #{inspect(body)}"
     assert %{"results" => results} = body
@@ -137,7 +139,7 @@ defmodule Chat.LiveServer.BuckitupXyzIngestEachTest do
       owner_timestamp: owner_timestamp
     }
 
-    reaction = %{reaction | sign_b64: sign(reaction, user.sign_skey)}
+    reaction = %{reaction | sign_b64: signature_of(reaction, user.sign_skey)}
 
     {:ok, _} =
       DialogSandbox.publish_reaction(
@@ -164,7 +166,7 @@ defmodule Chat.LiveServer.BuckitupXyzIngestEachTest do
         type_b64: type_b64
     }
 
-    %{updated | sign_b64: sign(updated, user.sign_skey)}
+    %{updated | sign_b64: signature_of(updated, user.sign_skey)}
   end
 
   defp sender_msg_key(user, peer_hash) do
@@ -194,7 +196,7 @@ defmodule Chat.LiveServer.BuckitupXyzIngestEachTest do
       owner_timestamp: owner_timestamp
     }
 
-    sign_b64 = sign(msg, user.sign_skey)
+    sign_b64 = signature_of(msg, user.sign_skey)
     sign_hash = Crypto.compute_sign_hash(sign_b64)
     %{msg | sign_b64: sign_b64, sign_hash: sign_hash}
   end
@@ -206,12 +208,12 @@ defmodule Chat.LiveServer.BuckitupXyzIngestEachTest do
         "message_id" => msg.message_id,
         "dialog_hash" => dialog_hash,
         "sender_hash" => sender_hash,
-        "content_b64" => encode_base64(msg.content_b64),
+        "content_b64" => to_base64(msg.content_b64),
         "deleted_flag" => false,
-        "refs_map_b64" => encode_base64(msg.refs_map_b64),
+        "refs_map_b64" => to_base64(msg.refs_map_b64),
         "parent_sign_hash" => nil,
         "owner_timestamp" => msg.owner_timestamp,
-        "sign_b64" => encode_base64(msg.sign_b64),
+        "sign_b64" => to_base64(msg.sign_b64),
         "sign_hash" => msg.sign_hash
       },
       "syncMetadata" => %{"relation" => "dialog_messages"}
@@ -228,10 +230,10 @@ defmodule Chat.LiveServer.BuckitupXyzIngestEachTest do
         "message_id" => original.message_id
       },
       "changes" => %{
-        "type_b64" => encode_base64(updated.type_b64),
+        "type_b64" => to_base64(updated.type_b64),
         "deleted_flag" => updated.deleted_flag,
         "owner_timestamp" => updated.owner_timestamp,
-        "sign_b64" => encode_base64(updated.sign_b64)
+        "sign_b64" => to_base64(updated.sign_b64)
       },
       "syncMetadata" => %{"relation" => "dialog_message_reactions"}
     }
@@ -246,7 +248,7 @@ defmodule Chat.LiveServer.BuckitupXyzIngestEachTest do
       |> Map.put(:deleted_flag, true)
       |> Map.put(:owner_timestamp, new_timestamp)
 
-    sign_b64 = sign(updated_card, user.sign_skey)
+    sign_b64 = signature_of(updated_card, user.sign_skey)
 
     payload = %{
       "mutations" => [
@@ -256,7 +258,7 @@ defmodule Chat.LiveServer.BuckitupXyzIngestEachTest do
           "changes" => %{
             "deleted_flag" => true,
             "owner_timestamp" => new_timestamp,
-            "sign_b64" => encode_base64(sign_b64)
+            "sign_b64" => to_base64(sign_b64)
           },
           "syncMetadata" => %{"relation" => "user_cards"}
         }
@@ -264,18 +266,10 @@ defmodule Chat.LiveServer.BuckitupXyzIngestEachTest do
     }
 
     with {:ok, challenge_resp} <- get_challenge(),
-         {:ok, %{status: status}} <- post_ingest_each(challenge_resp, payload, user.sign_skey) do
+         {:ok, %{status: status}} <- req_post_ingest_each(challenge_resp, payload, user.sign_skey) do
       status
     end
   end
-
-  defp sign(struct_or_map, sign_skey) do
-    struct_or_map
-    |> Integrity.signature_payload()
-    |> EnigmaPq.sign(sign_skey)
-  end
-
-  defp encode_base64(bin) when is_binary(bin), do: Base.encode64(bin, padding: false)
 
   defp get_challenge do
     case Req.get(@base_url <> "/electric/v1/challenge", headers: [{"accept", "application/json"}]) do
@@ -284,15 +278,13 @@ defmodule Chat.LiveServer.BuckitupXyzIngestEachTest do
     end
   end
 
-  defp post_ingest_each(
+  defp req_post_ingest_each(
          %{"challenge" => challenge, "challenge_id" => challenge_id},
          payload,
          sign_skey
        ) do
-    signature_b64 = challenge |> EnigmaPq.sign(sign_skey) |> Base.encode64(padding: false)
-
     payload_with_auth =
-      Map.put(payload, "auth", %{"challenge_id" => challenge_id, "signature" => signature_b64})
+      Map.put(payload, "auth", challenge_auth(challenge_id, challenge, sign_skey))
 
     Req.post(@base_url <> "/electric/v1/ingest_each",
       json: payload_with_auth,

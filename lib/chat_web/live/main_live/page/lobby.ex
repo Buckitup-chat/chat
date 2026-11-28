@@ -1,24 +1,42 @@
 defmodule ChatWeb.MainLive.Page.Lobby do
-  @moduledoc "Lobby part of chat. User list and room list"
+  @moduledoc """
+  Lobby part of chat: opening and closing the lobby, switching lobby modes, search,
+  and refreshing the lists. Also the stable entry point for the lobby router and the
+  other pages, which delegates to:
+
+  - `ChatWeb.MainLive.Page.Lobby.Users` — the user list
+  - `ChatWeb.MainLive.Page.Lobby.Rooms` — creating rooms, the room list, admin key check
+  - `ChatWeb.MainLive.Page.Lobby.RoomRequests` — requesting, approving and joining rooms
+  """
 
   import ChatWeb.LiveHelpers, only: [process: 2]
+
+  import ChatWeb.MainLive.Page.Lobby.Rooms,
+    only: [assign_room_list: 1, assign_room_list: 2, assign_admin: 1]
+
+  import ChatWeb.MainLive.Page.Lobby.Users, only: [assign_user_list: 1, assign_user_list: 2]
   import Phoenix.Component, only: [assign: 3]
 
   alias Chat.Broadcast
   alias Chat.Db.ChangeTracker
+  alias Chat.Db.StatusPoller
+  alias ChatWeb.MainLive.Page
+  alias ChatWeb.MainLive.Page.Lobby.RoomRequests
+  alias ChatWeb.MainLive.Page.Lobby.Rooms
   alias Phoenix.PubSub
 
-  alias Chat.AdminRoom
-  alias Chat.Db.StatusPoller
-  alias Chat.Identity
-  alias Chat.Log
-  alias Chat.Rooms
-  alias Chat.Rooms.RoomRequest
-  alias Chat.Rooms.RoomsBroker
-  alias Chat.User.UsersBroker
-  alias ChatWeb.MainLive.Page
-
   @topic "chat::lobby"
+
+  defdelegate new_room(socket, name, type), to: Rooms
+
+  defdelegate request_room(socket, room_key), to: RoomRequests
+  defdelegate approve_room_request(socket, room_or_hash, user_key), to: RoomRequests
+
+  defdelegate join_approved_room(socket, ciphered_room_identity, user_key, room_key),
+    to: RoomRequests
+
+  @doc "PubSub topic of lobby-wide events (new rooms)."
+  def topic, do: @topic
 
   def init(socket) do
     user_room_approval_topic = Broadcast.Topic.user_room_approval(socket.assigns.my_id)
@@ -36,8 +54,8 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign_user_list()
     |> assign_room_list()
     |> assign_admin()
-    |> process(&approve_pending_requests/1)
-    |> process(&join_approved_requests/1)
+    |> process(&RoomRequests.approve_pending_requests/1)
+    |> process(&RoomRequests.join_approved_requests/1)
   end
 
   def refresh_rooms_and_users(%{assigns: %{search_filter: :on}} = socket), do: socket
@@ -46,36 +64,6 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     socket
     |> assign_room_list()
     |> assign_user_list()
-  end
-
-  def new_room(%{assigns: %{me: me, monotonic_offset: time_offset}} = socket, name, type)
-      when type in [:public, :request, :private, :cargo] do
-    {cargo?, type} =
-      case type do
-        :cargo ->
-          {true, :request}
-
-        type ->
-          {false, type}
-      end
-
-    {new_room_identity, new_room} =
-      Rooms.add(me, name, type) |> tap(fn {_, room} -> RoomsBroker.put(room) end)
-
-    new_room_card = Chat.Card.from_identity(new_room_identity)
-    send(self(), {:maybe_activate_cargo_room, cargo?, new_room, new_room_identity})
-
-    me |> Log.create_room(Chat.Time.monotonic_to_unix(time_offset), new_room_identity, type)
-
-    ChangeTracker.on_saved(fn ->
-      PubSub.broadcast!(Chat.PubSub, @topic, {:new_room, new_room_card})
-    end)
-
-    socket
-    |> Page.Room.close()
-    |> Page.Room.store_new(new_room_identity)
-    |> Page.Shared.update_onliners_presence()
-    |> Page.Room.init({new_room_identity, new_room})
   end
 
   @deprecated "Use Chat.Sync.DbBrokers/0 instead"
@@ -133,88 +121,6 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     |> assign_room_list(String.trim(name))
   end
 
-  def request_room(
-        %{assigns: %{me: me, monotonic_offset: time_offset, new_rooms: rooms}} = socket,
-        room_key
-      ) do
-    time = Chat.Time.monotonic_to_unix(time_offset)
-
-    room =
-      Rooms.add_request(room_key, me, time, fn req_message ->
-        Page.Room.broadcast_new_message(req_message, room_key, me, time)
-      end)
-
-    Rooms.RoomsBroker.put(room)
-
-    Log.request_room_key(me, time, room.pub_key)
-
-    Broadcast.room_requested(room, me |> Identity.pub_key())
-
-    socket
-    |> assign(
-      :new_rooms,
-      Enum.map(rooms, fn
-        %{pub_key: pub_key} when pub_key == room.pub_key -> Map.put(room, :is_requested?, true)
-        other_room -> other_room
-      end)
-    )
-  end
-
-  def approve_room_request(
-        %{assigns: %{room_map: room_map, me: me, monotonic_offset: time_offset}} = socket,
-        room_or_hash,
-        user_key
-      ) do
-    room =
-      case room_or_hash do
-        %Rooms.Room{} = room ->
-          Rooms.approve_request(room, user_key, room_map[room.pub_key], public_only: true)
-
-        room_hash ->
-          room_key = room_hash |> Base.decode16!(case: :lower)
-          Rooms.approve_request(room_key, user_key, room_map[room_key], public_only: true)
-      end
-
-    case Rooms.get_request(room, user_key) do
-      %RoomRequest{ciphered_room_identity: ciphered} when is_bitstring(ciphered) ->
-        time = Chat.Time.monotonic_to_unix(time_offset)
-        Log.approve_room_request(me, time, room.pub_key)
-
-        Broadcast.room_request_approved(user_key, room.pub_key, ciphered)
-
-      _ ->
-        :ok
-    end
-
-    socket
-  rescue
-    _ -> socket
-  end
-
-  def join_approved_room(
-        %{assigns: %{me: me, my_id: my_id, monotonic_offset: time_offset, room_map: room_map}} =
-          socket,
-        ciphered_room_identity,
-        user_key,
-        room_key
-      )
-      when my_id == user_key do
-    if Map.has_key?(room_map, room_key) do
-      socket
-    else
-      new_room_identity = Rooms.decipher_identity_with_key(ciphered_room_identity, me, room_key)
-
-      time = Chat.Time.monotonic_to_unix(time_offset)
-      Rooms.clear_approved_request(new_room_identity, me)
-      Log.got_room_key(me, time, new_room_identity |> Identity.pub_key())
-
-      socket
-      |> Page.Room.store_new(new_room_identity)
-    end
-  end
-
-  def join_approved_room(socket, _, _, _), do: socket
-
   def set_db_status(socket, status) do
     socket
     |> assign(:db_status, status)
@@ -233,59 +139,6 @@ defmodule ChatWeb.MainLive.Page.Lobby do
     PubSub.unsubscribe(Chat.PubSub, user_room_approval_topic)
 
     socket
-  end
-
-  defp assign_user_list(socket, search_term \\ "")
-
-  defp assign_user_list(%{assigns: %{my_id: id}} = socket, search_term) when search_term == "" do
-    socket
-    |> assign(
-      :users,
-      UsersBroker.list()
-      |> Enum.split_with(fn card -> card.pub_key == id end)
-      |> then(fn {[mine], others} -> [mine | others] end)
-    )
-  end
-
-  defp assign_user_list(%{assigns: %{my_id: id}} = socket, search_term) do
-    socket
-    |> assign(
-      :users,
-      UsersBroker.list(search_term) |> Enum.reject(fn user -> user.pub_key == id end)
-    )
-  end
-
-  defp assign_room_list(%{assigns: %{room_map: rooms, my_id: my_id}} = socket, search_term \\ "") do
-    {joined, new} =
-      if search_term == "",
-        do: RoomsBroker.list(rooms),
-        else: RoomsBroker.list(rooms, search_term)
-
-    new =
-      Enum.map(new, fn room ->
-        Map.put(room, :is_requested?, Rooms.requested_by?(room.pub_key, my_id))
-      end)
-
-    socket
-    |> assign(:joined_rooms, joined)
-    |> assign(:new_rooms, new)
-  end
-
-  defp assign_admin(%{assigns: %{room_map: rooms}} = socket) do
-    has_admin_key =
-      with admin_pub_key <- AdminRoom.pub_key(),
-           false <- is_nil(admin_pub_key),
-           some_data <- admin_pub_key |> Enigma.hash(),
-           identity <- rooms[admin_pub_key],
-           false <- is_nil(identity),
-           sign <- Enigma.sign(some_data, identity.private_key),
-           true <- Enigma.valid_sign?(sign, some_data, admin_pub_key) do
-        true
-      else
-        _ -> false
-      end
-
-    socket |> assign(:is_admin, has_admin_key)
   end
 
   defp close_current_mode(%{assigns: %{lobby_mode: :chats}} = socket),
@@ -313,42 +166,6 @@ defmodule ChatWeb.MainLive.Page.Lobby do
 
   defp init_new_mode(%{assigns: %{lobby_mode: :admin}} = socket),
     do: socket |> Page.AdminPanel.init()
-
-  defp approve_pending_requests(socket) do
-    %{room_map: room_map, me: me, monotonic_offset: time_offset} = socket.assigns
-
-    for room_key <- Map.keys(room_map),
-        %RoomRequest{requester_key: user_key} <- Rooms.list_pending_requests(room_key),
-        room = Rooms.approve_request(room_key, user_key, room_map[room_key], public_only: true) do
-      Rooms.RoomsBroker.put(room)
-
-      case Rooms.get_request(room, user_key) do
-        %RoomRequest{ciphered_room_identity: ciphered} when is_bitstring(ciphered) ->
-          time = Chat.Time.monotonic_to_unix(time_offset)
-          Log.approve_room_request(me, time, room.pub_key)
-          Broadcast.room_request_approved(user_key, room.pub_key, ciphered)
-
-        _ ->
-          :ok
-      end
-    end
-  rescue
-    _ -> :skip
-  end
-
-  defp join_approved_requests(socket) do
-    %{new_rooms: rooms, my_id: my_id} = socket.assigns
-    root_pid = socket.root_pid
-
-    for %Rooms.Room{} = room <- rooms,
-        request <- Rooms.list_approved_requests_for(room, my_id),
-        ciphered = request.ciphered_room_identity,
-        true == is_bitstring(ciphered) do
-      send(root_pid, {:room_request_approved, ciphered, my_id, room.pub_key})
-    end
-  rescue
-    _ -> :skip
-  end
 
   defp get_version do
     cond do

@@ -531,3 +531,24 @@ Proposed.
   on the same host, behind the same PoP.
 - [PQ access gating](pq_access_gating.done.md) — the server identity
   and AdminDB that the node module uses.
+
+**The TypeScript services this port follows** (private,
+`Community-secret-sharing`), pinned to the revisions this document was
+written against:
+- [`backitup-node` @ `7674e89`](https://github.com/Community-secret-sharing/backitup-node/tree/7674e894b8db31b8ea1817299beaadb0fd61bed7)
+  — node protocol v3, its gates and their tests (§ Nodes). Open on top of it:
+  [#3](https://github.com/Community-secret-sharing/backitup-node/pull/3)
+  (`e962629`), review rounds 5–10 on v3.
+- [`backitup-recovery-backend` @ `9ba2ab0`](https://github.com/Community-secret-sharing/backitup-recovery-backend/tree/9ba2ab0ffb96381c476c1bb891effffa3c4d0871)
+  — relayer, indexer, read API and notifications: request and response
+  bodies, configuration variables, `test/relayer.test.ts`. Open on top of it:
+  [#4](https://github.com/Community-secret-sharing/backitup-recovery-backend/pull/4)
+  (`d8bfe03`), relayer nonce and hourly gas budget;
+  [#3](https://github.com/Community-secret-sharing/backitup-recovery-backend/pull/3)
+  (`528a73e`), Telegram link from the app.
+- [`backitup-secret-recovery-sdk` @ `3900a8f`](https://github.com/Community-secret-sharing/backitup-secret-recovery-sdk/tree/3900a8fceb3c5e66a1ef3267f25f90dc148c3197)
+  — v3 messages, ECIES, and the acceptance
+  [harness](https://github.com/Community-secret-sharing/backitup-secret-recovery-sdk/blob/3900a8fceb3c5e66a1ef3267f25f90dc148c3197/harness/run.mjs).
+- [`backitup-smart-contracts` @ `209f13a`](https://github.com/Community-secret-sharing/backitup-smart-contracts/tree/209f13a1f729b0e7c43f9f5d35c326e1e01a9653)
+  — `SecretRecovery` and `KeyRegistry`, whose ABI and events the relayer and
+  indexer encode and decode.

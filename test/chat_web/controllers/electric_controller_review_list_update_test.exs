@@ -12,15 +12,15 @@ defmodule ChatWeb.ElectricControllerReviewListUpdateTest do
   use ChatWeb.ConnCase, async: true
   use ChatWeb.DataCase
 
+  import Chat.Test.ElectricIngestHelpers,
+    only: [post_ingest: 3, signature_and_hash: 3, to_base64: 1]
+
   import Chat.Test.ReviewFixtures
 
-  alias Chat.Challenge
-  alias Chat.Data.Integrity
   alias Chat.Data.ReviewList, as: ReviewListData
   alias Chat.Data.Schemas.ReviewList
   alias Chat.Data.Types.ReviewListSignHash
   alias Chat.Data.User, as: UserData
-  alias EnigmaPq
 
   setup %{conn: conn} do
     author = UserData.generate_pq_identity("Author")
@@ -158,7 +158,8 @@ defmodule ChatWeb.ElectricControllerReviewListUpdateTest do
       owner_timestamp: System.os_time(:second)
     }
 
-    {sign_b64, sign_hash} = sign(entry, ctx.author.sign_skey)
+    {sign_b64, sign_hash} =
+      signature_and_hash(entry, ctx.author.sign_skey, &ReviewListSignHash.from_binary/1)
 
     mutation = %{
       "type" => "insert",
@@ -206,7 +207,8 @@ defmodule ChatWeb.ElectricControllerReviewListUpdateTest do
         _full -> merged
       end
 
-    {sign_b64, sign_hash} = sign(to_sign, ctx.author.sign_skey)
+    {sign_b64, sign_hash} =
+      signature_and_hash(to_sign, ctx.author.sign_skey, &ReviewListSignHash.from_binary/1)
 
     %{
       "type" => "update",
@@ -222,24 +224,5 @@ defmodule ChatWeb.ElectricControllerReviewListUpdateTest do
       },
       "syncMetadata" => %{"relation" => "review_list"}
     }
-  end
-
-  defp sign(struct, sign_skey) do
-    sign_b64 = struct |> Integrity.signature_payload() |> EnigmaPq.sign(sign_skey)
-    {sign_b64, sign_b64 |> EnigmaPq.hash() |> ReviewListSignHash.from_binary()}
-  end
-
-  defp to_base64(bin), do: Base.encode64(bin, padding: false)
-
-  defp post_ingest(conn, payload, sign_skey) do
-    {challenge_id, challenge} = Challenge.store()
-    signature_b64 = challenge |> EnigmaPq.sign(sign_skey) |> Base.encode64(padding: false)
-
-    payload =
-      Map.put(payload, "auth", %{"challenge_id" => challenge_id, "signature" => signature_b64})
-
-    conn
-    |> put_req_header("content-type", "application/json")
-    |> post("/electric/v1/ingest", Jason.encode!(payload))
   end
 end

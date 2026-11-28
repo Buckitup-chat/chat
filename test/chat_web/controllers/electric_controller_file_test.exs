@@ -2,7 +2,8 @@ defmodule ChatWeb.ElectricControllerFileTest do
   use ChatWeb.ConnCase, async: true
   use ChatWeb.DataCase
 
-  alias Chat.Challenge
+  import Chat.Test.ElectricIngestHelpers, only: [post_ingest: 3, to_base64: 1]
+
   alias Chat.Data.File, as: FileData
   alias Chat.Data.Integrity
   alias Chat.Data.Schemas.File, as: FileSchema
@@ -285,24 +286,5 @@ defmodule ChatWeb.ElectricControllerFileTest do
     result = post_ingest(conn, payload, sign_skey)
     assert result.status == 200, result.resp_body
     result
-  end
-
-  defp to_base64(bin), do: Base.encode64(bin, padding: false)
-
-  defp post_ingest(conn, payload, sign_skey) do
-    {challenge_id, challenge} = Challenge.store()
-
-    signature_b64 =
-      challenge
-      |> EnigmaPq.sign(sign_skey)
-      |> Base.encode64(padding: false)
-
-    payload =
-      payload
-      |> Map.put("auth", %{"challenge_id" => challenge_id, "signature" => signature_b64})
-
-    conn
-    |> put_req_header("content-type", "application/json")
-    |> post("/electric/v1/ingest", Jason.encode!(payload))
   end
 end

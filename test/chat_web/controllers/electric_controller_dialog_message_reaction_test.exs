@@ -8,16 +8,17 @@ defmodule ChatWeb.ElectricControllerDialogMessageReactionTest do
   use ChatWeb.ConnCase, async: true
   use ChatWeb.DataCase
 
-  alias Chat.Challenge
+  import Chat.Test.ElectricIngestFixtures,
+    only: [signed_dialog_key: 4, signed_message: 3]
+
+  import Chat.Test.ElectricIngestHelpers,
+    only: [maybe_base64: 1, post_ingest_each: 3, to_base64: 1]
+
   alias Chat.Data.Dialog
   alias Chat.Data.Integrity
-  alias Chat.Data.Schemas.DialogKey
-  alias Chat.Data.Schemas.DialogMessage
   alias Chat.Data.Schemas.DialogMessageReaction
   alias Chat.Data.Types.DialogHash
-  alias Chat.Data.Types.DialogMessageId
   alias Chat.Data.Types.DialogMessageReactionHash
-  alias Chat.Data.Types.DialogMessageSignHash
   alias Chat.Data.User, as: UserData
   alias Chat.NetworkSynchronization.Electric.ShapeWriter
 
@@ -96,23 +97,6 @@ defmodule ChatWeb.ElectricControllerDialogMessageReactionTest do
     msg
   end
 
-  defp signed_message(identity, dialog_hash, sender_hash, attrs \\ []) do
-    msg = %DialogMessage{
-      message_id: Keyword.get(attrs, :message_id, DialogMessageId.generate()),
-      dialog_hash: dialog_hash,
-      sender_hash: sender_hash,
-      content_b64: Keyword.get(attrs, :content_b64, :crypto.strong_rand_bytes(32)),
-      deleted_flag: Keyword.get(attrs, :deleted_flag, false),
-      refs_map_b64: Keyword.get(attrs, :refs_map_b64, :crypto.strong_rand_bytes(24)),
-      parent_sign_hash: Keyword.get(attrs, :parent_sign_hash, nil),
-      owner_timestamp: Keyword.get(attrs, :owner_timestamp, System.os_time(:millisecond))
-    }
-
-    sign_b64 = msg |> Integrity.signature_payload() |> EnigmaPq.sign(identity.sign_skey)
-    sign_hash = sign_b64 |> EnigmaPq.hash() |> DialogMessageSignHash.from_binary()
-    %{msg | sign_b64: sign_b64, sign_hash: sign_hash}
-  end
-
   defp insert_persisted_reaction(ctx, message) do
     reaction = %DialogMessageReaction{
       reaction_hash: DialogMessageReactionHash.from_binary(:crypto.strong_rand_bytes(64)),
@@ -136,21 +120,6 @@ defmodule ChatWeb.ElectricControllerDialogMessageReactionTest do
     updated = %{reaction | deleted_flag: true, owner_timestamp: reaction.owner_timestamp + 1}
     sign_b64 = updated |> Integrity.signature_payload() |> EnigmaPq.sign(identity.sign_skey)
     %{updated | sign_b64: sign_b64}
-  end
-
-  defp signed_dialog_key(identity, dialog_hash, sender_hash, peer_hash) do
-    dk = %DialogKey{
-      dialog_hash: dialog_hash,
-      sender_hash: sender_hash,
-      peer_hash: peer_hash,
-      peer_kem_wrap_key_b64: :crypto.strong_rand_bytes(32),
-      peer_wrapped_msg_key_b64: :crypto.strong_rand_bytes(44),
-      owner_timestamp: System.os_time(:millisecond),
-      deleted_flag: false
-    }
-
-    sign_b64 = dk |> Integrity.signature_payload() |> EnigmaPq.sign(identity.sign_skey)
-    %{dk | sign_b64: sign_b64}
   end
 
   defp insert_signed_user_card(identity) do
@@ -202,26 +171,5 @@ defmodule ChatWeb.ElectricControllerDialogMessageReactionTest do
       },
       "syncMetadata" => %{"relation" => "dialog_message_reactions"}
     }
-  end
-
-  defp to_base64(bin) when is_binary(bin), do: Base.encode64(bin, padding: false)
-
-  defp maybe_base64(nil), do: nil
-  defp maybe_base64(bin), do: to_base64(bin)
-
-  defp post_ingest_each(conn, payload, sign_skey) do
-    {challenge_id, challenge} = Challenge.store()
-
-    signature_b64 =
-      challenge
-      |> EnigmaPq.sign(sign_skey)
-      |> Base.encode64(padding: false)
-
-    payload =
-      Map.put(payload, "auth", %{"challenge_id" => challenge_id, "signature" => signature_b64})
-
-    conn
-    |> put_req_header("content-type", "application/json")
-    |> post("/electric/v1/ingest_each", Jason.encode!(payload))
   end
 end

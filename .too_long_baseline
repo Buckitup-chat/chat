@@ -1,6 +1,5 @@
 304 lib/chat/db/scope/key_scope.ex
 341 lib/chat/signed_parcel.ex
-636 lib/chat_web/live/electric_live/dialog_sandbox_live/api_client.ex
 608 lib/chat_web/live/electric_live/dialog_sandbox_live/components.ex
 480 lib/chat_web/live/electric_live/index.ex
 371 lib/chat_web/live/electric_live/sandbox_http.ex

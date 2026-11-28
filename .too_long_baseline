@@ -17,7 +17,6 @@
 370 lib/chat_web/live/main_live/page/recover_key_share.ex
 629 lib/chat_web/live/proxy_live/page/dialog.ex
 601 lib/chat_web/live/proxy_live/page/lobby.ex
-798 lib/chat_web/live/proxy_live/page/room.ex
 308 lib/chat_web/router.ex
 618 test/chat_web/controllers/electric_controller_candidate_ingest_test.exs
 623 test/chat_web/controllers/electric_controller_review_test.exs

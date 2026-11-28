@@ -2,7 +2,6 @@
 341 lib/chat/signed_parcel.ex
 636 lib/chat_web/live/electric_live/dialog_sandbox_live/api_client.ex
 608 lib/chat_web/live/electric_live/dialog_sandbox_live/components.ex
-793 lib/chat_web/live/electric_live/dialog_sandbox_live/index.ex
 480 lib/chat_web/live/electric_live/index.ex
 371 lib/chat_web/live/electric_live/sandbox_http.ex
 463 lib/chat_web/live/electric_live/user_sandbox_live/api_client.ex

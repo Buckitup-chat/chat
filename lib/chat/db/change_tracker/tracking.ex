@@ -3,7 +3,6 @@ defmodule Chat.Db.ChangeTracker.Tracking do
   Tracking logic
   """
 
-  require Logger
   require Record
 
   Record.defrecordp(:tracker,
@@ -23,6 +22,8 @@ defmodule Chat.Db.ChangeTracker.Tracking do
       end
 
     :dev ->
+      require Logger
+
       def expiry_callback([]), do: nil
 
       def expiry_callback(changes),

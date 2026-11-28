@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MIX_ENV: test
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Elixir
+        id: beam
+        uses: erlef/setup-beam@v1.24.1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      - name: Cache deps and _build
+        uses: actions/cache@v6
+        with:
+          path: |
+            deps
+            _build
+          key: mix-ubuntu-26.04-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            mix-ubuntu-26.04-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-
+
+      - run: mix deps.get
+
+      - name: Compile, format, credo, unused deps, sobelow, file length
+        run: make ci-check
+
+      # Restore and save are split so the PLT is saved even when dialyzer reports warnings.
+      - name: Restore PLT cache
+        id: plt_cache
+        uses: actions/cache/restore@v6
+        with:
+          path: priv/plts
+          key: plt-ubuntu-26.04-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            plt-ubuntu-26.04-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-
+
+      - name: Build PLT
+        if: steps.plt_cache.outputs.cache-hit != 'true'
+        run: mkdir -p priv/plts && mix dialyzer --plt
+
+      - name: Save PLT cache
+        if: steps.plt_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: priv/plts
+          key: ${{ steps.plt_cache.outputs.cache-primary-key }}
+
+      - name: Dialyzer
+        run: mix dialyzer --format github --format dialyxir
+
+  test:
+    name: test
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Elixir
+        id: beam
+        uses: erlef/setup-beam@v1.24.1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      # EnigmaPq uses ML-DSA-87 / ML-KEM-1024: OTP must link OpenSSL >= 3.5 (ubuntu-26.04 has 3.5.x)
+      - name: Check post-quantum crypto support
+        run: |
+          erl -noshell -eval '
+            io:format("~s~n", [element(3, hd(crypto:info_lib()))]),
+            Need = [{public_keys, mldsa87}, {kems, mlkem1024}],
+            Missing = [A || {K, A} <- Need, not lists:member(A, proplists:get_value(K, crypto:supports(), []))],
+            case Missing of [] -> halt(0); _ -> io:format("missing: ~p~n", [Missing]), halt(1) end.'
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+          cache: npm
+          cache-dependency-path: assets/package-lock.json
+
+      # wal_level is read only at server start and services: can't pass server flags,
+      # so PostgreSQL runs as a plain container. PgPairCase needs logical replication.
+      - name: Start PostgreSQL (wal_level=logical)
+        run: |
+          docker run -d --name pg -p 5432:5432 \
+            -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
+            postgres:18 \
+            -c wal_level=logical -c max_replication_slots=10 -c max_wal_senders=10
+          for _ in $(seq 1 30); do
+            docker exec pg pg_isready -U postgres -q && break
+            sleep 1
+          done
+          test "$(docker exec pg psql -U postgres -tAc 'SHOW wal_level')" = logical
+
+      - name: Cache deps and _build
+        uses: actions/cache@v6
+        with:
+          path: |
+            deps
+            _build
+          key: mix-ubuntu-26.04-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            mix-ubuntu-26.04-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-
+
+      - run: mix deps.get
+
+      - name: Tests and coverage gates
+        run: make ci-test
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: cover/
+          if-no-files-found: ignore

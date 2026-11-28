@@ -73,7 +73,11 @@ defmodule Chat.MixProject do
     Keyword.merge(project,
       consolidate_protocols: Mix.env() != :dev,
       test_coverage: [tool: ExCoveralls],
-      dialyzer: [plt_add_apps: [:ex_unit]],
+      dialyzer: [
+        plt_add_apps: [:ex_unit],
+        plt_core_path: "priv/plts",
+        plt_local_path: "priv/plts"
+      ],
       releases: [
         chat: [
           version: build_version(),

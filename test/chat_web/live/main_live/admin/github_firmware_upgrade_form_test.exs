@@ -3,7 +3,8 @@ defmodule ChatWebTest.MainLive.Admin.GithubFirmwareUpgradeFormTest do
 
   import Phoenix.LiveViewTest
   import LiveIsolatedComponent
-  import Rewire
+  import Support.Rewire
+  import Support.RetryHelper
 
   alias ChatWeb.MainLive.Admin.GithubFirmwareUpgradeForm
 
@@ -62,8 +63,7 @@ defmodule ChatWebTest.MainLive.Admin.GithubFirmwareUpgradeFormTest do
 
       assert html =~ "Loading releases..."
 
-      # Wait for async fetch to complete
-      :timer.sleep(100)
+      await_releases(view)
 
       html = render(view)
       assert html =~ "v0.4.1"
@@ -76,12 +76,7 @@ defmodule ChatWebTest.MainLive.Admin.GithubFirmwareUpgradeFormTest do
     end
 
     test "can select a different release" do
-      {:ok, view, _html} =
-        live_isolated_component(GithubFirmwareUpgradeForm,
-          assigns: %{id: :github_firmware_upgrade_form}
-        )
-
-      :timer.sleep(100)
+      view = mount_form()
 
       view
       |> form("form", %{"release" => "v0.4.0"})
@@ -91,12 +86,7 @@ defmodule ChatWebTest.MainLive.Admin.GithubFirmwareUpgradeFormTest do
     end
 
     test "clicking Install sends confirmation message to parent" do
-      {:ok, view, _html} =
-        live_isolated_component(GithubFirmwareUpgradeForm,
-          assigns: %{id: :github_firmware_upgrade_form}
-        )
-
-      :timer.sleep(100)
+      view = mount_form()
 
       view
       |> element("button", "Install")
@@ -110,12 +100,7 @@ defmodule ChatWebTest.MainLive.Admin.GithubFirmwareUpgradeFormTest do
 
   describe "download flow" do
     test "shows downloading state with progress" do
-      {:ok, view, _html} =
-        live_isolated_component(GithubFirmwareUpgradeForm,
-          assigns: %{id: :github_firmware_upgrade_form}
-        )
-
-      :timer.sleep(100)
+      view = mount_form()
 
       Phoenix.LiveView.send_update(view.pid, GithubFirmwareUpgradeForm,
         id: :github_firmware_upgrade_form,
@@ -147,12 +132,7 @@ defmodule ChatWebTest.MainLive.Admin.GithubFirmwareUpgradeFormTest do
     test "broadcasts upgrade request to platform" do
       Phoenix.PubSub.subscribe(Chat.PubSub, @outgoing_topic)
 
-      {:ok, view, _html} =
-        live_isolated_component(GithubFirmwareUpgradeForm,
-          assigns: %{id: :github_firmware_upgrade_form}
-        )
-
-      :timer.sleep(100)
+      view = mount_form()
 
       Phoenix.LiveView.send_update(view.pid, GithubFirmwareUpgradeForm,
         id: :github_firmware_upgrade_form,
@@ -170,10 +150,7 @@ defmodule ChatWebTest.MainLive.Admin.GithubFirmwareUpgradeFormTest do
 
   describe "error handling" do
     test "shows error when no releases found" do
-      {:ok, view, _html} =
-        live_isolated_component(GithubFirmwareUpgradeForm,
-          assigns: %{id: :github_firmware_upgrade_form}
-        )
+      view = mount_form()
 
       # Simulate empty releases response
       Phoenix.LiveView.send_update(view.pid, GithubFirmwareUpgradeForm,
@@ -187,10 +164,7 @@ defmodule ChatWebTest.MainLive.Admin.GithubFirmwareUpgradeFormTest do
     end
 
     test "shows error on fetch failure" do
-      {:ok, view, _html} =
-        live_isolated_component(GithubFirmwareUpgradeForm,
-          assigns: %{id: :github_firmware_upgrade_form}
-        )
+      view = mount_form()
 
       # Simulate error response
       Phoenix.LiveView.send_update(view.pid, GithubFirmwareUpgradeForm,
@@ -204,10 +178,7 @@ defmodule ChatWebTest.MainLive.Admin.GithubFirmwareUpgradeFormTest do
     end
 
     test "can retry after error" do
-      {:ok, view, _html} =
-        live_isolated_component(GithubFirmwareUpgradeForm,
-          assigns: %{id: :github_firmware_upgrade_form}
-        )
+      view = mount_form()
 
       # Simulate error
       Phoenix.LiveView.send_update(view.pid, GithubFirmwareUpgradeForm,
@@ -223,8 +194,7 @@ defmodule ChatWebTest.MainLive.Admin.GithubFirmwareUpgradeFormTest do
       |> element("button", "Retry")
       |> render_click()
 
-      # Wait for async fetch to complete and verify releases are shown
-      :timer.sleep(100)
+      await_releases(view)
 
       html = render(view)
       assert html =~ "v0.4.1"
@@ -232,12 +202,7 @@ defmodule ChatWebTest.MainLive.Admin.GithubFirmwareUpgradeFormTest do
     end
 
     test "shows error when upgrade fails" do
-      {:ok, view, _html} =
-        live_isolated_component(GithubFirmwareUpgradeForm,
-          assigns: %{id: :github_firmware_upgrade_form}
-        )
-
-      :timer.sleep(100)
+      view = mount_form()
 
       Phoenix.LiveView.send_update(view.pid, GithubFirmwareUpgradeForm,
         id: :github_firmware_upgrade_form,
@@ -248,4 +213,21 @@ defmodule ChatWebTest.MainLive.Admin.GithubFirmwareUpgradeFormTest do
       assert html =~ "Upgrade failed"
     end
   end
+
+  # Helpers
+
+  # The component fetches releases in a Task on mount. Wait for that update to land,
+  # so a simulated send_update in the test can't be overwritten by it afterwards.
+  defp mount_form do
+    {:ok, view, _html} =
+      live_isolated_component(GithubFirmwareUpgradeForm,
+        assigns: %{id: :github_firmware_upgrade_form}
+      )
+
+    await_releases(view)
+    view
+  end
+
+  defp await_releases(view),
+    do: retry_until(2000, fn -> assert render(view) =~ "v0.4.1" end)
 end

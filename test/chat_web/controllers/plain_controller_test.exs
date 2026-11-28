@@ -1,6 +1,6 @@
 defmodule ChatWeb.PlainControllerTest do
   use ChatWeb.ConnCase, async: true
-  import Rewire
+  import Support.Rewire
 
   # Define mock module for AdminRoom
   defmodule AdminRoomMock do

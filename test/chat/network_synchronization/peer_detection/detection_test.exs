@@ -1,6 +1,6 @@
 defmodule ChatTest.NetworkSynchronization.PeerDetection.DetectionTest do
   use ExUnit.Case, async: true
-  import Rewire
+  import Support.Rewire
 
   alias Chat.NetworkSynchronization.PeerDetection.LanDetection
   alias ChatSupport.Mocks.NetworkSynchronization.NeuronMockForLanDetection

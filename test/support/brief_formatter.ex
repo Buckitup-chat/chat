@@ -9,6 +9,7 @@ defmodule Chat.Test.BriefFormatter do
   use GenServer
 
   @max_reason 300
+  @max_tail 200
 
   @impl true
   def init(opts) do
@@ -54,8 +55,15 @@ defmodule Chat.Test.BriefFormatter do
     |> Exception.format_banner(reason, [])
     |> String.replace(~r/\s+/, " ")
     |> String.trim()
-    |> String.slice(0, @max_reason)
+    |> shorten()
   end
+
+  # Exits put the actual reason (`** (EXIT) ...`) after a possibly huge call
+  # message, so keep both ends of a long reason
+  defp shorten(reason) when byte_size(reason) <= @max_reason, do: reason
+
+  defp shorten(reason),
+    do: String.slice(reason, 0, @max_reason) <> " … " <> String.slice(reason, -@max_tail..-1//1)
 
   defp write_summary(state, times) do
     seconds = Float.round(Map.get(times, :run, 0) / 1_000_000, 1)

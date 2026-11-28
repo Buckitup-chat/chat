@@ -1,7 +1,7 @@
 defmodule Chat.Data.File.DriveCopySourceTest do
   use ExUnit.Case, async: false
 
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Data.File.ChunkStore
   alias Chat.Data.File.DriveCopySource
@@ -50,8 +50,11 @@ defmodule Chat.Data.File.DriveCopySourceTest do
     tmp_dir = System.tmp_dir!() |> Path.join("dcs_test_#{System.unique_integer([:positive])}")
     on_exit(fn -> File.rm_rf!(tmp_dir) end)
 
-    {:ok, pid} = GenServer.start_link(DriveCopySource, unit: @own)
-    on_exit(fn -> if Process.alive?(pid), do: GenServer.stop(pid, :normal, 1_000) end)
+    pid =
+      start_supervised!(%{
+        id: DriveCopySource,
+        start: {GenServer, :start_link, [DriveCopySource, [unit: @own]]}
+      })
 
     %{pid: pid, tmp_dir: tmp_dir}
   end

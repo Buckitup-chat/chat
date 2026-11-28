@@ -1,6 +1,6 @@
 defmodule ChatTest.NetworkSynchronization.PeerSyncDeciderTest do
   use ExUnit.Case, async: false
-  import Rewire
+  import Support.Rewire
 
   alias Chat.AdminDb
   alias Chat.Pq.OwnerBootstrap

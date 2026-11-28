@@ -47,6 +47,8 @@ defmodule NaiveApi.RoomTest do
       FakeData.image(@image_name)
       |> Rooms.add_new_message(me, room_identity)
 
+      ChangeTracker.await()
+
       [me: me, room_identity: room_identity]
     end
 

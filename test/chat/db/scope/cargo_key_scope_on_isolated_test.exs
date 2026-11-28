@@ -13,6 +13,8 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
 
   alias Chat.{
     AdminRoom,
+    Db.ChangeTracker,
+    Db.Copying,
     Db.Scope.KeyScope,
     Dialogs,
     Identity,
@@ -22,8 +24,6 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
     User,
     Utils
   }
-
-  alias Chat.Db.Copying
 
   test "user and checkpoint got room invites", %{isolated_dbs: dbs} do
     {[[checkpoint_1], checkpoint_key], [operator], [user]} = setup_test_data(1, 1, 1)
@@ -232,6 +232,9 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
 
   defp copy_cargo_to(context, target_db, checkpoints) do
     tap(context, fn %{room_identity: room_identity} = context ->
+      # invites are written through the db write queue; scan keys only once they landed
+      ChangeTracker.await()
+
       Chat.Db.db()
       |> KeyScope.get_cargo_keys(room_identity.public_key, checkpoints)
       |> then(

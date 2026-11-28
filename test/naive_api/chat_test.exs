@@ -62,6 +62,8 @@ defmodule NaiveApi.ChatTest do
       |> Messages.RoomInvite.new()
       |> Dialogs.add_new_message(me, dialog)
 
+      ChangeTracker.await()
+
       [me: me, peer: peer]
     end
 
@@ -295,6 +297,8 @@ defmodule NaiveApi.ChatTest do
           "uploadKey" => upload_key
         }
       )
+
+      ChangeTracker.await()
 
       {:ok, %{data: %{"chatRead" => [file_message]}}} =
         Absinthe.run(@chat_read_query, @schema,

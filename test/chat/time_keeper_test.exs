@@ -2,7 +2,7 @@ defmodule Chat.TimeKeeperTest do
   use ExUnit.Case, async: false
 
   import ExUnit.CaptureLog
-  import Rewire
+  import Support.Rewire
 
   alias Chat.TimeKeeper
 

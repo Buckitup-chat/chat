@@ -1,7 +1,7 @@
 defmodule Chat.Sync.DbBrokersTest do
   use ExUnit.Case, async: false
 
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Sync.DbBrokers
   alias Phoenix.PubSub

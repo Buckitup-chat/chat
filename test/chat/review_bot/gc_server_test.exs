@@ -1,6 +1,6 @@
 defmodule Chat.ReviewBot.GcServerTest do
   use ExUnit.Case, async: false
-  import Rewire
+  import Support.Rewire
 
   @now 1_700_000_000
   @tombstone_grace div(:timer.hours(24 * 3 * 7), 1000)

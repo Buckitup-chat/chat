@@ -3,7 +3,7 @@ defmodule Chat.Storage.Link.ReplicationBranchesTest do
   use ExUnit.Case, async: false
 
   import Chat.Storage.Link, only: [~>: 2]
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Storage.Link
   alias Chat.Storage.Links

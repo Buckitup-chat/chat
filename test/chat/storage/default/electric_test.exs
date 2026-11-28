@@ -2,7 +2,7 @@ defmodule Chat.Storage.Default.ElectricTest do
   use Chat.Test.PgPairCase, mode: :committed, async: false
 
   import ExUnit.CaptureLog
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Storage.Default.Electric
   alias Chat.Storage.Unit

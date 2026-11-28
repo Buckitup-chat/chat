@@ -2,7 +2,7 @@ defmodule Chat.Storage.Link.BootstrapBranchesTest do
   # registers the global CubDB names of main and backup, and shares the `Links` table
   use ExUnit.Case, async: false
 
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Data.Schemas.FileChunk
   alias Chat.Data.Schemas.UserCard

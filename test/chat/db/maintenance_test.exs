@@ -1,6 +1,6 @@
 defmodule Chat.Db.MaintenanceTest do
   use ExUnit.Case, async: true
-  import Rewire
+  import Support.Rewire
 
   defmodule CubDbMock do
     def current_db_file(_), do: "/fake/size_1234"

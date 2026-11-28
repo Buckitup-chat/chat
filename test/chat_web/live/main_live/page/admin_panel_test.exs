@@ -5,7 +5,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
   import Phoenix.LiveViewTest
 
   alias Chat.Admin.{BackupSettings, CargoSettings, MediaSettings}
-  alias Chat.{AdminDb, AdminRoom, Db, Identity, User}
+  alias Chat.{AdminDb, AdminRoom, Card, Db, Dialogs, Identity, User}
   alias Chat.Db.ChangeTracker
   alias Chat.User.UsersBroker
   alias ChatWeb.MainLive.Admin.FirmwareUpgradeForm
@@ -237,7 +237,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
 
   describe "cargo user form" do
     test "create a cargo user", %{conn: conn} do
-      %{view: view} = prepare_view(%{conn: conn})
+      %{view: view, socket: %{assigns: %{me: admin}}} = prepare_view(%{conn: conn})
 
       view
       |> element(".navbar button", "Admin")
@@ -252,7 +252,8 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
       assert view |> render() =~ "CargoBot888"
       assert view |> render() =~ "Download the Keys"
 
-      :timer.sleep(1000)
+      # the backup text and file messages are written by a background task
+      assert :ok = wait_until(fn -> backup_file_sent?(admin) end, "backup file", timeout: 5_000)
       ChangeTracker.await()
 
       view
@@ -278,7 +279,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
     end
 
     test "upload a cargo user", %{conn: conn} do
-      %{view: view} = prepare_view(%{conn: conn})
+      %{view: view, socket: %{assigns: %{me: admin}}} = prepare_view(%{conn: conn})
 
       view
       |> element(".navbar button", "Admin")
@@ -308,7 +309,8 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
       assert view |> render() =~ "Test User"
       assert view |> render() =~ "Download the Keys"
 
-      :timer.sleep(1000)
+      # the backup text and file messages are written by a background task
+      assert :ok = wait_until(fn -> backup_file_sent?(admin) end, "backup file", timeout: 5_000)
       ChangeTracker.await()
 
       view
@@ -447,6 +449,19 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
       send(view.pid, {:admin, :firmware_upgraded})
 
       assert view |> render() =~ "Firmware upgraded"
+    end
+  end
+
+  defp backup_file_sent?(admin) do
+    case AdminRoom.get_cargo_user() do
+      %Identity{} = cargo_user ->
+        cargo_user
+        |> Dialogs.open(Card.from_identity(admin))
+        |> Dialogs.read(admin)
+        |> Enum.any?(&(&1.type == :file))
+
+      _ ->
+        false
     end
   end
 end

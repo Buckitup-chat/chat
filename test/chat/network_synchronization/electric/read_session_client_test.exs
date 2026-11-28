@@ -3,7 +3,7 @@ defmodule Chat.NetworkSynchronization.Electric.ReadSessionClientTest do
   use ChatWeb.DataCase
 
   import Chat.Test.ReadGateHelpers
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Data.User
   alias Chat.NetworkSynchronization.Electric.ReadSessionClient

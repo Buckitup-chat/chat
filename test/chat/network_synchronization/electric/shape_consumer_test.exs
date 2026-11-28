@@ -1,7 +1,7 @@
 defmodule Chat.NetworkSynchronization.Electric.ShapeConsumerTest do
   use ExUnit.Case, async: true, group: :ets_deferred
 
-  import Rewire
+  import Support.Rewire
   import ChatSupport.Utils, only: [await_till: 2]
 
   alias Chat.Data.Schemas.UserCard

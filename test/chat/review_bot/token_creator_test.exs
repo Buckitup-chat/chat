@@ -1,6 +1,6 @@
 defmodule Chat.ReviewBot.TokenCreatorTest do
   use ExUnit.Case, async: true
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Data.Types.ReviewWriteTokenNonceHash
   alias Chat.ReviewBot.Identity

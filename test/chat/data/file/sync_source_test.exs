@@ -1,7 +1,7 @@
 defmodule Chat.Data.File.SyncSourceTest do
   use ExUnit.Case, async: false
 
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Data.File.SyncSource
   alias Chat.Storage.Unit

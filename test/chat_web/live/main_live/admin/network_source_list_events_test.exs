@@ -4,7 +4,7 @@ defmodule ChatWebTest.MainLive.Admin.NetworkSourceListEventsTest do
   import Phoenix.LiveView, only: [send_update: 3]
   import Phoenix.LiveViewTest
   import LiveIsolatedComponent
-  import Rewire
+  import Support.Rewire
 
   alias Chat.NetworkSynchronization.Source
   alias Chat.NetworkSynchronization.Status

@@ -1,6 +1,6 @@
 defmodule Chat.NetworkSynchronization.WorkerTest do
   use ExUnit.Case, async: true
-  import Rewire
+  import Support.Rewire
   import ChatSupport.Utils, only: [await_till: 2]
 
   alias Chat.NetworkSynchronization.Source

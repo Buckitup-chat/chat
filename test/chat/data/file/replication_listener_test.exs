@@ -1,7 +1,7 @@
 defmodule Chat.Data.File.ReplicationListenerTest do
   use ExUnit.Case, async: false
 
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Data.File.ReplicationListener
   alias Chat.Storage.Links

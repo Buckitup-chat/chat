@@ -29,16 +29,16 @@ defmodule Chat.Upload.StaleUploadsPrunerTest do
 
       timestamp = DateTime.to_unix(DateTime.utc_now())
       StaleUploadsPruner.maybe_set_timestamp(timestamp)
-      :timer.sleep(2000)
+      await_prune()
 
       uploads = UploadIndex.list()
       refute Map.has_key?(uploads, old_key)
       assert Map.has_key?(uploads, new_key)
 
-      :timer.sleep(1000)
-      pid = Process.whereis(StaleUploadsPruner)
-      send(pid, :prune)
-      :timer.sleep(100)
+      # let the monotonic clock age new_upload past one day
+      :timer.sleep(3000)
+      send(StaleUploadsPruner, :prune)
+      await_prune()
 
       uploads = UploadIndex.list()
       refute Map.has_key?(uploads, old_key)
@@ -53,10 +53,11 @@ defmodule Chat.Upload.StaleUploadsPrunerTest do
       key = UUID.uuid4()
       upload = %Upload{encrypted_secret: "1234", timestamp: timestamp}
       UploadIndex.add(key, upload)
+      ChangeTracker.await()
 
       timestamp = DateTime.to_unix(DateTime.utc_now())
       StaleUploadsPruner.maybe_set_timestamp(timestamp)
-      :timer.sleep(1000)
+      await_prune()
 
       uploads = UploadIndex.list()
       assert Map.has_key?(uploads, key)
@@ -73,7 +74,7 @@ defmodule Chat.Upload.StaleUploadsPrunerTest do
 
       timestamp = DateTime.to_unix(DateTime.utc_now())
       StaleUploadsPruner.maybe_set_timestamp(timestamp)
-      :timer.sleep(200)
+      await_prune()
 
       refute ChunkedFilesBroker.get(key)
       assert ChunkedFiles.size(key) == 0
@@ -91,9 +92,18 @@ defmodule Chat.Upload.StaleUploadsPrunerTest do
 
       timestamp = DateTime.to_unix(DateTime.utc_now())
       StaleUploadsPruner.maybe_set_timestamp(timestamp)
-      :timer.sleep(300)
+      await_prune()
 
       assert catch_exit(UploadStatus.get(key))
     end
+  end
+
+  # Helpers
+
+  # A call is handled only after the pending cast and its prune (handle_continue).
+  # The pruner's deletes then go through the write queue, so wait for them too.
+  defp await_prune do
+    :sys.get_state(StaleUploadsPruner)
+    ChangeTracker.await()
   end
 end

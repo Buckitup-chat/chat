@@ -1,6 +1,6 @@
 defmodule ChatWebTest.Controllers.DeviceLogControllerLoggingTest do
   use ExUnit.Case, async: true
-  import Rewire
+  import Support.Rewire
 
   alias ChatWeb.DeviceLogController
 

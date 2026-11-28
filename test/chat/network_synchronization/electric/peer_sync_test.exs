@@ -8,7 +8,7 @@ end
 defmodule Chat.NetworkSynchronization.Electric.PeerSyncTest do
   use ExUnit.Case, async: true
 
-  import Rewire
+  import Support.Rewire
 
   alias Chat.Data.Shapes
   alias Chat.NetworkSynchronization.Electric.PeerSync

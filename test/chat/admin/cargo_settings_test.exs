@@ -17,7 +17,7 @@ defmodule Chat.Admin.CargoSettingsTest do
     test "with missing checkpoints returns an error" do
       params = @valid_params |> Map.put(:checkpoints, nil)
       changeset = CargoSettings.checkpoints_changeset(%CargoSettings{}, params)
-      assert_has_error(changeset, :checkpoints, "can't be blank")
+      assert has_error?(changeset, :checkpoints, "can't be blank")
     end
   end
 

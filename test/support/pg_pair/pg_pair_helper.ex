@@ -124,7 +124,7 @@ defmodule Chat.Test.PgPairHelper do
 
   defp setup_pair do
     with_admin(fn admin ->
-      assert_logical_wal!(admin)
+      ensure_logical_wal!(admin)
       Enum.each(databases(), &Db.recreate_database(base_config(), admin, &1))
     end)
 
@@ -167,7 +167,7 @@ defmodule Chat.Test.PgPairHelper do
     Sandbox.mode(repo, :manual)
   end
 
-  defp assert_logical_wal!(admin) do
+  defp ensure_logical_wal!(admin) do
     case Db.wal_level(admin) do
       "logical" ->
         :ok

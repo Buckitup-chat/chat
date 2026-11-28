@@ -9,10 +9,8 @@
 315 lib/chat_web/live/electric_live/user_storage_version_live/index.ex
 345 lib/chat_web/live/helpers/uploader.ex
 396 lib/chat_web/live/main_live/admin/network_source_list.ex
-708 lib/chat_web/live/main_live/index.ex
 761 lib/chat_web/live/main_live/layout/message.ex
 372 lib/chat_web/live/main_live/layout/uploader.ex
-536 lib/chat_web/live/main_live/main.html.heex
 415 lib/chat_web/live/main_live/page/admin_panel.ex
 497 lib/chat_web/live/main_live/page/dialog.ex
 476 lib/chat_web/live/main_live/page/image_gallery.ex

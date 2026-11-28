@@ -1,101 +1,54 @@
 defmodule Chat.Data.DialogReactionTest do
   use ChatWeb.DataCase, async: true, group: :ets_deferred
 
+  import Chat.Test.DialogDataFixtures,
+    only: [
+      alice_and_bob: 1,
+      build_reaction: 2,
+      generate_reaction_hash: 0,
+      join_dialog: 1,
+      signed_message: 3,
+      signed_reaction: 3
+    ]
+
+  import Chat.Test.ReviewFixtures, only: [sign_with_key: 2]
+
   alias Chat.Data.Dialog
-  alias Chat.Data.Integrity
   alias Chat.Data.Integrity.Signable
   alias Chat.Data.Schemas.DialogMessageReaction
-  alias Chat.Data.Types.DialogHash
   alias Chat.Data.Types.DialogMessageId
-  alias Chat.Data.Types.DialogMessageReactionHash
-  alias Chat.Data.Types.DialogMessageSignHash
   alias Chat.Data.User
   alias Chat.NetworkSynchronization.Electric.ShapeWriter
-  alias EnigmaPq
 
-  setup do
-    :ets.delete_all_objects(:buckitup_deferred_records)
-
-    alice = User.generate_pq_identity("Alice")
-    bob = User.generate_pq_identity("Bob")
-    alice_card = insert_signed_user_card(alice)
-    bob_card = insert_signed_user_card(bob)
-
-    dialog_hash = DialogHash.for_pair(alice_card.user_hash, bob_card.user_hash)
-    insert_dialog_key(alice, dialog_hash, alice_card.user_hash, bob_card.user_hash)
-    insert_dialog_key(bob, dialog_hash, bob_card.user_hash, alice_card.user_hash)
-
-    {:ok,
-     alice: alice,
-     alice_hash: alice_card.user_hash,
-     bob: bob,
-     bob_hash: bob_card.user_hash,
-     dialog_hash: dialog_hash}
-  end
+  setup [:alice_and_bob, :join_dialog]
 
   describe "valid reaction — peer sync" do
     test "is persisted", ctx do
       reaction = signed_reaction(ctx.alice, ctx.alice_hash, dialog_hash: ctx.dialog_hash)
-      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, reaction)
+      write_reaction(:insert, reaction)
 
       assert Dialog.get_reaction(reaction.reaction_hash) != nil
     end
 
     test "LWW — newer timestamp overwrites", ctx do
-      reaction_hash = generate_reaction_hash()
+      reaction_hash =
+        write_two_versions(ctx, :insert, [owner_timestamp: 100], owner_timestamp: 200)
 
-      r1 =
-        signed_reaction(ctx.alice, ctx.alice_hash,
-          reaction_hash: reaction_hash,
-          owner_timestamp: 100,
-          dialog_hash: ctx.dialog_hash
-        )
-
-      r2 =
-        signed_reaction(ctx.alice, ctx.alice_hash,
-          reaction_hash: reaction_hash,
-          owner_timestamp: 200,
-          dialog_hash: ctx.dialog_hash
-        )
-
-      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, r1)
-      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, r2)
-
-      persisted = Dialog.get_reaction(reaction_hash)
-      assert persisted.owner_timestamp == 200
+      assert Dialog.get_reaction(reaction_hash).owner_timestamp == 200
     end
 
     test "LWW — older timestamp is rejected", ctx do
-      reaction_hash = generate_reaction_hash()
+      reaction_hash =
+        write_two_versions(ctx, :insert, [owner_timestamp: 200], owner_timestamp: 100)
 
-      r1 =
-        signed_reaction(ctx.alice, ctx.alice_hash,
-          reaction_hash: reaction_hash,
-          owner_timestamp: 200,
-          dialog_hash: ctx.dialog_hash
-        )
-
-      r2 =
-        signed_reaction(ctx.alice, ctx.alice_hash,
-          reaction_hash: reaction_hash,
-          owner_timestamp: 100,
-          dialog_hash: ctx.dialog_hash
-        )
-
-      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, r1)
-      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, r2)
-
-      persisted = Dialog.get_reaction(reaction_hash)
-      assert persisted.owner_timestamp == 200
+      assert Dialog.get_reaction(reaction_hash).owner_timestamp == 200
     end
   end
 
   describe "tampered reaction — peer sync" do
     test "tampered field is not persisted", ctx do
       reaction = signed_reaction(ctx.alice, ctx.alice_hash, dialog_hash: ctx.dialog_hash)
-      tampered = %{reaction | type_b64: "tampered"}
-
-      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, tampered)
+      write_reaction(:insert, %{reaction | type_b64: "tampered"})
 
       assert Dialog.get_reaction(reaction.reaction_hash) == nil
     end
@@ -116,7 +69,7 @@ defmodule Chat.Data.DialogReactionTest do
           dialog_hash: ctx.dialog_hash
         )
 
-      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, reaction)
+      write_reaction(:insert, reaction)
 
       assert Dialog.get_reaction(reaction.reaction_hash) == nil
     end
@@ -128,7 +81,7 @@ defmodule Chat.Data.DialogReactionTest do
           dialog_hash: ctx.dialog_hash
         )
 
-      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, reaction)
+      write_reaction(:insert, reaction)
 
       assert Dialog.get_reaction(reaction.reaction_hash) != nil
     end
@@ -158,85 +111,32 @@ defmodule Chat.Data.DialogReactionTest do
 
   describe "update path — peer sync" do
     test "valid update overwrites existing", ctx do
-      reaction_hash = generate_reaction_hash()
-      shared = [reaction_hash: reaction_hash, message_id: DialogMessageId.generate()]
+      reaction_hash =
+        write_two_versions(ctx, :update, [owner_timestamp: 100], owner_timestamp: 200)
 
-      r1 =
-        signed_reaction(
-          ctx.alice,
-          ctx.alice_hash,
-          shared ++ [owner_timestamp: 100, dialog_hash: ctx.dialog_hash]
-        )
-
-      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, r1)
-
-      r2 =
-        signed_reaction(
-          ctx.alice,
-          ctx.alice_hash,
-          shared ++ [owner_timestamp: 200, dialog_hash: ctx.dialog_hash]
-        )
-
-      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :update, r2)
-
-      persisted = Dialog.get_reaction(reaction_hash)
-      assert persisted.owner_timestamp == 200
+      assert Dialog.get_reaction(reaction_hash).owner_timestamp == 200
     end
 
     test "stale update is rejected", ctx do
-      reaction_hash = generate_reaction_hash()
-      shared = [reaction_hash: reaction_hash, message_id: DialogMessageId.generate()]
+      reaction_hash =
+        write_two_versions(ctx, :update, [owner_timestamp: 200], owner_timestamp: 100)
 
-      r1 =
-        signed_reaction(
-          ctx.alice,
-          ctx.alice_hash,
-          shared ++ [owner_timestamp: 200, dialog_hash: ctx.dialog_hash]
-        )
-
-      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, r1)
-
-      r2 =
-        signed_reaction(
-          ctx.alice,
-          ctx.alice_hash,
-          shared ++ [owner_timestamp: 100, dialog_hash: ctx.dialog_hash]
-        )
-
-      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :update, r2)
-
-      persisted = Dialog.get_reaction(reaction_hash)
-      assert persisted.owner_timestamp == 200
+      assert Dialog.get_reaction(reaction_hash).owner_timestamp == 200
     end
 
     test "update for non-existing reaction is ignored", ctx do
       reaction = signed_reaction(ctx.alice, ctx.alice_hash, dialog_hash: ctx.dialog_hash)
-      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :update, reaction)
+      write_reaction(:update, reaction)
 
       assert Dialog.get_reaction(reaction.reaction_hash) == nil
     end
 
     test "delete via update sets deleted_flag", ctx do
-      reaction_hash = generate_reaction_hash()
-      shared = [reaction_hash: reaction_hash, message_id: DialogMessageId.generate()]
-
-      r1 =
-        signed_reaction(
-          ctx.alice,
-          ctx.alice_hash,
-          shared ++ [owner_timestamp: 100, dialog_hash: ctx.dialog_hash]
+      reaction_hash =
+        write_two_versions(ctx, :update, [owner_timestamp: 100],
+          owner_timestamp: 200,
+          deleted_flag: true
         )
-
-      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, r1)
-
-      r2 =
-        signed_reaction(
-          ctx.alice,
-          ctx.alice_hash,
-          shared ++ [owner_timestamp: 200, deleted_flag: true, dialog_hash: ctx.dialog_hash]
-        )
-
-      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :update, r2)
 
       persisted = Dialog.get_reaction(reaction_hash)
       assert persisted.deleted_flag == true
@@ -244,107 +144,49 @@ defmodule Chat.Data.DialogReactionTest do
     end
 
     test "update with invalid signature is rejected", ctx do
-      bob = User.generate_pq_identity("Bob")
-      shared = [reaction_hash: generate_reaction_hash(), message_id: DialogMessageId.generate()]
+      stranger = User.generate_pq_identity("Bob")
+      reaction_hash = generate_reaction_hash()
+      shared = shared_reaction_attrs(ctx, reaction_hash)
 
-      r1 =
-        signed_reaction(
-          ctx.alice,
-          ctx.alice_hash,
-          shared ++ [owner_timestamp: 100, dialog_hash: ctx.dialog_hash]
-        )
+      write_reaction(
+        :insert,
+        signed_reaction(ctx.alice, ctx.alice_hash, [owner_timestamp: 100] ++ shared)
+      )
 
-      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :insert, r1)
+      ctx.alice_hash
+      |> build_reaction([owner_timestamp: 200] ++ shared)
+      |> sign_with_key(stranger.sign_skey)
+      |> then(&write_reaction(:update, &1))
 
-      r2 =
-        build_reaction(
-          ctx.alice_hash,
-          shared ++ [owner_timestamp: 200, dialog_hash: ctx.dialog_hash]
-        )
-        |> sign_with_key(bob.sign_skey)
-
-      {:ok, _} = ShapeWriter.write(:dialog_message_reactions, :update, r2)
-
-      persisted = Dialog.get_reaction(shared[:reaction_hash])
-      assert persisted.owner_timestamp == 100
+      assert Dialog.get_reaction(reaction_hash).owner_timestamp == 100
     end
   end
 
   # --- Helpers ---
 
-  defp signed_message(identity, dialog_hash, sender_hash) do
-    %Chat.Data.Schemas.DialogMessage{
+  defp write_reaction(operation, reaction) do
+    {:ok, _} = ShapeWriter.write(:dialog_message_reactions, operation, reaction)
+  end
+
+  defp write_two_versions(ctx, second_operation, first_attrs, second_attrs) do
+    reaction_hash = generate_reaction_hash()
+    shared = shared_reaction_attrs(ctx, reaction_hash)
+
+    write_reaction(:insert, signed_reaction(ctx.alice, ctx.alice_hash, first_attrs ++ shared))
+
+    write_reaction(
+      second_operation,
+      signed_reaction(ctx.alice, ctx.alice_hash, second_attrs ++ shared)
+    )
+
+    reaction_hash
+  end
+
+  defp shared_reaction_attrs(ctx, reaction_hash) do
+    [
+      reaction_hash: reaction_hash,
       message_id: DialogMessageId.generate(),
-      dialog_hash: dialog_hash,
-      sender_hash: sender_hash,
-      content_b64: :crypto.strong_rand_bytes(32),
-      deleted_flag: false,
-      refs_map_b64: nil,
-      parent_sign_hash: nil,
-      owner_timestamp: System.os_time(:millisecond)
-    }
-    |> sign_message_with_key(identity.sign_skey)
-  end
-
-  defp sign_message_with_key(struct, sign_skey) do
-    sign_b64 = struct |> Integrity.signature_payload() |> EnigmaPq.sign(sign_skey)
-    sign_hash = sign_b64 |> EnigmaPq.hash() |> DialogMessageSignHash.from_binary()
-    %{struct | sign_b64: sign_b64, sign_hash: sign_hash}
-  end
-
-  defp generate_reaction_hash do
-    binary = :crypto.strong_rand_bytes(64)
-    DialogMessageReactionHash.from_binary(binary)
-  end
-
-  defp build_reaction(reactor_hash, attrs \\ []) do
-    %DialogMessageReaction{
-      reaction_hash: Keyword.get(attrs, :reaction_hash, generate_reaction_hash()),
-      dialog_hash: Keyword.fetch!(attrs, :dialog_hash),
-      message_id: Keyword.get(attrs, :message_id, DialogMessageId.generate()),
-      message_sign_hash: "dms_" <> String.duplicate("cd", 64),
-      reactor_hash: reactor_hash,
-      type_b64: :crypto.strong_rand_bytes(24),
-      deleted_flag: Keyword.get(attrs, :deleted_flag, false),
-      owner_timestamp: Keyword.get(attrs, :owner_timestamp, System.os_time(:millisecond))
-    }
-  end
-
-  defp sign_with_key(struct, sign_skey) do
-    sign_b64 = struct |> Integrity.signature_payload() |> EnigmaPq.sign(sign_skey)
-    %{struct | sign_b64: sign_b64}
-  end
-
-  defp signed_reaction(identity, reactor_hash, attrs \\ []) do
-    build_reaction(reactor_hash, attrs)
-    |> sign_with_key(identity.sign_skey)
-  end
-
-  defp insert_signed_user_card(identity) do
-    card = identity |> User.extract_pq_card() |> sign_card(identity.sign_skey)
-    {:ok, _} = ShapeWriter.write(:user_card, :insert, card)
-    card
-  end
-
-  defp sign_card(card, sign_skey) do
-    sign_b64 = card |> Integrity.signature_payload() |> EnigmaPq.sign(sign_skey)
-    %{card | sign_b64: sign_b64}
-  end
-
-  defp insert_dialog_key(identity, dialog_hash, sender_hash, peer_hash) do
-    dk =
-      %Chat.Data.Schemas.DialogKey{
-        dialog_hash: dialog_hash,
-        sender_hash: sender_hash,
-        peer_hash: peer_hash,
-        peer_kem_wrap_key_b64: :crypto.strong_rand_bytes(32),
-        peer_wrapped_msg_key_b64: :crypto.strong_rand_bytes(44),
-        owner_timestamp: System.os_time(:millisecond),
-        deleted_flag: false
-      }
-      |> sign_with_key(identity.sign_skey)
-
-    {:ok, _} = ShapeWriter.write(:dialog_keys, :insert, dk)
-    dk
+      dialog_hash: ctx.dialog_hash
+    ]
   end
 end

@@ -23,8 +23,6 @@
 601 lib/chat_web/live/proxy_live/page/lobby.ex
 798 lib/chat_web/live/proxy_live/page/room.ex
 308 lib/chat_web/router.ex
-350 test/chat/data/dialog_reaction_test.exs
-709 test/chat/data/dialog_validation_test.exs
 353 test/chat/data/file/chunk_writer_test.exs
 361 test/chat/data/review_list_validation_test.exs
 412 test/chat/data/review_moderation_test.exs
@@ -32,7 +30,6 @@
 337 test/chat/data/vouch_token/chain_distance_test.exs
 307 test/chat/db/scope/cargo_key_scope_on_isolated_test.exs
 323 test/chat/db/scope/key_scope_test.exs
-429 test/chat/dialog_test.exs
 308 test/chat/signed_parcel_test.exs
 622 test/chat/storage/pg/batch_sync_test.exs
 417 test/chat/storage/pg/batch_sync_user_schemas_test.exs

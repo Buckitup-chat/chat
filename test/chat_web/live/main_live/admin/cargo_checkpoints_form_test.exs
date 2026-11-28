@@ -104,6 +104,18 @@ defmodule ChatWebTest.MainLive.Admin.CargoCheckpointsFormTest do
     assert has_element?(view, user_selector("rest", newcomer))
   end
 
+  test "refresh reloads the stored checkpoints", ctx do
+    view = mount_form()
+    refute has_element?(view, user_selector("checkpoints", ctx.first))
+
+    store_checkpoints([ctx.first])
+
+    send_update(view.pid, CargoCheckpointsForm, id: :cargo_checkpoints_form, action: :refresh)
+
+    assert has_element?(view, user_selector("checkpoints", ctx.first))
+    refute has_element?(view, user_selector("rest", ctx.first))
+  end
+
   test "other updates keep the selection", ctx do
     view = mount_form()
     view |> user_item("rest", ctx.first) |> render_click()

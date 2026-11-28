@@ -25,9 +25,6 @@
 308 lib/chat_web/router.ex
 307 test/chat/db/scope/cargo_key_scope_on_isolated_test.exs
 323 test/chat/db/scope/key_scope_test.exs
-622 test/chat/storage/pg/batch_sync_test.exs
-417 test/chat/storage/pg/batch_sync_user_schemas_test.exs
-387 test/chat/storage/pg/logical_replicator_test.exs
 431 test/chat_web/channels/webrtc_channel_test.exs
 618 test/chat_web/controllers/electric_controller_candidate_ingest_test.exs
 623 test/chat_web/controllers/electric_controller_review_test.exs

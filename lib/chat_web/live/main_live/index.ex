@@ -1,11 +1,15 @@
 defmodule ChatWeb.MainLive.Index do
-  @moduledoc "Main Liveview"
+  @moduledoc """
+  Main Liveview. Mounts the session and dispatches events and messages to page routers:
+  `Page.LoginRouter`, `Page.LogoutRouter`, `Page.LobbyRouter`, `Page.SyncRoomRouter`,
+  `Page.DialogRouter`, `Page.RoomRouter`, `Page.AdminPanelRouter` and `Page.LiveRouter`.
+
+  Markup lives in the embedded `*.html.heex` templates next to this module.
+  """
   use ChatWeb, :live_view
 
-  alias Chat.Admin.CargoSettings
-  alias Chat.{AdminRoom, Dialogs, Identity, Messages, RoomInviteIndex}
+  alias Chat.AdminRoom
   alias Chat.Rooms.Room
-  alias Chat.Sync.{CargoRoom, UsbDriveDumpRoom}
   alias ChatWeb.Hooks.{LiveModalHook, LocalTimeHook, UploaderHook}
 
   alias ChatWeb.MainLive.Admin.{
@@ -27,7 +31,6 @@ defmodule ChatWeb.MainLive.Index do
   alias ChatWeb.MainLive.{Layout, Page}
   alias ChatWeb.MainLive.Page.RoomForm
   alias Phoenix.LiveView.JS
-  alias Phoenix.PubSub
 
   on_mount LiveModalHook
   on_mount LocalTimeHook
@@ -35,6 +38,8 @@ defmodule ChatWeb.MainLive.Index do
 
   embed_templates "*"
 
+  @login_events ~W(login restoreAuth export-keys)
+  @lobby_events ~W(switch-lobby-mode lobby/search chat:load-more feed-more open-data-restore backup-file-submit close-data-restore)
   @impl true
   def mount(
         params,
@@ -50,34 +55,35 @@ defmodule ChatWeb.MainLive.Index do
       |> assign_cargo_settings()
       |> assign_media_settings()
 
-    if connected?(socket) do
-      if action == :export do
-        socket
-        |> assign(need_login: false, monotonic_offset: 0)
-        |> Page.ExportKeyRing.init(params["id"])
-        |> Page.Login.check_stored()
-        |> ok()
-      else
-        socket
-        |> assign(
-          need_login: true,
-          handshaked: false,
-          skip_user_creation: Chat.AdminDb.get(:skip_user_creation),
-          mode: :user_list,
-          monotonic_offset: 0
-        )
-        |> LocalTimeHook.assign_time(Phoenix.LiveView.get_connect_params(socket)["tz_info"])
-        |> allow_any500m_upload(:my_keys_file)
-        |> allow_recover_upload()
-        |> set_cargo_room()
-        |> set_usb_drive_dump_room()
-        |> Page.Login.check_stored()
-        |> ok()
-      end
-    else
-      socket
-      |> ok()
+    cond do
+      not connected?(socket) -> socket
+      action == :export -> socket |> init_export(params["id"])
+      true -> socket |> init_session()
     end
+    |> ok()
+  end
+
+  defp init_export(socket, id) do
+    socket
+    |> assign(need_login: false, monotonic_offset: 0)
+    |> Page.ExportKeyRing.init(id)
+    |> Page.Login.check_stored()
+  end
+
+  defp init_session(socket) do
+    socket
+    |> assign(
+      need_login: true,
+      handshaked: false,
+      skip_user_creation: Chat.AdminDb.get(:skip_user_creation),
+      mode: :user_list,
+      monotonic_offset: 0
+    )
+    |> LocalTimeHook.assign_time(Phoenix.LiveView.get_connect_params(socket)["tz_info"])
+    |> allow_any500m_upload(:my_keys_file)
+    |> allow_recover_upload()
+    |> Page.SyncRoomRouter.init()
+    |> Page.Login.check_stored()
   end
 
   @impl true
@@ -88,394 +94,91 @@ defmodule ChatWeb.MainLive.Index do
   end
 
   @impl true
-  def handle_params(params, _, socket) do
-    live_action = Map.get(socket.assigns, :live_action)
-
-    case {live_action, params} do
-      {:room_message_link, %{"hash" => hash}} ->
-        socket
-        |> assign(:room_message_link_hash, hash)
-        |> route_action_when_logged_in()
-
-      {:chat_link, %{"hash" => hash}} ->
-        socket
-        |> assign(:chat_link, hash)
-        |> route_action_when_logged_in()
-
-      {:rooms, _} ->
-        socket
-        |> route_action_when_logged_in()
-
-      {:chats, _} ->
-        socket
-        |> route_action_when_logged_in()
-
-      _ ->
-        socket
-    end
-    |> noreply()
-  end
+  def handle_params(params, _, socket),
+    do: socket |> Page.LiveRouter.params(params) |> noreply()
 
   @impl true
-  def handle_event("login", %{"login" => %{"name" => name}}, socket) do
-    socket
-    |> Page.Login.create_user(name)
-    |> login_init()
-    |> noreply()
-  end
+  def handle_event(event, params, socket) when event in @login_events,
+    do: socket |> Page.LoginRouter.event({event, params}) |> noreply()
 
-  def handle_event("restoreAuth", data, socket) when data == %{} do
-    socket
-    |> Page.Login.handshaked()
-    |> noreply()
-  end
+  def handle_event("login:" <> _ = event, params, socket),
+    do: socket |> Page.LoginRouter.event({event, params}) |> noreply()
 
-  def handle_event("restoreAuth", data, %{assigns: %{live_action: :export}} = socket) do
-    socket
-    |> Page.Login.load_user(data)
-    |> noreply()
-  end
+  def handle_event("logout" <> _ = event, params, socket),
+    do: socket |> Page.LogoutRouter.event({event, params}) |> noreply()
 
-  def handle_event("restoreAuth", data, socket) do
-    socket
-    |> Page.Login.handshaked()
-    |> Page.Login.load_user(data)
-    |> login_init()
-    |> noreply()
-  end
+  def handle_event(event, params, socket) when event in @lobby_events,
+    do: socket |> Page.LobbyRouter.event({event, params}) |> noreply()
 
-  def handle_event("client-timestamp", %{"timestamp" => timestamp}, socket) do
-    socket
-    |> assign(:monotonic_offset, timestamp |> Chat.Time.monotonic_offset())
-    |> noreply()
-  end
+  def handle_event("cargo:" <> _ = event, params, socket),
+    do: socket |> Page.SyncRoomRouter.event({event, params}) |> noreply()
 
-  def handle_event("login:request-key-ring", _, socket) do
-    socket
-    |> Page.Login.close()
-    |> Page.ImportKeyRing.init()
-    |> noreply()
-  end
+  def handle_event("dump:" <> _ = event, params, socket),
+    do: socket |> Page.SyncRoomRouter.event({event, params}) |> noreply()
 
-  def handle_event("login:import-own-key-ring", _, socket) do
-    socket
-    |> Page.Login.close()
-    |> Page.ImportOwnKeyRing.init()
-    |> noreply()
-  end
+  def handle_event("dialog/" <> event, params, socket),
+    do: socket |> Page.DialogRouter.event({event, params}) |> noreply()
 
-  def handle_event("login:recover-key-share", _, socket) do
-    socket
-    |> Page.Login.close()
-    |> assign(:mode, :recover_key_share)
-    |> noreply()
-  end
+  def handle_event("room/" <> event, params, socket),
+    do: socket |> Page.RoomRouter.event({event, params}) |> noreply()
 
-  def handle_event("login:my-keys-file-submit", _, socket) do
-    socket |> noreply()
-  end
+  def handle_event("admin/" <> event, params, socket),
+    do: socket |> Page.AdminPanelRouter.event({event, params}) |> noreply()
 
-  def handle_event(
-        "login:import-own-keyring-decrypt",
-        %{"import_own_keyring_password" => %{"password" => password}},
-        socket
-      ) do
-    socket
-    |> Page.ImportOwnKeyRing.try_password(password)
-    |> noreply()
-  end
+  def handle_event("client-timestamp", %{"timestamp" => timestamp}, socket),
+    do: socket |> assign(:monotonic_offset, Chat.Time.monotonic_offset(timestamp)) |> noreply()
 
-  def handle_event("login:import-own-keyring-reupload", _, socket) do
-    socket
-    |> Page.ImportOwnKeyRing.back_to_file()
-    |> noreply()
-  end
-
-  def handle_event("login:import-own-keyring:drop-password-error", _, socket) do
-    socket
-    |> Page.ImportOwnKeyRing.drop_error()
-    |> noreply()
-  end
-
-  def handle_event("login:import-keyring-close", _, socket) do
-    socket
-    |> Page.ImportKeyRing.close()
-    |> assign(:need_login, true)
-    |> noreply()
-  end
-
-  def handle_event("login:import-own-keyring-close", _, socket) do
-    socket
-    |> Page.ImportOwnKeyRing.close()
-    |> assign(:need_login, true)
-    |> noreply()
-  end
-
-  def handle_event("login:recovery-key-close", _, socket) do
-    socket
-    |> assign(:need_login, true)
-    |> noreply()
-  end
-
-  def handle_event("login:export-code-close", _, socket) do
-    socket
-    |> push_event("chat:redirect", %{url: Routes.main_index_path(socket, :index)})
-    |> noreply()
-  end
-
-  def handle_event("switch-lobby-mode", %{"lobby-mode" => mode}, socket) do
-    socket
-    |> Page.Lobby.switch_lobby_mode(mode)
-    |> Page.Room.init()
-    |> noreply()
-  end
-
-  def handle_event("chat:load-more", _, %{assigns: %{dialog: %{}}} = socket) do
-    socket
-    |> Page.Dialog.load_more_messages()
-    |> noreply()
-  end
-
-  def handle_event("chat:load-more", _, %{assigns: %{room: %{}}} = socket) do
-    socket
-    |> Page.Room.load_more_messages()
-    |> noreply()
-  end
-
-  def handle_event("export-keys", %{"export_key_ring" => %{"code" => code}}, socket) do
-    socket
-    |> Page.ExportKeyRing.send_key_ring(code |> String.to_integer())
-    |> noreply
-  end
-
-  def handle_event("feed-more", _, socket) do
-    socket
-    |> Page.Feed.more()
-    |> noreply()
-  end
-
-  def handle_event("open-data-restore", _, socket) do
-    socket
-    |> assign(:mode, :restore_data)
-    |> noreply()
-  end
-
-  def handle_event("backup-file-submit", _, socket), do: socket |> noreply()
-
-  def handle_event("close-data-restore", _, socket) do
-    socket
-    |> assign(:mode, :lobby)
-    |> noreply()
-  end
-
-  def handle_event("logout-open", _, socket) do
-    socket
-    |> Page.Logout.open()
-    |> noreply()
-  end
-
-  def handle_event("logout-go-middle", _, socket) do
-    socket
-    |> Page.Logout.go_middle()
-    |> noreply()
-  end
-
-  def handle_event("logout-go-share", _, socket) do
-    socket
-    |> Page.Logout.go_share()
-    |> noreply()
-  end
-
-  def handle_event("logout:toggle-password-visibility", _, socket) do
-    socket
-    |> Page.Logout.toggle_password_visibility()
-    |> noreply()
-  end
-
-  def handle_event("logout:toggle-password-confirmation-visibility", _, socket) do
-    socket
-    |> Page.Logout.toggle_password_confirmation_visibility()
-    |> noreply()
-  end
-
-  def handle_event("logout-download-insecure", _, socket) do
-    socket
-    |> Page.Logout.generate_backup("")
-    |> Page.Logout.go_final()
-    |> noreply()
-  end
-
-  def handle_event(
-        "logout-download-with-password",
-        %{"logout" => form},
-        socket
-      ) do
-    socket
-    |> Page.Logout.download_on_good_password(form)
-    |> noreply()
-  end
-
-  def handle_event("logout-check-password", %{"logout" => form}, socket) do
-    socket
-    |> Page.Logout.check_password(form)
-    |> noreply()
-  end
-
-  def handle_event("logout-wipe", _, socket) do
-    socket
-    |> Page.Shared.untrack_onliners_presence()
-    |> Page.Login.clear()
-    |> Page.Logout.wipe()
-    |> noreply()
-  end
-
-  def handle_event("logout-close", _, socket) do
-    socket
-    |> Page.Logout.close()
-    |> noreply()
-  end
-
-  def handle_event("lobby/search", params, socket) do
-    socket
-    |> Page.Lobby.filter_search_results(params)
-    |> noreply()
-  end
-
-  def handle_event("dialog/" <> event, params, socket) do
-    socket
-    |> Page.DialogRouter.event({event, params})
-    |> noreply()
-  end
-
-  def handle_event("room/" <> event, params, socket) do
-    socket
-    |> Page.RoomRouter.event({event, params})
-    |> noreply()
-  end
-
-  def handle_event("admin/" <> event, params, socket) do
-    socket
-    |> Page.AdminPanelRouter.event({event, params})
-    |> noreply()
-  end
-
-  def handle_event("put-flash", %{"key" => key, "message" => message}, socket) do
-    socket
-    |> put_flash(key, message)
-    |> noreply()
-  end
-
-  def handle_event("cargo:activate", _params, socket) do
-    UsbDriveDumpRoom.remove()
-    CargoRoom.activate(socket.assigns.room.pub_key)
-
-    %CargoSettings{} = cargo_settings = socket.assigns.cargo_settings
-    %Identity{} = me = socket.assigns.me
-    %Identity{} = room_identity = socket.assigns.room_identity
-    %Room{} = room = socket.assigns.room
-
-    cargo_settings.checkpoints
-    |> Enum.each(fn checkpoint ->
-      dialog = Dialogs.open(me, checkpoint)
-
-      invites =
-        Dialogs.read(dialog, me)
-        |> Stream.filter(fn %{type: type} -> type == :room_invite end)
-        |> Stream.filter(fn message ->
-          identity = Dialogs.extract_invite_room_identity(message)
-          identity.public_key == room_identity.public_key
-        end)
-        |> Enum.to_list()
-
-      if invites == [] do
-        room_identity
-        |> Map.put(:name, room.name)
-        |> Messages.RoomInvite.new()
-        |> Dialogs.add_new_message(me, dialog)
-        |> RoomInviteIndex.add(dialog, me, room.pub_key)
-      end
-    end)
-
-    noreply(socket)
-  end
-
-  def handle_event("cargo:remove", _params, socket) do
-    CargoRoom.remove()
-    noreply(socket)
-  end
-
-  def handle_event("dump:activate", _params, socket) do
-    CargoRoom.remove()
-
-    UsbDriveDumpRoom.activate(
-      socket.assigns.room.pub_key,
-      socket.assigns.room_identity,
-      socket.assigns.monotonic_offset
-    )
-
-    noreply(socket)
-  end
-
-  def handle_event("dump:remove", _params, socket) do
-    UsbDriveDumpRoom.remove()
-    noreply(socket)
-  end
-
-  def handle_info({:key_shared, _params}, socket) do
-    socket
-    |> Page.Logout.go_final()
-    |> noreply()
-  end
+  def handle_event("put-flash", %{"key" => key, "message" => message}, socket),
+    do: socket |> put_flash(key, message) |> noreply()
 
   @impl true
-  def handle_info({:new_user, card}, socket) do
-    socket
-    |> Page.Lobby.show_new_user(card)
-    |> noreply()
-  end
+  def handle_info({:key_shared, _} = message, socket),
+    do: socket |> Page.LogoutRouter.info(message) |> noreply()
 
-  def handle_info({:new_room, card}, socket) do
-    socket
-    |> Page.Lobby.show_new_room(card)
-    |> noreply()
-  end
+  def handle_info({:exported_key_ring, _} = message, socket),
+    do: socket |> Page.LoginRouter.info(message) |> noreply()
 
-  def handle_info({:room_request, room_key, user_key}, socket) do
-    socket
-    |> Page.Lobby.approve_room_request(room_key, user_key)
-    |> noreply()
-  end
+  def handle_info({:key_recovered, _} = message, socket),
+    do: socket |> Page.LoginRouter.info(message) |> noreply()
 
-  def handle_info({:room_request_approved, encrypted_room_entity, user_key, room_key}, socket) do
-    socket
-    |> Page.Lobby.join_approved_room(encrypted_room_entity, user_key, room_key)
-    |> noreply()
-  end
+  def handle_info({:sync_stored_room, _, _} = message, socket),
+    do: socket |> Page.LoginRouter.info(message) |> noreply()
 
-  def handle_info({:sync_stored_room, key, room_count}, socket) do
-    socket
-    |> Page.Login.sync_stored_room(key, room_count)
-    |> Page.Lobby.show_new_room(%{})
-    |> noreply()
-  end
+  def handle_info(:reset_rooms_to_backup = message, socket),
+    do: socket |> Page.LoginRouter.info(message) |> noreply()
 
-  def handle_info(:reset_rooms_to_backup, socket) do
-    socket
-    |> Page.Login.reset_rooms_to_backup()
-    |> noreply()
-  end
+  def handle_info({:new_user, _} = message, socket),
+    do: socket |> Page.LobbyRouter.info(message) |> noreply()
 
-  def handle_info({:exported_key_ring, keys}, socket) do
-    socket
-    |> Page.ImportKeyRing.save_key_ring(keys)
-    |> Page.Login.store()
-    |> Page.ImportKeyRing.close()
-    |> login_init()
-    |> noreply()
-  end
+  def handle_info({:new_room, _} = message, socket),
+    do: socket |> Page.LobbyRouter.info(message) |> noreply()
 
-  def handle_info({:db_status, msg}, socket),
-    do: socket |> Page.Lobby.set_db_status(msg) |> noreply()
+  def handle_info({:room_request, _, _} = message, socket),
+    do: socket |> Page.LobbyRouter.info(message) |> noreply()
+
+  def handle_info({:room_request_approved, _, _, _} = message, socket),
+    do: socket |> Page.LobbyRouter.info(message) |> noreply()
+
+  def handle_info({:create_new_room, _} = message, socket),
+    do: socket |> Page.LobbyRouter.info(message) |> noreply()
+
+  def handle_info({:lobby, _} = message, socket),
+    do: socket |> Page.LobbyRouter.info(message) |> noreply()
+
+  def handle_info({:db_status, _} = message, socket),
+    do: socket |> Page.LobbyRouter.info(message) |> noreply()
+
+  def handle_info({:maybe_activate_cargo_room, _, _, _} = message, socket),
+    do: socket |> Page.SyncRoomRouter.info(message) |> noreply()
+
+  def handle_info({:update_cargo_room, _} = message, socket),
+    do: socket |> Page.SyncRoomRouter.info(message) |> noreply()
+
+  def handle_info({:update_usb_drive_dump_progress, _} = message, socket),
+    do: socket |> Page.SyncRoomRouter.info(message) |> noreply()
+
+  def handle_info({:update_usb_drive_dump_room, _} = message, socket),
+    do: socket |> Page.SyncRoomRouter.info(message) |> noreply()
 
   def handle_info({:free_spaces, msg}, socket),
     do: socket |> Page.AdminPanel.set_free_spaces(msg) |> noreply()
@@ -486,125 +189,31 @@ defmodule ChatWeb.MainLive.Index do
   def handle_info({:platform_response, msg}, socket),
     do: socket |> Page.AdminPanelRouter.info(msg) |> noreply()
 
-  def handle_info({:lobby, :refresh_rooms_and_users}, socket),
-    do: socket |> Page.Lobby.refresh_rooms_and_users() |> noreply()
-
   def handle_info({:admin, msg}, socket),
     do: socket |> Page.AdminPanelRouter.info(msg) |> noreply()
 
   def handle_info({:dialog, msg}, socket), do: socket |> Page.DialogRouter.info(msg) |> noreply()
 
-  def handle_info({ref, :ok}, socket) do
-    Process.demonitor(ref, [:flush])
+  def handle_info({ref, :ok}, socket), do: socket |> forget_task(ref) |> noreply()
 
-    socket |> noreply()
-  end
+  def handle_info({ref, {:error, task, _reason}}, socket),
+    do: socket |> forget_task(ref) |> process(task) |> noreply()
 
-  def handle_info({ref, {:error, task, _reason}}, socket) do
-    Process.demonitor(ref, [:flush])
+  def handle_info(:update_backup_settings, socket),
+    do: socket |> assign_backup_settings() |> noreply()
 
-    socket
-    |> process(task)
-    |> noreply()
-  end
+  def handle_info(:update_cargo_settings, socket),
+    do: socket |> assign_cargo_settings() |> noreply()
 
-  def handle_info(:update_backup_settings, socket) do
-    socket
-    |> assign_backup_settings()
-    |> noreply()
-  end
+  def handle_info(:update_media_settings, socket),
+    do: socket |> assign_media_settings() |> noreply()
 
-  def handle_info(:update_cargo_settings, socket) do
-    socket
-    |> assign_cargo_settings()
-    |> noreply()
-  end
+  def handle_info({:push_patch, url}, socket), do: socket |> push_patch(to: url) |> noreply()
 
-  def handle_info(:update_media_settings, socket) do
-    socket
-    |> assign_media_settings()
-    |> noreply()
-  end
+  def handle_progress(:my_keys_file, %{done?: true}, socket),
+    do: socket |> Page.ImportOwnKeyRing.read_file() |> noreply()
 
-  def handle_info({:create_new_room, %{name: name, type: type}}, socket) do
-    socket
-    |> Page.Lobby.new_room(name, type)
-    |> Page.Room.maybe_enable_cargo()
-    |> Page.Room.maybe_enable_usb_drive_dump()
-    |> noreply()
-  end
-
-  def handle_info({:maybe_activate_cargo_room, true, %Room{} = room, room_identity}, socket) do
-    UsbDriveDumpRoom.remove()
-    CargoRoom.activate(room.pub_key)
-
-    %CargoSettings{} = cargo_settings = socket.assigns.cargo_settings
-    %Identity{} = me = socket.assigns.me
-
-    cargo_settings.checkpoints
-    |> Enum.each(fn checkpoint ->
-      dialog = Dialogs.find_or_open(me, checkpoint)
-
-      room_identity
-      |> Map.put(:name, room.name)
-      |> Messages.RoomInvite.new()
-      |> Dialogs.add_new_message(me, dialog)
-      |> RoomInviteIndex.add(dialog, me, room.pub_key)
-    end)
-
-    {:noreply, socket}
-  end
-
-  def handle_info({:maybe_activate_cargo_room, _cargo?, _room, _room_identity}, socket),
-    do: {:noreply, socket}
-
-  def handle_info({:update_cargo_room, cargo_room}, socket) do
-    socket
-    |> assign(:cargo_room, cargo_room)
-    |> Page.Room.maybe_enable_cargo()
-    |> Page.Room.maybe_enable_usb_drive_dump()
-    |> noreply()
-  end
-
-  def handle_info({:update_usb_drive_dump_progress, dump_room}, socket) do
-    socket
-    |> assign(:usb_drive_dump_room, dump_room)
-    |> noreply()
-  end
-
-  def handle_info({:update_usb_drive_dump_room, dump_room}, socket) do
-    socket
-    |> assign(:usb_drive_dump_room, dump_room)
-    |> Page.Room.maybe_enable_cargo()
-    |> Page.Room.maybe_enable_usb_drive_dump()
-    |> noreply()
-  end
-
-  def handle_info({:key_recovered, [me, rooms]}, socket) do
-    socket
-    |> assign(:step, nil)
-    |> assign(:mode, :lobby)
-    |> Page.Login.load_user(me, rooms)
-    |> Page.Login.store()
-    |> login_init()
-    |> noreply()
-  end
-
-  def handle_info({:push_patch, url}, socket) do
-    socket
-    |> push_patch(to: url)
-    |> noreply()
-  end
-
-  def handle_progress(:my_keys_file, %{done?: true}, socket) do
-    socket
-    |> Page.ImportOwnKeyRing.read_file()
-    |> noreply()
-  end
-
-  def handle_progress(_file, _entry, socket) do
-    socket |> noreply()
-  end
+  def handle_progress(_file, _entry, socket), do: socket |> noreply()
 
   def loading_screen(assigns) do
     ~H"""
@@ -636,21 +245,9 @@ defmodule ChatWeb.MainLive.Index do
     assign(socket, :media_settings, media_settings)
   end
 
-  defp action_confirmation_popup(assigns) do
-    ~H"""
-    <.modal id={@id} class="">
-      <h1 class="text-base font-bold text-grayscale">{@title}</h1>
-      <p class="mt-3 text-sm text-black/50">{@description}</p>
-      <div class="mt-5 flex items-center justify-between">
-        <button phx-click={hide_modal(@id)} class="w-full mr-1 h-12 border rounded-lg border-black/10">
-          Cancel
-        </button>
-        <button class="confirmButton w-full ml-1 h-12 border-0 rounded-lg bg-grayscale text-white flex items-center justify-center">
-          Confirm
-        </button>
-      </div>
-    </.modal>
-    """
+  defp forget_task(socket, ref) do
+    Process.demonitor(ref, [:flush])
+    socket
   end
 
   defp allow_any500m_upload(socket, type, opts \\ []) do
@@ -672,37 +269,5 @@ defmodule ChatWeb.MainLive.Index do
       accept: ~w(.social_part),
       max_entries: 100
     )
-  end
-
-  defp set_cargo_room(socket) do
-    PubSub.subscribe(Chat.PubSub, "chat::cargo_room")
-
-    assign(socket, :cargo_room, CargoRoom.get())
-  end
-
-  defp set_usb_drive_dump_room(socket) do
-    PubSub.subscribe(Chat.PubSub, "chat::usb_drive_dump_room")
-
-    assign(socket, :usb_drive_dump_room, UsbDriveDumpRoom.get())
-  end
-
-  defp login_init(socket) do
-    socket
-    |> on_login()
-  end
-
-  def on_login(socket) do
-    socket
-    |> Page.Lobby.init()
-    |> Page.Dialog.init()
-    |> Page.Logout.init()
-    |> Page.Shared.track_onliners_presence()
-    |> Page.LiveRouter.action()
-  end
-
-  defp route_action_when_logged_in(socket) do
-    if connected?(socket) and not socket.assigns.need_login,
-      do: Page.LiveRouter.action(socket),
-      else: socket
   end
 end

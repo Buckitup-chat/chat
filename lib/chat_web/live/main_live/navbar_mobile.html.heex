@@ -1,0 +1,117 @@
+<div id="navbarTop" class="navbarTop px-4">
+  <div
+    phx-click={JS.push("switch-lobby-mode") |> open_content()}
+    phx-value-lobby-mode="feeds"
+    class="sidebarIcon"
+  >
+    <.icon id="logo" class="w-6 h-6" />
+  </div>
+  <Layout.DbStatus.mobile status={@db_status} usb_drive_dump_room={@usb_drive_dump_room} />
+  <button
+    class="flex justify-between min-w-max"
+    phx-click={JS.push("logout-open") |> show_modal("logout-backup-popup")}
+    class="sidebarIcon mb-1"
+  >
+    <.icon id="logout" class="w-4 h-4 hover:fill-purple" />
+    <span class="text-xs">Log out & Back Up</span>
+  </button>
+</div>
+<div id="navbarBottom" class="navbarBottom px-20 z-20">
+  <button phx-click="switch-lobby-mode" phx-value-lobby-mode="rooms" class="sidebarIcon">
+    <.icon
+      id="sidebarRooms"
+      class={
+        classes("w-6 h-6 hover:fill-purple", %{
+          "fill-purple" =>
+            @lobby_mode == :rooms &&
+              assigns[:cargo_room][:pub_key] != assigns[:room][:pub_key],
+          "fill-grayscale" => @lobby_mode != :rooms
+        })
+      }
+    />
+    <span class="text-xs">Rooms</span>
+  </button>
+  <button phx-click="switch-lobby-mode" phx-value-lobby-mode="chats" class="sidebarIcon">
+    <.icon
+      id="sidebarChats"
+      class={
+        classes("w-6 h-6 hover:fill-purple", %{
+          "fill-purple" => @lobby_mode == :chats,
+          "fill-grayscale" => @lobby_mode != :chats
+        })
+      }
+    />
+    <span class="text-xs">Chats</span>
+  </button>
+  <%= if @is_admin do %>
+    <button phx-click="switch-lobby-mode" phx-value-lobby-mode="admin" class="sidebarIcon ">
+      <.icon
+        id="admin"
+        class={
+          classes("w-5 h-5 hover:fill-purple", %{
+            "fill-purple" => @lobby_mode == :admin,
+            "fill-grayscale" => @lobby_mode != :admin
+          })
+        }
+      />
+      <span class="text-xs">Admin</span>
+    </button>
+  <% end %>
+  <%= if assigns[:cargo_room][:status] == :complete and Map.has_key?(@room_map, assigns[:cargo_room][:pub_key]) do %>
+    <!-- desktop -->
+    <button
+      phx-click="room/switch"
+      phx-value-room={Room.hash(@cargo_room.pub_key)}
+      class="hidden md:flex flex-col items-center justify-center"
+    >
+      <.icon
+        id="cargo"
+        class={
+          classes("w-8 h-8 hover:fill-purple", %{
+            "fill-purple" => @cargo_room.pub_key == assigns[:room][:pub_key],
+            "fill-grayscale" => @cargo_room.pub_key != assigns[:room][:pub_key]
+          })
+        }
+      />
+      <span class="text-xs">Cargo Room</span>
+    </button>
+    <!-- mobile -->
+    <button
+      phx-click={JS.push("room/switch") |> open_content()}
+      phx-value-room={Room.hash(@cargo_room.pub_key)}
+      class="flex flex-col items-center justify-center md:hidden"
+    >
+      <.icon
+        id="cargo"
+        class={
+          classes("w-8 h-8 hover:fill-purple", %{
+            "fill-purple" => @cargo_room.pub_key == assigns[:room][:pub_key],
+            "fill-grayscale" => @cargo_room.pub_key != assigns[:room][:pub_key]
+          })
+        }
+      />
+      <span class="text-xs">Cargo Room</span>
+    </button>
+  <% end %>
+  <%= if assigns[:usb_drive_dump_room][:status] == :complete do %>
+    <button
+      phx-click="room/switch"
+      phx-value-room={Room.hash(@usb_drive_dump_room.pub_key)}
+      class="sidebarIcon"
+    >
+      <.icon
+        id="usbDrive"
+        class={
+          classes("w-8 h-8 hover:fill-purple", %{
+            "fill-purple" => @usb_drive_dump_room.pub_key == assigns[:room][:pub_key],
+            "fill-grayscale" => @usb_drive_dump_room.pub_key != assigns[:room][:pub_key]
+          })
+        }
+      />
+      <span class="text-xs">Dump room</span>
+    </button>
+  <% end %>
+  <button class="sidebarIcon">
+    <a href="/account">FE</a>
+  </button>
+</div>

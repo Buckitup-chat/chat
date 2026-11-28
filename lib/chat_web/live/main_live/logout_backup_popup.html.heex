@@ -1,0 +1,152 @@
+<.modal id="logout-backup-popup" hide_event="logout-close" class="">
+  <%= if @logout_step == :initial do %>
+    <h1 class="text-base font-bold text-grayscale">Log Out & Back Up</h1>
+    <Layout.Room.count_to_backup_message count={@room_count_to_backup} />
+    <p class="mt-3 text-sm text-black/50">
+      To get access again you will need the recovery keys:
+    </p>
+    <button
+      class="mt-5 w-full h-12 border-0 rounded-lg bg-grayscale flex items-center justify-center"
+      phx-click="logout-go-middle"
+    >
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-white t-download-key">Download the Keys</span>
+        <.icon id="upload" class="w-4 h-4 ml-2 fill-white" />
+      </div>
+    </button>
+    <button
+      class="mt-5 w-full h-12 border rounded-lg border-black/10 flex items-center justify-center t-download-key"
+      phx-click="logout-go-share"
+    >
+      <div class="flex items-center justify-between">
+        <span>Share the Key</span>
+        <.icon id="share" class="w-4 h-4 ml-2" />
+      </div>
+    </button>
+    <button
+      class="mt-3 w-full h-12 border rounded-lg border-black/10 t-logout-without-key"
+      phx-click={hide_modal("logout-backup-popup") |> show_modal("logout-without-key-popup")}
+    >
+      Log Out without the Keys
+    </button>
+    <button
+      phx-click={hide_modal("logout-backup-popup")}
+      class="mt-3 w-full h-12 border rounded-lg border-black/10 t-cancel-logout"
+    >
+      Cancel
+    </button>
+  <% end %>
+  <%= if @logout_step == :middle do %>
+    <h1 class="text-base font-bold text-grayscale">Set Up Password</h1>
+    <p class="mt-3 text-sm text-black/50">
+      To store the backup copy of the key securely, enter the encryption password for the file
+    </p>
+    <div class="mt-5 w-full h-7 flex items-center justify-between border-0 rounded-lg bg-black/10">
+      <.icon id="alert" class="ml-1 w-4 h-4 fill-black/40" />
+      <blockquote class="text-xs text-black/50 mr-3">
+        This password in not stored and can NOT be recovered
+      </blockquote>
+    </div>
+    <.form
+      :let={f}
+      for={@changeset}
+      id="logout-form"
+      phx-change="logout-check-password"
+      phx-submit="logout-download-with-password"
+      as={:logout}
+      class="mt-3 w-full"
+    >
+      <div class="w-ull relative">
+        <%= if @is_password_visible do %>
+          {text_input(f, :password,
+            type: "text",
+            placeholder: "Enter Password",
+            phx_debounce: 700,
+            class:
+              "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50"
+          )}
+          <a phx-click="logout:toggle-password-visibility">
+            <.icon id="visibility" class="w-4 h-4 absolute top-4 right-3 ml-2" />
+          </a>
+        <% else %>
+          {text_input(f, :password,
+            type: "password",
+            placeholder: "Enter Password",
+            phx_debounce: 700,
+            class:
+              "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50"
+          )}
+          <a phx-click="logout:toggle-password-visibility">
+            <.icon id="visibilityOff" class="w-4 h-4 absolute top-4 right-3 ml-2" />
+          </a>
+        <% end %>
+      </div>
+      <!--<%= error_tag f, :password %> -->
+      <div class="mt-3 w-ull relative">
+        <%= if @is_password_confirmation_visible do %>
+          {text_input(f, :password_confirmation,
+            type: "text",
+            placeholder: "Repeat Password",
+            phx_debounce: 700,
+            class:
+              "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50"
+          )}
+          <a phx-click="logout:toggle-password-confirmation-visibility">
+            <.icon id="visibility" class="w-4 h-4 absolute top-4 right-3 ml-2" />
+          </a>
+        <% else %>
+          {text_input(f, :password_confirmation,
+            type: "password",
+            placeholder: "Repeat Password",
+            phx_debounce: 700,
+            class:
+              "w-full h-12 placeholder-black/50 border rounded-lg border-black/10 focus:outline-none focus:ring-0 focus:border-black/50"
+          )}
+          <a phx-click="logout:toggle-password-confirmation-visibility">
+            <.icon id="visibilityOff" class="w-4 h-4 absolute top-4 right-3 ml-2" />
+          </a>
+        <% end %>
+      </div>
+      <!-- <%= error_tag f, :password_confirmation %> -->
+      <p class="mt-3 text-sm text-black/50">At least 12 symbols</p>
+      {submit("Download",
+        phx_disable_with: "Downloading...",
+        class: "mt-5 w-full h-12 border-0 rounded-lg bg-grayscale text-white disabled:opacity-50",
+        disabled: !@changeset.valid?
+      )}
+    </.form>
+    <button
+      class="mt-3 w-full h-12 border rounded-lg border-black/10"
+      phx-click="logout-download-insecure"
+    >
+      Download without password <span style="color: red">insecure!</span>
+    </button>
+  <% end %>
+  <%= if @logout_step == :share do %>
+    <.live_component
+      module={ChatWeb.MainLive.Page.KeyShareForm}
+      id="key-share"
+      users={@users}
+      me={@me}
+      monotonic_offset={@monotonic_offset}
+    />
+  <% end %>
+  <%= if @logout_step == :final do %>
+    <h1 class="text-base font-bold text-grayscale">Success</h1>
+    <p class="mt-3 text-sm text-black/50">
+      If you downloaded the the recovery key, you can log out now, it will erase all the browser data about BuckitUp.
+    </p>
+    <button
+      class="mt-3 w-full h-12 border-0 rounded-lg bg-grayscale text-white t-exit"
+      phx-click="logout-wipe"
+    >
+      Exit
+    </button>
+    <button
+      phx-click={hide_modal("logout-backup-popup")}
+      class="mt-3 w-full h-12 border rounded-lg border-black/10"
+    >
+      Cancel
+    </button>
+  <% end %>
+</.modal>

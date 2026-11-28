@@ -30,6 +30,9 @@ ci-check: too_long
 ci-test:
 	npm ci --prefix ./assets
 	mix assets.deploy
+	@# priv/static/app/ is the chat-frontend build (gitignored); SPA-serving tests only need a page
+	test -f priv/static/app/index.html || { mkdir -p priv/static/app && \
+		echo '<!doctype html><html><body>chat-frontend stub (CI)</body></html>' > priv/static/app/index.html; }
 	rm -rf priv/test_db priv/test_admin_db
 	mkdir -p priv/test_db priv/test_admin_db
 	MIX_ENV=test mix ecto.create

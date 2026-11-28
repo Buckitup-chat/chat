@@ -28,13 +28,15 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
   test "user and checkpoint got room invites", %{isolated_dbs: dbs} do
     {[[checkpoint_1], checkpoint_key], [operator], [user]} = setup_test_data(1, 1, 1)
 
-    %{isolated_dbs: dbs}
-    |> use_db(:operator)
-    |> generate_cargo_room(operator)
-    |> send_invite(from: operator, to: [checkpoint_1, user], mark_as: :index_1)
-    |> copy_cargo_to(:point1_db, checkpoint_key)
-    |> use_db(:point1_db)
-    |> assert_invites_received_by([checkpoint_1, user])
+    cargo =
+      %{isolated_dbs: dbs}
+      |> use_db(:operator)
+      |> generate_cargo_room(operator)
+      |> send_invite(from: operator, to: [checkpoint_1, user], mark_as: :index_1)
+      |> copy_cargo_to(:point1_db, checkpoint_key)
+      |> use_db(:point1_db)
+
+    assert users_without_cargo_invite(cargo, [checkpoint_1, user]) == []
   end
 
   test "user and checkpoint got room invites when many invitations in dialog", %{
@@ -42,15 +44,17 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
   } do
     {[[checkpoint_1], checkpoint_key], [operator], [user]} = setup_test_data(1, 1, 1)
 
-    %{isolated_dbs: dbs}
-    |> use_db(:operator)
-    |> generate_cargo_room(operator)
-    |> send_invite(from: operator, to: [checkpoint_1, user], mark_as: :fake_index_1)
-    |> generate_cargo_room(operator)
-    |> send_invite(from: operator, to: [checkpoint_1, user], mark_as: :index_1)
-    |> copy_cargo_to(:many_invitations, checkpoint_key)
-    |> use_db(:many_invitations)
-    |> assert_invites_received_by([checkpoint_1, user])
+    cargo =
+      %{isolated_dbs: dbs}
+      |> use_db(:operator)
+      |> generate_cargo_room(operator)
+      |> send_invite(from: operator, to: [checkpoint_1, user], mark_as: :fake_index_1)
+      |> generate_cargo_room(operator)
+      |> send_invite(from: operator, to: [checkpoint_1, user], mark_as: :index_1)
+      |> copy_cargo_to(:many_invitations, checkpoint_key)
+      |> use_db(:many_invitations)
+
+    assert users_without_cargo_invite(cargo, [checkpoint_1, user]) == []
   end
 
   test "room invitation should be found in dialog of operator and user by only checkpoints key",
@@ -58,15 +62,17 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
     {[[checkpoint_1, checkpoint_2], checkpoint_keys], [operator], [user_c, user_d] = _users} =
       setup_test_data(2, 1, 2)
 
-    %{isolated_dbs: dbs}
-    |> use_db(:operator)
-    |> generate_cargo_room(operator)
-    |> send_invite(from: operator, to: [checkpoint_1, checkpoint_2], mark_as: :index_1)
-    |> send_invite(from: operator, to: user_c, mark_as: :index_2)
-    |> send_invite(from: user_c, to: user_d, mark_as: :index_3)
-    |> copy_cargo_to(:point2_db, checkpoint_keys)
-    |> use_db(:point2_db)
-    |> assert_invites_received_by([checkpoint_1, checkpoint_2, user_c, user_d])
+    cargo =
+      %{isolated_dbs: dbs}
+      |> use_db(:operator)
+      |> generate_cargo_room(operator)
+      |> send_invite(from: operator, to: [checkpoint_1, checkpoint_2], mark_as: :index_1)
+      |> send_invite(from: operator, to: user_c, mark_as: :index_2)
+      |> send_invite(from: user_c, to: user_d, mark_as: :index_3)
+      |> copy_cargo_to(:point2_db, checkpoint_keys)
+      |> use_db(:point2_db)
+
+    assert users_without_cargo_invite(cargo, [checkpoint_1, checkpoint_2, user_c, user_d]) == []
   end
 
   test "room invitations found up to 1 handshake", %{isolated_dbs: dbs} do
@@ -76,20 +82,22 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
       [user_1, user_2, user_3, user_4, user_5]
     } = setup_test_data(3, 2, 5)
 
-    %{isolated_dbs: dbs}
-    |> use_db(:operator)
-    |> generate_cargo_room(operator_1)
-    |> send_invite(from: operator_1, to: [checkpoint_1, checkpoint_2], mark_as: :index_1)
-    |> send_invite(from: operator_2, to: checkpoint_3, mark_as: :index_2)
-    |> send_invite(from: operator_1, to: user_1, mark_as: :index_3)
-    |> send_invite(from: user_1, to: [user_2, user_4], mark_as: :index_4)
-    |> send_invite(from: user_2, to: user_3, mark_as: :index_5)
-    |> send_invite(from: user_3, to: [user_4, user_1], mark_as: :index_6)
-    |> copy_cargo_to(:point3_db, checkpoints_keys)
-    |> use_db(:point3_db)
-    |> assert_invites_received_by([checkpoint_1, checkpoint_2, checkpoint_3])
-    |> assert_invites_received_by([user_1, user_2, user_4])
-    |> refute_invites_received_by([user_5, user_3])
+    cargo =
+      %{isolated_dbs: dbs}
+      |> use_db(:operator)
+      |> generate_cargo_room(operator_1)
+      |> send_invite(from: operator_1, to: [checkpoint_1, checkpoint_2], mark_as: :index_1)
+      |> send_invite(from: operator_2, to: checkpoint_3, mark_as: :index_2)
+      |> send_invite(from: operator_1, to: user_1, mark_as: :index_3)
+      |> send_invite(from: user_1, to: [user_2, user_4], mark_as: :index_4)
+      |> send_invite(from: user_2, to: user_3, mark_as: :index_5)
+      |> send_invite(from: user_3, to: [user_4, user_1], mark_as: :index_6)
+      |> copy_cargo_to(:point3_db, checkpoints_keys)
+      |> use_db(:point3_db)
+
+    assert users_without_cargo_invite(cargo, [checkpoint_1, checkpoint_2, checkpoint_3]) == []
+    assert users_without_cargo_invite(cargo, [user_1, user_2, user_4]) == []
+    assert users_with_cargo_invite(cargo, [user_5, user_3]) == []
   end
 
   test "long forward chain", %{isolated_dbs: dbs} do
@@ -99,21 +107,23 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
       [user_1, user_2, user_3, user_4, user_5]
     } = setup_test_data(1, 1, 5)
 
-    %{isolated_dbs: dbs}
-    |> use_db(:operator)
-    |> generate_cargo_room(operator_1)
-    |> send_invite(from: operator_1, to: [checkpoint_1], mark_as: :index_1)
-    |> send_invite(from: operator_1, to: user_1, mark_as: :index_3)
-    |> send_invite(from: user_1, to: user_2, mark_as: :index_4)
-    |> send_invite(from: user_2, to: user_3, mark_as: :index_4)
-    |> send_invite(from: user_3, to: user_4, mark_as: :index_4)
-    |> send_invite(from: user_4, to: user_5, mark_as: :index_4)
-    |> send_invite(from: user_5, to: user_1, mark_as: :index_4)
-    |> copy_cargo_to(:long_forward_db, checkpoints_keys)
-    |> use_db(:long_forward_db)
-    |> assert_invites_received_by([checkpoint_1])
-    |> assert_invites_received_by([user_1, user_2])
-    |> refute_invites_received_by([user_3, user_4, user_5])
+    cargo =
+      %{isolated_dbs: dbs}
+      |> use_db(:operator)
+      |> generate_cargo_room(operator_1)
+      |> send_invite(from: operator_1, to: [checkpoint_1], mark_as: :index_1)
+      |> send_invite(from: operator_1, to: user_1, mark_as: :index_3)
+      |> send_invite(from: user_1, to: user_2, mark_as: :index_4)
+      |> send_invite(from: user_2, to: user_3, mark_as: :index_4)
+      |> send_invite(from: user_3, to: user_4, mark_as: :index_4)
+      |> send_invite(from: user_4, to: user_5, mark_as: :index_4)
+      |> send_invite(from: user_5, to: user_1, mark_as: :index_4)
+      |> copy_cargo_to(:long_forward_db, checkpoints_keys)
+      |> use_db(:long_forward_db)
+
+    assert users_without_cargo_invite(cargo, [checkpoint_1]) == []
+    assert users_without_cargo_invite(cargo, [user_1, user_2]) == []
+    assert users_with_cargo_invite(cargo, [user_3, user_4, user_5]) == []
   end
 
   @tag timeout: :infinity
@@ -125,29 +135,26 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
     } =
       setup_test_data(1, 1, 3)
 
-    %{isolated_dbs: dbs}
-    |> use_db(:operator)
-    |> then(fn context ->
-      1..20
-      |> Enum.reduce(context, fn _, context ->
-        context
-        |> generate_cargo_room(operator_1)
-        |> send_invite(from: operator_1, to: [checkpoint_1], mark_as: :index_1)
-        |> send_invite(from: operator_1, to: user_1, mark_as: :index_3)
-        |> send_invite(from: user_1, to: user_2, mark_as: :index_4)
-        |> send_invite(from: user_2, to: user_3, mark_as: :index_4)
+    cargo =
+      %{isolated_dbs: dbs}
+      |> use_db(:operator)
+      |> then(fn context ->
+        1..20
+        |> Enum.reduce(context, fn _, context ->
+          context
+          |> generate_cargo_room(operator_1)
+          |> send_invite(from: operator_1, to: [checkpoint_1], mark_as: :index_1)
+          |> send_invite(from: operator_1, to: user_1, mark_as: :index_3)
+          |> send_invite(from: user_1, to: user_2, mark_as: :index_4)
+          |> send_invite(from: user_2, to: user_3, mark_as: :index_4)
+        end)
       end)
-    end)
-    # |> mark_time()
-    |> copy_cargo_to(:more_invites, checkpoints_keys)
-    |> use_db(:more_invites)
-    |> assert_invites_received_by([checkpoint_1])
-    |> assert_invites_received_by([user_1, user_2])
-    |> refute_invites_received_by([user_3])
+      |> copy_cargo_to(:more_invites, checkpoints_keys)
+      |> use_db(:more_invites)
 
-    # |> yeild_time()
-    # |> show_db_stats(:operator)
-    # |> show_db_stats(:more_invites)
+    assert users_without_cargo_invite(cargo, [checkpoint_1]) == []
+    assert users_without_cargo_invite(cargo, [user_1, user_2]) == []
+    assert users_with_cargo_invite(cargo, [user_3]) == []
   end
 
   defp setup_test_data(checkpoints_count, operators_count, users_count) do
@@ -247,61 +254,21 @@ defmodule ChatTest.Db.Scope.CargoKeyScopeOnIsolatedTest do
     end)
   end
 
-  defp assert_invite_received(%Chat.Identity{} = user_identity, room: room_key) do
-    invite = Dialogs.room_invite_for_user_to_room(user_identity, room_key)
-    assert invite, "No invite for '#{user_identity.name}'"
-    room_identity = Dialogs.extract_invite_room_identity(invite)
-    assert room_identity
-    room_identity
+  defp users_without_cargo_invite(%{room_identity: cargo_room_identity}, user_identities) do
+    for user <- user_identities, not got_invite_to?(user, cargo_room_identity), do: user.name
   end
 
-  defp assert_invites_received_by(context, user_identities) do
-    tap(context, fn %{room_identity: cargo_room_identity} ->
-      user_identities
-      |> Enum.map(&assert_invite_received(&1, room: cargo_room_identity.public_key))
-      |> Enum.each(fn received_identity ->
-        assert received_identity == cargo_room_identity
-      end)
-    end)
+  defp users_with_cargo_invite(%{room_identity: cargo_room_identity}, user_identities) do
+    for user <- user_identities, invite_exists?(user, cargo_room_identity), do: user.name
   end
 
-  defp refute_invites_received_by(context, user_identities) do
-    tap(context, fn %{room_identity: cargo_room_identity} ->
-      user_identities
-      |> Enum.each(fn user ->
-        invite = Dialogs.room_invite_for_user_to_room(user, cargo_room_identity.public_key)
-        refute invite, "Got invite into [#{cargo_room_identity.name}] for #{user.name}"
-      end)
-    end)
+  defp got_invite_to?(user_identity, cargo_room_identity) do
+    case Dialogs.room_invite_for_user_to_room(user_identity, cargo_room_identity.public_key) do
+      nil -> false
+      invite -> Dialogs.extract_invite_room_identity(invite) == cargo_room_identity
+    end
   end
 
-  # defp show_db_stats(context, db_name) do
-  #   tap(context, fn context ->
-  #     context
-  #     |> db_name(db_name)
-  #     |> CubDB.select()
-  #     |> Enum.frequencies_by(fn
-  #       {{key, _, _, _}, _} -> key
-  #       {{key, _, _}, _} -> key
-  #       {{key, _}, _} -> key
-  #       {key, _} -> key
-  #       key -> key
-  #     end)
-  #     |> inspect(label: db_name)
-  #     |> IO.puts()
-  #   end)
-  # end
-  #
-  # defp mark_time(context) do
-  #   context
-  #   |> Map.put(:start_time, System.monotonic_time(:millisecond))
-  # end
-  #
-  # defp yeild_time(context) do
-  #   tap(context, fn context ->
-  #     span = System.monotonic_time(:millisecond) - context.start_time
-  #
-  #     IO.puts("Took #{span / 1000} s")
-  #   end)
-  # end
+  defp invite_exists?(user_identity, cargo_room_identity),
+    do: Dialogs.room_invite_for_user_to_room(user_identity, cargo_room_identity.public_key) != nil
 end

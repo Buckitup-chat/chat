@@ -12,5 +12,10 @@
   # decoded JSON map (`%{"error" => "read_session_required", ...}`). The unused_fun warning
   # cascades from the "impossible" 401 branch.
   {"lib/chat_web/live/electric_live/sandbox_gated_fetch.ex", :pattern_match},
-  {"lib/chat_web/live/electric_live/sandbox_gated_fetch.ex", :unused_fun}
+  {"lib/chat_web/live/electric_live/sandbox_gated_fetch.ex", :unused_fun},
+
+  # phoenix 1.8.3: `Phoenix.Socket.transport` is typed `atom`, but `Phoenix.ChannelTest.join/4`
+  # matches it against `{Phoenix.ChannelTest, sup}`, so every `subscribe_and_join` call compiled
+  # into test/support "has no local return".
+  {"test/support/webrtc_channel_helpers.ex", :no_return}
 ]

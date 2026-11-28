@@ -1,6 +1,5 @@
 defmodule ChatTest.SignedParcelTest do
   use ExUnit.Case, async: true
-  # import Mock
 
   alias Chat.Card
   alias Chat.Db.ChangeTracker
@@ -10,7 +9,6 @@ defmodule ChatTest.SignedParcelTest do
   alias Chat.Messages
   alias Chat.Rooms.Message, as: RoomMessage
   alias Chat.SignedParcel
-  # alias Chat.Dialogs.Registry, as: DialogRegistry
 
   test "text message parcel is corect" do
     {alice, bob, dialog} = create_alice_bob_dialog()
@@ -190,49 +188,6 @@ defmodule ChatTest.SignedParcelTest do
     refute SignedParcel.scope_valid?(parcel, charlie.public_key)
   end
 
-  # test "scope_valid? handles invalid memo keys" do
-  #   {alice, _bob, dialog} = create_alice_bob_dialog()
-  #   charlie = Identity.create("Charlie")
-  #   david = Identity.create("David")
-
-  #   # Create a memo message parcel
-  #   parcel =
-  #     Messages.Text.new(String.pad_trailing("Hello memo", 200, "-"), 1159)
-  #     |> SignedParcel.wrap_dialog_message(dialog, alice)
-
-  #   # Test when neither key matches
-  #   refute SignedParcel.scope_valid?(parcel, charlie.public_key)
-
-  #   # Test when keys are not in dialog peers
-  #   mock_dialog = %{a_key: alice.public_key, b_key: david.public_key}
-  #   with_mock DialogRegistry, [find: fn _ -> mock_dialog end] do
-  #     parcel = %SignedParcel{
-  #       data: [
-  #         {{:memo, "key"}, "data"},
-  #         {{:memo_index, charlie.public_key, "key"}, true},
-  #         {{:memo_index, david.public_key, "key"}, true},
-  #         {{:dialog_message, "dialog_key", :next, "msg_id"}, %DialogMessage{type: :memo}}
-  #       ]
-  #     }
-  #     refute SignedParcel.scope_valid?(parcel, charlie.public_key)
-  #   end
-  # end
-
-  # test "scope_valid? handles invalid room invite keys" do
-  #   {alice, _bob, dialog} = create_alice_bob_dialog()
-  #   charlie = Identity.create("Charlie")
-  #   david = Identity.create("David")
-  #   room = Identity.create("Room")
-
-  #   # Create a room invite message parcel
-  #   parcel =
-  #     Messages.RoomInvite.new(room, 1159)
-  #     |> SignedParcel.wrap_dialog_message(dialog, alice)
-
-  #   # Test when neither key matches
-  #   refute SignedParcel.scope_valid?(parcel, charlie.public_key)
-  # end
-
   test "main_item returns nil for unknown message type" do
     parcel = %SignedParcel{
       data: [
@@ -269,33 +224,6 @@ defmodule ChatTest.SignedParcelTest do
     assert String.contains?(result, "dialog_key")
     assert String.contains?(result, "msg_id")
   end
-
-  # test "wrap_dialog_message handles different data_list entries" do
-  #   {alice, _bob, dialog} = create_alice_bob_dialog()
-  #   msg = %Messages.Text{text: "test"}
-  #   with_mock Chat.DryStorable, [
-  #     type: fn _ -> :text end,
-  #     timestamp: fn _ -> 0 end,
-  #     content: fn _ -> "test" end,
-  #     to_parcel: fn _ -> {"test", []} end
-  #   ] do
-  #     parcel = SignedParcel.wrap_dialog_message(msg, dialog, alice)
-  #     assert [{{:dialog_message, _, :next, _}, %DialogMessage{}}] = SignedParcel.data_items(parcel)
-  #   end
-  # end
-
-  # test "dialog_peer_keys handles missing dialog" do
-  #   with_mock DialogRegistry, [find: fn _ -> nil end] do
-  #     parcel = %SignedParcel{
-  #       data: [
-  #         {{:dialog_message, "dialog_key", :next, "msg_id"}, %DialogMessage{type: :text}}
-  #       ]
-  #     }
-  #     assert_raise KeyError, fn ->
-  #       SignedParcel.scope_valid?(parcel, "some_key")
-  #     end
-  #   end
-  # end
 
   defp create_alice_bob_dialog do
     alice = Identity.create("Alice")

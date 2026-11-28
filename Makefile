@@ -1,4 +1,4 @@
-.PHONY: check test test-brief ci-check empty_db help assets
+.PHONY: check test test-brief ci-check ci-test too_long empty_db help assets
 
 help:
 	@clear
@@ -13,27 +13,27 @@ check: too_long
 	mix sobelow
 	MIX_ENV=test mix dialyzer
 
-## Check for files with more than 300 lines
+## Files over 300 lines: fails on new or grown ones (baseline: .too_long_baseline)
 too_long:
-	@echo "Checking for files with more than 300 lines..."
-	@find lib test -type f \( -name "*.ex" -o -name "*.exs" -o -name "*.heex" \) \
-		-exec wc -l {} + | \
-		grep -v total | \
-		awk '$$1 > 300' | \
-		sort -n || \
-	echo "No files exceed 300 lines"
+	mix too_long
 
-ci-check: 
+## CI lint (dialyzer runs as its own CI step, with a cached PLT)
+ci-check: too_long
 	mix deps.clean mime --build
-	mix compile --warnings-as-errors
+	mix compile --warnings-as-errors --all-warnings
 	mix format --check-formatted
 	mix credo --strict
 	mix deps.unlock --check-unused
-	mix dialyzer
+	mix sobelow
 
+## CI tests on a clean checkout: assets, fresh test DBs, coverage gates
 ci-test:
-	npm install --prefix ./assets
+	npm ci --prefix ./assets
 	mix assets.deploy
+	rm -rf priv/test_db priv/test_admin_db
+	mkdir -p priv/test_db priv/test_admin_db
+	MIX_ENV=test mix ecto.create
+	MIX_ENV=test mix ecto.migrate
 	MIX_ENV=test mix coveralls.json --max-failures=3
 	MIX_ENV=test mix coverage.dirs
 

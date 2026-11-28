@@ -1,4 +1,1 @@
-618 test/chat_web/controllers/electric_controller_candidate_ingest_test.exs
-623 test/chat_web/controllers/electric_controller_review_test.exs
 372 test/chat_web/controllers/electric_controller_user_storage_test.exs
-375 test/chat_web/controllers/sandbox_gated_reviews_integration_test.exs

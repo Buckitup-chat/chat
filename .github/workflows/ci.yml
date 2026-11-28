@@ -3,6 +3,8 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    # edited: a retarget (base change) re-evaluates the gate below
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
 
@@ -17,8 +19,10 @@ env:
   MIX_ENV: test
 
 jobs:
-  # Decides whether lint/test run. A PR touching only docs/ skips them; a skipped job
-  # counts as passing for required checks, so docs-only PRs stay mergeable.
+  # Decides whether lint/test run. A skipped job counts as passing for required checks.
+  # - Upper stack layer (base is not main) skips: it gets full CI once retargeted to main,
+  #   so a stack costs N runs instead of ~N^2/2 rebase waves.
+  # - A PR touching only docs/ skips, so docs-only PRs stay mergeable.
   # Pushes to main always run (keeps caches warm).
   changes:
     name: changes
@@ -38,6 +42,12 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" != pull_request ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # Live base, not the event payload: a retarget may race the rebase push.
+          base=$(gh api "repos/${{ github.repository }}/pulls/$PR" --jq .base.ref)
+          echo "base=$base"
+          if [ "$base" != main ]; then
+            echo "code=false" | tee -a "$GITHUB_OUTPUT"; exit 0
           fi
           files=$(gh api --paginate "repos/${{ github.repository }}/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')
           echo "$files"

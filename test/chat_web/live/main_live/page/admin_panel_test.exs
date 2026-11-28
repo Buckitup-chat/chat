@@ -2,29 +2,20 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
   use ChatWeb.ConnCase, async: false
 
   import ChatWeb.LiveTestHelpers
+  import ChatWeb.LiveTestHelpers.{AdminPanel, Navigation}
   import Phoenix.LiveViewTest
 
-  alias Chat.Admin.{BackupSettings, CargoSettings, MediaSettings}
-  alias Chat.{AdminDb, AdminRoom, Card, Db, Dialogs, Identity, User}
-  alias Chat.Db.ChangeTracker
-  alias Chat.User.UsersBroker
+  alias Chat.Admin.{BackupSettings, MediaSettings}
+  alias Chat.AdminRoom
   alias ChatWeb.MainLive.Admin.FirmwareUpgradeForm
 
-  setup do
-    CubDB.clear(AdminDb.db())
-    CubDB.clear(Db.db())
-    CubDB.set_auto_compact(AdminDb.db(), false)
-    UsersBroker.sync()
-  end
+  setup :reset_admin_db
 
   describe "backup settings form" do
     test "saves backup settings to the admin DB", %{conn: conn} do
       %{view: view} = prepare_view(%{conn: conn})
 
-      html =
-        view
-        |> element(".navbar button", "Admin")
-        |> render_click()
+      html = open_admin_panel(view)
 
       assert html =~ "Backup settings"
       assert html =~ "Should backup finish after copying data or continue syncing?"
@@ -77,296 +68,11 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
     end
   end
 
-  describe "cargo checkpoints form" do
-    @tag :skip
-    # todo: explain
-    # todo: migrate from dropdowns to select and button click
-    test "saves checkpoints preset to the admin DB", %{conn: conn} do
-      %{socket: socket, view: view} = prepare_view(%{conn: conn})
-
-      encoded_user_pub_key =
-        socket.assigns.me
-        |> Identity.pub_key()
-        |> Base.encode16(case: :lower)
-
-      {encoded_checkpoint_1_pub_key, _card1} =
-        "Checkpoint 1"
-        |> User.login()
-        |> tap(&User.register/1)
-        |> tap(&UsersBroker.put/1)
-        |> then(fn identity ->
-          {
-            identity |> Identity.pub_key() |> Base.encode16(case: :lower),
-            identity |> Chat.Card.from_identity()
-          }
-        end)
-
-      {checkpoint_2_pub_key, card2} =
-        "Checkpoint 2"
-        |> User.login()
-        |> tap(&User.register/1)
-        |> tap(&UsersBroker.put/1)
-        |> then(fn identity ->
-          {
-            identity |> Identity.pub_key(),
-            identity |> Chat.Card.from_identity()
-          }
-        end)
-
-      ChangeTracker.await()
-
-      encoded_checkpoint_2_pub_key = Base.encode16(checkpoint_2_pub_key, case: :lower)
-
-      html =
-        view
-        |> element(".navbar button", "Admin")
-        |> render_click()
-
-      refute html =~ "Cargo checkpoints preset"
-
-      view
-      |> form("#media_settings", %{"media_settings" => %{"functionality" => "cargo"}})
-      |> render_submit()
-
-      html = render(view)
-
-      assert html =~ "Cargo checkpoints preset"
-      assert html =~ "Checkpoints are automatically invited to the Cargo rooms you create."
-
-      assert has_element?(view, ".users-title", "Checkpoints")
-      assert has_element?(view, ".users-title", "Other users")
-
-      refute_users(view, "checkpoints", ["Checkpoint 1", "Checkpoint 2"])
-      assert_users(view, "rest", ["Checkpoint 1", "Checkpoint 2"])
-
-      view
-      |> element(
-        ~s(li[phx-value-type="rest"][phx-value-pub-key="#{encoded_checkpoint_1_pub_key}"])
-      )
-      |> render_click()
-
-      view
-      |> element(".t-buttons button", "Add")
-      |> render_click()
-
-      assert_users(view, "checkpoints", ["Checkpoint 1"])
-      refute_users(view, "checkpoints", ["Checkpoint 2"])
-      assert_users(view, "rest", ["Checkpoint 2"])
-      refute_users(view, "rest", ["Checkpoint 1"])
-
-      assert has_element?(
-               view,
-               ~s(li.selected-user[phx-value-pub-key="#{encoded_checkpoint_2_pub_key}"])
-             )
-
-      view
-      |> element(
-        ~s(li[phx-value-type="checkpoints"][phx-value-pub-key="#{encoded_checkpoint_1_pub_key}"])
-      )
-      |> render_click()
-
-      view
-      |> element("button", "Remove")
-      |> render_click()
-
-      refute_users(view, "checkpoints", ["Checkpoint 1", "Checkpoint 2"])
-      assert_users(view, "rest", ["Checkpoint 1", "Checkpoint 2"])
-
-      refute has_element?(view, "li.selected-user")
-
-      view
-      |> element("#users-rest")
-      |> render_hook("move_user", %{"type" => "rest", "pub_key" => encoded_checkpoint_2_pub_key})
-
-      assert has_element?(
-               view,
-               ~s(li.selected-user[phx-value-pub-key="#{encoded_user_pub_key}"])
-             )
-
-      view
-      |> element("#users-rest")
-      |> render_hook("move_user", %{"type" => "rest", "pub_key" => encoded_checkpoint_1_pub_key})
-
-      assert has_element?(
-               view,
-               ~s(li.selected-user[phx-value-pub-key="#{encoded_user_pub_key}"])
-             )
-
-      view
-      |> element("#users-checkpoints")
-      |> render_hook("move_user", %{
-        "type" => "checkpoints",
-        "pub_key" => encoded_checkpoint_1_pub_key
-      })
-
-      assert_users(view, "checkpoints", ["Checkpoint 2"])
-      refute_users(view, "checkpoints", ["Checkpoint 1"])
-      assert_users(view, "rest", ["Checkpoint 1"])
-      refute_users(view, "rest", ["Checkpoint 2"])
-
-      assert has_element?(
-               view,
-               ~s(li.selected-user[phx-value-pub-key="#{encoded_checkpoint_2_pub_key}"])
-             )
-
-      assert %CargoSettings{} = cargo_settings = AdminRoom.get_cargo_settings()
-      assert cargo_settings.checkpoints == [card2]
-    end
-
-    defp assert_users(view, type, users) do
-      Enum.each(users, fn user ->
-        assert view
-               |> element(~s(.users-list li[phx-value-type="#{type}"] ), user)
-               |> has_element?(),
-               "Expected to have #{user} in #{humanized_type(type)}"
-      end)
-    end
-
-    defp refute_users(view, type, users) do
-      Enum.each(users, fn user ->
-        refute view
-               |> element(~s(.users-list li[phx-value-type="#{type}"]), user)
-               |> has_element?(),
-               "Expected not to have #{user} in #{humanized_type(type)}"
-      end)
-    end
-
-    defp humanized_type("checkpoints"), do: "Checkpoints"
-    defp humanized_type("rest"), do: "Other users"
-  end
-
-  describe "cargo user form" do
-    test "create a cargo user", %{conn: conn} do
-      %{view: view, socket: %{assigns: %{me: admin}}} = prepare_view(%{conn: conn})
-
-      view
-      |> element(".navbar button", "Admin")
-      |> render_click()
-
-      assert view |> render() =~ "Cargo user"
-
-      view
-      |> form("#cargo_user_form", %{"user" => %{"name" => "CargoBot888"}})
-      |> render_submit()
-
-      assert view |> render() =~ "CargoBot888"
-      assert view |> render() =~ "Download the Keys"
-
-      # the backup text and file messages are written by a background task
-      assert :ok = wait_until(fn -> backup_file_sent?(admin) end, "backup file", timeout: 5_000)
-      ChangeTracker.await()
-
-      view
-      |> element(".navbar button", "Chats")
-      |> render_click()
-
-      %{socket: socket} = reload_view(%{view: view})
-
-      cargo_bot_hash =
-        socket.assigns.users |> Enum.find(&(&1.name == "CargoBot888")) |> Map.get(:hash)
-
-      view
-      |> element("#user-#{cargo_bot_hash}")
-      |> render_click()
-
-      assert has_vue_content?(
-               view |> render(),
-               "LinkedText",
-               "The backup `CargoBot888.data` is not encrypted. Do not share it with anyone."
-             )
-
-      assert view |> render() =~ "CargoBot888.data"
-    end
-
-    test "upload a cargo user", %{conn: conn} do
-      %{view: view, socket: %{assigns: %{me: admin}}} = prepare_view(%{conn: conn})
-
-      view
-      |> element(".navbar button", "Admin")
-      |> render_click()
-
-      assert view |> render() =~ "Cargo user"
-
-      content = File.read!("test/support/fixtures/import_keys/TestUser.data")
-
-      [identity_strings | _] = Jason.decode!(content)
-      test_user = Chat.Identity.from_strings(identity_strings)
-      test_user_hash = test_user.public_key |> Base.encode16(case: :lower)
-
-      cargo_user =
-        file_input(view, "#upload-cargo-user", :config, [
-          %{
-            last_modified: 1_594_171_879_000,
-            name: "TestUser.data",
-            content: content,
-            size: byte_size(content),
-            type: "text/plain"
-          }
-        ])
-
-      render_upload(cargo_user, "TestUser.data", 100)
-
-      assert view |> render() =~ "Test User"
-      assert view |> render() =~ "Download the Keys"
-
-      # the backup text and file messages are written by a background task
-      assert :ok = wait_until(fn -> backup_file_sent?(admin) end, "backup file", timeout: 5_000)
-      ChangeTracker.await()
-
-      view
-      |> element(".navbar button", "Chats")
-      |> render_click()
-
-      view
-      |> element("#user-#{test_user_hash}")
-      |> render_click()
-
-      assert has_vue_content?(
-               view |> render(),
-               "LinkedText",
-               "The backup `TestUser.data` is not encrypted. Do not share it with anyone."
-             )
-
-      assert view |> render() =~ "TestUser.data"
-    end
-  end
-
-  describe "cargo camera sensors form" do
-    test "validates camera urls", %{conn: conn} do
-      %{view: view} = prepare_view(%{conn: conn})
-
-      view
-      |> element(".navbar button", "Admin")
-      |> render_click()
-
-      refute view |> render() =~ "Cargo camera sensors"
-
-      view
-      |> form("#cargo_user_form", %{"user" => %{"name" => "CargoBot"}})
-      |> render_submit()
-
-      assert view |> render() =~ "Cargo camera sensors"
-
-      view
-      |> element(".camera-sensor-input-form")
-      |> render_change(%{"_target" => ["0"], "0" => "hello"})
-
-      assert view |> render() =~ "Please remove invalid sensors."
-
-      view |> element(".camera-sensor-input-form .camera-sensor button") |> render_click()
-
-      refute view |> render() =~ "Please remove invalid sensors."
-    end
-  end
-
   describe "media settings form" do
     test "saves media settings to the admin DB", %{conn: conn} do
       %{view: view} = prepare_view(%{conn: conn})
 
-      html =
-        view
-        |> element(".navbar button", "Admin")
-        |> render_click()
+      html = open_admin_panel(view)
 
       assert html =~ "Media settings"
 
@@ -425,7 +131,7 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
     test "saves backup settings to the admin DB", %{conn: conn} do
       %{view: view} = prepare_view(%{conn: conn})
 
-      view |> element(".navbar button", "Admin") |> render_click()
+      open_admin_panel(view)
       assert view |> render() =~ "Firmware upgrade"
       assert view |> render() =~ "Upload"
 
@@ -449,19 +155,6 @@ defmodule ChatWeb.MainLive.Page.AdminPanelTest do
       send(view.pid, {:admin, :firmware_upgraded})
 
       assert view |> render() =~ "Firmware upgraded"
-    end
-  end
-
-  defp backup_file_sent?(admin) do
-    case AdminRoom.get_cargo_user() do
-      %Identity{} = cargo_user ->
-        cargo_user
-        |> Dialogs.open(Card.from_identity(admin))
-        |> Dialogs.read(admin)
-        |> Enum.any?(&(&1.type == :file))
-
-      _ ->
-        false
     end
   end
 end

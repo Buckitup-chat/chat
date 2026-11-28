@@ -16,7 +16,6 @@
 476 lib/chat_web/live/main_live/page/image_gallery.ex
 367 lib/chat_web/live/main_live/page/lobby.ex
 370 lib/chat_web/live/main_live/page/recover_key_share.ex
-783 lib/chat_web/live/main_live/page/room.ex
 629 lib/chat_web/live/proxy_live/page/dialog.ex
 601 lib/chat_web/live/proxy_live/page/lobby.ex
 798 lib/chat_web/live/proxy_live/page/room.ex
